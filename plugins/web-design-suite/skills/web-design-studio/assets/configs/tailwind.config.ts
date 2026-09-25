@@ -182,6 +182,7 @@ export default {
       raised: t('--bg-raised'),
       sunken: t('--bg-sunken'),
       inverse: t('--bg-inverse'),
+      scrim: t('--bg-scrim'),
 
       /* Interaction overlays — translucent, compose over any surface. */
       hover: t('--bg-hover'),

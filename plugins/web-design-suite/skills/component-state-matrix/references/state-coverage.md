@@ -63,21 +63,22 @@ State is a **real ARIA attribute where one exists**, `data-state` otherwise, and
 
 **Expressed:** `:focus-visible`, never `:focus`. `:focus` fires on mouse clicks too and produces rings nobody asked for, which is how teams end up with `outline: none` and an inaccessible product.
 
-**Token:** the pair, always together:
+**Token:** an outline for the ring, and a box-shadow only for the gap (the starter's reset.css does this for every element):
 
 ```css
 .thing:focus-visible {
-  outline: var(--stroke-focus) solid transparent;  /* forced-colors bridge */
-  box-shadow: var(--shadow-focus);
+  outline: var(--stroke-focus) solid var(--border-focus);
+  outline-offset: var(--stroke-focus);
+  box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas);   /* the gap, not the ring */
 }
 ```
 
-The transparent `outline` is not decoration. Windows High Contrast / forced-colors mode discards `box-shadow` entirely and repaints `outline` in the system highlight colour. Ship only the `box-shadow` and your focus ring vanishes for exactly the users who most need it.
+The ring is the `outline`, and that is not a style choice. Windows High Contrast / forced-colors mode discards `box-shadow` entirely and repaints `outline` in the system highlight colour. A component's own `box-shadow`, in a later layer, replaces a shadow ring but cannot touch an outline. Draw the ring as a shadow and it vanishes for exactly the users who most need it.
 
 **Must not:**
 - Be removed. Ever. `outline: none` without a replacement is the single most common accessibility defect in production CSS.
-- Be thinner than 2px or lower than 3:1 against *both* the component and the surface behind it (SC 1.4.11).
-- Be clipped. `overflow: hidden` on a parent eats a ring drawn outside the border box. This is why `--shadow-focus` draws its inner ring in `--bg-canvas` rather than relying on a gap.
+- Be lower than 3:1 against *both* the component and the surface behind it (SC 1.4.11, adjacent colours), or thinner than 2px (the 2px perimeter is 2.4.13, Level AAA, which this suite holds as a floor).
+- Be clipped. `overflow: hidden` on a parent eats a ring drawn outside the border box. Leave room around the element, or use a negative `outline-offset` inside a scroller. The gap is painted in `--bg-canvas` so the ring stays readable on any fill.
 
 **Failure signature when missing:** the focus-visible row looks like the default row. Tab through the real component and you cannot tell where you are. On a dark theme with a clipped ring you get the nastier variant — the ring is present in light, absent in dark, because the inner ring colour was resolved against the wrong canvas.
 
@@ -309,7 +310,7 @@ Whatever the archetype:
 |---|---|
 | the focus ring comes from a global `:where(:focus-visible)` rule in `base.css` | false positive — look at the cell, it will be fine |
 | the state is genuinely unimplemented | true positive — the cell will look like `default` |
-| the state is implemented in JS by swapping a class | true positive *and* a Law-8 problem — move it to `data-state` |
+| the state is implemented in JS by swapping a class | true positive, and against `web-design-studio/references/style-architecture.md` §8: state belongs in `data-state`, not a class |
 
 So: the flag tells you where to look. The cell tells you what is true. Never resolve a flag without looking at its cell.
 

@@ -89,12 +89,25 @@ SKIP_DIRS = {
 # Files where literal values are not merely allowed but required: this is the
 # one place a raw value is a design decision rather than a leak.
 TOKEN_FILE_PAT = re.compile(
-    # tokens.css, brand-tokens.css, deck-tokens.css, design.tokens.css,
-    # theme.css, dark-theme.css. A separator before "tokens" is required so
-    # that an ordinary file like "mytokens.css" is not waved through.
+    # tokens.css, brand-tokens.css, deck-tokens.css, design.tokens.css, any
+    # file in a tokens/ folder, theme.css, dark-theme.css — the file classes
+    # in assets/rules/design-rules.json. A separator before "tokens" and
+    # "theme" is required, so "mytokens.css" and "theming.css" are not waved
+    # through.
     r"(^|[/\\])([\w.-]*[-.])?tokens?\.(css|scss)$"
-    r"|(^|[/\\])[\w.-]*theme\.(css|scss)$"
+    r"|(^|[/\\])tokens[/\\][\w.-]+\.(css|scss)$"
+    r"|(^|[/\\])([\w.-]*[-.])?theme\.(css|scss)$"
 )
+
+# Nesting below the top-level rule (design-rules.json).
+MAX_NESTING = 2
+
+
+def pseudo_classes_only(selector: str) -> bool:
+    """`:hover`, `:is(a, b):focus` — every list item starts with a
+    pseudo-class (not `&`, and not a `::pseudo-element`)."""
+    parts = [p.strip() for p in selector.split(",")]
+    return all(p.startswith(":") and not p.startswith("::") for p in parts if p)
 
 # Generated files are audited against their source, not by hand.
 CONFIG_FILE_PAT = re.compile(
@@ -140,6 +153,7 @@ TYPE_PROPS = {"font-size", "line-height", "letter-spacing", "font-weight", "font
 MOTION_PROPS = {"transition", "transition-duration", "animation",
                 "animation-duration", "transition-timing-function",
                 "animation-timing-function"}
+MOTION_SHORTHANDS = {"transition", "animation"}
 RADIUS_PROPS = {"border-radius", "border-start-start-radius",
                 "border-start-end-radius", "border-end-start-radius",
                 "border-end-end-radius", "border-top-left-radius",
@@ -149,9 +163,10 @@ SHADOW_PROPS = {"box-shadow", "text-shadow"}
 
 # Tier-1 primitives that HAVE a Tier-2 role, so reading them from a component
 # is a Law 6 violation. Prefixes without a semantic equivalent (--radius-*,
-# --stroke-*, --z-*, --bp-*, --font-*, --measure-*, --width-*, --tap-min) are
-# deliberately absent: they are primitives with no role layer, and using them
-# directly is correct.
+# --stroke-*, --weight-*, --z-*, --bp-*, --font-*, --measure-*, --width-*,
+# --tap-min) are deliberately absent: they are primitives with no role layer,
+# and using them directly is correct. Weight is one: the hierarchy method sets
+# weight without changing size, which no --type-* shorthand can do.
 TIER1_WITH_ROLE = {
     "space-": "a proximity/inset role (--gap-related, --pad-card, --space-section)",
     "neutral-": "a color role (--bg-surface, --fg-muted, --border-default)",
@@ -162,7 +177,6 @@ TIER1_WITH_ROLE = {
     "info-": "a color role",
     "text-": "a type role (--type-body, --type-h2, --type-ui)",
     "leading-": "a type role (--type-*), which carries leading in its shorthand",
-    "weight-": "a type role (--type-*), which carries weight in its shorthand",
     "shadow-": "an elevation role (--elevation-card, --elevation-modal)",
 }
 # Softer: sometimes you genuinely need one half of a motion pair.
@@ -212,9 +226,24 @@ TW_OPACITY = re.compile(
     r"|placeholder|accent|caret|divide)-[a-z][\w-]*/\d+(?!\w)")
 TW_TIER1_VAR = re.compile(
     r"\(--(?:space-(?!section|subsection|block|fluid)|neutral-|accent-|success-|warning-"
-    r"|danger-|info-|text-|leading-|weight-|shadow-)[\w-]*\)")
+    r"|danger-|info-|text-|leading-|shadow-)[\w-]*\)")
 JSX_STYLE = re.compile(r"\bstyle\s*=\s*\{\{")
 CLASS_ATTR = re.compile(r"""(?:className|class)\s*=\s*(?:\{?\s*)?["'`]([^"'`]*)["'`]""")
+# Arbitrary VARIANTS select a state and carry no value; an image URL and a
+# pseudo-element's content string cannot be tokens. Every other arbitrary
+# value is off the scale, as the ESLint config also rules.
+TW_ARBITRARY_OK = re.compile(
+    r"^(?:data|aria|group|peer|has|not|in|supports|nth|nth-last)-\["
+    r"|^(?:bg|mask)-\[url\(|^content-\[['\"]")
+TW_ARBITRARY_PROPERTY = re.compile(r"(?<![-\w])\[-{0,2}[a-zA-Z][\w-]*:[^\]\s]+\]")
+TW_IMPORTANT_SUFFIX = re.compile(r"(?<![\w!\[:-])[a-z][\w:./\[\]()-]*[\w\])]!(?=\s|$)")
+# Class strings also arrive as arguments of the class helpers (the ESLint
+# config reads the same list), including cva/tv variant maps.
+CLASS_HELPER = re.compile(r"\b(?:cn|clsx|classNames|classnames|cva|tv|twMerge|twJoin|cx)\s*\(")
+JS_STRING = re.compile(r"""(['"`])((?:\\.|(?!\1)[^\\])*?)\1""", re.S)
+# styled-components / emotion templates: their bodies are CSS.
+CSS_IN_JS = re.compile(
+    r"\b(?:styled(?:\.[A-Za-z]\w*|\s*\([^()]*\))(?:\s*\.attrs\s*\([^()]*\))?|css)\s*`")
 
 # Templates
 STYLE_BLOCK = re.compile(r"<style\b[^>]*>(.*?)</style\s*>", re.I | re.S)
@@ -312,7 +341,9 @@ def strip_css_comments(text: str) -> tuple[str, dict[int, str]]:
                 i += 1
             i = min(i + 2, n)
             body = text[start:i]
-            comments[start_line] = comments.get(start_line, "") + body
+            # Keyed by the line the comment ENDS on: a pragma wrapped over two
+            # lines covers the declaration after it, not its own second line.
+            comments[line] = comments.get(line, "") + body
             for j in range(start, i):
                 if out[j] != "\n":
                     out[j] = " "
@@ -355,8 +386,10 @@ def scan_css(text: str) -> Iterator[CssDecl | tuple]:
 
     def rule_depth() -> int:
         # At-rules push an empty marker to keep the stack aligned with
-        # braces; they are not style-rule nesting and must not count.
-        return sum(1 for s in sel_stack if s)
+        # braces; they are not style-rule nesting and must not count. Nor
+        # does a rule of pseudo-classes alone (`:hover`, unlike `&:hover`):
+        # stylelint's max-nesting-depth ignores those too (design-rules.json).
+        return sum(1 for s in sel_stack if s and not pseudo_classes_only(s))
 
     while i < n:
         ch = text[i]
@@ -525,8 +558,20 @@ def owl_selector(selectors: tuple[str, ...]) -> bool:
     return any(re.search(r"\+\s*\*|\*\s*\+", s) for s in selectors)
 
 
+def generated_content(selectors: tuple[str, ...]) -> bool:
+    """`::before` / `::after` are the component's own generated content. Its
+    rule decides what the pseudo-element sits beside, so a margin there is
+    inner spacing, not a child claiming room outside itself."""
+    return bool(selectors) and all(
+        re.search(r"::(?:before|after|marker)\s*$", s.strip()) for s in selectors)
+
+
 def margin_is_alignment(value: str) -> bool:
-    return "auto" in value.lower()
+    """auto aligns, and 0 asserts no space at all: neither is a child claiming
+    room around itself. (`margin: 0 auto` is both.)"""
+    parts = value.lower().replace("!important", "").split()
+    return "auto" in parts or (bool(parts) and all(
+        re.fullmatch(r"[+-]?0*\.?0+(?:[a-z]+|%)?", p) for p in parts))
 
 
 CANCELLED_TOKEN = re.compile(
@@ -603,9 +648,11 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 sel, line, depth = ev[1], ev[2], ev[3]
                 if not first_rule_line:
                     first_rule_line = line
-                if depth > 2:
+                # depth counts the top-level rule as 1; nesting starts below it,
+                # as stylelint counts (design-rules.json: max_depth 2).
+                if depth - 1 > MAX_NESTING:
                     add(line, "L5", "nesting-depth", "error",
-                        f"Nesting depth {depth} exceeds the limit of 2.",
+                        f"Nesting depth {depth - 1} exceeds the limit of {MAX_NESTING}.",
                         "Native nesting desugars through :is(), which takes the "
                         "specificity of its most specific argument — past depth 2 "
                         "nobody can predict the resulting number. Flatten it.")
@@ -713,6 +760,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 and not margin_is_alignment(value)
                 and not margin_cancels_token(value)
                 and not owl_selector(d.selectors)
+                and not generated_content(d.selectors)
                 and "prose" not in " ".join(d.selectors).lower()):
             add(line, "L2", "child-margin", "error",
                 f"`{prop}` on a component. A child may not set its own outer margin.",
@@ -761,8 +809,9 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 # No unit, so the length check below never saw it.
                 add(line, "L1", "raw-weight", "error",
                     f"`font-weight: {value.strip()}` hardcodes a weight.",
-                    "Use a --type-* role, which carries the weight in its font "
-                    "shorthand, or --weight-* outside component code.")
+                    "Use --weight-regular / -medium / -semibold / -bold (weight "
+                    "has no Tier-2 role), or a --type-* role, which carries the "
+                    "weight in its font shorthand.")
             elif (has_raw_length(value)
                   and not RELATIONAL_UNIT.match(value.strip())
                   and not (has_raw_length(value) or "").lower().endswith("em")):
@@ -823,7 +872,11 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                             f"role, not grep for {ref} across the repo.")
                         break
                 else:
-                    if any(bare.startswith(p) for p in TIER1_MOTION) and prop in MOTION_PROPS:
+                    # Only a shorthand can take a --motion-* pair. A longhand
+                    # (animation-duration, transition-timing-function) must read
+                    # the primitive — view-transition pseudo-elements and
+                    # scroll-driven animations need exactly that.
+                    if any(bare.startswith(p) for p in TIER1_MOTION) and prop in MOTION_SHORTHANDS:
                         add(line, "L6", "tier1-motion", "warning",
                             f"Component code reads `{ref}` directly.",
                             "Prefer a --motion-* pair so duration and easing "
@@ -948,6 +1001,10 @@ def audit_js(path: Path, text: str) -> list[Finding]:
 
     _audit_jsx_styles(clean, line_of, add)
     _audit_class_lists(clean, line_of, add)
+    for f in _audit_css_in_js(path, clean, line_of):
+        tags = line_ignores.get(f.line, set()) | file_ignores
+        if not (f.law in tags or f.rule.upper() in tags or "ALL" in tags):
+            findings.append(f)
 
     # ---- Hardcoded colours in JS strings -----------------------------------
     for m in re.finditer(r"""["'`](#[0-9a-fA-F]{3,8})["'`]""", clean):
@@ -996,19 +1053,85 @@ def _audit_jsx_styles(clean: str, line_of, add) -> None:
                 "consumes it living in the component's stylesheet.")
 
 
+def _call_end(text: str, open_at: int) -> int:
+    """Index of the `)` closing the call opened at `open_at`, skipping strings."""
+    depth, k, n = 0, open_at, len(text)
+    while k < n:
+        c = text[k]
+        if c in "\"'`":
+            q, k = c, k + 1
+            while k < n and text[k] != q:
+                k += 2 if text[k] == "\\" else 1
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return k
+        k += 1
+    return n
+
+
+def _class_strings(clean: str) -> Iterator[tuple[str, int]]:
+    """(class string, position): `className="…"` values, and every string
+    literal inside a class-helper call, once each."""
+    seen: set[int] = set()
+    for sm in CLASS_ATTR.finditer(clean):
+        seen.add(sm.start(1))
+        yield sm.group(1), sm.start(1)
+    for hm in CLASS_HELPER.finditer(clean):
+        open_at = hm.end() - 1
+        for lm in JS_STRING.finditer(clean, open_at, _call_end(clean, open_at)):
+            if lm.start(2) not in seen:
+                seen.add(lm.start(2))
+                yield lm.group(2), lm.start(2)
+
+
+def _audit_css_in_js(path: Path, clean: str, line_of) -> list[Finding]:
+    """A styled-components or emotion template body is CSS: audit it as the
+    component's CSS, at the lines it sits on. An interpolation is a runtime
+    value, so it stands in as a var()."""
+    found: list[Finding] = []
+    for m in CSS_IN_JS.finditer(clean):
+        start = m.end()                      # just past the opening backtick
+        k, n, body = start, len(clean), []
+        while k < n and clean[k] != "`":
+            if clean.startswith("${", k):
+                end = match_braces(clean, k + 1)
+                body.append("var(--interpolated)" + "\n" * clean.count("\n", k, end))
+                k = end
+                continue
+            body.append(clean[k])
+            k += 2 if clean[k] == "\\" else 1
+        css = ("\n" * (line_of(start) - 1) + "@layer components { .css-in-js {"
+               + "".join(body) + "} }")
+        found.extend(audit_css(path, css))
+    return found
+
+
 def _audit_class_lists(clean: str, line_of, add) -> None:
     # ---- Tailwind arbitrary values / bang / space-x ------------------------
-    for sm in CLASS_ATTR.finditer(clean):
-        cls, at = sm.group(1), sm.start(1)
+    for cls, at in _class_strings(clean):
         for m in TW_ARBITRARY.finditer(cls):
             tok = m.group(0)
-            if re.match(r"^(grid-cols|grid-rows|aspect|content|mask|bg|supports|data|aria)-\[", tok):
+            if TW_ARBITRARY_OK.match(tok):
                 continue
             add(line_of(at), "L3", "tw-arbitrary", "error",
                 f"Tailwind arbitrary value `{tok}`.",
                 "The theme IS the token file, so an on-scale class already "
                 "exists for whatever this is. An arbitrary value re-opens the "
                 "unbounded value space the closed scale exists to shut.")
+        for m in TW_ARBITRARY_PROPERTY.finditer(cls):
+            add(line_of(at), "L1", "tw-arbitrary-property", "error",
+                f"`{m.group(0)}` puts a whole declaration in a class list.",
+                "No theme, stylesheet or audit that reads CSS can see it. If "
+                "Tailwind has no utility for the property, add an @utility in "
+                "theme.css or give it a rule in the component's own stylesheet.")
+        for m in TW_IMPORTANT_SUFFIX.finditer(cls):
+            add(line_of(at), "L5", "tw-important", "error",
+                f"`{m.group(0)}` forces !important (the v4 suffix).",
+                "!important inverts layer order and makes the next override "
+                "harder. Fix the layer or the variant instead.")
         for m in TW_SPACE_XY.finditer(cls):
             add(line_of(at), "L2", "tw-space-xy", "error",
                 f"`{m.group(0)}` spaces children with margins.",
@@ -1026,7 +1149,7 @@ def _audit_class_lists(clean: str, line_of, add) -> None:
                 "Tailwind generates a bare number for duration-, delay-, z-, "
                 "border-, ring- and offset- utilities whatever the theme says, "
                 "so the closed scale does not remove it. Use the role: "
-                "motion-hover, z-modal, border-default, focus-ring. A literal "
+                "motion-hover, z-modal, border-stroke, focus-ring. A literal "
                 "duration also skips the reduced-motion tokens.")
         for m in TW_OPACITY.finditer(cls):
             add(line_of(at), "L1", "tw-opacity-modifier", "error",

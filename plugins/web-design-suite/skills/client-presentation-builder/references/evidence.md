@@ -137,7 +137,7 @@ The one place in the deck where overclaiming can be disproved by a single user, 
 the wrong wording can create a legal exposure for your client that they did not know they
 were accepting.
 
-**Automated tools detect roughly a third of WCAG success criteria.** They cannot judge
+**Automated tools fully decide 7 of the 55 WCAG 2.2 A and AA success criteria, and part of 31 more** (`a11y-audit-runner/references/automation-coverage.md` §3). They cannot judge
 whether alt text is *accurate*, whether a heading order matches the *meaning*, whether a
 custom control is operable in a real screen reader, or whether an error message is
 *comprehensible*. A green axe run means "no machine-detectable failures", which is a real

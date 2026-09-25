@@ -1,6 +1,6 @@
 ---
 name: email-template-system
-description: Build HTML email that survives Outlook, Gmail and dark mode — by compiling the design system's tokens into inlined, table-based email rather than hand-writing hexes at midnight. Use for building an HTML email or email template, transactional email (receipts, password resets, alerts), marketing email, newsletter design, responsive email, email accessibility, converting a design system or brand to email, email testing, and any version of "the email looks broken in Outlook", "the spacing is wrong in Gmail", "it's unreadable in dark mode", "the button lost its rounded corners", "images aren't showing", or "Gmail clipped my email". Reach for it whenever anyone mentions email HTML, email templates, MJML, Klaviyo/Mailchimp/Postmark/SendGrid templates, preheader text, bulletproof buttons, VML, mso conditionals, ghost tables, litmus or email on acid testing, unsubscribe footers, or a plain-text alternative.
+description: Build HTML email that survives Outlook, Gmail and dark mode by compiling the design system's tokens into inlined, table-based markup. Use for templates, transactional mail, newsletters, and 'it looks broken in Outlook' or 'Gmail clipped my email'. HTML and code only. Not for email copywriting or ESP campaign setup.
 ---
 
 # Email Template System
@@ -175,9 +175,9 @@ Ranked by how often they are the actual cause. Full detail in `references/email-
 
 **3. GANGA.** The Gmail app signed in with a non-Google account does **not apply embedded `<style>` at all**, and blocks images by default. Same app, same icon, materially poorer renderer. Anything that lives only in the `<style>` block is absent for those readers — which is why the layout must be correct without it, and why fluid-hybrid beats media queries as the default.
 
-**4. Gmail's two size ceilings.** 102,400 bytes of HTML and it clips, hiding everything past the cut — the footer, the unsubscribe link, the tracking pixel — behind "View entire message." Separately, 16,384 bytes of `<style>` content and it discards the excess **wholesale**, so what vanishes is your media queries. Both reported on every build.
+**4. Gmail's two size ceilings.** 102,400 bytes of HTML and it clips, hiding everything past the cut — the footer, the unsubscribe link, the tracking pixel — behind "View entire message." Separately, 16,384 bytes of `<style>` content, counted across every `<style>` element. Each element that crosses the ceiling is removed **whole**, along with every element after it, so one block over the ceiling loses all of its CSS. Past the ceiling the build splits the retained CSS into several blocks in authoring order, so only the tail is lost: put what matters most first. Both ceilings are reported on every build.
 
-**5. Dark mode, which you do not control.** Three behaviours: respect (Apple Mail, Thunderbird), partial colour inversion (most Outlook, Gmail Android), full forced inversion (Gmail iOS, classic Outlook). You cannot opt out of forced inversion anywhere. Design light, avoid pure `#000`/`#fff` because inversion algorithms key on the extremes, add the `prefers-color-scheme` block because three clients honour it, then stop.
+**5. Dark mode, which you do not control.** Three behaviours: respect (Apple Mail, and the Outlook apps other than classic Windows for the media query), partial colour inversion (most Outlook, Gmail Android), full forced inversion (Gmail iOS, classic Outlook). You cannot opt out of forced inversion anywhere. Design light, avoid pure `#000`/`#fff` because inversion algorithms key on the extremes, add the `prefers-color-scheme` block because Apple Mail, Outlook for Mac, Outlook.com, the Outlook mobile apps and Samsung Email 6.1 honour it, then stop.
 
 ---
 
@@ -259,21 +259,9 @@ Every `error` traces to a row in `references/email-client-matrix.md`. Nothing is
 
 ---
 
-## The requests you will actually get, and the answer
+## The requests you will actually get
 
-| They say | What is happening | Do |
-|---|---|---|
-| "It looks broken in Outlook" | The Word engine. Almost always `max-width` with no ghost table, a `div` layout, or `margin`. | `email-client-matrix.md` §3, then rebuild the skeleton from `email-architecture.md` §1 |
-| "The text is huge in Outlook but only on my colleague's machine" | The 120-DPI bug at 125% display scaling. | the `<o:PixelsPerInch>` block — the compiler adds it |
-| "The button lost its rounded corners" | `border-radius` in the Word engine. | VML `roundrect`, `email-architecture.md` §6 |
-| "There's a gap under every image" | Images are not `display:block`; the baseline descender space is showing. | `display:block`, always |
-| "The two columns didn't stack on my phone" | A media query that got stripped — likely GANGA. | fluid-hybrid, `email-architecture.md` §7 |
-| "Gmail cut my email off" | 102,400 bytes. | `--minify`, drop base64 images, measure via Show original |
-| "My media queries just vanished" | The 16,384-byte `<style>` ceiling — Gmail discards the excess wholesale. | inline more; only queries and pseudo-classes need to stay |
-| "It's unreadable in dark mode" | Forced or partial inversion. | `email-client-matrix.md` §8 — and be honest about what cannot be fixed |
-| "Can we use our brand font?" | No, not as the design. | build on the websafe stack, layer `@font-face` as decoration |
-| "Can it have a carousel / accordion / countdown?" | Interactive email. Works in Apple Mail, nowhere that matters. | a static frame that links to a page |
-| "Just make it one big image" | Invisible with images blocked, and a spam signature. | `email-workflow.md` §6 |
+The common requests, and the answer to each, are in `references/email-workflow.md` §10.
 
 ---
 

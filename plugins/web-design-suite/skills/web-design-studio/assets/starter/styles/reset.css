@@ -331,6 +331,7 @@
      reason teams start deleting focus rings in the first place.
      ----------------------------------------------------------------------- */
 
+  /* @snippet focus-ring */
   :focus-visible {
     /* A TWO-ring indicator:
          ring 1  --stroke-focus  in --bg-canvas    (separation gap)
@@ -359,14 +360,17 @@
       box-shadow: none;
     }
   }
+  /* @end-snippet */
 
-  /* CAVEAT worth knowing before you copy this pattern: a box-shadow ring is
-     clipped by any ancestor with `overflow: hidden` (a card with a rounded
-     image header, a scroll container, a carousel). `outline` is NOT clipped.
+  /* CAVEAT worth knowing before you copy this pattern: both rings are drawn
+     OUTSIDE the border box, so an ancestor with `overflow: hidden` (a card
+     with a rounded image header, a scroll container, a carousel) clips them,
+     the outline exactly as much as the box-shadow (measured in Chromium).
      When a focusable element lives inside a clipping ancestor, the component
-     should swap to `outline: var(--stroke-focus) solid var(--border-focus);
-     outline-offset: var(--stroke-focus); box-shadow: none;` in its own file.
-     That is a component decision, so it lives in the component's home. */
+     should draw its ring inside the box instead:
+     `outline-offset: calc(var(--stroke-focus) * -1); box-shadow: none;` in
+     its own file. That is a component decision, so it lives in the
+     component's home. */
 
 
   /* -----------------------------------------------------------------------

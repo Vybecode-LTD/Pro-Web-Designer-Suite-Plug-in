@@ -58,10 +58,12 @@ VOID_TAGS = {
 # to use instead. Sourced from references/email-client-matrix.md §2.
 UNSUPPORTED_PROPS = {
     "display": {
-        "flex": ("Outlook Windows (Word engine), Outlook Mac, Samsung Mail, Thunderbird",
+        "flex": ("classic Outlook for Windows (Word engine) and the Gmail app with a non-Google "
+                 "account; Gmail also drops flex-direction everywhere",
                  "table cells, or an inline-block fluid-hybrid column"),
         "inline-flex": ("same as display:flex", "inline-block"),
-        "grid": ("Outlook Windows (Word engine), Thunderbird, Samsung Mail",
+        "grid": ("classic Outlook for Windows (Word engine) and the Gmail app with a non-Google "
+                 "account",
                  "table cells"),
         "inline-grid": ("same as display:grid", "table cells"),
     },
@@ -70,7 +72,7 @@ UNSUPPORTED_PROPS = {
     "float": (None, "the Word engine honours it inconsistently and never unsets it",
               "table cells, or align on the <td>"),
     "gap": (None, "no client in the matrix supports it",
-            "cell padding and spacer rows — see email-architecture.md §4"),
+            "cell padding and spacer rows — see email-architecture.md §3"),
     "row-gap": (None, "no client in the matrix supports it", "spacer rows"),
     "column-gap": (None, "no client in the matrix supports it", "a gutter cell"),
     "box-shadow": (None, "the Word engine ignores it; several clients flatten it",
@@ -495,7 +497,7 @@ class Linter:
                             "scales some values and not others. The result is 20% larger "
                             "text in a container that did not grow.",
                      fix="build with build_email.py, or paste the mso conditional from "
-                         "references/email-architecture.md §3")
+                         "references/email-architecture.md §2")
 
         # Use the same test check_css() uses to exempt the preheader's hiding
         # declarations (is_preheader): that one also accepts opacity:0 without
@@ -549,12 +551,15 @@ class Linter:
                          "use https://")
 
             if label and label.lower().strip(" .!:>»→»") in WEAK_LINK_TEXT:
-                # Error, not warning: WCAG 2.2 SC 2.4.4 (Link Purpose) is Level A, and
-                # this suite treats Level AA as the floor.
+                # An error by the suite's choice. SC 2.4.4 (Level A) lets the
+                # surrounding sentence explain a link; the rule for a link read out
+                # of context is 2.4.9 (Link Only), Level AAA. Email readers list
+                # links out of context all the time, so this skill holds 2.4.9.
                 self.add("error", "link-text", 'link text is "%s"' % label, node.line,
                          "A screen reader user can pull up a list of every link in the "
                          "message with no surrounding text. Six links all called 'Read "
-                         "more' is a list of six identical rows. SC 2.4.4, Level A.",
+                         "more' is a list of six identical rows. SC 2.4.9 (Link Only), "
+                         "Level AAA, which this skill holds as its floor for email.",
                          "say where it goes: 'Read the full breakdown'")
             if not label and not any(
                 d.tag == "img" for d in node.walk() if d.kind == "element"
@@ -579,9 +584,10 @@ class Linter:
             self.add(severity, "links", "no unsubscribe link found",
                      detail="Required by CAN-SPAM for commercial email and by GDPR/PECR "
                             "for consent-based sending; Gmail and Yahoo bulk-sender rules "
-                            "additionally expect one-click unsubscribe. A transactional "
-                            "receipt is exempt from the body link, but still needs "
-                            "List-Unsubscribe headers if the ESP sends it.",
+                            "additionally expect one-click unsubscribe on marketing mail. "
+                            "Transactional mail (receipts, password resets) is exempt from "
+                            "both the body link and the one-click headers (Google's sender "
+                            "FAQ: 'Transactional messages are excluded').",
                      fix="add an unsubscribe link, or pass --transactional if this really "
                          "is a receipt/password reset")
 
@@ -612,10 +618,13 @@ class Linter:
         )
         if style_bytes > GMAIL_STYLE_BYTES:
             self.add("error", "size",
-                     "<style> content is %s bytes; Gmail drops everything past %s"
-                     % (f"{style_bytes:,}", f"{GMAIL_STYLE_BYTES:,}"),
-                     detail="Gmail discards the excess wholesale rather than truncating "
-                            "mid-rule, so your media queries are the part that disappears.",
+                     "<style> content is %s bytes in total; Gmail removes every <style> "
+                     "element that crosses %s bytes, counting all of them together, and "
+                     "every element after it" % (f"{style_bytes:,}", f"{GMAIL_STYLE_BYTES:,}"),
+                     detail="One block over the ceiling loses ALL of its CSS, not just the "
+                            "end (hteumeuleu/email-bugs#90). Several smaller blocks, most "
+                            "important first, lose only the tail: build_email.py splits the "
+                            "retained CSS that way past the ceiling.",
                      fix="inline more of it; only media queries and pseudo-classes need "
                          "to stay")
 

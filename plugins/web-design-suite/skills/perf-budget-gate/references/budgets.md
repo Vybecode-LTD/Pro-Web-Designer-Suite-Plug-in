@@ -183,7 +183,7 @@ Four arguments for a separate line item:
 3. **Each origin is 450 ms before a single useful byte** on a 150 ms RTT connection. Origins are the unit, not kilobytes.
 4. **Aggregating it into "js" hides it.** If third-party weight is inside the JS budget, every third-party addition looks like an engineering failure, so engineering learns to raise the JS budget. Splitting the line means the conversation happens with the person who wanted the tag.
 
-The static gate budgets **origins and script count**, because that is what it can see in markup. The runtime gate measures **bytes and main-thread time by origin**, because that needs a browser. Set both:
+The static gate budgets **origins and script count**, because that is what it can see in markup. The runtime gate measures what only a browser can: **the blocking time on the main thread**, and the transfer size of the largest resources (`--resources N`, 10 by default). It does not split either by origin, so read the resource list for the third-party lines. Set both:
 
 ```jsonc
 "third_party": { "origins": 3, "scripts": 3 }   // static, perf_audit.py
@@ -221,6 +221,7 @@ The containment techniques — facades, `async` with a deferred bootstrap, movin
 
 Notes that matter:
 
+- **The file is JSONC.** `perf_audit.py` and `measure_vitals.mjs` both accept `//` and `/* */` comments and trailing commas. That lets the device, the network and the person who chose each number sit next to it. Any other tool that reads the file (jq, a dashboard) needs the comments stripped first.
 - **`measure: "gzip"`** budgets text on its gzip -6 size, computed by `perf_audit.py` with the stdlib, because raw bytes on disk are not what crosses the wire. Already-compressed binaries (images, woff2, video) are always counted raw. Brotli ships roughly 15–20% under gzip for text, so this **over-counts slightly on purpose** — an over-count is a conversation, an under-count is a regression nobody sees.
 - **`largest_asset` is not redundant with `bytes`.** A total can be met by a hundred small files or blown by one enormous one, and only the second is fixable in an afternoon. The per-asset ceiling is what turns "the page is too big" into "this file is too big".
 - **`growth` is percent-per-check against the committed baseline.** It is the check that catches the regression nobody meant to make. Absolute budgets tell you that you are over; growth tells you *which change* put you over.

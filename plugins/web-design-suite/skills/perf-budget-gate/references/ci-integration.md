@@ -53,20 +53,21 @@ Two things to get right:
 name: perf
 on: [pull_request]
 
+defaults:
+  run:
+    shell: bash            # one script for Linux, macOS and Windows runners
+
 jobs:
   gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
-      - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.12' }
 
-      - run: npm ci
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'   # the image already has one
-
+      - run: npm ci            # playwright, serve, wait-on: exact-pinned devDependencies
       - run: npm run build
 
       # Gate 1 — the design laws. Deterministic, one second.
@@ -85,21 +86,22 @@ jobs:
           exit ${STATIC:-0}
 
       # Gate 3 — the real numbers. Slow, noisy, gated with headroom.
-      - name: serve
-        run: npx --yes serve dist -l 8080 &
-      - name: wait for server
-        run: npx --yes wait-on http://127.0.0.1:8080 -t 30000
-      - name: measure vitals
+      - uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium   # the one Playwright was built for
+      - name: serve, wait, measure
         run: |
+          npx serve dist -l 8080 &
+          npx wait-on http://127.0.0.1:8080 -t 30000
           node scripts/measure_vitals.mjs http://127.0.0.1:8080/ \
             --runs 7 --throttle slow4g \
             --budget perf-budget.ci.json \
-            --json > perf-runtime.json
-          node scripts/measure_vitals.mjs http://127.0.0.1:8080/ \
-            --runs 0 --quiet || true
+            --report perf-runtime.json
 
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: perf-reports
           path: |
@@ -110,7 +112,10 @@ jobs:
 Notes, in order of how often they bite:
 
 - **`if: always()` on the upload.** A report you can only download when the job passed is a report you can never use.
-- **`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`.** `measure_vitals.mjs` launches with an explicit `executablePath` and will never download. Set the env var anyway so `npm ci` does not pull 150 MB on every run.
+- **The browser comes from the lockfile.** `npx playwright install chromium` installs the Chromium that the locked Playwright was built for, and `measure_vitals.mjs` tries it first. The runner image's own Chrome changes with each image release, and two Chromium versions do not schedule identically (§4). The cache keeps the ~150 MB download to one per lockfile change. Nothing else is fetched at run time: `playwright`, `serve` and `wait-on` are exact-pinned devDependencies (`npm i -D -E playwright serve wait-on`).
+- **Serve, wait and measure in one step.** A process backgrounded in an earlier step may not outlive it on every runner, and without `wait-on` the first run races the server.
+- **`--report` writes the JSON and still prints the report.** The log names the breach and its fix, and the artifact keeps the numbers.
+- **`shell: bash` under `defaults`.** The steps use `\` continuations, `|| STATIC=$?` and `&`. A Windows runner's default shell is PowerShell, which reads none of them.
 - **A separate `perf-budget.ci.json` for the runtime gate.** Same schema, looser `lab` numbers. §4 explains why that is honesty rather than cheating.
 - **Serve the build over HTTP.** `file://` has no network stack: TTFB is ~0, resource priorities do not apply, and throttling barely bites. Every number flatters you.
 
@@ -124,7 +129,7 @@ Each item below removes one class of false failure. Skipping any one of them wil
 |---|---|---|
 | A single run is a rumour | `--runs 5` minimum, 7 if you can afford it; the **median** is reported | built in |
 | Cold vs warm cache | Fresh context per run; `--warm` is a separate, deliberate measurement | built in |
-| Browser version drift | **Pin it.** Chromium 140 and 141 do not schedule identically. Pin the Playwright version in `package-lock.json` and the binary in the image. | yours |
+| Browser version drift | **Pin it.** Chromium 140 and 141 do not schedule identically. Pin the Playwright version in `package-lock.json` (`npm i -D -E`) and install its own Chromium in CI (§3). | yours |
 | CPU contention on the runner | 4× CPU throttling via CDP makes the *relative* cost stable, not the absolute | `--throttle` |
 | Network variance | CDP network emulation, so the numbers do not depend on the runner's uplink | `--throttle` |
 | Timezone / locale drift | `locale: 'en-US'`, `timezoneId: 'UTC'` on the context | built in |
@@ -199,8 +204,25 @@ node -e '
   for (const [k, v] of Object.entries(led)) console.log(`| ${k} | ${(v/1000).toFixed(1)} KB |`);
   if (rows.length) console.log(`\n| | rule | what |\n|---|---|---|\n${rows.join("\n")}`);
 ' > comment.md
-gh pr comment "$PR" --body-file comment.md
 ```
+
+Post it from the workflow. The job needs the PR number, a token, and permission to write to pull requests:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write       # gh pr comment needs it; the default token may be read-only
+
+# in the job's steps, after the comment is written:
+      - name: comment on the PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR" --body-file comment.md
+```
+
+A pull request from a fork gets a read-only token whatever `permissions` says, so the step fails there. Skip it with `if: github.event.pull_request.head.repo.full_name == github.repository`, or post from a separate `workflow_run` workflow.
 
 **3. Include the fix text.** `perf_audit.py`'s `fix` field explains the mechanism, not just the rule — that is deliberate, because a developer who understands *why* a lazy LCP image costs a second fixes it once and never writes it again. Do not strip it with `--quiet` in the report that humans read; `--quiet` is for machine consumption.
 

@@ -10,19 +10,20 @@
  *
  * The honest coverage statement, up front
  * ---------------------------------------
- * Automated tools catch roughly a third of WCAG issues. In the only controlled
+ * Automated tools find well under half of the barriers. In the only controlled
  * study with a known denominator — GDS, 2017, a page with 143 deliberately
  * planted failures across 19 categories, ten tools run against it — the best
  * single tool found 37-41%, and 29% of the barriers were found by no tool at
  * all. Deque's widely-quoted 57% is measured differently (by VOLUME of issues
- * across 13,000 real pages, using a suite that includes human-answered guided
- * tests), and both numbers are consistent with the same conclusion:
+ * across 13,000 real pages, fully automated). By criterion, a tool fully
+ * decides 7 of the 55 WCAG 2.2 A and AA criteria and part of 31 more
+ * (references/automation-coverage.md §3). All of it points one way:
  *
  *   A clean run here means the machine-checkable subset passes.
  *   It is never, in any report, to any client, "the page is accessible".
  *
- * The value is that the third a machine CAN catch is caught on every commit
- * for free, so the human hours go to the two thirds that need judgement.
+ * The value is that the part a machine CAN catch is caught on every commit
+ * for free, so the human hours go to the rest, which needs judgement.
  * references/manual-protocol.md is that human pass, and it is not optional.
  *
  * What it runs
@@ -38,7 +39,8 @@
  *   contrast   text contrast from computed styles, including the overlay case
  *              that static analysis gets wrong
  *   keys       keyboard traversal against an expected key map from a config file
- *   reflow     200% and 400% zoom (1.4.4, 1.4.10)
+ *   reflow     400% zoom, a 320px viewport (1.4.10); horizontal scroll at 200%
+ *              is a warning, since it does not fail 1.4.4
  *
  * Usage
  * -----
@@ -76,6 +78,8 @@
  *                         first that starts of /opt/pw-browsers/chromium,
  *                         Playwright's own Chromium, Chrome or Edge)
  *   --json                machine-readable output
+ *   --report FILE         also write the --json output to FILE; the text report
+ *                         still prints, so a CI log has something a person reads
  *   --quiet
  *
  * The browser is NEVER downloaded, and axe is NEVER fetched from a CDN. Both
@@ -84,8 +88,11 @@
  * a gate that depends on a third-party CDN is a gate that goes red when that
  * CDN does, which teaches the same lesson faster.
  *
- *   npm install axe-core
- *   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D playwright
+ *   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D -E playwright axe-core
+ *
+ * That uses the Chrome you have. In CI, pin the browser instead: install the
+ * Chromium the locked Playwright was built for (npx playwright install
+ * chromium), which this script tries first. See SKILL.md, CI wiring.
  *
  * Exit codes
  * ----------
@@ -107,7 +114,7 @@ const ALL_CHECKS = ['axe', 'names', 'taborder', 'focus', 'forced', 'contrast',
                     'keys', 'reflow'];
 
 const COVERAGE_NOTE =
-  'Automated testing catches roughly a third of WCAG issues (GDS 2017: the ' +
+  'Automated testing finds well under half of the barriers (GDS 2017: the ' +
   'best single tool found 37-41% of 143 planted failures; 29% were found by ' +
   'no tool at all). A clean run is a floor, not a result. Report it as "the ' +
   'automated checks pass", never as "accessible", and run ' +
@@ -134,7 +141,7 @@ function parseArgs(argv) {
     dpr: 1,
     axe: null,
     browser: process.env.A11Y_CHROMIUM || '',
-    json: false, quiet: false,
+    json: false, quiet: false, report: null,
   };
   const need = (i, flag) => {
     if (i + 1 >= argv.length) die(`${flag} needs a value`);
@@ -170,6 +177,7 @@ function parseArgs(argv) {
       case '--axe': opts.axe = need(i, a); i++; break;
       case '--browser': opts.browser = need(i, a); i++; break;
       case '--json': opts.json = true; break;
+      case '--report': opts.report = need(i, a); i++; break;
       case '--quiet': opts.quiet = true; break;
       case '--viewport': {
         const v = need(i, a); i++;
@@ -329,7 +337,7 @@ function resolveAxe(explicit) {
   }
   die(
     'cannot find axe-core on disk.\n' +
-    '      npm install axe-core\n' +
+    '      npm i -D axe-core\n' +
     '  in the project under test or in this skill\'s scripts/ directory, or\n' +
     '  pass --axe /path/to/axe.min.js.\n' +
     '  This tool deliberately does NOT load axe from a CDN: a CI gate that\n' +
@@ -1632,7 +1640,7 @@ async function checkReflow(page, opts) {
   // 1280x1024 at 400% zoom is equivalent to a 320 CSS px viewport, which is
   // how 1.4.10 is actually specified and tested.
   const steps = [
-    { label: '200% zoom (1.4.4)', width: 640, height: 512, sc: '1.4.4' },
+    { label: '200% zoom', width: 640, height: 512, sc: '1.4.4' },
     { label: '400% zoom / 320px reflow (1.4.10)', width: 320, height: 256, sc: '1.4.10' },
   ];
   for (const s of steps) {
@@ -1656,7 +1664,22 @@ async function checkReflow(page, opts) {
         overflowing: over.slice(0, 6),
       };
     });
-    if (res.scrollWidth > res.innerWidth + 2) {
+    if (res.scrollWidth > res.innerWidth + 2 && s.sc === '1.4.4') {
+      // 1.4.4 asks that text resize to 200% without loss of content or
+      // function; scrolling sideways at 200% does not fail it. Worth knowing,
+      // since it is usually the 1.4.10 failure arriving early.
+      out.push(finding(
+        'reflow', 'horizontal-scroll-at-200-percent', '-', 'warning',
+        `At ${s.label} the document scrolls horizontally: content is ` +
+        `${res.scrollWidth}px wide in a ${res.innerWidth}px viewport` +
+        (res.overflowing.length
+          ? `. Widest: ${res.overflowing.map((o) => `${o.sel} (${o.width}px)`).join(', ')}`
+          : '') + '.',
+        'Not a WCAG failure at 200%. Check by eye that no text is clipped or ' +
+        'overlapping, which is what 1.4.4 asks, and fix the widest element ' +
+        'before it fails 1.4.10 at 400%.',
+        {}));
+    } else if (res.scrollWidth > res.innerWidth + 2) {
       out.push(finding(
         'reflow', 'two-dimensional-scrolling', s.sc, 'error',
         `At ${s.label} the document scrolls horizontally: content is ` +
@@ -1698,7 +1721,8 @@ const BUDGET_KEYS = {
   forced_colors_lost: (f) => f.filter((x) => x.check === 'forced').length,
   contrast_failures: (f) => f.filter((x) => x.check === 'contrast' &&
     x.severity === 'error').length,
-  reflow_failures: (f) => f.filter((x) => x.check === 'reflow').length,
+  reflow_failures: (f) => f.filter((x) => x.check === 'reflow' &&
+    x.severity === 'error').length,
   keymap_failures: (f) => f.filter((x) => x.check === 'keys' &&
     x.severity === 'error').length,
 };
@@ -2200,6 +2224,10 @@ async function main() {
     ringStats,
   };
 
+  if (opts.report) {
+    fs.mkdirSync(path.dirname(path.resolve(opts.report)), { recursive: true });
+    fs.writeFileSync(opts.report, JSON.stringify(out, null, 2) + '\n');
+  }
   process.stdout.write(opts.json
     ? JSON.stringify(out, null, 2) + '\n'
     : textReport(out, opts));

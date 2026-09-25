@@ -840,7 +840,7 @@ import styles from './StateBlock.module.css';
 
 export type StateBlockProps = {
   /** Drives the tone and the icon slot. These are DIFFERENT screens, not one
-   *  screen with different words — see screen-patterns.md section 10. */
+   *  screen with different words — see screen-patterns.md section 12. */
   kind: 'first-run' | 'filtered' | 'error' | 'forbidden' | 'stale';
   headline: string;
   body?: string;
@@ -1688,7 +1688,7 @@ $related
         </Button>
         {/* TODO(copy): a delete confirmation must name the record and state
             what else disappears with it. "Are you sure?" is not that. See
-            screen-patterns.md section 6. */}
+            screen-patterns.md section 8. */}
       </aside>
     </article>
   );
@@ -1932,7 +1932,7 @@ const fieldId = (name: string) => '$camel-' + name;
  *
  * Still yours to do: the unsaved-changes guard (block the route change while
  * `dirty`), and autosave if this form is long enough to deserve it. See
- * screen-patterns.md section 11.
+ * screen-patterns.md section 13.
  */
 export function ${Entity}Form({
   values,

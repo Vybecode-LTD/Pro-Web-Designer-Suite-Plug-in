@@ -264,7 +264,7 @@ It happens: a client with no budget, a frozen project, an agency contract that e
 |---|---|---|
 | **Remove anyway; they stay pinned on 2.x** | The default, and usually correct | They get no fixes, including security and accessibility ones. Say this to them in writing, once. |
 | **Keep the shim one more major** | The consumer is large, the shim is three lines, the cost is cosmetic | Every extension teaches everyone that removal dates are soft. Do it at most once, and say it is the last one. |
-| **Maintain a 2.x branch** | Contractual obligation, or a live product you are paid to support | Two branches means every fix is decided twice. §5 of `rollout.md` argues you should almost never do this. |
+| **Maintain a 2.x branch** | Contractual obligation, or a live product you are paid to support | Two branches means every fix is decided twice. §7 of `rollout.md` argues you should almost never do this. |
 | **Do the migration for them** | A client project you have commit access to | An afternoon, once, and it ends the problem permanently. For an agency this is nearly always the cheapest row in the table. |
 
 **The one thing that is never right** is delaying the removal indefinitely without saying so. The shim stays, the marker stays, and the next deprecation you announce is believed by nobody — including you.

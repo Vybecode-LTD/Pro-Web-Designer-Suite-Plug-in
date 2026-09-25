@@ -2,10 +2,10 @@
    LAYOUT PRIMITIVES
    =========================================================================
 
-   Eleven primitives and one page shell. Every layout in the product is a
-   composition of these. If you are about to write `display: grid` inside a
-   component file, stop: either one of these covers it, or you have found a
-   twelfth primitive and it belongs in THIS file (Law 4 — one home per
+   Twelve primitives, two flow containers (.flow, .prose) and one page shell.
+   Every layout in the product is a composition of these. If you are about
+   to write `display: grid` inside a component file, stop: either one of
+   these covers it, or you have found a thirteenth primitive and it belongs in THIS file (Law 4 — one home per
    component's styles; the layout primitives' home is here).
 
    HOW EACH PRIMITIVE IS CONFIGURED
@@ -66,6 +66,7 @@
     grid-template-rows: auto 1fr auto;  /* header · main · footer            */
   }
 
+  /* @snippet skip-link */
   /* Skip link. Present in the DOM, off-screen until focused. Never
      `display: none` — that removes it from the tab order, which is the one
      thing it exists for. */
@@ -84,6 +85,7 @@
     transition: translate var(--motion-enter);
   }
   .skip-link:focus-visible { translate: 0 0; }
+  /* @end-snippet */
 
   /* Anchor targets must not land under a sticky header. */
   :where(.page-shell) :target {
@@ -117,6 +119,7 @@
      column-gap MUST stay 0 — the tracks already encode the spacing. row-gap
      is where section rhythm lives (see §0.2).
      ----------------------------------------------------------------------- */
+  /* @snippet page-grid */
   .page-grid {
     --page-gutter:  var(--gutter-page);
     --page-content: var(--width-content);
@@ -136,6 +139,7 @@
   .page-grid > * { grid-column: content; }
   .page-grid > .bleed-wide { grid-column: wide; }
   .page-grid > .bleed-full { grid-column: full; }
+  /* @end-snippet */
 
   /* A full-bleed BACKGROUND with content still in the column: make the
      bleeding element a .page-grid itself and put the content back in place.
@@ -175,6 +179,7 @@
      In band mode a section with no background still gets `.band`. A
      transparent band keeps the rhythm uniform and keeps the rule one rule.
      ----------------------------------------------------------------------- */
+  /* @snippet sections */
   .sections {
     --sections-gap: var(--space-section);
     row-gap: var(--sections-gap);
@@ -188,6 +193,8 @@
   .band--tight { --band-pad-block: var(--space-block); }
   .band--loose { --band-pad-block: var(--space-section); }
   .band--flush { --band-pad-block: var(--space-0); }   /* edge-to-edge media */
+  .band--sunken { background: var(--bg-sunken); }     /* paint lives here, not in style="" */
+  /* @end-snippet */
 
   /* Subsection rhythm inside one section. Same ownership rule, one tier down. */
   .subsections {
@@ -244,29 +251,105 @@
      c) The children are produced by a CMS/MDX renderer you do not control,
         so you cannot guarantee they are element children (see a).
 
-     Block-level `gap` is specified and shipping, but is not yet baseline
-     across the browsers this starter supports. Until it is, prose uses .flow.
+     `gap` applies only to flex, grid and multi-column containers; a plain
+     block container has none. So prose uses .flow.
 
      LAW 2 IS INTACT HERE: the margin is written in the PARENT's rule
      (`.flow > * + *`). Ownership is about which rule makes the decision, not
      which box carries the pixels. A child's OWN stylesheet still never sets
      an outer margin.
+
+     ONE RHYTHM, ONE PLACE: `.prose` (1.2, below) is the long-form container —
+     measure and leading — and it takes its sibling rhythm from here, so the
+     two can never drift apart.
      ----------------------------------------------------------------------- */
-  .flow {
+  /* @snippet flow */
+  :is(.flow, .prose) {
     --flow-gap: var(--space-block);
   }
-  .flow > * + * { margin-block-start: var(--flow-gap); }
+  :is(.flow, .prose) > * + * { margin-block-start: var(--flow-gap); }
 
-  /* Per-pair overrides: a heading belongs to the thing it introduces, so it
-     sits close to it and far from what came before. This is Gestalt
-     proximity doing the work that a horizontal rule would otherwise do. */
-  .flow > :is(h2, h3, h4) { margin-block-start: var(--space-subsection); }
-  .flow > :is(h2, h3, h4) + * { margin-block-start: var(--gap-related); }
-  .flow > :is(ul, ol, figure, pre, blockquote) + * { margin-block-start: var(--space-block); }
-  .flow > :first-child { margin-block-start: var(--space-0); }
+  /* A heading belongs to the thing it introduces: far from what came before,
+     scaled to its rank, and close to what follows. Proximity does the work a
+     horizontal rule would otherwise do. Above to below is at least 2:1 at
+     every width: h2 40→88 : 12, h3 40 : 12, h4 24 : 12. */
+  :is(.flow, .prose) > * + h2 { margin-block-start: var(--space-subsection); }
+  :is(.flow, .prose) > * + h3 { margin-block-start: var(--gap-distinct); }
+  :is(.flow, .prose) > * + :is(h4, h5, h6) { margin-block-start: var(--gap-separate); }
+
+  /* Written after the heading rules, at equal specificity, so a heading that
+     follows a heading takes this tight gap too: two stacked headings are a
+     title and its subtitle, not two sections. */
+  :is(.flow, .prose) > :is(h1, h2, h3, h4, h5, h6) + * {
+    margin-block-start: var(--gap-related);
+  }
+
+  /* An <hr> means "the subject changes": subsection weight on both sides. */
+  :is(.flow, .prose) > * + hr,
+  :is(.flow, .prose) > hr + * { margin-block-start: var(--space-subsection); }
+  /* @end-snippet */
 
   .flow--tight { --flow-gap: var(--gap-related); }
   .flow--loose { --flow-gap: var(--space-subsection); }
+
+
+  /* -----------------------------------------------------------------------
+     1.2 PROSE — the long-form container, and .flow's other user
+     -----------------------------------------------------------------------
+     THE LAW-2 EXCEPTION, stated precisely.
+
+     Law 2: children never set their own outer margin; siblings are spaced by
+     the PARENT's `gap`, or by an owl selector declared on the parent.
+     `.prose` and `.flow` are the second clause, and they share one rhythm,
+     written once, in 1.1 above.
+
+     Why an owl and not `gap`:
+       - `gap` requires flex or grid. Flow layout is what prose needs: floated
+         pull-quotes, `display: contents` wrappers emitted by CMSs, and
+         multi-column all stop working under a flex parent.
+       - `gap` is ONE value. Prose rhythm is not one value: the space above an
+         <h2> must differ from the space between two paragraphs, or the
+         document has no visible structure. An owl can vary by element type;
+         `gap` cannot.
+
+     Why this does not break Law 2 in spirit: the DECLARATION lands on the
+     child, but the RULE is owned entirely by the parent's stylesheet. Nothing
+     a component ships travels with it. Drop a <Card> inside `.prose` and it
+     is spaced by `.prose`; drop the same Card in a flex row and it is spaced
+     by `gap`. The component never knows or cares — which is the outcome Law 2
+     exists to produce.
+
+     Two hard constraints keep the exception from spreading:
+       1. Direct child combinator ONLY (`>`). The owl must never reach inside
+          a component and space its internals.
+       2. Two classes do this, `.prose` and `.flow`, and the rhythm is
+          written once, in 1.1. A third context that "needs" an owl is
+          a layout: give it a `gap`.
+     ----------------------------------------------------------------------- */
+
+  .prose {
+    max-inline-size: var(--measure-prose);  /* 68ch — line length IS a
+                                               readability decision */
+    color: var(--fg-default);
+    /* Long-form wants more leading than UI body copy does. --type-body
+       carries --leading-normal (1.6); prose overrides the leading axis only,
+       after the shorthand set by <body>. */
+    line-height: var(--leading-relaxed);
+  }
+
+  /* Its sibling rhythm (the owl, and the space around headings and <hr>)
+     is .flow's, in 1.1: one rhythm, one place. */
+
+  /* Items in one list are one group; they get the related-items step, not
+     the between-blocks step. */
+  .prose li + li {
+    margin-block-start: var(--gap-tight);
+  }
+
+  /* A nested list is still part of its parent item. */
+  .prose li > :is(ul, ol) {
+    margin-block-start: var(--gap-tight);
+  }
 
 
   /* =======================================================================
@@ -567,12 +650,14 @@
      tracks, so title/body/footer align across the row no matter the content.
 
      Contract: the card must contain exactly --card-rows top-level children
-     (default 3: header, body, footer) and set no gap of its own — the parent
-     grid's row-gap becomes the card's internal gap, which is usually what you
-     want and occasionally is not. If it is not, do not fight it; use
-     .stack--fill inside a normal grid and accept the misalignment, or wrap.
+     (default 3: header, body, footer). It takes the parent grid's row-gap as
+     its internal gap unless it sets a row-gap of its own, which a subgrid may
+     do. If the shared alignment itself is not what you want, do not fight
+     it; use .stack--fill inside a normal grid and accept the misalignment, or
+     wrap.
 
-     Support: all current evergreen browsers. The @supports guard keeps the
+     Support: all current evergreen browsers (Chrome was last, with 117 in
+     September 2023). The @supports guard keeps the
      fallback (independent cards) for anything older, which degrades to
      "slightly uneven", never "broken".
      ---------------------------------------------------------------------- */
@@ -676,6 +761,7 @@
      promises. Adding the gutters back makes --width-content mean what it says.
      ======================================================================= */
 
+  /* @snippet center */
   .center {
     --center-max: var(--width-content);
     --center-gutter: var(--gutter-page);
@@ -690,6 +776,7 @@
   .center--form   { --center-max: var(--width-form); }
   .center--wide   { --center-max: var(--width-wide); }
   .center--flush  { --center-gutter: var(--space-0); }
+  /* @end-snippet */
 
   /* Centre children by their own intrinsic width rather than centring the
      box. Use for a short CTA stack under a heading — the text stays
@@ -758,7 +845,7 @@
      Modals, scrims, badge overlays, "pinned" hero cards. The only primitive
      that uses absolute positioning, and that is the point: absolute
      positioning is for OVERLAY, never for layout (see the anti-patterns in
-     references/layout-composition.md §11).
+     references/layout-composition.md §10).
 
      --imposter-margin keeps a long overlay off the viewport edges, and
      `overflow: auto` keeps it scrollable instead of clipped when its content
@@ -803,7 +890,9 @@
      1. An element CANNOT query ITSELF. You always need a wrapper. That is why
         .region exists as its own class rather than being folded into .card.
 
-     2. `container-type: inline-size` applies `contain: layout style inline-size`.
+     2. `container-type: inline-size` applies inline-size and style
+        containment, and makes the element a new formatting context. (It no
+        longer applies layout containment: the CSSWG dropped that in 2024.)
         The element's inline size is then computed WITHOUT looking at its
         contents, so it can no longer be sized BY its contents. Do not put it
         on a float, an inline-block meant to hug its text, or an item in an
@@ -815,11 +904,11 @@
         the right answer; use `size` only for something already fixed-height,
         like a full-screen panel.
 
-     4. `contain: layout` makes the container a containing block for absolutely
-        AND fixed-positioned descendants. A `position: fixed` modal rendered
-        inside a container will be positioned relative to that container, not
-        the viewport. Portal such things to the body, or do not containerise
-        the ancestor.
+     4. A container is a NEW FORMATTING CONTEXT. Margins stop collapsing
+        through it: a child's top margin stays inside the container instead of
+        pushing it down, so a parent and a child margin that used to merge now
+        add up. Floats inside it stay inside it. A `position: fixed` child is
+        placed against the viewport, as anywhere else.
 
      5. `contain: style` scopes CSS counters and quotes. An ordered list whose
         numbering is driven by counters will restart inside the container.
@@ -828,6 +917,7 @@
         has no effect on them.
      ======================================================================= */
 
+  /* @snippet media-object */
   .region {
     container-type: inline-size;
     container-name: region;
@@ -847,6 +937,7 @@
   @container region (inline-size >= 30rem) {   /* --bp-sm */
     .media-object { grid-template-columns: var(--media-object-rail) 1fr; }
   }
+  /* @end-snippet */
 
   /* Density is a dial (Law 7): a card in a narrow container compacts itself
      by re-pointing --density, not by rewriting a single padding rule. */

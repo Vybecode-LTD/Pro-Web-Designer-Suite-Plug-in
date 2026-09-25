@@ -30,12 +30,12 @@ what happens to what the eye sees?* Only OKLCH answers it honestly.
   `--accent-500` (L 0.645) and `--neutral-500` (L 0.580) read as related weights, and
   swapping a brand's hue never breaks the ramp's rhythm. That one property is why the
   ladder survives a rebrand.
-- **C (0 → ~0.37 in sRGB)** — chroma: colorfulness in absolute terms. Unlike HSL
+- **C (0 → ~0.322 in sRGB)** — chroma: colorfulness in absolute terms. Unlike HSL
   saturation it is *not* normalized per hue, which is the point — C 0.15 is the same
   colorfulness at hue 40 and hue 260. It is unbounded in principle, so a given (L, C, H)
   can simply not exist in sRGB; see gamut mapping below.
 - **H (0–360°)** — hue angle. Landmarks: **25** red, **40** ember, **70** amber,
-  **90** yellow, **145** green, **180** teal, **220** cyan-blue, **260** blue,
+  **110** yellow, **145** green, **180** teal, **220** cyan-blue, **260** blue,
   **295** violet, **330** magenta, **350** pink.
 
 Three rules follow immediately, and they are the whole reason we author here:
@@ -273,26 +273,49 @@ python -m scripts.generate_color_ramp 'oklch(58% 0.009 70)' --name neutral --neu
 ## 6. Semantic role mapping
 
 Tier 1 ramps are raw material. This table is the contract that turns them into a system.
-**Components read only the right-hand names.**
+**Components read only the left-hand names.** It is generated from the starter's `tokens.css` by
+`scripts/check_roles.py --table`, and a test keeps the two identical, so it cannot drift from the
+tokens again.
 
-| Tier-2 role | Light theme | Dark theme | Why |
+<!-- check_roles:table -->
+| Tier-2 role | Light | Dark | On the canvas, light / dark |
 |---|---|---|---|
-| `--bg-canvas` | `--neutral-50` | `--neutral-1000` | Never pure white in light: `#fff` canvas plus `#fff` cards leaves no room to separate them. |
-| `--bg-surface` | `--neutral-0` | `--neutral-950` | In light the card is *lighter* than canvas; in dark it is *lighter* too. See below. |
-| `--bg-raised` | `--neutral-0` + shadow | `--neutral-900` | Dark mode gains elevation by lightening, not by shadowing. |
-| `--bg-sunken` | `--neutral-100` | `--neutral-1000` | Wells, inputs, code blocks — recede by going *toward* the canvas extreme. |
-| `--bg-inverse` | `--neutral-900` | `--neutral-100` | Tooltips. A true flip. |
-| `--fg-default` | `--neutral-900` | `--neutral-100` | 17.4:1 light, 18.5:1 dark. |
-| `--fg-strong` | `--neutral-950` | `--neutral-50` | Headings only. |
-| `--fg-muted` | `--neutral-600` | `--neutral-400` | 6.35:1 light, 8.22:1 dark. Safe for body. |
-| `--fg-subtle` | `--neutral-500` | `--neutral-500` | **4.07:1 light — fails 4.5:1.** See the audit note below. |
-| `--fg-disabled` | `--neutral-400` | `--neutral-700` | Exempt from contrast minima (SC 1.4.3 excludes disabled controls) — but only if genuinely non-interactive. |
-| `--fg-accent` / `--fg-link` | `--accent-700` | `--accent-400` | Not the same step. Accent text must be *darker* than 500 on light and *lighter* on dark. |
-| `--border-subtle` | `--neutral-200` | `--neutral-900` | Dividers. Exempt from 3:1 (decorative). |
-| `--border-default` | `--neutral-300` | `--neutral-800` | Input outlines that convey the control's boundary need 3:1 against the adjacent surface. |
-| `--border-focus` | `--accent-600` | `--accent-400` | Must clear 3:1 against **both** the component and the background it sits on. |
-| `--bg-accent` | `--accent-500` | `--accent-500` | The fill. Its *foreground* is the thing that changes. |
-| `--fg-on-accent` | `--neutral-0` | `--neutral-1000` | See the second audit note. |
+| `--bg-canvas` | `--neutral-50` | `--neutral-1000` |  |
+| `--bg-surface` | `--neutral-0` | `--neutral-950` |  |
+| `--bg-raised` | `--neutral-0` | `--neutral-900` |  |
+| `--bg-sunken` | `--neutral-100` | `--neutral-1000` |  |
+| `--bg-inverse` | `--neutral-900` | `--neutral-100` |  |
+| `--fg-default` | `--neutral-900` | `--neutral-100` | 17.37:1 / 18.50:1 |
+| `--fg-strong` | `--neutral-950` | `--neutral-50` | 19.10:1 / 19.73:1 |
+| `--fg-muted` | `--neutral-600` | `--neutral-300` | 6.35:1 / 13.80:1 |
+| `--fg-subtle` | `--neutral-500` | `--neutral-400` | 4.91:1 / 8.22:1 |
+| `--fg-disabled` | `--neutral-400` | `--neutral-700` | 2.40:1 / 2.12:1 |
+| `--fg-accent` | `--accent-700` | `--accent-400` | 6.92:1 / 7.91:1 |
+| `--fg-link` | `--accent-700` | `--accent-400` | 6.92:1 / 7.91:1 |
+| `--fg-on-accent` | `--neutral-0` | `--neutral-1000` |  |
+| `--fg-on-inverse` | `--neutral-50` | `--neutral-900` |  |
+| `--border-subtle` | `--neutral-200` | `--neutral-900` | 1.20:1 / 1.14:1 |
+| `--border-default` | `--neutral-300` | `--neutral-800` | 1.43:1 / 1.42:1 |
+| `--border-strong` | `--neutral-500` | `--neutral-500` | 4.91:1 / 4.02:1 |
+| `--border-focus` | `--accent-600` | `--accent-600` | 4.67:1 / 4.23:1 |
+| `--bg-accent` | `--accent-600` | `--accent-500` |  |
+| `--bg-accent-hover` | `--accent-700` | `--accent-400` |  |
+| `--fg-danger` | `--danger-700` | `--danger-400` | 7.72:1 / 5.65:1 |
+| `--bg-danger` | `--danger-500` | `--danger-500` |  |
+<!-- /check_roles:table -->
+
+Why each role maps where it does:
+
+- `--bg-canvas` is never pure white in light: a `#fff` canvas under `#fff` cards leaves no room to separate them.
+- In light the card (`--bg-surface`) is *lighter* than the canvas; in dark it is lighter too. See below.
+- `--bg-raised`: dark mode gains elevation by lightening, not by shadowing.
+- `--bg-sunken`: wells, inputs and code blocks recede by going *toward* the canvas extreme.
+- `--bg-inverse` is a true flip, for tooltips and inverse bands.
+- `--fg-disabled` is exempt from contrast minima (SC 1.4.3 excludes disabled controls), but only if it is genuinely non-interactive.
+- `--fg-accent` and `--fg-link` are not the fill's step: accent text must be *darker* than 500 on light and *lighter* on dark.
+- `--border-subtle` and `--border-default` are dividers, decorative and exempt from 3:1. `--border-strong` marks a control's boundary, and clears 3:1 on every surface.
+- `--border-focus` must clear 3:1 against the surface it sits on; the canvas-coloured gap in the ring separates it from the component.
+- `--bg-accent` is the fill, and its foreground, `--fg-on-accent`, is the thing that changes between themes.
 
 ### Dark mode is not an inversion
 
@@ -317,23 +340,25 @@ reasons, each with a concrete consequence:
    `--fg-link`. Hence `--fg-accent` → 700 in light, 400 in dark: *the role is constant,
    the step is not.*
 
-### Two live audit findings in the starter tokens
+### The gate: `check_roles.py`
 
-Law 9 says nothing ships un-audited, including this document's own starting point. Run
-the generator against the starter values and two pairings fail:
+Run it on every change to `tokens.css`; the pre-commit hook does, once the script is vendored. It
+resolves each role per theme (light, dark, and `.inverse` in both) and checks the pairs components
+put together: every text role on every surface at 4.5:1, status text, labels on fills, text in an
+inverse band on its parent theme's `--bg-inverse`, and control borders and the focus ring at 3:1.
+The starter passes all of them. Two were fixed by hand before the tool existed, and they show what
+it is for:
 
-- **`--fg-subtle` (`--neutral-500`) on `--bg-canvas` = 4.07:1.** The token's comment
-  claims ≥ 4.5:1; it does not clear it. Placeholder text is real text under SC 1.4.3.
-  **Fix:** point `--fg-subtle` at `--neutral-600` (6.35:1), and reserve `--neutral-500`
-  for non-text UI at 3:1.
-- **`--fg-on-accent` (white) on `--bg-accent` (`--accent-500`) = 3.56:1.** Legal for
-  ≥ 24px text, illegal for a 14px button label — which is exactly what buttons are.
-  **Fix, in order of preference:** (a) fill buttons with `--accent-600`, where white
-  reaches 4.92:1; (b) use `--accent-950` as the on-accent foreground over `--accent-500`
-  (5.07:1); (c) restrict `--bg-accent` + white to large type only and document it.
+- **`--fg-subtle` is placeholder text**, which is real text under SC 1.4.3. On an evenly spaced
+  ramp it fails. The ramp's 500 sits at L 53.5% instead, which gives 4.91:1 (--neutral-500 on
+  --neutral-50) on the canvas and 4.60:1 (--neutral-500 on --neutral-100) on the sunken well, the
+  worst light surface it lands on.
+- **White on a mid-lightness accent fails at label size**: 3.56:1 (--neutral-0 on --accent-500).
+  The light `--bg-accent` is therefore `--accent-600`, where white measures 4.92:1 (--neutral-0 on
+  --accent-600). The dark theme keeps `--accent-500` and turns the label dark: 5.84:1
+  (--neutral-1000 on --accent-500).
 
-Both are ordinary outcomes of a mid-lightness accent. Catch them with the script, not in
-a VPAT.
+Both are ordinary outcomes of a mid-lightness palette. Catch them with the script, not in a VPAT.
 
 ---
 
@@ -367,9 +392,9 @@ the source of every complaint about WCAG 2.x, and also why it is auditable.
 | Ratio | SC | Applies to |
 |---|---|---|
 | **4.5:1** | 1.4.3 Contrast (Minimum), AA | All text and images of text below 24px regular / 19px bold. Includes placeholders, help text, captions, disabled-looking-but-actually-active controls, and text in images. |
-| **3:1** | 1.4.3, AA | Large text: ≥ 24px regular or ≥ 19px bold (18.66px/14px in CSS-pt terms). |
+| **3:1** | 1.4.3, AA | Large text: ≥ 18pt (24px) regular, or ≥ 14pt (18.66px) bold. Round the bold size up to 19px in practice. |
 | **3:1** | 1.4.11 Non-text Contrast, AA | (a) UI component boundaries required to identify the control — input borders, toggle tracks, checkbox outlines; (b) states that convey meaning — checked, selected, error; (c) graphics required to understand content — chart lines, icon-only buttons, required-field markers. Against *adjacent* colors. |
-| **3:1** | 2.4.13 Focus Appearance (AAA in 2.2; this skill holds it as a floor) | The focus indicator, against both the unfocused state and the adjacent background. 2.2 also requires the indicator be at least as large as a 2px-thick perimeter of the control, and not obscured by author content (2.4.11 Focus Not Obscured, the AA criterion). Our `--shadow-focus` satisfies the geometry with a 2px ring plus a 2px canvas-colored offset ring, which is what makes it visible on *any* surface. |
+| **3:1** | 2.4.13 Focus Appearance (AAA in 2.2; this skill holds it as a floor) | The focus indicator's own pixels, between the focused and unfocused states, over an area at least as large as a 2px-thick perimeter of the control. Contrast against the adjacent colours is 1.4.11's requirement, the row above. Not being hidden by author content is 2.4.11 Focus Not Obscured (Minimum), the AA criterion. The starter's ring (`reset.css` §7) meets the geometry with a 2px outline in `--border-focus`, offset 2px, plus a 2px `--bg-canvas` gap ring, which is what makes it visible on *any* surface. |
 | **7:1** | 1.4.6 Contrast (Enhanced), AAA | Body text, when the project targets AAA. |
 | **4.5:1** | 1.4.6, AAA | Large text under AAA. |
 | — | 1.4.3 exceptions | Pure decoration, inactive/disabled controls, logotypes. Do not stretch these; "it's decorative" is not a defense for a low-contrast icon that is the only affordance. |
@@ -383,7 +408,7 @@ python -m scripts.generate_color_ramp --check 'oklch(47.5% 0.009 75)' 'oklch(98.
 
 ### APCA, honestly
 
-APCA (the candidate algorithm for WCAG 3) models what WCAG 2.x ignores: polarity (dark
+APCA was proposed as WCAG 3's contrast method. The working group took it out of the WCAG 3 drafts in July 2023, and what replaces it is still undecided. It models what WCAG 2.x ignores: polarity (dark
 text on light is easier than the reverse at the same ratio), font size and weight, and
 spatial frequency. It yields an Lc value from about -108 to 106 — roughly Lc 75 for body
 text, 60 for medium, 45 for large headings, 30 as a non-text floor. It is better
@@ -430,9 +455,11 @@ Redundant encoding, in order of cost:
   must be ≥ 2 steps apart. Adjacent steps (600 vs 700) are a lightness whisper; they
   encode emphasis, never category.
 
-Status hues get special care: our `--success-500` (H 152) and `--danger-500` (H 25) are
-33 L-points apart *and* differ in luminance, so they survive deuteranopia as
-light-vs-dark even when both read as brown.
+Status hues get special care, and hue is not enough. Our `--success-500` (L 62%, H 152)
+and `--danger-500` (L 58%, H 25) are 4 L-points apart, 1.39:1 (--success-500 on
+--danger-500): under deuteranopia both read as a similar brown, and lightness does not
+separate them. So a status is never carried by colour alone (SC 1.4.1): every one pairs
+its colour with an icon and a word.
 
 ---
 
@@ -481,20 +508,26 @@ something; hover is just a finger hovering.
 Banding comes from three causes, and all three have fixes.
 
 ```css
-.hero {
+/* tokens.css, Tier 2: a brand gradient is a decision, so it is a role and
+   the ramp steps stay out of component code. */
+:root {
   /* 1. Interpolate in oklch, not sRGB. sRGB interpolation dips through a dead
         gray zone between distant hues; oklch keeps chroma up across the blend. */
   /* 2. Three or more stops. Two-stop gradients over a large area have no
         information to dither against. */
   /* 3. Keep the L delta modest across a huge field — a 0.6 L swing over 1200px
         is a lot of 8-bit steps to fake. */
-  background-image: linear-gradient(
+  --bg-hero: linear-gradient(
     in oklch to bottom right,
     var(--accent-700) 0%,
     var(--accent-600) 38%,
     var(--accent-500) 72%,
     var(--accent-400) 100%
   );
+}
+
+.hero {
+  background-image: var(--bg-hero);
   position: relative;
   isolation: isolate;
 }
@@ -505,6 +538,7 @@ Banding comes from three causes, and all three have fixes.
   content: "";
   position: absolute;
   inset: 0;
+  /* design-audit-ignore-next-line: L1 -- behind .hero's content, inside its own stacking context (isolation: isolate); not a page layer */
   z-index: -1;
   opacity: 0.03;                    /* 0.02-0.04. Above 0.05 it reads as dirt. */
   pointer-events: none;
@@ -512,7 +546,8 @@ Banding comes from three causes, and all three have fixes.
 }
 ```
 
-`in oklch` is supported wherever `oklch()` is. For hue-spanning gradients add
+`in oklch` shipped later than `oklch()` itself (Firefox 127 against 113, Safari 16.2
+against 15.4), and an engine without it draws the sRGB default. For hue-spanning gradients add
 `in oklch longer hue` or `shorter hue` explicitly — the default arc is rarely what you
 meant when the endpoints are more than 180° apart.
 

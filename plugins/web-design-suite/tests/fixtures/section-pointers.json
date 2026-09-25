@@ -1,0 +1,1802 @@
+[
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/automation-coverage.md",
+  "section": "1",
+  "heading": "The one-sentence version"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/automation-coverage.md",
+  "section": "3",
+  "heading": "The coverage table"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/automation-coverage.md",
+  "section": "4",
+  "heading": "False negatives: why a clean axe run is misleading"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/automation-coverage.md",
+  "section": "5",
+  "heading": "False positives: why teams disable rules"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/automation-coverage.md",
+  "section": "6",
+  "heading": "The coverage figure, with its sources"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/automation-coverage.md",
+  "section": "7",
+  "heading": "How to say it in a report"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/manual-protocol.md",
+  "section": "2",
+  "heading": "Keyboard-only walkthrough — 20 minutes"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/manual-protocol.md",
+  "section": "3",
+  "heading": "Screen reader smoke test — 30 minutes"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/manual-protocol.md",
+  "section": "4",
+  "heading": "Zoom, images off, styles off — 15 minutes"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/manual-protocol.md",
+  "section": "5",
+  "heading": "The cognitive-load pass — 10 minutes"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/manual-protocol.md",
+  "section": "6",
+  "heading": "Writing a finding so it gets fixed"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/manual-protocol.md",
+  "section": "7",
+  "heading": "The evidence trail: VPAT, ACR and the client report"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/manual-protocol.md",
+  "section": "8",
+  "heading": "Testing with actual disabled users"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "10",
+  "heading": "What a browser still cannot tell you"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "2",
+  "heading": "Accessible names and roles, computed"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "3",
+  "heading": "Tab order: trap, skip, jump"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "4",
+  "heading": "Focus visibility, measured in pixels"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "5",
+  "heading": "Forced colors"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "7",
+  "heading": "Contrast, with overlays composited"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "8",
+  "heading": "Driving the key map"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "9",
+  "heading": "Zoom and reflow"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "web-design-studio/references/color-system.md",
+  "section": "7",
+  "heading": "WCAG 2.2 contrast"
+ },
+ {
+  "from": "a11y-audit-runner/references/automation-coverage.md",
+  "to": "a11y-audit-runner/references/manual-protocol.md",
+  "section": "8",
+  "heading": "Testing with actual disabled users"
+ },
+ {
+  "from": "a11y-audit-runner/references/automation-coverage.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "7",
+  "heading": "Contrast, with overlays composited"
+ },
+ {
+  "from": "a11y-audit-runner/references/automation-coverage.md",
+  "to": "web-design-studio/references/accessibility.md",
+  "section": "1",
+  "heading": "The floor, stated concretely"
+ },
+ {
+  "from": "a11y-audit-runner/references/automation-coverage.md",
+  "to": "web-design-studio/references/accessibility.md",
+  "section": "6",
+  "heading": "Forms"
+ },
+ {
+  "from": "a11y-audit-runner/references/manual-protocol.md",
+  "to": "a11y-audit-runner/references/automation-coverage.md",
+  "section": "7",
+  "heading": "How to say it in a report"
+ },
+ {
+  "from": "a11y-audit-runner/references/manual-protocol.md",
+  "to": "web-design-studio/references/accessibility.md",
+  "section": "4",
+  "heading": "Keyboard"
+ },
+ {
+  "from": "a11y-audit-runner/references/runtime-checks.md",
+  "to": "a11y-audit-runner/references/automation-coverage.md",
+  "section": "4.3",
+  "heading": "A focus order that is valid and nonsensical"
+ },
+ {
+  "from": "a11y-audit-runner/references/runtime-checks.md",
+  "to": "a11y-audit-runner/references/manual-protocol.md",
+  "section": "8",
+  "heading": "Testing with actual disabled users"
+ },
+ {
+  "from": "a11y-audit-runner/references/runtime-checks.md",
+  "to": "web-design-studio/references/accessibility.md",
+  "section": "10",
+  "heading": "Testing procedure"
+ },
+ {
+  "from": "a11y-audit-runner/references/runtime-checks.md",
+  "to": "web-design-studio/references/accessibility.md",
+  "section": "4",
+  "heading": "Keyboard"
+ },
+ {
+  "from": "a11y-audit-runner/references/scripts.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "8",
+  "heading": "Driving the key map"
+ },
+ {
+  "from": "a11y-audit-runner/scripts/a11y_runtime.mjs",
+  "to": "a11y-audit-runner/references/automation-coverage.md",
+  "section": "3",
+  "heading": "The coverage table"
+ },
+ {
+  "from": "a11y-audit-runner/scripts/a11y_runtime.mjs",
+  "to": "a11y-audit-runner/references/manual-protocol.md",
+  "section": "2",
+  "heading": "Keyboard-only walkthrough — 20 minutes"
+ },
+ {
+  "from": "a11y-audit-runner/scripts/a11y_runtime.mjs",
+  "to": "web-design-studio/references/accessibility.md",
+  "section": "4",
+  "heading": "Keyboard"
+ },
+ {
+  "from": "a11y-audit-runner/scripts/a11y_static.py",
+  "to": "web-design-studio/references/accessibility.md",
+  "section": "1",
+  "heading": "The floor, stated concretely"
+ },
+ {
+  "from": "a11y-audit-runner/scripts/a11y_static.py",
+  "to": "web-design-studio/references/accessibility.md",
+  "section": "2",
+  "heading": "Semantics first"
+ },
+ {
+  "from": "a11y-audit-runner/scripts/a11y_static.py",
+  "to": "web-design-studio/references/accessibility.md",
+  "section": "9",
+  "heading": "Content"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/evidence.md",
+  "section": "1",
+  "heading": "The rule about numbers"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/evidence.md",
+  "section": "2",
+  "heading": "The translation table"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/evidence.md",
+  "section": "3",
+  "heading": "Accessibility, worded honestly"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/evidence.md",
+  "section": "4",
+  "heading": "Performance, worded honestly"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/evidence.md",
+  "section": "5",
+  "heading": "Screenshots and visual comparison"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/evidence.md",
+  "section": "6",
+  "heading": "When to show code"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/evidence.md",
+  "section": "7",
+  "heading": "\"Can you just try it in blue?\""
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "1",
+  "heading": "The audience taxonomy, and the first ninety seconds"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "2",
+  "heading": "The mixed room"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "3",
+  "heading": "Deck structures for the five situations"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "3.4",
+  "heading": "Redesigning something the client is attached to"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "4",
+  "heading": "The opening"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "5",
+  "heading": "Framing a decision"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "6",
+  "heading": "Before and after, done honestly"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "7",
+  "heading": "Showing the work"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "8",
+  "heading": "The parts you are not happy with"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "9",
+  "heading": "The close, and the ask"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "1",
+  "heading": "The catalogue"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "2",
+  "heading": "Taste objection or business objection"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "4",
+  "heading": "Disagreeing and keeping the relationship"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "5",
+  "heading": "Conceding well"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "6",
+  "heading": "Being wrong in the room"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "7",
+  "heading": "The decision-maker who is not there"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "8",
+  "heading": "Feedback that is genuinely incoherent"
+ },
+ {
+  "from": "client-presentation-builder/SKILL.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "9",
+  "heading": "Presenting alongside more senior designers"
+ },
+ {
+  "from": "client-presentation-builder/references/evidence.md",
+  "to": "a11y-audit-runner/references/automation-coverage.md",
+  "section": "3",
+  "heading": "The coverage table"
+ },
+ {
+  "from": "client-presentation-builder/references/narrative-structure.md",
+  "to": "client-presentation-builder/references/evidence.md",
+  "section": "2",
+  "heading": "The translation table"
+ },
+ {
+  "from": "client-presentation-builder/references/narrative-structure.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "7",
+  "heading": "The decision-maker who is not there"
+ },
+ {
+  "from": "client-presentation-builder/references/narrative-structure.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "9",
+  "heading": "Presenting alongside more senior designers"
+ },
+ {
+  "from": "client-presentation-builder/references/objection-handling.md",
+  "to": "client-presentation-builder/assets/MEETING_RECORD.md",
+  "section": "2",
+  "heading": "Changed in the room"
+ },
+ {
+  "from": "client-presentation-builder/references/objection-handling.md",
+  "to": "client-presentation-builder/assets/MEETING_RECORD.md",
+  "section": "3",
+  "heading": "Still open"
+ },
+ {
+  "from": "component-state-matrix/SKILL.md",
+  "to": "component-state-matrix/references/state-coverage.md",
+  "section": "3",
+  "heading": "Combinatorics, and the pruning rule"
+ },
+ {
+  "from": "component-state-matrix/SKILL.md",
+  "to": "component-state-matrix/references/state-coverage.md",
+  "section": "4",
+  "heading": "Per-archetype checklist"
+ },
+ {
+  "from": "component-state-matrix/SKILL.md",
+  "to": "component-state-matrix/references/visual-regression.md",
+  "section": "7",
+  "heading": "CI wiring"
+ },
+ {
+  "from": "component-state-matrix/SKILL.md",
+  "to": "component-state-matrix/references/visual-regression.md",
+  "section": "8",
+  "heading": "The cheaper alternative"
+ },
+ {
+  "from": "component-state-matrix/references/state-coverage.md",
+  "to": "web-design-studio/references/style-architecture.md",
+  "section": "8",
+  "heading": "State belongs in data attributes"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/field-mapping.md",
+  "section": "10",
+  "heading": "What the schema cannot tell you"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/field-mapping.md",
+  "section": "6",
+  "heading": "Relationships"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/field-mapping.md",
+  "section": "7",
+  "heading": "Money"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/field-mapping.md",
+  "section": "8",
+  "heading": "Dates, times and zones"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/screen-patterns.md",
+  "section": "12",
+  "heading": "The states generators skip"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/screen-patterns.md",
+  "section": "13",
+  "heading": "Form UX"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/screen-patterns.md",
+  "section": "4",
+  "heading": "The wide table on a phone"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "1",
+  "heading": "Getting the schema out"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "2",
+  "heading": "RLS is a UI concern"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "4",
+  "heading": "Realtime"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "8",
+  "heading": "Search"
+ },
+ {
+  "from": "content-model-to-ui/references/field-mapping.md",
+  "to": "content-model-to-ui/references/screen-patterns.md",
+  "section": "2",
+  "heading": "Index: table vs card grid vs feed"
+ },
+ {
+  "from": "content-model-to-ui/references/field-mapping.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "1",
+  "heading": "Getting the schema out"
+ },
+ {
+  "from": "content-model-to-ui/references/field-mapping.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "2",
+  "heading": "RLS is a UI concern"
+ },
+ {
+  "from": "content-model-to-ui/references/screen-patterns.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "2",
+  "heading": "RLS is a UI concern"
+ },
+ {
+  "from": "content-model-to-ui/references/screen-patterns.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "8",
+  "heading": "Search"
+ },
+ {
+  "from": "content-model-to-ui/references/supabase-integration.md",
+  "to": "content-model-to-ui/references/screen-patterns.md",
+  "section": "12",
+  "heading": "The states generators skip"
+ },
+ {
+  "from": "content-model-to-ui/scripts/introspect_schema.py",
+  "to": "content-model-to-ui/references/field-mapping.md",
+  "section": "6",
+  "heading": "Relationships"
+ },
+ {
+  "from": "content-model-to-ui/scripts/introspect_schema.py",
+  "to": "content-model-to-ui/references/field-mapping.md",
+  "section": "7",
+  "heading": "Money"
+ },
+ {
+  "from": "content-model-to-ui/scripts/introspect_schema.py",
+  "to": "content-model-to-ui/references/screen-patterns.md",
+  "section": "2",
+  "heading": "Index: table vs card grid vs feed"
+ },
+ {
+  "from": "content-model-to-ui/scripts/introspect_schema.py",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "2",
+  "heading": "RLS is a UI concern"
+ },
+ {
+  "from": "content-model-to-ui/scripts/scaffold_ui.py",
+  "to": "content-model-to-ui/references/field-mapping.md",
+  "section": "6",
+  "heading": "Relationships"
+ },
+ {
+  "from": "content-model-to-ui/scripts/scaffold_ui.py",
+  "to": "content-model-to-ui/references/screen-patterns.md",
+  "section": "12",
+  "heading": "The states generators skip"
+ },
+ {
+  "from": "content-model-to-ui/scripts/scaffold_ui.py",
+  "to": "content-model-to-ui/references/screen-patterns.md",
+  "section": "13",
+  "heading": "Form UX"
+ },
+ {
+  "from": "content-model-to-ui/scripts/scaffold_ui.py",
+  "to": "content-model-to-ui/references/screen-patterns.md",
+  "section": "4",
+  "heading": "The wide table on a phone"
+ },
+ {
+  "from": "content-model-to-ui/scripts/scaffold_ui.py",
+  "to": "content-model-to-ui/references/screen-patterns.md",
+  "section": "8",
+  "heading": "Delete confirmation"
+ },
+ {
+  "from": "content-model-to-ui/scripts/scaffold_ui.py",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "2",
+  "heading": "RLS is a UI concern"
+ },
+ {
+  "from": "design-critique-gate/SKILL.md",
+  "to": "web-design-studio/references/spacing-system.md",
+  "section": "13",
+  "heading": "Debugging a layout that \"feels off\""
+ },
+ {
+  "from": "design-critique-gate/assets/CRITIQUE_TEMPLATE.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "2",
+  "heading": "Turning a suspicion into a mechanism"
+ },
+ {
+  "from": "design-critique-gate/assets/self-review-protocol.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "2",
+  "heading": "Turning a suspicion into a mechanism"
+ },
+ {
+  "from": "design-critique-gate/assets/self-review-protocol.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "6",
+  "heading": "Critiquing your own work"
+ },
+ {
+  "from": "design-critique-gate/references/critique-method.md",
+  "to": "web-design-studio/references/spacing-system.md",
+  "section": "7",
+  "heading": "Optical spacing — where the math lies"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "3",
+  "heading": "What senior reviewers notice that juniors do not"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "3.1",
+  "heading": "Inconsistent gaps at one hierarchy level"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "3.10",
+  "heading": "A grid that is twelve columns in the file and three in reality"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "3.11",
+  "heading": "A hover state that shifts layout by a pixel"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "3.2",
+  "heading": "Optical misalignment"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "3.3",
+  "heading": "Corner radius that is not concentric"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "3.4",
+  "heading": "Type that is on-scale but semantically wrong for its role"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "3.5",
+  "heading": "A focus ring that only works on one surface"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "3.6",
+  "heading": "An accent used decoratively, and therefore devalued"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "3.7",
+  "heading": "Shadows that imply two light sources"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "3.8",
+  "heading": "An icon set drawn at mixed optical weights"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "design-critique-gate/references/critique-method.md",
+  "section": "3.9",
+  "heading": "Headings spaced symmetrically"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "web-design-studio/references/spacing-system.md",
+  "section": "13",
+  "heading": "Debugging a layout that \"feels off\""
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "web-design-studio/references/spacing-system.md",
+  "section": "7",
+  "heading": "Optical spacing — where the math lies"
+ },
+ {
+  "from": "design-system-docs/SKILL.md",
+  "to": "design-system-docs/references/documentation-model.md",
+  "section": "13",
+  "heading": "Why not Storybook"
+ },
+ {
+  "from": "design-system-docs/SKILL.md",
+  "to": "design-system-docs/references/documentation-model.md",
+  "section": "2",
+  "heading": "The five readers"
+ },
+ {
+  "from": "design-system-docs/SKILL.md",
+  "to": "design-system-docs/references/documentation-model.md",
+  "section": "4",
+  "heading": "The token page"
+ },
+ {
+  "from": "design-system-docs/SKILL.md",
+  "to": "design-system-docs/references/documentation-model.md",
+  "section": "7",
+  "heading": "The principles page"
+ },
+ {
+  "from": "design-system-docs/SKILL.md",
+  "to": "design-system-docs/references/documentation-model.md",
+  "section": "8",
+  "heading": "What must never be generated"
+ },
+ {
+  "from": "design-system-docs/SKILL.md",
+  "to": "design-system-docs/references/drift-detection.md",
+  "section": "6",
+  "heading": "Gate wiring"
+ },
+ {
+  "from": "design-system-docs/SKILL.md",
+  "to": "design-system-docs/references/extraction.md",
+  "section": "2",
+  "heading": "Tier classification"
+ },
+ {
+  "from": "design-system-docs/SKILL.md",
+  "to": "design-system-docs/references/extraction.md",
+  "section": "5",
+  "heading": "Static resolution, and its honest limits"
+ },
+ {
+  "from": "design-system-docs/SKILL.md",
+  "to": "web-design-studio/references/style-architecture.md",
+  "section": "7",
+  "heading": "Tier-3 properties as a component's public API"
+ },
+ {
+  "from": "design-system-docs/references/documentation-model.md",
+  "to": "design-system-docs/references/extraction.md",
+  "section": "7",
+  "heading": "Forced states"
+ },
+ {
+  "from": "design-system-docs/references/extraction.md",
+  "to": "web-design-studio/references/style-architecture.md",
+  "section": "6",
+  "heading": "The component stylesheet shape"
+ },
+ {
+  "from": "design-system-docs/scripts/build_docs.py",
+  "to": "design-system-docs/references/documentation-model.md",
+  "section": "9",
+  "heading": "The two-file rule"
+ },
+ {
+  "from": "design-system-docs/scripts/extract_system.py",
+  "to": "web-design-studio/references/style-architecture.md",
+  "section": "6",
+  "heading": "The component stylesheet shape"
+ },
+ {
+  "from": "design-system-versioning/SKILL.md",
+  "to": "design-system-versioning/references/change-classification.md",
+  "section": "10",
+  "heading": "The hard cases"
+ },
+ {
+  "from": "design-system-versioning/SKILL.md",
+  "to": "design-system-versioning/references/change-classification.md",
+  "section": "11",
+  "heading": "The decision procedure"
+ },
+ {
+  "from": "design-system-versioning/SKILL.md",
+  "to": "design-system-versioning/references/change-classification.md",
+  "section": "4",
+  "heading": "Re-pointing a Tier-2 role: the argument"
+ },
+ {
+  "from": "design-system-versioning/SKILL.md",
+  "to": "design-system-versioning/references/change-classification.md",
+  "section": "7",
+  "heading": "DOM structure and class names"
+ },
+ {
+  "from": "design-system-versioning/SKILL.md",
+  "to": "design-system-versioning/references/deprecation.md",
+  "section": "1",
+  "heading": "The contract"
+ },
+ {
+  "from": "design-system-versioning/SKILL.md",
+  "to": "design-system-versioning/references/deprecation.md",
+  "section": "4",
+  "heading": "The replacement shim"
+ },
+ {
+  "from": "design-system-versioning/SKILL.md",
+  "to": "design-system-versioning/references/deprecation.md",
+  "section": "6",
+  "heading": "What a codemod genuinely cannot do"
+ },
+ {
+  "from": "design-system-versioning/SKILL.md",
+  "to": "design-system-versioning/references/deprecation.md",
+  "section": "7",
+  "heading": "Evidence: is it safe to remove yet"
+ },
+ {
+  "from": "design-system-versioning/SKILL.md",
+  "to": "design-system-versioning/references/rollout.md",
+  "section": "1",
+  "heading": "Distribution shapes"
+ },
+ {
+  "from": "design-system-versioning/SKILL.md",
+  "to": "design-system-versioning/references/rollout.md",
+  "section": "3",
+  "heading": "The upgrade procedure"
+ },
+ {
+  "from": "design-system-versioning/SKILL.md",
+  "to": "design-system-versioning/references/rollout.md",
+  "section": "4",
+  "heading": "The visual diff is the acceptance test"
+ },
+ {
+  "from": "design-system-versioning/SKILL.md",
+  "to": "design-system-versioning/references/rollout.md",
+  "section": "7",
+  "heading": "The support matrix"
+ },
+ {
+  "from": "design-system-versioning/references/change-classification.md",
+  "to": "web-design-studio/references/style-architecture.md",
+  "section": "7",
+  "heading": "Tier-3 properties as a component's public API"
+ },
+ {
+  "from": "design-system-versioning/references/deprecation.md",
+  "to": "design-system-versioning/references/change-classification.md",
+  "section": "10.1",
+  "heading": "A bug fix to you is a breaking change to them"
+ },
+ {
+  "from": "design-system-versioning/references/deprecation.md",
+  "to": "design-system-versioning/references/rollout.md",
+  "section": "7",
+  "heading": "The support matrix"
+ },
+ {
+  "from": "design-system-versioning/references/rollout.md",
+  "to": "design-system-versioning/references/deprecation.md",
+  "section": "8",
+  "heading": "When a consumer will not upgrade"
+ },
+ {
+  "from": "design-system-versioning/references/scripts.md",
+  "to": "design-system-versioning/references/deprecation.md",
+  "section": "6",
+  "heading": "What a codemod genuinely cannot do"
+ },
+ {
+  "from": "design-system-versioning/scripts/deprecate.py",
+  "to": "design-system-versioning/references/deprecation.md",
+  "section": "4",
+  "heading": "The replacement shim"
+ },
+ {
+  "from": "design-token-migration/SKILL.md",
+  "to": "design-token-migration/references/migration-strategies.md",
+  "section": "6",
+  "heading": "Migrating Law 2 safely"
+ },
+ {
+  "from": "design-token-migration/references/extraction-and-clustering.md",
+  "to": "design-token-migration/references/framework-migrations.md",
+  "section": "6",
+  "heading": "Bootstrap, Material and other framework overrides"
+ },
+ {
+  "from": "design-token-migration/references/migration-strategies.md",
+  "to": "design-token-migration/references/framework-migrations.md",
+  "section": "6",
+  "heading": "Bootstrap, Material and other framework overrides"
+ },
+ {
+  "from": "design-token-migration/scripts/cluster_values.py",
+  "to": "web-design-studio/references/spacing-system.md",
+  "section": "8",
+  "heading": "Nested radius and the corner rule"
+ },
+ {
+  "from": "design-token-migration/scripts/extract_literals.py",
+  "to": "design-token-migration/references/framework-migrations.md",
+  "section": "6",
+  "heading": "Bootstrap, Material and other framework overrides"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "1",
+  "heading": "The skeleton, and why each level exists"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "3",
+  "heading": "Spacing discipline — Law 2, table-shaped"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "4",
+  "heading": "The component set"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "6",
+  "heading": "Bulletproof buttons"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "7",
+  "heading": "Responsive: fluid-hybrid versus media queries"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "8",
+  "heading": "Images"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "9",
+  "heading": "Accessibility in email"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "3",
+  "heading": "The Word engine, in detail"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "4",
+  "heading": "Gmail, in detail"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "7",
+  "heading": "Size limits and clipping"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "8",
+  "heading": "Dark mode"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "9",
+  "heading": "What I could not verify"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "1",
+  "heading": "The source-template format"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "10",
+  "heading": "The requests you will actually get, and the answer"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "2",
+  "heading": "The build step"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "3",
+  "heading": "Preheader text"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "4",
+  "heading": "Testing: what you can check for free"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "5",
+  "heading": "Testing: what needs a rendering service"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "6",
+  "heading": "Deliverability that lives in the HTML"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "7",
+  "heading": "The plain-text part"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "8",
+  "heading": "ESP handoff"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "9",
+  "heading": "The pre-send checklist"
+ },
+ {
+  "from": "email-template-system/assets/email-tokens.json",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "5",
+  "heading": "Elevation without shadows"
+ },
+ {
+  "from": "email-template-system/assets/email-tokens.json",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "8",
+  "heading": "Dark mode"
+ },
+ {
+  "from": "email-template-system/assets/templates/product-announcement.html",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "7",
+  "heading": "Responsive: fluid-hybrid versus media queries"
+ },
+ {
+  "from": "email-template-system/assets/templates/transactional-receipt.html",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "8",
+  "heading": "ESP handoff"
+ },
+ {
+  "from": "email-template-system/references/email-architecture.md",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "3",
+  "heading": "The Word engine, in detail"
+ },
+ {
+  "from": "email-template-system/references/email-architecture.md",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "7",
+  "heading": "Size limits and clipping"
+ },
+ {
+  "from": "email-template-system/references/email-client-matrix.md",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "3",
+  "heading": "Spacing discipline — Law 2, table-shaped"
+ },
+ {
+  "from": "email-template-system/references/email-client-matrix.md",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "7",
+  "heading": "Responsive: fluid-hybrid versus media queries"
+ },
+ {
+  "from": "email-template-system/references/email-workflow.md",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "1",
+  "heading": "The skeleton, and why each level exists"
+ },
+ {
+  "from": "email-template-system/references/email-workflow.md",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "6",
+  "heading": "Bulletproof buttons"
+ },
+ {
+  "from": "email-template-system/references/email-workflow.md",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "7",
+  "heading": "Responsive: fluid-hybrid versus media queries"
+ },
+ {
+  "from": "email-template-system/references/email-workflow.md",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "3",
+  "heading": "The Word engine, in detail"
+ },
+ {
+  "from": "email-template-system/references/email-workflow.md",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "8",
+  "heading": "Dark mode"
+ },
+ {
+  "from": "email-template-system/scripts/build_email.py",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "7",
+  "heading": "Size limits and clipping"
+ },
+ {
+  "from": "email-template-system/scripts/lint_email.py",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "2",
+  "heading": "The head, and the MSO scaffolding"
+ },
+ {
+  "from": "email-template-system/scripts/lint_email.py",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "3",
+  "heading": "Spacing discipline — Law 2, table-shaped"
+ },
+ {
+  "from": "email-template-system/scripts/lint_email.py",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "2",
+  "heading": "The capability matrix"
+ },
+ {
+  "from": "email-template-system/scripts/lint_email.py",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "3",
+  "heading": "Preheader text"
+ },
+ {
+  "from": "figma-variables-sync/SKILL.md",
+  "to": "figma-variables-sync/references/audit-and-reconcile.md",
+  "section": "10",
+  "heading": "Escalation: proposing a new token"
+ },
+ {
+  "from": "figma-variables-sync/SKILL.md",
+  "to": "figma-variables-sync/references/audit-and-reconcile.md",
+  "section": "4",
+  "heading": "Reporting it so a designer reads it"
+ },
+ {
+  "from": "figma-variables-sync/SKILL.md",
+  "to": "figma-variables-sync/references/audit-and-reconcile.md",
+  "section": "9",
+  "heading": "The timed default"
+ },
+ {
+  "from": "figma-variables-sync/SKILL.md",
+  "to": "figma-variables-sync/references/figma-mapping.md",
+  "section": "13",
+  "heading": "What each side can express that the other cannot"
+ },
+ {
+  "from": "figma-variables-sync/SKILL.md",
+  "to": "figma-variables-sync/references/figma-mapping.md",
+  "section": "14",
+  "heading": "The REST API, precisely"
+ },
+ {
+  "from": "figma-variables-sync/SKILL.md",
+  "to": "figma-variables-sync/references/figma-mapping.md",
+  "section": "2",
+  "heading": "Collections → tiers"
+ },
+ {
+  "from": "figma-variables-sync/SKILL.md",
+  "to": "figma-variables-sync/references/figma-mapping.md",
+  "section": "7",
+  "heading": "Text styles → the type roles"
+ },
+ {
+  "from": "figma-variables-sync/SKILL.md",
+  "to": "figma-variables-sync/references/figma-mapping.md",
+  "section": "8",
+  "heading": "Effect styles → the elevation roles"
+ },
+ {
+  "from": "figma-variables-sync/SKILL.md",
+  "to": "figma-variables-sync/references/figma-mapping.md",
+  "section": "9",
+  "heading": "Auto-layout → the layout primitives and the proximity ladder"
+ },
+ {
+  "from": "figma-variables-sync/references/audit-and-reconcile.md",
+  "to": "figma-variables-sync/references/figma-mapping.md",
+  "section": "4",
+  "heading": "Variable types — what each one can and cannot hold"
+ },
+ {
+  "from": "figma-variables-sync/references/audit-and-reconcile.md",
+  "to": "figma-variables-sync/references/figma-mapping.md",
+  "section": "9",
+  "heading": "Auto-layout → the layout primitives and the proximity ladder"
+ },
+ {
+  "from": "figma-variables-sync/references/audit-and-reconcile.md",
+  "to": "web-design-studio/references/spacing-system.md",
+  "section": "2",
+  "heading": "The closed scale"
+ },
+ {
+  "from": "landing-page-conversion/SKILL.md",
+  "to": "landing-page-conversion/assets/MESSAGE_BRIEF.md",
+  "section": "1",
+  "heading": "Positioning statement"
+ },
+ {
+  "from": "landing-page-conversion/SKILL.md",
+  "to": "landing-page-conversion/references/conversion-audit.md",
+  "section": "11",
+  "heading": "Dark patterns, as the law names them"
+ },
+ {
+  "from": "landing-page-conversion/SKILL.md",
+  "to": "landing-page-conversion/references/conversion-audit.md",
+  "section": "12",
+  "heading": "The ranking that holds up most often"
+ },
+ {
+  "from": "landing-page-conversion/SKILL.md",
+  "to": "landing-page-conversion/references/page-architecture.md",
+  "section": "3",
+  "heading": "Sequences by page type"
+ },
+ {
+  "from": "landing-page-conversion/SKILL.md",
+  "to": "landing-page-conversion/references/page-architecture.md",
+  "section": "8",
+  "heading": "Wiring sections to the design system"
+ },
+ {
+  "from": "landing-page-conversion/references/conversion-audit.md",
+  "to": "landing-page-conversion/references/copy-patterns.md",
+  "section": "9",
+  "heading": "Empty, error and success microcopy"
+ },
+ {
+  "from": "landing-page-conversion/references/conversion-audit.md",
+  "to": "landing-page-conversion/references/page-architecture.md",
+  "section": "1",
+  "heading": "The objection ladder"
+ },
+ {
+  "from": "landing-page-conversion/references/conversion-audit.md",
+  "to": "landing-page-conversion/references/page-architecture.md",
+  "section": "6",
+  "heading": "Rhythm, banding and the scroll contract"
+ },
+ {
+  "from": "landing-page-conversion/references/page-architecture.md",
+  "to": "web-design-studio/assets/starter/styles/layout.css",
+  "section": "0.2",
+  "heading": "Section rhythm — who owns the space between two sections"
+ },
+ {
+  "from": "landing-page-conversion/references/page-architecture.md",
+  "to": "web-design-studio/references/spacing-system.md",
+  "section": "10",
+  "heading": "Page rhythm — section, subsection, block"
+ },
+ {
+  "from": "landing-page-conversion/references/worked-example.md",
+  "to": "landing-page-conversion/references/page-architecture.md",
+  "section": "3",
+  "heading": "Sequences by page type"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "1",
+  "heading": "The derivation: from a promise to a number"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "2",
+  "heading": "The categories, and why each one exists separately"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "3",
+  "heading": "Per-page-type budgets"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "4",
+  "heading": "Budget the artifact and the experience — you need both"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "5",
+  "heading": "Third-party weight, budgeted separately"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "6",
+  "heading": "The budget file"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "7",
+  "heading": "Raising a budget legitimately"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "8",
+  "heading": "Lab versus field, honestly"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/ci-integration.md",
+  "section": "2",
+  "heading": "Pre-commit: the static layer only"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/ci-integration.md",
+  "section": "3",
+  "heading": "The PR job"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/ci-integration.md",
+  "section": "4",
+  "heading": "Keeping the runtime layer non-flaky"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/ci-integration.md",
+  "section": "5",
+  "heading": "Adopting it on a site that is already slow"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/ci-integration.md",
+  "section": "6",
+  "heading": "Reporting a regression so it gets fixed"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/ci-integration.md",
+  "section": "7",
+  "heading": "One command, alongside the design gate"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/ci-integration.md",
+  "section": "8",
+  "heading": "Closing the loop with field data"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "10",
+  "heading": "Images: format, dimensions, and the SVG trap"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "11",
+  "heading": "Third-party containment"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "12",
+  "heading": "What a failing run looks like"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "2",
+  "heading": "LCP: find the element first"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "4",
+  "heading": "Phases 2 and 3 — the resource"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "5",
+  "heading": "CLS: the sources, ranked by how often they are the answer"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "6",
+  "heading": "Metric-matched font fallbacks — the real code"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "7",
+  "heading": "CSS delivery, and the honest tradeoffs of critical CSS"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "8",
+  "heading": "INP: long tasks, hydration, handlers, yielding"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "9",
+  "heading": "JS bundles: where the weight actually goes"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "web-design-studio/references/motion-system.md",
+  "section": "5",
+  "heading": "Performance"
+ },
+ {
+  "from": "perf-budget-gate/SKILL.md",
+  "to": "web-design-studio/references/typography.md",
+  "section": "8",
+  "heading": "Web font loading"
+ },
+ {
+  "from": "perf-budget-gate/references/budgets.md",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "11",
+  "heading": "Third-party containment"
+ },
+ {
+  "from": "perf-budget-gate/references/budgets.md",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "9",
+  "heading": "JS bundles: where the weight actually goes"
+ },
+ {
+  "from": "perf-budget-gate/references/ci-integration.md",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "1",
+  "heading": "The derivation: from a promise to a number"
+ },
+ {
+  "from": "perf-budget-gate/references/diagnosis.md",
+  "to": "web-design-studio/references/motion-system.md",
+  "section": "5",
+  "heading": "Performance"
+ },
+ {
+  "from": "perf-budget-gate/references/diagnosis.md",
+  "to": "web-design-studio/references/typography.md",
+  "section": "8",
+  "heading": "Web font loading"
+ },
+ {
+  "from": "perf-budget-gate/scripts/measure_vitals.mjs",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "6",
+  "heading": "The budget file"
+ },
+ {
+  "from": "perf-budget-gate/scripts/measure_vitals.mjs",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "8",
+  "heading": "Lab versus field, honestly"
+ },
+ {
+  "from": "perf-budget-gate/scripts/measure_vitals.mjs",
+  "to": "perf-budget-gate/references/ci-integration.md",
+  "section": "3",
+  "heading": "The PR job"
+ },
+ {
+  "from": "perf-budget-gate/scripts/measure_vitals.mjs",
+  "to": "perf-budget-gate/references/ci-integration.md",
+  "section": "4",
+  "heading": "Keeping the runtime layer non-flaky"
+ },
+ {
+  "from": "perf-budget-gate/scripts/measure_vitals.mjs",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "2",
+  "heading": "LCP: find the element first"
+ },
+ {
+  "from": "perf-budget-gate/scripts/measure_vitals.mjs",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "3",
+  "heading": "Phase 1 — TTFB"
+ },
+ {
+  "from": "perf-budget-gate/scripts/measure_vitals.mjs",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "5",
+  "heading": "CLS: the sources, ranked by how often they are the answer"
+ },
+ {
+  "from": "perf-budget-gate/scripts/measure_vitals.mjs",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "8",
+  "heading": "INP: long tasks, hydration, handlers, yielding"
+ },
+ {
+  "from": "perf-budget-gate/scripts/perf_audit.py",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "1",
+  "heading": "The derivation: from a promise to a number"
+ },
+ {
+  "from": "perf-budget-gate/scripts/perf_audit.py",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "5",
+  "heading": "Third-party weight, budgeted separately"
+ },
+ {
+  "from": "perf-budget-gate/scripts/perf_audit.py",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "6",
+  "heading": "The budget file"
+ },
+ {
+  "from": "perf-budget-gate/scripts/perf_audit.py",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "7",
+  "heading": "Raising a budget legitimately"
+ },
+ {
+  "from": "perf-budget-gate/scripts/perf_audit.py",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "5",
+  "heading": "CLS: the sources, ranked by how often they are the answer"
+ },
+ {
+  "from": "perf-budget-gate/scripts/perf_audit.py",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "6",
+  "heading": "Metric-matched font fallbacks — the real code"
+ },
+ {
+  "from": "perf-budget-gate/scripts/perf_audit.py",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "7",
+  "heading": "CSS delivery, and the honest tradeoffs of critical CSS"
+ },
+ {
+  "from": "perf-budget-gate/scripts/perf_audit.py",
+  "to": "perf-budget-gate/references/diagnosis.md",
+  "section": "9",
+  "heading": "JS bundles: where the weight actually goes"
+ },
+ {
+  "from": "perf-budget-gate/scripts/perf_audit.py",
+  "to": "web-design-studio/references/motion-system.md",
+  "section": "5",
+  "heading": "Performance"
+ },
+ {
+  "from": "perf-budget-gate/scripts/perf_audit.py",
+  "to": "web-design-studio/references/typography.md",
+  "section": "8",
+  "heading": "Web font loading"
+ },
+ {
+  "from": "web-design-studio/SKILL.md",
+  "to": "web-design-studio/references/color-system.md",
+  "section": "4",
+  "heading": "Choosing a palette from a brief"
+ },
+ {
+  "from": "web-design-studio/SKILL.md",
+  "to": "web-design-studio/references/color-system.md",
+  "section": "6",
+  "heading": "Semantic role mapping"
+ },
+ {
+  "from": "web-design-studio/SKILL.md",
+  "to": "web-design-studio/references/handoff-conventions.md",
+  "section": "7",
+  "heading": "Claude Code handoff"
+ },
+ {
+  "from": "web-design-studio/SKILL.md",
+  "to": "web-design-studio/references/navigation-patterns.md",
+  "section": "1",
+  "heading": "Selection matrix"
+ },
+ {
+  "from": "web-design-studio/SKILL.md",
+  "to": "web-design-studio/references/spacing-system.md",
+  "section": "6",
+  "heading": "The spacing decision procedure"
+ },
+ {
+  "from": "web-design-studio/SKILL.md",
+  "to": "web-design-studio/references/style-architecture.md",
+  "section": "6",
+  "heading": "The component stylesheet shape"
+ },
+ {
+  "from": "web-design-studio/assets/configs/eslint.design.config.mjs",
+  "to": "web-design-studio/references/stack-tailwind.md",
+  "section": "2",
+  "heading": "Tailwind v4: wiring `@theme`"
+ },
+ {
+  "from": "web-design-studio/assets/configs/stylelint.config.mjs",
+  "to": "web-design-studio/assets/configs/theme.css",
+  "section": "0",
+  "heading": "THE FOUR LITERAL EXCEPTIONS"
+ },
+ {
+  "from": "web-design-studio/assets/configs/stylelint.config.mjs",
+  "to": "web-design-studio/assets/starter/styles/tokens.css",
+  "section": "7",
+  "heading": "RADIUS, BORDER, ELEVATION"
+ },
+ {
+  "from": "web-design-studio/assets/configs/theme.css",
+  "to": "web-design-studio/assets/starter/styles/tokens.css",
+  "section": "7",
+  "heading": "RADIUS, BORDER, ELEVATION"
+ },
+ {
+  "from": "web-design-studio/assets/starter/styles/base.css",
+  "to": "web-design-studio/assets/starter/styles/reset.css",
+  "section": "3",
+  "heading": "DOCUMENT & TEXT RENDERING"
+ },
+ {
+  "from": "web-design-studio/assets/starter/styles/layout.css",
+  "to": "web-design-studio/references/layout-composition.md",
+  "section": "10",
+  "heading": "Anti-patterns"
+ },
+ {
+  "from": "web-design-studio/references/accessibility.md",
+  "to": "a11y-audit-runner/references/automation-coverage.md",
+  "section": "3",
+  "heading": "The coverage table"
+ },
+ {
+  "from": "web-design-studio/references/accessibility.md",
+  "to": "web-design-studio/references/color-system.md",
+  "section": "6",
+  "heading": "Semantic role mapping"
+ },
+ {
+  "from": "web-design-studio/references/accessibility.md",
+  "to": "web-design-studio/references/color-system.md",
+  "section": "7",
+  "heading": "WCAG 2.2 contrast"
+ },
+ {
+  "from": "web-design-studio/references/accessibility.md",
+  "to": "web-design-studio/references/motion-system.md",
+  "section": "8",
+  "heading": "Reduced motion"
+ },
+ {
+  "from": "web-design-studio/references/accessibility.md",
+  "to": "web-design-studio/references/navigation-patterns.md",
+  "section": "4",
+  "heading": "Spacing spec"
+ },
+ {
+  "from": "web-design-studio/references/color-system.md",
+  "to": "web-design-studio/assets/starter/styles/reset.css",
+  "section": "7",
+  "heading": "FOCUS"
+ },
+ {
+  "from": "web-design-studio/references/motion-system.md",
+  "to": "web-design-studio/references/accessibility.md",
+  "section": "3",
+  "heading": "Focus"
+ },
+ {
+  "from": "web-design-studio/references/navigation-code.md",
+  "to": "web-design-studio/references/navigation-patterns.md",
+  "section": "4",
+  "heading": "Spacing spec"
+ },
+ {
+  "from": "web-design-studio/references/navigation-patterns.md",
+  "to": "web-design-studio/references/navigation-code.md",
+  "section": "1",
+  "heading": "Scroll-aware header"
+ },
+ {
+  "from": "web-design-studio/references/navigation-patterns.md",
+  "to": "web-design-studio/references/navigation-code.md",
+  "section": "2",
+  "heading": "Mega menu with safe triangle + keyboard"
+ },
+ {
+  "from": "web-design-studio/references/navigation-patterns.md",
+  "to": "web-design-studio/references/navigation-code.md",
+  "section": "3",
+  "heading": "Off-canvas drawer with focus management and `inert`"
+ },
+ {
+  "from": "web-design-studio/references/navigation-patterns.md",
+  "to": "web-design-studio/references/navigation-code.md",
+  "section": "4",
+  "heading": "Scroll-spy with IntersectionObserver"
+ },
+ {
+  "from": "web-design-studio/references/stack-css-modules.md",
+  "to": "web-design-studio/assets/starter/styles/reset.css",
+  "section": "7",
+  "heading": "FOCUS"
+ },
+ {
+  "from": "web-design-studio/references/stack-tailwind.md",
+  "to": "web-design-studio/assets/configs/theme.css",
+  "section": "0",
+  "heading": "THE FOUR LITERAL EXCEPTIONS"
+ },
+ {
+  "from": "web-design-studio/references/stack-vanilla-css.md",
+  "to": "web-design-studio/assets/starter/styles/reset.css",
+  "section": "7",
+  "heading": "FOCUS"
+ },
+ {
+  "from": "web-design-studio/references/style-architecture.md",
+  "to": "web-design-studio/references/spacing-system.md",
+  "section": "8",
+  "heading": "Nested radius and the corner rule"
+ },
+ {
+  "from": "web-design-studio/scripts/audit_design.py",
+  "to": "web-design-studio/references/spacing-system.md",
+  "section": "6",
+  "heading": "The spacing decision procedure"
+ },
+ {
+  "from": "web-design-studio/scripts/audit_design.py",
+  "to": "web-design-studio/references/spacing-system.md",
+  "section": "8",
+  "heading": "Nested radius and the corner rule"
+ }
+]

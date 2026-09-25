@@ -80,19 +80,19 @@ Theme and brand overrides re-point **Tier 2 only**. A theme block containing a c
 
 **Inset** — `--pad-inline-xs/-sm/-md`, `--pad-block-xs/-sm/-md`, `--pad-card`, `--pad-card-lg`, `--pad-well`
 **Page rhythm** — `--space-section`, `--space-subsection`, `--space-block`, `--gutter-page`
-**Surfaces** — `--bg-canvas --bg-surface --bg-raised --bg-sunken --bg-inverse`
+**Surfaces** — `--bg-canvas --bg-surface --bg-raised --bg-sunken --bg-inverse --bg-scrim`
 **Interaction** — `--bg-hover --bg-active --bg-selected --bg-disabled`
 **Foreground** — `--fg-default --fg-strong --fg-muted --fg-subtle --fg-disabled --fg-on-accent --fg-on-inverse --fg-accent --fg-link`
 **Borders** — `--border-subtle --border-default --border-strong --border-accent --border-focus`
 **Intent** — `--bg-accent --bg-accent-hover --bg-success --bg-warning --bg-danger --fg-success --fg-warning --fg-danger`
 **Type roles** — `--type-display --type-h1 --type-h2 --type-h3 --type-h4 --type-lead --type-body --type-ui --type-label --type-code`
 **Elevation** — `--elevation-flat --elevation-card --elevation-raised --elevation-overlay --elevation-modal --elevation-focus`
-**Motion roles** — `--motion-hover --motion-enter --motion-exit --motion-expand --motion-emphasis --motion-loop`
+**Motion roles** — `--motion-hover --motion-enter --motion-exit --motion-expand --motion-emphasis --motion-instant --motion-loop`
 **Z-index ladder** — `--z-base --z-raised --z-sticky --z-dropdown --z-overlay --z-modal --z-toast --z-tooltip`
 
 Note: `--space-section`, `--space-subsection`, `--space-block` and `--space-fluid-*` live in the `--space-*` namespace but **are Tier 2** — the tier is a property of the name's meaning, not its first word.
 
-Primitives with **no** Tier-2 equivalent — `--radius-*`, `--stroke-*`, `--z-*`, `--bp-*`, `--font-*`, `--measure-*`, `--width-*`, `--tap-min` — are read directly by components, and that is correct.
+Primitives with **no** Tier-2 equivalent — `--radius-*`, `--stroke-*`, `--weight-*`, `--z-*`, `--bp-*`, `--font-*`, `--measure-*`, `--width-*`, `--tap-min` — are read directly by components, and that is correct.
 
 ---
 
@@ -106,7 +106,7 @@ State is expressed as a real ARIA attribute where one exists (`aria-expanded`, `
 
 ## Accessibility floor
 
-WCAG 2.2 Level AA, treated as a floor. Contrast is **measured, never assumed**: 4.5:1 body text, 3:1 large text and UI components (SC 1.4.11), and the focus ring is an `outline` (`var(--stroke-focus) solid var(--border-focus)`, offset by `--stroke-focus`): forced-colors mode repaints it, and no component `box-shadow` can remove it. A component that adds `box-shadow: var(--elevation-focus)` keeps an outline beside it, never `outline: none`.
+WCAG 2.2 Level AA, treated as a floor. Contrast is **measured, never assumed**: 4.5:1 body text and 3:1 large text (SC 1.4.3), 3:1 UI components (SC 1.4.11), and the focus ring is an `outline` (`var(--stroke-focus) solid var(--border-focus)`, offset by `--stroke-focus`): forced-colors mode repaints it, and no component `box-shadow` can remove it. A component that adds `box-shadow: var(--elevation-focus)` keeps an outline beside it, never `outline: none`.
 
 ---
 

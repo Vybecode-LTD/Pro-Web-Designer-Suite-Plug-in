@@ -1,6 +1,6 @@
 ---
 name: client-presentation-builder
-description: Present design work so it is judged as reasoning rather than as taste. Use it for presenting to a client or stakeholder, building a design presentation or deck, writing design rationale, defending design decisions, preparing for a client review meeting, walking a team through a build, before/after comparisons, explaining why a design looks the way it does, handling design feedback and objections, and getting sign-off. Reframes every visual choice as a decision with a constraint, an alternative considered and a consequence — which turns a review from a referendum on taste into a conversation about tradeoffs, and is the thing that makes a junior read as senior. Assembles the deck from evidence that already exists — the decision log, audit and performance JSON, the a11y report and the critique gate's defence sheet. It will not manufacture a reason; a choice with no reason is presented as an open question, out loud, on purpose.
+description: Present design work to a client or team as reasoning rather than taste. Builds decks, design rationale, before-and-after comparisons and answers to objections from the evidence the other skills produce. Not for critiquing the design itself (design-critique-gate), or for a .pptx file for its own sake.
 ---
 
 # Client Presentation Builder
@@ -165,7 +165,7 @@ Two rules that apply to all of them:
 - **"Here's what we made" is the weakest possible opening.** It invites evaluation before
   context, makes you the subject, and has no shape. Open with the problem in their words, the
   number that decided everything, or the question the meeting has to answer (§4).
-- **Raise the parts you are not happy with yourself, early, with a plan** (§8). A flaw you
+- **Raise the parts you are not happy with yourself, early, with a plan** (`references/narrative-structure.md` §8). A flaw you
   name is a judgement call; the same flaw found by a reviewer is an oversight, and from that
   moment every other decision is re-read as a possible accident.
 
@@ -199,7 +199,7 @@ Then check the two meta-skills that decide how those go: telling a taste objecti
 business objection, because they need **opposite** responses (§2), and restating an
 objection before answering it (§3).
 
-If a senior designer or a creative director is in the room, §9. The single highest-value
+If a senior designer or a creative director is in the room, `references/objection-handling.md` §9. The single highest-value
 move in it is the pre-meeting: send the deck early and ask *"anything in here you would
 present differently?"* — which converts the disagreements that would have damaged you in
 front of a client into a ten-minute conversation where being persuaded is free.
@@ -329,7 +329,7 @@ Within this skill:
 | Manufacturing a reason for a coin-flip | Being asked "why?" feels like a test you must pass | Say it is a coin flip. It is the move that makes your real reasons believable |
 | Three directions presented as peers | It feels generous | It is an abdication: you are asking a client to do design selection. One recommendation, with the rejected options named |
 | A number with no comparison | It sounds impressive | "412 KB" is noise; "412 KB against the 600 KB budget" is an argument |
-| Claiming "fully accessible" from a green tool run | The tool said pass | Automated checks cover about a third of the criteria. `evidence.md` §3 has the wording |
+| Claiming "fully accessible" from a green tool run | The tool said pass | Automated checks fully decide 7 of the 55 A and AA criteria. `evidence.md` §3 has the wording |
 | Flattering the before | It happens by accident — old screenshot, narrower window, less content | Same width, same content, same state, or do not show it |
 | Hoping nobody notices the weak part | Optimism | They always notice, and it costs three times as much when they find it |
 | Defending taste with data | It feels like the strong move | It reads as a dodge. Accommodate a taste objection; investigate a business one |

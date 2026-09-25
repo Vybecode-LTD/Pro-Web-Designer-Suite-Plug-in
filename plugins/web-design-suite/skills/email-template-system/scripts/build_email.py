@@ -74,7 +74,7 @@ from pathlib import Path
 from typing import Iterable
 
 GMAIL_CLIP_BYTES = 102_400  # 100 KiB. Verified figure — see the matrix reference.
-GMAIL_STYLE_BYTES = 16_384  # Gmail drops <style> content past this.
+GMAIL_STYLE_BYTES = 16_384  # Gmail's ceiling on all <style> content, counted together.
 
 VOID_TAGS = {
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link",
@@ -707,8 +707,10 @@ def inline_rules(root: Node, rules: list[Rule], retained: list[Rule]) -> int:
     return count
 
 
-def render_retained(rules: list[Rule]) -> str:
-    """Re-emit the rules that must stay as CSS, grouped by at-rule context."""
+def retained_chunks(rules: list[Rule], max_bytes: int | None = None) -> list[str]:
+    """The rules that must stay as CSS, grouped by at-rule context, in order.
+    With max_bytes, no group grows past that size: a long run of rules under one
+    @media becomes several copies of the at-rule, each a whole block."""
     chunks: list[str] = []
     current_at: str | None = None
     buffer: list[str] = []
@@ -732,12 +734,42 @@ def render_retained(rules: list[Rule]) -> str:
         if rule.at_rule != current_at:
             flush()
             current_at = rule.at_rule
-        buffer.append(
-            "%s{%s}"
-            % (",".join(rule.selectors), ";".join(d.render() for d in rule.declarations))
-        )
+        text = "%s{%s}" % (",".join(rule.selectors),
+                           ";".join(d.render() for d in rule.declarations))
+        if max_bytes and buffer and len("".join(buffer + [text]).encode("utf-8")) > max_bytes:
+            flush()
+        buffer.append(text)
     flush()
-    return "".join(chunks)
+    return chunks
+
+
+def render_retained(rules: list[Rule]) -> str:
+    """Re-emit the rules that must stay as CSS, grouped by at-rule context."""
+    return "".join(retained_chunks(rules))
+
+
+STYLE_BLOCK_BYTES = 4_096
+
+
+def style_blocks(rules: list[Rule]) -> list[str]:
+    """The retained CSS as <style> contents. Gmail counts every <style> element
+    together and removes each one that crosses GMAIL_STYLE_BYTES, and every one
+    after it (hteumeuleu/email-bugs#90). One block over the ceiling therefore
+    loses ALL its CSS. Past the ceiling, emit several blocks in authoring
+    order, so what is lost is the tail, not everything."""
+    whole = render_retained(rules)
+    if len(whole.encode("utf-8")) <= GMAIL_STYLE_BYTES:
+        return [whole] if whole else []
+    blocks: list[str] = []
+    current = ""
+    for chunk in retained_chunks(rules, STYLE_BLOCK_BYTES):
+        if current and len((current + chunk).encode("utf-8")) > STYLE_BLOCK_BYTES:
+            blocks.append(current)
+            current = ""
+        current += chunk
+    if current:
+        blocks.append(current)
+    return blocks
 
 
 # ---------------------------------------------------------------------------
@@ -1049,17 +1081,29 @@ def build(
         style_node.set("data-compiled", "1")
 
     if inline and style_nodes:
-        survivors = render_retained(retained)
+        blocks = style_blocks(retained)
         target = None
         for node in style_nodes:
             if (node.get("data-embed") or "").lower() not in ("keep", "embed"):
                 target = node
                 break
         if target is not None:
-            if survivors:
-                text = Node("text", data="\n" + (minify_css(survivors) if minify else survivors) + "\n")
-                text.parent = target
-                target.children = [text]
+            if blocks:
+                parent = target.parent
+                at = parent.children.index(target) if parent is not None else 0
+                for n, block in enumerate(blocks):
+                    node = target if n == 0 else Node("element", "style")
+                    text = Node("text", data="\n" + (minify_css(block) if minify else block) + "\n")
+                    text.parent = node
+                    node.children = [text]
+                    if n and parent is not None:
+                        node.parent = parent
+                        parent.children.insert(at + n, node)
+                if len(blocks) > 1:
+                    report["notes"].append(
+                        "retained CSS is over Gmail's %s-byte <style> ceiling, so it is split "
+                        "into %d blocks in authoring order: Gmail keeps whole blocks up to the "
+                        "ceiling and drops the rest." % (GMAIL_STYLE_BYTES, len(blocks)))
             else:
                 parent = target.parent
                 if parent is not None:
@@ -1115,8 +1159,9 @@ def build(
         )
     if style_bytes > GMAIL_STYLE_BYTES:
         report["warnings"].append(
-            "<style> content is %s bytes; Gmail drops style content past %s."
-            % (style_bytes, GMAIL_STYLE_BYTES)
+            "<style> content is %s bytes; Gmail keeps whole <style> elements up to %s "
+            "bytes in total and removes the rest. Inline more, or move what matters most "
+            "to the top of the retained CSS." % (style_bytes, GMAIL_STYLE_BYTES)
         )
 
     return html, report

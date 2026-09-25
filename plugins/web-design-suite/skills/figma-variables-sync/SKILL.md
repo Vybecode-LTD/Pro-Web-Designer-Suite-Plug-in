@@ -1,6 +1,6 @@
 ---
 name: figma-variables-sync
-description: Keep a Figma file and a codebase speaking one vocabulary. Use when a designer sends a Figma file and you have to build it; when syncing Figma variables, modes or styles with CSS design tokens; when auditing a design file for off-scale spacing, off-ramp colours, unmapped text styles or contrast failures BEFORE writing code; when generating tokens.css / tokens.json / tokens.ts from a Figma export; when pushing code tokens back into Figma as an importable variables payload; when checking whether a design matches the design system; when deciding which side is the source of truth; or when design and code have drifted apart. Covers Figma-to-code handoff, the Variables REST API and its Enterprise gating, the exported-JSON path that needs no credentials, the three-outcome reconciliation ladder, and CI drift detection.
+description: Keep a Figma file and a codebase on one token vocabulary. Audit a design file before building it, generate tokens.css from a Figma export, push code tokens back as variables, and catch drift in CI. Not for building the page from the design (web-design-studio) or reviewing its taste (design-critique-gate).
 ---
 
 # Figma Variables Sync
@@ -36,21 +36,24 @@ here assumes it.
 
 ## Be honest about what this can and cannot do
 
-Nothing here reads a `.fig` file. There are exactly two ways to get data out of
-Figma, and one of them requires an Enterprise plan.
+Nothing here reads a `.fig` file. There are three ways to get variables out of
+Figma, and only one of them, the REST API, requires an Enterprise plan.
 
 | Path | Needs | Gets you | Use it when |
 |---|---|---|---|
 | **Exported JSON** — the primary path | A designer with a plugin, five minutes, one file sent to you | Every variable, collection, mode, alias and scope | **Always.** This is the default |
+| **Figma's MCP server** — the live path | The server connected to Claude; a Dev seat to read, a Full seat to write outside drafts | `get_variable_defs` for a selection, `search_design_system` across libraries, and `use_figma`, which runs Plugin API code that can read or create collections, modes and variables | The designer's file is open to you through the connection |
 | **REST API** — the optional upgrade | A personal access token, a file key, **an Enterprise plan** | The same data, on demand, in CI | You are on Enterprise and want automation |
 | **Screenshot + spec** — the fallback | Nothing | A conversation and some measurements | The file is not shareable, or the designer is not reachable |
 
 > **`GET /v1/files/:file_key/variables/local`, `…/variables/published` and
 > `POST /v1/files/:file_key/variables` are Enterprise-only, and have been since
 > the Variables API launched in June 2023.** Confirm the company's plan before
-> promising anyone a pipeline. On Professional or Organization there is no
-> scripting workaround: the exported-JSON path is not a fallback, it is the only
-> path. Details and the exact payload shapes: `references/figma-mapping.md` §14.
+> promising anyone a pipeline. On Professional or Organization the REST path is
+> closed, but scripting is not: the Plugin API reads and writes variables on
+> every plan, and Figma's MCP server runs Plugin API code through `use_figma`.
+> Without either, the exported JSON is the path. Details and the exact payload
+> shapes: `references/figma-mapping.md` §14.
 
 Both scripts read the exported-JSON shapes and the REST shape, and detect which
 they were handed. Nothing in the workflow below requires a token.
@@ -89,8 +92,12 @@ curl -H "X-Figma-Token: $FIGMA_TOKEN" \
 
 The file key is the segment after `/design/` in the URL. `local` includes
 unpublished drafts, which is usually what you want — the thing you are arguing
-about is rarely published yet. `…/styles` returns style *metadata* only, not the
-type properties; to get sizes you also read `…/nodes`. See
+about is rarely published yet. `…/styles` is different on both counts: it needs
+no Enterprise plan (scope `library_content:read`), and it returns **published**
+styles only, so on a file whose styles are still drafts it comes back empty and
+the style checks see nothing; export those with the plugin. It also returns
+style *metadata* only, not the type properties; to get sizes you also read
+`…/nodes`. See
 `references/figma-mapping.md` §7.
 
 **Fallback — a screenshot and the designer's spec.** Legitimate, and not a
@@ -241,7 +248,7 @@ builds the body; it never calls the API.
 `--shadow-*`, `--elevation-*` and the `clamp()`ed fluid steps are CSS shorthands;
 a Figma variable holds one scalar. `--reverse` skips them and says so. They ship
 as Figma *styles* named for the same role — see `references/figma-mapping.md`
-§§7–8 and the full loss table at §13.
+§7, §8 and §13 (the full loss table).
 
 ### Step 5 — Keep in sync
 
@@ -325,48 +332,7 @@ with like.
 colour — instead of the studio's. A client's brand ramp is the point of the
 migration that produced it; without `--tokens` it reads as eleven off-ramp errors.
 
-### `scripts/figma_audit.py`
-
-```
-figma_audit.py <file> [--styles FILE] [--format report|json|markdown]
-               [--shape rest|plugin|dtcg|records] [--collection NAME]
-               [--fail-on error|warn|info|never] [--tap-min PX]
-               [--deadline TEXT] [--no-color]
-```
-
-| Flag | Does |
-|---|---|
-| `--styles` | A second JSON of text/effect styles (e.g. `GET …/styles`) |
-| `--format report` | Terminal, grouped by finding type. The default |
-| `--format json` | `{summary, collections, findings[]}` for CI |
-| `--format markdown` | The document you send the designer |
-| `--fail-on` | Lowest severity that exits non-zero. Default `info` — any finding |
-| `--deadline` | The timed default's cutoff, printed into the markdown |
-
-Exit: `0` clean · `1` findings · `2` unreadable or empty input.
-
-### `scripts/figma_to_tokens.py`
-
-```
-figma_to_tokens.py <file> [--format css|json|ts|all] [--out FILE] [--out-dir DIR]
-                   [--reverse] [--flat] [--shape …] [--collection NAME]
-                   [--color-format oklch|hex] [--unit rem|px] [--full-themes]
-                   [--quiet]
-```
-
-| Flag | Does |
-|---|---|
-| `--format all --out-dir` | Writes `tokens.css`, `tokens.json`, `tokens.ts` together |
-| `--reverse` | Reads a `tokens.json` (or a flat `{name: value}` map), emits a Figma `POST …/variables` body |
-| `--flat` | With `--reverse`: one Figma collection instead of one per tier |
-| `--unit px` | Emit px instead of rem (hairlines and strokes stay px regardless) |
-| `--full-themes` | Restate every token in each theme block rather than only the re-points |
-
-Exit: `0` clean · `1` written with warnings (unmapped names, unresolved aliases,
-skipped composites — all on stderr) · `2` unreadable or empty input.
-
-The two scripts share their parsing and colour maths deliberately. If they ever
-disagree about what a file says, the audit passes and the build is wrong.
+Every argument of `figma_audit.py` and `figma_to_tokens.py` is in `references/scripts.md`.
 
 ---
 

@@ -8,7 +8,16 @@
  * does not pass through tokens.css.
  *
  * PEER DEPENDENCIES
- *   npm i -D stylelint@^16 stylelint-config-standard
+ *   npm i -D stylelint@^17 stylelint-config-standard@^40
+ *
+ *   stylelint-config-standard 40 requires stylelint ^17, so pairing it with
+ *   stylelint 16 stops npm with ERESOLVE. Stylelint 17 needs Node 20.19+.
+ *   It also reads nesting differently. The selector-max-* rules below check
+ *   each nested selector as written instead of desugaring it, and `&` takes
+ *   the largest specificity in its parent's list. So the limits apply per
+ *   written selector, and `max-nesting-depth` caps the nesting itself.
+ *   (stylelint.io/migration-guide/to-17. The suite's own tests do not run
+ *   stylelint yet, so re-check these limits on your code after upgrading.)
  *
  *   package.json
  *     "lint:css": "stylelint \"src/**\/*.css\" \"packages/**\/*.css\""
@@ -194,9 +203,17 @@ const designPlugin = createPlugin(layerRuleName, layerOrderRule);
  *             a `var()` pointing at a token that does not exist resolves to
  *             nothing and the declaration is dropped in silence.
  *
- *   VAR_ONE   ^var\(--[a-z0-9-]+\)$
- *             Exactly one token. Used for properties where a sequence is
- *             meaningless (`font-size`, `z-index`, `line-height`).
+ *   VAR_ONE   ^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$
+ *             Exactly one token, with or without a fallback. Used for
+ *             properties where a sequence is meaningless (`font-size`,
+ *             `z-index`, `line-height`). A fallback is not checked: the
+ *             token is the value (design-rules.json, var_fallback), as in
+ *             audit_design.
+ *
+ *   CANCEL    ^calc\(\s*(var(--t)\s*\*\s*-1|-1\s*\*\s*var(--t))\s*\)$
+ *             Law 2's third exception: a margin that cancels a known
+ *             token, `calc(var(--card-inset) * -1)`. Only `-1`: any other
+ *             factor invents a step (Law 3).
  *
  *   VAR_CALC  ^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$
  *             A token MINUS or PLUS a token, nothing else — no bare
@@ -211,7 +228,8 @@ const designPlugin = createPlugin(layerRuleName, layerOrderRule);
  * ========================================================================= */
 
 const VAR_SEQ = String.raw`/^(?:var\(--[a-z0-9-]+\)\s*)+$/`;
-const VAR_ONE = String.raw`/^var\(--[a-z0-9-]+\)$/`;
+const VAR_ONE = String.raw`/^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$/`;
+const CANCEL = String.raw`/^calc\(\s*(?:var\(--[a-z0-9-]+\)\s*\*\s*-1|-1\s*\*\s*var\(--[a-z0-9-]+\))\s*\)$/`;
 const VAR_CALC = String.raw`/^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$/`;
 
 /* CSS-wide keywords. Not design values; they are the language, and they are
@@ -343,7 +361,7 @@ const MARGIN_ALLOWLIST = Object.fromEntries(
     'margin-inline-end',
     'margin-block-start',
     'margin-block-end',
-  ].map((prop) => [prop, ['0', 'auto', '0 auto', 'auto 0', ...KEYWORDS]])
+  ].map((prop) => [prop, ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS]])
 );
 
 /* =========================================================================
@@ -505,7 +523,7 @@ export default {
      * review when a brand changes.
      * ------------------------------------------------------------------ */
     {
-      files: ['**/tokens.css', '**/tokens/*.css'],
+      files: ['**/tokens.css', '**/*-tokens.css', '**/*.tokens.css', '**/tokens/*.css'],
       rules: {
         'declaration-property-value-allowed-list': null,
         'color-no-hex': null,
@@ -527,7 +545,7 @@ export default {
      * never has to be.
      * ------------------------------------------------------------------ */
     {
-      files: ['**/theme.css', '**/configs/theme.css'],
+      files: ['**/theme.css', '**/*-theme.css'],
       rules: {
         'declaration-property-value-allowed-list': null,
         'custom-property-pattern': null, // `--text-h1--line-height` is Tailwind's syntax
@@ -545,15 +563,22 @@ export default {
      * itself has hardcoded one of those three and will be wrong in the
      * other two.
      *
-     * THE ESCAPE HATCH, and it is deliberately awkward to use:
+     * What does NOT need an escape hatch: cancelling a known token is Law
+     * 2's third exception and legal in both gates, e.g.
+     * `margin-block-start: calc(var(--stroke-hairline) * -1);`.
+     *
+     * THE ESCAPE HATCH is for a value neither gate accepts, and it is
+     * deliberately awkward to use. One comment carries both directives,
+     * because each tool reads "next line" as the line after the comment:
      *
      *   .tooltip__arrow {
      *     /* stylelint-disable-next-line declaration-property-value-allowed-list --
+     *        design-audit-ignore-next-line: L1, L2 --
      *        Law 2 escape: optical alignment. The arrow's bounding box sits
      *        1px below its visual centre because of the border join; no
      *        parent gap can express a sub-pixel optical correction.
      *        Reviewed by <name>, <date>. *\/
-     *     margin-block-start: calc(var(--space-px) * -1);
+     *     margin-block-start: -1px;
      *   }
      *
      * The justification must name WHY no gap can do the job — optical
@@ -566,7 +591,8 @@ export default {
       files: [
         '**/components/**/*.css',
         '**/ui/**/*.css',
-        'packages/ui/**/*.css',
+        '**/*.module.css',
+        '**/components.css',
       ],
       rules: {
         'declaration-property-value-allowed-list': {
@@ -577,7 +603,10 @@ export default {
          * reaching outside its box. `> *`, `+ *` and descendant element
          * selectors are how one component quietly starts owning another's
          * spacing — which is Law 2 broken from the other direction. */
-        'selector-max-universal': 0,
+        /* Universal selectors after `>` and `+` are the owl, written in the
+         * parent's own rule, which Law 2 allows. After a space (`.card *`)
+         * they still count. */
+        'selector-max-universal': [0, { ignoreAfterCombinators: ['>', '+'] }],
         'selector-max-type': 0,
       },
     },

@@ -66,13 +66,14 @@
     /* Fluid steps. Used where a fixed value would be cramped on desktop or
        absurd on a phone — section rhythm and page gutters, essentially.
        Formula: clamp(min, min + (max-min) * ((100vw - 380px) / (1440 - 380)), max)
-       expressed in vw terms. Regenerate with scripts/generate_space_scale.py
-       if the viewport anchors change; do not hand-tune these. */
+       expressed in vw terms: the slope m = (max-min)/(1440-380) becomes m*100
+       vw, and the intercept min - m*380 becomes rem. If the anchors change,
+       recompute both halves from the formula; do not hand-tune either. */
 
-    --space-fluid-sm:  clamp(1rem,    0.811rem + 0.755vw,  1.5rem);   /* 16 -> 24  */
-    --space-fluid-md:  clamp(1.5rem,  0.943rem + 2.264vw,  3rem);     /* 24 -> 48  */
-    --space-fluid-lg:  clamp(2.5rem,  1.368rem + 4.528vw,  5.5rem);   /* 40 -> 88  */
-    --space-fluid-xl:  clamp(4rem,    2.113rem + 7.547vw,  9rem);     /* 64 -> 144 */
+    --space-fluid-sm:  clamp(1rem,    0.8208rem + 0.755vw, 1.5rem);   /* 16 -> 24  */
+    --space-fluid-md:  clamp(1.5rem,  0.9623rem + 2.264vw, 3rem);     /* 24 -> 48  */
+    --space-fluid-lg:  clamp(2.5rem,  1.4245rem + 4.528vw, 5.5rem);   /* 40 -> 88  */
+    --space-fluid-xl:  clamp(4rem,    2.2075rem + 7.547vw, 9rem);     /* 64 -> 144 */
 
     /* Density dial. Set it with data-density="compact|comfortable|spacious"
        (or .region-compact) on any subtree to compress or expand the semantic
@@ -225,7 +226,8 @@
     /* 500 sits at L 53.5%, not the 58% a naive even ramp would give. That
        extra darkness is what lets --fg-subtle (placeholder text, which IS
        text under SC 1.4.3) clear 4.5:1 on --bg-sunken, the worst light
-       surface it lands on. Verified: 4.60:1. Do not lighten it. */
+       surface it lands on. Verified 4.60:1 (--neutral-500 on --neutral-100).
+       Do not lighten it. */
     --neutral-500: oklch(53.5% 0.009 75);
     --neutral-600: oklch(47.5% 0.009 75);
     --neutral-700: oklch(38.5% 0.008 75);
@@ -280,6 +282,7 @@
     --bg-raised:      var(--neutral-0);     /* menus, popovers (+ shadow)     */
     --bg-sunken:      var(--neutral-100);   /* wells, code blocks, inputs     */
     --bg-inverse:     var(--neutral-900);   /* tooltips, inverted sections    */
+    --bg-scrim:       oklch(0% 0 0 / 0.5);  /* behind a modal or drawer       */
 
     /* Interaction states, as translucent overlays so they compose over any
        surface. This is why you never need a --btn-hover-bg per variant. */
@@ -392,7 +395,7 @@
        modal entrance feels broken; a 400ms hover feels sticky.
        --------------------------------------------------------------------- */
 
-    --dur-instant: 80ms;    /* state swap: checkbox, toggle knob            */
+    --dur-instant: 80ms;    /* state swap: press, checkbox, toggle knob     */
     --dur-fast:    140ms;   /* hover, focus, small fades                    */
     --dur-base:    220ms;   /* dropdowns, tooltips, tab switch              */
     --dur-slow:    320ms;   /* drawers, modals, accordion                   */
@@ -410,6 +413,7 @@
     --motion-exit:    var(--dur-fast)    var(--ease-in);
     --motion-expand:  var(--dur-slow)    var(--ease-in-out);
     --motion-emphasis: var(--dur-slow)   var(--ease-spring);
+    --motion-instant: var(--dur-instant) var(--ease-out);   /* press, toggle, check, pick-up */
     /* Looping motion is a different animal from a transition: it is linear,
        it repeats, and it must NOT be collapsed by reduced-motion — a spinner
        that stops spinning reads as a hung page, which is worse than the
@@ -463,6 +467,7 @@
     --bg-raised:      var(--neutral-900);
     --bg-sunken:      var(--neutral-1000);
     --bg-inverse:     var(--neutral-100);
+    --bg-scrim:       oklch(0% 0 0 / 0.6);  /* 0.5 barely dims a dark page    */
 
     --bg-hover:       oklch(100% 0 0 / 0.06);
     --bg-active:      oklch(100% 0 0 / 0.10);
@@ -473,7 +478,9 @@
     --fg-strong:      var(--neutral-50);
     /* Shifted one step lighter than the light-theme mapping. Dark surfaces
        need MORE lightness separation, not the mirror image of the light
-       ramp: neutral-500 on neutral-1000 is only 4.02:1. Verified 8.22:1. */
+       ramp: neutral-500 on neutral-1000 is only 4.02:1. Verified 13.80:1
+       (--neutral-300 on --neutral-1000) for --fg-muted, and 8.22:1
+       (--neutral-400 on --neutral-1000) for --fg-subtle. */
     --fg-muted:       var(--neutral-300);
     --fg-subtle:      var(--neutral-400);
     --fg-disabled:    var(--neutral-700);

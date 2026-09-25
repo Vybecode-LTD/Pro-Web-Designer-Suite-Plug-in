@@ -2,7 +2,7 @@
 
 The screen set a content model implies, and how each one is built from the suite's layout primitives.
 
-`field-mapping.md` decides what each column becomes. This file decides what the columns get assembled into: which screens exist, how each is composed, what it does at 320px, and — §10 — the states that separate a product from a demo.
+`field-mapping.md` decides what each column becomes. This file decides what the columns get assembled into: which screens exist, how each is composed, what it does at 320px, and — §12 — the states that separate a product from a demo.
 
 Primitives are from `web-design-studio/references/layout-composition.md` and are used by name: `.stack`, `.cluster`, `.row`, `.split`, `.with-sidebar`, `.switcher`, `.grid`, `.center`, `.cover`, `.frame`, `.reel`. Spacing is the proximity ladder, picked by relationship and never by pixels.
 
@@ -233,7 +233,7 @@ Focus goes to the dialog on open, is trapped inside it, and returns to the trigg
 - **Filter state lives in the URL.** A filtered list a user cannot send to a colleague is a filtered list they will screenshot instead.
 - **Filtered-empty is a different screen from empty.** §12.
 
-`ilike` vs `tsvector` changes what the search box can promise — see `supabase-integration.md` §7.
+`ilike` vs `tsvector` changes what the search box can promise — see `supabase-integration.md` §8.
 
 ---
 

@@ -8,7 +8,7 @@ The suite exists because most design-system advice is a style guide — a docume
 
 ## The Nine Laws
 
-Every skill in the suite enforces the same nine laws. They are reproduced verbatim in each skill's `references/token-contract.md` — byte-identical in all thirteen — so any single `.skill` file works standalone.
+Every skill in the suite enforces the same nine laws. They are reproduced verbatim in each skill's `references/token-contract.md` — byte-identical in all thirteen — so each skill carries the laws with it. Most still need web-design-studio beside them to run the gate; see **As individual skills** below.
 
 1. **Tokens or nothing.** Literals live in exactly one file.
 2. **Parents own the gaps.** A child never sets its own outer margin.

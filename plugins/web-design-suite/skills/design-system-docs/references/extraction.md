@@ -100,7 +100,8 @@ Against the canonical token file this recovers 31 dark re-points, 3 density mode
 ```css
 --neutral-500: oklch(53.5% 0.009 75);
 /* 500 sits at L 53.5%, not the 58% a naive even ramp would give. That extra
-   darkness is what lets --fg-subtle clear 4.5:1 on --bg-sunken. Verified 4.60:1. */
+   darkness is what lets --fg-subtle clear 4.5:1 on --bg-sunken.
+   Verified 4.60:1 (--neutral-500 on --neutral-100). */
 ```
 
 That paragraph is the highest-value sentence in the entire token file and it already exists. Extracting it costs nothing and skipping it throws away the one piece of rationale a parser *can* reach.

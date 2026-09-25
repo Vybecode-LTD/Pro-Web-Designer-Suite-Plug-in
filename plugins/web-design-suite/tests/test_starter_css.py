@@ -223,6 +223,65 @@ class StarterInABrowser(TempDirTest):
         self.assertNotIn("rgba(0, 0, 0, 0)", got["focusOutline"], got)
         self.assertTrue(got["dialogFits"] and got["dialogScrolls"], got)
 
+    def test_the_caveat_fix_keeps_the_ring_visible_in_a_clipping_ancestor(self):
+        """reset.css's CAVEAT said an outline is NOT clipped by an ancestor's
+        overflow: hidden and told readers to swap to one. Both rings are
+        clipped; the fix the CAVEAT prescribes is applied here as written."""
+        caveat = re.search(r"/\*\s*CAVEAT(.*?)\*/", (STYLES / "reset.css").read_text(encoding="utf-8"), re.S)
+        self.assertIsNotNone(caveat, "reset.css lost its focus-ring CAVEAT")
+        recipes = [" ".join(s.split()) for s in re.findall(r"`([^`]*)`", caveat.group(1))
+                   if "outline" in s and ":" in s]
+        self.assertTrue(recipes, "the CAVEAT no longer quotes a declaration to copy")
+        links = "".join(f'<link rel="stylesheet" href="{(STYLES / f).as_uri()}">'
+                        for f in ("reset.css", "tokens.css", "base.css"))
+        page = self.write("clip.html", f"""<!doctype html><html lang="en"><head><title>t</title>
+<style>@layer reset, tokens, base, layout, components;
+@layer components {{
+  .wrap {{ overflow: hidden; inline-size: max-content; margin: 24px; }}
+  #wrap-visible {{ overflow: visible; }}
+  .wrap > button {{ display: block; }}
+  #inside:focus-visible {{ {recipes[-1]} }}
+}}</style>{links}</head>
+<body><div class="wrap" id="wrap-visible"><button id="visible">Save</button></div>
+<div class="wrap" id="wrap-outside"><button id="outside">Save</button></div>
+<div class="wrap" id="wrap-inside"><button id="inside">Save</button></div></body></html>""")
+        probe = self.write("clip.mjs", PROBE.split("const page =")[0] + CLIP_PROBE)
+        modules = next(p for p in [os.environ.get("WDS_NODE_MODULES", "")] +
+                       os.environ.get("NODE_PATH", "").split(os.pathsep)
+                       if p and os.path.isdir(os.path.join(p, "playwright")))
+        proc = subprocess.run([NODE, str(probe), str(page)], capture_output=True, timeout=180,
+                              env=env(NODE_PATH=modules))
+        if proc.returncode == 3:
+            self.skipTest(output(proc))
+        self.assertEqual(proc.returncode, 0, output(proc))
+        seen = json.loads(proc.stdout.decode("utf-8").strip().splitlines()[-1])
+        # visible: the positive control, proving the probe sees a ring at all.
+        self.assertEqual(seen, {"visible": True, "outside": False, "inside": True},
+                         f"CAVEAT recipe applied: {recipes[-1]}")
+
+
+# Tab to each button in turn and ask: did any pixel change in and around its
+# wrapper? A ring drawn outside a clipping wrapper is clipped away entirely.
+CLIP_PROBE = r"""
+const page = await browser.newPage({ viewport: { width: 500, height: 400 } });
+await page.goto(pathToFileURL(process.argv[2]).href);
+const ids = ['visible', 'outside', 'inside'];
+const regions = {}, before = {}, seen = {};
+for (const id of ids) {
+  const b = await page.locator('#wrap-' + id).boundingBox();
+  regions[id] = { x: b.x - 12, y: b.y - 12, width: b.width + 24, height: b.height + 24 };
+  before[id] = await page.screenshot({ clip: regions[id] });
+}
+for (const id of ids) {
+  await page.keyboard.press('Tab');
+  const focused = await page.evaluate(() => document.activeElement?.id);
+  seen[id] = focused === id ? !before[id].equals(await page.screenshot({ clip: regions[id] }))
+                            : 'focus went to ' + focused;
+}
+console.log(JSON.stringify(seen));
+await browser.close();
+"""
+
 
 if __name__ == "__main__":
     unittest.main()

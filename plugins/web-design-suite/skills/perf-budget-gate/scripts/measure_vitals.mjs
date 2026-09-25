@@ -53,6 +53,8 @@
  *   --dpr N            device pixel ratio                        (default 2)
  *   --resources N      how many of the largest resources to print (default 10)
  *   --json             machine-readable output
+ *   --report FILE      also write the --json output to FILE; the text report
+ *                      still prints, so a CI log has something a person reads
  *   --browser PATH     chromium executable   (default: found, see below)
  *   --quiet
  *
@@ -60,7 +62,10 @@
  * executablePath: --browser, else PERF_CHROMIUM, else the first that starts of
  * /opt/pw-browsers/chromium, Playwright's own Chromium, and an installed
  * Chrome or Edge. It fails with instructions if none of them starts.
- * Install the module with PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D playwright.
+ * Install the module with PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D -E playwright
+ * to use the Chrome you have. In CI, pin the browser instead: install the
+ * Chromium the locked Playwright was built for (npx playwright install
+ * chromium), which this script tries first. references/ci-integration.md §3.
  *
  * Exit codes
  * ----------
@@ -110,6 +115,7 @@ function parseArgs(argv) {
     dpr: 2,
     resources: 10,
     json: false,
+    report: null,
     browser: process.env.PERF_CHROMIUM || '',
     quiet: false,
   };
@@ -141,6 +147,7 @@ function parseArgs(argv) {
       case '--dpr': opts.dpr = num(need(i, a), a); i++; break;
       case '--resources': opts.resources = num(need(i, a), a); i++; break;
       case '--json': opts.json = true; break;
+      case '--report': opts.report = need(i, a); i++; break;
       case '--browser': opts.browser = need(i, a); i++; break;
       case '--quiet': opts.quiet = true; break;
       case '--viewport': {
@@ -562,11 +569,36 @@ function globMatch(pattern, value) {
 }
 
 // A budget saved by PowerShell (`>`, Out-File) or Notepad is UTF-16 or starts
-// with a byte-order mark, and JSON.parse rejects both.
+// with a byte-order mark, and JSON.parse rejects both. It is also JSONC: the
+// docs put the device and network in a comment (references/budgets.md §6), so
+// comments and trailing commas are dropped outside strings, as perf_audit.py
+// does.
 function readJsonFile(file) {
   const buf = fs.readFileSync(file);
   const utf16 = buf[0] === 0xFF && buf[1] === 0xFE;
-  return JSON.parse(buf.toString(utf16 ? 'utf16le' : 'utf8').replace(/^﻿/, ''));
+  const text = buf.toString(utf16 ? 'utf16le' : 'utf8').replace(/^﻿/, '');
+  let out = '';
+  let code = '';
+  const flush = () => { out += code.replace(/,(\s*[}\]])/g, '$1'); code = ''; };
+  for (let i = 0; i < text.length;) {
+    if (text[i] === '"') {
+      let j = i + 1;
+      while (j < text.length && text[j] !== '"') j += text[j] === '\\' ? 2 : 1;
+      flush();
+      out += text.slice(i, j + 1);
+      i = j + 1;
+    } else if (text.startsWith('//', i)) {
+      const j = text.indexOf('\n', i);
+      i = j < 0 ? text.length : j;
+    } else if (text.startsWith('/*', i)) {
+      const j = text.indexOf('*/', i + 2);
+      i = j < 0 ? text.length : j + 2;
+    } else {
+      code += text[i++];
+    }
+  }
+  flush();
+  return JSON.parse(out);
 }
 
 function loadLabBudget(file, pageType) {
@@ -712,6 +744,9 @@ async function main() {
       'server (python3 -m http.server) and point this at that instead.');
   }
 
+  // Read the budget before measuring: a typo found after N runs costs them all.
+  const lab = loadLabBudget(opts.budget, opts.pageType);
+
   const { chromium } = await loadPlaywright();
   const launched = await launchBrowser(chromium, opts.browser, {
     args: ['--force-color-profile=srgb', '--disable-lcd-text',
@@ -776,7 +811,6 @@ async function main() {
     (a, b) => (Math.abs((b.lcp ?? 1e9) - medLcp) < Math.abs((a.lcp ?? 1e9) - medLcp) ? b : a),
     runs[0]);
 
-  const lab = loadLabBudget(opts.budget, opts.pageType);
   const breaches = [];
   if (lab) {
     const map = { lcp_ms: 'lcp', cls: 'cls', tbt_ms: 'tbt', inp_ms: 'inp',
@@ -828,6 +862,10 @@ async function main() {
     })),
   };
 
+  if (opts.report) {
+    fs.mkdirSync(path.dirname(path.resolve(opts.report)), { recursive: true });
+    fs.writeFileSync(opts.report, JSON.stringify(out, null, 2) + '\n');
+  }
   process.stdout.write(opts.json
     ? JSON.stringify(out, null, 2) + '\n'
     : textReport(out));

@@ -2037,6 +2037,7 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
 {line("--bg-raised:", "var(--neutral-0);")}
 {line("--bg-sunken:", "var(--neutral-100);")}
 {line("--bg-inverse:", "var(--neutral-900);")}
+    --bg-scrim:       oklch(0% 0 0 / 0.5);
 
     --bg-hover:       oklch(0% 0 0 / 0.04);
     --bg-active:      oklch(0% 0 0 / 0.08);
@@ -2133,6 +2134,11 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
     --motion-exit:     var(--dur-fast)  var(--ease-in);
     --motion-expand:   var(--dur-slow)  var(--ease-in-out);
     --motion-emphasis: var(--dur-slow)  var(--ease-spring);
+    --motion-instant:  var(--dur-instant) var(--ease-out);
+    /* Looping motion keeps its own duration, out of the reduced-motion
+       block: a spinner that stops reads as a hung page. */
+    --dur-loop:        900ms;
+    --motion-loop:     var(--dur-loop) var(--ease-linear);
 
     /* ---------------------------------------------------------------------
        9. Z-INDEX — a closed ladder. Never write a literal z-index again.
@@ -2173,6 +2179,7 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
     --bg-raised:      var(--neutral-900);
     --bg-sunken:      var(--neutral-1000);
     --bg-inverse:     var(--neutral-100);
+    --bg-scrim:       oklch(0% 0 0 / 0.6);
 
     --bg-hover:       oklch(100% 0 0 / 0.06);
     --bg-active:      oklch(100% 0 0 / 0.10);

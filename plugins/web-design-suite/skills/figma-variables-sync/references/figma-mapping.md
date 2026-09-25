@@ -249,8 +249,10 @@ anything appearing to break.
 > font size shows a variable chip or a bare number. Bare numbers mean the type
 > scale in the file is decorative.
 
-The REST boundary is lossy here too. `GET /v1/files/:file_key/styles` returns
-*metadata* — `key`, `file_key`, `node_id`, `style_type`, `name`, `description` —
+The REST boundary is lossy here too. `GET /v1/files/:file_key/styles` is not
+Enterprise-gated (scope `library_content:read`), but it returns **published**
+styles only: a file whose styles are still drafts gives an empty list. And it
+returns *metadata* — `key`, `file_key`, `node_id`, `style_type`, `name`, `description` —
 not the type properties. For the actual `fontSize` and `lineHeightPx` you read
 the nodes the style is applied to (`GET /v1/files/:file_key/nodes`) and match on
 `styles.text`. Both scripts accept either shape: metadata alone (the name is
@@ -511,8 +513,11 @@ The GETs are Tier 2 for rate limiting; the POST is Tier 3.
 > **The plan gate is the single most important fact in this document.** The
 > Variables REST API has been Enterprise-only since it launched in June 2023. If
 > the company is on Professional or Organization, **no amount of scripting gets
-> variables out over the API** — the exported-JSON path is not a fallback, it is
-> the only path. Confirm the plan before promising anyone a pipeline.
+> variables out over the REST API**. Scripting is still possible: the Plugin API
+> reads and writes variables on every plan, and Figma's MCP server runs Plugin
+> API code through `use_figma` (a Dev seat reads, a Full seat writes outside
+> drafts). Without either, the exported JSON is the path. Confirm the plan
+> before promising anyone a pipeline.
 
 ### `GET …/variables/local` response
 
@@ -568,9 +573,9 @@ names the initial mode on the collection and only `CREATE`s the extra modes.
 
 | Need | Enterprise | Everyone else |
 |---|---|---|
-| Read variables | `GET …/variables/local` | A plugin export (SKILL.md, step 1) |
-| Write variables | `POST …/variables` | `--reverse` builds the payload; a plugin or a human imports it |
-| Read styles | `GET …/styles` + `GET …/nodes` | The same plugin export, or a screenshot and a conversation |
+| Read variables | `GET …/variables/local` | A plugin export (SKILL.md, step 1), or the MCP server's `get_variable_defs` |
+| Write variables | `POST …/variables` | `--reverse` builds the payload; a plugin, `use_figma` through the MCP server, or a human imports it |
+| Read styles | `GET …/styles` + `GET …/nodes`, published styles only | The same calls: they need no Enterprise plan. Draft styles need the plugin export |
 | Automate on merge | CI hits the API | CI checks the committed export; a human re-exports when the file changes |
 
 Figma announced native import and export of variables conforming to the W3C

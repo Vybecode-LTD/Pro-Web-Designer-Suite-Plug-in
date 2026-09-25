@@ -115,12 +115,31 @@ Vertical rhythm. The default answer to "these go one above another", and the rea
 
 Stack for containers that must stay block containers.
 
+<!-- snippet: layout.css#flow -->
 ```css
-.flow { --flow-gap: var(--space-block); }
-.flow > * + * { margin-block-start: var(--flow-gap); }
-.flow > :is(h2, h3, h4) { margin-block-start: var(--space-subsection); }
-.flow > :is(h2, h3, h4) + * { margin-block-start: var(--gap-related); }
-.flow > :first-child { margin-block-start: var(--space-0); }
+:is(.flow, .prose) {
+  --flow-gap: var(--space-block);
+}
+:is(.flow, .prose) > * + * { margin-block-start: var(--flow-gap); }
+
+/* A heading belongs to the thing it introduces: far from what came before,
+   scaled to its rank, and close to what follows. Proximity does the work a
+   horizontal rule would otherwise do. Above to below is at least 2:1 at
+   every width: h2 40→88 : 12, h3 40 : 12, h4 24 : 12. */
+:is(.flow, .prose) > * + h2 { margin-block-start: var(--space-subsection); }
+:is(.flow, .prose) > * + h3 { margin-block-start: var(--gap-distinct); }
+:is(.flow, .prose) > * + :is(h4, h5, h6) { margin-block-start: var(--gap-separate); }
+
+/* Written after the heading rules, at equal specificity, so a heading that
+   follows a heading takes this tight gap too: two stacked headings are a
+   title and its subtitle, not two sections. */
+:is(.flow, .prose) > :is(h1, h2, h3, h4, h5, h6) + * {
+  margin-block-start: var(--gap-related);
+}
+
+/* An <hr> means "the subject changes": subsection weight on both sides. */
+:is(.flow, .prose) > * + hr,
+:is(.flow, .prose) > hr + * { margin-block-start: var(--space-subsection); }
 ```
 
 **Use Flow, not Stack, when any of these holds:**
@@ -395,12 +414,22 @@ Rule of thumb: **if a component would answer the question differently inside a s
 
 ### Container queries, with the gotchas
 
+<!-- snippet: layout.css#media-object -->
 ```css
-.region { container-type: inline-size; container-name: region; }
+.region {
+  container-type: inline-size;
+  container-name: region;
+}
 
+/* Example contract, and the pattern to copy: a media object that is stacked
+   while its CONTAINER is narrow and horizontal once there is room —
+   regardless of viewport width, so it is correct in a page, a sidebar and a
+   modal with no extra rules. */
 .media-object {
+  --media-object-gap: var(--gap-grouped);
   --media-object-rail: calc(var(--width-content) / 6);
-  display: grid; gap: var(--media-object-gap);
+  display: grid;
+  gap: var(--media-object-gap);
   grid-template-columns: 1fr;
 }
 @container region (inline-size >= 30rem) {   /* --bp-sm */
@@ -411,9 +440,9 @@ Rule of thumb: **if a component would answer the question differently inside a s
 Six things that break, in the order people hit them:
 
 1. **An element cannot query itself.** You always need a wrapper. This is why `.region` is its own class rather than folded into `.card`.
-2. **`container-type: inline-size` applies `contain: layout style inline-size`.** The element's inline size is computed *without looking at its contents*, so it can no longer be sized *by* them. Do not put it on a float, on an inline-block meant to hug its text, or on an item in an `auto` / `min-content` grid track — it will collapse or stretch unexpectedly.
+2. **`container-type: inline-size` applies inline-size and style containment, and makes the element a new formatting context.** It no longer applies layout containment: the CSS Working Group dropped that in 2024, and browsers followed. Inline-size containment means the element's inline size is computed *without looking at its contents*, so it can no longer be sized *by* them. Do not put it on a float, on an inline-block meant to hug its text, or on an item in an `auto` / `min-content` grid track — it will collapse or stretch unexpectedly.
 3. **`container-type: size` contains both axes**, so the element's height stops coming from its children and it collapses to zero unless you give it an explicit `block-size`. This is why `inline-size` is almost always right; reserve `size` for something already fixed-height, like a full-screen panel.
-4. **`contain: layout` makes the container a containing block for absolutely *and* fixed-positioned descendants.** A `position: fixed` modal rendered inside a container is positioned relative to that container, not the viewport. Portal such things to `<body>`, or do not containerise the ancestor.
+4. **A container is a new formatting context.** Margins stop collapsing through it: a child's top margin stays inside the container instead of pushing the container down, so a parent margin and a child margin that used to merge now add up. Floats inside it stay inside it. (A `position: fixed` descendant is placed against the viewport, as anywhere else. Older advice to move fixed modals out of containers dates from when containers applied layout containment.)
 5. **`contain: style` scopes CSS counters and quotes.** An ordered list numbered with counters restarts inside the container.
 6. **`display: contents` elements cannot be containers.** `container-type` on them has no effect — silently.
 
@@ -460,6 +489,7 @@ The same automatic-minimum rule applies to flex items, where the fix is `min-inl
 
 The most useful thing in this file. Five named lines produce three addressable widths, and a child opts into one with a single declaration — no negative margins, no `100vw`, no `overflow-x` casualties.
 
+<!-- snippet: layout.css#page-grid -->
 ```css
 .page-grid {
   --page-gutter:  var(--gutter-page);
@@ -476,9 +506,10 @@ The most useful thing in this file. Five named lines produce three addressable w
     minmax(var(--page-gutter), 1fr) [full-end];
 }
 
-.page-grid > *            { grid-column: content; }
-.page-grid > .bleed-wide  { grid-column: wide; }
-.page-grid > .bleed-full  { grid-column: full; }
+/* Default: everything sits in the content column. Opt out explicitly. */
+.page-grid > * { grid-column: content; }
+.page-grid > .bleed-wide { grid-column: wide; }
+.page-grid > .bleed-full { grid-column: full; }
 ```
 
 ```html
@@ -524,9 +555,9 @@ Without subgrid, three cards in a row lay out independently: a two-line title in
 }
 ```
 
-**Contract.** The card must have exactly `--card-rows` top-level children (default 3: header, body, footer) and set no gap of its own — the parent grid's `row-gap` becomes the card's internal gap. That is usually what you want and occasionally is not; if it is not, do not fight it. Use `.stack--fill` inside a normal grid and accept the misalignment, or wrap.
+**Contract.** The card must have exactly `--card-rows` top-level children (default 3: header, body, footer). It takes the parent grid's `row-gap` as its internal gap unless it sets a `row-gap` of its own, which a subgrid may do. If the shared alignment itself is not what you want, do not fight it: use `.stack--fill` inside a normal grid and accept the misalignment, or wrap.
 
-**Support.** All current evergreen browsers; Safari was last in, in 2023. The `@supports` guard leaves older engines with independent cards, which degrades to "slightly uneven", never "broken" — the right shape for a progressive enhancement.
+**Support.** All current evergreen browsers. Firefox shipped it in 2019 and Safari in 2022 (16); Chrome was last, with 117 in September 2023. The `@supports` guard leaves older engines with independent cards, which degrades to "slightly uneven", never "broken" — the right shape for a progressive enhancement.
 
 ---
 
@@ -638,14 +669,22 @@ Who owns the space between two sections? Law 2 says the parent — but a parent'
 
 A page is therefore in exactly one of two modes, and **you never mix them on one shell.** Mixing is the single commonest cause of "why is there 200px of space here".
 
+<!-- snippet: layout.css#sections -->
 ```css
-.sections { --sections-gap: var(--space-section); row-gap: var(--sections-gap); }
+.sections {
+  --sections-gap: var(--space-section);
+  row-gap: var(--sections-gap);
+}
 .sections--banded { --sections-gap: var(--space-0); }
 
-.band { --band-pad-block: var(--space-subsection); padding-block: var(--band-pad-block); }
+.band {
+  --band-pad-block: var(--space-subsection);
+  padding-block: var(--band-pad-block);
+}
 .band--tight { --band-pad-block: var(--space-block); }
 .band--loose { --band-pad-block: var(--space-section); }
-.band--flush { --band-pad-block: var(--space-0); }
+.band--flush { --band-pad-block: var(--space-0); }   /* edge-to-edge media */
+.band--sunken { background: var(--bg-sunken); }     /* paint lives here, not in style="" */
 ```
 
 | Mode | Parent | Child | Boundary measures |
@@ -664,7 +703,7 @@ Two consequences worth stating, because both look like bugs until you see the re
 
 ```html
 <main class="page-grid sections--banded">
-  <section class="band bleed-full" style="background: var(--bg-sunken)">
+  <section class="band band--sunken bleed-full">
     <div class="page-grid"><div class="stack">…content, back in the column…</div></div>
   </section>
 </main>

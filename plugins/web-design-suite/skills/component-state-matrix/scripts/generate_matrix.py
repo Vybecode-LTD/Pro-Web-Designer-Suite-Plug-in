@@ -1203,9 +1203,11 @@ CHROME_CSS = r"""
   }
 
   /* ---- 3. VARIANTS ----------------------------------------------------- */
-  .msheet__mark--ok  { background: var(--bg-success); color: var(--fg-on-inverse); }
-  .msheet__mark--gap { background: var(--bg-danger);  color: var(--fg-on-accent); }
-  .msheet__mark--na  { background: var(--bg-disabled); color: var(--fg-disabled); }
+  /* Status text on a quiet pill, not white on a solid status fill: no one text
+     role clears 4.5:1 on --bg-success or --bg-danger in both themes. */
+  .msheet__mark--ok  { background: var(--bg-raised);   color: var(--fg-success); }
+  .msheet__mark--gap { background: var(--bg-raised);   color: var(--fg-danger); }
+  .msheet__mark--na  { background: var(--bg-disabled); color: var(--fg-muted); }
 
   .msheet__rowhead--gap { border-inline-start: var(--stroke-thick) solid var(--bg-danger); }
 

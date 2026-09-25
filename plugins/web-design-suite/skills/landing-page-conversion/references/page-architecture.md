@@ -341,3 +341,45 @@ Section boundaries are a reading aid, not decoration. The reader uses them to de
 ---
 
 Related: `references/copy-patterns.md` (what goes inside each of these blocks), `references/conversion-audit.md` (checking an existing page's architecture against this model), `assets/page-sections.css` (the shells), and `web-design-studio`'s `references/spacing-system.md` §10 for page rhythm and `references/layout-composition.md` for the primitives named throughout.
+
+---
+
+## 8. Wiring sections to the design system
+
+Now, and not before, express the structure in layout primitives from `web-design-studio`:
+
+| Section shape | Primitive | Gap token |
+|---|---|---|
+| Page shell with full-bleed bands | `.page-grid` + `.sections--banded` | band owns `--space-subsection` |
+| Hero: copy beside media | `.split.split--2-1` inside `.cover--partial` | `--gap-separate` |
+| Hero: headline stack | `.stack--tight` (eyebrow → h1 → sub) | `--gap-tight` |
+| 3-up value props | `.switcher.switcher--max-3` | `--gap-grouped` |
+| Feature deep-dive rows | `.split`, alternating | `--gap-separate` |
+| Logo strip / testimonial wall | `.grid.grid--min-xs` / `.grid--min-sm` | `--gap-grouped` |
+| Pricing tiers | `.switcher.switcher--max-3` | `--gap-grouped` |
+| FAQ | `.stack--related` of `<details>` | `--gap-related` |
+| Final CTA | `.center--intrinsic` inside a band | `--gap-separate` |
+
+`assets/page-sections.css` implements the section shells against these primitives using only Tier-2 tokens. It passes `audit_design.py` clean, so a page built from it is on-system from the first commit instead of being migrated later.
+
+Two spacing facts that decide more of a marketing page's feel than anything else:
+
+- **A marketing page runs at `data-density="spacious"` (1.125).** Density is a dial (Law 7), not a second stylesheet. Marketing copy needs more air than an admin table; that is a context, not a component difference.
+- **Pick one rhythm mode and keep it.** Banded (each section paints a background and owns `padding-block`) or unbanded (the parent owns `row-gap`). Mixing them on one page produces a boundary of `--space-section + --space-subsection` that nobody can reason about. Most landing pages want banded, because alternating surfaces is how a reader perceives sections as separate arguments.
+
+The shape of the whole page, in eleven lines:
+
+```html
+<main class="page-grid sections sections--banded" data-density="spacious">
+  <section class="band section hero bleed-full">…</section>            <!-- hero    -->
+  <section class="band band--tight section section--sunken">…</section>  <!-- proof   -->
+  <section class="band section">…</section>                             <!-- props   -->
+  <section class="band section section--surface bleed-full">…</section> <!-- how     -->
+  <section class="band section">…</section>                             <!-- quotes  -->
+  <section class="band section section--surface bleed-full">…</section> <!-- pricing -->
+  <section class="band section section--sunken">…</section>             <!-- faq     -->
+  <section class="band band--loose section section--inverse bleed-full">…</section>
+</main>
+```
+
+Every section is a `.band` even when it paints nothing — a transparent band keeps the rhythm one rule instead of two (`web-design-studio`, `layout.css` §0.2). Sections that paint a background take `.bleed-full` and nest a second `.page-grid` inside so the colour runs edge to edge while the copy stays in the content column. That is the whole full-bleed mechanism; no negative margins are involved, which is why it does not produce horizontal scroll when a scrollbar appears.

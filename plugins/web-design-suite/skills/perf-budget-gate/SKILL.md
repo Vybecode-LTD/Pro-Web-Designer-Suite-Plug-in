@@ -1,6 +1,6 @@
 ---
 name: perf-budget-gate
-description: Derive, set and enforce web performance budgets, then fail the build when they break. Use for Core Web Vitals, LCP, CLS, INP, TBT and TTFB, "the site is slow", "why is my LCP four seconds", page weight and bundle size limits, image optimization and oversized hero images, font loading performance and layout shift from font swap, render-blocking CSS, third-party script weight, Lighthouse in CI, and performance regression testing against a committed baseline. Reach for it whenever anyone mentions performance budgets, page speed, load time, largest contentful paint, cumulative layout shift, interaction to next paint, lazy loading, preload, preconnect, fetchpriority, code splitting, critical CSS, srcset, AVIF or WebP, PageSpeed Insights, CrUX or field data — and any time a site is beautiful, fully tokenized, and still takes four seconds to show anything.
+description: Derive, set and enforce web performance budgets, and fail the build when they break, with static weight and markup checks on every commit and measured Core Web Vitals on each PR. Use for 'the site is slow', LCP, CLS, INP and page weight. Not for back-end or database performance, or accessibility scores (a11y-audit-runner).
 ---
 
 # Performance Budget Gate
@@ -29,7 +29,7 @@ The suite has a design gate and no performance gate. That asymmetry is exactly h
 | Blind to | a 900 KB hero that uses every token correctly | a hardcoded colour in a 12 KB stylesheet |
 | Fails when | someone writes `margin: 24px` | someone adds a dependency |
 
-Run both. They fail for different reasons and both failures are actionable. They overlap in exactly one place and it is the right one: `transition: width` is a design violation (it animates a property nobody chose) *and* a performance violation (it relayouts every frame and shifts its siblings). Two independent reasons, same line.
+Run both. They fail for different reasons and both failures are actionable. Do not expect one to cover the other. `transition: width var(--motion-expand)` passes the design audit, because every value in it is a token, and `perf_audit.py` warns on it (`animated-layout-prop`: it relayouts every frame and shifts its siblings).
 
 ---
 
@@ -241,7 +241,7 @@ Four things it does that most runtime checks do not:
 - **It names the nodes in the largest CLS session window**, with the timestamp of each shift.
 - **It refuses to invent an INP.** A page nobody touched has no interaction latency, so it prints `n/a` and says TBT is the proxy. It also reports total blocking time alongside TBT, because a long task that finishes before FCP contributes **zero** TBT while being the worst thing on the page.
 
-**The browser is never downloaded.** It launches with an explicit `executablePath` (`--browser`, else `$PERF_CHROMIUM`, else the first that starts of `/opt/pw-browsers/chromium`, Playwright's own Chromium, an installed Chrome or Edge) and fails with instructions if none of them starts. Install the module with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D playwright`.
+**The browser is never downloaded.** It launches with an explicit `executablePath` (`--browser`, else `$PERF_CHROMIUM`, else the first that starts of `/opt/pw-browsers/chromium`, Playwright's own Chromium, an installed Chrome or Edge) and fails with instructions if none of them starts. Install the module with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D -E playwright` to use the Chrome you have. CI pins the browser instead. It installs the Chromium that the locked Playwright was built for, which the script tries first (`references/ci-integration.md` §3).
 
 **Serve the page over HTTP.** `file://` has no network stack — TTFB is ~0, resource priorities do not apply, throttling barely bites, and every number flatters you. The script warns and keeps going if you insist.
 
@@ -249,59 +249,7 @@ Four things it does that most runtime checks do not:
 
 ## What a failing run looks like
 
-Static layer. The ledger comes first because the answer is usually in it:
-
-```
-Weight ledger   (budget: perf-budget.json)
-             transfer     budget    used  requests
-  total        7.72MB    600.0KB   1287%  10
-  html           487B     25.0KB      2%  1
-  css            661B     60.0KB      1%  4
-  js             538B    170.0KB      0%  2
-  image        7.67MB    300.0KB   2557%  2
-  font         49.1KB    100.0KB     49%  1
-
-  Largest assets
-       5.30MB  image  images/card.png  1800x1200
-       2.37MB  image  images/hero.jpg  2400x1350
-
-index.html
-     16  error  C img-no-dimensions   `<img>` has no width/height: hero.jpg.
-     16  error  L lcp-lazy            Likely LCP image is `loading="lazy"`: hero.jpg.
-<images>
-      1  error  W oversized-image     images/hero.jpg is 2400x1350 intrinsic but renders
-                                      at 720px wide (3.3x). 2.37MB where ~854.9KB would
-                                      look identical.
-```
-
-Runtime layer, same page:
-
-```
-Metric      median      min       max    spread  rating
-  LCP          312       284       420      44%  good
-  CLS        0.269     0.269     0.269       0%  poor
-  long tasks    1 task(s), longest 123ms, 73ms blocking in total
-
-  LCP element   html > body > main.page > div.card:nth-of-type(1) > img
-
-  LCP sub-parts                        target
-    TTFB                       3ms     1%   ~40%
-    resource load delay       14ms     4%   <10%
-    resource load duration    50ms    16%   ~40%
-    element render delay     245ms    79%   <10%     ← the bug
-
-  Largest CLS window (worst run)
-     0.18366  at   421ms  html > body > main.page
-     0.08567  at   852ms  html > body > header.hero, html > body > main.page
-```
-
-Read it in this order, because that is the order of yield:
-
-1. **The ledger's `used` column.** One number over 1000% is one file, and one file is an afternoon.
-2. **The LCP element line.** It is frequently not what you assumed, and everything else is wasted until it is right.
-3. **The sub-part with the wrong share.** 79% render delay is not a bytes problem; it is CSS, fonts or the main thread.
-4. **The CLS window's nodes and timestamps.** A shift at 421 ms sourced at `main` means something above `main` grew.
-5. **Then the individual findings**, which by now you already know the shape of.
+A failing run of both scripts, and how to read it from the top: `references/diagnosis.md` §12.
 
 ---
 

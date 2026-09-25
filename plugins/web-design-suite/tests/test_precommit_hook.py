@@ -73,7 +73,9 @@ class PreCommitHook(TempDirTest):
     def run_hook(self, **env_changes):
         env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
         env.pop("DESIGN_GATE_BYPASS", None)
-        env.update({"DESIGN_GATE_PYTHON": PY, **env_changes})
+        # stylelint is not installed here, so the CSS stage may skip. The tests
+        # about a missing config pass DESIGN_GATE_ALLOW_SKIP=None.
+        env.update({"DESIGN_GATE_PYTHON": PY, "DESIGN_GATE_ALLOW_SKIP": "1", **env_changes})
         env = {k: v for k, v in env.items() if v is not None}
         proc = subprocess.run([SH, str(HOOK)], cwd=self.repo, env=env, capture_output=True, timeout=180)
         return proc.returncode, (proc.stdout + proc.stderr).decode("utf-8", "replace")
@@ -139,11 +141,131 @@ class PreCommitHook(TempDirTest):
         self.assertEqual(code, 1, out)                  # the design audit still refuses
         self.assertIn("13px", out)
 
+    def lightened_tokens(self) -> str:
+        """The starter's tokens with --neutral-500 lifted from L 53.5% to 60%:
+        --fg-subtle then fails 4.5:1 on the sunken well."""
+        css = TOKENS.read_text(encoding="utf-8")
+        lifted = css.replace("--neutral-500: oklch(53.5%", "--neutral-500: oklch(60%", 1)
+        self.assertNotEqual(css, lifted)
+        return lifted
+
+    def test_role_pairs_are_checked_when_a_tokens_file_is_staged(self):
+        """SS-C2: check_roles runs in the hook, once vendored (the harness
+        vendors every studio script)."""
+        self.stage("styles/tokens.css", self.lightened_tokens())
+        code, out = self.run_hook()
+        self.assertEqual(code, 1, out)
+        self.assertIn("check_roles", out)
+        self.assertIn("--fg-subtle on --bg-sunken", out)
+
+    def test_the_starters_palette_passes_the_role_stage(self):
+        self.stage("styles/tokens.css", TOKENS.read_text(encoding="utf-8"))
+        code, out = self.run_hook()
+        self.assertEqual(code, 0, out)
+
+    def test_the_role_stage_is_opt_in(self):
+        (self.repo / "scripts" / "check_roles.py").unlink(missing_ok=True)
+        self.stage("styles/tokens.css", self.lightened_tokens())
+        code, out = self.run_hook()
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("check_roles", out)
+
     def test_a_staged_readme_does_not_block_the_commit(self):
         self.vendor_a11y()
         self.stage("README.md", 'Avoid <div className="p-[13px]"> and <img src="x.png">.\n')
         code, out = self.run_hook()
         self.assertEqual(code, 0, out)
+
+    # --- 3.2.0: SB-C7, SB-A16 (b)-(e) -----------------------------------------
+
+    def test_a_missing_stylelint_config_fails_unless_skipping_is_allowed(self):
+        """(b) The default path, assets/configs/, is not in the canonical tree,
+        and a missing config was a silent SKIPPED that let the commit through."""
+        self.stage("components/card.css", "@layer components {\n  .card { padding: var(--pad-card); }\n}\n")
+        code, out = self.run_hook(DESIGN_GATE_ALLOW_SKIP=None)
+        self.assertEqual(code, 1, out)
+        self.assertIn("stylelint config", out)
+        code, out = self.run_hook(DESIGN_GATE_ALLOW_SKIP="1")
+        self.assertEqual(code, 0, out)
+        self.assertIn("SKIPPED", out)
+
+    def test_a_missing_audit_fails_unless_skipping_is_allowed(self):
+        (self.repo / "scripts" / "audit_design.py").unlink()
+        self.stage("site/index.html", '<!doctype html><html lang="en"><title>t</title>'
+                                      '<main><h1>Hi</h1></main></html>\n')
+        code, out = self.run_hook(DESIGN_GATE_ALLOW_SKIP=None)
+        self.assertEqual(code, 1, out)
+        self.assertIn("audit_design", out)
+
+    def stub_npx(self):
+        bin_dir = self.tmp / "stub-bin"
+        bin_dir.mkdir(exist_ok=True)
+        npx = bin_dir / "npx"
+        npx.write_text('#!/bin/sh\nprintf "%s\\n" "$@" >> "$NPX_LOG"\nexit 0\n',
+                       encoding="utf-8", newline="\n")
+        npx.chmod(0o755)
+        return bin_dir
+
+    def test_eslint_is_not_failed_by_a_file_it_ignores(self):
+        """(c) --max-warnings 0 turned "File ignored because of a matching
+        ignore pattern" into a refused commit."""
+        bin_dir = self.stub_npx()
+        log = self.tmp / "npx.log"
+        self.stage("src/Card.tsx", "export const Card = () => <div className=\"p-card\" />;\n")
+        code, out = self.run_hook(PATH=str(bin_dir) + os.pathsep + os.environ["PATH"],
+                                  NPX_LOG=str(log))
+        self.assertEqual(code, 0, out)
+        args = log.read_text(encoding="utf-8").split("\n")
+        self.assertIn("eslint", args)
+        self.assertIn("--no-warn-ignored", args)
+
+    def test_a_linked_worktree_logs_the_bypass_in_the_shared_git_dir(self):
+        """(d) In a linked worktree .git is a file: the log write failed with
+        "Not a directory" and the hook still said it had recorded the bypass."""
+        subprocess.run([GIT, "-C", str(self.repo), "-c", "user.email=a@b.c", "-c", "user.name=a",
+                        "commit", "-q", "--allow-empty", "-m", "root"], check=True, capture_output=True)
+        worktree = self.tmp / "wt"
+        subprocess.run([GIT, "-C", str(self.repo), "worktree", "add", "-q", str(worktree)],
+                       check=True, capture_output=True)
+        (worktree / "a.css").write_text(".a { padding: 13px; }\n", encoding="utf-8")
+        subprocess.run([GIT, "-C", str(worktree), "add", "a.css"], check=True, capture_output=True)
+        env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", DESIGN_GATE_PYTHON=PY,
+                   DESIGN_GATE_BYPASS="1")
+        proc = subprocess.run([SH, str(HOOK)], cwd=worktree, env=env, capture_output=True, timeout=180)
+        out = (proc.stdout + proc.stderr).decode("utf-8", "replace")
+        self.assertEqual(proc.returncode, 0, out)
+        self.assertNotIn("Not a directory", out)
+        self.assertIn("BYPASS", (self.repo / ".git" / "design-gate.log").read_text(encoding="utf-8"))
+
+    def test_a_bypass_travels_with_the_commit_as_a_trailer(self):
+        """(d) The local log never leaves the clone. The same script, installed
+        as the commit-msg hook, writes a trailer into the commit itself."""
+        hooks = self.repo / ".git" / "hooks"
+        for name in ("pre-commit", "commit-msg"):
+            shutil.copy(HOOK, hooks / name)
+            (hooks / name).chmod(0o755)
+        self.stage("components/card.css", "@layer components {\n  .card { padding: 13px; }\n}\n")
+        env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", DESIGN_GATE_PYTHON=PY,
+                   DESIGN_GATE_BYPASS="1", DESIGN_GATE_BYPASS_REASON="client demo in an hour")
+        proc = subprocess.run([GIT, "-c", "user.email=a@b.c", "-c", "user.name=a", "commit", "-q",
+                               "-m", "Ship the card"], cwd=self.repo, env=env, capture_output=True,
+                              timeout=180)
+        self.assertEqual(proc.returncode, 0, (proc.stdout + proc.stderr).decode("utf-8", "replace"))
+        message = subprocess.run([GIT, "-C", str(self.repo), "log", "-1", "--format=%B"],
+                                 capture_output=True, text=True).stdout
+        self.assertRegex(message, r"Design-Gate-Bypass: client demo in an hour")
+
+    def test_the_staged_content_can_be_audited_instead_of_the_working_tree(self):
+        """(e) The audit read the working tree, so a violation staged with
+        `git add -p` and then fixed only on disk went through."""
+        self.stage("components/card.css", "@layer components {\n  .card { padding: 13px; }\n}\n")
+        (self.repo / "components" / "card.css").write_text(
+            "@layer components {\n  .card { padding: var(--pad-card); }\n}\n", encoding="utf-8")
+        code, out = self.run_hook()
+        self.assertEqual(code, 0, out)                   # the working tree is clean
+        code, out = self.run_hook(DESIGN_GATE_INDEX="1")
+        self.assertEqual(code, 1, out)                   # what would be committed is not
+        self.assertIn("13px", out)
 
 
 if __name__ == "__main__":

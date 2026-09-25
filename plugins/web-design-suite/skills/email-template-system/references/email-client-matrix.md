@@ -51,9 +51,9 @@ Nine rendering environments, not nine apps. Several apps share an engine; severa
 | `<style>` in `<head>` | ⚠️ ¹ | ✅ | ⚠️ ² | ✅ | ⚠️ ³ | ⚠️ ³ | **❌** | ✅ | ⚠️ ⁴ | ⚠️ | ⚠️ |
 | `<style>` in `<body>` | ⚠️ | ✅ | ⚠️ | ✅ | ❌ | ❌ | ❌ | ✅ | ⚠️ | ⚠️ | ⚠️ |
 | `@media` queries | ❌ | ⚠️ ⁵ | ⚠️ ⁵ | ⚠️ | ⚠️ ⁶ | ✅ | ❌ | ✅ | ⚠️ ⁷ | ⚠️ ⁸ | ✅ |
-| `@media (prefers-color-scheme)` | ❌ | ⚠️ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ⚠️ | ✅ |
-| `display:flex` | ❌ | ✅ | ✅ | ❌ ⁹ | ⚠️ ¹⁰ | ⚠️ ¹⁰ | ❌ | ✅ | ⚠️ | ❌ | ❌ |
-| `display:grid` | ❌ | ✅ | ⚠️ | ⚠️ | ⚠️ ¹⁰ | ⚠️ ¹⁰ | ❌ | ✅ | ✅ | ❌ | ❌ |
+| `@media (prefers-color-scheme)` | ❌ | ⚠️ | ✅ ²³ | ✅ ²³ | ❌ | ❌ | ❌ | ✅ | ❌ | ⚠️ ²³ | ❌ ²³ |
+| `display:flex` | ❌ | ✅ | ✅ | ✅ ⁹ | ✅ ¹⁰ | ✅ ¹⁰ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| `display:grid` | ❌ | ✅ | ✅ | ✅ ⁹ | ✅ ¹⁰ | ✅ ¹⁰ | ❌ | ✅ | ✅ | ✅ | ✅ |
 | `max-width` | ❌ ¹¹ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `border-radius` | ❌ ¹² | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Web fonts (`@font-face`) | ❌ | ⚠️ | ❌ | ✅ | ❌ ¹³ | ❌ ¹³ | ❌ | ✅ | ❌ | ⚠️ | ⚠️ |
@@ -74,13 +74,13 @@ Nine rendering environments, not nine apps. Several apps share an engine; severa
 1. **Word engine `<style>`** — supported, but with a documented ordering bug: a style must be *declared before the markup it applies to*, and rules that reference a later element are unreliable. `caniemail.com` records this as "buggy support… styles must be declared before use." Since the compiler inlines almost everything, this rarely bites.
 2. **Outlook Web** applies a server-side rewrite before rendering: it prefixes class names, rewrites some selectors, and injects its own dark-mode overrides keyed on `[data-ogsc]` / `[data-ogsb]`. Your `<style>` block is not the one that runs.
 3. **Gmail `<style>`** — supported in `<head>` since the September 2016 update, **not** in `<body>`, and with a hard size ceiling (§7). Gmail also drops the whole block on some parse errors — historically including nested at-rules.
-4. **Yahoo** supports `<style>`, but: rules *after* a CSS comment are ignored on desktop webmail, and the Android app strips the first `<head>`, so a second `<head>` is the documented workaround. Use no CSS comments in the retained block. `build_email.py` strips them for you.
-5. **New Outlook / Outlook Web media queries** — support is reported as partial and nested media queries are explicitly not supported (and are removed in builds 16.80+). Sources disagree on how complete plain `max-width` support is. **Safe path: do not require a media query for the layout to be correct.** See §8 of `email-architecture.md` — fluid-hybrid first, media query as enhancement.
+4. **Yahoo** supports `<style>`. Two old quirks no longer reproduce in `caniemail.com`'s tests: desktop webmail ignored every rule after a CSS comment (gone by 2023-01), and the Android app stripped the first `<head>` (gone by 2025-06). `build_email.py` still strips comments, because they are bytes against Gmail's limit.
+5. **New Outlook / Outlook Web media queries** — support is reported as partial and nested media queries are explicitly not supported (and are removed in builds 16.80+). Sources disagree on how complete plain `max-width` support is. **Safe path: do not require a media query for the layout to be correct.** See §7 of `email-architecture.md` — fluid-hybrid first, media query as enhancement.
 6. **Gmail web media queries** is the sharpest live disagreement in this document. `caniemail.com` lists Gmail Desktop Webmail as *partial* (no nested, no height-based queries), Email on Acid's long-running Gmail article says embedded styles and media queries arrived in 2016 and work, and at least one 2026 rendering guide flatly states Gmail web "ignores" media queries. All three can be simultaneously true in practice, because **a desktop Gmail reading pane is wider than any `max-width` breakpoint you would set**, so a mobile-first media query never fires there and looks identical to "not supported." Treat Gmail web as: the block parses, the query may be evaluated, and it will not match on desktop anyway.
 7. **Yahoo** supports only `screen`, `min-width`, `max-width`, `min-height`, `max-height`. No `and`-chained feature queries beyond that.
 8. **Samsung Mail** media-query support is reported as depending on account type (Exchange vs IMAP) and app version. Unverifiable without a device farm; assume no.
-9. **Outlook for Mac** is WebKit-family and modern builds handle most CSS, but flex support specifically is inconsistent across the 16.x line. Not worth relying on when a table does the job.
-10. **Gmail and flex/grid** — `caniemail.com` records `display:grid` as partial in Gmail since 2019. Gmail's sanitiser is known to strip flex *sub*-properties (`flex-direction`, `justify-content`, `align-items`) while leaving `display:flex` itself. A `display:flex` with no flex properties is a `display:block`, which is worse than not trying: your columns become rows only in Gmail. Do not use it.
+9. **Outlook for Mac** is WebKit-family, and `caniemail.com` records `display:flex` and `display:grid` as supported in 16.80. Still not worth relying on, when a table does the job in every client.
+10. **Gmail and flex/grid** — `caniemail.com` records `display:flex` as supported in Gmail since 2019, and `display:grid` on the web since 2026-03. Neither works with a non-Google account (GANGA). Gmail also rejects `flex-direction: column` on every platform (tested 2023-01) while keeping `display:flex`, so a flex column arrives in Gmail as a row. Do not use it.
 11. **`max-width` in the Word engine** is not supported at all. This is the entire reason ghost tables exist: the conditional-comment table supplies the fixed width the Word engine needs while `max-width` handles everyone else.
 12. **`border-radius`** is ignored by the Word engine — corners render square. That is acceptable degradation for a card. It is not acceptable for a pill-shaped button that carries brand identity, which is what VML `roundrect` is for (§3).
 13. **Gmail web fonts** — only Roboto and Google Sans are available; other Google Fonts are excluded. Everything else falls back. Build the design on the fallback stack and treat a brand face as decoration.
@@ -90,9 +90,10 @@ Nine rendering environments, not nine apps. Several apps share an engine; severa
 17. **Gmail strips `position` entirely.** There is nothing to position against and no way to fake it.
 18. **CSS custom properties in Gmail** are listed as *partial* on `caniemail.com`: Gmail recognises the `var()` function but provides no way to declare a variable, and the mobile apps do not support it with non-Google accounts. In other words `var()` in Gmail is a function whose argument can never be defined. That is not support; it is the shape of support. Outlook (all Windows versions, Outlook.com, macOS, iOS, Android), Yahoo, Samsung and Thunderbird have no support at all. **This single row is why this skill compiles tokens rather than shipping them.**
 19. **`:hover`** — Gmail does not support it except in webmail, per Email on Acid's Gmail reference. Since you cannot tell which reader is in which, design the resting state to be obviously clickable and treat hover as decoration.
-20. **`margin` in the Word engine** is honoured inconsistently and collapses unpredictably. `padding` on a `<td>` is honoured reliably. This is the mechanical reason email spacing is table padding, not margins (see `email-architecture.md` §4).
+20. **`margin` in the Word engine** is honoured inconsistently and collapses unpredictably. `padding` on a `<td>` is honoured reliably. This is the mechanical reason email spacing is table padding, not margins (see `email-architecture.md` §3).
 21. **Samsung Mail** is reported to apply `margin` on paragraphs and headings but not on `div`s or tables.
 22. **New Outlook ignores conditional comments and VML entirely** — they are inert comments to a Chromium engine. This is the good news of the transition: one file can serve both engines, because each ignores what is addressed to the other. Downlevel-revealed comments (`<!--[if !mso]><!-- -->…<!--<![endif]-->`) are what make the non-Word branch visible to everyone else.
+23. **`prefers-color-scheme`**, per `caniemail.com` (tested 2023-03-08): Outlook.com, Outlook for Mac and the Outlook iOS and Android apps honour it, and also mark what they recolour with `data-og*` attributes. Samsung Email honours it in 6.1, not 6.0. Thunderbird honoured it in 68.4, but not in 78.5 or 91.13, the latest versions tested.
 
 ---
 
@@ -206,7 +207,7 @@ Gmail's renderer is a Chromium engine behind a **server-side sanitiser**, and th
 
 - Strips external stylesheets and `@import`. There is no such thing as a linked stylesheet in email.
 - Strips `<style>` in `<body>`. Head only.
-- Enforces a **16,384-byte ceiling** on `<style>` content (previously documented as 8,192 in 2017, raised since). Past the limit it **discards the excess wholesale rather than truncating mid-rule** — so what disappears is the end of your block, which is where your media queries are. Counting appears to happen before Gmail's own class-prefixing pass.
+- Enforces a **16,384-byte ceiling** on `<style>` content, counted across every `<style>` element (previously documented as 8,192 in 2017, raised since). Each element that crosses the ceiling is **removed whole**, along with every element after it (email-bugs #90), so a single block over the ceiling loses all of its CSS. Counting appears to happen before Gmail's own class-prefixing pass.
 - Strips `position`, `transform`, `animation`, negative margins, and flex sub-properties.
 - Does not support attribute selectors such as `div[class="content"]`.
 - Rewrites class names, so any selector you did not inline is operating on names you do not control.
@@ -225,7 +226,8 @@ New Outlook for Windows runs **Chromium via WebView2**, the same engine family a
 
 | Source | Claim |
 |---|---|
-| Multiple 2026 vendor posts | Microsoft ends support for desktop Outlook versions running the Word rendering engine in **October 2026** |
+| Microsoft Learn (updated 2026-02-23) | Existing installations of classic Outlook, perpetual and subscription, are supported **until at least 2029** |
+| Microsoft lifecycle | Office 2021, which includes Outlook 2021, retires on **2026-10-13**; Office 2019 retired in October 2025. This is the "October 2026" in many 2026 posts: the end of one perpetual version, not of classic Outlook |
 | Really Good Emails (2026) | Classic Outlook is on Microsoft's roadmap **through at least 2029**, with no published end date; enterprise accounts do not transition by default until a tentative **May 2027** |
 | Industry estimates cited in the same posts | The installed base of Word-engine Outlook stays significant in conservative enterprises **into 2028–2029** |
 
@@ -242,13 +244,13 @@ The transition is also the reason to prefer **fluid-hybrid over media queries**:
 Two Apple-specific behaviours to handle:
 
 - **`x-apple-data-detectors`.** iOS auto-links anything that looks like a date, address or phone number and restyles it blue. Neutralise it with an attribute-selector rule in the retained `<style>` block, plus `<meta name="format-detection" content="telephone=no,address=no,email=no,date=no">`.
-- **Mail Privacy Protection.** Apple pre-fetches images through a proxy for Mail users who enabled it, which fires your tracking pixel whether or not a human looked. This inflates open rates substantially — reported in the 15–20% range and, in some 2026 analyses, described as approaching half of all recorded opens. It does not change how your HTML renders; it changes what your open rate means. Measure clicks.
+- **Mail Privacy Protection.** Apple pre-fetches images through a proxy for Mail users who enabled it, which fires your tracking pixel whether or not a human looked. This inflates open rates, by as much as your share of Apple Mail readers with the protection on. It does not change how your HTML renders; it changes what your open rate means. Measure clicks.
 
-**Yahoo / AOL** share a renderer. Three specific traps: `height` is rewritten to `min-height`; CSS rules after a comment are ignored on desktop webmail; `!important` written with a space before it (`! important`) is removed. The Android app strips the first `<head>`. Keep the retained `<style>` block free of comments — the compiler does this — and write `!important` without a space.
+**Yahoo / AOL** share a renderer. Two specific traps: `height` is rewritten to `min-height`, and `!important` written with a space before it (`! important`) is removed, so write `!important` without a space. Two older traps no longer reproduce in `caniemail.com`'s tests: rules after a CSS comment (desktop, gone by 2023) and the Android app stripping the first `<head>` (gone by 2025).
 
 **Samsung Mail** decides layout from HTML `width` attributes, supports transitions but not keyframes, and applies `margin` to paragraphs and headings but not to `div`s or tables. Media-query behaviour reportedly varies with account type and app version.
 
-**Thunderbird** is Gecko and respects `prefers-color-scheme` with full developer control, similar to Apple Mail. Its `<style>` support is reported inconsistently across versions.
+**Thunderbird** is Gecko. It honoured `prefers-color-scheme` in 68, but not in 78 or 91, the latest versions `caniemail.com` tested. Its `<style>` support is reported inconsistently across versions.
 
 ---
 
@@ -270,7 +272,7 @@ Three things people get wrong about it:
 
 ### Gmail `<style>` ceiling — 16,384 bytes
 
-Separate from the above, and it bites earlier than you would think on a template with a large dark-mode block. **Excess is discarded wholesale, not truncated**, so the failure mode is "my media queries vanished," not "my CSS looks half-applied." Since the compiler inlines nearly everything, a healthy retained block is under 1 KB — the three templates in `assets/templates/` produce 600–750 bytes.
+Separate from the above, and it bites earlier than you would think on a template with a large dark-mode block. **Gmail removes every `<style>` element that crosses the ceiling, and every one after it**, so the failure mode is "my media queries vanished," not "my CSS looks half-applied." Past the ceiling, `build_email.py` splits the retained CSS into blocks of about 4 KB in authoring order, so Gmail keeps the first ones: write the retained CSS most important first. Since the compiler inlines nearly everything, a healthy retained block is under 1 KB — the three templates in `assets/templates/` produce 600–750 bytes.
 
 ---
 
@@ -284,7 +286,7 @@ Every client does one of three things to an email when the reader is in dark mod
 
 | Behaviour | What it means | Who does it |
 |---|---|---|
-| **Respect** | Honours `prefers-color-scheme` and `color-scheme`; leaves your colours alone otherwise | Apple Mail (macOS/iOS), Thunderbird, Outlook for Mac (partially) |
+| **Respect** | Honours `prefers-color-scheme` and `color-scheme`; leaves your colours alone otherwise | Apple Mail (macOS/iOS). Outlook for Mac, Outlook.com and the Outlook iOS/Android apps honour the media query too, while also rewriting some colours (below). Samsung Email 6.1 |
 | **Partial inversion** | Selectively rewrites *some* colours — typically backgrounds and near-black/near-white text — and leaves the rest | Outlook.com / Outlook Web (via injected `[data-ogsc]`/`[data-ogsb]` attributes), Outlook Mac, Outlook iOS/Android, Gmail Android, new Outlook Windows, GANGA |
 | **Full forced inversion** | Rewrites the whole palette algorithmically, including your logo and your pale text | Gmail iOS, classic Outlook Windows |
 
@@ -304,7 +306,7 @@ Sources disagree at the margins — particularly on Gmail web (some describe it 
 | Technique | Works in | Buys you |
 |---|---|---|
 | `color-scheme` / `supported-color-schemes` meta | Apple, WebKit | "I handled it, do not auto-invert" |
-| `@media (prefers-color-scheme: dark)` block | Apple Mail, Thunderbird, Outlook Mac (partly) | Real authored dark colours |
+| `@media (prefers-color-scheme: dark)` block | Apple Mail; Outlook for Mac, Outlook.com, Outlook iOS and Android; Samsung Email 6.1 | Real authored dark colours |
 | `[data-ogsc]` / `[data-ogsb]` selectors | Outlook.com and other Outlook clients that inject them | Corrective overrides where Outlook rewrote something badly |
 | PNG with a light *and* dark safe appearance | Everywhere | A logo that survives inversion |
 | Avoiding pure `#000000` and `#ffffff` | Everywhere | Inversion algorithms key on the extremes; near-black and near-white are rewritten most aggressively. The token set's `--neutral-900` (`#171512`) and `--neutral-50` (`#faf9f7`) are deliberately not the extremes. |
@@ -317,7 +319,7 @@ Sources disagree at the margins — particularly on Gmail web (some describe it 
 - **You cannot test your way to certainty**, because the behaviour depends on client version, OS version and the reader's specific setting, and vendors ship changes without announcement.
 - **A dark-designed email is riskier than a light one**, because a client that force-inverts a dark design produces a light one with dark-mode logo assets in it.
 
-**The practical position:** design light, with a palette whose colours are still legible if lightness is flipped, using images that read on both. Add the `prefers-color-scheme` block because it is nearly free and three clients honour it. Verify contrast in both directions. Then stop — further effort buys unpredictability, not control.
+**The practical position:** design light, with a palette whose colours are still legible if lightness is flipped, using images that read on both. Add the `prefers-color-scheme` block because it is nearly free and Apple Mail, the Outlook apps other than classic Windows, and Samsung Email 6.1 honour it. Verify contrast in both directions. Then stop — further effort buys unpredictability, not control.
 
 ---
 
@@ -331,7 +333,7 @@ Stated explicitly so nobody mistakes an assumption for a finding.
 | Gmail web media-query behaviour | **Sources conflict** (note 6). The practical answer holds regardless, but the underlying fact is not settled. |
 | Whether Gmail still drops the whole `<style>` block on a nested at-rule | **Unverified in 2026.** Documented historically; not retested. Avoid nested at-rules regardless — several clients remove them. |
 | Samsung Mail media-query support by account type | **Unverified.** Reported as version- and account-dependent; needs a device to confirm. |
-| Classic Outlook's true end-of-life date | **Contested** (§5). October 2026, May 2027 and 2029 are all cited by credible sources for different events. |
+| Classic Outlook's true end-of-life date | Supported until **at least 2029** (Microsoft, §5). October 2026 is Office 2021's retirement, not classic Outlook's; May 2027 is a tentative enterprise switch-over date. |
 | Exact current share of blocked-image opens | **Not established.** Widely repeated figures are old and vary by audience type. The design rule (alt text must carry meaning) does not depend on the number. |
 | Gmail iOS dark-mode inversion details | **Directionally verified, mechanically not.** Described consistently as high-risk full inversion; the exact algorithm is undocumented. |
 | Whether Gmail counts the HTML part's raw or transfer-encoded bytes | **Unverified.** Measure the delivered message via Show original and do not rely on the distinction. |

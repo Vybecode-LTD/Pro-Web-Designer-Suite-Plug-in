@@ -1,5 +1,103 @@
 # Changelog
 
+## 3.2.0 — 2026-09-25
+
+Phase 2 of the 3.0.1 review: the docs are tied to the code. Tests now read the
+commands, configs, code blocks, figures and pointers out of the docs and check them
+against the scripts, a real browser and the real tools, and the fixes followed from
+what they found. Every fix has a regression test that fails on 3.1.0 and passes here
+(`python -m unittest discover -s tests`: 296 tests).
+
+### Upgrading
+
+- **The pre-commit hook fails when a stage cannot run.** A missing stylelint config,
+  audit script or Python used to print SKIPPED and let the commit through. Set
+  `DESIGN_GATE_ALLOW_SKIP=1` while a stage is being adopted. Configs are now found at
+  the repo root first (`stylelint.config.*`, `.stylelintrc*`, a `stylelint` object in
+  package.json), then in `assets/configs/`.
+- **Install the hook twice**, as `pre-commit` and as `commit-msg`: a bypass
+  (`DESIGN_GATE_BYPASS=1 DESIGN_GATE_BYPASS_REASON="why"`) now leaves a
+  `Design-Gate-Bypass:` trailer in the commit as well as a line in the log.
+- **Re-baseline the design audit.** It now reads class strings inside `cn()`, `clsx()`,
+  `cva()` and the other class helpers, refuses every Tailwind arbitrary value except
+  arbitrary variants, image URLs and pseudo-element content, flags arbitrary properties
+  (`[padding:13px]`) and the v4 `!` suffix, and audits styled-components and emotion
+  template bodies as CSS.
+- **Renames and moves.** Tailwind's width utility `border-default` is now
+  `border-stroke` (it also painted the border colour). `.prose` moved from base.css to
+  layout.css. The navigation code moved from `navigation-patterns.md` §6 to
+  `navigation-code.md`.
+- **New roles** in all 14 contracts, the starter, both Tailwind configs, the migration
+  template, the Figma importer and the email map: `--motion-instant` (press, toggle,
+  check) and `--bg-scrim`. Components may read `--weight-*` directly.
+- **design-system-docs.** The drift baseline is `docs/system.json`, extracted from
+  `styles/ src/components/` in every step. `build_docs --check --baseline FILE` exits 2
+  when FILE does not exist; it used to check prose only and pass.
+- **Versions.** stylelint `^17` with stylelint-config-standard `^40`; ESLint `^10` with
+  a package.json `overrides` entry for eslint-plugin-jsx-a11y; eslint-plugin-tailwindcss
+  4.x for Tailwind v4 (`cssConfigPath`), pinned to 3.x on v3. CI actions on their
+  Node 24 majors (checkout@v5, setup-node@v5, setup-python@v6, cache@v5,
+  upload-artifact@v6).
+
+### Tests on the gap between docs and code
+
+- Every CSS, TSX and JSX block in the references passes the audit; deliberate bad
+  examples say so with `example: wrong | before | illustration`.
+- Quoted starter code is kept identical to its region in the starter
+  (`tools/sync_snippets.py --check`).
+- Every "Verified n:1" is recomputed and every `clamp()` anchor solved.
+- Every documented flag is one the script's own parser accepts.
+- Every § pointer resolves, and each cross-file pointer lands on the heading it was
+  checked against (`tools/check_pointers.py`, 300 registered).
+- Real tools where they are installed: ESLint (on 9 and 10), a Tailwind v4 compile of
+  theme.css, tailwind-merge with the documented config, and Chromium for the focus-ring
+  caveat, the navigation code, container queries, subgrid, layer order and more.
+- `check_roles.py` checks role pairs in light, dark, `.inverse` and dark `.inverse`, as
+  an opt-in hook stage, and generates color-system.md §6.
+- One rule spec, `assets/rules/design-rules.json`, that the audit, the stylelint config
+  and the docs are tested against.
+
+### Recipes that run as written
+
+- The drift gate: one baseline, one set of inputs.
+- Performance budgets are JSONC, and `measure_vitals` reads the budget before it starts
+  a browser.
+- The CI workflows: `shell: bash`, the server waited for in the step that uses it, the
+  lockfile's Chromium installed and cached, nothing installed ad hoc, a readable report
+  in the log (`--report FILE`, new in `measure_vitals` and `a11y_runtime`), and a PR
+  comment with its number, token and permission.
+- Navigation code: the safe triangle holds, a click keeps a hovered panel open, the
+  drawer's light dismiss ignores its own padding, and `--nav-offset` is registered as a
+  `<length>`.
+- The `@property` recipe uses a px initial value and a socket only the root reads.
+
+### Docs that are true
+
+- The accessibility skill's runtime promises (keys, reduced motion, budget keys, 200%
+  zoom as a warning), its coverage figures (a tool fully decides 7 of the 55 A and AA
+  criteria and part of 31 more), and "Not Evaluated" for AAA only.
+- Container queries, subgrid, SC levels, legal baselines (EU EN 301 549 v3.2.1, ADA
+  Title II WCAG 2.1 AA, Section 508), colour-science numbers, email-client support per
+  caniemail, Gmail's style ceiling (and the build now splits retained CSS over it),
+  classic Outlook's support dates, Figma plans and styles, Bootstrap's !important
+  utilities, MUI native colour, and the README's standalone claim.
+- An evidence register, `tests/fixtures/evidence.json`: each quoted figure with its
+  source, date checked and the source's own words. Baymard's checkout figures were
+  corrected on the way.
+
+### Leaner skills
+
+- Every SKILL.md fits in what Claude Code keeps after compaction (about 5,000 tokens);
+  large sections moved verbatim into references. Landing-page-conversion's ethics and
+  evidence rules come first.
+- Descriptions are 301–368 characters, lead with a sentence that stands alone, and say
+  what each skill is not for.
+
+### Not verified by execution
+
+stylelint 17 and eslint-plugin-tailwindcss 4.x are not installed here, so their config
+text is checked against the registry and their READMEs, not run.
+
 ## 3.1.0 — 2026-09-24
 
 Phase 1 of the 3.0.1 review: the gates stop passing things they never checked, the

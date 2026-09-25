@@ -333,109 +333,14 @@
 
 
   /* -----------------------------------------------------------------------
-     7. PROSE RHYTHM — the one owned context
-     -----------------------------------------------------------------------
-     THE LAW-2 EXCEPTION, stated precisely.
-
-     Law 2: children never set their own outer margin; siblings are spaced by
-     the PARENT's `gap`, or by an owl selector declared on the parent.
-     `.prose` is the second clause, and it is the only place in this codebase
-     that uses it.
-
-     Why an owl and not `gap`:
-       - `gap` requires flex or grid. Flow layout is what prose needs: floated
-         pull-quotes, `display: contents` wrappers emitted by CMSs, and
-         multi-column all stop working under a flex parent.
-       - `gap` is ONE value. Prose rhythm is not one value: the space above an
-         <h2> must differ from the space between two paragraphs, or the
-         document has no visible structure. An owl can vary by element type;
-         `gap` cannot.
-
-     Why this does not break Law 2 in spirit: the DECLARATION lands on the
-     child, but the RULE is owned entirely by the parent's stylesheet. Nothing
-     a component ships travels with it. Drop a <Card> inside `.prose` and it
-     is spaced by `.prose`; drop the same Card in a flex row and it is spaced
-     by `gap`. The component never knows or cares — which is the outcome Law 2
-     exists to produce.
-
-     Two hard constraints keep the exception from spreading:
-       1. Direct child combinator ONLY (`>`). The owl must never reach inside
-          a component and space its internals.
-       2. One class per project may do this. `.prose` is it. If a second
-          context "needs" an owl, it is a layout and it belongs in
-          layout.css with a `gap`.
+     7. PROSE — in layout.css (1.2), beside .flow. Its rhythm is layout, and
+     one class has one home (Law 4): styling .prose from two files made it
+     a component with two owners.
      ----------------------------------------------------------------------- */
 
-  .prose {
-    max-inline-size: var(--measure-prose);  /* 68ch — line length IS a
-                                               readability decision */
-    color: var(--fg-default);
-    /* Long-form wants more leading than UI body copy does. --type-body
-       carries --leading-normal (1.6); prose overrides the leading axis only,
-       after the shorthand set by <body>. */
-    line-height: var(--leading-relaxed);
-  }
-
-  /* The owl. Every sibling pair gets the block rhythm; the first child gets
-     nothing, which is what lets `.prose` sit flush inside a padded parent. */
-  .prose > * + * {
-    margin-block-start: var(--space-block);
-  }
-
-  /* HEADING SPACE ASYMMETRY.
-     A heading belongs to the content BELOW it, not above it. Space it evenly
-     and the eye cannot tell which paragraph it introduces — the classic
-     symptom of a page that "looks fine" and reads badly.
-
-     The asymmetry falls out of two rules rather than being typed as a ratio:
-
-       above an h2   --space-subsection   fluid 40 → 88px
-       above h3-h6   --space-block        fluid 24 → 48px
-       BELOW any heading (= the next element's top margin)
-                     --gap-grouped        16px × --density
-
-     At desktop that is roughly 5:1 above an h2 and 3:1 above an h3. Both
-     sit in the 2:1–6:1 band where a heading unambiguously joins downward.
-     `--gap-grouped` is the correct role by NAME too: a heading and its first
-     paragraph are one group. */
-
-  .prose > * + h2 {
-    margin-block-start: var(--space-subsection);
-  }
-
-  .prose > * + :is(h3, h4, h5, h6) {
-    margin-block-start: var(--space-block);
-  }
-
-  /* Written LAST of the three so it wins the tie at equal specificity
-     (0,1,1). That tie only occurs for a heading immediately following
-     another heading — and the tight gap is the right answer there: two
-     stacked headings are a title/subtitle pair, not two sections. */
-  .prose > :is(h1, h2, h3, h4, h5, h6) + * {
-    margin-block-start: var(--gap-grouped);
-  }
-
-  /* An <hr> means "the subject changes". Give it subsection weight on both
-     sides or it reads as decoration. */
-  .prose > * + hr,
-  .prose > hr + * {
-    margin-block-start: var(--space-subsection);
-  }
-
-  /* Items in one list are one group; they get the related-items step, not
-     the between-blocks step. */
-  .prose li + li {
-    margin-block-start: var(--gap-tight);
-  }
-
-  /* A nested list is still part of its parent item. */
-  .prose li > :is(ul, ol) {
-    margin-block-start: var(--gap-tight);
-  }
-
-  /* <figure> is a second owned context, and a legitimate one for the same
-     reason: the caption's relationship to its image is fixed by the pair,
-     not by wherever the figure is used. The rule is owned by the parent. */
+  /* <figure> owns its caption's spacing: the caption's relationship to its
+     image is fixed by the pair, not by wherever the figure is used, so the
+     rule belongs to the parent. */
   figure > figcaption {
     margin-block-start: var(--gap-tight);
   }

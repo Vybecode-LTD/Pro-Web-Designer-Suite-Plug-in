@@ -6,14 +6,14 @@ The criteria themselves are specified in `web-design-studio/references/accessibi
 
 ## Contents
 
-1. [The one-sentence version](#1-the-one-sentence-version)
-2. [Why "not automatable" almost always means "about meaning"](#2-why-not-automatable-almost-always-means-about-meaning)
-3. [The coverage table](#3-the-coverage-table)
-4. [False negatives: why a clean axe run is misleading](#4-false-negatives-why-a-clean-axe-run-is-misleading)
-5. [False positives: why teams disable rules](#5-false-positives-why-teams-disable-rules)
-6. [What to automate first](#55-what-to-automate-first-if-you-cannot-do-all-of-it)
-7. [The coverage figure, with its sources](#6-the-coverage-figure-with-its-sources)
-8. [How to say it in a report](#7-how-to-say-it-in-a-report)
+- [1. The one-sentence version](#1-the-one-sentence-version)
+- [2. Why "not automatable" almost always means "about meaning"](#2-why-not-automatable-almost-always-means-about-meaning)
+- [3. The coverage table](#3-the-coverage-table)
+- [4. False negatives: why a clean axe run is misleading](#4-false-negatives-why-a-clean-axe-run-is-misleading)
+- [5. False positives: why teams disable rules](#5-false-positives-why-teams-disable-rules)
+- [5.5 What to automate first](#55-what-to-automate-first-if-you-cannot-do-all-of-it)
+- [6. The coverage figure, with its sources](#6-the-coverage-figure-with-its-sources)
+- [7. How to say it in a report](#7-how-to-say-it-in-a-report)
 
 ---
 
@@ -55,14 +55,20 @@ Each row cross-references `accessibility.md` §1 rather than restating it. **Ful
 | SC | Auto | What a tool can decide | What it cannot, and why |
 |---|---|---|---|
 | **1.1.1** Non-text Content | **Partial** | `alt` is absent; `alt` is a filename, a placeholder or opens "image of"; a button or link has no name at all | **Whether the alt is correct.** `alt="image"` passes every scanner ever shipped. Whether a decorative image should have been described, or a described one should have been `alt=""`, is a content judgement. Volume-wise this is the biggest single gap in the whole table |
+| **1.2.1** Audio-only and Video-only (Prerecorded) | **None** | — | A tool can find the `<audio>` and `<video>`; whether an equivalent transcript or track exists is a human check |
+| **1.2.2** Captions (Prerecorded) | **Partial** | a `<video>` with no `<track kind="captions">` | **Whether the captions are accurate and in sync.** Open captions burned into the picture are invisible to a tool |
+| **1.2.3** Audio Description or Media Alternative | **None** | — | Requires knowing what the picture shows that the soundtrack does not |
+| **1.2.4** Captions (Live) | **None** | — | A live stream is not in the DOM a scanner reads |
+| **1.2.5** Audio Description (Prerecorded) | **None** | — | Requires watching the video |
 | **1.3.1** Info & Relationships | **Partial** | heading level skips, missing/duplicate landmarks, `<table>` without `<th scope>`, radio sets outside a `<fieldset>` | **Whether the structure describes the content.** Every heading can be at the right level and the outline still be meaningless. A `<div>` grid that looks like a table but is not is invisible here |
 | **1.3.2** Meaningful Sequence | **Partial** | DOM order vs visual order disagreements from CSS `order`, `grid-area`, `position: absolute` | **Which order is the meaningful one.** The tool can say the two disagree; only a reader knows which is right |
 | **1.3.3** Sensory Characteristics | **None** | — | "Click the button on the right" is ordinary English. Detecting it requires understanding that the sentence identifies a control by position |
 | **1.3.4** Orientation | Full | a CSS or meta orientation lock | — |
 | **1.3.5** Identify Input Purpose | **Full** | a personal-data field with no `autocomplete`, or with an invalid token | Whether the token chosen is the *right* one for the field is nearly always inferable from the name and label, so this is one of the few content-ish criteria a tool genuinely closes |
 | **1.4.1** Use of Color | **None** | (a tool can flag links with no underline in body text — a heuristic, not the criterion) | Requires knowing what information the colour carries. A red border on an invalid field is a failure; a red brand accent is not, and they are the same CSS |
+| **1.4.2** Audio Control | **Partial** | `autoplay` media that is not `muted` | Whether it plays for more than 3 seconds, and whether a control near the top of the page stops it |
 | **1.4.3** Contrast (Minimum) | **Partial** | any pair of solid, opaque colours — this is the highest-volume automated find on the web | **Text over an image, gradient, video or translucent overlay.** axe returns *incomplete* for these, which most CI jobs silently discard. The runtime layer composites overlays (`runtime-checks.md` §7) and still refuses to judge photographs |
-| **1.4.4** Resize Text | **Partial** | zoom disabled via `user-scalable=no`/`maximum-scale`; clipping and overflow measured at 200% | Whether clipped content mattered |
+| **1.4.4** Resize Text | **Partial** | zoom disabled via `user-scalable=no`/`maximum-scale`; horizontal scroll at 200% (a warning, not a failure) | Whether text is clipped or overlaps at 200%, which is what the criterion asks |
 | **1.4.5** Images of Text | **None** | — | Requires reading the image |
 | **1.4.10** Reflow | **Partial** | two-dimensional scrolling at a 320px-equivalent viewport, with the widest offender named | Whether content or functionality was *lost* rather than merely rearranged |
 | **1.4.11** Non-text Contrast | **Partial** | focus-ring contrast measured in pixels; icon and border contrast against a solid adjacent colour | **Which boundaries are "required to identify the control"** — that is a design judgement about affordance, not a property of the CSS |
@@ -85,6 +91,7 @@ Each row cross-references `accessibility.md` §1 rather than restating it. **Ful
 | **2.5.1** Pointer Gestures | **None** | — | Requires knowing a gesture exists |
 | **2.5.2** Pointer Cancellation | **Partial** | actions bound to `pointerdown`/`mousedown` rather than `click` | Whether the down-event *executes* the function or only previews it |
 | **2.5.3** Label in Name | **Full** | the visible text is not contained in the computed accessible name | Ordering subtleties in a few languages |
+| **2.5.4** Motion Actuation | **None** | — | Requires knowing a `devicemotion` handler triggers a function, and whether the interface offers the same function without it |
 | **2.5.7** Dragging Movements | **None** | — | Requires knowing a drag exists and whether the alternative is equivalent |
 | **2.5.8** Target Size | **Partial** | measure every target's rect | The **spacing**, **inline**, **equivalent** and **essential** exceptions all need judgement; axe gets the geometry right and the exceptions approximately |
 | **3.1.1** Language of Page | **Full** | `lang` present and a valid BCP 47 tag | Whether it matches the actual language — detectable heuristically, not a conformance result |
@@ -100,7 +107,7 @@ Each row cross-references `accessibility.md` §1 rather than restating it. **Ful
 | **4.1.2** Name, Role, Value | **Partial** | empty computed accessible names, invalid roles, invalid ARIA values, ARIA references that resolve to nothing, states that never change when driven | **Whether the name is a good name**, and whether the role is the *right* role for what the thing does |
 | **4.1.3** Status Messages | **Partial** | a live region exists before its content changes; an action produced no announcement at all | **Whether the announcement was timely, once, and useful** |
 
-Count the rows. Roughly a third are **Full**, a bit under half are **Partial**, and the rest are **None** — which is the coverage figure in §6 arrived at from the other direction, and it lands in the same place.
+Count the criteria. A tool fully decides 7 of the 55 A and AA criteria, decides part of 31 more, and leaves 17 that need a person. That is coverage counted by criterion. §6 counts barriers and issues instead, which are different quantities, so its numbers differ.
 
 ---
 
@@ -144,6 +151,7 @@ Nothing is skipped. Nothing is trapped. No positive `tabindex`. DOM order and vi
 ### 4.4 Contrast that passes on a colour nobody can see
 
 ```css
+/* example: illustration — literal colours, so the ratios can be read off */
 .hero-text  { color: #767676; background: #ffffff; }   /* 4.54:1 — passes */
 .hero-scrim { position: absolute; inset: 0; background: rgb(255 255 255 / 0.7); }
 ```
@@ -202,7 +210,7 @@ That is a real hole, and it is concentrated in exactly the places the false nega
 | `frame-tested` | a cross-origin iframe cannot be scanned | test the embed separately, or get the vendor's ACR |
 | `link-in-text-block` | whether the link is distinguishable without colour depends on the surrounding style | check it in greyscale |
 
-**An incomplete is the tool asking a question, and an unanswered question is not a pass.** This skill reports incompletes as warnings, with their selectors, and says so in the finding text. Under `--strict` they fail. Resolve each one and record the decision; the record is what makes the next audit cheap.
+**An incomplete is the tool asking a question, and an unanswered question is not a pass.** This skill reports incompletes as warnings, with their selectors, and says so in the finding text. To make them fail the run, cap them in the budget: `"axe_incomplete": 0` in the file passed to `--budget`. Resolve each one and record the decision; the record is what makes the next audit cheap.
 
 ---
 
@@ -212,7 +220,7 @@ The WebAIM Million data in §6 is a prioritisation list handed over for free: si
 
 | Order | Failure | On % of home pages | Cost to gate | Why here |
 |---|---|---|---|---|
-| 1 | **Low-contrast text** | 83.9% | trivial — one axe rule, or one token review | Highest volume by a distance, and fixing it is usually *one* token repointed, not a hundred edits. `--fg-subtle` at `--neutral-500` failing 4.5:1 is the canonical instance |
+| 1 | **Low-contrast text** | 83.9% | trivial — one axe rule, or one token review | Highest volume by a distance, and fixing it is usually *one* token repointed, not a hundred edits. a subtle-text role one ramp step too light is the canonical instance (the starter's `--fg-subtle` clears 4.5:1 only because its step was darkened for it) |
 | 2 | **Missing `alt`** | 53.1% | trivial to detect | Detecting it is free; writing good alt is the expensive part, and that is the point — the tool clears the queue so a writer can work through what remains |
 | 3 | **Missing form labels** | 51.0% | trivial | Directly costs conversions as well as conformance. The four mechanisms are in `accessibility.md` §6 |
 | 4 | **Empty links** | 46.3% | trivial | Nearly always an icon-only control whose `<svg>` is the entire content |
@@ -237,17 +245,17 @@ Three measurements, three methodologies, one conclusion.
 | Source | Figure | What was measured |
 |---|---|---|
 | **[GDS, 2017](https://accessibility.blog.gov.uk/2017/02/24/what-we-found-when-we-tested-tools-on-the-worlds-least-accessible-webpage/)** | **37–41%** best single tool; **71%** all ten combined; **29%** found by none | A page with **143 deliberately planted failures in 19 categories**, run through ten automated tools. Tenon found 37% counting errors and warnings; Asqatasun 41% counting its manual-inspection prompts |
-| **[Deque, 2021](https://www.deque.com/blog/automated-testing-study-identifies-57-percent-of-digital-accessibility-issues/)** | **57%** | Issues **by volume** — not by criterion — across 2,000+ audits, ~13,000 first-assessment pages and ~300,000 issues, using the axe suite **including Intelligent Guided Testing**, in which a human answers questions |
+| **[Deque, 2021](https://www.deque.com/blog/automated-testing-study-identifies-57-percent-of-digital-accessibility-issues/)** | **57%** | Issues **by volume** — not by criterion — across 2,000+ audits, ~13,000 first-assessment pages and ~300,000 issues, the share that **fully automated** axe testing covered. Deque mentions its Intelligent Guided Testing separately, with no figure |
 | **[WebAIM Million, 2026](https://webaim.org/projects/million/)** | **95.9%** of home pages | One million home pages scanned. 56.1 detectable errors per page on average, and six categories dominate: low-contrast text 83.9%, missing alt 53.1%, missing form labels 51.0%, empty links 46.3%, empty buttons 30.6%, missing document language 13.5% |
 
-**Read together they are not in conflict.** The GDS study counts *criteria a tool can evaluate*, with a known denominator, which is the honest way to answer "what fraction of WCAG does this cover" — and the answer is roughly a third. The Deque study counts *issues found*, which is higher because the machine-detectable failures are also the most numerous ones, and because guided testing puts a human in the loop. WebAIM explains why both are true at once: the same six machine-detectable failures appear on nearly every site on the web, over and over.
+**Read together they are not in conflict, because they count different things.** GDS counts *planted barriers a tool found*, with a known denominator: the best single tool found about two in five. Deque counts *issues by volume*, which is higher because the machine-detectable failures are also the most numerous ones. WebAIM explains why both are true at once: the same six machine-detectable failures appear on nearly every site on the web, over and over. None of the three counts *criteria*. For that, use the table in §3: a tool fully decides 7 of the 55 A and AA criteria and part of 31 more.
 
-**The figure this skill uses is "roughly a third", sourced to GDS 2017**, because it is the only one with a known denominator and no vendor interest, and because it is the conservative number. If you quote 57%, quote what it measures.
+**The figures this skill uses:** by barrier, GDS 2017's 37–41% for the best single tool, because it has a known denominator and no vendor interest; by criterion, the table in §3. If you quote 57%, quote what it measures: issues by volume.
 
 Two corollaries worth stating:
 
-- **The automated third is enormously worth having.** 83.9% of home pages fail on low-contrast text — a fully automatable check. Closing the machine-checkable set is not a small win; it is most of the *volume* of harm on the web, and it costs a second of CI.
-- **It is still a third of the criteria.** Volume and coverage are different quantities, and a report that reaches for whichever is more flattering is a report that will not survive its first real audit.
+- **The automated share is enormously worth having.** 83.9% of home pages fail on low-contrast text — a fully automatable check. Closing the machine-checkable set is not a small win; it is most of the *volume* of harm on the web, and it costs a second of CI.
+- **It is still a minority of the criteria.** Volume and coverage are different quantities, and a report that reaches for whichever is more flattering is a report that will not survive its first real audit.
 
 ---
 
@@ -270,13 +278,13 @@ This is not pedantry. In the EU the European Accessibility Act and EN 301 549 ma
 > ✅ **"Automated checks pass."** Scoped, true, and does not imply a conclusion it cannot support.
 >
 > ✅ For a status summary:
-> *"Automated accessibility checks (axe-core 4.13, WCAG 2.2 A/AA rule set) return zero violations across all 14 page templates and 312 component states. Automated testing covers an estimated one third of WCAG success criteria; the remainder was evaluated manually on 2026-09-10 using the protocol in Appendix B. Two criteria are Partially Supported — see the exceptions table."*
+> *"Automated accessibility checks (axe-core 4.13, WCAG 2.2 A/AA rule set) return zero violations across all 14 page templates and 312 component states. Automated checks fully decide 7 of the 55 WCAG 2.2 A and AA success criteria and part of 31 more; the other 48 were evaluated manually on 2026-09-10 using the protocol in Appendix B. Two criteria are Partially Supported — see the exceptions table."*
 >
 > ✅ For a VPAT/ACR remark:
 > *"Supports. Verified by automated rule (axe-core `color-contrast`) across all templates and by manual sampling of 12 representative components on 2026-09-10."*
 >
 > ✅ For something you have not tested:
-> *"Not Evaluated."* This is a legitimate, honest entry. Guessing is not.
+> *"Not Evaluated."* A legitimate entry for a Level AAA criterion only: VPAT 2.5 allows it for AAA and nowhere else. An A or AA criterion needs a real verdict, so test it. Guessing is not an option either.
 >
 > ✅ When a third party is the problem:
 > *"Partially Supports. The embedded payment iframe (Vendor, component v4.2) does not expose accessible names for its card fields. Reported to the vendor 2026-08-14, ref ABC-1182. Users can complete the same purchase via the phone path documented at /help/order-by-phone."*
@@ -285,8 +293,8 @@ This is not pedantry. In the EU the European Accessibility Act and EN 301 549 ma
 
 Somebody will ask these. Have the answer, not a flinch.
 
-1. **"Did it pass?"** → *"The automated checks pass. Those cover about a third of the criteria; here is what the manual pass found."*
+1. **"Did it pass?"** → *"The automated checks pass. Those fully decide 7 of the 55 A and AA criteria and part of 31 more; here is what the manual pass found."*
 2. **"So it's accessible?"** → *"It meets the criteria we've evaluated, which is all of AA. 'Accessible' is about whether people can actually use it, and the strongest evidence for that is testing with disabled users — see `manual-protocol.md` §8."*
-3. **"Why did the audit find things CI didn't?"** → *"By design. CI catches the machine-checkable third on every commit so the auditor's time goes to the rest. If the audit had found things CI *could* have caught, that would be the failure."*
+3. **"Why did the audit find things CI didn't?"** → *"By design. CI catches the machine-checkable part on every commit so the auditor's time goes to the rest. If the audit had found things CI *could* have caught, that would be the failure."*
 
 That last one is the whole skill in one exchange. An external audit that finds only judgement-level issues means the gate is working.

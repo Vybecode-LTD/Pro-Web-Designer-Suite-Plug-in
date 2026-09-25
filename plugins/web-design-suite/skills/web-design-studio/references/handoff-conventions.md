@@ -305,8 +305,8 @@ is not on it.
    `style={{ '--progress': pct } as CSSProperties}`. An inline `style` that sets a
    named CSS property is a bug.
 2. **Token-only values (Laws 1, 6).** Every declaration traces to a Tier 2 role, via a
-   Tier 3 token where the component needs its own vocabulary. Zero literals — including
-   `0`, which is `--space-0`, and `1px`, which is `--stroke-hairline`.
+   Tier 3 token where the component needs its own vocabulary. Zero literals, with one
+   exception: `0` itself, which every gate accepts. `1px` is `--stroke-hairline`.
 3. **`className` merges, never replaces.** `className={cx(styles.root, className)}`,
    consumer last so it can win inside the same layer. A component that drops the passed
    `className` will be forked by the first person who needs to position it.

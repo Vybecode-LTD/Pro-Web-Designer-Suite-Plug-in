@@ -79,20 +79,20 @@ You do not need to be fluent. You need to run one honest pass and listen for spe
 
 | Platform | Pairing | Notes |
 |---|---|---|
-| **Windows** | **NVDA + Firefox** | Free. The reference pairing for most developer testing, and closest to what a large share of users run |
+| **Windows** | **NVDA + Chrome** | Free, and the most common free pairing: 21.3% of respondents to WebAIM's survey #10 (Dec 2023 – Jan 2024), behind JAWS + Chrome at 24.7%. NVDA + Firefox, the classic developer pairing, was 10.0% |
 | **Windows** | **JAWS + Chrome** | Commercial, and still the most-used reader in enterprise and government. Has its own heuristics that differ materially from NVDA's |
 | **macOS** | **VoiceOver + Safari** | Built in (`Cmd+F5`). The only sensible pairing on macOS — VoiceOver with Chrome behaves differently and worse |
 | **Android** | **TalkBack + Chrome** | Built in. The realistic mobile test |
 | **iOS** | **VoiceOver + Safari** | Built in. Gesture-driven, and a genuinely different interaction model |
 
-**The honest note: these are not proxies for each other.** NVDA+Firefox, JAWS+Chrome and VoiceOver+Safari disagree in ways that change results — how much of an `aria-describedby` is read and when, whether a `role="status"` interrupts, how a table's headers are announced, whether a `<summary>` is a "button" or a "disclosure triangle", how much of a label a form field repeats. A component verified in one can be silently broken in another.
+**The honest note: these are not proxies for each other.** NVDA+Chrome, JAWS+Chrome and VoiceOver+Safari disagree in ways that change results — how much of an `aria-describedby` is read and when, whether a `role="status"` interrupts, how a table's headers are announced, whether a `<summary>` is a "button" or a "disclosure triangle", how much of a label a form field repeats. A component verified in one can be silently broken in another.
 
 What to do about it, in order of what you can afford:
 
 1. **Test with one, properly.** One real reader beats none by an enormous margin and finds most of what there is.
 2. **Add a second on a different engine** for anything custom — a combobox, a tree, a data grid. Different engine is the operative phrase; two Chromium readers tell you less than you think.
 3. **Match your actual audience.** A government or enterprise product that has never been tested in JAWS has not been tested.
-4. **Say which you used** in the report. "Verified with NVDA 2026.1 + Firefox 142" is evidence. "Screen reader tested" is not.
+4. **Say which you used** in the report. "Verified with NVDA 2026.1 + Chrome 153" is evidence. "Screen reader tested" is not.
 
 ### Learn five commands, not fifty
 
@@ -252,11 +252,11 @@ A VPAT (the template) produces an ACR (the filled-in report about your product).
 | **Does Not Support** | Not met. Writing this honestly is what makes the rest of the document credible |
 | **Not Applicable** | No content the criterion governs (no video, no audio) |
 
-**"Not Evaluated" is also a legitimate entry.** It is enormously better than a guess, and a reviewer who finds one guess stops trusting the whole document.
+**"Not Evaluated" is a legitimate entry for Level AAA criteria only.** VPAT 2.5 allows it there and nowhere else; for an A or AA criterion it gets the report rejected, so test the criterion. For a AAA criterion it is enormously better than a guess, and a reviewer who finds one guess stops trusting the whole document.
 
 ### The remark that survives scrutiny
 
-> *"**Supports.** Verified by automated rule (axe-core 4.13 `color-contrast`) across all 14 templates on 2026-09-10, and by manual sampling of 12 representative components in NVDA 2026.1 + Firefox 142 on the same date. Two components use text over photographic backgrounds; these were evaluated by hand against the highest-luminance region of each image."*
+> *"**Supports.** Verified by automated rule (axe-core 4.13 `color-contrast`) across all 14 templates on 2026-09-10, and by manual sampling of 12 representative components in NVDA 2026.1 + Chrome 153 on the same date. Two components use text over photographic backgrounds; these were evaluated by hand against the highest-luminance region of each image."*
 
 Name the tool, the version, the scope, the date, the method and the exceptions. And never write "compliant" on the strength of an automated run — `automation-coverage.md` §7 has the wording, and the reasons it matters legally as well as professionally.
 

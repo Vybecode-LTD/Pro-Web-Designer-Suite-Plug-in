@@ -200,7 +200,7 @@ Do not reach for this early. A flat `components` layer is correct for almost eve
 A third-party datepicker ships this:
 
 ```css
-/* vendor/datepicker.css — not yours, do not edit */
+/* vendor/datepicker.css — not yours, do not edit. example: illustration */
 #dp-root .dp-day.dp-day--selected {
   background: #0af !important;
   font-family: Helvetica, sans-serif !important;
@@ -289,6 +289,7 @@ Prefer re-pointing a token to this. An ancestor-qualified component rule means t
 A nested rule's parent reference behaves as `:is(<the full parent selector list>)`, and **`:is()` takes the specificity of its most specific argument.** That is the trap:
 
 ```css
+/* example: wrong */
 .card, #promo {          /* selector list with an ID in it */
   & .title { … }         /* → :is(.card, #promo) .title  →  specificity (1,1,0) */
 }
@@ -605,8 +606,9 @@ The card exists to demonstrate the two problems buttons do not have: **full-blee
       z-index: var(--z-raised);
     }
 
-    /* The card clips overflow, so the reset's box-shadow focus ring would be
-       cut off. Outline is never clipped. See reset.css §7. */
+    /* The card clips overflow, and a ring drawn outside the border box is
+       clipped with it: an outline exactly as much as a box-shadow. So draw
+       it inside, with a negative offset. See reset.css §7. */
     &:where(:focus-visible) {
       box-shadow: none;
       outline: var(--stroke-focus) solid var(--border-focus);

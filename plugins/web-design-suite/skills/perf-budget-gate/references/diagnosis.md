@@ -413,3 +413,61 @@ A 200 KB SVG is a raster in disguise. Run everything through SVGO (it strips edi
 | **Web worker isolation** | Significant complexity, real breakage risk | Partytown-style. Only for a tag you cannot delete, cannot defer and that provably dominates your main thread. |
 
 **The organisational fix beats all of them.** Every third-party script needs a named owner and a review date. A tag with no owner is a tag that will still be there in three years, slower.
+
+---
+
+## 12. What a failing run looks like
+
+Static layer. The ledger comes first because the answer is usually in it:
+
+```
+Weight ledger   (budget: perf-budget.json)
+             transfer     budget    used  requests
+  total        7.72MB    600.0KB   1287%  10
+  html           487B     25.0KB      2%  1
+  css            661B     60.0KB      1%  4
+  js             538B    170.0KB      0%  2
+  image        7.67MB    300.0KB   2557%  2
+  font         49.1KB    100.0KB     49%  1
+
+  Largest assets
+       5.30MB  image  images/card.png  1800x1200
+       2.37MB  image  images/hero.jpg  2400x1350
+
+index.html
+     16  error  C img-no-dimensions   `<img>` has no width/height: hero.jpg.
+     16  error  L lcp-lazy            Likely LCP image is `loading="lazy"`: hero.jpg.
+<images>
+      1  error  W oversized-image     images/hero.jpg is 2400x1350 intrinsic but renders
+                                      at 720px wide (3.3x). 2.37MB where ~854.9KB would
+                                      look identical.
+```
+
+Runtime layer, same page:
+
+```
+Metric      median      min       max    spread  rating
+  LCP          312       284       420      44%  good
+  CLS        0.269     0.269     0.269       0%  poor
+  long tasks    1 task(s), longest 123ms, 73ms blocking in total
+
+  LCP element   html > body > main.page > div.card:nth-of-type(1) > img
+
+  LCP sub-parts                        target
+    TTFB                       3ms     1%   ~40%
+    resource load delay       14ms     4%   <10%
+    resource load duration    50ms    16%   ~40%
+    element render delay     245ms    79%   <10%     ← the bug
+
+  Largest CLS window (worst run)
+     0.18366  at   421ms  html > body > main.page
+     0.08567  at   852ms  html > body > header.hero, html > body > main.page
+```
+
+Read it in this order, because that is the order of yield:
+
+1. **The ledger's `used` column.** One number over 1000% is one file, and one file is an afternoon.
+2. **The LCP element line.** It is frequently not what you assumed, and everything else is wasted until it is right.
+3. **The sub-part with the wrong share.** 79% render delay is not a bytes problem; it is CSS, fonts or the main thread.
+4. **The CLS window's nodes and timestamps.** A shift at 421 ms sourced at `main` means something above `main` grew.
+5. **Then the individual findings**, which by now you already know the shape of.

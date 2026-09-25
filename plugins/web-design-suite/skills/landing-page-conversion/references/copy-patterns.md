@@ -392,3 +392,13 @@ This is the register that matters most for audio software, developer tools, and 
 ---
 
 Related: `references/page-architecture.md` (where each block sits and why), `references/conversion-audit.md` (testing whether the copy lands), `assets/MESSAGE_BRIEF.md` (the positioning and hierarchy this copy is written from), and `web-design-studio`'s `references/typography.md` for measure, leading and the `--type-*` roles named throughout.
+
+---
+
+## 12. Three things worth saying plainly
+
+**On why pages fail.** Almost every under-performing landing page fails in the first screen, and fails for the same reason: it describes a *category* instead of making a *claim*. "The modern platform for audio production teams" is a category description. "Match any reference track's tonal balance in one pass" is a claim. The first is safe and says nothing; the second can be argued with, which is exactly what makes it worth reading. If your headline cannot be disagreed with, it cannot be believed either.
+
+**On technical audiences.** Producers, engineers and developers have an active allergy to marketing register, and they are the audience for most of this work. The rule is not "write less" — it is **write with the density of a spec sheet and the structure of an argument**. Give the latency figure, the plugin formats, the sample rates, the licence terms, the CPU cost. Every concrete detail buys you the right to make one claim. Every adjective spends that credit without buying anything.
+
+**On what conversion work actually is.** It is not a bag of tricks applied to a finished page. It is the discipline of being specific in public: saying who the product is for, what it replaces, and what it costs, in an order a stranger can follow, with evidence you can defend. That is also, not coincidentally, the same discipline that makes the product clearer to build.

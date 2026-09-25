@@ -1,6 +1,6 @@
 ---
 name: component-state-matrix
-description: Generate a component state/variant proof sheet — every component rendered at every state × density × theme in one self-contained page — and screenshot-diff it in CI. Use for visual regression testing of a design system, checking every state and theme actually renders, answering "did I implement all the states", dark mode verification, density verification, component QA before handoff, screenshot diffing and pixel baselines in CI, and building a living component gallery or a Storybook alternative without Storybook. Reach for it whenever anyone mentions component states, hover/focus/active/disabled/loading/error, a focus ring, dark mode or theme checking, compact/comfortable/spacious density, visual regression, screenshot tests, baselines, a component gallery, or QA before a design handoff — and any time a component library exists that nobody has ever seen all of at once.
+description: Render every component at every state, density and theme on one proof sheet, and screenshot-diff it in CI. Use for visual regression, 'did I implement all the states', dark-mode and density checks, and a component gallery without Storybook. Not for documenting component APIs (design-system-docs) or accessibility audits (a11y-audit-runner).
 ---
 
 # Component State Matrix
@@ -189,7 +189,7 @@ A custom property's `var()` references are substituted **on the element where th
 [data-density="compact"] { --density: 0.875; }
 ```
 
-resolves `--pad-card` to 24px *at `:root`* and inherits that number downward. Setting `data-density="compact"` on a descendant changes `--density` there and changes nothing else. Verified in Chromium: a descendant override yields the unchanged 16px.
+resolves `--pad-card` to 24px *at `:root`* and inherits that number downward. Setting `data-density="compact"` on a descendant changes `--density` there and changes nothing else. Verified in Chromium: a descendant override yields the unchanged 24px.
 
 In a real app this never surfaces, because `data-theme` and `data-density` live on `<html>` — the same element the tokens are declared on. A proof sheet puts three densities and two themes on one page, so it must re-declare, on each stage element, every root token that transitively depends on something a theme or density block re-points. The generator derives that set from your token file rather than hard-coding it, and prints the count in the emitted `<style data-role="token-rebind">` block.
 
@@ -299,7 +299,7 @@ The sheet's chrome lives in its own `matrix` cascade layer, declared after `util
 
 Exit `0` clean or updated · `1` regression, new cell or capture error · `2` bad arguments or no usable browser.
 
-**It never downloads a browser.** It launches with an explicit `executablePath` and fails with instructions if nothing is there. Install the module with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D playwright`.
+**It never downloads a browser.** It launches with an explicit `executablePath` and fails with instructions if nothing is there. Install the module with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D -E playwright` to use the Chrome you have. CI pins the browser instead. It installs the Chromium that the locked Playwright was built for, which the script tries first (`references/visual-regression.md` §7).
 
 Comparison runs on a canvas **inside the browser** — no `pixelmatch`, no `pngjs`, no `sharp`, nothing to compile. The metric is YIQ colour distance (luma weighted far above chroma, because that is how eyes work) with a 3×3 neighbourhood escape so sub-pixel antialiasing costs nothing.
 

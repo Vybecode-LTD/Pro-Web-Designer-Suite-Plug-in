@@ -610,16 +610,24 @@ export const twMerge = extendTailwindMerge({
         'display', 'display-sm', 'h1', 'h2', 'h3', 'h4',
         'lead', 'body', 'prose', 'ui', 'label', 'caps', 'meta', 'code',
       ],
+      // Typography roles. Without these, `font-regular` is read as a font
+      // FAMILY and `cn('font-body', 'font-regular')` drops the family.
+      font: ['body', 'code'],
+      'font-weight': ['regular', 'medium', 'semibold', 'bold'],
+      leading: ['flat', 'display', 'heading', 'body', 'long'],
+      tracking: ['display', 'heading', 'body', 'ui', 'allcaps'],
       shadow: ['flat', 'card', 'raised', 'overlay', 'modal'],
       ease: ['enter', 'exit', 'move', 'bounce', 'steady'],
     },
     classGroups: {
       // Utilities registered with @utility are invisible to tailwind-merge;
       // it has no stylesheet to read. Group them by the property they set, or
-      // two of them will happily coexist on one element.
+      // two of them will happily coexist on one element. Where tailwind-merge
+      // already has the group (`z`, `border-w`), extend IT under its own key,
+      // so a role and a stock class conflict too: `z-modal z-50` keeps one.
       motion: [{ motion: ['hover', 'enter', 'exit', 'expand', 'emphasis', 'instant', 'page'] }],
-      'z-ladder': [{ z: ['base', 'raised', 'sticky', 'dropdown', 'overlay', 'modal', 'toast', 'tooltip'] }],
-      'border-w': [{ border: ['hairline', 'default', 'thick'] }],
+      z: [{ z: ['base', 'raised', 'sticky', 'dropdown', 'overlay', 'modal', 'toast', 'tooltip'] }],
+      'border-w': [{ border: ['hairline', 'stroke', 'thick'] }],
     },
   },
 });
@@ -635,9 +643,13 @@ expect(cn('p-card', 'p-card-lg')).toBe('p-card-lg');
 expect(cn('bg-surface', 'bg-raised')).toBe('bg-raised');
 expect(cn('z-modal', 'z-toast')).toBe('z-toast');
 expect(cn('motion-hover', 'motion-expand')).toBe('motion-expand');
+expect(cn('font-body', 'font-regular')).toBe('font-body font-regular');
+expect(cn('z-modal', 'z-50')).toBe('z-50');
 ```
 
-Every one of these returns *both* classes with an unconfigured `twMerge`.
+An unconfigured `twMerge` returns *both* classes for the first, third and fourth.
+The colour pair merges already, because stock tailwind-merge accepts any colour
+name; it is here so a config change that breaks colours is caught too.
 
 ### 6.2 A complete component
 
@@ -666,7 +678,7 @@ const button = cva(
         primary: 'bg-accent text-on-accent hover:bg-accent-hover',
         secondary: 'bg-surface text-default border border-line hover:bg-hover',
         ghost: 'bg-transparent text-muted hover:bg-hover hover:text-default',
-        link: 'bg-transparent text-link underline underline-offset-2 hover:text-accent-fg',
+        link: 'bg-transparent text-link underline hover:text-accent-fg',
       },
 
       /* SIZE. Only padding and type change — radius does not, or the button
@@ -1044,6 +1056,7 @@ one.
 ### 9.6 Class lists so long the structure is invisible
 
 ```tsx
+// example: wrong — the structure is invisible
 <div className="relative flex min-h-0 flex-1 flex-col items-stretch justify-between gap-related overflow-hidden rounded-panel border border-line bg-surface p-card shadow-card transition-shadow motion-hover hover:shadow-raised focus-within:ring-2 focus-within:ring-focus dark:border-line-strong md:flex-row md:items-center md:gap-separate lg:p-card-lg">
 ```
 
@@ -1067,8 +1080,8 @@ export const buttonVariants = cva([...], { variants: { ... } });
 ```tsx
 // LinkButton.tsx
 import { buttonVariants } from './button-variants';
-export const LinkButton = ({ variant, size, className, ...props }) => (
-  <a className={cn(buttonVariants({ variant, size }), className)} {...props} />
+export const LinkButton = ({ variant, size, className, children, ...props }) => (
+  <a className={cn(buttonVariants({ variant, size }), className)} {...props}>{children}</a>
 );
 ```
 
@@ -1095,7 +1108,7 @@ months later a third of the theme is literals and the token file is decorative.
 
 **Gate.** Stylelint's `color-no-hex` and `function-disallowed-list` stay ON for
 `theme.css`. The file has exactly four literal exceptions — breakpoints, CSS-wide
-keywords, keyframe geometry, aspect ratios — each documented in its §0, each
+keywords, keyframe geometry, aspect ratios — each documented in `theme.css` §0, each
 justified by a property of CSS rather than a deadline. A hex is never one of
 them: a breakpoint *must* be a literal because media queries cannot read custom
 properties; a color never must be.
@@ -1124,11 +1137,19 @@ about *this* change — the only way it survives a deadline.
 suggestion loses. A rule you keep disabling is not too strict; it is a missing
 token. Add the token.
 
-**A visible bypass.** `DESIGN_GATE_BYPASS=1` works, and writes the timestamp,
-user and staged file list to `.git/design-gate.log` before exiting. Bypasses are
-sometimes correct; invisible bypasses never are. Read that log weekly — a bypass
-nobody can explain is a missing token or a missing escape hatch, and both are
-fixable.
+**A visible bypass.** `DESIGN_GATE_BYPASS=1` with a `DESIGN_GATE_BYPASS_REASON`
+works. It writes the time, user, reason and staged files to `design-gate.log` in
+the repository's git directory. With the same script installed as the commit-msg
+hook, it also puts a `Design-Gate-Bypass:` trailer in the commit, so the record
+travels with the history. Bypasses are sometimes correct; invisible bypasses never
+are. Review them weekly: a bypass nobody can explain is a missing token or a
+missing escape hatch, and both are fixable.
+
+**A gate that cannot run fails.** A missing stylelint config, audit script or
+Python refuses the commit instead of skipping quietly, because a skipped gate
+passes everything. `DESIGN_GATE_ALLOW_SKIP=1` makes it a warning while a stage
+is being adopted. Configs are found at the repo root first, then in
+`assets/configs/`.
 
 ---
 

@@ -980,6 +980,48 @@ def deep_merge(base: dict, over: dict) -> dict:
     return out
 
 
+def read_jsonc(raw: bytes):
+    """Parse JSON that may carry // and /* */ comments and trailing commas.
+
+    The budget file is written with the device and network in a comment
+    (references/budgets.md §6), so it is JSONC, not JSON. Strings pass
+    through untouched. The bytes may be UTF-16 or carry a byte-order mark,
+    as PowerShell's `>` writes them."""
+    text = raw.decode(json.detect_encoding(raw)).lstrip("﻿")
+    pieces: list[tuple[bool, str]] = []
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] == '"':
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == "\\" else 1
+            pieces.append((True, text[i:j + 1]))
+            i = j + 1
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+        else:
+            j = i
+            while j < n and text[j] != '"' and not text.startswith(("//", "/*"), j):
+                j += 1
+            pieces.append((False, text[i:j]))
+            i = j
+    # Merge the code between strings, so a comment between a trailing comma
+    # and its bracket cannot hide the comma from the regex.
+    out, code = [], ""
+    for is_string, piece in pieces:
+        if is_string:
+            out += [re.sub(r",(\s*[}\]])", r"\1", code), piece]
+            code = ""
+        else:
+            code += piece
+    out.append(re.sub(r",(\s*[}\]])", r"\1", code))
+    return json.loads("".join(out))
+
+
 def load_budget(path: str | None) -> tuple[dict, str]:
     """Returns (budget, provenance). A missing file is not an error — it is a
     prompt to go and set one."""
@@ -989,8 +1031,8 @@ def load_budget(path: str | None) -> tuple[dict, str]:
     if not p.exists():
         return DEFAULT_BUDGET, f"built-in defaults ({path} not found)"
     try:
-        data = json.loads(p.read_bytes())
-    except (OSError, json.JSONDecodeError) as exc:
+        data = read_jsonc(p.read_bytes())
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise SystemExit(f"perf_audit: cannot read budget {path}: {exc}")
     if data.get("$schema") not in (None, "perf-budget-gate/1"):
         raise SystemExit(

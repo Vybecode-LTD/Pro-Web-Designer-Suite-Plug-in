@@ -1,6 +1,6 @@
 ---
 name: landing-page-conversion
-description: Writing and structuring landing pages, marketing sites, product pages, pricing pages and hero sections — the words and the sequence, not the CSS. Use for headline and CTA copy, value propositions, social proof and testimonials, signup / waitlist / free-trial / demo pages, app-download and agency-services pages, and event or webinar registration. Use whenever someone asks why a page isn't converting, wants page copy that sells, wants an existing page's messaging audited, or says "make this convert better", "write my hero", "what should this page say", "our bounce rate is terrible", "rewrite the pricing page", or hands over a live URL for review. Produces a positioning statement, a message hierarchy, a section-by-section page architecture, the block copy, the markup wired to the design system, and a conversion + technical audit (LCP, CLS, form friction). Honest persuasion only — no fabricated proof, fake scarcity, or dark patterns.
+description: Write and structure landing, pricing and product pages, from positioning and message hierarchy to section order and block copy, wired to the design system and audited for conversion. Use for 'why isn't this converting' and hero or CTA copy. Honest persuasion only. Not for visual critique (design-critique-gate) or site-wide CSS (web-design-studio).
 ---
 
 # Landing Page Conversion
@@ -36,6 +36,45 @@ The diagnostic that proves this matters: when a page "isn't converting," the cau
 
 ---
 
+## The ethics boundary
+
+**This skill writes honest persuasion. It declines deception, and offers the honest version instead.**
+
+Honest persuasion is: making a true claim clearly, in the order a reader can absorb it, with real evidence attached, and asking plainly for the next step. That is the entire job. Everything below is outside it.
+
+| Declined | What it actually is | The honest alternative |
+|---|---|---|
+| Invented testimonials, made-up customer names, stock-photo "customers" | Fabricated evidence | Ask the user for three real customers. If there are none, say "we're new" and use a founder's note, a public build log, or a money-back guarantee |
+| Statistics with no source ("increases productivity 47%") | Fabricated evidence | Measure it, or state the mechanism without a number |
+| Countdown timers that reset on reload; "3 people are viewing this"; permanent "ends tonight" | Fake scarcity / false urgency | A real deadline with a real date, or no urgency device at all. A launch price that genuinely ends is worth more than a timer nobody believes |
+| Confirmshaming ("No thanks, I don't want more revenue") | Coercive framing | A neutral decline: "Not now" |
+| Ads or affiliate blocks styled as editorial content | Disguised advertising | Label it. A visible "Sponsored" costs less than the trust it protects |
+| Cancellation buried, phone-only, or behind a retention maze | Obstruction / roach motel | Cancel in the account page, in the same number of clicks it took to subscribe |
+| Pre-ticked upsells, sneaking items into a cart, hidden auto-renew | Sneaking | Opt-in, unticked, with the renewal terms next to the button |
+| "Free" that is a trial with stored card and no reminder | Bait / hidden cost | Say "14-day trial, card required, we email you 3 days before it bills" |
+
+These have names because regulators gave them names; the EU and US law behind each is in `references/conversion-audit.md` §11.
+
+**The practical argument, which matters more for a small company than the legal one.** A dark pattern converts someone who did not want the thing. You now own a refund, a chargeback, a support ticket, a public review, and one person who tells their peers. For a plugin company selling to a few thousand producers, or an agency whose pipeline is referrals, the audience is small enough that reputations are single-threaded. A burned prospect costs more than a converted one is worth, and the arithmetic does not improve at scale — it just takes longer to show up.
+
+If a user asks for one of these directly, do not lecture. Name what it is in one line, produce the honest alternative that serves the same goal, and move on.
+
+---
+
+## Evidence discipline
+
+Conversion writing is full of confidently-stated folklore, most of it a real finding from one company's site generalised into a law. Mark what you are standing on:
+
+**Real, and citable by name.** The Baymard Institute's checkout and form research. Nielsen Norman Group's eye-tracking on scroll and attention. NN/g's argument that five participants surface most usability problems in a qualitative study. Google's Core Web Vitals thresholds (LCP ≤ 2.5s, CLS ≤ 0.1, INP ≤ 200ms at the 75th percentile). WCAG 2.2 AA. The figures worth quoting from each, with what they measure, are in `references/conversion-audit.md`.
+
+**Correlational, so do not state it as causation.** Deloitte and Google's *Milliseconds Make Millions* study associated faster mobile pages with higher retail conversion, but it was observational monitoring, not a controlled experiment (`references/conversion-audit.md` has its numbers). Faster sites also tend to be better-resourced sites. Speed is worth fixing on mechanism alone; do not promise the number.
+
+**Practitioner heuristic — useful, not evidence.** "Above the fold" as a hard rule. Specific button colours. Urgency devices. Optimal word counts. "Long pages convert better" and "short pages convert better" in equal measure. Say "this is a heuristic" out loud when you use one, and prefer the mechanism ("a reader who cannot tell what this is will not scroll") over a borrowed statistic.
+
+**The rule.** Before stating a specific number, verify it. If you cannot find the source, cut the number and state the mechanism instead. A hedged fake statistic is still a fake statistic — hedging launders it rather than fixing it.
+
+---
+
 ## Routing: what was actually asked
 
 Most requests arrive as a symptom, not a phase number. Route from the symptom.
@@ -58,14 +97,7 @@ Two things worth refusing early, politely. A request to write a hero when nobody
 
 ## What this skill produces
 
-| Phase | Artifact | Where |
-|---|---|---|
-| 1 Positioning | A one-sentence positioning statement that passes the specificity test | `assets/MESSAGE_BRIEF.md` §1 |
-| 2 Message hierarchy | One claim, three supports, one proof per support | `assets/MESSAGE_BRIEF.md` §2–3 |
-| 3 Architecture | An ordered section list with a reason per section | `references/page-architecture.md` |
-| 4 Copy | Every block written: hero, props, proof, objections, pricing, FAQ, CTA | `references/copy-patterns.md` |
-| 5 Layout | Markup in layout primitives + the section stylesheet | `assets/page-sections.css` |
-| 6 Audit | Conversion review + technical review, with the fixes ranked | `references/conversion-audit.md` |
+Unless told otherwise, finish with: the filled-in `MESSAGE_BRIEF.md`, the ordered section architecture with a one-line justification per section, the full page copy block by block, the markup in layout primitives, `page-sections.css` adapted to the project, and the audit results with fixes ranked by expected effect over effort. State every assumption you had to make about the audience at the top, because those are the assumptions a real test would attack first.
 
 ---
 
@@ -186,43 +218,7 @@ Write in this order: claim → sub → CTA → props → proof → FAQ → eyebr
 
 ### Phase 5 — Wire it to the design system
 
-Now, and not before, express the structure in layout primitives from `web-design-studio`:
-
-| Section shape | Primitive | Gap token |
-|---|---|---|
-| Page shell with full-bleed bands | `.page-grid` + `.sections--banded` | band owns `--space-subsection` |
-| Hero: copy beside media | `.split.split--2-1` inside `.cover--partial` | `--gap-separate` |
-| Hero: headline stack | `.stack--tight` (eyebrow → h1 → sub) | `--gap-tight` |
-| 3-up value props | `.switcher.switcher--max-3` | `--gap-grouped` |
-| Feature deep-dive rows | `.split`, alternating | `--gap-separate` |
-| Logo strip / testimonial wall | `.grid.grid--min-xs` / `.grid--min-sm` | `--gap-grouped` |
-| Pricing tiers | `.switcher.switcher--max-3` | `--gap-grouped` |
-| FAQ | `.stack--related` of `<details>` | `--gap-related` |
-| Final CTA | `.center--intrinsic` inside a band | `--gap-separate` |
-
-`assets/page-sections.css` implements the section shells against these primitives using only Tier-2 tokens. It passes `audit_design.py` clean, so a page built from it is on-system from the first commit instead of being migrated later.
-
-Two spacing facts that decide more of a marketing page's feel than anything else:
-
-- **A marketing page runs at `data-density="spacious"` (1.125).** Density is a dial (Law 7), not a second stylesheet. Marketing copy needs more air than an admin table; that is a context, not a component difference.
-- **Pick one rhythm mode and keep it.** Banded (each section paints a background and owns `padding-block`) or unbanded (the parent owns `row-gap`). Mixing them on one page produces a boundary of `--space-section + --space-subsection` that nobody can reason about. Most landing pages want banded, because alternating surfaces is how a reader perceives sections as separate arguments.
-
-The shape of the whole page, in eleven lines:
-
-```html
-<main class="page-grid sections sections--banded" data-density="spacious">
-  <section class="band section hero bleed-full">…</section>            <!-- hero    -->
-  <section class="band band--tight section section--sunken">…</section>  <!-- proof   -->
-  <section class="band section">…</section>                             <!-- props   -->
-  <section class="band section section--surface bleed-full">…</section> <!-- how     -->
-  <section class="band section">…</section>                             <!-- quotes  -->
-  <section class="band section section--surface bleed-full">…</section> <!-- pricing -->
-  <section class="band section section--sunken">…</section>             <!-- faq     -->
-  <section class="band band--loose section section--inverse bleed-full">…</section>
-</main>
-```
-
-Every section is a `.band` even when it paints nothing — a transparent band keeps the rhythm one rule instead of two (`web-design-studio`, `layout.css` §0.2). Sections that paint a background take `.bleed-full` and nest a second `.page-grid` inside so the colour runs edge to edge while the copy stays in the content column. That is the whole full-bleed mechanism; no negative margins are involved, which is why it does not produce horizontal scroll when a scrollbar appears.
+Now, and not before, express the structure in `web-design-studio`'s layout primitives: the table, markup and rules are in `references/page-architecture.md` §8.
 
 ### Phase 6 — Audit
 
@@ -239,16 +235,7 @@ python -m scripts.audit_design <path>      # from web-design-studio
 
 Law 9 applies here exactly as it does in the studio skill: nothing ships un-audited.
 
-Report findings ranked by **expected effect over effort**, and be honest that "expected" is a judgement, not a measurement, until the page has traffic and instrumentation. The ranking that holds up most often:
-
-1. The page does not say what it is within one screen. *(Rewrite the hero. Costs an afternoon, changes everything downstream.)*
-2. An objection is unanswered and the reader hits the CTA without an answer. *(Add the section. Usually FAQ or pricing.)*
-3. The form asks for more than the next step requires. *(Delete fields. The cheapest change on this list.)*
-4. The proof is generic. *(Get one real, attributed, specific testimonial. Costs an email.)*
-5. LCP is slow because the hero image is unoptimised. *(Half a day, mechanically certain.)*
-6. Everything else.
-
-Button colour is not on the list. It is not that colour never matters — contrast and visual hierarchy matter a great deal, and `web-design-studio`'s `references/color-system.md` owns that — but "change the button to orange" as a *conversion* intervention is the most-repeated piece of folklore in this field and the least supported.
+Report findings ranked by **expected effect over effort**, and be honest that "expected" is a judgement, not a measurement, until the page has traffic and instrumentation. The ranking that holds up most often: `references/conversion-audit.md` §12.
 
 ---
 
@@ -267,58 +254,3 @@ Read the file when you hit the decision it covers. Do not read them all up front
 | `assets/page-sections.css` | Phase 5. Drop-in section shells on the layout primitives |
 
 Cross-skill: `web-design-studio` owns `references/spacing-system.md` (any spacing value), `references/layout-composition.md` (the primitives), `references/accessibility.md` (always), and the audit script.
-
----
-
-## The ethics boundary
-
-**This skill writes honest persuasion. It declines deception, and offers the honest version instead.**
-
-Honest persuasion is: making a true claim clearly, in the order a reader can absorb it, with real evidence attached, and asking plainly for the next step. That is the entire job. Everything below is outside it.
-
-| Declined | What it actually is | The honest alternative |
-|---|---|---|
-| Invented testimonials, made-up customer names, stock-photo "customers" | Fabricated evidence | Ask the user for three real customers. If there are none, say "we're new" and use a founder's note, a public build log, or a money-back guarantee |
-| Statistics with no source ("increases productivity 47%") | Fabricated evidence | Measure it, or state the mechanism without a number |
-| Countdown timers that reset on reload; "3 people are viewing this"; permanent "ends tonight" | Fake scarcity / false urgency | A real deadline with a real date, or no urgency device at all. A launch price that genuinely ends is worth more than a timer nobody believes |
-| Confirmshaming ("No thanks, I don't want more revenue") | Coercive framing | A neutral decline: "Not now" |
-| Ads or affiliate blocks styled as editorial content | Disguised advertising | Label it. A visible "Sponsored" costs less than the trust it protects |
-| Cancellation buried, phone-only, or behind a retention maze | Obstruction / roach motel | Cancel in the account page, in the same number of clicks it took to subscribe |
-| Pre-ticked upsells, sneaking items into a cart, hidden auto-renew | Sneaking | Opt-in, unticked, with the renewal terms next to the button |
-| "Free" that is a trial with stored card and no reminder | Bait / hidden cost | Say "14-day trial, card required, we email you 3 days before it bills" |
-
-These have names because regulators gave them names. In the **EU**, dark patterns fall under the Unfair Commercial Practices Directive — misleading actions and omissions (Arts. 6–7), aggressive practices (Arts. 8–9), and the Annex I blacklist, which includes falsely stating a product is available for a very limited time. The **Digital Services Act Art. 25** additionally prohibits online platforms from designing interfaces that deceive or manipulate users, and a proposed Digital Fairness Act would tighten this further. In the **US**, the FTC has brought dark-pattern and negative-option cases under the FTC Act and ROSCA, which requires clear disclosure of material terms, express informed consent, and a simple cancellation mechanism. (Be precise about this one: the FTC's 2024 "click-to-cancel" Negative Option Rule was **vacated** by the Eighth Circuit in July 2025, and the FTC restarted rulemaking in early 2026 — so the specific rule is not in force, but ROSCA and Section 5 enforcement are, and several US states have their own automatic-renewal statutes. "The rule got struck down" is not a defence.)
-
-**The practical argument, which matters more for a small company than the legal one.** A dark pattern converts someone who did not want the thing. You now own a refund, a chargeback, a support ticket, a public review, and one person who tells their peers. For a plugin company selling to a few thousand producers, or an agency whose pipeline is referrals, the audience is small enough that reputations are single-threaded. A burned prospect costs more than a converted one is worth, and the arithmetic does not improve at scale — it just takes longer to show up.
-
-If a user asks for one of these directly, do not lecture. Name what it is in one line, produce the honest alternative that serves the same goal, and move on.
-
----
-
-## Evidence discipline
-
-Conversion writing is full of confidently-stated folklore, most of it a real finding from one company's site generalised into a law. Mark what you are standing on:
-
-**Real, and citable by name.** The Baymard Institute's checkout and form research (e.g. the average checkout carries 11.3 form fields against a realistic target of ~8; the ~70% documented cart-abandonment average across 50 studies). Nielsen Norman Group's eye-tracking on scroll and attention (2018: ~57% of viewing time above the fold, ~74% in the first two screenfuls — down from ~80% above the fold in their 2010 study, which is the useful part: attention still decays sharply with depth, but the cliff moved). NN/g's argument that five participants surface most usability problems in a qualitative study. Google's Core Web Vitals thresholds (LCP ≤ 2.5s, CLS ≤ 0.1, INP ≤ 200ms at the 75th percentile). WCAG 2.2 AA.
-
-**Correlational, so do not state it as causation.** The Deloitte/Google *Milliseconds Make Millions* study (37 sites, 30M+ sessions, late 2019) found a 0.1s mobile-speed improvement associated with an 8.4% retail conversion lift — observational monitoring, not a controlled experiment. Faster sites also tend to be better-resourced sites. Speed is worth fixing on mechanism alone; do not promise the number.
-
-**Practitioner heuristic — useful, not evidence.** "Above the fold" as a hard rule. Specific button colours. Urgency devices. Optimal word counts. "Long pages convert better" and "short pages convert better" in equal measure. Say "this is a heuristic" out loud when you use one, and prefer the mechanism ("a reader who cannot tell what this is will not scroll") over a borrowed statistic.
-
-**The rule.** Before stating a specific number, verify it. If you cannot find the source, cut the number and state the mechanism instead. A hedged fake statistic is still a fake statistic — hedging launders it rather than fixing it.
-
----
-
-## Three things worth saying plainly
-
-**On why pages fail.** Almost every under-performing landing page fails in the first screen, and fails for the same reason: it describes a *category* instead of making a *claim*. "The modern platform for audio production teams" is a category description. "Match any reference track's tonal balance in one pass" is a claim. The first is safe and says nothing; the second can be argued with, which is exactly what makes it worth reading. If your headline cannot be disagreed with, it cannot be believed either.
-
-**On technical audiences.** Producers, engineers and developers have an active allergy to marketing register, and they are the audience for most of this work. The rule is not "write less" — it is **write with the density of a spec sheet and the structure of an argument**. Give the latency figure, the plugin formats, the sample rates, the licence terms, the CPU cost. Every concrete detail buys you the right to make one claim. Every adjective spends that credit without buying anything.
-
-**On what conversion work actually is.** It is not a bag of tricks applied to a finished page. It is the discipline of being specific in public: saying who the product is for, what it replaces, and what it costs, in an order a stranger can follow, with evidence you can defend. That is also, not coincidentally, the same discipline that makes the product clearer to build.
-
----
-
-## Deliverable shape
-
-Unless told otherwise, finish with: the filled-in `MESSAGE_BRIEF.md`, the ordered section architecture with a one-line justification per section, the full page copy block by block, the markup in layout primitives, `page-sections.css` adapted to the project, and the audit results with fixes ranked by expected effect over effort. State every assumption you had to make about the audience at the top, because those are the assumptions a real test would attack first.

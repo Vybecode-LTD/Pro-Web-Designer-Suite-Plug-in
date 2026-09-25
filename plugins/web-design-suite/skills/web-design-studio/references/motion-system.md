@@ -60,9 +60,9 @@ The numbers that hold up in practice:
 
 | Element | Travel | Enter token | Exit token | Why |
 |---|---|---|---|---|
-| Checkbox tick, toggle knob, radio dot | 0–8px | `--dur-instant` | `--dur-instant` | The state is the message; transit carries no information |
+| Checkbox tick, toggle knob, radio dot | 0–8px | `--motion-instant` | `--motion-instant` | The state is the message; transit carries no information |
 | Hover background, focus ring, icon color | none (no travel) | `--motion-hover` | `--motion-hover` | Must feel attached to the cursor; >200ms and the button feels sticky |
-| Button press depress | 1–2px | `--dur-instant` | `--dur-fast` | Down must be immediate; release can relax |
+| Button press depress | 1–2px | `--motion-instant` | `--motion-hover` | Down must be immediate; release can relax |
 | Tooltip, popover | 4–8px | `--motion-enter` | `--motion-exit` | Small, near its trigger |
 | Dropdown / select menu | 8–16px | `--motion-enter` | `--motion-exit` | Origin matters (job 1); scale from the trigger edge |
 | Toast / snackbar | 16–24px | `--motion-enter` | `--motion-exit` | Enters from the edge it docks to |
@@ -73,7 +73,7 @@ The numbers that hold up in practice:
 | Bottom sheet (mobile) | 50–90vh | `--dur-slow` | `--dur-base` | Same, plus the thumb expects gravity — `--ease-out` in, `--ease-in` out |
 | Page / route transition | full viewport | `--dur-slower` | `--dur-base` | Once per navigation; must not delay content (§9) |
 | List item enter (staggered) | 8–16px | `--motion-enter` per item | — | See stagger, §4 |
-| Skeleton shimmer, spinner | looping | `--dur-slower`+ with `--ease-linear` | — | Loops need constant velocity, not easing |
+| Skeleton shimmer, spinner | looping | `--motion-loop` | — | Loops need constant velocity, not easing |
 
 **Travel distance is a spacing decision.** A menu that slides in from 8px should reference the spacing scale, not the number 8. The shipped `tokens.css` has no motion-travel role, so declare one — Tier 2 roles are explicitly cheap to add:
 
@@ -167,12 +167,15 @@ For non-interruptible springs, CSS's `linear()` expresses a real spring curve na
     1.028 61.1%, 1.025 66.7%, 1.020 72.2%, 1.014 77.8%, 1.009 83.3%,
     1.005 88.9%, 1.003 94.4%, 1.001
   );
+  --motion-spring: var(--dur-slow) var(--ease-spring-physical);
 }
 
-.sheet {
-  /* Fallback first: a parser that does not know linear() keeps this declaration. */
-  transition: transform var(--dur-slow) var(--ease-spring);
-  transition: transform var(--dur-slow) var(--ease-spring-physical);
+/* Gate it; do not stack two declarations. The second would read a custom
+   property, so no parser can reject it: it wins, and where linear() is
+   unknown it computes to nothing and the sheet loses its transition. */
+.sheet { transition: transform var(--motion-emphasis); }
+@supports (transition-timing-function: linear(0, 1)) {
+  .sheet { transition: transform var(--motion-spring); }
 }
 ```
 
@@ -238,7 +241,8 @@ Two implementation routes: FLIP (§5, works everywhere, same-document only) and 
 /* Cross-document: opt both pages in. */
 @view-transition { navigation: auto; }
 
-/* Style the generated pseudo-elements with tokens like anything else. */
+/* Style the generated pseudo-elements with tokens like anything else. Set the
+   longhands: the `animation` shorthand would reset the UA's animation-name. */
 ::view-transition-old(hero),
 ::view-transition-new(hero) {
   animation-duration: var(--dur-slow);
@@ -398,7 +402,9 @@ CSS can now drive an animation's progress from scroll position instead of from t
 /* Reveal each card as it crosses the viewport: view() tracks the element's own
    intersection with the scrollport. The range is the useful half of the API. */
 .reveal {
-  animation: rise-in auto var(--ease-out) both;
+  animation-name: rise-in;
+  animation-fill-mode: both;
+  animation-timing-function: var(--ease-out);   /* no duration: the timeline owns it */
   animation-timeline: view();
   animation-range: entry 10% cover 35%;
 }
@@ -421,7 +427,8 @@ CSS can now drive an animation's progress from scroll position instead of from t
 ```css
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
-    .reveal { animation: rise-in auto var(--ease-out) both; animation-timeline: view(); }
+    .reveal { animation-name: rise-in; animation-fill-mode: both;
+              animation-timing-function: var(--ease-out); animation-timeline: view(); }
   }
 }
 ```
@@ -447,28 +454,28 @@ Overriding the scroll wheel to snap between full-screen panels, animate at a scr
 Each entry: **job · duration · easing · must not**.
 
 ### Button press
-Job 1 (causality). `--dur-instant` down, `--dur-fast` up, `--ease-out`.
+Job 1 (causality). `--motion-instant` down, `--motion-hover` up.
 ```css
-.btn { transition: transform var(--dur-instant) var(--ease-out),
+.btn { transition: transform var(--motion-instant),
                    background-color var(--motion-hover); }
 .btn:active { transform: scale(0.97); }
 ```
 **Must not** move the button's layout box (use `transform` only), delay the actual action until the animation ends, or exceed ~3% scale — more and the label visibly reflows.
 
 ### Toggle / switch
-Job 2 (continuity — the knob is one object moving). `--dur-instant`, `--ease-out`.
+Job 2 (continuity — the knob is one object moving). `--motion-instant`.
 ```css
-.switch-knob { transition: transform var(--dur-instant) var(--ease-out); }
+.switch-knob { transition: transform var(--motion-instant); }
 .switch[aria-checked="true"] .switch-knob { transform: translateX(100%); }
 .switch { transition: background-color var(--motion-hover); }
 ```
 **Must not** be the only indicator of state (colour + position + accessible name), and must not animate the track and knob on different durations.
 
 ### Checkbox check
-Job 3 (attention — confirm the hit registered). `--dur-instant`, `--ease-out`.
+Job 3 (attention — confirm the hit registered). `--motion-instant`.
 ```css
 .check-path { stroke-dasharray: 22; stroke-dashoffset: 22;
-              transition: stroke-dashoffset var(--dur-instant) var(--ease-out); }
+              transition: stroke-dashoffset var(--motion-instant); }
 input:checked + .check .check-path { stroke-dashoffset: 0; }
 ```
 **Must not** delay the underlying form state. **Must not** animate on initial render — a form restoring 12 checked boxes should not draw 12 ticks.
@@ -476,8 +483,8 @@ input:checked + .check .check-path { stroke-dashoffset: 0; }
 ### Input focus
 Job 3. `--motion-hover`, and the ring itself is instant.
 ```css
-.input { transition: border-color var(--motion-hover), box-shadow var(--motion-hover); }
-.input:focus-visible { border-color: var(--border-focus); box-shadow: var(--shadow-focus); }
+.input { transition: border-color var(--motion-hover); }
+.input:focus-visible { border-color: var(--border-focus); }   /* the ring is reset.css's outline */
 ```
 **Must not** animate the ring's *size* (it reads as a pulse and fails Focus Appearance during the transit), must not exceed `--dur-fast`, and must never be suppressed under reduced motion — the ring appears, it just appears immediately.
 
@@ -495,7 +502,7 @@ Job 3. `--motion-hover`, and the ring itself is instant.
   background: linear-gradient(90deg,
     var(--bg-sunken) 25%, var(--bg-hover) 37%, var(--bg-sunken) 63%);
   background-size: 400% 100%;
-  animation: shimmer var(--dur-slower) var(--ease-linear) infinite;
+  animation: shimmer var(--motion-loop) infinite;
 }
 @keyframes shimmer { from { background-position: 100% 0; }
                      to   { background-position: 0 0; } }
@@ -522,10 +529,10 @@ Job 4 (personality) with a touch of 1. `--motion-hover`.
 **Must not** shift layout — no `margin`, no `height`, nothing that moves a neighbour. **Must not** be the only affordance (the card must look interactive at rest). **Must not** apply on touch, where `:hover` sticks after the tap — hence the `(hover: hover)` guard.
 
 ### Drag affordance
-Job 1. Pick-up `--dur-instant`; drop `--dur-base` with `--ease-out`; reorder of displaced siblings via FLIP at `--motion-expand`.
+Job 1. Pick-up `--motion-instant`; drop `--motion-enter`; reorder of displaced siblings via FLIP at `--motion-expand`.
 ```css
-.draggable { transition: box-shadow var(--dur-instant) var(--ease-out),
-                         transform var(--dur-instant) var(--ease-out); }
+.draggable { transition: box-shadow var(--motion-instant),
+                         transform var(--motion-instant); }
 .draggable[data-dragging] { box-shadow: var(--elevation-overlay);
                             transform: scale(1.02); cursor: grabbing; }
 ```
@@ -634,4 +641,4 @@ Law 9. Run every item; a failure is a blocker, not a nit.
 7. **Interrupt every animation** — click the trigger twice fast, dismiss a dialog mid-entrance, navigate during a route transition. Nothing may get stuck, and no element may be left mid-transform.
 8. **Test on a real mid-tier Android** over a throttled network at least once per project.
 9. **Confirm no motion delays first content paint.**
-10. **Confirm focus survives** every transition — dialogs, view transitions, route changes. Cross-reference `references/accessibility.md` §4.
+10. **Confirm focus survives** every transition — dialogs, view transitions, route changes. Cross-reference `references/accessibility.md` §3.

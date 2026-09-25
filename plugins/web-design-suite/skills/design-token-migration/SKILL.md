@@ -1,6 +1,6 @@
 ---
 name: design-token-migration
-description: "Migrating or refactoring an existing codebase onto a design token system. Use this whenever someone inherits, adopts or cleans up CSS they did not write — \"our CSS is a mess\", a client codebase full of margin-top:13px and #3a3a3a, legacy stylesheets, inline styles, !important, magic numbers, a dozen near-identical grays, inconsistent spacing, or a design system that has to be adopted on a site that already ships. Extracts every hardcoded value in the repo, clusters them into the decisions they were trying to be, derives a tokens.css from the codebase's own values, generates a reviewable codemod, and proves it worked with a before/after audit diff. Strangler-fig by default: incremental, per-directory, with a baseline that freezes the remaining debt instead of a rewrite nobody approves. Covers plain CSS/SCSS, CSS Modules, styled-components/Emotion, Tailwind arbitrary values, Bootstrap/Material overrides, and inline-style-heavy React."
+description: Migrate an existing codebase onto design tokens, from a census of every hardcoded value, clustered into tokens.css, to a reviewable codemod proven by a before-and-after audit. Use for 'our CSS is a mess', magic numbers and near-identical greys. Not for building a new system (web-design-studio) or versioning a shipped one (design-system-versioning).
 ---
 
 # Design Token Migration
@@ -261,54 +261,7 @@ Exit codes: 0 clean, 1 something was skipped (read the list — every skip is de
 
 ## A worked run, end to end
 
-A real 8-file fixture — plain CSS, SCSS, two CSS Modules, JSX with inline styles and Tailwind arbitrary values, styled-components, a one-off marketing page, and a vendor override sheet. 223 literals.
-
-```sh
-python -m scripts.extract_literals ./src --format json -o literals.json
-#   223 literal value(s) across 8 file(s)
-#   distinct spacing values 27  (the closed scale has 18)
-#   distinct colors         22
-#   distinct shadows         6
-
-python -m scripts.cluster_values literals.json -o ./proposal
-#   81 rule(s) covering 180 occurrence(s); 24 need review;
-#   53 need a design decision
-
-cp proposal/tokens.css src/styles/tokens.css && git commit -am "tokens.css"
-
-for kind in color spacing type radius stroke duration shadow z-index tracking; do
-  python -m scripts.apply_codemod ./src -m proposal/mapping.json --kind "$kind" --apply
-  git commit -am "migrate: $kind"
-done
-#   135 replacements across 7 files
-```
-
-| | Before | After |
-|---|---:|---:|
-| Audit errors | 151 | **46** |
-| Audit warnings | 12 | 12 |
-| L1 Tokens or nothing | 123 | **30** |
-| L3 The scale is closed | 18 | **6** |
-| L2 Parents own the gaps | 4 | 4 |
-| L4 One home per component | 12 | 12 |
-| L5 Layers, not specificity | 6 | 6 |
-
-L1 and L3 collapse; L2, L4 and L5 do not move at all, because those are phases 4e–4g and nothing has been done to them yet. **That shape is what a correct run looks like.** A migration that claims to have fixed all five laws in one codemod has either deleted something or is not measuring.
-
-The 46 remaining errors are, in full:
-
-| Count | Finding | Waiting on |
-|---:|---|---|
-| 12 | `L4 inline-style` | Phase 4f — hand work, a class name each |
-| 8 | `L1 raw-spacing` | Reconciliation: `22px` (20 or 24?), `34px`, `74px`, `13px` all-sides |
-| 7 | `L1 raw-type` | Reconciliation: `47px` heading, `11px` meta, plus 5 skipped by the `font:` guard because the rule also sets `font-weight` |
-| 5 | `L5 unlayered` | Phase 4g — the `@layer` wrapping |
-| 5 | `L1 raw-color` | A `linear-gradient`, a `rgba()` scrim, two status tints with no Tier-2 role |
-| 4 | `L2 child-margin` | Phase 4e — container by container |
-| 4 | `L3 tw-arbitrary` | `py-[62px]`, `max-w-[1140px]`, `tracking-[-0.02em]`, `duration-[180ms]` — all reported |
-| 1 | `L5 important` | Phase 4g, after layers |
-
-Every one is a sentence in the reconciliation report or a phase that has not run. None is a surprise, and that is the actual deliverable.
+One migration from census to verified diff, with every command and what it printed: `references/worked-run.md`.
 
 ---
 
@@ -316,47 +269,7 @@ Every one is a sentence in the reconciliation report or a phase that has not run
 
 Migration only happens if somebody approves it. That approval is a business decision, and "the CSS is messy" is not a business case — it is a complaint, and it will be weighed against a feature. Make the argument properly.
 
-### The argument
-
-**Lead with the count, not the aesthetics.** Run Phase 1 and open with it: *"There are 1,431 hardcoded values across 212 files. 612 of them are the same eleven decisions repeated. 84% are mechanically replaceable in an afternoon."* That sentence is checkable, and it converts a taste argument into an arithmetic one.
-
-**Name the cost that is already being paid.** Nobody funds tidiness. They fund the removal of a recurring cost, and this one is always already there:
-
-| Symptom they already have | What it actually is |
-|---|---|
-| "Dark mode is a huge project" | Colors are hardcoded, so there is nothing to re-point. This is the big one — dark mode on a tokenized codebase is a day |
-| "Every rebrand is a rewrite" | Same cause. A brand change should be one ramp seed |
-| "The designer keeps filing 4px bugs" | Two owners for every gap. Each bug is real, individually trivial and collectively infinite |
-| "Nobody can find where a style comes from" | Six homes per component. The cost is paid in minutes per developer per day, which is the largest number in this table |
-| "Our accessibility audit failed on contrast" | Contrast was assumed, never measured. Roles make it measurable once instead of per-screen |
-
-**Be specific about what they get at each stopping point.** This is the part that wins the meeting. Phases 1–3 cost days and deliver a document, and the document is useful even if nothing else happens. Phase 4 can stop after any batch. Phase 6 works on a codebase that is 20% migrated — that is the whole point of the baseline.
-
-**Give the honest estimate, including the part that is not automatable.** Inflated confidence is how the second migration never gets funded.
-
-| Phase | Cost, 150–400 file codebase | Risk |
-|---|---|---|
-| 1 Inventory | 1–2 hours, mostly reading | None. Changes nothing |
-| 2–3 Cluster + propose | 1 day for the scripts, **2–4 days of design review** | None to the code. The review is where the time goes and it cannot be skipped |
-| 4a Colors | 1 day including review | Low. Mechanical, visually verifiable |
-| 4b Radius, stroke, shadow, motion | 1 day | Low. Few occurrences, contained |
-| 4c Type | 1 day | Medium. Also removes the sibling `line-height` / `font-weight` declarations by hand |
-| 4d Spacing | 1–2 days | **Medium.** Every snapped value moves something. This is where the screenshots earn their keep |
-| 4e Law 2 (child margins → parent gap) | 2–5 days | **High.** Changes layout. Container by container, never bulk |
-| 4f Law 4 (inline styles) | 1 day per ~30 offending components | Medium. Manual, but each one is small |
-| 4g Law 5 (`!important`, layers) | 1–3 days | Medium. Do it after layers are in, never before |
-| 5 Verify | Half a day per batch | — |
-| 6 Gate | 2 hours | None |
-
-Total for a typical mid-size app: **two to three weeks of one person's time**, of which roughly a third is design review rather than engineering, and about half is optional (4e–4g can be deferred behind the baseline indefinitely).
-
-**Offer the small version first.** Most teams should hear: *"Give me two days. I will produce the inventory, the proposed token file and the reconciliation report. Nothing changes. Then you decide."* Approval for two days of read-only work is nearly free, and by the end of it the case makes itself with their own numbers.
-
-### What not to promise
-
-- **Not "no visual changes."** Snapping 13px to 12px moves something. Promise no *unreviewed* visual changes, and mean it.
-- **Not a completion date for the whole thing.** Promise Phase 6 — the gate, with the baseline — and describe the rest as a burndown. This is true, and it is also the shape that survives a reprioritization.
-- **Not that it will be fun.** Phases 4e–4g are tedious. Saying so makes the rest of the estimate credible.
+The argument for the migration, with its numbers, and what not to promise: `references/selling-the-migration.md`.
 
 ### When to refuse
 

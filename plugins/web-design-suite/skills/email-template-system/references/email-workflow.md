@@ -159,7 +159,7 @@ Litmus, Email on Acid and Testi@ run your HTML on real clients and screenshot th
 
 | # | Combination | Uniquely catches |
 |---|---|---|
-| 1 | **Outlook 2019/2021, Windows, at 125% display scaling** | The Word engine *and* the 120-DPI bug together. The single highest-yield test that exists. |
+| 1 | **Classic Outlook for Microsoft 365, Windows, at 125% display scaling** | The Word engine *and* the 120-DPI bug together. The single highest-yield test that exists. (Outlook 2019 left support in October 2025, and 2021 leaves on 2026-10-13; classic Outlook for Microsoft 365 is the same Word engine, supported until at least 2029.) |
 | 2 | **Gmail app on Android with a non-Google account (GANGA)** | The stripped `<style>` block. Nothing else shows you this. |
 | 3 | **Apple Mail on iOS, dark mode** | Your `prefers-color-scheme` block, plus the largest mobile share. |
 | 4 | **Gmail web, desktop** | The sanitiser, the clip, and the largest webmail share. |
@@ -229,7 +229,7 @@ Every ESP transforms your HTML on the way out. Knowing what each does is the dif
 |---|---|---|---|
 | **Klaviyo** | `{{ first_name }}` / `{{ person.first_name }}` | `{% if %}…{% endif %}` (Django-ish) | Preserves custom HTML well. Uses `{% raw %}` blocks if your content contains literal braces. Drag-and-drop and HTML templates are separate object types — pick HTML and stay there. |
 | **Mailchimp** | `*\|FNAME\|*` | `*\|IF:…\|* … *\|END:IF\|*` | Editable regions are `mc:edit="name"` attributes on containers. Without them the template is not editable in their UI, which is usually what you want. Mailchimp's own inliner can be left on or off; leave it **off** — you already inlined. |
-| **Postmark** | `{{name}}` (Mustache) | `{{#each}}`, `{{#if}}` | Transactional-focused, minimal transformation, keeps your HTML close to intact. Has a built-in inliner you should disable. |
+| **Postmark** | `{{name}}` (Mustachio) | `{{#items}}…{{/items}}` sections and `{{^name}}` inverted sections; no `{{#if}}` | Transactional-focused, minimal transformation, keeps your HTML close to intact. Has a built-in inliner you should disable. |
 | **SendGrid** | `{{name}}` (Handlebars) or `-name-` (legacy substitution tags) | `{{#if}}` | Two template systems (Dynamic vs Legacy) with different syntax; confirm which one the account is on before writing a tag. |
 | **Customer.io** | `{{customer.first_name}}` (Liquid) | `{% if %}` | Liquid throughout, including in subject lines. |
 | **Braze** | `{{${first_name}}}` (Liquid + Connected Content) | `{% if %}` | The `${}` wrapper around attribute names is easy to get wrong. |
@@ -282,3 +282,21 @@ Run it every time. It is short because the compiler and the linter already did t
 ---
 
 Related: `references/email-client-matrix.md` (what breaks where), `references/email-architecture.md` (how to build it), `scripts/build_email.py`, `scripts/lint_email.py`.
+
+---
+
+## 10. The requests you will actually get, and the answer
+
+| They say | What is happening | Do |
+|---|---|---|
+| "It looks broken in Outlook" | The Word engine. Almost always `max-width` with no ghost table, a `div` layout, or `margin`. | `email-client-matrix.md` §3, then rebuild the skeleton from `email-architecture.md` §1 |
+| "The text is huge in Outlook but only on my colleague's machine" | The 120-DPI bug at 125% display scaling. | the `<o:PixelsPerInch>` block — the compiler adds it |
+| "The button lost its rounded corners" | `border-radius` in the Word engine. | VML `roundrect`, `email-architecture.md` §6 |
+| "There's a gap under every image" | Images are not `display:block`; the baseline descender space is showing. | `display:block`, always |
+| "The two columns didn't stack on my phone" | A media query that got stripped — likely GANGA. | fluid-hybrid, `email-architecture.md` §7 |
+| "Gmail cut my email off" | 102,400 bytes. | `--minify`, drop base64 images, measure via Show original |
+| "My media queries just vanished" | The 16,384-byte `<style>` ceiling: Gmail removes every `<style>` element that crosses it, and every one after. | inline more; only queries and pseudo-classes need to stay |
+| "It's unreadable in dark mode" | Forced or partial inversion. | `email-client-matrix.md` §8 — and be honest about what cannot be fixed |
+| "Can we use our brand font?" | No, not as the design. | build on the websafe stack, layer `@font-face` as decoration |
+| "Can it have a carousel / accordion / countdown?" | Interactive email. Works in Apple Mail, nowhere that matters. | a static frame that links to a page |
+| "Just make it one big image" | Invisible with images blocked, and a spam signature. | `email-workflow.md` §6 |

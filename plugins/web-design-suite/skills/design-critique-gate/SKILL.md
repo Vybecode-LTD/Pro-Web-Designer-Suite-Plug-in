@@ -1,6 +1,6 @@
 ---
 name: design-critique-gate
-description: Adversarial design review — the pass you run on your own work before a senior designer or a client takes it apart. Use it whenever someone asks "does this look professional", "what would a senior designer criticise", "something feels off about this page", or wants a design critique, design feedback, a pre-presentation QA pass, a readiness review, a mockup torn apart, or a built page checked before it is shown to a client or a team. Critiques in the order a reviewer's eye actually moves — premise, first impression, hierarchy, structure, craft, color, states, interaction, conformance, presentation readiness — and holds every finding to naming the mechanism that causes it rather than delivering a verdict. Ranks findings so the right three get fixed, separates taste from defect, folds in the mechanical auditor, and produces the sheet that lets you defend every non-obvious decision out loud. Reach for it before any design work is shown to anyone.
+description: Adversarial design review before a senior designer or a client sees the work, with ranked findings that name the mechanism behind each problem and keep taste apart from defect. Use for 'does this look professional' and a pre-presentation QA pass. Not for accessibility conformance (a11y-audit-runner) or conversion copy (landing-page-conversion).
 ---
 
 # Design Critique Gate

@@ -13,7 +13,7 @@ Catalog entries use nine fixed fields so you can diff two options in ten seconds
 3. [Cross-cutting rules](#3-cross-cutting-rules)
 4. [Spacing spec](#4-spacing-spec)
 5. [Failure gallery](#5-failure-gallery)
-6. [Code for the four most-often-broken patterns](#6-code-for-the-four-most-often-broken-patterns)
+6. Code for the four most-often-broken patterns: `navigation-code.md`
 
 ---
 
@@ -69,7 +69,7 @@ Catalog entries use nine fixed fields so you can diff two options in ten seconds
 **Keyboard** Header is early in the DOM, so early in tab order — good. Must be skip-link-bypassable, and must reveal on `focusin`.
 **Touch** Prefer scroll-aware to sticky on phones. With `fixed`, reserve height on `<main>` or the first screenful is hidden.
 **A11y** Fixed headers break in-page anchors — targets land behind them. Fix with `scroll-padding-top` on `:root` and `scroll-margin-top` on targets, not a JS offset hack. Under `prefers-reduced-motion` the tokens collapse durations to 1ms so the header snaps; that is correct, not a bug.
-**Build** Animate `transform: translateY(-100%)` only — animating `top`/`height`/`margin` reflows the document every frame. rAF-throttle the handler. Code: [§6.1](#61-scroll-aware-header).
+**Build** Animate `transform: translateY(-100%)` only — animating `top`/`height`/`margin` reflows the document every frame. rAF-throttle the handler. Code: `navigation-code.md` §1.
 **Spacing** Desktop target 64px, built from `--pad-block-md` + item box, never hardcoded. Mobile ≤56px. `z-index: var(--z-sticky)`.
 
 ### 2.3 Mega menu
@@ -81,7 +81,7 @@ Catalog entries use nine fixed fields so you can diff two options in ten seconds
 **Keyboard — what most get wrong** The trigger is a `<button aria-expanded aria-controls>`, not a link; if the category has a landing page, put that link *first inside the panel* ("All Shoes →") — a control that both navigates and expands satisfies neither user. **Do not use `role="menu"`/`menuitem`.** Those are for application command menus: they strip link semantics, remove items from the AT links rotor, force virtual-cursor users into forms mode, and oblige you to implement roving tabindex. A mega menu is a disclosure containing lists of links; `<button aria-expanded>` + `<ul><li><a>` is correct and complete. `Escape` closes and returns focus to the trigger. Tabbing past the last link closes and continues — **no focus trap**; this is non-modal.
 **Touch** There is no hover. Below `--bp-lg`, convert to an accordion inside the drawer. A hover-only mega menu on touch fires hover *and* click on first tap, navigating before the panel is read.
 **A11y** `aria-expanded` synced on every state change; panel labelled by its trigger via `aria-labelledby`; column headings are real elements bound to the `<ul>` with `aria-labelledby`. Close on `focusout` when focus leaves the trigger+panel subtree. One panel open at a time.
-**Build** Render the panel adjacent to its trigger so tab order is natural. Code: [§6.2](#62-mega-menu-with-safe-triangle--keyboard).
+**Build** Render the panel adjacent to its trigger so tab order is natural. Code: `navigation-code.md` §2.
 **Spacing** Panel `padding: var(--pad-card)`; columns `gap: var(--gap-separate)`; links in a column `gap: var(--gap-related)`; heading→first link `var(--gap-tight)`; `background: var(--bg-raised)`, `box-shadow: var(--elevation-overlay)`, `border-radius: var(--radius-xl)`, `z-index: var(--z-dropdown)`, entrance `var(--motion-enter)`.
 
 ### 2.4 Dropdowns: `<details>`, Popover, JS
@@ -93,11 +93,11 @@ Catalog entries use nine fixed fields so you can diff two options in ten seconds
 | Light dismiss | You write it | Built in (`popover="auto"`) | You write it |
 | `Escape` to close | You write it | Built in | You write it |
 | Top layer (escapes `overflow: hidden`) | No | Yes | No |
-| `aria-expanded` | Not reliably mapped across AT | **You must still set it** | You set it |
+| `aria-expanded` | Not reliably mapped across AT | **Set by the browser** on a `popovertarget` invoker; don't script it | You set it |
 | Positioning | Normal flow | Top layer — needs CSS anchor positioning or JS | You place it |
 | Animating open/close | Needs a wrapper; `height` isn't animatable on `<details>` | Needs `@starting-style` + `transition-behavior: allow-discrete` | Free |
 
-**Honest recommendation** Popover API for new work — top layer, light dismiss and `Escape` for zero JS, Baseline across Chrome/Edge 114+, Safari 17+, Firefox 125+. It does **not** set `aria-expanded`; do that yourself or the button announces as an inert button. CSS anchor positioning is the right placement answer but is younger than the popover API — ship a `position: absolute` fallback inside `@supports not (anchor-name: --a)`. Use `<details>` when it must work before hydration and you'll write outside-click and `Escape` yourself. Hand-roll only for behaviour neither gives you.
+**Honest recommendation** Popover API for new work — top layer, light dismiss and `Escape` for zero JS, Baseline across Chrome/Edge 114+, Safari 17+, Firefox 125+. The browser gives a `popovertarget` invoker an implicit `aria-expanded` and `aria-details` (MDN, "Using the Popover API"). In Chromium 153 the invoker reads collapsed, expanded, then collapsed again after light dismiss, with no script. So leave `aria-expanded` off the invoker. A hand-written value is one more thing to keep in step, and light dismiss never updates it. CSS anchor positioning is the right placement answer but is younger than the popover API — ship a `position: absolute` fallback inside `@supports not (anchor-name: --a)`. Use `<details>` when it must work before hydration and you'll write outside-click and `Escape` yourself. Hand-roll only for behaviour neither gives you.
 **Wins** Utility menus — account, language, sort — 3–10 items, secondary importance. **Fails** As primary nav past ~10 items, or nested two levels deep (a submenu inside a dropdown is a hit-area nightmare on every device).
 **Scent** Weak; contents invisible until opened. Compensate with a specific trigger label ("Account", not "⋯").
 **Keyboard** `Enter`/`Space` opens, `Escape` closes *and restores focus to the trigger*, `Tab` moves through and closes on exit.
@@ -132,7 +132,7 @@ Catalog entries use nine fixed fields so you can diff two options in ten seconds
 **Wins** Phone viewports with >5 destinations, or a deep tree needing an accordion. **Scent** Zero until opened. That is the whole problem.
 **Keyboard/focus (modal)** On open, move focus into the drawer — to a `tabindex="-1"` heading (better than the close button: the screen reader announces what opened). Trap `Tab`. `Escape` closes. On close, return focus to the trigger with `focus({ preventScroll: true })`. Background goes `inert`.
 **Touch** Rows ≥ `--tap-min`. Lock body scroll and set `overscroll-behavior: contain` on the panel.
-**Build** Use `<dialog>` + `showModal()`: top layer, backdrop, `Escape`, focus containment and background inertness from the platform, correctly, free. Baseline since 2022. Hand-roll with the `inert` attribute (Baseline since 2023) only when the drawer must be **non-modal** — i.e. the page behind stays usable. Code: [§6.3](#63-off-canvas-drawer-with-focus-management-and-inert).
+**Build** Use `<dialog>` + `showModal()`: top layer, backdrop, `Escape`, focus containment and background inertness from the platform, correctly, free. Baseline since 2022. Hand-roll with the `inert` attribute (Baseline since 2023) only when the drawer must be **non-modal** — i.e. the page behind stays usable. Code: `navigation-code.md` §3.
 **Spacing** Panel `padding: var(--pad-card)`, `inline-size: min(88vw, 22rem)`; rows `var(--pad-block-md) var(--pad-inline-md)`, `min-height: var(--tap-min)`; groups `gap: var(--gap-separate)`; scrim at `--z-overlay`; transition `var(--motion-expand)`.
 
 ### 2.8 Command palette (⌘K)
@@ -185,7 +185,7 @@ Catalog entries use nine fixed fields so you can diff two options in ten seconds
 **Keyboard** Plain links. Add `scroll-padding-top` on `:root` and `scroll-margin-top` on headings so a clicked anchor doesn't land under the header.
 **Touch** Usually collapses to a `<details>` "On this page" above the content; keep it, it's the only map on a phone.
 **A11y** `<nav aria-label="On this page">`; `aria-current="true"` on the active link (pick `"true"` or `"location"` and be consistent). Headings stay real `<h2>/<h3>` — the TOC mirrors the outline, it doesn't replace it. Do not announce scroll-spy changes in a live region; it's ambient state, not an event.
-**Build** Code: [§6.4](#64-scroll-spy-with-intersectionobserver).
+**Build** Code: `navigation-code.md` §4.
 **Spacing** Items `gap: var(--gap-tight)`; nested level indented `var(--pad-inline-md)`; active marker a `--stroke-thick` left rule in `--border-accent` against `--border-subtle`; `--type-ui`, `--fg-muted` → `--fg-default` when active.
 
 ### 2.13 Pagination vs. infinite scroll vs. load-more
@@ -340,16 +340,17 @@ Same problem at the right edge: the last item's trailing padding makes the bar l
 ```css
 .sidebar          { padding-inline: var(--pad-inline-sm); }
 .sidebar__nav     { display: grid; gap: var(--gap-separate); }   /* between groups */
-.sidebar__group   { display: grid; gap: var(--space-0); }        /* rows are contiguous */
+.sidebar__group   { display: grid; gap: 0; }                     /* rows are contiguous */
 .sidebar__link    { padding: var(--pad-block-sm) var(--pad-inline-md);
                     min-height: var(--tap-min); border-radius: var(--radius-md); }
 .sidebar__link[aria-current="page"] { background: var(--bg-selected); color: var(--fg-accent); }
 .sidebar__sublist { padding-inline-start: var(--pad-inline-md); }
 ```
 
-**Publish the header height once**, so anchors, sticky sidebars and scroll-spy all read the same number:
+**Publish the header height once**, so anchors, sticky sidebars and scroll-spy all read the same number. Register it as a `<length>`, so that script reads it back in pixels. Unregistered, it reads back as its `calc()` text:
 
 ```css
+@property --nav-offset { syntax: '<length>'; inherits: true; initial-value: 0px; }
 :root {
   --nav-offset: calc(var(--tap-min) + var(--pad-block-md) * 2);
   scroll-padding-top: calc(var(--nav-offset) + var(--gap-grouped));
@@ -379,354 +380,6 @@ Each of these is a defect, not a preference.
 - **Filters or tabs with no URL.** Unshareable, unbookmarkable, and the back button does the wrong thing. State the user can see is state the URL should carry.
 
 ---
-
-## 6. Code for the four most-often-broken patterns
-
-All CSS reads Tier-2 tokens only; component-specific values are Tier-3 variables declared in the component's own block (Laws 1 and 4), inside `@layer components` (Law 5).
-
-### 6.1 Scroll-aware header
-
-```html
-<a class="skip-link" href="#main">Skip to content</a>
-<header class="site-header" data-scroll-aware>
-  <nav class="nav" aria-label="Main">
-    <a class="nav__brand" href="/">Acme</a>
-    <ul class="nav__list">
-      <li><a href="/product" aria-current="page">Product</a></li>
-      <li><a href="/pricing">Pricing</a></li>
-    </ul>
-    <div class="nav__actions"><a class="btn" href="/signup">Start free</a></div>
-  </nav>
-</header>
-<main id="main" tabindex="-1">…</main>
-```
-
-```css
-@layer components {
-  .site-header {
-    position: fixed; inset-block-start: 0; inset-inline: 0;
-    z-index: var(--z-sticky);
-    background: var(--bg-surface);
-    border-block-end: var(--stroke-hairline) solid var(--border-subtle);
-    transition: transform var(--motion-enter);      /* only transform is animated */
-    will-change: transform;
-  }
-  .site-header[data-hidden="true"] {
-    transform: translateY(-100%);
-    transition: transform var(--motion-exit);
-  }
-  body  { padding-block-start: var(--nav-offset); } /* reserve it; --nav-offset from §4 */
-
-  .skip-link {
-    position: absolute;
-    inset-block-start: var(--space-2); inset-inline-start: var(--space-2);
-    z-index: calc(var(--z-sticky) + 1);             /* above the header, or it's useless */
-    padding: var(--pad-block-md) var(--pad-inline-md);
-    background: var(--bg-raised); color: var(--fg-default);
-    border-radius: var(--radius-md); box-shadow: var(--elevation-overlay);
-    transform: translateY(calc(-100% - var(--space-4)));  /* never display:none */
-    transition: transform var(--motion-enter);
-  }
-  .skip-link:focus-visible { transform: translateY(0); }
-}
-```
-
-```js
-// Hysteresis is what separates this from the jittery version.
-const header = document.querySelector('[data-scroll-aware]');
-const HYSTERESIS = 12;            // px of committed travel before we believe a flip
-let lastY = scrollY, anchorY = scrollY, direction = 'up', hidden = false, ticking = false;
-
-const setHidden = (next) => {
-  if (next === hidden) return;    // never touch the DOM for a no-op
-  hidden = next;
-  header.dataset.hidden = String(next);
-};
-
-function update() {
-  ticking = false;
-  const y = Math.max(0, scrollY);
-  const delta = y - lastY;
-  lastY = y;
-  if (delta === 0) return;
-
-  const next = delta > 0 ? 'down' : 'up';
-  if (next !== direction) { direction = next; anchorY = y; return; }  // await commitment
-  if (Math.abs(y - anchorY) < HYSTERESIS) return;                     // inside the deadband
-
-  const inRevealZone = y <= header.offsetHeight;   // always visible at the top of the page
-  const menuOpen     = header.querySelector('[aria-expanded="true"]') !== null;
-  const focusInside  = header.contains(document.activeElement);
-  setHidden(!(inRevealZone || direction === 'up' || menuOpen || focusInside));
-}
-
-addEventListener('scroll', () => {
-  if (!ticking) { ticking = true; requestAnimationFrame(update); }
-}, { passive: true });
-
-header.addEventListener('focusin', () => setHidden(false));  // never hide what's being tabbed
-```
-
-### 6.2 Mega menu with safe triangle + keyboard
-
-```html
-<nav class="nav" aria-label="Main">
-  <ul class="nav__list" data-megamenu>
-    <li class="nav__item">
-      <button type="button" class="nav__trigger" id="trigger-shoes"
-              aria-expanded="false" aria-controls="panel-shoes">Shoes</button>
-      <div class="megamenu" id="panel-shoes" aria-labelledby="trigger-shoes" hidden>
-        <div class="megamenu__col">
-          <p class="megamenu__heading" id="mm-run">Running</p>
-          <ul aria-labelledby="mm-run">
-            <li><a href="/shoes/running">All running shoes</a></li>
-            <li><a href="/shoes/trail">Trail</a></li>
-          </ul>
-        </div>
-      </div>
-    </li>
-  </ul>
-</nav>
-```
-
-Note what is absent: no `role="menu"`, no `role="menuitem"`, no `aria-haspopup="menu"`. The trigger is a disclosure button and the panel is a set of labelled link lists — the one contract screen readers actually handle well.
-
-```css
-@layer components {
-  .megamenu {
-    position: absolute; inset-inline: var(--gutter-page); inset-block-start: 100%;
-    z-index: var(--z-dropdown);
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-    gap: var(--gap-separate);
-    padding: var(--pad-card);
-    background: var(--bg-raised);
-    border: var(--stroke-hairline) solid var(--border-subtle);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--elevation-overlay);
-  }
-  .megamenu[hidden]     { display: none; }
-  .megamenu__col        { display: grid; gap: var(--gap-tight); }
-  .megamenu__col ul     { display: grid; gap: var(--gap-related); }
-  .megamenu__heading    { font: var(--type-label); color: var(--fg-muted);
-                          letter-spacing: var(--tracking-caps); text-transform: uppercase; }
-  .megamenu a           { display: flex; align-items: center; min-height: var(--tap-min);
-                          padding-inline: var(--pad-inline-xs); border-radius: var(--radius-sm); }
-  .megamenu a:hover     { background: var(--bg-hover); }
-}
-```
-
-```js
-const bar = document.querySelector('[data-megamenu]');
-const items = [...bar.querySelectorAll('.nav__item')].map(li => ({
-  li, trigger: li.querySelector('.nav__trigger'), panel: li.querySelector('.megamenu'),
-}));
-let open = null, lastPoint = null, pending = null, triangleSince = 0;
-const SAFE_MAX_MS = 300;   // cap, so a stalled pointer inside the triangle still resolves
-
-function show(item) {
-  if (open === item) return;
-  if (open) hide(open);
-  open = item;
-  item.panel.hidden = false;
-  item.trigger.setAttribute('aria-expanded', 'true');
-}
-function hide(item) {
-  item.panel.hidden = true;
-  item.trigger.setAttribute('aria-expanded', 'false');
-  if (open === item) open = null;
-}
-
-/* Safe triangle: apex = the pointer's last position, base = the panel's LEADING edge.
-   Panel below a bar -> its top edge. Sidebar flyout -> swap to the two left corners. */
-const side = (p, a, b) => (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
-function inTriangle(p, a, b, c) {
-  const d1 = side(p, a, b), d2 = side(p, b, c), d3 = side(p, c, a);
-  return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
-}
-function headingIntoPanel(point) {
-  if (!open || !lastPoint) return false;
-  const r = open.panel.getBoundingClientRect();
-  return inTriangle(point, lastPoint, { x: r.left, y: r.top }, { x: r.right, y: r.top });
-}
-
-bar.addEventListener('pointermove', (e) => {
-  if (e.pointerType === 'mouse') lastPoint = { x: e.clientX, y: e.clientY };
-}, { passive: true });
-
-items.forEach(item => {
-  item.li.addEventListener('pointerenter', (e) => {
-    if (e.pointerType !== 'mouse') return;               // touch and pen never hover
-    clearTimeout(pending);
-    if (open && open !== item && headingIntoPanel({ x: e.clientX, y: e.clientY })) {
-      triangleSince ||= performance.now();
-      if (performance.now() - triangleSince < SAFE_MAX_MS) {
-        pending = setTimeout(() => show(item), 60);       // re-evaluate shortly
-        return;
-      }
-    }
-    triangleSince = 0;
-    show(item);
-  });
-  // Click/keyboard open: identical behaviour on touch, where hover never fires.
-  item.trigger.addEventListener('click', () => (open === item ? hide(item) : show(item)));
-});
-
-bar.addEventListener('pointerleave', (e) => {
-  if (e.pointerType !== 'mouse') return;
-  clearTimeout(pending); triangleSince = 0;
-  if (open && !open.li.contains(document.activeElement)) hide(open);
-});
-
-// Non-modal contract: Escape returns focus, Tab out closes. No trap, ever.
-bar.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && open) { const t = open.trigger; hide(open); t.focus(); }
-});
-bar.addEventListener('focusout', (e) => {
-  if (open && !open.li.contains(e.relatedTarget)) hide(open);
-});
-```
-
-### 6.3 Off-canvas drawer with focus management and `inert`
-
-`<dialog>.showModal()` gives you the top layer, backdrop, `Escape`, focus containment and background inertness from the platform — correctly, with no trap code to get wrong. Baseline since 2022. Hand-roll with the `inert` attribute (Baseline 2023) only when the drawer must be **non-modal**.
-
-```html
-<button type="button" id="nav-toggle" aria-expanded="false" aria-controls="nav-drawer">
-  <svg aria-hidden="true" …></svg> Menu
-</button>
-
-<dialog id="nav-drawer" class="drawer" aria-labelledby="drawer-title">
-  <h2 id="drawer-title" tabindex="-1">Navigation</h2>
-  <button type="button" data-close>Close</button>
-  <nav aria-label="Main"><ul class="drawer__list">…</ul></nav>
-</dialog>
-```
-
-```css
-@layer components {
-  .drawer {
-    --drawer-width: min(88vw, 22rem);            /* Tier 3, sourced from Tier 2 below */
-    inline-size: var(--drawer-width); max-inline-size: none;
-    block-size: 100dvh; max-block-size: none;
-    margin: 0 0 0 auto;                          /* right-edge drawer */
-    padding: var(--pad-card);
-    border: 0; border-radius: 0;
-    background: var(--bg-surface); color: var(--fg-default);
-    box-shadow: var(--elevation-modal);
-    overflow-y: auto; overscroll-behavior: contain;
-    translate: 100% 0;
-    transition: translate var(--motion-expand),
-                display var(--motion-expand) allow-discrete,
-                overlay var(--motion-expand) allow-discrete;
-  }
-  .drawer[open] { translate: 0 0; }
-  @starting-style { .drawer[open] { translate: 100% 0; } }
-
-  .drawer::backdrop        { background: oklch(0% 0 0 / 0.4); opacity: 0;
-                             transition: opacity var(--motion-enter) allow-discrete; }
-  .drawer[open]::backdrop  { opacity: 1; }
-  @starting-style { .drawer[open]::backdrop { opacity: 0; } }
-
-  .drawer__list   { display: grid; gap: var(--gap-related); }
-  .drawer__list a { display: flex; align-items: center; min-height: var(--tap-min);
-                    padding: var(--pad-block-md) var(--pad-inline-md);
-                    border-radius: var(--radius-md); }
-}
-```
-
-```js
-const toggle = document.getElementById('nav-toggle');
-const drawer = document.getElementById('nav-drawer');
-const title  = document.getElementById('drawer-title');
-let opener = null;
-
-function openDrawer() {
-  opener = document.activeElement;
-  drawer.showModal();                     // top layer + backdrop + Escape + background inert
-  toggle.setAttribute('aria-expanded', 'true');
-  document.documentElement.style.overflow = 'hidden';            // body scroll lock
-  title.focus({ preventScroll: true });   // heading, not first link: SR announces what opened
-}
-
-drawer.addEventListener('close', () => {
-  toggle.setAttribute('aria-expanded', 'false');
-  document.documentElement.style.overflow = '';
-  // Return focus to the opener; fall back to a surviving ancestor — never to <body>.
-  ((opener?.isConnected && opener) || toggle).focus({ preventScroll: true });
-  opener = null;
-});
-
-toggle.addEventListener('click', openDrawer);
-drawer.addEventListener('click', (e) => {
-  if (e.target === drawer) drawer.close();            // light dismiss: <dialog> won't do it
-  if (e.target.closest('[data-close], a')) drawer.close();  // SPA nav must close it too,
-});                                                   // or focus is stranded in a hidden panel
-```
-
-For a genuinely non-modal drawer, skip `<dialog>`, toggle the panel's `hidden`, and leave the background reachable. If you find yourself adding `inert` to the background, the drawer is modal — use `<dialog>`.
-
-### 6.4 Scroll-spy with IntersectionObserver
-
-```js
-// The band: a thin strip just below the sticky header. A heading is "current"
-// exactly while its box intersects that strip.
-const toc   = document.querySelector('[data-toc]');
-const links = new Map([...toc.querySelectorAll('a[href^="#"]')]
-                .map(a => [decodeURIComponent(a.hash.slice(1)), a]));
-const headings = [...links.keys()].map(id => document.getElementById(id)).filter(Boolean);
-const navOffset = parseFloat(
-  getComputedStyle(document.documentElement).getPropertyValue('--nav-offset')) || 64;
-
-const visible = new Set();
-let active = null;
-
-function setActive(id) {
-  if (!id || id === active) return;
-  links.get(active)?.removeAttribute('aria-current');
-  links.get(id)?.setAttribute('aria-current', 'true');
-  active = id;
-}
-
-const observer = new IntersectionObserver((entries) => {
-  for (const e of entries) {
-    e.isIntersecting ? visible.add(e.target.id) : visible.delete(e.target.id);
-  }
-  // Rule 3: several can intersect during fast scroll — take the topmost in document order.
-  // Rule 1: if nothing intersects, keep the last active id. Never clear to nothing.
-  if (visible.size) setActive(headings.find(h => visible.has(h.id))?.id);
-}, {
-  // Top inset clears the header; bottom inset collapses the root to a ~25vh band.
-  rootMargin: `-${navOffset}px 0px -75% 0px`,
-  threshold: 0,
-});
-headings.forEach(h => observer.observe(h));
-
-// Rule 2: the last section is often too short to reach the band. Force it at the bottom.
-addEventListener('scroll', () => {
-  if (innerHeight + scrollY >= document.documentElement.scrollHeight - 2) {
-    setActive(headings.at(-1).id);
-  }
-}, { passive: true });
-```
-
-```css
-@layer components {
-  .toc {
-    position: sticky; inset-block-start: calc(var(--nav-offset) + var(--gap-grouped));
-    display: grid; gap: var(--gap-tight);
-    max-block-size: calc(100dvh - var(--nav-offset) - var(--gap-distinct));
-    overflow-y: auto; overscroll-behavior: contain;
-  }
-  .toc a {
-    font: var(--type-ui); color: var(--fg-muted);
-    padding-block: var(--pad-block-xs); padding-inline-start: var(--pad-inline-sm);
-    border-inline-start: var(--stroke-thick) solid var(--border-subtle);
-    transition: color var(--motion-hover), border-color var(--motion-hover);
-  }
-  .toc a[aria-current] { color: var(--fg-default); border-inline-start-color: var(--border-accent); }
-  .toc ul ul           { padding-inline-start: var(--pad-inline-md); }
-}
-```
 
 ---
 

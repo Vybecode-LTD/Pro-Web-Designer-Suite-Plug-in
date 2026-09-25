@@ -64,11 +64,14 @@ The test: **can a developer who has never seen this component predict its appear
 **No descendant styling across component boundaries.** A `.page` rule may not style `.card__title`. The page does not own the card. If a card needs to look different on a page, the page sets one of the card's documented Tier-3 properties (§7) — that is the sanctioned channel, and it is visible in both files.
 
 ```css
-/* WRONG — the page reaches into the card. Now the card has two homes. */
+/* WRONG — the page reaches into the card. Now the card has two homes. example: wrong */
 .pricing-page .card__title { font-size: 20px; color: #333; }
+```
 
-/* RIGHT — the page uses the card's documented API. One home each. */
-.pricing-page .card { --card-title-size: var(--text-xl); }
+```css
+/* RIGHT — the page uses the card's documented API: a socket that takes a
+   type role (card.css reads font: var(--card-title-type, var(--type-h3))). */
+.pricing-page .card { --card-title-type: var(--type-h2); }
 ```
 
 **No style props.** `<Card padding="large" color="blue" />` recreates the same problem in TypeScript: the component's appearance is now decided at every call site. Use a closed `variant` / `size` / `tone` triad instead, where the variant table lives in the one home and the call site chooses from a finite set.
@@ -143,8 +146,8 @@ Declared once, as the **first statement** in the entry stylesheet, before any `@
 |---|---|---|
 | `reset` | Element defaults zeroed and normalized | Any project-specific look |
 | `tokens` | Custom property definitions only | Any selector that paints |
-| `base` | Element-level typography and link styles, `.prose` flow | Classes for specific components |
-| `layout` | Layout primitives — Stack, Cluster, Grid, Center | Colours, typography, component internals |
+| `base` | Element-level typography and link styles | Classes for specific components |
+| `layout` | Layout primitives — Stack, Cluster, Grid, Center — and the two flow containers, `.flow` and `.prose`, which share one rhythm | Colours, component internals |
 | `components` | Everything with a component's name on it | Layout of *other* components |
 | `utilities` | The small closed set of single-purpose classes | Anything that needs more than one declaration |
 | `overrides` | Page-specific escapes, documented and rare | Anything that should have been a variant |
@@ -357,14 +360,18 @@ The consumer's rule sets no visual property. It supplies values to an API. The c
 Custom properties inherit. `--card-inset` set on `.pricing-grid` reaches *every* descendant, including nested cards you did not mean to touch. Two defences:
 
 1. Set the socket on the component root, not on an ancestor, whenever you can.
-2. For properties that must not leak, register them as non-inheriting:
+2. For a socket only the component root reads, register it as non-inheriting. A value set on an ancestor then never reaches the card:
    ```css
-   @property --card-inset {
-     syntax: "<length>";
+   @property --card-bg {
+     syntax: "<color>";
      inherits: false;
-     initial-value: 1.5rem;
+     initial-value: transparent;
    }
    ```
+   Two limits:
+   - **Only sockets the root alone reads.** `.card__media` reads `--card-radius` and `--card-inset` from the card root (`references/spacing-system.md` §8). If those were registered as non-inheriting, the media would get the initial value, not the card's. Leave part-read sockets inheriting, and rely on defence 1.
+   - **The initial value must be computationally independent.** Use `24px`, not `1.5rem`. A rem depends on the root font size, so the browser drops the whole `@property` rule and the property stays unregistered (checked in Chromium 153).
+
    `@property` also gives you type checking (an invalid value falls back to the initial rather than silently becoming a string) and makes the property animatable, which raw custom properties are not.
 
 ---

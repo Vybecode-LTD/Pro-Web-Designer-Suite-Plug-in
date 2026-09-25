@@ -237,7 +237,7 @@ class AuditPrecision(TempDirTest):
                 self.assertTrue(any(cls in m for m in found), found)
         roles = self.write("src/Roles.tsx",
                            'export const R = () => <div className="motion-hover z-modal '
-                           'border-default focus-ring p-card p-(--pad-card) bg-surface '
+                           'border-stroke focus-ring p-card p-(--pad-card) bg-surface '
                            'w-1/2 gap-related">x</div>;\n')
         proc = run_py("web-design-studio", "audit_design", roles, "--json", cwd=self.tmp)
         self.assertEqual(json.loads(proc.stdout), [], output(proc))
@@ -263,7 +263,7 @@ class AuditPrecision(TempDirTest):
             for cls in bad:
                 with self.subTest(pattern=name, cls=cls):
                     self.assertTrue(rx.search(f" {cls} "))
-            for good in ("motion-hover", "z-modal", "border-default", "w-1/2",
+            for good in ("motion-hover", "z-modal", "border-stroke", "w-1/2",
                          "p-(--pad-card)", "p-(--space-section)"):
                 with self.subTest(pattern=name, good=good):
                     self.assertFalse(rx.search(f" {good} "))
@@ -275,9 +275,132 @@ class AuditPrecision(TempDirTest):
         self.assertNotIn("nine laws", output(proc))
         self.assertIn("L1–L6", output(proc))
 
+    def test_weight_primitives_may_be_read_directly(self):
+        """SS-A10: the hierarchy method sets weight without changing size, and no
+        --type-* shorthand can do that, so --weight-* has no role layer."""
+        self.assertNotIn(("L6", "tier1-leak"), self.rules(".card { font-weight: var(--weight-semibold); }"))
+
+    def test_a_zero_margin_claims_no_space(self):
+        """SB-A14: a child resetting its margin to 0 asserts no space, and
+        stylelint already allowed it; the audit called it an outer margin."""
+        for value in ("0", "0px", "0 auto", "0 0 0 0"):
+            with self.subTest(value=value):
+                self.assertNotIn(("L2", "child-margin"),
+                                 self.rules(f".card__media {{ margin-block-end: {value}; }}"))
+        self.assertIn(("L2", "child-margin"),
+                      self.rules(".card__media { margin-block-end: var(--gap-related); }"))
+
+    def test_a_pragma_wrapped_over_two_lines_covers_the_next_declaration(self):
+        """Comments were keyed by the line they START on, so a wrapped pragma
+        ignored its own second line and the finding it argued stayed."""
+        css = (".quote {\n"
+               "  /* design-audit-ignore-next-line: L1 -- optical: the leading band,\n"
+               "     trimmed until text-box-trim lands */\n"
+               "  padding-block: calc(var(--pad-card) - 0.3em);\n"
+               "}")
+        self.assertNotIn("raw-spacing", self.l1(css))
+        self.assertIn("raw-spacing", self.l1(css.replace("design-audit-ignore-next-line", "note")))
+
+    def test_nesting_is_counted_below_the_top_level_rule(self):
+        """SB-A14: the audit counted the top-level rule as depth 1, so the
+        references' own `.card { & .title { &:hover {} } }` ("depth 2, the
+        edge") failed; stylelint counts nesting below it."""
+        for css in (".card { & .title { &:hover { color: var(--fg-strong); } } }",
+                    ".card { & .title { & .icon { :hover { color: var(--fg-strong); } } } }"):
+            with self.subTest(css=css):
+                self.assertNotIn(("L5", "nesting-depth"), self.rules(css))
+        self.assertIn(("L5", "nesting-depth"),
+                      self.rules(".a { & .b { & .c { & .d { color: var(--fg-strong); } } } }"))
+
+    def test_generated_content_may_space_itself_from_its_text(self):
+        """A `::after` label's margin is decided in the component's own rule."""
+        self.assertNotIn(("L2", "child-margin"), self.rules(
+            '.preset__name::after { content: "held"; margin-inline-start: var(--gap-fused); }'))
+        self.assertIn(("L2", "child-margin"),
+                      self.rules(".preset__name { margin-inline-start: var(--gap-fused); }"))
+
+    def test_motion_longhands_may_read_the_primitives(self):
+        """A --motion-* pair only fits a shorthand. View transitions and
+        scroll-driven animations must set the longhands, and were warned for it."""
+        longhands = self.rules("::view-transition-old(hero) { animation-duration: var(--dur-slow); "
+                               "animation-timing-function: var(--ease-in-out); }")
+        self.assertNotIn(("L6", "tier1-motion"), longhands)
+        self.assertIn(("L6", "tier1-motion"),
+                      self.rules(".x { transition: opacity var(--dur-fast) var(--ease-out); }"))
+
     def test_a_url_fragment_is_not_a_colour(self):
         self.assertNotIn("raw-color", self.l1(".mask { mask-image: url(#fade); "
                                               "background: url(icons.svg#add) no-repeat; }"))
+
+
+class JsxClassesAndCssInJs(TempDirTest):
+    """SB-A10 (rest), 3.2.0: the audit read only `className="…"` strings, and
+    exempted whole families of arbitrary values. A component whose classes
+    all went through cn() or cva(), or whose styles lived in a
+    styled-components template, passed as clean."""
+
+    def findings(self, tsx: str):
+        path = self.write("src/components/Thing.tsx", tsx)
+        proc = run_py("web-design-studio", "audit_design", path.parent, "--json", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        data = json.loads(proc.stdout)
+        return data["findings"] if isinstance(data, dict) else data
+
+    def rules(self, tsx: str):
+        return [(f["rule"], f["line"]) for f in self.findings(tsx)]
+
+    def test_class_helper_arguments_are_read(self):
+        found = self.findings(
+            "import { cva } from 'class-variance-authority';\n"
+            "const button = cva('inline-flex p-[13px]', {\n"
+            "  variants: { size: { sm: 'gap-[7px]', md: 'gap-related' } },\n"
+            "});\n"
+            "export const T = ({ on }) => (\n"
+            "  <div className={cn('flex', on && 'm-[3px]', clsx({ 'h-[41px]': on }))} />\n"
+            ");\n")
+        flagged = {f["message"].split("`")[1] for f in found if f["rule"] == "tw-arbitrary"}
+        self.assertEqual(flagged, {"p-[13px]", "gap-[7px]", "m-[3px]", "h-[41px]"})
+
+    def test_every_arbitrary_value_is_refused_but_variants_and_images(self):
+        refused = self.findings(
+            'export const T = () => <div className="grid-cols-[1fr_2fr] aspect-[4/3] bg-[#e8440a]" />;\n')
+        self.assertEqual({f["message"].split("`")[1] for f in refused if f["rule"] == "tw-arbitrary"},
+                         {"grid-cols-[1fr_2fr]", "aspect-[4/3]", "bg-[#e8440a]"})
+        allowed = self.findings(
+            'export const T = () => <div className="data-[state=open]:bg-surface '
+            "aria-[expanded=true]:bg-hover bg-[url(/hero.jpg)] before:content-[''] "
+            'group-[.is-open]:p-card" />;\n')
+        self.assertEqual([f for f in allowed if f["rule"] == "tw-arbitrary"], [])
+
+    def test_an_arbitrary_property_is_refused(self):
+        self.assertIn("tw-arbitrary-property", [r for r, _ in self.rules(
+            'export const T = () => <span className="[padding:13px] [--gap:4px]" />;\n')])
+
+    def test_the_v4_important_suffix_is_refused(self):
+        self.assertIn("tw-important", [r for r, _ in self.rules(
+            'export const T = () => <span className="p-card!" />;\n')])
+
+    def test_a_styled_template_is_audited_as_component_css(self):
+        found = self.rules(
+            "import styled from 'styled-components';\n"
+            "const Title = styled.h2`\n"
+            "  color: #ff0000;\n"
+            "  padding: ${(p) => p.pad};\n"
+            "  margin-top: 13px;\n"
+            "`;\n"
+            "export const T = () => <Title>t</Title>;\n")
+        lines = {rule: line for rule, line in found}
+        self.assertEqual(lines.get("raw-color"), 3, found)
+        self.assertTrue(any(line == 5 for _, line in found), found)      # the 13px margin
+        self.assertFalse(any(line == 4 for _, line in found), found)     # an interpolation is not a literal
+
+    def test_clean_helpers_and_templates_stay_clean(self):
+        self.assertEqual(self.findings(
+            "import styled from 'styled-components';\n"
+            "const Box = styled.div`\n  padding: var(--pad-card);\n  color: var(--fg-default);\n`;\n"
+            "export const T = ({ on }) => (\n"
+            "  <Box className={cn('p-card', on && 'gap-related', { 'bg-surface': on })} />\n"
+            ");\n"), [])
 
 
 if __name__ == "__main__":

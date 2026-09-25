@@ -1,0 +1,248 @@
+{
+  "about": "Every figure the docs quote from a study, survey, vendor or regulator: the value, what it measures, where it comes from, when it was last checked, and the source's own words. tests/test_evidence.py keeps the docs and this file in step. Re-check an entry at its URL before changing its figure.",
+  "entries": [
+    {
+      "figure": "19 categories",
+      "also": [
+        "143"
+      ],
+      "claim": "the size of the planted-failure test page",
+      "source": "UK Government Digital Service, What we found when we tested tools on the world's least-accessible webpage (2017-02-24)",
+      "url": "https://accessibility.blog.gov.uk/2017/02/24/what-we-found-when-we-tested-tools-on-the-worlds-least-accessible-webpage/",
+      "checked": "2026-09-25",
+      "quote": "At the moment it contains a total of 143 failures grouped into 19 categories.",
+      "docs": [
+        "a11y-audit-runner/SKILL.md",
+        "a11y-audit-runner/references/automation-coverage.md",
+        "web-design-studio/references/accessibility.md"
+      ]
+    },
+    {
+      "figure": "37–41%",
+      "also": [
+        "37%",
+        "41%"
+      ],
+      "claim": "the share of the planted barriers found by the best single tool: 37% counting errors and warnings (Tenon), 41% counting manual-inspection prompts (Asqatasun)",
+      "source": "UK Government Digital Service (2017-02-24)",
+      "url": "https://accessibility.blog.gov.uk/2017/02/24/what-we-found-when-we-tested-tools-on-the-worlds-least-accessible-webpage/",
+      "checked": "2026-09-25",
+      "quote": "If we only count error messages and warnings, then Tenon picked up the most barriers – it found 37% of them. If we also count manual inspection prompts, then Asqatasun was the most effective – it found 41% of the barriers.",
+      "docs": [
+        "a11y-audit-runner/SKILL.md",
+        "a11y-audit-runner/references/automation-coverage.md",
+        "a11y-audit-runner/scripts/a11y_runtime.mjs",
+        "web-design-studio/references/accessibility.md"
+      ]
+    },
+    {
+      "figure": "71%",
+      "claim": "the share of the planted barriers found by the ten tools combined",
+      "source": "UK Government Digital Service (2017-02-24)",
+      "url": "https://accessibility.blog.gov.uk/2017/02/24/what-we-found-when-we-tested-tools-on-the-worlds-least-accessible-webpage/",
+      "checked": "2026-09-25",
+      "quote": "While the tools picked up the majority of the accessibility barriers we created – 71% – there was a large minority that would only have been picked up by manual checking.",
+      "docs": [
+        "a11y-audit-runner/SKILL.md",
+        "a11y-audit-runner/references/automation-coverage.md"
+      ]
+    },
+    {
+      "figure": "29%",
+      "claim": "the share of the planted barriers found by no tool",
+      "source": "UK Government Digital Service (2017-02-24)",
+      "url": "https://accessibility.blog.gov.uk/2017/02/24/what-we-found-when-we-tested-tools-on-the-worlds-least-accessible-webpage/",
+      "checked": "2026-09-25",
+      "quote": "We found that a large proportion of the barriers we created weren't picked up by any of the 10 tools we tested – 29% in fact.",
+      "docs": [
+        "a11y-audit-runner/SKILL.md",
+        "a11y-audit-runner/references/automation-coverage.md",
+        "a11y-audit-runner/scripts/a11y_runtime.mjs"
+      ]
+    },
+    {
+      "figure": "57%",
+      "source_key": "deque",
+      "claim": "the share of accessibility issues, by volume, that fully automated testing covered",
+      "source": "Deque, Automated testing study identifies 57 percent of digital accessibility issues (2021-03-10)",
+      "url": "https://www.deque.com/blog/automated-testing-study-identifies-57-percent-of-digital-accessibility-issues/",
+      "checked": "2026-09-25",
+      "quote": "Deque found that, on average, 57 percent of accessibility issues were completely covered by this automated testing.",
+      "docs": [
+        "a11y-audit-runner/SKILL.md",
+        "a11y-audit-runner/references/automation-coverage.md",
+        "a11y-audit-runner/scripts/a11y_runtime.mjs",
+        "web-design-studio/references/accessibility.md"
+      ]
+    },
+    {
+      "figure": "2,000+ audits",
+      "also": [
+        "13,000",
+        "300,000 issues"
+      ],
+      "claim": "the size of Deque's data set",
+      "source": "Deque (2021-03-10)",
+      "url": "https://www.deque.com/blog/automated-testing-study-identifies-57-percent-of-digital-accessibility-issues/",
+      "checked": "2026-09-25",
+      "quote": "over 2,000 audits in various industries, spanning over 13,000 pages (all first-time page assessments) covering nearly 300,000 issues",
+      "docs": [
+        "a11y-audit-runner/SKILL.md",
+        "a11y-audit-runner/references/automation-coverage.md",
+        "a11y-audit-runner/scripts/a11y_runtime.mjs"
+      ]
+    },
+    {
+      "figure": "95.9%",
+      "also": [
+        "56.1"
+      ],
+      "claim": "home pages with detected WCAG 2 failures, and detected errors per page",
+      "source": "WebAIM Million (2026)",
+      "url": "https://webaim.org/projects/million/",
+      "checked": "2026-09-25",
+      "quote": "95.9% of home pages had detected WCAG 2 failures ... 56.1 errors per page",
+      "docs": [
+        "a11y-audit-runner/references/automation-coverage.md"
+      ]
+    },
+    {
+      "figure": "83.9%",
+      "also": [
+        "53.1%",
+        "51.0%",
+        "46.3%",
+        "30.6%",
+        "13.5%"
+      ],
+      "claim": "home pages with each of the six most common failures: low-contrast text, missing alt text, missing form labels, empty links, empty buttons, missing document language",
+      "source": "WebAIM Million (2026)",
+      "url": "https://webaim.org/projects/million/",
+      "checked": "2026-09-25",
+      "quote": "Low contrast text 83.9%; Missing alternative text for images 53.1%; Missing form input labels 51.0%; Empty links 46.3%; Empty buttons 30.6%; Missing document language 13.5%",
+      "docs": [
+        "a11y-audit-runner/references/automation-coverage.md"
+      ]
+    },
+    {
+      "figure": "21.3%",
+      "also": [
+        "24.7%",
+        "10.0%"
+      ],
+      "claim": "screen reader and browser pairings: NVDA with Chrome 21.3%, JAWS with Chrome 24.7%, NVDA with Firefox 10.0%",
+      "source": "WebAIM Screen Reader User Survey #10 (December 2023 to January 2024)",
+      "url": "https://webaim.org/projects/screenreadersurvey10/",
+      "checked": "2026-09-25",
+      "quote": "JAWS with Chrome 24.7%; NVDA with Chrome 21.3%; NVDA with Firefox 10.0%",
+      "docs": [
+        "a11y-audit-runner/references/manual-protocol.md"
+      ]
+    },
+    {
+      "figure": "120 participants",
+      "also": [
+        "130,000+ fixations"
+      ],
+      "claim": "the size of the 2018 eye-tracking study",
+      "source": "Nielsen Norman Group, Scrolling and Attention (2018)",
+      "url": "https://www.nngroup.com/articles/scrolling-and-attention/",
+      "checked": "2026-09-25",
+      "quote": "120 participants ... over 130,000 fixations",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md",
+        "landing-page-conversion/references/page-architecture.md"
+      ]
+    },
+    {
+      "figure": "57%",
+      "source_key": "nngroup",
+      "also": [
+        "74%",
+        "80%"
+      ],
+      "claim": "viewing time above the fold (2018), in the first two screenfuls (2018), and above the fold in the 2010 study",
+      "source": "Nielsen Norman Group, Scrolling and Attention (2018)",
+      "url": "https://www.nngroup.com/articles/scrolling-and-attention/",
+      "checked": "2026-09-25",
+      "quote": "57% of their page-viewing time above the fold ... 74% of the viewing time was spent in the first two screenfuls ... 80% of the viewing time was made up of fixations above the fold",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md",
+        "landing-page-conversion/references/page-architecture.md"
+      ]
+    },
+    {
+      "figure": "70%",
+      "also": [
+        "50 studies"
+      ],
+      "claim": "the average documented cart-abandonment rate, across 50 studies",
+      "source": "Baymard Institute, Cart abandonment rate statistics",
+      "url": "https://baymard.com/lists/cart-abandonment-rate",
+      "checked": "2026-09-25",
+      "quote": "70.22% – average documented online shopping cart abandonment rate (based on 50 different studies)",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "14.88",
+      "also": [
+        "14.88 form fields",
+        "23.48",
+        "7–8"
+      ],
+      "claim": "form fields in the average US checkout, form elements in it, and the ideal number of fields",
+      "source": "Baymard Institute, Cart abandonment rate statistics",
+      "url": "https://baymard.com/lists/cart-abandonment-rate",
+      "checked": "2026-09-25",
+      "quote": "an ideal checkout flow can be as short as 12-14 form elements (7-8 if only counting the form fields) ... the average US checkout flow contains 23.48 form elements displayed to users by default. (14.88 if only counting the form fields.)",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "8.4%",
+      "also": [
+        "37 sites",
+        "30M+"
+      ],
+      "claim": "the retail conversion lift associated with a 0.1 s mobile speed improvement, observational, 37 sites and 30M+ sessions at the end of 2019",
+      "source": "Deloitte and Google, Milliseconds Make Millions (web.dev case study)",
+      "url": "https://web.dev/case-studies/milliseconds-make-millions",
+      "checked": "2026-09-25",
+      "quote": "The research team studied 37 leading European and American brand sites, collecting data on over 30 million user sessions. ... retail sites seeing an increase of 8.4% in conversion rates",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "50,000 people",
+      "claim": "the population threshold for the earlier ADA Title II compliance date",
+      "source": "U.S. Department of Justice, ADA Title II web rule (as extended in April 2026)",
+      "url": "https://www.ada.gov/resources/2024-03-08-web-rule/",
+      "checked": "2026-09-25",
+      "quote": "The compliance date for State and local government entities with a total population of 50,000 or more [is extended] to April 26, 2027.",
+      "docs": [
+        "web-design-studio/references/accessibility.md"
+      ]
+    }
+  ],
+  "not_statistics": [
+    {
+      "doc": "a11y-audit-runner/references/runtime-checks.md",
+      "figure": "200%",
+      "why": "a zoom level"
+    },
+    {
+      "doc": "email-template-system/references/email-workflow.md",
+      "figure": "125%",
+      "why": "a display-scaling setting"
+    },
+    {
+      "doc": "landing-page-conversion/references/conversion-audit.md",
+      "figure": "27%",
+      "why": "an example of a claimed lift, quoted as one that does not replicate"
+    }
+  ]
+}

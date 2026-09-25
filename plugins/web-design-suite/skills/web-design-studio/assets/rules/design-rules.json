@@ -1,0 +1,41 @@
+{
+  "about": "The one spec the three gates share: audit_design.py, stylelint.config.mjs and eslint.design.config.mjs. Each tool carries its own copy of these values; tests/test_rules_spec.py fails when a copy disagrees with this file. Change the rule here first, then in each tool. Source of the rules: token-contract.md, the Nine Laws.",
+  "nesting": {
+    "max_depth": 2,
+    "counts": "Nested style rules below the top-level rule. @media, @supports, @layer, @container and @scope do not count, and neither does a rule whose selector is only pseudo-classes (`:hover`, as opposed to `&:hover`).",
+    "allowed": [
+      ".card { & .title { &:hover { color: var(--fg-strong); } } }",
+      ".card { & .title { & .icon { :hover { color: var(--fg-strong); } } } }"
+    ],
+    "refused": [
+      ".a { & .b { & .c { & .d { color: var(--fg-strong); } } } }"
+    ]
+  },
+  "zero": {
+    "rule": "A literal 0 is allowed wherever a length token is. --space-0 exists for token files and layout primitives; component code writes 0.",
+    "allowed": [".card { padding: 0; }", ".card__media { margin-block-end: 0; }"]
+  },
+  "margins_in_components": {
+    "rule": "Law 2: a component never sets its own outer margin. Legal: auto (alignment), 0, calc(var(--token) * -1) to cancel a known token, and an owl selector written in the parent's own rule.",
+    "allowed_values": ["0", "auto", "0 auto", "auto 0", "calc(var(--card-inset) * -1)", "calc(-1 * var(--card-inset))"],
+    "refused_values": ["16px", "var(--gap-related)", "calc(var(--card-inset) * -2)"],
+    "owl_selectors": [".stack > * + *", ".flow > * + *"],
+    "refused_selectors": [".card *", ".card p"]
+  },
+  "var_fallback": {
+    "rule": "A var() fallback is not checked: the token is the value, and the fallback only renders when the token is missing.",
+    "allowed": ["var(--fg-muted)", "var(--fg-muted, #666666)", "var(--card-pad, var(--pad-card))"]
+  },
+  "file_classes": {
+    "token_files": {
+      "globs": ["**/tokens.css", "**/*-tokens.css", "**/*.tokens.css", "**/tokens/*.css", "**/theme.css", "**/*-theme.css"],
+      "examples": ["src/styles/tokens.css", "brand-tokens.css", "design.tokens.css", "src/tokens/colour.css", "assets/configs/theme.css", "dark-theme.css"],
+      "not": ["mytokens.css", "src/components/card.css", "theming.css"]
+    },
+    "component_files": {
+      "globs": ["**/components/**/*.css", "**/ui/**/*.css", "**/*.module.css", "**/components.css"],
+      "examples": ["src/components/card.css", "packages/ui/button.css", "Card.module.css", "styles/components.css"],
+      "not": ["src/styles/layout.css", "src/styles/base.css"]
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # Runtime Checks
 
-What a browser lets you check that source analysis cannot, and how to check it. Every technique here is implemented in `scripts/a11y_runtime.mjs`; this file is why each one works the way it does, and what it costs.
+What a browser lets you check that source analysis cannot, and how to check it. Every technique here is implemented in `scripts/a11y_runtime.mjs` except §6, reduced motion: the script runs with reduced motion off, so §6 is a procedure to run by hand. This file is why each one works the way it does, and what it costs.
 
 The premise, stated once: **source describes intent, and a browser produces the result.** Every gap between them is somewhere an accessibility bug lives. `outline: none` is intent. Whether a ring is visible is a result. `aria-labelledby="x"` is intent. Whether the control has a name is a result, and it depends on whether `#x` exists, is unique, is not itself hidden, and contains text.
 
@@ -174,7 +174,7 @@ Three details that matter:
    9.66%    9.84%    input#email                    ← the UA's own ring
 ```
 
-**Indicator contrast.** SC 2.4.13 asks for 3:1 between the focused and unfocused states of the indicator's own pixels. The obvious implementation — average the changed pixels before and after, take the contrast — **is wrong**, and it is worth knowing why:
+**Indicator contrast.** SC 2.4.13 (Level AAA, so beyond this skill's AA floor) asks for 3:1 between the focused and unfocused states of the indicator's own pixels. The obvious implementation — average the changed pixels before and after, take the contrast — **is wrong**, and it is worth knowing why:
 
 > This suite's ring is two bands: an inner band in `--bg-canvas` and an outer band in `--border-focus`. The inner band's job is to sit between the accent and the component's own colour so the indicator is legible on a dark button or a photo. Average the two bands and you blend a 5.7:1 band with a ~1.0:1 band and report **2.39:1** for a ring that is plainly visible. The first implementation of this check did exactly that and flagged the *correct* ring as too weak.
 
@@ -218,17 +218,41 @@ An earlier version of this runner read the focus ring from computed style — fo
 
 The lesson generalises past this one bug: **where a criterion is about what the user sees, measure what is drawn.** Computed style is a description of intent that has been through one more layer of processing, and it is still not the picture.
 
-### The bridge, one more time because it is the whole fix
+### The ring, one more time because it is the whole fix
 
+<!-- snippet: reset.css#focus-ring -->
 ```css
-:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: var(--stroke-focus) solid transparent;   /* forced-colors lifeline */
+:focus-visible {
+  /* A TWO-ring indicator:
+       ring 1  --stroke-focus  in --bg-canvas    (separation gap)
+       ring 2  --stroke-focus  in --border-focus (the visible ring)
+     Two rings are what make a focus indicator survive an element sitting
+     on an accent fill, an image, or an inverse surface — there is always
+     a contrasting edge somewhere in the pair.
+
+     The visible ring is an OUTLINE, not a box-shadow. Components draw
+     their own box-shadow (a button's elevation, a card's shadow) in a
+     LATER layer, and a later layer's box-shadow replaced a ring drawn with
+     box-shadow here: the canonical Button showed no focus at all
+     (WCAG 2.4.7). No component sets an outline, so this ring survives all
+     of them; a component with its own shadow loses only the gap ring. */
+  outline: var(--stroke-focus) solid var(--border-focus);
   outline-offset: var(--stroke-focus);
-  box-shadow: var(--shadow-focus);
+  box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas);
+}
+
+/* Windows High Contrast / forced-colors DISCARDS box-shadow and forces
+   colours; the outline survives and is repainted in the system colour, in
+   a mode whose whole users are people who need the ring most. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+    box-shadow: none;
+  }
 }
 ```
 
-The transparent outline is invisible in normal mode and forced to a system colour in forced-colors, where it becomes the ring. One line, and it is the difference between a working indicator and none at all for every Windows High Contrast user on the site. `references/token-contract.md`, Accessibility floor.
+The ring is the outline. Forced-colors mode discards `box-shadow` and repaints `outline` in the system highlight colour, so an outline ring survives where a shadow ring vanishes. A component's own `box-shadow`, in a later layer, cannot remove an outline either. The box-shadow is only the canvas-coloured gap that keeps the ring readable on an accent fill. The older "bridge", a transparent outline under a box-shadow ring, also survives forced colours, but in normal mode any component shadow replaces its ring. `references/token-contract.md`, Accessibility floor.
 
 ### Auditing every state, which is where this pays
 
@@ -239,6 +263,8 @@ One integration detail worth knowing if you write your own: the proof sheet rend
 ---
 
 ## 6. Reduced motion
+
+Not in `a11y_runtime.mjs`, which runs with `reducedMotion: 'no-preference'`. Run this one by hand, in a context of its own:
 
 ```js
 const ctx = await browser.newContext({ reducedMotion: 'reduce' });
@@ -311,11 +337,13 @@ An expectation has to be declared, because a tool cannot know a `<div>` is a men
 
 | Pattern | Driven | The bug it catches |
 |---|---|---|
-| **Dialog** | Enter on trigger → open, focus inside; Esc → closed; focus back on the trigger | Focus falling to `<body>` on close. The user is silently returned to the top of the document and their next Tab starts from the beginning of the page. This is the single most common modal bug and it is invisible to every scanner |
-| **Menu** | Enter/↓ opens and focuses the first item; ↓ moves and wraps; `aria-expanded` flips; Esc closes **and returns focus**; Tab closes | An `aria-expanded` that never updates — it tells the user the menu is closed while it is open, which is worse than saying nothing |
-| **Tabs** | exactly one tab has `tabindex="0"`; → moves; Home/End | A composite widget that is N tab stops instead of one. A 40-item widget where every item is a tab stop is a failure even though every item is reachable |
+| **Dialog** | Enter on the trigger opens it and moves focus inside; Esc closes it and focus returns to the trigger | Focus falling to `<body>` on close. The user is silently returned to the top of the document and their next Tab starts from the beginning of the page. This is the single most common modal bug and it is invisible to every scanner |
+| **Menu** | Enter opens it and focuses the first item; Down arrow moves between items; `aria-expanded` flips; Esc closes it **and returns focus** | An `aria-expanded` that never updates — it tells the user the menu is closed while it is open, which is worse than saying nothing |
+| **Tabs** | exactly one tab has `tabindex="0"`; Right arrow moves | A composite widget that is N tab stops instead of one. A 40-item widget where every item is a tab stop is a failure even though every item is reachable |
 | **Disclosure** | Enter toggles `aria-expanded`; **focus stays on the trigger** | A disclosure that moves focus into its panel. The user did not ask to go there, and Shift+Tab now takes them somewhere they have already been |
-| **Combobox** | ↓ or Alt+↓ opens; Esc closes without committing | Esc that commits, or that closes the whole dialog behind the combobox instead of just the popup |
+| **Combobox** | Down arrow opens it; `aria-expanded` flips | A combobox the keyboard cannot open, or whose `aria-expanded` never changes |
+
+Not driven, so check these by hand: Space on a button, Home and End in tabs, arrow wrap in a menu, Tab leaving a menu, Tab staying inside an open dialog, and Esc on a combobox. Esc must close only the popup, without committing and without closing a dialog behind it.
 
 All five correct widgets in the verification fixture pass silently; all five broken ones are caught, each with its own rule name. The one sequencing note: if Esc does not close a thing, the focus-return assertion is not evaluated — you cannot check where focus went after a close that never happened, and reporting both would be one bug counted twice.
 
@@ -335,7 +363,7 @@ Two viewport changes, two assertions:
 
 | Check | How | SC |
 |---|---|---|
-| **200% text zoom** | viewport 640×512 (half of 1280×1024); look for clipped and overlapping content | 1.4.4 |
+| **200% zoom** | viewport 640×512 (half of 1280×1024); horizontal scroll is reported as a **warning**. It does not fail 1.4.4, which asks only that text resize without loss of content or function. Clipped or overlapping text is not measured: check it by eye | 1.4.4 (manual) |
 | **400% zoom / 320px reflow** | viewport 320×256 — 1280 CSS px at 400% is a 320px viewport, which is how the criterion is specified and tested | 1.4.10 |
 
 The assertion for 1.4.10 is `document.scrollingElement.scrollWidth > innerWidth`: two-dimensional scrolling, which means reading every line requires a horizontal scroll and back. **Name the widest offending element**, because the answer is nearly always one element:

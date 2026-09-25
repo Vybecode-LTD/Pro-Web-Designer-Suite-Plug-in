@@ -137,7 +137,7 @@ Drop `.card` into a different parent and it spaces correctly with zero changes. 
 `gap` is unavailable in exactly one situation worth caring about: a container of flowing prose, where `display: flex` would turn bare text nodes into anonymous flex items and shred the content. There, use the owl:
 
 ```css
-@layer base {
+@layer layout {
   .prose > * + * {
     margin-block-start: var(--space-block);
   }
@@ -152,7 +152,7 @@ The distinguishing test: *can you change every gap in this container by editing 
 
 1. **`margin: auto` for alignment** — `margin-inline: auto` to center, `margin-inline-start: auto` to push an item to the end of a flex row. This is positioning, not spacing.
 2. **The owl selector, written in the parent's rule**, as above.
-3. **The `.prose` flow context** — a single, project-wide, explicitly-owned container for CMS or markdown content where you do not control the child elements. One per project. Document it.
+3. **The flow containers, `.flow` and `.prose`** — explicitly owned containers for CMS or markdown content where you do not control the child elements. They share one rhythm, written once in layout.css (§9). Do not add a third; a third context that needs spacing is a layout, and gets a `gap`.
 
 Everything else is a violation and the auditor flags it.
 
@@ -235,10 +235,12 @@ Confusing these is the second most common structural spacing error. Every space 
 - A stack's gap is one value for the whole stack. If two children need different spacing from their neighbours, you have two stacks, not one stack with exceptions.
 
 ```css
-/* WRONG — exception inside a stack */
+/* WRONG — exception inside a stack. example: wrong */
 .settings { display: grid; gap: var(--gap-grouped); }
 .settings > .danger-zone { margin-block-start: var(--space-12); }
+```
 
+```css
 /* RIGHT — two stacks, the outer one expressing the real relationship */
 .settings-page { display: grid; gap: var(--gap-distinct); }
 .settings      { display: grid; gap: var(--gap-grouped); }
@@ -330,6 +332,7 @@ Fix: for text-only containers, reduce block padding by roughly half the leading 
   .quote {
     /* Leading adds ~0.3em of empty band top and bottom. Trim it so the
        optical inset matches the horizontal one. */
+    /* design-audit-ignore-next-line: L1 -- optical: the leading band, until text-box-trim below takes over */
     padding-block: calc(var(--pad-card) - 0.3em);
     padding-inline: var(--pad-card);
   }
@@ -440,28 +443,36 @@ Note the negative margin is written as `calc(token * -1)`, so changing `--pad-ca
 
 This is the single most-violated typographic spacing rule on the web, and fixing it makes long-form pages instantly read better. Default browser styles get it wrong (equal margins), and most resets do not fix it.
 
-Ratio: roughly **2:1 to 3:1**, above to below. Larger headings take the larger ratio, because a bigger heading is a stronger boundary.
+Ratio: at least **2:1**, above to below, at every width. Larger headings take the larger ratio, because a bigger heading is a stronger boundary.
 
+<!-- snippet: layout.css#flow -->
 ```css
-@layer base {
-  /* .prose is the one owned flow context — see Law 2's exception in §3. */
-  .prose > * + * { margin-block-start: var(--space-block); }
-
-  /* Headings override the flow gap with a larger one ABOVE. Because the
-     owl already set the gap, only the heading's own above-space changes,
-     and the space BELOW a heading is just the owl's default. That
-     asymmetry falls out of the rule order rather than being typed twice. */
-  .prose > :is(h2, h3, h4) + *  { margin-block-start: var(--gap-tight); }
-  .prose > * + h2 { margin-block-start: var(--space-subsection); }
-  .prose > * + h3 { margin-block-start: var(--space-block); }
-  .prose > * + h4 { margin-block-start: var(--gap-separate); }
-
-  /* A heading never carries space above it when it opens a container. */
-  .prose > :first-child { margin-block-start: 0; }
+:is(.flow, .prose) {
+  --flow-gap: var(--space-block);
 }
+:is(.flow, .prose) > * + * { margin-block-start: var(--flow-gap); }
+
+/* A heading belongs to the thing it introduces: far from what came before,
+   scaled to its rank, and close to what follows. Proximity does the work a
+   horizontal rule would otherwise do. Above to below is at least 2:1 at
+   every width: h2 40→88 : 12, h3 40 : 12, h4 24 : 12. */
+:is(.flow, .prose) > * + h2 { margin-block-start: var(--space-subsection); }
+:is(.flow, .prose) > * + h3 { margin-block-start: var(--gap-distinct); }
+:is(.flow, .prose) > * + :is(h4, h5, h6) { margin-block-start: var(--gap-separate); }
+
+/* Written after the heading rules, at equal specificity, so a heading that
+   follows a heading takes this tight gap too: two stacked headings are a
+   title and its subtitle, not two sections. */
+:is(.flow, .prose) > :is(h1, h2, h3, h4, h5, h6) + * {
+  margin-block-start: var(--gap-related);
+}
+
+/* An <hr> means "the subject changes": subsection weight on both sides. */
+:is(.flow, .prose) > * + hr,
+:is(.flow, .prose) > hr + * { margin-block-start: var(--space-subsection); }
 ```
 
-Read the result: after an `h3`, the next element sits 8px away — bound tightly to the heading. Before an `h3`, there is a full `--space-block`. The heading visually leads its section instead of floating between two.
+Read the result: after an `h3`, the next element sits 12px away (`--gap-related`) — bound tightly to the heading. Before an `h3`, there are 40px (`--gap-distinct`). The heading visually leads its section instead of floating between two.
 
 **In component contexts (not prose), the same asymmetry is expressed structurally**, which is cleaner:
 
@@ -515,15 +526,25 @@ Two sections therefore meet with `2 × --space-subsection` (80 → 176px), sligh
 
 ### Gutters and the content column
 
+<!-- snippet: layout.css#center -->
 ```css
 .center {
   --center-max: var(--width-content);
-  inline-size: min(100% - var(--gutter-page) * 2, var(--center-max));
+  --center-gutter: var(--gutter-page);
+  box-sizing: border-box;
+  max-inline-size: calc(var(--center-max) + var(--center-gutter) * 2);
   margin-inline: auto;
+  padding-inline: var(--center-gutter);
 }
+
+.center--prose  { --center-max: var(--measure-prose); }
+.center--narrow { --center-max: var(--measure-narrow); }
+.center--form   { --center-max: var(--width-form); }
+.center--wide   { --center-max: var(--width-wide); }
+.center--flush  { --center-gutter: var(--space-0); }
 ```
 
-`min()` rather than `max-width` plus padding, because this produces a single sizing rule with no padding to fight with child backgrounds. `margin-inline: auto` is the alignment exception from §3, not a spacing margin.
+The gutters are added back to the cap, so `--width-content` means the content column and not the column minus two gutters. The gutter is a socket, so `.center--flush` drops it by re-pointing one variable. (`inline-size: min(100% - 2 × gutter, max)` draws the same column; padding is what lets a modifier remove the gutter.) `margin-inline: auto` is the alignment exception from §3, not a spacing margin.
 
 ---
 

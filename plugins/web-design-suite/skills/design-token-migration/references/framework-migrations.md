@@ -22,7 +22,7 @@ The strategy is in `migration-strategies.md`; the clustering is in `extraction-a
 The easy case, and the one the codemod handles most completely.
 
 ```css
-/* before */
+/* example: before */
 .card {
   background: #ffffff;
   border: 1px solid #e6e6e6;
@@ -33,7 +33,7 @@ The easy case, and the one the codemod handles most completely.
 }
 ```
 ```css
-/* after */
+/* after the codemod: 22px is left for a person to decide. example: illustration */
 .card {
   background: var(--bg-surface);
   border: var(--stroke-default) solid var(--border-subtle);
@@ -173,9 +173,11 @@ A `.module.css` file is a **component file** by definition, which turns on three
 Law 6 is the one that bites during a migration, because the mapping must produce **role** tokens, not primitives:
 
 ```css
-/* WRONG — right value, wrong tier. Compiles, renders, fails the audit */
+/* WRONG — right value, wrong tier. Compiles, renders, fails the audit. example: wrong */
 .card { padding: var(--space-6); gap: var(--space-3); color: var(--neutral-900); }
+```
 
+```css
 /* RIGHT */
 .card { padding: var(--pad-card); gap: var(--gap-related); color: var(--fg-default); }
 ```
@@ -185,7 +187,7 @@ The difference shows up the day "more air in cards" lands: one is a single role 
 ### `composes:` is a second home
 
 ```css
-/* before */
+/* example: before */
 .primaryButton { composes: button from './Button.module.css'; background: #2f6df6; }
 ```
 
@@ -213,7 +215,7 @@ The values migrate cleanly. The interesting decision is where the values *live* 
 Almost every styled-components codebase has this:
 
 ```jsx
-// before
+// example: before
 const theme = {
   colors: { brand: '#2f6df6', ink: '#333333', line: '#e5e5e5' },
   space:  { sm: 8, md: 16, lg: 24 },
@@ -260,6 +262,7 @@ const dur = getComputedStyle(document.documentElement)
 ### Interpolations that are not values
 
 ```jsx
+// example: before
 const Badge = styled.span`
   padding: 2px 7px;
   color: ${(p) => tones[p.tone ?? 'info']};     // a variant, not a value
@@ -334,14 +337,14 @@ The full annotated config is `assets/configs/tailwind.config.ts` (v3) or `assets
 ### Move 2 — sweep the arbitrary values
 
 ```jsx
-/* before */
+/* example: before */
 <section className="px-[18px] py-[62px] bg-[#fafaf9]">
   <h1 className="text-[44px] text-[#333333]">…</h1>
   <div className="mt-[26px] flex gap-[9px]">
     <button className="rounded-[5px] px-[17px] py-[9px] bg-[#2f6df6]">…</button>
 ```
 ```jsx
-/* after */
+/* after the sweep: 62px has no rung, so it is left for review. example: illustration */
 <section className="px-inline-md py-[62px] bg-canvas">
   <h1 className="text-h1 text-default">…</h1>
   <div className="mt-separate flex gap-tight">
@@ -361,6 +364,7 @@ Three Tailwind-specific things the sweep does not fix:
 ### The trap: classes assembled at runtime
 
 ```jsx
+// example: wrong
 <div className={`p-[${pad}px]`}>          // generates nothing. Ever.
 ```
 
@@ -375,7 +379,7 @@ Tailwind scans source text; it cannot see a template it has not evaluated. This 
 Typical inherited override sheet:
 
 ```css
-/* before — an escalation the framework will always win eventually */
+/* example: before — an escalation the framework will always win eventually */
 .btn.btn-primary {
   background-color: #2f6df6 !important;
   border-color: #2558c8 !important;
@@ -404,26 +408,41 @@ The `!important`s are not laziness. They are the only tool left once you are in 
 
 Layer order beats specificity entirely: a single-class rule in `components` beats a triple-class rule in `vendor`, and it keeps beating it when Bootstrap 5.4 adds another class to the selector.
 
+**Except for `!important`, which inverts layer order.** An important declaration in the *lowest* layer beats important and normal declarations in every layer above it. Bootstrap's utilities (`.d-none`, `.mt-3`, `.bg-primary`, `.text-primary`…) are all `!important`, so from `vendor` they still beat your components. Build Bootstrap without its utilities API if you can. If you cannot, treat those classes as final and do not try to out-rank them. `.bg-primary` and `.text-primary` also read `--bs-primary-rgb`, an `r, g, b` triplet, so binding `--bs-primary` does not reach them, and an OKLCH role cannot be written as a triplet.
+
 ### Re-point the framework's own variables where it has them
 
 Bootstrap 5 and MUI both expose theming hooks. Use them — one binding is cheaper to maintain than fifty overrides.
 
 ```css
-/* Bootstrap 5: bind its variables to your roles, once */
+/* Bootstrap 5.3: bind its variables to your roles, once */
 @layer vendor {
   :root {
-    --bs-primary: var(--accent-600);
+    --bs-primary: var(--bg-accent);
     --bs-body-color: var(--fg-default);
     --bs-body-bg: var(--bg-canvas);
     --bs-border-color: var(--border-default);
     --bs-border-radius: var(--radius-lg);
   }
+  /* --bs-primary never reaches the button: .btn-primary sets its own
+     --bs-btn-* variables to literals. Bind those too. */
+  .btn-primary {
+    --bs-btn-bg: var(--bg-accent);
+    --bs-btn-border-color: var(--bg-accent);
+    --bs-btn-color: var(--fg-on-accent);
+    --bs-btn-hover-bg: var(--bg-accent-hover);
+    --bs-btn-hover-border-color: var(--bg-accent-hover);
+    --bs-btn-hover-color: var(--fg-on-accent);
+  }
 }
 ```
 
 ```jsx
-// MUI: the theme is JS, so hand it the custom properties
+// MUI: native color lets the palette alias custom properties, and derives
+// hover and ripple colours in CSS (color-mix, relative colour) instead of in
+// JavaScript, which cannot read a var().
 const theme = createTheme({
+  cssVariables: { nativeColor: true },
   palette: {
     primary:    { main: 'var(--bg-accent)' },
     background: { default: 'var(--bg-canvas)', paper: 'var(--bg-surface)' },
@@ -432,7 +451,7 @@ const theme = createTheme({
 });
 ```
 
-MUI computes derived colors (hover, ripple) from `main`, and it cannot compute from a `var()`. Supply `light` / `dark` / `contrastText` explicitly from your ramp rather than letting it guess — and note that this is the same problem as `darken()` in §2, for the same reason.
+Without `nativeColor`, MUI computes derived colors (hover, ripple) in JavaScript from `main`, and it cannot compute from a `var()`. On an MUI version without native color (see MUI's "Native color" page), supply `light` / `dark` / `contrastText` explicitly from your ramp rather than letting it guess. That is the same problem as `darken()` in §2, for the same reason.
 
 ### What to migrate and what to leave
 
@@ -450,7 +469,7 @@ MUI computes derived colors (hover, ripple) from `main`, and it cannot compute f
 The hardest stack, because the values are tokenizable but the *declarations* are in the wrong place, and moving them requires inventing names.
 
 ```jsx
-/* before — five homes for one table */
+/* example: before — five homes for one table */
 export function Table({ rows }) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>

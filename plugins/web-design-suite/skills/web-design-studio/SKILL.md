@@ -1,6 +1,6 @@
 ---
 name: web-design-studio
-description: Professional website design and front-end architecture — mockups, new builds, redesigns, and updates to existing sites. Enforces a token-driven system with obsessive spacing discipline (a closed 4px scale, parents-own-the-gaps, a proximity ladder that picks every gap by meaning rather than by eye), one home per component's styles, cascade layers instead of specificity fights, OKLCH color with verified WCAG 2.2 AA contrast, modular type scales, a deep catalog of proven navigation patterns, and a gated protocol for inventing genuinely new ones. Ships runnable validators that fail the build on drift. Use this whenever the user mentions a website, landing page, marketing site, web app UI, design system, CSS architecture, spacing, layout, navigation, color palette, typography, responsive design, dark mode, a redesign or restyle, or hands over a Figma file — even if they only say "make this look better" or "build me a site".
+description: Design systems and front-end architecture, enforced by an audit that fails the build. Covers tokens.css, a closed spacing and type scale, OKLCH colour with measured contrast, cascade layers, layout primitives and density. Use for new builds, redesigns and CSS architecture. Not for page copy (landing-page-conversion) or reviewing finished work (design-critique-gate).
 ---
 
 # Web Design Studio
@@ -16,7 +16,7 @@ description: Professional website design and front-end architecture — mockups,
 > The commands below are written `python -m scripts.<name>`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (audit_design.py, generate_color_ramp.py, generate_type_scale.py).
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (audit_design.py, check_roles.py, generate_color_ramp.py, generate_type_scale.py).
 
 A complete method for designing and building websites that look considered and stay coherent when more than one person touches them.
 
@@ -114,7 +114,7 @@ Then run `references/review-checklist.md` top to bottom: 92 checks across tokens
 
 ### Phase 6 — Handoff
 
-Per `references/handoff-conventions.md`: repo shape, a `CLAUDE.md` restating the laws and the audit command, an ordered `IMPLEMENTATION.md`, `DESIGN_DECISIONS.md` for the non-obvious choices, and the audit wired into an npm script and a pre-commit hook. The template is in §7 of that file, copy-paste ready.
+Per `references/handoff-conventions.md`: repo shape, a `CLAUDE.md` restating the laws and the audit command, an ordered `IMPLEMENTATION.md`, `DESIGN_DECISIONS.md` for the non-obvious choices, and the audit wired into an npm script and a pre-commit hook. The template is in `references/handoff-conventions.md` §7, copy-paste ready.
 
 ---
 
@@ -133,7 +133,7 @@ Per `references/handoff-conventions.md`: repo shape, a `CLAUDE.md` restating the
 | **content-model-to-ui** | The schema exists and now it needs screens. Maps Postgres/Supabase columns to controls by semantics rather than type, asks the handful of questions a schema cannot answer, and scaffolds on-system list/detail/form views. |
 | **email-template-system** | It has to land in an inbox. The one place these laws must bend — tables, inlined styles, no cascade — owned deliberately, with the token file still the source of truth and a compiler doing the inlining. |
 | **perf-budget-gate** | Fast is a feature you have to defend. The sibling of `audit_design.py`: static budget checks on every commit, real LCP/CLS/INP measurement in CI, and a baseline so an existing slow site can be frozen rather than ignored. |
-| **a11y-audit-runner** | The runtime accessibility gate. axe-core, computed accessible names, real tab-order extraction, focus visibility measured in pixels rather than assumed, forced-colors. Honest that automation catches about a third, and builds the human pass into the workflow. |
+| **a11y-audit-runner** | The runtime accessibility gate. axe-core, computed accessible names, real tab-order extraction, focus visibility measured in pixels rather than assumed, forced-colors. Honest that automation decides only part of WCAG, and builds the human pass into the workflow. |
 | **design-system-versioning** | The system has consumers now. Classifies every change against a token-specific breaking-change taxonomy, computes the blast radius of a Tier-1 edit, flags contrast crossings, and generates the changelog, migration guide and codemod. |
 | **client-presentation-builder** | You have to present it. Turns the decision log and the gate results into a deck that argues decisions rather than defending taste — and refuses to dress a coin-flip up as rationale. |
 
@@ -153,6 +153,7 @@ Read the file when you hit the decision it covers. Do not read them all up front
 | `references/typography.md` | Type scale, leading, measure, tracking, font loading, fluid type |
 | `references/layout-composition.md` | Page skeletons, grids, container queries, responsive strategy, alignment |
 | `references/navigation-patterns.md` | Choosing or building any nav — 17 patterns with keyboard, touch and a11y contracts |
+| `references/navigation-code.md` | Building a scroll-aware header, a mega menu, a drawer or a scroll-spy: working code |
 | `references/pattern-invention.md` | Inventing anything, or deciding whether an idea is safe to ship |
 | `references/motion-system.md` | Any animation, transition, or scroll behavior |
 | `references/accessibility.md` | Always, and specifically before declaring anything done |
@@ -177,6 +178,8 @@ python -m scripts.audit_design src/ --json             # machine-readable
 python -m scripts.audit_design src/ --write-baseline .design-baseline.json
                                                        # adopt on a legacy repo:
                                                        # only NEW findings fail
+python -m scripts.check_roles src/styles/tokens.css   # role pairs per theme: text 4.5:1,
+                                                       # borders and the focus ring 3:1
 
 # Generators. Run these in Phase 1.
 python -m scripts.generate_color_ramp "#e8440a" --name accent --format css
@@ -185,7 +188,9 @@ python -m scripts.generate_color_ramp --check "#ffffff" "oklch(56.5% 0.176 42)"
 python -m scripts.generate_type_scale --base 16 --ratio 1.2 --fluid 380 1440 --preview
 ```
 
-`audit_design.py` enforces Laws 1–6 across CSS, SCSS, JS and JSX. It understands cascade layers, distinguishes component files from token files, knows that `em` is a ratio and `vw` is relational, and allows the documented exceptions (`margin: auto`, the owl selector written in a parent's rule, `calc(var(--t) * -1)`). Escape hatches are comment pragmas, so every one is visible in review:
+`check_roles.py` is the palette's gate: it resolves every Tier-2 role in light, dark and `.inverse`, checks the pairs components put together, and prints the role table `references/color-system.md` §6 quotes (`--table`). Run it on every change to `tokens.css`.
+
+`audit_design.py` enforces Laws 1–6 across CSS, SCSS, JS and JSX: class strings in `className` and in `cn()`, `clsx()`, `cva()` and the other class helpers, Tailwind v4 syntax, and styled-components or emotion template bodies, audited as CSS. A style object passed by name (`style={box}`) is out of its reach; ESLint's `style` rule covers the inline form. It understands cascade layers, distinguishes component files from token files, knows that `em` is a ratio and `vw` is relational, and allows the documented exceptions (`margin: auto`, the owl selector written in a parent's rule, `calc(var(--t) * -1)`). Escape hatches are comment pragmas, so every one is visible in review:
 
 ```css
 /* design-audit-ignore-next-line: L2 -- CMS flow container, see ADR-014 */

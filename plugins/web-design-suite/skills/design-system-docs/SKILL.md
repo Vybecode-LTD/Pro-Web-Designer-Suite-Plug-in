@@ -1,6 +1,6 @@
 ---
 name: design-system-docs
-description: Generate a design system's documentation from its own source — a token reference with resolved values and measured contrast, a component reference whose API tables are extracted from each component's Tier-3 socket block, and a living style guide that cannot drift because nothing in it was transcribed. Use for documenting a design system, a component library reference or gallery, token documentation, a living style guide, "document our design system", a Storybook alternative without Storybook, onboarding a new developer onto a design system, documenting component props and CSS custom-property APIs, publishing a style guide, and keeping docs in sync with code. Reach for it whenever anyone mentions design system docs, component docs, a props table, a CSS API, a token reference, a docs site, stale or drifting documentation, or "where is this documented" — and any time a component library exists that nobody has ever written down.
+description: Generate a design system's documentation from its own source. A token reference with measured contrast, component API tables from each component's CSS sockets, and a style guide that fails CI when it drifts. Use for 'document our design system'. Not for general library or API docs, or project READMEs.
 ---
 
 # Design System Docs
@@ -10,7 +10,7 @@ description: Generate a design system's documentation from its own source — a 
 > inside this plugin:
 >
 > ```bash
-> python "${CLAUDE_SKILL_DIR}/scripts/extract_system.py" styles/ src/components/ --out system.json --report
+> python "${CLAUDE_SKILL_DIR}/scripts/extract_system.py" styles/ src/components/ --out docs/system.json --report
 > ```
 >
 > The commands below are written `python -m scripts.<name>`. That form is for a project that
@@ -86,18 +86,7 @@ The reviewer is the one who decides whether the documentation is a liability. Fu
 
 ## Why not Storybook
 
-Storybook is a good answer to a different question. It renders components in isolation with controls — which is a development environment, not a reference. Reach for this skill instead when:
-
-| You want | Storybook | Here |
-|---|---|---|
-| A props table | from the TS, at runtime, in a browser | from the TS, at build, in a static file |
-| A **CSS custom-property** API table | no concept of one | the socket block, extracted |
-| Resolved token values | you inspect the DOM | computed and printed, with the `var()` chain |
-| Measured contrast | an addon, if configured | a column, always, from the same maths as the ramp generator |
-| CI that fails on stale docs | no | `--check`, exit 1 |
-| Install cost | a build system, a config, a dependency tree | two stdlib Python files |
-
-The two coexist without friction: Storybook is where a component is *developed*, this is where it is *published*. If you already run Storybook, keep it and add `--check` to CI — the drift gate is the part Storybook has no answer for.
+Keep Storybook if you run it: it is where a component is developed, and this is where it is published. Add `--check` to CI beside it. The full comparison is in `references/documentation-model.md` §13.
 
 ---
 
@@ -106,7 +95,7 @@ The two coexist without friction: Storybook is where a component is *developed*,
 ### 1. Point it at the source
 
 ```bash
-python -m scripts.extract_system styles/ src/components/ --out system.json --report
+python -m scripts.extract_system styles/ src/components/ --out docs/system.json --report
 ```
 
 Directories, files or globs. Anything matching `tokens.css` / `theme.css` is read as a token file, other CSS as component CSS, `.ts`/`.tsx`/`.jsx` as prop sources. Name them explicitly when auto-detection guesses wrong:
@@ -116,17 +105,17 @@ python -m scripts.extract_system \
   --tokens styles/tokens.css --tokens styles/brand.css \
   --components "src/components/**/*.css" \
   --props "src/components/**/*.tsx" \
-  --prose docs/prose --out system.json --report
+  --prose docs/prose --out docs/system.json --report
 ```
 
-`system.json` is deterministic — sorted, no timestamps, paths relative to `--root`. **Commit it.** It is the baseline that step 4 diffs against, and a timestamp in it would make every run report drift.
+`system.json` is deterministic — sorted, no timestamps, paths relative to `--root`. **Commit it** at `docs/system.json`. It is the baseline that step 4 diffs against, so step 4 must read the same source: the same paths, the same flags. Otherwise an unchanged repo reports drift. Change one, change both, and a timestamp in it would make every run report drift.
 
 Read the `--report` summary before you build anything. It will already have found things.
 
 ### 2. Generate
 
 ```bash
-python -m scripts.build_docs system.json --out docs-site/ --prose docs/prose
+python -m scripts.build_docs docs/system.json --out docs/site/ --prose docs/prose
 ```
 
 Four pages, no build step, no network, opens from `file://`: an overview, a token reference with live swatches and the contrast column, a component reference with socket tables and a rendered instance per variant and per state, and a patterns page if you have written any. Plus a search box, a theme switcher and a density switcher — because a docs site that cannot show you dark mode is documenting half a system.
@@ -152,7 +141,7 @@ What to write, in order of value: *when not to use this* · the tradeoff · the 
 ### 4. Detect drift in CI
 
 ```bash
-python -m scripts.extract_system styles/ src/ --out build/system.json
+python -m scripts.extract_system styles/ src/components/ --out build/system.json
 python -m scripts.build_docs build/system.json --baseline docs/system.json \
        --prose docs/prose --check
 ```
@@ -175,7 +164,7 @@ Full wiring, including the GitHub Actions file, is in `references/drift-detectio
 
 ### 5. Publish
 
-The site is static and self-contained; any file host will do. Commit `system.json` alongside it in the same commit as the code change that caused it — a baseline updated on its own is unreviewable, and alongside its cause it reads as "this changed, so these forty numbers changed."
+The site is static and self-contained; any file host will do. Commit `docs/system.json` alongside it in the same commit as the code change that caused it — a baseline updated on its own is unreviewable, and alongside its cause it reads as "this changed, so these forty numbers changed."
 
 ---
 
@@ -281,44 +270,7 @@ Within this skill:
 
 ## Scripts
 
-### `scripts/extract_system.py` — stdlib Python 3, no dependencies
-
-| Flag | Does |
-|---|---|
-| `paths…` | files, directories or globs; classified by name and extension |
-| `--tokens PATH` | a token file, explicitly (repeatable) |
-| `--components PATH` | a component stylesheet, directory or glob (repeatable) |
-| `--props PATH` | a TS/TSX/JSX source for props and JSDoc (repeatable) |
-| `--prose DIR` | enables the `undocumented-component` and `orphan-doc` gaps |
-| `--out FILE` | where `system.json` goes (default: stdout) |
-| `--root DIR` | output paths are made relative to this |
-| `--root-font-size PX` | the `rem` basis for static resolution (default 16) |
-| `--report` | a human summary to stderr |
-| `--strict` | exit 1 if any error-severity gap was found |
-| `--color-impl PATH` / `--check-color-impl` | bind to, or verify against, the studio's colour math |
-
-Exit `0` extracted · `1` `--strict` with errors · `2` bad invocation.
-
-**On the contrast column:** it uses the OKLab/WCAG functions from `web-design-studio/scripts/generate_color_ramp.py`. When the suite is installed whole, that module is imported and used directly; shipped standalone, a byte-identical vendored copy runs instead, and `--check-color-impl` proves the two agree on a set of probe pairs. Two implementations of contrast in one suite is how a docs page says 4.48:1 and a ramp generator says 4.52:1 for the same pair, and how a reviewer learns to trust neither.
-
-### `scripts/build_docs.py` — stdlib Python 3, no dependencies
-
-| Flag | Does |
-|---|---|
-| `--out DIR` | the site (required unless `--check` runs alone) |
-| `--prose DIR` | hand-written markdown, merged by filename, never written to |
-| `--root DIR` | resolves the source paths recorded in `system.json` |
-| `--project NAME` | the title on every page |
-| `--only NAME` | one component; repeatable or comma-separated |
-| `--no-examples` | skip the rendered instances and the forced-state stylesheet |
-| `--check` | drift mode: diff against the baseline, check every hand-written claim, exit non-zero |
-| `--baseline FILE` | the committed `system.json` to diff against (default `<out>/assets/system.json`) |
-| `--emit-css FILE` | the site's own chrome stylesheet, for `audit_design.py` |
-| `--emit-examples DIR` | every fenced code example as a real file, to be linted like source |
-
-Exit `0` built / no drift · `1` drift found · `2` bad invocation.
-
-The rendered examples mirror each pseudo-class state rule onto a `data-force-state` attribute — `.button:hover:not(:disabled)` and `.button[data-force-state~="hover"]:not(:disabled)` have identical specificity (0,3,0), so the mirror wins on document order alone, in the same layer and the same at-rule context. That is how a focus ring appears on a static page without a mouse. A `:not(...)` is left alone: it is a guard, not a state.
+Every argument of `extract_system.py` and `build_docs.py` is in `references/scripts.md`.
 
 ---
 

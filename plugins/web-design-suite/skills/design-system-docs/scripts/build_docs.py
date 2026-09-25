@@ -30,11 +30,12 @@ Prose merge convention (all optional, all relative to --prose)
 
 Usage
 -----
-    python -m scripts.build_docs system.json --out docs-site/
-    python -m scripts.build_docs system.json --out docs-site/ --prose docs/prose
-    python -m scripts.build_docs system.json --only button --no-examples --out /tmp/d
-    python -m scripts.build_docs system.json --check            # CI: drift gate
-    python -m scripts.build_docs system.json --out docs-site/ \\
+    python -m scripts.build_docs docs/system.json --out docs/site/
+    python -m scripts.build_docs docs/system.json --out docs/site/ --prose docs/prose
+    python -m scripts.build_docs docs/system.json --only button --no-examples --out /tmp/d
+    python -m scripts.build_docs build/system.json --baseline docs/system.json \\
+        --prose docs/prose --check                              # CI: drift gate
+    python -m scripts.build_docs build/system.json --out build/docs \\
         --emit-css build/docs-chrome.css --emit-examples build/examples
 
 Exit codes: 0 built / no drift · 1 drift found in --check · 2 bad invocation.
@@ -1349,11 +1350,12 @@ def build_parser() -> argparse.ArgumentParser:
                     "or check it for drift.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  python -m scripts.build_docs system.json --out docs-site/
-  python -m scripts.build_docs system.json --out docs-site/ --prose docs/prose
-  python -m scripts.build_docs system.json --only button --no-examples --out /tmp/d
-  python -m scripts.build_docs system.json --check --prose docs/prose
-  python -m scripts.build_docs system.json --out docs-site/ \\
+  python -m scripts.build_docs docs/system.json --out docs/site/
+  python -m scripts.build_docs docs/system.json --out docs/site/ --prose docs/prose
+  python -m scripts.build_docs docs/system.json --only button --no-examples --out /tmp/d
+  python -m scripts.build_docs build/system.json --baseline docs/system.json \\
+      --prose docs/prose --check
+  python -m scripts.build_docs build/system.json --out build/docs \\
       --emit-css build/docs-chrome.css --emit-examples build/examples
 """)
     ap.add_argument("system", help="system.json from extract_system.py")
@@ -1414,6 +1416,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.check:
         baseline = Path(args.baseline) if args.baseline else (
             Path(args.out) / "assets" / "system.json" if args.out else None)
+        if args.baseline and not baseline.is_file():
+            # A named baseline that is not there is a wrong path, not a first
+            # run: skipping the diff here made the gate pass while comparing
+            # nothing.
+            print(f"error: --baseline {args.baseline} does not exist. Commit the baseline "
+                  "that extract_system.py wrote (docs/system.json in the documented "
+                  "workflow), or drop --baseline to check prose only.", file=sys.stderr)
+            return 2
         problems: List[str] = []
         if baseline and baseline.is_file():
             old = json.loads(baseline.read_bytes())

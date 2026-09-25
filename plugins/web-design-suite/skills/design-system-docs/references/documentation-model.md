@@ -328,3 +328,20 @@ What it cannot produce is the sentence next to each line saying what to do about
 3. **Generated and hand-written content never share a file**, because the day a regeneration eats somebody's prose is the day the team stops regenerating.
 
 Related: `references/extraction.md` (how the generated half is read out of the source), `references/drift-detection.md` (how both halves are kept honest), `references/token-contract.md` (the vocabulary).
+
+---
+
+## 13. Why not Storybook
+
+Storybook is a good answer to a different question. It renders components in isolation with controls — which is a development environment, not a reference. Reach for this skill instead when:
+
+| You want | Storybook | Here |
+|---|---|---|
+| A props table | from the TS, at runtime, in a browser | from the TS, at build, in a static file |
+| A **CSS custom-property** API table | no concept of one | the socket block, extracted |
+| Resolved token values | you inspect the DOM | computed and printed, with the `var()` chain |
+| Measured contrast | an addon, if configured | a column, always, from the same maths as the ramp generator |
+| CI that fails on stale docs | no | `--check`, exit 1 |
+| Install cost | a build system, a config, a dependency tree | two stdlib Python files |
+
+The two coexist without friction: Storybook is where a component is *developed*, this is where it is *published*. If you already run Storybook, keep it and add `--check` to CI — the drift gate is the part Storybook has no answer for.

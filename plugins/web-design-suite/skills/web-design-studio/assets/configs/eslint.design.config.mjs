@@ -18,7 +18,14 @@
  *   ];
  *
  * PEER DEPENDENCIES
- *   npm i -D eslint@^9 eslint-plugin-jsx-a11y
+ *   npm i -D eslint@^10 eslint-plugin-jsx-a11y
+ *
+ *   ESLint 9 reached end of life on 2026-08-06. eslint-plugin-jsx-a11y
+ *   6.10.2 declares a peer range that stops at ESLint 9, although its rules
+ *   run under ESLint 10. The suite's fixtures run this config on 10.4.0.
+ *   Until a release widens the range, tell npm in package.json:
+ *
+ *     "overrides": { "eslint-plugin-jsx-a11y": { "eslint": "$eslint" } }
  *
  * WHY LINT RULES AND NOT A STYLE GUIDE
  * ------------------------------------
@@ -112,7 +119,7 @@ const NUMERIC_SPACING =
  * `underline-offset-2`. Tailwind generates a bare number for these utilities
  * whatever the theme says, so `--*: initial` leaves them all working. A literal
  * duration also opts out of the reduced-motion tokens. Use the roles:
- * motion-hover, z-modal, border-default, the focus-ring utility. */
+ * motion-hover, z-modal, border-stroke, the focus-ring utility. */
 const LITERAL_UTILITY =
   /(?<![-\w])(?:duration|delay|-?z|border(?:-[xytrblse])?|ring|ring-offset|outline|outline-offset|underline-offset)-\d+(?:\.\d+)?(?![\w./-])/;
 
@@ -126,7 +133,7 @@ const OPACITY_MODIFIER =
  * `p-(--space-6)`, `bg-(--neutral-800)`. The same tier skip as a stock
  * palette class, spelled so the palette rule cannot see it. */
 const TIER1_SHORTHAND =
-  /\(--(?:space-(?!section|subsection|block|fluid)|neutral-|accent-|success-|warning-|danger-|info-|text-|leading-|weight-|shadow-)[\w-]*\)/;
+  /\(--(?:space-(?!section|subsection|block|fluid)|neutral-|accent-|success-|warning-|danger-|info-|text-|leading-|shadow-)[\w-]*\)/;
 
 /* LAW 2 — any outer margin utility except `auto`. `mx-auto` and `m-auto`
  * survive because centring is a container positioning ITSELF, not a child
@@ -296,12 +303,46 @@ const stylePropCustomPropertiesOnly = {
         }
         if (value.type !== 'JSXExpressionContainer') return;
 
-        const expr = value.expression;
-        if (expr.type !== 'ObjectExpression') {
-          context.report({ node: expr, messageId: 'notAnObject' });
-          return;
+        for (const expr of objectsOf(value.expression)) {
+          if (expr.type !== 'ObjectExpression') {
+            context.report({ node: expr, messageId: 'notAnObject' });
+            continue;
+          }
+          checkObject(expr);
         }
+      },
+    };
 
+    /* The value may be wrapped — `{…} as React.CSSProperties`, `satisfies`,
+     * `!`, parentheses — or chosen at runtime: `span ? { … } : undefined`,
+     * `on && { … }`, `a ?? { … }`. Check every object it can evaluate to;
+     * `undefined`, `null` and `false` set no style at all. */
+    function objectsOf(expr) {
+      if (!expr) return [];
+      switch (expr.type) {
+        case 'TSAsExpression':
+        case 'TSSatisfiesExpression':
+        case 'TSNonNullExpression':
+        case 'TSTypeAssertion':
+        case 'ParenthesizedExpression':
+          return objectsOf(expr.expression);
+        case 'ConditionalExpression':
+          return [...objectsOf(expr.consequent), ...objectsOf(expr.alternate)];
+        case 'LogicalExpression':
+          // `a && b` renders b or a falsy a; `a || b` and `a ?? b` either side.
+          return expr.operator === '&&'
+            ? objectsOf(expr.right)
+            : [...objectsOf(expr.left), ...objectsOf(expr.right)];
+        case 'Identifier':
+          return expr.name === 'undefined' ? [] : [expr];
+        case 'Literal':
+          return expr.value === null || expr.value === false ? [] : [expr];
+        default:
+          return [expr];
+      }
+    }
+
+    function checkObject(expr) {
         for (const prop of expr.properties) {
           if (prop.type === 'SpreadElement' || prop.type === 'ExperimentalSpreadProperty') {
             context.report({ node: prop, messageId: 'spread' });
@@ -330,8 +371,7 @@ const stylePropCustomPropertiesOnly = {
             });
           }
         }
-      },
-    };
+    }
   },
 };
 
@@ -532,7 +572,7 @@ const CORE_RESTRICTED_SYNTAX = [
         LITERAL_UTILITY,
         'Law 1 (tokens or nothing): a bare number in duration-*, delay-*, z-*, border-*, ring-* or *-offset-* is a literal. ' +
           'Tailwind generates these whatever the theme says, so the closed scale does not remove them. ' +
-          'Use the role: motion-hover / motion-enter, z-dropdown / z-modal, border-default / border-thick, focus-ring.'
+          'Use the role: motion-hover / motion-enter, z-dropdown / z-modal, border-stroke / border-thick, focus-ring.'
       ),
 
       ...forbidInClasses(
@@ -682,28 +722,28 @@ const componentConfig = {
 /* =========================================================================
  * PART 5 — TAILWIND PLUGIN SETTINGS
  * =========================================================================
- * `eslint-plugin-tailwindcss` (the `no-custom-classname` /
- * `enforces-shorthand` / `no-contradicting-classname` set) reads a v3
- * `tailwind.config.js` to learn the class universe. As of this writing its
- * stable release has NO Tailwind v4 support: there is no config file for it
- * to read, the theme lives in CSS, and pointing it at a v4 project makes it
- * report every one of our role classes as unknown. Turning it on against v4
- * produces hundreds of false errors and the team switches it off, which is
- * strictly worse than never having enabled it.
+ * `eslint-plugin-tailwindcss` has two lines, and they learn the class
+ * universe from different places (registry and README, 2026-09):
  *
- *   - ON TAILWIND v4: leave this disabled. The custom rules in Part 3 and
- *     the selector rules in Part 4 already cover arbitrary values,
- *     `!important`, off-scale spacing and stock palette classes — the four
- *     things the plugin would have caught. What you lose is
- *     `no-contradicting-classname` (`p-card px-inline-md` on one element)
- *     and `enforces-shorthand` (`pt-card pb-card` → `py-card`). Neither is
- *     a correctness bug; a design review catches both. Track the v4 branch
- *     and switch it on when it lands.
+ *   - 4.x (4.4.0) is made for Tailwind v4. It reads the CSS entry named by
+ *     `settings.tailwindcss.cssConfigPath`, the file that imports
+ *     tailwindcss and theme.css. `no-custom-classname` is the valuable rule
+ *     there: v4 generates nothing for a class that does not exist and says
+ *     nothing, so a misspelt role class ships as a silent no-op. The
+ *     suite's tests do not run this plugin, so read its report on your own
+ *     code before you make it an error.
  *
- *   - ON TAILWIND v3: uncomment the block. `no-custom-classname` is the
- *     valuable one — it is the only tool that catches a class that simply
- *     does not exist, which after `corePlugins: { space: false }` and a
- *     replaced scale is a large and useful set.
+ *   - 3.x reads a v3 `tailwind.config.js`. A v3 project must pin it
+ *     (`npm i -D eslint-plugin-tailwindcss@3`): an unpinned install now
+ *     brings 4.x, which requires tailwindcss ^4. After `corePlugins: {
+ *     space: false }` and a replaced scale, `no-custom-classname` catches a
+ *     large and useful set of classes that simply do not exist.
+ *
+ * Either way, the custom rules in Part 3 and the selector rules in Part 4
+ * already cover arbitrary values, `!important`, off-scale spacing and stock
+ * palette classes. The plugin adds `no-custom-classname`,
+ * `no-contradicting-classname` (`p-card px-inline-md` on one element) and
+ * `enforces-shorthand` (`pt-card pb-card` → `py-card`).
  *
  * `prettier-plugin-tailwindcss` is a separate, unconditional requirement
  * and works on both versions. Class ORDER is not enforced by this file and
@@ -716,6 +756,32 @@ const componentConfig = {
 
 // import tailwind from 'eslint-plugin-tailwindcss';
 //
+// Tailwind v4, eslint-plugin-tailwindcss@4:
+// const tailwindConfig = {
+//   name: 'design-laws/tailwind',
+//   files: ['**/*.{jsx,tsx}'],
+//   plugins: { tailwindcss: tailwind },
+//   settings: {
+//     tailwindcss: {
+//       // The entry that imports tailwindcss and theme.css (stack-tailwind.md §2).
+//       cssConfigPath: './src/styles/index.css',
+//       // Our own composers, so the plugin lints their string arguments too.
+//       functions: ['cn', 'clsx', 'classNames', 'cva', 'tv', 'twMerge', 'cx'],
+//     },
+//   },
+//   rules: {
+//     // Law 3: a class the theme does not generate is off the scale, and v4
+//     // drops it without a word.
+//     'tailwindcss/no-custom-classname': 'error',
+//     // Law 3: `p-card px-inline-md` — two rules for one box, last one wins,
+//     // and which one is last depends on Tailwind's internal sort order.
+//     'tailwindcss/no-contradicting-classname': 'error',
+//     // Readability: `pt-card pb-card` is `py-card`.
+//     'tailwindcss/enforces-shorthand': 'warn',
+//   },
+// };
+//
+// Tailwind v3, eslint-plugin-tailwindcss@3:
 // const tailwindV3Config = {
 //   name: 'design-laws/tailwind-v3',
 //   files: ['**/*.{jsx,tsx}'],
@@ -739,7 +805,7 @@ const componentConfig = {
 //     'tailwindcss/no-contradicting-classname': 'error',
 //     // Readability: `pt-card pb-card` is `py-card`.
 //     'tailwindcss/enforces-shorthand': 'warn',
-//     // Law 5: the plugin's own !important check, belt and braces.
+//     // Law 3: no arbitrary values. Part 3 bans them too; belt and braces.
 //     'tailwindcss/no-arbitrary-value': 'error',
 //   },
 // };

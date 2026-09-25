@@ -120,8 +120,8 @@ The file is a JSON array of violation keys. It only shrinks. Two rules keep it h
 2. **Never add an entry by hand.** If a genuine exception exists, it gets an inline pragma with a named reason, visible in review:
 
 ```css
-/* design-audit-ignore-next-line: L2 -- CMS-controlled flow container, see ADR-014 */
-.prose > * + * { margin-top: 1em; }
+/* design-audit-ignore-next-line: L2 -- CMS-controlled rich text, see ADR-014 */
+.cms-body h2 { margin-block-start: var(--space-subsection); }
 ```
 
 A pragma survives review because it is argued. A baseline entry survives review because nobody reads JSON.
@@ -132,6 +132,7 @@ A pragma survives review because it is argued. A baseline entry survives review 
 # pre-commit: only what you touched, fast, before the context switch —
 # web-design-studio's shipped hook, not a hand-written one
 cp <web-design-studio>/assets/configs/pre-commit-design-gate.sh .git/hooks/pre-commit
+cp <web-design-studio>/assets/configs/pre-commit-design-gate.sh .git/hooks/commit-msg
 
 # CI: everything, against the baseline
 python -m scripts.audit_design ./src
@@ -225,11 +226,13 @@ console.table(kids.slice(1).map((k, i) => ({
 **Step 3 — set the parent's gap to the measured value's nearest rung, chosen by relationship.**
 
 ```css
-/* before: two owners, unpredictable result */
+/* before: two owners, unpredictable result. example: before */
 .list { display: flex; flex-direction: column; }
 .list-item { margin-bottom: 16px; }
 .list-item:last-child { margin-bottom: 0; }   /* the tell */
+```
 
+```css
 /* after: one owner */
 .list { display: flex; flex-direction: column; gap: var(--gap-grouped); }
 ```
@@ -269,9 +272,11 @@ Inline styles cannot be codemodded, because moving a declaration into a styleshe
 Do them by hand, in batches of about ten components. The transformation is always the same shape:
 
 ```jsx
-/* before — five homes for one table cell */
+/* before — five homes for one table cell. example: before */
 <td style={{ padding: '9px 11px', color: '#333333' }}>{r.name}</td>
+```
 
+```tsx
 /* after — one home, in the stylesheet */
 <td className={styles.cell}>{r.name}</td>
 ```

@@ -255,6 +255,93 @@ class HookGuidance(unittest.TestCase):
                         self.assertNotIn("git diff --cached", block)
 
 
+def frontmatter(skill_md) -> dict[str, str]:
+    """The SKILL.md frontmatter's top-level `key: value` lines (all one-line)."""
+    text = skill_md.read_text(encoding="utf-8")
+    assert text.startswith("---\n"), f"{skill_md}: no frontmatter"
+    block = text[4:text.index("\n---\n", 4)]
+    return dict(re.match(r"([\w-]+):\s?(.*)", line).groups() for line in block.splitlines()
+                if re.match(r"[\w-]+:", line))
+
+
+class SkillFrontmatter(unittest.TestCase):
+    """XC-C5: every description parses as YAML and stays inside Claude Code's
+    1,024-character limit. An unquoted value with ": " is a YAML error; one
+    with " #" is silently cut at the #, which the first install hit."""
+
+    def test_every_skill_has_a_name_and_a_description_that_parse(self):
+        skills = sorted(SKILLS.glob("*/SKILL.md"))
+        self.assertEqual(len(skills), 13)
+        for skill_md in skills:
+            with self.subTest(skill=skill_md.parent.name):
+                fields = frontmatter(skill_md)
+                self.assertEqual(fields.get("name"), skill_md.parent.name)
+                description = fields.get("description", "")
+                self.assertTrue(description)
+                if description[:1] not in "\"'":
+                    self.assertNotIn(": ", description)
+                    self.assertNotIn(" #", description)
+                    self.assertNotIn(description[:1], "[]{}>|*&!%@`,?")
+                self.assertLessEqual(len(description), 1024)
+
+
+SHIPPED = sorted({p.stem for p in SKILLS.glob("*/scripts/*") if p.suffix in {".py", ".mjs"}},
+                 key=len, reverse=True)
+# A suite script however a doc spells its path: -m scripts.x, scripts/x.py,
+# "${CLAUDE_SKILL_DIR}/scripts/x.py", "$WDS/x.py", <skill>/scripts/x.mjs.
+SCRIPT_CALL = re.compile(r"\bscripts\.({0})\b|\b({0})\.(?:py|mjs)\b".format("|".join(SHIPPED)))
+NOT_SHELL = {"css", "scss", "tsx", "jsx", "ts", "js", "json", "html", "yaml", "yml", "sql", "mjs"}
+
+
+def documented_calls():
+    """(doc, script, flag, command) for every flag written after a suite script
+    in a shell block or an inline code span."""
+    for doc in doc_files():
+        text = doc.read_text(encoding="utf-8")
+        chunks = [body for lang, body in re.findall(r"^```(\w*)[^\n]*\n(.*?)^```", text, re.S | re.M)
+                  if lang.lower() not in NOT_SHELL]
+        chunks += [span for span in re.findall(r"`([^`\n]+)`", text) if SCRIPT_CALL.search(span)]
+        for chunk in chunks:
+            for line in re.sub(r"\\\n\s*", " ", chunk).splitlines():
+                for part in re.split(r"&&|\|\||[|;]", line.split(" #", 1)[0]):
+                    m = SCRIPT_CALL.search(part)
+                    if m:
+                        for flag in re.findall(r"(?<![\w-])(--[a-z][a-z0-9-]*)", part[m.end():]):
+                            yield doc, m.group(1) or m.group(2), flag, part.strip()
+
+
+class DocumentedFlags(unittest.TestCase):
+    """XC-C5, GT-A10: every flag a doc passes to a suite script is one that
+    script's own parser accepts (read from its --help)."""
+
+    def accepted(self) -> dict[str, set[str]]:
+        flags = {}
+        for script in sorted(SKILLS.glob("*/scripts/*")):
+            if script.suffix == ".py" and script.stem != "dtcg_values":
+                argv = [sys.executable, str(script), "--help"]
+            elif script.suffix == ".mjs" and NODE:
+                argv = [NODE, str(script), "--help"]
+            else:
+                continue
+            help_text = output(subprocess.run(argv, capture_output=True, timeout=60, env=env()))
+            subcommands = re.search(r"\{([a-z][\w,-]*)\}", help_text)
+            for sub in subcommands.group(1).split(",") if subcommands else ():
+                help_text += output(subprocess.run(argv[:-1] + [sub, "--help"], capture_output=True,
+                                                   timeout=60, env=env()))
+            flags[script.stem] = set(re.findall(r"--[a-z][a-z0-9-]*", help_text)) | {"--help"}
+        return flags
+
+    def test_every_documented_flag_exists(self):
+        accepted = self.accepted()
+        calls = list(documented_calls())
+        self.assertGreater(len(calls), 50)
+        for doc, script, flag, command in calls:
+            if script not in accepted:
+                continue                                    # a module, or node is absent
+            with self.subTest(doc=str(doc.relative_to(PLUGIN)), flag=flag, command=command[:90]):
+                self.assertIn(flag, accepted[script])
+
+
 class ScriptInvocation(TempDirTest):
     """XC-A8: the skills said `python -m scripts.X src/` and "run from the skill
     root" — `-m` needs the skill folder, `src/` means the project, and nothing

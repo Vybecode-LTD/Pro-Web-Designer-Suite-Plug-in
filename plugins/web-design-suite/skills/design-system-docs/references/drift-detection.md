@@ -37,10 +37,10 @@ Failure 3 is the one worth building the whole gate for. The other five are annoy
 
 ## 2. The baseline diff
 
-`system.json` is committed. Every CI run extracts a fresh one and compares.
+`docs/system.json` is committed. Every CI run extracts a fresh one from **the same source** and compares. Read a different set of paths and an unchanged repo reports drift. A missing baseline is an error (exit 2), not a quiet "prose only" pass.
 
 ```bash
-python -m scripts.extract_system styles/ src/ --out build/system.json
+python -m scripts.extract_system styles/ src/components/ --out build/system.json
 python -m scripts.build_docs build/system.json --baseline docs/system.json \
        --prose docs/prose --check
 ```
@@ -171,13 +171,17 @@ As a workflow:
 name: design-system-docs
 on: [pull_request]
 
+defaults:
+  run:
+    shell: bash            # one script for Linux, macOS and Windows runners
+
 jobs:
   docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.12" }
 
       - name: Audit the source
         run: python -m scripts.audit_design src/ --strict
@@ -203,7 +207,7 @@ jobs:
           python -m scripts.build_docs build/system.json \
             --baseline docs/system.json --prose docs/prose --check
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with: { name: docs-site, path: build/docs }
 ```

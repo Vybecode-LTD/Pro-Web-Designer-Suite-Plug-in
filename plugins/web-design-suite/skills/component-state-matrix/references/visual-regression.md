@@ -50,7 +50,7 @@ Every item here removes one class of false failure. Skipping any one of them wil
 Two that are **not** in the script and are yours to own:
 
 - **Fonts must be local.** A Google Fonts request that is slow or blocked renders a fallback face and diffs every text cell. Self-host, or embed as base64, or set `font-display: block` and wait. Never fetch a font over the network in a visual test.
-- **The browser build must be pinned.** Chromium 140 and Chromium 141 do not rasterise identically. Pin the Playwright version in `package-lock.json` and pin the browser binary in the image. A browser upgrade is a baseline-refresh event; plan it like one.
+- **The browser build must be pinned.** Chromium 140 and Chromium 141 do not rasterise identically. Pin the Playwright version in `package-lock.json` (`npm i -D -E playwright`) and install its own Chromium in CI (§7). A browser upgrade is a baseline-refresh event; plan it like one.
 
 ---
 
@@ -195,20 +195,28 @@ Run the auditor and the matrix as two gates in one job. They fail for different 
 name: design
 on: [pull_request]
 
+defaults:
+  run:
+    shell: bash            # one script for Linux, macOS and Windows runners
+
 jobs:
   gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
-      - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.12' }
 
-      # Deps. The browser is already in the image; never download one here.
+      # Deps, from the lockfile. playwright is an exact-pinned devDependency,
+      # and the browser is the Chromium it was built for, never the image's.
       - run: npm ci
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
 
       # Gate 1 — Law 9. The code is clean.
       - name: audit
@@ -232,7 +240,7 @@ jobs:
             --threshold 0.002
 
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: matrix-report
           path: build/matrix-report
@@ -241,7 +249,8 @@ jobs:
 Notes on that file, in order of how often they bite:
 
 - **`if: always()` on the artifact upload.** A report you can only download when the job passed is a report you can never use.
-- **`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`.** `snapshot_matrix.mjs` launches with an explicit `executablePath` and will never download. Set the env var anyway so `npm ci` does not either — otherwise every CI run pulls ~150 MB.
+- **The browser comes from the lockfile.** A baseline is only comparable with the browser that took it (§2). `npx playwright install chromium` installs the Chromium that the locked Playwright was built for, and `snapshot_matrix.mjs` tries it first. The runner image's own Chrome changes with each image release. The cache keeps the ~150 MB download to one per lockfile change. A Playwright upgrade is then a deliberate commit that refreshes the baselines, not something the runner image does to you.
+- **`shell: bash` under `defaults`.** The steps use `\` continuations, and a Windows runner's default shell is PowerShell.
 - **`--strict` on `generate_matrix`** fails the build on a state-coverage gap. Turn it on once the existing gaps are closed, not before; a permanently-red gate is a disabled gate.
 - **Two gates, not one job each.** They share the checkout and the deps, and a reviewer wants both results on one line.
 

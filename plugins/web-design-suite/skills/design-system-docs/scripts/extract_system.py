@@ -24,11 +24,14 @@ What it emits
 
 Usage
 -----
-    python -m scripts.extract_system styles/ src/components/ --out system.json
+    python -m scripts.extract_system styles/ src/components/ --out docs/system.json
     python -m scripts.extract_system --tokens styles/tokens.css \\
         --components "src/components/*.css" --props "src/components/*.tsx" \\
-        --prose docs/prose --out system.json
-    python -m scripts.extract_system styles/ src/ --out system.json --report
+        --prose docs/prose --out docs/system.json
+    python -m scripts.extract_system styles/ src/components/ --out build/system.json --report
+
+The committed baseline (docs/system.json) and every CI run must read the same
+source, or an unchanged repo reports drift.
 
 Contrast
 --------
@@ -1858,11 +1861,11 @@ def build_parser() -> argparse.ArgumentParser:
                     "from its own source into system.json.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  python -m scripts.extract_system styles/ src/components/ --out system.json
+  python -m scripts.extract_system styles/ src/components/ --out docs/system.json
   python -m scripts.extract_system --tokens styles/tokens.css \\
       --components "src/components/*.css" --props "src/components/*.tsx" \\
-      --prose docs/prose --out system.json --report
-  python -m scripts.extract_system styles/ --out system.json --strict
+      --prose docs/prose --out docs/system.json --report
+  python -m scripts.extract_system styles/ src/components/ --out build/system.json --strict
 """)
     ap.add_argument("paths", nargs="*", default=[],
                     help="Files, directories or globs. Anything matching tokens.css / "

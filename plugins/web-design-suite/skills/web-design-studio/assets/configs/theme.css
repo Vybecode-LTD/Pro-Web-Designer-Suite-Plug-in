@@ -221,6 +221,7 @@
   --color-raised:      var(--bg-raised);    /* bg-raised   menus, popovers  */
   --color-sunken:      var(--bg-sunken);    /* bg-sunken   wells, inputs    */
   --color-inverse:     var(--bg-inverse);   /* bg-inverse  tooltips         */
+  --color-scrim:       var(--bg-scrim);     /* bg-scrim    behind a modal   */
 
   /* Interaction overlays. Translucent, so they compose over ANY surface —
      this is why no component needs a per-variant hover color. Reach for
@@ -723,10 +724,14 @@
 /* ---- Stroke widths ------------------------------------------------------
    Tailwind's border widths are bare numbers, not theme-backed, so `border`
    is 1px by literal. These name the four strokes the system actually has.
+   The default width is `border-stroke`, not `border-default`: the colour
+   `--color-default` (body text) already generates a `border-default`, and
+   two utilities with one name both apply, so the width would also paint
+   the border in body-text colour. Border colours are `border-line*`.
    ------------------------------------------------------------------------- */
 
 @utility border-hairline { border-width: var(--stroke-hairline); }
-@utility border-default  { border-width: var(--stroke-default); }
+@utility border-stroke   { border-width: var(--stroke-default); }
 @utility border-thick    { border-width: var(--stroke-thick); }
 
 /* ---- Focus ring ---------------------------------------------------------

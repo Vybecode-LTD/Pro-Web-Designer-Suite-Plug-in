@@ -63,6 +63,7 @@ An interpolation that *holds* a literal — `` background: ${tones.error}; `` wi
 `style={{ … }}`, brace-matched, parsed as an object literal. Three value shapes, three behaviours:
 
 ```jsx
+// example: illustration — the three value shapes the census reads
 style={{ marginTop: 13 }}            // bare number: React appends px → "13px"
 style={{ padding: '11px 15px' }}     // string: parse as a CSS value, both slots
 style={{ zIndex: 10 }}               // React does NOT append px here
@@ -250,6 +251,7 @@ Snap to the type scale — 11, 12, 14, 16, 18, 22, 28, 35, 44 px — with the sa
 The replacement is a **whole-declaration rewrite**, not a value swap:
 
 ```css
+/* example: illustration — before and after, side by side */
 /* before */                      /* after */
 font-size: 15px;                  font: var(--type-body);
 ```
@@ -298,6 +300,7 @@ A `0 0 0 3px rgba(...)` with no blur is a **focus ring**, not an elevation. It b
 But the token they map to depends on the shape of the declaration:
 
 ```css
+/* example: illustration — each line reads before → after */
 /* A complete transition collapses to the Tier-2 PAIR */
 transition: opacity 250ms ease-out;   →   transition: opacity var(--motion-enter);
 
@@ -350,6 +353,7 @@ Exclude it from the census by default so the estimate is honest. Run once with `
 ### Values that exist only to cancel other values
 
 ```css
+/* example: before — what the census finds */
 .card { padding: 16px; }
 .card__media { margin: -16px -16px 16px; }   /* bleed to the edge */
 ```

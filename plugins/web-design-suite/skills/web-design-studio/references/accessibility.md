@@ -1,6 +1,6 @@
 # Accessibility
 
-WCAG 2.2 Level AA is the floor. It is the legal baseline in the EU (EN 301 549 / European Accessibility Act), the practical baseline for US ADA Title II and Section 508, and what every procurement questionnaire asks about. **Treat it as a floor, not a goal.** A page can pass every AA success criterion and still be miserable to use with a screen reader — AA does not require that focus order be *sensible*, only that it be programmatically determined; it does not require that an error message be *useful*, only that it exist.
+WCAG 2.2 Level AA is this suite's floor. The legal baselines are older, and it is worth knowing which (checked 2026-09-25). In the EU, the European Accessibility Act's harmonised standard is EN 301 549 v3.2.1, which is WCAG 2.1 AA. v4.1.1, which moves to WCAG 2.2, was published on 2026-09-02 and takes over once the Official Journal cites it. US ADA Title II requires WCAG 2.1 AA, from 2027-04-26 for public entities of 50,000 people or more and from 2028-04-26 for smaller ones. Section 508 is WCAG 2.0 AA. Meeting 2.2 AA covers all three, and it is what procurement questionnaires increasingly ask about. **Treat it as a floor, not a goal.** A page can pass every AA success criterion and still be miserable to use with a screen reader — AA does not require that focus order be *sensible*, only that it be programmatically determined; it does not require that an error message be *useful*, only that it exist.
 
 This file is the executable version of Law 9: nothing ships un-audited. It uses the tokens in `assets/starter/styles/tokens.css` as ground truth and defers to `references/color-system.md` for all contrast arithmetic.
 
@@ -257,8 +257,8 @@ A modal dialog must trap focus; nothing else should. Use the platform:
 - **Never trap focus in a non-modal thing.** A dropdown, a carousel and a video player must all let Tab out (2.1.2). A menu closes on Tab; it does not swallow it.
 
 ```css
-/* Add to your project's tokens.css, Tier 2 — the starter has no scrim role,
-   and Law 1 forbids the literal at the call site. */
+/* The scrim is a Tier-2 role in the starter's tokens.css, so no call site
+   holds the literal (Law 1). */
 :root { --bg-scrim: oklch(0% 0 0 / 0.5); }
 
 .dialog { z-index: var(--z-modal); box-shadow: var(--elevation-modal); }
@@ -269,22 +269,26 @@ A modal dialog must trap focus; nothing else should. Use the platform:
 
 2.4.1. One link, first in the DOM, visible on focus, pointing at `<main>`.
 
+<!-- snippet: layout.css#skip-link -->
 ```css
+/* Skip link. Present in the DOM, off-screen until focused. Never
+   `display: none` — that removes it from the tab order, which is the one
+   thing it exists for. */
 .skip-link {
   position: absolute;
-  inset-block-start: var(--space-2);
-  inset-inline-start: var(--space-2);
-  z-index: var(--z-modal);            /* must clear the sticky header */
-  padding: var(--pad-block-sm) var(--pad-inline-md);
-  background: var(--bg-surface);
+  inset-block-start: var(--space-0);
+  inset-inline-start: var(--space-0);
+  z-index: var(--z-toast);
+  padding: var(--pad-block-md) var(--pad-inline-md);
+  font: var(--type-ui);
   color: var(--fg-default);
+  background: var(--bg-surface);
   border-radius: var(--radius-md);
   box-shadow: var(--elevation-overlay);
-  font: var(--type-ui);
-  transform: translateY(-200%);
-  transition: transform var(--motion-enter);
+  translate: 0 -150%;
+  transition: translate var(--motion-enter);
 }
-.skip-link:focus { transform: none; }
+.skip-link:focus-visible { translate: 0 0; }
 ```
 
 Move it off-screen with `transform`, not `display: none` (which makes it unfocusable) and not `visibility: hidden`. Target `<main id="main" tabindex="-1">` — without `tabindex="-1"` the anchor scrolls but focus stays behind in most browsers.
@@ -294,7 +298,7 @@ Move it off-screen with `transform`, not `display: none` (which makes it unfocus
 A sticky header or a cookie bar that covers a focused control fails at AA. Two fixes, both cheap:
 
 ```css
-:root { scroll-padding-block-start: var(--space-16); } /* clears a sticky header */
+:root { scroll-padding-block-start: var(--nav-offset); } /* the header's height, published once: navigation-patterns.md §4 */
 ```
 
 `scroll-padding` makes the browser's own scroll-into-view leave room. Then **tab through the entire page with the header sticky and a cookie banner open** and watch for a ring that disappears. Sticky *footers* and chat launchers are the most-missed case.
@@ -350,7 +354,7 @@ The arithmetic, the thresholds table, gamut handling and the APCA discussion all
 
 ### The five places teams fail
 
-1. **Placeholder text.** It is text, and 1.4.3 applies at 4.5:1 — there is no exemption. The starter's `--fg-subtle` (`--neutral-500`) measures **4.07:1 on `--bg-canvas`** and 4.29:1 on `--bg-surface`. Both fail. `color-system.md` §6 logs this as a live audit finding; the fix is to point `--fg-subtle` at `--neutral-600` (6.35:1). Also: **placeholder is not a label** (§6), so the correct fix is often to delete it.
+1. **Placeholder text.** It is text, and 1.4.3 applies at 4.5:1 — there is no exemption. The starter's `--fg-subtle` (`--neutral-500`) clears it only because its ramp step was darkened for the purpose: 4.91:1 (--neutral-500 on --neutral-50) on the canvas and 4.60:1 (--neutral-500 on --neutral-100) on the sunken well, its worst light surface. `check_roles.py` holds it there (`color-system.md` §6). Also: **placeholder is not a label** (§6), so the correct fix is often to delete it.
 2. **Disabled state.** Genuinely exempt from 1.4.3 — but only if the control is genuinely inactive. A control that looks disabled and still works, or a "disabled" submit button that is the only feedback about an invalid form, is not exempt and is a usability failure regardless. `--fg-disabled` (`--neutral-400`, 2.53:1) is only legitimate on `disabled`/`aria-disabled` controls.
 3. **Focus rings.** Covered by 1.4.11 at AA and by 2.4.13's 3:1 focused-vs-unfocused requirement. The focus ring (`--border-focus`) clears it at 4.23–4.92:1 (§3). The failure mode is a custom ring that only exists in one theme.
 4. **Icon-only buttons.** The icon *is* the affordance, so 1.4.11's 3:1 applies to the glyph against its background. A `--fg-muted` (`--neutral-600`, 6.35:1) icon is fine; a `--border-default` (`--neutral-300`, 1.51:1) one is not. Icon-only controls also need an accessible name (§9).
@@ -647,7 +651,7 @@ npx pa11y-ci --sitemap https://example.com/sitemap.xml
 
 Also run axe DevTools or WAVE in the browser on each template, and enable `eslint-plugin-jsx-a11y` (or the framework equivalent) so the cheapest class of error never reaches a branch.
 
-**Automation catches roughly 30–40% of WCAG issues** — the commonly cited band, and consistent with what every audit finds when it re-tests an "axe-clean" site. (Deque reports higher figures for their guided-test flows, which involve a human answering questions; that is not the same as running the scanner.) A clean axe report means the machine-checkable subset passes. It does not mean the page is accessible.
+**Automation finds well under half of the barriers.** In the one controlled study, the best single tool found 37–41% of 143 planted barriers (GDS, 2017), which is consistent with what every audit finds when it re-tests an "axe-clean" site. (Deque's 57%, 2021, is a different quantity: issues counted by volume, not barriers or criteria.) By criterion, a tool fully decides 7 of the 55 A and AA criteria and part of 31 more (`a11y-audit-runner/references/automation-coverage.md` §3). A clean axe report means the machine-checkable subset passes. It does not mean the page is accessible.
 
 **What automation reliably catches:** missing `alt`, missing form labels, text contrast against a solid background, empty buttons and links, missing `lang`, duplicate IDs, invalid ARIA attribute names and values, ARIA references that point at nothing, missing document title, positive `tabindex`.
 
@@ -693,4 +697,4 @@ Put `axe-core` in the component test suite (`jest-axe`, `cypress-axe`, `@axe-cor
 | `role="button"` on an `<a href>` | Removes the link announcement, breaks middle-click, right-click and "copy link address", and Space now does two contradictory things |
 | Live region added to the DOM at the same moment as its content | The region must exist *before* the content changes, or nothing is announced. Render empty regions up front |
 | "Accessible" mode as a separate page or widget overlay | Separate but unequal, always out of date, and overlays measurably make things worse. Fix the page |
-| Shipping on an axe-clean report alone | Covers ~30–40% of the criteria. §10 |
+| Shipping on an axe-clean report alone | Finds well under half of the barriers, and fully decides 7 of the 55 A and AA criteria. §10 |

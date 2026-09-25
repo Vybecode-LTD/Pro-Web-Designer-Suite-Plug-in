@@ -146,35 +146,46 @@ Treat either as a **starting point, not a truth.** A curve knows nothing about t
 
 | Element | Space above | Space below | Ratio |
 |---|---|---|---|
-| `h2` (section) | `--space-subsection` (40→88px) | `--gap-related` (12px) | ~4:1 |
+| `h2` (section) | `--space-subsection` (40→88px) | `--gap-related` (12px) | 3:1 → 7:1 |
 | `h3` (subsection) | `--gap-distinct` (40px) | `--gap-related` (12px) | ~3:1 |
-| `h4` (minor) | `--gap-separate` (24px) | `--gap-related` (12px) | 2:1 |
+| `h4`–`h6` (minor) | `--gap-separate` (24px) | `--gap-related` (12px) | 2:1 |
 | `p` → `p` | `--space-block` (24→48px) | — | — |
 
 Aim for **at least 2:1**, and more as the heading grows.
 
+The rhythm is layout.css's, shared by `.prose` and `.flow`:
+
+<!-- snippet: layout.css#flow -->
 ```css
-@layer base {
-  .prose {
-    max-inline-size: var(--measure-prose);
-    font: var(--type-body);
-    color: var(--fg-default);
-    text-wrap: pretty;
-  }
+:is(.flow, .prose) {
+  --flow-gap: var(--space-block);
+}
+:is(.flow, .prose) > * + * { margin-block-start: var(--flow-gap); }
 
-  /* The owl. Every element that FOLLOWS a sibling gets the flow gap; the
-     first child gets nothing, so .prose never pushes on its own parent. */
-  .prose > * + * { margin-block-start: var(--space-block); }
+/* A heading belongs to the thing it introduces: far from what came before,
+   scaled to its rank, and close to what follows. Proximity does the work a
+   horizontal rule would otherwise do. Above to below is at least 2:1 at
+   every width: h2 40→88 : 12, h3 40 : 12, h4 24 : 12. */
+:is(.flow, .prose) > * + h2 { margin-block-start: var(--space-subsection); }
+:is(.flow, .prose) > * + h3 { margin-block-start: var(--gap-distinct); }
+:is(.flow, .prose) > * + :is(h4, h5, h6) { margin-block-start: var(--gap-separate); }
 
-  /* Anything directly after a heading sits CLOSE to it. */
-  .prose > :is(h2, h3, h4) + * { margin-block-start: var(--gap-related); }
+/* Written after the heading rules, at equal specificity, so a heading that
+   follows a heading takes this tight gap too: two stacked headings are a
+   title and its subtitle, not two sections. */
+:is(.flow, .prose) > :is(h1, h2, h3, h4, h5, h6) + * {
+  margin-block-start: var(--gap-related);
+}
 
-  /* Headings get more room above, scaled to rank. Declared after the rule
-     above so heading-after-heading resolves to the larger space. */
-  .prose > * + h2 { margin-block-start: var(--space-subsection); }
-  .prose > * + h3 { margin-block-start: var(--gap-distinct); }
-  .prose > * + h4 { margin-block-start: var(--gap-separate); }
+/* An <hr> means "the subject changes": subsection weight on both sides. */
+:is(.flow, .prose) > * + hr,
+:is(.flow, .prose) > hr + * { margin-block-start: var(--space-subsection); }
+```
 
+The headings inside long-form text, beside `.prose` in layout.css (its one home):
+
+```css
+@layer layout {
   .prose > :is(h2, h3, h4) { color: var(--fg-strong); }
   .prose > h2 { font: var(--type-h2); letter-spacing: var(--tracking-tight); }
   .prose > h3 { font: var(--type-h3); letter-spacing: var(--tracking-tight); }
@@ -243,10 +254,12 @@ Default to `swap` and kill the reflow with metric-matched fallbacks. `optional` 
 Use `font-variation-settings` only for axes with no high-level property (`GRAD`, custom axes), and set every axis you care about in that one declaration.
 
 ```css
-/* Wrong: the child resets weight to the file default. */
+/* Wrong: the child resets weight to the file default. example: wrong */
 .card        { font-variation-settings: "wght" 600; }
 .card__title { font-variation-settings: "opsz" 32; }
+```
 
+```css
 /* Right: high-level for wght, low-level only for what has no property. */
 .card        { font-weight: var(--weight-semibold); }
 .card__title { font-variation-settings: "opsz" 32; }
@@ -347,7 +360,7 @@ c = 44 − 0.026415 × 380 = 33.962px        → 2.1226rem
 
 `generate_type_scale.py --fluid 380 1440` emits exactly this with the algebra in a comment beside it. **The intercept must be in `rem`, not `px`:** a pure-`vw` middle term ignores the user's font-size preference entirely and fails WCAG 1.4.4.
 
-**Sanity-check the shipped tokens.** The fluid *spacing* tokens declare 380→1440 and their `vw` coefficients are exact for it (0.755 / 2.264 / 4.528 / 7.547), but the intercepts run ~1% low — the curve holds the right slope about 1.5px under target at the widest step. The clamp bounds absorb it at both ends, so it is cosmetic. The fluid *type* tokens use different, undeclared anchors: their lines hit the min at ~400px and the max at ~1015–1020px, so display type stops growing at laptop width. That is defensible — hero type that keeps growing past 1440px becomes a billboard — but it is undocumented, and two anchor pairs in one file is how a system drifts. Pick one pair, write it down, regenerate both.
+**The shipped tokens hold to this.** Every fluid step in tokens.css, spacing and type, is solved for 380→1440: put its `c` and `m` back into `size(vw)` and it reaches its minimum at 380px and its maximum at 1440px. The suite's tests solve each one on every change, because a clamp whose intercept is a little low still looks plausible, and meets its bounds 20px late. One anchor pair per file: two pairs is how a system drifts.
 
 **Fluid is right for** display and hero type (110px is right on a 27" monitor and absurd on a 390px phone — this is the whole use case), section headings that would otherwise need two breakpoints, and page-level gutters and section rhythm.
 
@@ -380,10 +393,10 @@ This is why `--type-*` roles are composite `font` shorthands: each bundles size,
 | Requirement | What it means for type | WCAG |
 |---|---|---|
 | Body ≥ 16px | `--text-base` is the floor for reading copy; sub-16px forces mobile zoom and triggers iOS input auto-zoom | practice |
-| Resize to 200% | All content and function available with text at 200% — achieved by sizing in `rem`/`ch`, never `px` | 1.4.4 A |
+| Resize to 200% | All content and function available with text at 200% — achieved by sizing in `rem`/`ch`, never `px` | 1.4.4 AA |
 | Reflow at 320px | No horizontal scroll at 320 CSS px (= 1280px at 400% zoom): single column, `max-inline-size` in `ch` | 1.4.10 AA |
 | Text-spacing overrides | Content survives user-applied line-height 1.5×, paragraph spacing 2×, letter-spacing 0.12em, word-spacing 0.16em | 1.4.12 AA |
-| Never disable user font size | No `user-scalable=no`, no `maximum-scale=1`, no `px` root font size | 1.4.4 A |
+| Never disable user font size | No `user-scalable=no`, no `maximum-scale=1`, no `px` root font size | 1.4.4 AA |
 | Avoid text in images | Image text does not scale, reflow, restyle, translate or get read aloud — use SVG text or real text over the image | 1.4.5 AA |
 
 **Pass 1.4.12 by construction.** It is the criterion that catches fixed-height components: a user stylesheet forcing `line-height: 1.5` on a button whose height you fixed at 40px clips the label. Give controls `min-block-size`, never `block-size`; let padding and line-height determine height; never combine a fixed height with `overflow: hidden` on text. `--leading-normal` is already 1.6, so body copy passes unchanged — it is the *components* that fail this.

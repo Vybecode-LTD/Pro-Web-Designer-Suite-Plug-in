@@ -479,7 +479,7 @@ A real data table — a receipt's line items, arguably — is the one exception,
 
 **4. Semantic headings in order.** One `<h1>`, then `<h2>`, then `<h3>` — no levels skipped. Screen reader users navigate an email by heading exactly as they navigate a page. A `<p>` styled to look like a heading is invisible to that.
 
-**5. Link text that works out of context.** A screen reader can list every link in the message with no surrounding prose. "Read more" six times is six identical rows. `lint_email.py` treats this as an error, because SC 2.4.4 (Link Purpose) is Level A.
+**5. Link text that works out of context.** A screen reader can list every link in the message with no surrounding prose. "Read more" six times is six identical rows. `lint_email.py` treats this as an error. That is this skill's choice, not Level A: SC 2.4.4 (Level A) lets the surrounding sentence explain a link, and the rule for links read out of context is 2.4.9 (Link Only), Level AAA. Email readers list links out of context all the time, so the skill holds 2.4.9.
 
 **6. Measured contrast.** 4.5:1 for body text, 3:1 for large text (24px, or 18.66px bold). Email is read on phones in sunlight more than any other medium, so the floor really is a floor. Every role pair in `assets/email-tokens.json` carries its measured ratio; `lint_email.py` re-measures the built file.
 
@@ -513,7 +513,7 @@ A real data table — a receipt's line items, arguably — is the one exception,
 | A layout table without `role="presentation"` | Every nested table is announced before any content. |
 | 11px legal text | iOS Mail enlarges it per element and breaks the alignment. |
 | `!important` in an inline style, written as `! important` | Yahoo strips `!important` when it has a space before it. |
-| A CSS comment in the retained `<style>` block | Yahoo desktop ignores every rule *after* a comment. The compiler strips them. |
+| A CSS comment in the retained `<style>` block | Bytes against Gmail's style limit. (Yahoo desktop used to ignore every rule after a comment; that no longer reproduces.) The compiler strips them. |
 | A dark-designed email | A client that force-inverts turns it light, with your dark-mode logo assets still in it. |
 | Hand-writing a hex in a template | Law 1. The compiler exists so you never have to. |
 

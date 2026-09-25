@@ -137,8 +137,9 @@ The escape hatch. It emits the class name unhashed.
 /* Legitimate: styling DOM you do not own. */
 .root :global(.flatpickr-day.selected) { background-color: var(--bg-accent); }
 
-/* Legitimate: a portal target rendered outside this tree. */
-:global(#toast-root) .toast { … }
+/* Legitimate: a portal target rendered outside this tree. Give the target a
+   class as well as its id, and select the class: no ID specificity. */
+:global(.toast-root) .toast { … }
 
 /* Legitimate: an animation a third-party library triggers by name. */
 :global {

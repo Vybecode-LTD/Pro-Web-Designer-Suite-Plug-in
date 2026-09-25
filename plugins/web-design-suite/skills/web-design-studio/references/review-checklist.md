@@ -46,7 +46,7 @@ later groups are looking at.
 | # | Look at | Failure signature |
 |---|---|---|
 | 1.1 | Run `python -m scripts.audit_design` (or `npm run design:audit`) | Any finding. Not "only warnings" — any finding |
-| 1.2 | Grep the diff for `#`, `px`, `rem`, `ms`, `%` outside `tokens.json` and generated files | A literal in a component rule. `0`, `1px`, `100%` count — they are `--space-0`, `--stroke-hairline`, and usually a layout mistake |
+| 1.2 | Grep the diff for `#`, `px`, `rem`, `ms`, `%` outside `tokens.json` and generated files | A literal in a component rule. `0` is the one literal every gate accepts; `1px` is `--stroke-hairline`, and `100%` is usually a layout mistake |
 | 1.3 | Grep component files for `--space-`, `--neutral-`, `--accent-`, `--text-`, `--success-` etc. | A Tier 1 token read by a component. Skipped a tier; the rebrand will miss it |
 | 1.4 | Tier 3 tokens in the component's first block | `--btn-pad-x: 12px` — Tier 3 sourced from a literal instead of Tier 2 |
 | 1.5 | `git diff` on generated `tokens.css` / `tokens.ts` | Changed without a matching `tokens.json` change. Someone hand-edited a generated file |
@@ -110,7 +110,7 @@ later groups are looking at.
 | # | Look at | Failure signature |
 |---|---|---|
 | 6.1 | Render at 320, 390, 768, 1024, 1440, 1920 | Anything clipped, overlapping, or stranded. 320 is where fixed widths die; 1920 is where centred content looks abandoned |
-| 6.2 | Browser at 200% zoom, 1280px viewport | Content lost or requiring two-axis scrolling. This is WCAG 1.4.10, and it is the check that catches fixed heights |
+| 6.2 | Browser at 200% zoom, 1280px viewport | Text clipped, overlapping or cut off by a fixed height. This is WCAG 1.4.4, and it is the check that catches fixed heights. Then 400% zoom, a 320px viewport, for reflow (1.4.10): no two-axis scrolling |
 | 6.3 | Horizontal overflow at every width | A scrollbar at the document level. Usual causes: a fixed `width` in px, `100vw` with a scrollbar present, an unwrapped long string, a negative margin |
 | 6.4 | Where the breakpoints are | A breakpoint at a device name rather than where the content actually broke. Two-column-to-one at "iPad" instead of at the width where the measure went too narrow |
 | 6.5 | Grid/flex children | A fixed `width` where `minmax()`/`flex` belongs. Fixed widths are how a layout survives 1440 and fails 1180 |

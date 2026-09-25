@@ -132,7 +132,7 @@ Fourteen steps, of which perhaps six are unavoidable. For each one ask, in order
 
 The highest-density source of real evidence in this whole field, because forms have been studied to death. Use it.
 
-**Field count.** Baymard's benchmark work finds the average e-commerce checkout carries about **11.3 form fields** while most sites need roughly **8**. The generalisable principle is not the numbers, it is the mechanism: **every field is a decision, a keystroke and an opportunity to abandon, and the ones you cannot justify are pure loss.** Baymard's own abandonment research (a documented ~**70%** average across 50 studies, 2006–2025) puts *required account creation* and *an overly long or complex checkout* among the top stated reasons. On a landing page, the equivalent is a signup form asking for company size before the product has been seen.
+**Field count.** Baymard's checkout research finds the average US checkout shows **14.88 form fields** by default (23.48 form elements), where an ideal flow needs **7–8**. The generalisable principle is not the numbers, it is the mechanism: **every field is a decision, a keystroke and an opportunity to abandon, and the ones you cannot justify are pure loss.** Baymard's own abandonment research (a documented ~**70%** average across 50 studies) puts *required account creation* and *an overly long or complex checkout* among the top stated reasons. On a landing page, the equivalent is a signup form asking for company size before the product has been seen.
 
 **The procedure.** For each field: *what breaks if I delete this?* If the answer is "our CRM has a blank column", delete it. Marketing's reporting convenience is not worth a percentage point of signups; the data can be collected later, in-product, from someone who has already converted.
 
@@ -278,3 +278,22 @@ python -m scripts.audit_design <path>      # from web-design-studio
 ---
 
 Related: `references/page-architecture.md` (the ladder the scroll review is measured against), `references/copy-patterns.md` (the rewrites this audit prescribes), and `web-design-studio`'s `references/accessibility.md` and `references/review-checklist.md` for the design-side gate.
+
+---
+
+## 11. Dark patterns, as the law names them
+
+These have names because regulators gave them names. In the **EU**, dark patterns fall under the Unfair Commercial Practices Directive — misleading actions and omissions (Arts. 6–7), aggressive practices (Arts. 8–9), and the Annex I blacklist, which includes falsely stating a product is available for a very limited time. The **Digital Services Act Art. 25** additionally prohibits online platforms from designing interfaces that deceive or manipulate users, and a proposed Digital Fairness Act would tighten this further. In the **US**, the FTC has brought dark-pattern and negative-option cases under the FTC Act and ROSCA, which requires clear disclosure of material terms, express informed consent, and a simple cancellation mechanism. (Be precise about this one: the FTC's 2024 "click-to-cancel" Negative Option Rule was **vacated** by the Eighth Circuit in July 2025, and the FTC restarted rulemaking in early 2026 — so the specific rule is not in force, but ROSCA and Section 5 enforcement are, and several US states have their own automatic-renewal statutes. "The rule got struck down" is not a defence.)
+
+---
+
+## 12. The ranking that holds up most often
+
+1. The page does not say what it is within one screen. *(Rewrite the hero. Costs an afternoon, changes everything downstream.)*
+2. An objection is unanswered and the reader hits the CTA without an answer. *(Add the section. Usually FAQ or pricing.)*
+3. The form asks for more than the next step requires. *(Delete fields. The cheapest change on this list.)*
+4. The proof is generic. *(Get one real, attributed, specific testimonial. Costs an email.)*
+5. LCP is slow because the hero image is unoptimised. *(Half a day, mechanically certain.)*
+6. Everything else.
+
+Button colour is not on the list. It is not that colour never matters — contrast and visual hierarchy matter a great deal, and `web-design-studio`'s `references/color-system.md` owns that — but "change the button to orange" as a *conversion* intervention is the most-repeated piece of folklore in this field and the least supported.

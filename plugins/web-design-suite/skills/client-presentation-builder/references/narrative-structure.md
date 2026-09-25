@@ -29,7 +29,7 @@ same question. Answer the wrong one and everything afterwards is heard as avoida
 | **Client marketing lead** | "Will this do the job I will be measured on?" | The mechanism by which it produces leads, sign-ups, bookings | Craft talk. Optical alignment does not appear on their dashboard |
 | **Client developer** | "Can I maintain this after you leave?" | The system: tokens, components, states, the gate | Vision language. They have inherited three of those and they all rotted |
 | **Agency creative director** | "Is this good, and is it *ours*?" | Your judgement — the calls, the rejected options | Justification by data alone. A deck of numbers reads as a designer who cannot see |
-| **The absent decision-maker** | (nothing, yet) | — | Everything. §2 and `objection-handling.md` §8 |
+| **The absent decision-maker** | (nothing, yet) | — | Everything. §2 and `objection-handling.md` §7 |
 
 ### 1.1 The client's decision-maker
 
