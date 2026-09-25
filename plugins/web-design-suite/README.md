@@ -93,7 +93,9 @@ web-design-studio beside any of them. (No packaged `.skill` files ship yet.)
 
 ---
 
-Every script is plain Python 3 (or Node for the three browser scripts). Run them
+Every script is plain Python and needs **Python 3.10 or newer**; the three browser
+scripts need Node instead. The lint configs need Node 20.19 or newer, because
+stylelint 17 and ESLint 10 do. Run the scripts
 **by path, from your project's root**, so `src/` means your `src/` and every output
 lands in your project, never inside the plugin. Below, `WDS` is the plugin's
 `skills` folder (for a local install, `~/.claude/local-marketplaces/web-design-suite/skills`).
@@ -150,13 +152,19 @@ Adopt it on a legacy repo with `--write-baseline`: the gate goes on today and th
 
 ## Regression tests
 
-The suite's own tests live in `tests/` and need only Python 3; git and a POSIX `sh` for the hook and recipe tests; Node for the browser-script tests. From the plugin root:
+The suite's own tests live in `tests/` and need Python 3.10 or newer (they run on 3.10 to 3.14); git and a POSIX `sh` for the hook and recipe tests; Node for the browser-script and real-tool tests. From the plugin root:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-Set `WDS_PLUGIN_ROOT` to run the same tests against another copy of the suite — that is how every fix is shown failing on the release before it. The real-browser tests (runtime contrast, modal and iframe focus, the matrix's state check, the starter CSS in Chromium) run when `WDS_NODE_MODULES` points at a `node_modules` holding `playwright` and `axe-core`; they never download a browser. What changed in each release is in `CHANGELOG.md`.
+Set `WDS_PLUGIN_ROOT` to run the same tests against another copy of the suite — that is how every fix is shown failing on the release before it. Two kinds of tests need tools from npm:
+- The real-browser tests (runtime contrast, modal and iframe focus, the matrix's state check, the starter CSS in Chromium) run when `WDS_NODE_MODULES` points at a `node_modules` holding `playwright` and `axe-core`. They never download a browser.
+- The real-tool tests run the shipped ESLint, stylelint and Tailwind configs through the real tools. They take their tools from `WDS_ESLINT_MODULES`, `WDS_STYLELINT_MODULES`, `WDS_TAILWIND_MODULES` and `WDS_TAILWIND_V3_MODULES`; `tests/test_real_tools.py` says what each must hold.
+
+In the plugin's repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3` installs every one of those tools at pinned versions, and the tests find them without any variable set.
+
+What changed in each release is in `CHANGELOG.md`.
 
 ---
 

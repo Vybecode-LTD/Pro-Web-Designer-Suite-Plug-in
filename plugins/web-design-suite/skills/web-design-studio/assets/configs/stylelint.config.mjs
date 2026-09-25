@@ -16,8 +16,9 @@
  *   each nested selector as written instead of desugaring it, and `&` takes
  *   the largest specificity in its parent's list. So the limits apply per
  *   written selector, and `max-nesting-depth` caps the nesting itself.
- *   (stylelint.io/migration-guide/to-17. The suite's own tests do not run
- *   stylelint yet, so re-check these limits on your code after upgrading.)
+ *   (stylelint.io/migration-guide/to-17. The suite's tests run this file
+ *   through stylelint 17.15 with stylelint-config-standard 40.0, over the
+ *   starter's own stylesheets.)
  *
  *   package.json
  *     "lint:css": "stylelint \"src/**\/*.css\" \"packages/**\/*.css\""
@@ -232,9 +233,36 @@ const VAR_ONE = String.raw`/^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$/`;
 const CANCEL = String.raw`/^calc\(\s*(?:var\(--[a-z0-9-]+\)\s*\*\s*-1|-1\s*\*\s*var\(--[a-z0-9-]+\))\s*\)$/`;
 const VAR_CALC = String.raw`/^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$/`;
 
+/* RING      0 0 0 var(--width) var(--colour)
+ *           A spread ring with no offset and no blur, built only from
+ *           tokens: the focus ring's gap in reset.css. It is an outline drawn
+ *           with box-shadow, not elevation, so the elevation rule does not
+ *           apply; every value in it is still a token. */
+const RING = String.raw`/^0 0 0 var\(--[a-z0-9-]+\) var\(--[a-z0-9-]+\)$/`;
+
+/* GEOMETRY  calc(), min(), max() and clamp() over tokens, percentages,
+ *           viewport units and bare numbers, with no length literal at all:
+ *           `calc(var(--center-max) + var(--center-gutter) * 2)`,
+ *           `calc(100% - var(--imposter-margin) * 2)`. Allowed only in the
+ *           layout primitives (Part 5, block 5), where deriving a box from
+ *           the tokens IS the job. */
+const GEOMETRY = String.raw`/^(?:calc|min|max|clamp)\((?:(?:calc|min|max|clamp)\(|var\(--[a-z0-9-]+\)|\d*\.?\d+(?:%|[sdl]?v[bhiw])?|[-+*/,()\s])+$/`;
+
 /* CSS-wide keywords. Not design values; they are the language, and they are
  * how a component says "do not participate" rather than "be this colour". */
 const KEYWORDS = ['inherit', 'initial', 'unset', 'revert', 'revert-layer'];
+
+/* The CSS system colours. In `@media (forced-colors: active)` they are the
+ * only correct values: the page's palette is gone and the user's is in
+ * charge, so a focus ring or a border must name the system colour it stands
+ * for (`outline-color: Highlight`). A stylelint allowlist cannot see the
+ * media query, so they are allowed wherever a colour keyword is. */
+const SYSTEM_COLORS = [
+  'AccentColor', 'AccentColorText', 'ActiveText', 'ButtonBorder', 'ButtonFace',
+  'ButtonText', 'Canvas', 'CanvasText', 'Field', 'FieldText', 'GrayText',
+  'Highlight', 'HighlightText', 'LinkText', 'Mark', 'MarkText', 'SelectedItem',
+  'SelectedItemText', 'VisitedText',
+];
 
 const VALUE_ALLOWLIST = {
   /* ---- Spacing. Law 1 + Law 3 + Law 6 --------------------------------
@@ -291,20 +319,20 @@ const VALUE_ALLOWLIST = {
    * Reach for `--elevation-card`, not `--shadow-sm`. A hand-written
    * shadow is always a single layer and always reads as a sticker; the
    * tokens are physically consistent PAIRS (contact + ambient). */
-  'box-shadow': [VAR_ONE, 'none', ...KEYWORDS],
+  'box-shadow': [VAR_ONE, RING, 'none', ...KEYWORDS],
 
   /* ---- Color. Law 1 + Law 6 ------------------------------------------
    * `currentColor` and `transparent` are keywords, not colours. Note what
    * is NOT here: no `oklch()`, no hex, no `rgb()` — not even a "temporary"
    * one, because a hex in a component is the one thing dark mode cannot
    * follow, and it will be found six months later by a client. */
-  color: [VAR_ONE, 'currentColor', 'transparent', ...KEYWORDS],
-  'background-color': [VAR_ONE, 'transparent', 'currentColor', ...KEYWORDS],
-  'border-color': [VAR_SEQ, 'currentColor', 'transparent', ...KEYWORDS],
-  'outline-color': [VAR_ONE, 'currentColor', 'transparent', ...KEYWORDS],
-  'text-decoration-color': [VAR_ONE, 'currentColor', 'transparent', ...KEYWORDS],
-  fill: [VAR_ONE, 'currentColor', 'none', 'transparent', ...KEYWORDS],
-  stroke: [VAR_ONE, 'currentColor', 'none', 'transparent', ...KEYWORDS],
+  color: [VAR_ONE, 'currentColor', 'transparent', ...SYSTEM_COLORS, ...KEYWORDS],
+  'background-color': [VAR_ONE, 'transparent', 'currentColor', ...SYSTEM_COLORS, ...KEYWORDS],
+  'border-color': [VAR_SEQ, 'currentColor', 'transparent', ...SYSTEM_COLORS, ...KEYWORDS],
+  'outline-color': [VAR_ONE, 'currentColor', 'transparent', ...SYSTEM_COLORS, ...KEYWORDS],
+  'text-decoration-color': [VAR_ONE, 'currentColor', 'transparent', ...SYSTEM_COLORS, ...KEYWORDS],
+  fill: [VAR_ONE, 'currentColor', 'none', 'transparent', ...SYSTEM_COLORS, ...KEYWORDS],
+  stroke: [VAR_ONE, 'currentColor', 'none', 'transparent', ...SYSTEM_COLORS, ...KEYWORDS],
   'accent-color': [VAR_ONE, 'auto', ...KEYWORDS],
 
   /* ---- Stacking. Law 3 -----------------------------------------------
@@ -332,7 +360,9 @@ const VALUE_ALLOWLIST = {
    * people defend hardest. */
   'max-inline-size': [VAR_ONE, 'none', '100%', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
   'max-width': [VAR_ONE, 'none', '100%', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
-  'min-block-size': [VAR_ONE, '0', '100%', '100dvh', 'auto', ...KEYWORDS],
+  /* The small- and dynamic-viewport units: `100svb` does not jump when
+   * mobile browser chrome hides, which is why the page shell uses it. */
+  'min-block-size': [VAR_ONE, '0', '100%', '100dvh', '100dvb', '100svh', '100svb', 'auto', ...KEYWORDS],
   'min-inline-size': [VAR_ONE, '0', '100%', 'auto', ...KEYWORDS],
 };
 
@@ -480,6 +510,18 @@ export default {
     'at-rule-empty-line-before': null,
     'rule-empty-line-before': null,
     'comment-whitespace-inside': null,
+    /* `.row--start { --row-align: flex-start; }` on one line is a table of
+     * modifiers, and it is how layout.css lists them. Line breaks are
+     * formatting. */
+    'declaration-block-single-line-max-declarations': null,
+
+    /* The references spell imports both ways: `@import url("./tokens.css")
+     * layer(tokens)` in the vanilla and CSS-modules entries, and
+     * `@import "tailwindcss/theme.css" layer(theme)` in the Tailwind entry
+     * (stack-tailwind.md §2). The standard config's `url` notation refused
+     * the second; `string` would refuse the first. The spelling is not a
+     * design law. */
+    'import-notation': null,
 
     /* Font stack names are proper nouns: "Geist Sans", "SFMono-Regular",
      * "Segoe UI". Lowercasing them is wrong, and it is the only place this
@@ -506,7 +548,7 @@ export default {
   /* =======================================================================
    * PART 5 — OVERRIDES
    * =======================================================================
-   * Each block below is a documented exemption. There are four, and the
+   * Each block below is a documented exemption. There are five, and the
    * list should not grow: every addition is a place the laws stop applying,
    * and the whole value of the system is that the answer to "where can I
    * put a literal?" is a short list somebody can hold in their head.
@@ -532,6 +574,10 @@ export default {
         /* Tier-1 steps are `--space-0-5`, `--text-2xs`, `--radius-2xl`:
          * digits inside segments, which the strict pattern rejects. */
         'custom-property-pattern': '^[a-z0-9]+(-[a-z0-9]+)*$',
+        /* Each tier opens its own `:root` block, in order: primitives, then
+         * roles, then theme overrides. One block per tier is the file's
+         * table of contents, not two people styling one thing. */
+        'no-duplicate-selectors': null,
       },
     },
 
@@ -656,6 +702,39 @@ export default {
         'at-rule-prelude-no-invalid': null,
         'no-descending-specificity': null,
         'selector-max-type': null,
+      },
+    },
+
+    /* ---------------------------------------------------------------------
+     * 5. LAYOUT PRIMITIVES — the parent that places things.
+     *
+     * layout.css derives boxes from tokens: a centred column is its max
+     * width plus a gutter on each side,
+     * `calc(var(--center-max) + var(--center-gutter) * 2)`; a full-bleed row
+     * pads to whichever is larger, the gutter or half the leftover width.
+     * Those are geometry over tokens, not new design values, so sizing and
+     * inline padding here may use GEOMETRY. A length literal is still
+     * refused.
+     *
+     * The file is ordered by primitive, and some rules rely on source order
+     * at equal specificity on purpose (a heading after a heading takes the
+     * tight gap: see `.flow`), so the specificity-order rule is off. The
+     * switcher's quantity queries (`> :nth-last-child(n + 5) ~ *`) are the
+     * technique, not DOM knowledge, so the compound cap is raised to 4.
+     * ------------------------------------------------------------------ */
+    {
+      files: ['**/layout.css', '**/layout/*.css'],
+      rules: {
+        'declaration-property-value-allowed-list': {
+          ...VALUE_ALLOWLIST,
+          ...Object.fromEntries(
+            ['max-inline-size', 'max-width', 'min-block-size', 'min-inline-size',
+              'padding-inline', 'padding-inline-start', 'padding-inline-end']
+              .map((prop) => [prop, [...VALUE_ALLOWLIST[prop], GEOMETRY]])
+          ),
+        },
+        'no-descending-specificity': null,
+        'selector-max-compound-selectors': 4,
       },
     },
   ],

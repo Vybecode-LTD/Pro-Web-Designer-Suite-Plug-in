@@ -36,6 +36,12 @@
       "globs": ["**/components/**/*.css", "**/ui/**/*.css", "**/*.module.css", "**/components.css"],
       "examples": ["src/components/card.css", "packages/ui/button.css", "Card.module.css", "styles/components.css"],
       "not": ["src/styles/layout.css", "src/styles/base.css"]
+    },
+    "layout_files": {
+      "rule": "Layout primitives may derive sizes and inline padding from tokens with calc(), min(), max() and clamp() over tokens, percentages, viewport units and bare numbers; a length literal is still refused. Only stylelint needs the class: the audit accepts that geometry in any file.",
+      "globs": ["**/layout.css", "**/layout/*.css"],
+      "examples": ["src/styles/layout.css", "src/styles/layout/stack.css"],
+      "not": ["src/components/layout-card.css", "src/styles/base.css"]
     }
   }
 }

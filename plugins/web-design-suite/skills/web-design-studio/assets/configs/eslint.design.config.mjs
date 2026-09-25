@@ -729,20 +729,25 @@ const componentConfig = {
  *     `settings.tailwindcss.cssConfigPath`, the file that imports
  *     tailwindcss and theme.css. `no-custom-classname` is the valuable rule
  *     there: v4 generates nothing for a class that does not exist and says
- *     nothing, so a misspelt role class ships as a silent no-op. The
- *     suite's tests do not run this plugin, so read its report on your own
- *     code before you make it an error.
+ *     nothing, so a misspelt role class ships as a silent no-op.
  *
  *   - 3.x reads a v3 `tailwind.config.js`. A v3 project must pin it
  *     (`npm i -D eslint-plugin-tailwindcss@3`): an unpinned install now
  *     brings 4.x, which requires tailwindcss ^4. After `corePlugins: {
  *     space: false }` and a replaced scale, `no-custom-classname` catches a
- *     large and useful set of classes that simply do not exist.
+ *     large and useful set of classes that simply do not exist. Give it the
+ *     config as an absolute path: 3.18 looks for tailwindcss from the
+ *     config's folder and cannot start from a relative one, so
+ *     `config: 'tailwind.config.ts'` stops ESLint with "Could not resolve
+ *     tailwindcss".
+ *
+ * The suite's tests run both blocks below, uncommented, through the real
+ * plugin: 4.4 with Tailwind 4.3, and 3.18 with Tailwind 3.4.
  *
  * Either way, the custom rules in Part 3 and the selector rules in Part 4
  * already cover arbitrary values, `!important`, off-scale spacing and stock
  * palette classes. The plugin adds `no-custom-classname`,
- * `no-contradicting-classname` (`p-card px-inline-md` on one element) and
+ * `no-contradicting-classname` (`p-card p-card-lg` on one element) and
  * `enforces-shorthand` (`pt-card pb-card` → `py-card`).
  *
  * `prettier-plugin-tailwindcss` is a separate, unconditional requirement
@@ -773,8 +778,10 @@ const componentConfig = {
 //     // Law 3: a class the theme does not generate is off the scale, and v4
 //     // drops it without a word.
 //     'tailwindcss/no-custom-classname': 'error',
-//     // Law 3: `p-card px-inline-md` — two rules for one box, last one wins,
-//     // and which one is last depends on Tailwind's internal sort order.
+//     // Law 3: `p-card p-card-lg` — two values for one property; the one
+//     // that wins is whichever Tailwind emits last, not the one written
+//     // last. (`p-card px-inline-md` is not a conflict: the longhand
+//     // always follows the shorthand.)
 //     'tailwindcss/no-contradicting-classname': 'error',
 //     // Readability: `pt-card pb-card` is `py-card`.
 //     'tailwindcss/enforces-shorthand': 'warn',
@@ -782,13 +789,15 @@ const componentConfig = {
 // };
 //
 // Tailwind v3, eslint-plugin-tailwindcss@3:
+// import path from 'node:path';
 // const tailwindV3Config = {
 //   name: 'design-laws/tailwind-v3',
 //   files: ['**/*.{jsx,tsx}'],
 //   plugins: { tailwindcss: tailwind },
 //   settings: {
 //     tailwindcss: {
-//       config: 'tailwind.config.ts',
+//       // Absolute, from the folder ESLint runs in (see the note above).
+//       config: path.resolve('tailwind.config.ts'),
 //       // Our own composers, so the plugin lints their string arguments too.
 //       callees: ['cn', 'clsx', 'classNames', 'cva', 'tv', 'twMerge', 'cx'],
 //       // Classes the plugin cannot know about because they come from
@@ -800,8 +809,10 @@ const componentConfig = {
 //     // Law 3: a class that does not exist in the theme is, by definition,
 //     // off the scale.
 //     'tailwindcss/no-custom-classname': ['error', { cssFiles: [] }],
-//     // Law 3: `p-card px-inline-md` — two rules for one box, last one wins,
-//     // and which one is last depends on Tailwind's internal sort order.
+//     // Law 3: `p-card p-card-lg` — two values for one property; the one
+//     // that wins is whichever Tailwind emits last, not the one written
+//     // last. (`p-card px-inline-md` is not a conflict: the longhand
+//     // always follows the shorthand.)
 //     'tailwindcss/no-contradicting-classname': 'error',
 //     // Readability: `pt-card pb-card` is `py-card`.
 //     'tailwindcss/enforces-shorthand': 'warn',

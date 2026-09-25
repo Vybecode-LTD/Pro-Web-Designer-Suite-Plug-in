@@ -26,6 +26,7 @@ Regressions covered:
 """
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -494,6 +495,51 @@ class MigrationRecipes(TempDirTest):
         for name in ("audit-before.json", "audit-after.json"):
             with self.subTest(report=name):
                 json.loads((self.tmp / name).read_text(encoding="utf-8"))
+
+
+# A drive-letter path two folders deep, or a home folder on Linux or macOS.
+MACHINE_PATH = re.compile(r"\b[A-Za-z]:[\\/][\w .-]+[\\/][\w .-]+|/home/[a-z][\w-]*|/Users/[A-Za-z][\w-]*")
+SHIPPED_TEXT = {".md", ".py", ".mjs", ".js", ".json", ".css", ".html", ".sh", ".ts", ".tsx",
+                ".jsx", ".yml", ".yaml", ".txt", ""}
+
+
+class NoMachinePaths(unittest.TestCase):
+    """3.2.1: the 3.0.1 CHANGELOG entry named a report by its folder in the
+    maintainer's workspace, a path no user has (3.0.0 did the same with the
+    sandbox's home folder). Nothing shipped may point at a machine."""
+
+    def test_no_shipped_file_names_a_folder_on_the_authors_machine(self):
+        found = []
+        for path in sorted(PLUGIN.rglob("*")):
+            if path.is_file() and path.suffix in SHIPPED_TEXT and "__pycache__" not in path.parts:
+                text = path.read_text(encoding="utf-8", errors="replace")
+                for number, line in enumerate(text.splitlines(), 1):
+                    found += [f"{path.relative_to(PLUGIN).as_posix()}:{number}: {m.group(0)}"
+                              for m in MACHINE_PATH.finditer(line)]
+        self.assertEqual([], found)
+
+
+PYTHON_FLOOR = (3, 10)
+
+
+class PythonFloor(unittest.TestCase):
+    """3.2.1: the README said "Python 3" with no floor, and macOS still ships
+    3.9. The suite runs on 3.10 to 3.14 (3.9 lacks what the tests use, such as
+    `ignore_cleanup_errors`), so 3.10 is the floor the README states. Parsing
+    every script with 3.10's grammar catches newer syntax before a user on
+    3.10 meets it; running the suite on 3.10 is the full check."""
+
+    def test_the_readme_states_the_floor(self):
+        phrase = "Python %d.%d or newer" % PYTHON_FLOOR
+        self.assertTrue(phrase in (PLUGIN / "README.md").read_text(encoding="utf-8"),
+                        f"the README does not say {phrase!r}")
+
+    def test_every_script_parses_with_the_floors_grammar(self):
+        scripts = sorted(p for folder in ("skills", "tests", "tools") for p in (PLUGIN / folder).rglob("*.py"))
+        self.assertGreater(len(scripts), 40)
+        for path in scripts:
+            with self.subTest(script=path.relative_to(PLUGIN).as_posix()):
+                ast.parse(path.read_text(encoding="utf-8"), feature_version=PYTHON_FLOOR)
 
 
 if __name__ == "__main__":

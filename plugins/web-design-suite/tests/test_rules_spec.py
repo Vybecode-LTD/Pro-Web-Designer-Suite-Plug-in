@@ -105,9 +105,10 @@ class TheAuditFollowsTheSpec(TempDirTest):
 
 
 class StylelintFollowsTheSpec(unittest.TestCase):
-    """stylelint is not installed on the machine these tests were written on;
-    its config is checked here by reading the values, and the value regexes
-    are run in Python (they are JavaScript regexes of the portable kind)."""
+    """The config's values, read from the file, with the value regexes run in
+    Python (they are JavaScript regexes of the portable kind), so these hold
+    wherever stylelint is absent. test_real_tools.StylelintConfig runs the
+    real stylelint over the same config."""
 
     @classmethod
     def setUpClass(cls):
@@ -130,11 +131,17 @@ class StylelintFollowsTheSpec(unittest.TestCase):
         self.assertEqual(sorted(SPEC["file_classes"]["token_files"]["globs"]), sorted(token_globs))
         self.assertEqual(sorted(SPEC["file_classes"]["component_files"]["globs"]),
                          sorted(self.override_files("components")))
+        self.assertEqual(sorted(SPEC["file_classes"]["layout_files"]["globs"]),
+                         sorted(self.override_files("layout.css")))
         for kind, globs in (("token_files", token_globs),
-                            ("component_files", self.override_files("components"))):
+                            ("component_files", self.override_files("components")),
+                            ("layout_files", self.override_files("layout.css"))):
             for path in SPEC["file_classes"][kind]["examples"]:
                 with self.subTest(kind=kind, path=path):
                     self.assertTrue(any(glob_match(path if "/" in path else "x/" + path, g) for g in globs))
+            for path in SPEC["file_classes"][kind].get("not", []):
+                with self.subTest(kind=kind, not_path=path):
+                    self.assertFalse(any(glob_match(path if "/" in path else "x/" + path, g) for g in globs))
 
     def test_nesting_limit(self):
         m = re.search(r"'max-nesting-depth':\s*\[\s*(\d+),\s*\{([^}]*)\}", self.config)

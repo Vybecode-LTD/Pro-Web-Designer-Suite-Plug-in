@@ -1,5 +1,59 @@
 # Changelog
 
+## 3.2.1 — 2026-09-25
+
+Ready to distribute. The stylelint config and both Tailwind blocks of the ESLint config
+now run through the real tools in the tests, and what that found is fixed. Every fix has
+a regression test that fails on 3.2.0 (`python -m unittest discover -s tests`: 317 tests).
+
+### Upgrading
+
+- **Tailwind v3 with Part 5 of the ESLint config:** give `settings.tailwindcss.config` an
+  absolute path, `path.resolve('tailwind.config.ts')` with `import path from 'node:path'`.
+  eslint-plugin-tailwindcss 3.18 stops ESLint with "Could not resolve tailwindcss" when
+  the path is relative.
+- **stylelint:** the config now accepts the starter as shipped; it used to refuse it 32
+  times. If you copied the starter's reset.css or base.css, take its new
+  `stylelint-disable-next-line` comments with it.
+
+### Fixed
+
+- The stylelint config, run on stylelint 17.15 with stylelint-config-standard 40.0:
+  - Layout primitives (`layout.css`, `layout/*.css`) may derive sizes and inline padding
+    from tokens with `calc()`, `min()`, `max()` and `clamp()`. This is a fifth documented
+    override, and a length literal is still refused.
+  - A zero-offset focus ring built from tokens is allowed, as are the CSS system colours
+    (for forced-colors mode) and `100svb`, `100svh` and `100dvb`.
+  - Token files may repeat `:root`, one block per tier.
+  - `import-notation` is off. The references spell imports both ways, and the
+    standard config's `url()` notation refused the documented Tailwind entry.
+  - The single-line-declarations rule is off: formatting is Prettier's job, as the
+    config already said.
+- The starter marks its documented one-offs with `stylelint-disable-next-line` and a
+  reason: the `[hidden]` override, iOS text-size-adjust, the second `html` rule and the
+  sub/sup ratio. `.imposter--bottom` uses the `inset-block` shorthand.
+- The ESLint config's Part 5:
+  - The v3 block uses an absolute config path.
+  - Both blocks and the header give `p-card p-card-lg` as the contradiction.
+    `p-card px-inline-md` is not one: the longhand always follows the shorthand, in
+    v4 and in v3.
+- The 3.0.1 entry below named a report by a path on the maintainer's machine.
+- The README states the floor: Python 3.10 or newer (the suite runs on 3.10 to 3.14),
+  and Node 20.19 or newer for the lint configs.
+- The rule spec, `design-rules.json`, records the layout-primitives file class.
+
+### Tests
+
+- `test_real_tools` runs stylelint over the starter, the documented Tailwind entry and
+  component fixtures. It runs both Part 5 blocks through the real plugin: 4.4 with
+  Tailwind 4.3, and 3.18 with Tailwind 3.4. Its fixtures are the examples the blocks'
+  own comments give.
+- `test_docs` checks that no shipped file names a folder on the author's machine, that
+  the README states the Python floor, and that every script parses with its grammar.
+- Inside the plugin's repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3`
+  installs every tool the tests use, at pinned versions. The tests find them without
+  any variable set.
+
 ## 3.2.0 — 2026-09-25
 
 Phase 2 of the 3.0.1 review: the docs are tied to the code. Tests now read the
@@ -204,5 +258,5 @@ the folder that holds it keeps matching.
 
 ## 3.0.1 — 2026-09-21
 
-38 bug fixes and the first regression suite (72 tests). See
-`C:\DEV\dev plans\web-design-suite-bugfix-report.md` in the maintainer's workspace.
+38 bug fixes and the first regression suite (72 tests). The report is
+`dev plans/web-design-suite-bugfix-report.md` in the project repository.

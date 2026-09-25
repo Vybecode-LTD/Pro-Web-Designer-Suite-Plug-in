@@ -1,24 +1,44 @@
 """The shipped configs, run through the real tools (3.2.0; review item C4).
 
-Each class skips unless its tool is available on the machine:
+Each class skips unless its tool is available on the machine. Inside the
+repository, `npm ci` in tooling/main and tooling/tailwind-v3 provides all of
+them (wds_support points these variables there when they are not set):
 
-  WDS_ESLINT_MODULES    a node_modules with eslint 9+, eslint-plugin-jsx-a11y
-                        and typescript-eslint; or several, separated by the
-                        path separator, each package taken from the first
-                        that has it (ESLint 10 from one project, jsx-a11y
-                        from another)
-  WDS_TAILWIND_MODULES  a node_modules with tailwindcss 4 and @tailwindcss/node
-                        (tailwind-merge too, for the merge config)
+  WDS_ESLINT_MODULES       a node_modules with eslint 9+, eslint-plugin-jsx-a11y
+                           and typescript-eslint; or several, separated by the
+                           path separator, each package taken from the first
+                           that has it (ESLint 10 from one project, jsx-a11y
+                           from another). With eslint-plugin-tailwindcss 4 and
+                           tailwindcss 4 beside them, the v4 half of the
+                           ESLint config's Part 5 runs too
+  WDS_TAILWIND_MODULES     a node_modules with tailwindcss 4 and @tailwindcss/node
+                           (tailwind-merge too, for the merge config)
+  WDS_STYLELINT_MODULES    a node_modules with stylelint 17 and
+                           stylelint-config-standard 40
+  WDS_TAILWIND_V3_MODULES  a node_modules with eslint, eslint-plugin-tailwindcss 3
+                           and tailwindcss 3, for the v3 half of Part 5
 
 Nothing is installed or downloaded. The configs are copied into a temporary
-directory with their package imports pointed at those folders by absolute
-URL, and nothing is written anywhere else.
+directory, either with their package imports pointed at those folders by
+absolute URL or with a link to the folder as the project's node_modules, and
+nothing is written anywhere else.
 
 Regressions covered:
 - SB-A13: the ESLint `style` rule accepted only a bare object literal, so it
   refused the pattern the references teach —
   `style={{ '--progress': pct } as React.CSSProperties}` and
   `style={span ? { '--card-span': span } : undefined}`.
+- 3.2.1: stylelint 17 refused the starter's own stylesheets 32 times. The
+  config had no room for the layout primitives' geometry over tokens, the
+  focus ring's gap, system colours in forced-colors mode or `100svb`; its
+  inherited formatting rule refused one-line modifier tables; and its
+  inherited `url()` import notation refused every import in the documented
+  Tailwind entry (the references use both spellings, so the rule is off).
+- 3.2.1: the v3 block of the ESLint config's Part 5 stopped ESLint ("Could
+  not resolve tailwindcss"): eslint-plugin-tailwindcss 3.18 cannot look for
+  tailwindcss from a relative config path. Both blocks also gave
+  `p-card px-inline-md` as a contradiction, which neither plugin flags,
+  because the longhand always follows the shorthand.
 """
 from __future__ import annotations
 
@@ -37,7 +57,9 @@ ESLINT_ROOTS = [p for p in os.environ.get("WDS_ESLINT_MODULES", "").split(os.pat
 ESLINT_MODULES = next((r for r in ESLINT_ROOTS
                        if (pathlib.Path(r) / "eslint" / "bin" / "eslint.js").is_file()), None)
 TAILWIND_MODULES = os.environ.get("WDS_TAILWIND_MODULES")
+STYLELINT_MODULES = os.environ.get("WDS_STYLELINT_MODULES")
 STYLE_RULE = "design-laws/style-prop-custom-properties-only"
+STARTER_STYLES = SKILLS / "web-design-studio" / "assets" / "starter" / "styles"
 
 
 def entry_url(modules: str | list[str], package: str) -> str:
@@ -50,6 +72,70 @@ def entry_url(modules: str | list[str], package: str) -> str:
         if not proc.returncode:
             return pathlib.Path(proc.stdout.strip()).as_uri()
     raise unittest.SkipTest(f"{package} is not in {modules}")
+
+
+def package_major(root: str, package: str) -> int | None:
+    try:
+        manifest = json.loads((pathlib.Path(root) / package / "package.json").read_text(encoding="utf-8"))
+        return int(manifest["version"].split(".")[0])
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def tailwind_lint_modules(roots: list[str], major: int) -> str | None:
+    """The first of `roots` holding ESLint with eslint-plugin-tailwindcss and
+    tailwindcss, both of `major`."""
+    return next((r for r in roots if package_major(r, "eslint")
+                 and package_major(r, "eslint-plugin-tailwindcss") == major
+                 and package_major(r, "tailwindcss") == major), None)
+
+
+TAILWIND_V4_LINT = tailwind_lint_modules(ESLINT_ROOTS, 4)
+TAILWIND_V3_LINT = tailwind_lint_modules(
+    [p for p in [os.environ.get("WDS_TAILWIND_V3_MODULES", "")] if p], 3)
+
+
+def temp_project(cls, prefix: str, modules: str) -> pathlib.Path:
+    """A temporary project whose node_modules is a link to `modules`, so the
+    tools resolve every package exactly as a real project does: a directory
+    junction on Windows (it needs no privilege), a symlink elsewhere. The link
+    is removed first, so cleaning up never reaches the folder it points at."""
+    holder = tempfile.TemporaryDirectory(prefix=prefix, ignore_cleanup_errors=True)
+    cls.addClassCleanup(holder.cleanup)
+    tmp = pathlib.Path(holder.name)
+    target, link = pathlib.Path(modules).resolve(), tmp / "node_modules"
+    if os.name == "nt":
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))
+        cls.addClassCleanup(os.rmdir, link)        # the junction, not its target
+    else:
+        link.symlink_to(target, target_is_directory=True)
+        cls.addClassCleanup(link.unlink)
+    return tmp
+
+
+def write_files(root: pathlib.Path, files: dict[str, str]) -> None:
+    for name, text in files.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+
+def documented_entry(doc: str = "stack-tailwind.md", header: str = "/* src/styles/index.css */") -> str:
+    """The entry file a reference tells a project to write: by default the
+    Tailwind v4 entry of stack-tailwind.md §2."""
+    text = (SKILLS / "web-design-studio" / "references" / doc).read_text(encoding="utf-8")
+    start = text.index(header)
+    return text[start:text.index("```", start)]
+
+
+# The two spellings the references use: strings in the Tailwind entry, `url()`
+# in the vanilla one.
+DOCUMENTED_ENTRIES = {
+    "src/styles/index.css": ("stack-tailwind.md", "/* src/styles/index.css */"),
+    "src/vanilla/index.css": ("handoff-conventions.md",
+                              "/* src/styles/index.css — the whole cascade, in one place. */"),
+}
 
 
 ALLOWED_STYLES = ("<div style={{ '--progress': pct } as React.CSSProperties} />",
@@ -293,6 +379,221 @@ class TailwindMergeConfig(unittest.TestCase):
         for inputs, expected in self.CASES.items():
             with self.subTest(cn=inputs):
                 self.assertEqual(self.merged[" | ".join(inputs)], expected)
+
+
+# Component-file fixtures for the stylelint config: what the laws refuse (and
+# the rule that must say so), and what they allow.
+REFUSED_CSS = {
+    "Literal": (".card { padding: 13px; }", "declaration-property-value-allowed-list"),
+    "Hex": (".card { color: #fff; }", "color-no-hex"),
+    "Important": (".card { color: var(--fg-default) !important; }", "declaration-no-important"),
+    "Id": ("#card { color: var(--fg-default); }", "selector-max-id"),
+    "Multiplied": (".card { padding: calc(var(--space-4) * 1.5); }",
+                   "declaration-property-value-allowed-list"),
+    "GeometryOutsideLayout": (".card { max-inline-size: calc(100% - var(--gutter-page) * 2); }",
+                              "declaration-property-value-allowed-list"),
+    "OwnMargin": (".card { margin-block-start: var(--gap-related); }",
+                  "declaration-property-value-allowed-list"),
+    "Apply": (".card { @apply p-card; }", "at-rule-disallowed-list"),
+}
+ALLOWED_CSS = {
+    "Ring": ".card:focus-visible { box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas); }",
+    "SystemColour": "@media (forced-colors: active) { .card { border-color: ButtonText; } }",
+    "SmallViewport": ".card { min-block-size: 100svb; }",
+    "Cancel": ".card { margin-block-start: calc(var(--card-inset) * -1); }",
+}
+
+
+@unittest.skipUnless(NODE and STYLELINT_MODULES, "set WDS_STYLELINT_MODULES to run the stylelint fixtures")
+class StylelintConfig(unittest.TestCase):
+    """stylelint.config.mjs as shipped, run by the real stylelint over the
+    starter's own stylesheets, the documented Tailwind entry, and component
+    fixtures. Every file is linted in one run; each test reads its own."""
+
+    @classmethod
+    def setUpClass(cls):
+        tmp = temp_project(cls, "wds-stylelint-", STYLELINT_MODULES)
+        files = {"stylelint.config.mjs": (CONFIGS / "stylelint.config.mjs").read_text(encoding="utf-8"),
+                 **{name: documented_entry(*where) for name, where in DOCUMENTED_ENTRIES.items()}}
+        for css in sorted(STARTER_STYLES.glob("*.css")):
+            files[f"src/styles/{css.name}"] = css.read_text(encoding="utf-8")
+        for stem, css in {**{k: v[0] for k, v in REFUSED_CSS.items()}, **ALLOWED_CSS}.items():
+            files[f"src/components/{stem}.css"] = "@layer components {\n" + css + "\n}\n"
+        write_files(tmp, files)
+        linted = [name for name in files if name.endswith(".css")]
+        proc = subprocess.run([NODE, str(pathlib.Path(STYLELINT_MODULES) / "stylelint" / "bin" / "stylelint.mjs"),
+                               *linted, "--config", "stylelint.config.mjs", "--formatter", "json"],
+                              cwd=tmp, capture_output=True, timeout=300)
+        # 0: clean, 2: problems found. stylelint 17 writes the report to stderr
+        # when it finds a problem and to stdout when it does not.
+        report = next((s for s in (proc.stdout, proc.stderr) if s.strip().startswith(b"[")), None)
+        if proc.returncode not in (0, 2) or report is None:
+            raise AssertionError(output(proc))
+        cls.results = {pathlib.Path(r["source"]).relative_to(tmp).as_posix(): r
+                       for r in json.loads(report.decode("utf-8"))}
+
+    def problems(self, name: str) -> list[str]:
+        result = self.results[name]
+        self.assertEqual([], result.get("invalidOptionWarnings", []), name)
+        self.assertEqual([], result.get("parseErrors", []), name)
+        return [f"{w['line']}:{w['column']} {w['rule']}" for w in result["warnings"]]
+
+    def test_the_starter_passes_its_own_config(self):
+        for css in sorted(STARTER_STYLES.glob("*.css")):
+            with self.subTest(file=css.name):
+                self.assertEqual([], self.problems(f"src/styles/{css.name}"))
+
+    def test_the_documented_entries_pass(self):
+        for name, (doc, _) in DOCUMENTED_ENTRIES.items():
+            with self.subTest(entry=doc):
+                self.assertEqual([], self.problems(name))
+
+    def test_what_the_laws_refuse_is_refused(self):
+        for stem, (css, rule) in REFUSED_CSS.items():
+            with self.subTest(css=css):
+                self.assertIn(rule, [p.split(" ", 1)[1] for p in self.problems(f"src/components/{stem}.css")])
+
+    def test_what_the_laws_allow_is_allowed(self):
+        for stem, css in ALLOWED_CSS.items():
+            with self.subTest(css=css):
+                self.assertEqual([], self.problems(f"src/components/{stem}.css"))
+
+
+def part5_block(title: str) -> str:
+    """The Part 5 block under `// {title}`, uncommented as a project would."""
+    lines = (CONFIGS / "eslint.design.config.mjs").read_text(encoding="utf-8").splitlines()
+    block = []
+    for line in lines[lines.index(f"// {title}") + 1:]:
+        if not line.startswith("//") or line.startswith("// Tailwind v"):
+            break
+        block.append(re.sub(r"^// ?", "", line))
+    return "\n".join(block).rstrip() + "\n"
+
+
+def documented_examples(block: str, rule: str) -> list[str]:
+    """The backticked examples in the comment right above `rule` in `block`."""
+    lines = block.splitlines()
+    at = next(n for n, line in enumerate(lines) if f"'{rule}'" in line)
+    comment = []
+    for line in reversed(lines[:at]):
+        if not line.strip().startswith("//"):
+            break
+        comment.insert(0, line)
+    return re.findall(r"`([^`]+)`", " ".join(comment))
+
+
+JSX_FIXTURE = "export const {name} = ({{ cn }}) => <div {attr} />;\n"
+
+
+class TailwindPluginBlock:
+    """One block of the ESLint config's Part 5, uncommented, run by the real
+    eslint-plugin-tailwindcss in a project wired as the docs say. The fixtures
+    for the contradiction and shorthand rules are the examples the block's own
+    comments give."""
+
+    TITLE = CONST = MODULES = None
+    EXTRA: dict[str, str] = {}
+
+    @classmethod
+    def tailwind_files(cls) -> dict[str, str]:
+        raise NotImplementedError
+
+    @classmethod
+    def setUpClass(cls):
+        tmp = temp_project(cls, "wds-twlint-", cls.MODULES)
+        block = part5_block(cls.TITLE)
+        conflict, *not_conflict = documented_examples(block, "tailwindcss/no-contradicting-classname")
+        cls.shorthand, cls.merged = documented_examples(block, "tailwindcss/enforces-shorthand")[:2]
+        cls.cases = {"Roles": 'className="p-card bg-surface text-default"',
+                     "Misspelt": 'className="p-card bg-surfce"',
+                     "OffScale": 'className="p-4 bg-neutral-800"',
+                     "Helper": "className={cn('bg-surfce', 'p-card')}",
+                     "Conflict": f'className="{conflict}"',
+                     "Shorthand": f'className="{cls.shorthand}"',
+                     **({"NotAConflict": f'className="{not_conflict[0]}"'} if not_conflict else {}),
+                     **cls.EXTRA}
+        files = {"eslint.config.mjs": (
+            "import tailwind from 'eslint-plugin-tailwindcss';\n" + block
+            + "export default [\n"
+              "  { files: ['**/*.jsx'], languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } } },\n"
+              f"  {cls.CONST},\n];\n"), **cls.tailwind_files()}
+        for name, attr in cls.cases.items():
+            files[f"src/components/{name}.jsx"] = JSX_FIXTURE.format(name=name, attr=attr)
+        write_files(tmp, files)
+        proc = subprocess.run([NODE, str(pathlib.Path(cls.MODULES) / "eslint" / "bin" / "eslint.js"),
+                               "-c", "eslint.config.mjs", "--format", "json", "src/components"],
+                              cwd=tmp, capture_output=True, timeout=300)
+        if proc.returncode not in (0, 1):
+            raise AssertionError(output(proc))
+        cls.messages = {pathlib.Path(r["filePath"]).stem: r["messages"] for r in json.loads(proc.stdout)}
+
+    def rules_in(self, name: str) -> list[str]:
+        messages = self.messages[name]
+        self.assertFalse([m for m in messages if m.get("fatal")], messages)
+        return [m["ruleId"] for m in messages]
+
+    def test_the_role_classes_pass(self):
+        self.assertEqual([], self.rules_in("Roles"))
+
+    def test_a_class_the_theme_does_not_generate_is_refused(self):
+        for name in ("Misspelt", "OffScale"):
+            with self.subTest(fixture=self.cases[name]):
+                self.assertIn("tailwindcss/no-custom-classname", self.rules_in(name))
+
+    def test_class_helpers_are_read(self):
+        self.assertIn("tailwindcss/no-custom-classname", self.rules_in("Helper"))
+
+    def test_the_documented_contradiction_is_caught(self):
+        self.assertIn("tailwindcss/no-contradicting-classname", self.rules_in("Conflict"),
+                      self.cases["Conflict"])
+
+    def test_what_the_comment_calls_no_contradiction_is_not_flagged(self):
+        if "NotAConflict" not in self.cases:
+            self.skipTest("the comment names no non-conflict")
+        self.assertNotIn("tailwindcss/no-contradicting-classname", self.rules_in("NotAConflict"))
+
+    def test_the_documented_shorthand_is_suggested(self):
+        messages = [m["message"] for m in self.messages["Shorthand"]
+                    if m["ruleId"] == "tailwindcss/enforces-shorthand"]
+        self.assertTrue(messages, self.cases["Shorthand"])
+        self.assertIn(self.merged, " ".join(messages))
+
+
+@unittest.skipUnless(NODE and TAILWIND_V4_LINT,
+                     "set WDS_ESLINT_MODULES to a node_modules with eslint-plugin-tailwindcss 4 and tailwindcss 4")
+class TailwindPluginV4(TailwindPluginBlock, unittest.TestCase):
+    TITLE = "Tailwind v4, eslint-plugin-tailwindcss@4:"
+    CONST = "tailwindConfig"
+    MODULES = TAILWIND_V4_LINT
+
+    @classmethod
+    def tailwind_files(cls) -> dict[str, str]:
+        files = {"src/styles/index.css": documented_entry(),
+                 "src/styles/theme.css": (CONFIGS / "theme.css").read_text(encoding="utf-8"),
+                 "src/styles/components/card.css": "@layer components {}\n"}
+        for name in ("tokens.css", "base.css", "layout.css"):
+            files[f"src/styles/{name}"] = (STARTER_STYLES / name).read_text(encoding="utf-8")
+        return files
+
+
+@unittest.skipUnless(NODE and TAILWIND_V3_LINT,
+                     "set WDS_TAILWIND_V3_MODULES to run the Tailwind v3 plugin fixtures")
+class TailwindPluginV3(TailwindPluginBlock, unittest.TestCase):
+    TITLE = "Tailwind v3, eslint-plugin-tailwindcss@3:"
+    CONST = "tailwindV3Config"
+    MODULES = TAILWIND_V3_LINT
+    EXTRA = {"Arbitrary": 'className="p-[13px]"',
+             "Whitelisted": 'className="focus-ring tap-target motion-hover"'}
+
+    @classmethod
+    def tailwind_files(cls) -> dict[str, str]:
+        return {"tailwind.config.ts": (CONFIGS / "tailwind.config.ts").read_text(encoding="utf-8")}
+
+    def test_arbitrary_values_are_refused(self):
+        self.assertIn("tailwindcss/no-arbitrary-value", self.rules_in("Arbitrary"))
+
+    def test_the_whitelisted_utilities_pass(self):
+        self.assertEqual([], self.rules_in("Whitelisted"))
 
 
 if __name__ == "__main__":
