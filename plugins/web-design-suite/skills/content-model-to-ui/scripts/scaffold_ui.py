@@ -185,6 +185,17 @@ class Answers:
     def readonly(self, table: dict[str, Any]) -> set[str]:
         return set(self.get(f"{table['name']}.readonly_columns", []) or [])
 
+    def in_form(self, table: dict[str, Any], col: dict[str, Any]) -> bool:
+        """On the form when the model places it there — or when it carries
+        authority and a human released it by removing it from the
+        `authority_columns` answer (after protecting it in the database)."""
+        if col["ui"].get("placement", {}).get("form"):
+            return True
+        if col["ui"].get("authority") and not col["ui"].get("never_display"):
+            kept = self.get(f"{table['name']}.authority_columns")
+            return kept is not None and col["name"] not in kept
+        return False
+
     def empty(self, table: dict[str, Any]) -> dict[str, str]:
         d = {"headline": f"No {table['name'].replace('_', ' ')} yet",
              "body": "", "action": "Add one"}
@@ -1123,7 +1134,7 @@ def emit_types(table: dict[str, Any], model: dict[str, Any],
     body.append("}")
 
     writable = [c["name"] for c in table["columns"]
-                if c["ui"].get("placement", {}).get("form")
+                if ans.in_form(table, c)
                 and c["name"] not in ans.readonly(table)]
     draft = (f"/** What a form submits: the writable columns only. Omitting\n"
              f" *  the rest is what stops a form quietly PATCHing a column\n"
@@ -1185,7 +1196,7 @@ def emit_fields(table: dict[str, Any], model: dict[str, Any],
     name = table["name"]
     Entity = pascal(singular(name))
     specs = [field_spec(c, table, model, ans) for c in table["columns"]
-             if c["ui"].get("placement", {}).get("form")]
+             if ans.in_form(table, c)]
 
     default_groups = [{"legend": "Details",
                        "fields": [s["name"] for s in specs]}]
@@ -1830,7 +1841,7 @@ def emit_form(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str
     Entities = pascal(name)
     specs = {s["name"]: s for s in
              (field_spec(c, table, model, ans) for c in table["columns"]
-              if c["ui"].get("placement", {}).get("form"))}
+              if ans.in_form(table, c))}
     default_groups = [{"legend": "Details", "fields": list(specs)}]
     groups = ans.groups(table, table["screens"].get("field_groups")
                         or default_groups)

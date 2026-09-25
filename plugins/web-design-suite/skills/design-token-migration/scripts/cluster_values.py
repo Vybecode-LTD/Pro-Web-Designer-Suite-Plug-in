@@ -46,8 +46,9 @@ USAGE
   # Just the report, nothing written
   python -m scripts.cluster_values literals.json --dry-run
 
-Run it from the skill root (the directory containing `scripts/`). Running the
-file directly — `python scripts/cluster_values.py literals.json` — works too.
+Run it by path from the PROJECT root, so `-o proposal/` lands in the project:
+`python <skill>/scripts/cluster_values.py literals.json -o proposal/`. The
+`-m scripts.cluster_values` form above is for a project that vendored scripts/.
 
 Exit codes: 0 on success, 2 on bad invocation or unreadable input.
 """
@@ -751,8 +752,8 @@ STATUS_RAMPS = {
                 700: (0.450, 0.120, 152.0)},
     "warning": {100: (0.955, 0.055, 85.0), 500: (0.750, 0.155, 85.0),
                 700: (0.520, 0.125, 85.0)},
-    "danger": {100: (0.945, 0.038, 25.0), 500: (0.580, 0.205, 25.0),
-               700: (0.450, 0.170, 25.0)},
+    "danger": {100: (0.945, 0.038, 25.0), 400: (0.640, 0.190, 25.0),
+               500: (0.580, 0.205, 25.0), 700: (0.450, 0.170, 25.0)},
     "info": {100: (0.945, 0.035, 250.0), 500: (0.580, 0.160, 250.0),
              700: (0.450, 0.140, 250.0)},
 }
@@ -910,6 +911,21 @@ def shadow_signature(value: str) -> Tuple[int, float, float]:
         if len(nums) >= 3:
             blurs.append(abs(nums[2]))
     return (max(1, len(layers)), max(blurs), max(offsets))
+
+
+def spread_ring(value: str) -> Optional[str]:
+    """'outer' or 'inset' when every layer is a pure ring — no offset, no blur,
+    only spread (`0 0 0 3px …`) — else None. A ring is a focus indicator or a
+    border drawn with a shadow; it is never an elevation, and filing it with
+    the card shadows (same zero blur) rewrote focus rings to --elevation-card."""
+    kinds = set()
+    for layer in split_top_level_commas(value):
+        body = SHADOW_COLOR_RE.sub(" ", layer)
+        nums = [float(m.group(1)) for m in SHADOW_NUM_RE.finditer(body)]
+        if len(nums) < 4 or any(nums[:3]) or not nums[3]:
+            return None
+        kinds.add("inset" if re.search(r"\binset\b", body, re.I) else "outer")
+    return kinds.pop() if len(kinds) == 1 else None
 
 
 def elevation_for_blur(blur: float) -> str:
@@ -1410,8 +1426,43 @@ def cluster_easing(lits: Sequence[dict], prop: Proposal) -> None:
 
 def cluster_shadows(lits: Sequence[dict], prop: Proposal) -> None:
     sigs: Dict[Tuple[int, float, float], List[dict]] = defaultdict(list)
+    rings: Dict[str, List[dict]] = defaultdict(list)
+    borders: Dict[str, List[dict]] = defaultdict(list)
     for l in lits:
-        sigs[shadow_signature(l["normalized"])].append(l)
+        ring = spread_ring(l["normalized"])
+        if ring == "outer" or (ring and ":focus" in (l.get("selector") or "")):
+            rings[l["normalized"]].append(l)
+        elif ring:
+            borders[l["normalized"]].append(l)
+        else:
+            sigs[shadow_signature(l["normalized"])].append(l)
+
+    # Focus rings map to the contract's ring role — at `review`, because the
+    # contract ring is two-ringed and must be paired with a transparent
+    # outline, which is a hand edit the codemod cannot make.
+    for j, (value, items) in enumerate(sorted(rings.items()), start=1):
+        raws = sorted({value} | {re.sub(r"\s+", " ", l["raw"].strip()) for l in items})
+        prop.rules.append(Rule(
+            id=f"ring-{j:03d}", kind="shadow", scope="value",
+            match=raws, replacement="var(--elevation-focus)", token="--elevation-focus",
+            prop_classes=["shadow"], props=["box-shadow"],
+            occurrences=len(items), confidence="review",
+            note="a spread-only ring is a focus indicator, not an elevation. "
+                 "--elevation-focus is the contract's ring; also add "
+                 "`outline: var(--stroke-focus) solid transparent` beside it so the "
+                 "ring survives forced-colors mode, which discards box-shadow.",
+        ))
+        prop.provenance["--elevation-focus"].append(f"{value} x{len(items)}")
+    for value, items in sorted(borders.items()):
+        prop.unmapped.append(Unmapped(
+            kind="shadow", value=value, occurrences=len(items), where=where_of(items),
+            reason="a spread-only inset ring is a border drawn with a shadow, "
+                   "not an elevation",
+            recommendation="use a real border (`border: var(--stroke-default) solid "
+                           "var(--border-default)`), or bind the ring's colour to a "
+                           "--border-* role by hand.",
+        ))
+
     for i, (sig, items) in enumerate(
             sorted(sigs.items(), key=lambda kv: (-len(kv[1]), kv[0])), start=1):
         n_layers, blur, offset = sig
@@ -1745,7 +1796,7 @@ ROLE_SOURCE = {
     "--bg-inverse": ("neutral", 900), "--bg-disabled": ("neutral", 100),
     "--bg-accent": ("accent", 600), "--bg-accent-hover": ("accent", 700),
     "--border-subtle": ("neutral", 200), "--border-default": ("neutral", 300),
-    "--border-strong": ("neutral", 400), "--border-accent": ("accent", 500),
+    "--border-strong": ("neutral", 500), "--border-accent": ("accent", 500),
     "--border-focus": ("accent", 600),
     "--bg-success": ("success", 500), "--bg-warning": ("warning", 500),
     "--bg-danger": ("danger", 500), "--fg-success": ("success", 700),
@@ -1898,15 +1949,23 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
     --space-fluid-xl:  clamp(4rem,    2.113rem + 7.547vw,  9rem);     /* 64 -> 144 */
 
     --density: 1;
+  }}
 
-    /* ---------------------------------------------------------------------
-       2. SPACING — TIER 2 (roles). Components read THESE.
-       Named for the RELATIONSHIP they express, not the number they hold.
-       --------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------
+     2. SPACING — TIER 2 (roles). Components read THESE.
+     Named for the RELATIONSHIP they express, not the number they hold.
+     Declared on every element that turns the density dial: a custom
+     property resolves var() where it is declared, so roles declared on
+     :root alone ignored data-density on a section.
+     --------------------------------------------------------------------- */
 
+  :root, [data-density], .region-compact {{
 {chr(10).join(role_lines)}
 
 {chr(10).join(inset_lines)}
+  }}
+
+  :root {{
 
     --space-section:    var(--space-fluid-xl);
     --space-subsection: var(--space-fluid-lg);
@@ -1996,7 +2055,7 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
 
 {line("--border-subtle:", "var(--neutral-200);")}
 {line("--border-default:", "var(--neutral-300);")}
-{line("--border-strong:", "var(--neutral-400);")}
+{line("--border-strong:", "var(--neutral-500);")}
 {line("--border-accent:", "var(--accent-500);")}
 {line("--border-focus:", "var(--accent-600);")}
 
@@ -2035,6 +2094,11 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
     --shadow-md:  0 2px 4px  oklch(0% 0 0 / 0.06), 0 6px 12px oklch(0% 0 0 / 0.06);
     --shadow-lg:  0 4px 8px  oklch(0% 0 0 / 0.06), 0 12px 24px oklch(0% 0 0 / 0.08);
     --shadow-xl:  0 8px 16px oklch(0% 0 0 / 0.07), 0 24px 48px oklch(0% 0 0 / 0.10);
+  }}
+
+  /* Theme-derived: these read colours or shadows a theme re-points, so they
+     are declared on themed elements too, not resolved once on :root. */
+  :root, [data-theme] {{
     --shadow-focus: 0 0 0 var(--stroke-focus) var(--bg-canvas),
                     0 0 0 calc(var(--stroke-focus) * 2) var(--border-focus);
 
@@ -2043,6 +2107,10 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
 {line("--elevation-raised:", "var(--shadow-md);")}
 {line("--elevation-overlay:", "var(--shadow-lg);")}
 {line("--elevation-modal:", "var(--shadow-xl);")}
+{line("--elevation-focus:", "var(--shadow-focus);")}
+  }}
+
+  :root {{
 
     /* ---------------------------------------------------------------------
        8. MOTION
@@ -2098,6 +2166,8 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
      ======================================================================= */
 
   [data-theme="dark"] {{
+    color-scheme: dark;     /* native controls follow the tokens */
+
     --bg-canvas:      var(--neutral-1000);
     --bg-surface:     var(--neutral-950);
     --bg-raised:      var(--neutral-900);
@@ -2121,20 +2191,47 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
 
     --border-subtle:  var(--neutral-900);
     --border-default: var(--neutral-800);
-    --border-strong:  var(--neutral-700);
+    --border-strong:  var(--neutral-500);
 
     --bg-accent:       var(--accent-500);
     --bg-accent-hover: var(--accent-400);
 
     --fg-success:     var(--success-500);
     --fg-warning:     var(--warning-500);
-    --fg-danger:      var(--danger-500);
+    --fg-danger:      var(--danger-400);
 
     --shadow-xs:  0 1px 2px  oklch(0% 0 0 / 0.30);
     --shadow-sm:  0 1px 2px  oklch(0% 0 0 / 0.36), 0 2px 4px  oklch(0% 0 0 / 0.24);
     --shadow-md:  0 2px 4px  oklch(0% 0 0 / 0.36), 0 6px 12px oklch(0% 0 0 / 0.30);
     --shadow-lg:  0 4px 8px  oklch(0% 0 0 / 0.40), 0 12px 24px oklch(0% 0 0 / 0.36);
     --shadow-xl:  0 8px 16px oklch(0% 0 0 / 0.44), 0 24px 48px oklch(0% 0 0 / 0.44);
+  }}
+
+  [data-theme="light"] {{ color-scheme: light; }}
+
+  /* An inverse band re-points its text and border roles like any theme. */
+  .inverse {{
+    --fg-default:     var(--neutral-100);
+    --fg-strong:      var(--neutral-50);
+    --fg-muted:       var(--neutral-300);
+    --fg-subtle:      var(--neutral-400);
+    --fg-accent:      var(--accent-300);
+    --fg-link:        var(--accent-300);
+    --border-subtle:  var(--neutral-800);
+    --border-default: var(--neutral-700);
+    --border-strong:  var(--neutral-500);
+  }}
+
+  [data-theme="dark"] .inverse {{
+    --fg-default:     var(--neutral-900);
+    --fg-strong:      var(--neutral-1000);
+    --fg-muted:       var(--neutral-600);
+    --fg-subtle:      var(--neutral-500);
+    --fg-accent:      var(--accent-700);
+    --fg-link:        var(--accent-700);
+    --border-subtle:  var(--neutral-200);
+    --border-default: var(--neutral-300);
+    --border-strong:  var(--neutral-500);
   }}
 
   [data-density="compact"]     {{ --density: 0.875; }}

@@ -74,20 +74,30 @@
     --space-fluid-lg:  clamp(2.5rem,  1.368rem + 4.528vw,  5.5rem);   /* 40 -> 88  */
     --space-fluid-xl:  clamp(4rem,    2.113rem + 7.547vw,  9rem);     /* 64 -> 144 */
 
-    /* Density dial. Set --density on any subtree to compress or expand the
-       semantic spacing below it WITHOUT touching a single component rule.
+    /* Density dial. Set it with data-density="compact|comfortable|spacious"
+       (or .region-compact) on any subtree to compress or expand the semantic
+       spacing below it WITHOUT touching a single component rule.
        0.875 = compact tables/admin. 1 = default. 1.125 = marketing/editorial. */
     --density: 1;
+  }
 
 
-    /* ---------------------------------------------------------------------
-       2. SPACING — TIER 2 (roles). Components read THESE.
-       ---------------------------------------------------------------------
-       Named for the relationship they express, not the number they hold.
-       Read them out loud: "gap-related", "pad-card", "space-section". If a
-       name does not describe a relationship, it does not belong here.
-       --------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------
+     2. SPACING — TIER 2 (roles). Components read THESE.
+     ---------------------------------------------------------------------
+     Named for the relationship they express, not the number they hold.
+     Read them out loud: "gap-related", "pad-card", "space-section". If a
+     name does not describe a relationship, it does not belong here.
 
+     Declared on every element that turns the density dial, not only on
+     :root. A custom property resolves its var()s where it is DECLARED and
+     inherits the finished value, so roles declared only on :root ignored a
+     --density set further down: <section data-density="compact"> changed
+     --density and nothing else. Setting --density by hand on some other
+     selector will NOT recompute these — use the attribute or the class.
+     --------------------------------------------------------------------- */
+
+  :root, [data-density], .region-compact {
     /* Proximity ladder — how strongly two things belong together.
        This is the whole of Gestalt proximity, encoded. Pick by MEANING. */
     --gap-fused:      calc(var(--space-1)  * var(--density));  /* icon + its label      */
@@ -108,6 +118,9 @@
     --pad-card:       calc(var(--space-6)  * var(--density));  /* card, panel           */
     --pad-card-lg:    calc(var(--space-8)  * var(--density));  /* hero card, modal body */
     --pad-well:       calc(var(--space-4)  * var(--density));  /* code block, callout   */
+  }
+
+  :root {
 
     /* Page-level rhythm. Fluid, because a 96px section gap on a 390px phone
        is a scroll tax and a 48px one on a 27" display looks unfinished. */
@@ -243,6 +256,10 @@
     --warning-500: oklch(75.0% 0.155  85);
     --warning-700: oklch(52.0% 0.125  85);
     --danger-100:  oklch(94.5% 0.038  25);
+    /* 400: the dark-theme text step. danger-500 on the dark canvas is 4.38:1
+       and fails body-text contrast; 400 is 5.65:1 on canvas, 5.46:1 on
+       surface, 4.97:1 on raised. */
+    --danger-400:  oklch(64.0% 0.190  25);
     --danger-500:  oklch(58.0% 0.205  25);
     --danger-700:  oklch(45.0% 0.170  25);
     --info-100:    oklch(94.5% 0.035 250);
@@ -284,8 +301,11 @@
 
     /* Borders. Three weights is all any interface needs. */
     --border-subtle:  var(--neutral-200);   /* dividers, table rules          */
-    --border-default: var(--neutral-300);   /* card and input outlines        */
-    --border-strong:  var(--neutral-400);   /* hover/emphasis outlines        */
+    --border-default: var(--neutral-300);   /* card outlines, decorative only */
+    /* A control's boundary is information: WCAG 1.4.11 needs >= 3:1 for it.
+       neutral-300 is 1.51:1 on white, so inputs, selects and checkboxes use
+       --border-strong: 5.17:1 on surface, 4.91:1 on canvas, 4.60:1 sunken. */
+    --border-strong:  var(--neutral-500);   /* control outlines, emphasis     */
     --border-accent:  var(--accent-500);
     --border-focus:   var(--accent-600);
 
@@ -337,6 +357,14 @@
     --shadow-md:  0 2px 4px  oklch(0% 0 0 / 0.06), 0 6px 12px oklch(0% 0 0 / 0.06);
     --shadow-lg:  0 4px 8px  oklch(0% 0 0 / 0.06), 0 12px 24px oklch(0% 0 0 / 0.08);
     --shadow-xl:  0 8px 16px oklch(0% 0 0 / 0.07), 0 24px 48px oklch(0% 0 0 / 0.10);
+  }
+
+  /* Theme-derived tokens: every value here reads a colour or shadow that a
+     theme re-points, so it is declared on every themed element as well as on
+     :root. Declared on :root alone it was resolved once, in the light theme,
+     and inherited: inside <section data-theme="dark"> the canvas flipped but
+     cards kept light-theme shadows and the focus ring kept a light gap. */
+  :root, [data-theme] {
     --shadow-focus: 0 0 0 var(--stroke-focus) var(--bg-canvas),
                     0 0 0 calc(var(--stroke-focus) * 2) var(--border-focus);
 
@@ -352,6 +380,9 @@
        transparent `outline` at the call site: forced-colors mode discards
        box-shadow, and the outline is what survives to become the indicator. */
     --elevation-focus:   var(--shadow-focus);
+  }
+
+  :root {
 
 
     /* ---------------------------------------------------------------------
@@ -423,6 +454,10 @@
      ======================================================================= */
 
   [data-theme="dark"] {
+    /* Native controls, scrollbars and the caret follow the tokens. A dark
+       page on a light OS kept white inputs holding near-white text (1.12:1). */
+    color-scheme: dark;
+
     --bg-canvas:      var(--neutral-1000);
     --bg-surface:     var(--neutral-950);
     --bg-raised:      var(--neutral-900);
@@ -449,7 +484,7 @@
 
     --border-subtle:  var(--neutral-900);
     --border-default: var(--neutral-800);
-    --border-strong:  var(--neutral-700);
+    --border-strong:  var(--neutral-500);   /* 3.89:1 on surface: >= 3:1    */
 
     /* On dark, the accent can move back to 500: the foreground on it is
        near-black (--fg-on-accent), so the fill wants to be lighter, not
@@ -459,7 +494,7 @@
 
     --fg-success:     var(--success-500);
     --fg-warning:     var(--warning-500);
-    --fg-danger:      var(--danger-500);
+    --fg-danger:      var(--danger-400);   /* 5.65:1; danger-500 was 4.38:1 */
 
     /* Shadows read as mud on dark surfaces. Depth comes from a lighter
        surface plus a top hairline instead. Keep a faint shadow for contact. */
@@ -470,13 +505,54 @@
     --shadow-xl:  0 8px 16px oklch(0% 0 0 / 0.44), 0 24px 48px oklch(0% 0 0 / 0.44);
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      /* Duplicate the block above, or set data-theme from an inline script
-         before first paint. Prefer the script: it avoids the duplication and
-         lets the user override the OS. See references/style-architecture.md. */
-    }
+  [data-theme="light"] {
+    color-scheme: light;
+  }
+
+  /* Following the OS: set data-theme from a blocking inline script in <head>,
+     before first paint, so the tokens and the native controls flip TOGETHER:
+
+       <script>
+         var t = localStorage.getItem('theme') ||
+           (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+         document.documentElement.dataset.theme = t;
+       </script>
+
+     Do not flip only `color-scheme` in a prefers-color-scheme query: that
+     turned native inputs dark on a page whose tokens stayed light, leaving
+     dark text on a dark field (1.63:1). See references/style-architecture.md.
+
+
+     =======================================================================
+     INVERSE — a dark band on a light page, or a light band on a dark one.
+     A theme like any other: it re-points the foreground and border roles so
+     headings, links and muted text stay legible on --bg-inverse. Without
+     these, .inverse headings measured 1.10:1. Ratios are against
+     --bg-inverse in the same theme.
+     ======================================================================= */
+
+  .inverse {
+    --fg-default:     var(--neutral-100);   /* 16.28:1 */
+    --fg-strong:      var(--neutral-50);
+    --fg-muted:       var(--neutral-300);   /* 12.14:1 */
+    --fg-subtle:      var(--neutral-400);   /*  7.23:1 */
+    --fg-accent:      var(--accent-300);    /*  9.56:1 */
+    --fg-link:        var(--accent-300);
+    --border-subtle:  var(--neutral-800);
+    --border-default: var(--neutral-700);
+    --border-strong:  var(--neutral-500);   /*  3.54:1 */
+  }
+
+  [data-theme="dark"] .inverse {
+    --fg-default:     var(--neutral-900);   /* 16.28:1 */
+    --fg-strong:      var(--neutral-1000);
+    --fg-muted:       var(--neutral-600);   /*  5.95:1 */
+    --fg-subtle:      var(--neutral-500);   /*  4.60:1 */
+    --fg-accent:      var(--accent-700);    /*  6.48:1 */
+    --fg-link:        var(--accent-700);
+    --border-subtle:  var(--neutral-200);
+    --border-default: var(--neutral-300);
+    --border-strong:  var(--neutral-500);   /*  4.60:1 */
   }
 
 

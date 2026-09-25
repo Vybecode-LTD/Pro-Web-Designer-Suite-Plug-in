@@ -8,6 +8,15 @@ Regressions covered:
   on PATH, but it only prints an install hint and fails — refusing the commit.
 - It looked for scripts/audit_design.py even when DESIGN_GATE_AUDIT_MODULE
   pointed elsewhere, so the override silently skipped the audit.
+
+3.1.0:
+- GT-A4: the accessibility floor had no place in the shipped hook, so
+  a11y-audit-runner's SKILL.md taught an inline snippet with no shebang (Git
+  for Windows cannot run it) and no `set -e` (a design-audit failure was
+  ignored when a11y_static passed). The shipped hook now runs a11y_static on
+  the staged files whenever scripts/a11y_static.py is vendored.
+- SB-A16: every staged file went to audit_design, which read a README.md as
+  JavaScript and refused the commit over an example in prose.
 """
 from __future__ import annotations
 
@@ -30,10 +39,12 @@ def find_sh():
     if os.name != "nt":
         return shutil.which("sh")
     if GIT:
-        root = pathlib.Path(GIT).resolve().parents[1]           # ...\Git\cmd\git.exe
-        for sh in (root / "bin" / "sh.exe", root / "usr" / "bin" / "sh.exe"):
-            if sh.exists():
-                return str(sh)
+        # ...\Git\cmd\git.exe from cmd/PowerShell; ...\Git\mingw64\bin\git.exe
+        # from Git Bash, one level deeper.
+        for root in pathlib.Path(GIT).resolve().parents[1:3]:
+            for sh in (root / "bin" / "sh.exe", root / "usr" / "bin" / "sh.exe"):
+                if sh.exists():
+                    return str(sh)
     return None
 
 
@@ -105,6 +116,34 @@ class PreCommitHook(TempDirTest):
         self.assertNotRegex(out, r"audit_design(\.py)? not found")
         self.assertEqual(code, 1, out)
         self.assertIn("13px", out)
+
+    def vendor_a11y(self):
+        shutil.copy(SKILLS / "a11y-audit-runner" / "scripts" / "a11y_static.py",
+                    self.repo / "scripts" / "a11y_static.py")
+
+    def test_the_accessibility_floor_runs_when_vendored(self):
+        self.vendor_a11y()
+        self.stage("site/index.html", '<!doctype html><html lang="en"><title>t</title>'
+                                      '<main><img src="hero.png"></main></html>\n')
+        code, out = self.run_hook()
+        self.assertEqual(code, 1, out)
+        self.assertIn("a11y_static", out)
+        self.assertIn("img-no-alt", out)
+
+    def test_both_gates_must_pass(self):
+        self.vendor_a11y()
+        self.stage("components/card.css", "@layer components {\n  .card { padding: 13px; }\n}\n")
+        self.stage("site/index.html", '<!doctype html><html lang="en"><title>t</title>'
+                                      '<main><h1>Clean</h1></main></html>\n')
+        code, out = self.run_hook()
+        self.assertEqual(code, 1, out)                  # the design audit still refuses
+        self.assertIn("13px", out)
+
+    def test_a_staged_readme_does_not_block_the_commit(self):
+        self.vendor_a11y()
+        self.stage("README.md", 'Avoid <div className="p-[13px]"> and <img src="x.png">.\n')
+        code, out = self.run_hook()
+        self.assertEqual(code, 0, out)
 
 
 if __name__ == "__main__":

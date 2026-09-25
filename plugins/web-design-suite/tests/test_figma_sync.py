@@ -1,0 +1,191 @@
+"""figma-variables-sync: figma_to_tokens.py and figma_audit.py (3.1.0).
+
+Regressions covered:
+- LC-A1: a DTCG 2025.10 export — the format's first stable version, where a
+  colour is {colorSpace, components, alpha, hex}, a dimension or duration is
+  {value, unit}, a token can be a JSON Pointer ($ref), a group can inherit
+  ($extends) and carry its own token ($root), and $type is inherited from the
+  group — was written out as Python dict reprs (`--space-6: {'value': 24,
+  'unit': 'px'};`) with exit 0, and the audit passed it with 0 findings.
+- LC-A2: a composed colour's opacity (Figma: a percentage, 0-100) was used as
+  a 0-1 alpha, so every translucent hover became opaque; with an alias in the
+  colour channel the value was written out as a Python dict.
+- LC-A3: figma_audit.py compared every colour with the studio's own ramps,
+  with no way to supply the project's, so a client's brand ramp failed as 11
+  OFF_RAMP_COLOR errors.
+- LC-A4: every generated tokens.css/json carried the current time, so the
+  documented CI drift check failed on an unchanged export.
+"""
+from __future__ import annotations
+
+import json
+import unittest
+from datetime import datetime, timedelta, timezone
+
+from wds_support import TempDirTest, output, run_py
+
+DTCG_2025 = {
+    "neutral": {"$type": "color",
+                "500": {"$value": {"colorSpace": "srgb", "components": [0.4196, 0.4196, 0.4196],
+                                   "alpha": 1, "hex": "#6b6b6b"}},
+                "0": {"$value": {"colorSpace": "srgb", "components": [1, 1, 1],
+                                 "alpha": 1, "hex": "#ffffff"}}},
+    "accent": {"$type": "color",
+               "600": {"$value": {"colorSpace": "oklch", "components": [0.565, 0.176, 42]}}},
+    "space": {"$type": "dimension",
+              "6": {"$value": {"value": 24, "unit": "px"}},
+              "7": {"$value": {"value": 28, "unit": "px"}}},
+    "dur": {"$type": "duration", "base": {"$value": {"value": 0.22, "unit": "s"}}},
+    "bg": {"$type": "color", "surface": {"$value": "{neutral.0}"}},
+    "fg": {"$type": "color", "muted": {"$value": "{neutral.500}"},
+           "subtle": {"$ref": "#/neutral/500"}},
+}
+
+
+class Dtcg2025(TempDirTest):
+    """LC-A1."""
+
+    def tokens(self, data, *args):
+        src = self.write("export.tokens.json", json.dumps(data))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--format", "css", *args,
+                      cwd=self.tmp)
+        return proc, proc.stdout.decode("utf-8")
+
+    def test_object_values_and_references_become_real_css(self):
+        clean = json.loads(json.dumps(DTCG_2025))
+        del clean["space"]["7"]                          # 28px is not a contract name
+        proc, css = self.tokens(clean)
+        self.assertNotIn("{'", css)
+        for decl in ("--space-6: 1.5rem;", "--dur-base: 220ms;",
+                     "--bg-surface: var(--neutral-0);", "--fg-muted: var(--neutral-500);",
+                     "--fg-subtle: var(--neutral-500);", "--accent-600: oklch(56.5% 0.176 42);"):
+            self.assertIn(decl, css)
+        self.assertRegex(css, r"--neutral-500: oklch\([\d.]+% [\d.]+ [\d.]+\);")
+        self.assertEqual(proc.returncode, 0, output(proc))
+
+    def test_root_tokens_and_extended_groups_are_read(self):
+        data = {"ink": {"$type": "color", "fg": {"$value": "#111111"},
+                        "bg": {"$value": "#ffffff"}},
+                "print": {"$extends": "{ink}", "fg": {"$value": "#000000"}},
+                "brand": {"$type": "color", "$root": {"$value": "#e8440a"},
+                          "hover": {"$value": "#c63a08"}}}
+        proc, css = self.tokens(data, "--color-format", "hex")
+        self.assertIn("--print-bg: #ffffff;", css)       # inherited from ink
+        self.assertIn("--print-fg: #000000;", css)       # overridden
+        self.assertIn("--brand: #e8440a;", css)          # the group's own $root token
+        self.assertIn("--brand-hover: #c63a08;", css)
+        self.assertNotIn("$root", css)
+
+    def test_a_value_it_cannot_express_is_reported_never_written_as_python(self):
+        data = dict(DTCG_2025, type={"body": {"$type": "typography", "$value": {
+            "fontFamily": "Inter", "fontSize": {"value": 16, "unit": "px"}}}})
+        proc, css = self.tokens(data)
+        self.assertNotIn("{'", css)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("type/body", output(proc))
+
+    def test_the_audit_reads_2025_10_values(self):
+        src = self.write("export.tokens.json", json.dumps(DTCG_2025))
+        proc = run_py("figma-variables-sync", "figma_audit", src, "--format", "json",
+                      cwd=self.tmp)
+        codes = {f["code"] for f in json.loads(proc.stdout)["findings"]}
+        self.assertTrue({"OFF_SCALE_SPACING", "OFF_RAMP_COLOR"} <= codes
+                        or ("OFF_RAMP_COLOR" in codes and any("SCALE" in c for c in codes)),
+                        codes)
+        self.assertEqual(proc.returncode, 1, output(proc))
+
+
+REST_COMPOSED = {
+    "status": 200, "error": False,
+    "meta": {
+        "variableCollections": {
+            "VariableCollectionId:1:1": {"id": "VariableCollectionId:1:1", "name": "Primitives",
+                                         "modes": [{"modeId": "1:0", "name": "Value"}],
+                                         "defaultModeId": "1:0", "variableIds": ["VariableID:1:2"]},
+            "VariableCollectionId:2:1": {"id": "VariableCollectionId:2:1", "name": "Semantic",
+                                         "modes": [{"modeId": "2:0", "name": "Light"}],
+                                         "defaultModeId": "2:0",
+                                         "variableIds": ["VariableID:2:2", "VariableID:2:3"]}},
+        "variables": {
+            "VariableID:1:2": {"id": "VariableID:1:2", "name": "neutral/900",
+                               "variableCollectionId": "VariableCollectionId:1:1",
+                               "resolvedType": "COLOR", "scopes": [],
+                               "valuesByMode": {"1:0": {"r": 0.12, "g": 0.11, "b": 0.1, "a": 1}}},
+            "VariableID:2:2": {"id": "VariableID:2:2", "name": "bg/hover",
+                               "variableCollectionId": "VariableCollectionId:2:1",
+                               "resolvedType": "COLOR", "scopes": ["ALL_FILLS"],
+                               "valuesByMode": {"2:0": {"color": {"type": "VARIABLE_ALIAS",
+                                                                  "id": "VariableID:1:2"},
+                                                        "opacity": 8}}},
+            "VariableID:2:3": {"id": "VariableID:2:3", "name": "bg/active",
+                               "variableCollectionId": "VariableCollectionId:2:1",
+                               "resolvedType": "COLOR", "scopes": ["ALL_FILLS"],
+                               "valuesByMode": {"2:0": {"color": {"r": 0.12, "g": 0.11, "b": 0.1,
+                                                                  "a": 1},
+                                                        "opacity": 12}}}}},
+}
+
+
+class ComposedColours(TempDirTest):
+    """LC-A2."""
+
+    def test_opacity_is_a_percentage_and_an_aliased_colour_keeps_its_link(self):
+        src = self.write("composed.json", json.dumps(REST_COMPOSED))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--format", "css",
+                      cwd=self.tmp)
+        css = proc.stdout.decode("utf-8")
+        self.assertIn("--bg-hover: color-mix(in oklch, var(--neutral-900) 8%, transparent);",
+                      css, output(proc))
+        self.assertRegex(css, r"--bg-active: oklch\([^)]*/ 0\.12\);")
+        self.assertNotIn("{'", css)
+
+
+PROJECT_ACCENT = ["#f0f6ff", "#deeaff", "#c2d9ff", "#9cc0ff", "#72a3ff", "#4d87ff",
+                  "#356aea", "#2a51b8", "#203a89", "#172861", "#0b1538"]
+STEPS = ["50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"]
+
+
+class ProjectRamps(TempDirTest):
+    """LC-A3."""
+
+    def test_the_audit_checks_against_the_projects_own_ramps(self):
+        records = [{"name": f"accent/{s}", "type": "COLOR", "value": h}
+                   for s, h in zip(STEPS, PROJECT_ACCENT)]
+        src = self.write("export.json", json.dumps(records))
+        tokens = self.write("src/styles/tokens.css", "@layer tokens {\n  :root {\n" + "".join(
+            f"    --accent-{s}: {h};\n" for s, h in zip(STEPS, PROJECT_ACCENT)) + "  }\n}\n")
+
+        def off_ramp(*extra):
+            proc = run_py("figma-variables-sync", "figma_audit", src, "--format", "json", *extra,
+                          cwd=self.tmp)
+            self.assertIn(proc.returncode, (0, 1), output(proc))
+            return [f for f in json.loads(proc.stdout)["findings"] if f["code"] == "OFF_RAMP_COLOR"]
+
+        self.assertEqual(len(off_ramp()), 11)                     # the studio's ramps: all off
+        self.assertEqual(off_ramp("--tokens", tokens), [])       # the project's ramps: all on
+
+
+class DeterministicOutput(TempDirTest):
+    """LC-A4."""
+
+    def test_generated_files_carry_no_clock_time(self):
+        src = self.write("export.tokens.json", json.dumps(DTCG_2025))
+        now = datetime.now(timezone.utc)
+        days = {(now + timedelta(days=d)).strftime("%Y-%m-%d") for d in (-1, 0, 1)}
+        for fmt in ("css", "json"):
+            with self.subTest(fmt=fmt):
+                proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--format", fmt,
+                              cwd=self.tmp)
+                text = proc.stdout.decode("utf-8")
+                self.assertTrue(text.strip(), output(proc))
+                self.assertFalse([d for d in days if d in text], text[:400])
+
+    def test_source_date_epoch_is_honoured_when_a_date_is_wanted(self):
+        src = self.write("export.tokens.json", json.dumps(DTCG_2025))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--format", "css",
+                      cwd=self.tmp, env_changes={"SOURCE_DATE_EPOCH": "0"})
+        self.assertIn("1970-01-01", proc.stdout.decode("utf-8"))
+
+
+if __name__ == "__main__":
+    unittest.main()

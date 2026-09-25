@@ -54,9 +54,9 @@ USAGE
   # cascade before you commit to inlining it
   python -m scripts.build_email src.html --out /tmp/debug.html --no-inline
 
-Run from the skill root (the directory containing `scripts/`). Running the file
-directly — `python scripts/build_email.py src.html` — works too; `--tokens` then
-defaults to `assets/email-tokens.json` relative to the skill root either way.
+Run it by path from the PROJECT root, so templates and build/ are the project's:
+`python <skill>/scripts/build_email.py emails/receipt.html --out build/receipt.html`.
+`--tokens` defaults to the skill's own `assets/email-tokens.json` either way.
 
 Exit codes: 0 compiled · 1 compiled but over the clipping threshold (or, with
 --strict, any warning) · 2 bad invocation, unreadable input, or unresolved tokens.

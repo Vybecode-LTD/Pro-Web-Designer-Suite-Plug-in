@@ -5,6 +5,20 @@ description: Generate a component state/variant proof sheet — every component 
 
 # Component State Matrix
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_SKILL_DIR}/scripts/generate_matrix.py" matrix.json --out build/proof-sheet.html
+> ```
+>
+> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (generate_matrix.py, snapshot_matrix.mjs).
+> From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
+
 `audit_design.py` proves the **code** is clean. This skill proves the **result** is.
 
 The two claims a token system makes about itself — Law 7, "density is a dial"; Law 6, "components read roles, not primitives" — are untestable by reading source. They are claims about what happens when the CSS runs. The only way to test them is to render every component at every state, every density and every theme, put it on one page, and look.
@@ -277,7 +291,7 @@ The sheet's chrome lives in its own `matrix` cascade layer, declared after `util
 | `--update-baselines` | accept everything as the new truth |
 | `--prune` | with the above, delete baselines with no cell |
 | `--threshold N` | max fraction of differing pixels per cell (default `0.002`) |
-| `--pixel-threshold N` | perceptual tolerance per pixel, 0..1 (default `0.10`) |
+| `--pixel-threshold N` | perceptual tolerance per pixel, 0..1 (default `0.03`: the suite's 4% hover overlay is a distance of ~0.038) |
 | `--allow-new` | a cell with no baseline is not a failure |
 | `--only SUBSTR` | only cells whose id contains SUBSTR; repeatable |
 | `--viewport WxH`, `--dpr N` | pinned rendering geometry |

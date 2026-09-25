@@ -94,16 +94,28 @@ What does **not** work: inspecting the error. A successful query returning zero 
 
 **Never surface the policy.** "You cannot see rows where `tenant_id != your_tenant`" tells an attacker your data model. "You do not have access to products. Ask an administrator if you think this is a mistake." tells the user what to do and reveals nothing — including whether any records exist at all.
 
-### Writes fail differently
+### Writes fail differently — and often silently
 
-A blocked read is silent; a blocked write is loud, and its error code is not obvious:
+A blocked read is silent. So is half of a blocked write:
 
-| Code | Means | Show |
+- **An `INSERT` a policy rejects raises `42501`**, and so does an `UPDATE` whose new row fails the policy's `WITH CHECK`.
+- **An `UPDATE` or `DELETE` on a row the policy's `USING` hides changes 0 rows and reports success.** Postgres's own docs show it: `UPDATE 0`. A successful response does not mean the write happened. Always `.select()` the written rows and treat an empty result as "not permitted, or gone".
+- **Foreign-key and unique checks run outside row security** ("referential integrity checks … always bypass row security", postgresql.org/docs/current/ddl-rowsecurity.html). A parent the user cannot see does **not** raise `23503`: the insert succeeds, which is how a user attaches a row to another tenant's record. The policy's `WITH CHECK` must confirm the parent is one this user may use (`exists (select 1 from projects p where p.id = project_id and p.org_id = (select org_id from profiles where id = auth.uid()))`). And because these checks see hidden rows, a `23505` or `23503` can reveal that a hidden row exists — word the messages so they do not.
+
+| Signal | Means | Show |
 |---|---|---|
-| `42501` | Insufficient privilege — a policy rejected the write | "You do not have permission to change this." |
-| `23505` | Unique violation | The field-level message from the unique index |
-| `23503` | Foreign key violation — often a parent the user cannot see | "That selection is no longer available." |
+| `42501` | A policy rejected an insert, or an update's new row failed `WITH CHECK` | "You do not have permission to change this." |
+| 0 rows from `.update()` / `.delete()` + `.select()` | The policy hid the row, or it no longer exists — Postgres said "success" | "You do not have permission to change this, or it no longer exists." |
+| `23505` | Unique violation — checked against rows the user cannot see | The field-level message from the unique index, without echoing the other row |
+| `23503` | Foreign key violation: the parent does not exist at all. A parent that exists but is hidden does **not** raise this | "That selection is no longer available." |
 | `PGRST116` | Zero rows from a `.single()` | Not found **or** not permitted. Do not say "deleted" |
+
+### Columns row-level security cannot protect
+
+Row-level security decides *which rows*; it has no opinion about *which columns*. Two kinds of column need column-level privileges as well:
+
+- **Secrets** — `*_token`, `*_secret`, `*_hash`, `api_key`, anything the browser must never receive. The generator leaves them out of every screen and type, but that is only the UI: a `select('*')` still sends them. Take them away from the API roles entirely — `revoke select (api_token, reset_token) on profiles from anon, authenticated;` — or keep them in a schema that is not exposed. A `password` column in an exposed schema is a schema bug: Supabase Auth owns passwords.
+- **Authority** — `role`, `is_admin`, `owner_id`, `org_id`, `plan`, `credits`: columns that decide who may do what. The standard profile policy `using (id = auth.uid())` with no `WITH CHECK` lets a user `update` every column of their own row, including `is_admin`. Revoke the column: `revoke update (role, is_admin, credits, org_id) on profiles from authenticated;`, or enforce it in `WITH CHECK` or a trigger. The generated `Draft` type leaves these columns out, but a TypeScript type is not access control.
 
 `PGRST116` is the one that bites. `.single()` on a row the policy hides returns the same error as `.single()` on a row that was deleted, and a detail page that renders "This record was deleted" for a permissions problem sends the user to the wrong support queue.
 
@@ -191,13 +203,17 @@ Keyset asks "give me the rows after *this one*", which is stable regardless of w
 
 ```ts
 // The sort column must be part of the cursor, and the cursor must be unique.
+// Name the columns: select('*') also sends any column the screen does not show.
 let q = supabase.from('products')
-  .select('*')
+  .select('id, name, price_cents, status, created_at')
   .order('created_at', { ascending: false })
   .order('id', { ascending: false })   // tiebreak — see below
   .limit(20);
 
 if (cursor) {
+  // .or() takes its string as-is: validate what goes into it.
+  if (!/^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-]\d{2}:\d{2})$/.test(cursor.created_at) ||
+      !/^[0-9a-f-]{36}$/i.test(cursor.id)) throw new Error('bad cursor');
   q = q.or(
     `created_at.lt.${cursor.created_at},` +
     `and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
@@ -227,8 +243,15 @@ The sequence, all five steps:
 
 ```ts
 useMutation({
-  mutationFn: (next) =>
-    supabase.from('products').update(next).eq('id', next.id).select().single(),
+  // supabase-js returns errors instead of throwing — throwOnError() makes a
+  // rejected write reach onError. .select() returns the rows actually written:
+  // none means the policy hid the row, and Postgres still reported success.
+  mutationFn: async (next) => {
+    const { data } = await supabase.from('products').update(next).eq('id', next.id)
+      .select().throwOnError();
+    if (!data?.length) throw new Error('not permitted, or no longer exists');
+    return data[0];
+  },
   onMutate: async (next) => {
     await qc.cancelQueries({ queryKey: ['products'] });
     const previous = qc.getQueryData(['products']);
@@ -244,7 +267,7 @@ useMutation({
 });
 ```
 
-**Under RLS, a rejected write returns `42501`, not a network error.** Handle it as "you do not have permission" rather than "something went wrong" — the retry the generic message invites will fail identically, forever.
+**Under RLS, a rejected write is either `42501` or zero rows — never a network error.** Handle both as "you do not have permission" rather than "something went wrong": the retry the generic message invites will fail identically, forever. An update that returns zero rows is the one that fools people, because nothing looks wrong.
 
 **`.select()` after the write is not optional** if the row has triggers, generated columns or an `updated_at`. Without it you keep your optimistic guess instead of the row the database actually holds.
 

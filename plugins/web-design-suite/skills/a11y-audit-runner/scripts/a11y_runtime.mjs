@@ -421,6 +421,18 @@ const HELPERS = () => {
     return false;
   };
 
+  // An open modal (<dialog> via showModal()) makes everything outside it inert:
+  // not focusable, not in the accessibility tree. The rest of the page is NOT
+  // "unreachable" and its links have not lost their names — they are simply
+  // behind the modal, which is exactly what a modal is for.
+  const openModal = () => {
+    try { return document.querySelector(':modal'); } catch { return null; }
+  };
+  const behindModal = (el) => {
+    const m = openModal();
+    return !!m && !m.contains(el);
+  };
+
   // Every element that SHOULD be a tab stop. The tab sequence is compared
   // against this: an element here that never receives focus is a skip.
   const expectedTabbables = (root) => {
@@ -436,6 +448,7 @@ const HELPERS = () => {
       if (ti !== null && Number(ti) < 0) continue;
       if (el.disabled) continue;
       if (el.closest('[inert]')) continue;
+      if (behindModal(el)) continue;
       if (!visible(el)) continue;
       if (el.tagName === 'A' && !el.hasAttribute('href')) continue;
       out.push({
@@ -450,7 +463,7 @@ const HELPERS = () => {
   };
 
   const describeActive = () => {
-    const el = document.activeElement;
+    let el = document.activeElement;
     if (!el || el === document.body || el === document.documentElement) {
       return { sel: '(document)', tag: 'body', docIndex: -1 };
     }
@@ -460,9 +473,22 @@ const HELPERS = () => {
       if (e === el) { idx = i; break; }
       i++;
     }
+    // Focus inside a same-origin iframe leaves document.activeElement on the
+    // <iframe> itself, so every Tab looked like "focus did not move". Follow it
+    // into the frame; the frame's position in this document stands in for
+    // the element's document order.
+    let prefix = '';
+    while (el && el.tagName === 'IFRAME') {
+      let inner = null;
+      try { inner = el.contentDocument && el.contentDocument.activeElement; } catch { inner = null; }
+      if (!inner || inner === el.contentDocument.body ||
+          inner === el.contentDocument.documentElement) break;
+      prefix += cssPath(el) + ' >>> ';
+      el = inner;
+    }
     const r = el.getBoundingClientRect();
     return {
-      sel: cssPath(el),
+      sel: prefix + cssPath(el),
       tag: el.tagName.toLowerCase(),
       tabindex: el.getAttribute('tabindex'),
       docIndex: idx,
@@ -472,7 +498,11 @@ const HELPERS = () => {
     };
   };
 
-  window.__a11y = { FOCUSABLE, cssPath, visible, expectedTabbables, describeActive };
+  // Not in the accessibility tree at all: inert, aria-hidden, or behind a modal.
+  const hiddenFromAT = (el) => !!inertOrHidden(el) || behindModal(el);
+
+  window.__a11y = { FOCUSABLE, cssPath, visible, expectedTabbables, describeActive,
+                    hiddenFromAT, openModal };
 };
 
 // ---------------------------------------------------------------------------
@@ -498,7 +528,24 @@ function contrastRatio(a, b) {
 
 async function injectAxe(page, axePath) {
   await page.addScriptTag({ path: axePath });
+  // Every frame too: axe.run() in the top frame collects results from frames
+  // that have axe, and reports the rest only as "frame-tested (incomplete)" —
+  // which is how an iframe's unlabelled input used to go unreported.
+  // axe only answers frames whose origin it allows. A page opened with --file
+  // has opaque "null" origins everywhere, so the default (same origin) left
+  // every frame unanswered; the harness owns every frame here, so allow them.
+  const allowFrames = () => {
+    try { axe.configure({ allowedOrigins: ['<unsafe_all_origins>'] }); } catch { /* old axe */ }
+  };
+  for (const frame of page.frames()) {
+    if (frame === page.mainFrame()) continue;
+    try {
+      await frame.addScriptTag({ path: axePath });
+      await frame.evaluate(allowFrames);
+    } catch { /* detached or blocked */ }
+  }
   const ok = await page.evaluate(() => typeof window.axe === 'object' && !!axe.version);
+  if (ok) await page.evaluate(allowFrames);
   if (!ok) die('axe-core was injected but did not define window.axe; the page ' +
                'may have a Content-Security-Policy that blocks inline scripts. ' +
                'Serve the page with a CSP that allows the test harness, or run ' +
@@ -591,6 +638,10 @@ async function collectNames(page, scope) {
         '[role=checkbox],[role=radio],[role=switch],[role=slider],[role=combobox]');
       for (const el of els) {
         if (!window.__a11y.visible(el)) continue;
+        // A screen reader cannot reach it, so it has no name to announce — and
+        // axe computes "" for it, which read as "missing name" on every link
+        // behind an open cookie dialog.
+        if (window.__a11y.hiddenFromAT(el)) continue;
         if (el.tagName === 'A' && !el.hasAttribute('href') &&
             !el.hasAttribute('role')) continue;
         let name = null, role = null, roleType = null;
@@ -771,9 +822,11 @@ function analyseTabOrder(forward, reverse, expected, opts) {
         { selector: [...tailSet].join(', ') }));
     }
   }
-  // Focus that does not move at all.
+  // Focus that does not move at all. An <iframe> reported as the stop is a
+  // cross-origin frame this script cannot look into, not a trap.
   for (let i = 1; i < forward.length; i++) {
-    if (forward[i].sel === forward[i - 1].sel && forward[i].sel !== '(document)') {
+    if (forward[i].sel === forward[i - 1].sel && forward[i].sel !== '(document)' &&
+        forward[i].tag !== 'iframe') {
       out.push(finding(
         'taborder', 'focus-stuck', '2.1.2', 'error',
         `Tab did not move focus away from ${forward[i].sel}.`,
@@ -1159,11 +1212,39 @@ async function forcedColorsSurvey(page) {
 // ---------------------------------------------------------------------------
 
 const CONTRAST_FN = () => {
+  // A computed colour is serialised in the space it was written in: rgb() for
+  // legacy colours, but oklch(), lab(), color(…) for the rest — which is every
+  // token this suite ships. Reading rgb() alone skipped those silently: no
+  // finding and no "unmeasurable" warning, on exactly the sites built with the
+  // suite. Anything that is not rgb() is painted into a 1x1 canvas and read
+  // back, which is the browser's own conversion to sRGB.
+  const pixel = document.createElement('canvas');
+  pixel.width = 1;
+  pixel.height = 1;
+  const ctx = pixel.getContext('2d', { willReadFrequently: true });
+  // design-audit-ignore-next-line: L1 -- a parse sentinel, not a design colour
+  const SENTINEL = '#010203';     // fillStyle left at this means "unparseable"
+  const cache = new Map();
   const parse = (c) => {
-    const m = /rgba?\(([^)]+)\)/.exec(c || '');
-    if (!m) return null;
-    const p = m[1].split(/[,\s/]+/).filter(Boolean).map(Number);
-    return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+    if (!c) return null;
+    if (cache.has(c)) return cache.get(c);
+    let out = null;
+    const m = /^rgba?\(([^)]+)\)$/.exec(c.trim());
+    if (m) {
+      const p = m[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+      out = { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+    } else if (ctx) {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = SENTINEL;
+      ctx.fillStyle = c;
+      if (ctx.fillStyle !== SENTINEL) {
+        ctx.fillRect(0, 0, 1, 1);
+        const d = ctx.getImageData(0, 0, 1, 1).data;
+        out = { r: d[0], g: d[1], b: d[2], a: Math.round((d[3] / 255) * 1000) / 1000 };
+      }
+    }
+    cache.set(c, out);
+    return out;
   };
   const over = (fg, bg) => ({
     r: fg.r * fg.a + bg.r * (1 - fg.a),

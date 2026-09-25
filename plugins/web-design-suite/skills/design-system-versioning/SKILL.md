@@ -5,6 +5,20 @@ description: Version a design system or token library without breaking the proje
 
 # Design System Versioning
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_SKILL_DIR}/scripts/diff_system.py" published/system.json build/system.json
+> ```
+>
+> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (deprecate.py, diff_system.py).
+> From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`; `${CLAUDE_PLUGIN_ROOT}/skills/design-system-docs/scripts/build_docs.py`; `${CLAUDE_PLUGIN_ROOT}/skills/design-system-docs/scripts/extract_system.py`; `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/generate_color_ramp.py`; `${CLAUDE_PLUGIN_ROOT}/skills/component-state-matrix/scripts/snapshot_matrix.mjs`.
+
 The suite now produces ten kinds of artifact and has no story for **changing** them.
 
 Here is the failure, concretely. Someone re-points `--bg-accent` from the 600 step to the 500 step to fix a contrast complaint. It is one line. It ships as a patch, because no name changed and nothing broke. Three client sites take it on their next dependency refresh. Two of them have a secondary button with 14px white text on that fill, which now measures **3.56:1** where it measured 4.92:1. Nothing failed. No test went red. Nobody notices for a month, and the person who finds it is a client.

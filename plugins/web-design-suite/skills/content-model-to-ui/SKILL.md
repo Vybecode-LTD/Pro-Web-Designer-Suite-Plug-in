@@ -5,6 +5,20 @@ description: Turn a database schema or content model into an on-system UI spec a
 
 # Content Model to UI
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_SKILL_DIR}/scripts/introspect_schema.py" supabase/migrations/*.sql -o model.json --summary
+> ```
+>
+> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (introspect_schema.py, scaffold_ui.py).
+> From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
+
 A Postgres schema exists. Somebody now has to turn it into screens.
 
 Done by hand that is a week of tedium and a guaranteed source of inconsistency: the third CRUD form is never shaped like the first, and by the eighth nobody can say which one is the house style. Done badly by a generator it produces the admin-panel look — every column a labelled text input, every list a grey table, every empty state the words "No data" — which no client accepts and which is faster to rebuild than to fix.
@@ -278,7 +292,7 @@ The honest summary: **this gets you to the end of the tedium, not to the end of 
 
 ## Scripts
 
-Both are stdlib-only Python 3. Run from the skill root.
+Both are stdlib-only Python 3. Run them by path from the project root (see *Running the scripts* at the top).
 
 ### `scripts/introspect_schema.py`
 

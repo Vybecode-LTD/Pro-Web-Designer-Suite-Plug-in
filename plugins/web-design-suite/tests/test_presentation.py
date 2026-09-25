@@ -11,10 +11,25 @@ Regressions covered:
   this suite checks the CSS still passes the gate the deck argues for).
 - (bug 5) `--dry-run` and critique_report crashed on non-cp1252 text outside
   Claude Code.
+
+3.1.0:
+- PS-A1: the deck's claims were fixed text. The accessibility slide told the
+  client "this page passes an automated WCAG 2.2 AA check and has been
+  keyboard-tested by hand" beside a table of violations and with no record of
+  any keyboard test; the performance slide was titled "It is fast, and it
+  stays fast" at 152% of budget; the creative-director slides claimed "Nine
+  laws, machine-enforced" (the audit checks L1–L6).
+- PS-A2: the defence sheet's "Known flaws" kept only findings that were NOT
+  confirmed, so confirmed defects vanished while suspicions were presented as
+  known flaws — and the deck's "What we are not happy with yet" slide copied it.
+- PS-A3: a hand finding that merely contained an audit rule's name as an
+  ordinary word ("the most important plan"; the rule is `important`) silently
+  folded that rule's whole machine group, defeating --audit-blocking too.
 """
 from __future__ import annotations
 
 import json
+import re
 import unittest
 
 from wds_support import TempDirTest, output, run_py
@@ -79,6 +94,60 @@ class BuildPresentation(TempDirTest):
         self.assertIn("🚀", proc.stdout.decode("utf-8"))
 
 
+A11Y_WITH_VIOLATIONS = {"violations": [
+    {"id": "color-contrast", "impact": "serious", "nodes": [{}, {}]},
+    {"id": "label", "impact": "critical", "nodes": [{}]}]}
+A11Y_CLEAN = {"violations": [], "passes": [{"id": "image-alt"}]}
+
+
+class DeckClaimsFollowTheData(TempDirTest):
+    """PS-A1."""
+
+    build = BuildPresentation.build
+
+    def deck(self, log_text, *args):
+        out = self.tmp / "deck.html"
+        proc = self.build(log_text, "-o", out, *args)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        return re.sub(r"\s+", " ", out.read_text(encoding="utf-8"))
+
+    def test_an_accessibility_slide_with_violations_claims_no_pass(self):
+        a11y = self.write("a11y.json", json.dumps(A11Y_WITH_VIOLATIONS))
+        html = self.deck(decision_log("D1 — Tokens"), "--audience", "client", "--a11y", a11y)
+        self.assertNotIn("passes an automated WCAG 2.2 AA check", html)
+        self.assertNotIn("keyboard-tested by hand", html)
+
+    def test_keyboard_testing_is_claimed_only_when_the_log_records_it(self):
+        a11y = self.write("a11y.json", json.dumps(A11Y_CLEAN))
+        html = self.deck(decision_log("D1 — Tokens"), "--audience", "client", "--a11y", a11y)
+        self.assertIn("passes an automated WCAG 2.2 AA check", html)
+        self.assertNotIn("keyboard-tested by hand", html)
+        template_only = decision_log("D1 — Tokens") + (
+            "\n## Tested by hand\n\n<!-- What was checked manually, by whom, when. -->\n")
+        html = self.deck(template_only, "--audience", "client", "--a11y", a11y)
+        self.assertNotIn("keyboard-tested by hand", html)       # a comment records nothing
+        tested = decision_log("D1 — Tokens") + (
+            "\n## Tested by hand\n\nKeyboard: every page, Tab and Shift+Tab, 2026-09-20.\n")
+        html = self.deck(tested, "--audience", "client", "--a11y", a11y)
+        self.assertIn("keyboard-tested by hand", html)
+
+    def test_a_page_over_budget_is_not_called_fast(self):
+        perf = self.write("perf.json", json.dumps({
+            "ledger": {"bytes": {"total": 912000}, "assets": []},
+            "budget": {"bytes": {"total": 600000}},
+            "findings": [{"severity": "error", "rule": "B total-over-budget"}]}))
+        html = self.deck(decision_log("D1 — Tokens"), "--audience", "client", "--perf", perf)
+        self.assertNotIn("It is fast, and it stays fast", html)
+        self.assertIn("over", html.lower())
+
+    def test_the_audit_is_credited_with_the_laws_it_checks(self):
+        audit = self.write("audit.json", "[]")
+        html = self.deck(decision_log("D1 — Tokens"), "--audience", "creative-director",
+                         "--audit", audit, "--a11y", self.write("a.json", json.dumps(A11Y_CLEAN)))
+        self.assertNotIn("Nine laws, machine-enforced", html)
+        self.assertNotIn("clears its floor by measurement", html)
+
+
 class CritiqueReport(TempDirTest):
 
     def test_summary_prints_non_cp1252_text_outside_claude_code(self):
@@ -90,6 +159,56 @@ class CritiqueReport(TempDirTest):
                               cwd=self.tmp, env_changes=OUTSIDE_CLAUDE_CODE)
                 self.assertNotIn("UnicodeEncodeError", output(proc))
                 self.assertIn(proc.returncode, (0, 1), output(proc))
+
+
+FINDINGS = [
+    {"layer": "color", "severity": "major", "confidence": "confirmed",
+     "title": "Muted text on the sunken band fails contrast",
+     "evidence": "Measured 3.2:1", "fix": "Re-point --fg-muted on sunken bands."},
+    {"layer": "craft", "severity": "minor", "confidence": "suspected",
+     "title": "Icon weights may differ", "fix": "Check the icon set."},
+    {"layer": "color", "severity": "minor", "confidence": "confirmed", "status": "fixed",
+     "title": "Link underline too faint", "fix": "Done in 4f2a."},
+]
+AUDIT_IMPORTANT = [{"file": f"src/a{i}.css", "line": i, "law": "L5", "rule": "important",
+                    "severity": "error", "message": "`!important` on `color`.", "fix": "",
+                    "snippet": ".a { color: red !important; }"} for i in range(1, 4)]
+
+
+class CritiqueDefenceAndMerge(TempDirTest):
+    """PS-A2 and PS-A3."""
+
+    def run_report(self, findings, *args):
+        path = self.write("findings.json", json.dumps({"subject": "Pricing", "findings": findings}))
+        return run_py("design-critique-gate", "critique_report", path, *args, cwd=self.tmp)
+
+    def test_the_defence_sheet_carries_open_confirmed_defects_and_labels_suspicions(self):
+        proc = self.run_report(FINDINGS, "--format", "defence")
+        text = proc.stdout.decode("utf-8")
+        flaws = text.split("## Known flaws you are carrying in", 1)[1].split("## ", 1)[0]
+        self.assertIn("Muted text on the sunken band fails contrast", flaws)
+        self.assertRegex(flaws, r"Icon weights may differ \| minor[^|]*suspected")
+        self.assertNotIn("Link underline too faint", flaws)          # status: fixed
+
+    def test_an_ordinary_word_does_not_fold_a_rule(self):
+        audit = self.write("audit.json", json.dumps(AUDIT_IMPORTANT))
+        hand = [{"layer": "hierarchy", "severity": "major",
+                 "title": "The most important plan is not visually recommended"}]
+        proc = self.run_report(hand, "--audit", audit, "--format", "triage")
+        self.assertIn("important × 3", proc.stdout.decode("utf-8"), output(proc))
+        proc = self.run_report(hand, "--audit", audit, "--audit-blocking", "important",
+                               "--fail-on", "blocking", "--summary")
+        self.assertEqual(proc.returncode, 1, output(proc))
+
+    def test_a_rule_is_folded_when_the_hand_finding_claims_it(self):
+        audit = self.write("audit.json", json.dumps(AUDIT_IMPORTANT))
+        for claim in ({"covers": ["important"]}, {"evidence": "the audit's `important` rule, 3 sites"}):
+            with self.subTest(claim=claim):
+                hand = [dict({"layer": "conformance", "severity": "major",
+                              "title": "Specificity fights in the legacy sheets"}, **claim)]
+                proc = self.run_report(hand, "--audit", audit, "--format", "triage")
+                self.assertNotIn("important × 3", proc.stdout.decode("utf-8"))
+                self.assertIn("folded", output(proc))                  # said, on stderr
 
 
 if __name__ == "__main__":

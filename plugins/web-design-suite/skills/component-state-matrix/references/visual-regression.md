@@ -115,10 +115,12 @@ That is the same metric `pixelmatch` uses, implemented on a canvas inside the br
 
 | Flag | Asks | Default | Raise it when |
 |---|---|---|---|
-| `--pixel-threshold` | how different does *one pixel* have to be to count | `0.10` | your renderer has unavoidable antialiasing jitter |
+| `--pixel-threshold` | how different does *one pixel* have to be to count | `0.03` | your renderer has unavoidable antialiasing jitter |
 | `--threshold` | what fraction of pixels may count before the cell fails | `0.002` | never, as a reflex — see below |
 
-`0.002` of a 300×200 cell is 120 pixels. That is about one glyph's worth of antialiasing and nothing more. It will catch a 1px padding change, a radius change, a border colour change, and any fill change.
+`0.002` of a 300×200 cell is 120 pixels. That is about one glyph's worth of antialiasing and nothing more. It will catch a 1px padding change, a radius change, a border colour change, and any fill change. The per-pixel default matters as much: at `0.10` (a distance of ~352) the suite's own 4% hover overlay (~51) and 8% pressed overlay (~210) were invisible, so deleting `:hover` or `:active` passed every cell. At `0.03` (~32) both count.
+
+Every run also checks, with no baseline at all, that each hover, active and focus-visible cell **differs** from its default cell. A state that renders pixel-for-pixel like default has no style for that state; it fails on the first run instead of being recorded as a baseline and enshrined.
 
 **Do not tune `--threshold` to make a failure go away.** Tune it once, on a clean tree, to the point where three consecutive runs pass with margin, and then leave it. If a real change is passing under it, lower it. The value belongs in the CI config with a comment saying who chose it and why — a threshold nobody can explain is a threshold that drifts upward forever.
 

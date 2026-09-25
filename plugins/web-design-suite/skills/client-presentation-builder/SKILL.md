@@ -5,6 +5,20 @@ description: Present design work so it is judged as reasoning rather than as tas
 
 # Client Presentation Builder
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_SKILL_DIR}/scripts/build_presentation.py" DECISION_LOG.md --audience client --dry-run
+> ```
+>
+> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_presentation.py).
+> From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`; `${CLAUDE_PLUGIN_ROOT}/skills/design-critique-gate/scripts/critique_report.py`; `${CLAUDE_PLUGIN_ROOT}/skills/perf-budget-gate/scripts/perf_audit.py`.
+
 A design presented without its reasoning is just taste. In a room full of people with
 taste, taste loses to whoever is most senior.
 
@@ -106,7 +120,7 @@ reconstruction and it will sound like one.
 | `DECISION_LOG.md` | `assets/DECISION_LOG.md`, kept as you worked | Every decision in the five-part shape |
 | `audit.json` | `audit_design.py --json` (web-design-studio) | "Every value comes from one file" |
 | `perf.json` | `perf_audit.py --json` (perf-budget-gate) | Weight against a budget agreed up front |
-| `a11y.json` | axe-core results | The accessibility claim you can actually make |
+| `a11y.json` | axe-core results | The accessibility claim you can actually make: "passes" only when it records no violations, "keyboard-tested by hand" only when the decision log has a `## Tested by hand` section saying what was tested |
 | `defence.md` | `critique_report.py --format defence` (design-critique-gate) | The decisions needing an out-loud justification, the taste calls, the flaws you are carrying |
 | `shots/` | Screenshots at the width the decision was made at | The work |
 

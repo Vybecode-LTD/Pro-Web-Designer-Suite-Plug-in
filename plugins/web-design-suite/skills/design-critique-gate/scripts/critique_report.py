@@ -59,10 +59,17 @@ A finding::
                     "'the one action' and spending it twice costs the signal.",
       "confidence": "confirmed",        # confirmed | likely | suspected (default likely)
       "is_taste":   false,              # true == preference, not defect
-      "defend":     false,              # force onto the defence sheet
+      "status":     "open",             # open | fixed (default open)
+      "defend":     false,              # carry onto the defence sheet even when fixed
+      "covers":     ["important"],      # audit rules this finding owns (merge)
       "id":         "hero-two-primaries",
       "ref":        "review-checklist 5.6"
     }
+
+Merging --audit: a machine group is folded into a hand finding only when the
+hand finding claims it — the rule id in `covers`, or written in backticks
+(`important`). An ordinary word never folds a rule, and a rule raised with
+--audit-blocking is never folded. Every merge is reported on stderr.
 
 Layers, in the order a reviewer's attention moves — a finding at layer 1 can
 make every finding below it moot, so they rank above them:
@@ -193,6 +200,14 @@ class Finding:
     count: int = 1                # machine findings collapse by rule
     also_by_hand: bool = False
     sites: list[str] = field(default_factory=list)   # machine findings only
+    status: str = "open"          # open | fixed
+    covers: list[str] = field(default_factory=list)  # audit rule ids it owns
+
+    def claims(self, rule: str) -> bool:
+        """Does this hand finding take ownership of an audit rule? Only when it
+        says so: the id in `covers`, or the id in backticks. A plain-text
+        search folded `important` into "the most important plan"."""
+        return rule in self.covers or f"`{rule.lower()}`" in self.haystack()
 
     @property
     def rank(self) -> tuple:
@@ -269,6 +284,21 @@ def normalise_confidence(value: Any, where: str) -> str:
     )
 
 
+def normalise_status(value: Any, where: str) -> str:
+    raw = str(value or "open").strip().lower()
+    if raw in ("open", "fixed"):
+        return raw
+    if raw in ("done", "resolved", "closed"):
+        return "fixed"
+    raise CritiqueError(f"{where}: unknown status {raw!r}. Use open or fixed.")
+
+
+def _str_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        value = value.split(",")
+    return [str(v).strip() for v in (value or []) if str(v).strip()]
+
+
 def parse_finding(raw: Any, where: str) -> Finding:
     if not isinstance(raw, dict):
         raise CritiqueError(f"{where}: expected an object, got {type(raw).__name__}")
@@ -299,6 +329,8 @@ def parse_finding(raw: Any, where: str) -> Finding:
         defend=bool(raw.get("defend", False)),
         id=str(raw.get("id", "")).strip(),
         ref=str(raw.get("ref", "")).strip(),
+        status=normalise_status(raw.get("status"), where),
+        covers=_str_list(raw.get("covers")),
         source=str(raw.get("source", "hand")).strip() or "hand",
         count=int(raw.get("count", 1) or 1),
     )
@@ -449,16 +481,18 @@ def _site_key(raw: str) -> str:
     return f"{path.replace(chr(92), '/').rsplit('/', 1)[-1]}:{line}"
 
 
-def merge(hand: list[Finding], machine: list[Finding]) -> tuple[list[Finding], list[str]]:
+def merge(hand: list[Finding], machine: list[Finding],
+          escalate: frozenset[str] = frozenset()) -> tuple[list[Finding], list[str]]:
     """Drop machine findings a human already wrote up, and say which.
 
     Two matchers, both deliberately conservative — a false merge hides a real
     finding, which is worse than a duplicate line:
-      1. the hand finding names the audit rule or law id anywhere in its text;
+      1. the hand finding CLAIMS the rule: its id in `covers`, or in backticks;
       2. the hand finding cites a file:line the machine finding also cites.
+    A rule raised with --audit-blocking is never folded: it was escalated so
+    that it stays visible, and folding it would make --fail-on blocking pass.
     """
     notes: list[str] = []
-    hand_text = " || ".join(f.haystack() for f in hand)
     hand_sites: dict[str, Finding] = {}
     for f in hand:
         for m in _SITE.finditer(f.haystack()):
@@ -467,15 +501,17 @@ def merge(hand: list[Finding], machine: list[Finding]) -> tuple[list[Finding], l
     kept: list[Finding] = []
     for mf in machine:
         rule = mf.id.replace("audit-", "")
+        if rule in escalate:
+            kept.append(mf)
+            continue
         sites = mf.sites or _SITE.findall(mf.evidence)
         covered = [s for s in sites if _site_key(s) in hand_sites]
 
-        # The human named the rule: they have taken ownership of all of it.
-        if rule and rule in hand_text:
-            notes.append(f"{mf.title} — folded whole (rule named by a hand finding)")
-            owner = next((f for f in hand if rule in f.haystack()), None)
-            if owner is not None:
-                owner.also_by_hand = True
+        # The human claimed the rule: they have taken ownership of all of it.
+        owner = next((f for f in hand if rule and f.claims(rule)), None)
+        if owner is not None:
+            notes.append(f"{mf.title} — folded whole (claimed by \"{owner.title}\")")
+            owner.also_by_hand = True
             continue
 
         # The human cited some of the same sites: subtract those and keep the
@@ -675,20 +711,25 @@ def render_defence(c: Critique, findings: list[Finding], notes: list[str]) -> st
     else:
         out.append("*None recorded.*")
 
-    carried = [f for f in ranked if f.severity != "taste" and (f.defend or f.confidence != "confirmed")]
+    # Every open defect you are presenting with — confirmed ones above all.
+    # Blocking ones are not "carried": they have their own section below.
+    carried = [f for f in ranked
+               if f.severity in ("major", "minor") and (f.status != "fixed" or f.defend)]
     out += ["", "## Known flaws you are carrying in", ""]
     if carried:
         out.append(
             "Name these before anyone else does. A flaw you raise is a judgement "
-            "call; the same flaw raised by the reviewer is an oversight.")
+            "call; the same flaw raised by the reviewer is an oversight. A "
+            "suspicion is said as a suspicion.")
         out.append("")
         out.append("| Flaw | Severity | What you say |")
         out.append("|---|---|---|")
         for f in carried:
             say = _first_sentence(f.fix) or _first_sentence(f.mechanism) or "Known; fix is scoped."
-            out.append(f"| {_cell(f.title)} | {f.severity} | {_cell(say)} |")
+            sev = f.severity if f.confidence == "confirmed" else f"{f.severity} ({f.confidence})"
+            out.append(f"| {_cell(f.title)} | {sev} | {_cell(say)} |")
     else:
-        out.append("*Nothing flagged. Every finding is either fixed, confirmed, or taste.*")
+        out.append("*Nothing open. Every finding is fixed, blocking (below) or taste.*")
 
     blocking = [f for f in ranked if f.severity == "blocking"]
     out += ["", "## Do not present until these are fixed", ""]
@@ -703,7 +744,8 @@ def render_defence(c: Critique, findings: list[Finding], notes: list[str]) -> st
 
 
 def render_summary(c: Critique, findings: list[Finding]) -> str:
-    defects = [f for f in sorted(findings, key=lambda f: f.rank) if f.severity != "taste"]
+    defects = [f for f in sorted(findings, key=lambda f: f.rank)
+               if f.severity != "taste" and f.status != "fixed"]
     if not defects:
         if not findings:
             return "No findings recorded. That is a result you have to earn — re-run the method.\n"
@@ -774,7 +816,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.audit:
             escalate = {r.strip() for r in args.audit_blocking.split(",") if r.strip()}
             machine = load_audit(args.audit, escalate)
-            findings, notes = merge(findings, machine)
+            findings, notes = merge(findings, machine, frozenset(escalate))
+            # Said in every format: a merge that nobody sees is how findings
+            # used to disappear from triage, defence and --summary.
+            for note in notes:
+                print(f"critique_report: merged {note}", file=sys.stderr)
 
         if args.layer:
             wanted = {normalise_layer(l, "--layer") for l in args.layer}
@@ -807,7 +853,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.fail_on != "never":
         threshold = SEVERITY_ORDER[args.fail_on]
-        if any(SEVERITY_ORDER[f.severity] <= threshold for f in findings):
+        if any(SEVERITY_ORDER[f.severity] <= threshold and f.status != "fixed"
+               for f in findings):
             return 1
     return 0
 

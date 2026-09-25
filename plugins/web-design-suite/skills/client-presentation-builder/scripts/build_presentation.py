@@ -442,6 +442,7 @@ class A11yFacts:
     by_impact: dict[str, int]
     top_rules: list[tuple[str, int]]
     passes: int | None
+    contrast: int = 0          # elements failing axe's color-contrast rule
 
 
 def load_a11y(path: Path) -> A11yFacts:
@@ -476,7 +477,8 @@ def load_a11y(path: Path) -> A11yFacts:
             passes += len(run["passes"])
     top = sorted(rules.items(), key=lambda kv: (-kv[1], kv[0]))[:4]
     return A11yFacts(str(path), pages, violations, nodes, by_impact, top,
-                     passes if saw_passes else None)
+                     passes if saw_passes else None,
+                     contrast=rules.get("color-contrast", 0))
 
 
 @dataclass
@@ -835,8 +837,9 @@ def slide_system(audit: AuditFacts, prov: Provenance, audience: str) -> Slide:
         else:
             s.kicker = "Craft, mechanically checked"
             s.blocks.append(blk_lede(
-                "Nine laws, machine-enforced. No hardcoded value survived into "
-                "the build, so the system is real rather than aspirational."))
+                "Laws 1–6 are machine-checked, and the audit is clean: no hardcoded "
+                "value survived into the build, so the system is real rather than "
+                "aspirational."))
         s.blocks.append(blk_metrics([
             (cited(c, "0"), "violations",
              inline("design audit, strict mode")),
@@ -865,7 +868,22 @@ def slide_system(audit: AuditFacts, prov: Provenance, audience: str) -> Slide:
 
 
 def slide_perf(perf: PerfFacts, prov: Provenance, audience: str) -> Slide:
-    s = Slide("evidence-perf", "It is fast, and it stays fast")
+    # The title is a claim, so it comes from the numbers: a byte ledger says
+    # what the page weighs, never that it is fast.
+    over = bool(perf.total_bytes and perf.budget_total
+                and perf.total_bytes > perf.budget_total)
+    if over:
+        title = "Over its weight budget, and what happens next"
+    elif perf.budget_total and perf.total_bytes is not None and not perf.errors:
+        title = "Inside the weight budget we agreed"
+    else:
+        title = "What the page weighs"
+    s = Slide("evidence-perf", title)
+    if over:
+        s.gaps.append(
+            f"The page is {round(perf.total_bytes / perf.budget_total * 100)}% of its "
+            f"weight budget. Fix it before the meeting, or put it on the known-flaws "
+            f"slide with an owner and a date.")
     rows: list[tuple[str, str, str]] = []
     if perf.total_bytes is not None:
         c_total = prov.add(perf.total_bytes, perf.source, "ledger.bytes.total")
@@ -915,8 +933,8 @@ def slide_perf(perf: PerfFacts, prov: Provenance, audience: str) -> Slide:
         s.blocks.append(blk_callout(
             "note", "Open performance findings",
             f"<p class='body'>{cited(c_e)} error(s), {cited(c_w)} warning(s) "
-            f"from the static audit. Raise these yourself if anyone is "
-            f"technical.</p>"))
+            f"from the static audit. Raise these yourself, before anyone "
+            f"asks.</p>"))
     s.notes.append(
         "Never present a lab number as a user-experience guarantee. The honest "
         "sentence is: 'this is what it weighs, measured on the build we are "
@@ -925,7 +943,19 @@ def slide_perf(perf: PerfFacts, prov: Provenance, audience: str) -> Slide:
     return s
 
 
-def slide_a11y(a11y: A11yFacts, prov: Provenance, audience: str) -> Slide:
+def manual_testing(log: DecisionLog) -> str:
+    """What the decision log records as tested by hand (`## Tested by hand`).
+    The deck claims manual testing only from here — never by default."""
+    for key in ("tested by hand", "manual testing", "tested manually", "manual checks"):
+        # The template's own guidance is an HTML comment; it records nothing.
+        text = re.sub(r"<!--.*?-->", "", log.sections.get(key, ""), flags=re.S).strip()
+        if text:
+            return text
+    return ""
+
+
+def slide_a11y(a11y: A11yFacts, prov: Provenance, audience: str,
+               manual: str = "") -> Slide:
     s = Slide("evidence-a11y", "Accessibility, stated honestly")
     c_v = prov.add(a11y.violations, a11y.source, "count(violations)")
     c_n = prov.add(a11y.nodes, a11y.source, "sum(len(violations[].nodes))")
@@ -949,13 +979,28 @@ def slide_a11y(a11y: A11yFacts, prov: Provenance, audience: str) -> Slide:
                 rows.append([esc(impact), cited(c)])
         s.blocks.append(blk_table(["Impact", "Elements"], rows))
         _ = c_s
-    wording = (
-        "The honest claim: this page passes an automated WCAG 2.2 AA check and "
-        "has been keyboard-tested by hand. Automated tools cover roughly a "
-        "third of the criteria — they cannot judge whether alt text is "
-        "<em>accurate</em> or whether an interaction makes sense to a screen "
-        "reader user. Claiming 'fully accessible' from a green tool result is "
-        "the one claim in this deck that can be disproved by a single user.")
+    # Every sentence below is chosen from the data. "Passes" only when the
+    # automated result has no violations; "keyboard-tested" only when the
+    # decision log records it (## Tested by hand).
+    limits = ("Automated tools find only part of the problems — they cannot "
+              "judge whether alt text is <em>accurate</em> or whether an "
+              "interaction makes sense to a screen reader user.")
+    if a11y.violations:
+        claim = (f"The honest claim today: the automated WCAG 2.2 AA check still "
+                 f"finds {cited(c_v)} issue(s) on {cited(c_n)} element(s), and "
+                 f"they are listed here with an owner and a date.")
+        s.gaps.append(
+            f"The automated accessibility check is not clean ({a11y.violations} "
+            f"violation(s) on {a11y.nodes} element(s)). Fix before presenting, or "
+            f"put them on the known-flaws slide with an owner and a date.")
+    else:
+        claim = "The honest claim: this page passes an automated WCAG 2.2 AA check"
+        claim += (" and has been keyboard-tested by hand." if manual else
+                  ". Keyboard and screen-reader passes are manual, and none is "
+                  "recorded for this build, so this deck does not claim one.")
+    wording = (f"{claim} {limits} Claiming 'fully accessible' from a green tool "
+               f"result is the one claim in this deck that can be disproved by a "
+               f"single user.")
     if audience == "client":
         s.kicker = "What we can and cannot promise"
         s.blocks.append(blk_callout("note", "Say it this way",
@@ -964,16 +1009,21 @@ def slide_a11y(a11y: A11yFacts, prov: Provenance, audience: str) -> Slide:
         s.kicker = "State of the a11y gate"
         s.blocks.append(blk_callout(
             "note", "What the number is not",
-            "<p class='body'>Automated coverage is about a third of the "
-            "success criteria. The keyboard pass and the screen-reader pass "
-            "are manual and belong in the definition of done.</p>"))
+            "<p class='body'>Automated checks cover only part of WCAG. The "
+            "keyboard pass and the screen-reader pass are manual and belong in "
+            "the definition of done.</p>"))
     else:
         s.kicker = "The floor, measured"
-        s.blocks.append(blk_callout(
-            "note", "Contrast is measured, never judged",
-            "<p class='body'>Every foreground/background pair in the system "
-            "clears its floor by measurement, which is why none of the colour "
-            "decisions in this deck are arguments about taste.</p>"))
+        if a11y.contrast:
+            c_c = prov.add(a11y.contrast, a11y.source, "violations[id==color-contrast].nodes")
+            body = (f"{cited(c_c)} element(s) still fail the automated contrast "
+                    f"check; they are listed below, and they are defects, not taste.")
+        else:
+            body = (f"The automated pass found no contrast failure on the "
+                    f"{cited(c_p)} page(s) scanned, which is why the colour "
+                    f"decisions in this deck are not arguments about taste.")
+        s.blocks.append(blk_callout("note", "Contrast is measured, never judged",
+                                    f"<p class='body'>{body}</p>"))
     if a11y.top_rules:
         rows = []
         for rid, count in a11y.top_rules:
@@ -1333,7 +1383,8 @@ def _plan_for(inp: Inputs, audience: str, max_decisions: int,
 
     sys_slide = slide_system(inp.audit, prov, audience) if inp.audit else None
     perf_slide = slide_perf(inp.perf, prov, audience) if inp.perf else None
-    a11y_slide = slide_a11y(inp.a11y, prov, audience) if inp.a11y else None
+    a11y_slide = (slide_a11y(inp.a11y, prov, audience, manual_testing(inp.log))
+                  if inp.a11y else None)
 
     plan: list[Slide] = []
     if audience == "client":

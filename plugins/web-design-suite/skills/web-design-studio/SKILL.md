@@ -5,6 +5,19 @@ description: Professional website design and front-end architecture — mockups,
 
 # Web Design Studio
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_SKILL_DIR}/scripts/generate_color_ramp.py" "#e8440a" --name accent --format css
+> ```
+>
+> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (audit_design.py, generate_color_ramp.py, generate_type_scale.py).
+
 A complete method for designing and building websites that look considered and stay coherent when more than one person touches them.
 
 Two halves, held in tension on purpose:
@@ -205,4 +218,4 @@ python -m scripts.generate_type_scale --base 16 --ratio 1.2 --fluid 380 1440 --p
 
 ## Deliverable shape
 
-Unless the user says otherwise, finish by producing a ZIP that drops straight into a repository: the full folder structure, the token and style files, the components built so far, `CLAUDE.md`, `IMPLEMENTATION.md`, `DESIGN_DECISIONS.md`, the audit script, and the lint configs wired into `package.json` and a pre-commit hook. The test is that Claude Code can be pointed at the extracted folder and continue without asking a single structural question.
+Inside a repository — Claude Code working in the user's project — write the files into the repo itself, where they are committed and reviewed like any change. Only when there is no repository to write into (a chat session, a handoff to another team), or the user asks for one, package the result as a ZIP that drops straight into a repository. Either way the deliverable is the same set: the full folder structure, the token and style files, the components built so far, `CLAUDE.md`, `IMPLEMENTATION.md`, `DESIGN_DECISIONS.md`, the audit script, and the lint configs wired into `package.json` and a pre-commit hook. The test is that Claude Code can be pointed at the result and continue without asking a single structural question.

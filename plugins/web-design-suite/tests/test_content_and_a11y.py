@@ -26,10 +26,26 @@ Regressions covered:
 - CSM-1: generate_matrix.py's manifest guard accepted a template with
   `{content}` but no `{attrs}`, so every state/variant/size cell rendered
   identically while the coverage line reported nothing wrong.
+
+3.1.0:
+- XC-A6: a11y_static recomputed every control's ancestors and the page's
+  label-for ids for EACH form control, and counted each tag's line from the
+  top of the file, so a 4,000-row page took ~46 s and a 2.8 MB page did not
+  finish.
+- GT-A4: a file named explicitly was audited as markup whatever it was, so a
+  hook that passes every staged file failed commits on README.md or render.py.
+- DL-A1: the credential rule matched a short list of exact names, although the
+  docs promise `*_token`, `*_hash`, `*_secret` patterns — so `api_token`,
+  `reset_token`, `webhook_secret` and `token_hash` were displayed and editable.
+- DL-A2: columns that carry authority (`role`, `is_admin`, `credits`,
+  `org_id`, `owner_id`, `plan`, and a profile's `id` that references
+  auth.users) were editable by default and in the generated Draft type, so a
+  profile form wired to `.update(draft)` let users promote themselves.
 """
 from __future__ import annotations
 
 import json
+import time
 import unittest
 
 from wds_support import TempDirTest, output, run_py
@@ -243,6 +259,118 @@ class ComponentMatrixRequiresAttrs(TempDirTest):
         none) — only {attrs} is mandatory."""
         proc = self.generate("<input class=\"badge\" {attrs} />")
         self.assertEqual(proc.returncode, 0, output(proc))
+
+
+SAAS_DDL = """\
+CREATE TABLE organizations (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name text NOT NULL,
+    plan text NOT NULL DEFAULT 'free'
+);
+CREATE TABLE profiles (
+    id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    display_name text NOT NULL,
+    role text NOT NULL DEFAULT 'member',
+    is_admin boolean NOT NULL DEFAULT false,
+    credits integer NOT NULL DEFAULT 0,
+    org_id uuid REFERENCES organizations(id),
+    api_token text,
+    reset_token text,
+    webhook_secret text,
+    token_hash text
+);
+CREATE TABLE projects (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name text NOT NULL,
+    owner_id uuid NOT NULL REFERENCES profiles(id)
+);
+"""
+
+
+class SupabaseSecurityDefaults(TempDirTest):
+    """DL-A1 and DL-A2."""
+
+    def setUp(self):
+        super().setUp()
+        self.write("schema.sql", SAAS_DDL)
+        proc = run_py("content-model-to-ui", "introspect_schema", "schema.sql", "-o", "model.json",
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.model = json.loads((self.tmp / "model.json").read_text(encoding="utf-8"))
+
+    def col(self, table, name):
+        t = next(t for t in self.model["tables"] if t["name"] == table)
+        return next(c for c in t["columns"] if c["name"] == name)
+
+    def test_secret_columns_are_never_displayed_or_editable(self):
+        for name in ("api_token", "reset_token", "webhook_secret", "token_hash"):
+            with self.subTest(column=name):
+                ui = self.col("profiles", name)["ui"]
+                self.assertTrue(ui.get("never_display"), ui)
+                self.assertFalse(ui["placement"]["detail"])
+                self.assertFalse(ui["placement"]["form"])
+
+    def test_authority_columns_are_read_only_by_default(self):
+        for table, name in (("profiles", "id"), ("profiles", "role"), ("profiles", "is_admin"),
+                            ("profiles", "credits"), ("profiles", "org_id"),
+                            ("organizations", "plan"), ("projects", "owner_id")):
+            with self.subTest(column=f"{table}.{name}"):
+                self.assertFalse(self.col(table, name)["ui"]["placement"]["form"])
+        self.assertTrue(self.col("profiles", "display_name")["ui"]["placement"]["form"])
+
+    def test_the_draft_type_leaves_authority_and_secrets_out(self):
+        proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "src",
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        types = next((self.tmp / "src").rglob("profile*.types.ts")).read_text(encoding="utf-8")
+        draft = types.split("export type ProfileDraft", 1)[1].split(">;", 1)[0]
+        self.assertIn("'display_name'", draft)
+        for name in ("role", "is_admin", "credits", "org_id", "api_token", "reset_token"):
+            self.assertNotIn(f"'{name}'", draft)
+
+    def test_a_human_can_release_an_authority_column(self):
+        answers = self.write("answers.json", json.dumps(
+            {"profiles.authority_columns": ["id", "role", "is_admin", "credits"]}))
+        proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "src",
+                      "--answers", answers, cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        types = next((self.tmp / "src").rglob("profile*.types.ts")).read_text(encoding="utf-8")
+        draft = types.split("export type ProfileDraft", 1)[1].split(">;", 1)[0]
+        self.assertIn("'org_id'", draft)                  # released
+        self.assertNotIn("'role'", draft)                 # still protected
+
+
+class A11yStaticScaleAndScope(TempDirTest):
+    """XC-A6 and GT-A4."""
+
+    def page(self, rows):
+        body = "".join(f'<div class="r"><img src="i{i}.png" alt=""><button>Go {i}</button>'
+                       f'<label>Name {i} <input type="text"></label></div>\n'
+                       for i in range(rows))
+        return self.write(f"page{rows}.html", '<!doctype html><html lang="en"><title>t</title>'
+                          f"<main><h1>t</h1>{body}</main></html>\n")
+
+    def timed(self, path):
+        start = time.perf_counter()
+        proc = run_py("a11y-audit-runner", "a11y_static", path, "--json", cwd=self.tmp,
+                      timeout=600)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return time.perf_counter() - start
+
+    def test_a_large_page_is_audited_in_roughly_linear_time(self):
+        small, large = self.timed(self.page(1000)), self.timed(self.page(4000))
+        # Four times the rows: linear work takes ~4x, quadratic ~16x.
+        self.assertLess(large / small, 8, f"1,000 rows {small:.1f}s, 4,000 rows {large:.1f}s")
+        self.assertLess(large, 20)
+
+    def test_files_named_explicitly_that_are_not_markup_are_skipped(self):
+        self.write("README.md", "Use <img src='x.png'> and <button></button>\n")
+        self.write("render.py", "html = '<input type=\"text\">'\n")
+        self.write("notes.txt", "<a href='#'></a>\n")
+        proc = run_py("a11y-audit-runner", "a11y_static", "README.md", "render.py",
+                      "notes.txt", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn("skipped", output(proc).lower())
 
 
 if __name__ == "__main__":

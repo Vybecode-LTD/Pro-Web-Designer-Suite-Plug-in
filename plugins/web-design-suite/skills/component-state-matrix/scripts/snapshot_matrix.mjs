@@ -39,7 +39,13 @@
  *   --update-baselines     accept everything as the new truth
  *   --prune                with --update-baselines, delete baselines with no cell
  *   --threshold N          max fraction of differing pixels per cell (default 0.002)
- *   --pixel-threshold N    perceptual tolerance per pixel, 0..1     (default 0.10)
+ *   --pixel-threshold N    perceptual tolerance per pixel, 0..1     (default 0.03)
+ *
+ * Every hover, active and focus-visible cell must also DIFFER from its default
+ * cell, in the same run, with no baseline involved: a state that renders
+ * exactly like default has no style, and that fails. (At the old 0.10
+ * tolerance the suite's own 4% hover and 8% pressed overlays were below the
+ * noise floor, so deleting :hover or :active passed every cell.)
  *   --allow-new            a cell with no baseline is not a failure
  *   --only SUBSTR          only cells whose id contains SUBSTR (repeatable)
  *   --viewport WxH         browser viewport                 (default 1440x900)
@@ -79,7 +85,10 @@ function parseArgs(argv) {
     update: false,
     prune: false,
     threshold: 0.002,
-    pixelThreshold: 0.10,
+    // 0.03 (a YIQ distance of ~32): a 4% black overlay on white moves each
+    // channel ~10 levels (distance ~51), 8% ~210. At 0.10 (~352) both were
+    // invisible. The antialiasing escape below still absorbs sub-pixel shifts.
+    pixelThreshold: 0.03,
     allowNew: false,
     only: [],
     viewport: { width: 1440, height: 900 },
@@ -496,6 +505,7 @@ async function main() {
 
   const rows = [];
   const seen = new Set();
+  const shots = new Map();        // id -> PNG buffer, for the state-vs-default check
   for (const id of ids) {
     seen.add(id);
     const file = `${id}.png`;
@@ -511,6 +521,7 @@ async function main() {
       continue;
     }
     fs.writeFileSync(curPath, buf);
+    shots.set(id, buf);
 
     if (opts.update) {
       fs.writeFileSync(basePath, buf);
@@ -550,6 +561,32 @@ async function main() {
       currentRel: path.relative(opts.out, curPath),
       diffRel: failed ? path.relative(opts.out, diffPath) : undefined,
     });
+  }
+
+  // A hover, active or focus-visible cell that is pixel-identical to its
+  // default cell has no style for that state. That needs no baseline: it is
+  // wrong on the first run, and a baseline recorded from it would enshrine it.
+  const STATE_SEG = /--st_(hover|active|focus-visible)(?=--|$)/;
+  for (const [id, buf] of shots) {
+    const m = STATE_SEG.exec(id);
+    if (!m) continue;
+    const defaultId = id.replace(STATE_SEG, '--st_default');
+    const base = shots.get(defaultId);
+    if (!base) continue;
+    const res = await cmp.evaluate(COMPARE_FN, {
+      aURL: 'data:image/png;base64,' + base.toString('base64'),
+      bURL: 'data:image/png;base64,' + buf.toString('base64'),
+      pixelThreshold: 0,
+    });
+    if (res.sizeChanged || res.mismatched > 0) continue;
+    const note = `renders exactly like ${defaultId}: the ${m[1]} state has no visible style`;
+    const row = rows.find((r) => r.id === id);
+    if (row) {
+      row.status = 'fail';
+      row.note = row.note ? `${note}; ${row.note}` : note;
+    } else {
+      rows.push({ id, status: 'fail', note });
+    }
   }
 
   // Baselines with no cell: either a cell was renamed or a component was

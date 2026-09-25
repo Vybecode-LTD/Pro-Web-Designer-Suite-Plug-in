@@ -41,8 +41,9 @@ USAGE
   # Include the files you would normally exclude, to see the true total
   python -m scripts.extract_literals . --include-vendor
 
-Run it from the skill root (the directory containing `scripts/`). Running the
-file directly — `python scripts/extract_literals.py ./src` — works too.
+Run it by path from the PROJECT root, so `./src` is the project's:
+`python <skill>/scripts/extract_literals.py ./src`. The `-m scripts.extract_literals`
+form above is for a project that vendored scripts/.
 
 Exit codes: 0 always when the walk completed (a census cannot "fail"),
 2 on bad invocation or an unreadable path.
@@ -51,6 +52,7 @@ Exit codes: 0 always when the walk completed (a census cannot "fail"),
 from __future__ import annotations
 
 import argparse
+import bisect
 import csv
 import io
 import json
@@ -76,7 +78,9 @@ SKIP_DIRS = {
 # Third-party CSS you did not write and will not migrate. Fighting it is the
 # classic way a migration runs 3x over estimate; see references/
 # framework-migrations.md §6 — you layer it, you do not rewrite it.
-VENDOR_DIRS = {"vendor", "vendors", "third-party", "thirdparty", "lib", "libs"}
+# Not `lib/`: SvelteKit keeps its components in src/lib, and a library's own
+# `lib/` is usually the code being migrated. Vendored copies go in vendor/.
+VENDOR_DIRS = {"vendor", "vendors", "third-party", "thirdparty"}
 VENDOR_FILE_PAT = re.compile(
     r"(^|[/\\])(normalize|reset|bootstrap|foundation|bulma|materialize|"
     r"swiper|slick|aos|fontawesome|tailwind\.output)[\w.-]*\.(css|scss|less)$",
@@ -377,10 +381,24 @@ def mask_strings_and_urls(value: str) -> str:
     return "".join(out)
 
 
+# (text, newline index) for the few texts in use. Holding the text keeps its id
+# from being reused, so the identity check below cannot match a different file.
+_LINE_STARTS: list[tuple[str, list[int]]] = []
+
+
 def line_col(text: str, offset: int) -> tuple[int, int]:
-    line = text.count("\n", 0, offset) + 1
-    last_nl = text.rfind("\n", 0, offset)
-    return line, offset - last_nl
+    """1-based line and column of `offset`. The newline index is built once per
+    text and bisected: counting from the top of the file for every literal made
+    one long line — minified CSS, a many-layer shadow — quadratic."""
+    for cached, starts in _LINE_STARTS:
+        if cached is text:
+            break
+    else:
+        starts = [0] + [m.end() for m in re.finditer("\n", text)]
+        _LINE_STARTS.insert(0, (text, starts))
+        del _LINE_STARTS[4:]
+    line = bisect.bisect_right(starts, offset)
+    return line, offset - starts[line - 1] + 1
 
 
 def kebab(name: str) -> str:
@@ -1125,10 +1143,15 @@ def classify_tailwind(prefix: str, body: str) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 
 def iter_files(paths: Sequence[str], *, include_vendor: bool,
-               include_tokens: bool) -> Iterator[Path]:
+               include_tokens: bool,
+               vendor_skipped: list[Path] | None = None) -> Iterator[Path]:
+    """Files to scan. A file named explicitly is always scanned (the user asked
+    for it); inside a folder, vendor files are left out and collected in
+    `vendor_skipped`, so the census can say what it did not count."""
     for raw in paths:
         p = Path(raw)
-        if p.is_file():
+        explicit = p.is_file()
+        if explicit:
             candidates = [p]
         else:
             candidates = []
@@ -1140,7 +1163,9 @@ def iter_files(paths: Sequence[str], *, include_vendor: bool,
         for fp in candidates:
             if fp.suffix.lower() not in CSS_EXT | JS_EXT:
                 continue
-            if not include_vendor and is_vendor(fp):
+            if not include_vendor and not explicit and is_vendor(fp):
+                if vendor_skipped is not None:
+                    vendor_skipped.append(fp)
                 continue
             if not include_tokens and is_token_file(fp):
                 continue
@@ -1151,8 +1176,10 @@ def extract(paths: Sequence[str], *, include_vendor: bool = False,
             include_tokens: bool = False) -> tuple[list[Literal], list[str]]:
     literals: list[Literal] = []
     problems: list[str] = []
+    vendor_skipped: list[Path] = []
     for fp in iter_files(paths, include_vendor=include_vendor,
-                         include_tokens=include_tokens):
+                         include_tokens=include_tokens,
+                         vendor_skipped=vendor_skipped):
         try:
             text = fp.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
@@ -1167,6 +1194,12 @@ def extract(paths: Sequence[str], *, include_vendor: bool = False,
                 literals.extend(extract_js(fp, text))
         except Exception as exc:                     # noqa: BLE001 — never abort a census
             problems.append(f"{fp}: parse failed ({type(exc).__name__}: {exc})")
+    if vendor_skipped:
+        names = ", ".join(norm_path(p) for p in vendor_skipped[:5])
+        more = f" and {len(vendor_skipped) - 5} more" if len(vendor_skipped) > 5 else ""
+        problems.append(f"excluded {len(vendor_skipped)} vendor file(s): {names}{more} "
+                        f"— you layer vendor CSS, you do not migrate it; "
+                        f"--include-vendor counts them")
     literals.sort(key=lambda l: (l.file, l.line, l.col))
     return literals, problems
 

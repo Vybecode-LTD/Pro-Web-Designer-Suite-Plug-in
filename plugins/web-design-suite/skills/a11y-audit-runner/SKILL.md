@@ -5,6 +5,20 @@ description: Automate accessibility testing and enforce WCAG 2.2 AA in CI — ax
 
 # Accessibility Audit Runner
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_SKILL_DIR}/scripts/a11y_static.py" src/
+> ```
+>
+> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (a11y_runtime.mjs, a11y_static.py).
+> From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
+
 **Automated tools catch roughly a third of WCAG issues.** Start here, say it out loud, and build everything else on top of it.
 
 The number is not a rhetorical hedge. In the only controlled study with a known denominator — the UK Government Digital Service, 2017, a page with **143 deliberately planted failures across 19 categories**, run through ten automated tools — the best single tool found **37%** (Tenon, errors and warnings) to **41%** (Asqatasun, counting its manual-inspection prompts). All ten tools *combined* found 71%. **29% of the barriers were found by no tool at all.** ([GDS](https://accessibility.blog.gov.uk/2017/02/24/what-we-found-when-we-tested-tools-on-the-worlds-least-accessible-webpage/))
@@ -68,15 +82,16 @@ git add .a11y-baseline.json
 
 Existing debt is frozen; new violations fail immediately. **A gate that fails on day one is a gate somebody deletes on day two.** Pay the baseline down per directory, starting with the categories a user feels first: `F` (labels), `K` (focus), `N` (names).
 
-Wire it beside the design gate — one hook, three checks:
+Wire it into the design gate's hook — one hook, both gates, and the commit is refused if either fails. Use the shipped hook rather than a hand-written one: it quotes file names with spaces, skips files that are not code, and reports every gate's verdict.
 
 ```bash
-# .githooks/pre-commit
-CHANGED=$(git diff --cached --name-only --diff-filter=ACM)
-[ -z "$CHANGED" ] && exit 0
-python -m scripts.audit_design $CHANGED        # Law 9
-python -m scripts.a11y_static  $CHANGED        # the accessibility floor
+cp <web-design-studio>/assets/configs/pre-commit-design-gate.sh .git/hooks/pre-commit
+mkdir -p scripts
+cp <web-design-studio>/scripts/audit_design.py scripts/        # Law 9
+cp <a11y-audit-runner>/scripts/a11y_static.py scripts/         # the accessibility floor
 ```
+
+The hook runs `a11y_static` on the staged files whenever `scripts/a11y_static.py` is present (set `DESIGN_GATE_A11Y_MODULE` if you keep it elsewhere). A hand-rolled `.githooks/pre-commit` with no shebang does not run at all under Git for Windows, and one without `set -e` passes whenever its LAST command passes.
 
 Never put the runtime layer in a pre-commit hook. A minute of browser time per commit is how a team discovers `--no-verify`.
 

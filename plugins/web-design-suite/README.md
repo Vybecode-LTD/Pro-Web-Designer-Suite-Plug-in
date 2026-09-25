@@ -77,49 +77,59 @@ compile target, and the one place the laws deliberately bend.
 
 ## Install
 
-**As a plugin** — everything at once:
+**As a plugin** — everything at once. Add the folder (or the git URL) that holds
+`.claude-plugin/marketplace.json`, then install by its full id:
 
 ```
-/plugin marketplace add <this repo>
-/plugin install web-design-suite
+/plugin marketplace add path/to/web-design-suite
+/plugin install web-design-suite@web-design-suite
 ```
 
-**As individual skills** — each `.skill` file installs with the *Add skill* button.
+**As individual skills** — a skill folder can be installed on its own, but eight of
+them run web-design-studio's `audit_design.py` as their gate, so install
+web-design-studio beside any of them. (No packaged `.skill` files ship yet.)
 
 **As a repo** — extract `skills/web-design-studio/assets/starter/styles/` into your project, wire the configs from `assets/configs/`, and point Claude Code at it.
 
 ---
 
+Every script is plain Python 3 (or Node for the three browser scripts). Run them
+**by path, from your project's root**, so `src/` means your `src/` and every output
+lands in your project, never inside the plugin. Below, `WDS` is the plugin's
+`skills` folder (for a local install, `~/.claude/local-marketplaces/web-design-suite/skills`).
+
 ## Quick start on a new project
 
 ```bash
 # 1. Tokens — derive the ramp from the brand, verify contrast
-python -m scripts.generate_color_ramp "#e8440a" --name accent --format css
-python -m scripts.generate_type_scale --base 16 --ratio 1.2 --fluid 380 1440 --preview
+python "$WDS/web-design-studio/scripts/generate_color_ramp.py" "#e8440a" --name accent --format css
+python "$WDS/web-design-studio/scripts/generate_type_scale.py" --base 16 --ratio 1.2 --fluid 380 1440 --preview
 
 # 2. Build. Copy tokens.css / reset.css / base.css / layout.css.
 
 # 3. Gate
-python -m scripts.audit_design src/ --strict      # the design gate
-python -m scripts.perf_audit dist/ --strict      # the performance gate
-python -m scripts.a11y_static src/ --strict      # the accessibility gate
+python "$WDS/web-design-studio/scripts/audit_design.py" src/ --strict    # the design gate
+python "$WDS/perf-budget-gate/scripts/perf_audit.py" dist/ --strict      # the performance gate
+python "$WDS/a11y-audit-runner/scripts/a11y_static.py" src/ --strict     # the accessibility gate
 ```
 
 ## Quick start on an inherited codebase
 
 ```bash
-python -m scripts.extract_literals ./src --format report        # what is actually there
-python -m scripts.cluster_values literals.json --out proposal/  # what it was trying to be
-python -m scripts.apply_codemod proposal/mapping.json --kind spacing   # dry run
-python -m scripts.apply_codemod proposal/mapping.json --kind spacing --apply
-python -m scripts.audit_design ./src --write-baseline .design-baseline.json  # freeze the rest
+M="$WDS/design-token-migration/scripts"
+python "$M/extract_literals.py" ./src --format report                   # what is actually there
+python "$M/extract_literals.py" ./src --format json -o literals.json     # the same, as data
+python "$M/cluster_values.py" literals.json -o proposal/                 # what it was trying to be
+python "$M/apply_codemod.py" ./src -m proposal/mapping.json --kind spacing          # dry run
+python "$M/apply_codemod.py" ./src -m proposal/mapping.json --kind spacing --apply
+python "$WDS/web-design-studio/scripts/audit_design.py" ./src --write-baseline .design-baseline.json  # freeze the rest
 ```
 
 ---
 
 ## What the gate actually catches
 
-`audit_design.py` is stdlib-only Python 3 and understands cascade layers, component vs token files, and the documented exceptions (`margin:auto`, the owl selector in a parent's rule, `calc(var(--t) * -1)`, `em` as a ratio, `vw` as relational).
+`audit_design.py` is stdlib-only Python 3 and understands cascade layers, component vs token files, and the documented exceptions (`margin:auto`, the owl selector in a parent's rule, `calc(var(--t) * -1)`, `em` as a ratio, `vw` as relational). It reads stylesheets, JS/TS/JSX, and the `<style>` blocks, `style=""` attributes and class lists of HTML, Vue, Svelte and Astro files (HTML email is `lint_email`'s job). A literal beside a `var()` is still a literal, and rules inside `@media` / `@container` are checked like any other. A folder with nothing auditable in it is an error, not a pass.
 
 - **L1** raw lengths, colors, shadows, durations, easings, radii, z-indexes, font sizes and weights — including literals **disguised inside a Tier-3 socket declaration**, which look tokenized and are not
 - **L2** child margins in components, and Tailwind `space-x/y-*`
@@ -140,13 +150,13 @@ Adopt it on a legacy repo with `--write-baseline`: the gate goes on today and th
 
 ## Regression tests
 
-The suite's own tests live in `tests/` and need only Python 3 (Node for the browser-script tests, which use a stub instead of a real browser). From the plugin root:
+The suite's own tests live in `tests/` and need only Python 3; git and a POSIX `sh` for the hook and recipe tests; Node for the browser-script tests. From the plugin root:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-Set `WDS_PLUGIN_ROOT` to run the same tests against another copy of the suite.
+Set `WDS_PLUGIN_ROOT` to run the same tests against another copy of the suite — that is how every fix is shown failing on the release before it. The real-browser tests (runtime contrast, modal and iframe focus, the matrix's state check, the starter CSS in Chromium) run when `WDS_NODE_MODULES` points at a `node_modules` holding `playwright` and `axe-core`; they never download a browser. What changed in each release is in `CHANGELOG.md`.
 
 ---
 

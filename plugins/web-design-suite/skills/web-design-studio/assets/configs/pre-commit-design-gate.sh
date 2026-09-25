@@ -9,6 +9,8 @@
 #   1. stylelint  — assets/configs/stylelint.config.mjs   (CSS side)
 #   2. eslint     — assets/configs/eslint.design.config.mjs (JSX/TSX side)
 #   3. python -m scripts.audit_design                      (cross-cutting)
+#   4. python -m scripts.a11y_static    (the accessibility floor — runs only
+#      when a11y-audit-runner's a11y_static.py is vendored into scripts/)
 #
 # INSTALL
 #   cp assets/configs/pre-commit-design-gate.sh .git/hooks/pre-commit
@@ -47,6 +49,8 @@ STYLELINT_CONFIG="${DESIGN_GATE_STYLELINT_CONFIG:-assets/configs/stylelint.confi
 ESLINT_CONFIG="${DESIGN_GATE_ESLINT_CONFIG:-assets/configs/eslint.design.config.mjs}"
 AUDIT_MODULE="${DESIGN_GATE_AUDIT_MODULE:-scripts.audit_design}"
 AUDIT_FILE="$(printf '%s' "$AUDIT_MODULE" | tr . /).py"
+A11Y_MODULE="${DESIGN_GATE_A11Y_MODULE:-scripts.a11y_static}"
+A11Y_FILE="$(printf '%s' "$A11Y_MODULE" | tr . /).py"
 PYTHON="${DESIGN_GATE_PYTHON:-}"
 if [ -z "$PYTHON" ]; then
   # `python3` on Windows is often the Microsoft Store placeholder: it is on
@@ -222,6 +226,19 @@ if [ -n "$PYTHON" ] && command -v "$PYTHON" >/dev/null 2>&1; then
   fi
 else
   printf '  %s!%s no working Python (set DESIGN_GATE_PYTHON) — audit SKIPPED\n' "$C_YEL" "$C_OFF"
+fi
+
+# 4. The accessibility floor — source-level WCAG checks from a11y-audit-runner.
+#    Opt-in by presence: it runs when scripts/a11y_static.py is vendored (or
+#    DESIGN_GATE_A11Y_MODULE names it), so a repo that has not adopted it is
+#    not nagged. Same staged files, same verdict: either gate refuses. Files
+#    that are not markup, JSX or CSS are skipped by the script itself.
+if [ -n "$PYTHON" ] && command -v "$PYTHON" >/dev/null 2>&1 && [ -f "$A11Y_FILE" ]; then
+  set --
+  while IFS= read -r f; do [ -n "$f" ] && set -- "$@" "$f"; done < "$STAGED"
+  run_gate "a11y_static" "WCAG 2.2 — the accessibility floor" \
+    "$TMP_DIR/out.a11y" \
+    "$PYTHON" -m "$A11Y_MODULE" "$@"
 fi
 
 # --- Verdict -----------------------------------------------------------------

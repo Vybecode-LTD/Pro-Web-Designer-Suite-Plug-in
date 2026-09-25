@@ -5,6 +5,19 @@ description: Derive, set and enforce web performance budgets, then fail the buil
 
 # Performance Budget Gate
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_SKILL_DIR}/scripts/perf_audit.py" dist/ --src src/ --budget perf-budget.json
+> ```
+>
+> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (measure_vitals.mjs, perf_audit.py).
+
 The suite has a design gate and no performance gate. That asymmetry is exactly how a beautifully-tokenized site ships with a four-second LCP: **the thing that is measured is the thing that gets fixed.**
 
 `audit_design.py` fails the build when the design regresses. This skill is its counterpart — it fails the build when *performance* regresses, against budgets agreed up front rather than opinions argued after the fact.

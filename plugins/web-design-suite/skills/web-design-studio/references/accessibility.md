@@ -4,7 +4,7 @@ WCAG 2.2 Level AA is the floor. It is the legal baseline in the EU (EN 301 549 /
 
 This file is the executable version of Law 9: nothing ships un-audited. It uses the tokens in `assets/starter/styles/tokens.css` as ground truth and defers to `references/color-system.md` for all contrast arithmetic.
 
-**One nomenclature note up front, because it trips people:** in the published WCAG 2.2 Recommendation, **2.4.11 Focus Not Obscured (Minimum)** is the Level AA criterion; **2.4.13 Focus Appearance** — the one with the geometry requirement — is **Level AAA**. This skill holds 2.4.13 as a floor anyway, because the AA criteria alone permit a focus indicator you cannot see, and because `--shadow-focus` satisfies it for free.
+**One nomenclature note up front, because it trips people:** in the published WCAG 2.2 Recommendation, **2.4.11 Focus Not Obscured (Minimum)** is the Level AA criterion; **2.4.13 Focus Appearance** — the one with the geometry requirement — is **Level AAA**. This skill holds 2.4.13 as a floor anyway, because the AA criteria alone permit a focus indicator you cannot see, and because the reset's focus ring (§3) satisfies it for free.
 
 ## Contents
 
@@ -54,7 +54,7 @@ Every criterion below is one a marketing or product website actually touches. Cr
 | **2.4.4** Link Purpose (In Context) | A | Link text makes sense from its context | §9 | Read the links list alone |
 | **2.4.5** Multiple Ways | AA | More than one route to each page | Nav + search + sitemap + footer | Site audit |
 | **2.4.6** Headings and Labels | AA | Headings and labels describe their content | §2, §6 | Read the heading outline as a table of contents |
-| **2.4.7** Focus Visible | AA | Keyboard focus has a visible indicator | `--shadow-focus` §3 | Tab; the ring is always visible |
+| **2.4.7** Focus Visible | AA | Keyboard focus has a visible indicator | The outline ring, §3 | Tab; the ring is always visible |
 | **2.4.11** Focus Not Obscured (Min) | **AA — new in 2.2** | The focused component is not *entirely* hidden by author content | Sticky headers/footers are the usual culprit §3 | Tab through with a sticky header; nothing disappears under it |
 | **2.5.1** Pointer Gestures | A | Multipoint/path gestures have a single-pointer alternative | Pinch-zoom maps, swipe carousels §8 | Operate with one finger, no path |
 | **2.5.2** Pointer Cancellation | A | Act on up-event, not down-event | §8 | Press, drag off, release — nothing happens |
@@ -184,21 +184,21 @@ Focus is the keyboard user's cursor. If they cannot see it, the page is unusable
 ### The visible indicator
 
 ```css
-/* One rule, in @layer components, applied to everything interactive. */
-:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: var(--stroke-focus) solid transparent;  /* forced-colors lifeline */
+/* One rule, in reset.css, applied to everything focusable. */
+:focus-visible {
+  outline: var(--stroke-focus) solid var(--border-focus);  /* the ring */
   outline-offset: var(--stroke-focus);
-  box-shadow: var(--shadow-focus);
-  border-radius: inherit;
+  box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas);  /* the gap */
 }
 ```
 
 Why that shape:
 
-- **`--shadow-focus` is `0 0 0 2px var(--bg-canvas), 0 0 0 4px var(--border-focus)`** — a 2px ring in the canvas color, then a 2px ring in the accent. The inner canvas ring is what makes it legible on a dark button, a photo, or an accent fill: the indicator never sits directly against the component's own color.
+- **Two rings: a 2px gap in the canvas color, then a 2px ring in `--border-focus`.** The canvas gap is what makes it legible on a dark button, a photo, or an accent fill: the indicator never sits directly against the component's own color.
+- **The ring is an `outline`, not a `box-shadow`.** A component that draws its own `box-shadow` — a button's elevation, a card's shadow — sits in a later layer and replaces any ring drawn with `box-shadow`, so the keyboard user sees nothing (2.4.7). No component sets `outline`, so this ring survives all of them; a component with its own shadow loses only the gap.
 - **It satisfies 2.4.13's geometry**: the accent ring is a 2px-thick perimeter around the whole component, which is the minimum area the criterion asks for.
 - **It satisfies the 3:1 contrast requirement.** `--border-focus` is `--accent-600`; measured against `--bg-canvas` it is **4.67:1** in light mode and **4.23:1** in dark (where `--border-focus` is deliberately *not* re-pointed, and does not need to be). Against `--bg-surface` in light mode it is 4.92:1. Verify any change with `python -m scripts.generate_color_ramp --check '<focus>' '<adjacent>'`.
-- **The transparent `outline` is not decoration.** In forced-colors mode `box-shadow` is discarded, so a shadow-only ring vanishes completely. A transparent outline gets forced to a system color and becomes the visible indicator. This one line is the difference between a working and a non-existent focus ring for Windows High Contrast users (§10).
+- **Forced colors keep it.** In forced-colors mode `box-shadow` is discarded, so a shadow-only ring vanishes completely; an outline is repainted in a system color and stays. That is the difference between a working and a non-existent focus ring for Windows High Contrast users (§10).
 
 **Never `outline: none` without a replacement in the same rule.** If you find one, the fix is not to add the outline back at a different specificity; the fix is to delete the reset.
 
@@ -352,7 +352,7 @@ The arithmetic, the thresholds table, gamut handling and the APCA discussion all
 
 1. **Placeholder text.** It is text, and 1.4.3 applies at 4.5:1 — there is no exemption. The starter's `--fg-subtle` (`--neutral-500`) measures **4.07:1 on `--bg-canvas`** and 4.29:1 on `--bg-surface`. Both fail. `color-system.md` §6 logs this as a live audit finding; the fix is to point `--fg-subtle` at `--neutral-600` (6.35:1). Also: **placeholder is not a label** (§6), so the correct fix is often to delete it.
 2. **Disabled state.** Genuinely exempt from 1.4.3 — but only if the control is genuinely inactive. A control that looks disabled and still works, or a "disabled" submit button that is the only feedback about an invalid form, is not exempt and is a usability failure regardless. `--fg-disabled` (`--neutral-400`, 2.53:1) is only legitimate on `disabled`/`aria-disabled` controls.
-3. **Focus rings.** Covered by 1.4.11 at AA and by 2.4.13's 3:1 focused-vs-unfocused requirement. `--shadow-focus` clears it at 4.23–4.92:1 (§3). The failure mode is a custom ring that only exists in one theme.
+3. **Focus rings.** Covered by 1.4.11 at AA and by 2.4.13's 3:1 focused-vs-unfocused requirement. The focus ring (`--border-focus`) clears it at 4.23–4.92:1 (§3). The failure mode is a custom ring that only exists in one theme.
 4. **Icon-only buttons.** The icon *is* the affordance, so 1.4.11's 3:1 applies to the glyph against its background. A `--fg-muted` (`--neutral-600`, 6.35:1) icon is fine; a `--border-default` (`--neutral-300`, 1.51:1) one is not. Icon-only controls also need an accessible name (§9).
 5. **Control boundaries.** An input whose only boundary is `--border-default` on `--bg-surface` measures **1.51:1** — below the 3:1 that 1.4.11 requires for "boundaries necessary to identify the control". This is fine when the input has a distinct fill (`--bg-sunken` against `--bg-surface` and the border is decorative), and a failure when the input is the same color as the page. **Decide which of the two you are shipping and check it.** Same problem, same answer, for dark mode's `--border-default` (`--neutral-800` on `--neutral-1000` = 1.42:1).
 
@@ -611,7 +611,7 @@ What breaks, and why:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| **The focus ring disappears** | `box-shadow` is discarded in forced-colors mode. `--shadow-focus` is a box-shadow | The transparent `outline` in §3. Its color is forced to a system color and becomes the ring |
+| **The focus ring disappears** | `box-shadow` is discarded in forced-colors mode, so a ring drawn only with `box-shadow` vanishes | Draw the ring as an `outline` (§3). Its color is forced to a system color and it stays |
 | **All elevation vanishes** | Same — shadows are gone, so a "raised" card is flush with the page | `@media (forced-colors: active) { .card { border: var(--stroke-default) solid CanvasText; } }` |
 | **Filled and ghost buttons look identical** | Both backgrounds are forced to `ButtonFace`. Anything distinguished only by background color collapses | Add a border, or `forced-color-adjust: none` on the one element that must keep its fill (and then guarantee its contrast yourself) |
 | **Selected / active / error states disappear** | `--bg-selected`, `--bg-hover`, `--bg-active` and status fills are all forced to the same color | Pair every color-carried state with a border, an underline, an icon or `Highlight`/`HighlightText` |

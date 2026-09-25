@@ -172,10 +172,20 @@ def _p(rx: str) -> re.Pattern[str]:
 
 
 NAME_RULES: list[tuple[re.Pattern[str], str, str, str, dict[str, Any]]] = [
-    (_p(r"^(password|passwd|pwd|password_hash|encrypted_password|secret|"
-        r"api_key|access_token|refresh_token|private_key)$"),
+    # Credentials, by the PATTERNS field-mapping.md promises (`*_token`,
+    # `*_hash`, `*_secret`, …), not a list of exact names: `api_token`,
+    # `reset_token`, `webhook_secret` and `token_hash` were displayed and
+    # editable. Hiding them here is the UI half only — the database must not
+    # let anon/authenticated read them at all (see supabase-integration.md).
+    (_p(r"^(password|passwd|pwd|secret|token|salt|otp|totp|api_?key|private_key)$"
+        r"|_(password|passwd|pwd|secret|token|hash|salt|digest|otp)$"
+        r"|(^|_)(api|private|secret|access|signing|encryption|client)_key$"
+        r"|^encrypted_"),
      "password-input", "high",
-     "name is a credential — write-only by construction",
+     "name is a credential — never displayed and never edited here. The "
+     "database must also stop the anon and authenticated roles reading it "
+     "(revoke the column's SELECT, or keep it in a private schema): a "
+     "`select('*')` would still send it to the browser",
      {"write_only": True, "never_display": True}),
 
     (_p(r"(^|_)(email|email_address|contact_email)$"),
@@ -1276,11 +1286,41 @@ def map_columns(model: Model) -> None:
             tcol is None or tcol.primary_key or tcol.type == "uuid")
         table.screens["subtitle_column"] = _subtitle_column(table, title)
         for col in table.columns:
-            col.ui = _map_column(model, table, col, title)
+            col.ui = _guard_authority(col, _map_column(model, table, col, title))
         _assign_placement(table, title)
         table.screens["index_layout"], table.screens["index_layout_signal"] = \
             _index_layout(table)
         table.screens["default_sort"] = _default_sort(table)
+
+
+# Columns that decide who may do what: ownership, tenancy, role, billing and
+# verification. A user who can edit one can promote themselves — the standard
+# Supabase profile policy (`USING (id = auth.uid())`, no WITH CHECK) lets
+# `.update(draft)` write any column the draft carries. A TypeScript type is
+# not access control, so these start read-only and get their own question.
+AUTHORITY = _p(
+    r"^(role|roles|user_role|permissions?|scopes?|admin|is_admin|is_staff|is_superuser"
+    r"|is_owner|is_verified|is_approved|is_banned|is_suspended|verified|approved"
+    r"|email_verified|owner_id|user_id|author_id|created_by|updated_by|org_id"
+    r"|organization_id|tenant_id|workspace_id|team_id|account_id|plan|plan_id|tier"
+    r"|credits|balance|quota|subscription_status|subscription_id|customer_id)$"
+    r"|_role$|^stripe_|^billing_")
+
+
+def _guard_authority(col: Column, ui: dict[str, Any]) -> dict[str, Any]:
+    """Make authority-bearing columns read-only by default (see AUTHORITY).
+    A primary key that is also a foreign key (profiles.id → auth.users) is the
+    row's identity borrowed from another table: never a user's choice."""
+    borrowed_identity = col.primary_key and bool(col.foreign_key)
+    if not (borrowed_identity or AUTHORITY.search(col.name)) or ui.get("never_display"):
+        return ui
+    ui["editable"] = False
+    ui["authority"] = True
+    ui["signal"] = (ui.get("signal", "") + " · carries authority (ownership, tenant, "
+                    "role, billing or identity) — read-only here by default. If users "
+                    "may change it, protect it in the database first: a policy WITH "
+                    "CHECK, a column grant, or a trigger").lstrip(" ·")
+    return ui
 
 
 def _map_column(model: Model, table: Table, col: Column,
@@ -1859,6 +1899,19 @@ def build_questions(model: Model) -> None:
             "The proposal below is by column ORDER and name, which correlates "
             "with meaning only by accident.",
             table=t.name)
+
+        authority = [c.name for c in t.columns if c.ui.get("authority")]
+        if authority:
+            ask(f"{t.name}.authority_columns", "list",
+                f"These {t.name} columns carry authority. Which must stay read-only "
+                f"in this UI?",
+                authority,
+                "They decide ownership, tenancy, role or billing, so a user who can "
+                "edit one can promote themselves. They start read-only. Remove a "
+                "column from this list only after the database protects it — a "
+                "policy WITH CHECK, a column-level grant, or a trigger — because the "
+                "form's Draft type is not access control.",
+                table=t.name, options=authority)
 
         readonly_guess = [c.name for c in t.columns
                           if not c.ui.get("editable", True)]

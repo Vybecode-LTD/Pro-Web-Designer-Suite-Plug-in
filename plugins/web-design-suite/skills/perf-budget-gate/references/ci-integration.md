@@ -25,18 +25,16 @@ The two layers have different costs and different reliability, so they belong in
 
 ```bash
 #!/usr/bin/env bash
-# .githooks/pre-commit — design and performance, one gate
+# .githooks/pre-commit — design, accessibility and performance, one gate
 set -euo pipefail
 
-CHANGED=$(git diff --cached --name-only --diff-filter=ACM)
-[ -z "$CHANGED" ] && exit 0
+# Law 9 and the accessibility floor: web-design-studio's shipped hook, copied
+# beside this file. It handles file names with spaces and non-code files, and
+# refuses the commit if any of its gates fails.
+sh "$(dirname "$0")/pre-commit-design-gate.sh"
 
-# Law 9 — the code is clean.
-python -m scripts.audit_design $CHANGED
-
-# The build output is what ships, so weigh that, and scan source for markup
-# problems in the files that actually changed.
-if [ -d dist ]; then
+# The build output is what ships, so weigh that.
+if [ -d dist ] && [ -f perf-budget.json ]; then
   python -m scripts.perf_audit dist/ --src src/ --budget perf-budget.json
 fi
 ```

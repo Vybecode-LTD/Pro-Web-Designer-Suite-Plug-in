@@ -399,9 +399,10 @@ $bp: (sm: 30rem, md: 48rem, lg: 64rem, xl: 80rem, xxl: 96rem);
       outline-offset: calc(var(--stroke-focus) * -2);
       box-shadow: none;
     } @else {
-      outline: var(--stroke-focus) solid transparent;
+      /* The reset's ring: an outline no component box-shadow can remove. */
+      outline: var(--stroke-focus) solid var(--border-focus);
       outline-offset: var(--stroke-focus);
-      box-shadow: var(--shadow-focus);
+      box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas);
     }
   }
 }

@@ -143,8 +143,17 @@ raise is a judgement call; the same flaw raised by them is an oversight.>
       "fix": "",
       "confidence": "confirmed|likely|suspected",
       "is_taste": false,
+      "status": "open|fixed",
+      "defend": false,
+      "covers": [],
       "ref": ""
     }
   ]
 }
 ```
+
+`status` — every `open` major or minor finding goes on the defence sheet's "Known flaws"
+list, confirmed ones included; mark a finding `fixed` once it is. `defend: true` keeps a
+fixed finding on the sheet anyway (to say "we caught and fixed this"). `covers` lists the
+audit rules this finding owns when you pass `--audit` (e.g. `["important"]`); only a rule
+named there, or written in backticks, is folded into your finding.

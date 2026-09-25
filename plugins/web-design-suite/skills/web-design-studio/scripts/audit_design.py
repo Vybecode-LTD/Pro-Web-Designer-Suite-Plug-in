@@ -29,6 +29,17 @@ Usage
     python -m scripts.audit_design src/ --strict          # warnings fail too
     python -m scripts.audit_design $(git diff --cached --name-only)
 
+What it reads
+-------------
+    .css .scss .sass .less .pcss        every declaration
+    .js .jsx .ts .tsx .mjs .cjs         inline styles, class strings, colours
+    .html .htm .vue .svelte .astro      <style> blocks, style="" attributes,
+                                        class attributes (HTML email is left
+                                        to email-template-system's lint_email)
+
+A file named explicitly with any other extension is skipped and listed, never
+guessed at. A folder with nothing auditable in it is an error, not "clean".
+
 Adopting it on a legacy codebase
 --------------------------------
     python -m scripts.audit_design src/ --write-baseline .design-baseline.json
@@ -36,6 +47,8 @@ Adopting it on a legacy codebase
 
 The baseline records existing violations so the gate can be turned on today
 and the debt paid down deliberately, instead of the gate being turned off.
+Its keys are paths relative to the baseline file, so `src/`, `./src` and the
+absolute path all match, from any working directory.
 
 Escape hatches (use sparingly, they are visible in review)
 ---------------------------------------------------------
@@ -48,6 +61,7 @@ Exit codes: 0 clean · 1 violations found · 2 bad invocation.
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import os
 import re
@@ -62,10 +76,14 @@ from typing import Iterable, Iterator
 
 CSS_EXT = {".css", ".scss", ".sass", ".less", ".pcss"}
 JS_EXT = {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}
+# Markup that carries CSS: <style> blocks, style="" attributes, class lists.
+TEMPLATE_EXT = {".html", ".htm", ".vue", ".svelte", ".astro"}
 
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit",
     "coverage", "__pycache__", ".venv", "venv", "vendor", ".turbo", "out",
+    # Generated HTML reports and static exports, now that HTML is read.
+    "storybook-static", "playwright-report", "test-results", "htmlcov", "_site",
 }
 
 # Files where literal values are not merely allowed but required: this is the
@@ -163,15 +181,6 @@ TIER2_EXCEPTIONS = {
 # 0,3,1 draws the same line).
 COMPOUND_SEL = re.compile(r"(\.[\w-]+(?:\s*[>+~]?\s*)){3,}\.[\w-]+")
 
-# Values that are legitimately literal anywhere.
-KEYWORD_OK = {
-    "0", "0px", "0rem", "auto", "none", "inherit", "initial", "unset", "revert",
-    "revert-layer", "currentcolor", "transparent", "normal", "min-content",
-    "max-content", "fit-content", "stretch", "baseline", "center", "start",
-    "end", "flex-start", "flex-end", "space-between", "space-around",
-    "space-evenly", "safe", "unsafe", "subgrid", "full-width", "100%", "50%",
-}
-
 # Non-tokenizable units. Viewport and container units express a relationship to
 # the viewport, not a spacing decision; % is relational; ch/ex are typographic.
 RELATIONAL_UNIT = re.compile(
@@ -192,8 +201,28 @@ ID_SELECTOR = re.compile(r"(?<![\w\\\[\"'=])#[a-zA-Z_][\w-]*")
 # JSX / Tailwind
 TW_ARBITRARY = re.compile(r"(?<![\w])(?:[a-z][\w-]*?)-\[[^\]\s]+\]")
 TW_IMPORTANT = re.compile(r"(?<![\w-])!(?:[a-z][\w-]*-)+[\w./\[\]-]+")
-TW_SPACE_XY = re.compile(r"(?<![\w-])(?:[a-z]{2}:)*space-[xy]-\d")
+TW_SPACE_XY = re.compile(r"(?<![\w-])(?:[a-z]{2}:)*space-[xy]-[\w(][\w().-]*")
+# Literal values Tailwind generates whatever the theme says (`--*: initial`
+# does not remove them): durations, delays, z-indexes, stroke widths, offsets.
+TW_LITERAL = re.compile(
+    r"(?<![-\w])(?:duration|delay|-?z|border(?:-[xytrblse])?|ring|ring-offset|outline"
+    r"|outline-offset|underline-offset)-\d+(?:\.\d+)?(?![\w./-])")
+TW_OPACITY = re.compile(
+    r"(?<![-\w])(?:bg|text|border|ring|fill|stroke|outline|shadow|decoration|from|via|to"
+    r"|placeholder|accent|caret|divide)-[a-z][\w-]*/\d+(?!\w)")
+TW_TIER1_VAR = re.compile(
+    r"\(--(?:space-(?!section|subsection|block|fluid)|neutral-|accent-|success-|warning-"
+    r"|danger-|info-|text-|leading-|weight-|shadow-)[\w-]*\)")
 JSX_STYLE = re.compile(r"\bstyle\s*=\s*\{\{")
+CLASS_ATTR = re.compile(r"""(?:className|class)\s*=\s*(?:\{?\s*)?["'`]([^"'`]*)["'`]""")
+
+# Templates
+STYLE_BLOCK = re.compile(r"<style\b[^>]*>(.*?)</style\s*>", re.I | re.S)
+SCRIPT_BLOCK = re.compile(r"<script\b[^>]*>(.*?)</script\s*>", re.I | re.S)
+TAG_STYLE_ATTR = re.compile(r"""<[a-zA-Z][\w:-]*\b[^>]*?\sstyle\s*=\s*(["'])(.*?)\1""", re.S)
+# HTML email cannot use custom properties or layers, so this script's laws do
+# not fit it; email-template-system's lint_email is its gate.
+EMAIL_MARKERS = ("<!--[if mso", "<!--[if gte mso", "urn:schemas-microsoft-com")
 
 IGNORE_LINE = re.compile(r"design-audit-ignore-next-line\s*:?\s*([\w,\s]*)")
 IGNORE_FILE = re.compile(r"design-audit-ignore-file\s*:?\s*([\w,\s]*)")
@@ -219,10 +248,22 @@ class Finding:
     fix: str
     snippet: str = ""
 
-    def key(self) -> str:
+    def key(self, root: Path | None = None) -> str:
         """Stable identity for baselining. Deliberately excludes the line
-        number so that unrelated edits above a violation do not resurrect it."""
-        return portable_key(f"{self.file}|{self.rule}|{self.snippet.strip()[:120]}")
+        number so that unrelated edits above a violation do not resurrect it.
+
+        With `root` (the baseline file's folder) the path is made relative to
+        it, so `src/`, `./src`, `/abs/path/src` and `../src` from a subfolder
+        all produce the same key. Keys written before 3.1.0 were relative to
+        the working directory, which is where the default baseline lives, so
+        they keep matching."""
+        path = self.file
+        if root is not None and not path.startswith("<"):
+            try:
+                path = os.path.relpath(Path(path).resolve(), root)
+            except ValueError:                    # another drive on Windows
+                path = str(Path(path).resolve())
+        return portable_key(f"{path}|{self.rule}|{self.snippet.strip()[:120]}")
 
 
 def portable_key(key: str) -> str:
@@ -411,27 +452,66 @@ def in_layer(at_rules: Iterable[str], name: str) -> bool:
     return any(a.startswith("@layer") and name in a for a in at_rules)
 
 
-def in_query_prelude(at_rules: Iterable[str]) -> bool:
-    return any(a.startswith(("@media", "@container", "@supports")) for a in at_rules)
+VAR_MARK = " var() "
 
 
-def value_is_tokenized(value: str) -> bool:
-    v = value.strip().lower().rstrip("!important").strip()
-    if not v:
-        return True
-    if "var(--" in v:
-        return True
-    if v in KEYWORD_OK:
-        return True
-    parts = [p for p in re.split(r"[\s,/]+", v) if p]
-    return all(
-        p in KEYWORD_OK or RELATIONAL_UNIT.match(p) or "var(--" in p
-        for p in parts
-    )
+def _close_paren(text: str, open_at: int) -> int:
+    """Index of the `)` matching the `(` at `open_at` (len(text) if unmatched)."""
+    depth = 0
+    for k in range(open_at, len(text)):
+        if text[k] == "(":
+            depth += 1
+        elif text[k] == ")":
+            depth -= 1
+            if depth == 0:
+                return k
+    return len(text)
+
+
+def strip_var_refs(value: str) -> str:
+    """`value` with every var(…) reference — fallback included, however deeply
+    nested — replaced by a ` var() ` marker. What is left is what the author
+    wrote as a literal. Containing a var() is not the same as being tokenized:
+    `var(--pad-sm) 13px` still hardcodes 13px."""
+    out: list[str] = []
+    low, i = value.lower(), 0
+    while True:
+        j = low.find("var(", i)
+        if j < 0:
+            out.append(value[i:])
+            return "".join(out)
+        if j > 0 and (low[j - 1].isalnum() or low[j - 1] in "-_"):
+            out.append(value[i:j + 4])            # part of a longer name
+            i = j + 4
+            continue
+        out.append(value[i:j])
+        out.append(VAR_MARK)
+        i = _close_paren(value, j + 3) + 1
+
+
+def raw_colour(value: str) -> tuple[str, str] | None:
+    """(rule, text) for the first colour written as a literal, else None.
+
+    var() references and their fallbacks are ignored, and so is a colour
+    function that derives from a token — `oklch(from var(--x) l c h / .5)`,
+    `rgb(var(--rgb) / .5)` — because the token still decides the colour.
+    `url(…)` is ignored too: `url(#fade)` is a reference, not a hex colour."""
+    rest = re.sub(r"url\([^)]*\)", " url() ", strip_var_refs(value), flags=re.I)
+    m = HEX_COLOR.search(rest)
+    if m:
+        return "raw-color", m.group(0)
+    for fm in FUNC_COLOR.finditer(rest):
+        body = rest[fm.end() - 1:_close_paren(rest, fm.end() - 1)]
+        if VAR_MARK.strip() not in body:
+            return "raw-color", fm.group(0).rstrip("( ")
+    m = NAMED_COLOR.search(rest)
+    if m:
+        return "named-color", m.group(0)
+    return None
 
 
 def has_raw_length(value: str) -> str | None:
-    v = re.sub(r"var\(--[\w-]+(\s*,[^()]*)?\)", " ", value)
+    v = strip_var_refs(value)
     m = LENGTH_LITERAL.search(v)
     if not m:
         return None
@@ -562,8 +642,11 @@ def audit_css(path: Path, text: str) -> list[Finding]:
             # forbids, just wearing a custom property as a disguise — and
             # it is the easiest place for one to hide, because it LOOKS
             # like tokenized code. Unitless numbers, ratios and fallbacks
-            # are fine; a length, a colour or a duration is not.
-            if not token_file and "var(--" not in value:
+            # are fine; a length, a colour or a duration is not — including
+            # one written beside a var(), as in `calc(var(--pad) + 28px)`.
+            if not token_file:
+                rest = strip_var_refs(value)
+                colour = raw_colour(value)
                 if OPTICAL_PROP.search(prop):
                     pass                       # declared optical correction
                 elif has_raw_length(value) and not RELATIONAL_UNIT.match(value.strip()):
@@ -573,12 +656,12 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                         "a Tier-2 role — that is what makes the component "
                         "theme-able, density-aware and auditable. If no role "
                         "fits, the missing role is the actual finding.")
-                elif HEX_COLOR.search(value) or FUNC_COLOR.search(value):
+                elif colour and colour[0] == "raw-color":
                     add(line, "L1", "socket-literal", "error",
                         f"Socket `{prop}` hardcodes the colour `{value.strip()}`.",
                         "Dark mode re-points roles, not sockets. A literal "
                         "here is a colour the theme can never reach.")
-                elif TIME_LITERAL.search(value) or BEZIER_LITERAL.search(value):
+                elif TIME_LITERAL.search(rest) or BEZIER_LITERAL.search(rest):
                     add(line, "L1", "socket-literal", "error",
                         f"Socket `{prop}` hardcodes motion: `{value.strip()}`.",
                         "Bind it to a --motion-* pair so duration and easing "
@@ -597,10 +680,10 @@ def audit_css(path: Path, text: str) -> list[Finding]:
         if token_file:
             continue
 
-        tokenized = value_is_tokenized(value)
-
         # ---- L1 / L3 spacing -----------------------------------------------
-        if prop in SPACING_PROPS and not in_query_prelude(d.at_rules):
+        # Inside @media / @container / @supports too: the prelude is never a
+        # declaration, and responsive rules are where literals collect.
+        if prop in SPACING_PROPS:
             raw = has_raw_length(value)
             # em is a RATIO to the current font size, so an em offset tracks
             # type instead of bypassing the scale. Legitimate for positioning
@@ -609,7 +692,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     OUTER_MARGIN_PROPS | {"gap", "row-gap", "column-gap",
                                           "grid-gap"}) and not prop.startswith("padding"):
                 raw = None
-            if raw and not tokenized:
+            if raw:
                 on_scale_note = ""
                 if raw.lower().endswith("px"):
                     try:
@@ -640,23 +723,27 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 "cancel a known token, an owl selector in the parent's rule.)")
 
         # ---- L1 colour ------------------------------------------------------
+        # Every check below looks at what is left once var() references are
+        # taken out, so a token beside a literal no longer hides the literal.
         if prop in COLOR_PROPS or prop in COLOR_SHORTHANDS:
-            if "var(--" not in value:
-                m = HEX_COLOR.search(value) or FUNC_COLOR.search(value)
-                if m:
-                    add(line, "L1", "raw-color", "error",
-                        f"`{prop}: {value.strip()}` hardcodes a colour.",
-                        "Use a role: --bg-surface / --fg-muted / --border-default "
-                        "/ --bg-accent. A hardcoded colour is a colour that dark "
-                        "mode cannot re-point, which is how a theme silently breaks.")
-                elif NAMED_COLOR.search(value):
-                    add(line, "L1", "named-color", "warning",
-                        f"`{prop}: {value.strip()}` uses a CSS named colour.",
-                        "Named colours are outside the ramp and outside the "
-                        "contrast budget. Use a role token.")
+            colour = raw_colour(value)
+            if colour and colour[0] == "raw-color":
+                add(line, "L1", "raw-color", "error",
+                    f"`{prop}: {value.strip()}` hardcodes a colour.",
+                    "Use a role: --bg-surface / --fg-muted / --border-default "
+                    "/ --bg-accent. A hardcoded colour is a colour that dark "
+                    "mode cannot re-point, which is how a theme silently breaks.")
+            elif colour:
+                add(line, "L1", "named-color", "warning",
+                    f"`{prop}: {value.strip()}` uses a CSS named colour.",
+                    "Named colours are outside the ramp and outside the "
+                    "contrast budget. Use a role token.")
 
         # ---- L1 shadows ------------------------------------------------------
-        if prop in SHADOW_PROPS and "var(--" not in value and value.strip() != "none":
+        if (prop in SHADOW_PROPS
+                and value.strip().lower() not in ("none", "inherit", "initial",
+                                                  "unset", "revert", "revert-layer")
+                and (has_raw_length(value) or raw_colour(value))):
             add(line, "L1", "raw-shadow", "error",
                 f"`{prop}` is a literal shadow.",
                 "Use an elevation role: --elevation-card / --elevation-raised / "
@@ -664,7 +751,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 "drift out of the light model within about three commits.")
 
         # ---- L1 typography ---------------------------------------------------
-        if prop in TYPE_PROPS and "var(--" not in value:
+        if prop in TYPE_PROPS:
             if prop == "line-height" and re.fullmatch(r"[\d.]+", value.strip()):
                 add(line, "L3", "raw-leading", "warning",
                     f"`line-height: {value.strip()}` is a literal ratio.",
@@ -685,21 +772,22 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     "Orphan sizes are how hierarchy stops reading as hierarchy.")
 
         # ---- L1 radius -------------------------------------------------------
-        if prop in RADIUS_PROPS and "var(--" not in value and has_raw_length(value):
+        if prop in RADIUS_PROPS and has_raw_length(value):
             add(line, "L1", "raw-radius", "error",
                 f"`{prop}: {value.strip()}` is a literal radius.",
                 "Use --radius-*. Concentric corners depend on the radius and the "
                 "inset being related — see references/spacing-system.md §8.")
 
         # ---- L1 motion -------------------------------------------------------
-        if prop in MOTION_PROPS and "var(--" not in value:
-            if TIME_LITERAL.search(value):
+        if prop in MOTION_PROPS:
+            rest = strip_var_refs(value)
+            if TIME_LITERAL.search(rest):
                 add(line, "L1", "raw-duration", "error",
                     f"`{prop}: {value.strip()}` hardcodes a duration.",
                     "Use --motion-hover / --motion-enter / --motion-exit / "
                     "--motion-expand. A literal duration also ignores "
                     "prefers-reduced-motion, which the tokens handle for you.")
-            elif BEZIER_LITERAL.search(value):
+            elif BEZIER_LITERAL.search(rest):
                 add(line, "L1", "raw-easing", "error",
                     f"`{prop}` hardcodes an easing curve.",
                     "Use --ease-out (arriving), --ease-in (leaving), "
@@ -849,8 +937,7 @@ def audit_js(path: Path, text: str) -> list[Finding]:
     if any(mark in text[:800] for mark in GENERATED_MARKERS):
         return []
 
-    def line_of(pos: int) -> int:
-        return clean.count("\n", 0, pos) + 1
+    line_of = _line_finder(clean)
 
     def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str) -> None:
         tags = line_ignores.get(line, set()) | file_ignores
@@ -859,6 +946,34 @@ def audit_js(path: Path, text: str) -> list[Finding]:
         snippet = lines[line - 1].strip() if 0 < line <= len(lines) else ""
         findings.append(Finding(str(path), line, law, rule, sev, msg, fix, snippet))
 
+    _audit_jsx_styles(clean, line_of, add)
+    _audit_class_lists(clean, line_of, add)
+
+    # ---- Hardcoded colours in JS strings -----------------------------------
+    for m in re.finditer(r"""["'`](#[0-9a-fA-F]{3,8})["'`]""", clean):
+        ln = line_of(m.start())
+        ctx = lines[ln - 1] if 0 < ln <= len(lines) else ""
+        if re.search(r"\b(test|spec|stories|mock|fixture)\b", str(path), re.I):
+            continue
+        if "#" in ctx and re.search(r"(href|id|anchor|hash|sha|commit)", ctx, re.I):
+            continue
+        add(ln, "L1", "js-raw-color", "warning",
+            f"Hardcoded colour `{m.group(1)}` in JS.",
+            "Read the token instead — getComputedStyle().getPropertyValue('--bg-accent') "
+            "for canvas/chart code, or set it from CSS via a custom property. A "
+            "colour in JS is a colour dark mode cannot re-point.")
+
+    return findings
+
+
+def _line_finder(text: str):
+    """pos -> 1-based line number, by bisecting a newline index (one pass over
+    the text, instead of counting newlines again for every finding)."""
+    starts = [0] + [m.end() for m in re.finditer("\n", text)]
+    return lambda pos: bisect.bisect_right(starts, pos)
+
+
+def _audit_jsx_styles(clean: str, line_of, add) -> None:
     # ---- L4 inline style ---------------------------------------------------
     for m in JSX_STYLE.finditer(clean):
         open_at = clean.index("{", m.start())
@@ -880,8 +995,10 @@ def audit_js(path: Path, text: str) -> list[Finding]:
                 "custom property: style={{'--card-span': n}}, with the rule that "
                 "consumes it living in the component's stylesheet.")
 
+
+def _audit_class_lists(clean: str, line_of, add) -> None:
     # ---- Tailwind arbitrary values / bang / space-x ------------------------
-    for sm in re.finditer(r"""(?:className|class)\s*=\s*(?:\{?\s*)?["'`]([^"'`]*)["'`]""", clean):
+    for sm in CLASS_ATTR.finditer(clean):
         cls, at = sm.group(1), sm.start(1)
         for m in TW_ARBITRARY.finditer(cls):
             tok = m.group(0)
@@ -903,21 +1020,103 @@ def audit_js(path: Path, text: str) -> list[Finding]:
                 f"`{m.group(0)}` forces !important.",
                 "!important inverts layer order and makes the next override "
                 "harder. Fix the layer or the variant instead.")
+        for m in TW_LITERAL.finditer(cls):
+            add(line_of(at), "L1", "tw-literal", "error",
+                f"`{m.group(0)}` is a literal value.",
+                "Tailwind generates a bare number for duration-, delay-, z-, "
+                "border-, ring- and offset- utilities whatever the theme says, "
+                "so the closed scale does not remove it. Use the role: "
+                "motion-hover, z-modal, border-default, focus-ring. A literal "
+                "duration also skips the reduced-motion tokens.")
+        for m in TW_OPACITY.finditer(cls):
+            add(line_of(at), "L1", "tw-opacity-modifier", "error",
+                f"`{m.group(0)}` sets a literal alpha.",
+                "A /NN modifier compiles to color-mix() with a number nobody "
+                "chose. Translucency has roles (bg-hover, bg-active, the scrim "
+                "role) that dark mode and the contrast checks can reach.")
+        for m in TW_TIER1_VAR.finditer(cls):
+            add(line_of(at), "L6", "tier1-leak", "error",
+                f"`{m.group(0)}` reads a Tier-1 primitive.",
+                "Use the role: p-card rather than p-(--space-6), bg-surface "
+                "rather than bg-(--neutral-800).")
 
-    # ---- Hardcoded colours in JS strings -----------------------------------
-    for m in re.finditer(r"""["'`](#[0-9a-fA-F]{3,8})["'`]""", clean):
-        ln = line_of(m.start())
-        ctx = lines[ln - 1] if 0 < ln <= len(lines) else ""
-        if re.search(r"\b(test|spec|stories|mock|fixture)\b", str(path), re.I):
-            continue
-        if "#" in ctx and re.search(r"(href|id|anchor|hash|sha|commit)", ctx, re.I):
-            continue
-        add(ln, "L1", "js-raw-color", "warning",
-            f"Hardcoded colour `{m.group(1)}` in JS.",
-            "Read the token instead — getComputedStyle().getPropertyValue('--bg-accent') "
-            "for canvas/chart code, or set it from CSS via a custom property. A "
-            "colour in JS is a colour dark mode cannot re-point.")
 
+# ---------------------------------------------------------------------------
+# Templates: HTML pages and single-file components
+# ---------------------------------------------------------------------------
+
+def _blank(text: str, spans: Iterable[tuple[int, int]], keep: bool) -> str:
+    """Positions and newlines preserved. keep=True blanks everything EXCEPT the
+    spans; keep=False blanks the spans themselves."""
+    spans = list(spans)
+    if keep:
+        out = [c if c == "\n" else " " for c in text]
+        for s, e in spans:
+            out[s:e] = text[s:e]
+    else:
+        out = list(text)
+        for s, e in spans:
+            for k in range(s, e):
+                if out[k] != "\n":
+                    out[k] = " "
+    return "".join(out)
+
+
+def audit_template(path: Path, text: str) -> list[Finding]:
+    """.html / .htm / .vue / .svelte / .astro.
+
+    <style> blocks are audited as CSS in place: everything else is blanked
+    with line breaks kept, so every finding points at the real line. A
+    style="" attribute that sets a visual property is the same Law 4 failure
+    as a JSX inline style, and class lists get the Tailwind checks. HTML email
+    never reaches here (see is_html_email)."""
+    if any(mark in text[:800] for mark in GENERATED_MARKERS):
+        return []
+
+    lines = text.splitlines()
+    file_ignores: set[str] = set()
+    line_ignores: dict[int, set[str]] = {}
+    for idx, raw in enumerate(lines, start=1):
+        m = IGNORE_FILE.search(raw)
+        if m:
+            file_ignores |= {t.strip().upper() for t in m.group(1).split(",") if t.strip()}
+        m = IGNORE_LINE.search(raw)
+        if m:
+            line_ignores[idx + 1] = {t.strip().upper() for t in m.group(1).split(",") if t.strip()}
+
+    style_spans = [m.span(1) for m in STYLE_BLOCK.finditer(text)]
+    findings = audit_css(path, _blank(text, style_spans, keep=True)) if style_spans else []
+
+    markup = _blank(text, style_spans + [m.span(1) for m in SCRIPT_BLOCK.finditer(text)],
+                    keep=False)
+    line_of = _line_finder(text)
+
+    def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str) -> None:
+        tags = line_ignores.get(line, set()) | file_ignores
+        if law in tags or rule.upper() in tags or "ALL" in tags:
+            return
+        snippet = lines[line - 1].strip() if 0 < line <= len(lines) else ""
+        findings.append(Finding(str(path), line, law, rule, sev, msg, fix, snippet))
+
+    for m in TAG_STYLE_ATTR.finditer(markup):
+        props = [d.split(":", 1)[0].strip().lower()
+                 for d in m.group(2).split(";") if ":" in d]
+        offenders = [p for p in props if p and not p.startswith("--")]
+        if offenders:
+            add(line_of(m.start(2)), "L4", "inline-style", "error",
+                f"style=\"\" sets visual propert{'y' if len(offenders) == 1 else 'ies'}: "
+                f"{', '.join(offenders[:4])}.",
+                "An inline style beats every stylesheet and layer and is invisible "
+                "to the theme. Give the element a class and style it in the "
+                "stylesheet; the one legal inline use is a custom property carrying "
+                "a runtime value (style=\"--progress: 40%\").")
+
+    _audit_jsx_styles(markup, line_of, add)       # Astro accepts style={{…}}
+    _audit_class_lists(markup, line_of, add)
+
+    if file_ignores:
+        findings = [f for f in findings
+                    if not ({f.law, f.rule.upper(), "ALL"} & file_ignores)]
     return findings
 
 
@@ -1018,33 +1217,74 @@ def audit_cross_file(files: list[tuple[Path, str]]) -> list[Finding]:
 # Driver
 # ---------------------------------------------------------------------------
 
+def file_kind(path: Path) -> str | None:
+    ext = path.suffix.lower()
+    if ext in CSS_EXT:
+        return "css"
+    if ext in JS_EXT:
+        return "js"
+    if ext in TEMPLATE_EXT:
+        return "template"
+    return None
+
+
 def iter_files(paths: list[str]) -> Iterator[Path]:
     for raw in paths:
         p = Path(raw)
         if p.is_file():
-            yield p
+            yield p                               # named explicitly: always reported
         elif p.is_dir():
             for root, dirs, files in os.walk(p):
                 dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
                 for f in sorted(files):
                     fp = Path(root) / f
-                    if fp.suffix.lower() in CSS_EXT | JS_EXT:
+                    if file_kind(fp):
                         yield fp
 
 
+def is_html_email(text: str) -> bool:
+    """HTML email cannot use custom properties or layers, so these laws do not
+    fit it; email-template-system's lint_email is its gate."""
+    low = text.lower()
+    return any(mark in low for mark in EMAIL_MARKERS)
+
+
+SKIP_NOT_AUDITABLE = "not CSS, JS or HTML"
+SKIP_EMAIL = "HTML email: lint it with email-template-system's lint_email"
+
+
 def audit(paths: list[str]) -> list[Finding]:
+    return audit_run(paths)[0]
+
+
+def audit_run(paths: list[str]) -> tuple[list[Finding], int, list[tuple[Path, str]]]:
+    """(findings, number of files audited, [(file, why it was skipped)])."""
     out: list[Finding] = []
+    audited = 0
+    skipped: list[tuple[Path, str]] = []
     css_sources: list[tuple[Path, str]] = []
     for fp in iter_files(paths):
+        kind = file_kind(fp)
+        if kind is None:
+            skipped.append((fp, SKIP_NOT_AUDITABLE))
+            continue
         try:
-            text = fp.read_text(encoding="utf-8", errors="replace")
+            # utf-8-sig: PowerShell 5.1's Set-Content -Encoding utf8 writes a
+            # BOM, and a BOM before `@layer` read as a rule outside any layer.
+            text = fp.read_text(encoding="utf-8-sig", errors="replace")
         except OSError:
             continue
-        if fp.suffix.lower() in CSS_EXT:
+        if kind == "template" and is_html_email(text):
+            skipped.append((fp, SKIP_EMAIL))
+            continue
+        audited += 1
+        if kind == "css":
             css_sources.append((fp, text))
         try:
-            if fp.suffix.lower() in CSS_EXT:
+            if kind == "css":
                 out.extend(audit_css(fp, text))
+            elif kind == "template":
+                out.extend(audit_template(fp, text))
             else:
                 out.extend(audit_js(fp, text))
         except Exception as exc:  # a crashed rule must never block a commit
@@ -1059,7 +1299,7 @@ def audit(paths: list[str]) -> list[Finding]:
                            f"cross-file analysis failed: {exc}",
                            "Per-file findings above are unaffected."))
     out.sort(key=lambda f: (f.file, f.line, SEVERITY_ORDER.get(f.severity, 9)))
-    return out
+    return out, audited, skipped
 
 
 LAW_NAMES = {
@@ -1072,9 +1312,13 @@ LAW_NAMES = {
 }
 
 
-def report(findings: list[Finding], *, use_color: bool, show_fix: bool) -> str:
+def report(findings: list[Finding], *, use_color: bool, show_fix: bool,
+           audited: int | None = None) -> str:
     if not findings:
-        return "design audit: clean — all nine laws hold.\n"
+        # L1–L6, not "all nine laws": 7–9 (density, keyboard, audit) are not
+        # something a static scan of source can check.
+        where = f" across {audited} file(s)" if audited is not None else ""
+        return f"design audit: clean — L1–L6 hold{where}.\n"
 
     def c(code: str, s: str) -> str:
         return f"\033[{code}m{s}\033[0m" if use_color else s
@@ -1132,8 +1376,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--strict", action="store_true", help="warnings fail the run too")
     ap.add_argument("--quiet", action="store_true", help="suppress the fix guidance")
     ap.add_argument("--no-color", action="store_true")
-    ap.add_argument("--baseline", metavar="FILE", default=".design-baseline.json",
-                    help="ignore findings recorded in this file (default: .design-baseline.json)")
+    ap.add_argument("--baseline", metavar="FILE", default=None,
+                    help="ignore findings recorded in this file "
+                         "(default: .design-baseline.json, if it exists)")
     ap.add_argument("--write-baseline", metavar="FILE",
                     help="record current findings so only NEW ones fail")
     ap.add_argument("--law", action="append", metavar="Lx",
@@ -1146,15 +1391,39 @@ def main(argv: list[str] | None = None) -> int:
         print(f"audit_design: no such path: {', '.join(missing)}", file=sys.stderr)
         return 2
 
-    findings = audit(paths)
+    findings, audited, skipped = audit_run(paths)
+
+    for why in (SKIP_NOT_AUDITABLE, SKIP_EMAIL):
+        group = [p for p, reason in skipped if reason == why]
+        if group:
+            names = ", ".join(str(p) for p in group[:5]) + (" …" if len(group) > 5 else "")
+            print(f"audit_design: skipped {len(group)} file(s) ({why}): {names}",
+                  file=sys.stderr)
+    if audited == 0:
+        folders = [p for p in paths if Path(p).is_dir()]
+        if folders:
+            print(f"audit_design: 0 files audited in {', '.join(folders)}, so a pass "
+                  f"would prove nothing. Point it at the folder that holds the styles.",
+                  file=sys.stderr)
+            return 2
+        if args.json:
+            print("[]")
+        else:
+            print("design audit: nothing to audit (no CSS, JS or HTML among the files given).")
+        return 0
 
     if args.law:
         wanted = {l.upper() for l in args.law}
         findings = [f for f in findings if f.law in wanted]
 
+    # Keys are relative to the baseline file's folder, so the path spelling
+    # and the working directory stop mattering.
+    bp = Path(args.write_baseline or args.baseline or ".design-baseline.json")
+    root = bp.resolve().parent
+
     if args.write_baseline:
-        Path(args.write_baseline).write_text(
-            json.dumps(sorted({f.key() for f in findings}), indent=2) + "\n",
+        bp.write_text(
+            json.dumps(sorted({f.key(root) for f in findings}), indent=2) + "\n",
             encoding="utf-8")
         print(f"audit_design: recorded {len(findings)} finding(s) as the baseline in "
               f"{args.write_baseline}.\nOnly NEW violations will fail from now on. "
@@ -1162,21 +1431,24 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     baseline: set[str] = set()
-    bp = Path(args.baseline)
     if bp.exists():
         try:
             baseline = {portable_key(k) for k in json.loads(bp.read_bytes())}
         except (OSError, json.JSONDecodeError):
             print(f"audit_design: could not read baseline {bp}; auditing everything.",
                   file=sys.stderr)
+    elif args.baseline:
+        print(f"audit_design: baseline {args.baseline} not found; auditing everything.",
+              file=sys.stderr)
     if baseline:
-        findings = [f for f in findings if f.key() not in baseline]
+        findings = [f for f in findings if f.key(root) not in baseline]
 
     if args.json:
         print(json.dumps([asdict(f) for f in findings], indent=2))
     else:
         use_color = not args.no_color and sys.stdout.isatty()
-        sys.stdout.write(report(findings, use_color=use_color, show_fix=not args.quiet))
+        sys.stdout.write(report(findings, use_color=use_color, show_fix=not args.quiet,
+                                audited=audited))
 
     failing = [f for f in findings
                if f.severity == "error" or (args.strict and f.severity == "warning")]

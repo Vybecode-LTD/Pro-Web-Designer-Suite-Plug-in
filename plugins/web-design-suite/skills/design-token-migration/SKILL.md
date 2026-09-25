@@ -5,6 +5,20 @@ description: "Migrating or refactoring an existing codebase onto a design token 
 
 # Design Token Migration
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_SKILL_DIR}/scripts/extract_literals.py" ./src
+> ```
+>
+> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (apply_codemod.py, cluster_values.py, extract_literals.py).
+> From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
+
 Getting an inherited codebase onto the system in `references/token-contract.md`, without a rewrite and without a regression.
 
 This is the hard half of design systems work. Building a token system on a greenfield project is a pleasant afternoon. Getting four hundred files of somebody else's CSS onto one — while the product ships every Tuesday, while nobody has time, and while the person who wrote it has left — is the job people actually pay for, and it is the job that most often fails.
@@ -132,10 +146,15 @@ It refuses to touch a file with uncommitted changes. It writes to a temp file in
 `audit_design.py` is the sibling `web-design-studio` skill's gate — the same script, unmodified, so the number you report is the number that skill enforces. Copy it into the project or invoke it from wherever the suite is installed; do not fork it.
 
 ```sh
-# before, on the commit you branched from
-git stash && python -m scripts.audit_design ./src --json > /tmp/before.json && git stash pop
-python -m scripts.audit_design ./src --json > /tmp/after.json
+# before: the branch point, checked out beside the repo (nothing stashed)
+git worktree add ../migration-base main
+python -m scripts.audit_design ../migration-base/src --json > ../audit-before.json
+git worktree remove ../migration-base
+# after: this branch
+python -m scripts.audit_design ./src --json > ../audit-after.json
 ```
+
+One command per line, never `&&`: the audit exits 1 whenever it finds anything, which on a legacy codebase is always, so a chained `git stash && … && git stash pop` never reaches the `pop` and strands the batch in the stash. Write the reports outside the repo (not `/tmp`, which Windows does not have).
 
 Report the delta by law. A real migration moves L1 and L3 to near zero and leaves L2, L4 and L5 roughly where they were — those are the phases you have not done yet, and saying so is more credible than a round number.
 

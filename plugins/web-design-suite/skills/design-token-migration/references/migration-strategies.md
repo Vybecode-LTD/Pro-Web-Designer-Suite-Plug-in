@@ -129,15 +129,15 @@ A pragma survives review because it is argued. A baseline entry survives review 
 ### Two gates, two jobs
 
 ```sh
-# pre-commit: only what you touched, fast, before the context switch
-FILES=$(git diff --cached --name-only --diff-filter=ACM)
-[ -n "$FILES" ] && python -m scripts.audit_design $FILES
+# pre-commit: only what you touched, fast, before the context switch —
+# web-design-studio's shipped hook, not a hand-written one
+cp <web-design-studio>/assets/configs/pre-commit-design-gate.sh .git/hooks/pre-commit
 
 # CI: everything, against the baseline
 python -m scripts.audit_design ./src
 ```
 
-The `[ -n "$FILES" ]` guard is not decoration: with no staged files the audit falls back to auditing the whole tree, and a hook that takes forty seconds on an empty commit is a hook that gets removed.
+Use the shipped hook rather than a two-line `git diff --cached` loop. It exits at once on an empty commit; without that, the audit falls back to the whole tree, and a hook that takes forty seconds on an empty commit is a hook that gets removed. It also keeps file names with spaces in one piece, which `$FILES` unquoted does not, and it runs the accessibility floor too when `scripts/a11y_static.py` is vendored.
 
 The pre-commit hook matters more, because CI tells you after you have moved on and the cost of a fix triples once you have.
 
@@ -355,7 +355,7 @@ Law 2 work, once child margins are deleted and containers have gaps, is intertwi
 
 ## 9. Keeping a migration branch from rotting
 
-A long-lived migration branch dies of merge conflicts. Every conflict is in a file somebody else also edited, and the resolution is always "take theirs, re-run the codemod" — which is tedious enough that after the fourth time the branch gets abandoned.
+A long-lived migration branch dies of merge conflicts. Every conflict is in a file somebody else also edited, and the resolution is always "take the teammate's version, re-run the codemod" — which is tedious enough that after the fourth time the branch gets abandoned.
 
 Five habits, in order of effect:
 
@@ -363,12 +363,15 @@ Five habits, in order of effect:
 
 **2. Rebase daily, never merge.** A migration branch's history should stay linear so that `git revert` on a batch still works after the fact.
 
-**3. Resolve every conflict by re-running, never by hand.**
+**3. Resolve every conflict by re-running, never by hand.** During a *rebase* the sides are swapped: `--ours` is main — the teammate's version — and `--theirs` is your migration commit. Taking `--theirs` keeps your already-migrated file and silently drops their change; the codemod then finds nothing to replace and exits 0. Take `--ours`, then migrate it again:
    ```sh
-   git checkout --theirs path/to/conflicted.css
+   git checkout --ours -- path/to/conflicted.css
+   git add path/to/conflicted.css
    python -m scripts.apply_codemod path/to/conflicted.css -m proposal/mapping.json --apply
+   git add path/to/conflicted.css
+   git rebase --continue
    ```
-   The mapping is deterministic, so the result is identical to what the branch had. Hand-resolving a tokenization conflict is how one file ends up half-migrated, and nobody will ever notice.
+   The first `git add` marks the conflict resolved, which the codemod needs — it refuses files with uncommitted changes. The mapping is deterministic, so the result is the teammate's edit, migrated. Hand-resolving a tokenization conflict is how one file ends up half-migrated, and nobody will ever notice.
 
 **4. Land `tokens.css` on main first, alone.** It changes no rendering. Once it is on main, every subsequent branch is only *using* tokens, not introducing them, and the conflict surface halves.
 

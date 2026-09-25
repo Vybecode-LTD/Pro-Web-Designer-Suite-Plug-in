@@ -59,10 +59,13 @@ Tailwind lets a value reach the browser three ways:
 So the fix has two halves, and skipping either one leaves a door open:
 
 > **The theme IS the token file** — Tailwind's scale is *replaced*, not
-> extended, so an off-scale class does not exist and the build errors on it.
+> extended, so an off-scale class generates no CSS at all. That is silent,
+> not a build error: the element simply ships unstyled.
 >
-> **Arbitrary values and the `style` prop are lint-banned** — because no
-> amount of theme configuration can shut them.
+> **Arbitrary values, literal utilities and the `style` prop are lint-banned**
+> — because no amount of theme configuration can shut them. `duration-300`,
+> `z-50`, `border-2`, `bg-accent/37` and `p-(--space-6)` all still generate
+> with `--*: initial`; the ESLint config and `audit_design.py` refuse them.
 
 ### 1.3 Replaced, not extended
 
@@ -101,7 +104,8 @@ Tailwind v4 has a single multiplier, `--spacing: 0.25rem`, that generates
 `--*: initial` removes it, and **we deliberately do not restore it.** That
 single omission is Law 3 — the scale is closed — expressed in one line of
 config. With no generator, an off-scale numeric step has no way to come into
-existence. `p-7` is a build error, not a silently-accepted 28px.
+existence. `p-7` generates nothing — no 28px, and no error either, which is
+why the linter has to catch it.
 
 Restoring `--spacing` while defining named steps looks harmless and reopens the
 whole door.
@@ -1218,14 +1222,18 @@ plugin(({ addUtilities }) => {
       transitionDuration: t('--dur-fast'),
       transitionTimingFunction: t('--ease-out'),
     },
-    '.focus-ring': { outline: 'none', boxShadow: t('--shadow-focus') },
+    '.focus-ring': {
+      outline: `${t('--stroke-focus')} solid ${t('--border-focus')}`,  // forced-colors keeps it
+      outlineOffset: t('--stroke-focus'),
+      boxShadow: `0 0 0 ${t('--stroke-focus')} ${t('--bg-canvas')}`,   // the gap ring
+    },
   });
 });
 ```
 
 Use `addUtilities`, not `addComponents`. Components-layer classes lose to any
-utility, which is how you get a `focus-ring` that a stray `shadow-card` silently
-beats.
+utility. And draw the ring as an `outline`: a ring drawn with `box-shadow` is
+silently replaced by a stray `shadow-card`, and vanishes in forced-colors mode.
 
 ### 11.6 Dark mode and layers
 
@@ -1234,24 +1242,33 @@ darkMode: ['selector', '[data-theme="dark"]'],   // v3.4.1+
 // older v3: ['class', '[data-theme="dark"]'] — same mechanism, legacy name
 ```
 
-Layers are the real compromise. v3 emits into three layers it names itself, so
-Law 5's seven can only be approximated:
+Layers are the real compromise. **v3 does not emit native cascade layers.** Its
+`@layer base|components|utilities` are build-time directives, and the output is
+plain, unlayered CSS — which beats every native layer. Put the `@tailwind`
+directives straight under a native `@layer` statement and v3's preflight
+(`button { background-color: transparent }`) and every utility override your
+layered CSS, the opposite of Law 5.
+
+Put Tailwind's output into the layers instead: build it as two sheets and import
+them with native `layer()` (postcss-import 15+, before tailwindcss in the PostCSS
+plugins):
 
 ```css
+/* tailwind-base.css */      @tailwind base;
+/* tailwind-utilities.css */ @tailwind components; @tailwind utilities;
+
+/* index.css */
 @layer reset, tokens, base, layout, components, utilities, overrides;
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import url("./tailwind-base.css") layer(base);
+@import url("./tailwind-utilities.css") layer(utilities);
 ```
 
-v3's own output slots into the matching rungs. The practical consequence: a v3
-`@layer components` rule and a hand-written one are in the *same* layer, so
-source order decides between them. Import hand-written component CSS after
-`@tailwind components` and the behaviour matches v4 closely enough that
-components port without edits.
+Check the built CSS once: preflight's `button { … }` must sit inside `@layer base`.
+If the toolchain cannot do that, keep all hand-written CSS unlayered too and order
+it by import; Law 5 then holds only by convention. v4 emits native layers itself.
 
-Do not use v3's `@layer components { … }` PostCSS directive for hand-written
-CSS. It is not the native at-rule, it silently enables `@apply` semantics, and
-it hides which layer a rule really lands in.
+Do not use v3's `@layer components { … }` directive for hand-written CSS. It is not
+the native at-rule: it moves the rules into Tailwind's unlayered output, purges any
+class the content globs do not see, and hides where a rule really lands.
 
 ---

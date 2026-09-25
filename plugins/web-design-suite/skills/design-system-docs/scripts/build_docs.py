@@ -54,6 +54,9 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 # The CSS scanner and the colour math live in extract_system.py. Importing them
 # is the point: a second parser in this file is a second set of bugs and a
 # second opinion about what a socket is.
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin, which is read-only as far as a project is concerned.
+sys.dont_write_bytecode = True
 try:                                              # python -m scripts.build_docs
     from .extract_system import CssFile, SEVEN_STATES, strip_guards
 except ImportError:                               # python scripts/build_docs.py

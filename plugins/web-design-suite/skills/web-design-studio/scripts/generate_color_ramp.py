@@ -34,8 +34,8 @@ USAGE
   # Audit a ramp against a non-default canvas
   python -m scripts.generate_color_ramp '#e8440a' --name accent --canvas '#0d0d0f'
 
-Run it from the skill root (the directory containing `scripts/`). Running the
-file directly — `python scripts/generate_color_ramp.py '#e8440a'` — works too.
+Run it by path from anywhere — it writes only to stdout, or to -o:
+`python <skill>/scripts/generate_color_ramp.py '#e8440a'`.
 """
 
 from __future__ import annotations

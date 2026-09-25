@@ -106,7 +106,7 @@ State is expressed as a real ARIA attribute where one exists (`aria-expanded`, `
 
 ## Accessibility floor
 
-WCAG 2.2 Level AA, treated as a floor. Contrast is **measured, never assumed**: 4.5:1 body text, 3:1 large text and UI components (SC 1.4.11), and the focus ring pairs `box-shadow: var(--elevation-focus)` with `outline: var(--stroke-focus) solid transparent` so it survives forced-colors mode, which discards `box-shadow`.
+WCAG 2.2 Level AA, treated as a floor. Contrast is **measured, never assumed**: 4.5:1 body text, 3:1 large text and UI components (SC 1.4.11), and the focus ring is an `outline` (`var(--stroke-focus) solid var(--border-focus)`, offset by `--stroke-focus`): forced-colors mode repaints it, and no component `box-shadow` can remove it. A component that adds `box-shadow: var(--elevation-focus)` keeps an outline beside it, never `outline: none`.
 
 ---
 

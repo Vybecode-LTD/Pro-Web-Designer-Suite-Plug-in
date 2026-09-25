@@ -5,6 +5,20 @@ description: Adversarial design review — the pass you run on your own work bef
 
 # Design Critique Gate
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_SKILL_DIR}/scripts/critique_report.py" findings.json --audit audit.json
+> ```
+>
+> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (critique_report.py).
+> From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
+
 The expensive failure is not a bug. It is standing in front of a senior designer or a
 client with work that comes apart in the first ninety seconds — because in those ninety
 seconds you lose the room, and every good decision in the file afterwards is heard as an
@@ -273,11 +287,16 @@ python -m scripts.critique_report findings.json --audit audit.json --fail-on blo
 ```
 
 Findings are JSON. Each one carries `layer`, `severity`, `title`, `mechanism`, `evidence`,
-`fix`, `confidence` and `is_taste`; the schema is in the script's docstring and the shape
-is the same one `assets/CRITIQUE_TEMPLATE.md` fills in by hand. `--audit` folds
-`audit_design.py --json` output in as conformance findings, collapsed by rule, deduplicated
-against anything you already wrote up by hand — by rule name, and site by site, so a group
-of eleven violations is not silently deleted because you happened to mention one of them.
+`fix`, `confidence` and `is_taste`, plus `status` (`open` | `fixed`) and optional `covers`;
+the schema is in the script's docstring and the shape is the same one
+`assets/CRITIQUE_TEMPLATE.md` fills in by hand. `--audit` folds `audit_design.py --json`
+output in as conformance findings, collapsed by rule, deduplicated against anything you
+already wrote up by hand — a whole rule only when your finding claims it (the rule id in
+`covers`, or in backticks), and otherwise site by site, so a group of eleven violations is
+not silently deleted because you mentioned one of them, or used the word "important".
+A rule raised with `--audit-blocking` is never folded, and every merge is reported on
+stderr. The defence sheet carries every open major and minor finding — confirmed ones
+first, suspicions labelled as suspicions — and drops the ones marked `fixed`.
 
 ---
 

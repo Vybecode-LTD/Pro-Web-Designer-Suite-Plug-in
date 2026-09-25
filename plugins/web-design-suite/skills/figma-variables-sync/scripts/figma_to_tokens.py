@@ -40,12 +40,22 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import re
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin, which is read-only as far as a project is concerned.
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.figma_to_tokens
+    from . import dtcg_values                     # type: ignore[import-not-found]
+except ImportError:                               # python scripts/figma_to_tokens.py
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import dtcg_values                            # type: ignore[no-redef]
 
 # ===========================================================================
 # The contract's token names. This list is what makes the round trip lossless:
@@ -209,7 +219,8 @@ RAMP_OKLCH: Dict[str, Dict[str, Tuple[float, float, float]]] = {
                "900": (30.0, 0.090, 42), "950": (21.0, 0.062, 42)},
     "success": {"100": (94.0, 0.050, 152), "500": (62.0, 0.150, 152), "700": (45.0, 0.120, 152)},
     "warning": {"100": (95.5, 0.055, 85), "500": (75.0, 0.155, 85), "700": (52.0, 0.125, 85)},
-    "danger": {"100": (94.5, 0.038, 25), "500": (58.0, 0.205, 25), "700": (45.0, 0.170, 25)},
+    "danger": {"100": (94.5, 0.038, 25), "400": (64.0, 0.190, 25), "500": (58.0, 0.205, 25),
+               "700": (45.0, 0.170, 25)},
     "info": {"100": (94.5, 0.035, 250), "500": (58.0, 0.160, 250), "700": (45.0, 0.140, 250)},
 }
 _CANONICAL: Dict[str, Tuple[float, float, float]] = {}
@@ -260,12 +271,16 @@ def as_color(value: Any) -> Optional[Tuple[float, float, float, float]]:
             except (TypeError, ValueError):
                 return None
         if "color" in value:
+            # VariableComposedColor: Figma gives `opacity` as a PERCENTAGE,
+            # 0-100 (developers.figma.com/docs/rest-api/variables-types). Read
+            # as 0-1, every translucent hover and scrim became opaque.
             base = as_color(value["color"])
             if base is None:
                 return None
-            alpha = value.get("opacity", value.get("alpha", base[3]))
-            if isinstance(alpha, (int, float)):
-                return (base[0], base[1], base[2], float(alpha))
+            if isinstance(value.get("opacity"), (int, float)):
+                return (base[0], base[1], base[2], base[3] * float(value["opacity"]) / 100.0)
+            if isinstance(value.get("alpha"), (int, float)):
+                return (base[0], base[1], base[2], float(value["alpha"]))
             return base
         return None
     if not isinstance(value, str):
@@ -422,6 +437,8 @@ class FDoc:
     collections: Dict[str, FCollection] = field(default_factory=dict)
     variables: List[FVar] = field(default_factory=list)
     by_id: Dict[str, FVar] = field(default_factory=dict)
+    # (token path, why) for DTCG values with no CSS form here; left out, reported.
+    unsupported: List[Tuple[str, str]] = field(default_factory=list)
 
 
 def detect_shape(data: Any) -> str:
@@ -597,7 +614,10 @@ def dtcg_type(declared: Optional[str], value: Any) -> str:
 def parse_dtcg(data: dict, collection: str) -> FDoc:
     doc = FDoc("dtcg")
     doc.collections[collection] = FCollection(collection, ["Value"], "Value")
-    reserved = {"$schema", "$description", "$extensions", "$type", "$value"}
+    # 2025.10 objects, $ref, $extends and group $type become the string forms
+    # read below; anything with no CSS form is listed, not guessed at.
+    data, doc.unsupported = dtcg_values.normalise(data)
+    reserved = dtcg_values.META_KEYS | {"$value"}
 
     def walk(node: Any, path: List[str]) -> None:
         if isinstance(node, dict) and ("$value" in node or "value" in node):
@@ -613,7 +633,9 @@ def parse_dtcg(data: dict, collection: str) -> FDoc:
             return
         if isinstance(node, dict):
             for k, v in node.items():
-                if k not in reserved:
+                if k == "$root":                   # the group's own token
+                    walk(v, path)
+                elif k not in reserved:
                     walk(v, path + [str(k)])
 
     walk(data, [])
@@ -689,6 +711,12 @@ class Converter:
                     "unmapped-name", v.name,
                     f"`{v.name}` is not a name in the contract; emitted as `--{name}`. "
                     "Rename it in Figma or add it to the contract -- do not let both exist."))
+        for path, why in doc.unsupported:
+            self.problems.append(Problem(
+                "unsupported-value", path,
+                f"`{path}` was left out: {why}. Writing it anyway would put a value "
+                "CSS cannot read into tokens.css; split a typography token into "
+                "--type-* roles, or give the colour an sRGB `hex` fallback."))
 
     # -- lookups ------------------------------------------------------------
 
@@ -736,9 +764,20 @@ class Converter:
             return (f"var(--{self.token_name(tgt)})", True)
 
         if var.resolved_type == "COLOR":
+            if isinstance(raw, dict) and "color" in raw and (
+                    as_alias(raw["color"]) is not None or as_alias(raw.get("opacity")) is not None):
+                return self.composed_css(var, mode, raw, chain)
             rgba = as_color(raw)
             if rgba is None:
-                return (str(raw), False)
+                if isinstance(raw, str):
+                    return (raw, False)      # a keyword: transparent, currentColor
+                # Never str() an object into tokens.css: a Python dict repr is
+                # CSS nobody can read, and it used to exit 0.
+                self.problems.append(Problem(
+                    "unreadable-color", var.name,
+                    f"`{var.name}` ({mode}) is not a colour this script can read: "
+                    f"{str(raw)[:60]}. Emitted commented out."))
+                return ("/* unreadable colour */", False)
             if self.color_format == "hex" and rgba[3] >= 0.999:
                 return (rgb_to_hex(*rgba[:3]), True)
             return (format_oklch(*rgba), True)
@@ -770,13 +809,57 @@ class Converter:
             return ("1" if raw else "0", True)
         return (str(raw), True)
 
+    def composed_css(self, var: FVar, mode: str, raw: dict,
+                     chain: Optional[List[str]] = None) -> Tuple[str, bool]:
+        """A VariableComposedColor with an alias in either channel. The link is
+        the point, so it survives as `color-mix(in oklch, var(--x) 8%,
+        transparent)`: the percentage is Figma's opacity, 0-100, unchanged."""
+        opacity = raw.get("opacity", 100)
+        op_alias = as_alias(opacity)
+        if op_alias is not None:
+            tgt = self.target(op_alias)
+            if tgt is None:
+                self.problems.append(Problem(
+                    "broken-alias", var.name,
+                    f"`{var.name}`'s opacity aliases `{op_alias}`, which is not in this export."))
+                return (f"/* unresolved alias: {op_alias} */", False)
+            pct, pct_css = None, f"calc(var(--{self.token_name(tgt)}) * 1%)"
+        else:
+            try:
+                pct = float(opacity)
+            except (TypeError, ValueError):
+                self.problems.append(Problem(
+                    "unreadable-color", var.name,
+                    f"`{var.name}`'s opacity {opacity!r} is not a number."))
+                return ("/* unreadable opacity */", False)
+            pct_css = f"{pct:g}%"
+        colour = raw["color"]
+        if as_alias(colour) is not None:
+            base, ok = self.css_value(var, mode, colour, chain)
+        else:
+            rgba = as_color(colour)
+            if rgba is None:
+                return ("/* unreadable colour */", False)
+            base, ok = format_oklch(*rgba), True
+        if not ok:
+            return (base, False)
+        if pct is not None and pct >= 100:
+            return (base, True)
+        return (f"color-mix(in oklch, {base} {pct_css}, transparent)", True)
+
     def json_value(self, var: FVar, mode: str, raw: Any) -> dict:
         css, ok = self.css_value(var, mode, raw)
         entry: Dict[str, Any] = {"value": css, "type": var.resolved_type.lower()}
         alias = as_alias(raw)
+        composed = raw.get("color") if isinstance(raw, dict) and "color" in raw else None
         if alias is not None:
             tgt = self.target(alias)
             entry["alias"] = self.token_name(tgt) if tgt else alias
+        elif composed is not None and as_alias(composed) is not None:
+            tgt = self.target(as_alias(composed))
+            entry["alias"] = self.token_name(tgt) if tgt else as_alias(composed)
+            if isinstance(raw.get("opacity"), (int, float)):
+                entry["alpha"] = round(float(raw["opacity"]) / 100.0, 6)
         elif var.resolved_type == "COLOR":
             rgba = as_color(raw)
             if rgba:
@@ -856,14 +939,27 @@ class Converter:
 # ===========================================================================
 
 
+def build_date() -> Optional[str]:
+    """The date to stamp, or None. Only SOURCE_DATE_EPOCH (the reproducible-
+    builds convention) sets one: a clock time made two runs on an unchanged
+    export differ, so the documented CI drift check failed every time."""
+    epoch = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if not epoch:
+        return None
+    try:
+        return datetime.fromtimestamp(int(epoch), timezone.utc).strftime("%Y-%m-%d")
+    except (ValueError, OverflowError, OSError):
+        return None
+
+
 def header(source: str, extra: Sequence[str] = ()) -> List[str]:
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    stamp = build_date()
     lines = [
         "GENERATED FILE -- DO NOT EDIT BY HAND.",
         "",
         f"  source     {source}",
         f"  generator  scripts/figma_to_tokens.py",
-        f"  generated  {stamp}",
+        *([f"  generated  {stamp}"] if stamp else []),
         "",
         "Hand edits here are lost on the next sync, and worse, they make the",
         "design file and the code disagree while both look authoritative. Change",
@@ -908,7 +1004,7 @@ def emit_json(conv: Converter, source: str) -> str:
         "$generated": {
             "generator": "scripts/figma_to_tokens.py",
             "source": source,
-            "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            **({"generated": build_date()} if build_date() else {}),
             "warning": "GENERATED FILE -- edit the source, not this.",
             "note": ("For COLOR entries, `hex` is the exact value and `value` is the "
                      "human-readable OKLCH rounded for display. --reverse reads `hex`. "

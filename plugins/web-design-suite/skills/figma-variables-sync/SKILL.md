@@ -5,6 +5,19 @@ description: Keep a Figma file and a codebase speaking one vocabulary. Use when 
 
 # Figma Variables Sync
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_SKILL_DIR}/scripts/figma_audit.py" design/figma-variables.json
+> ```
+>
+> The commands below are written `python scripts/<name>.py`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (figma_audit.py, figma_to_tokens.py).
+
 One vocabulary, two rendering surfaces.
 
 A design system is a set of named decisions. Figma renders those names as a
@@ -298,9 +311,19 @@ old, say so.
 
 ## Scripts
 
-Both are stdlib-only Python 3.9+, run from the skill root, and detect their
+Both are stdlib-only Python 3.9+, run by path from the project root, and detect their
 input shape: REST `variables/local`, a plugin `{"collections": […]}` export, W3C
-DTCG nested tokens, or a flat list of `{name, type, value}` records.
+DTCG nested tokens (including 2025.10's object values, `$ref`, `$extends` and
+`$root`), or a flat list of `{name, type, value}` records. A composed colour's
+opacity is Figma's percentage, 0–100, and an aliased colour keeps its link as
+`color-mix(in oklch, var(--x) 8%, transparent)`. Output carries no clock time
+(set `SOURCE_DATE_EPOCH` to stamp a date), so the CI drift check compares like
+with like.
+
+`figma_audit.py --tokens src/styles/tokens.css` checks colours against the
+**project's** ramps — every `--<name>-<step>` in that file holding a literal
+colour — instead of the studio's. A client's brand ramp is the point of the
+migration that produced it; without `--tokens` it reads as eleven off-ramp errors.
 
 ### `scripts/figma_audit.py`
 

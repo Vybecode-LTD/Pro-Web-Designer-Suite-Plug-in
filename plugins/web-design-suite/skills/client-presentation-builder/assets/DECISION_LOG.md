@@ -124,6 +124,13 @@ is questioned properly.
 
 ---
 
+## Tested by hand
+
+<!-- What was checked manually, by whom, when: "Keyboard: every page, Tab and
+Shift+Tab, 2026-09-20 (A. Name)". The deck claims "keyboard-tested by hand" ONLY
+when this section says so; with it empty, the accessibility slide says no manual
+pass is recorded. -->
+
 ## Reversals
 
 > When a decision is overturned — by the client, by a constraint you found

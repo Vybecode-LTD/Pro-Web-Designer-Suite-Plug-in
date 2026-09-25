@@ -12,13 +12,29 @@ Regressions covered:
   was not either.
 - Baselines: keys embedded the OS path separator, so a baseline written on
   Windows suppressed nothing on Linux CI, and vice versa.
+
+3.1.0 (false passes found in the 3.0.1 review):
+- SB-A3: any `var(--` anywhere in a value switched off every Law 1 check for
+  that declaration, so `padding: var(--pad-sm) 13px` or
+  `transition: opacity 300ms var(--ease-out)` passed.
+- SB-A4: spacing inside @media / @container / @supports was never checked.
+- PS-A4: HTML was never audited. A folder of pages passed as "clean", and an
+  .html file named explicitly went to the JS checker, which ignores <style>.
+  Unknown extensions (a staged README.md) were audited as JavaScript.
+- A path with nothing auditable in it reported "clean" instead of saying so.
+- SS-A19: a stylesheet saved with a UTF-8 BOM failed as "unlayered".
+- XC-A9: baseline keys depended on how the path was spelled, so auditing
+  `src/` by its absolute path resurrected every baselined finding.
+- The clean message claimed "all nine laws hold"; the script checks L1–L6.
+- `background: url(icons.svg#add)` was a "hardcoded colour": the fragment
+  `#add` reads as hex.
 """
 from __future__ import annotations
 
 import json
 import unittest
 
-from wds_support import TempDirTest, output, run_py
+from wds_support import SKILLS, TempDirTest, output, run_py
 
 
 class AuditDesign(TempDirTest):
@@ -86,6 +102,182 @@ class AuditDesign(TempDirTest):
                               "--baseline", variant, cwd=self.tmp)
                 self.assertEqual(json.loads(proc.stdout), [], output(proc))
                 self.assertEqual(proc.returncode, 0)
+
+
+class AuditPrecision(TempDirTest):
+    """A gate that says "clean" about code it never checked is worse than no gate."""
+
+    audit = AuditDesign.audit
+    rules = AuditDesign.rules
+
+    def l1(self, css):
+        return {r for law, r in self.rules(css) if law == "L1"}
+
+    def test_a_var_reference_does_not_hide_a_literal_beside_it(self):
+        cases = {
+            "padding: var(--pad-block-sm) 13px": "raw-spacing",
+            "transition: opacity 300ms var(--ease-out)": "raw-duration",
+            "box-shadow: 0 1px 2px #000, var(--elevation-card)": "raw-shadow",
+            "font: 600 14px/1.2 var(--font-sans)": "raw-type",
+            "background: color-mix(in oklch, var(--bg-accent) 50%, #ff0000)": "raw-color",
+            "border-radius: var(--radius-md) 4px": "raw-radius",
+            "padding: calc(var(--pad-card) + 3px)": "raw-spacing",
+        }
+        for decl, rule in cases.items():
+            with self.subTest(decl=decl):
+                self.assertIn(rule, self.l1(f".card {{ {decl}; }}"))
+
+    def test_fully_tokenised_values_stay_clean(self):
+        for decl in ("padding: var(--pad-block-sm) var(--pad-inline-md)",
+                     "padding: calc(var(--pad-card) * 2)",
+                     "transition: opacity var(--motion-hover)",
+                     "box-shadow: var(--elevation-focus), var(--elevation-card)",
+                     "background: color-mix(in oklch, var(--bg-accent) 50%, transparent)",
+                     "color: oklch(from var(--fg-default) l c h / 0.5)",
+                     "color: var(--fg-muted, #666666)",
+                     "border-radius: calc(var(--radius-lg) - var(--pad-card))"):
+            with self.subTest(decl=decl):
+                self.assertEqual(self.l1(f".card {{ {decl}; }}"), set())
+
+    def test_spacing_inside_media_container_and_supports_is_checked(self):
+        for wrapper in ("@media (width >= 48rem)", "@container (inline-size > 30rem)",
+                        "@supports (display: grid)"):
+            with self.subTest(wrapper=wrapper):
+                self.assertIn("raw-spacing",
+                              self.l1(f"{wrapper} {{ .card {{ padding: 7px 9px; }} }}"))
+
+    def test_html_style_blocks_and_style_attributes_are_audited(self):
+        page = ('<!doctype html><html lang="en"><head><title>t</title>\n'
+                '<style>.hero{margin-top:37px;color:#ff0000;font-size:13px !important}\n'
+                '#buy{padding:7px}</style></head>\n'
+                '<body><main><p style="margin:13px;color:#f00">x</p></main></body></html>\n')
+        self.write("site/index.html", page)
+        for target in ("site", "site/index.html"):
+            with self.subTest(target=target):
+                proc = run_py("web-design-studio", "audit_design", target, "--json", cwd=self.tmp)
+                rules = {(f["law"], f["rule"]) for f in json.loads(proc.stdout)}
+                self.assertEqual(proc.returncode, 1, output(proc))
+                for expected in (("L1", "raw-spacing"), ("L1", "raw-color"), ("L1", "raw-type"),
+                                 ("L5", "important"), ("L5", "id-selector"),
+                                 ("L4", "inline-style")):
+                    self.assertIn(expected, rules)
+
+    def test_single_file_component_styles_are_audited(self):
+        for name in ("Card.vue", "Card.svelte", "Card.astro"):
+            with self.subTest(name=name):
+                self.write(f"sfc/{name}", "<template><div class='card'>x</div></template>\n"
+                           "<style>\n@layer components {\n  .card { padding: 13px; }\n}\n</style>\n")
+                proc = run_py("web-design-studio", "audit_design", f"sfc/{name}", "--json",
+                              cwd=self.tmp)
+                found = json.loads(proc.stdout)
+                self.assertIn(("L1", "raw-spacing", 4),
+                              {(f["law"], f["rule"], f["line"]) for f in found}, output(proc))
+
+    def test_a_clean_page_and_an_html_email_pass(self):
+        self.write("ok/index.html", "<!doctype html><html lang='en'><title>t</title><style>\n"
+                   "@layer components { .hero { padding: var(--pad-card); } }\n</style>"
+                   "<p style='--progress: 40%'>x</p></html>\n")
+        self.write("ok/receipt.html", "<!doctype html><html xmlns:v='urn:schemas-microsoft-com:vml'>"
+                   "<!--[if mso]><style>td{padding:13px}</style><![endif]-->"
+                   "<td style='padding:24px;color:#333333'>x</td></html>\n")
+        proc = run_py("web-design-studio", "audit_design", "ok", "--strict", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+
+    def test_files_it_cannot_audit_are_skipped_not_misread(self):
+        self.write("docs/guide.md", 'Bad: <div className="p-[13px]" style={{color: "#ff0000"}}>\n')
+        proc = run_py("web-design-studio", "audit_design", "docs/guide.md", "--strict",
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn("skipped", output(proc).lower())
+
+    def test_a_folder_with_nothing_auditable_is_not_reported_clean(self):
+        self.write("templates/page.twig", "<p style='margin:13px'>x</p>\n")
+        proc = run_py("web-design-studio", "audit_design", "templates", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("0 files", output(proc))
+
+    def test_a_stylesheet_saved_with_a_bom_is_not_unlayered(self):
+        self.write("bom/a.css", "﻿@layer components {\n  .a { color: var(--fg-default); }\n}\n")
+        proc = run_py("web-design-studio", "audit_design", "bom", "--strict", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+
+    def test_a_baseline_matches_however_the_path_is_spelled(self):
+        self.audit(".card { padding: 13px; }")
+        proc = run_py("web-design-studio", "audit_design", "src/", "--write-baseline",
+                      ".design-baseline.json", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        (self.tmp / "sub").mkdir()
+        runs = {"absolute path": (str(self.tmp / "src"), self.tmp, []),
+                "./src": ("./src", self.tmp, []),
+                "from a subfolder": ("../src", self.tmp / "sub",
+                                     ["--baseline", "../.design-baseline.json"])}
+        for label, (target, cwd, extra) in runs.items():
+            with self.subTest(label):
+                proc = run_py("web-design-studio", "audit_design", target, "--json", *extra, cwd=cwd)
+                self.assertEqual(json.loads(proc.stdout), [], output(proc))
+                self.assertEqual(proc.returncode, 0)
+
+    def test_a_named_baseline_that_does_not_exist_is_reported(self):
+        self.audit(".card { padding: var(--pad-card); }")
+        proc = run_py("web-design-studio", "audit_design", "src", "--baseline", "nope.json",
+                      cwd=self.tmp)
+        self.assertIn("nope.json", output(proc))
+
+    def test_literal_tailwind_utilities_the_theme_cannot_remove_are_flagged(self):
+        """SB-A5: these still generate with `--*: initial`, and nothing flagged them."""
+        self.write("src/Holes.tsx",
+                   'export const H = () => <div className="duration-300 delay-150 z-50 '
+                   'border-2 ring-2 underline-offset-2 bg-accent/37 p-(--space-6) '
+                   'space-y-related">x</div>;\n')
+        proc = run_py("web-design-studio", "audit_design", "src/Holes.tsx", "--json", cwd=self.tmp)
+        found = [f["message"] for f in json.loads(proc.stdout)]
+        for cls in ("duration-300", "delay-150", "z-50", "border-2", "ring-2",
+                    "underline-offset-2", "bg-accent/37", "(--space-6)", "space-y-related"):
+            with self.subTest(cls=cls):
+                self.assertTrue(any(cls in m for m in found), found)
+        roles = self.write("src/Roles.tsx",
+                           'export const R = () => <div className="motion-hover z-modal '
+                           'border-default focus-ring p-card p-(--pad-card) bg-surface '
+                           'w-1/2 gap-related">x</div>;\n')
+        proc = run_py("web-design-studio", "audit_design", roles, "--json", cwd=self.tmp)
+        self.assertEqual(json.loads(proc.stdout), [], output(proc))
+
+    def test_the_eslint_config_bans_the_same_classes(self):
+        """SB-A5: the design ESLint config has matching patterns (checked here as
+        regexes, so the test needs no node_modules)."""
+        import re
+        config = (SKILLS / "web-design-studio" / "assets" / "configs" /
+                  "eslint.design.config.mjs").read_text(encoding="utf-8")
+
+        def pattern(name):
+            m = re.search(rf"const {name} =\s*\n?\s*/(.+?)/;\n", config)
+            self.assertIsNotNone(m, f"{name} is not declared")
+            return re.compile(m.group(1))
+
+        cases = {"LITERAL_UTILITY": ("duration-300", "z-50", "-z-10", "border-2", "ring-2",
+                                     "outline-offset-2"),
+                 "OPACITY_MODIFIER": ("bg-accent/37", "text-fg/80"),
+                 "TIER1_SHORTHAND": ("p-(--space-6)", "bg-(--neutral-800)")}
+        for name, bad in cases.items():
+            rx = pattern(name)
+            for cls in bad:
+                with self.subTest(pattern=name, cls=cls):
+                    self.assertTrue(rx.search(f" {cls} "))
+            for good in ("motion-hover", "z-modal", "border-default", "w-1/2",
+                         "p-(--pad-card)", "p-(--space-section)"):
+                with self.subTest(pattern=name, good=good):
+                    self.assertFalse(rx.search(f" {good} "))
+
+    def test_the_clean_message_names_only_the_laws_it_checks(self):
+        self.audit(".card { padding: var(--pad-card); }")
+        proc = run_py("web-design-studio", "audit_design", "src", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertNotIn("nine laws", output(proc))
+        self.assertIn("L1–L6", output(proc))
+
+    def test_a_url_fragment_is_not_a_colour(self):
+        self.assertNotIn("raw-color", self.l1(".mask { mask-image: url(#fade); "
+                                              "background: url(icons.svg#add) no-repeat; }"))
 
 
 if __name__ == "__main__":

@@ -70,6 +70,7 @@ Exit codes: 0 clean · 1 violations found · 2 bad invocation.
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import os
 import re
@@ -393,10 +394,19 @@ def _skip_braces(text: str, i: int) -> int:
     return n
 
 
+def _line_finder(text: str):
+    """pos -> 1-based line number, by bisecting a newline index built once.
+    Counting newlines from the top of the file for every tag and attribute made
+    large pages quadratic."""
+    starts = [0] + [m.end() for m in re.finditer("\n", text)]
+    return lambda pos: bisect.bisect_right(starts, pos)
+
+
 def scan_tags(text: str) -> list[Tag]:
     tags: list[Tag] = []
     n = len(text)
     i = 0
+    line_of = _line_finder(text)
     while i < n:
         j = text.find("<", i)
         if j < 0:
@@ -411,7 +421,7 @@ def scan_tags(text: str) -> list[Tag]:
         attrs: dict = {}
         attr_lines: dict = {}
         self_closing = False
-        line = text.count("\n", 0, j) + 1
+        line = line_of(j)
         while k < n:
             while k < n and text[k].isspace():
                 k += 1
@@ -433,7 +443,7 @@ def scan_tags(text: str) -> list[Tag]:
                 k += 1
                 continue
             raw_name = am.group(0)
-            aline = text.count("\n", 0, k) + 1
+            aline = line_of(k)
             k = am.end()
             while k < n and text[k].isspace():
                 k += 1
@@ -589,13 +599,14 @@ def extract_pragmas(text: str) -> tuple[set, dict]:
             spans.append((m.start(), m.end(), m.group(0)))
     for m in re.finditer(r"//[^\n]*", text):
         spans.append((m.start(), m.end(), m.group(0)))
+    line_of = _line_finder(text)
     for start, end, body in spans:
         fm = IGNORE_FILE.search(body)
         if fm:
             file_ignores |= {t.strip().upper() for t in fm.group(1).split(",") if t.strip()}
         lm = IGNORE_LINE.search(body)
         if lm:
-            end_line = text.count("\n", 0, end) + 1
+            end_line = line_of(end)
             tags = {t.strip().upper() for t in lm.group(1).split(",") if t.strip()}
             # The pragma applies to the next line, and to the rest of this one
             # (an inline pragma before a tag on the same line).
@@ -680,24 +691,36 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
     # A node index so a rule can ask "what is inside this element?"
     node_by_start = {n.tag.start: n for n in nodes}
 
+    # Each open tag's enclosing element, found in ONE pass over the tags. The
+    # open-element stack only ever loses a suffix, so the stack beneath any
+    # element is exactly its chain of parents — walking the chain gives the
+    # same answer the per-call rescan did, in O(depth) instead of O(tags).
+    parent_of: dict[int, Tag | None] = {}
+    open_stack: list[Tag] = []
+    for other in tags:
+        if other.closing:
+            for i in range(len(open_stack) - 1, -1, -1):
+                if open_stack[i].name == other.name:
+                    del open_stack[i:]
+                    break
+            continue
+        parent_of[other.start] = open_stack[-1] if open_stack else None
+        if not (other.self_closing or other.name in VOID):
+            open_stack.append(other)
+
     def ancestors_of(t: Tag) -> list[str]:
         """Enclosing element names, outermost first — good enough for the two
         questions that need it (is this header at page level, is this input
         wrapped in a label)."""
         out = []
-        stack: list[str] = []
-        for other in tags:
-            if other.start >= t.start:
-                break
-            if other.closing:
-                for i in range(len(stack) - 1, -1, -1):
-                    if stack[i] == other.name:
-                        del stack[i:]
-                        break
-            elif not (other.self_closing or other.name in VOID):
-                stack.append(other.name)
-        out = list(stack)
+        p = parent_of.get(t.start)
+        while p is not None:
+            out.append(p.name)
+            p = parent_of.get(p.start)
+        out.reverse()
         return out
+
+    label_fors = ids_with_for(open_tags)     # the page's <label for=…> ids, once
 
     for t in open_tags:
         name = t.name
@@ -960,7 +983,7 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
         if name in ("input", "select", "textarea"):
             itype = str(a.get("type", "text")).lower() if name == "input" else name
             if itype not in INPUT_NO_LABEL_NEEDED:
-                labelled = _labelled(t, ids_with_for(open_tags), a, ancestors_of(t))
+                labelled = _labelled(t, label_fors, a, ancestors_of(t))
                 if labelled is None and "\x00spread" not in a:
                     add(line, "F", "control-no-label", "3.3.2 / 4.1.2", "error",
                         f"<{name}"
@@ -1370,6 +1393,7 @@ def audit_css(path: Path, text: str, origin: str | None = None,
                                 snippet[:200]))
 
     src = re.sub(r"/\*.*?\*/", lambda m: " " * len(m.group(0)), text, flags=re.S)
+    line_of = _line_finder(src)
 
     # Rule blocks: selector { declarations }. Nesting is rare in a focus rule
     # and a nested block simply audits as its own block, which is correct.
@@ -1385,7 +1409,7 @@ def audit_css(path: Path, text: str, origin: str | None = None,
         if c == "{":
             if depth == 0:
                 sel = "".join(buf).strip()
-                sel_line = src.count("\n", 0, i) + 1
+                sel_line = line_of(i)
                 body_start = i + 1
                 buf = []
             depth += 1
@@ -1409,7 +1433,7 @@ def audit_css(path: Path, text: str, origin: str | None = None,
         for m in re.finditer(r"([-\w]+)\s*:\s*([^;{}]+)", body):
             prop = m.group(1).strip().lower()
             val = m.group(2).strip()
-            ln = src.count("\n", 0, body_off + m.start()) + 1
+            ln = line_of(body_off + m.start())
             decls[prop] = (val, ln)
 
         outline = decls.get("outline") or decls.get("outline-style") or \
@@ -1430,10 +1454,11 @@ def audit_css(path: Path, text: str, origin: str | None = None,
                     "removes the only cursor a keyboard user has — not degraded, "
                     "unusable. And the fix is not to add an outline back at a "
                     "higher specificity somewhere else; the fix is to DELETE the "
-                    "reset. If the default ring is ugly, restyle it: "
-                    "`:focus-visible { outline: var(--stroke-focus) solid "
-                    "transparent; outline-offset: var(--stroke-focus); "
-                    "box-shadow: var(--shadow-focus); }`. If you genuinely want "
+                    "reset. If the default ring is ugly, restyle it as an "
+                    "outline, which forced-colors mode keeps and no component "
+                    "box-shadow can remove: `:focus-visible { outline: "
+                    "var(--stroke-focus) solid var(--border-focus); "
+                    "outline-offset: var(--stroke-focus); }`. If you genuinely want "
                     "no ring for MOUSE users, that is what `:focus-visible` "
                     "already does for you.")
             elif replacement == ["box-shadow"] and FOCUS_SEL.search(sel):
@@ -1493,25 +1518,39 @@ def audit_embedded_css(path: Path, text: str) -> list[Finding]:
 # Driver
 # ---------------------------------------------------------------------------
 
+AUDITABLE_EXT = MARKUP_EXT | JSX_EXT | CSS_EXT
+
+
 def iter_files(paths: list[str]) -> Iterator[Path]:
-    exts = MARKUP_EXT | JSX_EXT | CSS_EXT
     for raw in paths:
         p = Path(raw)
         if p.is_file():
-            yield p
+            yield p                  # named explicitly: audited or reported skipped
         elif p.is_dir():
             for root, dirs, files in os.walk(p):
                 dirs[:] = [d for d in dirs
                            if d not in SKIP_DIRS and not d.startswith(".")]
                 for f in sorted(files):
                     fp = Path(root) / f
-                    if fp.suffix.lower() in exts:
+                    if fp.suffix.lower() in AUDITABLE_EXT:
                         yield fp
 
 
 def audit(paths: list[str]) -> list[Finding]:
+    return audit_run(paths)[0]
+
+
+def audit_run(paths: list[str]) -> tuple[list[Finding], list[Path]]:
+    """(findings, files named explicitly that are not markup, JSX or CSS).
+
+    A hook passes every staged file; README.md or render.py must be skipped
+    and listed, not parsed as HTML and failed."""
     out: list[Finding] = []
+    skipped: list[Path] = []
     for fp in iter_files(paths):
+        if fp.suffix.lower() not in AUDITABLE_EXT:
+            skipped.append(fp)
+            continue
         try:
             text = fp.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -1532,7 +1571,7 @@ def audit(paths: list[str]) -> list[Finding]:
                                "Please report this file shape; the rest of the "
                                "audit completed normally."))
     out.sort(key=lambda f: (f.file, f.line, SEVERITY_ORDER.get(f.severity, 9)))
-    return out
+    return out, skipped
 
 
 def _wrap(s: str, width: int) -> list[str]:
@@ -1632,7 +1671,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"a11y_static: no such path: {', '.join(missing)}", file=sys.stderr)
         return 2
 
-    findings = audit(paths)
+    findings, skipped = audit_run(paths)
+    if skipped:
+        names = ", ".join(str(p) for p in skipped[:5]) + (" …" if len(skipped) > 5 else "")
+        print(f"a11y_static: skipped {len(skipped)} file(s) that are not markup, JSX "
+              f"or CSS: {names}", file=sys.stderr)
 
     if args.category:
         wanted = {c.upper() for c in args.category}

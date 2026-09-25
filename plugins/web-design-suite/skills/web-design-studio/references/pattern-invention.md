@@ -344,7 +344,7 @@ Answer each with evidence, not intention. "We'll handle that in QA" is a fail.
 | --- | --- | --- | --- |
 | H1 | **Discoverability** | A first-time user finds the interaction with no instruction. There is a **visible cue at rest** — before hover, before focus, before scroll. Name the cue explicitly. | The affordance only appears on hover. The cue is a coach-mark or a tooltip on first visit (that is an admission of failure, not a cue). |
 | H2 | **Learnability (5-second rule)** | Shown a static screenshot for five seconds, a user can state what will happen if they act. Prediction, not exploration. | "I'd have to click it and see." Two plausible contradictory predictions. |
-| H3 | **Keyboard equivalence** | The complete task is achievable with keyboard alone, in a sane tab order, with a visible focus ring (`--shadow-focus`), and no keyboard trap. Every pointer gesture has a key equivalent. **No exceptions, ever.** | Drag-only reordering. Hover-only reveal. A custom widget that takes focus but has no arrow-key model. |
+| H3 | **Keyboard equivalence** | The complete task is achievable with keyboard alone, in a sane tab order, with a visible focus ring (the reset's outline ring — never `outline: none`), and no keyboard trap. Every pointer gesture has a key equivalent. **No exceptions, ever.** | Drag-only reordering. Hover-only reveal. A custom widget that takes focus but has no arrow-key model. |
 | H4 | **Touch** | Works with a finger. No behaviour depends on hover. Every target ≥ `--tap-min` (44px). **No scroll hijacking** — the page's vertical scroll is never retimed, intercepted or converted into another action. Horizontal drag near a viewport edge does not fight the OS back-gesture. | Cursor-proximity effects that are the only signal. A horizontal carousel that swallows the edge-swipe back gesture. `wheel` handlers with `preventDefault` driving a narrative. |
 | H5 | **Screen reader** | You can name the announcement, in words, for every state. You can name the **existing ARIA pattern it is closest to** (`tablist`, `listbox`, `slider`, `tree`, `disclosure`, `grid`, `dialog`…) and implement with real semantics — native elements first, `role` only where nothing native fits. **If it maps to no existing ARIA pattern, it probably cannot be understood, and that is a fail.** | A pile of `role="presentation"` plus `aria-label` on divs. A pattern whose announcement you cannot write down. Live regions used to narrate motion. |
 | H6 | **Reduced motion / vestibular safety** | With `prefers-reduced-motion: reduce`, the pattern is fully functional and all *information* is still conveyed. No parallax, no large-area movement, no motion the user did not initiate. **If the pattern *is* the motion, it fails.** | A comparison that only exists as a crossfade. A state change readable only from a transition. Any effect that survives reduced-motion because "it's subtle". |
@@ -471,7 +471,7 @@ they are where the insight comes from, and the distinctive variant is where it g
                                          the absence of a value, not a scale step */
     list-style: none;
   }
-  .preset-list:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+  .preset-list:focus-visible { outline: var(--stroke-focus) solid var(--border-focus); outline-offset: var(--stroke-focus); }
 
   .preset {
     display: flex;
@@ -608,7 +608,7 @@ named. Ships.
   }
   .work-card:hover,
   .work-card:focus-within { box-shadow: var(--elevation-raised); }
-  .work-card a:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+  .work-card a:focus-visible { outline: var(--stroke-focus) solid var(--border-focus); outline-offset: var(--stroke-focus); }
 
   /* The FLIP re-flow is the invented part. It is an enhancement: the class is
      added by script only when motion is allowed, so reduced-motion users get the
@@ -715,7 +715,7 @@ idea and lose the liability.
     color: var(--fg-strong);
     box-shadow: var(--elevation-card);
   }
-  .ab-compare__btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+  .ab-compare__btn:focus-visible { outline: var(--stroke-focus) solid var(--border-focus); outline-offset: var(--stroke-focus); }
 
   /* The hold hint only appears once the control is focused or hovered — it is a
      refinement of an affordance that is already visible, not the affordance itself.

@@ -49,8 +49,9 @@ USAGE
   python -m scripts.apply_codemod ./src --mapping proposal/mapping.json \\
       --skip-review --apply
 
-Run it from the skill root (the directory containing `scripts/`). Running the
-file directly — `python scripts/apply_codemod.py ./src -m mapping.json` — works.
+Run it by path from the PROJECT root, so `./src` is the project's and nothing is
+written into the plugin: `python <skill>/scripts/apply_codemod.py ./src -m mapping.json`.
+The `-m scripts.apply_codemod` form above is for a project that vendored scripts/.
 
 Exit codes: 0 clean (including a dry run), 1 if a file was skipped or a rule
 could not be applied safely, 2 on bad invocation.
@@ -74,6 +75,9 @@ from typing import Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 # The CSS scanner, the comment blanker and the normalizers live in
 # extract_literals.py. One implementation, or the codemod and the census
 # disagree about what a declaration is, which is the worst possible bug here.
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin, which is read-only as far as a project is concerned.
+sys.dont_write_bytecode = True
 try:                                                # python -m scripts.apply_codemod
     from .extract_literals import (                 # type: ignore[import-not-found]
         blank_css_comments, blank_js_comments, blank_interpolations,
@@ -687,11 +691,17 @@ def dirty_files(root: Path) -> Optional[set]:
 # Walking
 # ---------------------------------------------------------------------------
 
-def iter_files(paths: Sequence[str], only: Sequence[str]) -> Iterator[Path]:
+def iter_files(paths: Sequence[str], only: Sequence[str], *,
+               include_vendor: bool = False,
+               vendor_skipped: List[Path] | None = None) -> Iterator[Path]:
+    """A file named explicitly is always rewritten (the user asked for it);
+    inside a folder, vendor files are left alone unless --include-vendor, and
+    collected in `vendor_skipped` so the summary can say so."""
     for raw in paths:
         p = Path(raw)
         candidates: List[Path]
-        if p.is_file():
+        explicit = p.is_file()
+        if explicit:
             candidates = [p]
         else:
             candidates = []
@@ -702,7 +712,11 @@ def iter_files(paths: Sequence[str], only: Sequence[str]) -> Iterator[Path]:
         for fp in candidates:
             if fp.suffix.lower() not in CSS_EXT | JS_EXT:
                 continue
-            if is_vendor(fp) or is_token_file(fp):
+            if is_token_file(fp):
+                continue
+            if not (explicit or include_vendor) and is_vendor(fp):
+                if vendor_skipped is not None:
+                    vendor_skipped.append(fp)
                 continue
             if only and not any(
                     fnmatch.fnmatch(norm_path(fp), pat) or
@@ -812,6 +826,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="suppress the diff (implies a summary only)")
     ap.add_argument("--force", action="store_true",
                     help="write over files with uncommitted changes")
+    ap.add_argument("--include-vendor", action="store_true",
+                    help="also rewrite vendor/third-party files found inside a folder "
+                         "(a file named explicitly is always rewritten)")
     return ap
 
 
@@ -853,7 +870,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     skips: List[Skip] = []
     results: List[FileResult] = []
-    for fp in iter_files(args.paths, args.only):
+    vendor_skipped: List[Path] = []
+    for fp in iter_files(args.paths, args.only, include_vendor=args.include_vendor,
+                         vendor_skipped=vendor_skipped):
         res = process(fp, mapping, skips)
         if not res:
             continue
@@ -925,6 +944,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"  {len(untouched)} file(s) were left alone:")
         for s in untouched:
             print(f"    {s.file}  {s.reason}")
+    if vendor_skipped:
+        print()
+        print(f"  {len(vendor_skipped)} vendor file(s) not rewritten (you layer vendor "
+              f"CSS, you do not migrate it; --include-vendor, or name the file):")
+        for fp in vendor_skipped[:10]:
+            print(f"    {norm_path(fp)}")
 
     if not args.apply and total_edits:
         print()

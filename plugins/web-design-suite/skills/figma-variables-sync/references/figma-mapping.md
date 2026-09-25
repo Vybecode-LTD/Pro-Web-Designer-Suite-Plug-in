@@ -577,6 +577,11 @@ Figma announced native import and export of variables conforming to the W3C
 Design Tokens Community Group 1.0 specification, rolling out in stages from late
 2025. **Verify its availability and its exact file shape in the app before
 building on it** — the rollout has been staged and reported dates have moved;
-this document does not claim to know its current state. Both scripts already read
-DTCG-shaped JSON (`$value` / `$type`, `{group.token}` references), so if it is
-live in your account it works today.
+this document does not claim to know its current state. Both scripts read the
+DTCG format's first stable version, 2025.10: colour objects (`{colorSpace,
+components, alpha, hex}` — sRGB, sRGB-linear, HSL, OKLCH and OKLab, other spaces
+through their `hex` fallback), `{value, unit}` dimensions and durations,
+`{group.token}` and `$ref` references, `$extends`, `$root` and a group's `$type`.
+Shadow, border and transition composites are written as CSS; a typography
+composite, or a colour with no sRGB form, is reported by name and left out —
+never written as something CSS cannot read.

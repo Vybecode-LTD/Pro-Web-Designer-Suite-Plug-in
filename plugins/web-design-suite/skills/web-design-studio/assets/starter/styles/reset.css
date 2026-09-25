@@ -332,25 +332,27 @@
      ----------------------------------------------------------------------- */
 
   :focus-visible {
-    /* `--shadow-focus` is a TWO-ring halo by construction:
-         ring 1  --stroke-focus  in --bg-canvas   (separation gap)
+    /* A TWO-ring indicator:
+         ring 1  --stroke-focus  in --bg-canvas    (separation gap)
          ring 2  --stroke-focus  in --border-focus (the visible ring)
        Two rings are what make a focus indicator survive an element sitting
        on an accent fill, an image, or an inverse surface — there is always
-       a contrasting edge somewhere in the pair. A single-colour ring fails
-       WCAG 2.4.11 the moment the background approaches its colour. */
-    box-shadow: var(--shadow-focus);
+       a contrasting edge somewhere in the pair.
 
-    /* Kill the UA ring (we have replaced it) but keep an outline BOX so the
-       forced-colors rule below has something to repaint. */
-    outline: var(--stroke-focus) solid transparent;
+       The visible ring is an OUTLINE, not a box-shadow. Components draw
+       their own box-shadow (a button's elevation, a card's shadow) in a
+       LATER layer, and a later layer's box-shadow replaced a ring drawn with
+       box-shadow here: the canonical Button showed no focus at all
+       (WCAG 2.4.7). No component sets an outline, so this ring survives all
+       of them; a component with its own shadow loses only the gap ring. */
+    outline: var(--stroke-focus) solid var(--border-focus);
     outline-offset: var(--stroke-focus);
+    box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas);
   }
 
-  /* Windows High Contrast / forced-colors DISCARDS box-shadow entirely. The
-     transparent outline above is the bridge: forced-colors repaints outline
-     colours, so the ring survives in a mode whose whole users are people who
-     need the ring most. */
+  /* Windows High Contrast / forced-colors DISCARDS box-shadow and forces
+     colours; the outline survives and is repainted in the system colour, in
+     a mode whose whole users are people who need the ring most. */
   @media (forced-colors: active) {
     :focus-visible {
       outline-color: Highlight;
@@ -404,14 +406,13 @@
      -----------------------------------------------------------------------
      `[hidden]` is a promise: this element is not rendered in any
      presentation. The UA implements it as `display: none`, which ANY author
-     `display` beats — including one in a later layer. That is why every
-     other reset on the internet writes `!important` here.
+     `display` beats — including one in a later layer: `.stack[hidden]` and
+     `.cluster[hidden]` rendered as flex.
 
-     Law 5 forbids `!important`, so we solve it with layer order instead:
-     this declaration is repeated as the LAST rule of `overrides.css`, which
-     is the last layer. The copy here handles the 99% case cheaply; the copy
-     in `overrides` is the authoritative one that a `display: flex` in
-     `components` cannot defeat. Do not delete either.
+     This is the one sanctioned `!important` (Law 5). Important declarations
+     reverse layer order, so an `!important` in reset — the FIRST layer —
+     beats every later layer, important or not. Nothing else in the system
+     may use it, and nothing needs to: `hidden` is a state, not a style.
 
      `until-found` is excluded: that value means "hidden but findable by
      find-in-page and reachable by a fragment link", and the browser removes
@@ -419,7 +420,8 @@
      `display: none` on it disables the feature. ------------------------ */
 
   [hidden]:not([hidden="until-found"]) {
-    display: none;
+    /* design-audit-ignore-next-line: L5 -- the sanctioned [hidden] override, see above */
+    display: none !important;
   }
 
 
@@ -442,15 +444,15 @@
     display: none;
   }
 
-  /* The UA gives <dialog> a border and a fixed max-size; the border in
-     particular is a 2px inset ridge that no design has ever wanted. */
+  /* The UA gives <dialog> a 2px inset ridge that no design has ever wanted.
+     Its max-size stays: the UA's calc(100% - 38px) (or so) is what keeps a
+     tall modal inside the viewport AND scrollable. Setting it to none let a
+     modal run off-screen with no way to reach its buttons. */
   dialog {
     border: none;
     padding: 0;
     background: none;
     color: inherit;
-    max-inline-size: none;
-    max-block-size: none;
   }
 
   /* Same for the popover API's UA chrome. */

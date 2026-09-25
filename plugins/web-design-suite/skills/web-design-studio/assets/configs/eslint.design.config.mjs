@@ -49,8 +49,8 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';
  * double-escaping every backslash, which is how these rules silently stop
  * matching anything and nobody notices for a quarter.
  *
- * All of them are verified against fixtures in the repo's lint tests; if
- * you change one, change the fixture.
+ * The plugin's tests apply these patterns to fixture class lists
+ * (tests/test_audit_design.py); if you change one, change the fixture.
  * ========================================================================= */
 
 /* LAW 1 + LAW 3 — Tailwind arbitrary VALUES: `mt-[13px]`, `text-[#e8440a]`,
@@ -59,7 +59,8 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';
  * This is the drift the skill exists to prevent, and it is the one thing
  * `@theme` cannot switch off: arbitrary values are a language feature of
  * the class parser, not a theme entry. Deleting the stock scale makes `p-4`
- * a build error; it does nothing about `p-[17px]`. Only a linter closes it.
+ * generate nothing (silently — it is not a build error); it does nothing
+ * about `p-[17px]`. Only a linter closes it.
  *
  * Arbitrary VARIANTS are explicitly allowed — `data-[state=open]:`,
  * `aria-[expanded=true]:`, `group-[.is-open]:`, `peer-[:checked]:`,
@@ -105,6 +106,27 @@ const STOCK_PALETTE =
  * a developer's muscle memory. All three are exactly how a system dies. */
 const NUMERIC_SPACING =
   /(?<![-\w])(?:p[xytrbles]?|m[xytrbles]?|gap-[xy]|gap|space-[xy])-(?:[1-9]\d*(?:\.\d+)?|0\.\d+)(?![\w-])/;
+
+/* LAW 1 — literal values that no theme can remove: `duration-300`,
+ * `delay-150`, `z-50`, `z-9999`, `border-2`, `ring-2`, `outline-offset-2`,
+ * `underline-offset-2`. Tailwind generates a bare number for these utilities
+ * whatever the theme says, so `--*: initial` leaves them all working. A literal
+ * duration also opts out of the reduced-motion tokens. Use the roles:
+ * motion-hover, z-modal, border-default, the focus-ring utility. */
+const LITERAL_UTILITY =
+  /(?<![-\w])(?:duration|delay|-?z|border(?:-[xytrblse])?|ring|ring-offset|outline|outline-offset|underline-offset)-\d+(?:\.\d+)?(?![\w./-])/;
+
+/* LAW 1 — `/NN` opacity modifiers: `bg-accent/37`, `text-fg/80`. The number is
+ * a literal alpha compiled into color-mix(). Translucency has roles
+ * (--bg-hover, --bg-active, scrims); a modifier is a colour nobody chose. */
+const OPACITY_MODIFIER =
+  /(?<![-\w])(?:bg|text|border|ring|fill|stroke|outline|shadow|decoration|from|via|to|placeholder|accent|caret|divide)-[a-z][\w-]*\/\d+(?![\w])/;
+
+/* LAW 6 — v4's `(--var)` shorthand naming a Tier-1 primitive:
+ * `p-(--space-6)`, `bg-(--neutral-800)`. The same tier skip as a stock
+ * palette class, spelled so the palette rule cannot see it. */
+const TIER1_SHORTHAND =
+  /\(--(?:space-(?!section|subsection|block|fluid)|neutral-|accent-|success-|warning-|danger-|info-|text-|leading-|weight-|shadow-)[\w-]*\)/;
 
 /* LAW 2 — any outer margin utility except `auto`. `mx-auto` and `m-auto`
  * survive because centring is a container positioning ITSELF, not a child
@@ -504,6 +526,25 @@ const CORE_RESTRICTED_SYNTAX = [
           'p-4 says how many pixels; p-card says what the thing is, and follows [data-density] for free. ' +
           'Use the proximity ladder (gap-fused, gap-tight, gap-related, gap-grouped, gap-separate, gap-distinct) ' +
           'and the inset roles (p-card, p-card-lg, p-well, px-inline-md, py-block-sm). p-0 and p-px are on the scale.'
+      ),
+
+      ...forbidInClasses(
+        LITERAL_UTILITY,
+        'Law 1 (tokens or nothing): a bare number in duration-*, delay-*, z-*, border-*, ring-* or *-offset-* is a literal. ' +
+          'Tailwind generates these whatever the theme says, so the closed scale does not remove them. ' +
+          'Use the role: motion-hover / motion-enter, z-dropdown / z-modal, border-default / border-thick, focus-ring.'
+      ),
+
+      ...forbidInClasses(
+        OPACITY_MODIFIER,
+        'Law 1 (tokens or nothing): a /NN opacity modifier is a literal alpha. ' +
+          'Translucency has roles — bg-hover, bg-active, the scrim role — so dark mode and contrast checks can reach it.'
+      ),
+
+      ...forbidInClasses(
+        TIER1_SHORTHAND,
+        'Law 6 (semantic before primitive): (--space-6), (--neutral-800) and friends read a Tier-1 primitive. ' +
+          'Use the role class (p-card, bg-surface), or the role variable: p-(--pad-card).'
       ),
 
       ...forbidInClasses(

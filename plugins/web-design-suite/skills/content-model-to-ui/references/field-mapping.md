@@ -308,7 +308,7 @@ This is the rule that keeps forms honest. Invent a client rule and one of two th
 | `CHECK (col ~ '…')` | `pattern` | Locally |
 | `CHECK (col IN (…))` | the option set | By construction — the control has no other values |
 | `UNIQUE` index | `unique` | **Server.** Debounce on blur, and still handle the `23505` race on submit |
-| `FOREIGN KEY` | `exists` | **Server only.** A client cannot see rows RLS hides from it, so a local "does this id exist" check rejects valid input |
+| `FOREIGN KEY` | `exists` | **Server only.** A client cannot see rows RLS hides from it, so a local "does this id exist" check rejects valid input. The database checks the key *outside* RLS, so it accepts a hidden parent too: the policy's `WITH CHECK` must confirm the parent is one this user may use |
 | Enum type | the option set | By construction |
 
 `introspect_schema.py` marks each rule `mirror: true` or `mirror: false`. The `false` ones — email format, URL scheme, slug pattern, "money is non-negative" — are conveniences the database does not enforce, and each is an argument for adding the constraint. A reviewer should read that list and decide, per rule, whether to tighten the schema or accept the divergence knowingly.

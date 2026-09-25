@@ -5,6 +5,19 @@ description: Writing and structuring landing pages, marketing sites, product pag
 
 # Landing Page Conversion
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py" src/ --strict
+> ```
+>
+> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
+
 The sibling skill `web-design-studio` owns **form**: tokens, spacing, architecture, navigation, the audit gate. It says nothing about what a page should *say* or in what order. That omission is deliberate, and this skill is the missing half.
 
 A page that converts is not a well-designed page with persuasive words dropped into it. It is an argument, sequenced, and then given a body. Get the argument wrong and no amount of spacing discipline rescues it — you have built a beautiful vehicle for a claim nobody wanted.

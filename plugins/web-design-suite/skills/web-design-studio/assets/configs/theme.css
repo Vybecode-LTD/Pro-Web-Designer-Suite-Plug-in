@@ -76,9 +76,11 @@
    §1  BURN THE DEFAULT THEME
    =========================================================================
    `--*: initial` clears EVERY default Tailwind theme namespace. After this
-   line `bg-neutral-800`, `p-4`, `text-sm`, `rounded-lg`, `duration-200` and
-   `shadow-md` do not exist — not "are discouraged", do not exist. The build
-   errors on them.
+   line `bg-neutral-800`, `p-4` and `text-sm` do not exist — not "are
+   discouraged", do not exist: Tailwind generates no CSS for them. That is
+   silent, not a build error; the element ships unstyled. Utilities that
+   take a bare value (`duration-300`, `z-50`, `border-2`) do not read the
+   theme, so they still generate: the lint rules refuse those.
 
    This is the mechanical half of Laws 1, 3 and 6. A designer's scale and
    Tailwind's stock scale are never the same scale; leaving the stock one
@@ -91,8 +93,8 @@
                            We deliberately do NOT restore it. That single
                            omission is Law 3 (the scale is closed): with no
                            `--spacing`, an arbitrary numeric step has no
-                           generator and `p-7` is a build error, not a
-                           silently-accepted 28px.
+                           generator: `p-7` produces nothing (silently —
+                           the linter is what flags it), never 28px.
      - `--breakpoint-*`    restored in §2.
      - `--color-transparent/current/inherit`   restored in §4.
      - `--animate-*` + their keyframes         restored in §9.
@@ -728,16 +730,21 @@
 @utility border-thick    { border-width: var(--stroke-thick); }
 
 /* ---- Focus ring ---------------------------------------------------------
-   One class, everywhere, on every interactive element. `--shadow-focus` is
-   a two-ring shadow: a canvas-colored gap then the focus color, so the ring
-   stays visible on top of any surface including the accent fill itself.
+   One class, everywhere, on every interactive element — the same ring as
+   reset.css. The visible ring is an OUTLINE: forced-colors mode discards
+   box-shadow and repaints outlines in the system colour, and a `shadow-*`
+   utility on the same element replaces box-shadow but not the outline. The
+   box-shadow is only the canvas-coloured gap that keeps the ring legible on
+   an accent fill. (`outline: none` here used to leave Windows High Contrast
+   users with no focus indicator at all.)
 
    `focus-visible:` not `focus:` — a mouse click should not paint a ring.
    ------------------------------------------------------------------------- */
 
 @utility focus-ring {
-  outline: none;
-  box-shadow: var(--shadow-focus);
+  outline: var(--stroke-focus) solid var(--border-focus);
+  outline-offset: var(--stroke-focus);
+  box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas);
 }
 
 /* ---- Minimum tap target -------------------------------------------------

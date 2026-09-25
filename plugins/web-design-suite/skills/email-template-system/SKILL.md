@@ -5,6 +5,19 @@ description: Build HTML email that survives Outlook, Gmail and dark mode — by 
 
 # Email Template System
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_SKILL_DIR}/scripts/build_email.py" emails/my-email.html --out build/my-email.html
+> ```
+>
+> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_email.py, lint_email.py).
+
 Every agency client eventually needs email, and email is the one place where **this suite's laws must be deliberately broken**. HTML email has no cascade layers, no custom properties you can rely on, no `gap`, no flexbox or grid in the client that matters most, and `<style>` blocks that several clients strip entirely.
 
 That is a real, principled exception, and it deserves to be owned explicitly rather than improvised badly the night before a send.
@@ -44,14 +57,16 @@ That is the entire exception. Anything beyond it — a hardcoded colour, a hand-
 ## Quick start
 
 ```bash
-# 1. Start from a template that already compiles clean
-cp assets/templates/transactional-receipt.html assets/templates/my-email.html
+# 1. Start from a template that already compiles clean — copied INTO the project,
+#    where it is committed; the plugin's copy is replaced on every update
+mkdir -p emails
+cp "${CLAUDE_SKILL_DIR}/assets/templates/transactional-receipt.html" emails/my-email.html
 
 # 2. Edit the copy — tokens only, no literals, utilities declared last
 
 # 3. Compile: resolve tokens, inline the CSS, keep the media queries,
 #    add the Outlook scaffolding, write the plain-text part, report bytes
-python -m scripts.build_email assets/templates/my-email.html \
+python -m scripts.build_email emails/my-email.html \
     --out build/my-email.html --text build/my-email.txt
 
 # 4. Gate it
@@ -113,7 +128,7 @@ Referencing a dropped token is a **hard build error**, not a silent nothing. `va
 
 ### 2. Author the source template
 
-Start from one of the three in `assets/templates/`. They are complete and they compile:
+Start from one of the three in `${CLAUDE_SKILL_DIR}/assets/templates/` — copy it into the project first. They are complete and they compile:
 
 | Template | Shows |
 |---|---|
@@ -126,7 +141,7 @@ Authoring rules, in full, in `references/email-workflow.md` §1. The short versi
 ### 3. Build
 
 ```bash
-python -m scripts.build_email assets/templates/transactional-receipt.html \
+python -m scripts.build_email "${CLAUDE_SKILL_DIR}/assets/templates/transactional-receipt.html" \
     --out build/receipt.html --text build/receipt.txt
 ```
 

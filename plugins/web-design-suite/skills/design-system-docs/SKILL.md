@@ -5,6 +5,20 @@ description: Generate a design system's documentation from its own source — a 
 
 # Design System Docs
 
+> **Running the scripts** — by path, from the user's project root, so `src/`
+> means the project's `src/` and every output lands in the project, never
+> inside this plugin:
+>
+> ```bash
+> python "${CLAUDE_SKILL_DIR}/scripts/extract_system.py" styles/ src/components/ --out system.json --report
+> ```
+>
+> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> has copied the scripts into its own `scripts/` folder, as CI and git hooks
+> do; when you run one here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_docs.py, extract_system.py).
+> From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`; `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/generate_color_ramp.py`.
+
 Hand-written design system documentation is worse than no documentation.
 
 That is not a provocation, it is the failure sequence. Someone writes "`--fg-subtle` on `--bg-sunken`, 4.6:1, passes AA." Six months later the neutral ramp is retuned by one step. The page still says 4.6:1. A reviewer checks the docs instead of measuring, ships the screen, and the contrast failure reaches production **through** the documentation. With no page at all, that reviewer would have measured.

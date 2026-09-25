@@ -17,8 +17,9 @@
  * Tailwind's stock scale and leaves `p-4`, `bg-neutral-800` and `text-sm`
  * alive next to ours — two scales, one codebase, and a slow drift nobody
  * can grep for. A top-level key REPLACES the default, so after this config
- * an off-scale class does not exist and the build errors on it. That is
- * Law 3 (the scale is closed) expressed as a config shape.
+ * an off-scale class generates no CSS (silently — the linter flags it, the
+ * build does not). That is Law 3 (the scale is closed) expressed as a
+ * config shape.
  *
  * Keys we do not list keep their defaults, deliberately: `opacity`,
  * `flex`, `gridTemplateColumns` and friends hold no design values.
@@ -580,14 +581,15 @@ export default {
           transitionTimingFunction: t('--ease-in-out'),
         },
 
-        /* One focus ring, everywhere. `--shadow-focus` is a two-ring
-         * shadow — a canvas-colored gap then the focus color — so it stays
-         * visible on top of any surface including the accent fill itself.
-         * Always pair with `focus-visible:`; a mouse click should not
-         * paint a ring. */
+        /* One focus ring, everywhere — the same ring as reset.css. The
+         * visible ring is an OUTLINE: forced-colors mode repaints it, and a
+         * `shadow-*` class on the same element cannot remove it. The
+         * box-shadow is only the canvas-coloured gap. Always pair with
+         * `focus-visible:`; a mouse click should not paint a ring. */
         '.focus-ring': {
-          outline: 'none',
-          boxShadow: t('--shadow-focus'),
+          outline: `${t('--stroke-focus')} solid ${t('--border-focus')}`,
+          outlineOffset: t('--stroke-focus'),
+          boxShadow: `0 0 0 ${t('--stroke-focus')} ${t('--bg-canvas')}`,
         },
 
         /* 44px. Non-negotiable on anything a finger touches. A visually
@@ -616,30 +618,35 @@ export default {
 } satisfies Config;
 
 /* =========================================================================
- * LAYERS IN v3 — the unavoidable compromise
+ * LAYERS IN v3 — read this before mixing v3 with native cascade layers
  * =========================================================================
- * v3 emits into three native cascade layers it names itself: `base`,
- * `components`, `utilities`. It cannot be told to emit into `reset`,
- * `tokens`, `layout` or `overrides`, so Law 5's seven-layer order can only
- * be approximated:
+ * v3 does NOT emit native cascade layers. Its `@layer base|components|
+ * utilities` are Tailwind directives: at build time they move rules to
+ * where the matching `@tailwind` directive sits, and the output is plain,
+ * UNLAYERED CSS. Unlayered CSS beats every native layer whatever the
+ * specificity, so with `@layer reset, tokens, base, …` in the same sheet,
+ * v3's preflight (`button { background-color: transparent }`) and every
+ * utility override your layered CSS — the opposite of Law 5.
  *
+ * Put Tailwind's output INTO the layers instead. Build it as two sheets
+ * and import them with native layer() (postcss-import 15+, listed before
+ * tailwindcss in the PostCSS plugins, keeps the layer when it inlines):
+ *
+ *   tailwind-base.css        @tailwind base;
+ *   tailwind-utilities.css   @tailwind components; @tailwind utilities;
+ *
+ *   index.css
  *   @layer reset, tokens, base, layout, components, utilities, overrides;
+ *   @import url("./tailwind-base.css") layer(base);
+ *   @import url("./tailwind-utilities.css") layer(utilities);
  *
- * Declare the statement above BEFORE the `@tailwind` directives. v3's own
- * `base`, `components` and `utilities` then slot into the matching rungs,
- * and `reset`, `tokens`, `layout` and `overrides` are yours. Put your
- * layout primitives in `@layer layout` and component CSS in
- * `@layer components` — the same file organisation as v4, with Tailwind's
- * own output interleaved rather than nested.
+ * Check the built CSS once: preflight's `button { … }` must sit inside
+ * `@layer base`. If your toolchain cannot do that, keep ALL hand-written
+ * CSS unlayered too and order it by import — Law 5 then holds only by
+ * convention. v4 removes the problem: it emits native layers itself.
  *
- * The practical consequence: a v3 `@layer components` rule and a hand-
- * written `@layer components` rule are in the SAME layer, so source order
- * decides between them. Keep hand-written component CSS imported after the
- * `@tailwind components` directive and the behaviour matches v4 closely
- * enough that components port without edits.
- *
- * Do not use v3's `@layer components { ... }` PostCSS directive (the
- * Tailwind-specific one) for hand-written CSS. It is not the native CSS
- * at-rule, it silently enables `@apply` semantics, and it hides which
- * layer a rule really lands in.
+ * Do not use v3's `@layer components { ... }` directive (the Tailwind one)
+ * for hand-written CSS. It is not the native at-rule: it moves the rules
+ * into Tailwind's unlayered output, purges any class the content globs do
+ * not see, and hides where a rule really lands.
  * ========================================================================= */

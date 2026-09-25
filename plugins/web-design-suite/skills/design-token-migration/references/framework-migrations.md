@@ -327,7 +327,7 @@ export default {
 };
 ```
 
-`extend` leaves `p-4`, `bg-neutral-800` and `text-sm` alive next to yours — two scales in one codebase and a drift nobody can grep for. A top-level key removes the stock classes, so an off-scale class **does not exist** and the build errors on it. That is Law 3 expressed as a config shape, and it is the only enforcement that works on a Tailwind codebase.
+`extend` leaves `p-4`, `bg-neutral-800` and `text-sm` alive next to yours — two scales in one codebase and a drift nobody can grep for. A top-level key removes the stock classes, so an off-scale class **does not exist**: Tailwind generates no CSS for it. That is silent, not a build error. The element simply ships unstyled, so the lint rules are what find it (Part 5 of `eslint.design.config.mjs`). The config shape is Law 3; the lint rules enforce it.
 
 The full annotated config is `assets/configs/tailwind.config.ts` (v3) or `assets/configs/theme.css` (v4) in the `web-design-studio` skill. Do not hand-write it.
 
@@ -354,7 +354,7 @@ Three Tailwind-specific things the sweep does not fix:
 
 | Left behind | Why | Fix |
 |---|---|---|
-| `text-white`, `bg-gray-100` — stock classes | Not arbitrary, so not in the census. They stop existing when the theme is replaced, and the build tells you | Fix during Move 1, guided by build errors |
+| `text-white`, `bg-gray-100` — stock classes | Not arbitrary, so not in the census. They stop existing when the theme is replaced, silently: no CSS and no build error, just an unstyled element | Fix during Move 1: the design ESLint config finds them (its Part 5), and a visual diff of each screen confirms |
 | `space-x-4` / `space-y-4` | Compiles to child margins with a `:not(:last-child)` selector — the Law 2 double-ownership problem behind a nicer name | `gap-*` on the parent |
 | `!p-4` (important modifier) | Inverts layer order, same as `!important` | Fix the layer or the variant |
 

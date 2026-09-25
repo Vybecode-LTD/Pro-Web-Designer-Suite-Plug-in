@@ -27,6 +27,8 @@ USAGE
   python scripts/figma_audit.py variables.json --format json | jq '.summary'
   python scripts/figma_audit.py rest-dump.json --styles file-styles.json
   python scripts/figma_audit.py variables.json --fail-on error   # looser CI gate
+  python scripts/figma_audit.py variables.json --tokens src/styles/tokens.css
+                                     # the project's own ramps, e.g. a client's brand
 
 EXIT CODES
 ----------
@@ -45,6 +47,15 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin, which is read-only as far as a project is concerned.
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.figma_audit
+    from . import dtcg_values                     # type: ignore[import-not-found]
+except ImportError:                               # python scripts/figma_audit.py
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import dtcg_values                            # type: ignore[no-redef]
 
 # ===========================================================================
 # THE CONTRACT. These tables are the closed scales from token-contract.md and
@@ -131,7 +142,8 @@ RAMPS: Dict[str, Dict[str, Tuple[float, float, float]]] = {
     },
     "success": {"100": (94.0, 0.050, 152), "500": (62.0, 0.150, 152), "700": (45.0, 0.120, 152)},
     "warning": {"100": (95.5, 0.055, 85), "500": (75.0, 0.155, 85), "700": (52.0, 0.125, 85)},
-    "danger": {"100": (94.5, 0.038, 25), "500": (58.0, 0.205, 25), "700": (45.0, 0.170, 25)},
+    "danger": {"100": (94.5, 0.038, 25), "400": (64.0, 0.190, 25), "500": (58.0, 0.205, 25),
+               "700": (45.0, 0.170, 25)},
     "info": {"100": (94.5, 0.035, 250), "500": (58.0, 0.160, 250), "700": (45.0, 0.140, 250)},
 }
 
@@ -269,17 +281,17 @@ def as_color(value: Any) -> Optional[Tuple[float, float, float, float]]:
             except (TypeError, ValueError):
                 return None
         # VariableComposedColor (Sept 2026): colour and opacity authored apart.
+        # Figma gives `opacity` as a PERCENTAGE, 0-100; read as 0-1, every
+        # translucent hover and scrim was audited as opaque.
         if "color" in value:
             base = as_color(value["color"])
             if base is None:
                 return None
-            alpha = value.get("opacity", value.get("alpha", base[3]))
-            if isinstance(alpha, dict):      # an alias in the opacity channel
-                alpha = base[3]
-            try:
-                return (base[0], base[1], base[2], float(alpha))
-            except (TypeError, ValueError):
-                return base
+            if isinstance(value.get("opacity"), (int, float)):
+                return (base[0], base[1], base[2], base[3] * float(value["opacity"]) / 100.0)
+            if isinstance(value.get("alpha"), (int, float)):
+                return (base[0], base[1], base[2], float(value["alpha"]))
+            return base                      # an alias in the opacity channel
         return None
     if not isinstance(value, str):
         return None
@@ -417,6 +429,9 @@ class FDoc:
     effect_styles: List[dict] = field(default_factory=list)
     by_id: Dict[str, FVar] = field(default_factory=dict)
     notes: List[str] = field(default_factory=list)
+    # (token path, why) for DTCG values this script cannot read; each one is a
+    # finding, because an unaudited token must never look like a clean one.
+    unsupported: List[Tuple[str, str]] = field(default_factory=list)
 
 
 TIER_PREFIXES = {
@@ -603,7 +618,10 @@ def parse_records(data: Any, collection: str) -> FDoc:
 def parse_dtcg(data: dict, collection: str) -> FDoc:
     doc = FDoc(shape="dtcg")
     doc.collections[collection] = FCollection(collection, ["Value"], "Value")
-    reserved = {"$schema", "$description", "$extensions", "$type", "$value"}
+    # 2025.10 objects, $ref, $extends and group $type become the string forms
+    # the checks read; anything unreadable is kept as a finding.
+    data, doc.unsupported = dtcg_values.normalise(data)
+    reserved = dtcg_values.META_KEYS | {"$value"}
 
     def walk(node: Any, path: List[str]) -> None:
         if _is_leaf_token(node):
@@ -622,9 +640,10 @@ def parse_dtcg(data: dict, collection: str) -> FDoc:
             return
         if isinstance(node, dict):
             for k, v in node.items():
-                if k in reserved:
-                    continue
-                walk(v, path + [str(k)])
+                if k == "$root":                   # the group's own token
+                    walk(v, path)
+                elif k not in reserved:
+                    walk(v, path + [str(k)])
 
     walk(data, [])
     return doc
@@ -749,6 +768,7 @@ CODE_TITLES = {
     "BROKEN_ALIAS": "Aliases that point at nothing",
     "ALIAS_CYCLE": "Aliases that point at each other",
     "TIER_VIOLATION": "Semantic roles bound to raw values instead of primitives",
+    "UNSUPPORTED_VALUE": "Values this audit cannot read, so could not check",
 }
 
 # ===========================================================================
@@ -868,15 +888,20 @@ class Auditor:
         if raw is None and var.values:
             raw = var.values.get(next(iter(var.values)))
         alias = as_alias(raw)
+        composed = raw.get("color") if isinstance(raw, dict) and "color" in raw else None
         out: Optional[Tuple[float, float, float, float]]
-        if alias is not None:
-            tgt = self.target_of(alias)
+        if alias is not None or (composed is not None and as_alias(composed) is not None):
+            tgt = self.target_of(alias if alias is not None else as_alias(composed))
             if tgt is None:
                 out = None
             else:
                 tmode = mode if mode in tgt.values else (
                     next(iter(tgt.values)) if tgt.values else mode)
                 out = self.resolve_color(tgt, tmode, _seen)
+                # A composed colour over an alias: the alias's colour at this opacity.
+                op = raw.get("opacity") if composed is not None else None
+                if out is not None and isinstance(op, (int, float)):
+                    out = (out[0], out[1], out[2], out[3] * float(op) / 100.0)
         else:
             out = as_color(raw)
         if len(_seen) == 1:
@@ -886,6 +911,13 @@ class Auditor:
     # -- checks -------------------------------------------------------------
 
     def run(self) -> List[Finding]:
+        for path, why in self.doc.unsupported:
+            self.add(code="UNSUPPORTED_VALUE", severity="error", collection="", mode="",
+                     name=path, summary=f"not audited: {why}",
+                     detail="A token this audit cannot read is a token nobody checked. "
+                            "It is not in the generated tokens either.",
+                     suggestion="split a typography token into --type-* roles, or give "
+                                "the colour an sRGB `hex` fallback")
         self.check_aliases()
         for var in self.doc.variables:
             for mode in (var.values.keys() or [""]):
@@ -1289,6 +1321,42 @@ def ramp_hex_index() -> Dict[str, str]:
     return _RAMP_HEX
 
 
+_RAMP_DECL = re.compile(r"--([a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)*)-(\d+)\s*:\s*([^;{}]+);", re.I)
+
+
+def load_project_ramps(path: Path) -> Dict[str, Dict[str, Tuple[float, float, float]]]:
+    """Colour ramps declared in a project's tokens.css: every `--<name>-<step>`
+    whose value is a literal colour. A client's brand ramp is the point — the
+    migration seeds the accent from the brand on purpose — so checking a file
+    against the studio's own orange called every brand colour "off ramp"."""
+    text = re.sub(r"/\*.*?\*/", " ", path.read_text(encoding="utf-8-sig"), flags=re.S)
+    ramps: Dict[str, Dict[str, Tuple[float, float, float]]] = {}
+    for name, step, value in _RAMP_DECL.findall(text):
+        rgba = as_color(value.strip())
+        if rgba is None or rgba[3] < 0.999:
+            continue                         # a var() re-point, or not a colour
+        L, a, b = rgb_to_oklab(*rgba[:3])
+        ramps.setdefault(name.lower(), {}).setdefault(
+            step, (L * 100.0, math.hypot(a, b), math.degrees(math.atan2(b, a)) % 360))
+    return ramps
+
+
+def use_ramps(ramps: Dict[str, Dict[str, Tuple[float, float, float]]]) -> None:
+    """Make `ramps` the ones every check compares against: each named ramp
+    replaces the studio's ramp of that name; the default surfaces follow."""
+    RAMPS.update(ramps)
+    _RAMP_HEX.clear()
+    for theme, roles in (("light", {"bg-canvas": ("neutral", "50"), "bg-surface": ("neutral", "0"),
+                                    "bg-sunken": ("neutral", "100"), "bg-raised": ("neutral", "0"),
+                                    "bg-inverse": ("neutral", "900"), "bg-accent": ("accent", "600")}),
+                         ("dark", {"bg-canvas": ("neutral", "1000"), "bg-surface": ("neutral", "950"),
+                                   "bg-sunken": ("neutral", "1000"), "bg-raised": ("neutral", "900"),
+                                   "bg-inverse": ("neutral", "100"), "bg-accent": ("accent", "500")})):
+        for role, (ramp, step) in roles.items():
+            if step in RAMPS.get(ramp, {}):
+                DEFAULT_SURFACE[theme][role] = RAMPS[ramp][step]
+
+
 def fmt(n: Any) -> str:
     try:
         f = float(n)
@@ -1476,6 +1544,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"minimum touch target in px (default: {TAP_MIN_PX:g})")
     p.add_argument("--deadline", default="end of day tomorrow",
                    help="the timed default's cutoff, printed in --format markdown")
+    p.add_argument("--tokens", metavar="TOKENS_CSS",
+                   help="the project's tokens.css: its colour ramps (any --<name>-<step> "
+                        "holding a literal colour) replace the studio's ramps of the same name")
     p.add_argument("--no-color", action="store_true")
     return p
 
@@ -1502,6 +1573,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               "That is a wrong file or an export shape this script does not know; pass "
               "--shape to force one.", file=sys.stderr)
         return 2
+
+    if args.tokens:
+        try:
+            ramps = load_project_ramps(Path(args.tokens))
+        except OSError as exc:
+            print(f"could not read {args.tokens}: {exc}", file=sys.stderr)
+            return 2
+        if ramps:
+            use_ramps(ramps)
+            doc.notes.append(f"colour ramps from {args.tokens}: {', '.join(sorted(ramps))}")
+        else:
+            print(f"{args.tokens} declares no colour ramps (--<name>-<step>: <colour>); "
+                  "auditing against the studio's ramps.", file=sys.stderr)
 
     auditor = Auditor(doc, tap_min=args.tap_min)
     findings = auditor.run()

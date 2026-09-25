@@ -133,7 +133,7 @@ These block Phase 4. Each is a row in `reconciliation.md` and each needs a name 
 | A snapped value visibly moves something | **High** | Low | Every value moving >2px is listed in `reconciliation.md` and gets before/after screenshots in its own commit |
 | A Law 2 change collapses a layout | Medium | **High** | One container per commit; measured gaps before and after; §7 rollback |
 | A color maps to the wrong role | Medium | Medium | Measured contrast table reviewed before Phase 4a; color batch is one revert |
-| Branch rots against main | Medium | Medium | Strangler-fig: each directory merges within a day. Conflicts resolved by re-running the codemod, never by hand |
+| Branch rots against main | Medium | Medium | Strangler-fig: each directory merges within a day. Conflicts resolved by taking main's side (`--ours` during a rebase) and re-running the codemod, never by hand |
 | Migration stalls after Phase 3 | **High** | Low | The baseline lands in week 1, so the debt is already frozen. Stalling costs the remaining fix, not the whole benefit |
 | The gate gets disabled | Medium | **High** | Named owner in this document's header; pre-commit hook plus CI; baseline regenerated only after a migration batch, never to silence a failure |
 | A codemod corrupts a file | Low | **High** | Dry-run by default; refuses files with uncommitted changes; atomic temp-file writes behind brace-balance and declaration-count checks |
