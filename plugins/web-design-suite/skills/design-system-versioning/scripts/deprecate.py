@@ -130,7 +130,7 @@ def load_ledger(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return empty_ledger()
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_bytes())
     except (OSError, json.JSONDecodeError) as exc:
         raise bail(f"deprecate: {path} is not readable JSON ({exc}). "
                          f"Fix it or move it aside; this script will not "
@@ -711,6 +711,12 @@ def cmd_retire(args: argparse.Namespace) -> int:
         print(f"deprecate: {args.name} is not in {ledger_path}.", file=sys.stderr)
         return 2
     usage = entry.get("usage") or {}
+    if not usage and not args.force:
+        print(f"deprecate: {args.name} has never been scanned. A removal date is "
+              f"a plan, not evidence. Run `deprecate scan <consumer repos> --record` "
+              f"first, or pass --force if you have decided to retire it without "
+              f"evidence.", file=sys.stderr)
+        return 1
     if usage.get("total") and not args.force:
         print(f"deprecate: {args.name} was last seen {usage['total']} time(s) in "
               f"{len([c for c, n in (usage.get('consumers') or {}).items() if n])} "
@@ -1055,4 +1061,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

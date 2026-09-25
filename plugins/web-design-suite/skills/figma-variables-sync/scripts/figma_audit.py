@@ -652,7 +652,7 @@ def dtcg_type(declared: Optional[str], value: Any) -> str:
 
 def load_document(path: Path, forced: Optional[str], collection: str) -> FDoc:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_bytes())
     except OSError as exc:
         raise SystemExit(f"cannot read {path}: {exc}")
     except json.JSONDecodeError as exc:
@@ -776,6 +776,11 @@ SIZE_RE = re.compile(r"(^|[-/])(size|height|min-height|minheight|min|h)([-/]|$)"
 # the single biggest source of false positives in a token linter.
 TEXT_ROLE_RE = re.compile(r"^(fg|text|foreground|ink|content|label|on)([-/]|$)", re.I)
 BG_ROLE_RE = re.compile(r"^(bg|background|surface|canvas|fill)([-/]|$)", re.I)
+# token-contract.md's Tier-2 colour roles also include a `border-*` group
+# (`--border-subtle`, `--border-default`, `--border-strong`, `--border-accent`,
+# `--border-focus`) alongside `bg-*`/`fg-*` -- a semantic collection holding
+# only border roles is exactly as much "Law 6" as one holding only bg/fg ones.
+BORDER_ROLE_RE = re.compile(r"^(border)([-/]|$)", re.I)
 DISABLED_RE = re.compile(r"disabled|inactive", re.I)
 LARGE_TEXT_RE = re.compile(r"display|hero|h1|heading|title|large", re.I)
 
@@ -1163,7 +1168,8 @@ class Auditor:
         for cname, col in self.doc.collections.items():
             semantic = [v for v in self.doc.variables
                         if v.collection == cname and v.resolved_type == "COLOR"
-                        and (BG_ROLE_RE.search(v.slug) or TEXT_ROLE_RE.search(v.slug))]
+                        and (BG_ROLE_RE.search(v.slug) or TEXT_ROLE_RE.search(v.slug)
+                             or BORDER_ROLE_RE.search(v.slug))]
             if len(semantic) < 3:
                 continue
             has_dark = any(re.search(r"dark|night", m, re.I) for m in col.modes)
@@ -1479,7 +1485,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         doc = load_document(Path(args.path), args.shape, args.collection)
         if args.styles:
-            extra = json.loads(Path(args.styles).read_text(encoding="utf-8"))
+            extra = json.loads(Path(args.styles).read_bytes())
             attach_styles(doc, extra)
     except SystemExit as exc:
         print(str(exc), file=sys.stderr)
@@ -1522,4 +1528,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

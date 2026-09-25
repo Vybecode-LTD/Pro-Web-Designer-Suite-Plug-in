@@ -1002,6 +1002,8 @@ def extract_js(path: Path, text: str) -> list[Literal]:
             continue
         open_at = clean.index("{", m.start())
         end = match_braces(clean, open_at)
+        # Claimed, or the bare-hex pass below counts every quoted colour twice.
+        claim(m.start(), end)
         inner_start = clean.index("{", open_at + 1) + 1 if "{" in clean[open_at + 1:end] else open_at + 1
         body = clean[inner_start:end - 2] if end - 2 > inner_start else ""
         for key, raw_value, rel in parse_style_object(body):
@@ -1392,4 +1394,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

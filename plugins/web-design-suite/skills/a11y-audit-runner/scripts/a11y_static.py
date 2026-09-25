@@ -880,8 +880,9 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
         if name == "img":
             alt = a.get("alt")
             if alt is None:
-                if str(a.get("role", "")).lower() in ("presentation", "none"):
-                    pass
+                if str(a.get("role", "")).lower() in ("presentation", "none") \
+                        or "\x00spread" in a:
+                    pass          # role handles it, or a spread may supply `alt`
                 else:
                     add(line, "N", "img-no-alt", "1.1.1", "error",
                         f"<img> has no `alt` attribute"
@@ -960,7 +961,7 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
             itype = str(a.get("type", "text")).lower() if name == "input" else name
             if itype not in INPUT_NO_LABEL_NEEDED:
                 labelled = _labelled(t, ids_with_for(open_tags), a, ancestors_of(t))
-                if labelled is None:
+                if labelled is None and "\x00spread" not in a:
                     add(line, "F", "control-no-label", "3.3.2 / 4.1.2", "error",
                         f"<{name}"
                         + (f" type=\"{itype}\"" if name == "input" else "")
@@ -1031,8 +1032,8 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
             named = _has_name(t, a, inner, node)
             is_link = name == "a" and a.get("href") is not None
             if not named:
-                if name == "a" and a.get("href") is None:
-                    pass                       # an anchor with no href is text
+                if (name == "a" and a.get("href") is None) or "\x00spread" in a:
+                    pass          # anchor with no href is text; a spread may supply a name
                 else:
                     add(line, "N", "empty-control", "4.1.2 / 2.4.4", "error",
                         f"<{name}> has no accessible name — no text, no "
@@ -1655,7 +1656,7 @@ def main(argv: list[str] | None = None) -> int:
     bp = Path(args.baseline)
     if bp.exists():
         try:
-            baseline = set(json.loads(bp.read_text(encoding="utf-8")))
+            baseline = set(json.loads(bp.read_bytes()))
         except (OSError, json.JSONDecodeError):
             print(f"a11y_static: could not read baseline {bp}; auditing "
                   f"everything.", file=sys.stderr)
@@ -1681,4 +1682,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

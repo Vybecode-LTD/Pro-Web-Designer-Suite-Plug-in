@@ -121,7 +121,7 @@ python -m scripts.audit_design ./src --write-baseline .design-baseline.json  # f
 
 `audit_design.py` is stdlib-only Python 3 and understands cascade layers, component vs token files, and the documented exceptions (`margin:auto`, the owl selector in a parent's rule, `calc(var(--t) * -1)`, `em` as a ratio, `vw` as relational).
 
-- **L1** raw lengths, colors, shadows, durations, easings, radii, z-indexes, font sizes — including literals **disguised inside a Tier-3 socket declaration**, which look tokenized and are not
+- **L1** raw lengths, colors, shadows, durations, easings, radii, z-indexes, font sizes and weights — including literals **disguised inside a Tier-3 socket declaration**, which look tokenized and are not
 - **L2** child margins in components, and Tailwind `space-x/y-*`
 - **L3** off-scale values and Tailwind arbitrary values
 - **L4** JSX inline styles that set visual properties, plus a **cross-file pass** catching a class styled from two files or the same property owned twice
@@ -135,6 +135,18 @@ Escape hatches are comment pragmas, so every exception is visible in review:
 ```
 
 Adopt it on a legacy repo with `--write-baseline`: the gate goes on today and the existing debt is frozen rather than growing.
+
+---
+
+## Regression tests
+
+The suite's own tests live in `tests/` and need only Python 3 (Node for the browser-script tests, which use a stub instead of a real browser). From the plugin root:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Set `WDS_PLUGIN_ROOT` to run the same tests against another copy of the suite.
 
 ---
 

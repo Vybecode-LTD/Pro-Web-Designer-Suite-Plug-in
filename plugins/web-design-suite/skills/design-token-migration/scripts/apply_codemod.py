@@ -288,18 +288,22 @@ class Mapping:
     @classmethod
     def load(cls, path: Path, kinds: Optional[Sequence[str]],
              skip_review: bool) -> "Mapping":
+        # Exit 2, like every other bad invocation: `raise SystemExit("msg")`
+        # exits 1, which the docs reserve for "a file was skipped".
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise SystemExit(
-                f"apply_codemod: {path} is not readable JSON ({exc}).\n"
-                f"Generate it with:\n"
-                f"  python -m scripts.cluster_values literals.json -o ./proposal")
-        if payload.get("schema", "").split("@")[0] != "design-token-migration/mapping":
-            raise SystemExit(
-                f"apply_codemod: {path} is not a codemod mapping "
-                f"(schema={payload.get('schema')!r}). It must come from "
-                f"cluster_values.py.")
+            payload = json.loads(path.read_bytes())
+        except (OSError, ValueError) as exc:
+            print(f"apply_codemod: {path} is not readable JSON ({exc}).\n"
+                  f"Generate it with:\n"
+                  f"  python -m scripts.cluster_values literals.json -o ./proposal",
+                  file=sys.stderr)
+            raise SystemExit(2)
+        schema = payload.get("schema") if isinstance(payload, dict) else None
+        if str(schema or "").split("@")[0] != "design-token-migration/mapping":
+            print(f"apply_codemod: {path} is not a codemod mapping "
+                  f"(schema={schema!r}). It must come from cluster_values.py.",
+                  file=sys.stderr)
+            raise SystemExit(2)
         m = cls()
         wanted = {k.lower() for k in kinds} if kinds else None
         for rule in payload.get("rules", []):
@@ -635,14 +639,17 @@ def structurally_sound(before: str, after: str, is_css: bool) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def git_root(path: Path) -> Optional[Path]:
+    # Git prints paths as UTF-8 whatever the platform; text=True would decode
+    # them with the locale (cp1252 on Windows) and mangle or crash on them.
     try:
         out = subprocess.run(
             ["git", "-C", str(path if path.is_dir() else path.parent),
              "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, timeout=10)
+            capture_output=True, timeout=10)
     except (OSError, subprocess.SubprocessError):
         return None
-    return Path(out.stdout.strip()) if out.returncode == 0 and out.stdout.strip() else None
+    top = out.stdout.decode("utf-8", "surrogateescape").strip()
+    return Path(top) if out.returncode == 0 and top else None
 
 
 def dirty_files(root: Path) -> Optional[set]:
@@ -650,23 +657,26 @@ def dirty_files(root: Path) -> Optional[set]:
     # -uall, because `git status --porcelain` collapses a directory of
     # untracked files into a single `?? src/` line, and a guard that compares
     # file paths against `src/` protects nothing.
+    # -z, because without it git quotes and octal-escapes any name with a
+    # non-ASCII character ("caf\303\251.css"), which never matches the file.
     try:
         out = subprocess.run(
-            ["git", "-C", str(root), "status", "--porcelain",
+            ["git", "-C", str(root), "status", "--porcelain", "-z",
              "--untracked-files=all"],
-            capture_output=True, text=True, timeout=30)
+            capture_output=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
         return None
     if out.returncode != 0:
         return None
     dirty = set()
-    for raw in out.stdout.splitlines():
+    fields = iter(out.stdout.decode("utf-8", "surrogateescape").split("\0"))
+    for raw in fields:
         if len(raw) < 4:
             continue
-        name = raw[3:]
-        if " -> " in name:
-            name = name.split(" -> ", 1)[1]
-        entry = (root / name.strip('"')).resolve()
+        status, name = raw[:2], raw[3:]
+        if "R" in status or "C" in status:
+            next(fields, None)        # -z gives "XY new\0old\0"; skip the old name
+        entry = (root / name).resolve()
         dirty.add(str(entry))
         if entry.is_dir():
             dirty.update(str(p) for p in entry.rglob("*") if p.is_file())
@@ -926,4 +936,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

@@ -228,7 +228,7 @@ Four things it does that most runtime checks do not:
 - **It names the nodes in the largest CLS session window**, with the timestamp of each shift.
 - **It refuses to invent an INP.** A page nobody touched has no interaction latency, so it prints `n/a` and says TBT is the proxy. It also reports total blocking time alongside TBT, because a long task that finishes before FCP contributes **zero** TBT while being the worst thing on the page.
 
-**The browser is never downloaded.** It launches with an explicit `executablePath` (default `/opt/pw-browsers/chromium`, or `$PERF_CHROMIUM`, or `--browser`) and fails with instructions if nothing is there. Install the module with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D playwright`.
+**The browser is never downloaded.** It launches with an explicit `executablePath` (`--browser`, else `$PERF_CHROMIUM`, else the first that starts of `/opt/pw-browsers/chromium`, Playwright's own Chromium, an installed Chrome or Edge) and fails with instructions if none of them starts. Install the module with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D playwright`.
 
 **Serve the page over HTTP.** `file://` has no network stack — TTFB is ~0, resource priorities do not apply, throttling barely bites, and every number flatters you. The script warns and keeps going if you insist.
 

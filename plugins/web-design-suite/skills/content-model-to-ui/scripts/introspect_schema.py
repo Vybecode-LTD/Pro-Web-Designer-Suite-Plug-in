@@ -660,7 +660,16 @@ def _parse_column_def(item: str, table: Table, model: Model) -> Column | None:
         col.enum = raw_type.strip().lower().rstrip("[]")
 
     low = mods.lower()
-    col.nullable = "not null" not in low
+    # A plain substring test over the whole modifier text also matches a
+    # `NOT NULL` that only appears inside a CHECK (or other parenthesised)
+    # expression — e.g. `CHECK (published_at IS NOT NULL OR status='draft')`
+    # on an otherwise-nullable column. Only a top-level keyword, outside any
+    # parentheses, actually makes the column NOT NULL.
+    col.nullable = True
+    for nn in re.finditer(r"(?i)\bnot\s+null\b", mods):
+        if mods[:nn.start()].count("(") - mods[:nn.start()].count(")") == 0:
+            col.nullable = False
+            break
     if re.search(r"(?i)\b(serial|bigserial|smallserial)\b", raw_type):
         col.nullable = False
         col.default = "sequence"
@@ -1121,6 +1130,14 @@ def _group_flat_columns(data: dict[str, Any]) -> list[dict[str, Any]]:
 # Structural inference — join tables and relationships
 # ---------------------------------------------------------------------------
 
+def _has_own_title(table: Table) -> bool:
+    """Whether `table` has a textual, non-FK column that could stand as a
+    human-readable title. Used to decide whether a cascade-deleted child is
+    truly an owned, nameless detail of its parent, or an independent record
+    that merely cannot outlive it."""
+    return any(c.type in TEXTUAL_TYPES and not c.foreign_key for c in table.columns)
+
+
 def infer_structure(model: Model) -> None:
     for t in model.tables:
         fks = [c for c in t.columns if c.foreign_key]
@@ -1154,28 +1171,35 @@ def infer_structure(model: Model) -> None:
             p = model.table(parent)
             if p is None or t.kind == "join":
                 continue
-            owned = c.foreign_key.get("on_delete") == "cascade"
-            if owned:
+            cascade = c.foreign_key.get("on_delete") == "cascade"
+            if cascade:
                 t.screens["owned_by"] = parent
+            # Owned means BOTH cascade AND no title of its own — the same
+            # test used below for screens.primary_home. A cascade-deleted
+            # child that still has a name of its own (`full_name`, `email`,
+            # ...) is not a nameless detail of the parent; it keeps its own
+            # CRUD screens and is only linked from the parent's.
+            owned = cascade and not _has_own_title(t)
             p.relationships.append(Relationship(
                 kind="one-to-many", to=t.name, local_column=c.foreign_key.get("column", "id"),
                 remote_column=c.name, on_delete=c.foreign_key.get("on_delete"),
                 control="inline-subtable" if owned else "linked-list",
                 confidence="medium" if owned else "low",
-                signal=("ON DELETE CASCADE — the children do not outlive the "
-                        "parent, so they are owned and belong inside the "
-                        "parent's own form"
+                signal=("ON DELETE CASCADE and no title of its own — the "
+                        "children do not outlive the parent and are not "
+                        "named things in their own right, so they belong "
+                        "inside the parent's own form"
                         if owned else
-                        "the children survive the parent's deletion, so they "
-                        "are independent records and get their own screens "
-                        "with a link back")))
+                        "the children survive the parent's deletion, or have "
+                        "a title of their own, so they are independent "
+                        "records and get their own screens with a link "
+                        "back")))
 
     # An owned child with no title of its own is a detail of its parent, not a
     # thing in the product's vocabulary. It still gets screens — somebody has
     # to fix a bad line item — but its primary home is the parent's form.
     for t in model.tables:
-        if t.screens.get("owned_by") and not any(
-                c.type in TEXTUAL_TYPES and not c.foreign_key for c in t.columns):
+        if t.screens.get("owned_by") and not _has_own_title(t):
             t.screens["primary_home"] = "inline in " + t.screens["owned_by"]
 
     # Many-to-many: collapse each join table into one edge per side, and mark
@@ -2231,7 +2255,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"introspect_schema: no such file: {path}", file=sys.stderr)
         return 2
     try:
-        text = path.read_text(encoding="utf-8", errors="replace")
+        raw = path.read_bytes()
+        # A dump saved with `>` in PowerShell is UTF-16 or starts with a BOM.
+        text = raw.decode(json.detect_encoding(raw), errors="replace")
     except OSError as exc:
         print(f"introspect_schema: cannot read {path}: {exc}", file=sys.stderr)
         return 2
@@ -2283,4 +2309,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

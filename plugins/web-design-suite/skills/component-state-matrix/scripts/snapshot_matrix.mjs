@@ -12,7 +12,9 @@
  * Only dependency: `playwright`. The comparison runs inside the browser on a
  * canvas, so there is no pixelmatch/pngjs/sharp to install and nothing to
  * compile. The browser is never downloaded — pass --browser, set
- * MATRIX_CHROMIUM, or leave the default /opt/pw-browsers/chromium.
+ * MATRIX_CHROMIUM, or let it use the first that starts of
+ * /opt/pw-browsers/chromium, Playwright's own Chromium, and an installed
+ * Chrome or Edge. Pin one for baselines that must match across machines.
  *
  * Usage
  * -----
@@ -42,7 +44,7 @@
  *   --only SUBSTR          only cells whose id contains SUBSTR (repeatable)
  *   --viewport WxH         browser viewport                 (default 1440x900)
  *   --dpr N                device pixel ratio               (default 1)
- *   --browser PATH         chromium executable      (default /opt/pw-browsers/chromium)
+ *   --browser PATH         chromium executable      (default: found, see above)
  *   --quiet
  *
  * Exit codes
@@ -53,7 +55,7 @@
  */
 
 import { createRequire } from 'node:module';
-import { execFileSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -82,7 +84,7 @@ function parseArgs(argv) {
     only: [],
     viewport: { width: 1440, height: 900 },
     dpr: 1,
-    browser: process.env.MATRIX_CHROMIUM || DEFAULT_BROWSER,
+    browser: process.env.MATRIX_CHROMIUM || '',
     quiet: false,
   };
   const need = (i, flag) => {
@@ -143,9 +145,7 @@ async function loadPlaywright() {
 
   const roots = [];
   if (process.env.NODE_PATH) roots.push(...process.env.NODE_PATH.split(path.delimiter));
-  try {
-    roots.push(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim());
-  } catch { /* npm may not be on PATH; that is fine */ }
+  roots.push(...nodeModulesAbove(process.cwd()), npmGlobalRoot());
 
   for (const root of roots.filter(Boolean)) {
     for (const entry of ['index.mjs', 'index.js']) {
@@ -164,6 +164,71 @@ async function loadPlaywright() {
     '      NODE_PATH="$(npm root -g)" node snapshot_matrix.mjs ...\n' +
     '  Tried:\n    ' + tried.join('\n    ')
   );
+}
+
+// npm is npm.cmd on Windows, which execFile cannot start without a shell;
+// execSync always goes through one.
+let npmRoot;
+function npmGlobalRoot() {
+  if (npmRoot === undefined) {
+    try {
+      npmRoot = execSync('npm root -g', {
+        encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 20000,
+      }).trim();
+    } catch { npmRoot = ''; }   // npm may not be on PATH; that is fine
+  }
+  return npmRoot;
+}
+
+// A bare import('playwright') only searches upward from this script, which
+// lives in the plugin, not in the project under test.
+function nodeModulesAbove(dir) {
+  const found = [];
+  for (let d = path.resolve(dir); ; d = path.dirname(d)) {
+    found.push(path.join(d, 'node_modules'));
+    if (path.dirname(d) === d) return found;
+  }
+}
+
+// The browser is never downloaded. An explicit path must exist and start;
+// otherwise the first of these that starts wins: the sandbox default, the
+// browser Playwright itself would launch (its own Chromium or headless shell,
+// if installed), an installed Chrome or Edge. Each is tried in turn because an
+// installed browser can still fail to start.
+async function launchBrowser(chromium, explicit, options) {
+  const candidates = explicit ? [explicit]
+    : [...(fs.existsSync(DEFAULT_BROWSER) ? [DEFAULT_BROWSER] : []), undefined,
+       ...installedBrowsers().filter((p) => fs.existsSync(p))];
+  const tried = [];
+  for (const exe of candidates) {
+    const label = exe || "Playwright's own Chromium";
+    if (exe && !fs.existsSync(exe)) { tried.push(`${label}: no such file`); continue; }
+    try {
+      return { browser: await chromium.launch({ ...options, executablePath: exe }),
+               label, auto: !explicit };
+    } catch (err) {
+      tried.push(`${label}: ${String(err.message || err).split('\n')[0]}`);
+    }
+  }
+  return { tried };
+}
+
+function installedBrowsers() {
+  if (process.platform === 'win32') {
+    const env = process.env;
+    return [env.PROGRAMFILES, env['PROGRAMFILES(X86)'], env.LOCALAPPDATA].filter(Boolean)
+      .flatMap((root) => [
+        path.join(root, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        path.join(root, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+      ]);
+  }
+  if (process.platform === 'darwin') {
+    return ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+            '/Applications/Chromium.app/Contents/MacOS/Chromium',
+            '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'];
+  }
+  return ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome',
+          '/usr/bin/google-chrome-stable', '/snap/bin/chromium', '/usr/bin/microsoft-edge'];
 }
 
 // ---------------------------------------------------------------------------
@@ -373,25 +438,24 @@ async function main() {
   const started = Date.now();
   const log = (s) => { if (!opts.quiet) process.stdout.write(s + '\n'); };
 
-  if (!fs.existsSync(opts.browser)) {
-    die(`no chromium at ${opts.browser}.\n` +
+  const { chromium } = await loadPlaywright();
+  const launched = await launchBrowser(chromium, opts.browser, {
+    args: ['--force-color-profile=srgb', '--disable-lcd-text',
+           '--font-render-hinting=none', '--hide-scrollbars'],
+  });
+  if (!launched.browser) {
+    die('no usable chromium. Tried:\n    ' + launched.tried.join('\n    ') + '\n' +
         '  This script never downloads a browser. Point it at one:\n' +
         '      node snapshot_matrix.mjs sheet.html --browser /path/to/chrome\n' +
         '  or set MATRIX_CHROMIUM.');
   }
-
-  const { chromium } = await loadPlaywright();
+  if (launched.auto) log(`browser: ${launched.label}`);
+  const browser = launched.browser;
   fs.mkdirSync(opts.baselines, { recursive: true });
   const curDir = path.join(opts.out, 'current');
   const diffDir = path.join(opts.out, 'diff');
   fs.mkdirSync(curDir, { recursive: true });
   fs.mkdirSync(diffDir, { recursive: true });
-
-  const browser = await chromium.launch({
-    executablePath: opts.browser,
-    args: ['--force-color-profile=srgb', '--disable-lcd-text',
-           '--font-render-hinting=none', '--hide-scrollbars'],
-  });
   const context = await browser.newContext({
     viewport: opts.viewport,
     deviceScaleFactor: opts.dpr,

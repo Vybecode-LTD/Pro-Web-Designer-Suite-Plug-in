@@ -11,7 +11,8 @@ half; a script catches all of it, in a second, for free, forever.
 What it checks
 --------------
   L1  Tokens or nothing        raw lengths, colors, durations, z-indexes,
-                               shadows and font sizes outside the token file
+                               shadows, font sizes and weights outside the
+                               token file
   L2  Parents own the gaps     outer margins on children in component files
   L3  The scale is closed      values that are not on the spacing/type scale
   L4  One home per component   JSX inline styles that set visual properties,
@@ -109,6 +110,13 @@ COLOR_PROPS = {
     "fill", "stroke", "caret-color", "text-decoration-color", "accent-color",
     "column-rule-color", "text-emphasis-color",
 }
+# Shorthands whose value can carry a colour among widths and styles.
+COLOR_SHORTHANDS = {
+    "border", "border-top", "border-right", "border-bottom", "border-left",
+    "border-block", "border-block-start", "border-block-end",
+    "border-inline", "border-inline-start", "border-inline-end",
+    "outline", "column-rule", "text-decoration",
+}
 
 TYPE_PROPS = {"font-size", "line-height", "letter-spacing", "font-weight", "font"}
 MOTION_PROPS = {"transition", "transition-duration", "animation",
@@ -150,8 +158,9 @@ TIER2_EXCEPTIONS = {
     "--space-fluid-sm", "--space-fluid-md", "--space-fluid-lg", "--space-fluid-xl",
 }
 
-# Three or more classes compounded in one selector is specificity built to win
-# a fight that layers already settled.
+# Four or more classes chained in one selector is specificity built to win a
+# fight that layers already settled (stylelint's selector-max-specificity
+# 0,3,1 draws the same line).
 COMPOUND_SEL = re.compile(r"(\.[\w-]+(?:\s*[>+~]?\s*)){3,}\.[\w-]+")
 
 # Values that are legitimately literal anywhere.
@@ -213,7 +222,15 @@ class Finding:
     def key(self) -> str:
         """Stable identity for baselining. Deliberately excludes the line
         number so that unrelated edits above a violation do not resurrect it."""
-        return f"{self.file}|{self.rule}|{self.snippet.strip()[:120]}"
+        return portable_key(f"{self.file}|{self.rule}|{self.snippet.strip()[:120]}")
+
+
+def portable_key(key: str) -> str:
+    """Baseline keys use `/` in the path, so a baseline written on Windows still
+    matches on Linux CI and the reverse — including baselines written before
+    keys were normalised."""
+    path, sep, rest = key.partition("|")
+    return path.replace("\\", "/") + sep + rest
 
 
 # ---------------------------------------------------------------------------
@@ -432,9 +449,14 @@ def margin_is_alignment(value: str) -> bool:
     return "auto" in value.lower()
 
 
+CANCELLED_TOKEN = re.compile(
+    r"calc\(\s*(?:var\(\s*--[\w-]+\s*\)\s*\*\s*-1|-1\s*\*\s*var\(\s*--[\w-]+\s*\))\s*\)", re.I)
+
+
 def margin_cancels_token(value: str) -> bool:
-    """`calc(var(--token) * -1)` keeps the relationship; `-24px` does not."""
-    return "var(--" in value and "-1" in value.replace(" ", "")
+    """`calc(var(--token) * -1)` keeps the relationship; `-24px` does not.
+    Matched as that shape: a bare "-1" substring also matched --space-16."""
+    return bool(CANCELLED_TOKEN.search(value))
 
 
 # ---------------------------------------------------------------------------
@@ -618,7 +640,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 "cancel a known token, an owl selector in the parent's rule.)")
 
         # ---- L1 colour ------------------------------------------------------
-        if prop in COLOR_PROPS or prop == "border":
+        if prop in COLOR_PROPS or prop in COLOR_SHORTHANDS:
             if "var(--" not in value:
                 m = HEX_COLOR.search(value) or FUNC_COLOR.search(value)
                 if m:
@@ -627,7 +649,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                         "Use a role: --bg-surface / --fg-muted / --border-default "
                         "/ --bg-accent. A hardcoded colour is a colour that dark "
                         "mode cannot re-point, which is how a theme silently breaks.")
-                elif NAMED_COLOR.search(value) and prop in COLOR_PROPS:
+                elif NAMED_COLOR.search(value):
                     add(line, "L1", "named-color", "warning",
                         f"`{prop}: {value.strip()}` uses a CSS named colour.",
                         "Named colours are outside the ramp and outside the "
@@ -648,6 +670,12 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     f"`line-height: {value.strip()}` is a literal ratio.",
                     "Use --leading-* in base.css, or better, a --type-* role "
                     "which carries leading in its font shorthand.")
+            elif prop == "font-weight" and re.fullmatch(r"\d{1,4}", value.strip()):
+                # No unit, so the length check below never saw it.
+                add(line, "L1", "raw-weight", "error",
+                    f"`font-weight: {value.strip()}` hardcodes a weight.",
+                    "Use a --type-* role, which carries the weight in its font "
+                    "shorthand, or --weight-* outside component code.")
             elif (has_raw_length(value)
                   and not RELATIONAL_UNIT.match(value.strip())
                   and not (has_raw_length(value) or "").lower().endswith("em")):
@@ -1137,7 +1165,7 @@ def main(argv: list[str] | None = None) -> int:
     bp = Path(args.baseline)
     if bp.exists():
         try:
-            baseline = set(json.loads(bp.read_text(encoding="utf-8")))
+            baseline = {portable_key(k) for k in json.loads(bp.read_bytes())}
         except (OSError, json.JSONDecodeError):
             print(f"audit_design: could not read baseline {bp}; auditing everything.",
                   file=sys.stderr)
@@ -1156,4 +1184,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

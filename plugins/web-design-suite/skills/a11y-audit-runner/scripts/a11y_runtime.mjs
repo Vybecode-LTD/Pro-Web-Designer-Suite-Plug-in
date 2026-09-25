@@ -72,7 +72,9 @@
  *   --viewport WxH        viewport                            (default 1280x900)
  *   --dpr N               device pixel ratio                        (default 1)
  *   --axe PATH            axe.min.js to inject
- *   --browser PATH        chromium executable   (default /opt/pw-browsers/chromium)
+ *   --browser PATH        chromium executable   (default: A11Y_CHROMIUM, else the
+ *                         first that starts of /opt/pw-browsers/chromium,
+ *                         Playwright's own Chromium, Chrome or Edge)
  *   --json                machine-readable output
  *   --quiet
  *
@@ -93,7 +95,7 @@
  */
 
 import { createRequire } from 'node:module';
-import { execFileSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -131,7 +133,7 @@ function parseArgs(argv) {
     viewport: { width: 1280, height: 900 },
     dpr: 1,
     axe: null,
-    browser: process.env.A11Y_CHROMIUM || DEFAULT_BROWSER,
+    browser: process.env.A11Y_CHROMIUM || '',
     json: false, quiet: false,
   };
   const need = (i, flag) => {
@@ -217,9 +219,7 @@ async function loadPlaywright() {
 
   const roots = [];
   if (process.env.NODE_PATH) roots.push(...process.env.NODE_PATH.split(path.delimiter));
-  try {
-    roots.push(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim());
-  } catch { /* npm may not be on PATH; that is fine */ }
+  roots.push(...nodeModulesAbove(process.cwd()), npmGlobalRoot());
 
   for (const root of roots.filter(Boolean)) {
     for (const entry of ['index.mjs', 'index.js']) {
@@ -240,6 +240,71 @@ async function loadPlaywright() {
   );
 }
 
+// npm is npm.cmd on Windows, which execFile cannot start without a shell;
+// execSync always goes through one.
+let npmRoot;
+function npmGlobalRoot() {
+  if (npmRoot === undefined) {
+    try {
+      npmRoot = execSync('npm root -g', {
+        encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 20000,
+      }).trim();
+    } catch { npmRoot = ''; }   // npm may not be on PATH; that is fine
+  }
+  return npmRoot;
+}
+
+// A bare import('playwright') only searches upward from this script, which
+// lives in the plugin, not in the project under test.
+function nodeModulesAbove(dir) {
+  const found = [];
+  for (let d = path.resolve(dir); ; d = path.dirname(d)) {
+    found.push(path.join(d, 'node_modules'));
+    if (path.dirname(d) === d) return found;
+  }
+}
+
+// The browser is never downloaded. An explicit path must exist and start;
+// otherwise the first of these that starts wins: the sandbox default, the
+// browser Playwright itself would launch (its own Chromium or headless shell,
+// if installed), an installed Chrome or Edge. Each is tried in turn because an
+// installed browser can still fail to start.
+async function launchBrowser(chromium, explicit, options) {
+  const candidates = explicit ? [explicit]
+    : [...(fs.existsSync(DEFAULT_BROWSER) ? [DEFAULT_BROWSER] : []), undefined,
+       ...installedBrowsers().filter((p) => fs.existsSync(p))];
+  const tried = [];
+  for (const exe of candidates) {
+    const label = exe || "Playwright's own Chromium";
+    if (exe && !fs.existsSync(exe)) { tried.push(`${label}: no such file`); continue; }
+    try {
+      return { browser: await chromium.launch({ ...options, executablePath: exe }),
+               label, auto: !explicit };
+    } catch (err) {
+      tried.push(`${label}: ${String(err.message || err).split('\n')[0]}`);
+    }
+  }
+  return { tried };
+}
+
+function installedBrowsers() {
+  if (process.platform === 'win32') {
+    const env = process.env;
+    return [env.PROGRAMFILES, env['PROGRAMFILES(X86)'], env.LOCALAPPDATA].filter(Boolean)
+      .flatMap((root) => [
+        path.join(root, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        path.join(root, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+      ]);
+  }
+  if (process.platform === 'darwin') {
+    return ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+            '/Applications/Chromium.app/Contents/MacOS/Chromium',
+            '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'];
+  }
+  return ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome',
+          '/usr/bin/google-chrome-stable', '/snap/bin/chromium', '/usr/bin/microsoft-edge'];
+}
+
 function resolveAxe(explicit) {
   const candidates = [];
   if (explicit) candidates.push(explicit);
@@ -247,17 +312,16 @@ function resolveAxe(explicit) {
   try { candidates.push(require_.resolve('axe-core/axe.min.js')); } catch { /* not here */ }
   candidates.push(path.join(HERE, 'node_modules/axe-core/axe.min.js'));
   candidates.push(path.join(HERE, '..', 'node_modules/axe-core/axe.min.js'));
-  candidates.push(path.join(process.cwd(), 'node_modules/axe-core/axe.min.js'));
+  for (const nm of nodeModulesAbove(process.cwd())) {
+    candidates.push(path.join(nm, 'axe-core/axe.min.js'));
+  }
   if (process.env.NODE_PATH) {
     for (const root of process.env.NODE_PATH.split(path.delimiter)) {
       if (root) candidates.push(path.join(root, 'axe-core/axe.min.js'));
     }
   }
-  try {
-    candidates.push(path.join(
-      execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(),
-      'axe-core/axe.min.js'));
-  } catch { /* fine */ }
+  const globalRoot = npmGlobalRoot();
+  if (globalRoot) candidates.push(path.join(globalRoot, 'axe-core/axe.min.js'));
 
   const tried = [...new Set(candidates.filter(Boolean))];
   for (const c of tried) {
@@ -266,7 +330,8 @@ function resolveAxe(explicit) {
   die(
     'cannot find axe-core on disk.\n' +
     '      npm install axe-core\n' +
-    '  in this skill\'s scripts/ directory, or pass --axe /path/to/axe.min.js.\n' +
+    '  in the project under test or in this skill\'s scripts/ directory, or\n' +
+    '  pass --axe /path/to/axe.min.js.\n' +
     '  This tool deliberately does NOT load axe from a CDN: a CI gate that\n' +
     '  depends on a third-party CDN goes red when that CDN does, and a team\n' +
     '  that has been taught red means "re-run it" is a team with no gate.\n' +
@@ -280,6 +345,15 @@ function resolveAxe(explicit) {
 
 function finding(check, rule, sc, severity, message, fix, extra = {}) {
   return { check, rule, sc, severity, message, fix, ...extra };
+}
+
+// Shorten at a word boundary and say so. A hard cut left text like
+// "Element do" running straight into the help URL.
+function clip(text, max) {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max + 1);
+  const at = cut.lastIndexOf(' ');
+  return `${(at > 0 ? cut.slice(0, at) : text.slice(0, max)).replace(/[\s,;:]+$/, '')} …`;
 }
 
 // ---------------------------------------------------------------------------
@@ -448,7 +522,7 @@ async function runAxe(page, tags, context) {
       tags: v.tags.filter((t) => /^wcag|^best-practice$/.test(t)),
       nodes: v.nodes.slice(0, 8).map((n) => ({
         target: Array.isArray(n.target) ? n.target.join(' ') : String(n.target),
-        summary: (n.failureSummary || '').replace(/\s+/g, ' ').trim().slice(0, 300),
+        summary: (n.failureSummary || '').replace(/\s+/g, ' ').trim(),
         cell: (() => {
           try {
             const el = document.querySelector(
@@ -476,7 +550,7 @@ function axeFindings(res) {
       'axe', v.id, sc || v.tags.join(','),
       AXE_SEVERITY[v.impact] || 'warning',
       `${v.help} — ${v.count} element(s), impact ${v.impact}.`,
-      `${v.nodes[0] ? v.nodes[0].summary : ''} ${v.helpUrl}`.trim(),
+      `${clip(v.nodes[0] ? v.nodes[0].summary : '', 300)} ${v.helpUrl}`.trim(),
       { nodes: v.nodes.map((n) => n.target), cells: [...new Set(v.nodes.map((n) => n.cell).filter(Boolean))] }));
   }
   for (const v of res.incomplete) {
@@ -1548,11 +1622,19 @@ const BUDGET_KEYS = {
     x.severity === 'error').length,
 };
 
+// A budget or keymap saved by PowerShell (`>`, Out-File) or Notepad is UTF-16
+// or starts with a byte-order mark, and JSON.parse rejects both.
+function readJsonFile(file) {
+  const buf = fs.readFileSync(file);
+  const utf16 = buf[0] === 0xFF && buf[1] === 0xFE;
+  return JSON.parse(buf.toString(utf16 ? 'utf16le' : 'utf8').replace(/^﻿/, ''));
+}
+
 function loadBudget(file) {
   if (!file) return null;
   if (!fs.existsSync(file)) die(`no such budget file: ${file}`);
   let data;
-  try { data = JSON.parse(fs.readFileSync(file, 'utf8')); }
+  try { data = readJsonFile(file); }
   catch (err) { die(`cannot parse ${file}: ${err.message}`); }
   if (data.$schema && data.$schema !== 'a11y-audit-runner/1') {
     die(`${file} declares $schema "${data.$schema}"; this tool understands ` +
@@ -1739,17 +1821,10 @@ async function main() {
     mode = 'page';
   }
 
-  if (!fs.existsSync(opts.browser)) {
-    die(`no chromium at ${opts.browser}.\n` +
-        '  Pass --browser PATH, set A11Y_CHROMIUM, or install one.\n' +
-        '  This script never downloads a browser: a gate that pulls 150MB on ' +
-        'every CI run is a gate somebody turns off.');
-  }
-
   let keymap = null;
   if (opts.keymap) {
     if (!fs.existsSync(opts.keymap)) die(`no such keymap file: ${opts.keymap}`);
-    try { keymap = JSON.parse(fs.readFileSync(opts.keymap, 'utf8')); }
+    try { keymap = readJsonFile(opts.keymap); }
     catch (err) { die(`cannot parse ${opts.keymap}: ${err.message}`); }
   }
   const budget = loadBudget(opts.budget);
@@ -1758,12 +1833,19 @@ async function main() {
   const log = (s) => { if (!opts.quiet && !opts.json) process.stderr.write(s + '\n'); };
 
   const { chromium } = await loadPlaywright();
-  const browser = await chromium.launch({
-    executablePath: opts.browser,
+  const launched = await launchBrowser(chromium, opts.browser, {
     args: ['--force-color-profile=srgb', '--disable-lcd-text',
            '--font-render-hinting=none', '--no-sandbox',
            '--disable-dev-shm-usage'],
   });
+  if (!launched.browser) {
+    die('no usable chromium. Tried:\n    ' + launched.tried.join('\n    ') + '\n' +
+        '  Pass --browser PATH, set A11Y_CHROMIUM, or install Chrome or Edge.\n' +
+        '  This script never downloads a browser: a gate that pulls 150MB on ' +
+        'every CI run is a gate somebody turns off.');
+  }
+  if (launched.auto) log(`browser: ${launched.label}`);
+  const browser = launched.browser;
 
   const findings = [];
   let axeVersion = '?';

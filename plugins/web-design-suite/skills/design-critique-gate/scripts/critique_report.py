@@ -349,14 +349,15 @@ def load_critique(path: str) -> Critique:
     )
 
 
-def _read(path: str) -> str:
+def _read(path: str) -> bytes:
+    # Bytes, so json.loads detects UTF-16 or a BOM (PowerShell's `>` writes both).
     if path == "-":
-        return sys.stdin.read()
+        return sys.stdin.buffer.read()
     p = Path(path)
     if not p.exists():
         raise CritiqueError(f"{path}: no such file. Pass a JSON file or '-' for stdin.")
     try:
-        return p.read_text(encoding="utf-8")
+        return p.read_bytes()
     except OSError as exc:
         raise CritiqueError(f"{path}: cannot read — {exc}") from exc
 
@@ -812,4 +813,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

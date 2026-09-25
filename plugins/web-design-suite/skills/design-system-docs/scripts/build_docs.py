@@ -1287,7 +1287,8 @@ def check_prose(system: Dict[str, Any], prose: Path) -> List[str]:
 
 
 def check_examples(system: Dict[str, Any], prose: Optional[Path]) -> List[str]:
-    """Lint every fenced code block in the prose as if it were source."""
+    """Lint every fenced code block in the prose, and every example.html override,
+    as if it were source."""
     out: List[str] = []
     if not prose:
         return out
@@ -1295,6 +1296,20 @@ def check_examples(system: Dict[str, Any], prose: Optional[Path]) -> List[str]:
     sockets = {s["name"] for c in system.get("components", []) for s in c["sockets"]}
     classes = {c["root_class"] for c in system.get("components", [])}
     classes |= {p["class"] for c in system.get("components", []) for p in c.get("parts", [])}
+    class_bases = {c.split("__")[0] for c in classes}
+
+    def check_vars(rel: Path, label: str, code: str) -> None:
+        for ref in set(re.findall(r"var\(\s*(--[\w-]+)", code)):
+            if ref not in tokens and ref not in sockets:
+                out.append(f"{rel}: {label} uses `{ref}`, which is not a token "
+                           "or a socket in this system")
+
+    def check_class(rel: Path, label: str, cls: str) -> None:
+        base = cls.split("__")[0]
+        if base in class_bases and cls not in classes:
+            out.append(f"{rel}: {label} styles `.{cls}`, which is not a part "
+                       "this component publishes")
+
     for path in sorted(prose.rglob("*.md")):
         rel = path.relative_to(prose)
         blocks: List[Dict[str, str]] = []
@@ -1302,15 +1317,21 @@ def check_examples(system: Dict[str, Any], prose: Optional[Path]) -> List[str]:
         for i, block in enumerate(blocks):
             if block["lang"] not in ("css", "scss"):
                 continue
-            for ref in set(re.findall(r"var\(\s*(--[\w-]+)", block["code"])):
-                if ref not in tokens and ref not in sockets:
-                    out.append(f"{rel}: example {i + 1} uses `{ref}`, which is not a token "
-                               "or a socket in this system")
+            check_vars(rel, f"example {i + 1}", block["code"])
             for cls in set(re.findall(r"\.([a-z][\w-]*)\s*[{,:\[]", block["code"])):
-                base = cls.split("__")[0]
-                if base in {c.split("__")[0] for c in classes} and cls not in classes:
-                    out.append(f"{rel}: example {i + 1} styles `.{cls}`, which is not a part "
-                               "this component publishes")
+                check_class(rel, f"example {i + 1}", cls)
+
+    # `components/<name>.example.html` overrides the generated example markup
+    # (documentation-model.md §9) and is never fenced CSS, so it needs its own
+    # extraction: `var()` can appear anywhere (e.g. a style attribute), and a
+    # class is spelled `class="…"`, not a `.class { }` selector.
+    for path in sorted(prose.rglob("*.example.html")):
+        rel = path.relative_to(prose)
+        code = path.read_text(encoding="utf-8")
+        check_vars(rel, "override", code)
+        for attr in re.findall(r'class\s*=\s*"([^"]*)"', code):
+            for cls in attr.split():
+                check_class(rel, "override", cls)
     return out
 
 
@@ -1370,7 +1391,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = ap.parse_args(argv)
 
     try:
-        system = json.loads(Path(args.system).read_text(encoding="utf-8"))
+        system = json.loads(Path(args.system).read_bytes())
     except OSError as exc:
         print(f"error: cannot read {args.system}: {exc}", file=sys.stderr)
         return 2
@@ -1392,7 +1413,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             Path(args.out) / "assets" / "system.json" if args.out else None)
         problems: List[str] = []
         if baseline and baseline.is_file():
-            old = json.loads(baseline.read_text(encoding="utf-8"))
+            old = json.loads(baseline.read_bytes())
             problems += diff_systems(old, system)
         elif baseline:
             print(f"note: no baseline at {baseline}; checking prose only.", file=sys.stderr)
@@ -1430,4 +1451,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

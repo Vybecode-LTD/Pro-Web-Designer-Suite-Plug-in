@@ -387,6 +387,8 @@ EASINGS: List[Tuple[str, Tuple[float, float, float, float]]] = [
     ("--ease-in-out", (0.65, 0.0, 0.35, 1.0)),
     ("--ease-spring", (0.34, 1.56, 0.64, 1.0)),
 ]
+# The contract's eight rungs start at --z-base (0). A literal 0 is left alone,
+# so only the seven rungs above it are ever assigned.
 Z_LADDER = ["--z-raised", "--z-sticky", "--z-dropdown", "--z-overlay",
             "--z-modal", "--z-toast", "--z-tooltip"]
 ELEVATION_BY_BLUR: List[Tuple[float, str]] = [
@@ -492,10 +494,11 @@ def tw_prop_class(prefix: str) -> str:
         return "pad-inline"
     if prefix in {"py", "pt", "pb"}:
         return "pad-block"
-    if prefix.startswith(("m", "gap", "space")):
-        return "gap"
+    # Before the margin test: max-w/min-w/max-h/min-h start with "m" too.
     if prefix in {"w", "h", "min-w", "max-w", "min-h", "max-h"}:
         return "size"
+    if prefix.startswith(("m", "gap", "space")):
+        return "gap"
     return "other"
 
 
@@ -965,6 +968,33 @@ def literal_index(payload: dict) -> Dict[str, List[dict]]:
     return idx
 
 
+UNMAPPED_KIND = {"length": "spacing", "font-size": "type", "border-width": "stroke"}
+
+
+def route_inline_styles(idx: Dict[str, List[dict]], prop: Proposal) -> None:
+    """JSX `style={{…}}` values are Law 4 hand work (Phase 4f): apply_codemod
+    never rewrites them, because the declaration has to move into a stylesheet
+    under a class name. Left in the pools they were counted as mechanically
+    replaceable, so they get their own unmapped rows instead."""
+    for kind in list(idx):
+        inline = [l for l in idx[kind] if l.get("context") == "inline-style"]
+        if not inline:
+            continue
+        idx[kind] = [l for l in idx[kind] if l.get("context") != "inline-style"]
+        by_value: Dict[str, List[dict]] = defaultdict(list)
+        for l in inline:
+            by_value[l["normalized"]].append(l)
+        for value, items in sorted(by_value.items()):
+            prop.unmapped.append(Unmapped(
+                kind=UNMAPPED_KIND.get(kind, kind), value=value, occurrences=len(items),
+                where=where_of(items),
+                reason="set in a JSX inline style (Law 4) — the codemod does not rewrite these",
+                recommendation=("Phase 4f: move the declaration into the component's "
+                                "stylesheet under a class name, then re-run "
+                                "extract_literals so it is mapped with the rest."),
+            ))
+
+
 def where_of(lits: Sequence[dict], limit: int = 3) -> List[str]:
     seen: List[str] = []
     for l in lits:
@@ -1417,8 +1447,8 @@ def cluster_z(lits: Sequence[dict], prop: Proposal) -> None:
         return
     if len(values) > len(Z_LADDER):
         prop.notes.append(
-            f"{len(values)} distinct z-indexes for an {len(Z_LADDER)}-rung "
-            f"ladder. Several values are collapsed onto one rung; read the "
+            f"{len(values)} distinct z-indexes for the {len(Z_LADDER)} rungs above "
+            f"`--z-base`. Several values are collapsed onto one rung; read the "
             f"stacking contexts before applying.")
     # Magnitude picks the starting rung — 9999 means "above everything", and
     # that intent is worth keeping — then rank order is enforced so no two
@@ -2307,7 +2337,7 @@ def main(argv: Sequence[str] | None = None) -> int:
               f"-o {src}", file=sys.stderr)
         return 2
     try:
-        payload = json.loads(src.read_text(encoding="utf-8"))
+        payload = json.loads(src.read_bytes())
     except (OSError, json.JSONDecodeError) as exc:
         print(f"cluster_values: {src} is not readable JSON ({exc}).\n"
               f"It must be the output of `extract_literals.py --format json`.",
@@ -2321,6 +2351,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     idx = literal_index(payload)
     prop = Proposal()
+    route_inline_styles(idx, prop)
 
     neutral, accent, status = cluster_color_phase(
         idx.get("color", []), args.color_tolerance, prop, args.accent)
@@ -2428,4 +2459,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

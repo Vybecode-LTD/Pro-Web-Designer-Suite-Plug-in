@@ -872,7 +872,7 @@ def load_snapshot(raw: str, label: str, *, no_upstream: bool = False) -> Snapsho
                 f"  python -m scripts.extract_system {raw} --out system.json")
     if p.suffix.lower() == ".json":
         try:
-            data = json.loads(p.read_text(encoding="utf-8"))
+            data = json.loads(p.read_bytes())
         except (OSError, json.JSONDecodeError) as exc:
             raise bail(f"diff_system: {p} is not readable JSON ({exc}).")
         schema = str(data.get("schema", ""))
@@ -1538,7 +1538,7 @@ def load_ledger(path: Optional[str]) -> Tuple[List[Dict[str, Any]], Optional[str
     if not p.exists():
         return [], f"no deprecation ledger at {p}"
     try:
-        data = json.loads(p.read_text(encoding="utf-8"))
+        data = json.loads(p.read_bytes())
     except (OSError, json.JSONDecodeError) as exc:
         raise bail(f"diff_system: {p} is not readable JSON ({exc}).")
     if str(data.get("schema", "")).split("@")[0] != LEDGER_SCHEMA.split("@")[0]:
@@ -2185,4 +2185,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

@@ -1439,9 +1439,9 @@ class Extractor:
 
     def rel(self, p: str | Path) -> str:
         try:
-            return str(Path(p).resolve().relative_to(self.root.resolve()))
+            return Path(p).resolve().relative_to(self.root.resolve()).as_posix()
         except ValueError:
-            return str(p)
+            return Path(p).as_posix()
 
     # -- tokens -----------------------------------------------------------
     def read_tokens(self, files: Sequence[Path]) -> None:
@@ -1729,7 +1729,7 @@ class Extractor:
             for comp in sorted(names - documented):
                 self.gaps.append({
                     "kind": "undocumented-component", "severity": "warning",
-                    "component": comp, "where": str(prose_dir / "components" / f"{comp}.md"),
+                    "component": comp, "where": self.rel(prose_dir / "components" / f"{comp}.md"),
                     "detail": f"`{comp}` exists in code with no hand-written page. The generated "
                               "page will have the what and none of the why.",
                 })
@@ -1737,7 +1737,7 @@ class Extractor:
                 self.gaps.append({
                     "kind": "orphan-doc", "severity": "error",
                     "component": doc,
-                    "where": str(prose_dir / "components" / f"{doc}.md"),
+                    "where": self.rel(prose_dir / "components" / f"{doc}.md"),
                     "detail": f"`{doc}.md` documents a component that no longer exists in the "
                               "source. A doc for a deleted component is worse than no doc: it "
                               "is an instruction to use something that is gone.",
@@ -1981,4 +1981,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

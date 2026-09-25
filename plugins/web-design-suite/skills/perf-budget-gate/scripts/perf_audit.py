@@ -989,7 +989,7 @@ def load_budget(path: str | None) -> tuple[dict, str]:
     if not p.exists():
         return DEFAULT_BUDGET, f"built-in defaults ({path} not found)"
     try:
-        data = json.loads(p.read_text(encoding="utf-8"))
+        data = json.loads(p.read_bytes())
     except (OSError, json.JSONDecodeError) as exc:
         raise SystemExit(f"perf_audit: cannot read budget {path}: {exc}")
     if data.get("$schema") not in (None, "perf-budget-gate/1"):
@@ -1120,7 +1120,7 @@ def load_baseline(path: str) -> tuple[set[str], dict]:
     if not p.exists():
         return set(), {}
     try:
-        data = json.loads(p.read_text(encoding="utf-8"))
+        data = json.loads(p.read_bytes())
     except (OSError, json.JSONDecodeError):
         print(f"perf_audit: could not read baseline {p}; auditing everything.",
               file=sys.stderr)
@@ -1698,4 +1698,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

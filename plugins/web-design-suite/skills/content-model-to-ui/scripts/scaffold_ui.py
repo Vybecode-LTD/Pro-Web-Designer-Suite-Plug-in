@@ -377,6 +377,7 @@ BUTTON_CSS = """\
   @media (prefers-reduced-motion: reduce) {
     /* Slowed, not removed: the spinner is the only signal that the button is
        still working, so stopping it reads as a hang. */
+    /* design-audit-ignore-next-line: L6 -- reduced-motion fallback keeps the same loop, only slower; no --motion-* pair models "still looping, just calmer" */
     .spinner { animation-duration: var(--dur-slower); }
   }
 }
@@ -2632,7 +2633,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"scaffold_ui: no such file: {mp}", file=sys.stderr)
         return 2
     try:
-        model = json.loads(mp.read_text(encoding="utf-8"))
+        model = json.loads(mp.read_bytes())
     except json.JSONDecodeError as exc:
         print(f"scaffold_ui: {mp} is not valid JSON: {exc}", file=sys.stderr)
         return 2
@@ -2651,7 +2652,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"scaffold_ui: no such answers file: {apath}", file=sys.stderr)
             return 2
         try:
-            answers_data = json.loads(apath.read_text(encoding="utf-8"))
+            answers_data = json.loads(apath.read_bytes())
         except json.JSONDecodeError as exc:
             print(f"scaffold_ui: {apath} is not valid JSON: {exc}",
                   file=sys.stderr)
@@ -2707,4 +2708,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

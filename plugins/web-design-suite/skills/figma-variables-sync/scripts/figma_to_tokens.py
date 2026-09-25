@@ -118,7 +118,7 @@ for _n in TIER2:
 # what turns silent data loss into a printed warning.
 COMPOSITE_ONLY = {n for n in TIER2 if n.startswith(("type-", "motion-", "elevation-"))}
 COMPOSITE_ONLY |= {n for n in TIER1 if n.startswith(("shadow-", "ease-", "space-fluid-"))}
-COMPOSITE_ONLY |= {"text-5xl", "text-6xl", "font-sans", "font-mono"}
+COMPOSITE_ONLY |= {"text-5xl", "text-6xl"}
 
 TIER_PREFIXES = {
     "primitive", "primitives", "core", "global", "base", "raw", "foundation",
@@ -542,6 +542,13 @@ def parse_records(data: Any, collection: str) -> FDoc:
     rows = data if isinstance(data, list) else (data.get("variables") or [])
     doc = FDoc("records")
     doc.collections[collection] = FCollection(collection, ["Value"], "Value")
+    # Rows are one (collection, name, mode) triple each. Like `parse_plugin`'s
+    # `_ingest`, merge rows that share (collection, name) into one FVar with a
+    # multi-mode `values` dict -- otherwise each mode becomes its own variable,
+    # and `Converter.blocks()` cannot tell "no value for :root" from "this is
+    # the only mode", so it treats every split-off variable as its own default
+    # and every mode collapses onto `:root`.
+    merged: Dict[Tuple[str, str], FVar] = {}
     for row in rows:
         if not isinstance(row, dict) or "name" not in row:
             continue
@@ -552,14 +559,18 @@ def parse_records(data: Any, collection: str) -> FDoc:
             doc.collections[cname].modes.append(mode)
         if not doc.collections[cname].default_mode:
             doc.collections[cname].default_mode = mode
-        fv = FVar(str(row["name"]), cname,
-                  str(row.get("type") or row.get("resolvedType") or "").upper(),
-                  {mode: row.get("value", row.get("$value"))},
-                  list(row.get("scopes") or []), {}, row.get("description") or "",
-                  str(row.get("id") or row["name"]))
-        doc.variables.append(fv)
-        doc.by_id.setdefault(fv.var_id, fv)
-        doc.by_id.setdefault(fv.name, fv)
+        key = (cname, str(row["name"]))
+        fv = merged.get(key)
+        if fv is None:
+            fv = FVar(str(row["name"]), cname,
+                      str(row.get("type") or row.get("resolvedType") or "").upper(),
+                      {}, list(row.get("scopes") or []), {}, row.get("description") or "",
+                      str(row.get("id") or row["name"]))
+            merged[key] = fv
+            doc.variables.append(fv)
+            doc.by_id.setdefault(fv.var_id, fv)
+            doc.by_id.setdefault(fv.name, fv)
+        fv.values[mode] = row.get("value", row.get("$value"))
     return doc
 
 
@@ -610,7 +621,7 @@ def parse_dtcg(data: dict, collection: str) -> FDoc:
 
 
 def load_document(path: Path, forced: Optional[str], collection: str) -> FDoc:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_bytes())
     shape = forced or detect_shape(data)
     doc = {"rest": lambda: parse_rest(data), "plugin": lambda: parse_plugin(data),
            "records": lambda: parse_records(data, collection),
@@ -1281,7 +1292,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     path = Path(args.path)
     try:
         if args.reverse:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_bytes())
             text, problems = emit_reverse(data, str(path), collection_split=not args.flat)
             write_out(text, args.out)
             report_problems(problems, args.quiet)
@@ -1311,4 +1322,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

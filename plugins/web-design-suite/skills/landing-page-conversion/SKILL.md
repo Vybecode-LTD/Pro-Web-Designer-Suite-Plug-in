@@ -221,7 +221,7 @@ Two passes, both in `references/conversion-audit.md`:
 Then run the design gate:
 
 ```bash
-python /home/claude/web-design-studio/scripts/audit_design.py <path>
+python -m scripts.audit_design <path>      # from web-design-studio
 ```
 
 Law 9 applies here exactly as it does in the studio skill: nothing ships un-audited.

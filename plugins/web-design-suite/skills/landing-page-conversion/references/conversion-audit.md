@@ -272,7 +272,7 @@ Separate the certainties from the guesses explicitly, and never launder a guess 
 Close the report with the design gate:
 
 ```bash
-python /home/claude/web-design-studio/scripts/audit_design.py <path>
+python -m scripts.audit_design <path>      # from web-design-studio
 ```
 
 ---

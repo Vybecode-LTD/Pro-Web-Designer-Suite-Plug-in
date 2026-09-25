@@ -46,7 +46,18 @@ set -u
 STYLELINT_CONFIG="${DESIGN_GATE_STYLELINT_CONFIG:-assets/configs/stylelint.config.mjs}"
 ESLINT_CONFIG="${DESIGN_GATE_ESLINT_CONFIG:-assets/configs/eslint.design.config.mjs}"
 AUDIT_MODULE="${DESIGN_GATE_AUDIT_MODULE:-scripts.audit_design}"
-PYTHON="${DESIGN_GATE_PYTHON:-python3}"
+AUDIT_FILE="$(printf '%s' "$AUDIT_MODULE" | tr . /).py"
+PYTHON="${DESIGN_GATE_PYTHON:-}"
+if [ -z "$PYTHON" ]; then
+  # `python3` on Windows is often the Microsoft Store placeholder: it is on
+  # PATH but only prints an install hint. Take the first interpreter that runs.
+  for candidate in python3 python py; do
+    if "$candidate" -c 'import sys' >/dev/null 2>&1; then
+      PYTHON=$candidate
+      break
+    fi
+  done
+fi
 
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
   echo "design-gate: not inside a git repository" >&2
@@ -193,23 +204,24 @@ if [ -s "$TMP_DIR/js" ]; then
   fi
 fi
 
-# 3. The design audit — Law 9, and the checks no linter can express:
-#    breakpoints in theme.css vs --bp-* in tokens.css, --type-* roles vs
-#    their --text-* re-expression, contrast ratios for every fg/bg role
-#    pair, tokens defined but never used, tokens used but never defined.
-#    Run from the repo root so `-m scripts.audit_design` resolves.
-if command -v "$PYTHON" >/dev/null 2>&1; then
-  if [ -f "scripts/audit_design.py" ]; then
+# 3. The design audit — Law 9, and the checks no linter can express: literals
+#    disguised inside Tier-3 socket declarations, the cross-file pass (one
+#    class styled from two files, one property owned twice), layer order, and
+#    the baseline that freezes existing debt instead of failing on it.
+#    Run from the repo root so `-m scripts.audit_design` resolves. The staged
+#    paths are passed as arguments; the audit reads them from the working tree.
+if [ -n "$PYTHON" ] && command -v "$PYTHON" >/dev/null 2>&1; then
+  if [ -f "$AUDIT_FILE" ]; then
     set --
     while IFS= read -r f; do [ -n "$f" ] && set -- "$@" "$f"; done < "$STAGED"
     run_gate "audit_design" "Law 9 — nothing ships un-audited" \
       "$TMP_DIR/out.audit" \
-      "$PYTHON" -m "$AUDIT_MODULE" --staged "$@"
+      "$PYTHON" -m "$AUDIT_MODULE" "$@"
   else
-    printf '  %s!%s scripts/audit_design.py not found — SKIPPED\n' "$C_YEL" "$C_OFF"
+    printf '  %s!%s %s not found — SKIPPED\n' "$C_YEL" "$C_OFF" "$AUDIT_FILE"
   fi
 else
-  printf '  %s!%s %s not on PATH — audit SKIPPED\n' "$C_YEL" "$C_OFF" "$PYTHON"
+  printf '  %s!%s no working Python (set DESIGN_GATE_PYTHON) — audit SKIPPED\n' "$C_YEL" "$C_OFF"
 fi
 
 # --- Verdict -----------------------------------------------------------------

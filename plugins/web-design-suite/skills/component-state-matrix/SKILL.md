@@ -241,7 +241,7 @@ Theme is inside every cell in every pass — it is the cheapest axis (it adds no
 
 Notes:
 
-- **`{attrs}` is mandatory** in a template (or `{content}` at minimum). Without it, state, variant and size cannot be applied and every cell renders identically — the generator refuses.
+- **`{attrs}` is mandatory** in a template. `{content}` is not a substitute for it — a template may omit `{content}` (a void element like `<input>` has none) but never `{attrs}`: without it, state, variant and size cannot be applied and every cell renders identically — the generator refuses.
 - **`stage_style` keys must all start with `--`.** Law 4 permits inline style only when every key is a custom property; the generator enforces it and tells you why.
 - **`disabled` is applied intelligently**: a real `disabled` attribute on form controls (detected from the template, overridable with `form_control`), `aria-disabled="true"` otherwise. Never both on a `<div>`, which is invalid.
 
@@ -281,7 +281,7 @@ The sheet's chrome lives in its own `matrix` cascade layer, declared after `util
 | `--allow-new` | a cell with no baseline is not a failure |
 | `--only SUBSTR` | only cells whose id contains SUBSTR; repeatable |
 | `--viewport WxH`, `--dpr N` | pinned rendering geometry |
-| `--browser PATH` | chromium executable (default `/opt/pw-browsers/chromium`, or `$MATRIX_CHROMIUM`) |
+| `--browser PATH` | chromium executable (default `$MATRIX_CHROMIUM`, else the first that starts of `/opt/pw-browsers/chromium`, Playwright's own Chromium, an installed Chrome or Edge — pin one for baselines shared across machines) |
 
 Exit `0` clean or updated · `1` regression, new cell or capture error · `2` bad arguments or no usable browser.
 

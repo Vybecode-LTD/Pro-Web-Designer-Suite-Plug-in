@@ -292,7 +292,7 @@ class TokenError(Exception):
 def load_tokens(path: Path) -> dict[str, str]:
     """Flatten email-tokens.json into name -> literal, resolving token references."""
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_bytes())
     except FileNotFoundError:
         raise TokenError("token file not found: %s" % path)
     except json.JSONDecodeError as exc:
@@ -1233,4 +1233,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

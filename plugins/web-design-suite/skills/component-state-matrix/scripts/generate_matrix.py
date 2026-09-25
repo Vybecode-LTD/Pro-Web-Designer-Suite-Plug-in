@@ -518,11 +518,13 @@ class Component:
                     f"Known template ids: {', '.join(sorted(templates)) or '(none)'}."
                 )
             tpl = templates[key]
-        if "{content}" not in tpl and "{attrs}" not in tpl:
+        if "{attrs}" not in tpl:
             raise ManifestError(
-                f"component '{self.name}' template contains neither {{attrs}} nor "
-                f"{{content}}. Without {{attrs}} the generator cannot apply state, "
-                f"variant or size, so every cell would render identically."
+                f"component '{self.name}' template has no {{attrs}} placeholder. "
+                f"`{{content}}` is not a substitute: without {{attrs}} the "
+                f"generator cannot apply state, variant or size, so every cell "
+                f"would render identically while the coverage line says all is "
+                f"fine."
             )
         return tpl
 
@@ -536,7 +538,7 @@ class Manifest:
     def __init__(self, path: Path, root: Optional[Path] = None):
         self.path = path
         try:
-            raw = json.loads(read_text(path))
+            raw = json.loads(read_raw(path))
         except json.JSONDecodeError as exc:
             raise ManifestError(f"{path}: not valid JSON — {exc}") from None
         if not isinstance(raw, dict):
@@ -601,6 +603,14 @@ def resolve(root: Path, rel: str, where: str) -> Path:
 def read_text(path: Path) -> str:
     try:
         return path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ManifestError(f"cannot read {path}: {exc}") from None
+
+
+def read_raw(path: Path) -> bytes:
+    """For JSON: json.loads(bytes) handles a BOM and UTF-16 (PowerShell's `>`)."""
+    try:
+        return path.read_bytes()
     except OSError as exc:
         raise ManifestError(f"cannot read {path}: {exc}") from None
 
@@ -1511,4 +1521,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

@@ -497,15 +497,11 @@ class Linter:
                      fix="build with build_email.py, or paste the mso conditional from "
                          "references/email-architecture.md §3")
 
-        preheader = None
-        for node in self.root.elements():
-            if node.get("data-preheader") is not None:
-                preheader = node
-                break
-            style = (node.get("style") or "").replace(" ", "").lower()
-            if "display:none" in style and "max-height:0" in style:
-                preheader = node
-                break
+        # Use the same test check_css() uses to exempt the preheader's hiding
+        # declarations (is_preheader): that one also accepts opacity:0 without
+        # max-height:0, and a node missed here but caught there produced a
+        # false "no preheader found" for a preheader check_css already knew about.
+        preheader = next((node for node in self.root.elements() if is_preheader(node)), None)
         if preheader is None:
             self.add("error", "head", "no preheader found",
                      detail="The inbox list shows the subject and then the first text in "
@@ -864,4 +860,10 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

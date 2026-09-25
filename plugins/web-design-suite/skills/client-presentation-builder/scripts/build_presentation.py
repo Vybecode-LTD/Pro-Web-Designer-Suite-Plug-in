@@ -261,7 +261,11 @@ def parse_decision_log(text: str, path: Path | None = None) -> DecisionLog:
                 ident = (m.group(1) or "").replace(" ", "").replace("-", "") if m else ""
                 name = (m.group(2) or title).strip(" —–-:") if m else title
                 if not ident:
-                    ident = f"D{len(log.decisions) + 1}"
+                    taken = {d.ident for d in log.decisions}
+                    k = len(log.decisions) + 1
+                    while f"D{k}" in taken:
+                        k += 1
+                    ident = f"D{k}"
                 current = Decision(ident=ident.upper(), title=name, line=n)
                 log.decisions.append(current)
                 continue
@@ -353,7 +357,7 @@ class Provenance:
 
 def _read_json(path: Path) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_bytes())
     except OSError as exc:
         raise BuildError(f"cannot read {path}: {exc}") from exc
     except json.JSONDecodeError as exc:
@@ -1600,16 +1604,16 @@ DECK_CSS = """@layer layout {
   }
 
   /* -- .dlist — one decision, in the five-part shape ----------------- */
+  /* --dlist-key is a socket with a default, so a container (the help
+     panel) can narrow the key column without restyling the list. */
   .dlist {
-    --dlist-key: minmax(auto, var(--measure-narrow));
-
     display: grid;
     gap: var(--gap-grouped);
   }
 
   .dlist__row {
     display: grid;
-    grid-template-columns: var(--dlist-key) 1fr;
+    grid-template-columns: var(--dlist-key, minmax(auto, var(--measure-narrow))) 1fr;
     gap: var(--gap-related);
     align-items: baseline;
   }
@@ -1900,6 +1904,10 @@ DECK_CSS = """@layer layout {
   .deck[data-help="open"] .help { display: grid; }
 
   .help__panel {
+    /* The panel is --width-form wide; the list's default key column would
+       leave each answer a few words' width. Split it evenly instead. */
+    --dlist-key: minmax(0, 1fr);
+
     display: flex;
     flex-direction: column;
     gap: var(--gap-grouped);
@@ -2348,6 +2356,15 @@ def main(argv: list[str] | None = None) -> int:
                 f"`## Decisions` followed by `### D1 — Title` blocks with "
                 f"`**Constraint:**` / `**Choice:**` fields. See "
                 f"assets/DECISION_LOG.md.")
+        first_seen: dict[str, int] = {}
+        for d in log.decisions:
+            if d.ident in first_seen:
+                raise BuildError(
+                    f"{log_path}: decision {d.ident} appears twice (lines "
+                    f"{first_seen[d.ident]} and {d.line}). Give every "
+                    f"`### D<n> — Title` block its own number — the deck's "
+                    f"appendix and the meeting record refer to decisions by id.")
+            first_seen[d.ident] = d.line
 
         inp = Inputs(log=log)
         if args.audit:
@@ -2373,20 +2390,28 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     out_path = Path(args.out)
-    if out_path.parent and not out_path.parent.exists():
-        out_path.parent.mkdir(parents=True, exist_ok=True)
     html_text = render_html(plan, inp, args.audience, tokens_css)
-    out_path.write_text(html_text, encoding="utf-8")
-
     size = len(html_text.encode("utf-8"))
     written = [f"{out_path} ({human_bytes(size)})"]
-    if args.notes:
-        Path(args.notes).write_text(render_notes(plan, inp, args.audience),
-                                    encoding="utf-8")
-        written.append(args.notes)
-    if args.emit_css:
-        for p in emit_css(Path(args.emit_css), tokens_css):
-            written.append(str(p))
+    # All three outputs get the same treatment: missing folders are created,
+    # and a path that cannot be written is a bad invocation (exit 2), not a
+    # traceback.
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(html_text, encoding="utf-8")
+        if args.notes:
+            notes_path = Path(args.notes)
+            notes_path.parent.mkdir(parents=True, exist_ok=True)
+            notes_path.write_text(render_notes(plan, inp, args.audience),
+                                  encoding="utf-8")
+            written.append(args.notes)
+        if args.emit_css:
+            for p in emit_css(Path(args.emit_css), tokens_css):
+                written.append(str(p))
+    except OSError as exc:
+        print(f"build_presentation: cannot write {exc.filename or args.out}: "
+              f"{exc.strerror or exc}", file=sys.stderr)
+        return 2
 
     gaps = [(i, g) for i, s in enumerate(plan, 1) for g in s.gaps]
     print(f"build_presentation: {len(plan)} slides for `{args.audience}` "
@@ -2415,4 +2440,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

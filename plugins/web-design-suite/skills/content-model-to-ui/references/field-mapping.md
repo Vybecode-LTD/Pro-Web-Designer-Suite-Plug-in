@@ -192,12 +192,15 @@ Two properties belong to the relationship, not the control:
 
 ### 6.2 One-to-many (children point at this row)
 
-`ON DELETE` is the signal, and it is a good one:
+`ON DELETE` is the signal, but it is not the whole test. A child is **owned**
+only when it ALSO has no title of its own — `CASCADE` alone says the rows
+cannot outlive the parent, not that they are anonymous details of it:
 
-| `ON DELETE` | Meaning | Control |
-|---|---|---|
-| `CASCADE` | The children do not outlive the parent — they are **owned** | **inline-subtable** inside the parent's form: add, edit and remove rows in place, saved in one transaction with the parent. Order lines, survey options, image variants |
-| `RESTRICT` / `NO ACTION` / `SET NULL` | The children survive — they are **independent** | **linked-list** on the parent's detail page: a few rows, a count, and a link to their own screens. Never an editor |
+| `ON DELETE` | Has a title of its own? | Meaning | Control |
+|---|---|---|---|
+| `CASCADE` | no | The children do not outlive the parent and are not named things in their own right — they are **owned** | **inline-subtable** inside the parent's form: add, edit and remove rows in place, saved in one transaction with the parent. Order lines, survey options, image variants |
+| `CASCADE` | yes | The children do not outlive the parent, but each is still a record someone looks up by name (e.g. `users` under `organizations`) | **linked-list**, same as independent — full CRUD screens of its own, linked from the parent |
+| `RESTRICT` / `NO ACTION` / `SET NULL` | — | The children survive — they are **independent** | **linked-list** on the parent's detail page: a few rows, a count, and a link to their own screens. Never an editor |
 
 Getting this backwards is expensive in both directions. Editing independent records inline means two screens can write the same row and neither knows about the other. Giving owned children their own CRUD screens means a user can create an order line with no order.
 
