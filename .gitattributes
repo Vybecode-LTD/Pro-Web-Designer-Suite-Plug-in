@@ -1,0 +1,6 @@
+# Every text file is stored and checked out with LF, on every platform. The
+# design-gate hook is a POSIX shell script, and the tests compare files byte for
+# byte, so a CRLF checkout on Windows would break both.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
