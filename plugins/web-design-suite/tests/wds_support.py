@@ -23,6 +23,24 @@ SKILLS = PLUGIN / "skills"
 NODE = shutil.which("node")
 NPM = shutil.which("npm")
 
+# Inside its repository (plugins/web-design-suite, with `npm ci` run in
+# tooling/main and tooling/tailwind-v3), the plugin's tests use the
+# repository's pinned toolchain for any tool location that is not set. The
+# toolchain sits beside the plugin, never above it: Node looks for packages in
+# every parent folder, and a node_modules above the scripts would stand in for
+# the stub modules the resolution tests plant. A plugin unpacked on its own has
+# no toolchain, and those tests skip as before. Set a variable to an empty
+# string to switch its tests off.
+_PARENTS = pathlib.Path(__file__).resolve().parents
+REPO = _PARENTS[3] if len(_PARENTS) > 3 else None
+TOOLING = REPO / "tooling" if REPO and (REPO / ".claude-plugin" / "marketplace.json").is_file() else None
+if TOOLING and (TOOLING / "main" / "node_modules").is_dir():
+    for _var in ("WDS_NODE_MODULES", "WDS_ESLINT_MODULES", "WDS_TAILWIND_MODULES",
+                 "WDS_STYLELINT_MODULES"):
+        os.environ.setdefault(_var, str(TOOLING / "main" / "node_modules"))
+if TOOLING and (TOOLING / "tailwind-v3" / "node_modules").is_dir():
+    os.environ.setdefault("WDS_TAILWIND_V3_MODULES", str(TOOLING / "tailwind-v3" / "node_modules"))
+
 
 def env(**changes: str | None) -> dict[str, str]:
     """The current environment plus `changes`; a value of None removes that variable.

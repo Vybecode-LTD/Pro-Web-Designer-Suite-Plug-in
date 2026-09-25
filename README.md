@@ -6,6 +6,7 @@ The source of **web-design-suite**, a Claude Code plugin. It has thirteen skills
 |---|---|
 | [`plugins/web-design-suite`](plugins/web-design-suite) | The plugin. Its [README](plugins/web-design-suite/README.md) describes the skills, and its [CHANGELOG](plugins/web-design-suite/CHANGELOG.md) the releases. |
 | [`dev plans`](dev%20plans) | The review, the phase plans and the reports. |
+| [`tooling`](tooling) | The pinned tools the plugin's tests run its configs through (`npm ci` in each folder). |
 | [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) | Makes this repository a plugin marketplace. |
 
 ## Install
@@ -21,7 +22,17 @@ The repository is private, so installing from it needs a GitHub account with acc
 
 ## Releases
 
-Each release is a tagged commit: `v3.0.0`, `v3.0.1`, `v3.1.0` and `v3.2.0`. Only the `plugins/web-design-suite` folder is installed, so nothing outside it ships to users.
+Each release is a tagged commit, from `v3.0.0` on. Only the `plugins/web-design-suite` folder is installed, so nothing outside it ships to users.
+
+## Tests
+
+From `plugins/web-design-suite`, after `npm ci` in `tooling/main` and `tooling/tailwind-v3`:
+
+```
+python -m unittest discover -s tests
+```
+
+This needs Python 3.10 or newer, Node 20.19 or newer, git, and a POSIX `sh`.
 
 ## License
 

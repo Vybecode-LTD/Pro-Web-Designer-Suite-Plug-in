@@ -1,0 +1,11 @@
+{
+  "name": "pro-web-designer-suite-dev-tailwind-v3",
+  "private": true,
+  "description": "Tailwind v3 tooling for the v3 half of the ESLint config's Part 5, kept apart because one node_modules can hold only one tailwindcss.",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "10.11.0",
+    "eslint-plugin-tailwindcss": "3.18.3",
+    "tailwindcss": "3.4.19"
+  }
+}
