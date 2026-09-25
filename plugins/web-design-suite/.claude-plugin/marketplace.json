@@ -1,0 +1,43 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "web-design-suite",
+  "description": "A professional web design and front-end architecture toolkit \u2014 tokens, spacing discipline, style architecture, accessibility, and runnable validators that fail the build on drift.",
+  "owner": {
+    "name": "Big Haas",
+    "url": "https://vybecod.ing"
+  },
+  "plugins": [
+    {
+      "name": "web-design-suite",
+      "source": "./",
+      "description": "Thirteen skills for designing and building websites that stay coherent under multiple developers. A closed token system with obsessive spacing discipline, one styling home per component, cascade layers instead of specificity fights, measured WCAG 2.2 AA contrast, a gated protocol for inventing new interaction patterns, and runnable validators. Covers migrating an inherited codebase onto tokens, syncing with Figma, designing and building, schema-to-screens scaffolding, pages that convert, HTML email, state proof sheets, performance budgets, self-generating docs, a runtime accessibility gate, semver for the token system, an adversarial critique, and the client presentation that argues the decisions.",
+      "author": {
+        "name": "Big Haas",
+        "url": "https://vybecod.ing"
+      },
+      "homepage": "https://vybecod.ing",
+      "license": "MIT",
+      "category": "design",
+      "keywords": [
+        "accessibility",
+        "axe-core",
+        "conversion",
+        "core-web-vitals",
+        "css-architecture",
+        "design-system",
+        "design-tokens",
+        "documentation",
+        "figma",
+        "html-email",
+        "performance",
+        "presentation",
+        "semver",
+        "spacing",
+        "supabase",
+        "tailwind",
+        "ui-ux",
+        "web-design"
+      ]
+    }
+  ]
+}

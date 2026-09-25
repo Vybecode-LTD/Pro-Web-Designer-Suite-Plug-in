@@ -1,0 +1,718 @@
+/**
+ * =========================================================================
+ * eslint.design.config.mjs — the Nine Laws, enforced in JSX/TSX
+ * =========================================================================
+ *
+ * A flat-config FRAGMENT. It carries no parser, no TypeScript rules, no
+ * React rules, no `ignores`. Compose it into the project config:
+ *
+ *   // eslint.config.mjs
+ *   import js from '@eslint/js';
+ *   import tseslint from 'typescript-eslint';
+ *   import design from './assets/configs/eslint.design.config.mjs';
+ *
+ *   export default [
+ *     js.configs.recommended,
+ *     ...tseslint.configs.recommended,
+ *     ...design,                       // design laws last: it escalates
+ *   ];
+ *
+ * PEER DEPENDENCIES
+ *   npm i -D eslint@^9 eslint-plugin-jsx-a11y
+ *
+ * WHY LINT RULES AND NOT A STYLE GUIDE
+ * ------------------------------------
+ * Every law in this file is one a competent engineer already agrees with
+ * and will still break at 6pm on a Thursday with a client on the phone.
+ * The theme config (assets/configs/theme.css) removes the off-scale
+ * classes so they cannot be typed. This file closes the two doors Tailwind
+ * leaves open regardless of theme configuration — arbitrary values and the
+ * `style` prop — because no amount of `@theme` configuration can shut
+ * them. Law 9: nothing ships un-audited.
+ *
+ * SEVERITY POLICY
+ * ---------------
+ * Everything here is `error`. A design-system warning is a design-system
+ * suggestion, and a suggestion loses to a deadline. If a rule is genuinely
+ * wrong for one line, disable it on that line with a `--` justification;
+ * that comment is the audit trail and it survives in `git blame`. A rule
+ * you keep disabling is a missing token — add the token.
+ * ========================================================================= */
+
+import jsxA11y from 'eslint-plugin-jsx-a11y';
+
+/* =========================================================================
+ * PART 1 — PATTERNS
+ * =========================================================================
+ * Declared once, as real RegExp objects, and interpolated into esquery
+ * selectors via `.source`. Writing them inline as selector strings means
+ * double-escaping every backslash, which is how these rules silently stop
+ * matching anything and nobody notices for a quarter.
+ *
+ * All of them are verified against fixtures in the repo's lint tests; if
+ * you change one, change the fixture.
+ * ========================================================================= */
+
+/* LAW 1 + LAW 3 — Tailwind arbitrary VALUES: `mt-[13px]`, `text-[#e8440a]`,
+ * `w-[calc(100%-2rem)]`, `min-[600px]:flex`.
+ *
+ * This is the drift the skill exists to prevent, and it is the one thing
+ * `@theme` cannot switch off: arbitrary values are a language feature of
+ * the class parser, not a theme entry. Deleting the stock scale makes `p-4`
+ * a build error; it does nothing about `p-[17px]`. Only a linter closes it.
+ *
+ * Arbitrary VARIANTS are explicitly allowed — `data-[state=open]:`,
+ * `aria-[expanded=true]:`, `group-[.is-open]:`, `peer-[:checked]:`,
+ * `has-[img]:`, `supports-[display:grid]:`, `not-[...]`, `nth-[2n]:`. Those
+ * select a STATE; they carry no value and cannot drift off-scale. Banning
+ * them would make every Radix/Headless-UI integration unreachable, and a
+ * rule that blocks correct code gets switched off wholesale. */
+const ARBITRARY_VALUE =
+  /(?<![-\w])(?!(?:data|aria|group|peer|has|not|in|supports|nth|nth-last)\b)[a-zA-Z][\w-]*-\[/;
+
+/* LAW 1 — Tailwind arbitrary PROPERTIES: `[mask-type:luminance]`,
+ * `[--my-var:4px]`. A whole declaration smuggled into a class attribute.
+ * Undiscoverable, un-themeable, invisible to every audit that reads CSS.
+ * If a component needs a property Tailwind has no utility for, that is an
+ * `@utility` in theme.css or a rule in the component's own stylesheet. */
+const ARBITRARY_PROPERTY = /(?<![-\w])\[[a-zA-Z-]+:/;
+
+/* LAW 5 — `!important`, in both spellings: v3's `!bg-accent` prefix and
+ * v4's `bg-accent!` suffix. Specificity is solved by the layer order, not
+ * by force. An `!` means two rules are fighting, and the fix is to move one
+ * of them into the right layer — `overrides` exists precisely so that a
+ * genuine one-off never needs this. */
+const IMPORTANT_MODIFIER = /(?<![-\w])![a-zA-Z]|[\w\])]!(?=\s|$)/;
+
+/* LAW 6 — stock Tailwind palette classes: `bg-neutral-800`, `text-slate-500`.
+ * With `--*: initial` in theme.css these do not resolve and produce nothing,
+ * which is worse than an error: the element renders with no background and
+ * looks like a CSS loading bug. Catch them at the source.
+ *
+ * This also catches the real failure: `bg-neutral-800` is a PRIMITIVE. Even
+ * if it rendered, it would be a component reading Tier 1 — the exact tier
+ * skip that makes "a bit more contrast in cards" a grep across 200 files.
+ * The role is `bg-surface`, and it is already correct in dark mode. */
+const STOCK_PALETTE =
+  /(?<![-\w])(?:bg|text|border|ring|fill|stroke|divide|outline|shadow|accent|caret|decoration|from|via|to|placeholder)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/;
+
+/* LAW 3 + LAW 6 — numeric spacing steps: `p-4`, `mt-12`, `gap-7`.
+ * `-0` and `-px` are permitted; they are real steps in tokens.css.
+ * Fractions (`w-1/2`) are untouched — those are layout ratios, not spacing.
+ *
+ * With theme.css loaded these classes generate nothing, so this rule mainly
+ * fires on code pasted in from a tutorial, a v0/AI-generated component, or
+ * a developer's muscle memory. All three are exactly how a system dies. */
+const NUMERIC_SPACING =
+  /(?<![-\w])(?:p[xytrbles]?|m[xytrbles]?|gap-[xy]|gap|space-[xy])-(?:[1-9]\d*(?:\.\d+)?|0\.\d+)(?![\w-])/;
+
+/* LAW 2 — any outer margin utility except `auto`. `mx-auto` and `m-auto`
+ * survive because centring is a container positioning ITSELF, not a child
+ * pushing its siblings around.
+ *
+ * Scoped to component directories in Part 4, because a page-level layout
+ * file is allowed to place things. */
+const OUTER_MARGIN = /(?<![-\w])-?m(?:x|y|t|r|b|l|s|e|bs|be|is|ie)?-(?!auto(?![\w-]))[\w[]/;
+
+/* LAW 2 — `space-x-*`, `space-y-*`, `divide-*`.
+ * These compile to `margin-left` / `border-left-width` on
+ * `> * + *`: every child except the first setting its own outer edge. Four
+ * concrete failures, not one aesthetic objection:
+ *   1. it breaks the instant the row wraps — the wrapped item keeps the
+ *      inline margin and gains no block spacing;
+ *   2. it inverts under `flex-row-reverse` and puts the gap on the wrong
+ *      side;
+ *   3. `order-*` reorders the DOM visually but `:first-child` does not
+ *      move, so the un-spaced item ends up in the middle;
+ *   4. it adds a selector and a specificity bump per child, for a job one
+ *      `gap` declaration on the parent does with neither.
+ * `gap` is the parent owning the gap. Use it. */
+const SPACE_BETWEEN = /(?<![-\w])(?:space-[xy]-|divide-[xy]?(?:-|\b))/;
+
+/* LAW 1 — a color literal anywhere in a JS/TS string: hex, `rgb()`,
+ * `hsl()`, `oklch()`, `lab()`, `color()`. Chart configs, canvas fills,
+ * `<meta name="theme-color">`, SVG `fill` props and email templates are
+ * where these actually appear, and every one of them is a surface that
+ * silently ignores dark mode.
+ *
+ * Read the token instead:
+ *   getComputedStyle(el).getPropertyValue('--bg-accent')
+ * or pass the token through a custom property and let CSS resolve it.
+ *
+ * KNOWN FALSE POSITIVE: a fragment identifier whose characters are all hex
+ * — `href="#abc"`, `href="#defaced"`. Disable on the line with a
+ * justification; it will be rare enough to be worth the noise everywhere
+ * else. */
+const RAW_COLOR =
+  /(?:^|[\s(:,'"`[])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z])|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\s*\(/;
+
+/* =========================================================================
+ * PART 2 — SELECTOR SCOPES
+ * =========================================================================
+ * A class name reaches the DOM by four routes, and a rule that only knows
+ * the first is a rule that only catches beginners:
+ *
+ *   1. `className="…"`                      a Literal in a JSXAttribute
+ *   2. `className={cn('…', x && '…')}`      Literals inside a helper call
+ *   3. `const variants = { primary: '…' }`  a lookup table, often in a
+ *                                           separate file from the JSX
+ *   4. `className={`px-${n}`}`              a template literal (Part 3)
+ *
+ * cva/tv configs are route 2 by construction, since their variant maps are
+ * descendants of the `cva(...)` CallExpression.
+ * ========================================================================= */
+
+const CLASS_ATTR = "JSXAttribute[name.name=/^(className|class)$/]";
+
+const CLASS_HELPER =
+  "CallExpression[callee.name=/^(cn|clsx|classNames|classnames|cva|tv|twMerge|twJoin|cx)$/]";
+
+/* Route 3. Matches `buttonVariants`, `cardStyles`, `rowClasses` — the
+ * naming conventions a variant table actually uses. Deliberately a
+ * heuristic: it costs nothing when it misses and catches the common case
+ * where a variant map has drifted into a `constants.ts` nobody reviews. */
+const CLASS_TABLE =
+  "VariableDeclarator[id.name=/([Vv]ariants?|[Ss]tyles?|[Cc]lasses|[Cc]lassNames?)$/]";
+
+const CLASS_SCOPES = [CLASS_ATTR, CLASS_HELPER, CLASS_TABLE];
+
+/** Build one `no-restricted-syntax` entry per scope × node kind.
+ *
+ *  Both `Literal` and `TemplateElement` are needed: a class list inside
+ *  backticks is a TemplateLiteral whose text lives in `TemplateElement`
+ *  nodes, and a rule that only checks `Literal` misses every conditional
+ *  class list written with template syntax. */
+const forbidInClasses = (pattern, message) =>
+  CLASS_SCOPES.flatMap((scope) => [
+    { selector: `${scope} Literal[value=/${pattern.source}/]`, message },
+    {
+      selector: `${scope} TemplateElement[value.raw=/${pattern.source}/]`,
+      message,
+    },
+  ]);
+
+/* =========================================================================
+ * PART 3 — LOCAL PLUGIN
+ * =========================================================================
+ * Two laws cannot be expressed as an esquery selector because they need to
+ * inspect the SHAPE of a node, not its text. They are implemented here as
+ * real rules. No placeholder, no stub — these run.
+ * ========================================================================= */
+
+/** LAW 4 — One home per component's styles.
+ *
+ *  The `style` prop is a second home for a component's styles, at a
+ *  specificity no stylesheet can reach and in a place no audit, no theme
+ *  and no media query can see. `style={{ padding: 16 }}` is unreachable by
+ *  dark mode, by `[data-density]`, by print styles and by the token
+ *  pipeline simultaneously.
+ *
+ *  THE ONE LEGITIMATE USE is passing a value only the runtime knows into
+ *  CSS as a custom property, so that the STYLING still lives in the
+ *  stylesheet and only the NUMBER crosses the boundary:
+ *
+ *      <div className="progress" style={{ '--progress': pct }} />
+ *      .progress::after { inline-size: calc(var(--progress) * 1%); }
+ *
+ *  That is the rule: every key must start with `--`. Anything else — an
+ *  identifier key, a spread whose contents cannot be seen, a computed key
+ *  whose name cannot be known — is reported.
+ *
+ *  It also reports a custom-property whose VALUE is a design literal
+ *  (`style={{ '--gap': '12px' }}`), because that is Law 1 sneaking in
+ *  through Law 4's one exception. A number, an identifier, a member
+ *  expression or a call is fine — those are the runtime values this
+ *  exception exists for. */
+const stylePropCustomPropertiesOnly = {
+  meta: {
+    type: 'problem',
+    docs: {
+      description:
+        'Disallow the JSX `style` attribute unless every key is a CSS custom property (Law 4)',
+    },
+    schema: [],
+    messages: {
+      stringAttr:
+        'Law 4 (one home per component\'s styles): `style="…"` is not valid JSX and is never the right home for styles. Move this to the component stylesheet.',
+      notAnObject:
+        'Law 4 (one home per component\'s styles): the `style` prop must be an inline object literal so its keys can be checked. A style object built elsewhere hides arbitrary CSS from every audit. Move the styling to the component stylesheet and pass only runtime numbers as `--custom-properties`.',
+      spread:
+        'Law 4 (one home per component\'s styles): a spread in `style` hides its keys from the audit. Enumerate the custom properties you actually need.',
+      computedKey:
+        'Law 4 (one home per component\'s styles): a computed key in `style` cannot be verified to be a custom property. Use a literal `"--name"` key.',
+      plainProperty:
+        'Law 4 (one home per component\'s styles): `{{ name }}` is a CSS property set inline, where no theme, density mode, media query or audit can reach it. The only permitted `style` keys are CSS custom properties (`--name`), used to pass a runtime value into the stylesheet.',
+      literalValue:
+        'Law 1 (tokens or nothing): `{{ name }}: {{ value }}` hardcodes a design value inside the one place inline styles are allowed. Pass a runtime NUMBER and do the arithmetic in CSS with calc(), or point the property at a token: `var(--gap-related)`.',
+    },
+  },
+  create(context) {
+    /* A design literal: a length, a color, or a raw hex. Bare numbers,
+     * identifiers, member expressions and calls are runtime values and are
+     * exactly what this exception exists to carry. */
+    const DESIGN_LITERAL =
+      /^-?\d*\.?\d+(px|rem|em|ch|ex|vw|vh|vmin|vmax|%|deg|s|ms)$|^#[0-9a-fA-F]{3,8}$|^(rgba?|hsla?|oklch|oklab|lab|lch)\(/;
+
+    const keyNameOf = (prop) => {
+      if (prop.computed) return null;
+      const { key } = prop;
+      if (key.type === 'Identifier') return key.name;
+      if (key.type === 'Literal' && typeof key.value === 'string') return key.value;
+      return null;
+    };
+
+    return {
+      JSXAttribute(node) {
+        if (node.name.type !== 'JSXIdentifier' || node.name.name !== 'style') return;
+
+        const value = node.value;
+        if (!value) return; // bare `style` — not our business
+
+        if (value.type === 'Literal') {
+          context.report({ node, messageId: 'stringAttr' });
+          return;
+        }
+        if (value.type !== 'JSXExpressionContainer') return;
+
+        const expr = value.expression;
+        if (expr.type !== 'ObjectExpression') {
+          context.report({ node: expr, messageId: 'notAnObject' });
+          return;
+        }
+
+        for (const prop of expr.properties) {
+          if (prop.type === 'SpreadElement' || prop.type === 'ExperimentalSpreadProperty') {
+            context.report({ node: prop, messageId: 'spread' });
+            continue;
+          }
+          const name = keyNameOf(prop);
+          if (name === null) {
+            context.report({ node: prop, messageId: 'computedKey' });
+            continue;
+          }
+          if (!name.startsWith('--')) {
+            context.report({ node: prop, messageId: 'plainProperty', data: { name } });
+            continue;
+          }
+          const v = prop.value;
+          if (
+            v &&
+            v.type === 'Literal' &&
+            typeof v.value === 'string' &&
+            DESIGN_LITERAL.test(v.value.trim())
+          ) {
+            context.report({
+              node: v,
+              messageId: 'literalValue',
+              data: { name, value: v.value },
+            });
+          }
+        }
+      },
+    };
+  },
+};
+
+/** LAW 1 — Dynamic class construction.
+ *
+ *  Tailwind does not execute your code; it reads your files with a regex.
+ *  `` `text-${tone}-500` `` is not a class name in any file, so no CSS is
+ *  generated and the element renders unstyled. The failure is invisible in
+ *  dev (the class was probably generated by some other file that happened
+ *  to contain it) and appears in production after tree-shaking, which is
+ *  the worst possible time to find it.
+ *
+ *  The tell is a template chunk that ends mid-class — with `-`, `:` or an
+ *  alphanumeric — immediately before an interpolation. A chunk that ends in
+ *  whitespace is fine: that is a whole class name being switched in, which
+ *  is what the variant table in Part 2 route 3 exists for.
+ *
+ *  The fix is always the same: map to complete class names.
+ *      const TONE = { danger: 'bg-danger', success: 'bg-success' } */
+const noDynamicClassConstruction = {
+  meta: {
+    type: 'problem',
+    docs: {
+      description:
+        'Disallow building Tailwind class names by interpolation, which the source scanner cannot see (Law 1)',
+    },
+    schema: [],
+    messages: {
+      partial:
+        'Law 1 (tokens or nothing): this interpolation completes a class name ("{{ prefix }}${…}"). Tailwind scans source text and will never generate this class, so the element ships unstyled. Map to whole class names instead: `const TONE = {{ example }}`.',
+    },
+  },
+  create(context) {
+    const inClassContext = (node) => {
+      for (let n = node.parent; n; n = n.parent) {
+        if (
+          n.type === 'JSXAttribute' &&
+          n.name?.type === 'JSXIdentifier' &&
+          /^(className|class)$/.test(n.name.name)
+        ) {
+          return true;
+        }
+        if (
+          n.type === 'CallExpression' &&
+          n.callee?.type === 'Identifier' &&
+          /^(cn|clsx|classNames|classnames|cva|tv|twMerge|twJoin|cx)$/.test(n.callee.name)
+        ) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    return {
+      TemplateLiteral(node) {
+        if (node.expressions.length === 0) return;
+        if (!inClassContext(node)) return;
+
+        node.expressions.forEach((_, i) => {
+          const raw = node.quasis[i]?.value?.raw ?? '';
+          if (raw.length === 0) return; // interpolation at the very start
+          if (/[\s]$/.test(raw)) return; // whole class being switched in — fine
+          const prefix = raw.slice(Math.max(0, raw.length - 24));
+          context.report({
+            node: node.quasis[i],
+            messageId: 'partial',
+            data: { prefix, example: "{ danger: 'bg-danger' }" },
+          });
+        });
+      },
+    };
+  },
+};
+
+const designLaws = {
+  meta: { name: 'design-laws', version: '1.0.0' },
+  rules: {
+    'style-prop-custom-properties-only': stylePropCustomPropertiesOnly,
+    'no-dynamic-class-construction': noDynamicClassConstruction,
+  },
+};
+
+/* =========================================================================
+ * PART 4 — THE CONFIG
+ * ========================================================================= */
+
+/** Accessibility. Law 8 (a novel pattern passes a usability gate) has a
+ *  floor, and this is it: a pattern that cannot be operated by keyboard or
+ *  announced by a screen reader has not passed any gate.
+ *
+ *  `jsx-a11y` ships most of its recommended set as `warn`. Warnings are
+ *  suggestions. The escalations below are the rules that map to an actual
+ *  WCAG failure a client can be sued over, or to a control a keyboard user
+ *  simply cannot reach — those are errors. */
+const a11yConfig = {
+  name: 'design-laws/a11y',
+  ...jsxA11y.flatConfigs.recommended,
+  rules: {
+    ...jsxA11y.flatConfigs.recommended.rules,
+
+    /* WCAG 1.1.1 — non-text content. An unlabelled image or icon button is
+     * a dead end for a screen reader, and an icon-only button is the single
+     * most common unlabelled control in agency work. */
+    'jsx-a11y/alt-text': 'error',
+    'jsx-a11y/anchor-has-content': 'error',
+    'jsx-a11y/heading-has-content': 'error',
+
+    /* WCAG 2.1.1 — keyboard. A `<div onClick>` is invisible to Tab, to
+     * Enter, to Space and to voice control. Use a `<button>`. */
+    'jsx-a11y/click-events-have-key-events': 'error',
+    'jsx-a11y/no-static-element-interactions': 'error',
+    'jsx-a11y/no-noninteractive-element-interactions': 'error',
+    'jsx-a11y/interactive-supports-focus': 'error',
+
+    /* WCAG 4.1.2 — name, role, value. A wrong `role` or an invalid ARIA
+     * attribute is worse than none: it lies to assistive tech confidently. */
+    'jsx-a11y/aria-props': 'error',
+    'jsx-a11y/aria-proptypes': 'error',
+    'jsx-a11y/aria-role': 'error',
+    'jsx-a11y/aria-unsupported-elements': 'error',
+    'jsx-a11y/role-has-required-aria-props': 'error',
+    'jsx-a11y/role-supports-aria-props': 'error',
+    'jsx-a11y/no-redundant-roles': 'error',
+
+    /* WCAG 1.3.1 / 3.3.2 — a form control with no programmatic label.
+     * Placeholder text is not a label; it disappears on focus. */
+    'jsx-a11y/label-has-associated-control': [
+      'error',
+      { assert: 'either', depth: 3 },
+    ],
+
+    /* WCAG 2.4.4 / 2.4.9 — link purpose. "Click here" and a bare arrow
+     * glyph both fail. */
+    'jsx-a11y/anchor-is-valid': 'error',
+
+    /* Focus must never be removed without a replacement. Our replacement is
+     * the `focus-ring` utility; `outline: none` on its own is a WCAG 2.4.7
+     * failure and the fastest way to make a site unusable by keyboard. */
+    'jsx-a11y/no-autofocus': 'error',
+    'jsx-a11y/tabindex-no-positive': 'error',
+
+    /* WCAG 2.2.2 — motion. `<marquee>`, autoplaying video and distracting
+     * animation, including the ones a designer asked for. */
+    'jsx-a11y/no-distracting-elements': 'error',
+    'jsx-a11y/media-has-caption': 'error',
+  },
+};
+
+/** The product-wide `no-restricted-syntax` entries.
+ *
+ *  Hoisted into a constant because flat config REPLACES a rule's options
+ *  rather than merging them. A later config block that sets
+ *  `no-restricted-syntax` for component files would otherwise silently drop
+ *  every entry below for exactly the files that need them most. This is the
+ *  single most common way a flat config quietly stops enforcing something;
+ *  compose the arrays, never re-declare the rule. */
+const CORE_RESTRICTED_SYNTAX = [
+      ...forbidInClasses(
+        ARBITRARY_VALUE,
+        'Law 1 (tokens or nothing) + Law 3 (the scale is closed): Tailwind arbitrary values are banned. ' +
+          'A value typed into a class attribute traces to nothing, survives no rebrand, and is invisible to the token audit. ' +
+          'Use a role class (p-card, gap-related, text-h2, rounded-panel). ' +
+          'If no role fits, the answer is a new Tier-2 token in tokens.css and a line in theme.css — not a bracket. ' +
+          'Arbitrary VARIANTS (data-[…], aria-[…], group-[…], has-[…], supports-[…]) are allowed; they carry state, not values.'
+      ),
+
+      ...forbidInClasses(
+        ARBITRARY_PROPERTY,
+        'Law 1 (tokens or nothing): an arbitrary property ([prop:value]) is a CSS declaration smuggled into a class attribute — ' +
+          'undiscoverable, un-themeable, and invisible to every audit that reads CSS. ' +
+          'Add an @utility in theme.css, or put the declaration in the component stylesheet.'
+      ),
+
+      ...forbidInClasses(
+        IMPORTANT_MODIFIER,
+        'Law 5 (layers, not specificity): `!important` is banned in both spellings (!class and class!). ' +
+          'An `!` means two rules are fighting. Move the loser into the right layer — the order is ' +
+          'reset, tokens, base, layout, components, utilities, overrides, and `overrides` exists so a genuine one-off never needs force.'
+      ),
+
+      ...forbidInClasses(
+        STOCK_PALETTE,
+        'Law 6 (semantic before primitive): stock Tailwind palette classes are banned. ' +
+          'They are Tier-1 primitives — a component reading one has skipped the role layer, and it will not follow dark mode. ' +
+          'With theme.css loaded these generate NO CSS at all, so the element ships with no background. ' +
+          'Use the role: bg-surface, bg-sunken, text-muted, text-strong, border-line, bg-danger, text-danger-fg.'
+      ),
+
+      ...forbidInClasses(
+        NUMERIC_SPACING,
+        'Law 3 (the scale is closed) + Law 6 (semantic before primitive): numeric spacing steps are banned. ' +
+          'p-4 says how many pixels; p-card says what the thing is, and follows [data-density] for free. ' +
+          'Use the proximity ladder (gap-fused, gap-tight, gap-related, gap-grouped, gap-separate, gap-distinct) ' +
+          'and the inset roles (p-card, p-card-lg, p-well, px-inline-md, py-block-sm). p-0 and p-px are on the scale.'
+      ),
+
+      ...forbidInClasses(
+        SPACE_BETWEEN,
+        'Law 2 (parents own the gaps): space-x-*, space-y-* and divide-* set a margin or border on every child but the first. ' +
+          'That breaks when the row wraps, inverts under flex-row-reverse, and misplaces itself under order-*. ' +
+          'Put `gap-*` on the parent: one declaration, no :not(:first-child), correct in every direction.'
+      ),
+
+      /* ---- Law 1 — color literals anywhere in JS/TS ------------------- */
+      {
+        selector: `Literal[value=/${RAW_COLOR.source}/]`,
+        message:
+          'Law 1 (tokens or nothing): a color literal in JavaScript. ' +
+          'Chart configs, canvas fills and SVG props are still product surfaces, and a literal there ignores dark mode silently. ' +
+          'Read the token — getComputedStyle(el).getPropertyValue("--bg-accent") — or pass it through a CSS custom property and let CSS resolve it. ' +
+          'Every color in this product lives in tokens.css.',
+      },
+      {
+        selector: `TemplateElement[value.raw=/${RAW_COLOR.source}/]`,
+        message:
+          'Law 1 (tokens or nothing): a color literal in a template string. See tokens.css — every color has a role name.',
+      },
+
+      /* ---- Law 5 — no IDs as styling hooks --------------------------- */
+      {
+        selector: "JSXAttribute[name.name='id'] Literal[value=/^(js-|style-|the-)/]",
+        message:
+          'Law 5 (layers, not specificity): an id used as a styling or scripting hook. ' +
+          'An id selector outranks every class and every layer, so it can only be beaten by another id or by !important. ' +
+          'Use a data attribute (data-testid, data-state) or a class.',
+      },
+];
+
+/** Rules that apply to every JSX/TSX file in the product. */
+const coreConfig = {
+  name: 'design-laws/core',
+  files: ['**/*.{js,jsx,ts,tsx}'],
+  plugins: { 'design-laws': designLaws },
+  rules: {
+    /* ---- Law 4 — one home per component's styles ---------------------- */
+    'design-laws/style-prop-custom-properties-only': 'error',
+
+    /* ---- Law 1 — the scanner cannot see interpolated class names ------ */
+    'design-laws/no-dynamic-class-construction': 'error',
+
+    /* ---- Laws 1, 3, 5, 6 — text patterns in class lists --------------- */
+    'no-restricted-syntax': ['error', ...CORE_RESTRICTED_SYNTAX],
+
+    /* ---- Law 1 — the CSS-in-JS escape hatch --------------------------
+     * styled-components, emotion, @stitches and friends are a second home
+     * for styles with their own scale, their own theme object and their own
+     * runtime. Two systems, one product. If a project is already on one,
+     * delete this entry and point its theme object at tokens.css instead —
+     * but do not add one to a project that is not. */
+    'no-restricted-imports': [
+      'error',
+      {
+        paths: [
+          {
+            name: 'styled-components',
+            message:
+              'Law 1 + Law 4: CSS-in-JS is a second styling home with a second scale. Styles live in the component stylesheet; values live in tokens.css.',
+          },
+          {
+            name: '@emotion/styled',
+            message:
+              'Law 1 + Law 4: CSS-in-JS is a second styling home with a second scale. Styles live in the component stylesheet; values live in tokens.css.',
+          },
+          {
+            name: '@emotion/react',
+            message:
+              'Law 1 + Law 4: CSS-in-JS is a second styling home with a second scale. Styles live in the component stylesheet; values live in tokens.css.',
+          },
+        ],
+        patterns: [
+          {
+            group: ['tailwindcss/colors', 'tailwindcss/defaultTheme'],
+            message:
+              'Law 6 (semantic before primitive): importing Tailwind\'s stock theme reintroduces the scale theme.css deliberately deleted. The palette is tokens.css.',
+          },
+        ],
+      },
+    ],
+  },
+};
+
+/** Law 2 is stricter inside component directories than in page layout.
+ *
+ *  A COMPONENT must not know what is next to it. It renders at its natural
+ *  size and the parent decides the spacing; that is the whole reason a card
+ *  can be dropped into a grid, a sidebar or a modal without edits. A
+ *  component that sets `mt-related` on itself has hardcoded one context and
+ *  will be wrong in the other two.
+ *
+ *  A LAYOUT file is the parent, so it is allowed to place things — though
+ *  even there `gap` is almost always the better tool, and a margin is worth
+ *  a second look.
+ *
+ *  ESCAPE HATCH, documented so it is visible rather than silent:
+ *
+ *      {/* eslint-disable-next-line no-restricted-syntax --
+ *          Law 2 escape: optical alignment. The icon's bounding box sits
+ *          1px below its visual centre at this size; no gap can express
+ *          that. Reviewed by <name>, <date>. *\/}
+ *
+ *  If the justification is not a sentence about optics or a documented
+ *  browser bug, it is not an escape hatch, it is a shortcut. */
+const componentConfig = {
+  name: 'design-laws/components',
+  files: [
+    '**/components/**/*.{jsx,tsx}',
+    '**/ui/**/*.{jsx,tsx}',
+    'packages/ui/**/*.{jsx,tsx}',
+  ],
+  rules: {
+    /* Note the spread of CORE_RESTRICTED_SYNTAX. Without it, this block
+     * would replace the rule's options wholesale and component files — the
+     * files this whole system exists to protect — would stop being checked
+     * for arbitrary values, !important and off-scale spacing entirely. */
+    'no-restricted-syntax': [
+      'error',
+      ...CORE_RESTRICTED_SYNTAX,
+      ...forbidInClasses(
+        OUTER_MARGIN,
+        'Law 2 (parents own the gaps): a component must not set its own outer margin. ' +
+          'It has hardcoded one context and will be wrong in every other one — a card with mt-related is wrong in a grid, a sidebar and a modal. ' +
+          'Render at natural size and let the parent space you with `gap-*`. ' +
+          '`mx-auto` and `m-auto` are allowed: that is a container centring itself, not a child pushing a sibling.'
+      ),
+    ],
+  },
+};
+
+/* =========================================================================
+ * PART 5 — TAILWIND PLUGIN SETTINGS
+ * =========================================================================
+ * `eslint-plugin-tailwindcss` (the `no-custom-classname` /
+ * `enforces-shorthand` / `no-contradicting-classname` set) reads a v3
+ * `tailwind.config.js` to learn the class universe. As of this writing its
+ * stable release has NO Tailwind v4 support: there is no config file for it
+ * to read, the theme lives in CSS, and pointing it at a v4 project makes it
+ * report every one of our role classes as unknown. Turning it on against v4
+ * produces hundreds of false errors and the team switches it off, which is
+ * strictly worse than never having enabled it.
+ *
+ *   - ON TAILWIND v4: leave this disabled. The custom rules in Part 3 and
+ *     the selector rules in Part 4 already cover arbitrary values,
+ *     `!important`, off-scale spacing and stock palette classes — the four
+ *     things the plugin would have caught. What you lose is
+ *     `no-contradicting-classname` (`p-card px-inline-md` on one element)
+ *     and `enforces-shorthand` (`pt-card pb-card` → `py-card`). Neither is
+ *     a correctness bug; a design review catches both. Track the v4 branch
+ *     and switch it on when it lands.
+ *
+ *   - ON TAILWIND v3: uncomment the block. `no-custom-classname` is the
+ *     valuable one — it is the only tool that catches a class that simply
+ *     does not exist, which after `corePlugins: { space: false }` and a
+ *     replaced scale is a large and useful set.
+ *
+ * `prettier-plugin-tailwindcss` is a separate, unconditional requirement
+ * and works on both versions. Class ORDER is not enforced by this file and
+ * must not be: a lint rule that reorders class names produces a diff on
+ * every file and an argument in every review. Prettier sorts on save, the
+ * order stops being a decision, and Law 5's "layout → box → typography →
+ * visual → interactive → state" reading order is simply what the formatter
+ * produces.
+ * ========================================================================= */
+
+// import tailwind from 'eslint-plugin-tailwindcss';
+//
+// const tailwindV3Config = {
+//   name: 'design-laws/tailwind-v3',
+//   files: ['**/*.{jsx,tsx}'],
+//   plugins: { tailwindcss: tailwind },
+//   settings: {
+//     tailwindcss: {
+//       config: 'tailwind.config.ts',
+//       // Our own composers, so the plugin lints their string arguments too.
+//       callees: ['cn', 'clsx', 'classNames', 'cva', 'tv', 'twMerge', 'cx'],
+//       // Classes the plugin cannot know about because they come from
+//       // `addUtilities` in the config's plugin block.
+//       whitelist: ['motion-.*', 'focus-ring', 'tap-target', 'page-gutter', 'grid-layout'],
+//     },
+//   },
+//   rules: {
+//     // Law 3: a class that does not exist in the theme is, by definition,
+//     // off the scale.
+//     'tailwindcss/no-custom-classname': ['error', { cssFiles: [] }],
+//     // Law 3: `p-card px-inline-md` — two rules for one box, last one wins,
+//     // and which one is last depends on Tailwind's internal sort order.
+//     'tailwindcss/no-contradicting-classname': 'error',
+//     // Readability: `pt-card pb-card` is `py-card`.
+//     'tailwindcss/enforces-shorthand': 'warn',
+//     // Law 5: the plugin's own !important check, belt and braces.
+//     'tailwindcss/no-arbitrary-value': 'error',
+//   },
+// };
+
+/* =========================================================================
+ * EXPORTS
+ * =========================================================================
+ * Default export is the composed fragment, in cascade order: a11y first,
+ * then the product-wide laws, then the stricter component scope. Named
+ * exports are for projects that need to place them differently — for
+ * instance, running `componentConfig` over a design-system package but not
+ * over a marketing site in the same monorepo.
+ * ========================================================================= */
+
+export { designLaws, a11yConfig, coreConfig, componentConfig };
+
+export default [a11yConfig, coreConfig, componentConfig];

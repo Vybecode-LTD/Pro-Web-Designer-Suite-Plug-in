@@ -1,0 +1,884 @@
+/* =========================================================================
+   LAYOUT PRIMITIVES
+   =========================================================================
+
+   Eleven primitives and one page shell. Every layout in the product is a
+   composition of these. If you are about to write `display: grid` inside a
+   component file, stop: either one of these covers it, or you have found a
+   twelfth primitive and it belongs in THIS file (Law 4 — one home per
+   component's styles; the layout primitives' home is here).
+
+   HOW EACH PRIMITIVE IS CONFIGURED
+   --------------------------------
+   Every primitive declares Tier-3 custom properties on itself, each sourced
+   from a Tier-2 token in tokens.css:
+
+       .stack { --stack-gap: var(--gap-grouped); gap: var(--stack-gap); }
+
+   Tune an instance by re-pointing the Tier-3 var at a DIFFERENT Tier-2 token,
+   either with a modifier class or inline:
+
+       <div class="stack" style="--stack-gap: var(--gap-separate)">
+
+   Never `style="--stack-gap: 18px"`. The Tier-3 var is a socket, not a
+   licence to invent values (Laws 1 and 3).
+
+   THE ONE LICENSED RAW-VALUE EXCEPTION
+   ------------------------------------
+   `@media` and `@container` preludes cannot read custom properties. This is
+   a CSS limitation, not a choice: the conditional rules are evaluated before
+   the cascade resolves variables. Every media/container query below therefore
+   writes the literal rem value with the token it mirrors in a comment:
+
+       30rem = --bp-sm    48rem = --bp-md    64rem = --bp-lg
+       80rem = --bp-xl    96rem = --bp-2xl
+
+   Change a breakpoint in tokens.css and you MUST grep this file for the old
+   literal. That is the cost of the limitation; there is no way around it.
+
+   Other non-tokenizable values used here, and why:
+     - unitless flex ratios (`flex-grow: 999`, `flex: 1 1 0`) — proportions
+     - percentages used as wrap THRESHOLDS (`min-inline-size: 60%`) — ratios
+     - `100svh` / `100dvh` — viewport units have no scale
+     - `0` / `100%` / `auto` / `1fr` — structural keywords
+     - `999` in the switcher/split basis hack — a clamp multiplier
+   Nothing else. No px, no rem, no em outside the breakpoint literals.
+   ========================================================================= */
+
+@layer layout {
+
+  /* =======================================================================
+     0. PAGE SHELL
+     =======================================================================
+     Two pieces: the vertical shell (header / main / footer, footer pinned to
+     the bottom on short pages) and the horizontal shell (.page-grid — the
+     named-line grid that lets any child break out to full-bleed without
+     leaving the flow or touching a negative margin).
+     ======================================================================= */
+
+  /* The header's height is needed by .cover and by scroll-margin. Derive it
+     from tokens so it cannot drift from the real component. */
+  :where(.page-shell) {
+    --header-block-size: calc(var(--tap-min) + var(--pad-block-md) * 2);
+
+    min-block-size: 100svb;          /* svb: no jump when mobile chrome hides */
+    display: grid;
+    grid-template-rows: auto 1fr auto;  /* header · main · footer            */
+  }
+
+  /* Skip link. Present in the DOM, off-screen until focused. Never
+     `display: none` — that removes it from the tab order, which is the one
+     thing it exists for. */
+  .skip-link {
+    position: absolute;
+    inset-block-start: var(--space-0);
+    inset-inline-start: var(--space-0);
+    z-index: var(--z-toast);
+    padding: var(--pad-block-md) var(--pad-inline-md);
+    font: var(--type-ui);
+    color: var(--fg-default);
+    background: var(--bg-surface);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elevation-overlay);
+    translate: 0 -150%;
+    transition: translate var(--motion-enter);
+  }
+  .skip-link:focus-visible { translate: 0 0; }
+
+  /* Anchor targets must not land under a sticky header. */
+  :where(.page-shell) :target {
+    scroll-margin-block-start: calc(var(--header-block-size) + var(--space-block));
+  }
+
+
+  /* -----------------------------------------------------------------------
+     0.1 .page-grid — full-bleed within a constrained page
+     -----------------------------------------------------------------------
+     THE most useful thing in this file. Five named lines produce three
+     addressable widths, and a child opts into one with a single declaration.
+
+       full-start │ wide-start │ content-start … content-end │ wide-end │ full-end
+       ├──1fr──────┼───────────┼──── min(100%-2g, content) ──┼─────────┼──1fr──┤
+
+     Track by track:
+       1. minmax(gutter, 1fr)   outer channel; never narrower than the gutter
+       2. minmax(0, (wide-content)/2)  the "wide" shoulder; collapses to 0 on
+          small screens because its min is 0
+       3. min(100% - 2*gutter, --width-content)  the content column. The
+          `100% - 2*gutter` half is what keeps gutters on phones; the
+          --width-content half is what caps it on desktop.
+       4/5. mirrors of 2 and 1.
+
+     Why this instead of a negative-margin breakout: negative margins fight
+     `overflow-x`, break inside `overflow: hidden` ancestors, and silently
+     produce horizontal scroll when the scrollbar appears. This does not,
+     because nothing ever leaves the grid.
+
+     column-gap MUST stay 0 — the tracks already encode the spacing. row-gap
+     is where section rhythm lives (see §0.2).
+     ----------------------------------------------------------------------- */
+  .page-grid {
+    --page-gutter:  var(--gutter-page);
+    --page-content: var(--width-content);
+    --page-wide:    var(--width-wide);
+
+    display: grid;
+    column-gap: var(--space-0);
+    grid-template-columns:
+      [full-start] minmax(var(--page-gutter), 1fr)
+      [wide-start] minmax(var(--space-0), calc((var(--page-wide) - var(--page-content)) / 2))
+      [content-start] min(100% - (var(--page-gutter) * 2), var(--page-content)) [content-end]
+      minmax(var(--space-0), calc((var(--page-wide) - var(--page-content)) / 2)) [wide-end]
+      minmax(var(--page-gutter), 1fr) [full-end];
+  }
+
+  /* Default: everything sits in the content column. Opt out explicitly. */
+  .page-grid > * { grid-column: content; }
+  .page-grid > .bleed-wide { grid-column: wide; }
+  .page-grid > .bleed-full { grid-column: full; }
+
+  /* A full-bleed BACKGROUND with content still in the column: make the
+     bleeding element a .page-grid itself and put the content back in place.
+     This is the pattern for a tinted band, a hero, a footer. */
+  .bleed-full > .page-grid,
+  .bleed-wide > .page-grid { grid-column: full; }
+
+  /* Narrower reading column inside the content column, without a wrapper. */
+  .page-grid > .bleed-prose {
+    grid-column: content;
+    inline-size: min(100%, var(--measure-prose));
+    margin-inline: auto;
+  }
+
+
+  /* -----------------------------------------------------------------------
+     0.2 Section rhythm — who owns the space between two sections
+     -----------------------------------------------------------------------
+     THE RULE (derived from Law 2, stated once, applied everywhere):
+
+       The boundary between two sections is owned by the parent as `row-gap`
+       — UNLESS a section paints a background, in which case that section
+       owns the boundary as `padding-block`, because a gap cannot be painted.
+
+     A page is therefore in exactly one of two modes. Never mix them on one
+     shell; mixing is the single commonest cause of "why is there 200px here".
+
+       .sections            gap mode.  Parent pays --space-section. Sections
+                            are transparent and set no block padding.
+       .sections--banded    band mode. Parent pays 0. EVERY child is a .band
+                            and pays --space-subsection on both block edges,
+                            so a seam between two bands measures 2× that —
+                            slightly more than --space-section, which is
+                            correct: a colour change deserves more air than
+                            an invisible boundary, not less.
+
+     In band mode a section with no background still gets `.band`. A
+     transparent band keeps the rhythm uniform and keeps the rule one rule.
+     ----------------------------------------------------------------------- */
+  .sections {
+    --sections-gap: var(--space-section);
+    row-gap: var(--sections-gap);
+  }
+  .sections--banded { --sections-gap: var(--space-0); }
+
+  .band {
+    --band-pad-block: var(--space-subsection);
+    padding-block: var(--band-pad-block);
+  }
+  .band--tight { --band-pad-block: var(--space-block); }
+  .band--loose { --band-pad-block: var(--space-section); }
+  .band--flush { --band-pad-block: var(--space-0); }   /* edge-to-edge media */
+
+  /* Subsection rhythm inside one section. Same ownership rule, one tier down. */
+  .subsections {
+    --subsections-gap: var(--space-subsection);
+    display: grid;
+    row-gap: var(--subsections-gap);
+  }
+
+
+  /* =======================================================================
+     1. STACK — vertical rhythm
+     =======================================================================
+     The default answer to "these things go one above another". Reach for it
+     before you type `margin-bottom` anywhere, ever.
+     ======================================================================= */
+
+  .stack {
+    --stack-gap: var(--gap-grouped);
+    display: flex;
+    flex-direction: column;
+    gap: var(--stack-gap);
+  }
+
+  /* The proximity ladder, as modifiers. Pick by MEANING, not by size. */
+  .stack--fused    { --stack-gap: var(--gap-fused); }     /* icon + label     */
+  .stack--tight    { --stack-gap: var(--gap-tight); }     /* label + input    */
+  .stack--related  { --stack-gap: var(--gap-related); }   /* items in a group */
+  .stack--separate { --stack-gap: var(--gap-separate); }  /* distinct groups  */
+  .stack--distinct { --stack-gap: var(--gap-distinct); }  /* unrelated blocks */
+  .stack--prose    { --stack-gap: var(--space-block); }   /* prose blocks     */
+
+  /* Push everything after this child to the bottom. `auto` is an ALIGNMENT
+     keyword, not a length from the scale, so this does not violate Law 2 —
+     no spacing decision is being made in a child's stylesheet. */
+  .stack > .stack__push-end { margin-block-start: auto; }
+
+  /* Common case: a card whose footer sits on the floor however tall the card
+     grows. Requires the stack to have a definite height (grid row stretch,
+     100%, or a subgrid parent). */
+  .stack--fill { block-size: 100%; }
+
+
+  /* -----------------------------------------------------------------------
+     1.1 FLOW — the owl, for when `gap` is the wrong tool
+     -----------------------------------------------------------------------
+     PREFER `gap` (i.e. .stack). Use .flow only when one of these is true:
+
+     a) The container must stay a BLOCK container. `display: flex` turns every
+        bare text node into an anonymous flex item — mixed prose (`text <a>
+        link</a> more text`) fragments into stacked blocks. Flex/grid also
+        kill float-based pull quotes and margin collapsing.
+     b) The boundary value DIFFERS by sibling pair. `gap` is one value for
+        every boundary; prose needs `h2 + p` tighter than `p + p`.
+     c) The children are produced by a CMS/MDX renderer you do not control,
+        so you cannot guarantee they are element children (see a).
+
+     Block-level `gap` is specified and shipping, but is not yet baseline
+     across the browsers this starter supports. Until it is, prose uses .flow.
+
+     LAW 2 IS INTACT HERE: the margin is written in the PARENT's rule
+     (`.flow > * + *`). Ownership is about which rule makes the decision, not
+     which box carries the pixels. A child's OWN stylesheet still never sets
+     an outer margin.
+     ----------------------------------------------------------------------- */
+  .flow {
+    --flow-gap: var(--space-block);
+  }
+  .flow > * + * { margin-block-start: var(--flow-gap); }
+
+  /* Per-pair overrides: a heading belongs to the thing it introduces, so it
+     sits close to it and far from what came before. This is Gestalt
+     proximity doing the work that a horizontal rule would otherwise do. */
+  .flow > :is(h2, h3, h4) { margin-block-start: var(--space-subsection); }
+  .flow > :is(h2, h3, h4) + * { margin-block-start: var(--gap-related); }
+  .flow > :is(ul, ol, figure, pre, blockquote) + * { margin-block-start: var(--space-block); }
+  .flow > :first-child { margin-block-start: var(--space-0); }
+
+  .flow--tight { --flow-gap: var(--gap-related); }
+  .flow--loose { --flow-gap: var(--space-subsection); }
+
+
+  /* =======================================================================
+     2. CLUSTER — a wrapping horizontal group
+     =======================================================================
+     Tag lists, button groups, meta rows, filter chips, footer link sets.
+     Wraps intrinsically: no breakpoint knows or cares how many chips exist.
+     `gap` is essential here — with margins, a wrapped row gains a phantom
+     leading margin and the rows sit at different distances.
+     ======================================================================= */
+
+  .cluster {
+    --cluster-gap: var(--gap-related);
+    --cluster-align: center;
+    --cluster-justify: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cluster-gap);
+    align-items: var(--cluster-align);
+    justify-content: var(--cluster-justify);
+  }
+
+  .cluster--fused   { --cluster-gap: var(--gap-fused); }    /* icon + label  */
+  .cluster--tight   { --cluster-gap: var(--gap-tight); }
+  .cluster--grouped { --cluster-gap: var(--gap-grouped); }
+  .cluster--center  { --cluster-justify: center; }
+  .cluster--end     { --cluster-justify: flex-end; }
+  .cluster--between { --cluster-justify: space-between; }
+  .cluster--baseline{ --cluster-align: baseline; }          /* text + badge  */
+  .cluster--start   { --cluster-align: flex-start; }
+
+
+  /* =======================================================================
+     3. ROW — a horizontal line that does NOT wrap
+     =======================================================================
+     Toolbars, list-row internals, form field + button. Distinct from Cluster
+     because "never wrap" is a design decision: a toolbar that wraps into two
+     rows at 340px is usually a bug, and you want to see the overflow instead.
+     ======================================================================= */
+
+  .row {
+    --row-gap: var(--gap-related);
+    --row-align: center;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: var(--row-align);
+    gap: var(--row-gap);
+  }
+
+  /* min-inline-size: 0 — THE flexbox overflow fix. A flex item's automatic
+     minimum size is its min-content size, so a child containing a long word,
+     a <pre>, or a table refuses to shrink and blows the row out of its
+     parent. Zeroing it lets `text-overflow: ellipsis` and `overflow: auto`
+     actually work on descendants. */
+  .row > * { min-inline-size: 0; }
+
+  .row--baseline { --row-align: baseline; }
+  .row--start    { --row-align: flex-start; }
+  .row--stretch  { --row-align: stretch; }
+  .row--between  { justify-content: space-between; }
+  .row--equal > * { flex: 1 1 0; }        /* equal columns regardless of text */
+  .row--fill-first > :first-child { flex: 1 1 auto; }   /* input + button     */
+  .row--fill-last  > :last-child  { flex: 1 1 auto; }
+
+
+  /* =======================================================================
+     4. SPLIT — two panes at a fixed ratio that stack intrinsically
+     =======================================================================
+     Feature rows: copy beside an image, form beside a summary. Asymmetric
+     ratios without a media query.
+
+     The mechanism: flex-basis is `(threshold - 100%) * 999`, where 100% is
+     the CONTAINER's inline size.
+       container <  threshold  ->  basis is a large POSITIVE number, so each
+                                   pane demands more than the full width and
+                                   they wrap to one per line.
+       container >= threshold  ->  basis is negative, which is invalid and
+                                   clamps to 0, so the panes divide the space
+                                   by their flex-grow ratio (--split-a : --split-b).
+
+     This is intrinsic: it responds to the CONTAINER, so the same markup works
+     in a full-width hero and inside a sidebar with no extra rules.
+     ======================================================================= */
+
+  .split {
+    --split-gap: var(--gap-separate);
+    --split-threshold: var(--width-form);   /* below one form-width per pane,
+                                               two columns stop being usable */
+    --split-a: 1;
+    --split-b: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--split-gap);
+    align-items: var(--split-align, flex-start);
+  }
+  .split > * { min-inline-size: 0; max-inline-size: 100%; }
+  .split > :first-child {
+    flex: var(--split-a) 1 calc((var(--split-threshold) - 100%) * 999);
+  }
+  .split > :last-child {
+    flex: var(--split-b) 1 calc((var(--split-threshold) - 100%) * 999);
+  }
+
+  .split--1-2 { --split-a: 1; --split-b: 2; }
+  .split--2-1 { --split-a: 2; --split-b: 1; }
+  .split--1-3 { --split-a: 1; --split-b: 3; }
+  .split--3-1 { --split-a: 3; --split-b: 1; }
+  .split--center  { --split-align: center; }
+  .split--stretch { --split-align: stretch; }
+  .split--loose { --split-gap: var(--space-block); }
+  /* A LARGER threshold stacks EARLIER (the container has to be wider before
+     two panes are allowed); a smaller one stacks later. Name the behaviour,
+     not the number, or everyone gets the direction backwards. */
+  .split--stack-early { --split-threshold: var(--measure-prose); }
+  .split--stack-late  { --split-threshold: var(--measure-narrow); }
+
+
+  /* =======================================================================
+     5. WITH-SIDEBAR — content + a rail that wraps at a CONTENT threshold
+     =======================================================================
+     Docs nav, filter rail, article + aside. The rail keeps a sensible width
+     while there is room; the moment the MAIN pane would fall below
+     --with-sidebar-content-min of the container, the two wrap to a single
+     column. No breakpoint is involved, so the same component works in a page,
+     in a modal, and inside another sidebar.
+
+     Rail width is derived from --width-content rather than invented: a rail
+     is one quarter of the content column. Re-point --width-content and every
+     rail in the product follows.
+     ======================================================================= */
+
+  .with-sidebar {
+    --with-sidebar-gap: var(--gap-separate);
+    --with-sidebar-rail: calc(var(--width-content) / 4);   /* 288px @ 72rem  */
+    --with-sidebar-content-min: 60%;   /* ratio, not a scale value — the wrap
+                                          threshold, expressed as the share of
+                                          the container the MAIN pane needs */
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--with-sidebar-gap);
+  }
+
+  .with-sidebar > .with-sidebar__rail {
+    flex-basis: var(--with-sidebar-rail);
+    flex-grow: 1;              /* fills the line once wrapped                 */
+    min-inline-size: 0;
+  }
+  .with-sidebar > .with-sidebar__main {
+    flex-basis: 0;
+    flex-grow: 999;            /* takes all remaining space while side-by-side */
+    min-inline-size: var(--with-sidebar-content-min);
+  }
+
+  .with-sidebar--narrow-rail { --with-sidebar-rail: calc(var(--width-content) / 6); }
+  .with-sidebar--wide-rail   { --with-sidebar-rail: calc(var(--width-content) / 3); }
+  .with-sidebar--tight       { --with-sidebar-gap: var(--gap-grouped); }
+  .with-sidebar--loose       { --with-sidebar-gap: var(--space-block); }
+  /* Wrap later (rail survives longer) / earlier (rail gives up sooner). */
+  .with-sidebar--wrap-late   { --with-sidebar-content-min: 50%; }
+  .with-sidebar--wrap-early  { --with-sidebar-content-min: 70%; }
+
+  /* --with-sidebar-rail-offset is an instance-only socket: it has no default
+     declaration because its var() fallback (--space-block) IS the default.
+     Set it per instance when a sticky header must be cleared:
+     style="--with-sidebar-rail-offset: calc(var(--header-block-size) + var(--gap-grouped))"
+
+     A sticky rail MUST be align-self: start. A stretched flex item is already
+     as tall as the row, so it has nowhere to stick to and silently does
+     nothing — the commonest "sticky doesn't work" bug in flex layouts. */
+  .with-sidebar--sticky-rail > .with-sidebar__rail {
+    align-self: start;
+    position: sticky;
+    inset-block-start: var(--with-sidebar-rail-offset, var(--space-block));
+    max-block-size: 100svb;
+    overflow-y: auto;
+  }
+
+
+  /* =======================================================================
+     6. SWITCHER — N equal columns that flip to stacked below a threshold
+     =======================================================================
+     Three pricing tiers, a four-up feature row, a two-up CTA. Same clamp
+     mechanism as Split, but every child shares one basis so they stay equal.
+
+     The quantity guard matters: past the cap, equal columns become unreadably
+     narrow whatever the container width, so they are forced to full width.
+     `:nth-last-child(n + N)` counts from the END, which is how you ask "are
+     there at least N children?" in plain CSS.
+
+     The cap is a MODIFIER CLASS, not a custom property, and cannot be one:
+     a selector is matched before the cascade resolves variables, so
+     `:nth-last-child(n + var(--x))` is not expressible. Same limitation as
+     the media-query preludes, same workaround — a fixed set of named options.
+     ======================================================================= */
+
+  .switcher {
+    --switcher-gap: var(--gap-grouped);
+    --switcher-threshold: var(--width-form);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--switcher-gap);
+  }
+  .switcher > * {
+    flex-grow: 1;
+    flex-basis: calc((var(--switcher-threshold) - 100%) * 999);
+    min-inline-size: 0;
+  }
+
+  /* Default cap: 4. With 5+ children, everything goes full width. */
+  .switcher > :nth-last-child(n + 5),
+  .switcher > :nth-last-child(n + 5) ~ * { flex-basis: 100%; }
+
+  /* Cap at 3 — the right call for cards with headings and body copy. */
+  .switcher--max-3 > :nth-last-child(n + 4),
+  .switcher--max-3 > :nth-last-child(n + 4) ~ * { flex-basis: 100%; }
+
+  /* Cap at 2. */
+  .switcher--max-2 > :nth-last-child(n + 3),
+  .switcher--max-2 > :nth-last-child(n + 3) ~ * { flex-basis: 100%; }
+
+  .switcher--tight { --switcher-gap: var(--gap-related); }
+  .switcher--loose { --switcher-gap: var(--gap-separate); }
+  .switcher--narrow-threshold { --switcher-threshold: var(--measure-narrow); }
+
+
+  /* =======================================================================
+     7. GRID — auto-fit / minmax
+     =======================================================================
+     Card grids, logo walls, media galleries: any collection whose count is
+     unknown at design time. Unlike Switcher, the column COUNT is derived from
+     the available width, so 7 items lay out sensibly without a special case.
+
+     Two fixes everybody forgets, both present below:
+
+     1. min(--grid-min, 100%) — a bare `minmax(18rem, 1fr)` OVERFLOWS any
+        container narrower than 18rem, because 18rem is a hard floor. The
+        min() clamps the floor to the container. This single call is the
+        difference between a grid that works in a sidebar and one that does not.
+
+     2. min-inline-size: 0 on children — a grid item's automatic minimum size
+        is min-content, exactly as in flex. Without this, one long URL in one
+        card widens that column and unbalances the whole row.
+     ======================================================================= */
+
+  .grid {
+    --grid-gap: var(--gap-grouped);
+    --grid-min: var(--measure-narrow);
+    display: grid;
+    gap: var(--grid-gap);
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--grid-min), 100%), 1fr));
+  }
+  .grid > * { min-inline-size: 0; }
+
+  /* auto-fill keeps empty tracks: use it when the items must stay a fixed
+     size and NOT stretch to fill a half-empty last row (logo walls, avatars).
+     auto-fit (the default above) collapses empty tracks so 2 items centre-fill
+     a 4-track row instead of hugging the left edge. */
+  .grid--fill {
+    grid-template-columns: repeat(auto-fill, minmax(min(var(--grid-min), 100%), 1fr));
+  }
+
+  /* Track floors, derived from the content column so they stay in proportion. */
+  .grid--min-xs { --grid-min: calc(var(--width-content) / 6); }  /* 192px */
+  .grid--min-sm { --grid-min: calc(var(--width-content) / 4); }  /* 288px */
+  .grid--min-md { --grid-min: calc(var(--width-content) / 3); }  /* 384px */
+  .grid--min-lg { --grid-min: calc(var(--width-content) / 2); }  /* 576px */
+  .grid--tight  { --grid-gap: var(--gap-related); }
+  .grid--loose  { --grid-gap: var(--gap-separate); }
+
+  /* ---- 7.1 The 12-column grid ------------------------------------------
+     Use ONLY when the design genuinely asks for editorial column positions
+     (an offset pull quote, a 7/5 asymmetric feature). For a row of equal
+     cards, .grid or .switcher is fewer decisions and fewer failure modes.
+
+     minmax(0, 1fr) is not optional. `1fr` means `minmax(auto, 1fr)`, and
+     `auto` as a minimum resolves to min-content — so a single long word in
+     one column expands that column past its share and the grid stops being
+     a grid. This is the most-reported "my grid overflows" bug in existence.
+
+     Mobile-first: every child is full width until --bp-md, then honours its
+     own --span. Children set --span inline; they never write grid-column.
+     ---------------------------------------------------------------------- */
+  .grid--12 {
+    grid-template-columns: repeat(var(--grid-columns), minmax(0, 1fr));
+  }
+  .grid--12 > * { grid-column: 1 / -1; }
+
+  @media (min-width: 48rem) {   /* --bp-md */
+    .grid--12 > * {
+      grid-column: span var(--span, var(--grid-columns));
+    }
+  }
+
+  /* ---- 7.2 Subgrid: align card internals across a row -------------------
+     Without subgrid, three cards in a row each lay out independently: a
+     two-line title in card 2 shoves its body copy down and the row's
+     baselines stop agreeing. Subgrid makes every card share the PARENT's row
+     tracks, so title/body/footer align across the row no matter the content.
+
+     Contract: the card must contain exactly --card-rows top-level children
+     (default 3: header, body, footer) and set no gap of its own — the parent
+     grid's row-gap becomes the card's internal gap, which is usually what you
+     want and occasionally is not. If it is not, do not fight it; use
+     .stack--fill inside a normal grid and accept the misalignment, or wrap.
+
+     Support: all current evergreen browsers. The @supports guard keeps the
+     fallback (independent cards) for anything older, which degrades to
+     "slightly uneven", never "broken".
+     ---------------------------------------------------------------------- */
+  @supports (grid-template-rows: subgrid) {
+    .grid--rows-aligned > * {
+      --card-rows: 3;
+      display: grid;
+      grid-template-rows: subgrid;
+      grid-row: span var(--card-rows);
+    }
+  }
+
+
+  /* =======================================================================
+     8. COVER — min-height with a vertically centred principal child
+     =======================================================================
+     Heroes, empty states, full-screen prompts, marketing intros.
+
+     `margin-block: auto` on the centre child is what makes header and footer
+     optional: with neither, the child is centred; with one, it is centred in
+     the remaining space. `auto` is an alignment keyword, not a value off the
+     spacing scale, so Law 2 holds.
+
+     Use svh, not vh. On mobile, `100vh` is the LARGEST viewport (chrome
+     hidden), so a `100vh` hero is taller than the visible screen on load and
+     its bottom content is cut off. `svh` is the smallest viewport: always
+     visible, never cut. `dvh` resizes live, which is correct for a fixed
+     overlay and jarring for page content because it reflows mid-scroll.
+     ======================================================================= */
+
+  .cover {
+    --cover-min: 100svh;
+    --cover-pad: var(--space-subsection);
+    --cover-gap: var(--gap-separate);
+    display: flex;
+    flex-direction: column;
+    min-block-size: var(--cover-min);
+    padding-block: var(--cover-pad);
+    gap: var(--cover-gap);
+  }
+  .cover > .cover__centre,
+  .cover > .cover__center { margin-block: auto; }
+
+  /* A hero that sits below a sticky header and still fills exactly one screen. */
+  .cover--below-header { --cover-min: calc(100svh - var(--header-block-size)); }
+  /* Deliberately shorter than a screen: signals "scroll", which a full-bleed
+     100svh hero actively hides. Prefer this for content-led pages. */
+  .cover--partial { --cover-min: calc(100svh - var(--space-section) * 2); }
+  .cover--live    { --cover-min: 100dvh; }   /* fixed overlays only */
+  .cover--flush   { --cover-pad: var(--space-0); }
+
+
+  /* =======================================================================
+     9. FRAME — a fixed aspect ratio around unpredictable media
+     =======================================================================
+     Stops the page reflowing when an image loads (the CLS fix) and makes a
+     row of thumbnails agree even when the source assets do not.
+
+     `object-fit: cover` crops; `object-position` decides what survives the
+     crop. For portraits, faces are near the top: --frame-position: 50% 25%.
+     ======================================================================= */
+
+  .frame {
+    --frame-ratio: 16 / 9;
+    --frame-fit: cover;
+    --frame-position: 50% 50%;
+    aspect-ratio: var(--frame-ratio);
+    overflow: hidden;
+    display: block;
+  }
+  /* <picture> is a wrapper, not a replaced element: object-fit does nothing on
+     it, so the inner <img> must be targeted too. Missing this is why art-directed
+     images letterbox inside an otherwise correct frame. */
+  .frame > :is(img, video, canvas, svg, iframe, picture),
+  .frame > picture > img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: var(--frame-fit);
+    object-position: var(--frame-position);
+  }
+
+  .frame--square   { --frame-ratio: 1 / 1; }
+  .frame--4-3      { --frame-ratio: 4 / 3; }
+  .frame--3-2      { --frame-ratio: 3 / 2; }
+  .frame--21-9     { --frame-ratio: 21 / 9; }
+  .frame--portrait { --frame-ratio: 3 / 4; --frame-position: 50% 25%; }
+  .frame--contain  { --frame-fit: contain; }   /* logos: never crop a mark */
+  .frame--rounded  { border-radius: var(--radius-lg); }
+
+
+  /* =======================================================================
+     10. CENTER — the constrained column
+     =======================================================================
+     The ONE place `margin-inline: auto` is allowed to live. Scattered
+     `margin: 0 auto` is an anti-pattern precisely because it is a layout
+     decision taken 40 times in 40 files; here it is taken once.
+
+     Note the max-inline-size arithmetic. With `box-sizing: border-box`,
+     `max-inline-size: var(--width-content)` plus `padding-inline` yields a
+     CONTENT column of (width-content - 2 × gutter) — narrower than the token
+     promises. Adding the gutters back makes --width-content mean what it says.
+     ======================================================================= */
+
+  .center {
+    --center-max: var(--width-content);
+    --center-gutter: var(--gutter-page);
+    box-sizing: border-box;
+    max-inline-size: calc(var(--center-max) + var(--center-gutter) * 2);
+    margin-inline: auto;
+    padding-inline: var(--center-gutter);
+  }
+
+  .center--prose  { --center-max: var(--measure-prose); }
+  .center--narrow { --center-max: var(--measure-narrow); }
+  .center--form   { --center-max: var(--width-form); }
+  .center--wide   { --center-max: var(--width-wide); }
+  .center--flush  { --center-gutter: var(--space-0); }
+
+  /* Centre children by their own intrinsic width rather than centring the
+     box. Use for a short CTA stack under a heading — the text stays
+     left-aligned (readable) while the block sits on the page's centre line. */
+  .center--intrinsic {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+
+  /* =======================================================================
+     11. REEL — a horizontal scroller
+     =======================================================================
+     For collections where "see the rest" beats "see everything": related
+     posts, a media strip, a mobile card carousel. Honest about its overflow —
+     unlike a carousel, the scrollbar and the clipped next item both tell the
+     user there is more.
+
+     Accessibility contract: a scroll container that is not focusable traps
+     keyboard users. `tabindex="0"` plus an accessible name makes it a
+     keyboard-scrollable region. `scroll-snap-type: inline proximity` (not
+     mandatory) leaves the user in control; mandatory snapping fights
+     fast flicks and can strand people between items.
+     ======================================================================= */
+
+  .reel {
+    --reel-gap: var(--gap-grouped);
+    --reel-item: calc(var(--width-content) / 4);
+    display: flex;
+    gap: var(--reel-gap);
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;   /* no accidental back-navigation  */
+    scroll-snap-type: inline proximity;
+    scroll-padding-inline: var(--gutter-page);
+    /* A flex container DOES honour padding-inline-end at the scroll end,
+       unlike a block container, where the last child's margin is dropped. */
+    padding-block-end: var(--gap-related);   /* room for the scrollbar       */
+    scrollbar-color: var(--border-strong) transparent;
+    scrollbar-width: thin;
+  }
+  .reel > * {
+    flex: 0 0 var(--reel-item);
+    min-inline-size: 0;
+    scroll-snap-align: start;
+  }
+
+  .reel--sm     { --reel-item: calc(var(--width-content) / 6); }
+  .reel--lg     { --reel-item: calc(var(--width-content) / 3); }
+  /* Peek: the next item is deliberately half visible on phones so the
+     affordance is unmistakable. */
+  .reel--peek   { --reel-item: min(80%, calc(var(--width-content) / 3)); }
+  .reel--snap-strict { scroll-snap-type: inline mandatory; }
+
+  /* Full-bleed reel inside .page-grid: scrolls edge to edge, but the first
+     and last items still line up with the content column. */
+  .page-grid > .reel.bleed-full {
+    padding-inline: max(var(--gutter-page),
+                        calc((100% - var(--width-content)) / 2));
+  }
+
+
+  /* =======================================================================
+     12. IMPOSTER — overlay a thing on top of another thing
+     =======================================================================
+     Modals, scrims, badge overlays, "pinned" hero cards. The only primitive
+     that uses absolute positioning, and that is the point: absolute
+     positioning is for OVERLAY, never for layout (see the anti-patterns in
+     references/layout-composition.md §11).
+
+     --imposter-margin keeps a long overlay off the viewport edges, and
+     `overflow: auto` keeps it scrollable instead of clipped when its content
+     exceeds the space. Both are routinely forgotten and both are how modals
+     become unusable on a 667px-tall phone.
+     ======================================================================= */
+
+  .imposter {
+    --imposter-margin: var(--pad-card);
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    translate: -50% -50%;
+    max-inline-size: calc(100% - var(--imposter-margin) * 2);
+    max-block-size: calc(100% - var(--imposter-margin) * 2);
+    overflow: auto;
+    z-index: var(--z-raised);
+  }
+  /* The positioning parent. Never rely on an accidental ancestor. */
+  .imposter-anchor { position: relative; }
+
+  .imposter--fixed   { position: fixed; z-index: var(--z-modal); }
+  .imposter--contain { max-block-size: calc(100svb - var(--imposter-margin) * 2); }
+  .imposter--top     { inset-block-start: var(--imposter-margin); translate: -50% 0; }
+  .imposter--bottom  { inset-block-start: auto; inset-block-end: var(--imposter-margin); translate: -50% 0; }
+
+
+  /* =======================================================================
+     13. CONTAINER QUERY SCOPES
+     =======================================================================
+     Primitives 4-7 respond to their container WITHOUT container queries, via
+     flex-basis clamping and minmax — always prefer that, it is cheaper and
+     has no containment side effects.
+
+     Reach for @container when the change is not a wrap threshold but a
+     DIFFERENT ARRANGEMENT or a different type/padding scale: a card that goes
+     from stacked to side-by-side, a stat that grows its numeral, a nav item
+     that reveals its label.
+
+     CONTAINMENT GOTCHAS — read before adding `container-type`:
+
+     1. An element CANNOT query ITSELF. You always need a wrapper. That is why
+        .region exists as its own class rather than being folded into .card.
+
+     2. `container-type: inline-size` applies `contain: layout style inline-size`.
+        The element's inline size is then computed WITHOUT looking at its
+        contents, so it can no longer be sized BY its contents. Do not put it
+        on a float, an inline-block meant to hug its text, or an item in an
+        `auto`/`min-content` track — it will collapse or stretch unexpectedly.
+
+     3. `container-type: size` contains BOTH axes, so the element's height no
+        longer comes from its children and it collapses to zero unless you give
+        it an explicit block-size. This is why `inline-size` is almost always
+        the right answer; use `size` only for something already fixed-height,
+        like a full-screen panel.
+
+     4. `contain: layout` makes the container a containing block for absolutely
+        AND fixed-positioned descendants. A `position: fixed` modal rendered
+        inside a container will be positioned relative to that container, not
+        the viewport. Portal such things to the body, or do not containerise
+        the ancestor.
+
+     5. `contain: style` scopes CSS counters and quotes. An ordered list whose
+        numbering is driven by counters will restart inside the container.
+
+     6. `display: contents` elements cannot be containers, and container-type
+        has no effect on them.
+     ======================================================================= */
+
+  .region {
+    container-type: inline-size;
+    container-name: region;
+  }
+
+  /* Example contract, and the pattern to copy: a media object that is stacked
+     while its CONTAINER is narrow and horizontal once there is room —
+     regardless of viewport width, so it is correct in a page, a sidebar and a
+     modal with no extra rules. */
+  .media-object {
+    --media-object-gap: var(--gap-grouped);
+    --media-object-rail: calc(var(--width-content) / 6);
+    display: grid;
+    gap: var(--media-object-gap);
+    grid-template-columns: 1fr;
+  }
+  @container region (inline-size >= 30rem) {   /* --bp-sm */
+    .media-object { grid-template-columns: var(--media-object-rail) 1fr; }
+  }
+
+  /* Density is a dial (Law 7): a card in a narrow container compacts itself
+     by re-pointing --density, not by rewriting a single padding rule. */
+  @container region (inline-size < 30rem) {    /* --bp-sm */
+    .region-compact { --density: 0.875; }
+  }
+
+
+  /* =======================================================================
+     14. LAYOUT ESCAPE HATCHES
+     =======================================================================
+     Small, named, auditable. Each exists because the alternative is a magic
+     number in a component file.
+     ======================================================================= */
+
+  /* Opt a subtree out of the flex/grid min-content floor. Prefer fixing it at
+     the primitive, but templated content sometimes nests three deep. */
+  .u-min-0 { min-inline-size: 0; }
+
+  /* Long unbroken strings (URLs, IDs, hashes) in a constrained column. */
+  .u-wrap-anywhere { overflow-wrap: anywhere; }
+
+  /* Optical alignment nudges. The ONLY sanctioned sub-scale movements, and
+     they are optical corrections, not spacing (Law 1 governs spacing; a 1-2px
+     optical shift is a rendering correction to the glyph or icon itself).
+     If you need more than --space-0-5, the asset is wrong — fix the SVG's
+     viewBox or the icon's padding instead. */
+  .u-optical-up    { translate: 0 calc(var(--space-px) * -1); }
+  .u-optical-left  { translate: calc(var(--space-px) * -1) 0; }
+  .u-hang-punct    { margin-inline-start: calc(var(--space-0-5) * -1); }
+
+  /* Isolate a stacking context so a component's z-index ladder cannot leak
+     into the page's. Pair with the --z-* tokens; never with a literal. */
+  .u-isolate { isolation: isolate; }
+}

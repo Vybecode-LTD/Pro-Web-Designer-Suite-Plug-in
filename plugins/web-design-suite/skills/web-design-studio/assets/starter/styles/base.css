@@ -1,0 +1,632 @@
+/* =========================================================================
+   BASE — @layer base
+   =========================================================================
+
+   Element-level defaults. What a bare <h2>, <a>, <table> or <code> looks
+   like when nobody has written a component for it yet.
+
+   Three jobs, and nothing else:
+     1. Bind every text element to a Tier-2 `--type-*` role.
+     2. Bind every text element to a Tier-2 colour role.
+     3. Make un-classed CMS / Markdown output look deliberate (§7, `.prose`).
+
+   What does NOT belong here: layout, components, anything with a variant,
+   anything that needs a state. If a rule needs a modifier, it is a component
+   and it has its own file (Law 4).
+
+   TWO DOCUMENTED TIER-1 REACHES, both flagged inline:
+     - `--tracking-*`.  Optical tracking is not carried by the `font`
+       shorthand, and tokens.css exposes no Tier-2 tracking role. base.css is
+       therefore the file where size → tracking is BOUND; that binding is
+       itself the semantic act. Components inherit it and must not restate it.
+     - `sub`/`sup` sizing, which is an em-relative optical ratio rather than
+       a step on any scale. See §4.
+
+   Everything else in this file traces to Tier 2.
+
+   `:where()` is used on the element selectors so every rule here lands at
+   ZERO specificity. A component then overrides a base default by existing in
+   a later layer, with no specificity arithmetic and no `!important`.
+   ========================================================================= */
+
+@layer base {
+
+  /* -----------------------------------------------------------------------
+     1. THE PAGE
+     ----------------------------------------------------------------------- */
+
+  body {
+    /* One declaration sets family, size, weight and leading, because
+       `--type-body` is a `font` shorthand. This is the point of the Tier-2
+       type roles: a type decision is never spread across four properties
+       that can drift apart. */
+    font: var(--type-body);
+    color: var(--fg-default);
+    background-color: var(--bg-canvas);
+
+    /* Kerning and standard ligatures. Browsers disable kerning below ~20px
+       by default in some engines; at body sizes the difference is small but
+       free, and it is very visible in headings. */
+    font-kerning: normal;
+    font-variant-ligatures: common-ligatures contextual;
+
+    /* Order matters: `font` above resets `font-variant-*` to initial, so any
+       font-variant longhand MUST be written after the shorthand or it is
+       silently discarded. This is the single most common "why did my
+       tabular-nums stop working" bug in a token-driven codebase. */
+    font-variant-numeric: normal;
+  }
+
+
+  /* -----------------------------------------------------------------------
+     2. HEADINGS
+     -----------------------------------------------------------------------
+     Note what is absent: MARGIN. A heading carries no outer spacing of its
+     own (Law 2). Its rhythm is supplied by whatever context it lands in —
+     a card's `gap`, a grid, or `.prose` in §7.
+
+     `text-wrap: balance` is applied here rather than in the reset because it
+     is a typographic decision tied to these roles: headings are short blocks
+     where equalised line lengths read as designed rather than as an accident
+     of the viewport. Engines cap it (~6 lines in Chrome) and fall back to
+     normal wrapping above that, which is the correct failure.
+     ----------------------------------------------------------------------- */
+
+  :where(h1, h2, h3, h4, h5, h6) {
+    color: var(--fg-strong);
+    text-wrap: balance;
+
+    /* Large type sets too loose at its default tracking; the eye reads the
+       counters, not the sidebearings. Each --type-* role below re-points
+       this to the step tokens.css documents for that size band. */
+    letter-spacing: var(--tracking-tight);
+  }
+
+  :where(h1) {
+    font: var(--type-h1);
+    letter-spacing: var(--tracking-tighter);  /* TIER-1 REACH — see header */
+  }
+
+  :where(h2) {
+    font: var(--type-h2);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  :where(h3) {
+    font: var(--type-h3);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  :where(h4) {
+    font: var(--type-h4);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  /* h5 and h6 have no dedicated type role, and inventing --text-* steps for
+     them would open a closed scale (Law 3). They are built instead by taking
+     an existing role and changing ONE axis — weight for h5, case for h6 —
+     which is exactly the escape valve the type reference prescribes when a
+     size step is missing. */
+  :where(h5) {
+    font: var(--type-body);
+    font-weight: var(--weight-semibold);  /* MUST come after `font:` — the
+                                             shorthand resets weight. */
+    letter-spacing: var(--tracking-normal);
+  }
+
+  :where(h6) {
+    font: var(--type-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-caps);  /* uppercase needs real tracking
+                                              or the caps jam together */
+    color: var(--fg-muted);
+  }
+
+
+  /* -----------------------------------------------------------------------
+     3. THE DISPLAY / LEAD ROLES
+     -----------------------------------------------------------------------
+     Not elements — roles. A hero <h1> is still an <h1> for the document
+     outline; it borrows the display SIZE via a class, so screen-reader
+     structure and visual weight stay independent. This is the whole reason
+     `--type-display` is a token and not `h1 { font-size: 6xl }`.
+     ----------------------------------------------------------------------- */
+
+  .text-display {
+    font: var(--type-display);
+    letter-spacing: var(--tracking-tighter);  /* TIER-1 REACH — see header */
+    text-wrap: balance;
+    color: var(--fg-strong);
+  }
+
+  .text-lead {
+    font: var(--type-lead);
+    color: var(--fg-muted);
+    text-wrap: pretty;
+    max-inline-size: var(--measure-narrow);
+  }
+
+
+  /* -----------------------------------------------------------------------
+     4. INLINE TEXT
+     ----------------------------------------------------------------------- */
+
+  /* 700 is heavier than inline emphasis needs in most grotesques; it stops
+     reading as "this word" and starts reading as "this heading". 600 holds
+     the emphasis and keeps the line colour even. */
+  :where(strong, b) {
+    font-weight: var(--weight-semibold);
+  }
+
+  :where(em, i) {
+    font-style: italic;
+  }
+
+  :where(small) {
+    font: var(--type-ui);
+    color: var(--fg-muted);
+  }
+
+  /* TIER-1 REACH (documented, §header): `0.75em` is an optical ratio bound
+     to the parent's size, not a step on the type scale — a <sup> inside an
+     <h1> and one inside a caption must both be three-quarters of THEIR
+     line. An absolute --text-* token would be wrong in one of the two.
+     `--leading-none` collapses the raised glyph's line box, which is what
+     stops a footnote marker from increasing the leading of its paragraph. */
+  :where(sub, sup) {
+    font-size: 0.75em;
+    line-height: var(--leading-none);
+    position: relative;
+    vertical-align: baseline;
+  }
+
+  /* Offsets are em-relative for the same reason the size is: the raise must
+     scale with whatever type the marker sits in. Same documented exception. */
+  :where(sup) { inset-block-end: 0.4em; }
+  :where(sub) { inset-block-start: 0.25em; }
+
+  /* The closest honest Tier-2 role for a highlight. If the brand needs a
+     distinct highlight colour, add `--bg-highlight` to Tier 2 and re-point
+     it here — do NOT reach into `--warning-100`. Reaching into a Tier-1 ramp
+     from a component is how a palette stops being themeable (Law 6). */
+  :where(mark) {
+    background-color: var(--bg-selected);
+    color: var(--fg-default);
+    padding-inline: var(--pad-inline-xs);
+    border-radius: var(--radius-xs);
+  }
+
+  /* A dotted underline is the convention; `cursor: help` is the only signal
+     touch users get, and it is a weak one — prefer expanding the abbreviation
+     on first use in copy rather than relying on a tooltip nobody can open. */
+  :where(abbr[title]) {
+    text-decoration: underline dotted;
+    text-underline-offset: var(--stroke-thick);
+    cursor: help;
+  }
+
+  :where(kbd) {
+    font: var(--type-code);
+    background-color: var(--bg-surface);
+    color: var(--fg-default);
+    border: var(--stroke-hairline) solid var(--border-default);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-xs);
+    padding-inline: var(--pad-inline-xs);
+    padding-block: var(--pad-block-xs);
+  }
+
+  /* NOT wrapped in :where() — pseudo-ELEMENTS are forbidden inside :is()/
+     :where(), and including one invalidates the entire selector list. */
+  ::placeholder {
+    color: var(--fg-subtle);
+    /* Placeholders inherit opacity in Firefox; force it or the colour role
+       you just set renders at ~54% of itself and fails contrast. */
+    opacity: 1;
+  }
+
+
+  /* -----------------------------------------------------------------------
+     5. LINKS
+     -----------------------------------------------------------------------
+     Underlined by default, and that is not negotiable in body copy: colour
+     alone as the only distinguishing feature fails WCAG 1.4.1 for the ~8%
+     of men with a colour vision deficiency. Remove the underline only in
+     contexts where position already identifies the link — nav bars, card
+     titles, buttons — and do it in that component's file.
+
+     A component anchor (`.button`, `.card__link`) does not need to fight
+     these rules: `components` is a later layer, so it wins outright. That is
+     the payoff of Law 5 — no `a.button` selectors, no `:not([class])`
+     gymnastics, no specificity arms race.
+     ----------------------------------------------------------------------- */
+
+  :where(a) {
+    color: var(--fg-link);
+
+    /* Longhands rather than the `text-decoration` shorthand so that hover
+       can change ONE axis without restating the others. */
+    text-decoration-line: underline;
+    text-decoration-thickness: var(--stroke-hairline);
+
+    /* 2px (--stroke-thick used as a length) clears the descenders of g, j, p,
+       q, y at body size without the underline detaching from the word. The UA
+       default is ~0, which runs the rule straight through the descenders and
+       is the single biggest reason underlines "look cheap".
+       If you materially change --text-base, re-check this by eye: it is a
+       fixed length against an em-relative shape. */
+    text-underline-offset: var(--stroke-thick);
+
+    /* Break the underline around descenders instead of striking through
+       them. `auto` lets the engine decide; it is the right default for
+       Latin and it self-disables for scripts where gaps would hurt. */
+    text-decoration-skip-ink: auto;
+
+    transition: color var(--motion-hover),
+                text-decoration-thickness var(--motion-hover);
+  }
+
+  :where(a):hover {
+    color: var(--fg-accent);
+    /* Thicken rather than change colour alone: it is a non-colour hover
+       affordance, and it reads at a glance without moving any layout. */
+    text-decoration-thickness: var(--stroke-thick);
+  }
+
+  /* Visited is deliberately NOT re-coloured. In an application it leaks
+     navigation history into the UI and confuses state with identity; in
+     long-form editorial it is genuinely useful. Opt in per site, in
+     overrides.css, not here. */
+
+
+  /* -----------------------------------------------------------------------
+     6. LISTS
+     ----------------------------------------------------------------------- */
+
+  /* The reset zeroed the UA's 40px indent. Restore a marker gutter that is
+     a token: 16px is enough to hang a bullet or a two-digit number outside
+     the text column without the list reading as a quotation. */
+  :where(ul, ol) {
+    padding-inline-start: var(--pad-inline-md);
+  }
+
+  /* Safari + VoiceOver stop announcing a list ("list, 4 items") when
+     `list-style: none` is applied — the styling silently removes semantics.
+     The fix is to make the author RE-STATE the role when they strip the
+     markers, so the semantics survive. This lives in `base`, not `reset`,
+     on purpose: it has to beat the gutter rule above, and layer order (not
+     specificity) is what decides that — a rule in the weaker `reset` layer
+     would lose no matter how specific it was. */
+  :where(ul, ol)[role="list"] {
+    list-style: none;
+    padding-inline-start: 0;
+  }
+
+  /* ::marker accepts a deliberately small property set — colour, font-*,
+     content, white-space. Anything else (padding, transform) is ignored, so
+     do not try to position a marker here; use `list-style: none` plus a
+     pseudo-element when you need real control.
+     `tabular-nums` on ordered lists is the reason items 9 and 10 have their
+     periods in the same column. */
+  ::marker {
+    color: var(--fg-subtle);
+  }
+
+  :where(ol) > li::marker {
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-muted);
+  }
+
+  /* Definition lists. <dd> keeps the UA indent stripped by the reset and
+     earns it back as a token, matching the <ul> gutter so a page mixing the
+     two lines up. */
+  :where(dt) {
+    font: var(--type-body);
+    font-weight: var(--weight-semibold);  /* after the shorthand — §2 */
+    color: var(--fg-strong);
+  }
+
+  :where(dd) {
+    padding-inline-start: var(--pad-inline-md);
+    color: var(--fg-muted);
+  }
+
+
+  /* -----------------------------------------------------------------------
+     7. PROSE RHYTHM — the one owned context
+     -----------------------------------------------------------------------
+     THE LAW-2 EXCEPTION, stated precisely.
+
+     Law 2: children never set their own outer margin; siblings are spaced by
+     the PARENT's `gap`, or by an owl selector declared on the parent.
+     `.prose` is the second clause, and it is the only place in this codebase
+     that uses it.
+
+     Why an owl and not `gap`:
+       - `gap` requires flex or grid. Flow layout is what prose needs: floated
+         pull-quotes, `display: contents` wrappers emitted by CMSs, and
+         multi-column all stop working under a flex parent.
+       - `gap` is ONE value. Prose rhythm is not one value: the space above an
+         <h2> must differ from the space between two paragraphs, or the
+         document has no visible structure. An owl can vary by element type;
+         `gap` cannot.
+
+     Why this does not break Law 2 in spirit: the DECLARATION lands on the
+     child, but the RULE is owned entirely by the parent's stylesheet. Nothing
+     a component ships travels with it. Drop a <Card> inside `.prose` and it
+     is spaced by `.prose`; drop the same Card in a flex row and it is spaced
+     by `gap`. The component never knows or cares — which is the outcome Law 2
+     exists to produce.
+
+     Two hard constraints keep the exception from spreading:
+       1. Direct child combinator ONLY (`>`). The owl must never reach inside
+          a component and space its internals.
+       2. One class per project may do this. `.prose` is it. If a second
+          context "needs" an owl, it is a layout and it belongs in
+          layout.css with a `gap`.
+     ----------------------------------------------------------------------- */
+
+  .prose {
+    max-inline-size: var(--measure-prose);  /* 68ch — line length IS a
+                                               readability decision */
+    color: var(--fg-default);
+    /* Long-form wants more leading than UI body copy does. --type-body
+       carries --leading-normal (1.6); prose overrides the leading axis only,
+       after the shorthand set by <body>. */
+    line-height: var(--leading-relaxed);
+  }
+
+  /* The owl. Every sibling pair gets the block rhythm; the first child gets
+     nothing, which is what lets `.prose` sit flush inside a padded parent. */
+  .prose > * + * {
+    margin-block-start: var(--space-block);
+  }
+
+  /* HEADING SPACE ASYMMETRY.
+     A heading belongs to the content BELOW it, not above it. Space it evenly
+     and the eye cannot tell which paragraph it introduces — the classic
+     symptom of a page that "looks fine" and reads badly.
+
+     The asymmetry falls out of two rules rather than being typed as a ratio:
+
+       above an h2   --space-subsection   fluid 40 → 88px
+       above h3-h6   --space-block        fluid 24 → 48px
+       BELOW any heading (= the next element's top margin)
+                     --gap-grouped        16px × --density
+
+     At desktop that is roughly 5:1 above an h2 and 3:1 above an h3. Both
+     sit in the 2:1–6:1 band where a heading unambiguously joins downward.
+     `--gap-grouped` is the correct role by NAME too: a heading and its first
+     paragraph are one group. */
+
+  .prose > * + h2 {
+    margin-block-start: var(--space-subsection);
+  }
+
+  .prose > * + :is(h3, h4, h5, h6) {
+    margin-block-start: var(--space-block);
+  }
+
+  /* Written LAST of the three so it wins the tie at equal specificity
+     (0,1,1). That tie only occurs for a heading immediately following
+     another heading — and the tight gap is the right answer there: two
+     stacked headings are a title/subtitle pair, not two sections. */
+  .prose > :is(h1, h2, h3, h4, h5, h6) + * {
+    margin-block-start: var(--gap-grouped);
+  }
+
+  /* An <hr> means "the subject changes". Give it subsection weight on both
+     sides or it reads as decoration. */
+  .prose > * + hr,
+  .prose > hr + * {
+    margin-block-start: var(--space-subsection);
+  }
+
+  /* Items in one list are one group; they get the related-items step, not
+     the between-blocks step. */
+  .prose li + li {
+    margin-block-start: var(--gap-tight);
+  }
+
+  /* A nested list is still part of its parent item. */
+  .prose li > :is(ul, ol) {
+    margin-block-start: var(--gap-tight);
+  }
+
+  /* <figure> is a second owned context, and a legitimate one for the same
+     reason: the caption's relationship to its image is fixed by the pair,
+     not by wherever the figure is used. The rule is owned by the parent. */
+  figure > figcaption {
+    margin-block-start: var(--gap-tight);
+  }
+
+  :where(figcaption) {
+    font: var(--type-ui);
+    color: var(--fg-muted);
+    text-wrap: pretty;
+  }
+
+
+  /* -----------------------------------------------------------------------
+     8. CODE
+     ----------------------------------------------------------------------- */
+
+  /* `--type-code` is 14px mono against 16px body, and that is intentional,
+     not a mistake to "fix". Monospace faces carry a noticeably larger
+     x-height and wider set width than the sans at the same nominal size; set
+     them equal and the code visibly outweighs the prose around it. */
+  :where(pre) {
+    font: var(--type-code);
+    color: var(--fg-default);
+    background-color: var(--bg-sunken);
+    padding: var(--pad-well);
+    border-radius: var(--radius-md);
+
+    /* Code must not reflow — a wrapped line changes what the code MEANS in
+       whitespace-significant languages, and hides the line-length problem
+       instead of showing it. Scroll instead. */
+    overflow-x: auto;
+
+    /* `tab-size` is a count, not a length; no scale applies. 2 matches the
+       house formatter. */
+    tab-size: 2;
+
+    /* A horizontally scrollable region must be keyboard-reachable, or its
+       off-screen content cannot be read without a mouse (WCAG 2.1.1). CSS
+       alone cannot do this: the markup must carry `tabindex="0"` and a
+       `role="region"` with an accessible name. This rule supplies the focus
+       indicator that becomes mandatory once it does. */
+    &:focus-visible {
+      box-shadow: var(--shadow-focus);
+    }
+  }
+
+  /* Inline code only. `pre > code` must stay transparent and un-padded or
+     every code block gains a second nested box. */
+  :where(:not(pre) > code) {
+    font: var(--type-code);
+    background-color: var(--bg-sunken);
+    color: var(--fg-default);
+    padding-inline: var(--pad-inline-xs);
+    padding-block: var(--pad-block-xs);
+    border-radius: var(--radius-sm);
+    /* An inline code span that wraps mid-token is unreadable; let it break
+       only when it genuinely cannot fit. */
+    overflow-wrap: break-word;
+  }
+
+
+  /* -----------------------------------------------------------------------
+     9. TABLES
+     ----------------------------------------------------------------------- */
+
+  :where(table) {
+    inline-size: 100%;
+
+    /* THE reason tables exist in a design system. Proportional figures give
+       every digit its own width, so a column of numbers is a ragged mess and
+       the eye cannot compare magnitudes by length. `tabular-nums` forces one
+       advance width for all ten digits and the column aligns itself.
+       Deliberately NOT applied to <body>: tabular figures read as stiff and
+       machine-set in running prose, which is exactly where you want the
+       proportional forms. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  :where(caption) {
+    font: var(--type-ui);
+    color: var(--fg-muted);
+    text-align: start;
+    /* Padding, not margin: the caption is part of the table box, and Law 2
+       still applies to it. */
+    padding-block-end: var(--pad-block-md);
+  }
+
+  :where(th) {
+    font: var(--type-ui);
+    /* AFTER the shorthand — `font` resets font-variant-numeric to initial,
+       which would silently undo the table rule above for headers. */
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-muted);
+    /* `start`, not `left` — it flips correctly in RTL. */
+    text-align: start;
+    /* A sticky header needs the ladder, never a literal. */
+    position: relative;
+    z-index: var(--z-base);
+  }
+
+  :where(th, td) {
+    padding-block: var(--pad-block-sm);
+    padding-inline: var(--pad-inline-md);
+    /* Row rules only. Column rules turn a table into a grid of boxes and
+       fight the eye's natural left-to-right scan of a row. */
+    border-block-end: var(--stroke-hairline) solid var(--border-subtle);
+    vertical-align: baseline;
+  }
+
+  /* Flush the outer edges so the table's text column lines up with the prose
+     above it. Without this a table looks indented by exactly its cell
+     padding, and nobody can ever say why the page feels misaligned. */
+  :where(th, td):first-child { padding-inline-start: 0; }
+  :where(th, td):last-child  { padding-inline-end: 0; }
+
+  /* The header rule is the structural one; make it read as heavier. */
+  :where(thead) > tr > th {
+    border-block-end: var(--stroke-thick) solid var(--border-default);
+  }
+
+  /* Numeric columns are opted in by the author, because only the author
+     knows which they are. Right-alignment is what makes place value line up. */
+  :where(th, td)[data-numeric] {
+    text-align: end;
+  }
+
+
+  /* -----------------------------------------------------------------------
+     10. RULES, QUOTES, SELECTION
+     ----------------------------------------------------------------------- */
+
+  /* A `border-top` hr cannot be given a colour independent of its own box
+     model and inherits odd UA `inset` shading in some engines. A zero-border
+     box with an explicit block-size and background is a real, predictable
+     rectangle you can theme. No margin — §7 owns its spacing. */
+  :where(hr) {
+    border: none;
+    block-size: var(--stroke-hairline);
+    background-color: var(--border-subtle);
+  }
+
+  :where(blockquote) {
+    font: var(--type-lead);
+    color: var(--fg-default);
+    /* The accent bar is the whole signal. `--stroke-thick` reads at a glance
+       where a hairline would look like a stray divider. */
+    border-inline-start: var(--stroke-thick) solid var(--border-accent);
+    padding-inline-start: var(--pad-inline-md);
+    text-wrap: pretty;
+  }
+
+  :where(blockquote) cite {
+    display: block;
+    font: var(--type-ui);
+    font-style: normal;  /* UA italicises <cite>; at UI size that reads as a
+                            second voice rather than an attribution. */
+    color: var(--fg-muted);
+    margin-block-start: var(--gap-tight);  /* owned by the blockquote context */
+  }
+
+  /* ::selection takes a deliberately tiny property set: colour,
+     background-color, text-decoration and text-shadow. Everything else is
+     ignored. The background MUST be fully opaque — a translucent selection
+     composites differently over every surface and fails contrast somewhere.
+     `--bg-selected` re-points in dark mode; `--fg-strong` stays legible on
+     both because the token layer already guarantees that pairing. */
+  ::selection {
+    background-color: var(--bg-selected);
+    color: var(--fg-strong);
+  }
+
+
+  /* -----------------------------------------------------------------------
+     11. INVERSE CONTEXT
+     -----------------------------------------------------------------------
+     The one place font smoothing is switched on (see reset.css §3). On a
+     dark fill, light glyphs bloom under subpixel rendering and read a full
+     weight heavier than they are; greyscale antialiasing corrects it. That
+     problem exists HERE and nowhere else, which is why the property is
+     scoped here and not on <html>.
+
+     This block owns the smoothing decision and the two colour roles that
+     already exist. A full inverse section — headings, links, borders, muted
+     text — is a THEME, and themes re-point Tier 2. Add those re-points
+     inside `.inverse` in tokens.css, exactly as `[data-theme="dark"]` does.
+     Do not accumulate `.inverse h2 { ... }` rules in this file.
+     ----------------------------------------------------------------------- */
+
+  .inverse {
+    background-color: var(--bg-inverse);
+    color: var(--fg-on-inverse);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}

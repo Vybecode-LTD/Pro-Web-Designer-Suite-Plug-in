@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<!--
+  SOURCE TEMPLATE — plain-ish newsletter.
+  Deliberately the least designed of the three. A text-forward newsletter has the
+  best deliverability profile in the set (high text-to-image ratio, few links, no
+  hero) and is the right default for anything that is read rather than shopped.
+    python -m scripts.build_email assets/templates/newsletter.html \
+      --out build/newsletter.html --text build/newsletter.txt
+-->
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="format-detection" content="telephone=no,address=no,email=no,date=no">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>The Wharf Road Letter — No. 47: what a ten-year guarantee actually costs</title>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    background-color: var(--bg-canvas);
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+  }
+
+  table { border-collapse: collapse; }
+  img { border: 0; display: block; outline: none; text-decoration: none; }
+
+  .wrap { width: 100%; background-color: var(--bg-canvas); }
+
+  .container {
+    width: 100%;
+    max-width: var(--email-width);
+    background-color: var(--bg-surface);
+  }
+
+  .pad { padding-left: var(--gutter-page); padding-right: var(--gutter-page); }
+
+  .masthead {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-label-size);
+    line-height: var(--type-label-line);
+    font-weight: var(--type-label-weight);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+
+  .h1 {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-h1-size);
+    line-height: var(--type-h1-line);
+    font-weight: var(--type-h1-weight);
+    letter-spacing: var(--tracking-tight);
+    color: var(--fg-strong);
+  }
+
+  .h3 {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-h3-size);
+    line-height: var(--type-h3-line);
+    font-weight: var(--type-h3-weight);
+    color: var(--fg-strong);
+  }
+
+  .prose {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-body-size);
+    line-height: var(--type-body-line);
+    font-weight: var(--type-body-weight);
+    color: var(--fg-default);
+    padding-bottom: var(--gap-grouped);
+  }
+
+  .pull {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-lead-size);
+    line-height: var(--type-lead-line);
+    color: var(--fg-default);
+    border-left: 3px solid var(--border-accent);
+    padding-left: var(--gap-grouped);
+  }
+
+  .legal {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-legal-size);
+    line-height: var(--type-legal-line);
+    color: var(--fg-muted);
+  }
+
+  a { color: var(--fg-link); }
+
+  .divider { height: 1px; background-color: var(--border-subtle); font-size: 0; line-height: 0; }
+
+  .footer { background-color: var(--bg-sunken); }
+
+  .caption {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-legal-size);
+    line-height: var(--type-legal-line);
+    color: var(--fg-muted);
+    padding-top: var(--gap-tight);
+  }
+
+  /* Utilities last. */
+  .muted { color: var(--fg-muted); }
+
+  a[x-apple-data-detectors] {
+    color: inherit !important;
+    text-decoration: none !important;
+    font-size: inherit !important;
+  }
+
+  @media only screen and (max-width: var(--email-bp-stack)) {
+    .pad { padding-left: 20px !important; padding-right: 20px !important; }
+    .h1 { font-size: 26px !important; line-height: 32px !important; }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .wrap { background-color: var(--email-dark-canvas) !important; }
+    .container { background-color: var(--email-dark-surface) !important; }
+    .h1, .h3, .prose, .pull { color: var(--email-dark-fg) !important; }
+    .masthead, .legal, .caption, .muted { color: var(--email-dark-fg-muted) !important; }
+    .footer { background-color: var(--email-dark-sunken) !important; }
+    .divider { background-color: var(--email-dark-border) !important; }
+    a { color: var(--email-dark-link) !important; }
+  }
+</style>
+</head>
+
+<body>
+
+<div data-preheader="1" style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">
+  We repaired 1,412 jackets last year. Here is the arithmetic, honestly.
+  &zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;
+</div>
+
+<table role="presentation" class="wrap" cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr>
+<td align="center" style="padding-top:var(--space-block);padding-bottom:var(--space-section);">
+
+  <!--[if mso]>
+  <table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="width:600px;"><tr><td>
+  <![endif]-->
+
+  <table role="presentation" class="container" cellpadding="0" cellspacing="0" border="0" align="center">
+
+    <tr>
+      <td class="pad" style="padding-top:var(--pad-card);padding-bottom:var(--gap-related);">
+        <p class="masthead">The Wharf Road Letter &middot; No. 47 &middot; {{issue_date}}</p>
+      </td>
+    </tr>
+    <tr><td class="pad"><div class="divider">&nbsp;</div></td></tr>
+
+    <tr>
+      <td class="pad" style="padding-top:var(--space-subsection);">
+        <h1 class="h1">What a ten-year guarantee actually costs</h1>
+      </td>
+    </tr>
+    <tr><td style="height:var(--gap-grouped);font-size:0;line-height:0;">&nbsp;</td></tr>
+
+    <tr>
+      <td class="pad">
+        <p class="prose">We repaired 1,412 jackets last year. That is up from 890 the year before, which sounds like a quality problem and is actually the opposite — the guarantee is eleven years old now, and the jackets from 2015 are finally wearing through at the cuffs.</p>
+        <p class="prose">The number people ask for is the cost. It was $61.40 a jacket, all in: thread, fabric, two repair technicians, and the return postage both ways. Against an average order of $248, that is a shade under 25% of revenue on any jacket that eventually comes back, and about 4% across everything we sell.</p>
+      </td>
+    </tr>
+
+    <tr>
+      <td class="pad" style="padding-top:var(--gap-tight);padding-bottom:var(--space-block);">
+        <blockquote class="pull">A guarantee that never gets used is not generous. It is a claim nobody tested.</blockquote>
+      </td>
+    </tr>
+
+    <tr>
+      <td class="pad">
+        <h2 class="h3">Why we publish this</h2>
+        <p class="prose" style="padding-top:var(--gap-tight);">Because the number is the argument. Anyone can print "lifetime guarantee" on a hangtag. Very few will tell you what they spent honouring it, and the ones that will not are usually the ones hoping you never ask. <a href="https://example.com/letters/47">The full breakdown, with the per-repair costs</a>, is on the site.</p>
+      </td>
+    </tr>
+
+    <tr>
+      <td class="pad" style="padding-bottom:var(--space-block);">
+        <img src="https://cdn.example.com/northbeam/repair-bench-1104.jpg" width="552" height="310"
+             alt="A repair technician patching a cuff on a Ridgeline Jacket at the Wharf Road bench"
+             style="width:100%;max-width:552px;height:auto;">
+        <p class="caption">Marisol, who has re-cuffed more Ridgelines than anyone alive.</p>
+      </td>
+    </tr>
+
+    <tr><td class="pad"><div class="divider">&nbsp;</div></td></tr>
+    <tr>
+      <td class="pad" style="padding-top:var(--gap-separate);padding-bottom:var(--pad-card-lg);">
+        <h2 class="h3">Also this month</h2>
+        <p class="prose" style="padding-top:var(--gap-tight);">The Ridgeline is back in three colours — <a href="https://example.com/ridgeline">Slate, Ochre and Deep Pine</a>. The repair bench is hiring a third technician. And we are finally, genuinely sorry about the shipping delays in March; <a href="https://example.com/letters/46">issue 46</a> explains what went wrong.</p>
+        <p class="prose muted" style="padding-bottom:0;">&mdash; Tomas, Wharf Road</p>
+      </td>
+    </tr>
+
+    <tr>
+      <td class="footer pad" style="padding-top:var(--pad-card);padding-bottom:var(--pad-card);">
+        <p class="legal">Northbeam Supply Co., 118 Wharf Road, Portland, OR 97209</p>
+        <p class="legal" style="padding-top:var(--gap-tight);">You subscribed to The Wharf Road Letter at northbeam.example.com. <a href="https://example.com/preferences?e={{email_hash}}">Change what we send you</a> or <a href="https://example.com/unsubscribe?e={{email_hash}}">unsubscribe</a>. We send this once a month and nothing else.</p>
+      </td>
+    </tr>
+
+  </table>
+
+  <!--[if mso]>
+  </td></tr></table>
+  <![endif]-->
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>

@@ -1,0 +1,772 @@
+/* =========================================================================
+   theme.css — the Tailwind v4 binding layer
+   =========================================================================
+
+   This file is the ONLY place where Tailwind learns what a value is.
+   It contains no design decisions. Every right-hand side is either
+
+     (a) `var(--token)` pointing into assets/starter/styles/tokens.css, or
+     (b) a CSS keyword (`transparent`, `currentColor`, `inherit`), or
+     (c) one of the four documented literal exceptions in §0.
+
+   If you are tempted to type a number here, the number belongs in
+   tokens.css. That is Law 1, and this file is where it is either kept or
+   broken for the whole product.
+
+   -------------------------------------------------------------------------
+   HOW TO WIRE IT UP
+
+     src/styles/index.css
+     ---------------------------------------------------------------
+     @layer reset, tokens, theme, base, layout, components, utilities, overrides;
+
+     @import "tailwindcss/preflight.css" layer(reset);
+     @import "tailwindcss/theme.css"     layer(theme);
+     @import "tailwindcss/utilities.css" layer(utilities);
+
+     @import "./tokens.css";              -- itself wrapped in @layer tokens
+     @import "./theme.css";               -- this file
+     @import "./base.css"   layer(base);
+     @import "./layout.css" layer(layout);
+     @import "./components/card.css";     -- each wrapped in
+     @import "./components/button.css";   -- @layer components
+     ---------------------------------------------------------------
+     (`--` marks a note; CSS block comments do not nest, so an inner
+      pair here would end this one on its first close marker.)
+
+   Do NOT use the single-line `@import "tailwindcss"`. It hardcodes the
+   layer order `theme, base, components, utilities`, which cannot express
+   Law 5's seven-layer order. The three granular imports above are the
+   documented way to place Tailwind's own output into layers you control.
+
+   The bare `@layer` statement must come first: it is the one rule CSS
+   permits before `@import`, and it is what fixes the order. Layers declared
+   later win; `overrides` is last so a genuine one-off never needs
+   `!important`.
+
+   ========================================================================= */
+
+
+/* =========================================================================
+   §0  THE FOUR LITERAL EXCEPTIONS
+   =========================================================================
+   Everything below is `var(--token)` except these, and each has a reason
+   that is a property of CSS, not a lapse of discipline.
+
+   1. BREAKPOINTS (`--breakpoint-*`). Media query *conditions* cannot read
+      custom properties — `@media (width >= var(--bp-md))` is invalid and is
+      dropped silently. The value must be a literal. Mirrors `--bp-*` in
+      tokens.css; `scripts/audit_design.py` diffs the two and fails if they
+      drift. Change one, change both.
+
+   2. CSS-WIDE KEYWORDS (`transparent`, `currentColor`, `inherit`). Not
+      design values; they are the language.
+
+   3. KEYFRAME GEOMETRY (`rotate(360deg)`, `opacity: .5`). Not a token,
+      an identity — a full turn is 360deg in every brand.
+
+   4. `--aspect-video: 16/9`. A container format, not a design choice.
+
+   If you find yourself writing a fifth exception, you are adding a token.
+   Add it to tokens.css and point at it from here.
+   ========================================================================= */
+
+
+/* =========================================================================
+   §1  BURN THE DEFAULT THEME
+   =========================================================================
+   `--*: initial` clears EVERY default Tailwind theme namespace. After this
+   line `bg-neutral-800`, `p-4`, `text-sm`, `rounded-lg`, `duration-200` and
+   `shadow-md` do not exist — not "are discouraged", do not exist. The build
+   errors on them.
+
+   This is the mechanical half of Laws 1, 3 and 6. A designer's scale and
+   Tailwind's stock scale are never the same scale; leaving the stock one
+   loaded means every component is one keystroke from off-system, and code
+   review is the only thing standing in the way. Code review loses, on a
+   long enough timeline, every time.
+
+   What `--*: initial` takes with it, that you must consciously give back:
+     - `--spacing`         the dynamic multiplier behind `p-4`, `gap-7`, `w-13`.
+                           We deliberately do NOT restore it. That single
+                           omission is Law 3 (the scale is closed): with no
+                           `--spacing`, an arbitrary numeric step has no
+                           generator and `p-7` is a build error, not a
+                           silently-accepted 28px.
+     - `--breakpoint-*`    restored in §2.
+     - `--color-transparent/current/inherit`   restored in §4.
+     - `--animate-*` + their keyframes         restored in §9.
+     - `--default-*`       Preflight's base font and transition defaults;
+                           restored in §10.
+     - `--container-*`     NOT restored. See §7 for why measures are
+                           `@utility` rules instead.
+   ========================================================================= */
+
+@theme {
+  --*: initial;
+
+  /* ---------------------------------------------------------------------
+     §2  BREAKPOINTS — literal exception #1, mirrors --bp-* in tokens.css
+     ---------------------------------------------------------------------
+     `sm:`, `md:`, `lg:`, `xl:`, `2xl:`. Min-width, mobile-first: a `md:`
+     rule applies at 768px AND ABOVE. Design the small layout first and let
+     these add to it; a breakpoint that subtracts is a layout you built
+     backwards.
+     --------------------------------------------------------------------- */
+
+  --breakpoint-sm:  30rem;   /*  480px — mirrors --bp-sm   large phone      */
+  --breakpoint-md:  48rem;   /*  768px — mirrors --bp-md   tablet portrait  */
+  --breakpoint-lg:  64rem;   /* 1024px — mirrors --bp-lg   tablet landscape */
+  --breakpoint-xl:  80rem;   /* 1280px — mirrors --bp-xl   laptop           */
+  --breakpoint-2xl: 96rem;   /* 1536px — mirrors --bp-2xl  desktop          */
+
+  /* Literal exception #4. */
+  --aspect-video: 16 / 9;
+}
+
+
+/* =========================================================================
+   §3  WHY EVERYTHING BELOW IS `@theme inline`
+   =========================================================================
+   Read this before you change anything in this file. Getting it wrong does
+   not throw an error; it produces a product where dark mode works on the
+   page and fails inside a scoped subtree, and nobody can see why.
+
+   ---- THE MECHANISM --------------------------------------------------
+
+   Plain `@theme` emits an indirection into `:root` and makes the utility
+   point at that indirection:
+
+       :root       { --color-surface: var(--bg-surface); }     -- emitted
+       .bg-surface { background-color: var(--color-surface); }  -- utility
+
+   A custom property whose value contains `var()` is substituted at
+   computed-value time ON THE ELEMENT WHERE THE DECLARATION APPLIES. That
+   declaration applies to `:root`. So `--color-surface` is resolved once, at
+   `:root`, against `:root`'s `--bg-surface` — the light value — and what
+   inherits down the tree is that already-resolved color. A
+   `[data-theme="dark"]` further down re-points `--bg-surface`, but nothing
+   re-declares `--color-surface`, so the frozen light value wins. Every
+   `bg-surface` in that subtree stays light. No warning, no error.
+
+   `@theme inline` removes the indirection. The utility carries the token
+   reference itself:
+
+       .bg-surface { background-color: var(--bg-surface); }
+
+   Now `var(--bg-surface)` resolves on the element the utility is applied
+   to, so it sees whatever `[data-theme]` or `[data-density]` ancestor that
+   element actually has.
+
+   ---- THE RULE -------------------------------------------------------
+
+   Use `inline` for any theme variable whose value is `var(...)` of a token
+   that a theme selector can re-point.
+
+   In THIS system that is every Tier-2 token, for two reasons at once:
+
+     - colors are re-pointed by `[data-theme="dark"]`;
+     - EVERY Tier-2 spacing role is `calc(var(--space-n) * var(--density))`,
+       and `--density` is re-pointed by `[data-density]` on a subtree.
+
+   The density case is the one teams miss. Without `inline`, the admin
+   table you wrapped in `data-density="compact"` renders at exactly the
+   default density and Law 7 quietly stops being true.
+
+   So: **the whole mapping block is `inline`.** If you are ever unsure,
+   `inline` is the safe default here — it costs nothing when the token is
+   not themed.
+
+   ---- THE PRICE ------------------------------------------------------
+
+   With `inline`, do not assume `--color-surface` exists at runtime. It is
+   a compile-time name for generating utilities, not a variable to read.
+   In hand-written CSS read the Tier-2 token directly:
+
+       .card { background: var(--bg-surface); }     -- correct
+       .card { background: var(--color-surface); }  -- do not
+   ========================================================================= */
+
+
+/* =========================================================================
+   §4  COLOR
+   =========================================================================
+   Tailwind has ONE color namespace. `--color-x` generates `bg-x`, `text-x`,
+   `border-x`, `ring-x`, `fill-x`, `divide-x`, `from-x` … all of them, with
+   no way to say "this role is a fill, never an ink". So the names below are
+   chosen for the position they are MEANT to occupy, and the audit catches
+   the rest (`bg-muted` is syntactically valid and semantically wrong).
+
+   NOTE THE NAME COLLISIONS AND WHAT THEY BOUGHT US. Tailwind's namespaces
+   are `--color-*`, `--text-*`, `--radius-*`, `--shadow-*`, `--ease-*`,
+   `--leading-*`, `--tracking-*`, `--font-*`. Four of those collide exactly
+   with Tier-1 token names in tokens.css, and CSS cannot express
+   `--radius-lg: var(--radius-lg)`. The collision forces every Tailwind
+   entry to be named after its ROLE rather than its step — which is Law 6,
+   arriving for free. Treat it as a feature, not an obstacle.
+   ========================================================================= */
+
+@theme inline {
+
+  /* Literal exception #2 — CSS-wide keywords, not design values. */
+  --color-transparent: transparent;
+  --color-current:     currentColor;
+  --color-inherit:     inherit;
+
+  /* ---- Surfaces. Use with bg-*. Back to front. --------------------- */
+  --color-canvas:      var(--bg-canvas);    /* bg-canvas   the page itself  */
+  --color-surface:     var(--bg-surface);   /* bg-surface  cards, panels    */
+  --color-raised:      var(--bg-raised);    /* bg-raised   menus, popovers  */
+  --color-sunken:      var(--bg-sunken);    /* bg-sunken   wells, inputs    */
+  --color-inverse:     var(--bg-inverse);   /* bg-inverse  tooltips         */
+
+  /* Interaction overlays. Translucent, so they compose over ANY surface —
+     this is why no component needs a per-variant hover color. Reach for
+     `hover:bg-hover`, never a second background token. */
+  --color-hover:       var(--bg-hover);     /* bg-hover                     */
+  --color-active:      var(--bg-active);    /* bg-active                    */
+  --color-selected:    var(--bg-selected);  /* bg-selected                  */
+  --color-disabled:    var(--bg-disabled);  /* bg-disabled  (surface)       */
+
+  /* ---- Foreground. Use with text-*. -------------------------------- */
+  --color-default:     var(--fg-default);   /* text-default  body copy      */
+  --color-strong:      var(--fg-strong);    /* text-strong   headings       */
+  --color-muted:       var(--fg-muted);     /* text-muted    secondary      */
+  --color-subtle:      var(--fg-subtle);    /* text-subtle   placeholder    */
+  --color-link:        var(--fg-link);      /* text-link                    */
+  --color-on-accent:   var(--fg-on-accent); /* text-on-accent  on a fill    */
+  --color-on-inverse:  var(--fg-on-inverse);/* text-on-inverse on bg-inverse*/
+
+  /* `disabled` and the four intents each need a fill AND an ink, and one
+     namespace cannot hold both under one name. Convention, applied without
+     exception: BARE NAME = the fill, `-fg` SUFFIX = the ink.
+       bg-danger      -> --bg-danger  (danger-500, a solid fill)
+       text-danger-fg -> --fg-danger  (danger-700, legible on a light bg)
+     Using `text-danger` instead of `text-danger-fg` puts 500-weight text on
+     a light surface and drops you under 4.5:1. The audit flags it. */
+  --color-disabled-fg: var(--fg-disabled);  /* text-disabled-fg             */
+
+  /* ---- Intent fills. Use with bg-*. -------------------------------- */
+  --color-accent:       var(--bg-accent);       /* bg-accent                */
+  --color-accent-hover: var(--bg-accent-hover); /* hover:bg-accent-hover    */
+  --color-success:      var(--bg-success);      /* bg-success               */
+  --color-warning:      var(--bg-warning);      /* bg-warning               */
+  --color-danger:       var(--bg-danger);       /* bg-danger                */
+
+  /* ---- Intent inks. Use with text-*. ------------------------------- */
+  --color-accent-fg:   var(--fg-accent);    /* text-accent-fg               */
+  --color-success-fg:  var(--fg-success);   /* text-success-fg              */
+  --color-warning-fg:  var(--fg-warning);   /* text-warning-fg              */
+  --color-danger-fg:   var(--fg-danger);    /* text-danger-fg               */
+
+  /* ---- Lines. Use with border-*, divide-*, outline-*, ring-*. ------ */
+  --color-line-subtle: var(--border-subtle);  /* border-line-subtle         */
+  --color-line:        var(--border-default); /* border-line                */
+  --color-line-strong: var(--border-strong);  /* border-line-strong         */
+  --color-line-accent: var(--border-accent);  /* border-line-accent         */
+  --color-focus:       var(--border-focus);   /* ring-focus, outline-focus  */
+
+  /* Tier 1 ramps are NOT exposed. There is no `bg-neutral-800`, no
+     `text-accent-500`. If a design needs a step that no role names, the
+     answer is a new Tier-2 role in tokens.css and a new line here — not a
+     component reaching past the role layer. That is Law 6, enforced by the
+     absence of the class rather than by anybody's memory. */
+
+
+  /* =======================================================================
+     §5  SPACING
+     =======================================================================
+     `--spacing-*` drives p-*, m-*, gap-*, space-*, w-*, h-*, size-*,
+     inset-*, translate-*, scroll-m-*. Because §1 dropped `--spacing`, these
+     named steps are the ENTIRE spacing vocabulary. `p-4` does not exist.
+     `gap-7` does not exist. `mt-[13px]` is lint-banned in §D of the ESLint
+     config. There is no third way to produce an off-scale gap.
+
+     Every one of these is `calc(step * var(--density))` upstream, which is
+     exactly why this block must be `inline` — see §3.
+
+     `m-*` utilities exist because Tailwind generates them from the same
+     namespace; the ESLint config bans them on components anyway (Law 2).
+     They are legitimate on layout primitives for `m-auto` centering only.
+     ------------------------------------------------------------------- */
+
+  /* Proximity ladder. Pick by MEANING, not by how it looks at 100% zoom.
+     Two things at `gap-related` are read as one group; the same two at
+     `gap-separate` are read as two. This ladder is the whole of Gestalt
+     proximity expressed as six class names. */
+  --spacing-fused:     var(--gap-fused);     /* gap-fused     icon + label  */
+  --spacing-tight:     var(--gap-tight);     /* gap-tight     label + input */
+  --spacing-related:   var(--gap-related);   /* gap-related   one group     */
+  --spacing-grouped:   var(--gap-grouped);   /* gap-grouped   sibling cards */
+  --spacing-separate:  var(--gap-separate);  /* gap-separate  two groups    */
+  --spacing-distinct:  var(--gap-distinct);  /* gap-distinct  unrelated     */
+
+  /* Insets. Padding inside a container, scaled to the container's weight. */
+  --spacing-inline-xs: var(--pad-inline-xs); /* px-inline-xs  chip, tag     */
+  --spacing-inline-sm: var(--pad-inline-sm); /* px-inline-sm  sm btn, input */
+  --spacing-inline-md: var(--pad-inline-md); /* px-inline-md  btn, list row */
+  --spacing-block-xs:  var(--pad-block-xs);  /* py-block-xs                 */
+  --spacing-block-sm:  var(--pad-block-sm);  /* py-block-sm                 */
+  --spacing-block-md:  var(--pad-block-md);  /* py-block-md                 */
+
+  --spacing-card:      var(--pad-card);      /* p-card       card, panel    */
+  --spacing-card-lg:   var(--pad-card-lg);   /* p-card-lg    hero, modal    */
+  --spacing-well:      var(--pad-well);      /* p-well       code, callout  */
+
+  /* Page rhythm. Fluid: these clamp between a phone and a 1440 desktop, so
+     `gap-section` is 64px on a 390px phone and 144px on a laptop from one
+     class. A fixed section gap is always wrong at one of the two ends. */
+  --spacing-section:    var(--space-section);    /* gap-section             */
+  --spacing-subsection: var(--space-subsection); /* gap-subsection          */
+  --spacing-block:      var(--space-block);      /* gap-block  prose blocks */
+  --spacing-gutter:     var(--gutter-page);      /* px-gutter  page margin  */
+
+  /* Minimum finger target. `size-tap` / `min-h-tap` on every icon button. */
+  --spacing-tap:        var(--tap-min);          /* size-tap, min-h-tap     */
+
+  /* One hairline step, for 1px nudges and hairline offsets only. */
+  --spacing-px:         var(--space-px);         /* p-px, -top-px           */
+  --spacing-0:          var(--space-0);          /* p-0, gap-0              */
+
+
+  /* =======================================================================
+     §6  TYPOGRAPHY
+     =======================================================================
+     Tailwind's `--text-*` namespace takes three companion sub-variables —
+     `--text-x--line-height`, `--text-x--letter-spacing`,
+     `--text-x--font-weight` — and emits all four properties from ONE class.
+     That is the exact shape of Tier 2's `--type-*` shorthands, so the roles
+     below are the Tailwind expression of the same decisions, not a second
+     set of them.
+
+     `text-h2` therefore ships size + leading + tracking + weight together.
+     You cannot get the size without the leading, which is the point: a 35px
+     heading at body leading is the single most common typographic bug in
+     shipped marketing sites.
+
+     Tier 1 steps (`--text-3xl` etc.) are NOT exposed as classes. `text-3xl`
+     does not exist. Ask for the role.
+
+     WHERE THE `--type-*` TOKENS WENT. tokens.css Tier 2 expresses each role
+     as a `font` shorthand: `--type-h2: var(--weight-semibold)
+     var(--text-3xl)/var(--leading-tight) var(--font-sans)`. A shorthand
+     cannot be decomposed by CSS, so Tailwind cannot read it — the four
+     lines below are the same decision, re-expressed in the four properties
+     Tailwind's namespace takes. They are not a second source of truth, but
+     they are a second PLACE, so when a type role changes, change both.
+     `scripts/audit_design.py` compares them.
+
+     In hand-written component CSS prefer the shorthand — `font:
+     var(--type-h2)` is one declaration that cannot half-apply.
+     ------------------------------------------------------------------- */
+
+  --text-display:                 var(--text-6xl);
+  --text-display--line-height:    var(--leading-tight);
+  --text-display--letter-spacing: var(--tracking-tighter);
+  --text-display--font-weight:    var(--weight-bold);
+
+  /* A section-opening display size below the page hero — the second-loudest
+     thing on a long marketing page. Fluid like `display`, because a fixed
+     44px+ heading is either cramped on a laptop or unreadable on a phone. */
+  --text-display-sm:                 var(--text-5xl);
+  --text-display-sm--line-height:    var(--leading-tight);
+  --text-display-sm--letter-spacing: var(--tracking-tighter);
+  --text-display-sm--font-weight:    var(--weight-bold);
+
+  --text-h1:                      var(--text-4xl);
+  --text-h1--line-height:         var(--leading-tight);
+  --text-h1--letter-spacing:      var(--tracking-tighter);
+  --text-h1--font-weight:         var(--weight-bold);
+
+  --text-h2:                      var(--text-3xl);
+  --text-h2--line-height:         var(--leading-tight);
+  --text-h2--letter-spacing:      var(--tracking-tight);
+  --text-h2--font-weight:         var(--weight-semibold);
+
+  --text-h3:                      var(--text-2xl);
+  --text-h3--line-height:         var(--leading-snug);
+  --text-h3--letter-spacing:      var(--tracking-tight);
+  --text-h3--font-weight:         var(--weight-semibold);
+
+  --text-h4:                      var(--text-xl);
+  --text-h4--line-height:         var(--leading-snug);
+  --text-h4--letter-spacing:      var(--tracking-tight);
+  --text-h4--font-weight:         var(--weight-semibold);
+
+  --text-lead:                    var(--text-lg);
+  --text-lead--line-height:       var(--leading-normal);
+  --text-lead--letter-spacing:    var(--tracking-normal);
+  --text-lead--font-weight:       var(--weight-regular);
+
+  --text-body:                    var(--text-base);
+  --text-body--line-height:       var(--leading-normal);
+  --text-body--letter-spacing:    var(--tracking-normal);
+  --text-body--font-weight:       var(--weight-regular);
+
+  /* Long-form article body. Same size as `text-body`, looser leading —
+     a separate role because the decision is "this is read for minutes",
+     not "this is bigger". */
+  --text-prose:                   var(--text-base);
+  --text-prose--line-height:      var(--leading-relaxed);
+  --text-prose--letter-spacing:   var(--tracking-normal);
+  --text-prose--font-weight:      var(--weight-regular);
+
+  --text-ui:                      var(--text-sm);
+  --text-ui--line-height:         var(--leading-snug);
+  --text-ui--letter-spacing:      var(--tracking-wide);
+  --text-ui--font-weight:         var(--weight-medium);
+
+  --text-label:                   var(--text-xs);
+  --text-label--line-height:      var(--leading-snug);
+  --text-label--letter-spacing:   var(--tracking-wide);
+  --text-label--font-weight:      var(--weight-medium);
+
+  --text-caps:                    var(--text-xs);
+  --text-caps--line-height:       var(--leading-snug);
+  --text-caps--letter-spacing:    var(--tracking-caps);
+  --text-caps--font-weight:       var(--weight-semibold);
+
+  --text-meta:                    var(--text-2xs);
+  --text-meta--line-height:       var(--leading-snug);
+  --text-meta--letter-spacing:    var(--tracking-wide);
+  --text-meta--font-weight:       var(--weight-regular);
+
+  --text-code:                    var(--text-sm);
+  --text-code--line-height:       var(--leading-normal);
+  --text-code--letter-spacing:    var(--tracking-normal);
+  --text-code--font-weight:       var(--weight-regular);
+
+  /* Families. `--font-*` is the family namespace, so `font-body` and
+     `font-code`. Named `body`/`code` rather than `sans`/`mono` because a
+     client who swaps to a serif should not have to rename every class. */
+  --font-body: var(--font-sans);   /* font-body */
+  --font-code: var(--font-mono);   /* font-code */
+
+  /* Weights. Separate namespace, same `font-` utility prefix. */
+  --font-weight-regular:  var(--weight-regular);   /* font-regular  */
+  --font-weight-medium:   var(--weight-medium);    /* font-medium   */
+  --font-weight-semibold: var(--weight-semibold);  /* font-semibold */
+  --font-weight-bold:     var(--weight-bold);      /* font-bold     */
+
+  /* Standalone leading and tracking, for the cases `text-*` cannot cover:
+     multi-line numerals, a heading that wraps into a caption, and so on.
+     Role-named because `--leading-tight` and `--tracking-tight` collide
+     with Tier 1 and CSS cannot self-reference a custom property. */
+  --leading-flat:    var(--leading-none);     /* leading-flat     numerals  */
+  --leading-display: var(--leading-tight);    /* leading-display  h1, hero  */
+  --leading-heading: var(--leading-snug);     /* leading-heading  h3/h4, UI */
+  --leading-body:    var(--leading-normal);   /* leading-body               */
+  --leading-long:    var(--leading-relaxed);  /* leading-long     articles  */
+
+  --tracking-display: var(--tracking-tighter); /* tracking-display 44px+    */
+  --tracking-heading: var(--tracking-tight);   /* tracking-heading 22-35px  */
+  --tracking-body:    var(--tracking-normal);  /* tracking-body             */
+  --tracking-ui:      var(--tracking-wide);    /* tracking-ui      12-14px  */
+  --tracking-allcaps: var(--tracking-caps);    /* tracking-allcaps          */
+
+
+  /* =======================================================================
+     §7  RADIUS
+     =======================================================================
+     Tier 1 has steps (`--radius-lg`); components need roles. These role
+     names are the Tier-2 radius layer — tokens.css §7 defines the steps and
+     the nesting rule but names no roles, so they are declared here, at the
+     binding layer, where they can only ever be aliases.
+
+     If a project also writes plain CSS against these names, promote the
+     eight lines into tokens.css Tier 2 and re-point this block at them. Do
+     not maintain two definitions.
+
+     THE NESTING RULE STILL APPLIES: inner radius = outer radius − inner
+     padding. `rounded-panel` (16px) with `p-card` (24px) holds a child at
+     `rounded-flat`, not `rounded-card`. Concentric corners that ignore this
+     look peeled, and no amount of tokens will save you from eyeballing it.
+     ------------------------------------------------------------------- */
+
+  --radius-flat:     var(--radius-none);  /* rounded-flat                   */
+  --radius-hairline: var(--radius-xs);    /* rounded-hairline  2px, nested  */
+  --radius-inner:    var(--radius-sm);    /* rounded-inner     4px, nested  */
+  --radius-control:  var(--radius-md);    /* rounded-control   chip, input  */
+  --radius-card:     var(--radius-lg);    /* rounded-card      button, card */
+  --radius-panel:    var(--radius-xl);    /* rounded-panel     panel, modal */
+  --radius-hero:     var(--radius-2xl);   /* rounded-hero      hero surface */
+  --radius-pill:     var(--radius-full);  /* rounded-pill                   */
+
+
+  /* =======================================================================
+     §8  ELEVATION
+     =======================================================================
+     Reach for the ROLE, never the step. `--shadow-md` is a pair of
+     offsets; `--elevation-raised` is a statement about where the thing sits
+     in the stack, and dark mode re-points the steps underneath it without
+     touching a component.
+
+     Every step is a PAIR — a tight contact shadow plus a wide ambient one.
+     Single-shadow elevation always reads as a sticker.
+     ------------------------------------------------------------------- */
+
+  --shadow-flat:    var(--elevation-flat);     /* shadow-flat               */
+  --shadow-card:    var(--elevation-card);     /* shadow-card               */
+  --shadow-raised:  var(--elevation-raised);   /* shadow-raised  hover lift */
+  --shadow-overlay: var(--elevation-overlay);  /* shadow-overlay menus      */
+  --shadow-modal:   var(--elevation-modal);    /* shadow-modal   dialogs    */
+
+
+  /* =======================================================================
+     §9  MOTION
+     =======================================================================
+     `--ease-*` is a Tailwind namespace AND a Tier-1 prefix in tokens.css,
+     so these are role-named. Duration has no theme namespace in v4 at all —
+     see the `@utility` block below, where duration and easing are bound
+     together so they cannot drift apart.
+     ------------------------------------------------------------------- */
+
+  --ease-enter:  var(--ease-out);      /* ease-enter   things arriving      */
+  --ease-exit:   var(--ease-in);       /* ease-exit    things leaving       */
+  --ease-move:   var(--ease-in-out);   /* ease-move    things repositioning */
+  --ease-bounce: var(--ease-spring);   /* ease-bounce  playful overshoot    */
+  --ease-steady: var(--ease-linear);   /* ease-steady  progress, spinners   */
+
+  /* Animations. `--*: initial` removed the stock `--animate-*` and, with
+     them, Tailwind's generated keyframes — so both halves are restored
+     here. Keyframe geometry is literal exception #3. */
+  --animate-spin:  spin  1s   var(--ease-linear) infinite;
+  --animate-pulse: pulse 2s   var(--ease-in-out) infinite;
+  --animate-enter: enter var(--dur-base) var(--ease-out) both;
+
+
+  /* =======================================================================
+     §10  PREFLIGHT DEFAULTS
+     =======================================================================
+     These are not namespaces; they are the values Tailwind's base layer
+     applies to `html` and to any `transition-*` utility that does not name
+     a duration. `--*: initial` cleared them, so the page would otherwise
+     fall back to the browser's Times New Roman and a 0s transition.
+     ------------------------------------------------------------------- */
+
+  --default-font-family:              var(--font-sans);
+  --default-mono-font-family:         var(--font-mono);
+  --default-transition-duration:      var(--dur-fast);
+  --default-transition-timing-function: var(--ease-out);
+}
+
+
+/* =========================================================================
+   §11  KEYFRAMES
+   =========================================================================
+   Top level, not inside `@theme`, so they survive regardless of how the
+   theme is tree-shaken. Geometry only — literal exception #3.
+   ========================================================================= */
+
+@keyframes spin  { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { opacity: 0.5; } }
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2));
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+
+/* =========================================================================
+   §12  DARK MODE VARIANT
+   =========================================================================
+   tokens.css themes on `[data-theme="dark"]`, not on `.dark`, so the `dark:`
+   variant must be redefined to match. `:where()` keeps the variant at zero
+   specificity, which is what stops `dark:` from out-ranking a later
+   `hover:` by accident. The second selector covers descendants, so a
+   scoped `<section data-theme="dark">` themes its whole subtree.
+
+   In a correctly token-driven component you should almost never need
+   `dark:`. If a component has more than one or two, the fix is a Tier-2
+   role that dark mode re-points, not a variant.
+   ========================================================================= */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Density does not need a variant at all. `[data-density]` re-points
+   `--density`, every `--spacing-*` is `inline` and therefore resolves at
+   the element, and the whole subtree recomposes. Zero component changes,
+   zero variants. That is Law 7 holding in Tailwind. */
+
+
+/* =========================================================================
+   §13  SOURCE DETECTION
+   =========================================================================
+   Tailwind scans the project root, honouring .gitignore, and does not look
+   into node_modules. A design system shipped as a workspace package
+   therefore produces classes that never get generated — the component
+   renders unstyled in the consuming app and looks like a build bug.
+
+   Register every package whose source contains class names. Paths are
+   relative to THIS FILE'S FINAL LOCATION, which these assume is
+   `src/styles/theme.css`. If you put it elsewhere, re-count the `../`.
+   Getting this wrong is silent: an unmatched @source scans nothing and
+   reports nothing.
+
+   NOTE ALSO: when you split `@import "tailwindcss"` into the three
+   granular imports (see the header), automatic source detection is still
+   anchored at the project root, but a monorepo package outside that root
+   is not scanned at all. That is this block's whole job.
+   ========================================================================= */
+
+@source "../../packages/ui/src";
+
+/* Never scan build output, fixtures or snapshots: stale classes from a dist
+   bundle keep dead CSS alive forever and defeat the audit. */
+@source not "../../**/dist";
+@source not "../../**/*.snap";
+
+/* `@source inline()` is the ONLY legitimate safelist. Use it when a class
+   name genuinely comes from data — a CMS field, an API enum — and cannot
+   exist as a literal in source. Everything else that "needs safelisting" is
+   a dynamically-constructed class name, which is a bug; see the ESLint
+   config and the failure-modes section of references/stack-tailwind.md.
+
+   @source inline("bg-{success,warning,danger}"); */
+
+
+/* =========================================================================
+   §14  SEMANTIC AND STRUCTURAL UTILITIES
+   =========================================================================
+   Everything a theme namespace cannot express. Each of these is a ROLE, so
+   the class name still reads as intent.
+   ========================================================================= */
+
+/* ---- Motion pairs -------------------------------------------------------
+   Duration has no theme namespace in Tailwind v4, and tokens.css is explicit
+   that duration and easing "travel together or you get drift". These bind
+   both halves of each `--motion-*` role in one class, so you cannot ship a
+   320ms drawer with a hover easing.
+
+   The `--motion-*` tokens themselves are `duration easing` fragments meant
+   for the `transition` shorthand — `transition: opacity var(--motion-enter)`
+   — and a shorthand fragment cannot be split, so Tailwind cannot consume
+   them directly. These utilities are the same pairs, re-expressed. Prefer
+   `--motion-*` in hand-written CSS and these classes in JSX; do not mix
+   both on one element.
+
+   Use as:  transition-colors motion-hover
+            transition-transform motion-enter
+   ------------------------------------------------------------------------- */
+
+@utility motion-hover {
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-out);
+}
+@utility motion-enter {
+  transition-duration: var(--dur-base);
+  transition-timing-function: var(--ease-out);
+}
+@utility motion-exit {
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-in);
+}
+@utility motion-expand {
+  transition-duration: var(--dur-slow);
+  transition-timing-function: var(--ease-in-out);
+}
+@utility motion-emphasis {
+  transition-duration: var(--dur-slow);
+  transition-timing-function: var(--ease-spring);
+}
+@utility motion-instant {
+  transition-duration: var(--dur-instant);
+  transition-timing-function: var(--ease-out);
+}
+@utility motion-page {
+  transition-duration: var(--dur-slower);
+  transition-timing-function: var(--ease-in-out);
+}
+
+/* ---- Z-index ladder -----------------------------------------------------
+   Closed, ordered, named for the thing that occupies it. There is no
+   `z-50`, no `z-[9999]`, and therefore no z-index war. If two things need
+   to stack within one rung, they are siblings in the DOM and source order
+   decides — which is the honest answer anyway.
+   ------------------------------------------------------------------------- */
+
+@utility z-base     { z-index: var(--z-base); }
+@utility z-raised   { z-index: var(--z-raised); }
+@utility z-sticky   { z-index: var(--z-sticky); }
+@utility z-dropdown { z-index: var(--z-dropdown); }
+@utility z-overlay  { z-index: var(--z-overlay); }
+@utility z-modal    { z-index: var(--z-modal); }
+@utility z-toast    { z-index: var(--z-toast); }
+@utility z-tooltip  { z-index: var(--z-tooltip); }
+
+/* ---- Measure and container widths ---------------------------------------
+   These are deliberately NOT in the `--container-*` namespace. That
+   namespace feeds container-query variants (`@content:`) as well as
+   `max-w-*`, and a container query condition — like a media query — cannot
+   read a custom property. A `var()` there produces an invalid condition
+   that the browser drops without a word. `@utility` only ever emits a
+   declaration, so it is safe.
+
+   Line length is a spacing decision, not a typographic afterthought: 60-75
+   characters is the readable band and `max-w-prose` is how you hit it.
+   ------------------------------------------------------------------------- */
+
+@utility max-w-prose   { max-inline-size: var(--measure-prose); }
+@utility max-w-narrow  { max-inline-size: var(--measure-narrow); }
+@utility max-w-content { max-inline-size: var(--width-content); }
+@utility max-w-wide    { max-inline-size: var(--width-wide); }
+@utility max-w-form    { max-inline-size: var(--width-form); }
+
+/* ---- Stroke widths ------------------------------------------------------
+   Tailwind's border widths are bare numbers, not theme-backed, so `border`
+   is 1px by literal. These name the four strokes the system actually has.
+   ------------------------------------------------------------------------- */
+
+@utility border-hairline { border-width: var(--stroke-hairline); }
+@utility border-default  { border-width: var(--stroke-default); }
+@utility border-thick    { border-width: var(--stroke-thick); }
+
+/* ---- Focus ring ---------------------------------------------------------
+   One class, everywhere, on every interactive element. `--shadow-focus` is
+   a two-ring shadow: a canvas-colored gap then the focus color, so the ring
+   stays visible on top of any surface including the accent fill itself.
+
+   `focus-visible:` not `focus:` — a mouse click should not paint a ring.
+   ------------------------------------------------------------------------- */
+
+@utility focus-ring {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+/* ---- Minimum tap target -------------------------------------------------
+   44px. Non-negotiable on anything a finger touches. An icon button that is
+   visually 24px still needs this; pad it or use a transparent hit area.
+   ------------------------------------------------------------------------- */
+
+@utility tap-target {
+  min-inline-size: var(--tap-min);
+  min-block-size: var(--tap-min);
+}
+
+/* ---- Page gutter --------------------------------------------------------
+   The one place a horizontal margin is correct: centring a content column.
+   Law 2 governs SIBLING spacing; this is a container centring itself.
+   ------------------------------------------------------------------------- */
+
+@utility page-gutter {
+  padding-inline: var(--gutter-page);
+  margin-inline: auto;
+}
+
+/* ---- Grid ---------------------------------------------------------------
+   The layout grid is 12 columns, from tokens.css. Exposed as one utility so
+   a section cannot quietly become a 5-column grid.
+   ------------------------------------------------------------------------- */
+
+@utility grid-layout {
+  display: grid;
+  grid-template-columns: repeat(var(--grid-columns), minmax(0, 1fr));
+  gap: var(--gap-grouped);
+}

@@ -1,0 +1,1525 @@
+#!/usr/bin/env python3
+"""Audit a Figma variables export against the token contract, BEFORE anyone builds.
+
+Dependency-free (Python 3.9+, stdlib only). Reads whatever the designer could
+plausibly hand you and reports every value that is not on the closed scale, not
+on a color ramp, not bound to a type role, or not legible.
+
+The whole point is to move the "that 28px isn't a thing" argument OUT of the
+build and into the twenty minutes before it. Findings are written to be pasted
+to a designer, not to win an argument.
+
+INPUT SHAPES (auto-detected, --shape to force)
+----------------------------------------------
+  rest      GET /v1/files/:key/variables/local  ->  {"meta": {"variables": {...},
+            "variableCollections": {...}}}                    (Enterprise only)
+  plugin    A Variables plugin export: {"collections": [{name, modes, variables}]}
+  dtcg      W3C DTCG nested tokens:  {"space": {"6": {"$value": "24px"}}}
+  records   A flat list: [{"name": ..., "type": ..., "value": ...}, ...]
+
+Text and effect styles are read from a `styles`, `textStyles` or `effectStyles`
+key at the top level, or from a second file passed with --styles.
+
+USAGE
+-----
+  python scripts/figma_audit.py variables.json
+  python scripts/figma_audit.py variables.json --format markdown > for-the-designer.md
+  python scripts/figma_audit.py variables.json --format json | jq '.summary'
+  python scripts/figma_audit.py rest-dump.json --styles file-styles.json
+  python scripts/figma_audit.py variables.json --fail-on error   # looser CI gate
+
+EXIT CODES
+----------
+  0  no findings at or above --fail-on (default: any finding at all)
+  1  findings  -> the gate is red, the handoff is not done
+  2  the input could not be read or understood
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import re
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+# ===========================================================================
+# THE CONTRACT. These tables are the closed scales from token-contract.md and
+# the exact ramp values from tokens.css. They are the reason this script can
+# say "that is not a thing" with a straight face. If tokens.css changes, change
+# these in the same commit -- a fork here is a fork in the vocabulary.
+# ===========================================================================
+
+SPACING_PX: Tuple[float, ...] = (
+    0, 1, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192,
+)
+SPACING_NAME = {
+    0: "--space-0", 1: "--space-px", 2: "--space-0-5", 4: "--space-1",
+    8: "--space-2", 12: "--space-3", 16: "--space-4", 20: "--space-5",
+    24: "--space-6", 32: "--space-8", 40: "--space-10", 48: "--space-12",
+    64: "--space-16", 80: "--space-20", 96: "--space-24", 128: "--space-32",
+    160: "--space-40", 192: "--space-48",
+}
+
+# Type scale. The last four are the *rendered endpoints* of the two fluid
+# steps -- a designer working at 1440 sees 72 and 110, at 380 sees 44 and 56.
+TYPE_PX: Tuple[float, ...] = (11, 12, 14, 16, 18, 22, 28, 35, 44, 56, 72, 110)
+TYPE_NAME = {
+    11: "--text-2xs", 12: "--text-xs", 14: "--text-sm", 16: "--text-base",
+    18: "--text-lg", 22: "--text-xl", 28: "--text-2xl", 35: "--text-3xl",
+    44: "--text-4xl (or --text-5xl at its 380px floor)",
+    56: "--text-6xl at its 380px floor", 72: "--text-5xl at its 1440px ceiling",
+    110: "--text-6xl at its 1440px ceiling",
+}
+
+LEADING = (1.0, 1.15, 1.3, 1.6, 1.75)
+LEADING_NAME = {
+    1.0: "--leading-none", 1.15: "--leading-tight", 1.3: "--leading-snug",
+    1.6: "--leading-normal", 1.75: "--leading-relaxed",
+}
+TRACKING_EM = (-0.03, -0.015, 0.0, 0.02, 0.08)
+TRACKING_NAME = {
+    -0.03: "--tracking-tighter", -0.015: "--tracking-tight",
+    0.0: "--tracking-normal", 0.02: "--tracking-wide", 0.08: "--tracking-caps",
+}
+WEIGHTS = (400, 500, 600, 700)
+WEIGHT_NAME = {
+    400: "--weight-regular", 500: "--weight-medium",
+    600: "--weight-semibold", 700: "--weight-bold",
+}
+RADIUS_PX = (0, 2, 4, 8, 12, 16, 24, 9999)
+RADIUS_NAME = {
+    0: "--radius-none", 2: "--radius-xs", 4: "--radius-sm", 8: "--radius-md",
+    12: "--radius-lg", 16: "--radius-xl", 24: "--radius-2xl", 9999: "--radius-full",
+}
+STROKE_PX = (1, 2)
+STROKE_NAME = {1: "--stroke-default", 2: "--stroke-thick / --stroke-focus"}
+DUR_MS = (80, 140, 220, 320, 480)
+DUR_NAME = {
+    80: "--dur-instant", 140: "--dur-fast", 220: "--dur-base",
+    320: "--dur-slow", 480: "--dur-slower",
+}
+Z_STEPS = (0, 10, 100, 200, 300, 400, 500, 600)
+Z_NAME = {
+    0: "--z-base", 10: "--z-raised", 100: "--z-sticky", 200: "--z-dropdown",
+    300: "--z-overlay", 400: "--z-modal", 500: "--z-toast", 600: "--z-tooltip",
+}
+BP_PX = (480, 768, 1024, 1280, 1536)
+BP_NAME = {
+    480: "--bp-sm", 768: "--bp-md", 1024: "--bp-lg",
+    1280: "--bp-xl", 1536: "--bp-2xl",
+}
+TAP_MIN_PX = 44.0
+
+# The ramps, transcribed from tokens.css as (L%, C, H). Keep byte-identical.
+RAMPS: Dict[str, Dict[str, Tuple[float, float, float]]] = {
+    "neutral": {
+        "0": (100.0, 0.0, 0.0), "50": (98.2, 0.003, 75), "100": (96.0, 0.004, 75),
+        "200": (92.2, 0.005, 75), "300": (86.5, 0.006, 75), "400": (71.5, 0.008, 75),
+        "500": (53.5, 0.009, 75), "600": (47.5, 0.009, 75), "700": (38.5, 0.008, 75),
+        "800": (28.0, 0.007, 75), "900": (19.5, 0.006, 75), "950": (13.0, 0.005, 75),
+        "1000": (8.0, 0.004, 75),
+    },
+    "accent": {
+        "50": (97.0, 0.020, 42), "100": (93.5, 0.042, 42), "200": (88.0, 0.078, 42),
+        "300": (80.5, 0.118, 42), "400": (72.0, 0.158, 42), "500": (64.5, 0.188, 42),
+        "600": (56.5, 0.176, 42), "700": (47.0, 0.148, 42), "800": (38.0, 0.118, 42),
+        "900": (30.0, 0.090, 42), "950": (21.0, 0.062, 42),
+    },
+    "success": {"100": (94.0, 0.050, 152), "500": (62.0, 0.150, 152), "700": (45.0, 0.120, 152)},
+    "warning": {"100": (95.5, 0.055, 85), "500": (75.0, 0.155, 85), "700": (52.0, 0.125, 85)},
+    "danger": {"100": (94.5, 0.038, 25), "500": (58.0, 0.205, 25), "700": (45.0, 0.170, 25)},
+    "info": {"100": (94.5, 0.035, 250), "500": (58.0, 0.160, 250), "700": (45.0, 0.140, 250)},
+}
+
+TYPE_ROLES = (
+    "type-display", "type-h1", "type-h2", "type-h3", "type-h4",
+    "type-lead", "type-body", "type-ui", "type-label", "type-code",
+)
+ELEVATION_ROLES = (
+    "elevation-flat", "elevation-card", "elevation-raised",
+    "elevation-overlay", "elevation-modal",
+)
+INTERACTION_ROLES = ("bg-hover", "bg-active", "bg-selected", "bg-disabled")
+
+# Default surfaces per theme, used when the file carries no --bg-* of its own.
+DEFAULT_SURFACE = {
+    "light": {"bg-canvas": RAMPS["neutral"]["50"], "bg-surface": RAMPS["neutral"]["0"],
+              "bg-sunken": RAMPS["neutral"]["100"], "bg-raised": RAMPS["neutral"]["0"],
+              "bg-inverse": RAMPS["neutral"]["900"], "bg-accent": RAMPS["accent"]["600"]},
+    "dark": {"bg-canvas": RAMPS["neutral"]["1000"], "bg-surface": RAMPS["neutral"]["950"],
+             "bg-sunken": RAMPS["neutral"]["1000"], "bg-raised": RAMPS["neutral"]["900"],
+             "bg-inverse": RAMPS["neutral"]["100"], "bg-accent": RAMPS["accent"]["500"]},
+}
+
+# A ramp step and a hex are not the same number: 8-bit quantisation costs about
+# 0.002 in OKLab. 0.006 is comfortably above the rounding floor and far below a
+# just-noticeable difference (~0.02), so "on the ramp" stays strict.
+ON_RAMP_DE = 0.006
+# Below this, the colour is a near-miss: almost certainly the ramp step with an
+# eyedropper error, not a deliberate new colour. Worth saying so out loud.
+NEAR_MISS_DE = 0.030
+
+# ===========================================================================
+# Colour math. Identical to scripts/generate_color_ramp.py in web-design-studio
+# -- same matrices, same transfer function. Two implementations that disagree
+# by a rounding digit produce two different audit verdicts, which is worse than
+# having no audit.
+# ===========================================================================
+
+
+def srgb_to_linear(c: float) -> float:
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def linear_to_srgb(c: float) -> float:
+    return c * 12.92 if c <= 0.0031308 else 1.055 * (c ** (1 / 2.4)) - 0.055
+
+
+def linear_srgb_to_oklab(r: float, g: float, b: float) -> Tuple[float, float, float]:
+    l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
+    m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b
+    s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b
+    l_ = math.copysign(abs(l) ** (1 / 3), l)
+    m_ = math.copysign(abs(m) ** (1 / 3), m)
+    s_ = math.copysign(abs(s) ** (1 / 3), s)
+    return (
+        0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+        1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+        0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_,
+    )
+
+
+def oklab_to_linear_srgb(L: float, a: float, b: float) -> Tuple[float, float, float]:
+    l_ = L + 0.3963377774 * a + 0.2158037573 * b
+    m_ = L - 0.1055613458 * a - 0.0638541728 * b
+    s_ = L - 0.0894841775 * a - 1.2914855480 * b
+    l, m, s = l_ ** 3, m_ ** 3, s_ ** 3
+    return (
+        +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+    )
+
+
+def oklch_to_oklab(L: float, C: float, H: float) -> Tuple[float, float, float]:
+    rad = math.radians(H)
+    return (L, C * math.cos(rad), C * math.sin(rad))
+
+
+def oklch_to_rgb(L_pct: float, C: float, H: float) -> Tuple[float, float, float]:
+    """OKLCH (L in percent) -> sRGB 0..1, clamped to gamut."""
+    lr, lg, lb = oklab_to_linear_srgb(*oklch_to_oklab(L_pct / 100.0, C, H))
+    return tuple(min(1.0, max(0.0, linear_to_srgb(c))) for c in (lr, lg, lb))  # type: ignore
+
+
+def rgb_to_oklab(r: float, g: float, b: float) -> Tuple[float, float, float]:
+    return linear_srgb_to_oklab(srgb_to_linear(r), srgb_to_linear(g), srgb_to_linear(b))
+
+
+def delta_e_ok(c1: Tuple[float, float, float], c2: Tuple[float, float, float]) -> float:
+    """Euclidean distance in OKLab. ~0.02 is a just-noticeable difference."""
+    return math.dist(c1, c2)
+
+
+def relative_luminance(r: float, g: float, b: float) -> float:
+    rl, gl, bl = srgb_to_linear(r), srgb_to_linear(g), srgb_to_linear(b)
+    return 0.2126 * rl + 0.7152 * gl + 0.0722 * bl
+
+
+def contrast_ratio(fg: Tuple[float, float, float], bg: Tuple[float, float, float]) -> float:
+    l1, l2 = relative_luminance(*fg), relative_luminance(*bg)
+    if l1 < l2:
+        l1, l2 = l2, l1
+    return (l1 + 0.05) / (l2 + 0.05)
+
+
+def rgb_to_hex(r: float, g: float, b: float) -> str:
+    return "#" + "".join(f"{round(min(1.0, max(0.0, c)) * 255):02x}" for c in (r, g, b))
+
+
+def composite_over(fg: Tuple[float, float, float], alpha: float,
+                   bg: Tuple[float, float, float]) -> Tuple[float, float, float]:
+    """Flatten a translucent colour onto a backdrop. Contrast is measured on
+    what the eye receives, not on what the swatch declares."""
+    return tuple(fg[i] * alpha + bg[i] * (1 - alpha) for i in range(3))  # type: ignore
+
+
+# ===========================================================================
+# Value parsing. Figma hands you numbers; plugins hand you strings; DTCG hands
+# you strings with units. All three have to arrive here as the same thing.
+# ===========================================================================
+
+_HEX = re.compile(r"^#?([0-9a-fA-F]{3,8})$")
+_RGB_FN = re.compile(r"^rgba?\(([^)]*)\)$", re.I)
+_OKLCH_FN = re.compile(r"^oklch\(([^)]*)\)$", re.I)
+_NUM_UNIT = re.compile(r"^(-?\d*\.?\d+)\s*(px|rem|em|pt|%|ms|s)?$", re.I)
+
+
+def as_color(value: Any) -> Optional[Tuple[float, float, float, float]]:
+    """Return (r, g, b, a) in 0..1, or None if this is not a colour."""
+    if isinstance(value, dict):
+        if all(k in value for k in ("r", "g", "b")):
+            try:
+                return (float(value["r"]), float(value["g"]), float(value["b"]),
+                        float(value.get("a", 1.0)))
+            except (TypeError, ValueError):
+                return None
+        # VariableComposedColor (Sept 2026): colour and opacity authored apart.
+        if "color" in value:
+            base = as_color(value["color"])
+            if base is None:
+                return None
+            alpha = value.get("opacity", value.get("alpha", base[3]))
+            if isinstance(alpha, dict):      # an alias in the opacity channel
+                alpha = base[3]
+            try:
+                return (base[0], base[1], base[2], float(alpha))
+            except (TypeError, ValueError):
+                return base
+        return None
+    if not isinstance(value, str):
+        return None
+    raw = value.strip()
+    m = _HEX.match(raw)
+    if m and raw.startswith("#"):
+        h = m.group(1)
+        if len(h) == 3:
+            h = "".join(c * 2 for c in h)
+        elif len(h) == 4:
+            h = "".join(c * 2 for c in h)
+        if len(h) == 6:
+            h += "ff"
+        if len(h) != 8:
+            return None
+        v = [int(h[i:i + 2], 16) / 255.0 for i in range(0, 8, 2)]
+        return (v[0], v[1], v[2], v[3])
+    m = _RGB_FN.match(raw)
+    if m:
+        parts = [p.strip() for p in re.split(r"[,\s/]+", m.group(1)) if p.strip()]
+        try:
+            chans = []
+            for p in parts[:3]:
+                chans.append(float(p[:-1]) / 100.0 if p.endswith("%") else float(p) / 255.0)
+            alpha = 1.0
+            if len(parts) > 3:
+                a = parts[3]
+                alpha = float(a[:-1]) / 100.0 if a.endswith("%") else float(a)
+            return (chans[0], chans[1], chans[2], alpha)
+        except (ValueError, IndexError):
+            return None
+    m = _OKLCH_FN.match(raw)
+    if m:
+        parts = [p.strip() for p in re.split(r"[\s/]+", m.group(1)) if p.strip()]
+        try:
+            L = float(parts[0][:-1]) if parts[0].endswith("%") else float(parts[0]) * 100.0
+            C = float(parts[1])
+            H = float(parts[2].rstrip("deg")) if len(parts) > 2 else 0.0
+            alpha = 1.0
+            if len(parts) > 3:
+                a = parts[3]
+                alpha = float(a[:-1]) / 100.0 if a.endswith("%") else float(a)
+            r, g, b = oklch_to_rgb(L, C, H)
+            return (r, g, b, alpha)
+        except (ValueError, IndexError):
+            return None
+    return None
+
+
+def as_px(value: Any) -> Optional[float]:
+    """Return a pixel number, or None. Bare numbers are px -- that is what a
+    Figma FLOAT variable is."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    m = _NUM_UNIT.match(value.strip())
+    if not m:
+        return None
+    n, unit = float(m.group(1)), (m.group(2) or "px").lower()
+    if unit == "px":
+        return n
+    if unit in ("rem", "em"):
+        return n * 16.0
+    if unit == "pt":
+        return n * 4.0 / 3.0
+    return None
+
+
+def as_ms(value: Any) -> Optional[float]:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    if isinstance(value, str):
+        m = _NUM_UNIT.match(value.strip())
+        if m:
+            n, unit = float(m.group(1)), (m.group(2) or "ms").lower()
+            return n * 1000.0 if unit == "s" else n
+    return None
+
+
+def as_alias(value: Any) -> Optional[str]:
+    """Return the alias target (a variable id, or a dotted/slashed path)."""
+    if isinstance(value, dict):
+        if value.get("type") == "VARIABLE_ALIAS" and "id" in value:
+            return str(value["id"])
+        for key in ("alias", "aliasTo", "variableAlias"):
+            if key in value and isinstance(value[key], str):
+                return value[key]
+        return None
+    if isinstance(value, str):
+        s = value.strip()
+        if s.startswith("{") and s.endswith("}"):
+            return s[1:-1]
+        if s.startswith("$") and len(s) > 1 and not s.startswith("$#"):
+            return s[1:]
+    return None
+
+
+# ===========================================================================
+# Document model
+# ===========================================================================
+
+
+@dataclass
+class FVar:
+    name: str
+    collection: str
+    resolved_type: str
+    values: Dict[str, Any] = field(default_factory=dict)   # mode name -> raw value
+    scopes: List[str] = field(default_factory=list)
+    code_syntax: Dict[str, str] = field(default_factory=dict)
+    description: str = ""
+    var_id: str = ""
+
+    @property
+    def slug(self) -> str:
+        return slugify(self.name)
+
+
+@dataclass
+class FCollection:
+    name: str
+    modes: List[str] = field(default_factory=list)
+    default_mode: str = ""
+
+
+@dataclass
+class FDoc:
+    shape: str
+    collections: Dict[str, FCollection] = field(default_factory=dict)
+    variables: List[FVar] = field(default_factory=list)
+    text_styles: List[dict] = field(default_factory=list)
+    effect_styles: List[dict] = field(default_factory=list)
+    by_id: Dict[str, FVar] = field(default_factory=dict)
+    notes: List[str] = field(default_factory=list)
+
+
+TIER_PREFIXES = {
+    "primitive", "primitives", "core", "global", "base", "raw", "foundation",
+    "semantic", "semantics", "alias", "aliases", "theme", "themes", "role", "roles",
+    "component", "components", "token", "tokens", "design", "ds",
+}
+
+
+def slugify(name: str) -> str:
+    """`Primitive/Space/6` -> `space-6`. Figma's `/` grouping is the same
+    grammar as `--category-role-variant`; this is the round trip."""
+    parts = [p.strip() for p in str(name).replace("\\", "/").split("/") if p.strip()]
+    while len(parts) > 1 and parts[0].strip().lower() in TIER_PREFIXES:
+        parts = parts[1:]
+    slug = "-".join(parts).lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
+    return re.sub(r"-{2,}", "-", slug)
+
+
+def _is_leaf_token(node: Any) -> bool:
+    return isinstance(node, dict) and ("$value" in node or "value" in node)
+
+
+def detect_shape(data: Any) -> str:
+    if isinstance(data, list):
+        return "records"
+    if not isinstance(data, dict):
+        raise ValueError("top level of the file is neither an object nor an array")
+    meta = data.get("meta")
+    if isinstance(meta, dict) and ("variables" in meta or "variableCollections" in meta):
+        return "rest"
+    if isinstance(data.get("collections"), list):
+        return "plugin"
+    if isinstance(data.get("variables"), list):
+        return "records"
+    if isinstance(data.get("variables"), dict) and isinstance(data.get("variableCollections"), dict):
+        return "rest"
+    return "dtcg"
+
+
+def parse_rest(data: dict) -> FDoc:
+    meta = data.get("meta", data)
+    raw_cols = meta.get("variableCollections", {}) or {}
+    raw_vars = meta.get("variables", {}) or {}
+    doc = FDoc(shape="rest")
+    mode_names: Dict[str, Dict[str, str]] = {}      # collection id -> modeId -> name
+    col_of: Dict[str, str] = {}                      # collection id -> collection name
+    for cid, col in raw_cols.items():
+        cname = col.get("name") or cid
+        modes = col.get("modes") or []
+        names, seen = [], {}
+        for m in modes:
+            mid = m.get("modeId") or m.get("id") or ""
+            mn = m.get("name") or mid or "Mode"
+            if mn in seen:                            # duplicate mode labels happen
+                mn = f"{mn} ({mid})"
+            seen[mn] = True
+            names.append(mn)
+            mode_names.setdefault(cid, {})[mid] = mn
+        default_id = col.get("defaultModeId") or (modes[0].get("modeId") if modes else "")
+        doc.collections[cname] = FCollection(
+            name=cname, modes=names,
+            default_mode=mode_names.get(cid, {}).get(default_id, names[0] if names else "Value"),
+        )
+        col_of[cid] = cname
+    for vid, v in raw_vars.items():
+        cid = v.get("variableCollectionId", "")
+        cname = col_of.get(cid, "(unknown collection)")
+        if cname not in doc.collections:
+            doc.collections[cname] = FCollection(name=cname, modes=[], default_mode="Value")
+        values: Dict[str, Any] = {}
+        for mid, val in (v.get("valuesByMode") or {}).items():
+            values[mode_names.get(cid, {}).get(mid, mid)] = val
+        fv = FVar(
+            name=v.get("name", vid), collection=cname,
+            resolved_type=(v.get("resolvedType") or "").upper(),
+            values=values, scopes=list(v.get("scopes") or []),
+            code_syntax=dict(v.get("codeSyntax") or {}),
+            description=v.get("description") or "", var_id=vid,
+        )
+        doc.variables.append(fv)
+        doc.by_id[vid] = fv
+        if v.get("key"):
+            doc.by_id.setdefault(str(v["key"]), fv)
+    return doc
+
+
+def parse_plugin(data: dict) -> FDoc:
+    """The `{"collections": [...]}` family. Two sub-shapes exist in the wild:
+    variables listed once per mode, and variables listed once with valuesByMode.
+    Both arrive here."""
+    doc = FDoc(shape="plugin")
+    for col in data.get("collections", []):
+        if not isinstance(col, dict):
+            continue
+        cname = col.get("name") or "tokens"
+        raw_modes = col.get("modes") or []
+        mode_labels: List[str] = []
+        merged: Dict[str, FVar] = {}
+
+        def _ingest(entry: dict, mode: str) -> None:
+            if not isinstance(entry, dict) or "name" not in entry:
+                return
+            key = str(entry["name"])
+            fv = merged.get(key)
+            if fv is None:
+                fv = FVar(
+                    name=key, collection=cname,
+                    resolved_type=str(entry.get("type") or entry.get("resolvedType") or "").upper(),
+                    scopes=list(entry.get("scopes") or []),
+                    code_syntax=dict(entry.get("codeSyntax") or {}),
+                    description=entry.get("description") or "",
+                    var_id=str(entry.get("id") or key),
+                )
+                merged[key] = fv
+                doc.by_id.setdefault(fv.var_id, fv)
+                doc.by_id.setdefault(key, fv)
+            vbm = entry.get("valuesByMode")
+            if isinstance(vbm, dict):
+                for mk, mv in vbm.items():
+                    fv.values[str(mk)] = mv
+                    if str(mk) not in mode_labels:
+                        mode_labels.append(str(mk))
+            elif "value" in entry or "$value" in entry:
+                fv.values[mode] = entry.get("value", entry.get("$value"))
+
+        # Sub-shape 1: modes carry their own variable lists.
+        nested = False
+        for m in raw_modes:
+            if isinstance(m, dict) and isinstance(m.get("variables"), list):
+                nested = True
+                mname = m.get("name") or m.get("modeId") or "Value"
+                if mname not in mode_labels:
+                    mode_labels.append(mname)
+                for entry in m["variables"]:
+                    _ingest(entry, mname)
+            elif isinstance(m, dict):
+                mn = m.get("name") or m.get("modeId") or "Value"
+                if mn not in mode_labels:
+                    mode_labels.append(mn)
+            elif isinstance(m, str) and m not in mode_labels:
+                mode_labels.append(m)
+        # Sub-shape 2: a flat variable list with valuesByMode.
+        if not nested:
+            for entry in col.get("variables", []) or []:
+                _ingest(entry, mode_labels[0] if mode_labels else "Value")
+        if not mode_labels:
+            mode_labels = ["Value"]
+        default = col.get("defaultMode") or col.get("defaultModeId") or mode_labels[0]
+        if default not in mode_labels:
+            default = mode_labels[0]
+        doc.collections[cname] = FCollection(cname, mode_labels, default)
+        doc.variables.extend(merged.values())
+    return doc
+
+
+def parse_records(data: Any, collection: str) -> FDoc:
+    rows = data if isinstance(data, list) else (data.get("variables") or [])
+    doc = FDoc(shape="records")
+    doc.collections[collection] = FCollection(collection, ["Value"], "Value")
+    for row in rows:
+        if not isinstance(row, dict) or "name" not in row:
+            continue
+        fv = FVar(
+            name=str(row["name"]), collection=row.get("collection") or collection,
+            resolved_type=str(row.get("type") or row.get("resolvedType") or "").upper(),
+            values={row.get("mode", "Value"): row.get("value", row.get("$value"))},
+            scopes=list(row.get("scopes") or []),
+            description=row.get("description") or "",
+            var_id=str(row.get("id") or row["name"]),
+        )
+        if fv.collection not in doc.collections:
+            doc.collections[fv.collection] = FCollection(fv.collection, ["Value"], "Value")
+        mode = row.get("mode", "Value")
+        if mode not in doc.collections[fv.collection].modes:
+            doc.collections[fv.collection].modes.append(mode)
+        doc.variables.append(fv)
+        doc.by_id.setdefault(fv.var_id, fv)
+        doc.by_id.setdefault(fv.name, fv)
+    return doc
+
+
+def parse_dtcg(data: dict, collection: str) -> FDoc:
+    doc = FDoc(shape="dtcg")
+    doc.collections[collection] = FCollection(collection, ["Value"], "Value")
+    reserved = {"$schema", "$description", "$extensions", "$type", "$value"}
+
+    def walk(node: Any, path: List[str]) -> None:
+        if _is_leaf_token(node):
+            name = "/".join(path)
+            fv = FVar(
+                name=name, collection=collection,
+                resolved_type=dtcg_type(node.get("$type") or node.get("type"),
+                                        node.get("$value", node.get("value"))),
+                values={"Value": node.get("$value", node.get("value"))},
+                description=node.get("$description") or node.get("description") or "",
+                var_id=name,
+            )
+            doc.variables.append(fv)
+            doc.by_id.setdefault(name, fv)
+            doc.by_id.setdefault(".".join(path), fv)
+            return
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k in reserved:
+                    continue
+                walk(v, path + [str(k)])
+
+    walk(data, [])
+    return doc
+
+
+def dtcg_type(declared: Optional[str], value: Any) -> str:
+    if declared:
+        d = declared.lower()
+        if d == "color":
+            return "COLOR"
+        if d in ("dimension", "number", "duration", "fontweight", "font-weight"):
+            return "FLOAT"
+        if d in ("fontfamily", "font-family", "string", "cubicbezier", "shadow", "typography"):
+            return "STRING"
+        if d == "boolean":
+            return "BOOLEAN"
+    if isinstance(value, bool):
+        return "BOOLEAN"
+    if as_color(value) is not None:
+        return "COLOR"
+    if as_px(value) is not None:
+        return "FLOAT"
+    return "STRING"
+
+
+def load_document(path: Path, forced: Optional[str], collection: str) -> FDoc:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise SystemExit(f"cannot read {path}: {exc}")
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"{path} is not valid JSON: {exc}")
+    shape = forced or detect_shape(data)
+    if shape == "rest":
+        doc = parse_rest(data)
+    elif shape == "plugin":
+        doc = parse_plugin(data)
+    elif shape == "records":
+        doc = parse_records(data, collection)
+    else:
+        doc = parse_dtcg(data, collection)
+    attach_styles(doc, data)
+    # Fill in types the source omitted, from the value itself.
+    for v in doc.variables:
+        if v.resolved_type not in ("COLOR", "FLOAT", "STRING", "BOOLEAN"):
+            sample = next((x for x in v.values.values() if as_alias(x) is None), None)
+            v.resolved_type = dtcg_type(None, sample)
+    return doc
+
+
+def attach_styles(doc: FDoc, data: Any) -> None:
+    if not isinstance(data, dict):
+        return
+    buckets: List[Any] = [data.get("textStyles"), data.get("effectStyles")]
+    meta = data.get("meta")
+    if isinstance(meta, dict):
+        buckets += [meta.get("styles"), meta.get("textStyles"), meta.get("effectStyles")]
+    buckets.append(data.get("styles"))
+    for bucket in buckets:
+        rows: Iterable[Any]
+        if isinstance(bucket, dict):
+            rows = [{**v, "key": k} for k, v in bucket.items() if isinstance(v, dict)]
+        elif isinstance(bucket, list):
+            rows = [r for r in bucket if isinstance(r, dict)]
+        else:
+            continue
+        for row in rows:
+            st = str(row.get("styleType") or row.get("style_type") or row.get("type") or "").upper()
+            if st == "TEXT" or ("fontSize" in row or "style" in row):
+                if row not in doc.text_styles:
+                    doc.text_styles.append(row)
+            elif st == "EFFECT" or "effects" in row:
+                if row not in doc.effect_styles:
+                    doc.effect_styles.append(row)
+
+
+# ===========================================================================
+# Findings
+# ===========================================================================
+
+SEVERITY_ORDER = {"error": 3, "warn": 2, "info": 1}
+
+
+@dataclass
+class Finding:
+    code: str
+    severity: str
+    collection: str
+    mode: str
+    name: str
+    summary: str
+    detail: str = ""
+    suggestion: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "code": self.code, "severity": self.severity, "collection": self.collection,
+            "mode": self.mode, "name": self.name, "summary": self.summary,
+            "detail": self.detail, "suggestion": self.suggestion,
+        }
+
+
+CODE_TITLES = {
+    "OFF_SCALE_SPACING": "Spacing values that are not on the scale",
+    "OFF_SCALE_RADIUS": "Corner radii that are not on the scale",
+    "OFF_SCALE_TYPE": "Font sizes that are not on the type scale",
+    "OFF_SCALE_LEADING": "Line heights that are not on the leading scale",
+    "OFF_SCALE_TRACKING": "Letter spacing that is not on the tracking scale",
+    "OFF_SCALE_WEIGHT": "Font weights that are not on the weight scale",
+    "OFF_SCALE_STROKE": "Stroke widths that are not on the scale",
+    "OFF_SCALE_DURATION": "Durations that are not on the motion scale",
+    "OFF_SCALE_Z": "Z-index values that are not on the ladder",
+    "OFF_SCALE_BREAKPOINT": "Breakpoints that are not on the ladder",
+    "OFF_RAMP_COLOR": "Colours that are not on a ramp",
+    "CONTRAST_FAIL": "Text colours that do not meet WCAG 2.2 AA",
+    "TAP_TARGET": "Interactive sizes below the 44px minimum",
+    "UNMAPPED_TEXT_STYLE": "Text styles with no type role",
+    "UNMAPPED_EFFECT_STYLE": "Effect styles with no elevation role",
+    "TEXT_STYLE_OFF_SCALE": "Text styles built from off-scale values",
+    "MISSING_DARK_MODE": "Semantic colour collections with no dark mode",
+    "MISSING_STATE": "Interaction states that were never designed",
+    "BROKEN_ALIAS": "Aliases that point at nothing",
+    "ALIAS_CYCLE": "Aliases that point at each other",
+    "TIER_VIOLATION": "Semantic roles bound to raw values instead of primitives",
+}
+
+# ===========================================================================
+# Classifiers -- deciding which closed scale a variable is answerable to.
+# Scope wins over name: a designer who scoped it told you what it is for.
+# ===========================================================================
+
+SPACING_NAME_RE = re.compile(
+    r"(^|[-/])(space|spacing|gap|pad|padding|inset|gutter|margin|offset)([-/]|$)", re.I)
+RADIUS_NAME_RE = re.compile(r"(^|[-/])(radius|corner|rounding)([-/]|$)", re.I)
+TYPE_SIZE_RE = re.compile(r"(^|[-/])(text|fontsize|font-size|type-size|size-text)([-/]|$)", re.I)
+LEADING_RE = re.compile(r"(^|[-/])(leading|line-height|lineheight)([-/]|$)", re.I)
+TRACKING_RE = re.compile(r"(^|[-/])(tracking|letter-spacing|letterspacing)([-/]|$)", re.I)
+WEIGHT_RE = re.compile(r"(^|[-/])(weight|font-weight|fontweight)([-/]|$)", re.I)
+STROKE_RE = re.compile(r"(^|[-/])(stroke|border-width|borderwidth)([-/]|$)", re.I)
+DURATION_RE = re.compile(r"(^|[-/])(dur|duration|motion|transition)([-/]|$)", re.I)
+Z_RE = re.compile(r"(^|[-/])(z|z-index|zindex|layer|elevation-index)([-/]|$)", re.I)
+BP_RE = re.compile(r"(^|[-/])(bp|breakpoint|screen|viewport)([-/]|$)", re.I)
+TAP_RE = re.compile(
+    r"(^|[-/])(tap|touch|target|hit|control|button|input|field|checkbox|radio|switch)([-/]|$)", re.I)
+SIZE_RE = re.compile(r"(^|[-/])(size|height|min-height|minheight|min|h)([-/]|$)", re.I)
+# Anchored at the START of the slug on purpose. `fg-muted` is a text role;
+# `brand-ink-blue` is a primitive that happens to contain the word "ink", and a
+# primitive has no backdrop to be measured against. Unanchored matching here is
+# the single biggest source of false positives in a token linter.
+TEXT_ROLE_RE = re.compile(r"^(fg|text|foreground|ink|content|label|on)([-/]|$)", re.I)
+BG_ROLE_RE = re.compile(r"^(bg|background|surface|canvas|fill)([-/]|$)", re.I)
+DISABLED_RE = re.compile(r"disabled|inactive", re.I)
+LARGE_TEXT_RE = re.compile(r"display|hero|h1|heading|title|large", re.I)
+
+
+def float_kind(var: FVar) -> Optional[str]:
+    """Which closed scale does this FLOAT answer to? Scope first, then name."""
+    scopes = {s.upper() for s in var.scopes}
+    if "CORNER_RADIUS" in scopes:
+        return "radius"
+    if "FONT_SIZE" in scopes:
+        return "type"
+    if "LINE_HEIGHT" in scopes:
+        return "leading"
+    if "LETTER_SPACING" in scopes:
+        return "tracking"
+    if "FONT_WEIGHT" in scopes:
+        return "weight"
+    if "STROKE_FLOAT" in scopes:
+        return "stroke"
+    if "GAP" in scopes or "PARAGRAPH_SPACING" in scopes or "PARAGRAPH_INDENT" in scopes:
+        return "spacing"
+    n = var.slug
+    for regex, kind in (
+        (RADIUS_NAME_RE, "radius"), (LEADING_RE, "leading"), (TRACKING_RE, "tracking"),
+        (WEIGHT_RE, "weight"), (STROKE_RE, "stroke"), (DURATION_RE, "duration"),
+        (BP_RE, "breakpoint"), (Z_RE, "z"), (TYPE_SIZE_RE, "type"),
+        (SPACING_NAME_RE, "spacing"),
+    ):
+        if regex.search(n):
+            return kind
+    if "WIDTH_HEIGHT" in scopes and TAP_RE.search(n):
+        return "tap"
+    if TAP_RE.search(n) and SIZE_RE.search(n):
+        return "tap"
+    return None
+
+
+def nearest(value: float, scale: Sequence[float]) -> Tuple[float, float]:
+    best = min(scale, key=lambda s: abs(s - value))
+    return best, value - best
+
+
+def close_enough(value: float, scale: Sequence[float], tol: float = 0.01) -> bool:
+    return any(abs(value - s) <= tol for s in scale)
+
+
+# ===========================================================================
+# The audit
+# ===========================================================================
+
+
+class Auditor:
+    def __init__(self, doc: FDoc, *, tap_min: float = TAP_MIN_PX) -> None:
+        self.doc = doc
+        self.tap_min = tap_min
+        self.findings: List[Finding] = []
+        self.checked = 0
+        self._resolved: Dict[Tuple[str, str], Optional[Tuple[float, float, float, float]]] = {}
+        self._by_slug: Dict[Tuple[str, str], FVar] = {}
+        for v in doc.variables:
+            self._by_slug.setdefault((v.collection, v.slug), v)
+
+    # -- alias resolution ---------------------------------------------------
+
+    def target_of(self, alias: str) -> Optional[FVar]:
+        if alias in self.doc.by_id:
+            return self.doc.by_id[alias]
+        slug = slugify(alias.replace(".", "/"))
+        for (_, s), v in self._by_slug.items():
+            if s == slug:
+                return v
+        return None
+
+    def resolve_color(self, var: FVar, mode: str,
+                      _seen: Optional[set] = None) -> Optional[Tuple[float, float, float, float]]:
+        key = (var.var_id or var.name, mode)
+        if _seen is None:
+            if key in self._resolved:
+                return self._resolved[key]
+            _seen = set()
+        if key in _seen:
+            return None
+        _seen.add(key)
+        raw = var.values.get(mode)
+        if raw is None and var.values:
+            raw = var.values.get(next(iter(var.values)))
+        alias = as_alias(raw)
+        out: Optional[Tuple[float, float, float, float]]
+        if alias is not None:
+            tgt = self.target_of(alias)
+            if tgt is None:
+                out = None
+            else:
+                tmode = mode if mode in tgt.values else (
+                    next(iter(tgt.values)) if tgt.values else mode)
+                out = self.resolve_color(tgt, tmode, _seen)
+        else:
+            out = as_color(raw)
+        if len(_seen) == 1:
+            self._resolved[key] = out
+        return out
+
+    # -- checks -------------------------------------------------------------
+
+    def run(self) -> List[Finding]:
+        self.check_aliases()
+        for var in self.doc.variables:
+            for mode in (var.values.keys() or [""]):
+                raw = var.values.get(mode)
+                if as_alias(raw) is not None:
+                    continue                       # an alias is checked at its target
+                self.checked += 1
+                if var.resolved_type == "FLOAT":
+                    self.check_float(var, mode, raw)
+                elif var.resolved_type == "COLOR":
+                    self.check_color(var, mode, raw)
+        self.check_contrast()
+        self.check_dark_mode()
+        self.check_states()
+        self.check_text_styles()
+        self.check_effect_styles()
+        self.findings.sort(key=lambda f: (-SEVERITY_ORDER[f.severity], f.code, f.name, f.mode))
+        return self.findings
+
+    def add(self, **kw: Any) -> None:
+        self.findings.append(Finding(**kw))
+
+    def check_aliases(self) -> None:
+        for var in self.doc.variables:
+            for mode, raw in var.values.items():
+                alias = as_alias(raw)
+                if alias is None:
+                    continue
+                tgt = self.target_of(alias)
+                if tgt is None:
+                    self.add(
+                        code="BROKEN_ALIAS", severity="error", collection=var.collection,
+                        mode=mode, name=var.name,
+                        summary=f"aliases `{alias}`, which is not in this file",
+                        detail="The variable it points at was deleted, lives in a library that "
+                               "was not exported, or the export dropped it.",
+                        suggestion="Re-export with the library included, or repoint the variable.",
+                    )
+                    continue
+                # Walk the chain looking for a loop.
+                seen = {(var.var_id or var.name, mode)}
+                cur, cmode, depth = tgt, mode, 0
+                while depth < 64:
+                    ckey = (cur.var_id or cur.name, cmode if cmode in cur.values else (
+                        next(iter(cur.values)) if cur.values else cmode))
+                    if ckey in seen:
+                        loop_at = cur.name if ckey[0] != (var.var_id or var.name) else var.name
+                        self.add(
+                            code="ALIAS_CYCLE", severity="error", collection=var.collection,
+                            mode=mode, name=var.name,
+                            summary=f"alias chain loops at `{loop_at}`",
+                            detail="A cycle has no value at the end of it. In CSS this renders as "
+                                   "an invalid custom property and the element falls back to "
+                                   "`unset`, which usually looks like black text on black.",
+                            suggestion="Break the loop: one of these two should hold a literal.",
+                        )
+                        break
+                    seen.add(ckey)
+                    nxt_raw = cur.values.get(ckey[1])
+                    nxt_alias = as_alias(nxt_raw)
+                    if nxt_alias is None:
+                        break
+                    nxt = self.target_of(nxt_alias)
+                    if nxt is None:
+                        break
+                    cur, cmode, depth = nxt, ckey[1], depth + 1
+
+    def check_float(self, var: FVar, mode: str, raw: Any) -> None:
+        kind = float_kind(var)
+        if kind is None:
+            return
+        if kind == "duration":
+            ms = as_ms(raw)
+            if ms is None or close_enough(ms, DUR_MS, 0.5):
+                return
+            best, delta = nearest(ms, DUR_MS)
+            self.add(
+                code="OFF_SCALE_DURATION", severity="warn", collection=var.collection,
+                mode=mode, name=var.name, summary=f"{fmt(ms)}ms is not one of the five durations",
+                detail=f"nearest is {fmt(best)}ms ({DUR_NAME[int(best)]}), {signed(delta)}ms away",
+                suggestion=f"use {DUR_NAME[int(best)]}",
+            )
+            return
+
+        px = as_px(raw)
+        if px is None:
+            return
+        table: Dict[str, Tuple[Sequence[float], Dict[Any, str], str, str]] = {
+            "spacing": (SPACING_PX, SPACING_NAME, "OFF_SCALE_SPACING", "px"),
+            "radius": (RADIUS_PX, RADIUS_NAME, "OFF_SCALE_RADIUS", "px"),
+            "type": (TYPE_PX, TYPE_NAME, "OFF_SCALE_TYPE", "px"),
+            "stroke": (STROKE_PX, STROKE_NAME, "OFF_SCALE_STROKE", "px"),
+            "z": (Z_STEPS, Z_NAME, "OFF_SCALE_Z", ""),
+            "breakpoint": (BP_PX, BP_NAME, "OFF_SCALE_BREAKPOINT", "px"),
+        }
+        if kind in table:
+            scale, names, code, unit = table[kind]
+            if close_enough(px, scale):
+                return
+            best, delta = nearest(px, scale)
+            token = names.get(int(best), names.get(best, ""))
+            self.add(
+                code=code, severity="error" if kind in ("spacing", "type") else "warn",
+                collection=var.collection, mode=mode, name=var.name,
+                summary=f"{fmt(px)}{unit} is not a step on the {kind} scale",
+                detail=f"nearest legal step is {fmt(best)}{unit} ({token}), {signed(delta)}{unit} away",
+                suggestion=f"use {token}" if abs(delta) <= max(4.0, best * 0.15)
+                else f"use {token}, or make the case for a new step (Law 3 sign-off)",
+            )
+            return
+        if kind == "leading":
+            ratio = float(raw) if isinstance(raw, (int, float)) else px
+            if ratio > 10:                      # authored in px or percent
+                ratio = ratio / 100.0 if ratio <= 400 else ratio
+            if close_enough(ratio, LEADING, 0.02):
+                return
+            best, delta = nearest(ratio, LEADING)
+            self.add(
+                code="OFF_SCALE_LEADING", severity="warn", collection=var.collection,
+                mode=mode, name=var.name, summary=f"{fmt(ratio)} is not one of the five leadings",
+                detail=f"nearest is {fmt(best)} ({LEADING_NAME[best]}), {signed(delta)} away",
+                suggestion=f"use {LEADING_NAME[best]}",
+            )
+            return
+        if kind == "tracking":
+            em = float(raw) if isinstance(raw, (int, float)) else 0.0
+            if abs(em) > 1:                     # authored in px against a 16px body
+                em = em / 16.0
+            if close_enough(em, TRACKING_EM, 0.002):
+                return
+            best, delta = nearest(em, TRACKING_EM)
+            self.add(
+                code="OFF_SCALE_TRACKING", severity="warn", collection=var.collection,
+                mode=mode, name=var.name, summary=f"{em:g}em is not on the tracking scale",
+                detail=f"nearest is {best:g}em ({TRACKING_NAME[best]}), {delta:+.4g}em away",
+                suggestion=f"use {TRACKING_NAME[best]}",
+            )
+            return
+        if kind == "weight":
+            if close_enough(px, WEIGHTS, 0.5):
+                return
+            best, delta = nearest(px, WEIGHTS)
+            self.add(
+                code="OFF_SCALE_WEIGHT", severity="warn", collection=var.collection,
+                mode=mode, name=var.name, summary=f"weight {fmt(px)} is not one of the four",
+                detail=f"nearest is {fmt(best)} ({WEIGHT_NAME[int(best)]}), {signed(delta)} away",
+                suggestion=f"use {WEIGHT_NAME[int(best)]}",
+            )
+            return
+        if kind == "tap" and 0 < px < self.tap_min:
+            self.add(
+                code="TAP_TARGET", severity="error", collection=var.collection,
+                mode=mode, name=var.name,
+                summary=f"{fmt(px)}px is below the {fmt(self.tap_min)}px minimum touch target",
+                detail="WCAG 2.2 SC 2.5.8 sets 24x24 as the floor; this system sets 44 "
+                       "(`--tap-min`) because 24 is a legal minimum, not a usable one.",
+                suggestion=f"raise to {fmt(self.tap_min)}px, or keep the visual size and add "
+                           "invisible padding so the hit area reaches 44",
+            )
+
+    def check_color(self, var: FVar, mode: str, raw: Any) -> None:
+        rgba = as_color(raw)
+        if rgba is None:
+            return
+        r, g, b, a = rgba
+        if a < 0.999:
+            # Translucent overlays (--bg-hover, --bg-active) are deliberately off-ramp.
+            return
+        hexv = rgb_to_hex(r, g, b)
+        if hexv in ramp_hex_index():
+            return          # the 8-bit rendering of a ramp step IS the ramp step
+        lab = rgb_to_oklab(r, g, b)
+        best_name, best_de = "", float("inf")
+        for ramp, steps in RAMPS.items():
+            for step, oklch in steps.items():
+                cand = rgb_to_oklab(*oklch_to_rgb(*oklch))
+                de = delta_e_ok(lab, cand)
+                if de < best_de:
+                    best_de, best_name = de, f"--{ramp}-{step}"
+        if best_de <= ON_RAMP_DE:
+            return
+        if best_de <= NEAR_MISS_DE:
+            detail = (f"nearest ramp step is {best_name} (dEok {best_de:.3f}). That is below the "
+                      "just-noticeable threshold, so this is almost certainly an eyedropper "
+                      "error rather than a decision.")
+            suggestion = f"bind to {best_name}"
+            severity = "error"
+        else:
+            detail = (f"nearest ramp step is {best_name} (dEok {best_de:.3f}) -- far enough to be "
+                      "a deliberate choice, which makes it a design-system change, not a fix.")
+            suggestion = (f"either bind to {best_name}, or take it through the new-token path "
+                          "(Law 3: adding a ramp step needs sign-off)")
+            severity = "error"
+        self.add(
+            code="OFF_RAMP_COLOR", severity=severity, collection=var.collection,
+            mode=mode, name=var.name, summary=f"{hexv} is not on any ramp",
+            detail=detail, suggestion=suggestion,
+        )
+
+    def check_contrast(self) -> None:
+        for var in self.doc.variables:
+            if var.resolved_type != "COLOR":
+                continue
+            slug = var.slug
+            scopes = {s.upper() for s in var.scopes}
+            is_text = "TEXT_FILL" in scopes or (
+                TEXT_ROLE_RE.search(slug) and not BG_ROLE_RE.search(slug))
+            if not is_text or DISABLED_RE.search(slug):
+                continue
+            for mode in var.values:
+                fg = self.resolve_color(var, mode)
+                if fg is None:
+                    continue
+                threshold = 3.0 if LARGE_TEXT_RE.search(slug) else 4.5
+                fails: List[Tuple[float, str, Tuple[float, float, float],
+                                  Tuple[float, float, float]]] = []
+                for bg_slug, bg in self.backdrops(var.collection, mode, slug):
+                    flat_fg = composite_over(fg[:3], fg[3], bg) if fg[3] < 0.999 else fg[:3]
+                    ratio = contrast_ratio(flat_fg, bg)
+                    if ratio + 1e-9 < threshold:
+                        fails.append((ratio, bg_slug, flat_fg, bg))
+                if not fails:
+                    continue
+                # One finding per colour per mode, reporting its worst surface. A
+                # designer does not need the same colour listed three times; they
+                # need to know it has to move.
+                ratio, bg_slug, flat_fg, bg = min(fails, key=lambda t: t[0])
+                also = (f" (and {len(fails) - 1} other surface"
+                        f"{'' if len(fails) == 2 else 's'})") if len(fails) > 1 else ""
+                self.add(
+                    code="CONTRAST_FAIL", severity="error", collection=var.collection,
+                    mode=mode, name=var.name,
+                    summary=f"{ratio:.2f}:1 against {bg_slug}{also} -- needs {threshold:g}:1",
+                    detail=f"{rgb_to_hex(*flat_fg)} on {rgb_to_hex(*bg)} in mode `{mode}`. "
+                           "WCAG 2.2 SC 1.4.3. Measured, not assumed.",
+                    suggestion="move the foreground one ramp step further from the surface "
+                               "(darker on light, lighter on dark) and re-measure; do not "
+                               "adjust the background, which is load-bearing for every other "
+                               "role sitting on it",
+                )
+
+    def backdrops(self, collection: str, mode: str,
+                  fg_slug: str) -> List[Tuple[str, Tuple[float, float, float]]]:
+        """Which surfaces does this foreground actually land on?"""
+        theme = "dark" if re.search(r"dark|night", mode, re.I) else "light"
+        if "on-accent" in fg_slug:
+            wanted = ["bg-accent"]
+        elif "on-inverse" in fg_slug:
+            wanted = ["bg-inverse"]
+        else:
+            wanted = ["bg-canvas", "bg-surface", "bg-sunken"]
+        out: List[Tuple[str, Tuple[float, float, float]]] = []
+        for want in wanted:
+            found = None
+            for (col, slug), v in self._by_slug.items():
+                if slug.endswith(want) and v.resolved_type == "COLOR":
+                    if col == collection or found is None:
+                        rgba = self.resolve_color(v, mode if mode in v.values else (
+                            next(iter(v.values)) if v.values else mode))
+                        if rgba is not None:
+                            found = (v.slug, rgba[:3])
+                            if col == collection:
+                                break
+            if found is None:
+                oklch = DEFAULT_SURFACE[theme].get(want)
+                if oklch is None:
+                    continue
+                found = (f"{want} (system default)", oklch_to_rgb(*oklch))
+            out.append(found)
+        # De-duplicate identical surfaces so one colour is not reported three times.
+        seen, uniq = set(), []
+        for name, rgb in out:
+            key = rgb_to_hex(*rgb)
+            if key not in seen:
+                seen.add(key)
+                uniq.append((name, rgb))
+        return uniq
+
+    def check_dark_mode(self) -> None:
+        for cname, col in self.doc.collections.items():
+            semantic = [v for v in self.doc.variables
+                        if v.collection == cname and v.resolved_type == "COLOR"
+                        and (BG_ROLE_RE.search(v.slug) or TEXT_ROLE_RE.search(v.slug))]
+            if len(semantic) < 3:
+                continue
+            has_dark = any(re.search(r"dark|night", m, re.I) for m in col.modes)
+            if not has_dark:
+                self.add(
+                    code="MISSING_DARK_MODE", severity="warn", collection=cname, mode="-",
+                    name=cname,
+                    summary=f"`{cname}` holds {len(semantic)} semantic colour roles and one mode",
+                    detail="A second mode is the whole reason semantic roles exist. Without it, "
+                           "dark mode arrives later as a set of component overrides, which is "
+                           "the failure Law 6 exists to prevent.",
+                    suggestion="add a Dark mode to this collection and re-point the roles; "
+                               "primitives stay constant across modes",
+                )
+
+    def check_states(self) -> None:
+        slugs = {v.slug for v in self.doc.variables}
+        interactive = any(s.endswith("bg-accent") or s.endswith("bg-surface") for s in slugs)
+        if not interactive:
+            return
+        missing = [r for r in INTERACTION_ROLES if not any(s.endswith(r) for s in slugs)]
+        if missing:
+            self.add(
+                code="MISSING_STATE", severity="warn", collection="-", mode="-",
+                name=", ".join(missing),
+                summary=f"{len(missing)} of the interaction roles are not in the file",
+                detail="Seven states ship per interactive component: default, hover, "
+                       "focus-visible, active, disabled, loading, error. A role that does not "
+                       "exist in the file gets invented during the build, by whoever gets there "
+                       "first.",
+                suggestion="design hover, active, selected and disabled once, as roles, not per "
+                           "component",
+            )
+
+    def check_text_styles(self) -> None:
+        for style in self.doc.text_styles:
+            name = str(style.get("name") or style.get("key") or "(unnamed)")
+            slug = slugify(name)
+            mapped = any(slug.endswith(role) or slug == role.replace("type-", "")
+                         for role in TYPE_ROLES)
+            if not mapped:
+                self.add(
+                    code="UNMAPPED_TEXT_STYLE", severity="error", collection="text styles",
+                    mode="-", name=name,
+                    summary="no `--type-*` role answers to this style",
+                    detail="The roles are: " + ", ".join(f"--{r}" for r in TYPE_ROLES) + ". "
+                           "One text style per role, not one per usage -- `Card title` and "
+                           "`Modal title` are the same role at two call sites.",
+                    suggestion="rename to the role it plays, or delete it and use the role",
+                )
+            props = style.get("style") if isinstance(style.get("style"), dict) else style
+            size = props.get("fontSize") if isinstance(props, dict) else None
+            if isinstance(size, (int, float)) and not close_enough(float(size), TYPE_PX):
+                best, delta = nearest(float(size), TYPE_PX)
+                self.add(
+                    code="TEXT_STYLE_OFF_SCALE", severity="error", collection="text styles",
+                    mode="-", name=name,
+                    summary=f"font-size {fmt(size)}px is not on the type scale",
+                    detail=f"nearest is {fmt(best)}px ({TYPE_NAME[int(best)]}), "
+                           f"{signed(delta)}px away",
+                    suggestion=f"use {TYPE_NAME[int(best)]}",
+                )
+            if isinstance(props, dict):
+                weight = props.get("fontWeight")
+                if isinstance(weight, (int, float)) and not close_enough(float(weight), WEIGHTS, 0.5):
+                    best, delta = nearest(float(weight), WEIGHTS)
+                    self.add(
+                        code="TEXT_STYLE_OFF_SCALE", severity="warn", collection="text styles",
+                        mode="-", name=name,
+                        summary=f"weight {fmt(weight)} is not one of the four",
+                        detail=f"nearest is {fmt(best)} ({WEIGHT_NAME[int(best)]})",
+                        suggestion=f"use {WEIGHT_NAME[int(best)]}",
+                    )
+                lh = props.get("lineHeightPx")
+                if isinstance(lh, (int, float)) and isinstance(size, (int, float)) and size:
+                    ratio = float(lh) / float(size)
+                    if not close_enough(ratio, LEADING, 0.03):
+                        best, _ = nearest(ratio, LEADING)
+                        self.add(
+                            code="OFF_SCALE_LEADING", severity="warn", collection="text styles",
+                            mode="-", name=name,
+                            summary=f"line-height {ratio:.3g} is not one of the five leadings",
+                            detail=f"{fmt(lh)}px over {fmt(size)}px. Nearest is {best:g} "
+                                   f"({LEADING_NAME[best]}).",
+                            suggestion=f"use {LEADING_NAME[best]}",
+                        )
+
+    def check_effect_styles(self) -> None:
+        for style in self.doc.effect_styles:
+            name = str(style.get("name") or style.get("key") or "(unnamed)")
+            slug = slugify(name)
+            if any(slug.endswith(role) or slug == role.replace("elevation-", "")
+                   for role in ELEVATION_ROLES):
+                continue
+            self.add(
+                code="UNMAPPED_EFFECT_STYLE", severity="warn", collection="effect styles",
+                mode="-", name=name,
+                summary="no `--elevation-*` role answers to this style",
+                detail="The roles are: " + ", ".join(f"--{r}" for r in ELEVATION_ROLES) + ". "
+                       "An effect style named for its blur radius (`Shadow 12`) cannot be "
+                       "re-tuned later without renaming it everywhere.",
+                suggestion="rename to the role it plays (`elevation/card`), not the value it holds",
+            )
+
+
+_RAMP_HEX: Dict[str, str] = {}
+
+
+def ramp_hex_index() -> Dict[str, str]:
+    """hex -> token name, for every ramp step. A designer who eyedropped the
+    swatch gets a byte-exact hex, and no float comparison should second-guess
+    that. Built once, lazily."""
+    if not _RAMP_HEX:
+        for ramp, steps in RAMPS.items():
+            for step, oklch in steps.items():
+                _RAMP_HEX[rgb_to_hex(*oklch_to_rgb(*oklch))] = f"--{ramp}-{step}"
+    return _RAMP_HEX
+
+
+def fmt(n: Any) -> str:
+    try:
+        f = float(n)
+    except (TypeError, ValueError):
+        return str(n)
+    return f"{f:g}"
+
+
+def signed(n: float) -> str:
+    return f"{n:+g}"
+
+
+# ===========================================================================
+# Output
+# ===========================================================================
+
+BOLD, DIM, RED, YEL, CYA, GRN, OFF = (
+    "\033[1m", "\033[2m", "\033[31m", "\033[33m", "\033[36m", "\033[32m", "\033[0m")
+SEV_COLOR = {"error": RED, "warn": YEL, "info": CYA}
+
+
+def group(findings: Sequence[Finding]) -> Dict[str, List[Finding]]:
+    out: Dict[str, List[Finding]] = {}
+    for f in findings:
+        out.setdefault(f.code, []).append(f)
+    return out
+
+
+def render_report(doc: FDoc, findings: Sequence[Finding], checked: int, use_color: bool) -> str:
+    c = (lambda s, col: f"{col}{s}{OFF}") if use_color else (lambda s, col: s)
+    lines: List[str] = []
+    lines.append(c("Figma audit", BOLD))
+    lines.append(f"  shape       {doc.shape}")
+    col_bits = ", ".join(
+        f"{k} [{len(v.modes)} mode{'' if len(v.modes) == 1 else 's'}]"
+        for k, v in doc.collections.items())
+    lines.append(f"  collections {len(doc.collections)}  ({col_bits})")
+    lines.append(f"  variables   {len(doc.variables)}  ({checked} concrete values checked)")
+    if doc.text_styles or doc.effect_styles:
+        lines.append(f"  styles      {len(doc.text_styles)} text, {len(doc.effect_styles)} effect")
+    lines.append("")
+    if not findings:
+        lines.append(c("  Clean. Every value resolves to the contract. Build it.", GRN))
+        return "\n".join(lines)
+    counts = {s: sum(1 for f in findings if f.severity == s) for s in ("error", "warn", "info")}
+    lines.append("  " + "  ".join(
+        c(f"{counts[s]} {s}", SEV_COLOR[s]) for s in ("error", "warn", "info") if counts[s]))
+    lines.append("")
+    for code, rows in group(findings).items():
+        lines.append(c(f"  {CODE_TITLES.get(code, code)}  ({len(rows)})", BOLD))
+        for f in rows:
+            tag = c(f.severity.upper().ljust(5), SEV_COLOR[f.severity])
+            where = f"{f.collection} / {f.mode}" if f.mode not in ("-", "") else f.collection
+            lines.append(f"    {tag} {c(f.name, BOLD)}  {c(where, DIM)}")
+            lines.append(f"          {f.summary}")
+            if f.detail:
+                for wrapped in wrap(f.detail, 84):
+                    lines.append(f"          {c(wrapped, DIM)}")
+            if f.suggestion:
+                lines.append(f"          {c('-> ' + f.suggestion, CYA)}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def wrap(text: str, width: int) -> List[str]:
+    out, line = [], ""
+    for word in text.split():
+        if line and len(line) + 1 + len(word) > width:
+            out.append(line)
+            line = word
+        else:
+            line = f"{line} {word}".strip()
+    if line:
+        out.append(line)
+    return out
+
+
+def render_json(doc: FDoc, findings: Sequence[Finding], checked: int) -> str:
+    return json.dumps({
+        "shape": doc.shape,
+        "summary": {
+            "collections": len(doc.collections),
+            "variables": len(doc.variables),
+            "values_checked": checked,
+            "text_styles": len(doc.text_styles),
+            "effect_styles": len(doc.effect_styles),
+            "findings": len(findings),
+            "errors": sum(1 for f in findings if f.severity == "error"),
+            "warnings": sum(1 for f in findings if f.severity == "warn"),
+            "info": sum(1 for f in findings if f.severity == "info"),
+            "clean": not findings,
+        },
+        "collections": {k: {"modes": v.modes, "default_mode": v.default_mode}
+                        for k, v in doc.collections.items()},
+        "findings": [f.to_dict() for f in findings],
+    }, indent=2)
+
+
+MD_INTRO = """\
+# Design system check — {n} thing{s} to decide before I build
+
+I ran the file through the token checker. This is not a list of mistakes; it is
+a list of **decisions that have to be made by someone**, and it is much cheaper
+to make them now than halfway through the build.
+
+For each one there are three possible answers, and all three are fine:
+
+1. **The design is right** — the system is missing something. I open a token
+   proposal and we add it properly, with sign-off.
+2. **The system is right** — it was a stray value. You nudge it to the nearest
+   step and nothing else changes.
+3. **Both are right** — there is a real reason for the exception. We write it
+   down in `DESIGN_DECISIONS.md` and I hard-code it once, on purpose.
+
+**Timed default — if I have not heard back by {deadline}, I take option 2** on
+everything still open: nearest legal step, each one listed in the PR description
+so any of them is a one-line revert. Handoff does not get to stall on a reply.
+"""
+
+
+def render_markdown(doc: FDoc, findings: Sequence[Finding], checked: int,
+                    deadline: str = "end of day tomorrow") -> str:
+    if not findings:
+        return (f"# Design system check — clean\n\n"
+                f"Ran {checked} value{'s' if checked != 1 else ''} from "
+                f"{len(doc.collections)} collection"
+                f"{'s' if len(doc.collections) != 1 else ''} against the token contract. "
+                f"Everything is on the scale, on the ramp, and legible.\n\n"
+                f"Nothing needed from you — starting the build.\n")
+    n = len(findings)
+    out = [MD_INTRO.format(n=n, s="" if n == 1 else "s", deadline=deadline), ""]
+    for code, rows in group(findings).items():
+        out.append(f"## {CODE_TITLES.get(code, code)}")
+        out.append("")
+        out.append("| Where | What I found | Nearest thing in the system |")
+        out.append("|---|---|---|")
+        for f in rows:
+            where = f"`{f.name}`"
+            if f.mode not in ("-", ""):
+                where += f" <br><sub>{f.collection} / {f.mode}</sub>"
+            elif f.collection not in ("-", ""):
+                where += f" <br><sub>{f.collection}</sub>"
+            detail = f.detail.replace("\n", " ")
+            out.append(f"| {where} | {f.summary} | {f.suggestion or detail} |")
+        out.append("")
+        longest = max(rows, key=lambda r: len(r.detail))
+        if longest.detail:
+            out.append(f"> {longest.detail}")
+            out.append("")
+    out.append("---")
+    out.append("")
+    out.append("**What I need:** a yes/no per row, or just \"take the defaults\". "
+               "Reply in this doc, or grab fifteen minutes and we will go through it "
+               "together — that is usually faster than typing.")
+    out.append("")
+    out.append(f"<sub>Generated by `scripts/figma_audit.py` from a `{doc.shape}`-shaped export. "
+               f"{checked} concrete values checked. Contrast measured in sRGB per WCAG 2.2; "
+               f"colour distance measured as ΔE<sub>OK</sub>.</sub>")
+    return "\n".join(out)
+
+
+# ===========================================================================
+# CLI
+# ===========================================================================
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="figma_audit.py",
+        description="Audit a Figma variables export against the token contract.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Exit 0 = clean, 1 = findings, 2 = could not read the input.",
+    )
+    p.add_argument("path", help="the exported JSON")
+    p.add_argument("--styles", help="a second JSON holding text/effect styles "
+                                    "(e.g. GET /v1/files/:key/styles)")
+    p.add_argument("--format", choices=("report", "json", "markdown"), default="report")
+    p.add_argument("--shape", choices=("rest", "plugin", "dtcg", "records"),
+                   help="skip auto-detection")
+    p.add_argument("--collection", default="tokens",
+                   help="collection name for shapes that carry none (default: tokens)")
+    p.add_argument("--fail-on", choices=("error", "warn", "info", "never"), default="info",
+                   help="lowest severity that exits non-zero (default: info = any finding)")
+    p.add_argument("--tap-min", type=float, default=TAP_MIN_PX,
+                   help=f"minimum touch target in px (default: {TAP_MIN_PX:g})")
+    p.add_argument("--deadline", default="end of day tomorrow",
+                   help="the timed default's cutoff, printed in --format markdown")
+    p.add_argument("--no-color", action="store_true")
+    return p
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = build_parser().parse_args(argv)
+    try:
+        doc = load_document(Path(args.path), args.shape, args.collection)
+        if args.styles:
+            extra = json.loads(Path(args.styles).read_text(encoding="utf-8"))
+            attach_styles(doc, extra)
+    except SystemExit as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    except (ValueError, OSError, json.JSONDecodeError) as exc:
+        print(f"could not read {args.path}: {exc}", file=sys.stderr)
+        return 2
+
+    if not doc.variables and not doc.text_styles and not doc.effect_styles:
+        # "Clean" here would be a lie with consequences: an empty result is a
+        # wrong file, a failed export or an unsupported shape, never a design
+        # system with nothing wrong with it.
+        print(f"{args.path} parsed as `{doc.shape}` but contains no variables and no styles. "
+              "That is a wrong file or an export shape this script does not know; pass "
+              "--shape to force one.", file=sys.stderr)
+        return 2
+
+    auditor = Auditor(doc, tap_min=args.tap_min)
+    findings = auditor.run()
+
+    try:
+        if args.format == "json":
+            print(render_json(doc, findings, auditor.checked))
+        elif args.format == "markdown":
+            print(render_markdown(doc, findings, auditor.checked, args.deadline))
+        else:
+            use_color = sys.stdout.isatty() and not args.no_color
+            print(render_report(doc, findings, auditor.checked, use_color))
+    except BrokenPipeError:          # piped into `head`; not an audit failure
+        try:
+            sys.stdout.close()
+        except BrokenPipeError:
+            pass
+        return 1 if findings and args.fail_on != "never" else 0
+
+    if args.fail_on == "never":
+        return 0
+    floor = SEVERITY_ORDER[args.fail_on]
+    return 1 if any(SEVERITY_ORDER[f.severity] >= floor for f in findings) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

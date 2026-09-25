@@ -1,0 +1,513 @@
+/* =========================================================================
+   TOKENS — the single source of truth for every value in the product.
+   =========================================================================
+
+   THREE TIERS. Respect the direction of flow; it is what keeps a codebase
+   coherent when five people touch it in the same week.
+
+     Tier 1  PRIMITIVE   raw, unopinionated values.  --space-6, --gray-800
+                         Never referenced by a component. Ever.
+     Tier 2  SEMANTIC    a value bound to a ROLE.    --pad-card, --fg-muted
+                         This is the only tier component CSS is allowed to read.
+     Tier 3  COMPONENT   a role narrowed to one part. --btn-pad-x
+                         Declared in the component's own file, sourced from Tier 2.
+
+   Flow is one-way: PRIMITIVE -> SEMANTIC -> COMPONENT -> rule.
+   A component that reads --space-6 directly has skipped a tier, and the day
+   the brand asks for "a bit more air in cards" you will be grepping for 6s.
+
+   Editing rules
+   -------------
+   - Add a Tier 1 value only when a real design decision requires a step that
+     does not exist. Adding --space-7 because something "felt tight" is how
+     scales die.
+   - Add Tier 2 roles freely. They are cheap and they are the vocabulary the
+     team actually speaks.
+   - Theme overrides (dark, density, brand) re-point Tier 2 ONLY. Tier 1 is
+     constant across every theme; that is what makes it primitive.
+   ========================================================================= */
+
+@layer tokens {
+
+  :root {
+
+    /* ---------------------------------------------------------------------
+       1. SPACING — TIER 1
+       ---------------------------------------------------------------------
+       4px base. The scale is CLOSED: these steps and nothing between them.
+       Steps 1-6 are linear (4px apart) because small spacing needs fine
+       control; above that it grows roughly geometrically because at large
+       sizes the eye reads ratio, not difference. 20px and 40px exist as the
+       two honest in-betweens that real layouts keep needing.
+
+       There is no --space-7, --space-9, --space-11, --space-14. That is the
+       point. If a gap "needs" 28px, the layout is wrong, not the scale.
+       --------------------------------------------------------------------- */
+
+    --space-0:    0;
+    --space-px:   1px;          /* hairlines, borders, 1px nudges only       */
+    --space-0-5:  0.125rem;     /*  2px  icon/label optical gaps             */
+    --space-1:    0.25rem;      /*  4px                                      */
+    --space-2:    0.5rem;       /*  8px                                      */
+    --space-3:    0.75rem;      /* 12px                                      */
+    --space-4:    1rem;         /* 16px  the anchor step                     */
+    --space-5:    1.25rem;      /* 20px                                      */
+    --space-6:    1.5rem;       /* 24px                                      */
+    --space-8:    2rem;         /* 32px                                      */
+    --space-10:   2.5rem;       /* 40px                                      */
+    --space-12:   3rem;         /* 48px                                      */
+    --space-16:   4rem;         /* 64px                                      */
+    --space-20:   5rem;         /* 80px                                      */
+    --space-24:   6rem;         /* 96px                                      */
+    --space-32:   8rem;         /* 128px                                     */
+    --space-40:  10rem;         /* 160px                                     */
+    --space-48:  12rem;         /* 192px                                     */
+
+    /* Fluid steps. Used where a fixed value would be cramped on desktop or
+       absurd on a phone — section rhythm and page gutters, essentially.
+       Formula: clamp(min, min + (max-min) * ((100vw - 380px) / (1440 - 380)), max)
+       expressed in vw terms. Regenerate with scripts/generate_space_scale.py
+       if the viewport anchors change; do not hand-tune these. */
+
+    --space-fluid-sm:  clamp(1rem,    0.811rem + 0.755vw,  1.5rem);   /* 16 -> 24  */
+    --space-fluid-md:  clamp(1.5rem,  0.943rem + 2.264vw,  3rem);     /* 24 -> 48  */
+    --space-fluid-lg:  clamp(2.5rem,  1.368rem + 4.528vw,  5.5rem);   /* 40 -> 88  */
+    --space-fluid-xl:  clamp(4rem,    2.113rem + 7.547vw,  9rem);     /* 64 -> 144 */
+
+    /* Density dial. Set --density on any subtree to compress or expand the
+       semantic spacing below it WITHOUT touching a single component rule.
+       0.875 = compact tables/admin. 1 = default. 1.125 = marketing/editorial. */
+    --density: 1;
+
+
+    /* ---------------------------------------------------------------------
+       2. SPACING — TIER 2 (roles). Components read THESE.
+       ---------------------------------------------------------------------
+       Named for the relationship they express, not the number they hold.
+       Read them out loud: "gap-related", "pad-card", "space-section". If a
+       name does not describe a relationship, it does not belong here.
+       --------------------------------------------------------------------- */
+
+    /* Proximity ladder — how strongly two things belong together.
+       This is the whole of Gestalt proximity, encoded. Pick by MEANING. */
+    --gap-fused:      calc(var(--space-1)  * var(--density));  /* icon + its label      */
+    --gap-tight:      calc(var(--space-2)  * var(--density));  /* label + its input     */
+    --gap-related:    calc(var(--space-3)  * var(--density));  /* items in one group    */
+    --gap-grouped:    calc(var(--space-4)  * var(--density));  /* sibling cards, rows   */
+    --gap-separate:   calc(var(--space-6)  * var(--density));  /* distinct groups       */
+    --gap-distinct:   calc(var(--space-10) * var(--density));  /* unrelated blocks      */
+
+    /* Inset — padding inside a container. Scales with the container's weight. */
+    --pad-inline-xs:  calc(var(--space-2)  * var(--density));  /* chip, tag             */
+    --pad-inline-sm:  calc(var(--space-3)  * var(--density));  /* small button, input   */
+    --pad-inline-md:  calc(var(--space-4)  * var(--density));  /* button, list row      */
+    --pad-block-xs:   calc(var(--space-1)  * var(--density));
+    --pad-block-sm:   calc(var(--space-2)  * var(--density));
+    --pad-block-md:   calc(var(--space-3)  * var(--density));
+
+    --pad-card:       calc(var(--space-6)  * var(--density));  /* card, panel           */
+    --pad-card-lg:    calc(var(--space-8)  * var(--density));  /* hero card, modal body */
+    --pad-well:       calc(var(--space-4)  * var(--density));  /* code block, callout   */
+
+    /* Page-level rhythm. Fluid, because a 96px section gap on a 390px phone
+       is a scroll tax and a 48px one on a 27" display looks unfinished. */
+    --space-section:    var(--space-fluid-xl);   /* between page sections     */
+    --space-subsection: var(--space-fluid-lg);   /* within a long section     */
+    --space-block:      var(--space-fluid-md);   /* between prose blocks      */
+    --gutter-page:      var(--space-fluid-sm);   /* left/right page margin    */
+
+    /* Measure & container widths. Line length is a spacing decision. */
+    --measure-prose:    68ch;   /* body copy: 60-75ch is the readable band   */
+    --measure-narrow:   48ch;   /* captions, form help, cards                */
+    --width-content:    72rem;  /* 1152px — standard content column          */
+    --width-wide:       90rem;  /* 1440px — full-bleed sections with gutters */
+    --width-form:       28rem;  /* 448px  — single-column form               */
+
+
+    /* ---------------------------------------------------------------------
+       3. TYPOGRAPHY — TIER 1
+       ---------------------------------------------------------------------
+       Modular scale, ratio 1.200 (minor third) at the body end and 1.250
+       above it, so headings separate clearly without the display sizes
+       exploding. Regenerate with scripts/generate_type_scale.py.
+       --------------------------------------------------------------------- */
+
+    --font-sans: "Geist Sans", ui-sans-serif, system-ui, -apple-system,
+                 "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono",
+                 Menlo, Consolas, "Liberation Mono", monospace;
+
+    --text-2xs:  0.6875rem;   /* 11px  legal, dense table meta               */
+    --text-xs:   0.75rem;     /* 12px  labels, badges                        */
+    --text-sm:   0.875rem;    /* 14px  secondary UI text                     */
+    --text-base: 1rem;        /* 16px  body — never smaller for reading copy */
+    --text-lg:   1.125rem;    /* 18px  lead paragraph                        */
+    --text-xl:   1.375rem;    /* 22px  h4 / card title                       */
+    --text-2xl:  1.75rem;     /* 28px  h3                                    */
+    --text-3xl:  2.1875rem;   /* 35px  h2                                    */
+    --text-4xl:  2.75rem;     /* 44px  h1                                    */
+    /* Same 380 -> 1440 viewport anchors as the fluid spacing above. Two
+       different anchor pairs in one file is drift you will pay for later;
+       regenerate both from scripts/generate_type_scale.py if you move them. */
+    --text-5xl:  clamp(2.75rem, 2.1226rem + 2.642vw, 4.5rem);   /* display   */
+    --text-6xl:  clamp(3.5rem,  2.2901rem + 5.094vw, 6.875rem); /* hero      */
+
+    /* Leading is a function of size: big type needs proportionally less.
+       These four cover everything; do not invent a fifth. */
+    --leading-none:    1;      /* single-line numerals, tight display        */
+    --leading-tight:   1.15;   /* display + h1/h2                            */
+    --leading-snug:    1.3;    /* h3/h4, UI labels, buttons                  */
+    --leading-normal:  1.6;    /* body copy                                  */
+    --leading-relaxed: 1.75;   /* long-form article body                     */
+
+    /* Optical tracking. Large type sets too loose by default, small too tight. */
+    --tracking-tighter: -0.03em;  /* display 44px+                           */
+    --tracking-tight:   -0.015em; /* headings 22-35px                        */
+    --tracking-normal:  0em;      /* body                                    */
+    --tracking-wide:    0.02em;   /* 12-14px uppercase-adjacent UI           */
+    --tracking-caps:    0.08em;   /* actual uppercase labels                 */
+
+    --weight-regular:  400;
+    --weight-medium:   500;
+    --weight-semibold: 600;
+    --weight-bold:     700;
+
+
+    /* ---------------------------------------------------------------------
+       4. TYPOGRAPHY — TIER 2 (roles)
+       --------------------------------------------------------------------- */
+
+    --type-display:  var(--weight-bold)     var(--text-6xl)/var(--leading-tight)   var(--font-sans);
+    --type-h1:       var(--weight-bold)     var(--text-4xl)/var(--leading-tight)   var(--font-sans);
+    --type-h2:       var(--weight-semibold) var(--text-3xl)/var(--leading-tight)   var(--font-sans);
+    --type-h3:       var(--weight-semibold) var(--text-2xl)/var(--leading-snug)    var(--font-sans);
+    --type-h4:       var(--weight-semibold) var(--text-xl)/var(--leading-snug)     var(--font-sans);
+    --type-lead:     var(--weight-regular)  var(--text-lg)/var(--leading-normal)   var(--font-sans);
+    --type-body:     var(--weight-regular)  var(--text-base)/var(--leading-normal) var(--font-sans);
+    --type-ui:       var(--weight-medium)   var(--text-sm)/var(--leading-snug)     var(--font-sans);
+    --type-label:    var(--weight-medium)   var(--text-xs)/var(--leading-snug)     var(--font-sans);
+    --type-code:     var(--weight-regular)  var(--text-sm)/var(--leading-normal)   var(--font-mono);
+
+
+    /* ---------------------------------------------------------------------
+       5. COLOR — TIER 1 (OKLCH ramps)
+       ---------------------------------------------------------------------
+       OKLCH because its L channel is perceptually uniform: step 500 of the
+       accent and step 500 of the neutral read as the same "weight", which is
+       what makes a palette feel designed rather than assembled. Regenerate
+       any ramp with scripts/generate_color_ramp.py — it also prints the
+       WCAG contrast matrix so you do not guess.
+
+       Steps: 50 (near-white) -> 950 (near-black), L descending.
+       --------------------------------------------------------------------- */
+
+    /* Neutral — warm graphite, not pure gray. Pure #808080 neutrals read as
+       cheap on screens; a few degrees of warmth costs nothing and reads rich. */
+    --neutral-0:   oklch(100%  0     0);
+    --neutral-50:  oklch(98.2% 0.003 75);
+    --neutral-100: oklch(96.0% 0.004 75);
+    --neutral-200: oklch(92.2% 0.005 75);
+    --neutral-300: oklch(86.5% 0.006 75);
+    --neutral-400: oklch(71.5% 0.008 75);
+    /* 500 sits at L 53.5%, not the 58% a naive even ramp would give. That
+       extra darkness is what lets --fg-subtle (placeholder text, which IS
+       text under SC 1.4.3) clear 4.5:1 on --bg-sunken, the worst light
+       surface it lands on. Verified: 4.60:1. Do not lighten it. */
+    --neutral-500: oklch(53.5% 0.009 75);
+    --neutral-600: oklch(47.5% 0.009 75);
+    --neutral-700: oklch(38.5% 0.008 75);
+    --neutral-800: oklch(28.0% 0.007 75);
+    --neutral-900: oklch(19.5% 0.006 75);
+    --neutral-950: oklch(13.0% 0.005 75);
+    --neutral-1000: oklch(8.0%  0.004 75);
+
+    /* Accent — Ember. Replace the hue (42) and chroma to rebrand; the L
+       values are tuned for contrast and should survive a hue change. */
+    --accent-50:  oklch(97.0% 0.020 42);
+    --accent-100: oklch(93.5% 0.042 42);
+    --accent-200: oklch(88.0% 0.078 42);
+    --accent-300: oklch(80.5% 0.118 42);
+    --accent-400: oklch(72.0% 0.158 42);
+    --accent-500: oklch(64.5% 0.188 42);   /* brand anchor — Ember           */
+    --accent-600: oklch(56.5% 0.176 42);
+    --accent-700: oklch(47.0% 0.148 42);
+    --accent-800: oklch(38.0% 0.118 42);
+    --accent-900: oklch(30.0% 0.090 42);
+    --accent-950: oklch(21.0% 0.062 42);
+
+    /* Status ramps — abbreviated to the steps UI actually uses. */
+    --success-100: oklch(94.0% 0.050 152);
+    --success-500: oklch(62.0% 0.150 152);
+    --success-700: oklch(45.0% 0.120 152);
+    --warning-100: oklch(95.5% 0.055  85);
+    --warning-500: oklch(75.0% 0.155  85);
+    --warning-700: oklch(52.0% 0.125  85);
+    --danger-100:  oklch(94.5% 0.038  25);
+    --danger-500:  oklch(58.0% 0.205  25);
+    --danger-700:  oklch(45.0% 0.170  25);
+    --info-100:    oklch(94.5% 0.035 250);
+    --info-500:    oklch(58.0% 0.160 250);
+    --info-700:    oklch(45.0% 0.140 250);
+
+
+    /* ---------------------------------------------------------------------
+       6. COLOR — TIER 2 (roles). Components read THESE and only these.
+       ---------------------------------------------------------------------
+       Every role is named for its job. Dark mode re-points these names; no
+       component rule changes, no `.dark &` selector anywhere in components.
+       --------------------------------------------------------------------- */
+
+    /* Surfaces, from furthest back to furthest forward. */
+    --bg-canvas:      var(--neutral-50);    /* the page itself                */
+    --bg-surface:     var(--neutral-0);     /* cards, panels                  */
+    --bg-raised:      var(--neutral-0);     /* menus, popovers (+ shadow)     */
+    --bg-sunken:      var(--neutral-100);   /* wells, code blocks, inputs     */
+    --bg-inverse:     var(--neutral-900);   /* tooltips, inverted sections    */
+
+    /* Interaction states, as translucent overlays so they compose over any
+       surface. This is why you never need a --btn-hover-bg per variant. */
+    --bg-hover:       oklch(0% 0 0 / 0.04);
+    --bg-active:      oklch(0% 0 0 / 0.08);
+    --bg-selected:    var(--accent-50);
+    --bg-disabled:    var(--neutral-100);
+
+    /* Foreground. The number is the contrast intent, not the ramp step. */
+    --fg-default:     var(--neutral-900);   /* body copy      >= 12:1         */
+    --fg-strong:      var(--neutral-950);   /* headings                       */
+    --fg-muted:       var(--neutral-600);   /* secondary text >= 4.5:1        */
+    --fg-subtle:      var(--neutral-500);   /* placeholder    >= 4.5:1        */
+    --fg-disabled:    var(--neutral-400);   /* non-interactive, exempt        */
+    --fg-on-accent:   var(--neutral-0);
+    --fg-on-inverse:  var(--neutral-50);
+    --fg-accent:      var(--accent-700);    /* accent text on light surface   */
+    --fg-link:        var(--accent-700);
+
+    /* Borders. Three weights is all any interface needs. */
+    --border-subtle:  var(--neutral-200);   /* dividers, table rules          */
+    --border-default: var(--neutral-300);   /* card and input outlines        */
+    --border-strong:  var(--neutral-400);   /* hover/emphasis outlines        */
+    --border-accent:  var(--accent-500);
+    --border-focus:   var(--accent-600);
+
+    /* Intent roles. */
+    /* Note the asymmetry: --accent-500 is the BRAND anchor, but a filled
+       button is text on that fill, and white on accent-500 measures only
+       3.56:1 — legal above 24px, illegal on a 14px button label. So the
+       button role takes 600 (4.92:1 with white) while the brand keeps 500
+       for borders, icons and large display type. This is exactly why roles
+       exist: one ramp, two jobs, two different steps. */
+    --bg-accent:      var(--accent-600);
+    --bg-accent-hover: var(--accent-700);
+    --bg-success:     var(--success-500);
+    --bg-warning:     var(--warning-500);
+    --bg-danger:      var(--danger-500);
+    --fg-success:     var(--success-700);
+    --fg-warning:     var(--warning-700);
+    --fg-danger:      var(--danger-700);
+
+
+    /* ---------------------------------------------------------------------
+       7. RADIUS, BORDER, ELEVATION
+       ---------------------------------------------------------------------
+       Nested radius rule: inner radius = outer radius - inner padding.
+       A 16px card with 8px padding holds a 8px-radius child. Get this wrong
+       and corners look "peeled". --radius-nested-* encodes the common cases.
+       --------------------------------------------------------------------- */
+
+    --radius-none: 0;
+    --radius-xs:   0.125rem;   /*  2px  */
+    --radius-sm:   0.25rem;    /*  4px  */
+    --radius-md:   0.5rem;     /*  8px  chips, inputs, small buttons */
+    --radius-lg:   0.75rem;    /* 12px  buttons, cards */
+    --radius-xl:   1rem;       /* 16px  panels, modals */
+    --radius-2xl:  1.5rem;     /* 24px  hero surfaces */
+    --radius-full: 9999px;
+
+    --stroke-hairline: 1px;
+    --stroke-default:  1px;
+    --stroke-thick:    2px;
+    --stroke-focus:    2px;
+
+    /* Elevation = shadow + (optionally) surface lift. Six levels, each one a
+       physically consistent pair: a tight contact shadow plus a wider ambient
+       one. Single-shadow elevation always looks like a sticker. */
+    --shadow-none: none;
+    --shadow-xs:  0 1px 2px  oklch(0% 0 0 / 0.05);
+    --shadow-sm:  0 1px 2px  oklch(0% 0 0 / 0.06), 0 2px 4px  oklch(0% 0 0 / 0.04);
+    --shadow-md:  0 2px 4px  oklch(0% 0 0 / 0.06), 0 6px 12px oklch(0% 0 0 / 0.06);
+    --shadow-lg:  0 4px 8px  oklch(0% 0 0 / 0.06), 0 12px 24px oklch(0% 0 0 / 0.08);
+    --shadow-xl:  0 8px 16px oklch(0% 0 0 / 0.07), 0 24px 48px oklch(0% 0 0 / 0.10);
+    --shadow-focus: 0 0 0 var(--stroke-focus) var(--bg-canvas),
+                    0 0 0 calc(var(--stroke-focus) * 2) var(--border-focus);
+
+    /* Elevation roles — reach for these, not the raw shadows. */
+    --elevation-flat:    var(--shadow-none);
+    --elevation-card:    var(--shadow-sm);
+    --elevation-raised:  var(--shadow-md);
+    --elevation-overlay: var(--shadow-lg);
+    --elevation-modal:   var(--shadow-xl);
+    /* The focus ring is an elevation role too. Without this, every component
+       that draws a ring had to reach for the Tier-1 --shadow-focus, which is
+       a Law 6 violation the auditor was right to flag. Pair it with a
+       transparent `outline` at the call site: forced-colors mode discards
+       box-shadow, and the outline is what survives to become the indicator. */
+    --elevation-focus:   var(--shadow-focus);
+
+
+    /* ---------------------------------------------------------------------
+       8. MOTION
+       ---------------------------------------------------------------------
+       Duration scales with distance travelled and element size. A 120ms
+       modal entrance feels broken; a 400ms hover feels sticky.
+       --------------------------------------------------------------------- */
+
+    --dur-instant: 80ms;    /* state swap: checkbox, toggle knob            */
+    --dur-fast:    140ms;   /* hover, focus, small fades                    */
+    --dur-base:    220ms;   /* dropdowns, tooltips, tab switch              */
+    --dur-slow:    320ms;   /* drawers, modals, accordion                   */
+    --dur-slower:  480ms;   /* page/route transitions, large reveals        */
+
+    --ease-out:     cubic-bezier(0.22, 1, 0.36, 1);      /* things arriving  */
+    --ease-in:      cubic-bezier(0.64, 0, 0.78, 0);      /* things leaving   */
+    --ease-in-out:  cubic-bezier(0.65, 0, 0.35, 1);      /* things moving    */
+    --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);   /* playful overshoot*/
+    --ease-linear:  linear;                              /* progress, spin   */
+
+    /* Role pairs — duration and easing travel together or you get drift. */
+    --motion-hover:   var(--dur-fast)    var(--ease-out);
+    --motion-enter:   var(--dur-base)    var(--ease-out);
+    --motion-exit:    var(--dur-fast)    var(--ease-in);
+    --motion-expand:  var(--dur-slow)    var(--ease-in-out);
+    --motion-emphasis: var(--dur-slow)   var(--ease-spring);
+    /* Looping motion is a different animal from a transition: it is linear,
+       it repeats, and it must NOT be collapsed by reduced-motion — a spinner
+       that stops spinning reads as a hung page, which is worse than the
+       motion it was meant to spare you. Hence its own duration primitive,
+       deliberately left out of the reduced-motion block below. */
+    --dur-loop:        900ms;
+    --motion-loop:     var(--dur-loop) var(--ease-linear);
+
+
+    /* ---------------------------------------------------------------------
+       9. Z-INDEX — a closed ladder. Never write a literal z-index again.
+       --------------------------------------------------------------------- */
+
+    --z-base:      0;
+    --z-raised:    10;   /* sticky table headers, hovering cards            */
+    --z-sticky:    100;  /* sticky nav, sub-headers                         */
+    --z-dropdown:  200;  /* menus, comboboxes, popovers                     */
+    --z-overlay:   300;  /* scrims, drawers                                 */
+    --z-modal:     400;  /* dialogs                                         */
+    --z-toast:     500;  /* notifications                                   */
+    --z-tooltip:   600;  /* always on top of everything it describes        */
+
+
+    /* ---------------------------------------------------------------------
+       10. LAYOUT & BREAKPOINTS (mirror these in the JS/Tailwind config)
+       --------------------------------------------------------------------- */
+
+    --bp-sm:  30rem;   /*  480px  large phone         */
+    --bp-md:  48rem;   /*  768px  tablet portrait     */
+    --bp-lg:  64rem;   /* 1024px  tablet landscape    */
+    --bp-xl:  80rem;   /* 1280px  laptop              */
+    --bp-2xl: 96rem;   /* 1536px  desktop             */
+
+    --tap-min: 2.75rem;  /* 44px — the minimum any finger target may be     */
+    --grid-columns: 12;
+  }
+
+
+  /* =======================================================================
+     DARK THEME — re-points Tier 2 only. Note there is not one component
+     selector below. That is the whole test of whether your token layer works.
+     ======================================================================= */
+
+  [data-theme="dark"] {
+    --bg-canvas:      var(--neutral-1000);
+    --bg-surface:     var(--neutral-950);
+    --bg-raised:      var(--neutral-900);
+    --bg-sunken:      var(--neutral-1000);
+    --bg-inverse:     var(--neutral-100);
+
+    --bg-hover:       oklch(100% 0 0 / 0.06);
+    --bg-active:      oklch(100% 0 0 / 0.10);
+    --bg-selected:    var(--accent-950);
+    --bg-disabled:    var(--neutral-900);
+
+    --fg-default:     var(--neutral-100);
+    --fg-strong:      var(--neutral-50);
+    /* Shifted one step lighter than the light-theme mapping. Dark surfaces
+       need MORE lightness separation, not the mirror image of the light
+       ramp: neutral-500 on neutral-1000 is only 4.02:1. Verified 8.22:1. */
+    --fg-muted:       var(--neutral-300);
+    --fg-subtle:      var(--neutral-400);
+    --fg-disabled:    var(--neutral-700);
+    --fg-on-accent:   var(--neutral-1000);
+    --fg-on-inverse:  var(--neutral-900);
+    --fg-accent:      var(--accent-400);
+    --fg-link:        var(--accent-400);
+
+    --border-subtle:  var(--neutral-900);
+    --border-default: var(--neutral-800);
+    --border-strong:  var(--neutral-700);
+
+    /* On dark, the accent can move back to 500: the foreground on it is
+       near-black (--fg-on-accent), so the fill wants to be lighter, not
+       darker. 5.84:1. The mirror-image instinct is wrong here too. */
+    --bg-accent:       var(--accent-500);
+    --bg-accent-hover: var(--accent-400);
+
+    --fg-success:     var(--success-500);
+    --fg-warning:     var(--warning-500);
+    --fg-danger:      var(--danger-500);
+
+    /* Shadows read as mud on dark surfaces. Depth comes from a lighter
+       surface plus a top hairline instead. Keep a faint shadow for contact. */
+    --shadow-xs:  0 1px 2px  oklch(0% 0 0 / 0.30);
+    --shadow-sm:  0 1px 2px  oklch(0% 0 0 / 0.36), 0 2px 4px  oklch(0% 0 0 / 0.24);
+    --shadow-md:  0 2px 4px  oklch(0% 0 0 / 0.36), 0 6px 12px oklch(0% 0 0 / 0.30);
+    --shadow-lg:  0 4px 8px  oklch(0% 0 0 / 0.40), 0 12px 24px oklch(0% 0 0 / 0.36);
+    --shadow-xl:  0 8px 16px oklch(0% 0 0 / 0.44), 0 24px 48px oklch(0% 0 0 / 0.44);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      /* Duplicate the block above, or set data-theme from an inline script
+         before first paint. Prefer the script: it avoids the duplication and
+         lets the user override the OS. See references/style-architecture.md. */
+    }
+  }
+
+
+  /* =======================================================================
+     DENSITY MODES — one attribute, whole subtree recomposes.
+     ======================================================================= */
+
+  [data-density="compact"]     { --density: 0.875; }
+  [data-density="comfortable"] { --density: 1; }
+  [data-density="spacious"]    { --density: 1.125; }
+
+
+  /* =======================================================================
+     REDUCED MOTION — collapse durations to near-zero rather than disabling
+     transitions. Zeroing `transition` entirely breaks components that listen
+     for transitionend; 1ms keeps the event and removes the animation.
+     ======================================================================= */
+
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --dur-instant: 1ms;
+      --dur-fast:    1ms;
+      --dur-base:    1ms;
+      --dur-slow:    1ms;
+      --dur-slower:  1ms;
+      --ease-spring: var(--ease-out);  /* no overshoot for vestibular safety */
+      /* --dur-loop is deliberately NOT collapsed. Reduced motion means "do
+         not move things around the screen", not "freeze the indicator that
+         tells me the page is alive". A spinner is small, in place, and
+         informational. If a loop IS large or travelling, it should not have
+         been a loop. */
+    }
+  }
+}

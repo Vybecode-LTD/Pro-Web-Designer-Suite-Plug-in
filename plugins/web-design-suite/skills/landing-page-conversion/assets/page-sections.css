@@ -1,0 +1,535 @@
+/* =========================================================================
+   PAGE SECTIONS — the canonical landing-page shells
+   =========================================================================
+
+   The section-level companion to web-design-studio's `layout.css`. That file
+   owns the PRIMITIVES (stack, cluster, split, switcher, grid, cover, frame,
+   center, reel). This file owns the seven SECTION SHELLS a converting page is
+   assembled from, expressed entirely in those primitives:
+
+     1. Section band + heading block     5. Pricing table
+     2. Hero                             6. FAQ disclosure
+     3. Feature / value-prop grid        7. CTA block
+     4. Testimonial card                 8. Logo strip, comparison table
+
+   RULES THIS FILE OBEYS (see references/token-contract.md)
+   -------------------------------------------------------
+   - Tier-2 tokens ONLY. Not one --space-N, --neutral-N, --accent-N, --text-N
+     or --shadow-N is read here. Every value arrives through a role.
+   - Every shell declares its Tier-3 sockets first, each sourced from a Tier-2
+     role, so an instance is tuned by RE-POINTING a socket at a different role:
+
+         <section class="section" style="--section-pad-block: var(--space-section)">
+
+     Never `style="--section-pad-block: 72px"`. The socket is a socket, not a
+     licence to invent values.
+   - Parents own the gaps. Nothing here sets an outer margin except
+     `margin-inline: auto` for alignment, which is positioning, not spacing.
+   - No focus styling lives here. Focus rings are a base-layer concern and are
+     defined once, globally, in the design system's `base.css` — a section
+     shell that redefines them is how one component ends up with a focus ring
+     nobody else has.
+
+   DENSITY
+   -------
+   A marketing page runs at `data-density="spacious"` on <main>. Every gap and
+   inset below is `Tier-2 role × --density`, so that single attribute gives a
+   marketing page its air without a second stylesheet (Law 7).
+
+   Audited with: python -m scripts.audit_design assets/page-sections.css
+   ========================================================================= */
+
+@layer components {
+
+  /* =======================================================================
+     1. SECTION BAND + HEADING BLOCK
+     =======================================================================
+     Every section on the page is a `.band .section`. Even the transparent
+     ones: a uniform rule is one rule, and the moment some sections pay
+     padding while others rely on a parent gap, the seam between the two
+     systems measures --space-section + --space-subsection and nobody can
+     work out where it came from.
+
+     `.band` itself comes from layout.css and owns --band-pad-block. What
+     `.section` adds is the SURFACE and the heading-block rhythm.
+     ======================================================================= */
+
+  .section {
+    --section-bg: transparent;
+    --section-fg: var(--fg-default);
+    --section-gap: var(--gap-distinct);   /* heading block -> section body   */
+
+    display: grid;
+    gap: var(--section-gap);
+    background: var(--section-bg);
+    color: var(--section-fg);
+  }
+
+  /* Alternating surfaces. Four distinguishable bands, no colour invented.
+     Reserve --section--inverse for exactly ONE band per page (usually the
+     final CTA): its scarcity is what makes it read as the emphatic close. */
+  .section--surface { --section-bg: var(--bg-surface); }
+  .section--sunken  { --section-bg: var(--bg-sunken); }
+  .section--inverse {
+    --section-bg: var(--bg-inverse);
+    --section-fg: var(--fg-on-inverse);
+  }
+
+  /* The heading block is ONE group: eyebrow, heading and deck bind together
+     at --gap-tight and sit --gap-distinct from the body. This is the
+     heading-asymmetry rule (a heading belongs to what follows it) expressed
+     structurally instead of with margins — which is why no margin appears. */
+  .section__header {
+    --section-header-gap: var(--gap-tight);
+    --section-header-measure: var(--measure-narrow);
+
+    display: grid;
+    gap: var(--section-header-gap);
+    max-inline-size: var(--section-header-measure);
+  }
+  .section__header--center {
+    justify-items: center;
+    text-align: center;
+    margin-inline: auto;          /* alignment, not spacing */
+  }
+
+  .section__eyebrow {
+    font: var(--type-label);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--fg-accent);
+  }
+  .section__title { font: var(--type-h2); color: var(--fg-strong); }
+  .section__deck  { font: var(--type-lead); color: var(--fg-muted); }
+
+
+  /* =======================================================================
+     2. HERO
+     =======================================================================
+     Deliberately NOT 100svh. `.cover--partial` is shorter than one screen so
+     the next section peeks above the fold — a full-height hero hides the fact
+     that the page continues, which is the one thing the first screen must not
+     do. Compose as:
+
+       <section class="band section bleed-full">
+         <div class="page-grid">
+           <div class="cover cover--partial hero">
+             <div class="cover__centre split split--2-1 split--center">
+               <div class="hero__copy"> … </div>
+               <figure class="frame frame--3-2 hero__media"> … </figure>
+     ======================================================================= */
+
+  /* The hero re-points the SPLIT primitive's own socket rather than
+     inventing a gap of its own — the copy/media boundary is the split's
+     boundary, and one owner per gap is the whole of Law 2. */
+  .hero {
+    --split-gap: var(--gap-separate);
+    --hero-copy-measure: var(--measure-narrow);
+  }
+
+  /* The copy pane. Capped at --measure-narrow, not --measure-prose: a lead
+     paragraph set at 68ch under a display-size headline makes the eye travel
+     too far to find the line return, and the hero stops reading as one unit. */
+  .hero__copy {
+    --hero-copy-gap: var(--gap-separate);  /* heading group -> CTA cluster   */
+
+    display: grid;
+    gap: var(--hero-copy-gap);
+    max-inline-size: var(--hero-copy-measure);
+  }
+
+  /* Eyebrow -> H1 -> sub. One group, one gap. */
+  .hero__heading {
+    display: grid;
+    gap: var(--gap-tight);
+  }
+  .hero__title { font: var(--type-display); color: var(--fg-strong); }
+  .hero__sub   { font: var(--type-lead); color: var(--fg-muted); }
+
+  /* The CTA cluster and the friction-reducer line beneath it. --gap-tight is
+     load-bearing: the line ANNOTATES the button. One rung looser and it reads
+     as its own statement, which is exactly the job it must not do. */
+  .hero__actions {
+    display: grid;
+    gap: var(--gap-tight);
+    justify-items: start;
+  }
+  .hero__note {
+    font: var(--type-ui);
+    color: var(--fg-muted);
+  }
+
+  .hero__media {
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--elevation-raised);
+  }
+
+
+  /* =======================================================================
+     3. FEATURE / VALUE-PROP GRID
+     =======================================================================
+     Three cards, because the message hierarchy has three supports. Use
+     `.switcher--max-3` as the parent; this file styles the CARD.
+
+     The gap relationship that decides whether this row reads at all:
+     card -> card is --gap-grouped (16px) while title -> body inside a card is
+     --gap-tight (8px). That 2x ratio is what makes the card boundaries
+     visible before a word is read. When the two are equal — the commonest
+     defect on hand-built marketing pages — the row blurs into one block.
+     ======================================================================= */
+
+  .feature-card {
+    --feature-card-inset: var(--pad-card);
+    --feature-card-gap: var(--gap-tight);
+    --feature-card-radius: var(--radius-lg);
+
+    display: grid;
+    gap: var(--feature-card-gap);
+    align-content: start;
+    padding: var(--feature-card-inset);
+    background: var(--bg-surface);
+    border: var(--stroke-default) solid var(--border-subtle);
+    border-radius: var(--feature-card-radius);
+  }
+
+  .feature-card__icon { color: var(--fg-accent); }
+  .feature-card__title { font: var(--type-h4); color: var(--fg-strong); }
+  .feature-card__body  { font: var(--type-body); color: var(--fg-muted); }
+  .feature-card__proof {
+    font: var(--type-ui);
+    color: var(--fg-link);
+  }
+
+  /* Bordered variant for a card that must sit on --bg-surface without
+     disappearing into it. Concentric corners: the inner radius equals the
+     outer minus the inset, floored so it never goes negative. */
+  .feature-card--media { padding: 0; }
+  .feature-card--media > .feature-card__figure {
+    border-start-start-radius: var(--feature-card-radius);
+    border-start-end-radius: var(--feature-card-radius);
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+  }
+  .feature-card--media > .feature-card__content {
+    display: grid;
+    gap: var(--feature-card-gap);
+    padding: var(--feature-card-inset);
+  }
+
+
+  /* =======================================================================
+     4. TESTIMONIAL CARD
+     =======================================================================
+     The quote and its attribution are DISTINCT groups (--gap-separate), not
+     one group. The gap is what makes the quote read as ended; at --gap-tight
+     the attribution reads as the quote's last line.
+
+     Avatar -> name is --gap-fused, and the avatar takes one rung LESS
+     surrounding space than a rectangle of the same size would, because a
+     circle touches its bounding box at one point per side and therefore reads
+     as further away than it measures.
+     ======================================================================= */
+
+  .testimonial {
+    --testimonial-inset: var(--pad-card);
+    --testimonial-gap: var(--gap-separate);
+
+    display: grid;
+    gap: var(--testimonial-gap);
+    align-content: space-between;
+    padding: var(--testimonial-inset);
+    background: var(--bg-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--elevation-card);
+  }
+
+  /* --type-lead, not --type-body: a quote carries more weight than the copy
+     around it, and size is the cheapest way to say so. */
+  .testimonial__quote {
+    font: var(--type-lead);
+    color: var(--fg-default);
+  }
+
+  .testimonial__attribution {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-tight);
+  }
+  .testimonial__avatar {
+    inline-size: var(--tap-min);
+    block-size: var(--tap-min);
+    border-radius: var(--radius-full);
+    object-fit: cover;
+    flex: none;
+  }
+  .testimonial__who {
+    display: grid;
+    gap: var(--gap-fused);
+  }
+  .testimonial__name { font: var(--type-ui); color: var(--fg-strong); }
+  .testimonial__role { font: var(--type-label); color: var(--fg-muted); }
+
+  /* The kicker above a logo strip. The strip itself is `.grid--min-xs` with
+     `.frame--contain` children — never crop a mark. */
+  .logo-strip__kicker {
+    font: var(--type-label);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+
+
+  /* =======================================================================
+     5. PRICING TABLE
+     =======================================================================
+     Parent is `.switcher--max-3`. The ladder inside a plan card is the whole
+     design:
+
+       name   -> price      --gap-tight      (the price annotates the name)
+       price  -> who-line   --gap-tight      (same group)
+       who    -> features   --gap-separate   (a distinct group begins)
+       features (internal)  --gap-related    (items in one list)
+       features -> CTA      --gap-distinct   (so the button is never read as
+                                              another feature row)
+
+     One plan is recommended and says so. A row of equally-weighted plans
+     hands the reader a comparison task they did not come to do.
+
+     Note the two nested stacks. `.plan` owns only ONE boundary — body to CTA,
+     at --gap-distinct — and `.plan__body` owns the boundaries inside it at
+     --gap-separate. Two stacks, not one stack with an exception on its last
+     child: the relationship lives in the structure where a reviewer can see
+     it, and no child sets a margin.
+     ======================================================================= */
+
+  .plan {
+    --plan-inset: var(--pad-card-lg);
+    --plan-gap: var(--gap-distinct);
+    --plan-border: var(--border-default);
+    --plan-elevation: var(--elevation-card);
+
+    display: grid;
+    gap: var(--plan-gap);
+    grid-template-rows: 1fr auto;   /* CTA on the floor, however tall the card */
+    padding: var(--plan-inset);
+    background: var(--bg-surface);
+    border: var(--stroke-default) solid var(--plan-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--plan-elevation);
+  }
+
+  /* Recommended plan: accent border and one step of elevation. Not a
+     different size — a taller card in a switcher row breaks the baseline
+     agreement across the row and looks like a rendering bug. */
+  .plan--recommended {
+    --plan-border: var(--border-accent);
+    --plan-elevation: var(--elevation-raised);
+  }
+
+  /* Everything above the CTA. Its own stack, its own one gap. */
+  .plan__body {
+    display: grid;
+    gap: var(--gap-separate);
+    align-content: start;
+  }
+
+  .plan__header {
+    display: grid;
+    gap: var(--gap-tight);
+  }
+  .plan__name  { font: var(--type-h4); color: var(--fg-strong); }
+  .plan__price { font: var(--type-h2); color: var(--fg-strong); }
+  .plan__period { font: var(--type-ui); color: var(--fg-muted); }
+
+  /* The most-skipped and most-useful element on any pricing page: one line
+     saying who this plan is for, in the reader's own terms. */
+  .plan__who { font: var(--type-body); color: var(--fg-muted); }
+
+  .plan__features {
+    display: grid;
+    gap: var(--gap-related);
+    font: var(--type-body);
+    list-style: none;
+    padding: 0;
+  }
+  .plan__feature {
+    display: flex;
+    align-items: baseline;
+    gap: var(--gap-tight);
+  }
+  .plan__feature-mark { color: var(--fg-accent); flex: none; }
+
+  .plan__badge {
+    justify-self: start;
+    padding: var(--pad-block-xs) var(--pad-inline-xs);
+    font: var(--type-label);
+    letter-spacing: var(--tracking-wide);
+    color: var(--fg-on-accent);
+    background: var(--bg-accent);
+    border-radius: var(--radius-full);
+  }
+
+  /* The CTA is the plan's second grid row, so it sits on the card's floor
+     however tall the feature list grows — and the buttons across a row of
+     plans line up, which is what stops the row looking broken. */
+  .plan__cta { align-self: end; }
+
+
+  /* =======================================================================
+     6. FAQ DISCLOSURE
+     =======================================================================
+     A real <details>/<summary>. It works before hydration, it is findable by
+     the browser's own in-page search, and it needs no ARIA to be correct.
+
+     `min-block-size: var(--tap-min)` on the summary is not decoration: a
+     44px row is the floor for a finger, and this is the control most often
+     shipped at 28px because the text happens to be short.
+     ======================================================================= */
+
+  .faq {
+    --faq-gap: var(--gap-related);
+    --faq-measure: var(--measure-prose);
+
+    display: grid;
+    gap: var(--faq-gap);
+    max-inline-size: var(--faq-measure);
+  }
+
+  .faq__item {
+    background: var(--bg-surface);
+    border: var(--stroke-default) solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .faq__question {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gap-related);
+    min-block-size: var(--tap-min);
+    padding: var(--pad-block-md) var(--pad-inline-md);
+    font: var(--type-h4);
+    color: var(--fg-strong);
+    cursor: pointer;
+    list-style: none;
+  }
+  .faq__question::-webkit-details-marker { display: none; }
+
+  /* The chevron rotates on open. `transition` is named property-by-property;
+     `transition: all` animates things nobody designed and costs layout work
+     on every change. --motion-expand collapses to 1ms under
+     prefers-reduced-motion, so the disclosure snaps — which is correct. */
+  .faq__marker {
+    color: var(--fg-muted);
+    flex: none;
+    transition: rotate var(--motion-expand);
+  }
+  .faq__item[open] > .faq__question > .faq__marker { rotate: 180deg; }
+
+  .faq__answer {
+    padding: var(--pad-well);
+    padding-block-start: 0;
+    font: var(--type-body);
+    color: var(--fg-muted);
+  }
+
+
+  /* =======================================================================
+     7. CTA BLOCK
+     =======================================================================
+     `.center--intrinsic` is the right parent: the text stays left-aligned
+     (readable) while the block sits on the page's centre line. Centred
+     multi-line body copy is measurably harder to read, because every line
+     starts at a different x and the eye has to hunt for the return.
+
+     The button label here is the SAME label as the hero's. Two labels for one
+     action reads as two offers.
+     ======================================================================= */
+
+  .cta-block {
+    --cta-block-gap: var(--gap-separate);
+    --cta-block-measure: var(--measure-narrow);
+
+    display: grid;
+    gap: var(--cta-block-gap);
+    justify-items: center;
+    text-align: center;
+    max-inline-size: var(--cta-block-measure);
+    margin-inline: auto;         /* alignment, not spacing */
+  }
+  .cta-block__claim { font: var(--type-h2); }
+  .cta-block__note  { font: var(--type-ui); opacity: 0.85; }
+
+  /* The button shell. Focus styling is deliberately absent — it is defined
+     once in base.css for every focusable element on the page. */
+  .cta {
+    --cta-pad-inline: var(--pad-inline-md);
+    --cta-pad-block: var(--pad-block-md);
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--gap-fused);
+    min-block-size: var(--tap-min);
+    padding: var(--cta-pad-block) var(--cta-pad-inline);
+    font: var(--type-ui);
+    color: var(--fg-on-accent);
+    background: var(--bg-accent);
+    border: var(--stroke-default) solid transparent;
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    transition: background-color var(--motion-hover);
+  }
+  .cta:hover { background: var(--bg-accent-hover); }
+
+  /* The secondary action is an outline, never a second filled button. Two
+     buttons of equal weight is a choice the reader did not come to make, and
+     the common answer to an unwanted choice is neither. */
+  .cta--secondary {
+    color: var(--fg-accent);
+    background: transparent;
+    border-color: var(--border-default);
+  }
+  .cta--secondary:hover { background: var(--bg-hover); }
+
+
+  /* =======================================================================
+     8. COMPARISON TABLE
+     =======================================================================
+     A real <table>, because it is real tabular data and a screen reader user
+     needs the row and column headers to navigate it.
+
+     On narrow viewports do NOT shrink the type. Put the table in a `.reel`
+     (which is honest about its overflow) or transpose it to stacked cards.
+     ======================================================================= */
+
+  .compare {
+    --compare-cell-pad-block: var(--pad-block-sm);
+    --compare-cell-pad-inline: var(--pad-inline-md);
+
+    inline-size: 100%;
+    border-collapse: collapse;
+    font: var(--type-body);
+  }
+  .compare th,
+  .compare td {
+    padding: var(--compare-cell-pad-block) var(--compare-cell-pad-inline);
+    text-align: start;
+    border-block-end: var(--stroke-hairline) solid var(--border-subtle);
+  }
+  .compare thead th {
+    font: var(--type-label);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+  .compare tbody th { font: var(--type-ui); color: var(--fg-strong); }
+  .compare__yes { color: var(--fg-success); }
+  .compare__no  { color: var(--fg-subtle); }
+
+  /* Highlight your own column with a surface change, not a colour shout —
+     and include at least one row you lose. A table won 12-0 is read as
+     marketing and discounted whole. */
+  .compare__mine { background: var(--bg-selected); }
+}

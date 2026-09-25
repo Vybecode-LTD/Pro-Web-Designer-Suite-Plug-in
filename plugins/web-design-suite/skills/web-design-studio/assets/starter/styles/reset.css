@@ -1,0 +1,469 @@
+/* =========================================================================
+   RESET — @layer reset
+   =========================================================================
+
+   This is not normalize.css. Normalize *preserves* useful browser defaults
+   and irons out the differences. This file deletes the defaults that fight
+   a design system and keeps only the ones that carry meaning.
+
+   It is the FIRST layer, which means every rule here is the weakest thing
+   in the stylesheet: `base`, `layout`, `components`, `utilities` and
+   `overrides` all beat it without needing a single point of specificity.
+   That is deliberate. A reset you have to fight is a reset that has failed.
+
+   Note on var() inside a weak layer: layer order decides which DECLARATION
+   wins a conflict. It has nothing to do with whether a custom property
+   resolves. `var(--shadow-focus)` below reads the value set on :root in the
+   `tokens` layer perfectly well, because custom properties resolve through
+   INHERITANCE, not through the cascade of this rule. Reset may read tokens;
+   it may not define them.
+
+   Every non-obvious line carries the reason it exists.
+   ========================================================================= */
+
+@layer reset {
+
+  /* -----------------------------------------------------------------------
+     1. BOX MODEL
+     ----------------------------------------------------------------------- */
+
+  /* Inheritance rather than `* { box-sizing: border-box }`. Identical result,
+     but one escape hatch: a third-party widget subtree that genuinely needs
+     content-box can opt out with a single rule on its root and have every
+     descendant follow. With the universal selector you would be rewriting
+     someone else's CSS element by element. */
+  html {
+    box-sizing: border-box;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: inherit;
+  }
+
+
+  /* -----------------------------------------------------------------------
+     2. THE LAW-2 ENABLER — zero the outer margins
+     -----------------------------------------------------------------------
+     Law 2 says PARENTS OWN THE GAPS: a child never sets its own outer
+     margin, and siblings are spaced by the parent's `gap` or by an owl
+     selector declared on the parent.
+
+     That law is unenforceable until this block runs. Every browser ships an
+     <h2> with ~0.83em of margin above and below it, a <p> with 1em, a <ul>
+     with 1em. Those are margins a CHILD brings with it into a layout it
+     knows nothing about. They collapse unpredictably against each other,
+     they break `gap` arithmetic (a flex parent's gap and a child's margin
+     ADD, they do not collapse), they make the first and last child of a
+     card push against padding you already set, and they make "why is there
+     24px here" a five-minute investigation instead of a glance.
+
+     Zeroing them converts spacing from an emergent property of the UA
+     stylesheet into a decision someone made on purpose. Everything the
+     design system does about rhythm — `gap`, `.prose`'s owl, `--space-*` —
+     depends on starting from zero.
+
+     `:where()` keeps this at ZERO specificity so `base` and `components`
+     never have to out-specify it; they only have to be in a later layer.
+     It is spelled out element by element rather than `* { margin: 0 }`
+     because the universal form also destroys `dialog`'s UA `margin: auto`,
+     which is what centres a modal, and author styles beat UA styles in
+     every layer — including this one. ----------------------------------- */
+
+  :where(
+    body, h1, h2, h3, h4, h5, h6,
+    p, figure, figcaption, blockquote,
+    dl, dt, dd,
+    ul, ol, menu, li,
+    pre, hr, table, caption, th, td,
+    form, fieldset, legend, search
+  ) {
+    margin: 0;
+  }
+
+  /* Padding is a smaller problem but the same problem: a UA `padding-inline-
+     start: 40px` on <ul> is an indent nobody chose. Zero it here and let
+     base.css restore a marker gutter it can defend in tokens. */
+  :where(ul, ol, menu, fieldset, legend, figure, blockquote, dd) {
+    padding: 0;
+  }
+
+
+  /* -----------------------------------------------------------------------
+     3. DOCUMENT & TEXT RENDERING
+     ----------------------------------------------------------------------- */
+
+  html {
+    /* iOS Safari inflates text in landscape ("text autosizing") by a factor
+       it computes from the block width. A modular scale survives exactly
+       none of that: your 14px label and 16px body converge, the hierarchy
+       flattens, and it only reproduces on a real device held sideways. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+
+    /* Tell the UA which of its own light/dark surfaces to paint: form
+       controls, scrollbars, the caret, the <dialog> backdrop, `Highlight`.
+       Declared here so the page is coherent before tokens.css re-points
+       anything; tokens.css sits in a LATER layer and wins when it flips
+       this to `dark`. Without it, dark themes ship white scrollbars. */
+    color-scheme: light;
+
+    /* Leading floor, not a design decision. `--leading-normal` is Tier 1 and
+       normally off-limits (Law 6), but there is no standalone Tier-2 leading
+       role: leading travels INSIDE the `--type-*` shorthands. base.css
+       immediately replaces this on <body> with `font: var(--type-body)`.
+       It exists so an element that somehow escapes a type role still sets
+       readable text instead of the UA's `normal` (~1.2). */
+    line-height: var(--leading-normal);
+
+    /* A 120-character unbroken URL or hash should reflow, not blow out the
+       page's inline size and produce a horizontal scrollbar on mobile.
+       `break-word` is the safe global choice: it breaks the word only after
+       the line has already overflowed, and it leaves min-content sizing
+       alone. Its stronger sibling `overflow-wrap: anywhere` ALSO shrinks the
+       element's min-content size, which is what finally stops a stubborn
+       grid/flex track from overflowing — apply that one locally, to the
+       specific track that misbehaves, never here. */
+    overflow-wrap: break-word;
+
+    /* FONT SMOOTHING — read before enabling.
+       `-webkit-font-smoothing: antialiased` switches macOS/iOS from
+       subpixel (RGB) rendering to greyscale. It makes type visibly THINNER.
+       The honest tradeoff:
+         + On light-on-dark text it removes the bloom that makes light glyphs
+           look overweight, and it is close to required for good dark mode.
+         - On dark-on-light body copy at 14-16px it removes stem weight the
+           reader needs, especially on non-HiDPI displays, and it disables
+           the subpixel positioning that keeps stems even.
+         - It is a macOS/iOS-only property. It does nothing on Windows or
+           Android, so your team's Macs will disagree with your users.
+       The defensible rule: do NOT set it globally. Set it on inverse
+       surfaces only — see base.css / the `.inverse` context — where the
+       problem it solves actually exists. Left commented on purpose. */
+    /* -webkit-font-smoothing: antialiased; */
+    /* -moz-osx-font-smoothing: grayscale; */
+  }
+
+  body {
+    /* `dvh`, not `vh`: on mobile `100vh` is the LARGEST viewport height, so
+       a full-height element sits under the collapsing URL bar until you
+       scroll. `min-block-size` (not `block-size`) so content longer than the
+       viewport still grows the page. */
+    min-block-size: 100dvh;
+  }
+
+  /* Orphan and ragged-line control.
+       `pretty`  — the browser reflows the LAST few lines to avoid a single
+                   word on its own line. Cheap, safe, applies to long text.
+       `balance` — equalises line lengths across the whole block. Only for
+                   short blocks; engines cap it (Chrome at ~6 lines) and it
+                   is O(n) work per reflow, so it is wrong for body copy.
+     Headings get `balance` in base.css, where their type roles live. */
+  :where(p, li, dd, figcaption, blockquote, caption, td, th) {
+    text-wrap: pretty;
+  }
+
+
+  /* -----------------------------------------------------------------------
+     4. MEDIA
+     ----------------------------------------------------------------------- */
+
+  /* `display: block` kills the phantom 4px gap under every image — images
+     are inline by default, so they sit on the text baseline and reserve
+     descender space that looks like a mystery margin.
+     `max-inline-size: 100%` is the one rule that stops a 3000px CMS upload
+     from widening the whole page. */
+  :where(img, svg, video, canvas, audio, iframe, embed, object) {
+    display: block;
+    max-inline-size: 100%;
+  }
+
+  /* Pair with the clamp above or the image keeps its intrinsic height while
+     its width shrinks, and it distorts. `auto` restores the aspect ratio. */
+  :where(img, video) {
+    block-size: auto;
+  }
+
+  /* Alt text is content. When an image 404s the alt string renders as inline
+     text with no signal that something failed; italic makes broken images
+     obvious in QA without a single devtools open. */
+  img {
+    font-style: italic;
+  }
+
+  /* An <audio> with no controls renders as a zero-size box that still
+     participates in layout and still counts as a flex/grid item. */
+  audio:not([controls]) {
+    display: none;
+  }
+
+  /* SVG defaults to `fill: black`. Inheriting `currentColor` is what makes
+     an icon automatically correct inside a button, a link, a danger state
+     and dark mode without a single icon-specific rule. */
+  svg {
+    fill: currentColor;
+  }
+
+
+  /* -----------------------------------------------------------------------
+     5. FORM CONTROLS
+     ----------------------------------------------------------------------- */
+
+  /* Form controls do NOT inherit typography. Every browser substitutes a
+     system UI font at a system size, which is how a carefully set 16px
+     Geist form ends up rendering in 13.333px Arial. `font: inherit` is one
+     declaration and it fixes the single most common "why does my input look
+     wrong" bug.
+     `letter-spacing: inherit` is separate and necessary: Safari does not
+     inherit tracking into form controls even when the font is inherited, so
+     a tracked label and its input drift apart. */
+  :where(input, button, textarea, select, optgroup) {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+  }
+
+  /* Same problem, different pseudo-element: the button inside <input
+     type="file"> is a separate UA widget with its own font. */
+  ::file-selector-button {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* An unstyled button should look like NOTHING. Law 4 says a component has
+     one home for its styles; if the reset leaves a grey gradient and a
+     border here, every button component starts by un-doing the browser and
+     the true appearance is split across two files. Strip it to a rectangle
+     and let components/button.css be the only source of truth. */
+  :where(button, [type="button"], [type="reset"], [type="submit"]) {
+    background: none;
+    border: none;
+    text-align: inherit;
+  }
+
+  /* Horizontal resize breaks every layout it is dropped into: a textarea
+     dragged wider overflows its grid track and there is no way to undo it.
+     Vertical resize solves the real user need (more room to write). */
+  textarea {
+    resize: vertical;
+  }
+
+  /* Progressive enhancement: where supported, the textarea grows with its
+     content and the resize handle becomes a refinement rather than the only
+     way to see what you typed. Guarded so unsupporting browsers keep the
+     rule above rather than getting a broken auto-size. */
+  @supports (field-sizing: content) {
+    textarea {
+      field-sizing: content;
+    }
+  }
+
+  /* <fieldset> ships a border and inline padding that exist to draw a box
+     nobody has asked for since 2005; <legend> ships padding that makes it
+     straddle that border. Both are now the component's decision. */
+  :where(fieldset) {
+    border: none;
+    min-inline-size: 0;   /* fieldset's UA `min-width: min-content` is the
+                             reason a flex/grid child inside one refuses to
+                             shrink. It is a real, well-documented bug farm. */
+  }
+
+
+  /* -----------------------------------------------------------------------
+     6. INTERACTIVITY
+     ----------------------------------------------------------------------- */
+
+  /* `cursor: pointer` on buttons is a deliberate break with the native
+     platform convention (macOS and Windows both use the arrow on buttons;
+     the hand historically means "hyperlink"). We break it because twenty
+     years of the web have taught users that the hand means "clickable", and
+     a custom-styled <div>-shaped button with an arrow cursor reads as inert.
+     Applied through :where() so a component that wants `cursor: default`
+     (a toggle already in its on state, say) costs nothing to write. */
+  :where(
+    button, [role="button"], summary, select,
+    label[for], [type="radio"], [type="checkbox"], [type="file"]
+  ) {
+    cursor: pointer;
+  }
+
+  /* `manipulation` disables double-tap-to-zoom on the element, which is what
+     removes the ~300ms delay iOS otherwise waits before firing the click.
+     Scoped to interactive elements only — disabling it document-wide takes
+     pinch-free zoom away from people who need it. */
+  :where(button, [role="button"], a, summary, label, input, select, textarea) {
+    touch-action: manipulation;
+  }
+
+  /* The grey flash on tap is unstyleable and fires before your own :active
+     state. Removing it is only acceptable BECAUSE components are required to
+     ship a visible :active. If you take the highlight away and give nothing
+     back, touch users lose their only confirmation that the tap landed. */
+  :where(button, [role="button"], a, summary, label) {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* An element that is aria-disabled or [disabled] still receives hover; it
+     should not claim to be pressable. */
+  :where([disabled], [aria-disabled="true"]) {
+    cursor: default;
+  }
+
+  /* Removes the default disclosure triangle so components/details.css can
+     supply its own marker. Two selectors because WebKit ignores ::marker on
+     <summary> and uses a proprietary pseudo-element. */
+  summary {
+    list-style: none;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+
+  /* -----------------------------------------------------------------------
+     7. FOCUS
+     -----------------------------------------------------------------------
+     `:focus-visible`, never `:focus`. The UA heuristic already knows the
+     difference between a mouse click and a Tab press; styling `:focus`
+     means a ring appears every time someone clicks a button, which is the
+     reason teams start deleting focus rings in the first place.
+     ----------------------------------------------------------------------- */
+
+  :focus-visible {
+    /* `--shadow-focus` is a TWO-ring halo by construction:
+         ring 1  --stroke-focus  in --bg-canvas   (separation gap)
+         ring 2  --stroke-focus  in --border-focus (the visible ring)
+       Two rings are what make a focus indicator survive an element sitting
+       on an accent fill, an image, or an inverse surface — there is always
+       a contrasting edge somewhere in the pair. A single-colour ring fails
+       WCAG 2.4.11 the moment the background approaches its colour. */
+    box-shadow: var(--shadow-focus);
+
+    /* Kill the UA ring (we have replaced it) but keep an outline BOX so the
+       forced-colors rule below has something to repaint. */
+    outline: var(--stroke-focus) solid transparent;
+    outline-offset: var(--stroke-focus);
+  }
+
+  /* Windows High Contrast / forced-colors DISCARDS box-shadow entirely. The
+     transparent outline above is the bridge: forced-colors repaints outline
+     colours, so the ring survives in a mode whose whole users are people who
+     need the ring most. */
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline-color: Highlight;
+      box-shadow: none;
+    }
+  }
+
+  /* CAVEAT worth knowing before you copy this pattern: a box-shadow ring is
+     clipped by any ancestor with `overflow: hidden` (a card with a rounded
+     image header, a scroll container, a carousel). `outline` is NOT clipped.
+     When a focusable element lives inside a clipping ancestor, the component
+     should swap to `outline: var(--stroke-focus) solid var(--border-focus);
+     outline-offset: var(--stroke-focus); box-shadow: none;` in its own file.
+     That is a component decision, so it lives in the component's home. */
+
+
+  /* -----------------------------------------------------------------------
+     8. SCROLLING
+     ----------------------------------------------------------------------- */
+
+  /* Smooth scrolling ONLY while a fragment target exists. A blanket
+     `html { scroll-behavior: smooth }` also animates find-in-page, browser
+     restore-scroll-position, and every programmatic scrollTo — which makes
+     "jump to the error field" take 400ms and makes long pages feel broken.
+     `:has(:target)` limits it to the case the user actually asked for:
+     they clicked an in-page anchor. */
+  @media (prefers-reduced-motion: no-preference) {
+    html:has(:target) {
+      scroll-behavior: smooth;
+    }
+  }
+
+  /* An anchored element must not land flush against the top of the viewport
+     (or worse, under a sticky header). `--space-block` is the Tier-2 role
+     for the distance between prose blocks, which is exactly the breathing
+     room a freshly-scrolled heading wants. A page with a sticky header
+     should extend this in layout.css, where the header's height is known. */
+  :target {
+    scroll-margin-block-start: var(--space-block);
+  }
+
+  /* Deliberately NOT `:where([id]) { scroll-margin-block-start: ... }`, which
+     several popular resets ship. It applies to every element that happens to
+     carry an id — modal roots, scroll containers, app shells — and silently
+     offsets every `scrollIntoView()` in the codebase by an amount nobody can
+     find. Scope the fix to the state that needs it: `:target`. */
+
+
+  /* -----------------------------------------------------------------------
+     9. HIDDEN
+     -----------------------------------------------------------------------
+     `[hidden]` is a promise: this element is not rendered in any
+     presentation. The UA implements it as `display: none`, which ANY author
+     `display` beats — including one in a later layer. That is why every
+     other reset on the internet writes `!important` here.
+
+     Law 5 forbids `!important`, so we solve it with layer order instead:
+     this declaration is repeated as the LAST rule of `overrides.css`, which
+     is the last layer. The copy here handles the 99% case cheaply; the copy
+     in `overrides` is the authoritative one that a `display: flex` in
+     `components` cannot defeat. Do not delete either.
+
+     `until-found` is excluded: that value means "hidden but findable by
+     find-in-page and reachable by a fragment link", and the browser removes
+     the attribute itself when it reveals the element. Forcing
+     `display: none` on it disables the feature. ------------------------ */
+
+  [hidden]:not([hidden="until-found"]) {
+    display: none;
+  }
+
+
+  /* -----------------------------------------------------------------------
+     10. MISCELLANEOUS UA CORRECTIONS
+     ----------------------------------------------------------------------- */
+
+  /* `separate` (the UA default) leaves a 2px gap between cells that no
+     amount of border styling will remove, and doubles every shared border. */
+  table {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+
+  /* <dialog> is `display: none` until open, but authors routinely give it a
+     `display: grid` in a component file and permanently break `close()`.
+     Restating the closed state at zero specificity makes the failure
+     visible: if a component overrides this it did so on purpose. */
+  :where(dialog:not([open])) {
+    display: none;
+  }
+
+  /* The UA gives <dialog> a border and a fixed max-size; the border in
+     particular is a 2px inset ridge that no design has ever wanted. */
+  dialog {
+    border: none;
+    padding: 0;
+    background: none;
+    color: inherit;
+    max-inline-size: none;
+    max-block-size: none;
+  }
+
+  /* Same for the popover API's UA chrome. */
+  [popover] {
+    border: none;
+    padding: 0;
+    background: none;
+    color: inherit;
+  }
+
+  /* <template> occasionally leaks into layout when a framework clones it
+     into the DOM before hydration. */
+  template {
+    display: none;
+  }
+}
