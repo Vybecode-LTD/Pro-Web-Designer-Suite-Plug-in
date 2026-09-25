@@ -7,6 +7,7 @@ The source of **web-design-suite**, a Claude Code plugin. It has thirteen skills
 | [`plugins/web-design-suite`](plugins/web-design-suite) | The plugin. Its [README](plugins/web-design-suite/README.md) describes the skills, and its [CHANGELOG](plugins/web-design-suite/CHANGELOG.md) the releases. |
 | [`dev plans`](dev%20plans) | The review, the phase plans and the reports. |
 | [`tooling`](tooling) | The pinned tools the plugin's tests run its configs through (`npm ci` in each folder). |
+| [`CLAUDE.md`](CLAUDE.md) and [`docs/HANDOFF.md`](docs/HANDOFF.md) | For whoever works on it next: the project map, and the current state with the next steps. |
 | [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) | Makes this repository a plugin marketplace. |
 
 ## Install
