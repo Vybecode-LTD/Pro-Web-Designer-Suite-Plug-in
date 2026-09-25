@@ -14,7 +14,7 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-09-25)
 
-- **Version:** 3.2.1. It is PR #1, reviewed by CodeRabbit; merge it, then tag `v3.2.1`. `main` holds 3.0.0 to 3.2.0 as tagged commits.
+- **Version:** 3.2.1. It is PR #1, not yet merged; `docs/HANDOFF.md` says what to do with it. `main` holds 3.0.0 to 3.2.0 as tagged commits.
 - **Installed:** sessions load the plugin from `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`. That folder is a copy of `plugins/web-design-suite`, already updated to 3.2.1.
 - **Tests:**
   - 317, passing on Python 3.10 to 3.14 on Windows.

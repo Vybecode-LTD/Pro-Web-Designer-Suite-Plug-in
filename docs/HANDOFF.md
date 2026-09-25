@@ -9,7 +9,7 @@
   - the pinned test toolchain in `tooling/`;
   - the completion plan, this handoff and `CLAUDE.md`.
 
-  CodeRabbit is reviewing the PR; it has not been merged yet.
+  It has not been merged. The organisation's CodeRabbit reviewer was at its rate limit when the PR opened, and its next review was about an hour away. So the PR had no review when this session ended.
 - **3.2.1** fixes items 1–3 before distribution:
   - No shipped file names a path on this machine.
   - The stylelint config and the Tailwind ESLint blocks work on the real tools.
@@ -22,7 +22,8 @@
 ## Next steps
 
 1. **Finish PR #1.**
-   - Read CodeRabbit's review, and fix what is right, with tests; say why for anything you decline.
+   - If CodeRabbit has reviewed it, fix what is right, with tests, and say why for anything you decline.
+   - If it has not, ask the user whether to request a review (a PR comment `@coderabbitai review`) or to merge without one.
    - Merge, then tag `v3.2.1` on `main` and push the tag.
    - If the fixes change the plugin, rebuild the zip and update the installed copy (release procedure, steps 4 and 6).
 2. **Set up and check.** Run `npm ci` in `tooling/main` and `tooling/tailwind-v3`. Then, from `plugins/web-design-suite`, `python -m unittest discover -s tests` must report 317 tests OK.
