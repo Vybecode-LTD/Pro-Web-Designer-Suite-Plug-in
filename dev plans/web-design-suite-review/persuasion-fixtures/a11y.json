@@ -1,0 +1,4 @@
+{"url": "http://localhost:8080/pricing", "violations": [
+  {"id": "color-contrast", "impact": "serious", "nodes": [{"target": [".plan__who"]}, {"target": [".faq__answer"]}]},
+  {"id": "label", "impact": "critical", "nodes": [{"target": ["#email"]}]}
+], "passes": [{"id": "document-title"}]}

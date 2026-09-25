@@ -1,0 +1,11 @@
+{
+  "subject": "Acme pricing page",
+  "decisions": [
+    {"decision": "Hero has no image", "rationale": "The proposition is a number | a photo would dilute it", "alternative": "Product screenshot, rejected", "cost": "Less scroll-stopping in a feed"}
+  ],
+  "findings": [
+    {"layer": "hierarchy", "severity": "minor", "title": "The most important plan is not visually recommended", "mechanism": "All three cards share one elevation, so the eye picks the leftmost.", "confidence": "confirmed"},
+    {"layer": "color", "severity": "major", "title": "Muted text on the sunken band fails contrast", "mechanism": "Measured 3.2:1 against the 4.5:1 floor. Unreadable in daylight.", "fix": "Re-point --fg-muted one step darker.", "confidence": "confirmed"},
+    {"layer": "craft", "severity": "minor", "title": "Icon weights may differ", "mechanism": "Suspicion only.", "confidence": "suspected"}
+  ]
+}

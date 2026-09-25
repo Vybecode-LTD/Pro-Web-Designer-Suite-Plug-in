@@ -1,0 +1,1 @@
+{"tool": "a11y_runtime", "coverageNote": "...", "target": "http://localhost:8080/", "mode": "url", "axeVersion": "4.10.0", "tags": ["wcag2a","wcag2aa","wcag21aa","wcag22aa"], "counters": {"axe_violations": 3}, "findings": [{"check": "axe", "rule": "color-contrast", "severity": "error"}]}

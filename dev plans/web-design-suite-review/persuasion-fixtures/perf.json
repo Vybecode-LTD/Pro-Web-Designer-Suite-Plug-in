@@ -1,0 +1,1 @@
+{"findings":[{"rule":"budget-total","severity":"error","message":"over budget"}],"ledger":{"bytes":{"total":912000,"image":700000},"assets":[{"path":"img/hero.jpg","transfer":650000}]},"budget":{"bytes":{"total":600000}}}

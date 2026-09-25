@@ -1,0 +1,5 @@
+[
+ {"file": "src/components/hero.css", "line": 3, "law": "L5", "rule": "important", "severity": "error", "message": "!important inverts layer order", "fix": "Move the rule to the right @layer"},
+ {"file": "src/components/nav.css", "line": 9, "law": "L5", "rule": "important", "severity": "error", "message": "!important inverts layer order", "fix": "Move the rule to the right @layer"},
+ {"file": "src/components/card.css", "line": 14, "law": "L5", "rule": "important", "severity": "error", "message": "!important inverts layer order", "fix": "Move the rule to the right @layer"}
+]

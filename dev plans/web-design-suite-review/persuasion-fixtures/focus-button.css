@@ -1,0 +1,6 @@
+@layer components {
+  .button:focus-visible {
+    box-shadow: var(--shadow-focus);
+    outline: var(--stroke-focus) solid transparent;
+  }
+}
