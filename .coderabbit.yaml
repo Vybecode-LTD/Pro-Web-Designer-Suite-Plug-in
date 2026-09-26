@@ -16,7 +16,7 @@ reviews:
         Standard library only: flag any third-party import. The floor is Python 3.10, so flag syntax or library APIs newer than 3.10.
     - path: "plugins/web-design-suite/tests/**/*.py"
       instructions: |
-        Every subprocess a test starts must pass env=env(...) from tests/wds_support.py, which gives it the harness's environment without git's repository variables. Flag a subprocess call without it.
+        Every subprocess a test starts must get its environment from env() in tests/wds_support.py, passed as env= directly or through a variable that holds env()'s result; env() gives the harness's environment without git's repository variables. Flag a subprocess call with no env=, or an environment built from os.environ.
     - path: "plugins/web-design-suite/skills/**/SKILL.md"
       instructions: |
         A SKILL.md must stay at or under 20,500 bytes (tests/test_skill_budget.py). A figure from outside the plugin must be registered, with its quote, in tests/fixtures/evidence.json.
