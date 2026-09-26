@@ -13,8 +13,8 @@
   - The stylelint config refused the plugin's own starter stylesheets 32 times, and refused the documented Tailwind entry.
   - The Tailwind v3 block of the ESLint config stopped ESLint with "Could not resolve tailwindcss".
   - Both Tailwind blocks gave `p-card px-inline-md` as a contradiction, and neither plugin flags it.
-- **3. The Python floor.** Python 3.10 or newer, verified by the final suite (332 tests) on each of 3.10 to 3.14. On 3.9 the test harness fails (`ignore_cleanup_errors` is 3.10+). Every script compiles on 3.9, but that does not make it supported.
-- **Tests.** 296 → 332: 21 for items 1–3, then 15 more from the review. Inside the repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3` provides every tool the tests use but the browser, at pinned versions.
+- **3. The Python floor.** Python 3.10 or newer, verified by the final suite (338 tests) on each of 3.10 to 3.14. On 3.9 the test harness fails (`ignore_cleanup_errors` is 3.10+). Every script compiles on 3.9, but that does not make it supported.
+- **Tests.** 296 → 338: 21 for items 1–3, 15 more from the review, and 6 from CodeRabbit's second review. Inside the repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3` provides every tool the tests use but the browser, at pinned versions.
 
 ## Where everything is
 
@@ -62,6 +62,13 @@
 - The zip builder's 3 new tests fail against `8b27ff7`'s builder.
 - Guards that pass on both: the starter and the documented entries, the refusals and allowances that already held, the machine-path pattern check and the harness tests (they test the test code), and the floor interpreter (the scripts ran on 3.10 before too).
 
+**CodeRabbit's second review**, of those fixes at `00fb5f2`, raised four more points and kept one open. All five are fixed.
+- **Git's repository variables.** Inherited from a git hook or a shell, `GIT_DIR` and the like pointed the builder at another repository, and the tests' git commands too: 19 test subprocesses got no environment of their own, and the hook tests built theirs from `os.environ`. Run with `GIT_DIR` set to a scratch repository, `00fb5f2`'s hook test passed and left `components/card.css` staged in that repository's index. The builder now drops the variables `git rev-parse --local-env-vars` names and runs git from the repository's top folder. `env()` drops them for every test subprocess, every call passes it, and a test holds both.
+- **What the zip leaves out.** The builder skipped a tracked symbolic link, and a file that `export-ignore` keeps out of `git archive`, and still reported success. It now checks what it packed against `git ls-tree` and refuses, writing nothing.
+- **The plan.** N6 and the handoff still asked for decision 2, which was made; the rule on two Python versions gave no command for 3.14; and the zip check compared a folder with an archive stream.
+
+Against `00fb5f2`, the 6 new tests fail (5 failures, 1 error): the 3 builder tests against its builder, and the 3 harness tests against its harness, with the new test files placed beside it. With the fix, the same scratch repository's index stays empty through the hook and migration tests.
+
 ## Evidence
 
 ### Test runs
@@ -70,17 +77,19 @@ Each run was from `plugins/web-design-suite`, with `PYTHONDONTWRITEBYTECODE=1` a
 
 | Run | Python | Result |
 |---|---|---|
-| `python -m unittest discover -s tests`, the final suite | 3.14.5 | Ran 332 tests in 205.3 s: **OK** |
-| The same | 3.13.9 | Ran 332 tests in 258.4 s: **OK** |
-| The same | 3.12.12 | Ran 332 tests in 259.7 s: **OK** |
-| The same | 3.11.15 | Ran 332 tests in 259.2 s: **OK** |
-| The same | 3.10.20 (the floor) | Ran 332 tests in 240.4 s: **OK** |
+| `python -B -m unittest discover -s tests`, the final suite | 3.14.5 | Ran 338 tests in 213.0 s: **OK** |
+| The same | 3.13.9 | Ran 338 tests in 230.1 s: **OK** |
+| The same | 3.12.12 | Ran 338 tests in 231.1 s: **OK** |
+| The same | 3.11.15 | Ran 338 tests in 240.3 s: **OK** |
+| The same | 3.10.20 (the floor) | Ran 338 tests in 248.5 s: **OK** |
 | With `WDS_PLUGIN_ROOT` set to `8b27ff7`, the review's fail-before | 3.14.5 | Ran 319 tests in 502.0 s: **FAILED (failures=4, errors=2)**, as intended |
-| Linux: WSL2 Ubuntu, dash as `/bin/sh` | 3.14.4 | Ran 332 tests in 109.883s: **OK**, 59 skipped (no Node there, and no floor interpreter or toolchain for Linux) |
+| CodeRabbit's second review: the new test files beside `00fb5f2`'s builder and harness | 3.14.5 | Ran 14 tests: **FAILED (failures=5, errors=1)**, as intended |
+| Linux: WSL2 Ubuntu, dash as `/bin/sh` | 3.14.4 | Ran 338 tests in 127.8 s: **OK**, 59 skipped (no Node there, and no floor interpreter or toolchain for Linux) |
+| Before CodeRabbit's second review: 332 tests | 3.10.20 to 3.14.5, and Linux | **OK** on each (Linux: 59 skipped) |
 | Before the review: 317 tests | 3.14.5, 3.12.10, 3.10.20 | **OK** in 172.3, 199.5 and 201.5 s |
 | Before the review: with `WDS_PLUGIN_ROOT` set to an unpacked 3.2.0 | 3.14.5 | Ran 309 tests in 183.2 s: **FAILED (failures=13, errors=1, skipped=1)**, as intended |
 
-The final 3.14 and 3.10 runs went side by side, then 3.11, 3.12 and 3.13 together. The first Linux run of the final suite failed one new test: git on Linux reads file modes from the disk, so the zip test's `git add` put 0644 back over the `+x` it had staged. The test now makes the file executable on disk as well.
+The final 3.14, 3.10 and 3.11 runs went side by side, then 3.12, 3.13 and Linux together. The first Linux run of the final suite failed one new test: git on Linux reads file modes from the disk, so the zip test's `git add` put 0644 back over the `+x` it had staged. The test now makes the file executable on disk as well.
 
 Against 3.2.0:
 - 14 of the 21 new tests fail, eight of them because the v3 class cannot even load.

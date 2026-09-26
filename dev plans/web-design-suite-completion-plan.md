@@ -12,7 +12,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`, then this plan.
 2. Install the test tools once: `npm ci` in `tooling/main` and in `tooling/tailwind-v3` (`tooling/README.md`).
-3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 332 tests OK before you change anything; if it does not, fix that first.
+3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 338 tests OK before you change anything; if it does not, fix that first.
 4. Work the phases in order. Inside a phase the workstreams are independent, so take them one at a time and ship the phase as one release.
 5. When a workstream is done, update its rows in the inventory: the release, and the test that holds each fix.
 
@@ -21,7 +21,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 - **Fail before, pass after.** Every fix gets a regression test, and the test is seen failing on the previous release. Get that release from its tag, `git archive v3.2.1 plugins/web-design-suite | tar -x -C <scratch folder>`, and run the suite with `WDS_PLUGIN_ROOT` pointed at it. The 3.1.0 and 3.2.0 reports show how to report it: the fail-before counts, plus the controls and guards that pass on both versions.
 - **Reproduce first.** Some items were fixed under another ID (the inventory marks those known). If an item no longer reproduces, record which release fixed it and which test holds it; do not write a fix for it.
 - **Read the item in its detail file** (`web-design-suite-review/<area>.md`) before you touch it. The detail files give where, why, and usually how. The tables below carry only the first sentence.
-- **Two Python versions.** Before each commit that changes the plugin, run the full suite on Python 3.14 and on the floor: `"$(uv python find 3.10)" -B -m unittest discover -s tests` (3.9 once W4 lowers the floor).
+- **Two Python versions.** Before each commit that changes the plugin, run the full suite from `plugins/web-design-suite` on Python 3.14, `"$(uv python find 3.14)" -B -m unittest discover -s tests`, and on the floor, the same with `3.10` (3.9 once W4 lowers the floor).
 - **One set of rules.** A change to what a gate accepts goes into `skills/web-design-studio/assets/rules/design-rules.json` first. Then it goes into the audit, the stylelint config and the ESLint config, with a real-tool test in `test_real_tools.py`.
 - **Facts from outside the plugin** (laws, standards, vendor limits, prices, dates) are re-read at their source on the day and registered in `tests/fixtures/evidence.json` with their quote.
 - **Git.** One branch per phase, conventional commits, and a PR. Tag after the merge. Read the staged diff before every commit: never commit a secret.
@@ -165,7 +165,7 @@ These were found in phase 2 and 3.2.1:
 
 - **N4.** `accessibility.md` is 60.1 KB, at the limit of one Read. Split it the way 3.2.0 split navigation-patterns.md, and keep `test_skill_budget` passing.
 - **N5.** Only the nine scripts that were executable in 3.0.0 are marked executable (the hook is one of them). Mark the other 17 scripts that have a shebang, and add a test that reads git's file modes. Since 3.2.1 the zip builder takes modes from git, so the zip carries them.
-- **N6.** Settle Python 3.9 (decision 2). If 3.10 stays the floor, each script should stop on an older Python with one clear line, and a test should hold it.
+- **N6.** Support Python 3.9 (decision 2, made on 2026-09-25). The test harness uses three calls only 3.10 has (`ignore_cleanup_errors`, `write_text(newline=)` and slicing `Path.parents`): make it run on 3.9, state 3.9 in the READMEs and CLAUDE.md, and run the floor checks on 3.9.
 - **N7.** TypeScript 7 is npm's latest, and typescript-eslint 8.70 accepts TypeScript below 6.1. A project that installs typescript-eslint without pinning TypeScript gets a peer conflict. Say so wherever the docs install typescript-eslint.
 - **N8.** The plugin README's install section names only a local folder. Add the GitHub route, `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, and say that it needs access while the repository is private.
 - **N9.** Add a repository-level check that the root `.claude-plugin/marketplace.json` and the plugin's own agree on name, description, category and keywords.
@@ -465,7 +465,7 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 
    Use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\claude.exe`; the one on PATH is older.
 3. Write the report as `dev plans/web-design-suite-<version>-report.md`, modelled on the 3.1.0 and 3.2.0 reports. Update the inventory and the `dev plans` README.
-4. Build the zip from the merged commit with `python tooling/release/build_zip.py <previous release zip> <out zip> --rev <commit or tag>` (until phase 5 replaces it). It packs only what git tracks, with git's file modes, dated at the commit, so a rebuild is byte-identical; entries keep the previous zip's order, and removed files are listed. Write the output into `Downloads`, which is not redirected to OneDrive. Then extract it and `diff -r` it against `git archive` of the same commit.
+4. Build the zip from the merged commit with `python tooling/release/build_zip.py <previous release zip> <out zip> --rev <commit or tag>` (until phase 5 replaces it). It packs only what git tracks, with git's file modes, dated at the commit, so a rebuild is byte-identical; entries keep the previous zip's order, and removed files are listed. It refuses, and writes nothing, if the plugin holds a link or a submodule, or a file `git archive` leaves out. Write the output into `Downloads`, which is not redirected to OneDrive. Then extract the zip into one folder and `git archive` of the same commit into another, and `diff -r` the two.
 5. Open the PR, merge, then tag `vX.Y.Z` on main and push the tag.
 6. Update the installed copy.
    - Mirror the release into `C:\Users\vybec\.claude\local-marketplaces\web-design-suite\`, removing files that were deleted: extract the zip from step 4 (or `git archive` of the release commit) and mirror that, never the working folder, which can hold a `__pycache__` or a `node_modules`. That folder is what sessions load, so never move or delete it.
