@@ -1,51 +1,98 @@
-"""Package a patched plugin tree as a zip laid out like the original release.
+"""Build the release zip of plugins/web-design-suite from git.
 
-usage: python rebuild_zip.py <original.zip> <patched web-design-suite dir> <out.zip>
-Existing entries keep the original's order and permission bits; new files (tests/)
-follow, sorted. Folder entries are stored, files deflated, Unix metadata — as the
-original was built.
+usage: python tooling/release/build_zip.py <previous release zip> <out.zip> [--rev REV]
+
+The zip holds what git holds at REV (default HEAD), and nothing else:
+- only tracked files, so a local node_modules, .DS_Store or editor backup never ships;
+- git's file modes, so a script git marks executable is executable in the zip;
+- every entry dated at REV's commit time, so two builds of one commit are identical.
+
+Entries that were in the previous release keep its order, new ones follow sorted,
+and removed ones are listed. Folders are stored and files deflated, with Unix
+metadata, as the earlier releases were. Run it from inside the repository.
+Exit codes: 0 built, 1 the zip failed its own test, 2 bad invocation.
 """
-import pathlib
+from __future__ import annotations
+
+import argparse
+import io
+import stat
+import subprocess
 import sys
+import tarfile
 import time
 import zipfile
 
-orig_zip, tree, out = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
-top = "web-design-suite/"
+PLUGIN = "plugins/web-design-suite"
+TOP = "web-design-suite/"
 
-with zipfile.ZipFile(orig_zip) as z:
-    original = {i.filename: i for i in z.infolist()}
-    order = [i.filename for i in z.infolist()]
 
-wanted = [top]
-for p in sorted(tree.rglob("*")):
-    rel = p.relative_to(tree).as_posix()
-    if "__pycache__" in rel:
-        raise SystemExit(f"refusing to package bytecode: {rel}")
-    wanted.append(top + rel + ("/" if p.is_dir() else ""))
+def git(*args: str) -> bytes:
+    return subprocess.run(["git", *args], check=True, capture_output=True).stdout
 
-gone = [n for n in order if n not in wanted]
-if gone:
-    raise SystemExit(f"entries in the original but not in the tree: {gone}")
-names = order + [n for n in wanted if n not in original]
 
-with zipfile.ZipFile(out, "x") as zout:
-    for name in names:
-        src = tree / name[len(top):]
-        mtime = src.stat().st_mtime if src.exists() else time.time()
-        info = zipfile.ZipInfo(name, date_time=time.localtime(mtime)[:6])
-        info.create_system = 3
-        if name.endswith("/"):
-            info.external_attr = original[name].external_attr if name in original else (0o40755 << 16) | 0x10
-            info.compress_type = zipfile.ZIP_STORED
-            zout.writestr(info, b"")
-        else:
-            info.external_attr = original[name].external_attr if name in original else 0o100644 << 16
-            info.compress_type = zipfile.ZIP_DEFLATED
-            zout.writestr(info, src.read_bytes())
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("previous", help="the previous release's zip, whose entry order is kept")
+    parser.add_argument("out", help="the zip to write; it must not exist yet")
+    parser.add_argument("--rev", default="HEAD", help="the commit to build (default: HEAD)")
+    args = parser.parse_args(argv)
 
-with zipfile.ZipFile(out) as z:
-    bad = z.testzip()
-    infos = z.infolist()
-print(f"wrote {out} — {len(infos)} entries ({sum(i.is_dir() for i in infos)} folders, "
-      f"{sum(not i.is_dir() for i in infos)} files), {out.stat().st_size} bytes, testzip: {bad or 'OK'}")
+    try:
+        commit = git("rev-parse", "--verify", args.rev + "^{commit}").decode().strip()
+        stamp = int(git("log", "-1", "--format=%ct", commit).decode().strip())
+        archive = git("archive", "--format=tar", commit, PLUGIN)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        detail = getattr(exc, "stderr", b"") or b""
+        parser.error(f"cannot read {args.rev!r} from git: {detail.decode(errors='replace').strip() or exc}")
+    with zipfile.ZipFile(args.previous) as z:
+        order = [i.filename for i in z.infolist()]
+
+    date_time = time.gmtime(stamp)[:6]
+    entries: dict[str, tuple[int, bytes]] = {}            # zip name -> (mode, content)
+    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+        for member in tar.getmembers():
+            rel = member.name[len(PLUGIN):].lstrip("/")
+            if not member.name.startswith(PLUGIN) or member.issym() or member.islnk():
+                continue
+            if member.isdir():
+                entries[TOP + rel + "/" if rel else TOP] = (stat.S_IFDIR | 0o755, b"")
+            elif member.isfile():
+                data = tar.extractfile(member).read()
+                entries[TOP + rel] = (stat.S_IFREG | (0o755 if member.mode & 0o111 else 0o644), data)
+    entries.setdefault(TOP, (stat.S_IFDIR | 0o755, b""))
+
+    names = [n for n in order if n in entries] + sorted(n for n in entries if n not in set(order))
+    removed = [n for n in order if n not in entries]
+
+    try:
+        zout = zipfile.ZipFile(args.out, "x")
+    except FileExistsError:
+        parser.error(f"{args.out} exists; this tool never overwrites a release")
+    with zout:
+        for name in names:
+            mode, data = entries[name]
+            info = zipfile.ZipInfo(name, date_time=date_time)
+            info.create_system = 3
+            info.external_attr = mode << 16
+            if name.endswith("/"):
+                info.external_attr |= 0x10                  # MS-DOS directory bit
+                info.compress_type = zipfile.ZIP_STORED
+            else:
+                info.compress_type = zipfile.ZIP_DEFLATED
+            zout.writestr(info, data)
+
+    with zipfile.ZipFile(args.out) as z:
+        bad = z.testzip()
+        infos = z.infolist()
+    executable = sum(1 for i in infos if not i.is_dir() and (i.external_attr >> 16) & 0o111)
+    print(f"wrote {args.out} from {commit[:12]}: {len(infos)} entries "
+          f"({sum(i.is_dir() for i in infos)} folders, {len(infos) - sum(i.is_dir() for i in infos)} files, "
+          f"{executable} executable), testzip: {bad or 'OK'}")
+    for name in removed:
+        print(f"  removed since the previous release: {name}")
+    return 1 if bad else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
