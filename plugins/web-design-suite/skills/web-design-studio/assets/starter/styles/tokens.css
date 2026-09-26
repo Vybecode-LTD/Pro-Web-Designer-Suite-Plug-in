@@ -121,6 +121,7 @@
     --pad-well:       calc(var(--space-4)  * var(--density));  /* code block, callout   */
   }
 
+  /* stylelint-disable-next-line no-duplicate-selectors -- one :root block per section; page rhythm is fluid, so it is declared on :root alone, not per density */
   :root {
 
     /* Page-level rhythm. Fluid, because a 96px section gap on a 390px phone
@@ -385,6 +386,7 @@
     --elevation-focus:   var(--shadow-focus);
   }
 
+  /* stylelint-disable-next-line no-duplicate-selectors -- one :root block per section; this one opens §8, motion, which no density or theme re-declares */
   :root {
 
 

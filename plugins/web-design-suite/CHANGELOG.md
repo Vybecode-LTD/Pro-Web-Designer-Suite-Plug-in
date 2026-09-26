@@ -3,56 +3,81 @@
 ## 3.2.1 — 2026-09-25
 
 Ready to distribute. The stylelint config and both Tailwind blocks of the ESLint config
-now run through the real tools in the tests, and what that found is fixed. Every fix has
-a regression test that fails on 3.2.0 (`python -m unittest discover -s tests`: 317 tests).
+now run through the real tools in the tests, and what that found is fixed. A review of
+this release before it shipped found more, and that is fixed too. Every fix has a
+regression test that fails on 3.2.0, or on the release candidate for what the review
+found (`python -m unittest discover -s tests`: 332 tests).
 
 ### Upgrading
 
 - **Tailwind v3 with Part 5 of the ESLint config:** give `settings.tailwindcss.config` an
-  absolute path, `path.resolve('tailwind.config.ts')` with `import path from 'node:path'`.
-  eslint-plugin-tailwindcss 3.18 stops ESLint with "Could not resolve tailwindcss" when
-  the path is relative.
+  absolute path anchored at your project, not at the folder ESLint runs in. Copy the v3
+  block as it stands now: it looks up from the config file (`import.meta.dirname`) to
+  the nearest `package.json`. eslint-plugin-tailwindcss 3.18 stops ESLint with "Could
+  not resolve tailwindcss" when the path is relative, and ESLint 10 loads a config from
+  whichever folder it lints, so a path resolved from the working folder broke a run from
+  a monorepo root.
+- **Tailwind, both lines:** Part 5 now whitelists the starter's own classes (`stack`,
+  `cluster--tight`, `u-*`) in `ownClasses`; add your components' blocks there before
+  you make `no-custom-classname` an error, or it reports every one of them.
 - **stylelint:** the config now accepts the starter as shipped; it used to refuse it 32
-  times. If you copied the starter's reset.css or base.css, take its new
-  `stylelint-disable-next-line` comments with it.
+  times. If you copied the starter, take its new comments with it: the
+  `stylelint-disable` comments in reset.css, base.css, tokens.css and layout.css, and
+  layout.css's sockets (`--center-box`, `--imposter-max`, `--reel-bleed-pad`) and
+  `.imposter--bottom` shorthand.
+- **Node:** the lint configs need a Node both stylelint 17 and ESLint 10 support: 20.19+,
+  22.13+ or 24+.
 
 ### Fixed
 
 - The stylelint config, run on stylelint 17.15 with stylelint-config-standard 40.0:
-  - Layout primitives (`layout.css`, `layout/*.css`) may derive sizes and inline padding
-    from tokens with `calc()`, `min()`, `max()` and `clamp()`. This is a fifth documented
-    override, and a length literal is still refused.
-  - A zero-offset focus ring built from tokens is allowed, as are the CSS system colours
-    (for forced-colors mode) and `100svb`, `100svh` and `100dvb`.
-  - Token files may repeat `:root`, one block per tier.
+  - The CSS system colours (`Canvas`, `ButtonText`, `Highlight`…) are allowed only inside
+    `@media (forced-colors: active)`, in any case; a new rule,
+    `design/system-colors-in-forced-colors`, refuses them anywhere else, shorthands
+    included.
+  - `100svb`, `100svh` and `100dvb` are allowed for `min-block-size`.
   - `import-notation` is off. The references spell imports both ways, and the
     standard config's `url()` notation refused the documented Tailwind entry.
   - The single-line-declarations rule is off: formatting is Prettier's job, as the
     config already said.
-- The starter marks its documented one-offs with `stylelint-disable-next-line` and a
-  reason: the `[hidden]` override, iOS text-size-adjust, the second `html` rule and the
-  sub/sup ratio. `.imposter--bottom` uses the `inset-block` shorthand.
+  - The file-class overrides are still the documented four. A fifth, for layout
+    primitives, was tried and removed: placed after the component block, it took Law 2
+    from any component in a `layout/` folder, and its regex hung on a long number.
+- The starter:
+  - It marks its documented one-offs with a `stylelint-disable` comment and a reason: the
+    `[hidden]` override, iOS text-size-adjust, the second `html` rule, the sub/sup
+    ratio, the focus ring's gap, the two repeated `:root` blocks in tokens.css, and in
+    layout.css the switcher's quantity queries and the file's `> *` child rules.
+  - layout.css derives its three computed boxes through sockets, as it already did
+    elsewhere, and `.imposter--bottom` uses the `inset-block` shorthand. Nothing renders
+    differently.
 - The ESLint config's Part 5:
-  - The v3 block uses an absolute config path.
+  - The v3 block anchors its config path at the project.
+  - Both blocks whitelist the starter's own classes; the v3 block no longer whitelists
+    the utilities the plugin already learns from the config, which hid their typos.
   - Both blocks and the header give `p-card p-card-lg` as the contradiction.
     `p-card px-inline-md` is not one: the longhand always follows the shorthand, in
     v4 and in v3.
 - The 3.0.1 entry below named a report by a path on the maintainer's machine.
-- The README states the floor: Python 3.10 or newer (the suite runs on 3.10 to 3.14),
-  and Node 20.19 or newer for the lint configs.
-- The rule spec, `design-rules.json`, records the layout-primitives file class.
+- The README states the floors: Python 3.10 or newer (the suite runs on 3.10 to 3.14),
+  and Node 20.19+, 22.13+ or 24+ for the lint configs.
+- The rule spec, `design-rules.json`, records the system-colour rule, and that a
+  component in a `layout/` folder is a component.
 
 ### Tests
 
-- `test_real_tools` runs stylelint over the starter, the documented Tailwind entry and
-  component fixtures. It runs both Part 5 blocks through the real plugin: 4.4 with
-  Tailwind 4.3, and 3.18 with Tailwind 3.4. Its fixtures are the examples the blocks'
-  own comments give.
-- `test_docs` checks that no shipped file names a folder on the author's machine, that
-  the README states the Python floor, and that every script parses with its grammar.
+- `test_real_tools` runs stylelint over the starter, the documented entries and fixtures
+  for each law and for everything the review found. It runs both Part 5 blocks through
+  the real plugin (4.4 with Tailwind 4.3, 3.18 with Tailwind 3.4) from the folder above
+  the project, over role classes, the starter's own classes and typos of both; the
+  contradiction fixtures are the examples the blocks' own comments give.
+- `test_docs` checks that no shipped file names a folder on the author's machine
+  (including as JSON escapes it and WSL paths), that the README states the Python
+  floor, and that every script compiles, and every shipped script's `--help` runs, on
+  the floor interpreter itself (`WDS_FLOOR_PYTHON`, else uv's).
 - Inside the plugin's repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3`
-  installs every tool the tests use, at pinned versions. The tests find them without
-  any variable set.
+  installs every tool the tests use, at pinned versions, and the tests find them
+  without any variable set; `off` switches a group of tests off.
 
 ## 3.2.0 — 2026-09-25
 

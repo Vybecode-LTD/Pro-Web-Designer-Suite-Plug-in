@@ -94,8 +94,9 @@ web-design-studio beside any of them. (No packaged `.skill` files ship yet.)
 ---
 
 Every script is plain Python and needs **Python 3.10 or newer**; the three browser
-scripts need Node instead. The lint configs need Node 20.19 or newer, because
-stylelint 17 and ESLint 10 do. Run the scripts
+scripts need Node instead. The lint configs need a Node that stylelint 17 and
+ESLint 10 both support: 20.19 or newer on the 20 line, 22.13 or newer on the 22
+line, or 24 and later. Run the scripts
 **by path, from your project's root**, so `src/` means your `src/` and every output
 lands in your project, never inside the plugin. Below, `WDS` is the plugin's
 `skills` folder (for a local install, `~/.claude/local-marketplaces/web-design-suite/skills`).
@@ -162,7 +163,7 @@ Set `WDS_PLUGIN_ROOT` to run the same tests against another copy of the suite â€
 - The real-browser tests (runtime contrast, modal and iframe focus, the matrix's state check, the starter CSS in Chromium) run when `WDS_NODE_MODULES` points at a `node_modules` holding `playwright` and `axe-core`. They never download a browser.
 - The real-tool tests run the shipped ESLint, stylelint and Tailwind configs through the real tools. They take their tools from `WDS_ESLINT_MODULES`, `WDS_STYLELINT_MODULES`, `WDS_TAILWIND_MODULES` and `WDS_TAILWIND_V3_MODULES`; `tests/test_real_tools.py` says what each must hold.
 
-In the plugin's repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3` installs every one of those tools at pinned versions, and the tests find them without any variable set.
+In the plugin's repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3` installs every one of those tools at pinned versions, and the tests find them without any variable set (a toolchain installed for another operating system is ignored). Set a variable to `off` to switch its tests off.
 
 What changed in each release is in `CHANGELOG.md`.
 

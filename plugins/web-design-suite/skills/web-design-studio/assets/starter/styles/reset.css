@@ -350,6 +350,7 @@
        of them; a component with its own shadow loses only the gap ring. */
     outline: var(--stroke-focus) solid var(--border-focus);
     outline-offset: var(--stroke-focus);
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- ring 1, the gap: a spread of two tokens, drawn here once */
     box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas);
   }
 

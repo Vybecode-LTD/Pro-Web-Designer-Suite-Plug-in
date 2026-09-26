@@ -50,12 +50,11 @@ Regressions covered:
 from __future__ import annotations
 
 import json
-import os
 import pathlib
 import re
 import unittest
 
-from wds_support import NODE, SKILLS, TempDirTest, output, run_node
+from wds_support import NODE, SKILLS, TempDirTest, output, run_node, tool_modules
 
 A11Y = SKILLS / "a11y-audit-runner"
 RUNTIME = A11Y / "scripts" / "a11y_runtime.mjs"
@@ -144,10 +143,7 @@ class RuntimePromises(unittest.TestCase):
 
 
 def a11y_modules():
-    for c in [os.environ.get("WDS_NODE_MODULES", "")] + os.environ.get("NODE_PATH", "").split(os.pathsep):
-        if c and (pathlib.Path(c) / "playwright").is_dir() and (pathlib.Path(c) / "axe-core").is_dir():
-            return c
-    return None
+    return tool_modules("WDS_NODE_MODULES", "playwright", "axe-core", node_path=True)
 
 
 @unittest.skipUnless(NODE and a11y_modules(), "needs node plus WDS_NODE_MODULES pointing at "

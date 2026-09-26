@@ -182,6 +182,71 @@ layerOrderRule.meta = { url: 'references/style-architecture.md#layers' };
 
 const designPlugin = createPlugin(layerRuleName, layerOrderRule);
 
+/* -------------------------------------------------------------------------
+ * LOCAL RULE: SYSTEM COLOURS ONLY IN FORCED-COLORS MODE (LAW 1)
+ *
+ * `Canvas`, `ButtonText`, `Highlight` and the rest are the only correct
+ * colours inside `@media (forced-colors: active)`: the page's palette is gone
+ * and the user's is in charge, so a focus ring or a border names the system
+ * colour it stands for. Anywhere else a system colour is a literal no token
+ * controls, no theme re-points and no contrast check measures — `Highlight`
+ * renders each user's own OS accent. The value allowlist cannot see the media
+ * query, so it accepts them (COLOUR_WORDS, Part 3) and this rule refuses them
+ * outside it, shorthands included (`border: 1px solid ButtonText`).
+ * ------------------------------------------------------------------------- */
+
+const SYSTEM_COLOR_NAMES = [
+  'accentcolor', 'accentcolortext', 'activetext', 'buttonborder', 'buttonface',
+  'buttontext', 'canvas', 'canvastext', 'field', 'fieldtext', 'graytext',
+  'highlight', 'highlighttext', 'linktext', 'mark', 'marktext', 'selecteditem',
+  'selecteditemtext', 'visitedtext',
+];
+const systemColorRuleName = 'design/system-colors-in-forced-colors';
+const systemColorMessages = utils.ruleMessages(systemColorRuleName, {
+  outside: (word) =>
+    `Law 1 (tokens or nothing): "${word}" is a CSS system colour, which is right only inside ` +
+    `@media (forced-colors: active). Anywhere else it is a colour no token controls, no theme re-points ` +
+    `and no contrast check measures. Use a role token.`,
+});
+/* Properties whose values can hold a colour. Others are left alone: `canvas`
+ * or `mark` may be a grid-area or an animation name. */
+const COLOUR_PROPERTY = /^(?:color|fill|stroke|stop-color|flood-color|lighting-color|accent-color|caret-color|background(?:-color)?|border(?:-[a-z]+)*|outline(?:-color)?|text-decoration(?:-color)?|text-emphasis(?:-color)?|column-rule(?:-color)?|box-shadow|text-shadow)$/i;
+const SYSTEM_COLOR_WORD = new RegExp(`^(?:${SYSTEM_COLOR_NAMES.join('|')})$`, 'i');
+
+const inForcedColors = (node) => {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (parent.type === 'atrule' && /^media$/i.test(parent.name)
+        && /forced-colors\s*:\s*active/i.test(parent.params)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const systemColorRule = (primary) => (root, result) => {
+  if (!utils.validateOptions(result, systemColorRuleName, { actual: primary, possible: [true] })) {
+    return;
+  }
+  root.walkDecls(COLOUR_PROPERTY, (decl) => {
+    const word = decl.value.split(/[\s,/()]+/).find((w) => SYSTEM_COLOR_WORD.test(w));
+    if (word && !inForcedColors(decl)) {
+      utils.report({
+        message: systemColorMessages.outside(word),
+        node: decl,
+        word,
+        result,
+        ruleName: systemColorRuleName,
+      });
+    }
+  });
+};
+
+systemColorRule.ruleName = systemColorRuleName;
+systemColorRule.messages = systemColorMessages;
+systemColorRule.meta = { url: 'references/accessibility.md' };
+
+const systemColorPlugin = createPlugin(systemColorRuleName, systemColorRule);
+
 /* =========================================================================
  * PART 3 — THE VALUE ALLOWLISTS (LAW 1, LAW 3, LAW 6)
  * =========================================================================
@@ -233,36 +298,20 @@ const VAR_ONE = String.raw`/^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$/`;
 const CANCEL = String.raw`/^calc\(\s*(?:var\(--[a-z0-9-]+\)\s*\*\s*-1|-1\s*\*\s*var\(--[a-z0-9-]+\))\s*\)$/`;
 const VAR_CALC = String.raw`/^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$/`;
 
-/* RING      0 0 0 var(--width) var(--colour)
- *           A spread ring with no offset and no blur, built only from
- *           tokens: the focus ring's gap in reset.css. It is an outline drawn
- *           with box-shadow, not elevation, so the elevation rule does not
- *           apply; every value in it is still a token. */
-const RING = String.raw`/^0 0 0 var\(--[a-z0-9-]+\) var\(--[a-z0-9-]+\)$/`;
-
-/* GEOMETRY  calc(), min(), max() and clamp() over tokens, percentages,
- *           viewport units and bare numbers, with no length literal at all:
- *           `calc(var(--center-max) + var(--center-gutter) * 2)`,
- *           `calc(100% - var(--imposter-margin) * 2)`. Allowed only in the
- *           layout primitives (Part 5, block 5), where deriving a box from
- *           the tokens IS the job. */
-const GEOMETRY = String.raw`/^(?:calc|min|max|clamp)\((?:(?:calc|min|max|clamp)\(|var\(--[a-z0-9-]+\)|\d*\.?\d+(?:%|[sdl]?v[bhiw])?|[-+*/,()\s])+$/`;
-
 /* CSS-wide keywords. Not design values; they are the language, and they are
  * how a component says "do not participate" rather than "be this colour". */
 const KEYWORDS = ['inherit', 'initial', 'unset', 'revert', 'revert-layer'];
 
-/* The CSS system colours. In `@media (forced-colors: active)` they are the
- * only correct values: the page's palette is gone and the user's is in
- * charge, so a focus ring or a border must name the system colour it stands
- * for (`outline-color: Highlight`). A stylelint allowlist cannot see the
- * media query, so they are allowed wherever a colour keyword is. */
-const SYSTEM_COLORS = [
-  'AccentColor', 'AccentColorText', 'ActiveText', 'ButtonBorder', 'ButtonFace',
-  'ButtonText', 'Canvas', 'CanvasText', 'Field', 'FieldText', 'GrayText',
-  'Highlight', 'HighlightText', 'LinkText', 'Mark', 'MarkText', 'SelectedItem',
-  'SelectedItemText', 'VisitedText',
-];
+/* COLOUR_WORDS  The colour keywords that are not a colour from the palette,
+ * in any case (CSS keywords are case-insensitive, and a plain string in this
+ * rule matches one spelling only). `currentColor` and `transparent` follow
+ * the text or paint nothing. The CSS system colours (`Canvas`, `ButtonText`,
+ * `Highlight`…) are the only correct values in
+ * `@media (forced-colors: active)`, where the user's palette replaces the
+ * page's; this allowlist cannot see the media query, so the
+ * design/system-colors-in-forced-colors rule (Part 2) refuses them anywhere
+ * else. */
+const COLOUR_WORDS = String.raw`/^(?:currentcolor|transparent|${SYSTEM_COLOR_NAMES.join('|')})$/i`;
 
 const VALUE_ALLOWLIST = {
   /* ---- Spacing. Law 1 + Law 3 + Law 6 --------------------------------
@@ -319,20 +368,21 @@ const VALUE_ALLOWLIST = {
    * Reach for `--elevation-card`, not `--shadow-sm`. A hand-written
    * shadow is always a single layer and always reads as a sticker; the
    * tokens are physically consistent PAIRS (contact + ambient). */
-  'box-shadow': [VAR_ONE, RING, 'none', ...KEYWORDS],
+  'box-shadow': [VAR_ONE, 'none', ...KEYWORDS],
 
   /* ---- Color. Law 1 + Law 6 ------------------------------------------
-   * `currentColor` and `transparent` are keywords, not colours. Note what
+   * `currentColor` and `transparent` are keywords, not colours, and the
+   * system colours belong to forced-colors mode (COLOUR_WORDS). Note what
    * is NOT here: no `oklch()`, no hex, no `rgb()` — not even a "temporary"
    * one, because a hex in a component is the one thing dark mode cannot
    * follow, and it will be found six months later by a client. */
-  color: [VAR_ONE, 'currentColor', 'transparent', ...SYSTEM_COLORS, ...KEYWORDS],
-  'background-color': [VAR_ONE, 'transparent', 'currentColor', ...SYSTEM_COLORS, ...KEYWORDS],
-  'border-color': [VAR_SEQ, 'currentColor', 'transparent', ...SYSTEM_COLORS, ...KEYWORDS],
-  'outline-color': [VAR_ONE, 'currentColor', 'transparent', ...SYSTEM_COLORS, ...KEYWORDS],
-  'text-decoration-color': [VAR_ONE, 'currentColor', 'transparent', ...SYSTEM_COLORS, ...KEYWORDS],
-  fill: [VAR_ONE, 'currentColor', 'none', 'transparent', ...SYSTEM_COLORS, ...KEYWORDS],
-  stroke: [VAR_ONE, 'currentColor', 'none', 'transparent', ...SYSTEM_COLORS, ...KEYWORDS],
+  color: [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  'background-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  'border-color': [VAR_SEQ, COLOUR_WORDS, ...KEYWORDS],
+  'outline-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  'text-decoration-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  fill: [VAR_ONE, COLOUR_WORDS, 'none', ...KEYWORDS],
+  stroke: [VAR_ONE, COLOUR_WORDS, 'none', ...KEYWORDS],
   'accent-color': [VAR_ONE, 'auto', ...KEYWORDS],
 
   /* ---- Stacking. Law 3 -----------------------------------------------
@@ -400,12 +450,16 @@ const MARGIN_ALLOWLIST = Object.fromEntries(
 
 export default {
   extends: ['stylelint-config-standard'],
-  plugins: [designPlugin],
+  plugins: [designPlugin, systemColorPlugin],
 
   rules: {
     /* ---- LAW 5: layers, not specificity ------------------------------ */
 
     [layerRuleName]: true,
+
+    /* ---- LAW 1: a system colour belongs to forced-colors mode -------- */
+
+    [systemColorRuleName]: true,
 
     /* `!important` is the admission that the layer order is wrong. There is
      * no legitimate use in a codebase that has `overrides` as its last
@@ -548,7 +602,7 @@ export default {
   /* =======================================================================
    * PART 5 — OVERRIDES
    * =======================================================================
-   * Each block below is a documented exemption. There are five, and the
+   * Each block below is a documented exemption. There are four, and the
    * list should not grow: every addition is a place the laws stop applying,
    * and the whole value of the system is that the answer to "where can I
    * put a literal?" is a short list somebody can hold in their head.
@@ -574,10 +628,10 @@ export default {
         /* Tier-1 steps are `--space-0-5`, `--text-2xs`, `--radius-2xl`:
          * digits inside segments, which the strict pattern rejects. */
         'custom-property-pattern': '^[a-z0-9]+(-[a-z0-9]+)*$',
-        /* Each tier opens its own `:root` block, in order: primitives, then
-         * roles, then theme overrides. One block per tier is the file's
-         * table of contents, not two people styling one thing. */
-        'no-duplicate-selectors': null,
+        /* `no-duplicate-selectors` stays ON: a second `[data-theme="dark"]`
+         * block that quietly redefines a token is the bug it catches. The
+         * starter opens one `:root` block per tier (primitives, roles, …)
+         * and marks each repeat with a disable comment that says so. */
       },
     },
 
@@ -702,39 +756,6 @@ export default {
         'at-rule-prelude-no-invalid': null,
         'no-descending-specificity': null,
         'selector-max-type': null,
-      },
-    },
-
-    /* ---------------------------------------------------------------------
-     * 5. LAYOUT PRIMITIVES — the parent that places things.
-     *
-     * layout.css derives boxes from tokens: a centred column is its max
-     * width plus a gutter on each side,
-     * `calc(var(--center-max) + var(--center-gutter) * 2)`; a full-bleed row
-     * pads to whichever is larger, the gutter or half the leftover width.
-     * Those are geometry over tokens, not new design values, so sizing and
-     * inline padding here may use GEOMETRY. A length literal is still
-     * refused.
-     *
-     * The file is ordered by primitive, and some rules rely on source order
-     * at equal specificity on purpose (a heading after a heading takes the
-     * tight gap: see `.flow`), so the specificity-order rule is off. The
-     * switcher's quantity queries (`> :nth-last-child(n + 5) ~ *`) are the
-     * technique, not DOM knowledge, so the compound cap is raised to 4.
-     * ------------------------------------------------------------------ */
-    {
-      files: ['**/layout.css', '**/layout/*.css'],
-      rules: {
-        'declaration-property-value-allowed-list': {
-          ...VALUE_ALLOWLIST,
-          ...Object.fromEntries(
-            ['max-inline-size', 'max-width', 'min-block-size', 'min-inline-size',
-              'padding-inline', 'padding-inline-start', 'padding-inline-end']
-              .map((prop) => [prop, [...VALUE_ALLOWLIST[prop], GEOMETRY]])
-          ),
-        },
-        'no-descending-specificity': null,
-        'selector-max-compound-selectors': 4,
       },
     },
   ],

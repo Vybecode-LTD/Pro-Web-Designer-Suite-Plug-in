@@ -45,6 +45,10 @@
    Nothing else. No px, no rem, no em outside the breakpoint literals.
    ========================================================================= */
 
+/* stylelint-disable no-descending-specificity -- every primitive's child rule
+   ends in `> *` or `+ *`, and this rule compares all of them, whatever their
+   parent: `.row > *` after `.flow`'s heading rule is not an override of it.
+   The file is ordered by primitive. */
 @layer layout {
 
   /* =======================================================================
@@ -558,6 +562,9 @@
     min-inline-size: 0;
   }
 
+  /* stylelint-disable selector-max-compound-selectors -- a quantity query
+     counts the children (`> :nth-last-child(n + 5) ~ *`); it is the
+     technique, not knowledge of anyone's DOM. */
   /* Default cap: 4. With 5+ children, everything goes full width. */
   .switcher > :nth-last-child(n + 5),
   .switcher > :nth-last-child(n + 5) ~ * { flex-basis: 100%; }
@@ -569,6 +576,7 @@
   /* Cap at 2. */
   .switcher--max-2 > :nth-last-child(n + 3),
   .switcher--max-2 > :nth-last-child(n + 3) ~ * { flex-basis: 100%; }
+  /* stylelint-enable selector-max-compound-selectors */
 
   .switcher--tight { --switcher-gap: var(--gap-related); }
   .switcher--loose { --switcher-gap: var(--gap-separate); }
@@ -765,8 +773,10 @@
   .center {
     --center-max: var(--width-content);
     --center-gutter: var(--gutter-page);
+    /* Derived: the column plus a gutter on each side. */
+    --center-box: calc(var(--center-max) + var(--center-gutter) * 2);
     box-sizing: border-box;
-    max-inline-size: calc(var(--center-max) + var(--center-gutter) * 2);
+    max-inline-size: var(--center-box);
     margin-inline: auto;
     padding-inline: var(--center-gutter);
   }
@@ -834,8 +844,9 @@
   /* Full-bleed reel inside .page-grid: scrolls edge to edge, but the first
      and last items still line up with the content column. */
   .page-grid > .reel.bleed-full {
-    padding-inline: max(var(--gutter-page),
-                        calc((100% - var(--width-content)) / 2));
+    /* The gutter, or half the width the content column leaves, whichever is larger. */
+    --reel-bleed-pad: max(var(--gutter-page), calc((100% - var(--width-content)) / 2));
+    padding-inline: var(--reel-bleed-pad);
   }
 
 
@@ -853,17 +864,21 @@
      become unusable on a 667px-tall phone.
      ======================================================================= */
 
+  /* @snippet imposter */
   .imposter {
     --imposter-margin: var(--pad-card);
     position: absolute;
     inset-block-start: 50%;
     inset-inline-start: 50%;
     translate: -50% -50%;
-    max-inline-size: calc(100% - var(--imposter-margin) * 2);
-    max-block-size: calc(100% - var(--imposter-margin) * 2);
+    /* Derived: the parent, less the margin on each side. */
+    --imposter-max: calc(100% - var(--imposter-margin) * 2);
+    max-inline-size: var(--imposter-max);
+    max-block-size: var(--imposter-max);
     overflow: auto;
     z-index: var(--z-raised);
   }
+  /* @end-snippet */
   /* The positioning parent. Never rely on an accidental ancestor. */
   .imposter-anchor { position: relative; }
 

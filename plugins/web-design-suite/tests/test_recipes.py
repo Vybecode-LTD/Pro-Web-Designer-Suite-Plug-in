@@ -53,7 +53,7 @@ import sys
 import unittest
 
 from test_browser_scripts import STUB_PLAYWRIGHT
-from wds_support import NODE, SKILLS, TempDirTest, env, output, run_node, run_py
+from wds_support import NODE, SKILLS, TempDirTest, env, output, run_node, run_py, tailwind_part5, tool_modules
 
 SHELL_BREAK = {"&&", "||", "|", ";", ">", ">>", "2>&1", "&"}
 
@@ -244,9 +244,7 @@ TRICKY_JSONC = """\ufeff{
 
 
 def playwright_modules():
-    return next((p for p in [os.environ.get("WDS_NODE_MODULES", "")] +
-                 os.environ.get("NODE_PATH", "").split(os.pathsep)
-                 if p and os.path.isdir(os.path.join(p, "playwright"))), None)
+    return tool_modules("WDS_NODE_MODULES", "playwright", node_path=True)
 
 
 class PerfBudgetFile(TempDirTest):
@@ -524,8 +522,7 @@ class DependencyFacts(unittest.TestCase):
     def test_each_tailwind_plugin_block_fits_its_major(self):
         text = (CONFIG_DIR / "eslint.design.config.mjs").read_text(encoding="utf-8")
         part5 = text.split("PART 5", 1)[1].split("EXPORTS", 1)[0]
-        blocks = re.split(r"^// Tailwind v\d, eslint-plugin-tailwindcss@(\d+):", part5, flags=re.M)
-        found = {int(blocks[i]): blocks[i + 1] for i in range(1, len(blocks) - 1, 2)}
+        _, found = tailwind_part5(text)
         self.assertEqual(sorted(found), [3, 4], "one block per plugin major")
         self.assertIn("cssConfigPath", found[4], "4.x reads the v4 CSS entry")
         self.assertNotRegex(found[4], r"\b(config|callees):", "v3 settings; 4.x ignores them")

@@ -23,21 +23,14 @@ Regressions covered:
 from __future__ import annotations
 
 import json
-import os
-import pathlib
 import unittest
 
-from wds_support import NODE, TempDirTest, output, run_node
+from wds_support import NODE, TempDirTest, output, run_node, tool_modules
 
 
 def node_modules() -> str | None:
     """A node_modules folder with playwright and axe-core, or None."""
-    candidates = [os.environ.get("WDS_NODE_MODULES", "")]
-    candidates += os.environ.get("NODE_PATH", "").split(os.pathsep)
-    for c in candidates:
-        if c and (pathlib.Path(c) / "playwright").is_dir() and (pathlib.Path(c) / "axe-core").is_dir():
-            return c
-    return None
+    return tool_modules("WDS_NODE_MODULES", "playwright", "axe-core", node_path=True)
 
 
 MODULES = node_modules()

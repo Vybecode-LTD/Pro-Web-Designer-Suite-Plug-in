@@ -36,7 +36,7 @@ import subprocess
 import sys
 import unittest
 
-from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, output
+from wds_support import NODE, OFF, PLUGIN, SKILLS, TempDirTest, env, output
 
 GIT = shutil.which("git")
 GIT_ENV = {"GIT_AUTHOR_NAME": "wds-test", "GIT_AUTHOR_EMAIL": "wds-test@example.invalid",
@@ -497,8 +497,13 @@ class MigrationRecipes(TempDirTest):
                 json.loads((self.tmp / name).read_text(encoding="utf-8"))
 
 
-# A drive-letter path two folders deep, or a home folder on Linux or macOS.
-MACHINE_PATH = re.compile(r"\b[A-Za-z]:[\\/][\w .-]+[\\/][\w .-]+|/home/[a-z][\w-]*|/Users/[A-Za-z][\w-]*")
+# A drive-letter path two folders deep, also as JSON and source code write it
+# (with doubled backslashes), except the `C:\path\to\…` placeholder; a WSL or
+# Git Bash drive mount; a home folder on Linux or macOS, or root's.
+MACHINE_PATH = re.compile(r"\b[A-Za-z]:(?!(?:\\\\|[\\/])path(?:\\\\|[\\/])to\b)"
+                          r"(?:\\\\|[\\/])[\w .()-]+(?:\\\\|[\\/])[\w .()-]+"
+                          r"|(?<![\w.])/mnt/[a-z]/[\w.-]+|(?<![\w.:])/[a-z]/(?:DEV|Users|dev|home)\b"
+                          r"|/home/[A-Za-z][\w-]*|/Users/[A-Za-z][\w-]*|/root/\.")
 SHIPPED_TEXT = {".md", ".py", ".mjs", ".js", ".json", ".css", ".html", ".sh", ".ts", ".tsx",
                 ".jsx", ".yml", ".yaml", ".txt", ""}
 
@@ -513,21 +518,63 @@ class NoMachinePaths(unittest.TestCase):
         for path in sorted(PLUGIN.rglob("*")):
             if path.is_file() and path.suffix in SHIPPED_TEXT and "__pycache__" not in path.parts:
                 text = path.read_text(encoding="utf-8", errors="replace")
-                for number, line in enumerate(text.splitlines(), 1):
-                    found += [f"{path.relative_to(PLUGIN).as_posix()}:{number}: {m.group(0)}"
-                              for m in MACHINE_PATH.finditer(line)]
+                found += [f"{path.relative_to(PLUGIN).as_posix()}:{text.count(chr(10), 0, m.start()) + 1}: "
+                          f"{m.group(0)}" for m in MACHINE_PATH.finditer(text)]
         self.assertEqual([], found)
+
+    def test_the_pattern_sees_every_way_a_path_is_written(self):
+        """3.2.1 review: the pattern missed a Windows path as JSON and source
+        code store it, and WSL paths, which the release procedure uses."""
+        # Assembled from pieces, so this file does not name a machine itself.
+        bs, sl = "\\", "/"
+        for text in ("see C:" + bs + "DEV" + bs + "dev plans" + bs + "report.md",
+                     '"report": "C:' + bs * 2 + "Users" + bs * 2 + "vybec" + bs * 2 + 'notes.md"',
+                     "C:" + sl + "Users" + sl + "vybec" + sl + "AppData",
+                     "cd " + sl.join(["", "mnt", "c", "DEV", "Pro-Web-Designer-Suite-Plug-in"]),
+                     "cd " + sl.join(["", "c", "DEV", "Pro-Web-Designer-Suite-Plug-in"]),
+                     sl.join(["", "home", "claude", "wds"]), sl.join(["", "Users", "haas", "site"]),
+                     sl.join(["", "root", ".claude", "x"])):
+            with self.subTest(text=text):
+                self.assertTrue(MACHINE_PATH.search(text))
+        for text in ("https://github.com/Vybecode-LTD/x", "a:hover", "url(/img/a.png)", "~/project",
+                     "$HOME/.claude", "src/components/card.css", "python -m http.server",
+                     "set WDS_NODE_MODULES=C:" + bs * 2 + "path" + bs * 2 + "to" + bs * 2 + "project",
+                     "/opt/pw-browsers/chromium", r"re.sub(r'\\\n\s*', ' ', chunk)"):
+            with self.subTest(clean=text):
+                self.assertIsNone(MACHINE_PATH.search(text))
 
 
 PYTHON_FLOOR = (3, 10)
+SCRIPTS = sorted(p for folder in ("skills", "tests", "tools") for p in (PLUGIN / folder).rglob("*.py"))
+
+
+def floor_python() -> str | None:
+    """An interpreter at the floor: WDS_FLOOR_PYTHON (a value in OFF switches
+    the check off), else the one `uv python find` gives."""
+    named = os.environ.get("WDS_FLOOR_PYTHON")
+    if named is not None:
+        return None if named.strip().lower() in OFF else named
+    uv = shutil.which("uv")
+    if not uv:
+        return None
+    proc = subprocess.run([uv, "python", "find", "%d.%d" % PYTHON_FLOOR], capture_output=True, text=True)
+    return proc.stdout.strip() if proc.returncode == 0 and proc.stdout.strip() else None
+
+
+FLOOR_PYTHON = floor_python()
 
 
 class PythonFloor(unittest.TestCase):
     """3.2.1: the README said "Python 3" with no floor, and macOS still ships
     3.9. The suite runs on 3.10 to 3.14 (3.9 lacks what the tests use, such as
-    `ignore_cleanup_errors`), so 3.10 is the floor the README states. Parsing
-    every script with 3.10's grammar catches newer syntax before a user on
-    3.10 meets it; running the suite on 3.10 is the full check."""
+    `ignore_cleanup_errors`), so 3.10 is the floor the README states.
+
+    Parsing with the floor's grammar is a quick first check, and only that:
+    `ast.parse(feature_version=)` on a newer Python accepts, for one, a PEP 701
+    f-string the floor refuses, and it cannot see a library call the floor
+    lacks. The floor interpreter itself compiles every script and runs every
+    shipped script's --help; running the whole suite on the floor is the full
+    check (release procedure, step 2)."""
 
     def test_the_readme_states_the_floor(self):
         phrase = "Python %d.%d or newer" % PYTHON_FLOOR
@@ -535,11 +582,26 @@ class PythonFloor(unittest.TestCase):
                         f"the README does not say {phrase!r}")
 
     def test_every_script_parses_with_the_floors_grammar(self):
-        scripts = sorted(p for folder in ("skills", "tests", "tools") for p in (PLUGIN / folder).rglob("*.py"))
-        self.assertGreater(len(scripts), 40)
-        for path in scripts:
+        self.assertGreater(len(SCRIPTS), 40)
+        for path in SCRIPTS:
             with self.subTest(script=path.relative_to(PLUGIN).as_posix()):
-                ast.parse(path.read_text(encoding="utf-8"), feature_version=PYTHON_FLOOR)
+                ast.parse(path.read_bytes(), feature_version=PYTHON_FLOOR)
+
+    @unittest.skipUnless(FLOOR_PYTHON, "set WDS_FLOOR_PYTHON, or install uv, to run the scripts on the floor")
+    def test_every_script_runs_on_the_floor_interpreter(self):
+        probe = subprocess.run([FLOOR_PYTHON, "-c", "import sys; print('%d.%d' % sys.version_info[:2])"],
+                               capture_output=True, text=True, env=env(), timeout=60)
+        self.assertEqual("%d.%d" % PYTHON_FLOOR, probe.stdout.strip(), output(probe) if probe.returncode else "")
+        compiled = subprocess.run([FLOOR_PYTHON, "-c",
+                                   "import sys\nfor p in sys.argv[1:]:\n"
+                                   "    compile(open(p, 'rb').read(), p, 'exec')\n", *map(str, SCRIPTS)],
+                                  capture_output=True, env=env(), timeout=120)
+        self.assertEqual(0, compiled.returncode, output(compiled))
+        for script in sorted(SKILLS.glob("*/scripts/*.py")):
+            with self.subTest(script=script.relative_to(PLUGIN).as_posix()):
+                proc = subprocess.run([FLOOR_PYTHON, str(script), "--help"], capture_output=True,
+                                      env=env(), timeout=60)
+                self.assertEqual(0, proc.returncode, output(proc))
 
 
 if __name__ == "__main__":

@@ -336,15 +336,24 @@ Two jobs: stop the page reflowing when an image loads (the CLS fix), and make a 
 
 ### 2.11 Center
 
+<!-- snippet: layout.css#center -->
 ```css
 .center {
   --center-max: var(--width-content);
   --center-gutter: var(--gutter-page);
+  /* Derived: the column plus a gutter on each side. */
+  --center-box: calc(var(--center-max) + var(--center-gutter) * 2);
   box-sizing: border-box;
-  max-inline-size: calc(var(--center-max) + var(--center-gutter) * 2);
+  max-inline-size: var(--center-box);
   margin-inline: auto;
   padding-inline: var(--center-gutter);
 }
+
+.center--prose  { --center-max: var(--measure-prose); }
+.center--narrow { --center-max: var(--measure-narrow); }
+.center--form   { --center-max: var(--width-form); }
+.center--wide   { --center-max: var(--width-wide); }
+.center--flush  { --center-gutter: var(--space-0); }
 ```
 
 **The one place `margin-inline: auto` is allowed to live.** Scattered `margin: 0 auto` is an anti-pattern precisely because it is the same layout decision taken 40 times in 40 files; here it is taken once.
@@ -381,14 +390,18 @@ Honest about its overflow, which is what makes it better than a carousel: the sc
 
 ### 2.13 Imposter
 
+<!-- snippet: layout.css#imposter -->
 ```css
 .imposter {
   --imposter-margin: var(--pad-card);
   position: absolute;
-  inset-block-start: 50%; inset-inline-start: 50%;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
   translate: -50% -50%;
-  max-inline-size: calc(100% - var(--imposter-margin) * 2);
-  max-block-size: calc(100% - var(--imposter-margin) * 2);
+  /* Derived: the parent, less the margin on each side. */
+  --imposter-max: calc(100% - var(--imposter-margin) * 2);
+  max-inline-size: var(--imposter-max);
+  max-block-size: var(--imposter-max);
   overflow: auto;
   z-index: var(--z-raised);
 }
