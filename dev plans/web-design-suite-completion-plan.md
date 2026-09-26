@@ -44,8 +44,8 @@ Ask before the phase that needs each one.
 
 ## Where things stand
 
-3.2.1:
-- **Tests:** 317, passing on Python 3.10 to 3.14 on Windows.
+3.2.1 is released (`v3.2.1`, 2026-09-26), and 3.3.0 is in progress on `main`:
+- **Tests:** 342, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
 - **Linux (WSL):** the suite passes with the Node tests skipped, because that Linux has no Node.
 - **macOS:** never run.
 - **Real tools:** the shipped ESLint config, the stylelint config, both Tailwind blocks of Part 5, Tailwind 4 and tailwind-merge all run in the suite, at the versions pinned in `tooling/`.

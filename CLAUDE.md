@@ -14,13 +14,13 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-09-26)
 
-- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits.
+- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress; the Python 3.9 floor (N6) is its first change.
 - **Installed:** 3.2.1 from `63932cf`. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
 - **Tests:**
   - 342, passing on Python 3.9 and 3.14 on Windows.
   - Linux passes with the Node tests skipped.
   - macOS has never been run.
-- **Active work:** `dev plans/web-design-suite-completion-plan.md`. Next is phase 3 (3.3.0), starting with W1, the Supabase access boundary.
+- **Active work:** phase 3 (3.3.0) of `dev plans/web-design-suite-completion-plan.md`, as small PRs. After N6, next is W2's audit false-clean (SB-A9), then W1, the Supabase access boundary.
 - **Open from the review** (the inventory has each item): 59 issues, none high; 43 gaps plus 4 partly done; 46 improvements plus 6 partly done.
 
 ## Commands
