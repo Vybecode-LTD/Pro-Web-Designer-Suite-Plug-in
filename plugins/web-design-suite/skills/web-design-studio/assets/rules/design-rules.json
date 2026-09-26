@@ -26,6 +26,15 @@
     "rule": "A var() fallback is not checked: the token is the value, and the fallback only renders when the token is missing.",
     "allowed": ["var(--fg-muted)", "var(--fg-muted, #666666)", "var(--card-pad, var(--pad-card))"]
   },
+  "system_colors": {
+    "rule": "A CSS system colour (Canvas, ButtonText, Highlight and the rest) is correct only inside @media (forced-colors: active), where the user's palette replaces the page's. Anywhere else it is a colour no token controls, no theme re-points and no contrast check measures. CSS keywords are case-insensitive, so every spelling counts. stylelint enforces this with design/system-colors-in-forced-colors; audit_design still accepts a system colour anywhere (completion plan, W2 N1).",
+    "allowed": [
+      "@media (forced-colors: active) { .card { border-color: ButtonText; } }",
+      "@media (forced-colors: active) { .card { outline-color: highlight; } }",
+      ".card { @media (forced-colors: active) { outline-color: Highlight; } }"
+    ],
+    "refused": [".badge { color: GrayText; }", ".panel { border: var(--stroke-default) solid ButtonBorder; }"]
+  },
   "file_classes": {
     "token_files": {
       "globs": ["**/tokens.css", "**/*-tokens.css", "**/*.tokens.css", "**/tokens/*.css", "**/theme.css", "**/*-theme.css"],
@@ -34,7 +43,8 @@
     },
     "component_files": {
       "globs": ["**/components/**/*.css", "**/ui/**/*.css", "**/*.module.css", "**/components.css"],
-      "examples": ["src/components/card.css", "packages/ui/button.css", "Card.module.css", "styles/components.css"],
+      "examples": ["src/components/card.css", "packages/ui/button.css", "Card.module.css", "styles/components.css",
+                   "src/components/layout/header.css", "packages/ui/layout.css"],
       "not": ["src/styles/layout.css", "src/styles/base.css"]
     }
   }

@@ -1,0 +1,27 @@
+# W1 facts, re-read at source on 2026-09-25 (for tests/fixtures/evidence.json)
+
+- https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys
+  - "Supabase is deprecating the `anon` and `service_role` keys by the end of 2026."
+  - Publishable key (`sb_publishable_xxx`): "Browsers, mobile and desktop apps, CLIs, public source"
+  - Secret key (`sb_secret_xxx`): "Servers, Edge Functions, workers, other backend code"
+  - "They return HTTP 401 if used in a browser (matched on the `User-Agent` header)"
+  - "Secret keys bypass Row Level Security and have full access to your data."
+- https://supabase.com/docs/guides/database/postgres/row-level-security
+  - "A `security definer` function in an exposed schema is callable over the Data API with the creator's privileges. Never create one in a schema listed under "Exposed schemas" in your API settings."
+  - "Set `search_path = ''` on every `security definer` function and schema-qualify the names inside it."
+  - "`raw_user_meta_data` - can be updated by the authenticated user using the `supabase.auth.update()` function. It is not a good place to store authorization data."
+  - "`raw_app_meta_data` - cannot be updated by the user, so it's a good place to store authorization data."
+  - "To perform an `UPDATE` operation, a corresponding `SELECT` policy is required."
+  - "A secret key authorizes access through the `service_role` Postgres role, which has the `bypassrls` attribute."
+- https://www.postgresql.org/docs/current/ddl-rowsecurity.html (PostgreSQL 18)
+  - "Referential integrity checks, such as unique or primary key constraints and foreign key references, always bypass row security to ensure that data integrity is maintained."
+  - Example: "RLS silently prevents updating other rows" -> `UPDATE 0`
+  - WITH CHECK violation -> `ERROR:  new row violates WITH CHECK OPTION for "passwd"`
+- Still to re-read: Realtime postgres-changes DELETE + RLS (troubleshooting page), throwOnError, `.or()` sanitisation, supabase CLI dump format (--quote-all-identifiers), gen types format.
+- https://supabase.com/docs/guides/realtime/postgres-changes
+  - "Caution: RLS policies are not applied to `DELETE` statements, because there is no way for Postgres to verify that a user has access to a deleted record."
+  - "You can only filter Delete events when tracking Postgres Changes if the table has the `replica identity` set to `full`."
+  - "If you expect more than ~3,000 concurrent subscribers on the same changes, use Broadcast to stream database changes instead. ..."
+  - (The page does NOT say `old` holds only the PK under RLS; the review cited the troubleshooting page for that. Re-read it before writing the doc.)
+- https://supabase.com/docs/guides/troubleshooting/realtime-postgres-changes-troubleshooting
+  - "If the table has Row Level Security enabled, `replica identity full` isn't enough by itself: the `old` record still contains only the primary key."

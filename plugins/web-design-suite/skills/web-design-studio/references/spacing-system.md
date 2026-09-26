@@ -531,8 +531,10 @@ Two sections therefore meet with `2 × --space-subsection` (80 → 176px), sligh
 .center {
   --center-max: var(--width-content);
   --center-gutter: var(--gutter-page);
+  /* Derived: the column plus a gutter on each side. */
+  --center-box: calc(var(--center-max) + var(--center-gutter) * 2);
   box-sizing: border-box;
-  max-inline-size: calc(var(--center-max) + var(--center-gutter) * 2);
+  max-inline-size: var(--center-box);
   margin-inline: auto;
   padding-inline: var(--center-gutter);
 }

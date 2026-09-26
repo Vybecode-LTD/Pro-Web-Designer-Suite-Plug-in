@@ -52,6 +52,12 @@ def glob_match(path: str, glob: str) -> bool:
     return re.fullmatch(rx, path) is not None
 
 
+def matches_any(path: str, globs: list[str]) -> bool:
+    """Whether stylelint's `files` list would take `path`; a bare file name is
+    placed in a folder, as a real one always is."""
+    return any(glob_match(path if "/" in path else "x/" + path, g) for g in globs)
+
+
 class TheAuditFollowsTheSpec(TempDirTest):
 
     @classmethod
@@ -105,9 +111,10 @@ class TheAuditFollowsTheSpec(TempDirTest):
 
 
 class StylelintFollowsTheSpec(unittest.TestCase):
-    """stylelint is not installed on the machine these tests were written on;
-    its config is checked here by reading the values, and the value regexes
-    are run in Python (they are JavaScript regexes of the portable kind)."""
+    """The config's values, read from the file, with the value regexes run in
+    Python (they are JavaScript regexes of the portable kind), so these hold
+    wherever stylelint is absent. test_real_tools.StylelintConfig runs the
+    real stylelint over the same config."""
 
     @classmethod
     def setUpClass(cls):
@@ -126,15 +133,34 @@ class StylelintFollowsTheSpec(unittest.TestCase):
         self.fail(f"no override lists a file like {contains}")
 
     def test_file_globs(self):
-        token_globs = self.override_files("tokens.css") + self.override_files("theme.css")
-        self.assertEqual(sorted(SPEC["file_classes"]["token_files"]["globs"]), sorted(token_globs))
-        self.assertEqual(sorted(SPEC["file_classes"]["component_files"]["globs"]),
-                         sorted(self.override_files("components")))
-        for kind, globs in (("token_files", token_globs),
-                            ("component_files", self.override_files("components"))):
+        globs = {"token_files": self.override_files("tokens.css") + self.override_files("theme.css"),
+                 "component_files": self.override_files("components")}
+        for kind, found in globs.items():
+            self.assertEqual(sorted(SPEC["file_classes"][kind]["globs"]), sorted(found), kind)
             for path in SPEC["file_classes"][kind]["examples"]:
                 with self.subTest(kind=kind, path=path):
-                    self.assertTrue(any(glob_match(path if "/" in path else "x/" + path, g) for g in globs))
+                    self.assertTrue(matches_any(path, found))
+            for path in SPEC["file_classes"][kind].get("not", []):
+                with self.subTest(kind=kind, not_path=path):
+                    self.assertFalse(matches_any(path, found))
+
+    def test_the_file_class_overrides_are_the_documented_four(self):
+        """3.2.1 added a fifth, for layout primitives, after the component
+        block. Its allowlist replaced the component block's for any file both
+        matched (`src/components/layout/*.css`, `packages/ui/layout.css`), so
+        those components lost Law 2. The starter now routes its derived boxes
+        through sockets and the list is back to the four the config documents."""
+        self.assertEqual(4, len(re.findall(r"^    \{\n      files:", self.config, re.M)))
+        self.assertIn("There are four", self.config)
+
+    def test_system_colours_are_scoped_to_forced_colors(self):
+        """3.2.1 allowed the system colours in every colour property of every
+        file, as exact PascalCase strings. A rule now scopes them to
+        `@media (forced-colors: active)`, and the allowlist reads them in any
+        case (test_real_tools.StylelintConfig runs the spec's examples)."""
+        self.assertRegex(self.config, r"systemColorRuleName = 'design/system-colors-in-forced-colors'")
+        self.assertIn("[systemColorRuleName]: true", self.config)
+        self.assertIn("plugins: [designPlugin, systemColorPlugin]", self.config)
 
     def test_nesting_limit(self):
         m = re.search(r"'max-nesting-depth':\s*\[\s*(\d+),\s*\{([^}]*)\}", self.config)

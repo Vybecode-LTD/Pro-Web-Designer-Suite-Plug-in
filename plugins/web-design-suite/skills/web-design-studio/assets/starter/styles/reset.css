@@ -94,11 +94,13 @@
      3. DOCUMENT & TEXT RENDERING
      ----------------------------------------------------------------------- */
 
+  /* stylelint-disable-next-line no-duplicate-selectors -- the reset is ordered by topic; §1 set html's box model, this sets its text */
   html {
     /* iOS Safari inflates text in landscape ("text autosizing") by a factor
        it computes from the block width. A modular scale survives exactly
        none of that: your 14px label and 16px body converge, the hierarchy
        flattens, and it only reproduces on a real device held sideways. */
+    /* stylelint-disable-next-line property-no-vendor-prefix -- iOS Safari, see above */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
 
@@ -348,6 +350,7 @@
        of them; a component with its own shadow loses only the gap ring. */
     outline: var(--stroke-focus) solid var(--border-focus);
     outline-offset: var(--stroke-focus);
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- ring 1, the gap: a spread of two tokens, drawn here once */
     box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas);
   }
 
@@ -424,7 +427,8 @@
      `display: none` on it disables the feature. ------------------------ */
 
   [hidden]:not([hidden="until-found"]) {
-    /* design-audit-ignore-next-line: L5 -- the sanctioned [hidden] override, see above */
+    /* stylelint-disable-next-line declaration-no-important --
+       design-audit-ignore-next-line: L5 -- the sanctioned [hidden] override, see above */
     display: none !important;
   }
 

@@ -45,7 +45,7 @@ import time
 import unittest
 
 import test_starter_css as starter
-from wds_support import TempDirTest, output, run_py
+from wds_support import TempDirTest, env, output, run_py
 
 GIT = shutil.which("git")
 CSS = ".card { margin: 13px; }\n"
@@ -69,7 +69,7 @@ class ApplyCodemodDirtyGuard(TempDirTest):
     def git_repo(self, name):
         repo = self.tmp / name
         repo.mkdir(parents=True)
-        subprocess.run([GIT, "init", "-q", str(repo)], check=True, capture_output=True)
+        subprocess.run([GIT, "init", "-q", str(repo)], check=True, capture_output=True, env=env())
         return repo
 
     def test_a_clean_file_outside_git_is_rewritten(self):
@@ -105,7 +105,7 @@ class ApplyCodemodDirtyGuard(TempDirTest):
         git = [GIT, "-C", str(repo), "-c", "user.name=wds-test",
                "-c", "user.email=wds-test@example.invalid"]
         for args in (["add", "old.css"], ["commit", "-q", "-m", "fixture"], ["mv", "old.css", "new.css"]):
-            subprocess.run(git + args, check=True, capture_output=True)
+            subprocess.run(git + args, check=True, capture_output=True, env=env())
         (repo / "other.css").write_text(CSS, encoding="utf-8")
         proc = self.apply(repo, cwd=repo)
         for name in ("new.css", "other.css"):

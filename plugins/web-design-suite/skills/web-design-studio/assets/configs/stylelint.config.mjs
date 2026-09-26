@@ -16,8 +16,9 @@
  *   each nested selector as written instead of desugaring it, and `&` takes
  *   the largest specificity in its parent's list. So the limits apply per
  *   written selector, and `max-nesting-depth` caps the nesting itself.
- *   (stylelint.io/migration-guide/to-17. The suite's own tests do not run
- *   stylelint yet, so re-check these limits on your code after upgrading.)
+ *   (stylelint.io/migration-guide/to-17. The suite's tests run this file
+ *   through stylelint 17.15 with stylelint-config-standard 40.0, over the
+ *   starter's own stylesheets.)
  *
  *   package.json
  *     "lint:css": "stylelint \"src/**\/*.css\" \"packages/**\/*.css\""
@@ -181,6 +182,71 @@ layerOrderRule.meta = { url: 'references/style-architecture.md#layers' };
 
 const designPlugin = createPlugin(layerRuleName, layerOrderRule);
 
+/* -------------------------------------------------------------------------
+ * LOCAL RULE: SYSTEM COLOURS ONLY IN FORCED-COLORS MODE (LAW 1)
+ *
+ * `Canvas`, `ButtonText`, `Highlight` and the rest are the only correct
+ * colours inside `@media (forced-colors: active)`: the page's palette is gone
+ * and the user's is in charge, so a focus ring or a border names the system
+ * colour it stands for. Anywhere else a system colour is a literal no token
+ * controls, no theme re-points and no contrast check measures — `Highlight`
+ * renders each user's own OS accent. The value allowlist cannot see the media
+ * query, so it accepts them (COLOUR_WORDS, Part 3) and this rule refuses them
+ * outside it, shorthands included (`border: 1px solid ButtonText`).
+ * ------------------------------------------------------------------------- */
+
+const SYSTEM_COLOR_NAMES = [
+  'accentcolor', 'accentcolortext', 'activetext', 'buttonborder', 'buttonface',
+  'buttontext', 'canvas', 'canvastext', 'field', 'fieldtext', 'graytext',
+  'highlight', 'highlighttext', 'linktext', 'mark', 'marktext', 'selecteditem',
+  'selecteditemtext', 'visitedtext',
+];
+const systemColorRuleName = 'design/system-colors-in-forced-colors';
+const systemColorMessages = utils.ruleMessages(systemColorRuleName, {
+  outside: (word) =>
+    `Law 1 (tokens or nothing): "${word}" is a CSS system colour, which is right only inside ` +
+    `@media (forced-colors: active). Anywhere else it is a colour no token controls, no theme re-points ` +
+    `and no contrast check measures. Use a role token.`,
+});
+/* Properties whose values can hold a colour. Others are left alone: `canvas`
+ * or `mark` may be a grid-area or an animation name. */
+const COLOUR_PROPERTY = /^(?:color|fill|stroke|stop-color|flood-color|lighting-color|accent-color|caret-color|background(?:-color)?|border(?:-[a-z]+)*|outline(?:-color)?|text-decoration(?:-color)?|text-emphasis(?:-color)?|column-rule(?:-color)?|box-shadow|text-shadow)$/i;
+const SYSTEM_COLOR_WORD = new RegExp(`^(?:${SYSTEM_COLOR_NAMES.join('|')})$`, 'i');
+
+const inForcedColors = (node) => {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (parent.type === 'atrule' && /^media$/i.test(parent.name)
+        && /forced-colors\s*:\s*active/i.test(parent.params)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const systemColorRule = (primary) => (root, result) => {
+  if (!utils.validateOptions(result, systemColorRuleName, { actual: primary, possible: [true] })) {
+    return;
+  }
+  root.walkDecls(COLOUR_PROPERTY, (decl) => {
+    const word = decl.value.split(/[\s,/()]+/).find((w) => SYSTEM_COLOR_WORD.test(w));
+    if (word && !inForcedColors(decl)) {
+      utils.report({
+        message: systemColorMessages.outside(word),
+        node: decl,
+        word,
+        result,
+        ruleName: systemColorRuleName,
+      });
+    }
+  });
+};
+
+systemColorRule.ruleName = systemColorRuleName;
+systemColorRule.messages = systemColorMessages;
+systemColorRule.meta = { url: 'references/accessibility.md' };
+
+const systemColorPlugin = createPlugin(systemColorRuleName, systemColorRule);
+
 /* =========================================================================
  * PART 3 — THE VALUE ALLOWLISTS (LAW 1, LAW 3, LAW 6)
  * =========================================================================
@@ -235,6 +301,17 @@ const VAR_CALC = String.raw`/^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0
 /* CSS-wide keywords. Not design values; they are the language, and they are
  * how a component says "do not participate" rather than "be this colour". */
 const KEYWORDS = ['inherit', 'initial', 'unset', 'revert', 'revert-layer'];
+
+/* COLOUR_WORDS  The colour keywords that are not a colour from the palette,
+ * in any case (CSS keywords are case-insensitive, and a plain string in this
+ * rule matches one spelling only). `currentColor` and `transparent` follow
+ * the text or paint nothing. The CSS system colours (`Canvas`, `ButtonText`,
+ * `Highlight`…) are the only correct values in
+ * `@media (forced-colors: active)`, where the user's palette replaces the
+ * page's; this allowlist cannot see the media query, so the
+ * design/system-colors-in-forced-colors rule (Part 2) refuses them anywhere
+ * else. */
+const COLOUR_WORDS = String.raw`/^(?:currentcolor|transparent|${SYSTEM_COLOR_NAMES.join('|')})$/i`;
 
 const VALUE_ALLOWLIST = {
   /* ---- Spacing. Law 1 + Law 3 + Law 6 --------------------------------
@@ -294,17 +371,18 @@ const VALUE_ALLOWLIST = {
   'box-shadow': [VAR_ONE, 'none', ...KEYWORDS],
 
   /* ---- Color. Law 1 + Law 6 ------------------------------------------
-   * `currentColor` and `transparent` are keywords, not colours. Note what
+   * `currentColor` and `transparent` are keywords, not colours, and the
+   * system colours belong to forced-colors mode (COLOUR_WORDS). Note what
    * is NOT here: no `oklch()`, no hex, no `rgb()` — not even a "temporary"
    * one, because a hex in a component is the one thing dark mode cannot
    * follow, and it will be found six months later by a client. */
-  color: [VAR_ONE, 'currentColor', 'transparent', ...KEYWORDS],
-  'background-color': [VAR_ONE, 'transparent', 'currentColor', ...KEYWORDS],
-  'border-color': [VAR_SEQ, 'currentColor', 'transparent', ...KEYWORDS],
-  'outline-color': [VAR_ONE, 'currentColor', 'transparent', ...KEYWORDS],
-  'text-decoration-color': [VAR_ONE, 'currentColor', 'transparent', ...KEYWORDS],
-  fill: [VAR_ONE, 'currentColor', 'none', 'transparent', ...KEYWORDS],
-  stroke: [VAR_ONE, 'currentColor', 'none', 'transparent', ...KEYWORDS],
+  color: [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  'background-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  'border-color': [VAR_SEQ, COLOUR_WORDS, ...KEYWORDS],
+  'outline-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  'text-decoration-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  fill: [VAR_ONE, COLOUR_WORDS, 'none', ...KEYWORDS],
+  stroke: [VAR_ONE, COLOUR_WORDS, 'none', ...KEYWORDS],
   'accent-color': [VAR_ONE, 'auto', ...KEYWORDS],
 
   /* ---- Stacking. Law 3 -----------------------------------------------
@@ -332,7 +410,9 @@ const VALUE_ALLOWLIST = {
    * people defend hardest. */
   'max-inline-size': [VAR_ONE, 'none', '100%', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
   'max-width': [VAR_ONE, 'none', '100%', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
-  'min-block-size': [VAR_ONE, '0', '100%', '100dvh', 'auto', ...KEYWORDS],
+  /* The small- and dynamic-viewport units: `100svb` does not jump when
+   * mobile browser chrome hides, which is why the page shell uses it. */
+  'min-block-size': [VAR_ONE, '0', '100%', '100dvh', '100dvb', '100svh', '100svb', 'auto', ...KEYWORDS],
   'min-inline-size': [VAR_ONE, '0', '100%', 'auto', ...KEYWORDS],
 };
 
@@ -370,12 +450,16 @@ const MARGIN_ALLOWLIST = Object.fromEntries(
 
 export default {
   extends: ['stylelint-config-standard'],
-  plugins: [designPlugin],
+  plugins: [designPlugin, systemColorPlugin],
 
   rules: {
     /* ---- LAW 5: layers, not specificity ------------------------------ */
 
     [layerRuleName]: true,
+
+    /* ---- LAW 1: a system colour belongs to forced-colors mode -------- */
+
+    [systemColorRuleName]: true,
 
     /* `!important` is the admission that the layer order is wrong. There is
      * no legitimate use in a codebase that has `overrides` as its last
@@ -480,6 +564,18 @@ export default {
     'at-rule-empty-line-before': null,
     'rule-empty-line-before': null,
     'comment-whitespace-inside': null,
+    /* `.row--start { --row-align: flex-start; }` on one line is a table of
+     * modifiers, and it is how layout.css lists them. Line breaks are
+     * formatting. */
+    'declaration-block-single-line-max-declarations': null,
+
+    /* The references spell imports both ways: `@import url("./tokens.css")
+     * layer(tokens)` in the vanilla and CSS-modules entries, and
+     * `@import "tailwindcss/theme.css" layer(theme)` in the Tailwind entry
+     * (stack-tailwind.md §2). The standard config's `url` notation refused
+     * the second; `string` would refuse the first. The spelling is not a
+     * design law. */
+    'import-notation': null,
 
     /* Font stack names are proper nouns: "Geist Sans", "SFMono-Regular",
      * "Segoe UI". Lowercasing them is wrong, and it is the only place this
@@ -532,6 +628,10 @@ export default {
         /* Tier-1 steps are `--space-0-5`, `--text-2xs`, `--radius-2xl`:
          * digits inside segments, which the strict pattern rejects. */
         'custom-property-pattern': '^[a-z0-9]+(-[a-z0-9]+)*$',
+        /* `no-duplicate-selectors` stays ON: a second `[data-theme="dark"]`
+         * block that quietly redefines a token is the bug it catches. The
+         * starter opens one `:root` block per tier (primitives, roles, …)
+         * and marks each repeat with a disable comment that says so. */
       },
     },
 

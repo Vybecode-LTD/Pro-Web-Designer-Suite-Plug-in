@@ -19,12 +19,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import re
 import subprocess
 import unittest
 
-from wds_support import NODE, SKILLS, TempDirTest, env, output
+from wds_support import NODE, SKILLS, TempDirTest, env, output, tool_modules
 
 STYLES = SKILLS / "web-design-studio" / "assets" / "starter" / "styles"
 
@@ -190,9 +189,10 @@ await browser.close();
 """
 
 
-@unittest.skipUnless(NODE and any((os.path.isdir(os.path.join(p, "playwright"))) for p in
-                                  [os.environ.get("WDS_NODE_MODULES", "")] +
-                                  os.environ.get("NODE_PATH", "").split(os.pathsep) if p),
+PLAYWRIGHT = tool_modules("WDS_NODE_MODULES", "playwright", node_path=True)
+
+
+@unittest.skipUnless(NODE and PLAYWRIGHT,
                      "needs node plus WDS_NODE_MODULES pointing at playwright")
 class StarterInABrowser(TempDirTest):
 
@@ -208,9 +208,7 @@ class StarterInABrowser(TempDirTest):
 <div class="stack" id="hid" hidden><p>x</p></div>
 <dialog id="tall"><div style="block-size: 3000px">tall</div></dialog></main></body></html>""")
         probe = self.write("probe.mjs", PROBE)
-        modules = next(p for p in [os.environ.get("WDS_NODE_MODULES", "")] +
-                       os.environ.get("NODE_PATH", "").split(os.pathsep)
-                       if p and os.path.isdir(os.path.join(p, "playwright")))
+        modules = PLAYWRIGHT
         proc = subprocess.run([NODE, str(probe), str(page)], capture_output=True, timeout=180,
                               env=env(NODE_PATH=modules))
         if proc.returncode == 3:
@@ -246,9 +244,7 @@ class StarterInABrowser(TempDirTest):
 <div class="wrap" id="wrap-outside"><button id="outside">Save</button></div>
 <div class="wrap" id="wrap-inside"><button id="inside">Save</button></div></body></html>""")
         probe = self.write("clip.mjs", PROBE.split("const page =")[0] + CLIP_PROBE)
-        modules = next(p for p in [os.environ.get("WDS_NODE_MODULES", "")] +
-                       os.environ.get("NODE_PATH", "").split(os.pathsep)
-                       if p and os.path.isdir(os.path.join(p, "playwright")))
+        modules = PLAYWRIGHT
         proc = subprocess.run([NODE, str(probe), str(page)], capture_output=True, timeout=180,
                               env=env(NODE_PATH=modules))
         if proc.returncode == 3:
