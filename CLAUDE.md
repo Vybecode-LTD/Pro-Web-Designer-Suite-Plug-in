@@ -7,7 +7,7 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **What:** web-design-suite, a Claude Code plugin. Thirteen skills for designing and building websites that stay coherent under multiple developers: tokens, style architecture, measured contrast, and gates that fail the build on drift.
 - **Stack:**
   - The scripts and tests are Python 3.10 or newer, standard library only.
-  - Node 20.19 or newer is needed for the browser scripts and the real-tool tests.
+  - Node 20.19+, 22.13+ or 24+ (ESLint 10's range) is needed for the browser scripts and the real-tool tests.
   - The skills and references are Markdown.
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is private.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
@@ -25,9 +25,11 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Commands
 
+For the Bash tool (Git Bash), from the repository root:
+
 ```bash
-cd tooling/main && npm ci             # once; PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 if the browser is already here
-cd tooling/tailwind-v3 && npm ci      # once
+npm ci --prefix tooling/main          # once; PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 if the browser is already here
+npm ci --prefix tooling/tailwind-v3   # once
 cd plugins/web-design-suite
 python -m unittest discover -s tests                        # the suite: 317 tests
 WDS_PLUGIN_ROOT=<unpacked older release> python -m unittest discover -s tests   # fail-before
@@ -36,7 +38,7 @@ python tools/sync_snippets.py --check # starter code quoted in the references
 python skills/web-design-studio/scripts/audit_design.py skills --strict
 ```
 
-Get an older release with `git archive v3.2.0 plugins/web-design-suite | tar -x -C <scratch folder>`.
+Get an older release with `git archive v3.2.0 plugins/web-design-suite | tar -x -C <scratch folder>`. In cmd.exe the fail-before run is `set "WDS_PLUGIN_ROOT=<folder>" && python -m unittest discover -s tests`.
 
 The Python floor runs with `"$(uv python find 3.10)" -m unittest discover -s tests`. Linux runs through WSL, from PowerShell; the release procedure in the plan gives the exact command.
 
@@ -50,9 +52,10 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 - **Backslashes in heredocs.** The Bash tool unescapes `\\` inside heredocs, so write Python that contains backslash escapes with the Edit tool.
 - **Linked `node_modules`.** The real-tool tests give their temp project a linked `node_modules`: a junction on Windows. Remove a junction with Python's `os.rmdir`, never `rm -rf`.
 - **stylelint 17** writes its JSON report to stderr when it finds problems, and to stdout when it does not.
-- **eslint-plugin-tailwindcss 3.18** needs an absolute config path.
+- **eslint-plugin-tailwindcss 3.18** needs an absolute config path, anchored at the project: ESLint 10 loads a config from whichever folder it lints.
 - **Never write into OneDrive** or the folders redirected into it (Documents, Desktop, Pictures, Music, Videos). Downloads is safe.
-- **Commands for the user** must work in cmd.exe.
+- **Commands you give the user** to run must work in cmd.exe. (The Commands block above is for the Bash tool.)
+- **Never run `npm ci` in a worktree whose `tooling/*/node_modules` is a junction**: it deletes the real toolchain through the link.
 
 ## Conventions
 

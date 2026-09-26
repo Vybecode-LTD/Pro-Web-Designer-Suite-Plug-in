@@ -21,7 +21,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 - **Fail before, pass after.** Every fix gets a regression test, and the test is seen failing on the previous release. Get that release from its tag, `git archive v3.2.1 plugins/web-design-suite | tar -x -C <scratch folder>`, and run the suite with `WDS_PLUGIN_ROOT` pointed at it. The 3.1.0 and 3.2.0 reports show how to report it: the fail-before counts, plus the controls and guards that pass on both versions.
 - **Reproduce first.** Some items were fixed under another ID (the inventory marks those known). If an item no longer reproduces, record which release fixed it and which test holds it; do not write a fix for it.
 - **Read the item in its detail file** (`web-design-suite-review/<area>.md`) before you touch it. The detail files give where, why, and usually how. The tables below carry only the first sentence.
-- **Two Python versions.** Before each commit that changes the plugin, run the full suite on Python 3.14 and on the floor, 3.10 (`uv python find 3.10`).
+- **Two Python versions.** Before each commit that changes the plugin, run the full suite on Python 3.14 and on the floor: `"$(uv python find 3.10)" -m unittest discover -s tests` (3.9 once W4 lowers the floor).
 - **One set of rules.** A change to what a gate accepts goes into `skills/web-design-studio/assets/rules/design-rules.json` first. Then it goes into the audit, the stylelint config and the ESLint config, with a real-tool test in `test_real_tools.py`.
 - **Facts from outside the plugin** (laws, standards, vendor limits, prices, dates) are re-read at their source on the day and registered in `tests/fixtures/evidence.json` with their quote.
 - **Git.** One branch per phase, conventional commits, and a PR. Tag after the merge. Read the staged diff before every commit: never commit a secret.
@@ -37,7 +37,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 Ask before the phase that needs each one.
 
 1. **Private or public** (before phase 5). The repository is private. `dev plans/` names folders on the maintainer's machine and the user's other projects. Before the repository is made public, decide whether that folder stays, moves or is scrubbed.
-2. **Python 3.9** (W4). The floor is 3.10, but the Python that macOS still ships is 3.9. Either keep 3.10 and have each script stop on 3.9 with a clear message, or support 3.9, which needs the test harness changed too.
+2. **Python 3.9** (W4). *Decided 2026-09-25: support 3.9.* The floor was 3.10, but the Python that macOS still ships is 3.9; the test harness changes too.
 3. **The Tailwind lint plugin** (W12). Stay on eslint-plugin-tailwindcss, which 3.2.1 verified, or move to eslint-plugin-better-tailwindcss as SB-C4 proposes.
 4. **Eval spend** (W9). `claude plugin eval` runs real sessions and costs money. Agree a cost cap per run first.
 5. **Large downloads.** The user approved downloads for this work on 2026-09-25. Still ask before anything large, such as a browser build or a container image.
@@ -96,13 +96,14 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 
 | Construct | audit_design | stylelint config | The spec today |
 |---|---|---|---|
-| `padding: calc(var(--space-4) * 1.5)`, a factor on a spacing token | accepts | refuses (Law 3: an invented step) | silent |
+| `padding: calc(var(--pad-card) * 1.5)`, a factor on a role token (on a Tier-1 token such as `--space-4` the audit refuses it too, as L6) | accepts | refuses (Law 3: an invented step) | silent |
 | `gap: calc(var(--space-2) * 3)` | accepts | refuses | silent |
 | `font-size: 0.75em` | accepts ("`em` as a ratio", README) | refuses ("no `em`") | silent |
 | `max-inline-size: 65ch` | accepts | refuses (line length is a spacing decision) | silent |
 | Type selectors in component files | accepts | refuses (`selector-max-type: 0`) | silent |
 | A hex inside a `var()` fallback | accepts | refuses (`color-no-hex`) | "a fallback is not checked", so stylelint is wrong |
 | A margin inside an owl rule in a component file | accepts | refuses the value | the owl is allowed, so stylelint is wrong |
+| A CSS system colour outside `@media (forced-colors: active)` (`color: Canvas`) | accepts | refuses (`design/system-colors-in-forced-colors`, 3.2.1) | refused (3.2.1), so the audit is wrong |
 
 **N2 · The rest of item 9.**
 - `tools/sync_rules.py --check`, which generates each tool's rule sections from the spec.
@@ -163,7 +164,7 @@ These are from the review:
 These were found in phase 2 and 3.2.1:
 
 - **N4.** `accessibility.md` is 60.1 KB, at the limit of one Read. Split it the way 3.2.0 split navigation-patterns.md, and keep `test_skill_budget` passing.
-- **N5.** Only the nine scripts that were executable in 3.0.0 are marked executable. Mark every script that has a shebang, including the hook, and add a test that reads git's file modes.
+- **N5.** Only the nine scripts that were executable in 3.0.0 are marked executable (the hook is one of them). Mark the other 17 scripts that have a shebang, and add a test that reads git's file modes. Since 3.2.1 the zip builder takes modes from git, so the zip carries them.
 - **N6.** Settle Python 3.9 (decision 2). If 3.10 stays the floor, each script should stop on an older Python with one clear line, and a test should hold it.
 - **N7.** TypeScript 7 is npm's latest, and typescript-eslint 8.70 accepts TypeScript below 6.1. A project that installs typescript-eslint without pinning TypeScript gets a peer conflict. Say so wherever the docs install typescript-eslint.
 - **N8.** The plugin README's install section names only a local folder. Add the GitHub route, `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, and say that it needs access while the repository is private.
@@ -303,7 +304,7 @@ PS-C1 makes the deck honest by construction: wording chosen from the data, a `--
 The gates now tell the truth and agree with each other, so Claude can run them on every edit. Do this phase in this order:
 
 1. **Release engineering and CI first** (XC-C6, GT-C12, XC-B3), so everything after it is tested on every push.
-   - A GitHub Actions matrix: Windows, Linux and macOS × Python 3.10 to 3.14, with Node 20.19 or newer.
+   - A GitHub Actions matrix: Windows, Linux and macOS × Python 3.9 to 3.14, with a Node in ESLint 10's range (20.19+, 22.13+ or 24+).
    - The matrix runs `npm ci` in `tooling/`, the suite, and `claude plugin validate`.
    - A build tool that makes the zip and the 13 `.skill` files reproducibly. It replaces `tooling/release/build_zip.py`.
    - GitHub releases from tags. CI is the only thing that creates a release.
@@ -462,7 +463,7 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 
    Use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\claude.exe`; the one on PATH is older.
 3. Write the report as `dev plans/web-design-suite-<version>-report.md`, modelled on the 3.1.0 and 3.2.0 reports. Update the inventory and the `dev plans` README.
-4. Build the zip with `tooling/release/build_zip.py` (until phase 5 replaces it). Pass it the previous release's zip as the layout, and write the output into `Downloads`, which is not redirected to OneDrive. Then check it: `testzip`, extract, and `diff -r` against the plugin folder.
+4. Build the zip from the merged commit with `python tooling/release/build_zip.py <previous release zip> <out zip> --rev <commit or tag>` (until phase 5 replaces it). It packs only what git tracks, with git's file modes, dated at the commit, so a rebuild is byte-identical; entries keep the previous zip's order, and removed files are listed. Write the output into `Downloads`, which is not redirected to OneDrive. Then extract it and `diff -r` it against `git archive` of the same commit.
 5. Open the PR, merge, then tag `vX.Y.Z` on main and push the tag.
 6. Update the installed copy.
    - Mirror `plugins/web-design-suite/` into `C:\Users\vybec\.claude\local-marketplaces\web-design-suite\`, removing files that were deleted. That folder is what sessions load, so never move or delete it.

@@ -88,7 +88,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-A22 | medium | fixed in 3.2.0, item 1 | the references' snippets fail the suite's own audit |
 | SB-A23 | low-medium | W2 (3.3.0) | The files disagree on how to wrap imports in layers. |
 | SB-A24 | low-medium | W2 (3.3.0) | SCSS: a `@mixin`-only partial fails L5, while `$card-padding: 24px` passes. |
-| SB-A25 | low | W2 (3.3.0) | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. |
+| SB-A25 | low | partly done (the `url(#fade)` false positive and the multi-line pragma no longer reproduce, 3.2.1 review; release to attribute); the rest in W2 (3.3.0) | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. |
 | SB-B1 | — | fixed in 3.1.0, with PS-A4 | templates aren't audited. |
 | SB-B2 | — | fixed in 3.2.0 and 3.2.1 (real-tool tests) | no executable tests for the configs. |
 | SB-B3 | — | W5 (3.4.0) | focus, forced-colors and density aren't checked by any gate in the build flow. |

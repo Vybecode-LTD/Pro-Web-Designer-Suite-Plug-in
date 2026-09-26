@@ -33,7 +33,7 @@ From `plugins/web-design-suite`, after `npm ci` in `tooling/main` and `tooling/t
 python -m unittest discover -s tests
 ```
 
-This needs Python 3.10 or newer, Node 20.19 or newer, git, and a POSIX `sh`.
+This needs Python 3.10 or newer; Node 20.19+, 22.13+ or 24+ (ESLint 10's range); git; and a POSIX `sh`.
 
 ## License
 

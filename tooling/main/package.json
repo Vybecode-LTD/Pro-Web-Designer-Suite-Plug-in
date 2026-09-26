@@ -4,7 +4,7 @@
   "description": "Test tooling for plugins/web-design-suite: the real tools its configs are checked against. Nothing here ships with the plugin.",
   "license": "MIT",
   "engines": {
-    "node": ">=20.19.0"
+    "node": "^20.19.0 || ^22.13.0 || >=24"
   },
   "devDependencies": {
     "@tailwindcss/node": "4.3.3",
