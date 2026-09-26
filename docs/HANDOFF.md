@@ -1,43 +1,35 @@
 # Handoff
 
-**2026-09-25**, at the end of the session that moved the plugin into this repository and released 3.2.1.
+**2026-09-26**, at the end of the session that reviewed and fixed PR #1 and started the CodeRabbit week.
 
 ## State
 
-- **Repository:** `main` holds 3.0.0 to 3.2.0 as tagged commits, the root marketplace and `dev plans/`. [PR #1](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/pull/1) holds three things:
-  - 3.2.1;
-  - the pinned test toolchain in `tooling/`;
-  - the completion plan, this handoff and `CLAUDE.md`.
-
-  It was reviewed before merging: a ten-angle review with verification, and CodeRabbit's full review (the organisation is on CodeRabbit Teams for a trial week; on its Free plan CodeRabbit only summarises). The 30 confirmed findings are fixed on the PR, and so are the five points of CodeRabbit's second review.
-- **3.2.1** fixes items 1–3 before distribution:
-  - No shipped file names a path on this machine.
-  - The stylelint config and the Tailwind ESLint blocks work on the real tools.
-  - The README states Python 3.10 or newer.
-
-  It passes 338 tests on each of Python 3.10 to 3.14, and on Linux (59 skipped there: that WSL has no Node). The details are in `dev plans/web-design-suite-3.2.1-report.md`.
-- **Installed:** the plugin that sessions load (`~/.claude/local-marketplaces/web-design-suite`) is 3.2.1. The zip is in `Downloads`.
-- **Left:** everything is in `dev plans/web-design-suite-completion-plan.md`. Phases 3 to 6 are 14 workstreams covering 158 open or partly done review items and 10 new findings (N1–N10). The inventory has all 265 review items.
+- **PR #1 (3.2.1)** is ready to merge, on `fix/3.2.1-distribution-readiness`.
+  - Fixed, each with a fail-before: the ten-angle review's 30 findings, the gap sweep's 4, and all five points of CodeRabbit's second review (report: `dev plans/web-design-suite-3.2.1-report.md`).
+  - 338 tests pass on Python 3.10 to 3.14 on Windows, and on Linux (59 skipped: that WSL has no Node). `claude plugin validate --strict` passes on all three targets.
+  - CodeRabbit has not reviewed the last push yet; its incremental review will be on the PR.
+- **Python 3.9 (N6, decision 2)** is done on `feat/python-3.9-floor` (`644c528`), pushed, with no PR yet. It passed 335 tests on 3.9, 3.10 and 3.14. It is based on `00fb5f2`, so rebase it onto `main` once PR #1 merges. Expect conflicts in `tests/wds_support.py`, `tests/test_harness.py` and `tests/test_token_migration.py` (imports), `CLAUDE.md` and the plan (line 24, N6). Keep both sides; the floor becomes 3.9 everywhere, and the suite becomes 341 tests.
+- **CodeRabbit** is on the Teams trial until about 2026-10-02: line-by-line reviews, 10 an hour, and each reply to a CodeRabbit thread costs one. Push fixes, let the incremental review mark threads addressed, and reply only where it does not.
+- **Installed plugin:** 3.2.1 as first built (`8b27ff7`), without the review's fixes. Step 2 updates it.
 
 ## Next steps
 
-1. **Finish PR #1.**
-   - If CodeRabbit has reviewed it, fix what is right, with tests, and say why for anything you decline.
-   - If it has not, ask the user whether to request a review (a PR comment `@coderabbitai review`) or to merge without one.
-   - Merge, then tag `v3.2.1` on `main` and push the tag.
-   - If the fixes change the plugin, rebuild the zip and update the installed copy (release procedure, steps 4 and 6).
-2. **Set up and check.** Run `npm ci` in `tooling/main` and `tooling/tailwind-v3`. Then, from `plugins/web-design-suite`, `python -B -m unittest discover -s tests` must report 338 tests OK.
-3. **Decision 2 is made:** support Python 3.9 (N6, phase 3). Ask the user decisions 1, 3 and 4 before phases 5 and 6.
-4. **Start phase 3 (3.3.0)** on a new branch: W1 (the Supabase access boundary: DL-B1 and DL-B2 are the only high-severity items left), then W2, W3 and W4. Follow the rules in the plan: reproduce first, fail before and pass after, Python 3.14 and 3.10.
-5. **Release 3.3.0** with the plan's release procedure. Write its report, update the inventory, and hand off. Then phase 4, and so on, until the inventory has nothing planned.
+1. **PR #1.** Read CodeRabbit's incremental review; fix what is right (with tests) and say why for anything declined. Merge with a merge commit, tag `v3.2.1` on `main`, push the tag.
+2. **Release 3.2.1** (plan, release procedure, steps 4 and 6). Build the zip from the merge commit with `tooling/release/build_zip.py` into Downloads under a new name: the existing `web-design-suite-plugin-3.2.1.zip` was built from `8b27ff7`, and the builder never overwrites. Update the report's zip row. Mirror the extracted zip into the installed copy, `diff -r`, then `claude plugin update` and `details` with the bundled CLI.
+3. **`.coderabbit.yaml`**, as a small PR merged early (CodeRabbit reads it from each PR's branch): `language: en-GB`, `reviews.profile: assertive`, `poem: false`, path filters for lockfiles and the review fixtures, and path instructions from CLAUDE.md's conventions (stdlib only, fail-before tests, `env()` for every test subprocess, one set of rules, size limits, cmd.exe commands).
+4. **The 3.9 PR.** Rebase `feat/python-3.9-floor`, run 3.14 and 3.9, open the PR.
+5. **Rescue the review's repro inputs** before Storage Sense deletes them: `%TEMP%/claude/C--DEV/5b1a5cc7-460d-4e95-848e-f823553c2172/scratchpad/review` (190 MB) into `dev plans/web-design-suite-review/fixtures/`. Without plugin copies, generated output, binaries and files over 500 KB it is 610 files, about 7 MB. Scan them for secrets first, and filter the folder out of CodeRabbit's review.
+6. **Phase 3 as small PRs**, one item or a few each, so CodeRabbit reviews each: W2's audit false-clean (SB-A9, `//` inside `url()`) first, then W1 (Supabase; the facts are in `dev plans/w1-supabase-facts.md`), W3 and W4 (N4, N5, N7–N10, XC-A2, XC-A5, XC-B5, XC-C9). Release 3.3.0 when the phase is in.
+7. **Plan the rest.** The user asked for a plan covering every open issue. The completion plan covers them all, but not the PR-by-PR sequencing above: fold that and the progress into the plan and the inventory.
 
 ## Blockers
 
-None. The user has approved downloads for this work, but ask before anything large, such as a browser build or a container image.
+None.
 
 ## Warnings
 
-- **The installed plugin is a copy.** Update it after every release, or sessions keep the old skills.
-- **Cost.** The user is cost-sensitive: no subagent or workflow fan-out unless asked. `claude plugin eval` costs money and needs a cap (decision 4).
+- **Cost.** The user is cost-sensitive, and this session ran past 4 million tokens. Keep a session to one or two PRs, and do not fan out to subagents or run max-effort reviews unless asked.
+- **The installed plugin is a copy.** Update it after every release.
+- **Worktrees.** Never run `npm ci` in a worktree whose `tooling/*/node_modules` is a junction; remove junctions with `os.rmdir` before `git worktree remove`.
 - **Don't trust the review's ✔ marks.** Use the inventory.
-- **Private material.** The repository is private, and `dev plans/` names folders on this machine. Settle decision 1 before it goes public.
+- **Private material.** `dev plans/` names folders on this machine; settle decision 1 before the repository goes public.
