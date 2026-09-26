@@ -28,30 +28,30 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 For the Bash tool (Git Bash), from the repository root:
 
 ```bash
-npm ci --prefix tooling/main          # once; PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 if the browser is already here
+npm ci --prefix tooling/main          # once; it downloads no browser (tooling/README.md)
 npm ci --prefix tooling/tailwind-v3   # once
 cd plugins/web-design-suite
-python -m unittest discover -s tests                        # the suite: 317 tests
-WDS_PLUGIN_ROOT=<unpacked older release> python -m unittest discover -s tests   # fail-before
+python -B -m unittest discover -s tests                     # the suite: 332 tests; -B keeps bytecode out of the plugin
+WDS_PLUGIN_ROOT=<unpacked older release> python -B -m unittest discover -s tests   # fail-before
 python tools/check_pointers.py        # § pointers; --write-register after editing one, then read the diff
 python tools/sync_snippets.py --check # starter code quoted in the references
 python skills/web-design-studio/scripts/audit_design.py skills --strict
 ```
 
-Get an older release with `git archive v3.2.0 plugins/web-design-suite | tar -x -C <scratch folder>`. In cmd.exe the fail-before run is `set "WDS_PLUGIN_ROOT=<folder>" && python -m unittest discover -s tests`.
+Get an older release with `git archive v3.2.0 plugins/web-design-suite | tar -x -C <scratch folder>`. In cmd.exe the fail-before run is `set "WDS_PLUGIN_ROOT=<folder>" && python -B -m unittest discover -s tests`.
 
-The Python floor runs with `"$(uv python find 3.10)" -m unittest discover -s tests`. Linux runs through WSL, from PowerShell; the release procedure in the plan gives the exact command.
+The Python floor runs with `"$(uv python find 3.10)" -B -m unittest discover -s tests`. Linux runs through WSL, from PowerShell; the release procedure in the plan gives the exact command.
 
 For `claude plugin validate --strict`, `update` and `details`, use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\claude.exe`. The one on PATH is older.
 
 ## Gotchas
 
 - **Keep `tooling/` beside the plugin.** Never put a `node_modules` above `plugins/`: Node searches parent folders, and one there replaced the stub modules the browser-resolution tests plant (16 failures).
-- **Bytecode.** Run Python with `PYTHONDONTWRITEBYTECODE=1`. A bare `python -c "import test_x"` writes `__pycache__` into the plugin.
+- **Bytecode.** Run Python with `-B` or `PYTHONDONTWRITEBYTECODE=1`. Without either, test discovery alone writes `tests/__pycache__` into the plugin.
 - **Line endings.** `.gitattributes` stores every text file with LF. A CRLF checkout breaks the POSIX hook and the byte-for-byte tests.
 - **Backslashes in heredocs.** The Bash tool unescapes `\\` inside heredocs, so write Python that contains backslash escapes with the Edit tool.
 - **Linked `node_modules`.** The real-tool tests give their temp project a linked `node_modules`: a junction on Windows. Remove a junction with Python's `os.rmdir`, never `rm -rf`.
-- **stylelint 17** writes its JSON report to stderr when it finds problems, and to stdout when it does not.
+- **stylelint 17** writes its JSON report to stderr, clean or not; stdout stays empty.
 - **eslint-plugin-tailwindcss 3.18** needs an absolute config path, anchored at the project: ESLint 10 loads a config from whichever folder it lints.
 - **Never write into OneDrive** or the folders redirected into it (Documents, Desktop, Pictures, Music, Videos). Downloads is safe.
 - **Commands you give the user** to run must work in cmd.exe. (The Commands block above is for the Bash tool.)

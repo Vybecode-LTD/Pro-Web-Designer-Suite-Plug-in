@@ -14,7 +14,7 @@
   - The Tailwind v3 block of the ESLint config stopped ESLint with "Could not resolve tailwindcss".
   - Both Tailwind blocks gave `p-card px-inline-md` as a contradiction, and neither plugin flags it.
 - **3. The Python floor.** Python 3.10 or newer, verified by the final suite (332 tests) on each of 3.10 to 3.14. On 3.9 the test harness fails (`ignore_cleanup_errors` is 3.10+). Every script compiles on 3.9, but that does not make it supported.
-- **Tests.** 296 → 332: 21 for items 1–3, then 15 more from the review. Inside the repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3` provides every tool the tests use, at pinned versions.
+- **Tests.** 296 → 332: 21 for items 1–3, then 15 more from the review. Inside the repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3` provides every tool the tests use but the browser, at pinned versions.
 
 ## Where everything is
 

@@ -14,7 +14,7 @@ cd tooling/main && npm ci
 cd ../tailwind-v3 && npm ci
 ```
 
-Set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for the first one if the machine already has the browser Playwright 1.63 uses. The tests launch a headless shell and fall back to an installed Chrome or Edge, so they never download a browser.
+`npm ci` installs no browser: Playwright 1.63 has no install script. The browser tests use Playwright's pinned headless shell when it is installed (`npx playwright install --only-shell chromium`, run in `tooling/main`), and otherwise an installed Chrome or Edge, whose version is not pinned; with neither they skip. They never download a browser themselves.
 
 The tests use these folders for any of `WDS_NODE_MODULES`, `WDS_ESLINT_MODULES`, `WDS_TAILWIND_MODULES`, `WDS_STYLELINT_MODULES` and `WDS_TAILWIND_V3_MODULES` that is not set (`tool_modules` in `tests/wds_support.py`). Set one to `off` to switch its tests off; cmd.exe and PowerShell cannot set an empty value. A `node_modules` installed on another operating system is ignored: `npm ci` installs native bindings (lightningcss) for one platform, so WSL needs its own install.
 

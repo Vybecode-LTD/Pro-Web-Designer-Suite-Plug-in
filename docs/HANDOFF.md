@@ -26,7 +26,7 @@
    - If it has not, ask the user whether to request a review (a PR comment `@coderabbitai review`) or to merge without one.
    - Merge, then tag `v3.2.1` on `main` and push the tag.
    - If the fixes change the plugin, rebuild the zip and update the installed copy (release procedure, steps 4 and 6).
-2. **Set up and check.** Run `npm ci` in `tooling/main` and `tooling/tailwind-v3`. Then, from `plugins/web-design-suite`, `python -m unittest discover -s tests` must report 332 tests OK.
+2. **Set up and check.** Run `npm ci` in `tooling/main` and `tooling/tailwind-v3`. Then, from `plugins/web-design-suite`, `python -B -m unittest discover -s tests` must report 332 tests OK.
 3. **Ask the user** decision 2 in the plan (Python 3.9), which phase 3 needs. Decisions 1, 3 and 4 come before phases 5 and 6.
 4. **Start phase 3 (3.3.0)** on a new branch: W1 (the Supabase access boundary: DL-B1 and DL-B2 are the only high-severity items left), then W2, W3 and W4. Follow the rules in the plan: reproduce first, fail before and pass after, Python 3.14 and 3.10.
 5. **Release 3.3.0** with the plan's release procedure. Write its report, update the inventory, and hand off. Then phase 4, and so on, until the inventory has nothing planned.

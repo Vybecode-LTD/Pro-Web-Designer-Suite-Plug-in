@@ -30,7 +30,7 @@ Each release is a tagged commit, from `v3.0.0` on. Only the `plugins/web-design-
 From `plugins/web-design-suite`, after `npm ci` in `tooling/main` and `tooling/tailwind-v3`:
 
 ```
-python -m unittest discover -s tests
+python -B -m unittest discover -s tests
 ```
 
 This needs Python 3.10 or newer; Node 20.19+, 22.13+ or 24+ (ESLint 10's range); git; and a POSIX `sh`.

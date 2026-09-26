@@ -6,7 +6,7 @@ Ready to distribute. The stylelint config and both Tailwind blocks of the ESLint
 now run through the real tools in the tests, and what that found is fixed. A review of
 this release before it shipped found more, and that is fixed too. Every fix has a
 regression test that fails on 3.2.0, or on the release candidate for what the review
-found (`python -m unittest discover -s tests`: 332 tests).
+found (`python -B -m unittest discover -s tests`: 332 tests).
 
 ### Upgrading
 
@@ -76,8 +76,8 @@ found (`python -m unittest discover -s tests`: 332 tests).
   floor, and that every script compiles, and every shipped script's `--help` runs, on
   the floor interpreter itself (`WDS_FLOOR_PYTHON`, else uv's).
 - Inside the plugin's repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3`
-  installs every tool the tests use, at pinned versions, and the tests find them
-  without any variable set; `off` switches a group of tests off.
+  installs every tool the tests use but the browser, at pinned versions, and the tests
+  find them without any variable set; `off` switches a group of tests off.
 
 ## 3.2.0 — 2026-09-25
 

@@ -12,7 +12,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`, then this plan.
 2. Install the test tools once: `npm ci` in `tooling/main` and in `tooling/tailwind-v3` (`tooling/README.md`).
-3. From `plugins/web-design-suite`, run `python -m unittest discover -s tests`. It must report 317 tests OK before you change anything; if it does not, fix that first.
+3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 332 tests OK before you change anything; if it does not, fix that first.
 4. Work the phases in order. Inside a phase the workstreams are independent, so take them one at a time and ship the phase as one release.
 5. When a workstream is done, update its rows in the inventory: the release, and the test that holds each fix.
 
@@ -21,7 +21,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 - **Fail before, pass after.** Every fix gets a regression test, and the test is seen failing on the previous release. Get that release from its tag, `git archive v3.2.1 plugins/web-design-suite | tar -x -C <scratch folder>`, and run the suite with `WDS_PLUGIN_ROOT` pointed at it. The 3.1.0 and 3.2.0 reports show how to report it: the fail-before counts, plus the controls and guards that pass on both versions.
 - **Reproduce first.** Some items were fixed under another ID (the inventory marks those known). If an item no longer reproduces, record which release fixed it and which test holds it; do not write a fix for it.
 - **Read the item in its detail file** (`web-design-suite-review/<area>.md`) before you touch it. The detail files give where, why, and usually how. The tables below carry only the first sentence.
-- **Two Python versions.** Before each commit that changes the plugin, run the full suite on Python 3.14 and on the floor: `"$(uv python find 3.10)" -m unittest discover -s tests` (3.9 once W4 lowers the floor).
+- **Two Python versions.** Before each commit that changes the plugin, run the full suite on Python 3.14 and on the floor: `"$(uv python find 3.10)" -B -m unittest discover -s tests` (3.9 once W4 lowers the floor).
 - **One set of rules.** A change to what a gate accepts goes into `skills/web-design-studio/assets/rules/design-rules.json` first. Then it goes into the audit, the stylelint config and the ESLint config, with a real-tool test in `test_real_tools.py`.
 - **Facts from outside the plugin** (laws, standards, vendor limits, prices, dates) are re-read at their source on the day and registered in `tests/fixtures/evidence.json` with their quote.
 - **Git.** One branch per phase, conventional commits, and a PR. Tag after the merge. Read the staged diff before every commit: never commit a secret.
@@ -97,7 +97,7 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 | Construct | audit_design | stylelint config | The spec today |
 |---|---|---|---|
 | `padding: calc(var(--pad-card) * 1.5)`, a factor on a role token (on a Tier-1 token such as `--space-4` the audit refuses it too, as L6) | accepts | refuses (Law 3: an invented step) | silent |
-| `gap: calc(var(--space-2) * 3)` | accepts | refuses | silent |
+| `gap: calc(var(--gap-related) * 3)` (on `--space-2` the audit refuses it too, as L6) | accepts | refuses | silent |
 | `font-size: 0.75em` | accepts ("`em` as a ratio", README) | refuses ("no `em`") | silent |
 | `max-inline-size: 65ch` | accepts | refuses (line length is a spacing decision) | silent |
 | Type selectors in component files | accepts | refuses (`selector-max-type: 0`) | silent |
@@ -301,6 +301,8 @@ PS-C1 makes the deck honest by construction: wording chosen from the data, a `--
 
 ## Phase 5 · 3.5.0: a full Claude Code plugin (the review's phase 3)
 
+### W9 · The plugin's own components, CI and evals
+
 The gates now tell the truth and agree with each other, so Claude can run them on every edit. Do this phase in this order:
 
 1. **Release engineering and CI first** (XC-C6, GT-C12, XC-B3), so everything after it is tested on every push.
@@ -466,7 +468,7 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 4. Build the zip from the merged commit with `python tooling/release/build_zip.py <previous release zip> <out zip> --rev <commit or tag>` (until phase 5 replaces it). It packs only what git tracks, with git's file modes, dated at the commit, so a rebuild is byte-identical; entries keep the previous zip's order, and removed files are listed. Write the output into `Downloads`, which is not redirected to OneDrive. Then extract it and `diff -r` it against `git archive` of the same commit.
 5. Open the PR, merge, then tag `vX.Y.Z` on main and push the tag.
 6. Update the installed copy.
-   - Mirror `plugins/web-design-suite/` into `C:\Users\vybec\.claude\local-marketplaces\web-design-suite\`, removing files that were deleted. That folder is what sessions load, so never move or delete it.
+   - Mirror the release into `C:\Users\vybec\.claude\local-marketplaces\web-design-suite\`, removing files that were deleted: extract the zip from step 4 (or `git archive` of the release commit) and mirror that, never the working folder, which can hold a `__pycache__` or a `node_modules`. That folder is what sessions load, so never move or delete it.
    - Check it with `diff -r`, then run `claude plugin update web-design-suite@web-design-suite`.
    - Confirm with `claude plugin details web-design-suite@web-design-suite`.
 7. Do the handoff: rewrite `docs/HANDOFF.md`, update the Current State in `CLAUDE.md`, and update the memory note.

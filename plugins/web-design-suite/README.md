@@ -156,14 +156,14 @@ Adopt it on a legacy repo with `--write-baseline`: the gate goes on today and th
 The suite's own tests live in `tests/` and need Python 3.10 or newer (they run on 3.10 to 3.14); git and a POSIX `sh` for the hook and recipe tests; Node for the browser-script and real-tool tests. From the plugin root:
 
 ```bash
-python -m unittest discover -s tests -v
+python -B -m unittest discover -s tests -v
 ```
 
 Set `WDS_PLUGIN_ROOT` to run the same tests against another copy of the suite — that is how every fix is shown failing on the release before it. Two kinds of tests need tools from npm:
 - The real-browser tests (runtime contrast, modal and iframe focus, the matrix's state check, the starter CSS in Chromium) run when `WDS_NODE_MODULES` points at a `node_modules` holding `playwright` and `axe-core`. They never download a browser.
 - The real-tool tests run the shipped ESLint, stylelint and Tailwind configs through the real tools. They take their tools from `WDS_ESLINT_MODULES`, `WDS_STYLELINT_MODULES`, `WDS_TAILWIND_MODULES` and `WDS_TAILWIND_V3_MODULES`; `tests/test_real_tools.py` says what each must hold.
 
-In the plugin's repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3` installs every one of those tools at pinned versions, and the tests find them without any variable set (a toolchain installed for another operating system is ignored). Set a variable to `off` to switch its tests off.
+In the plugin's repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3` installs every one of those tools at pinned versions (a browser apart: see `tooling/README.md`), and the tests find them without any variable set (a toolchain installed for another operating system is ignored). Set a variable to `off` to switch its tests off.
 
 What changed in each release is in `CHANGELOG.md`.
 

@@ -126,6 +126,19 @@ def temp_project(cls, prefix: str, modules: str) -> pathlib.Path:
     return tmp
 
 
+def json_report(proc: subprocess.CompletedProcess) -> list | None:
+    """The JSON array a linter printed, from whichever stream holds it and
+    wherever it starts, so a Node warning printed ahead of it cannot hide it."""
+    for stream in (proc.stdout, proc.stderr):
+        text = stream.decode("utf-8", "replace")
+        for start in re.finditer(r"^\[", text, re.M):
+            try:
+                return json.JSONDecoder().raw_decode(text, start.start())[0]
+            except ValueError:
+                continue
+    return None
+
+
 def write_files(root: pathlib.Path, files: dict[str, str]) -> None:
     """Each file with LF line endings, byte for byte as the plugin ships them."""
     for name, text in files.items():
@@ -465,13 +478,12 @@ class StylelintConfig(unittest.TestCase):
         proc = subprocess.run([NODE, str(pathlib.Path(STYLELINT_MODULES) / "stylelint" / "bin" / "stylelint.mjs"),
                                *linted, "--config", "stylelint.config.mjs", "--formatter", "json"],
                               cwd=tmp, capture_output=True, timeout=300)
-        # 0: clean, 2: problems found. stylelint 17 writes the report to stderr
-        # when it finds a problem and to stdout when it does not.
-        report = next((s for s in (proc.stdout, proc.stderr) if s.strip().startswith(b"[")), None)
+        # 0: clean, 2: problems found. stylelint 17 writes the JSON report to
+        # stderr, clean or not.
+        report = json_report(proc)
         if proc.returncode not in (0, 2) or report is None:
             raise AssertionError(output(proc))
-        cls.results = {pathlib.Path(r["source"]).resolve().relative_to(tmp).as_posix(): r
-                       for r in json.loads(report.decode("utf-8"))}
+        cls.results = {pathlib.Path(r["source"]).resolve().relative_to(tmp).as_posix(): r for r in report}
 
     def problems(self, name: str) -> list[str]:
         result = self.results[name]
