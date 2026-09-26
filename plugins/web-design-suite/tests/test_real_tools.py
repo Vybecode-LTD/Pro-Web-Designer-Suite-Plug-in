@@ -61,7 +61,7 @@ import re
 import subprocess
 import unittest
 
-from wds_support import (NODE, SKILLS, TOOLING_MAIN, TOOLING_V3, class_temp_dir, output,
+from wds_support import (NODE, SKILLS, TOOLING_MAIN, TOOLING_V3, class_temp_dir, env, output,
                          tailwind_part5, tool_modules, tool_roots)
 
 CONFIGS = SKILLS / "web-design-studio" / "assets" / "configs"
@@ -83,7 +83,7 @@ def entry_url(modules: str | list[str], package: str) -> str:
     code = ("const r = require('module').createRequire(process.argv[1] + '/');"
             "console.log(r.resolve(process.argv[2]))")
     for root in [modules] if isinstance(modules, str) else modules:
-        proc = subprocess.run([NODE, "-e", code, root, package], capture_output=True, text=True)
+        proc = subprocess.run([NODE, "-e", code, root, package], capture_output=True, text=True, env=env())
         if not proc.returncode:
             return pathlib.Path(proc.stdout.strip()).as_uri()
     raise unittest.SkipTest(f"{package} is not in {modules}")
@@ -221,7 +221,7 @@ class DesignEslintConfig(unittest.TestCase):
         write_files(tmp, {**files, **linted})
         proc = subprocess.run([NODE, str(pathlib.Path(ESLINT_MODULES) / "eslint" / "bin" / "eslint.js"),
                                "-c", "eslint.config.mjs", "--format", "json", *linted],
-                              cwd=tmp, capture_output=True, timeout=600)
+                              cwd=tmp, capture_output=True, timeout=600, env=env())
         if proc.returncode not in (0, 1):
             raise AssertionError(output(proc))
         cls.messages = {pathlib.Path(r["filePath"]).resolve().relative_to(tmp).as_posix(): r["messages"]
@@ -303,7 +303,7 @@ class TailwindTheme(unittest.TestCase):
         node_url = entry_url(TAILWIND_MODULES, "@tailwindcss/node")
         proc = subprocess.run([NODE, str(harness), node_url, str(CONFIGS / "theme.css"),
                                str(pathlib.Path(TAILWIND_MODULES).parent), json.dumps(cls.CANDIDATES)],
-                              capture_output=True, timeout=300)
+                              capture_output=True, timeout=300, env=env())
         if proc.returncode:
             raise AssertionError(output(proc))
         cls.css = json.loads(proc.stdout)
@@ -391,7 +391,7 @@ class TailwindMergeConfig(unittest.TestCase):
         harness.write_text(MERGE_HARNESS, encoding="utf-8")
         proc = subprocess.run([NODE, str(harness), entry_url(TAILWIND_MODULES, "tailwind-merge"),
                                str(SKILLS / "web-design-studio" / "references" / "stack-tailwind.md"),
-                               json.dumps([list(k) for k in cls.CASES])], capture_output=True, timeout=120)
+                               json.dumps([list(k) for k in cls.CASES])], capture_output=True, timeout=120, env=env())
         if proc.returncode:
             raise AssertionError(output(proc))
         cls.merged = json.loads(proc.stdout)
@@ -477,7 +477,7 @@ class StylelintConfig(unittest.TestCase):
         linted = [name for name in files if name.endswith(".css")]
         proc = subprocess.run([NODE, str(pathlib.Path(STYLELINT_MODULES) / "stylelint" / "bin" / "stylelint.mjs"),
                                *linted, "--config", "stylelint.config.mjs", "--formatter", "json"],
-                              cwd=tmp, capture_output=True, timeout=300)
+                              cwd=tmp, capture_output=True, timeout=300, env=env())
         # 0: clean, 2: problems found. stylelint 17 writes the JSON report to
         # stderr, clean or not.
         report = json_report(proc)
@@ -574,7 +574,7 @@ class TailwindPluginBlock:
         write_files(tmp, files)
         proc = subprocess.run([NODE, str(pathlib.Path(cls.MODULES) / "eslint" / "bin" / "eslint.js"),
                                "-c", "app/eslint.config.mjs", "--format", "json", "app/src/components"],
-                              cwd=tmp, capture_output=True, timeout=300)
+                              cwd=tmp, capture_output=True, timeout=300, env=env())
         if proc.returncode not in (0, 1):
             raise AssertionError(output(proc))
         cls.messages = {pathlib.Path(r["filePath"]).stem: r["messages"] for r in json.loads(proc.stdout)}
@@ -668,7 +668,7 @@ class OwnClassesCoverTheStarter(unittest.TestCase):
         shared, _ = TAILWIND_PART5
         proc = subprocess.run([NODE, "--input-type=module", "-e",
                                shared + "\nconsole.log(JSON.stringify(ownClasses));"],
-                              capture_output=True, timeout=60)
+                              capture_output=True, timeout=60, env=env())
         self.assertEqual(0, proc.returncode, output(proc))
         patterns = [re.compile(f"(?:{p})") for p in json.loads(proc.stdout)]
         css = re.sub(r"/\*.*?\*/", "", (STARTER_STYLES / "layout.css").read_text(encoding="utf-8"), flags=re.S)

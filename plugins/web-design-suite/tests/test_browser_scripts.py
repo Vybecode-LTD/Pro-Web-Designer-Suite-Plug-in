@@ -182,7 +182,7 @@ class AxeFixText(unittest.TestCase):
         js = helper.group(0) + (
             "console.log(JSON.stringify([clip('Element has no title attribute Element does "
             "not have text that is visible to screen readers', 40), clip('short', 40)]));")
-        proc = subprocess.run([NODE, "-e", js], capture_output=True)
+        proc = subprocess.run([NODE, "-e", js], capture_output=True, env=env())
         clipped, short = json.loads(proc.stdout.decode("utf-8"))
         self.assertEqual(clipped, "Element has no title attribute Element …")
         self.assertEqual(short, "short")

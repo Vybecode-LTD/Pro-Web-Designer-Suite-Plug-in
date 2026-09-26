@@ -27,7 +27,7 @@ import subprocess
 import sys
 import unittest
 
-from wds_support import SKILLS, TempDirTest
+from wds_support import SKILLS, TempDirTest, env
 
 GIT = shutil.which("git")
 HOOK = SKILLS / "web-design-studio" / "assets" / "configs" / "pre-commit-design-gate.sh"
@@ -59,7 +59,7 @@ class PreCommitHook(TempDirTest):
         super().setUp()
         self.repo = self.tmp / "repo"
         self.repo.mkdir()
-        subprocess.run([GIT, "init", "-q", str(self.repo)], check=True, capture_output=True)
+        subprocess.run([GIT, "init", "-q", str(self.repo)], check=True, capture_output=True, env=env())
         shutil.copytree(SKILLS / "web-design-studio" / "scripts", self.repo / "scripts",
                         ignore=shutil.ignore_patterns("__pycache__"))
         shutil.copy(TOKENS, self.repo / "tokens.css")
@@ -68,16 +68,14 @@ class PreCommitHook(TempDirTest):
         path = self.repo / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
-        subprocess.run([GIT, "-C", str(self.repo), "add", rel], check=True, capture_output=True)
+        subprocess.run([GIT, "-C", str(self.repo), "add", rel], check=True, capture_output=True, env=env())
 
     def run_hook(self, **env_changes):
-        env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
-        env.pop("DESIGN_GATE_BYPASS", None)
         # stylelint is not installed here, so the CSS stage may skip. The tests
         # about a missing config pass DESIGN_GATE_ALLOW_SKIP=None.
-        env.update({"DESIGN_GATE_PYTHON": PY, "DESIGN_GATE_ALLOW_SKIP": "1", **env_changes})
-        env = {k: v for k, v in env.items() if v is not None}
-        proc = subprocess.run([SH, str(HOOK)], cwd=self.repo, env=env, capture_output=True, timeout=180)
+        hook_env = env(**{"DESIGN_GATE_BYPASS": None, "DESIGN_GATE_PYTHON": PY, "DESIGN_GATE_ALLOW_SKIP": "1",
+                          **env_changes})
+        proc = subprocess.run([SH, str(HOOK)], cwd=self.repo, env=hook_env, capture_output=True, timeout=180)
         return proc.returncode, (proc.stdout + proc.stderr).decode("utf-8", "replace")
 
     def test_a_clean_change_is_allowed(self):
@@ -223,15 +221,14 @@ class PreCommitHook(TempDirTest):
         """(d) In a linked worktree .git is a file: the log write failed with
         "Not a directory" and the hook still said it had recorded the bypass."""
         subprocess.run([GIT, "-C", str(self.repo), "-c", "user.email=a@b.c", "-c", "user.name=a",
-                        "commit", "-q", "--allow-empty", "-m", "root"], check=True, capture_output=True)
+                        "commit", "-q", "--allow-empty", "-m", "root"], check=True, capture_output=True, env=env())
         worktree = self.tmp / "wt"
         subprocess.run([GIT, "-C", str(self.repo), "worktree", "add", "-q", str(worktree)],
-                       check=True, capture_output=True)
+                       check=True, capture_output=True, env=env())
         (worktree / "a.css").write_text(".a { padding: 13px; }\n", encoding="utf-8")
-        subprocess.run([GIT, "-C", str(worktree), "add", "a.css"], check=True, capture_output=True)
-        env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", DESIGN_GATE_PYTHON=PY,
-                   DESIGN_GATE_BYPASS="1")
-        proc = subprocess.run([SH, str(HOOK)], cwd=worktree, env=env, capture_output=True, timeout=180)
+        subprocess.run([GIT, "-C", str(worktree), "add", "a.css"], check=True, capture_output=True, env=env())
+        proc = subprocess.run([SH, str(HOOK)], cwd=worktree, env=env(DESIGN_GATE_PYTHON=PY, DESIGN_GATE_BYPASS="1"),
+                              capture_output=True, timeout=180)
         out = (proc.stdout + proc.stderr).decode("utf-8", "replace")
         self.assertEqual(proc.returncode, 0, out)
         self.assertNotIn("Not a directory", out)
@@ -245,14 +242,14 @@ class PreCommitHook(TempDirTest):
             shutil.copy(HOOK, hooks / name)
             (hooks / name).chmod(0o755)
         self.stage("components/card.css", "@layer components {\n  .card { padding: 13px; }\n}\n")
-        env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", DESIGN_GATE_PYTHON=PY,
-                   DESIGN_GATE_BYPASS="1", DESIGN_GATE_BYPASS_REASON="client demo in an hour")
+        commit_env = env(DESIGN_GATE_PYTHON=PY, DESIGN_GATE_BYPASS="1",
+                         DESIGN_GATE_BYPASS_REASON="client demo in an hour")
         proc = subprocess.run([GIT, "-c", "user.email=a@b.c", "-c", "user.name=a", "commit", "-q",
-                               "-m", "Ship the card"], cwd=self.repo, env=env, capture_output=True,
+                               "-m", "Ship the card"], cwd=self.repo, env=commit_env, capture_output=True,
                               timeout=180)
         self.assertEqual(proc.returncode, 0, (proc.stdout + proc.stderr).decode("utf-8", "replace"))
         message = subprocess.run([GIT, "-C", str(self.repo), "log", "-1", "--format=%B"],
-                                 capture_output=True, text=True).stdout
+                                 capture_output=True, text=True, env=env()).stdout
         self.assertRegex(message, r"Design-Gate-Bypass: client demo in an hour")
 
     def test_the_staged_content_can_be_audited_instead_of_the_working_tree(self):

@@ -234,7 +234,7 @@ class SupabaseSamples(TempDirTest):
     def test_the_samples_fail_loudly_and_check_the_cursor(self):
         harness = self.write("samples.cjs", SAMPLES_HARNESS)
         doc = SKILLS / "content-model-to-ui" / "references" / "supabase-integration.md"
-        proc = subprocess.run([NODE, str(harness), str(doc)], capture_output=True, timeout=60)
+        proc = subprocess.run([NODE, str(harness), str(doc)], capture_output=True, timeout=60, env=env())
         self.assertEqual(proc.returncode, 0, output(proc))
         got = json.loads(proc.stdout)
         for case in got["hostile"]:
@@ -557,7 +557,7 @@ def floor_python() -> str | None:
     uv = shutil.which("uv")
     if not uv:
         return None
-    proc = subprocess.run([uv, "python", "find", "%d.%d" % PYTHON_FLOOR], capture_output=True, text=True)
+    proc = subprocess.run([uv, "python", "find", "%d.%d" % PYTHON_FLOOR], capture_output=True, text=True, env=env())
     return proc.stdout.strip() if proc.returncode == 0 and proc.stdout.strip() else None
 
 

@@ -469,7 +469,7 @@ class CiRecipes(unittest.TestCase):
                 script = re.sub(r"\$\{\{[^}]*\}\}", "X", block)   # GitHub expressions
                 with self.subTest(where=where, step=block[:60]):
                     proc = subprocess.run([bash, "-n"], input=script.encode("utf-8"),
-                                          capture_output=True, timeout=60)
+                                          capture_output=True, timeout=60, env=env())
                     self.assertEqual(proc.returncode, 0, output(proc))
 
 

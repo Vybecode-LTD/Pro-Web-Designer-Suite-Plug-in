@@ -10,17 +10,28 @@ Regressions covered (3.2.1 review):
   browser tests back on.
 - A toolchain installed on Windows was used from WSL, where its native
   bindings cannot load, so tests errored instead of skipping.
+- (CodeRabbit) A run from a git hook, or under `git -c`, passed GIT_DIR,
+  GIT_INDEX_FILE and the like on to the tests' git commands: 19 subprocesses
+  got no environment of their own, and the hook tests built theirs from
+  os.environ, so `git init` and `git add` in a temporary folder would have
+  gone to the hook's repository.
 """
 from __future__ import annotations
 
+import ast
 import os
 import pathlib
+import shutil
+import subprocess
 import sys
 import unittest
 from unittest import mock
 
 import wds_support
-from wds_support import TempDirTest, installed_here, tool_modules, tool_roots
+from wds_support import PLUGIN, TempDirTest, env, installed_here, output, tool_modules, tool_roots
+
+GIT = shutil.which("git")
+SPAWN = {"run", "Popen", "call", "check_call", "check_output"}
 
 
 class ToolLocations(TempDirTest):
@@ -73,6 +84,41 @@ class ToolLocations(TempDirTest):
         scripts under test see only what the user set."""
         source = pathlib.Path(wds_support.__file__).read_text(encoding="utf-8")
         self.assertNotRegex(source, r"os\.environ\.(setdefault|update)\(|os\.environ\[[^\]]+\]\s*=")
+
+
+class Subprocesses(unittest.TestCase):
+
+    def test_env_leaves_out_gits_repository_variables(self):
+        # The assertions compare names only: a failure must not print the
+        # environment, which can hold tokens, into a log.
+        inherited = {"GIT_DIR": "elsewhere/.git", "GIT_INDEX_FILE": "elsewhere/index", "GIT_EDITOR": "true"}
+        with mock.patch.dict(os.environ, inherited):
+            given = env()
+            self.assertEqual(["GIT_EDITOR"], [name for name in inherited if name in given])
+            self.assertEqual("true", given.get("GIT_EDITOR"))
+            self.assertEqual("mine", env(GIT_DIR="mine").get("GIT_DIR"))
+
+    @unittest.skipUnless(GIT, "needs git")
+    def test_those_are_the_variables_git_names(self):
+        proc = subprocess.run([GIT, "rev-parse", "--local-env-vars"], capture_output=True, env=env(), timeout=60)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertLessEqual(set(proc.stdout.decode("utf-8").split()), wds_support.GIT_REPOSITORY_VARIABLES)
+
+    def test_every_subprocess_a_test_starts_gets_env(self):
+        found = []
+        for path in sorted((PLUGIN / "tests").glob("*.py")):
+            for node in ast.walk(ast.parse(path.read_bytes())):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                if (isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name)
+                        and func.value.id == "subprocess" and func.attr in SPAWN
+                        and not any(k.arg == "env" for k in node.keywords)):
+                    found.append(f"{path.name}:{node.lineno}: subprocess.{func.attr} without env=")
+                if (isinstance(func, ast.Name) and func.id == "dict" and node.args
+                        and ast.unparse(node.args[0]) == "os.environ"):
+                    found.append(f"{path.name}:{node.lineno}: an environment built from os.environ")
+        self.assertEqual([], found)
 
 
 if __name__ == "__main__":

@@ -96,14 +96,28 @@ def tailwind_part5(config_text: str) -> tuple[str, dict[int, str]]:
     return pieces[0].strip() + "\n", blocks
 
 
+# The variables that tie git to one repository, as `git rev-parse
+# --local-env-vars` names them (git 2.55). A run from a git hook, or under
+# `git -c`, inherits them, and they would point the tests' git commands, and
+# the hook under test, at that repository instead of a temporary one.
+GIT_REPOSITORY_VARIABLES = frozenset({
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT",
+    "GIT_OBJECT_DIRECTORY", "GIT_DIR", "GIT_WORK_TREE", "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE",
+    "GIT_INDEX_FILE", "GIT_NO_REPLACE_OBJECTS", "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_SHALLOW_FILE",
+    "GIT_COMMON_DIR"})
+
+
 def env(**changes: str | None) -> dict[str, str]:
-    """The current environment plus `changes`; a value of None removes that variable.
+    """The environment for every subprocess a test starts: the current one
+    without git's repository variables, plus `changes`; a value of None removes
+    that variable.
 
     PYTHONIOENCODING defaults to utf-8, as it is inside Claude Code, so results do
     not depend on where the tests are launched from. Tests about the real-world
     terminal behaviour remove it explicitly.
     """
-    e = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8")
+    e = {k: v for k, v in os.environ.items() if k not in GIT_REPOSITORY_VARIABLES}
+    e.update(PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8")
     for key, value in changes.items():
         if value is None:
             e.pop(key, None)
