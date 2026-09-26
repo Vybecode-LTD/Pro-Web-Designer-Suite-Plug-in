@@ -21,7 +21,7 @@
 | What | Where |
 |---|---|
 | The installed plugin, which sessions load | `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`: `claude plugin update` moved it from 3.2.0 to 3.2.1 |
-| Package | `C:\Users\vybec\Downloads\web-design-suite-plugin-3.2.1.zip`: 225 entries, 1,568,691 bytes, SHA-256 `abd86e9a55529f743d82d1f41cae3413621586d3c2b97753001a421678b71adf` |
+| Package | `C:\Users\vybec\Downloads\web-design-suite-plugin-3.2.1-63932cf.zip`, built from the merge commit `63932cf` (`v3.2.1`): 227 entries (9 executable), 1,581,079 bytes, SHA-256 `592c985f523044f7a95b16fea765ecf3a911e7d7d5fa299acc7a91d36d6f9694`. It matches `git archive v3.2.1` under `diff -r`. The `web-design-suite-plugin-3.2.1.zip` beside it is the pre-review build, from `8b27ff7`. |
 | What changed since 3.2.0 | `git diff v3.2.0 fix/3.2.1-distribution-readiness -- plugins`. There are no more `.patch` files: the tags hold the history |
 | Release notes | `plugins/web-design-suite/CHANGELOG.md` |
 | Test tools | `tooling/` and its README |

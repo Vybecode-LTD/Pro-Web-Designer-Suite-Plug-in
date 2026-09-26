@@ -12,10 +12,10 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is private.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
-## Current state (2026-09-25)
+## Current state (2026-09-26)
 
-- **Version:** 3.2.1. It is PR #1, not yet merged; `docs/HANDOFF.md` says what to do with it. `main` holds 3.0.0 to 3.2.0 as tagged commits.
-- **Installed:** sessions load the plugin from `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`. That folder is a copy of `plugins/web-design-suite`, already updated to 3.2.1.
+- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits.
+- **Installed:** 3.2.1 from `63932cf`. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
 - **Tests:**
   - 339, passing on Python 3.10 to 3.14 on Windows.
   - Linux passes with the Node tests skipped.
