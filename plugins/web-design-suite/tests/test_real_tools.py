@@ -144,7 +144,7 @@ def write_files(root: pathlib.Path, files: dict[str, str]) -> None:
     for name, text in files.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8", newline="")
+        path.write_bytes(text.encode("utf-8"))
 
 
 def documented_entry(doc: str = "stack-tailwind.md", header: str = "/* src/styles/index.css */") -> str:

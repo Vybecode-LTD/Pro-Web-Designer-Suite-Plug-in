@@ -544,7 +544,7 @@ class NoMachinePaths(unittest.TestCase):
                 self.assertIsNone(MACHINE_PATH.search(text))
 
 
-PYTHON_FLOOR = (3, 10)
+PYTHON_FLOOR = (3, 9)
 SCRIPTS = sorted(p for folder in ("skills", "tests", "tools") for p in (PLUGIN / folder).rglob("*.py"))
 
 
@@ -565,9 +565,10 @@ FLOOR_PYTHON = floor_python()
 
 
 class PythonFloor(unittest.TestCase):
-    """3.2.1: the README said "Python 3" with no floor, and macOS still ships
-    3.9. The suite runs on 3.10 to 3.14 (3.9 lacks what the tests use, such as
-    `ignore_cleanup_errors`), so 3.10 is the floor the README states.
+    """3.2.1 stated a floor of Python 3.10, because the test harness used calls
+    only 3.10 has (`ignore_cleanup_errors`, `write_text(newline=)`, slicing
+    `Path.parents`). The Python macOS still ships is 3.9, so 3.3.0 supports
+    it: the harness no longer needs 3.10, and the README says 3.9.
 
     Parsing with the floor's grammar is a quick first check, and only that:
     `ast.parse(feature_version=)` on a newer Python accepts, for one, a PEP 701
@@ -602,6 +603,15 @@ class PythonFloor(unittest.TestCase):
                 proc = subprocess.run([FLOOR_PYTHON, str(script), "--help"], capture_output=True,
                                       env=env(), timeout=60)
                 self.assertEqual(0, proc.returncode, output(proc))
+
+    @unittest.skipUnless(FLOOR_PYTHON, "set WDS_FLOOR_PYTHON, or install uv, to run the harness on the floor")
+    def test_the_harness_runs_on_the_floor_interpreter(self):
+        """On 3.9, 3.2.1's harness errored in 181 tests, on
+        `TemporaryDirectory(ignore_cleanup_errors=)`; past that, in 192, on
+        `write_text(newline=)`. test_harness exercises both."""
+        proc = subprocess.run([FLOOR_PYTHON, "-B", "-m", "unittest", "test_harness"], cwd=PLUGIN / "tests",
+                              capture_output=True, env=env(), timeout=120)
+        self.assertEqual(0, proc.returncode, output(proc))
 
 
 if __name__ == "__main__":

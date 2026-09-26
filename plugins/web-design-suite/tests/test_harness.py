@@ -15,6 +15,12 @@ Regressions covered (3.2.1 review):
   got no environment of their own, and the hook tests built theirs from
   os.environ, so `git init` and `git add` in a temporary folder would have
   gone to the hook's repository.
+
+Regressions covered (3.3.0):
+- The temporary folders and TempDirTest.write used
+  `TemporaryDirectory(ignore_cleanup_errors=)` and `write_text(newline=)`,
+  both Python 3.10+, so on 3.9 every test that used them errored.
+  test_docs.PythonFloor runs this module on 3.9.
 """
 from __future__ import annotations
 
@@ -28,7 +34,7 @@ import unittest
 from unittest import mock
 
 import wds_support
-from wds_support import PLUGIN, TempDirTest, env, installed_here, output, tool_modules, tool_roots
+from wds_support import PLUGIN, TempDirTest, env, installed_here, output, temp_dir, tool_modules, tool_roots
 
 GIT = shutil.which("git")
 SPAWN = {"run", "Popen", "call", "check_call", "check_output"}
@@ -119,6 +125,24 @@ class Subprocesses(unittest.TestCase):
                         and ast.unparse(node.args[0]) == "os.environ"):
                     found.append(f"{path.name}:{node.lineno}: an environment built from os.environ")
         self.assertEqual([], found)
+
+
+class TempFolders(TempDirTest):
+
+    def test_write_keeps_the_text_as_given(self):
+        """LF stays LF on Windows: the byte-for-byte tests depend on it."""
+        self.assertEqual(b"a {\n  color: red;\n}\n", self.write("a/b.css", "a {\n  color: red;\n}\n").read_bytes())
+        self.assertEqual(b"\x00\r\n", self.write("c.bin", b"\x00\r\n").read_bytes())
+
+    def test_cleanup_leaves_behind_what_it_cannot_delete(self):
+        """A file still open cannot be deleted on Windows. Cleanup leaves it
+        there instead of failing the test; POSIX simply deletes it."""
+        holder = temp_dir("wds-held-")
+        self.addCleanup(shutil.rmtree, holder.name, ignore_errors=True)
+        with open(pathlib.Path(holder.name) / "held.txt", "w", encoding="utf-8") as held:
+            held.write("x")
+            held.flush()
+            holder.cleanup()
 
 
 if __name__ == "__main__":

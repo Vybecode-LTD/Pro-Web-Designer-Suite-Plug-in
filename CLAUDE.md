@@ -6,7 +6,7 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 - **What:** web-design-suite, a Claude Code plugin. Thirteen skills for designing and building websites that stay coherent under multiple developers: tokens, style architecture, measured contrast, and gates that fail the build on drift.
 - **Stack:**
-  - The scripts and tests are Python 3.10 or newer, standard library only.
+  - The scripts and tests are Python 3.9 or newer, standard library only.
   - Node 20.19+, 22.13+ or 24+ (ESLint 10's range) is needed for the browser scripts and the real-tool tests.
   - The skills and references are Markdown.
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is private.
@@ -40,7 +40,7 @@ python skills/web-design-studio/scripts/audit_design.py skills --strict
 
 Get an older release with `git archive v3.2.1 plugins/web-design-suite | tar --strip-components=1 -x -C <scratch folder>`, which unpacks the plugin as `<scratch folder>/web-design-suite`. In cmd.exe the fail-before run is `set "WDS_PLUGIN_ROOT=<folder>" && python -B -m unittest discover -s tests`.
 
-The Python floor runs with `"$(uv python find 3.10)" -B -m unittest discover -s tests`. Linux runs through WSL, from PowerShell; the release procedure in the plan gives the exact command.
+The Python floor runs with `"$(uv python find 3.9)" -B -m unittest discover -s tests`. Linux runs through WSL, from PowerShell; the release procedure in the plan gives the exact command.
 
 For `claude plugin validate --strict`, `update` and `details`, use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\claude.exe`. The one on PATH is older.
 

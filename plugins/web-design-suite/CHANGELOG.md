@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.3.0 — unreleased
+
+### Changed
+
+- **Python 3.9 or newer**, down from 3.10. The scripts already ran on 3.9, the Python
+  macOS still ships; now the tests do too. The harness no longer uses
+  `TemporaryDirectory(ignore_cleanup_errors=)`, `write_text(newline=)` or a slice of
+  `Path.parents`, all 3.10+, and the README states the new floor.
+
+### Tests
+
+- `test_docs` runs `test_harness` on the floor interpreter, and `test_harness` checks
+  the temporary folders and `TempDirTest.write` there. On 3.9, 3.2.1's harness errored
+  in 181 tests.
+- The budget test passes `maxsplit` to `re.split` by keyword, as Python 3.13 asks.
+
 ## 3.2.1 — 2026-09-25
 
 Ready to distribute. The stylelint config and both Tailwind blocks of the ESLint config

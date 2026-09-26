@@ -162,7 +162,7 @@ def write_register(skills: pathlib.Path = SKILLS, register: pathlib.Path = REGIS
                 rows[(p.source, p.target, p.section)] = heads[p.section]
     data = [{"from": f, "to": t, "section": s, "heading": h} for (f, t, s), h in sorted(rows.items())]
     register.parent.mkdir(parents=True, exist_ok=True)
-    register.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="")
+    register.write_bytes((json.dumps(data, indent=1, ensure_ascii=False) + "\n").encode("utf-8"))
     return len(data)
 
 

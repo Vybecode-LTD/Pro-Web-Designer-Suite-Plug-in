@@ -93,7 +93,7 @@ web-design-studio beside any of them. (No packaged `.skill` files ship yet.)
 
 ---
 
-Every script is plain Python and needs **Python 3.10 or newer**; the three browser
+Every script is plain Python and needs **Python 3.9 or newer**; the three browser
 scripts need Node instead. The lint configs need a Node that stylelint 17 and
 ESLint 10 both support: 20.19 or newer on the 20 line, 22.13 or newer on the 22
 line, or 24 and later. Run the scripts
@@ -153,7 +153,7 @@ Adopt it on a legacy repo with `--write-baseline`: the gate goes on today and th
 
 ## Regression tests
 
-The suite's own tests live in `tests/` and need Python 3.10 or newer (they run on 3.10 to 3.14); git and a POSIX `sh` for the hook and recipe tests; Node for the browser-script and real-tool tests. From the plugin root:
+The suite's own tests live in `tests/` and need Python 3.9 or newer (they run on 3.9 to 3.14); git and a POSIX `sh` for the hook and recipe tests; Node for the browser-script and real-tool tests. From the plugin root:
 
 ```bash
 python -B -m unittest discover -s tests -v

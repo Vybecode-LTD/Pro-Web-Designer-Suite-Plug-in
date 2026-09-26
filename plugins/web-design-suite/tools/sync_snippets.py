@@ -80,7 +80,7 @@ def sync(check: bool, skills: pathlib.Path = SKILLS) -> list[str]:
 
         new = QUOTE.sub(fresh, text)
         if new != text and not check:
-            doc.write_text(new, encoding="utf-8", newline="")
+            doc.write_bytes(new.encode("utf-8"))
     return stale
 
 

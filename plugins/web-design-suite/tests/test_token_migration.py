@@ -40,12 +40,11 @@ import pathlib
 import re
 import shutil
 import subprocess
-import tempfile
 import time
 import unittest
 
 import test_starter_css as starter
-from wds_support import TempDirTest, env, output, run_py
+from wds_support import TempDirTest, env, output, run_py, temp_dir
 
 GIT = shutil.which("git")
 CSS = ".card { margin: 13px; }\n"
@@ -251,7 +250,7 @@ class FocusRingsStayFocusRings(TempDirTest):
 def proposed_tokens_css() -> str:
     """extract_literals → cluster_values on a small project; the proposed
     tokens.css, comments removed."""
-    with tempfile.TemporaryDirectory(prefix="wds-test-", ignore_cleanup_errors=True) as holder:
+    with temp_dir("wds-test-") as holder:
         tmp = pathlib.Path(holder)
         (tmp / "src").mkdir()
         (tmp / "src" / "card.css").write_text(
