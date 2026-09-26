@@ -13,8 +13,8 @@
   - The stylelint config refused the plugin's own starter stylesheets 32 times, and refused the documented Tailwind entry.
   - The Tailwind v3 block of the ESLint config stopped ESLint with "Could not resolve tailwindcss".
   - Both Tailwind blocks gave `p-card px-inline-md` as a contradiction, and neither plugin flags it.
-- **3. The Python floor.** Python 3.10 or newer, verified by the final suite (338 tests) on each of 3.10 to 3.14. On 3.9 the test harness fails (`ignore_cleanup_errors` is 3.10+). Every script compiles on 3.9, but that does not make it supported.
-- **Tests.** 296 → 338: 21 for items 1–3, 15 more from the review, and 6 from CodeRabbit's second review. Inside the repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3` provides every tool the tests use but the browser, at pinned versions.
+- **3. The Python floor.** Python 3.10 or newer, verified by the final suite (339 tests) on each of 3.10 to 3.14. On 3.9 the test harness fails (`ignore_cleanup_errors` is 3.10+). Every script compiles on 3.9, but that does not make it supported.
+- **Tests.** 296 → 339: 21 for items 1–3, 15 more from the review, 6 from CodeRabbit's second review, and 1 from its third. Inside the repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3` provides every tool the tests use but the browser, at pinned versions.
 
 ## Where everything is
 
@@ -69,6 +69,12 @@
 
 Against `00fb5f2`, the 6 new tests fail (5 failures, 1 error): the 3 builder tests against its builder, and the 3 harness tests against its harness, with the new test files placed beside it. With the fix, the same scratch repository's index stays empty through the hook and migration tests.
 
+**CodeRabbit's third review**, at `ee1b050`, raised two points. Both are fixed.
+- **Executable bits.** The builder took each file's mode from the tar that `git archive` writes, and git's `tar.umask` setting masks those bits: with `tar.umask=0111`, a script git tracks as `100755` went into the zip as 0644. The builder now takes the mode from `git ls-tree`, the list it already checks the zip against.
+- **The zip check.** The zip unpacks to `web-design-suite/`, but `git archive` of the plugin unpacks to `plugins/web-design-suite/`, so step 4's `diff -r` compared different roots. Step 4, the plan's fail-before rule and CLAUDE.md now extract with `tar --strip-components=1`, which Windows' `tar.exe` and Git Bash's tar both accept.
+
+Against `ee1b050`'s builder, the new test fails (the script comes out as `0o100644`); with the fix, it passes.
+
 ## Evidence
 
 ### Test runs
@@ -77,14 +83,16 @@ Each run was from `plugins/web-design-suite`, with `PYTHONDONTWRITEBYTECODE=1` a
 
 | Run | Python | Result |
 |---|---|---|
-| `python -B -m unittest discover -s tests`, the final suite | 3.14.5 | Ran 338 tests in 213.0 s: **OK** |
-| The same | 3.13.9 | Ran 338 tests in 230.1 s: **OK** |
-| The same | 3.12.12 | Ran 338 tests in 231.1 s: **OK** |
-| The same | 3.11.15 | Ran 338 tests in 240.3 s: **OK** |
-| The same | 3.10.20 (the floor) | Ran 338 tests in 248.5 s: **OK** |
+| `python -B -m unittest discover -s tests`, the final suite | 3.14.5 | Ran 339 tests in 276.6 s: **OK** |
+| The same | 3.13.9 | Ran 339 tests in 318.7 s: **OK** |
+| The same | 3.12.12 | Ran 339 tests in 319.5 s: **OK** |
+| The same | 3.11.15 | Ran 339 tests in 285.5 s: **OK** |
+| The same | 3.10.20 (the floor) | Ran 339 tests in 294.5 s: **OK** |
 | With `WDS_PLUGIN_ROOT` set to `8b27ff7`, the review's fail-before | 3.14.5 | Ran 319 tests in 502.0 s: **FAILED (failures=4, errors=2)**, as intended |
 | CodeRabbit's second review: the new test files beside `00fb5f2`'s builder and harness | 3.14.5 | Ran 14 tests: **FAILED (failures=5, errors=1)**, as intended |
-| Linux: WSL2 Ubuntu, dash as `/bin/sh` | 3.14.4 | Ran 338 tests in 127.8 s: **OK**, 59 skipped (no Node there, and no floor interpreter or toolchain for Linux) |
+| CodeRabbit's third review: the builder test file against `ee1b050`'s builder | 3.14.5 | Ran 7 tests: **FAILED (failures=1)**, as intended |
+| Linux: WSL2 Ubuntu, dash as `/bin/sh` | 3.14.4 | Ran 339 tests in 181.3 s: **OK**, 59 skipped (no Node there, and no floor interpreter or toolchain for Linux) |
+| Before CodeRabbit's third review: 338 tests | 3.10.20 to 3.14.5, and Linux | **OK** on each (Linux: 59 skipped) |
 | Before CodeRabbit's second review: 332 tests | 3.10.20 to 3.14.5, and Linux | **OK** on each (Linux: 59 skipped) |
 | Before the review: 317 tests | 3.14.5, 3.12.10, 3.10.20 | **OK** in 172.3, 199.5 and 201.5 s |
 | Before the review: with `WDS_PLUGIN_ROOT` set to an unpacked 3.2.0 | 3.14.5 | Ran 309 tests in 183.2 s: **FAILED (failures=13, errors=1, skipped=1)**, as intended |

@@ -5,10 +5,10 @@
 ## State
 
 - **PR #1 (3.2.1)** is ready to merge, on `fix/3.2.1-distribution-readiness`.
-  - Fixed, each with a fail-before: the ten-angle review's 30 findings, the gap sweep's 4, and all five points of CodeRabbit's second review (report: `dev plans/web-design-suite-3.2.1-report.md`).
-  - 338 tests pass on Python 3.10 to 3.14 on Windows, and on Linux (59 skipped: that WSL has no Node). `claude plugin validate --strict` passes on all three targets.
+  - Fixed, each with a fail-before: the ten-angle review's 30 findings, the gap sweep's 4, all five points of CodeRabbit's second review, and both of its third (report: `dev plans/web-design-suite-3.2.1-report.md`).
+  - 339 tests pass on Python 3.10 to 3.14 on Windows, and on Linux (59 skipped: that WSL has no Node). `claude plugin validate --strict` passes on all three targets.
   - CodeRabbit has not reviewed the last push yet; its incremental review will be on the PR.
-- **Python 3.9 (N6, decision 2)** is done on `feat/python-3.9-floor` (`644c528`), pushed, with no PR yet. It passed 335 tests on 3.9, 3.10 and 3.14. It is based on `00fb5f2`, so rebase it onto `main` once PR #1 merges. Expect conflicts in `tests/wds_support.py`, `tests/test_harness.py` and `tests/test_token_migration.py` (imports), `CLAUDE.md` and the plan (line 24, N6). Keep both sides; the floor becomes 3.9 everywhere, and the suite becomes 341 tests.
+- **Python 3.9 (N6, decision 2)** is done on `feat/python-3.9-floor` (`644c528`), pushed, with no PR yet. It passed 335 tests on 3.9, 3.10 and 3.14. It is based on `00fb5f2`, so rebase it onto `main` once PR #1 merges. Expect conflicts in `tests/wds_support.py`, `tests/test_harness.py` and `tests/test_token_migration.py` (imports), `CLAUDE.md` and the plan (line 24, N6). Keep both sides; the floor becomes 3.9 everywhere, and the suite becomes 342 tests.
 - **CodeRabbit** is on the Teams trial until about 2026-10-02: line-by-line reviews, 10 an hour, and each reply to a CodeRabbit thread costs one. Push fixes, let the incremental review mark threads addressed, and reply only where it does not.
 - **Installed plugin:** 3.2.1 as first built (`8b27ff7`), without the review's fixes. Step 2 updates it.
 

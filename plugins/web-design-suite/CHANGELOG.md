@@ -6,7 +6,7 @@ Ready to distribute. The stylelint config and both Tailwind blocks of the ESLint
 now run through the real tools in the tests, and what that found is fixed. A review of
 this release before it shipped found more, and that is fixed too. Every fix has a
 regression test that fails on 3.2.0, or on the release candidate for what the review
-found (`python -B -m unittest discover -s tests`: 338 tests).
+found (`python -B -m unittest discover -s tests`: 339 tests).
 
 ### Upgrading
 

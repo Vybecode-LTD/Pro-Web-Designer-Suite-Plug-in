@@ -17,7 +17,7 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Version:** 3.2.1. It is PR #1, not yet merged; `docs/HANDOFF.md` says what to do with it. `main` holds 3.0.0 to 3.2.0 as tagged commits.
 - **Installed:** sessions load the plugin from `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`. That folder is a copy of `plugins/web-design-suite`, already updated to 3.2.1.
 - **Tests:**
-  - 338, passing on Python 3.10 to 3.14 on Windows.
+  - 339, passing on Python 3.10 to 3.14 on Windows.
   - Linux passes with the Node tests skipped.
   - macOS has never been run.
 - **Active work:** `dev plans/web-design-suite-completion-plan.md`. Next is phase 3 (3.3.0), starting with W1, the Supabase access boundary.
@@ -31,14 +31,14 @@ For the Bash tool (Git Bash), from the repository root:
 npm ci --prefix tooling/main          # once; it downloads no browser (tooling/README.md)
 npm ci --prefix tooling/tailwind-v3   # once
 cd plugins/web-design-suite
-python -B -m unittest discover -s tests                     # the suite: 338 tests; -B keeps bytecode out of the plugin
+python -B -m unittest discover -s tests                     # the suite: 339 tests; -B keeps bytecode out of the plugin
 WDS_PLUGIN_ROOT=<unpacked older release> python -B -m unittest discover -s tests   # fail-before
 python tools/check_pointers.py        # § pointers; --write-register after editing one, then read the diff
 python tools/sync_snippets.py --check # starter code quoted in the references
 python skills/web-design-studio/scripts/audit_design.py skills --strict
 ```
 
-Get an older release with `git archive v3.2.0 plugins/web-design-suite | tar -x -C <scratch folder>`. In cmd.exe the fail-before run is `set "WDS_PLUGIN_ROOT=<folder>" && python -B -m unittest discover -s tests`.
+Get an older release with `git archive v3.2.1 plugins/web-design-suite | tar --strip-components=1 -x -C <scratch folder>`, which unpacks the plugin as `<scratch folder>/web-design-suite`. In cmd.exe the fail-before run is `set "WDS_PLUGIN_ROOT=<folder>" && python -B -m unittest discover -s tests`.
 
 The Python floor runs with `"$(uv python find 3.10)" -B -m unittest discover -s tests`. Linux runs through WSL, from PowerShell; the release procedure in the plan gives the exact command.
 
