@@ -5,9 +5,9 @@
 ## Summary
 
 - **The repository.** [Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in) is private; its local clone is `C:\DEV\Pro-Web-Designer-Suite-Plug-in`.
-  - `main` has the four releases 3.0.0 to 3.2.0 as tagged commits. Each was checked to equal the one before plus its `.patch`.
+  - `main` has the releases 3.0.0 to 3.2.1 as tagged commits. The four up to 3.2.0 were each checked to equal the one before plus its `.patch`.
   - The plugin is in `plugins/web-design-suite`, the repository root is a marketplace, and the project docs are in `dev plans`.
-  - 3.2.1 is [PR #1](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/pull/1). It was reviewed before it merged (see *The review before release*); tag `v3.2.1` after the merge.
+  - 3.2.1 is [PR #1](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/pull/1), reviewed before it merged (see *The review before release*). It merged on 2026-09-26 as `63932cf`, which is tagged `v3.2.1`.
 - **1. No machine paths.** The 3.0.1 CHANGELOG entry named a report by its folder on the maintainer's machine. A test now scans every shipped file for such paths.
 - **2. The lint configs, run for real.** stylelint 17.15 and eslint-plugin-tailwindcss 4.4 and 3.18 ran the shipped configs for the first time. They found three bugs, and all three are fixed:
   - The stylelint config refused the plugin's own starter stylesheets 32 times, and refused the documented Tailwind entry.
@@ -21,7 +21,7 @@
 | What | Where |
 |---|---|
 | The installed plugin, which sessions load | `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`: `claude plugin update` moved it from 3.2.0 to 3.2.1 |
-| Package | `C:\Users\vybec\Downloads\web-design-suite-plugin-3.2.1.zip`: 225 entries, 1,568,691 bytes, SHA-256 `abd86e9a55529f743d82d1f41cae3413621586d3c2b97753001a421678b71adf` |
+| Package | `C:\Users\vybec\Downloads\web-design-suite-plugin-3.2.1-63932cf.zip`, built from the merge commit `63932cf` (`v3.2.1`): 227 entries (9 executable), 1,581,079 bytes, SHA-256 `592c985f523044f7a95b16fea765ecf3a911e7d7d5fa299acc7a91d36d6f9694`. It matches `git archive v3.2.1` under `diff -r`. The `web-design-suite-plugin-3.2.1.zip` beside it is the pre-review build, from `8b27ff7`. |
 | What changed since 3.2.0 | `git diff v3.2.0 fix/3.2.1-distribution-readiness -- plugins`. There are no more `.patch` files: the tags hold the history |
 | Release notes | `plugins/web-design-suite/CHANGELOG.md` |
 | Test tools | `tooling/` and its README |
