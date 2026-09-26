@@ -17,7 +17,7 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits.
 - **Installed:** 3.2.1 from `63932cf`. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
 - **Tests:**
-  - 339, passing on Python 3.10 to 3.14 on Windows.
+  - 342, passing on Python 3.9 and 3.14 on Windows.
   - Linux passes with the Node tests skipped.
   - macOS has never been run.
 - **Active work:** `dev plans/web-design-suite-completion-plan.md`. Next is phase 3 (3.3.0), starting with W1, the Supabase access boundary.
@@ -31,7 +31,7 @@ For the Bash tool (Git Bash), from the repository root:
 npm ci --prefix tooling/main          # once; it downloads no browser (tooling/README.md)
 npm ci --prefix tooling/tailwind-v3   # once
 cd plugins/web-design-suite
-python -B -m unittest discover -s tests                     # the suite: 339 tests; -B keeps bytecode out of the plugin
+python -B -m unittest discover -s tests                     # the suite: 342 tests; -B keeps bytecode out of the plugin
 WDS_PLUGIN_ROOT=<unpacked older release> python -B -m unittest discover -s tests   # fail-before
 python tools/check_pointers.py        # § pointers; --write-register after editing one, then read the diff
 python tools/sync_snippets.py --check # starter code quoted in the references
