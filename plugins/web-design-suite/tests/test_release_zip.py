@@ -12,6 +12,9 @@ Regressions covered (3.2.1 review):
 - It refused any release that removed a file, dated entries by the checkout's
   mtimes, so two builds of one commit differed, and exited 0 when its own
   test of the zip failed.
+- (CodeRabbit) A GIT_DIR inherited from a hook or a shell made it build that
+  repository. It skipped a tracked symbolic link, and a file `export-ignore`
+  keeps out of `git archive`, and still reported success.
 """
 from __future__ import annotations
 
@@ -64,9 +67,9 @@ class ReleaseZip(TempDirTest):
         self.write("plugins/web-design-suite/.DS_Store", "x")
         self.write("plugins/web-design-suite/README.md.orig", "x")
 
-    def build(self, name: str) -> subprocess.CompletedProcess:
+    def build(self, name: str, **env_changes: str) -> subprocess.CompletedProcess:
         return subprocess.run([sys.executable, str(BUILDER), "previous.zip", name], cwd=self.tmp,
-                              capture_output=True, env=env(**GIT_ENV), timeout=120)
+                              capture_output=True, env=env(**GIT_ENV, **env_changes), timeout=120)
 
     def test_the_zip_holds_what_git_holds_with_its_modes(self):
         proc = self.build("out.zip")
@@ -90,6 +93,37 @@ class ReleaseZip(TempDirTest):
         proc = self.build("out.zip")
         self.assertEqual(2, proc.returncode, output(proc))
         self.assertIn("never overwrites", output(proc))
+
+    def test_it_builds_the_repository_it_runs_in(self):
+        self.git("init", "-q", "other")
+        self.write("other/plugins/web-design-suite/OTHER.md", "other\n")
+        self.git("-C", "other", "add", ".")
+        self.git("-C", "other", "commit", "-q", "-m", "other")
+        other = self.tmp / "other"
+        proc = self.build("out.zip", GIT_DIR=str(other / ".git"), GIT_WORK_TREE=str(other))
+        self.assertEqual(0, proc.returncode, output(proc))
+        with zipfile.ZipFile(self.tmp / "out.zip") as z:
+            names = z.namelist()
+        self.assertIn("web-design-suite/scripts/tool.py", names)
+        self.assertNotIn("web-design-suite/OTHER.md", names)
+
+    def test_a_link_is_refused(self):
+        blob = self.git("hash-object", "-w", "plugins/web-design-suite/README.md").strip()
+        self.git("update-index", "--add", "--cacheinfo", f"120000,{blob},plugins/web-design-suite/link.md")
+        self.git("commit", "-q", "-m", "a link")
+        proc = self.build("out.zip")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("plugins/web-design-suite/link.md is a symbolic link", output(proc))
+        self.assertFalse((self.tmp / "out.zip").exists())
+
+    def test_a_file_git_archive_leaves_out_is_refused(self):
+        self.write(".gitattributes", "plugins/web-design-suite/scripts/new.py export-ignore\n")
+        self.git("add", ".gitattributes")
+        self.git("commit", "-q", "-m", "export-ignore")
+        proc = self.build("out.zip")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("plugins/web-design-suite/scripts/new.py is tracked, but git archive left it out", output(proc))
+        self.assertFalse((self.tmp / "out.zip").exists())
 
 
 if __name__ == "__main__":
