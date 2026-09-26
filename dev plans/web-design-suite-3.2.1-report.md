@@ -5,9 +5,9 @@
 ## Summary
 
 - **The repository.** [Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in) is private; its local clone is `C:\DEV\Pro-Web-Designer-Suite-Plug-in`.
-  - `main` has the four releases 3.0.0 to 3.2.0 as tagged commits. Each was checked to equal the one before plus its `.patch`.
+  - `main` has the releases 3.0.0 to 3.2.1 as tagged commits. The four up to 3.2.0 were each checked to equal the one before plus its `.patch`.
   - The plugin is in `plugins/web-design-suite`, the repository root is a marketplace, and the project docs are in `dev plans`.
-  - 3.2.1 is [PR #1](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/pull/1), reviewed before it merged (see *The review before release*). It merged on 2026-09-26 as `63932cf`, tagged `v3.2.1`, so `main` now has the five releases 3.0.0 to 3.2.1.
+  - 3.2.1 is [PR #1](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/pull/1), reviewed before it merged (see *The review before release*). It merged on 2026-09-26 as `63932cf`, which is tagged `v3.2.1`.
 - **1. No machine paths.** The 3.0.1 CHANGELOG entry named a report by its folder on the maintainer's machine. A test now scans every shipped file for such paths.
 - **2. The lint configs, run for real.** stylelint 17.15 and eslint-plugin-tailwindcss 4.4 and 3.18 ran the shipped configs for the first time. They found three bugs, and all three are fixed:
   - The stylelint config refused the plugin's own starter stylesheets 32 times, and refused the documented Tailwind entry.
