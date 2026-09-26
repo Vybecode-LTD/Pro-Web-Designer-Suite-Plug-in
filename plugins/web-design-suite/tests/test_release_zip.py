@@ -82,6 +82,13 @@ class ReleaseZip(TempDirTest):
         self.assertEqual(0o100644, infos["web-design-suite/scripts/new.py"].external_attr >> 16)
         self.assertIn("removed since the previous release: web-design-suite/scripts/old.py", output(proc))
 
+    def test_a_tar_umask_cannot_drop_an_executable_bit(self):
+        self.git("config", "tar.umask", "0111")          # git archive then writes every file as 0666
+        proc = self.build("out.zip")
+        self.assertEqual(0, proc.returncode, output(proc))
+        with zipfile.ZipFile(self.tmp / "out.zip") as z:
+            self.assertEqual(0o100755, z.getinfo("web-design-suite/scripts/tool.py").external_attr >> 16)
+
     def test_two_builds_of_one_commit_are_identical(self):
         self.assertEqual(0, self.build("a.zip").returncode)
         (self.tmp / "plugins/web-design-suite/README.md").touch()

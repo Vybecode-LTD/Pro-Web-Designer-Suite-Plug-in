@@ -87,7 +87,8 @@ def main(argv: list[str] | None = None) -> int:
                 entries[TOP + rel + "/" if rel else TOP] = (stat.S_IFDIR | 0o755, b"")
             elif member.isfile():
                 data = tar.extractfile(member).read()
-                entries[TOP + rel] = (stat.S_IFREG | (0o755 if member.mode & 0o111 else 0o644), data)
+                executable = tracked.get(member.name) == "100755"   # not member.mode: tar.umask can mask it
+                entries[TOP + rel] = (stat.S_IFREG | (0o755 if executable else 0o644), data)
     entries.setdefault(TOP, (stat.S_IFDIR | 0o755, b""))
 
     refused = [f"{path} is a {'symbolic link' if mode == '120000' else 'submodule'}, "
