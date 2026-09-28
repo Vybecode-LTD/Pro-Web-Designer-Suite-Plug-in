@@ -36,7 +36,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 
 Ask before the phase that needs each one.
 
-1. **Private or public** (before phase 5). The repository is private, and this only matters if it is ever made public. This repository's own `dev plans/` folder (not the one in any other project) is committed, and it names paths on the maintainer's machine (`C:\Users\vybec\…` and session temp folders) and two other projects, `audio-promptmonster` and `Basefra.me`. Before going public, decide whether that folder stays, moves out of the repository, or is scrubbed of those.
+1. **Private or public.** *Decided 2026-09-28: public, and MIT-licensed at the root as well as in the plugin.* The repository went public with its own `dev plans/` as it was. That folder and the history name paths on the maintainer's machine (`C:\Users\vybec\…` and session temp folders) and two other projects, `audio-promptmonster` and `Basefra.me`, and every commit carries `info@apmonster.ai`. A scan of every commit found no secrets, and the user chose to leave that material as it is.
 2. **Python 3.9** (W4). *Decided 2026-09-25: support 3.9. Done for 3.3.0 (N6).* The floor was 3.10, but the Python that macOS still ships is 3.9; the test harness changes too.
 3. **The Tailwind lint plugin** (W12). Stay on eslint-plugin-tailwindcss, which 3.2.1 verified, or move to eslint-plugin-better-tailwindcss as SB-C4 proposes.
 4. **Eval spend** (W9). `claude plugin eval` runs real sessions and costs money. Agree a cost cap per run first.
@@ -167,7 +167,7 @@ These were found in phase 2 and 3.2.1:
 - **N5.** Only the nine scripts that were executable in 3.0.0 are marked executable (the hook is one of them). Mark the other 17 scripts that have a shebang, and add a test that reads git's file modes. Since 3.2.1 the zip builder takes modes from git, so the zip carries them.
 - **N6.** *Done for 3.3.0.* Python 3.9 is the floor (decision 2). The harness no longer needs 3.10, `test_docs.PythonFloor` runs `test_harness` on 3.9, and the README states 3.9.
 - **N7.** TypeScript 7 is npm's latest, and typescript-eslint 8.70 accepts TypeScript below 6.1. A project that installs typescript-eslint without pinning TypeScript gets a peer conflict. Say so wherever the docs install typescript-eslint.
-- **N8.** The plugin README's install section names only a local folder. Add the GitHub route, `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, and say that it needs access while the repository is private.
+- **N8.** The plugin README's install section names only a local folder. Add the GitHub route, `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, which anyone can use now that the repository is public.
 - **N9.** Add a repository-level check that the root `.claude-plugin/marketplace.json` and the plugin's own agree on name, description, category and keywords.
 - **N10.** The review's ✔ marks are stale. The inventory replaces them, so point the review's header at the inventory.
 

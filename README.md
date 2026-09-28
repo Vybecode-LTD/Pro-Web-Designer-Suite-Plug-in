@@ -19,7 +19,7 @@ In Claude Code:
 /plugin install web-design-suite@web-design-suite
 ```
 
-The repository is private, so installing from it needs a GitHub account with access. You can also install from a release zip: unpack it, then add the unpacked `web-design-suite` folder as the marketplace.
+You can also install from a release zip: unpack it, then add the unpacked `web-design-suite` folder as the marketplace.
 
 ## Releases
 
