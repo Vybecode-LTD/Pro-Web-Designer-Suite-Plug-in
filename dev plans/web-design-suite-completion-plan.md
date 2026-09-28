@@ -36,7 +36,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 
 Ask before the phase that needs each one.
 
-1. **Private or public** (before phase 5). The repository is private. `dev plans/` names folders on the maintainer's machine and the user's other projects. Before the repository is made public, decide whether that folder stays, moves or is scrubbed.
+1. **Private or public** (before phase 5). The repository is private, and this only matters if it is ever made public. This repository's own `dev plans/` folder (not the one in any other project) is committed, and it names paths on the maintainer's machine (`C:\Users\vybec\…` and session temp folders) and two other projects, `audio-promptmonster` and `Basefra.me`. Before going public, decide whether that folder stays, moves out of the repository, or is scrubbed of those.
 2. **Python 3.9** (W4). *Decided 2026-09-25: support 3.9. Done for 3.3.0 (N6).* The floor was 3.10, but the Python that macOS still ships is 3.9; the test harness changes too.
 3. **The Tailwind lint plugin** (W12). Stay on eslint-plugin-tailwindcss, which 3.2.1 verified, or move to eslint-plugin-better-tailwindcss as SB-C4 proposes.
 4. **Eval spend** (W9). `claude plugin eval` runs real sessions and costs money. Agree a cost cap per run first.

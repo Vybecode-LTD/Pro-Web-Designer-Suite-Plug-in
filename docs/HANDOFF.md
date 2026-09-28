@@ -28,4 +28,4 @@ None.
 - **The installed plugin is a copy, and sessions load a cache of it.** Update both after every release.
 - **Worktrees.** Never run `npm ci` in a worktree whose `tooling/*/node_modules` is a junction; remove junctions with `os.rmdir` before `git worktree remove`.
 - **Don't trust the review's ✔ marks.** Use the inventory.
-- **Private material.** `dev plans/` names folders on this machine; settle decision 1 before the repository goes public.
+- **Private material.** This repository's own `dev plans/` names paths on this machine and two other projects (`audio-promptmonster`, `Basefra.me`). It matters only if the repository goes public; settle decision 1 first.
