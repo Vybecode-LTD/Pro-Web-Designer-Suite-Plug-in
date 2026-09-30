@@ -241,6 +241,8 @@ class AddressesAreNotComments(TempDirTest):
             "    background: url(//cdn.example.com/b.svg); margin: 13px;\n"
             "  }\n"
             "}\n")
+    # A Sass url() may hold an expression, whose comments are still comments.
+    EXPR = '$asset: "hero.svg";\n.x { background: url($asset /* " */); margin: 13px; }\n'
 
     def test_literals_after_an_address_are_in_the_census(self):
         self.write("src/components/hero.css", self.CSS)
@@ -248,13 +250,15 @@ class AddressesAreNotComments(TempDirTest):
         # `\)` inside an unquoted url() is part of the address. (The codemod
         # leaves such a file alone: its parentheses do not balance.)
         self.write("src/components/escaped.scss", ".e { background: url(//cdn.example.com/a\\)//b.svg); margin: 13px; }\n")
+        self.write("src/components/expr.scss", self.EXPR)
         _, data = self.extract("src")
         # Each under its own property: the unclosed url( made `background`'s
         # value run on, so its literals were found but filed under it.
         found = {(pathlib.PurePath(l["file"].replace("\\", "/")).name, l["line"], l["prop"], l["normalized"])
                  for l in data["literals"]}
         for want in (("hero.css", 2, "margin", "13px"), ("hero.css", 3, "color", "#123456"),
-                     ("card.scss", 4, "margin", "13px"), ("escaped.scss", 1, "margin", "13px")):
+                     ("card.scss", 4, "margin", "13px"), ("escaped.scss", 1, "margin", "13px"),
+                     ("expr.scss", 2, "margin", "13px")):
             with self.subTest(want=want):
                 self.assertIn(want, found)
         self.assertNotIn("7px", {n for *_, n in found})
@@ -263,8 +267,10 @@ class AddressesAreNotComments(TempDirTest):
         mapping = self.write("mapping.json", json.dumps(self.MAPPING))
         css = self.write("src/components/hero.css", self.CSS)
         scss = self.write("src/components/card.scss", self.SCSS)
+        expr = self.write("src/components/expr.scss", self.EXPR)
         proc = run_py("design-token-migration", "apply_codemod", "-m", mapping, "--apply", "src",
                       cwd=self.tmp)
+        self.assertIn('/* " */); margin: var(--gap-related); }', expr.read_text(encoding="utf-8"), output(proc))
         self.assertIn("hero.svg); margin: var(--gap-related); }", css.read_text(encoding="utf-8"), output(proc))
         self.assertIn("b.svg); margin: var(--gap-related);", scss.read_text(encoding="utf-8"), output(proc))
         self.assertIn("// margin: 7px;", scss.read_text(encoding="utf-8"))

@@ -384,6 +384,16 @@ class AuditPrecision(TempDirTest):
                    "}\n")
         self.assertEqual([("L1", "raw-color", 2)], self.found("scss"))
 
+    def test_a_sass_expression_in_url_keeps_its_comments(self):
+        # In Sass, url() may hold an expression rather than an address; a
+        # comment in it is still a comment (CodeRabbit on PR #6).
+        self.write("scss/components/card.scss",
+                   '$asset: "hero.svg";\n'
+                   "@layer components {\n"
+                   '  .card { background: url($asset /* " */); color: #ff0000; }\n'
+                   "}\n")
+        self.assertEqual([("L1", "raw-color", 3)], self.found("scss"))
+
     def test_a_rule_after_a_closed_layer_is_unlayered(self):
         # SB-A9 (b): the audit never left a layer once it had entered one.
         self.write("src/components/card.css",

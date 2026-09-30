@@ -8,8 +8,9 @@
   - It read `//` as a comment in plain CSS, so `url(https://cdn…/hero.svg)` hid every
     declaration after it, and a custom property holding an address (`--terms:
     https://…`) hid the rest of its line. `//` is now a comment only in Sass, Less,
-    styled templates and single-file components, and never inside `url()`, where an
-    escaped `\)` does not end the address.
+    styled templates and single-file components, and never inside an unquoted address
+    in `url()`, where an escaped `\)` does not end it. A Sass `url()` that holds an
+    expression instead (`url($asset)`) is read as code, so its comments still count.
   - A rule after a closed `@layer` block was never reported as unlayered. The finding
     now points at the first unlayered rule. A `@keyframes` block outside a layer, as
     the references and the scaffold write it, is not unlayered CSS: a keyframe is not

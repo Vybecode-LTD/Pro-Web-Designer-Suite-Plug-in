@@ -284,6 +284,31 @@ def line_comments(path: Path) -> bool:
     return path.suffix.lower() not in PLAIN_CSS_EXT
 
 
+def unquoted_url_end(text: str, j: int) -> int | None:
+    """The index of the `)` that closes an unquoted address starting at `j`,
+    just after `url(`; None when the argument is not one. An unquoted address
+    is a single token: no quote, no `(` and no inner whitespace, and an
+    escaped character (`\\)`) is part of it. The audit has the same test."""
+    n = len(text)
+    while j < n and text[j] in " \t\r\n":
+        j += 1
+    while j < n:
+        c = text[j]
+        if c == "\\":
+            j += 2
+        elif c == ")":
+            return j
+        elif c in "\"'(":
+            return None
+        elif c in " \t\r\n":
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            return j if j < n and text[j] == ")" else None
+        else:
+            j += 1
+    return None
+
+
 def blank_css_comments(text: str, slash_comments: bool = True) -> str:
     """Replace comment bodies with spaces, preserving every offset and newline.
 
@@ -300,15 +325,12 @@ def blank_css_comments(text: str, slash_comments: bool = True) -> str:
         ch = text[i]
         if (ch in "uU" and text[i:i + 4].lower() == "url("
                 and not (i and (text[i - 1].isalnum() or text[i - 1] in "-_"))):
-            j = i + 4
-            while j < n and text[j] in " \t\r\n":
-                j += 1
-            if j < n and text[j] not in "\"'":         # a quoted address is a string, read below
-                while j < n and text[j] != ")":
-                    j += 2 if text[j] == "\\" else 1     # `\)` is part of the address
-                j = min(j, n)
-            i = j
-            continue
+            end = unquoted_url_end(text, i + 4)
+            if end is not None:
+                i = end
+                continue
+            # Otherwise a quoted address, read as a string below, or a Sass
+            # expression (`url($asset)`), whose comments are still comments.
         if ch in "\"'":
             quote, i = ch, i + 1
             while i < n and text[i] != quote:
