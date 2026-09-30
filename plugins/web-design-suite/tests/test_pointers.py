@@ -22,15 +22,16 @@ import pathlib
 import sys
 import unittest
 
-from wds_support import SKILLS, TempDirTest
+from wds_support import PLUGIN, SKILLS, TempDirTest
 
 HERE = pathlib.Path(__file__).resolve().parent
 
 
-def load_tool(name: str):
-    """A maintainer tool from this suite's own plugin, run against the tree
-    under test (WDS_PLUGIN_ROOT may point at an older copy without it)."""
-    spec = importlib.util.spec_from_file_location(f"wds_{name}", HERE.parent / "tools" / f"{name}.py")
+def load_tool(name: str, plugin: pathlib.Path = HERE.parent):
+    """A maintainer tool, by default from this suite's own plugin, run against
+    the tree under test (WDS_PLUGIN_ROOT may point at an older copy without it)."""
+    suffix = "" if plugin == HERE.parent else "_under_test"
+    spec = importlib.util.spec_from_file_location(f"wds_{name}{suffix}", plugin / "tools" / f"{name}.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -68,7 +69,11 @@ class WritingTheRegister(TempDirTest):
         self.write("skills/demo/SKILL.md", "Read `guide.md` §2 first.\n")
         self.write("skills/demo/references/guide.md", "# Guide\n\n## 2. Café crème\n\nText.\n")
         register = self.tmp / "fixtures" / "section-pointers.json"
-        tool = load_tool("check_pointers")
+        # The tool under test is the plugin's own, so WDS_PLUGIN_ROOT runs an
+        # older release's (3.2.1's fails on 3.9). Before 3.2.0 there was none.
+        if not (PLUGIN / "tools" / "check_pointers.py").is_file():
+            self.skipTest("the plugin under test has no tools/check_pointers.py")
+        tool = load_tool("check_pointers", PLUGIN)
         self.assertEqual(1, tool.write_register(skills, register))
         self.assertEqual(('[\n {\n  "from": "demo/SKILL.md",\n  "to": "demo/references/guide.md",\n'
                           '  "section": "2",\n  "heading": "Café crème"\n }\n]\n').encode("utf-8"),

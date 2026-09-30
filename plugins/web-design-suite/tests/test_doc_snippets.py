@@ -32,7 +32,7 @@ import re
 import sys
 import unittest
 
-from wds_support import SKILLS, TempDirTest
+from wds_support import PLUGIN, SKILLS, TempDirTest
 
 FENCE = re.compile(r"^```(\w*)[^\n]*\n(.*?)^```", re.S | re.M)
 NOT_FOR_COPYING = re.compile(r"example:\s*(wrong|before|illustration)\b", re.I)
@@ -156,11 +156,11 @@ class ReferenceSnippetsPassTheGate(TempDirTest):
                                       for f in findings])      # --strict: warnings count too
 
 
-def sync_tool():
-    """tools/sync_snippets.py from this suite's own plugin; the tree it checks
-    is the one under test (WDS_PLUGIN_ROOT may point at an older copy)."""
-    spec = importlib.util.spec_from_file_location(
-        "wds_sync_snippets", pathlib.Path(__file__).resolve().parents[1] / "tools" / "sync_snippets.py")
+def sync_tool(plugin: pathlib.Path = pathlib.Path(__file__).resolve().parents[1]):
+    """tools/sync_snippets.py, by default from this suite's own plugin; the
+    tree it checks is the one under test (WDS_PLUGIN_ROOT may point at an
+    older copy)."""
+    spec = importlib.util.spec_from_file_location("wds_sync_snippets", plugin / "tools" / "sync_snippets.py")
     sync = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(sync)
     return sync
@@ -195,7 +195,11 @@ class SyncRewritesAStaleQuote(TempDirTest):
                    "  /* @end-snippet */\n}\n")
         doc = self.write("skills/demo/references/guide.md",
                          "# Guide — naïve\n\n<!-- snippet: layout.css#flow -->\n```css\n.flow { }\n```\n")
-        sync = sync_tool()
+        # The tool under test is the plugin's own, so WDS_PLUGIN_ROOT runs an
+        # older release's (3.2.1's fails on 3.9). Before 3.2.0 there was none.
+        if not (PLUGIN / "tools" / "sync_snippets.py").is_file():
+            self.skipTest("the plugin under test has no tools/sync_snippets.py")
+        sync = sync_tool(PLUGIN)
         self.assertEqual(["demo/references/guide.md: layout.css#flow"], sync.sync(check=False, skills=skills))
         self.assertEqual(("# Guide — naïve\n\n<!-- snippet: layout.css#flow -->\n```css\n"
                           ".flow > * + * { margin-block-start: var(--flow-space); } /* café */\n```\n"
