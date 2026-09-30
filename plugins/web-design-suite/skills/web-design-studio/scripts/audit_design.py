@@ -78,6 +78,9 @@ CSS_EXT = {".css", ".scss", ".sass", ".less", ".pcss"}
 JS_EXT = {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}
 # Markup that carries CSS: <style> blocks, style="" attributes, class lists.
 TEMPLATE_EXT = {".html", ".htm", ".vue", ".svelte", ".astro"}
+# Files whose CSS is plain CSS, where `//` is not a comment (line_comments).
+PLAIN_CSS_EXT = {".css", ".pcss", ".html", ".htm"}
+KEYFRAMES_AT = re.compile(r"@(-[a-z]+-)?keyframes\b", re.I)
 
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit",
@@ -93,10 +96,17 @@ TOKEN_FILE_PAT = re.compile(
     # file in a tokens/ folder, theme.css, dark-theme.css — the file classes
     # in assets/rules/design-rules.json. A separator before "tokens" and
     # "theme" is required, so "mytokens.css" and "theming.css" are not waved
-    # through.
-    r"(^|[/\\])([\w.-]*[-.])?tokens?\.(css|scss)$"
+    # through, and the spec's globs are plural: "brand-token.css" is not.
+    r"(^|[/\\])([\w.-]*[-.])?tokens\.(css|scss)$"
     r"|(^|[/\\])tokens[/\\][\w.-]+\.(css|scss)$"
     r"|(^|[/\\])([\w.-]*[-.])?theme\.(css|scss)$"
+)
+COMPONENT_FILE_PAT = re.compile(
+    # A components/ or ui/ folder at any depth, the project root included (the
+    # common Next.js layout, SB-A9), a CSS module, and components.css itself,
+    # not mycomponents.css: the component file class in design-rules.json.
+    # Matched against a lower-case path with forward slashes.
+    r"\.module\.|(^|/)(components|ui)/|(^|/)components\.css$"
 )
 
 # Nesting below the top-level rule (design-rules.json).
@@ -307,11 +317,20 @@ def portable_key(key: str) -> str:
 # CSS scanning
 # ---------------------------------------------------------------------------
 
-def strip_css_comments(text: str) -> tuple[str, dict[int, str]]:
+def line_comments(path: Path) -> bool:
+    """`//` starts a comment in Sass, Less, a styled template and a single-file
+    component's style block, which may be Sass; never in CSS itself, where it
+    is part of a value (`--terms: https://…`)."""
+    return path.suffix.lower() not in PLAIN_CSS_EXT
+
+
+def strip_css_comments(text: str, slash_comments: bool = True) -> tuple[str, dict[int, str]]:
     """Blank out comments while preserving line numbers and offsets.
 
     Returns the blanked text plus a map of line number -> original comment
-    text, so ignore-pragmas remain readable.
+    text, so ignore-pragmas remain readable. `//` comments count only with
+    `slash_comments`, and an unquoted `url(…)` is one token either way: the
+    `//` in `url(https://cdn…)` is the address, not a comment.
     """
     out = list(text)
     comments: dict[int, str] = {}
@@ -321,6 +340,18 @@ def strip_css_comments(text: str) -> tuple[str, dict[int, str]]:
         if ch == "\n":
             line += 1
             i += 1
+            continue
+        if (ch in "uU" and text[i:i + 4].lower() == "url("
+                and not (i and (text[i - 1].isalnum() or text[i - 1] in "-_"))):
+            j = i + 4
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            if j < n and text[j] not in "\"'":         # a quoted address is a string, read below
+                while j < n and text[j] != ")":
+                    j += 2 if text[j] == "\\" else 1     # `\)` is part of the address
+                j = min(j, n)
+            line += text.count("\n", i, j)
+            i = j
             continue
         if ch in "\"'":
             quote, i = ch, i + 1
@@ -348,7 +379,7 @@ def strip_css_comments(text: str) -> tuple[str, dict[int, str]]:
                 if out[j] != "\n":
                     out[j] = " "
             continue
-        if ch == "/" and i + 1 < n and text[i + 1] == "/":
+        if slash_comments and ch == "/" and i + 1 < n and text[i + 1] == "/":
             start, start_line = i, line
             while i < n and text[i] != "\n":
                 i += 1
@@ -425,7 +456,7 @@ def scan_css(text: str) -> Iterator[CssDecl | tuple]:
                 yield ("at_open", head, line, tuple(at_stack))
             else:
                 sel_stack.append(head)
-                yield ("rule_open", head, line, rule_depth())
+                yield ("rule_open", head, line, rule_depth(), tuple(at_stack))
             i += 1
             continue
 
@@ -472,13 +503,7 @@ def is_token_file(path: Path) -> bool:
 
 def is_component_file(path: Path) -> bool:
     """A component file is where Laws 2 and 6 bite hardest."""
-    s = str(path).replace(os.sep, "/").lower()
-    return (
-        ".module." in s
-        or "/components/" in s
-        or "/ui/" in s
-        or s.endswith("components.css")
-    )
+    return bool(COMPONENT_FILE_PAT.search(str(path).replace(os.sep, "/").lower()))
 
 
 def in_layer(at_rules: Iterable[str], name: str) -> bool:
@@ -591,7 +616,7 @@ def margin_cancels_token(value: str) -> bool:
 def audit_css(path: Path, text: str) -> list[Finding]:
     findings: list[Finding] = []
     lines = text.splitlines()
-    clean, comments = strip_css_comments(text)
+    clean, comments = strip_css_comments(text, line_comments(path))
 
     file_ignores = set()
     for body in comments.values():
@@ -612,7 +637,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
     saw_layer_statement = False
     layer_statement_line = 0
     first_rule_line = 0
-    any_top_level_rule_outside_layer = False
+    first_unlayered_line = 0
     declared_props: set[str] = set()
 
     def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str) -> None:
@@ -621,8 +646,6 @@ def audit_css(path: Path, text: str) -> list[Finding]:
             return
         snippet = lines[line - 1].strip() if 0 < line <= len(lines) else ""
         findings.append(Finding(str(path), line, law, rule, sev, msg, fix, snippet))
-
-    at_depth_stack: list[str] = []
 
     for ev in scan_css(clean):
         if isinstance(ev, tuple):
@@ -642,10 +665,8 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                             "Use: @layer reset, tokens, base, layout, components, "
                             "utilities, overrides; extra layers may be inserted, "
                             "but the canonical ones must keep their relative order.")
-            elif kind == "at_open":
-                at_depth_stack.append(ev[1])
             elif kind == "rule_open":
-                sel, line, depth = ev[1], ev[2], ev[3]
+                sel, line, depth, at_rules = ev[1], ev[2], ev[3], ev[4]
                 if not first_rule_line:
                     first_rule_line = line
                 # depth counts the top-level rule as 1; nesting starts below it,
@@ -670,10 +691,14 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                         f"ID selector `{m.group(0)}` in a style rule.",
                         "IDs buy specificity you then have to match forever. "
                         "Use a class; layers already decide who wins.")
-                if not token_file and depth == 1 and not any(
-                    a.startswith("@layer") for a in at_depth_stack
+                # The at-rules open around this rule, not every one seen so
+                # far: a rule after a closed @layer block is unlayered (SB-A9).
+                # A keyframe (`from`, `to`, `50%`) is not a style rule; the
+                # references and the scaffold keep @keyframes outside layers.
+                if not token_file and depth == 1 and not first_unlayered_line and not any(
+                    a.startswith("@layer") or KEYFRAMES_AT.match(a) for a in at_rules
                 ):
-                    any_top_level_rule_outside_layer = True
+                    first_unlayered_line = line
             elif kind == "rule_close":
                 pass
             continue
@@ -893,8 +918,8 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 "than 2px it is a layout bug being papered over.")
 
     # ---- File-level checks --------------------------------------------------
-    if not token_file and any_top_level_rule_outside_layer:
-        add(first_rule_line or 1, "L5", "unlayered", "error",
+    if not token_file and first_unlayered_line:
+        add(first_unlayered_line, "L5", "unlayered", "error",
             "This stylesheet has rules outside any @layer.",
             "Unlayered CSS beats every layer regardless of specificity, so one "
             "unwrapped file quietly makes its rules unoverridable. Wrap the "
@@ -1276,7 +1301,7 @@ def audit_cross_file(files: list[tuple[Path, str]]) -> list[Finding]:
             continue                      # build-time scoped: cannot collide
         if any(mark in text[:800] for mark in GENERATED_MARKERS):
             continue
-        clean, _ = strip_css_comments(text)
+        clean, _ = strip_css_comments(text, line_comments(path))
         seen_lines[str(path)] = text.splitlines()
         for ev in scan_css(clean):
             if isinstance(ev, tuple):
