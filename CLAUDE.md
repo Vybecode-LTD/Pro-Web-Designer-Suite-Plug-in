@@ -6,21 +6,21 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 - **What:** web-design-suite, a Claude Code plugin. Thirteen skills for designing and building websites that stay coherent under multiple developers: tokens, style architecture, measured contrast, and gates that fail the build on drift.
 - **Stack:**
-  - The scripts and tests are Python 3.10 or newer, standard library only.
+  - The scripts and tests are Python 3.9 or newer, standard library only.
   - Node 20.19+, 22.13+ or 24+ (ESLint 10's range) is needed for the browser scripts and the real-tool tests.
   - The skills and references are Markdown.
-- **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is private.
+- **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is public (since 2026-09-28), and MIT-licensed like the plugin.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
-## Current state (2026-09-26)
+## Current state (2026-09-30)
 
-- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits.
+- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress; the Python 3.9 floor (N6) is its first change.
 - **Installed:** 3.2.1 from `63932cf`. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
 - **Tests:**
-  - 339, passing on Python 3.10 to 3.14 on Windows.
+  - 344, passing on Python 3.9 and 3.14 on Windows.
   - Linux passes with the Node tests skipped.
   - macOS has never been run.
-- **Active work:** `dev plans/web-design-suite-completion-plan.md`. Next is phase 3 (3.3.0), starting with W1, the Supabase access boundary.
+- **Active work:** phase 3 (3.3.0) of `dev plans/web-design-suite-completion-plan.md`, as small PRs. After N6, next is W2's audit false-clean (SB-A9), then W1, the Supabase access boundary.
 - **Open from the review** (the inventory has each item): 59 issues, none high; 43 gaps plus 4 partly done; 46 improvements plus 6 partly done.
 
 ## Commands
@@ -31,7 +31,7 @@ For the Bash tool (Git Bash), from the repository root:
 npm ci --prefix tooling/main          # once; it downloads no browser (tooling/README.md)
 npm ci --prefix tooling/tailwind-v3   # once
 cd plugins/web-design-suite
-python -B -m unittest discover -s tests                     # the suite: 339 tests; -B keeps bytecode out of the plugin
+python -B -m unittest discover -s tests                     # the suite: 344 tests; -B keeps bytecode out of the plugin
 WDS_PLUGIN_ROOT=<unpacked older release> python -B -m unittest discover -s tests   # fail-before
 python tools/check_pointers.py        # § pointers; --write-register after editing one, then read the diff
 python tools/sync_snippets.py --check # starter code quoted in the references
@@ -40,7 +40,7 @@ python skills/web-design-studio/scripts/audit_design.py skills --strict
 
 Get an older release with `git archive v3.2.1 plugins/web-design-suite | tar --strip-components=1 -x -C <scratch folder>`, which unpacks the plugin as `<scratch folder>/web-design-suite`. In cmd.exe the fail-before run is `set "WDS_PLUGIN_ROOT=<folder>" && python -B -m unittest discover -s tests`.
 
-The Python floor runs with `"$(uv python find 3.10)" -B -m unittest discover -s tests`. Linux runs through WSL, from PowerShell; the release procedure in the plan gives the exact command.
+The Python floor runs with `uv run --no-project --python 3.9 python -B -m unittest discover -s tests`, which works in cmd as well. Linux runs through WSL, from PowerShell; the release procedure in the plan gives the exact command.
 
 For `claude plugin validate --strict`, `update` and `details`, use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\claude.exe`. The one on PATH is older.
 

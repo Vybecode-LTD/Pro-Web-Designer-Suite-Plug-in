@@ -19,7 +19,7 @@ In Claude Code:
 /plugin install web-design-suite@web-design-suite
 ```
 
-The repository is private, so installing from it needs a GitHub account with access. You can also install from a release zip: unpack it, then add the unpacked `web-design-suite` folder as the marketplace.
+You can also install from a release zip: unpack it, then add the unpacked `web-design-suite` folder as the marketplace.
 
 ## Releases
 
@@ -33,7 +33,7 @@ From `plugins/web-design-suite`, after `npm ci` in `tooling/main` and `tooling/t
 python -B -m unittest discover -s tests
 ```
 
-This needs Python 3.10 or newer; Node 20.19+, 22.13+ or 24+ (ESLint 10's range); git; and a POSIX `sh`.
+This needs Python 3.9 or newer; Node 20.19+, 22.13+ or 24+ (ESLint 10's range); git; and a POSIX `sh`.
 
 ## License
 

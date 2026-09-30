@@ -49,7 +49,7 @@ class SkillBudget(unittest.TestCase):
             with self.subTest(skill=skill.parent.name):
                 self.assertLessEqual(len(description), DESCRIPTION_CHARS)
                 self.assertIn("Not for", description)
-                first = re.split(r"(?<=[.!?])\s", description, 1)[0]
+                first = re.split(r"(?<=[.!?])\s", description, maxsplit=1)[0]
                 self.assertLessEqual(len(first), 200, "the first sentence must work alone")
 
     def test_the_landing_page_rules_that_must_survive_come_first(self):

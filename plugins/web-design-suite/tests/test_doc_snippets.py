@@ -32,7 +32,7 @@ import re
 import sys
 import unittest
 
-from wds_support import SKILLS, TempDirTest
+from wds_support import PLUGIN, SKILLS, TempDirTest
 
 FENCE = re.compile(r"^```(\w*)[^\n]*\n(.*?)^```", re.S | re.M)
 NOT_FOR_COPYING = re.compile(r"example:\s*(wrong|before|illustration)\b", re.I)
@@ -156,17 +156,22 @@ class ReferenceSnippetsPassTheGate(TempDirTest):
                                       for f in findings])      # --strict: warnings count too
 
 
+def sync_tool(plugin: pathlib.Path = pathlib.Path(__file__).resolve().parents[1]):
+    """tools/sync_snippets.py, by default from this suite's own plugin; the
+    tree it checks is the one under test (WDS_PLUGIN_ROOT may point at an
+    older copy)."""
+    spec = importlib.util.spec_from_file_location("wds_sync_snippets", plugin / "tools" / "sync_snippets.py")
+    sync = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sync)
+    return sync
+
+
 class QuotedStarterCode(unittest.TestCase):
     """SS-C4, SS-A7: code a reference says it quotes from the starter is the
     starter's code, and the starter passes its own gate."""
 
     def test_every_quote_matches_its_region_in_the_starter(self):
-        # The tool comes from this suite's own plugin; the tree it checks is the
-        # one under test (WDS_PLUGIN_ROOT may point at an older copy).
-        spec = importlib.util.spec_from_file_location(
-            "wds_sync_snippets", pathlib.Path(__file__).resolve().parents[1] / "tools" / "sync_snippets.py")
-        sync = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(sync)
+        sync = sync_tool()
         self.assertGreaterEqual(len(list(sync.quoted_blocks(SKILLS))), 4)
         self.assertEqual([], sync.sync(check=True, skills=SKILLS))
 
@@ -175,6 +180,31 @@ class QuotedStarterCode(unittest.TestCase):
         findings, audited, _ = load_audit().audit_run([str(styles)])
         self.assertEqual(audited, 4)
         self.assertEqual([], [f"{f.file}:{f.line} {f.law} {f.rule}: {f.message}" for f in findings])
+
+
+class SyncRewritesAStaleQuote(TempDirTest):
+    """N6: without --check, sync_snippets.py rewrites a stale quote from its
+    region, as UTF-8 with LF endings. It wrote with write_text(newline=""),
+    which Python 3.9 does not accept."""
+
+    def test_a_stale_quote_is_rewritten_byte_for_byte(self):
+        skills = self.tmp / "skills"
+        self.write("skills/web-design-studio/assets/starter/styles/layout.css",
+                   "@layer layout {\n  /* @snippet flow */\n"
+                   "  .flow > * + * { margin-block-start: var(--flow-space); } /* café */\n"
+                   "  /* @end-snippet */\n}\n")
+        doc = self.write("skills/demo/references/guide.md",
+                         "# Guide — naïve\n\n<!-- snippet: layout.css#flow -->\n```css\n.flow { }\n```\n")
+        # The tool under test is the plugin's own, so WDS_PLUGIN_ROOT runs an
+        # older release's (3.2.1's fails on 3.9). Before 3.2.0 there was none.
+        if not (PLUGIN / "tools" / "sync_snippets.py").is_file():
+            self.skipTest("the plugin under test has no tools/sync_snippets.py")
+        sync = sync_tool(PLUGIN)
+        self.assertEqual(["demo/references/guide.md: layout.css#flow"], sync.sync(check=False, skills=skills))
+        self.assertEqual(("# Guide — naïve\n\n<!-- snippet: layout.css#flow -->\n```css\n"
+                          ".flow > * + * { margin-block-start: var(--flow-space); } /* café */\n```\n"
+                          ).encode("utf-8"), doc.read_bytes())
+        self.assertEqual([], sync.sync(check=True, skills=skills))
 
 
 if __name__ == "__main__":

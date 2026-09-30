@@ -12,7 +12,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`, then this plan.
 2. Install the test tools once: `npm ci` in `tooling/main` and in `tooling/tailwind-v3` (`tooling/README.md`).
-3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 339 tests OK before you change anything; if it does not, fix that first.
+3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 344 tests OK before you change anything; if it does not, fix that first.
 4. Work the phases in order. Inside a phase the workstreams are independent, so take them one at a time and ship the phase as one release.
 5. When a workstream is done, update its rows in the inventory: the release, and the test that holds each fix.
 
@@ -21,7 +21,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 - **Fail before, pass after.** Every fix gets a regression test, and the test is seen failing on the previous release. Get that release from its tag, `git archive v3.2.1 plugins/web-design-suite | tar --strip-components=1 -x -C <scratch folder>`, and run the suite with `WDS_PLUGIN_ROOT` pointed at the `web-design-suite` folder it unpacks. The 3.1.0 and 3.2.0 reports show how to report it: the fail-before counts, plus the controls and guards that pass on both versions.
 - **Reproduce first.** Some items were fixed under another ID (the inventory marks those known). If an item no longer reproduces, record which release fixed it and which test holds it; do not write a fix for it.
 - **Read the item in its detail file** (`web-design-suite-review/<area>.md`) before you touch it. The detail files give where, why, and usually how. The tables below carry only the first sentence.
-- **Two Python versions.** Before each commit that changes the plugin, run the full suite from `plugins/web-design-suite` on Python 3.14, `"$(uv python find 3.14)" -B -m unittest discover -s tests`, and on the floor, the same with `3.10` (3.9 once W4 lowers the floor).
+- **Two Python versions.** Before each commit that changes the plugin, run the full suite from `plugins/web-design-suite` on Python 3.14, `uv run --no-project --python 3.14 python -B -m unittest discover -s tests`, and on the floor, the same with `3.9`. The command is the same in cmd, PowerShell and Git Bash.
 - **One set of rules.** A change to what a gate accepts goes into `skills/web-design-studio/assets/rules/design-rules.json` first. Then it goes into the audit, the stylelint config and the ESLint config, with a real-tool test in `test_real_tools.py`.
 - **Facts from outside the plugin** (laws, standards, vendor limits, prices, dates) are re-read at their source on the day and registered in `tests/fixtures/evidence.json` with their quote.
 - **Git.** One branch per phase, conventional commits, and a PR. Tag after the merge. Read the staged diff before every commit: never commit a secret.
@@ -36,16 +36,16 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 
 Ask before the phase that needs each one.
 
-1. **Private or public** (before phase 5). The repository is private. `dev plans/` names folders on the maintainer's machine and the user's other projects. Before the repository is made public, decide whether that folder stays, moves or is scrubbed.
-2. **Python 3.9** (W4). *Decided 2026-09-25: support 3.9.* The floor was 3.10, but the Python that macOS still ships is 3.9; the test harness changes too.
+1. **Private or public.** *Decided 2026-09-28: public, and MIT-licensed at the root as well as in the plugin.* The repository went public with its own `dev plans/` as it was. That folder and the history name paths on the maintainer's machine (`C:\Users\vybec\…` and session temp folders) and two other projects, `audio-promptmonster` and `Basefra.me`, and every commit carries `info@apmonster.ai`. A scan of every commit found no secrets, and the user chose to leave that material as it is.
+2. **Python 3.9** (W4). *Decided 2026-09-25: support 3.9. Done for 3.3.0 (N6).* The floor was 3.10, but the Python that macOS still ships is 3.9; the test harness changes too.
 3. **The Tailwind lint plugin** (W12). Stay on eslint-plugin-tailwindcss, which 3.2.1 verified, or move to eslint-plugin-better-tailwindcss as SB-C4 proposes.
 4. **Eval spend** (W9). `claude plugin eval` runs real sessions and costs money. Agree a cost cap per run first.
 5. **Large downloads.** The user approved downloads for this work on 2026-09-25. Still ask before anything large, such as a browser build or a container image.
 
 ## Where things stand
 
-3.2.1:
-- **Tests:** 317, passing on Python 3.10 to 3.14 on Windows.
+3.2.1 is released (`v3.2.1`, 2026-09-26), and 3.3.0 is in progress on `main`:
+- **Tests:** 344, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
 - **Linux (WSL):** the suite passes with the Node tests skipped, because that Linux has no Node.
 - **macOS:** never run.
 - **Real tools:** the shipped ESLint config, the stylelint config, both Tailwind blocks of Part 5, Tailwind 4 and tailwind-merge all run in the suite, at the versions pinned in `tooling/`.
@@ -165,9 +165,9 @@ These were found in phase 2 and 3.2.1:
 
 - **N4.** `accessibility.md` is 60.1 KB, at the limit of one Read. Split it the way 3.2.0 split navigation-patterns.md, and keep `test_skill_budget` passing.
 - **N5.** Only the nine scripts that were executable in 3.0.0 are marked executable (the hook is one of them). Mark the other 17 scripts that have a shebang, and add a test that reads git's file modes. Since 3.2.1 the zip builder takes modes from git, so the zip carries them.
-- **N6.** Support Python 3.9 (decision 2, made on 2026-09-25). The test harness uses three calls only 3.10 has (`ignore_cleanup_errors`, `write_text(newline=)` and slicing `Path.parents`): make it run on 3.9, state 3.9 in the READMEs and CLAUDE.md, and run the floor checks on 3.9.
+- **N6.** *Done for 3.3.0.* Python 3.9 is the floor (decision 2). The harness no longer needs 3.10, `test_docs.PythonFloor` runs `test_harness` on 3.9, and the README states 3.9.
 - **N7.** TypeScript 7 is npm's latest, and typescript-eslint 8.70 accepts TypeScript below 6.1. A project that installs typescript-eslint without pinning TypeScript gets a peer conflict. Say so wherever the docs install typescript-eslint.
-- **N8.** The plugin README's install section names only a local folder. Add the GitHub route, `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, and say that it needs access while the repository is private.
+- **N8.** The plugin README's install section names only a local folder. Add the GitHub route, `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, which anyone can use now that the repository is public.
 - **N9.** Add a repository-level check that the root `.claude-plugin/marketplace.json` and the plugin's own agree on name, description, category and keywords.
 - **N10.** The review's ✔ marks are stale. The inventory replaces them, so point the review's header at the inventory.
 
@@ -332,7 +332,7 @@ The gates now tell the truth and agree with each other, so Claude can run them o
 | XC-C2 | M · high | An opt-in design-gate hook: PostToolUse on Edit/Write runs `audit_design` on the changed file and returns the findings to Claude. |
 | XC-C3 | M · high | User-invocable workflows as skills with `disable-model-invocation: true`: /gate, /install-gate, /critique, /new-system and more. |
 | XC-C4 | M · medium | Subagents (design-critic, a11y-auditor), so heavy references load in an isolated context. |
-| XC-C6 | M · medium | Build and release: a build tool for the zip and the 13 `.skill` files, `claude plugin tag`, and a CI matrix of Windows/Linux/macOS × Python 3.10–3.14 with Node. |
+| XC-C6 | M · medium | Build and release: a build tool for the zip and the 13 `.skill` files, `claude plugin tag`, and a CI matrix of Windows/Linux/macOS × Python 3.9–3.14 with Node. |
 | XC-C8 | M · medium | One project config file, `.design-suite.json`, read by every script, the hook and the commands. |
 | SS-C6 | — | Use Claude Code plugin features (M, P1). |
 | SS-C7 | — | An eval suite of script-graded cases, run against a no-plugin baseline. |
@@ -458,7 +458,7 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 
 1. Write the CHANGELOG entry first, then set the version in `plugins/web-design-suite/.claude-plugin/plugin.json`.
 2. Verify:
-   - the full suite on Python 3.14 and 3.10;
+   - the full suite on Python 3.14 and 3.9, the floor;
    - the fail-before run against the previous tag;
    - Linux through WSL: `wsl -e sh -c "cd /mnt/c/DEV/Pro-Web-Designer-Suite-Plug-in/plugins/web-design-suite && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests"`;
    - `claude plugin validate --strict` on the repository root, on the plugin folder, and on `plugin.json`.

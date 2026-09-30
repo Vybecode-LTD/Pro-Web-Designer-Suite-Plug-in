@@ -41,7 +41,7 @@ def find_sh():
     if GIT:
         # ...\Git\cmd\git.exe from cmd/PowerShell; ...\Git\mingw64\bin\git.exe
         # from Git Bash, one level deeper.
-        for root in pathlib.Path(GIT).resolve().parents[1:3]:
+        for root in list(pathlib.Path(GIT).resolve().parents)[1:3]:     # slicing parents is 3.10+
             for sh in (root / "bin" / "sh.exe", root / "usr" / "bin" / "sh.exe"):
                 if sh.exists():
                     return str(sh)
@@ -96,10 +96,10 @@ class PreCommitHook(TempDirTest):
         bin_dir = self.tmp / "bin"
         bin_dir.mkdir()
         fake = bin_dir / "python3"
-        fake.write_text("#!/bin/sh\necho 'Python was not found; run without arguments to "
-                        "install from the Microsoft Store'\nexit 9009\n", encoding="utf-8", newline="\n")
+        fake.write_bytes(b"#!/bin/sh\necho 'Python was not found; run without arguments to "
+                         b"install from the Microsoft Store'\nexit 9009\n")
         real = bin_dir / "python"
-        real.write_text(f'#!/bin/sh\nexec "{PY}" "$@"\n', encoding="utf-8", newline="\n")
+        real.write_bytes(f'#!/bin/sh\nexec "{PY}" "$@"\n'.encode("utf-8"))
         for f in (fake, real):
             f.chmod(0o755)
         self.stage("components/card.css",
@@ -199,8 +199,7 @@ class PreCommitHook(TempDirTest):
         bin_dir = self.tmp / "stub-bin"
         bin_dir.mkdir(exist_ok=True)
         npx = bin_dir / "npx"
-        npx.write_text('#!/bin/sh\nprintf "%s\\n" "$@" >> "$NPX_LOG"\nexit 0\n',
-                       encoding="utf-8", newline="\n")
+        npx.write_bytes(b'#!/bin/sh\nprintf "%s\\n" "$@" >> "$NPX_LOG"\nexit 0\n')
         npx.chmod(0o755)
         return bin_dir
 

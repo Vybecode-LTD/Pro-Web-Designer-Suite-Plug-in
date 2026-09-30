@@ -146,12 +146,36 @@ def output(proc: subprocess.CompletedProcess) -> str:
     return (proc.stdout + proc.stderr).decode("utf-8", "replace")
 
 
+if sys.version_info >= (3, 10):
+    def temp_dir(prefix: str) -> tempfile.TemporaryDirectory:
+        """A temporary folder whose cleanup leaves behind what it cannot delete
+        (a file Windows still holds open) instead of failing the test."""
+        return tempfile.TemporaryDirectory(prefix=prefix, ignore_cleanup_errors=True)
+else:
+    class _TemporaryDirectory(tempfile.TemporaryDirectory):
+        """Python 3.9 has no ignore_cleanup_errors. Its own cleanup already
+        clears read-only files, such as git's objects, and retries; what it
+        still cannot delete is left behind, as ignore_cleanup_errors does."""
+
+        @classmethod
+        def _rmtree(cls, name):
+            try:
+                super()._rmtree(name)
+            except OSError:
+                pass
+
+    def temp_dir(prefix: str) -> tempfile.TemporaryDirectory:
+        """A temporary folder whose cleanup leaves behind what it cannot delete
+        (a file Windows still holds open) instead of failing the test."""
+        return _TemporaryDirectory(prefix=prefix)
+
+
 def class_temp_dir(cls, prefix: str) -> pathlib.Path:
     """A temporary folder for one test class, removed after its tests, as a
     resolved path. Node reports files under the resolved folder (getcwd()
     resolves /var to /private/var on macOS), so paths compare only when both
     sides are resolved."""
-    holder = tempfile.TemporaryDirectory(prefix=prefix, ignore_cleanup_errors=True)
+    holder = temp_dir(prefix)
     cls.addClassCleanup(holder.cleanup)
     return pathlib.Path(holder.name).resolve()
 
@@ -160,7 +184,7 @@ class TempDirTest(unittest.TestCase):
     """A test case with a fresh temporary directory in self.tmp."""
 
     def setUp(self):
-        holder = tempfile.TemporaryDirectory(prefix="wds-test-", ignore_cleanup_errors=True)
+        holder = temp_dir("wds-test-")
         self.addCleanup(holder.cleanup)
         self.tmp = pathlib.Path(holder.name)
 
@@ -170,5 +194,5 @@ class TempDirTest(unittest.TestCase):
         if isinstance(content, bytes):
             path.write_bytes(content)
         else:
-            path.write_text(content, encoding="utf-8", newline="")
+            path.write_bytes(content.encode("utf-8"))      # LF as written; write_text(newline=) is 3.10+
         return path

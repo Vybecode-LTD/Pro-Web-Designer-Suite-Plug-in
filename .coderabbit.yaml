@@ -13,7 +13,7 @@ reviews:
         Every bug fix needs a regression test in tests/ that fails on the previous release (the suite run with WDS_PLUGIN_ROOT pointed at that release's tag) and passes now. Flag a fix that adds no test, or whose test would also pass before the fix.
     - path: "plugins/web-design-suite/**/*.py"
       instructions: |
-        Standard library only: flag any third-party import. The floor is Python 3.10, so flag syntax or library APIs newer than 3.10.
+        Standard library only: flag any third-party import. The floor is Python 3.9, so flag syntax or library APIs newer than 3.9.
     - path: "plugins/web-design-suite/tests/**/*.py"
       instructions: |
         Every subprocess a test starts must get its environment from env() in tests/wds_support.py, passed as env= directly or through a variable that holds env()'s result; env() gives the harness's environment without git's repository variables. Flag a subprocess call with no env=, or an environment built from os.environ.
@@ -31,7 +31,7 @@ reviews:
         One set of rules: a gate change goes into assets/rules/design-rules.json first, then this audit, the stylelint config and the ESLint config follow, each with a real-tool test in tests/test_real_tools.py. Flag a gate changed here but not in the others.
     - path: "tooling/**/*.py"
       instructions: |
-        Standard library only, on the same Python floor as the plugin (3.10). Every bug fix needs a regression test (the zip builder's are in plugins/web-design-suite/tests/test_release_zip.py) that fails before the fix and passes after.
+        Standard library only, on the same Python floor as the plugin (3.9). Every bug fix needs a regression test (the zip builder's are in plugins/web-design-suite/tests/test_release_zip.py) that fails before the fix and passes after.
     - path: "dev plans/**/*.md"
       instructions: |
         Commands written for the maintainer to run must work in cmd.exe.
