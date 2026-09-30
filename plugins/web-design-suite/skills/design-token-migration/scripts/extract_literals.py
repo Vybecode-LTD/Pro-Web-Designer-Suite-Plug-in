@@ -274,17 +274,41 @@ class Literal:
 # Shared text utilities
 # ---------------------------------------------------------------------------
 
-def blank_css_comments(text: str) -> str:
+# `//` starts a comment in Sass, Less and a styled template, never in CSS
+# itself, where it is part of a value (`--terms: https://…`). The audit's
+# line_comments makes the same split (SB-A9, N12).
+PLAIN_CSS_EXT = {".css", ".pcss"}
+
+
+def line_comments(path: Path) -> bool:
+    return path.suffix.lower() not in PLAIN_CSS_EXT
+
+
+def blank_css_comments(text: str, slash_comments: bool = True) -> str:
     """Replace comment bodies with spaces, preserving every offset and newline.
 
     Offsets must survive because every record carries a file/line/col that a
     human is going to open. A stripping pass that shifts offsets produces an
     inventory nobody trusts, and an untrusted inventory does not get funded.
+
+    `//` comments count only with `slash_comments`, and an unquoted `url(…)` is
+    one token either way: the `//` in `url(https://cdn…)` is the address.
     """
     out = list(text)
     i, n = 0, len(text)
     while i < n:
         ch = text[i]
+        if (ch in "uU" and text[i:i + 4].lower() == "url("
+                and not (i and (text[i - 1].isalnum() or text[i - 1] in "-_"))):
+            j = i + 4
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            if j < n and text[j] not in "\"'":         # a quoted address is a string, read below
+                while j < n and text[j] != ")":
+                    j += 2 if text[j] == "\\" else 1     # `\)` is part of the address
+                j = min(j, n)
+            i = j
+            continue
         if ch in "\"'":
             quote, i = ch, i + 1
             while i < n and text[i] != quote:
@@ -303,7 +327,7 @@ def blank_css_comments(text: str) -> str:
                 if out[j] != "\n":
                     out[j] = " "
             continue
-        if ch == "/" and i + 1 < n and text[i + 1] == "/":
+        if slash_comments and ch == "/" and i + 1 < n and text[i + 1] == "/":
             start = i
             while i < n and text[i] != "\n":
                 i += 1
@@ -815,7 +839,7 @@ def literals_from_value(
 
 def extract_css(path: Path, text: str) -> list[Literal]:
     out: list[Literal] = []
-    blanked = blank_css_comments(text)
+    blanked = blank_css_comments(text, line_comments(path))
     component = is_component_file(path)
     fname = norm_path(path)
 

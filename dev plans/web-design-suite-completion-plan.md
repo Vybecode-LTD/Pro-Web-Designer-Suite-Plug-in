@@ -12,7 +12,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`, then this plan.
 2. Install the test tools once: `npm ci` in `tooling/main` and in `tooling/tailwind-v3` (`tooling/README.md`).
-3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 350 tests OK before you change anything; if it does not, fix that first.
+3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 352 tests OK before you change anything; if it does not, fix that first.
 4. Work the phases in order. Inside a phase the workstreams are independent, so take them one at a time and ship the phase as one release.
 5. When a workstream is done, update its rows in the inventory: the release, and the test that holds each fix.
 
@@ -45,7 +45,7 @@ Ask before the phase that needs each one.
 ## Where things stand
 
 3.2.1 is released (`v3.2.1`, 2026-09-26), and 3.3.0 is in progress on `main`:
-- **Tests:** 350, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
+- **Tests:** 352, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
 - **Linux (WSL):** the suite passes with the Node tests skipped, because that Linux has no Node.
 - **macOS:** never run.
 - **Real tools:** the shipped ESLint config, the stylelint config, both Tailwind blocks of Part 5, Tailwind 4 and tailwind-merge all run in the suite, at the versions pinned in `tooling/`.
@@ -122,7 +122,7 @@ Add a stylelint snippet test like `DesignEslintConfig.test_the_references_tsx_sn
 
 **N11 and N12 · found while fixing SB-A9.** The token migration tool keeps its own copies of the audit's scanner helpers.
 - **N11.** *Done for 3.3.0.* Its file classes had drifted from the spec: its token-file pattern predated 3.2.0 (four of the spec's six examples missed), and its component test shared SB-A9's `components/` bug. It now uses the audit's patterns, and `test_rules_spec.test_file_classes` holds both copies.
-- **N12.** `extract_literals.blank_css_comments` reads `//` as a comment in plain CSS, as the audit did (SB-A9 (a)): after `url(https://…)` the inventory and the codemod skip the rest of the file. Fix it the way the audit was fixed (`//` only in Sass, Less and styled templates, never inside `url()`), with a test that a literal after a URL is inventoried and rewritten.
+- **N12.** *Done for 3.3.0.* `extract_literals.blank_css_comments` read `//` as a comment in plain CSS, as the audit did (SB-A9 (a)). After `url(https://…)` the census filed the literals that followed under `background`, and the codemod rewrote none of them. It now reads comments as the audit does; `test_token_migration.AddressesAreNotComments` holds it.
 
 | ID | Severity or size | What is wrong or missing |
 |---|---|---|

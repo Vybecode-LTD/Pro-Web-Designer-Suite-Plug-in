@@ -22,6 +22,10 @@
   `dark-theme.css` as token files, so its inventory listed their literals and the
   codemod did not skip them, and it shared the `components/` bug above. It now uses
   the audit's patterns, and the spec test holds both copies.
+- **The token migration tool had the same `//` bug** (N12). After `url(https://…)` in
+  plain CSS its census filed every literal to the end of the file under `background`,
+  so clustering saw the wrong property, and the codemod rewrote none of them. It now
+  reads comments as the audit does.
 - **A singular `token.css` or `brand-token.css` was a token file** to the audit, so it
   was never checked; the spec's globs and stylelint name only `tokens`. Both copies of
   the test now follow the spec, and its examples include the two names.
@@ -38,6 +42,8 @@
 - SB-A9 and N11: six `AuditPrecision` tests and `test_rules_spec`'s file classes.
   Against 3.2.1 all seven fail; a quoted `url("https://…")` passes on both, as the
   control.
+- N12: `test_token_migration.AddressesAreNotComments`, the census and the codemod.
+  Against 3.2.1 both fail, in five subtests.
 - `test_docs` runs `test_harness` on the floor interpreter, and `test_harness` checks
   the temporary folders and `TempDirTest.write` there. On 3.9, 3.2.1's harness errored
   in 181 tests.

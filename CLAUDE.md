@@ -14,13 +14,13 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-09-30)
 
-- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress: the Python 3.9 floor (N6, PR #4) and the audit's false cleans (SB-A9 with N11, PR #5) are merged.
+- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress: the Python 3.9 floor (N6, PR #4) and the audit's false cleans (SB-A9 with N11, PR #5) are merged; N12 is in PR #6.
 - **Installed:** 3.2.1 from `63932cf`. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
 - **Tests:**
-  - 350, passing on Python 3.9 and 3.14 on Windows.
+  - 352, passing on Python 3.9 and 3.14 on Windows.
   - Linux passes with the Node tests skipped.
   - macOS has never been run.
-- **Active work:** phase 3 (3.3.0) of `dev plans/web-design-suite-completion-plan.md`, as small PRs. Next: N12, the migration tool's copy of SB-A9's `//` bug, then W1, the Supabase access boundary.
+- **Active work:** phase 3 (3.3.0) of `dev plans/web-design-suite-completion-plan.md`, as small PRs. Next: SB-A24 (SCSS in the audit; a gate change, so `design-rules.json` first), then W1, the Supabase access boundary.
 - **Open from the review** (the inventory has each item): 58 issues, none high; 43 gaps plus 4 partly done; 46 improvements plus 6 partly done.
 
 ## Commands
@@ -31,7 +31,7 @@ For the Bash tool (Git Bash), from the repository root:
 npm ci --prefix tooling/main          # once; it downloads no browser (tooling/README.md)
 npm ci --prefix tooling/tailwind-v3   # once
 cd plugins/web-design-suite
-python -B -m unittest discover -s tests                     # the suite: 350 tests; -B keeps bytecode out of the plugin
+python -B -m unittest discover -s tests                     # the suite: 352 tests; -B keeps bytecode out of the plugin
 WDS_PLUGIN_ROOT=<unpacked older release> python -B -m unittest discover -s tests   # fail-before
 python tools/check_pointers.py        # § pointers; --write-register after editing one, then read the diff
 python tools/sync_snippets.py --check # starter code quoted in the references
