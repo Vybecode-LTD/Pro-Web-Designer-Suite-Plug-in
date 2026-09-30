@@ -39,7 +39,7 @@
     "token_files": {
       "globs": ["**/tokens.css", "**/*-tokens.css", "**/*.tokens.css", "**/tokens/*.css", "**/theme.css", "**/*-theme.css"],
       "examples": ["src/styles/tokens.css", "brand-tokens.css", "design.tokens.css", "src/tokens/colour.css", "assets/configs/theme.css", "dark-theme.css"],
-      "not": ["mytokens.css", "src/components/card.css", "theming.css"]
+      "not": ["mytokens.css", "src/components/card.css", "theming.css", "token.css", "brand-token.css"]
     },
     "component_files": {
       "globs": ["**/components/**/*.css", "**/ui/**/*.css", "**/*.module.css", "**/components.css"],

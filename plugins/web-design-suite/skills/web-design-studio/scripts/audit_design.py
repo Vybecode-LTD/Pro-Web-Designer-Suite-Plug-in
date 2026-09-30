@@ -96,8 +96,8 @@ TOKEN_FILE_PAT = re.compile(
     # file in a tokens/ folder, theme.css, dark-theme.css — the file classes
     # in assets/rules/design-rules.json. A separator before "tokens" and
     # "theme" is required, so "mytokens.css" and "theming.css" are not waved
-    # through.
-    r"(^|[/\\])([\w.-]*[-.])?tokens?\.(css|scss)$"
+    # through, and the spec's globs are plural: "brand-token.css" is not.
+    r"(^|[/\\])([\w.-]*[-.])?tokens\.(css|scss)$"
     r"|(^|[/\\])tokens[/\\][\w.-]+\.(css|scss)$"
     r"|(^|[/\\])([\w.-]*[-.])?theme\.(css|scss)$"
 )
@@ -347,8 +347,9 @@ def strip_css_comments(text: str, slash_comments: bool = True) -> tuple[str, dic
             while j < n and text[j] in " \t\r\n":
                 j += 1
             if j < n and text[j] not in "\"'":         # a quoted address is a string, read below
-                j = text.find(")", j)
-                j = n if j < 0 else j
+                while j < n and text[j] != ")":
+                    j += 2 if text[j] == "\\" else 1     # `\)` is part of the address
+                j = min(j, n)
             line += text.count("\n", i, j)
             i = j
             continue

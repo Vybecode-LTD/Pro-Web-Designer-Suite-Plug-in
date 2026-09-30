@@ -92,7 +92,7 @@ VENDOR_FILE_PAT = re.compile(
 # design-rules.json): token files are skipped, component files are held to
 # Laws 2, 4 and 6. tests/test_rules_spec.py holds both copies to the spec.
 TOKEN_FILE_PAT = re.compile(
-    r"(^|[/\\])([\w.-]*[-.])?tokens?\.(css|scss)$"
+    r"(^|[/\\])([\w.-]*[-.])?tokens\.(css|scss)$"
     r"|(^|[/\\])tokens[/\\][\w.-]+\.(css|scss)$"
     r"|(^|[/\\])([\w.-]*[-.])?theme\.(css|scss)$"
 )

@@ -375,6 +375,15 @@ class AuditPrecision(TempDirTest):
             with self.subTest(root=root):
                 self.assertEqual([("L1", "raw-color", 5)], self.found(root))
 
+    def test_an_escaped_parenthesis_does_not_end_a_url(self):
+        # `\)` inside an unquoted url() is part of the address, so a `//` after
+        # it is not a Sass comment (CodeRabbit on PR #5).
+        self.write("scss/components/card.scss",
+                   "@layer components {\n"
+                   "  .card { background: url(//cdn.example.com/a\\)//b.svg); color: #ff0000; }\n"
+                   "}\n")
+        self.assertEqual([("L1", "raw-color", 2)], self.found("scss"))
+
     def test_a_rule_after_a_closed_layer_is_unlayered(self):
         # SB-A9 (b): the audit never left a layer once it had entered one.
         self.write("src/components/card.css",
