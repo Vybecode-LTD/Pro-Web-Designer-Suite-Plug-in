@@ -12,7 +12,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`, then this plan.
 2. Install the test tools once: `npm ci` in `tooling/main` and in `tooling/tailwind-v3` (`tooling/README.md`).
-3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 342 tests OK before you change anything; if it does not, fix that first.
+3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 344 tests OK before you change anything; if it does not, fix that first.
 4. Work the phases in order. Inside a phase the workstreams are independent, so take them one at a time and ship the phase as one release.
 5. When a workstream is done, update its rows in the inventory: the release, and the test that holds each fix.
 
@@ -21,7 +21,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 - **Fail before, pass after.** Every fix gets a regression test, and the test is seen failing on the previous release. Get that release from its tag, `git archive v3.2.1 plugins/web-design-suite | tar --strip-components=1 -x -C <scratch folder>`, and run the suite with `WDS_PLUGIN_ROOT` pointed at the `web-design-suite` folder it unpacks. The 3.1.0 and 3.2.0 reports show how to report it: the fail-before counts, plus the controls and guards that pass on both versions.
 - **Reproduce first.** Some items were fixed under another ID (the inventory marks those known). If an item no longer reproduces, record which release fixed it and which test holds it; do not write a fix for it.
 - **Read the item in its detail file** (`web-design-suite-review/<area>.md`) before you touch it. The detail files give where, why, and usually how. The tables below carry only the first sentence.
-- **Two Python versions.** Before each commit that changes the plugin, run the full suite from `plugins/web-design-suite` on Python 3.14, `"$(uv python find 3.14)" -B -m unittest discover -s tests`, and on the floor, the same with `3.9`.
+- **Two Python versions.** Before each commit that changes the plugin, run the full suite from `plugins/web-design-suite` on Python 3.14, `uv run --no-project --python 3.14 python -B -m unittest discover -s tests`, and on the floor, the same with `3.9`. The command is the same in cmd, PowerShell and Git Bash.
 - **One set of rules.** A change to what a gate accepts goes into `skills/web-design-studio/assets/rules/design-rules.json` first. Then it goes into the audit, the stylelint config and the ESLint config, with a real-tool test in `test_real_tools.py`.
 - **Facts from outside the plugin** (laws, standards, vendor limits, prices, dates) are re-read at their source on the day and registered in `tests/fixtures/evidence.json` with their quote.
 - **Git.** One branch per phase, conventional commits, and a PR. Tag after the merge. Read the staged diff before every commit: never commit a secret.
@@ -45,7 +45,7 @@ Ask before the phase that needs each one.
 ## Where things stand
 
 3.2.1 is released (`v3.2.1`, 2026-09-26), and 3.3.0 is in progress on `main`:
-- **Tests:** 342, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
+- **Tests:** 344, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
 - **Linux (WSL):** the suite passes with the Node tests skipped, because that Linux has no Node.
 - **macOS:** never run.
 - **Real tools:** the shipped ESLint config, the stylelint config, both Tailwind blocks of Part 5, Tailwind 4 and tailwind-merge all run in the suite, at the versions pinned in `tooling/`.

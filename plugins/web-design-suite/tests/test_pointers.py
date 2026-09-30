@@ -22,7 +22,7 @@ import pathlib
 import sys
 import unittest
 
-from wds_support import SKILLS
+from wds_support import SKILLS, TempDirTest
 
 HERE = pathlib.Path(__file__).resolve().parent
 
@@ -56,6 +56,24 @@ class SectionPointers(unittest.TestCase):
         self.assertEqual([], self.moved)
         self.assertEqual([], self.unregistered)        # a new pointer: read it, then register it
         self.assertEqual([], self.stale)
+
+
+class WritingTheRegister(TempDirTest):
+    """N6: --write-register records each cross-file pointer's heading as UTF-8
+    with LF endings. It wrote with write_text(newline=""), which Python 3.9
+    does not accept."""
+
+    def test_a_non_ascii_heading_is_recorded_byte_for_byte(self):
+        skills = self.tmp / "skills"
+        self.write("skills/demo/SKILL.md", "Read `guide.md` §2 first.\n")
+        self.write("skills/demo/references/guide.md", "# Guide\n\n## 2. Café crème\n\nText.\n")
+        register = self.tmp / "fixtures" / "section-pointers.json"
+        tool = load_tool("check_pointers")
+        self.assertEqual(1, tool.write_register(skills, register))
+        self.assertEqual(('[\n {\n  "from": "demo/SKILL.md",\n  "to": "demo/references/guide.md",\n'
+                          '  "section": "2",\n  "heading": "Café crème"\n }\n]\n').encode("utf-8"),
+                         register.read_bytes())
+        self.assertEqual(([], [], [], []), tool.check(skills, register))
 
 
 if __name__ == "__main__":

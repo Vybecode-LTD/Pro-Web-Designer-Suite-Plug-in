@@ -14,6 +14,9 @@
 - `test_docs` runs `test_harness` on the floor interpreter, and `test_harness` checks
   the temporary folders and `TempDirTest.write` there. On 3.9, 3.2.1's harness errored
   in 181 tests.
+- `tools/check_pointers.py --write-register` and `tools/sync_snippets.py` (without
+  `--check`) are tested writing a file: UTF-8, LF, byte for byte. With 3.2.1's tools
+  both tests error on 3.9, where `write_text` has no `newline`.
 - The budget test passes `maxsplit` to `re.split` by keyword, as Python 3.13 asks.
 
 ## 3.2.1 — 2026-09-25
