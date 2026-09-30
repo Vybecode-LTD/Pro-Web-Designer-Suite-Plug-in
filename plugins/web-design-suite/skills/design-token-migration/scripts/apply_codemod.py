@@ -85,7 +85,7 @@ try:                                                # python -m scripts.apply_co
         normalize_length, normalize_time, scan_css_declarations,
         STYLED_TAG_RE, CLASSNAME_RE, CLASSLIST_STRING_RE, CSS_EXT, JS_EXT,
         SKIP_DIRS, is_vendor, is_token_file, GENERATED_MARKERS, norm_path,
-        Slot, split_slots,
+        Slot, split_slots, line_comments,
     )
 except ImportError:                                 # python scripts/apply_codemod.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -95,7 +95,7 @@ except ImportError:                                 # python scripts/apply_codem
         normalize_length, normalize_time, scan_css_declarations,
         STYLED_TAG_RE, CLASSNAME_RE, CLASSLIST_STRING_RE, CSS_EXT, JS_EXT,
         SKIP_DIRS, is_vendor, is_token_file, GENERATED_MARKERS, norm_path,
-        Slot, split_slots,
+        Slot, split_slots, line_comments,
     )
 
 LENGTH_RE = re.compile(r"^(-?\d*\.?\d+)(px|rem|em|pt|pc|in|cm|mm|q)$", re.IGNORECASE)
@@ -407,11 +407,11 @@ def replacement_for(rule: dict, negate: bool) -> str:
 
 def plan_css(text: str, mapping: Mapping, *, base: int = 0,
              source_name: str = "", skips: Optional[List[Skip]] = None,
-             blanked: Optional[str] = None) -> List[Edit]:
+             blanked: Optional[str] = None, slash_comments: bool = True) -> List[Edit]:
     """Compute the edits for one CSS body. `text` is the REAL source."""
     edits: List[Edit] = []
     skips = skips if skips is not None else []
-    scan_text = blanked if blanked is not None else blank_css_comments(text)
+    scan_text = blanked if blanked is not None else blank_css_comments(text, slash_comments)
 
     decls = list(scan_css_declarations(scan_text))
     # Group declarations by their enclosing block so a `font:` shorthand can
@@ -614,7 +614,8 @@ def overlapping(edits: Sequence[Edit]) -> Optional[Tuple[Edit, Edit]]:
     return None
 
 
-def structurally_sound(before: str, after: str, is_css: bool) -> Optional[str]:
+def structurally_sound(before: str, after: str, is_css: bool,
+                       slash_comments: bool = True) -> Optional[str]:
     """Cheap invariants that catch a corrupting rewrite before it lands.
 
     Not a validator — a tripwire. If a replacement ever unbalances a brace or
@@ -631,8 +632,8 @@ def structurally_sound(before: str, after: str, is_css: bool) -> Optional[str]:
         return (f"unbalanced parentheses after rewrite "
                 f"({after.count('(')} open, {after.count(')')} close)")
     if is_css:
-        n_before = len(list(scan_css_declarations(blank_css_comments(before))))
-        n_after = len(list(scan_css_declarations(blank_css_comments(after))))
+        n_before = len(list(scan_css_declarations(blank_css_comments(before, slash_comments))))
+        n_after = len(list(scan_css_declarations(blank_css_comments(after, slash_comments))))
         if n_before != n_after:
             return f"declaration count changed {n_before} -> {n_after}"
     return None
@@ -750,7 +751,8 @@ def process(fp: Path, mapping: Mapping, skips: List[Skip]) -> Optional[FileResul
         return None
     is_css = fp.suffix.lower() in CSS_EXT
     try:
-        edits = (plan_css(text, mapping, source_name=norm_path(fp), skips=skips)
+        edits = (plan_css(text, mapping, source_name=norm_path(fp), skips=skips,
+                          slash_comments=line_comments(fp))
                  if is_css else plan_js(text, mapping, norm_path(fp), skips))
     except Exception as exc:                          # noqa: BLE001
         skips.append(Skip(norm_path(fp), 0,
@@ -766,7 +768,7 @@ def process(fp: Path, mapping: Mapping, skips: List[Skip]) -> Optional[FileResul
                           f"want the same text — file left untouched", ""))
         return None
     after = splice(text, edits)
-    problem = structurally_sound(text, after, is_css)
+    problem = structurally_sound(text, after, is_css, line_comments(fp))
     if problem:
         skips.append(Skip(norm_path(fp), 0,
                           f"rewrite failed its safety check ({problem}) — "

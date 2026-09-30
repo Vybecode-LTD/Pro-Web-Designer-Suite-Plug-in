@@ -274,17 +274,63 @@ class Literal:
 # Shared text utilities
 # ---------------------------------------------------------------------------
 
-def blank_css_comments(text: str) -> str:
+# `//` starts a comment in Sass, Less and a styled template, never in CSS
+# itself, where it is part of a value (`--terms: https://…`). The audit's
+# line_comments makes the same split (SB-A9, N12).
+PLAIN_CSS_EXT = {".css", ".pcss"}
+
+
+def line_comments(path: Path) -> bool:
+    return path.suffix.lower() not in PLAIN_CSS_EXT
+
+
+def unquoted_url_end(text: str, j: int) -> int | None:
+    """The index of the `)` that closes an unquoted address starting at `j`,
+    just after `url(`; None when the argument is not one. An unquoted address
+    is a single token: no quote, no `(` and no inner whitespace, and an
+    escaped character (`\\)`) is part of it. The audit has the same test."""
+    n = len(text)
+    while j < n and text[j] in " \t\r\n":
+        j += 1
+    while j < n:
+        c = text[j]
+        if c == "\\":
+            j += 2
+        elif c == ")":
+            return j
+        elif c in "\"'(":
+            return None
+        elif c in " \t\r\n":
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            return j if j < n and text[j] == ")" else None
+        else:
+            j += 1
+    return None
+
+
+def blank_css_comments(text: str, slash_comments: bool = True) -> str:
     """Replace comment bodies with spaces, preserving every offset and newline.
 
     Offsets must survive because every record carries a file/line/col that a
     human is going to open. A stripping pass that shifts offsets produces an
     inventory nobody trusts, and an untrusted inventory does not get funded.
+
+    `//` comments count only with `slash_comments`, and an unquoted `url(…)` is
+    one token either way: the `//` in `url(https://cdn…)` is the address.
     """
     out = list(text)
     i, n = 0, len(text)
     while i < n:
         ch = text[i]
+        if (ch in "uU" and text[i:i + 4].lower() == "url("
+                and not (i and (text[i - 1].isalnum() or text[i - 1] in "-_"))):
+            end = unquoted_url_end(text, i + 4)
+            if end is not None:
+                i = end
+                continue
+            # Otherwise a quoted address, read as a string below, or a Sass
+            # expression (`url($asset)`), whose comments are still comments.
         if ch in "\"'":
             quote, i = ch, i + 1
             while i < n and text[i] != quote:
@@ -303,7 +349,7 @@ def blank_css_comments(text: str) -> str:
                 if out[j] != "\n":
                     out[j] = " "
             continue
-        if ch == "/" and i + 1 < n and text[i + 1] == "/":
+        if slash_comments and ch == "/" and i + 1 < n and text[i + 1] == "/":
             start = i
             while i < n and text[i] != "\n":
                 i += 1
@@ -815,7 +861,7 @@ def literals_from_value(
 
 def extract_css(path: Path, text: str) -> list[Literal]:
     out: list[Literal] = []
-    blanked = blank_css_comments(text)
+    blanked = blank_css_comments(text, line_comments(path))
     component = is_component_file(path)
     fname = norm_path(path)
 

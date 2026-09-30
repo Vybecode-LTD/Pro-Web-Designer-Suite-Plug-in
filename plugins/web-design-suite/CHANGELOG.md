@@ -8,8 +8,9 @@
   - It read `//` as a comment in plain CSS, so `url(https://cdn…/hero.svg)` hid every
     declaration after it, and a custom property holding an address (`--terms:
     https://…`) hid the rest of its line. `//` is now a comment only in Sass, Less,
-    styled templates and single-file components, and never inside `url()`, where an
-    escaped `\)` does not end the address.
+    styled templates and single-file components, and never inside an unquoted address
+    in `url()`, where an escaped `\)` does not end it. A Sass `url()` that holds an
+    expression instead (`url($asset)`) is read as code, so its comments still count.
   - A rule after a closed `@layer` block was never reported as unlayered. The finding
     now points at the first unlayered rule. A `@keyframes` block outside a layer, as
     the references and the scaffold write it, is not unlayered CSS: a keyframe is not
@@ -22,6 +23,10 @@
   `dark-theme.css` as token files, so its inventory listed their literals and the
   codemod did not skip them, and it shared the `components/` bug above. It now uses
   the audit's patterns, and the spec test holds both copies.
+- **The token migration tool had the same `//` bug** (N12). After `url(https://…)` in
+  plain CSS its census filed every literal to the end of the file under `background`,
+  so clustering saw the wrong property, and the codemod rewrote none of them. It now
+  reads comments as the audit does.
 - **A singular `token.css` or `brand-token.css` was a token file** to the audit, so it
   was never checked; the spec's globs and stylelint name only `tokens`. Both copies of
   the test now follow the spec, and its examples include the two names.
@@ -38,6 +43,8 @@
 - SB-A9 and N11: six `AuditPrecision` tests and `test_rules_spec`'s file classes.
   Against 3.2.1 all seven fail; a quoted `url("https://…")` passes on both, as the
   control.
+- N12: `test_token_migration.AddressesAreNotComments`, the census and the codemod.
+  Against 3.2.1 both fail, in five subtests.
 - `test_docs` runs `test_harness` on the floor interpreter, and `test_harness` checks
   the temporary folders and `TempDirTest.write` there. On 3.9, 3.2.1's harness errored
   in 181 tests.

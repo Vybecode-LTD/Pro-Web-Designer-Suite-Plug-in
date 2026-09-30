@@ -32,6 +32,10 @@ Regressions covered:
   SS-A4): roles resolved once on :root, so data-density and data-theme on a
   section changed nothing; no color-scheme; dark error text, .inverse text
   and the control border under AA. A migrated project inherited all of them.
+3.3.0:
+- N12: `//` was a comment in plain CSS, as in the audit (SB-A9), so after
+  `url(https://…)` the census filed every literal under `background` and the
+  codemod rewrote none of them.
 """
 from __future__ import annotations
 
@@ -217,6 +221,59 @@ class VendorScopeAndScale(TempDirTest):
     def test_a_minified_stylesheet_is_extracted_in_roughly_linear_time(self):
         small, large = self.timed(2000), self.timed(8000)
         self.assertLess(large / small, 6, f"2,000 rules {small:.1f}s, 8,000 rules {large:.1f}s")
+
+
+class AddressesAreNotComments(TempDirTest):
+    """N12: the migration tool read `//` as a comment in plain CSS, as the
+    audit did (SB-A9), so `url(https://…)` hid the rest of its line from the
+    census and the codemod, and a custom property holding an address did too.
+    In Sass `//` is still a comment, except inside url()."""
+
+    extract = MigrationPipeline.extract
+    MAPPING = VendorScopeAndScale.MAPPING
+    CSS = ("@layer components {\n"
+           "  .hero { background: url(https://cdn.example.com/hero.svg); margin: 13px; }\n"
+           "  .card { --terms: https://example.com/terms; color: #123456; }\n"
+           "}\n")
+    SCSS = ("@layer components {\n"
+            "  .card {\n"
+            "    // margin: 7px;\n"
+            "    background: url(//cdn.example.com/b.svg); margin: 13px;\n"
+            "  }\n"
+            "}\n")
+    # A Sass url() may hold an expression, whose comments are still comments.
+    EXPR = '$asset: "hero.svg";\n.x { background: url($asset /* " */); margin: 13px; }\n'
+
+    def test_literals_after_an_address_are_in_the_census(self):
+        self.write("src/components/hero.css", self.CSS)
+        self.write("src/components/card.scss", self.SCSS)
+        # `\)` inside an unquoted url() is part of the address. (The codemod
+        # leaves such a file alone: its parentheses do not balance.)
+        self.write("src/components/escaped.scss", ".e { background: url(//cdn.example.com/a\\)//b.svg); margin: 13px; }\n")
+        self.write("src/components/expr.scss", self.EXPR)
+        _, data = self.extract("src")
+        # Each under its own property: the unclosed url( made `background`'s
+        # value run on, so its literals were found but filed under it.
+        found = {(pathlib.PurePath(l["file"].replace("\\", "/")).name, l["line"], l["prop"], l["normalized"])
+                 for l in data["literals"]}
+        for want in (("hero.css", 2, "margin", "13px"), ("hero.css", 3, "color", "#123456"),
+                     ("card.scss", 4, "margin", "13px"), ("escaped.scss", 1, "margin", "13px"),
+                     ("expr.scss", 2, "margin", "13px")):
+            with self.subTest(want=want):
+                self.assertIn(want, found)
+        self.assertNotIn("7px", {n for *_, n in found})
+
+    def test_the_codemod_rewrites_after_an_address(self):
+        mapping = self.write("mapping.json", json.dumps(self.MAPPING))
+        css = self.write("src/components/hero.css", self.CSS)
+        scss = self.write("src/components/card.scss", self.SCSS)
+        expr = self.write("src/components/expr.scss", self.EXPR)
+        proc = run_py("design-token-migration", "apply_codemod", "-m", mapping, "--apply", "src",
+                      cwd=self.tmp)
+        self.assertIn('/* " */); margin: var(--gap-related); }', expr.read_text(encoding="utf-8"), output(proc))
+        self.assertIn("hero.svg); margin: var(--gap-related); }", css.read_text(encoding="utf-8"), output(proc))
+        self.assertIn("b.svg); margin: var(--gap-related);", scss.read_text(encoding="utf-8"), output(proc))
+        self.assertIn("// margin: 7px;", scss.read_text(encoding="utf-8"))
 
 
 class FocusRingsStayFocusRings(TempDirTest):
