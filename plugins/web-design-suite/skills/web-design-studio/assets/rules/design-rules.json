@@ -44,8 +44,8 @@
     "component_files": {
       "globs": ["**/components/**/*.css", "**/ui/**/*.css", "**/*.module.css", "**/components.css"],
       "examples": ["src/components/card.css", "packages/ui/button.css", "Card.module.css", "styles/components.css",
-                   "src/components/layout/header.css", "packages/ui/layout.css"],
-      "not": ["src/styles/layout.css", "src/styles/base.css"]
+                   "src/components/layout/header.css", "packages/ui/layout.css", "components/card.css", "ui/button.css"],
+      "not": ["src/styles/layout.css", "src/styles/base.css", "mycomponents.css"]
     }
   }
 }

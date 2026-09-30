@@ -28,6 +28,14 @@ Regressions covered:
 - The clean message claimed "all nine laws hold"; the script checks L1–L6.
 - `background: url(icons.svg#add)` was a "hardcoded colour": the fragment
   `#add` reads as hex.
+
+3.3.0 (SB-A9, false passes that were still open):
+- `//` was a comment in plain CSS, so `url(https://…)` lost its closing
+  parenthesis and nothing after it was checked; a custom property holding an
+  address hid the rest of its line.
+- A rule after a closed @layer block was never reported as unlayered.
+- A root-level components/ folder, the common Next.js layout, did not hold
+  component files, so Law 2 was skipped.
 """
 from __future__ import annotations
 
@@ -331,6 +339,67 @@ class AuditPrecision(TempDirTest):
     def test_a_url_fragment_is_not_a_colour(self):
         self.assertNotIn("raw-color", self.l1(".mask { mask-image: url(#fade); "
                                               "background: url(icons.svg#add) no-repeat; }"))
+
+    def found(self, root: str) -> list[tuple[str, str, int]]:
+        proc = run_py("web-design-studio", "audit_design", root, "--json", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return sorted((f["law"], f["rule"], f["line"]) for f in json.loads(proc.stdout))
+
+    def test_a_url_does_not_hide_the_rest_of_the_file(self):
+        # SB-A9 (a): `//` was a comment in plain CSS, so `url(https://…)` lost
+        # its closing parenthesis and the scanner read nothing after it, and a
+        # custom property holding an address hid the rest of its line.
+        for value in ("url(https://cdn.example.com/hero.svg)", "url( //cdn.example.com/hero.svg )",
+                      'url("https://cdn.example.com/hero.svg")', "https://example.com/terms"):
+            prop = "--terms" if value.startswith("https") else "background-image"
+            with self.subTest(value=value):
+                self.write("src/components/card.css",
+                           "@layer components {\n"
+                           f"  .hero {{ {prop}: {value}; z-index: 9999; }}\n"
+                           "  .after-url { padding: 13px; color: #ff0000; }\n"
+                           "}\n")
+                self.assertEqual([("L1", "raw-color", 3), ("L1", "raw-spacing", 3), ("L1", "raw-z-index", 2)],
+                                 self.found("src"))
+
+    def test_line_comments_stay_comments_where_they_are_comments(self):
+        # SB-A9 (a): in Sass, Less and a styled template, `//` still starts a
+        # comment, except inside url().
+        decls = ("    // padding: 13px;\n"
+                 "    background-image: url(//cdn.example.com/card.svg);\n"
+                 "    color: #ff0000;\n")
+        self.write("scss/components/card.scss", "@layer components {\n  .card {\n" + decls + "  }\n}\n")
+        self.write("less/components/card.less", "@layer components {\n  .card {\n" + decls + "  }\n}\n")
+        self.write("tsx/components/Card.tsx", "import styled from 'styled-components';\n"
+                                              "export const Card = styled.div`\n" + decls + "`;\n")
+        for root in ("scss", "less", "tsx"):
+            with self.subTest(root=root):
+                self.assertEqual([("L1", "raw-color", 5)], self.found(root))
+
+    def test_a_rule_after_a_closed_layer_is_unlayered(self):
+        # SB-A9 (b): the audit never left a layer once it had entered one.
+        self.write("src/components/card.css",
+                   "@layer components {\n  .a { color: var(--fg-default); }\n}\n\n"
+                   ".b { color: var(--fg-default); }\n")
+        self.write("src/components/media.css",
+                   "@layer components {\n  @media (width >= 48rem) { .c { color: var(--fg-default); } }\n}\n"
+                   "@media (width >= 48rem) { .d { color: var(--fg-default); } }\n")
+        self.assertEqual([("L5", "unlayered", 4), ("L5", "unlayered", 5)], self.found("src"))
+
+    def test_keyframes_outside_a_layer_are_not_unlayered_rules(self):
+        # A keyframe is not a style rule. The references and the scaffold keep
+        # @keyframes beside the rules that use them, outside any layer.
+        self.write("motion/components/spinner.css",
+                   "@layer components {\n  .spinner { color: var(--fg-default); }\n}\n\n"
+                   "@keyframes spin { to { rotate: 1turn; } }\n")
+        self.write("motion/components/keyframes.css", "@-webkit-keyframes fade { from { opacity: 0; } }\n")
+        self.assertEqual([], self.found("motion"))
+
+    def test_a_root_level_components_folder_holds_components(self):
+        # SB-A9 (c): `components/card.css` at the project root, the common
+        # Next.js layout, was not a component file, so Law 2 was skipped.
+        self.write("components/card.css",
+                   "@layer components {\n  .card { margin-block-start: var(--gap-grouped); }\n}\n")
+        self.assertEqual([("L2", "child-margin", 2)], self.found("components"))
 
 
 class JsxClassesAndCssInJs(TempDirTest):

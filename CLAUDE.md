@@ -20,8 +20,8 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
   - 344, passing on Python 3.9 and 3.14 on Windows.
   - Linux passes with the Node tests skipped.
   - macOS has never been run.
-- **Active work:** phase 3 (3.3.0) of `dev plans/web-design-suite-completion-plan.md`, as small PRs. After N6, next is W2's audit false-clean (SB-A9), then W1, the Supabase access boundary.
-- **Open from the review** (the inventory has each item): 59 issues, none high; 43 gaps plus 4 partly done; 46 improvements plus 6 partly done.
+- **Active work:** phase 3 (3.3.0) of `dev plans/web-design-suite-completion-plan.md`, as small PRs: N6 (Python 3.9) in PR #4, then SB-A9 (the audit's false cleans) with N11. Next: N12, the migration tool's copy of SB-A9's `//` bug, then W1, the Supabase access boundary.
+- **Open from the review** (the inventory has each item): 58 issues, none high; 43 gaps plus 4 partly done; 46 improvements plus 6 partly done.
 
 ## Commands
 

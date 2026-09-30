@@ -88,7 +88,15 @@ VENDOR_FILE_PAT = re.compile(
 )
 
 # The destination, not a source. Literals here are the point.
-TOKEN_FILE_PAT = re.compile(r"(^|[/\\])tokens?\.(css|scss)$|(^|[/\\])theme\.css$")
+# The audit's file classes (web-design-studio's audit_design.py and
+# design-rules.json): token files are skipped, component files are held to
+# Laws 2, 4 and 6. tests/test_rules_spec.py holds both copies to the spec.
+TOKEN_FILE_PAT = re.compile(
+    r"(^|[/\\])([\w.-]*[-.])?tokens?\.(css|scss)$"
+    r"|(^|[/\\])tokens[/\\][\w.-]+\.(css|scss)$"
+    r"|(^|[/\\])([\w.-]*[-.])?theme\.(css|scss)$"
+)
+COMPONENT_FILE_PAT = re.compile(r"\.module\.|(^|/)(components|ui)/|(^|/)components\.css$")
 
 GENERATED_MARKERS = ("@generated", "DO NOT EDIT", "AUTO-GENERATED", "Auto-generated")
 
@@ -431,13 +439,7 @@ def is_vendor(path: Path) -> bool:
 
 def is_component_file(path: Path) -> bool:
     """Where Laws 2, 4 and 6 bite. Same test the audit script uses."""
-    s = norm_path(path).lower()
-    return (
-        ".module." in s
-        or "/components/" in s
-        or "/ui/" in s
-        or s.endswith("components.css")
-    )
+    return bool(COMPONENT_FILE_PAT.search(norm_path(path).lower()))
 
 
 # ---------------------------------------------------------------------------

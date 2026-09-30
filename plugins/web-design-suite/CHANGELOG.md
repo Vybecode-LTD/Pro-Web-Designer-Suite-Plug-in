@@ -2,6 +2,26 @@
 
 ## 3.3.0 — unreleased
 
+### Fixed
+
+- **The audit passed three kinds of file as clean** (SB-A9):
+  - It read `//` as a comment in plain CSS, so `url(https://cdn…/hero.svg)` hid every
+    declaration after it, and a custom property holding an address (`--terms:
+    https://…`) hid the rest of its line. `//` is now a comment only in Sass, Less,
+    styled templates and single-file components, and never inside `url()`.
+  - A rule after a closed `@layer` block was never reported as unlayered. The finding
+    now points at the first unlayered rule. A `@keyframes` block outside a layer, as
+    the references and the scaffold write it, is not unlayered CSS: a keyframe is not
+    a style rule. 3.2.1 flagged a file that held only keyframes.
+  - A root-level `components/` or `ui/` folder, the common Next.js layout, was not a
+    component file, so Law 2 was skipped there. `mycomponents.css` no longer counts
+    as `components.css`. The spec's file-class examples now include both cases.
+- **The token migration tool's file classes** had drifted from the audit's (N11): it
+  missed `brand-tokens.css`, `design.tokens.css`, files in `tokens/` and
+  `dark-theme.css` as token files, so its inventory listed their literals and the
+  codemod did not skip them, and it shared the `components/` bug above. It now uses
+  the audit's patterns, and the spec test holds both copies.
+
 ### Changed
 
 - **Python 3.9 or newer**, down from 3.10. The scripts already ran on 3.9, the Python
@@ -11,6 +31,9 @@
 
 ### Tests
 
+- SB-A9 and N11: five `AuditPrecision` tests and `test_rules_spec`'s file classes.
+  Against 3.2.1 all six fail; a quoted `url("https://…")` passes on both, as the
+  control.
 - `test_docs` runs `test_harness` on the floor interpreter, and `test_harness` checks
   the temporary folders and `TempDirTest.write` there. On 3.9, 3.2.1's harness errored
   in 181 tests.

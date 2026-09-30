@@ -37,13 +37,16 @@ SPEC = json.loads((HERE.parent / "skills" / "web-design-studio" / "assets" / "ru
 CONFIGS = SKILLS / "web-design-studio" / "assets" / "configs"
 
 
-def load_audit():
-    spec = importlib.util.spec_from_file_location(
-        "wds_audit_rules", SKILLS / "web-design-studio" / "scripts" / "audit_design.py")
+def load_script(skill: str, name: str):
+    spec = importlib.util.spec_from_file_location(f"wds_{name}_rules", SKILLS / skill / "scripts" / f"{name}.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def load_audit():
+    return load_script("web-design-studio", "audit_design")
 
 
 def glob_match(path: str, glob: str) -> bool:
@@ -72,14 +75,20 @@ class TheAuditFollowsTheSpec(TempDirTest):
         return {(f.law, f.rule) for f in found}
 
     def test_file_classes(self):
-        for kind, check in (("token_files", self.audit.is_token_file),
-                            ("component_files", self.audit.is_component_file)):
+        # SB-A9: a root-level components/ folder, the common Next.js layout,
+        # was not a component file. The migration tool keeps its own copy of
+        # the audit's test, so the spec holds both.
+        migration = load_script("design-token-migration", "extract_literals")
+        for kind, tool, check in (("token_files", "audit", self.audit.is_token_file),
+                                  ("component_files", "audit", self.audit.is_component_file),
+                                  ("token_files", "migration", migration.is_token_file),
+                                  ("component_files", "migration", migration.is_component_file)):
             spec = SPEC["file_classes"][kind]
             for path in spec["examples"]:
-                with self.subTest(kind=kind, path=path):
+                with self.subTest(kind=kind, tool=tool, path=path):
                     self.assertTrue(check(pathlib.Path(path)))
             for path in spec["not"]:
-                with self.subTest(kind=kind, not_=path):
+                with self.subTest(kind=kind, tool=tool, not_=path):
                     self.assertFalse(check(pathlib.Path(path)))
 
     def test_nesting(self):

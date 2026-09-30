@@ -72,7 +72,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-A6 | high | fixed in 3.1.0 | The handoff describes a token pipeline the suite does not ship. |
 | SB-A7 | high | fixed in 3.1.0 | The claim "v3 emits into three native cascade layers" is false. |
 | SB-A8 | medium | W2 (3.3.0) | The canonical `index.css` puts third-party CSS on top of every layer. |
-| SB-A9 | medium | W2 (3.3.0) | The scanner has bugs that hide violations. |
+| SB-A9 | medium | fixed in 3.3.0: (a) to (c) by `test_audit_design.AuditPrecision` (`test_a_url_does_not_hide_the_rest_of_the_file`, `test_line_comments_stay_comments_where_they_are_comments`, `test_a_rule_after_a_closed_layer_is_unlayered`, `test_a_root_level_components_folder_holds_components`) and `test_rules_spec` `test_file_classes`; (d) is SS-A19, fixed in 3.1.0 | The scanner has bugs that hide violations. |
 | SB-A10 | medium | fixed in 3.1.0 | The Tailwind and JSX checks date from v3 and catch less than ESLint. |
 | SB-A11 | medium | W2 (3.3.0) | Docs promise checks that don't exist; for example, the audit does not diff `--breakpoint-*` against `--bp-*`. |
 | SB-A12 | medium | fixed in 3.1.0 | "Off-scale classes … the build errors on them" and "`p-7` is a build error" are false. |
@@ -95,7 +95,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-B4 | — | partly done; the rest in W3 (3.3.0) | the contract is missing roles the references need. |
 | SB-B5 | — | W12 (3.6.0+) | parts of Tailwind v4 aren't covered. |
 | SB-B6 | — | W12 (3.6.0+) | SCSS and other stacks. |
-| SB-C1 | S-M | partly done; the rest in W2 (3.3.0) | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. |
+| SB-C1 | S-M | partly done (3.1.0: A3, A4, A10; 3.3.0: A9); SB-A24 is left, in W2 (3.3.0) | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. |
 | SB-C2 | M · high | partly done; the rest in W2 (3.3.0) | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. |
 | SB-C3 | S-M · high | W12 (3.6.0+) | Ship a `tw_probe` script and a `/tw-probe` skill command. |
 | SB-C4 | S · high | W12 (3.6.0+) | Replace Part 5 with eslint-plugin-better-tailwindcss 4.7 (peers ESLint 7–10 and Tailwind 3.3/4.1). |
