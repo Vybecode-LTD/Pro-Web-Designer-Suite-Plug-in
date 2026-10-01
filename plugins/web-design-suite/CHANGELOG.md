@@ -124,6 +124,23 @@
   JSON dump gives the same model is gone: that depends on its query. The reference's
   `pg_dump` command keeps the privileges now, because the security pass reads them.
 
+### Added
+
+- **The scaffold proposes each table's row-level security** (DL-B2). It used to
+  decide which columns a form writes and emit client validation, with nothing on the
+  database side. Now `db/policies/<table>.policies.todo.sql`, join tables included,
+  turns RLS on and guesses whose a row is from the keys: the user's own row, an owner
+  column, a child of an owned row, a tenant (a commented template) or nobody (read
+  only). It revokes the table-level insert and update and grants back the form's
+  columns, so the database and the `Draft` type agree. No write policy it proposes
+  has a `true` condition, and the schema tool finds no hole in the result.
+- **A smoke test per table**, `<table>.policies.test.sql`: plain SQL in a transaction
+  that rolls back. It checks that RLS is on, that `anon` sees nothing, that a signed-in
+  user sees only their rows, and that the columns outside the form refuse a write.
+- **`lib/supabase.ts`** (the rest of DL-B1): the browser's one client, with the
+  publishable key. It refuses to start on an `sb_secret_` key or a legacy
+  `service_role` JWT.
+
 ### Changed
 
 - **Python 3.9 or newer**, down from 3.10. The scripts already ran on 3.9, the Python
@@ -158,6 +175,11 @@
   and the same schema as `gen types` writes it. Also `gen types` for a real 25-table
   project. Against 3.2.1, thirteen fail. The real project's types and the `db pull`
   form pass there, as controls: the parser already read both.
+- DL-B2 and DL-B1: `test_policies`, eleven tests. Three run the generated SQL on a
+  scratch Postgres when one is on PATH, and skip otherwise. Every proposal applies and
+  every smoke test passes. Then four breakages each make their test fail with its
+  reason: an open read policy, a re-granted owner column, RLS turned off, and a write
+  policy on a read-only table. Against 3.2.1 all eleven fail.
 - `test_docs` runs `test_harness` on the floor interpreter, and `test_harness` checks
   the temporary folders and `TempDirTest.write` there. On 3.9, 3.2.1's harness errored
   in 181 tests.

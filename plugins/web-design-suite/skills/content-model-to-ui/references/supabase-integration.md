@@ -452,4 +452,17 @@ The generated forms validate in the browser. That is a courtesy to the user, and
 | What a valid value is | Constraints in the schema (`NOT NULL`, `CHECK`, unique indexes), and the FastAPI model for anything they cannot express | The form's validation |
 | Who the user is | The token Supabase Auth signed; authorization data in `app_metadata` only | Anything the client sends in the body |
 
-A table the scaffold builds screens for needs its policies written before it ships. The scaffold does not write them: it cannot know who owns a row.
+A table the scaffold builds screens for needs its policies before it ships. The schema cannot say who owns a row, so the scaffold proposes and a human decides. It writes three things:
+
+- **`db/policies/<table>.policies.todo.sql` per table, join tables included.** It turns RLS on and guesses whose a row is from the keys and names:
+  - the user's own row, when the key references `auth.users`;
+  - an owner column, which is a key into `auth.users` or into such a table, or an `owner_id`;
+  - a child of an owned row;
+  - a tenant (`org_id`), which gets a commented template, because the memberships are not in the schema;
+  - nobody, which gets read access for signed-in users and no write from the browser.
+
+  It then revokes the table-level insert and update and grants back the form's columns: the `Draft` type and the database agree. No write policy it proposes has a `true` condition.
+- **`db/policies/<table>.policies.test.sql`, a smoke test.** It is plain SQL in a transaction that rolls back. It checks that RLS is on, that `anon` sees nothing, and that a signed-in user sees only their rows. It also checks that the columns outside the form refuse a write. Postgres checks a column privilege before it touches a row, so `update … where false` proves it.
+- **`lib/supabase.ts`, the client above.** It refuses to start when the "publishable" key is a secret one: an `sb_secret_` key, or a legacy JWT whose role is `service_role`.
+
+Read each proposal, fix it, move it into a migration, then run its test against the database.
