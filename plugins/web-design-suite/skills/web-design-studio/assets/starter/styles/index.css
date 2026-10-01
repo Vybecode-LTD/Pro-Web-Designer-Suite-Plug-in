@@ -1,0 +1,31 @@
+/* =========================================================================
+   INDEX — the entry stylesheet, and the only file that decides the cascade
+   =========================================================================
+
+   Law 5: the layer order is stated once, here, before anything else. The
+   references quote this file instead of writing their own (stack-vanilla-css
+   §4, stack-css-modules §5, handoff-conventions §1), and
+   tools/sync_snippets.py keeps every quote identical to it. The Tailwind v4
+   entry is assets/configs/index.tailwind.css.
+   ========================================================================= */
+
+/* @snippet entry */
+/* 1. The order, first: before every import and every rule. `vendor` is
+      named before there is any vendor CSS, because a layer first named by
+      its import is appended after `overrides`, where its rules beat every
+      rule you write. */
+@layer reset, vendor, tokens, base, layout, components, utilities, overrides;
+
+/* 2. Each of these opens its own @layer block, so import it bare:
+      `layer(base)` around base.css would nest it as `base.base`. */
+@import url("reset.css");
+@import url("tokens.css");
+@import url("base.css");
+@import url("layout.css");
+
+/* 3. CSS you do not control names no layer: wrap it as it loads.
+        @import url("../vendor/datepicker.css") layer(vendor);
+      Then one line per component file, after the layers above:
+        @import url("components/card.css");
+      With CSS Modules there are none: each component imports its own. */
+/* @end-snippet */

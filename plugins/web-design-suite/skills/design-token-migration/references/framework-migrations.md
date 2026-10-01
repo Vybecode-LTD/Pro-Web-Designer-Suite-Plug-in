@@ -54,7 +54,7 @@ Note what the codemod did *not* do. `22px` is equidistant from 20 and 24 with no
 
 ```css
 /* src/styles/index.css — the entry stylesheet, in this exact order */
-@layer reset, tokens, base, layout, components, utilities, overrides;
+@layer reset, vendor, tokens, base, layout, components, utilities, overrides;
 
 @import "./reset.css"   layer(reset);
 @import "./tokens.css"  layer(tokens);
@@ -391,7 +391,7 @@ The `!important`s are not laziness. They are the only tool left once you are in 
 
 ```css
 /* index.css — the framework goes in a layer BELOW yours */
-@layer vendor, reset, tokens, base, layout, components, utilities, overrides;
+@layer reset, vendor, tokens, base, layout, components, utilities, overrides;
 
 @import "bootstrap/dist/css/bootstrap.css" layer(vendor);
 ```

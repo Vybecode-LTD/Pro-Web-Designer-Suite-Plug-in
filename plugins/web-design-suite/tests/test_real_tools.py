@@ -147,25 +147,9 @@ def write_files(root: pathlib.Path, files: dict[str, str]) -> None:
         path.write_bytes(text.encode("utf-8"))
 
 
-def documented_entry(doc: str = "stack-tailwind.md", header: str = "/* src/styles/index.css */") -> str:
-    """The entry file a reference tells a project to write: the css block of
-    `doc` that opens with `header` (by default the Tailwind v4 entry of
-    stack-tailwind.md §2), read as test_doc_snippets reads the references, so a
-    block marked as a wrong example, or quoted from the starter, never counts."""
-    from test_doc_snippets import snippets
-    for path, _, lang, body in snippets():
-        if path.name == doc and lang == "css" and body.lstrip().startswith(header):
-            return body
-    raise AssertionError(f"{doc} has no css block opening with {header!r}")
-
-
-# The two spellings the references use: strings in the Tailwind entry, `url()`
-# in the vanilla one.
-DOCUMENTED_ENTRIES = {
-    "src/styles/index.css": ("stack-tailwind.md", "/* src/styles/index.css */"),
-    "src/vanilla/index.css": ("handoff-conventions.md",
-                              "/* src/styles/index.css — the whole cascade, in one place. */"),
-}
+# The canonical entries (SB-C9): the starter's index.css is linted with the rest of
+# the starter, and the Tailwind v4 entry lives with the configs.
+CANONICAL_ENTRIES = {"src/tailwind/index.css": CONFIGS / "index.tailwind.css"}
 
 
 ALLOWED_STYLES = ("<div style={{ '--progress': pct } as React.CSSProperties} />",
@@ -445,6 +429,9 @@ REFUSED_CSS = {
                                     '[data-theme="dark"] { --y: var(--x); }\n', "no-duplicate-selectors"),
     **{f"src/components/SystemColour{n}.css": (in_layer("components", css), "design/system-colors-in-forced-colors")
        for n, css in enumerate(SPEC["system_colors"]["refused"])},
+    # SB-A8: the order, and a layer imported into but not stated.
+    **{f"src/entries/refused{n}/index.css": (css + "\n", "design/layer-order")
+       for n, css in enumerate(SPEC["layers"]["refused"])},
 }
 ALLOWED_CSS = {
     "src/components/SmallViewport.css": in_layer("components", ".card { min-block-size: 100svb; }"),
@@ -455,6 +442,7 @@ ALLOWED_CSS = {
                   "max-inline-size: var(--center-box); }"),
     **{f"src/components/ForcedColours{n}.css": in_layer("components", css)
        for n, css in enumerate(SPEC["system_colors"]["allowed"])},
+    **{f"src/entries/allowed{n}/index.css": css + "\n" for n, css in enumerate(SPEC["layers"]["allowed"])},
 }
 
 
@@ -468,7 +456,7 @@ class StylelintConfig(unittest.TestCase):
     def setUpClass(cls):
         tmp = temp_project(cls, "wds-stylelint-", STYLELINT_MODULES)
         files = {"stylelint.config.mjs": (CONFIGS / "stylelint.config.mjs").read_text(encoding="utf-8"),
-                 **{name: documented_entry(*where) for name, where in DOCUMENTED_ENTRIES.items()},
+                 **{name: path.read_text(encoding="utf-8") for name, path in CANONICAL_ENTRIES.items()},
                  **{f"src/styles/{css.name}": css.read_text(encoding="utf-8")
                     for css in sorted(STARTER_STYLES.glob("*.css"))},
                  **{name: css for name, (css, _) in REFUSED_CSS.items()},
@@ -496,9 +484,9 @@ class StylelintConfig(unittest.TestCase):
             with self.subTest(file=css.name):
                 self.assertEqual([], self.problems(f"src/styles/{css.name}"))
 
-    def test_the_documented_entries_pass(self):
-        for name, (doc, _) in DOCUMENTED_ENTRIES.items():
-            with self.subTest(entry=doc):
+    def test_the_canonical_entries_pass(self):
+        for name, path in CANONICAL_ENTRIES.items():
+            with self.subTest(entry=path.name):
                 self.assertEqual([], self.problems(name))
 
     def test_what_the_laws_refuse_is_refused(self):
@@ -626,7 +614,7 @@ class TailwindPluginV4(TailwindPluginBlock, unittest.TestCase):
 
     @classmethod
     def tailwind_files(cls) -> dict[str, str]:
-        files = {"src/styles/index.css": documented_entry(),
+        files = {"src/styles/index.css": (CONFIGS / "index.tailwind.css").read_text(encoding="utf-8"),
                  "src/styles/theme.css": (CONFIGS / "theme.css").read_text(encoding="utf-8"),
                  "src/styles/components/card.css": "@layer components {}\n"}
         for name in ("tokens.css", "base.css", "layout.css"):

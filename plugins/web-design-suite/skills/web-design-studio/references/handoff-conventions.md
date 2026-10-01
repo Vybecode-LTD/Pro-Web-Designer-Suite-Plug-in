@@ -85,16 +85,26 @@ project/
 layer declaration **(Law 5)**. Declaring the order up front means every later file can
 be written in whatever order is convenient — the cascade is already decided.
 
+<!-- snippet: index.css#entry -->
 ```css
-/* src/styles/index.css — the whole cascade, in one place. */
-@layer reset, tokens, base, layout, components, utilities, overrides;
+/* 1. The order, first: before every import and every rule. `vendor` is
+      named before there is any vendor CSS, because a layer first named by
+      its import is appended after `overrides`, where its rules beat every
+      rule you write. */
+@layer reset, vendor, tokens, base, layout, components, utilities, overrides;
 
-@import url("./reset.css")     layer(reset);
-@import url("./tokens.css")    layer(tokens);
-@import url("./base.css")      layer(base);
-@import url("./layout.css")    layer(layout);
-@import url("./utilities.css") layer(utilities);
-/* components/*.module.css declare `@layer components` internally. */
+/* 2. Each of these opens its own @layer block, so import it bare:
+      `layer(base)` around base.css would nest it as `base.base`. */
+@import url("reset.css");
+@import url("tokens.css");
+@import url("base.css");
+@import url("layout.css");
+
+/* 3. CSS you do not control names no layer: wrap it as it loads.
+        @import url("../vendor/datepicker.css") layer(vendor);
+      Then one line per component file, after the layers above:
+        @import url("components/card.css");
+      With CSS Modules there are none: each component imports its own. */
 ```
 
 | File | Belongs here | Never here |
@@ -625,7 +635,7 @@ with figma-variables-sync's scripts vendored beside `audit_design.py`.
       name: design system audit
       entry: python -m scripts.audit_design
       language: system
-      pass_filenames: false
+      types_or: [css, scss, javascript, jsx, ts, tsx]   # the staged files, as the hook
 ```
 
 ### 7.2 The `CLAUDE.md` template

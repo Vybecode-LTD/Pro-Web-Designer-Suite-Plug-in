@@ -124,8 +124,30 @@
   JSON dump gives the same model is gone: that depends on its query. The reference's
   `pg_dump` command keeps the privileges now, because the security pass reads them.
 
+- **Vendor CSS beat every layer** (SB-A8). The canonical `index.css` in
+  stack-vanilla-css §4 left `vendor` out of its statement and then imported into it,
+  and a layer first named by its import is appended after `overrides`. Three references
+  put `vendor` in three different places. The order is now in `design-rules.json`
+  (`layers`): `reset, vendor, tokens, base, layout, components, utilities, overrides`,
+  plus `theme` in a Tailwind entry. Every statement in the plugin names `vendor`, the
+  contract's included. The audit and stylelint refuse a statement out of that order,
+  and an `@import … layer(x)` whose `x` the statement does not name.
+- **Self-wrapped files were imported with `layer()`** (SB-A23). Starter files open
+  their own `@layer` block, so `layer(base)` around `base.css` made `base.base`, which
+  stack-vanilla-css itself forbids. handoff-conventions and stack-tailwind did it, and
+  style-architecture called it deliberate. handoff §7.1's pre-commit hook audited the
+  whole tree on every commit; it takes the staged files now, as the hook does.
+- **Two claims about a vendor's `!important` were wrong.** style-architecture §11 said
+  a layer makes it lose to your components. stack-vanilla-css §5 said three `!important`s
+  in `overrides` beat it. Important declarations reverse the layer order, so the
+  vendor's win in both cases. The references now say to strip them at build time, or
+  patch a vendored copy.
+
 ### Added
 
+- **One canonical entry stylesheet per stack** (SB-C9, SS-C9 in part). The starter
+  ships `index.css`, and the configs ship `index.tailwind.css` for Tailwind v4. Five
+  references quote them through `tools/sync_snippets.py` instead of writing their own.
 - **The scaffold proposes each table's row-level security** (DL-B2). It used to
   decide which columns a form writes and emit client validation, with nothing on the
   database side. Now `db/policies/<table>.policies.todo.sql`, join tables included,
@@ -180,6 +202,13 @@
   every smoke test passes. Then four breakages each make their test fail with its
   reason: an open read policy, a re-granted owner column, RLS turned off, and a write
   policy on a read-only table. Against 3.2.1 all eleven fail.
+- SB-A8, SB-A23 and SB-C9:
+  - `test_rules_spec`: the spec's layer examples through the audit, the stylelint
+    config's copy of the order, and every layer statement in the docs, configs and
+    starter. Against 3.2.1 all three fail.
+  - `test_real_tools.StylelintConfig` runs the examples through the real stylelint,
+    and lints the two canonical entries. On 3.2.1 it cannot set up, because the
+    entries do not exist there.
 - `test_docs` runs `test_harness` on the floor interpreter, and `test_harness` checks
   the temporary folders and `TempDirTest.write` there. On 3.9, 3.2.1's harness errored
   in 181 tests.

@@ -1680,6 +1680,12 @@
   "heading": "Tailwind v4: wiring `@theme`"
  },
  {
+  "from": "web-design-studio/assets/configs/index.tailwind.css",
+  "to": "web-design-studio/references/stack-tailwind.md",
+  "section": "2.1",
+  "heading": "Do not use `@import \"tailwindcss\"`"
+ },
+ {
   "from": "web-design-studio/assets/configs/stylelint.config.mjs",
   "to": "web-design-studio/assets/configs/theme.css",
   "section": "0",
@@ -1708,6 +1714,24 @@
   "to": "web-design-studio/assets/starter/styles/reset.css",
   "section": "3",
   "heading": "DOCUMENT & TEXT RENDERING"
+ },
+ {
+  "from": "web-design-studio/assets/starter/styles/index.css",
+  "to": "web-design-studio/references/handoff-conventions.md",
+  "section": "1",
+  "heading": "The repository shape"
+ },
+ {
+  "from": "web-design-studio/assets/starter/styles/index.css",
+  "to": "web-design-studio/references/stack-css-modules.md",
+  "section": "5",
+  "heading": "How tokens reach a module"
+ },
+ {
+  "from": "web-design-studio/assets/starter/styles/index.css",
+  "to": "web-design-studio/references/stack-vanilla-css.md",
+  "section": "4",
+  "heading": "`index.css` and the import order"
  },
  {
   "from": "web-design-studio/assets/starter/styles/layout.css",
@@ -1810,6 +1834,12 @@
   "to": "web-design-studio/references/spacing-system.md",
   "section": "8",
   "heading": "Nested radius and the corner rule"
+ },
+ {
+  "from": "web-design-studio/references/style-architecture.md",
+  "to": "web-design-studio/references/stack-vanilla-css.md",
+  "section": "5",
+  "heading": "Cascade layers in depth"
  },
  {
   "from": "web-design-studio/scripts/audit_design.py",

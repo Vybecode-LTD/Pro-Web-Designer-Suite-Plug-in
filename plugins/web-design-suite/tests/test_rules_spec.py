@@ -139,6 +139,48 @@ class TheAuditFollowsTheSpec(TempDirTest):
             with self.subTest(fallback=value):
                 self.assertEqual(set(), self.findings(f".card {{ color: {value}; }}"))
 
+    def test_layers(self):
+        # SB-A8: `vendor` was missing from the order, so an entry that imported
+        # into it put third-party CSS above every layer, and three references
+        # gave three different places for it.
+        self.assertEqual(SPEC["layers"]["order"], self.audit.LAYER_ORDER)
+        self.assertEqual(SPEC["layers"]["statement"], self.audit.LAYER_STATEMENT)
+        layer_rules = {("L5", "layer-order"), ("L5", "layer-undeclared")}
+        for kind in ("allowed", "refused"):
+            for n, css in enumerate(SPEC["layers"][kind]):
+                with self.subTest(**{kind: css}):
+                    path = self.tmp / f"{kind}{n}" / "index.css"
+                    path.parent.mkdir()
+                    path.write_text(css + "\n", encoding="utf-8")
+                    found, _, _ = self.audit.audit_run([str(path)])
+                    hit = {(f.law, f.rule) for f in found} & layer_rules
+                    self.assertEqual(kind == "refused", len(hit) == 1, found)
+
+
+class TheDocsStateTheSpecsOrder(unittest.TestCase):
+
+    def test_every_layer_statement_follows_the_spec(self):
+        """SB-A8 and SB-C9: the contract's statement left `vendor` out, and three
+        references put it in three places, one of them after `overrides`."""
+        order = SPEC["layers"]["order"]
+        assets = SKILLS / "web-design-studio" / "assets"
+        paths = [*SKILLS.glob("*/SKILL.md"), *SKILLS.glob("*/references/*.md"),
+                 SKILLS.parent / "shared" / "token-contract.md",
+                 *(assets / "configs").iterdir(), *(assets / "starter" / "styles").iterdir()]
+        wrong, full = [], 0
+        for path in paths:
+            for m in re.finditer(r"@layer ([a-z][\w-]*(?:,\s*[a-z][\w-]*)+);", path.read_text(encoding="utf-8")):
+                names = [n.strip() for n in m.group(1).split(",")]
+                known = [n for n in names if n in order]
+                if {"reset", "overrides"} <= set(names):
+                    full += 1
+                    if "vendor" not in names:
+                        wrong.append(f"{path.name}: {m.group(0)} (no vendor)")
+                if known != [n for n in order if n in known]:
+                    wrong.append(f"{path.name}: {m.group(0)} (out of order)")
+        self.assertGreater(full, 20)
+        self.assertEqual([], wrong)
+
 
 class StylelintFollowsTheSpec(unittest.TestCase):
     """The config's values, read from the file, with the value regexes run in
@@ -182,6 +224,15 @@ class StylelintFollowsTheSpec(unittest.TestCase):
         through sockets and the list is back to the four the config documents."""
         self.assertEqual(4, len(re.findall(r"^    \{\n      files:", self.config, re.M)))
         self.assertIn("There are four", self.config)
+
+    def test_the_layer_order_is_the_specs(self):
+        """SB-A8: the config's LAYER_ORDER had no `vendor`, so it refused the
+        corrected statement as an unknown layer; and nothing checked that a
+        layer an entry imports into is in its statement
+        (test_real_tools.StylelintConfig runs the spec's examples)."""
+        block = re.search(r"const LAYER_ORDER = \[(.*?)\];", self.config, re.S).group(1)
+        self.assertEqual(SPEC["layers"]["order"], re.findall(r"^\s*'(\w+)',", block, re.M))
+        self.assertIn("undeclaredImport", self.config)
 
     def test_system_colours_are_scoped_to_forced_colors(self):
         """3.2.1 allowed the system colours in every colour property of every

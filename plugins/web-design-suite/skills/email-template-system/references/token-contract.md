@@ -12,7 +12,7 @@ The canonical implementation is `tokens.css` in the `web-design-studio` skill.
 2. **Parents own the gaps.** A child never sets its own outer margin. Space between siblings comes from the parent's `gap`. Legal exceptions: `margin:auto` for alignment, an owl selector (`> * + *`) written in the parent's own rule, and `calc(var(--token) * -1)` to cancel a known token.
 3. **The scale is closed.** 18 spacing steps, 11 type steps, 5 leadings, 6 elevations, 5 durations, 8 z-indexes. Nothing between the steps.
 4. **One home per component's styles.** A reviewer must predict a component's appearance from one file. Inline `style` is legal only when *every* key is a CSS custom property.
-5. **Layers, not specificity.** `@layer reset, tokens, base, layout, components, utilities, overrides;` declared once, first, before any import. No `!important`, no ID selectors, nesting depth 2 maximum.
+5. **Layers, not specificity.** `@layer reset, vendor, tokens, base, layout, components, utilities, overrides;` declared once, first, before any import. No `!important`, no ID selectors, nesting depth 2 maximum.
 6. **Semantic before primitive.** Components read Tier-2 roles (`--pad-card`), never Tier-1 primitives (`--space-6`).
 7. **Density is a dial.** Compactness is `--density` (0.875 / 1 / 1.125), not a second set of styles.
 8. **Novel patterns pass the gate.** Nothing ships that a first-time user cannot operate with a keyboard.

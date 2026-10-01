@@ -45,6 +45,9 @@ import stylelint from 'stylelint';
 
 const LAYER_ORDER = [
   'reset',      // Preflight / normalize. Beaten by literally everything.
+  'vendor',     // CSS you do not control, imported with layer(vendor). Named
+                //   even before there is any: a layer first named by its
+                //   import lands after overrides and beats everything (SB-A8).
   'tokens',     // tokens.css. Declarations only, no selectors that paint.
   'theme',      // Tailwind's generated @theme output (v4 only).
   'base',       // element defaults: html, body, headings, links.
@@ -91,6 +94,9 @@ const layerMessages = utils.ruleMessages(layerRuleName, {
     `Law 5 (layers, not specificity): "@layer ${name}" is not one of [${LAYER_ORDER.join(', ')}]. ` +
     `An undeclared layer is appended AFTER every declared one, so this rule now beats utilities and overrides. ` +
     `If the layer is real, add it to the canonical order; if it is a typo, it is the most expensive kind.`,
+  undeclaredImport: (name) =>
+    `Law 5 (layers, not specificity): \`layer(${name})\` imports into a layer the @layer statement does not name. ` +
+    `A layer first named by its import is appended after overrides, so these rules beat every rule you write. Name it in the statement.`,
   nestedLayer: (name) =>
     `Law 5 (layers, not specificity): "@layer ${name}" nested inside another layer creates a sub-layer whose rank is not obvious from the order statement. Flatten it.`,
 });
@@ -101,6 +107,7 @@ const layerOrderRule = (primary) => (root, result) => {
   }
 
   let seenStatement = false;
+  const declaredNames = new Set();
 
   root.walkAtRules(/^layer$/i, (atRule) => {
     /* A STATEMENT has no block: `@layer a, b, c;` */
@@ -122,6 +129,7 @@ const layerOrderRule = (primary) => (root, result) => {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
+      declared.forEach((name) => declaredNames.add(name));
 
       /* Subsequence check: omitting a layer is fine, reordering is not. */
       let cursor = -1;
@@ -168,6 +176,20 @@ const layerOrderRule = (primary) => (root, result) => {
     if (atRule.parent && atRule.parent.type === 'atrule' && /^layer$/i.test(atRule.parent.name)) {
       utils.report({
         message: layerMessages.nestedLayer(name),
+        node: atRule,
+        result,
+        ruleName: layerRuleName,
+      });
+    }
+  });
+
+  /* An import into a layer the statement leaves out (SB-A8). */
+  if (!seenStatement) return;
+  root.walkAtRules(/^import$/i, (atRule) => {
+    const m = /\blayer\(\s*([\w.-]+)\s*\)/i.exec(atRule.params);
+    if (m && !declaredNames.has(m[1])) {
+      utils.report({
+        message: layerMessages.undeclaredImport(m[1]),
         node: atRule,
         result,
         ruleName: layerRuleName,

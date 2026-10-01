@@ -30,7 +30,7 @@
  *
  *   postcss.config.js:  { plugins: { tailwindcss: {}, autoprefixer: {} } }
  *   src/styles/index.css:
- *     @layer reset, tokens, base, layout, components, utilities, overrides;
+ *     @layer reset, vendor, tokens, base, layout, components, utilities, overrides;
  *     @import "./tokens.css";
  *     @tailwind base;        // v3 emits into its own `base`/`components`/
  *     @tailwind components;  // `utilities` layers; see the note at the
@@ -637,7 +637,7 @@ export default {
  *   tailwind-utilities.css   @tailwind components; @tailwind utilities;
  *
  *   index.css
- *   @layer reset, tokens, base, layout, components, utilities, overrides;
+ *   @layer reset, vendor, tokens, base, layout, components, utilities, overrides;
  *   @import url("./tailwind-base.css") layer(base);
  *   @import url("./tailwind-utilities.css") layer(utilities);
  *
