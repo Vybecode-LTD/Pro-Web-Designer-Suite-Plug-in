@@ -12,7 +12,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`, then this plan.
 2. Install the test tools once: `npm ci` in `tooling/main` and in `tooling/tailwind-v3` (`tooling/README.md`).
-3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 359 tests OK before you change anything; if it does not, fix that first.
+3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 364 tests OK before you change anything; if it does not, fix that first.
 4. Work the phases in order. Inside a phase the workstreams are independent, so take them one at a time and ship the phase as one release.
 5. When a workstream is done, update its rows in the inventory: the release, and the test that holds each fix.
 
@@ -45,7 +45,7 @@ Ask before the phase that needs each one.
 ## Where things stand
 
 3.2.1 is released (`v3.2.1`, 2026-09-26), and 3.3.0 is in progress on `main`:
-- **Tests:** 359, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
+- **Tests:** 364, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
 - **Linux (WSL):** the suite passes with the Node tests skipped, because that Linux has no Node.
 - **macOS:** never run.
 - **Real tools:** the shipped ESLint config, the stylelint config, both Tailwind blocks of Part 5, Tailwind 4 and tailwind-merge all run in the suite, at the versions pinned in `tooling/`.
@@ -124,9 +124,9 @@ Add a stylelint snippet test like `DesignEslintConfig.test_the_references_tsx_sn
 - **N11.** *Done for 3.3.0.* Its file classes had drifted from the spec: its token-file pattern predated 3.2.0 (four of the spec's six examples missed), and its component test shared SB-A9's `components/` bug. It now uses the audit's patterns, and `test_rules_spec.test_file_classes` holds both copies.
 - **N12.** *Done for 3.3.0.* `extract_literals.blank_css_comments` read `//` as a comment in plain CSS, as the audit did (SB-A9 (a)). After `url(https://…)` the census filed the literals that followed under `background`, and the codemod rewrote none of them. It now reads comments as the audit does; `test_token_migration.AddressesAreNotComments` holds it.
 
-**N13 · found while fixing SB-A24.** Sass the audit could not read.
-- *Done for 3.3.0, in the audit.* The braces of an interpolation (`.card-#{$name}`) closed the layer around them, and indented Sass (`.sass`), which has no braces, passed as clean. The audit now reads an interpolation as text and lists a `.sass` file as skipped.
-- **Open.** Three more scripts list `.sass` and follow braces. On a `.sass` file full of literals (measured 2026-10-01), `extract_literals` reports "no hardcoded design values found" and `a11y_static` reports clean for `outline: none`; `perf_audit` only weighs the file, which is right. Make the first two list the file as skipped, as the audit does.
+**N13 · found while fixing SB-A24.** *Done for 3.3.0.* Sass the scripts could not read.
+- **The audit.** The braces of an interpolation (`.card-#{$name}`) closed the layer around them, and indented Sass (`.sass`), which has no braces, passed as clean. The audit now reads an interpolation as text and lists a `.sass` file as skipped.
+- **The other scripts.** Three more listed `.sass` and follow braces. On a `.sass` file full of literals (measured 2026-10-01), `extract_literals` reported "no hardcoded design values found" and `a11y_static` reported clean for `outline: none`. Both now say which `.sass` files they did not read (`test_token_migration`, `test_content_and_a11y`). `perf_audit` only weighs the file, which is right.
 
 | ID | Severity or size | What is wrong or missing |
 |---|---|---|

@@ -13,7 +13,7 @@ mechanically replaceable" does.
 
 WHAT IT READS
 -------------
-  .css .scss .sass .less .pcss   CSS declarations, SCSS/LESS variables,
+  .css .scss .less .pcss         CSS declarations, SCSS/LESS variables,
                                  `darken()`/`lighten()` calls
   .js .jsx .ts .tsx .mjs .cjs    JSX inline `style={{...}}`, styled-components
                                  and Emotion template literals, Tailwind
@@ -67,7 +67,10 @@ from typing import Iterable, Iterator, Sequence
 # What counts as source
 # ---------------------------------------------------------------------------
 
-CSS_EXT = {".css", ".scss", ".sass", ".less", ".pcss"}
+CSS_EXT = {".css", ".scss", ".less", ".pcss"}
+# Indented Sass has no braces for the scanner to follow, so reading it would
+# count nothing; the census says it was not read instead (N13).
+INDENTED_SASS_EXT = ".sass"
 JS_EXT = {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}
 
 SKIP_DIRS = {
@@ -1192,10 +1195,12 @@ def classify_tailwind(prefix: str, body: str) -> tuple[str, str]:
 
 def iter_files(paths: Sequence[str], *, include_vendor: bool,
                include_tokens: bool,
-               vendor_skipped: list[Path] | None = None) -> Iterator[Path]:
+               vendor_skipped: list[Path] | None = None,
+               unread: list[Path] | None = None) -> Iterator[Path]:
     """Files to scan. A file named explicitly is always scanned (the user asked
     for it); inside a folder, vendor files are left out and collected in
-    `vendor_skipped`, so the census can say what it did not count."""
+    `vendor_skipped`, so the census can say what it did not count. Indented
+    Sass is never scanned, and is collected in `unread`."""
     for raw in paths:
         p = Path(raw)
         explicit = p.is_file()
@@ -1209,6 +1214,8 @@ def iter_files(paths: Sequence[str], *, include_vendor: bool,
                 for f in sorted(files):
                     candidates.append(Path(root) / f)
         for fp in candidates:
+            if fp.suffix.lower() == INDENTED_SASS_EXT and unread is not None:
+                unread.append(fp)
             if fp.suffix.lower() not in CSS_EXT | JS_EXT:
                 continue
             if not include_vendor and not explicit and is_vendor(fp):
@@ -1225,9 +1232,10 @@ def extract(paths: Sequence[str], *, include_vendor: bool = False,
     literals: list[Literal] = []
     problems: list[str] = []
     vendor_skipped: list[Path] = []
+    unread: list[Path] = []
     for fp in iter_files(paths, include_vendor=include_vendor,
                          include_tokens=include_tokens,
-                         vendor_skipped=vendor_skipped):
+                         vendor_skipped=vendor_skipped, unread=unread):
         try:
             text = fp.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
@@ -1248,6 +1256,12 @@ def extract(paths: Sequence[str], *, include_vendor: bool = False,
         problems.append(f"excluded {len(vendor_skipped)} vendor file(s): {names}{more} "
                         f"— you layer vendor CSS, you do not migrate it; "
                         f"--include-vendor counts them")
+    if unread:
+        names = ", ".join(norm_path(p) for p in unread[:5])
+        more = f" and {len(unread) - 5} more" if len(unread) > 5 else ""
+        problems.append(f"did not read {len(unread)} indented Sass file(s): {names}{more} "
+                        f"— the census follows braces, which .sass does not have; "
+                        f"count their literals in the compiled CSS, or convert them to .scss")
     literals.sort(key=lambda l: (l.file, l.line, l.col))
     return literals, problems
 
@@ -1266,7 +1280,8 @@ def render_report(literals: Sequence[Literal], *, top: int,
     if not literals:
         return ("extract_literals: no hardcoded design values found.\n"
                 "Either this tree is already tokenized, or you pointed it at "
-                "the wrong directory.\n")
+                "the wrong directory.\n"
+                + "".join(f"  ! {p}\n" for p in problems))
 
     buf: list[str] = []
     files = sorted({l.file for l in literals})

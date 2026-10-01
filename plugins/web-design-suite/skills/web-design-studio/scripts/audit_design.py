@@ -89,7 +89,10 @@ KEYFRAMES_AT = re.compile(r"@(-[a-z]+-)?keyframes\b", re.I)
 SASS_DEFINITION_AT = re.compile(r"@(mixin|function)\b", re.I)
 SASS_FUNCTION_AT = re.compile(r"@function\b", re.I)
 SASS_VARIABLE = re.compile(r"^([\w-]+\.)?\$[\w-]+$")
-SASS_BREAKPOINT = re.compile(r"\$(bp|breakpoints?)([-_][\w-]*)?$", re.I)
+SASS_BREAKPOINT = re.compile(r"\$(?:bp(?:[-_][\w-]*)?|breakpoint[\w-]*)$", re.I)
+SASS_MIXIN_NAME = re.compile(r"@mixin\s+([\w-]+)", re.I)
+SASS_INCLUDE_NAME = re.compile(r"@include\s+([\w-]+)(?![\w.-])", re.I)
+SASS_STRING = re.compile(r"""(['"])(?:\\.|(?!\1).)*\1""", re.S)
 
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit",
@@ -478,7 +481,12 @@ def scan_css(text: str) -> Iterator[CssDecl | tuple]:
             # and close nothing (SB-A24).
             j, nested = i + 1, 0
             while j < n:
-                if text[j] == "{":
+                if text[j] in "\"'":              # a brace in a string is text
+                    quote = text[j]
+                    j += 1
+                    while j < n and text[j] != quote:
+                        j += 2 if text[j] == "\\" else 1
+                elif text[j] == "{":
                     nested += 1
                 elif text[j] == "}":
                     nested -= 1
@@ -528,7 +536,7 @@ def scan_css(text: str) -> Iterator[CssDecl | tuple]:
             stmt = "".join(buf).strip()
             buf = []
             if stmt.startswith("@"):
-                yield ("at_statement", stmt, line, tuple(at_stack))
+                yield ("at_statement", stmt, line, tuple(at_stack), rule_depth())
             elif ":" in stmt:
                 p, _, v = stmt.partition(":")
                 yield CssDecl(p.strip().lower(), v.strip(), line,
@@ -617,13 +625,11 @@ def raw_colour(value: str) -> tuple[str, str] | None:
 
 
 def has_raw_length(value: str) -> str | None:
-    v = strip_var_refs(value)
-    m = LENGTH_LITERAL.search(v)
-    if not m:
-        return None
-    if re.fullmatch(r"-?0+(\.0+)?(px|rem|em)?", m.group(0), re.I):
-        return None
-    return m.group(0)
+    # Every length, not the first: `0px 13px` hid the 13px behind the zero.
+    for m in LENGTH_LITERAL.finditer(strip_var_refs(value)):
+        if not re.fullmatch(r"-?0+(\.0+)?(px|rem|em)?", m.group(0), re.I):
+            return m.group(0)
+    return None
 
 
 def owl_selector(selectors: tuple[str, ...]) -> bool:
@@ -687,6 +693,14 @@ def audit_css(path: Path, text: str) -> list[Finding]:
     first_rule_line = 0
     first_unlayered_line = 0
     declared_props: set[str] = set()
+    emitting_mixins: set[str] = set()     # mixins in this file that hold a whole rule
+
+    def outside_a_layer(at_rules: Iterable[str]) -> bool:
+        # A keyframe (`from`, `to`, `50%`) is not a style rule; the references
+        # and the scaffold keep @keyframes outside layers. A Sass @mixin or
+        # @function emits nothing where it is written (SB-A24).
+        return not any(a.startswith("@layer") or KEYFRAMES_AT.match(a) or SASS_DEFINITION_AT.match(a)
+                       for a in at_rules)
 
     def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str) -> None:
         tags = line_ignores.get(line, set()) | file_ignores
@@ -713,6 +727,13 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                             "Use: @layer reset, tokens, base, layout, components, "
                             "utilities, overrides; extra layers may be inserted, "
                             "but the canonical ones must keep their relative order.")
+                # A mixin that holds a whole rule emits it where it is included,
+                # so at the root of a file the rule is unlayered. Only a mixin
+                # defined in this file is known (design-rules.json: sass).
+                included = SASS_INCLUDE_NAME.match(stmt)
+                if (included and included.group(1).lower() in emitting_mixins and ev[4] == 0
+                        and not token_file and not first_unlayered_line and outside_a_layer(ev[3])):
+                    first_unlayered_line = ev[2]
             elif kind == "rule_open":
                 sel, line, depth, at_rules = ev[1], ev[2], ev[3], ev[4]
                 if not first_rule_line:
@@ -741,15 +762,10 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                         "Use a class; layers already decide who wins.")
                 # The at-rules open around this rule, not every one seen so
                 # far: a rule after a closed @layer block is unlayered (SB-A9).
-                # A keyframe (`from`, `to`, `50%`) is not a style rule; the
-                # references and the scaffold keep @keyframes outside layers.
-                # A Sass @mixin or @function emits nothing where it is written
-                # (SB-A24); the layer is checked where it is included.
-                if not token_file and depth == 1 and not first_unlayered_line and not any(
-                    a.startswith("@layer") or KEYFRAMES_AT.match(a) or SASS_DEFINITION_AT.match(a)
-                    for a in at_rules
-                ):
+                if not token_file and depth == 1 and not first_unlayered_line and outside_a_layer(at_rules):
                     first_unlayered_line = line
+                if depth == 1 and not sel.lstrip().startswith("&"):
+                    emitting_mixins.update(m.group(1).lower() for m in map(SASS_MIXIN_NAME.match, at_rules) if m)
             elif kind == "rule_close":
                 pass
             continue
@@ -796,9 +812,10 @@ def audit_css(path: Path, text: str) -> list[Finding]:
         # up (SB-A24; design-rules.json: sass.variables).
         if (SASS_VARIABLE.match(prop) and not token_file and not SASS_BREAKPOINT.search(prop)
                 and not any(SASS_FUNCTION_AT.match(a) for a in d.at_rules)):
-            rest = strip_var_refs(value)
-            colour = raw_colour(value)
-            if (has_raw_length(value) or (colour and colour[0] == "raw-color")
+            bare = SASS_STRING.sub('""', value)          # a string is text, not a value
+            rest = strip_var_refs(bare)
+            colour = raw_colour(bare)
+            if (has_raw_length(bare) or (colour and colour[0] == "raw-color")
                     or TIME_LITERAL.search(rest) or BEZIER_LITERAL.search(rest)):
                 add(line, "L1", "sass-literal", "error",
                     f"Sass variable `{prop}` holds a literal: `{value.strip()}`.",

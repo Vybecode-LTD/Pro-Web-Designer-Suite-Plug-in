@@ -474,6 +474,27 @@ class AuditPrecision(TempDirTest):
                    "}\n")
         self.assertEqual([("L1", "raw-spacing", 5), ("L2", "child-margin", 5)], self.found("src"))
 
+    def test_a_brace_in_a_string_does_not_extend_an_interpolation(self):
+        # CodeRabbit on PR #7: a quoted `{` inside `#{…}` was counted as
+        # nesting, so the interpolation swallowed the rest of the file.
+        self.write("src/components/card.scss",
+                   "@layer components {\n"
+                   '  #{map.get(("{": ".card"), "{")} {\n'
+                   "    padding: 13px;\n"
+                   "  }\n"
+                   "}\n")
+        self.assertEqual([("L1", "raw-spacing", 3)], self.found("src"))
+
+    def test_a_zero_with_a_unit_does_not_hide_the_length_after_it(self):
+        # CodeRabbit on PR #7, and older than Sass: only the first length in a
+        # value was looked at, so `0px 13px` passed.
+        self.write("src/components/card.css",
+                   "@layer components {\n"
+                   "  .card { padding: 0px 13px; }\n"
+                   "  .card__media { padding: 0px 0rem; }\n"
+                   "}\n")
+        self.assertEqual([("L1", "raw-spacing", 2)], self.found("src"))
+
     def test_indented_sass_is_skipped_not_passed(self):
         # Found with SB-A24: the scanner follows braces and indented Sass has
         # none, so a .sass file full of literals was reported clean.

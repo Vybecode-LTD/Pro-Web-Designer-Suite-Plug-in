@@ -192,6 +192,13 @@ class StylelintFollowsTheSpec(unittest.TestCase):
         self.assertIn("[systemColorRuleName]: true", self.config)
         self.assertIn("plugins: [designPlugin, systemColorPlugin]", self.config)
 
+    def test_sass_is_left_to_the_audit(self):
+        """The spec says stylelint reads no Sass (`sass.gates`), so the Sass
+        rules live in the audit alone. The day this config takes a Sass syntax,
+        it has to follow those rules too, with a real-tool test."""
+        self.assertIn("stylelint", SPEC["sass"]["gates"])
+        self.assertNotRegex(self.config, r"(?i)s[ac]ss")
+
     def test_nesting_limit(self):
         m = re.search(r"'max-nesting-depth':\s*\[\s*(\d+),\s*\{([^}]*)\}", self.config)
         self.assertIsNotNone(m)
