@@ -35,8 +35,9 @@
   - A partial holding only mixins, such as the references' own `_mq.scss`, failed as
     unlayered, because a mixin holds rules. A `@mixin` or `@function` body emits
     nothing where it is written, so the layer is now checked where it is included.
-    A mixin that holds a whole rule and is included at the root of its own file is
-    unlayered there; a mixin defined in another file is not followed.
+    A mixin that holds a whole rule and is included at the root of its own file,
+    directly or through another mixin, is unlayered there; a mixin defined in another
+    file is not followed.
   - A Sass variable holding a literal passed (`$card-padding: 24px`, then
     `padding: $card-padding`). Outside a token file, a variable that holds a length,
     a hex or functional colour, a duration or an easing curve now fails as
@@ -75,7 +76,7 @@
   Against 3.2.1 both fail, in five subtests.
 - SB-A24: seven `AuditPrecision` tests and `test_rules_spec.test_sass`, which runs the
   spec's Sass examples through the audit. Against 3.2.1 seven fail, `test_sass` in
-  ten subtests; the eighth, a brace in a string inside an interpolation, guards a bug
+  eleven subtests; the eighth, a brace in a string inside an interpolation, guards a bug
   that existed only while this fix was in review. Its example of an interpolation inside a layer passes there, because
   3.2.1 never reported a rule after a closed block; it fails on `5fd068e`, the commit
   before this fix. `test_sass_is_left_to_the_audit` holds the spec's statement that

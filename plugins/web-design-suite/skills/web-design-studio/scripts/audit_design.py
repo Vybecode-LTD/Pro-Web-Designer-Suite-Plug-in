@@ -731,9 +731,14 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 # so at the root of a file the rule is unlayered. Only a mixin
                 # defined in this file is known (design-rules.json: sass).
                 included = SASS_INCLUDE_NAME.match(stmt)
-                if (included and included.group(1).lower() in emitting_mixins and ev[4] == 0
-                        and not token_file and not first_unlayered_line and outside_a_layer(ev[3])):
-                    first_unlayered_line = ev[2]
+                if included and included.group(1).lower() in emitting_mixins and ev[4] == 0:
+                    # Inside another mixin, the rule is emitted wherever that
+                    # one is included, so the wrapper holds a whole rule too.
+                    wrappers = [m.group(1).lower() for m in map(SASS_MIXIN_NAME.match, ev[3]) if m]
+                    if wrappers:
+                        emitting_mixins.update(wrappers)
+                    elif not token_file and not first_unlayered_line and outside_a_layer(ev[3]):
+                        first_unlayered_line = ev[2]
             elif kind == "rule_open":
                 sel, line, depth, at_rules = ev[1], ev[2], ev[3], ev[4]
                 if not first_rule_line:
