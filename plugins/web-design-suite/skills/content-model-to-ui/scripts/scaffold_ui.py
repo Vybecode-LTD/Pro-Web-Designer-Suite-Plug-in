@@ -208,10 +208,11 @@ class Answers:
         return self.get("app.density", "compact")
 
     def rls(self, table: dict[str, Any] | None = None) -> bool:
-        """The human's answer if there is one; otherwise what the DDL states
-        for this table; otherwise on, the safe assumption."""
+        """What the DDL states for this table. The one answer for the whole
+        application covers a source that cannot say, and never overrides a
+        table's own fact: in a mixed schema it is "no" for every table."""
         stated = table.get("rls") if table else None
-        return bool(self.get("app.rls_enabled", True if stated is None else stated))
+        return bool(self.get("app.rls_enabled", True) if stated is None else stated)
 
 
 # ---------------------------------------------------------------------------

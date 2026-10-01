@@ -85,15 +85,25 @@
     row because its condition is `true`.
   - `warn`: RLS on with no policy for a signed-in user, or authority columns (`role`,
     `is_admin`, `org_id`) that a user who may update a row can change, with the
-    `revoke` that closes it.
+    revoke and grant that close it. A column counts as safe only when the user has no
+    UPDATE privilege on it, or a policy pins it to the caller (`owner_id = auth.uid()`).
+  Policies are replayed as the migrations state them: a dropped policy is gone, and a
+  restrictive policy narrows the permissive ones and grants nothing.
   The findings are in the model (`security`), the "Is RLS on?" question defaults from
   the DDL, and `scaffold_ui` repeats the blocking findings and writes each table's
   forbidden-state notes from that table's own RLS. It does not refuse to write the
   screens. From generated types or a JSON dump the block says "unknown".
+- **The reference's column revoke did nothing** (N15, from CodeRabbit on PR #9). It
+  told readers to protect `is_admin` with `revoke update (role, is_admin, …) on
+  profiles from authenticated`, and secrets with a column-level `revoke select`.
+  Postgres ignores a column-level revoke while a table-level grant stands, and
+  Supabase grants table-level privileges by default. The reference and the security
+  pass now give the form that works: revoke on the table, grant the columns back.
 - **The skill's own command failed on two migration files** (N14).
   `introspect_schema supabase/migrations/*.sql` was an argparse error as soon as the
   folder held more than one file. Several DDL files are now read as one schema, in
   the order given, which is also how a later migration's policies reach the table.
+  A pattern is expanded by the tool itself, because cmd.exe passes it as written.
 
 ### Changed
 
@@ -121,8 +131,8 @@
 - DL-B1, DL-A5 and DL-C4: `test_docs.SupabaseGuidance.test_the_access_boundary_is_stated`
   holds what the reference must say and must no longer say. Against 3.2.1 it fails
   in 16 subtests. The two dated figures it quotes are in the evidence register.
-- DL-A6, DL-C1 and N14: nine tests in `test_content_and_a11y.SchemaSecurityPass`. Against
-  3.2.1 all nine fail. Controls inside them: a public read policy, a policy for the
+- DL-A6, DL-C1, N14 and N15: twelve tests in `test_content_and_a11y.SchemaSecurityPass`. Against
+  3.2.1 all twelve fail. Controls inside them: a public read policy, a policy for the
   service role and an owner check are not findings.
 - `test_docs` runs `test_harness` on the floor interpreter, and `test_harness` checks
   the temporary folders and `TempDirTest.write` there. On 3.9, 3.2.1's harness errored

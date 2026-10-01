@@ -417,13 +417,65 @@ class SchemaSecurityPass(TempDirTest):
         self.assertIn("notes_write", message)
         self.assertNotIn("notes_read", json.dumps(model["security"]))
 
-    def test_a_column_revoke_closes_the_authority_warning(self):
-        revoke = "REVOKE UPDATE (role, is_admin, credits, org_id) ON profiles FROM authenticated;\n"
-        _, model = self.introspect(RLS_DDL + revoke)
+    def test_only_a_table_revoke_takes_a_column_away(self):
+        # CodeRabbit on PR #9, and Postgres: a column-level revoke has no
+        # effect while the table-level grant stands, which is Supabase's default.
+        column = "REVOKE UPDATE (role, is_admin, credits, org_id) ON profiles FROM authenticated;\n"
+        _, model = self.introspect(RLS_DDL + column)
+        warning = next(f["message"] for f in model["security"]["findings"]
+                       if f["code"] == "authority-writable")
+        self.assertIn("has no effect while the table-level grant stands", warning)
+        self.assertIn("revoke update on profiles from authenticated; grant update (display_name)", warning)
+        table = ("REVOKE UPDATE ON profiles FROM authenticated;\n"
+                 "GRANT UPDATE (display_name) ON profiles TO authenticated;\n")
+        _, model = self.introspect(RLS_DDL + table)
         self.assertNotIn(("profiles", "warn", "authority-writable"), self.found(model))
-        # Revoked from anon alone, a signed-in user still holds the columns.
-        _, model = self.introspect(RLS_DDL + revoke.replace("authenticated", "anon"))
+        # Granted back, the column is exposed again; revoked from anon alone, nothing changed.
+        _, model = self.introspect(RLS_DDL + table + "GRANT UPDATE (role) ON profiles TO authenticated;\n")
         self.assertIn(("profiles", "warn", "authority-writable"), self.found(model))
+        _, model = self.introspect(RLS_DDL + "REVOKE UPDATE ON profiles FROM anon;\n")
+        self.assertIn(("profiles", "warn", "authority-writable"), self.found(model))
+
+    def test_naming_an_authority_column_is_not_pinning_it(self):
+        # Codex on PR #9: `role in ('member', 'admin')` names the column and
+        # lets a member choose admin.
+        base = SAAS_DDL + "ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;\n"
+        named = ("CREATE POLICY p ON profiles FOR UPDATE TO authenticated USING (id = auth.uid()) "
+                 "WITH CHECK (id = auth.uid() AND role IN ('member', 'admin'));\n")
+        _, model = self.introspect(base + named)
+        warning = next(f["message"] for f in model["security"]["findings"]
+                       if f["code"] == "authority-writable")
+        self.assertIn("role", warning)
+        self.assertNotIn("change id,", warning)             # `id = auth.uid()` does pin id
+        pinned = ("CREATE POLICY p ON projects FOR UPDATE TO authenticated "
+                  "USING (owner_id = (select auth.uid()));\n")
+        _, model = self.introspect(SAAS_DDL + "ALTER TABLE projects ENABLE ROW LEVEL SECURITY;\n" + pinned)
+        self.assertNotIn(("projects", "warn", "authority-writable"), self.found(model))
+
+    def test_a_restrictive_policy_narrows_and_never_grants(self):
+        # Codex and CodeRabbit on PR #9: Postgres ANDs a restrictive policy
+        # with the permissive ones, and one alone lets nothing through.
+        base = SAAS_DDL + "ALTER TABLE projects ENABLE ROW LEVEL SECURITY;\n"
+        open_write = "CREATE POLICY anyone ON projects FOR UPDATE TO authenticated USING (true);\n"
+        narrow = ("CREATE POLICY mine ON projects AS RESTRICTIVE FOR UPDATE TO authenticated "
+                  "USING (owner_id = auth.uid());\n")
+        _, model = self.introspect(base + open_write)
+        self.assertIn(("projects", "block", "open-write"), self.found(model))
+        _, model = self.introspect(base + open_write + narrow)
+        self.assertNotIn("open-write", {f["code"] for f in model["security"]["findings"]})
+        _, model = self.introspect(base + narrow)
+        self.assertIn(("projects", "warn", "no-policy"), self.found(model))
+
+    def test_a_dropped_policy_is_gone(self):
+        # Codex and CodeRabbit on PR #9: migrations are replayed in order.
+        base = SAAS_DDL + "ALTER TABLE projects ENABLE ROW LEVEL SECURITY;\n"
+        history = ("CREATE POLICY \"open\" ON projects FOR ALL TO authenticated USING (true);\n"
+                   "DROP POLICY IF EXISTS \"open\" ON public.projects;\n"
+                   "CREATE POLICY mine ON projects FOR ALL TO authenticated USING (owner_id = auth.uid());\n")
+        _, model = self.introspect(base + history)
+        projects = next(t for t in model["tables"] if t["name"] == "projects")
+        self.assertEqual(["mine"], [p["name"] for p in projects["policies"]])
+        self.assertNotIn("open-write", {f["code"] for f in model["security"]["findings"]})
 
     def test_the_summary_opens_with_the_security_block(self):
         proc, _ = self.introspect(RLS_DDL)
@@ -465,6 +517,12 @@ class SchemaSecurityPass(TempDirTest):
                       "database.types.ts", cwd=self.tmp)
         self.assertEqual(proc.returncode, 2, output(proc))
         self.assertIn("database.types.ts alone", output(proc))
+        # cmd.exe hands the pattern over as written (CodeRabbit on PR #9).
+        proc = run_py("content-model-to-ui", "introspect_schema", "migrations/*.sql", "-o", "glob.json",
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        globbed = json.loads((self.tmp / "glob.json").read_text(encoding="utf-8"))
+        self.assertTrue(next(t for t in globbed["tables"] if t["name"] == "projects")["rls"])
 
     def test_the_rls_question_defaults_from_the_ddl(self):
         def default(model):
@@ -491,6 +549,14 @@ class SchemaSecurityPass(TempDirTest):
 
         self.assertIn("RLS was reported as off", states("Projects"))
         self.assertIn("Row-level security is on for this table", states("Profiles"))
+        # Codex on PR #9: the pre-filled answer is "no" for a mixed schema, and
+        # one answer for the whole application must not overrule a table's fact.
+        answers = self.write("answers.json", json.dumps({"app.rls_enabled": False}))
+        proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "src", "--force",
+                      "--answers", answers, cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn("Row-level security is on for this table", states("Profiles"))
+        self.assertIn("RLS was reported as off", states("Projects"))
 
 
 class A11yStaticScaleAndScope(TempDirTest):

@@ -10,7 +10,8 @@
   - `introspect_schema` reads `ENABLE ROW LEVEL SECURITY`, `CREATE POLICY` and column revokes, and opens `--summary` with a SECURITY block: `BLOCK` for a table with RLS off or a policy whose write condition is `true`; `warn` for RLS with no user policy, or authority columns a user can change.
   - The findings are in the model (`security`). The "Is RLS on?" question defaults from the DDL, and `scaffold_ui` repeats the blocking findings.
   - N14, found on the way: the skill's own command passed `supabase/migrations/*.sql`, which failed on two files. Several DDL files are now one schema.
-  - 374 tests pass on 3.14 and 3.9. The nine new tests fail on `v3.2.1`.
+  - N15, from the reviews: a column-level revoke does nothing while a table-level grant stands, which is Supabase's default. The reference's own advice was wrong and is corrected; the pass tracks `GRANT`, `REVOKE` and `DROP POLICY` in order, and treats a column as safe only when a policy pins it to the caller.
+  - 377 tests pass on 3.14 and 3.9. The twelve new tests fail on `v3.2.1`.
 - **Decisions the user has not made:**
   - `scaffold_ui` warns about blocking findings but still writes the screens. Refusing to write them would break every schema whose policies are kept elsewhere.
   - stylelint reads no Sass, so the audit is the only Sass gate (`test_rules_spec` holds the statement). Teaching stylelint Sass means shipping `postcss-scss`.

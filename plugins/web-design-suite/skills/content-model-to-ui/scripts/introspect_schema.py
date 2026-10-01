@@ -65,6 +65,7 @@ invocation or an unreadable path.
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -377,7 +378,11 @@ class Table:
     # say (generated types, a JSON dump). False: DDL that never enables it.
     rls: bool | None = None
     policies: list[dict[str, Any]] = field(default_factory=list)
-    revoked_update: list[str] = field(default_factory=list)
+    # Columns a signed-in user may UPDATE. None: the table-level grant
+    # stands (Supabase's default), so every column. A list: the table-level
+    # grant was revoked and these columns were granted back.
+    update_columns: list[str] | None = None
+    ineffective_revokes: list[str] = field(default_factory=list)
 
     def col(self, name: str) -> Column | None:
         return next((c for c in self.columns if c.name == name), None)
@@ -548,6 +553,8 @@ RE_ALTER_RLS = _p(r"^\s*alter\s+table(?:\s+if\s+exists)?(?:\s+only)?\s+([\w\".]+
                   r"(enable|disable|force|no\s+force)\s+row\s+level\s+security\s*$")
 RE_CREATE_POLICY = _p(r"^\s*create\s+policy\s+(\"[^\"]+\"|\w+)\s+on\s+([\w\".]+)\s*(.*)$")
 RE_REVOKE = _p(r"^\s*revoke\s+(.+?)\s+on\s+(?:table\s+)?([\w\".]+)\s+from\s+(.+)$")
+RE_GRANT = _p(r"^\s*grant\s+(.+?)\s+on\s+(?:table\s+)?([\w\".]+)\s+to\s+(.+)$")
+RE_DROP_POLICY = _p(r"^\s*drop\s+policy(?:\s+if\s+exists)?\s+(\"[^\"]+\"|\w+)\s+on\s+([\w\".]+)")
 RE_POLICY_AS = _p(r"\s*as\s+(permissive|restrictive)\b")
 RE_POLICY_FOR = _p(r"\s*for\s+(all|select|insert|update|delete)\b")
 RE_POLICY_TO = _p(r"\s*to\s+(.+?)(?=\s+using\s*\(|\s+with\s+check\s*\(|\s*$)")
@@ -590,17 +597,50 @@ def _parse_policy(name: str, tail: str) -> dict[str, Any]:
     return policy
 
 
-def _apply_revoke(table: Table, privileges: str, grantees: str) -> None:
-    """`REVOKE UPDATE (role, is_admin) ON profiles FROM authenticated`: the
-    columns a row policy can no longer hand out to a signed-in user."""
-    if not re.search(r"\b(authenticated|public)\b", grantees, re.I):
+def _apply_privileges(table: Table, verb: str, privileges: str, grantees: str) -> None:
+    """GRANT and REVOKE of UPDATE for a signed-in user, replayed in order.
+
+    Postgres: "if a role has been granted privileges on a table, then revoking
+    the same privileges from individual columns will have no effect". Supabase
+    grants table-level UPDATE to `authenticated` by default, so a column is
+    protected only by revoking UPDATE on the table and granting back the
+    columns a user may change."""
+    if not re.search(r"\bauthenticated\b", grantees, re.I):
         return
-    for m in re.finditer(r"\bupdate\s*(?:\(([^)]*)\))?", privileges, re.I):
-        cols = ([unquote_ident(c.strip()) for c in m.group(1).split(",") if c.strip()]
-                if m.group(1) else [c.name for c in table.columns])
-        table.revoked_update.extend(c for c in cols if c not in table.revoked_update)
-    if re.match(r"\s*all\b", privileges, re.I):
-        table.revoked_update = [c.name for c in table.columns]
+    whole_table = bool(re.match(r"\s*all\b", privileges, re.I))
+    columns: list[str] = []
+    for m in re.finditer(r"\bupdate\b\s*(?:\(([^)]*)\))?", privileges, re.I):
+        if m.group(1) is None:
+            whole_table = True
+        else:
+            columns += [unquote_ident(c.strip()) for c in m.group(1).split(",") if c.strip()]
+    if verb == "revoke":
+        if whole_table:
+            table.update_columns = []
+            table.ineffective_revokes = []
+        elif table.update_columns is None:
+            table.ineffective_revokes += [c for c in columns if c not in table.ineffective_revokes]
+        else:
+            table.update_columns = [c for c in table.update_columns if c not in columns]
+    elif whole_table:
+        table.update_columns = None
+    elif table.update_columns is not None:
+        table.update_columns += [c for c in columns if c not in table.update_columns]
+
+
+def _pinned_to_caller(column: str, check: str) -> bool:
+    """Whether a policy condition fixes `column` to who is calling:
+    `owner_id = auth.uid()`, `org_id = (select … auth.uid() …)`. Naming the
+    column is not enough: `role in ('member', 'admin')` lets a member choose."""
+    col = re.escape(column)
+    if re.search(rf"auth\.\w+\s*\(\s*\)[\s)]*=\s*{col}(?!\w)", check, re.I):
+        return True
+    for m in re.finditer(rf"(?<![\w.]){col}\s*=\s*", check, re.I):
+        rest = check[m.end():]
+        operand = "(" + _balanced_slice(rest, 0) + ")" if rest.startswith("(") else re.split(r"\s", rest, 1)[0]
+        if re.search(r"\bauth\.\w+\s*\(", operand, re.I):
+            return True
+    return False
 
 
 def _is_true(expr: str | None) -> bool:
@@ -631,7 +671,17 @@ def security_pass(model: Model) -> None:
                 "write every row" + (f" ({len(t.policies)} policy(ies) exist and do nothing "
                                      f"until it is enabled)" if t.policies else ""))
             continue
-        open_to_users = [p for p in t.policies if not set(p["roles"]) <= SERVER_ROLES]
+        for_users = [p for p in t.policies if not set(p["roles"]) <= SERVER_ROLES]
+        # A restrictive policy grants nothing: it narrows what the permissive
+        # ones allow, and Postgres ANDs it with them.
+        open_to_users = [p for p in for_users if p["permissive"]]
+        narrowing = [p for p in for_users if not p["permissive"]]
+
+        def narrowed(command: str) -> bool:
+            return any(r["command"] in (command, "all")
+                       and not _is_true(r["with_check"] if r["with_check"] is not None else r["using"])
+                       for r in narrowing)
+
         if not open_to_users:
             add("warn", t, "no-policy",
                 "row-level security is on with no policy for a signed-in user: every query "
@@ -643,7 +693,8 @@ def security_pass(model: Model) -> None:
             # Postgres: with no WITH CHECK, the USING expression checks the new row too.
             new_row_check = (p["with_check"] if p["with_check"] is not None else p["using"]) \
                 if cmd in ("all", "insert", "update") else None
-            if cmd != "select" and (_is_true(row_check) or _is_true(new_row_check)):
+            if (cmd != "select" and (_is_true(row_check) or _is_true(new_row_check))
+                    and not narrowed(cmd)):
                 add("block", t, "open-write",
                     f"policy \"{p['name']}\" lets {', '.join(p['roles'])} "
                     f"{'write' if cmd == 'all' else cmd} every row: its condition is `true`",
@@ -651,20 +702,33 @@ def security_pass(model: Model) -> None:
         writers = [p for p in open_to_users if p["command"] in ("all", "update")]
         if writers:
             exposed = []
+            def check_of(p: dict[str, Any]) -> str:
+                return p["with_check"] if p["with_check"] is not None else (p["using"] or "")
+
             for c in t.columns:
-                if not c.ui.get("authority") or c.name in t.revoked_update:
+                if not c.ui.get("authority"):
                     continue
-                named = re.compile(rf"(?<![\w.]){re.escape(c.name)}(?!\w)")
-                checks = [p["with_check"] if p["with_check"] is not None else (p["using"] or "")
-                          for p in writers]
-                if not all(named.search(check) for check in checks):
+                if t.update_columns is not None and c.name not in t.update_columns:
+                    continue                                  # no UPDATE privilege on it
+                # Permissive policies are ORed, so each must pin the column;
+                # a restrictive one is ANDed, so one is enough.
+                pinned = (all(_pinned_to_caller(c.name, check_of(p)) for p in writers)
+                          or any(_pinned_to_caller(c.name, check_of(r)) for r in narrowing
+                                 if r["command"] in ("all", "update")))
+                if not pinned:
                     exposed.append(c.name)
             if exposed:
                 cols = ", ".join(exposed)
+                safe = ", ".join(c.name for c in t.columns
+                                 if c.ui.get("placement", {}).get("form") and not c.ui.get("authority"))
+                dead = [c for c in t.ineffective_revokes if c in exposed]
                 add("warn", t, "authority-writable",
-                    f"a user who may update a row may change {cols}: no column revoke and no "
-                    f"WITH CHECK names them. If that is not intended: revoke update ({cols}) "
-                    f"on {t.name} from authenticated;")
+                    f"a user who may update a row may change {cols}: the table-level UPDATE "
+                    f"grant covers every column and no policy pins them to the caller. "
+                    + (f"The column revoke on {', '.join(dead)} has no effect while the "
+                       f"table-level grant stands. " if dead else "")
+                    + f"If that is not intended: revoke update on {t.name} from authenticated; "
+                    f"grant update ({safe or '…'}) on {t.name} to authenticated;")
 
     model.security = {**model.security,
                       "stated_by_source": any(t.rls is not None for t in model.tables),
@@ -752,11 +816,27 @@ def parse_ddl(text: str) -> Model:
                 t.policies.append(_parse_policy(unquote_ident(m.group(1)), m.group(3)))
             continue
 
+        m = RE_DROP_POLICY.match(one_line)
+        if m:
+            # Migrations are replayed in order: a dropped policy is gone.
+            t = model.table(bare_table_name(m.group(2)))
+            if t:
+                name = unquote_ident(m.group(1))
+                t.policies = [p for p in t.policies if p["name"] != name]
+            continue
+
         m = RE_REVOKE.match(one_line)
         if m:
             t = model.table(bare_table_name(m.group(2)))
             if t:
-                _apply_revoke(t, m.group(1), m.group(3))
+                _apply_privileges(t, "revoke", m.group(1), m.group(3))
+            continue
+
+        m = RE_GRANT.match(one_line)
+        if m:
+            t = model.table(bare_table_name(m.group(2)))
+            if t:
+                _apply_privileges(t, "grant", m.group(1), m.group(3))
             continue
 
         m = RE_ALTER_ADD.match(one_line)
@@ -799,7 +879,7 @@ def parse_ddl(text: str) -> Model:
         "carries": ["tables", "columns", "types", "lengths", "nullability",
                     "defaults", "generated", "checks", "primary keys",
                     "foreign keys", "unique indexes", "enums", "comments",
-                    "row-level security", "policies", "column revokes"],
+                    "row-level security", "policies", "column privileges"],
         "missing": ["row counts / cardinality",
                     "which column is the title", "display order",
                     "what users actually do with each field"],
@@ -2243,8 +2323,9 @@ def build_questions(model: Model) -> None:
         + "Under RLS a row you cannot see and a row that does not exist are the "
         "same response, so 'empty' and 'forbidden' have to be told apart "
         "deliberately or the UI tells users their data is gone. The forbidden "
-        "state is generated either way; the answer sets what its notes say. "
-        "See supabase-integration.md §2.")
+        "state is generated either way. Where the DDL states RLS for a table, "
+        "that table's notes follow the DDL; this answer covers a source that "
+        "cannot say. See supabase-integration.md §2.")
     ask("app.density", "choice",
         "Which density should the generated screens run at?",
         "compact",
@@ -2509,7 +2590,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="restrict the model to these tables (repeatable)")
     args = ap.parse_args(argv)
 
-    paths = [Path(p) for p in args.schema]
+    # cmd.exe hands `supabase/migrations/*.sql` over as written, so expand a
+    # pattern here; sorted, which is the order migrations are applied in.
+    paths = []
+    for given in args.schema:
+        matched = sorted(glob.glob(given)) if any(ch in given for ch in "*?[") else []
+        paths += [Path(p) for p in matched] or [Path(given)]
     path = paths[0]
     texts: list[str] = []
     for each in paths:
