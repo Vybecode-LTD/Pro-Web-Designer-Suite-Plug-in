@@ -64,7 +64,7 @@ Reads a `.sql` DDL file, a `supabase gen types typescript` `.ts` file, or a JSON
 
 **Prefer the DDL.** All three sources produce the same structural model, but generated types carry no lengths, no CHECKs, no `ON DELETE` and no unique indexes — which is exactly the information the mapper wants most. `references/supabase-integration.md` §1 has the fidelity table and the measured difference.
 
-`--summary` prints the proposal: every column, its control, the signal that chose it, and a confidence level. Read it. It is faster than reading the JSON and it is where you will spot the one column the machine got backwards.
+`--summary` opens with a SECURITY block (from DDL: tables with RLS off, policies that let anyone write, authority columns a user can change) and then prints the proposal: every column, its control, the signal that chose it, and a confidence level. Read it. It is faster than reading the JSON and it is where you will spot the one column the machine got backwards.
 
 ### 2. Enrich it — the human step
 
@@ -143,7 +143,9 @@ Then prove the result, not just the code: `component-state-matrix` renders every
   "source":   { "path": "schema.sql", "format": "ddl", "pg_schema": "public" },
   "fidelity": { "source_format": "ddl",
                 "carries": ["lengths", "checks", "unique indexes", "…"],
-                "missing": ["row counts / cardinality", "RLS policies", "…"] },
+                "missing": ["row counts / cardinality", "…"] },
+  "security": { "stated_by_source": true,
+                "findings": [{ "level": "block", "table": "projects", "code": "rls-off", "message": "…" }] },
   "enums":    { "order_status": ["pending", "paid", "shipped", "cancelled"] },
 
   "tables": [{

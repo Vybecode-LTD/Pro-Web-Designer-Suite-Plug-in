@@ -582,6 +582,12 @@
   "heading": "RLS is a UI concern"
  },
  {
+  "from": "content-model-to-ui/scripts/introspect_schema.py",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "9",
+  "heading": "Who talks to the database"
+ },
+ {
   "from": "content-model-to-ui/scripts/scaffold_ui.py",
   "to": "content-model-to-ui/references/field-mapping.md",
   "section": "6",
@@ -616,6 +622,12 @@
   "to": "content-model-to-ui/references/supabase-integration.md",
   "section": "2",
   "heading": "RLS is a UI concern"
+ },
+ {
+  "from": "content-model-to-ui/scripts/scaffold_ui.py",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "9",
+  "heading": "Who talks to the database"
  },
  {
   "from": "design-critique-gate/SKILL.md",

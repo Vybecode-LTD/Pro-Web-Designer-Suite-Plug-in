@@ -207,8 +207,12 @@ class Answers:
     def density(self) -> str:
         return self.get("app.density", "compact")
 
-    def rls(self) -> bool:
-        return bool(self.get("app.rls_enabled", True))
+    def rls(self, table: dict[str, Any] | None = None) -> bool:
+        """What the DDL states for this table. The one answer for the whole
+        application covers a source that cannot say, and never overrides a
+        table's own fact: in a mixed schema it is "no" for every table."""
+        stated = table.get("rls") if table else None
+        return bool(self.get("app.rls_enabled", True) if stated is None else stated)
 
 
 # ---------------------------------------------------------------------------
@@ -2074,7 +2078,7 @@ def emit_states(table: dict[str, Any], model: dict[str, Any],
     human = name.replace("_", " ")
     empty = ans.empty(table)
     cols = len(ans.list_columns(table)) or 3
-    rls = ans.rls()
+    rls = ans.rls(table)
 
     forbidden_note = (
         "Row-level security is on for this table, so this is a real state: the\n"
@@ -2683,6 +2687,17 @@ def main(argv: list[str] | None = None) -> int:
 
     files = build_files(model, ans, args.stack, entities)
     root = Path(args.out)
+
+    # The screens are only as safe as the tables behind them: say so here,
+    # where the code is about to be written (DL-A6).
+    blocking = [f for f in model.get("security", {}).get("findings", [])
+                if f["level"] == "block" and (entities is None or f["table"] in entities)]
+    for f in blocking:
+        print(f"scaffold_ui: SECURITY {f['table']}: {f['message']}", file=sys.stderr)
+    if blocking:
+        print(f"scaffold_ui: {len(blocking)} blocking security finding(s) in the schema. "
+              f"The screens are generated, but fix the database before they ship "
+              f"(supabase-integration.md §2, §9).", file=sys.stderr)
 
     if args.dry_run:
         total = 0

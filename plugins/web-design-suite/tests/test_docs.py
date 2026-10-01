@@ -154,7 +154,8 @@ class SupabaseGuidance(unittest.TestCase):
             with self.subTest(wrong=wrong):
                 self.assertNotIn(wrong, text)
         for right in ("bypass row security", "changes 0 rows and reports success",
-                      "throwOnError", "revoke update (role, is_admin"):
+                      "throwOnError", "revoke update on profiles from authenticated; grant update (display_name)",
+                      "Revoking a single column does nothing on Supabase"):
             with self.subTest(right=right):
                 self.assertIn(right, text)
 
@@ -168,7 +169,9 @@ class SupabaseGuidance(unittest.TestCase):
         for wrong in ("returns boolean security definer`",           # in public, no search_path
                       "The JWT's claims, or",                         # user_metadata is user-writable
                       "REPLICA IDENTITY FULL` gives you the old row",  # not under RLS
-                      "The id itself is what leaks"):                 # a uuid hides no delete count
+                      "The id itself is what leaks",                  # a uuid hides no delete count
+                      "revoke update (role, is_admin",                # no effect under a table grant
+                      "revoke select (api_token"):
             with self.subTest(wrong=wrong):
                 self.assertNotIn(wrong, text)
         for right in ("## 9. Who talks to the database", "sb_publishable_", "sb_secret_", "bypassrls",

@@ -8,6 +8,12 @@ Every quote below was found word for word on 2026-10-01, in the page's `.md` for
 - https://supabase.com/docs/guides/database/postgres/row-level-security
   - A change to `app_metadata` "will not be reflected using `auth.jwt()` until the user's JWT is refreshed."
   - The template: `create function private.user_list_ids() … security definer set search_path = '' stable`, then `revoke execute on function private.user_list_ids() from public; grant usage on schema private to authenticated; grant execute … to authenticated`.
+- https://www.postgresql.org/docs/current/sql-revoke.html
+  - "if a role has been granted privileges on a table, then revoking the same privileges from individual columns will have no effect."
+- https://www.postgresql.org/docs/current/sql-createpolicy.html
+  - "If only a USING clause is specified, then that clause will be used for both USING and WITH CHECK cases."
+- https://supabase.com/docs/guides/database/postgres/column-level-security
+  - "By default, our table will have a table-level `UPDATE` privilege, which means that the `authenticated` role can update all the columns in the table."
 - https://supabase.com/docs/guides/realtime/authorization
   - "By creating RLS policies on the `realtime.messages` table you can control the access users have to a Channel topic"
   - "To enforce private channels you need to disable the 'Allow public access' setting in Realtime Settings"

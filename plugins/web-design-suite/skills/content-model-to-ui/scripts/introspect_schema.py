@@ -65,6 +65,7 @@ invocation or an unreadable path.
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -373,6 +374,15 @@ class Table:
     unique_indexes: list[list[str]] = field(default_factory=list)
     relationships: list[Relationship] = field(default_factory=list)
     screens: dict[str, Any] = field(default_factory=dict)
+    # Row-level security, as the source states it. None: the source cannot
+    # say (generated types, a JSON dump). False: DDL that never enables it.
+    rls: bool | None = None
+    policies: list[dict[str, Any]] = field(default_factory=list)
+    # Columns a signed-in user may UPDATE. None: the table-level grant
+    # stands (Supabase's default), so every column. A list: the table-level
+    # grant was revoked and these columns were granted back.
+    update_columns: list[str] | None = None
+    ineffective_revokes: list[str] = field(default_factory=list)
 
     def col(self, name: str) -> Column | None:
         return next((c for c in self.columns if c.name == name), None)
@@ -385,6 +395,7 @@ class Model:
     enums: dict[str, list[str]] = field(default_factory=dict)
     tables: list[Table] = field(default_factory=list)
     questions: list[dict[str, Any]] = field(default_factory=list)
+    security: dict[str, Any] = field(default_factory=dict)
 
     def table(self, name: str) -> Table | None:
         return next((t for t in self.tables if t.name == name), None)
@@ -537,10 +548,226 @@ RE_PK_CLAUSE = _p(r"^primary\s+key\s*\(([^)]*)\)")
 RE_UNIQUE_CLAUSE = _p(r"^unique\s*(?:nulls\s+(?:not\s+)?distinct\s*)?\(([^)]*)\)")
 RE_CHECK_CLAUSE = _p(r"^check\s*\((.*)\)\s*$")
 RE_INLINE_REFS = _p(r"\breferences\s+([\w\".]+)\s*(?:\(([^)]*)\))?(.*)$")
+# Row-level security (DL-A6): the statements the parser used to skip.
+RE_ALTER_RLS = _p(r"^\s*alter\s+table(?:\s+if\s+exists)?(?:\s+only)?\s+([\w\".]+)\s+"
+                  r"(enable|disable|force|no\s+force)\s+row\s+level\s+security\s*$")
+RE_CREATE_POLICY = _p(r"^\s*create\s+policy\s+(\"[^\"]+\"|\w+)\s+on\s+([\w\".]+)\s*(.*)$")
+RE_REVOKE = _p(r"^\s*revoke\s+(.+?)\s+on\s+(?:table\s+)?([\w\".]+)\s+from\s+(.+)$")
+RE_GRANT = _p(r"^\s*grant\s+(.+?)\s+on\s+(?:table\s+)?([\w\".]+)\s+to\s+(.+)$")
+RE_DROP_POLICY = _p(r"^\s*drop\s+policy(?:\s+if\s+exists)?\s+(\"[^\"]+\"|\w+)\s+on\s+([\w\".]+)")
+RE_POLICY_AS = _p(r"\s*as\s+(permissive|restrictive)\b")
+RE_POLICY_FOR = _p(r"\s*for\s+(all|select|insert|update|delete)\b")
+RE_POLICY_TO = _p(r"\s*to\s+(.+?)(?=\s+using\s*\(|\s+with\s+check\s*\(|\s*$)")
+RE_POLICY_USING = _p(r"\s*using\s*\(")
+RE_POLICY_CHECK = _p(r"\s*with\s+check\s*\(")
+
+# Roles a browser never holds: a policy written for them alone is not a way in.
+SERVER_ROLES = {"service_role", "postgres", "supabase_admin", "supabase_auth_admin",
+                "supabase_storage_admin", "dashboard_user"}
+
+
+def _parse_policy(name: str, tail: str) -> dict[str, Any]:
+    """`CREATE POLICY name ON table` and what follows it, in the order Postgres
+    takes the clauses: AS, FOR, TO, USING, WITH CHECK."""
+    policy: dict[str, Any] = {"name": name, "command": "all", "roles": ["public"],
+                              "permissive": True, "using": None, "with_check": None}
+    m = RE_POLICY_AS.match(tail)
+    if m:
+        policy["permissive"] = m.group(1).lower() == "permissive"
+        tail = tail[m.end():]
+    m = RE_POLICY_FOR.match(tail)
+    if m:
+        policy["command"] = m.group(1).lower()
+        tail = tail[m.end():]
+    m = RE_POLICY_TO.match(tail)
+    if m:
+        policy["roles"] = [unquote_ident(r.strip()).lower() for r in m.group(1).split(",") if r.strip()]
+        tail = tail[m.end():]
+    for key, rx in (("using", RE_POLICY_USING), ("with_check", RE_POLICY_CHECK)):
+        m = rx.match(tail)
+        if m:
+            depth, i = 0, m.end() - 1
+            while i < len(tail):
+                depth += (tail[i] == "(") - (tail[i] == ")")
+                if depth == 0:
+                    break
+                i += 1
+            policy[key] = tail[m.end():i].strip()
+            tail = tail[i + 1:]
+    return policy
+
+
+def _apply_privileges(table: Table, verb: str, privileges: str, grantees: str) -> None:
+    """GRANT and REVOKE of UPDATE for a signed-in user, replayed in order.
+
+    Postgres: "if a role has been granted privileges on a table, then revoking
+    the same privileges from individual columns will have no effect". Supabase
+    grants table-level UPDATE to `authenticated` by default, so a column is
+    protected only by revoking UPDATE on the table and granting back the
+    columns a user may change."""
+    if not re.search(r"\bauthenticated\b", grantees, re.I):
+        return
+    whole_table = bool(re.match(r"\s*all\b", privileges, re.I))
+    columns: list[str] = []
+    for m in re.finditer(r"\bupdate\b\s*(?:\(([^)]*)\))?", privileges, re.I):
+        if m.group(1) is None:
+            whole_table = True
+        else:
+            columns += [unquote_ident(c.strip()) for c in m.group(1).split(",") if c.strip()]
+    if verb == "revoke":
+        if whole_table:
+            table.update_columns = []
+            table.ineffective_revokes = []
+        elif table.update_columns is None:
+            table.ineffective_revokes += [c for c in columns if c not in table.ineffective_revokes]
+        else:
+            table.update_columns = [c for c in table.update_columns if c not in columns]
+    elif whole_table:
+        table.update_columns = None
+    elif table.update_columns is not None:
+        table.update_columns += [c for c in columns if c not in table.update_columns]
+
+
+def _pinned_to_caller(column: str, check: str) -> bool:
+    """Whether a policy condition fixes `column` to who is calling:
+    `owner_id = auth.uid()`, `org_id = (select … auth.uid() …)`. Naming the
+    column is not enough: `role in ('member', 'admin')` lets a member choose."""
+    col = re.escape(column)
+    if re.search(rf"auth\.\w+\s*\(\s*\)[\s)]*=\s*{col}(?!\w)", check, re.I):
+        return True
+    for m in re.finditer(rf"(?<![\w.]){col}\s*=\s*", check, re.I):
+        rest = check[m.end():]
+        operand = "(" + _balanced_slice(rest, 0) + ")" if rest.startswith("(") else re.split(r"\s", rest, 1)[0]
+        if re.search(r"\bauth\.\w+\s*\(", operand, re.I):
+            return True
+    return False
+
+
+def _is_true(expr: str | None) -> bool:
+    return expr is not None and re.sub(r"[\s()]", "", expr).lower() == "true"
+
+
+def security_pass(model: Model) -> None:
+    """What the source says about who may reach each table (DL-A6, DL-C1).
+
+    `block` findings are holes: a table anyone holding the publishable key can
+    read and write, or a policy that lets every signed-in user write every
+    row. `warn` findings need a human to look. Nothing is reported for a
+    source that cannot state row-level security."""
+    findings: list[dict[str, Any]] = []
+
+    def add(level: str, table: Table, code: str, message: str, policy: str | None = None) -> None:
+        entry = {"level": level, "table": table.name, "code": code, "message": message}
+        if policy:
+            entry["policy"] = policy
+        findings.append(entry)
+
+    for t in model.tables:
+        if t.rls is None:
+            continue
+        if not t.rls:
+            add("block", t, "rls-off",
+                "row-level security is off: with the publishable key, anyone can read and "
+                "write every row" + (f" ({len(t.policies)} policy(ies) exist and do nothing "
+                                     f"until it is enabled)" if t.policies else ""))
+            continue
+        for_users = [p for p in t.policies if not set(p["roles"]) <= SERVER_ROLES]
+        # A restrictive policy grants nothing: it narrows what the permissive
+        # ones allow, and Postgres ANDs it with them.
+        open_to_users = [p for p in for_users if p["permissive"]]
+        narrowing = [p for p in for_users if not p["permissive"]]
+
+        def narrowed(command: str) -> bool:
+            return any(r["command"] in (command, "all")
+                       and not _is_true(r["with_check"] if r["with_check"] is not None else r["using"])
+                       for r in narrowing)
+
+        if not open_to_users:
+            add("warn", t, "no-policy",
+                "row-level security is on with no policy for a signed-in user: every query "
+                "returns nothing, so these screens stay empty until a policy exists")
+            continue
+        for p in open_to_users:
+            cmd = p["command"]
+            row_check = p["using"] if cmd in ("all", "update", "delete") else None
+            # Postgres: with no WITH CHECK, the USING expression checks the new row too.
+            new_row_check = (p["with_check"] if p["with_check"] is not None else p["using"]) \
+                if cmd in ("all", "insert", "update") else None
+            if (cmd != "select" and (_is_true(row_check) or _is_true(new_row_check))
+                    and not narrowed(cmd)):
+                add("block", t, "open-write",
+                    f"policy \"{p['name']}\" lets {', '.join(p['roles'])} "
+                    f"{'write' if cmd == 'all' else cmd} every row: its condition is `true`",
+                    policy=p["name"])
+        writers = [p for p in open_to_users if p["command"] in ("all", "update")]
+        if writers:
+            exposed = []
+            def check_of(p: dict[str, Any]) -> str:
+                return p["with_check"] if p["with_check"] is not None else (p["using"] or "")
+
+            for c in t.columns:
+                if not c.ui.get("authority"):
+                    continue
+                if t.update_columns is not None and c.name not in t.update_columns:
+                    continue                                  # no UPDATE privilege on it
+                # Permissive policies are ORed, so each must pin the column;
+                # a restrictive one is ANDed, so one is enough.
+                pinned = (all(_pinned_to_caller(c.name, check_of(p)) for p in writers)
+                          or any(_pinned_to_caller(c.name, check_of(r)) for r in narrowing
+                                 if r["command"] in ("all", "update")))
+                if not pinned:
+                    exposed.append(c.name)
+            if exposed:
+                cols = ", ".join(exposed)
+                safe = ", ".join(c.name for c in t.columns
+                                 if c.ui.get("placement", {}).get("form") and not c.ui.get("authority"))
+                dead = [c for c in t.ineffective_revokes if c in exposed]
+                add("warn", t, "authority-writable",
+                    f"a user who may update a row may change {cols}: the table-level UPDATE "
+                    f"grant covers every column and no policy pins them to the caller. "
+                    + (f"The column revoke on {', '.join(dead)} has no effect while the "
+                       f"table-level grant stands. " if dead else "")
+                    + f"If that is not intended: revoke update on {t.name} from authenticated; "
+                    f"grant update ({safe or '…'}) on {t.name} to authenticated;")
+
+    model.security = {**model.security,
+                      "stated_by_source": any(t.rls is not None for t in model.tables),
+                      "findings": findings}
+
+
+def security_block(model: Model) -> list[str]:
+    """The lines `--summary` prints before anything else."""
+    if not model.security.get("stated_by_source"):
+        return ["SECURITY    unknown: this source carries no row-level security or policies.",
+                "            Introspect the DDL (migrations or `supabase db dump`) to check it.", ""]
+    out = ["SECURITY    as this DDL states it"]
+    if not model.security.get("rls_statements"):
+        out.append("            The file has no row-level security statement at all. If the policies")
+        out.append("            live in another migration, introspect the files together.")
+    by_table: dict[str, list[dict[str, Any]]] = {}
+    for f in model.security.get("findings", []):
+        by_table.setdefault(f["table"], []).append(f)
+    width = max((len(t.name) for t in model.tables), default=0)
+    for t in model.tables:
+        found = by_table.get(t.name, [])
+        if not found:
+            commands = sorted({p["command"] for p in t.policies})
+            out.append(f"  ok     {t.name:<{width}}  RLS on · {len(t.policies)} policy(ies): "
+                       f"{', '.join(commands)}")
+        for f in found:
+            out.append(f"  {f['level'].upper() if f['level'] == 'block' else 'warn':<6} "
+                       f"{t.name:<{width}}  {f['message']}")
+    blocks = sum(1 for f in model.security.get("findings", []) if f["level"] == "block")
+    if blocks:
+        out.append(f"            {blocks} blocking: fix these in the database before the screens ship "
+                   f"(supabase-integration.md §2, §9).")
+    out.append("")
+    return out
 
 
 def parse_ddl(text: str) -> Model:
     model = Model()
+    rls_statements = 0
     clean = strip_sql_comments(text)
     statements = [s.strip() for s in split_top_level(clean, ";") if s.strip()]
 
@@ -572,6 +799,46 @@ def parse_ddl(text: str) -> Model:
                 t.unique_indexes.append(cols)
             continue
 
+        m = RE_ALTER_RLS.match(one_line)
+        if m:
+            rls_statements += 1
+            t = model.table(bare_table_name(m.group(1)))
+            verb = m.group(2).lower()
+            if t and verb in ("enable", "disable"):
+                t.rls = verb == "enable"
+            continue
+
+        m = RE_CREATE_POLICY.match(one_line)
+        if m:
+            rls_statements += 1
+            t = model.table(bare_table_name(m.group(2)))
+            if t:
+                t.policies.append(_parse_policy(unquote_ident(m.group(1)), m.group(3)))
+            continue
+
+        m = RE_DROP_POLICY.match(one_line)
+        if m:
+            # Migrations are replayed in order: a dropped policy is gone.
+            t = model.table(bare_table_name(m.group(2)))
+            if t:
+                name = unquote_ident(m.group(1))
+                t.policies = [p for p in t.policies if p["name"] != name]
+            continue
+
+        m = RE_REVOKE.match(one_line)
+        if m:
+            t = model.table(bare_table_name(m.group(2)))
+            if t:
+                _apply_privileges(t, "revoke", m.group(1), m.group(3))
+            continue
+
+        m = RE_GRANT.match(one_line)
+        if m:
+            t = model.table(bare_table_name(m.group(2)))
+            if t:
+                _apply_privileges(t, "grant", m.group(1), m.group(3))
+            continue
+
         m = RE_ALTER_ADD.match(one_line)
         if m:
             _apply_table_constraint(model, bare_table_name(m.group(1)),
@@ -600,12 +867,20 @@ def parse_ddl(text: str) -> Model:
             "that statements are terminated with `;`. If it is a generated "
             "types file, pass --format ts.")
 
+    # DDL is the one source that states row-level security. A table the file
+    # never enables it on is, as far as this file shows, open (DL-A6).
+    for t in model.tables:
+        if t.rls is None:
+            t.rls = False
+    model.security = {"stated_by_source": True, "rls_statements": rls_statements}
+
     model.fidelity = {
         "source_format": "ddl",
         "carries": ["tables", "columns", "types", "lengths", "nullability",
                     "defaults", "generated", "checks", "primary keys",
-                    "foreign keys", "unique indexes", "enums", "comments"],
-        "missing": ["row counts / cardinality", "RLS policies",
+                    "foreign keys", "unique indexes", "enums", "comments",
+                    "row-level security", "policies", "column privileges"],
+        "missing": ["row counts / cardinality",
                     "which column is the title", "display order",
                     "what users actually do with each field"],
     }
@@ -2036,13 +2311,21 @@ def build_questions(model: Model) -> None:
 
     if not model.tables:
         return
+    # The DDL states it; any other source cannot, and the answer stays a guess.
+    stated = [t for t in model.tables if t.rls is not None]
+    off = [t.name for t in stated if not t.rls]
     ask("app.rls_enabled", "choice",
         "Is RLS on for every table listed here?",
-        True,
-        "This changes the generated code, not just the copy. Under RLS a row "
-        "you cannot see and a row that does not exist are the same response, "
-        "so 'empty' and 'forbidden' have to be told apart deliberately or the "
-        "UI tells users their data is gone. See supabase-integration.md §2.")
+        not off,
+        ("The DDL says no: it is off on " + ", ".join(off) + ". " if off else
+         "The DDL enables it on every table. " if stated else
+         "This source cannot say, so check the database. ")
+        + "Under RLS a row you cannot see and a row that does not exist are the "
+        "same response, so 'empty' and 'forbidden' have to be told apart "
+        "deliberately or the UI tells users their data is gone. The forbidden "
+        "state is generated either way. Where the DDL states RLS for a table, "
+        "that table's notes follow the DDL; this answer covers a source that "
+        "cannot say. See supabase-integration.md §2.")
     ask("app.density", "choice",
         "Which density should the generated screens run at?",
         "compact",
@@ -2131,6 +2414,7 @@ def model_to_dict(model: Model, source: dict[str, Any]) -> dict[str, Any]:
         "source": source,
         "fidelity": model.fidelity,
         "enums": model.enums,
+        "security": model.security,
         "tables": [_table_dict(t) for t in model.tables],
         "questions": model.questions,
         "stats": {
@@ -2161,7 +2445,7 @@ def _confidence_counts(model: Model) -> dict[str, int]:
 
 
 def summary(model: Model, doc: dict[str, Any]) -> str:
-    out: list[str] = []
+    out: list[str] = security_block(model)
     st = doc["stats"]
     out.append(f"source      {doc['source']['path']} "
                f"({doc['fidelity'].get('source_format')})")
@@ -2267,6 +2551,7 @@ def build_model(path: Path, text: str, fmt: str, schema: str) -> Model:
         raise SchemaError(f"Unknown format `{fmt}`.")
     infer_structure(model)
     map_columns(model)
+    security_pass(model)
     build_questions(model)
     return model
 
@@ -2281,8 +2566,10 @@ def main(argv: list[str] | None = None) -> int:
                "strong signal with a plausible alternative · low = a default "
                "standing in for a decision nobody has made yet.",
     )
-    ap.add_argument("schema", help="a .sql DDL file, a `supabase gen types "
-                                   "typescript` .ts file, or a .json dump")
+    ap.add_argument("schema", nargs="+",
+                    help="a .sql DDL file, a `supabase gen types typescript` .ts "
+                         "file, or a .json dump. Several .sql files are read as one, "
+                         "in the order given (supabase/migrations/*.sql)")
     ap.add_argument("-o", "--out", metavar="FILE",
                     help="write model.json here (default: stdout as JSON, "
                          "unless --summary or --questions is given)")
@@ -2303,17 +2590,35 @@ def main(argv: list[str] | None = None) -> int:
                     help="restrict the model to these tables (repeatable)")
     args = ap.parse_args(argv)
 
-    path = Path(args.schema)
-    if not path.exists():
-        print(f"introspect_schema: no such file: {path}", file=sys.stderr)
-        return 2
-    try:
-        raw = path.read_bytes()
-        # A dump saved with `>` in PowerShell is UTF-16 or starts with a BOM.
-        text = raw.decode(json.detect_encoding(raw), errors="replace")
-    except OSError as exc:
-        print(f"introspect_schema: cannot read {path}: {exc}", file=sys.stderr)
-        return 2
+    # cmd.exe hands `supabase/migrations/*.sql` over as written, so expand a
+    # pattern here; sorted, which is the order migrations are applied in.
+    paths = []
+    for given in args.schema:
+        matched = sorted(glob.glob(given)) if any(ch in given for ch in "*?[") else []
+        paths += [Path(p) for p in matched] or [Path(given)]
+    path = paths[0]
+    texts: list[str] = []
+    for each in paths:
+        if not each.exists():
+            print(f"introspect_schema: no such file: {each}", file=sys.stderr)
+            return 2
+        try:
+            raw = each.read_bytes()
+            # A dump saved with `>` in PowerShell is UTF-16 or starts with a BOM.
+            texts.append(raw.decode(json.detect_encoding(raw), errors="replace"))
+        except OSError as exc:
+            print(f"introspect_schema: cannot read {each}: {exc}", file=sys.stderr)
+            return 2
+    # Migrations build on each other, so several DDL files are one schema.
+    if len(paths) > 1:
+        other = [str(each) for each, body in zip(paths, texts)
+                 if (args.format if args.format != "auto" else detect_format(each, body)) != "ddl"]
+        if other:
+            print(f"introspect_schema: several files are read together only when all are "
+                  f"DDL; pass {', '.join(other)} alone.", file=sys.stderr)
+            return 2
+    # The `;` ends a last statement its file left open.
+    text = "\n;\n".join(texts) if len(texts) > 1 else texts[0]
 
     try:
         fmt = args.format if args.format != "auto" else detect_format(path, text)
@@ -2328,11 +2633,12 @@ def main(argv: list[str] | None = None) -> int:
         model.questions = [q for q in model.questions
                            if q.get("table", "(application)") in wanted
                            or "table" not in q]
+        security_pass(model)
         if not model.tables:
             print(f"introspect_schema: --only matched no tables.", file=sys.stderr)
             return 1
 
-    doc = model_to_dict(model, {"path": str(path), "format": fmt,
+    doc = model_to_dict(model, {"path": ", ".join(str(each) for each in paths), "format": fmt,
                                 "pg_schema": args.pg_schema})
 
     if args.answers_template:

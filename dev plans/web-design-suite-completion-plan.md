@@ -12,7 +12,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`, then this plan.
 2. Install the test tools once: `npm ci` in `tooling/main` and in `tooling/tailwind-v3` (`tooling/README.md`).
-3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 365 tests OK before you change anything; if it does not, fix that first.
+3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 377 tests OK before you change anything; if it does not, fix that first.
 4. Work the phases in order. Inside a phase the workstreams are independent, so take them one at a time and ship the phase as one release.
 5. When a workstream is done, update its rows in the inventory: the release, and the test that holds each fix.
 
@@ -45,18 +45,18 @@ Ask before the phase that needs each one.
 ## Where things stand
 
 3.2.1 is released (`v3.2.1`, 2026-09-26), and 3.3.0 is in progress on `main`:
-- **Tests:** 365, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
+- **Tests:** 377, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
 - **Linux (WSL):** the suite passes with the Node tests skipped, because that Linux has no Node.
 - **macOS:** never run.
 - **Real tools:** the shipped ESLint config, the stylelint config, both Tailwind blocks of Part 5, Tailwind 4 and tailwind-merge all run in the suite, at the versions pinned in `tooling/`.
 
 | | Total | Fixed | Partly done | Planned here |
 |---|---|---|---|---|
-| A. Issues | 138 | 82 | 0 | 56 |
+| A. Issues | 138 | 83 | 0 | 55 |
 | B. Gaps | 52 | 5 | 5 | 42 |
-| C. Improvements | 75 | 25 | 5 | 45 |
+| C. Improvements | 75 | 26 | 5 | 44 |
 
-Open issues: 56 (31 medium, 16 low, 9 low-medium). None is high severity. The two high-severity items left are gaps, DL-B1 and DL-B2, which is why W1 comes first.
+Open issues: 55 (30 medium, 16 low, 9 low-medium). None is high severity. The two high-severity items left are gaps, DL-B1 and DL-B2, which is why W1 comes first.
 
 ---
 
@@ -69,7 +69,9 @@ The Supabase access boundary is the only high-severity work left. And the hook i
 The scaffold decides which columns are writable and emits client-only validation. But it says nothing about keys, row-level security or server-side checks.
 
 Target:
-- A security pass in `introspect_schema` that reads RLS and policies, and prints a SECURITY block first (DL-C1).
+- *Done for 3.3.0.* A security pass in `introspect_schema` that reads RLS and policies, and prints a SECURITY block first (DL-C1). `scaffold_ui` repeats the blocking findings but still writes the screens: refusing to write them is a decision for the user.
+- *Done for 3.3.0 (N15, from the review of PR #9).* The reference told readers to revoke `update` on single columns, which Postgres ignores while a table-level grant stands (Supabase's default). The reference and the security pass now say: revoke on the table, grant the columns back.
+- *Done for 3.3.0 (N14, found on the way).* The skill's command, `introspect_schema supabase/migrations/*.sql`, failed on more than one file. Several DDL files are now read as one schema.
 - A `policies.todo.sql` per table, with a smoke-test stub (DL-B2).
 - *Done for 3.3.0.* A rewrite of supabase-integration.md §2, §4 and §6 (DL-C4), with a new §9, "Who talks to the database". It covers which key goes where, the publishable and secret key formats, forwarding the user's token from FastAPI, `search_path` on security-definer functions, and `app_metadata` only.
 - Real `db pull` and `gen types` files as fixtures, so the parser is tested on what Supabase emits (DL-C2, DL-B8).
@@ -79,12 +81,12 @@ Re-check every Supabase fact at supabase.com on the day, and register it.
 | ID | Severity or size | What is wrong or missing |
 |---|---|---|
 | DL-A5 | medium | unsafe or stale guidance. *Done for 3.3.0.* |
-| DL-A6 | medium | the tool cannot see RLS. |
+| DL-A6 | medium | the tool cannot see RLS. *Done for 3.3.0.* |
 | DL-A7 | medium | Supabase's own schema outputs are silently misread. |
 | DL-B1 | high | no data-access boundary. *Partly done: the reference states it (§9); the scaffold does not yet generate `lib/supabase.ts`.* |
 | DL-B2 | high | authorization and server validation belong to nobody. |
 | DL-B8 | low | unverifiable claims. |
-| DL-C1 | M | A security pass in `introspect_schema`: classify sensitive columns, parse RLS and policies, print a SECURITY block first. |
+| DL-C1 | M | A security pass in `introspect_schema`: classify sensitive columns, parse RLS and policies, print a SECURITY block first. *Done for 3.3.0.* |
 | DL-C2 | M | A sturdier schema parser, tested on real `db pull` and `gen types` files. |
 | DL-C4 | S | rewrite supabase-integration.md §2/§4/§6 *Done for 3.3.0.* |
 

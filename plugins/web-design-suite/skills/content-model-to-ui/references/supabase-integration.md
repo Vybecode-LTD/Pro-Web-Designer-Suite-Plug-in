@@ -40,7 +40,7 @@ Three sources, three fidelities. `introspect_schema.py` reads all three and reco
 | Enums | yes | yes | with a join to `pg_enum` |
 | Column comments | yes | no | yes |
 | Row counts | **no** | **no** | **no** |
-| RLS policies | if the dump includes them | no | separate (`pg_policies`) |
+| RLS and policies | yes: `ENABLE ROW LEVEL SECURITY`, `CREATE POLICY` and column revokes are read | **no** | separate (`pg_policies`); not read |
 
 **Prefer the DDL.** Measured on the fixture in this skill's verification: the DDL and a full `information_schema` dump produce byte-identical models. The generated-types source produces an identical *structural* model — same tables, columns, nullability, foreign keys, enums, join-table detection, many-to-many edges, controls and list placement — but loses **14 validation rules across 13 columns** (every `maxLength`, every `unique`, every CHECK-derived `min`/`max`), loses ownership (no `ON DELETE`, so every one-to-many degrades from `inline-subtable` to `linked-list`), and cannot see that a `timestamp` column is missing its time zone.
 
@@ -58,6 +58,13 @@ pg_dump --schema-only --no-owner --no-privileges -n public "$DATABASE_URL" > /tm
 supabase gen types typescript --project-id "$PROJECT_ID" > database.types.ts
 python -m scripts.introspect_schema database.types.ts -o model.json
 ```
+
+**The summary opens with a SECURITY block**, because the screens are only as safe as the tables behind them. From DDL it lists, per table:
+
+- `BLOCK`: row-level security is off, so anyone holding the publishable key can read and write every row; or a policy lets a signed-in user write every row because its condition is `true`.
+- `warn`: RLS is on with no policy for a signed-in user (every query returns nothing); or a user who may update a row may change an authority column (`role`, `is_admin`, `org_id`), because the table-level grant covers it and no policy pins it to the caller. The finding gives the revoke and grant that close it.
+
+It reads only what the file states. A table the file never enables RLS on is reported as off, so introspect the migrations together, policies included: `DROP POLICY`, `GRANT` and `REVOKE` are replayed in order. From generated types or a JSON dump the block says "unknown": check the database. `scaffold_ui` repeats the blocking findings when it writes the screens; it does not refuse to write them.
 
 If you are building the JSON dump yourself, join the constraint tables. A dump of `information_schema.columns` alone is the generated-types source with extra steps.
 
@@ -137,8 +144,10 @@ A blocked read is silent. So is half of a blocked write:
 
 Row-level security decides *which rows*; it has no opinion about *which columns*. Two kinds of column need column-level privileges as well:
 
-- **Secrets** — `*_token`, `*_secret`, `*_hash`, `api_key`, anything the browser must never receive. The generator leaves them out of every screen and type, but that is only the UI: a `select('*')` still sends them. Take them away from the API roles entirely — `revoke select (api_token, reset_token) on profiles from anon, authenticated;` — or keep them in a schema that is not exposed. A `password` column in an exposed schema is a schema bug: Supabase Auth owns passwords.
-- **Authority** — `role`, `is_admin`, `owner_id`, `org_id`, `plan`, `credits`: columns that decide who may do what. The standard profile policy `using (id = auth.uid())` with no `WITH CHECK` lets a user `update` every column of their own row, including `is_admin`. Revoke the column: `revoke update (role, is_admin, credits, org_id) on profiles from authenticated;`, or enforce it in `WITH CHECK` or a trigger. The generated `Draft` type leaves these columns out, but a TypeScript type is not access control.
+**Revoking a single column does nothing on Supabase.** Tables get a table-level grant by default, and Postgres ignores a column-level revoke while a table-level grant stands ("revoking the same privileges from individual columns will have no effect", postgresql.org, REVOKE). So `revoke update (is_admin) on profiles from authenticated;` leaves `is_admin` writable. Revoke on the table, then grant the columns back.
+
+- **Secrets** — `*_token`, `*_secret`, `*_hash`, `api_key`, anything the browser must never receive. The generator leaves them out of every screen and type, but that is only the UI: a `select('*')` still sends them. Take them away from the API roles: revoke `select` on the table and grant back the columns a client may read (`revoke select on profiles from anon, authenticated; grant select (id, display_name) on profiles to authenticated;`), or keep them in a schema that is not exposed. A `password` column in an exposed schema is a schema bug: Supabase Auth owns passwords.
+- **Authority** — `role`, `is_admin`, `owner_id`, `org_id`, `plan`, `credits`: columns that decide who may do what. The standard profile policy `using (id = auth.uid())` with no `WITH CHECK` lets a user `update` every column of their own row, including `is_admin`. Revoke `update` on the table and grant back only what a user may change: `revoke update on profiles from authenticated; grant update (display_name) on profiles to authenticated;`. Or enforce it in a trigger, or in a `WITH CHECK` that pins the column to the caller. The generated `Draft` type leaves these columns out, but a TypeScript type is not access control.
 
 `PGRST116` is the one that bites. `.single()` on a row the policy hides returns the same error as `.single()` on a row that was deleted, and a detail page that renders "This record was deleted" for a permissions problem sends the user to the wrong support queue.
 
