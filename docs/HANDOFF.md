@@ -1,51 +1,43 @@
 # Handoff
 
-**2026-10-01**, in the session that opened PR #12.
+**2026-10-01**, in the session that opened PRs #12, #13 and #14.
 
 ## State
 
 - **3.2.1 is released** (`v3.2.1`, `63932cf`) and installed. 3.3.0 is in progress and unreleased.
-- **Merged for 3.3.0:** PRs #4 to #10. Those are N6, SB-A9 with N11, N12, SB-A24 with N13, W1's reference, W1's security pass and `scaffold_ui --strict`.
-- **Open: PR #12, the parser on real output** (DL-A7, DL-C2, DL-B8). Branch `fix/w1-schema-sources`. It has no CI checks; it waits for review and the user's merge.
-  - `introspect_schema` now reads `pg_dump --quote-all-identifiers` (what `supabase db pull` runs) and `ALTER TABLE` replays (identity, add, drop, alter and rename). It also handles `$$` bodies, pg_dump 18's `\restrict`, prettier's wrapped unions in `gen types`, and `BETWEEN`.
-  - The fixtures are in `tests/fixtures/supabase/` (README there):
-    - the worked example as a migration;
-    - a real `pg_dump` of it from local Postgres 18;
-    - its generated types;
-    - Brewr's real `gen types`.
-  - §1 of `supabase-integration.md` is now measured on those fixtures. Two of its claims were wrong.
-  - 392 tests pass on 3.14 and 3.9. Of the 15 new ones, 13 fail on `v3.2.1`; the other 2 are controls.
-- **Brewr** (`ccsgoijoouggdepsweus`) is **still active**, waiting for the user's `pg_dump`. The command is under Next steps. Pause it (`pause_project`) once the dump is in, or when the user says so.
+- **Merged for 3.3.0:** PRs #4 to #10.
+- **Open, stacked, to merge in this order:**
+  1. **#12** `fix/w1-schema-sources` → `main`. The parser on real output: DL-A7, DL-C2, DL-B8. It reads `pg_dump --quote-all-identifiers` (what `supabase db pull` runs), `ALTER TABLE` replays, `$$` bodies and wrapped `gen types` unions. Fixtures are in `tests/fixtures/supabase/`.
+  2. **#13** `feat/w1-policies` → #12. DL-B2 and DL-B1:
+     - `db/policies/<table>.policies.todo.sql`: RLS, policies guessed from the keys, and column grants equal to the form's `Draft`;
+     - a plain-SQL smoke test per table;
+     - `lib/supabase.ts`.
+     - `test_policies` runs the SQL on a scratch Postgres when `initdb` is on PATH.
+  3. **#14** `fix/w2-canonical-index` → #13. SB-A8, SB-A23, SB-C9:
+     - `layers` in `design-rules.json`, with `vendor` after `reset`;
+     - the audit and stylelint refuse an import into an unstated layer;
+     - the canonical `starter/styles/index.css` and `configs/index.tailwind.css`, quoted by five references;
+     - two wrong claims about a vendor's `!important`, corrected.
+  - GitHub retargets each when the one below merges. If it doesn't, rebase onto `main`. Each branch carries the previous one's commits.
+- **Tests:** 406 on #14's branch, passing on 3.14 and 3.9 (392 on #12, 403 on #13).
+- **Brewr** (`ccsgoijoouggdepsweus`) is **still active**. The user's `pg_dump` produced an empty file (0 bytes), so it failed. Ask them to run it without `> file` to see the error; the `[YOUR-PASSWORD]` placeholder is the likely cause.
 - **Decisions the user has not made:**
-  - stylelint reads no Sass. Teaching it means shipping `postcss-scss`.
-  - Scope: I recommended finishing phases 3 to 5, releasing, and moving phase 6 (broader coverage) to a backlog. No answer yet.
+  - stylelint reads no Sass (it would need `postcss-scss`).
+  - Scope: I recommended finishing phases 3 to 5 and moving phase 6 to a backlog. No answer yet.
+- **Left open in this work:**
+  - DL-B2's server-side schema (pydantic or zod mirroring the constraints);
+  - SB-C9's Tailwind v3 entry, which is still inline in stack-tailwind.
 
 ## Next steps
 
-1. **PR #13: the rest of W1 in the scaffold** (DL-B2, the rest of DL-B1). Base it on main once #12 is merged, because it uses #12's fixtures. The design below was proven on Postgres 18 on 2026-10-01.
-   - **`features/<t>/<t>.policies.todo.sql`, one per entity.** Each file enables RLS. It then proposes policies from the first of these that matches:
-     - a primary key that references `auth.users` gets `id = (select auth.uid())`;
-     - an owner column gets the same check on that column. An owner column is a foreign key to `users`, or to a table whose key is `auth.users`, or a column named `user_id`, `owner_id`, `author_id`, `created_by` or `customer_id`;
-     - a child of an owned parent gets an `exists (…)` check;
-     - a tenant column (`org_id` and the like) gets a TODO with the security-definer helper template from `w1-supabase-facts.md`;
-     - anything else gets select for `authenticated` and no writes.
-   - **Grants in the same file:** `revoke insert, update … from authenticated`, then grant insert on the writable columns plus the owner column, and update on the writable columns only. "Writable" means `emit_types`' `Draft` list (`ans.in_form`, not readonly), so the database and the form agree.
-   - **`<t>.policies.test.sql`:** plain SQL in a transaction that rolls back. It asserts:
-     - `relrowsecurity` is on;
-     - `anon` sees 0 rows;
-     - as `authenticated` (`set local role`, plus `set_config('request.jwt.claims', …)`), no foreign rows are visible;
-     - `update … set <authority column> = <itself> where false` raises `insufficient_privilege`, and the same update on a writable column passes. The privilege check runs even with `where false`.
-   - **A real-Postgres test**, skipped when `initdb` is not on PATH:
-     - its stub's `auth.uid()` reads `request.jwt.claims`, as Supabase's does;
-     - it applies every policies file and runs every test file;
-     - re-introspecting the DDL plus the policies must give no findings;
-     - a `using (true)` variant must make the smoke test fail.
-   - **`lib/supabase.ts`** is the §9 snippet, plus a throw when the key starts with `sb_secret_`.
-   - **Docs:** update §9's "The scaffold does not write them" and SKILL.md's "does not decide: … permissions".
-2. **Brewr's real dump**, when the user has run this in cmd (Session pooler URI from the dashboard's Connect button):
-   `pg_dump --schema-only --quote-all-identifiers --no-owner -n public "<URI>" > "%USERPROFILE%\Downloads\brewr-schema.sql"`
-   Read it for anything private. Add it as `tests/fixtures/supabase/brewr.dump.sql`, with a test that it agrees with `brewr.types.ts`, then pause Brewr.
-3. **The rest of W2:** N1 to N3, SB-A8, A11, A15, A23, A25, SB-C2 and C9. Then W3 and W4, and release 3.3.0.
+1. **After the merges:** check that `main` has all three, then delete the branches.
+2. **Brewr's real dump**, once it works: read it for anything private, then add it as `tests/fixtures/supabase/brewr.dump.sql` (LF) with a test that it agrees with `brewr.types.ts`. Then `pause_project`.
+3. **The rest of W2:**
+   - **N1:** decide each row of the gates-disagree table in the plan, spec first, and make all three gates follow it.
+   - **N2:** `tools/sync_rules.py --check`, and conformance fixtures through the real tools.
+   - **N3:** a stylelint snippet test, then fix the 56 failing reference snippets or the config.
+   - **SB-A11, A15, A25,** and the rest of **SB-C2**.
+4. **Then W3** (generators, roles, starter files) and **W4** (hygiene, N4 to N10). Then release 3.3.0 by the plan's release procedure.
 
 ## Blockers
 
@@ -53,12 +45,12 @@ None.
 
 ## Warnings
 
-- **Cost.** The cap is 500 thousand tokens a session; this one stopped at about 350 thousand. Keep a session to one or two PRs and report usage as you go. Don't fan out to subagents.
-- **Local Postgres 18** is installed (`initdb`, `pg_ctl`, `psql` on PATH). For a scratch cluster: `initdb -D <scratch>/pgdata -U postgres -A trust`, then `pg_ctl -D … -o "-p 54329" start`. Roles are per cluster, so create them once. Stop the cluster when done.
+- **Cost.** The usual cap is 500 thousand tokens a session; the user allowed 750 thousand for this one, which stopped at about 580 thousand. Report usage as you go, and don't fan out to subagents.
+- **Heredocs in the Bash tool** turn `\\b` into a backspace byte and drop other backslashes. Write edit scripts with the Write tool, then run them.
+- **`pg_ctl start` from Python on Windows** must not capture output: the server inherits the pipes and the call never returns. `test_policies` uses DEVNULL and a log file.
+- **Local Postgres 18** is installed. The scratch cluster from this session is at `<scratchpad>/pgdata`, on port 54329; stop it with `pg_ctl -D … stop`.
 - **pg_dump on Windows writes CRLF.** Convert a dump to LF before committing it.
-- **Fail-before from Git Bash.** `tar -x -C` needs a POSIX path (`cygpath -u`), and `WDS_PLUGIN_ROOT` a Windows one (`cygpath -w`).
-- **Don't edit a script while the suite runs.** Every test spawns the scripts afresh, and a test edited mid-run is loaded by the next interpreter's run.
-- **Heredocs in the Bash tool lose backslashes.** For regex edits, write a small Python file with the Write tool.
+- **A new `§` pointer in any file** must be registered: `python tools/check_pointers.py --write-register`, then read the diff.
+- **Don't edit a script while the suite runs.** A test file edited mid-run is loaded by the next interpreter's run.
 - **The installed plugin is a copy, and sessions load a cache of it.** Update both after every release.
-- **Never run `npm ci` in a worktree** whose `tooling/*/node_modules` is a junction.
 - **The repository is public.** Commit nothing private.
