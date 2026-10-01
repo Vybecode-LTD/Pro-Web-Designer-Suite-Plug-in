@@ -39,7 +39,8 @@ What it reads
 
 A file named explicitly with any other extension is skipped and listed, never
 guessed at. So is indented Sass (.sass): it has no braces for the scanner to
-follow, and reading it would pass it as clean. A folder with nothing auditable in it is an error, not "clean".
+follow, and reading it would pass it as clean. A folder with nothing auditable
+in it is an error, not "clean".
 
 Adopting it on a legacy codebase
 --------------------------------
