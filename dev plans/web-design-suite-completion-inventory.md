@@ -235,7 +235,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-A2 | high | fixed in 3.1.0 | authorization columns are editable by default. |
 | DL-A3 | high | fixed in 3.1.0 | the RLS write-failure model is wrong. |
 | DL-A4 | medium | fixed in 3.1.0 | two samples are buggy. |
-| DL-A5 | medium | W1 (3.3.0) | unsafe or stale guidance. |
+| DL-A5 | medium | fixed in 3.3.0: `test_docs.SupabaseGuidance.test_the_access_boundary_is_stated` | unsafe or stale guidance. |
 | DL-A6 | medium | W1 (3.3.0) | the tool cannot see RLS. |
 | DL-A7 | medium | W1 (3.3.0) | Supabase's own schema outputs are silently misread. |
 | DL-A8 | medium | W7 (3.4.0) | interview answers are ignored. |
@@ -252,7 +252,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-A19 | low | fixed in 3.1.0, as XC-A4 and XC-A8 | Invocation and Windows portability (instances of XC-A4 and XC-A8). |
 | DL-A20 | low | W7 (3.4.0) | authoring notes ship in the email. |
 | DL-A21 | low | W7 (3.4.0) | Consistency: "same 18 steps" and the email tokens' weight note are wrong. |
-| DL-B1 | high | W1 (3.3.0) | no data-access boundary. |
+| DL-B1 | high | partly done (3.3.0: the reference's §9, held by `test_docs.SupabaseGuidance.test_the_access_boundary_is_stated`); the scaffold's generated `lib/supabase.ts` is left, in W1 (3.3.0) | no data-access boundary. |
 | DL-B2 | high | W1 (3.3.0) | authorization and server validation belong to nobody. |
 | DL-B3 | medium | W13 (3.6.0+) | stacks the description implies but doesn't serve. |
 | DL-B4 | medium | W13 (3.6.0+) | email frameworks. |
@@ -263,7 +263,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-C1 | M | W1 (3.3.0) | A security pass in `introspect_schema`: classify sensitive columns, parse RLS and policies, print a SECURITY block first. |
 | DL-C2 | M | W1 (3.3.0) | A sturdier schema parser, tested on real `db pull` and `gen types` files. |
 | DL-C3 | M | W7 (3.4.0) | Email: fix A10–A12, then add a dark pass and a no-`<style>` check to `lint_email`, and `render_email.py`. |
-| DL-C4 | S | W1 (3.3.0) | rewrite supabase-integration.md §2/§4/§6 |
+| DL-C4 | S | fixed in 3.3.0, with DL-A5 and DL-B1's reference | rewrite supabase-integration.md §2/§4/§6 |
 | DL-C5 | S | W7 (3.4.0) | `lint_email --source`: flag literals, `var()` fallbacks and dropped tokens. |
 | DL-C6 | S | fixed in 3.2.0 | pointer and command hygiene; the detail file lists them. |
 | DL-C7 | M | W9 (3.5.0) | plugin features for these skills. |

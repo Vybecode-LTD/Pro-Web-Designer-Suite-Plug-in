@@ -158,6 +158,29 @@ class SupabaseGuidance(unittest.TestCase):
             with self.subTest(right=right):
                 self.assertIn(right, text)
 
+    def test_the_access_boundary_is_stated(self):
+        """DL-B1 and DL-A5 (W1): nothing said which key goes where, the
+        permission RPC was a `security definer` function in the exposed schema
+        with no search_path, the JWT's claims were trusted whole, and the fix
+        offered for Realtime deletes does not work on a table with RLS."""
+        text = (SKILLS / "content-model-to-ui" / "references" /
+                "supabase-integration.md").read_text(encoding="utf-8")
+        for wrong in ("returns boolean security definer`",           # in public, no search_path
+                      "The JWT's claims, or",                         # user_metadata is user-writable
+                      "REPLICA IDENTITY FULL` gives you the old row"):  # not under RLS
+            with self.subTest(wrong=wrong):
+                self.assertNotIn(wrong, text)
+        for right in ("## 9. Who talks to the database", "sb_publishable_", "sb_secret_", "bypassrls",
+                      "Every `VITE_` variable is public", '"apikey": SUPABASE_PUBLISHABLE_KEY',
+                      "security definer set search_path = ''", "revoke execute on function private.",
+                      "Never `user_metadata`", "A claim is as old as the token",
+                      "not on `DELETE`", "the `old` record still holds only the key",
+                      "A public bucket is world-readable"):
+            with self.subTest(right=right):
+                self.assertIn(right, text)
+        # The secret key never appears in browser code: no VITE_ name holds it.
+        self.assertNotRegex(text, r"VITE_\w*(SECRET|SERVICE)")
+
 
 # Runs the doc's two samples against a stand-in that behaves like supabase-js:
 # a query resolves to { data, error } and rejects only after .throwOnError();

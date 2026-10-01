@@ -4,6 +4,8 @@ The stack-specific half: where the schema comes from, what RLS does to a UI, and
 
 Everything here assumes FastAPI + Supabase + React 19/Vite. The mapping rules in `field-mapping.md` are stack-agnostic; this file is not.
 
+**Read §9 before wiring anything.** It says which key each process holds, and every guarantee in §2 depends on it.
+
 ## Contents
 
 1. [Getting the schema out](#1-getting-the-schema-out)
@@ -14,6 +16,7 @@ Everything here assumes FastAPI + Supabase + React 19/Vite. The mapping rules in
 6. [Optimistic updates](#6-optimistic-updates)
 7. [Storage-backed fields](#7-storage-backed-fields)
 8. [Search](#8-search)
+9. [Who talks to the database](#9-who-talks-to-the-database)
 
 ---
 
@@ -86,9 +89,29 @@ export type ProductListState =
 
 **Decide `forbidden` from something other than the row count**, because the row count cannot tell you. In order of preference:
 
-1. **A capability the session already knows.** The JWT's claims, or a `/me` endpoint that returns what this user can do. Reading permission from the session is the only approach that works before the first query.
-2. **An explicit RPC.** `create function can_read_products() returns boolean security definer` — one round trip, unambiguous, and the function decides what to reveal.
+1. **A capability the session already knows.** A `/me` endpoint that returns what this user can do, or a claim in the JWT's `app_metadata`. Reading permission from the session is the only approach that works before the first query. Two limits on the claim:
+   - **Never `user_metadata`.** The signed-in user can write it through the auth API; `app_metadata` they cannot, which is why Supabase names it as the place for authorization data.
+   - **A claim is as old as the token.** A change to `app_metadata` reaches `auth.jwt()` only when the token is refreshed. Where a stale answer matters, ask `/me`.
+2. **An explicit RPC.** `select can_read_products()` — one round trip, unambiguous, and the function decides what to reveal. Write it as an ordinary function (security invoker, the default) that reads only what the user may already read, such as their own membership row. If it must read more than that, see the template below.
 3. **A count against a table the user can always read.** "The tenant has 40 products, this query returned 0" distinguishes the cases. Only viable when such a table exists.
+
+**A `security definer` function runs with its owner's rights, so it is a hole in RLS by design.** Three rules, all Supabase's own (its RLS guide): keep it out of every schema the API exposes, set `search_path = ''` and schema-qualify every name inside it, and take `execute` away from `public`:
+
+```sql
+create schema if not exists private;
+
+create function private.readable_org_ids() returns setof uuid
+  language sql security definer set search_path = '' stable
+as $$
+  select org_id from public.memberships where user_id = (select auth.uid())
+$$;
+
+revoke execute on function private.readable_org_ids() from public;
+grant usage on schema private to authenticated;
+grant execute on function private.readable_org_ids() to authenticated;
+```
+
+A policy, or an invoker function in `public`, may then call `private.readable_org_ids()`. The client cannot reach it directly, because `private` is not exposed.
 
 What does **not** work: inspecting the error. A successful query returning zero rows is a success.
 
@@ -171,7 +194,15 @@ supabase.channel('products')
 
 Realtime is a list-state problem before it is a transport problem.
 
-**Realtime respects RLS, and that is a trap on `DELETE`.** `INSERT` and `UPDATE` payloads are policy-filtered, so you only receive rows you can see. But the `DELETE` payload contains only the primary key unless the table's replica identity is `FULL` — so you cannot evaluate a policy against it, and you cannot tell whether the deleted row was one of yours. `ALTER TABLE products REPLICA IDENTITY FULL` gives you the old row, at the cost of a larger WAL.
+**Realtime respects RLS on `INSERT` and `UPDATE`, and not on `DELETE`.** Insert and update payloads are policy-filtered, so you only receive rows you can see. A delete is not: Postgres has no row left to check a policy against, so Supabase applies none (Realtime guide, Postgres Changes). Every subscriber to the table hears every delete, whoever owned the row.
+
+What arrives is the primary key and nothing else. `REPLICA IDENTITY FULL` does not change that on a table with RLS: the `old` record still holds only the key (Supabase's Realtime troubleshooting guide). So:
+
+- **Treat a `DELETE` event as "a row with this id is gone", and nothing more.** Remove the row only if that id is in the list you hold. Render nothing from `old`.
+- **The id itself is what leaks.** With a sequential key, another tenant's subscriber can count your deletes. Use `uuid` keys on any table that is both multi-tenant and realtime.
+- **Do not filter deletes.** A filter on delete events needs replica identity `full`, and under RLS the old row is still only the key.
+
+**At scale, switch transport.** Supabase's guidance is to use Broadcast instead of Postgres Changes past about 3,000 concurrent subscribers on the same changes.
 
 **An arriving row that fails the current filter must not be inserted.** The subscription is on the table; the list is a filtered, sorted, paginated view of it. Re-apply the filter and the sort client-side, or the user's carefully filtered list starts growing rows that do not match.
 
@@ -299,6 +330,8 @@ idle → selected (local preview, revoke the object URL on unmount)
 
 **RLS applies to Storage too**, via policies on `storage.objects`. A working upload and a broken read is a missing `SELECT` policy, and it is the commonest Storage bug.
 
+**A public bucket is world-readable, whatever the policies say.** Marking a bucket public switches off access control for reading and serving its files: anyone who has the URL has the file (Supabase's Storage guide, bucket fundamentals). Policies still govern uploading, deleting, moving and copying. A public bucket is for assets you would publish anyway: avatars, product images. Invoices, exports and anything per-tenant go in a private bucket behind signed URLs.
+
 ---
 
 ## 8. Search
@@ -336,3 +369,72 @@ A generated column keeps the index in step with the data with no trigger to forg
 ---
 
 Related: `field-mapping.md` (types and controls), `screen-patterns.md` §12 (the states RLS and realtime make reachable), `token-contract.md`.
+
+---
+
+## 9. Who talks to the database
+
+§2 holds for a request that reaches Postgres **as the user**. Which key a process holds decides whether it does.
+
+| Key | Looks like | May live in | What Postgres sees |
+|---|---|---|---|
+| **Publishable** | `sb_publishable_…` | The browser bundle, a mobile app, public source | `anon`, or `authenticated` when the user's token comes with it. RLS applies |
+| **Secret** | `sb_secret_…` | A server only: FastAPI, an Edge Function, a worker | `service_role`, which has `bypassrls`. No policy runs |
+
+The older `anon` and `service_role` JWT keys are the same two authorities under their old names. Supabase is deprecating them by the end of 2026, so new code uses the two above.
+
+### The browser holds the publishable key, and nothing else
+
+```ts
+// src/lib/supabase.ts — the only client the React code imports.
+import { createClient } from '@supabase/supabase-js';
+import type { Database } from './database.types';
+
+export const supabase = createClient<Database>(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+);
+```
+
+**Every `VITE_` variable is public.** Vite writes it into the bundle, where anyone can read it. The project URL and the publishable key belong there. A secret key in a `VITE_` variable is a published secret, and so is one in any file the browser can fetch. Supabase rejects a secret key sent from a browser with a 401, but it tells a browser by its `User-Agent`: that is a safety net, not a control.
+
+The publishable key is not a secret and gives no protection. With it, anyone can send any query the policies allow. The policies are the protection: a table in an exposed schema with RLS off answers to anyone who holds that key.
+
+### FastAPI has two authorities, and must choose per request
+
+**As the user (the default).** Forward the caller's access token. The publishable key goes on the `apikey` header and the user's token on `Authorization`, so PostgREST runs the query as that user and every policy applies:
+
+```python
+# One call, as the user: row-level security applies.
+async def list_products(request: Request) -> list[dict]:
+    token = request.headers["authorization"].removeprefix("Bearer ")
+    async with httpx.AsyncClient(base_url=f"{SUPABASE_URL}/rest/v1") as db:
+        response = await db.get(
+            "/products",
+            params={"select": "id,name,price"},
+            headers={"apikey": SUPABASE_PUBLISHABLE_KEY, "Authorization": f"Bearer {token}"},
+        )
+        response.raise_for_status()
+        return response.json()
+```
+
+**As the service.** The secret key, for work that has no user: a webhook, a scheduled job, an admin task. Nothing in §2 applies, so the endpoint does the policy's job itself:
+
+- Check who is calling, and what they may do, before the first query.
+- Write every tenant filter by hand (`org_id = …`). There is no policy behind it to catch a missing one.
+- Never send what comes back straight to a client. A `select *` as the service returns the columns §2 told you to revoke.
+
+**The mistake that voids everything:** one module-level client built with the secret key and used for user requests. Every query succeeds, every test passes, and every user can read every tenant's rows through the API.
+
+### Where validation and authorization live
+
+The generated forms validate in the browser. That is a courtesy to the user, and nothing more: a request built by hand skips it.
+
+| Concern | Enforced by | Not by |
+|---|---|---|
+| Which rows a user may read or change | RLS policies (`USING`, `WITH CHECK`) | A filter in the React query |
+| Which columns a user may change | Column privileges, `WITH CHECK` or a trigger (§2) | The generated `Draft` type |
+| What a valid value is | Constraints in the schema (`NOT NULL`, `CHECK`, unique indexes), and the FastAPI model for anything they cannot express | The form's validation |
+| Who the user is | The token Supabase Auth signed; authorization data in `app_metadata` only | Anything the client sends in the body |
+
+A table the scaffold builds screens for needs its policies written before it ships. The scaffold does not write them: it cannot know who owns a row.

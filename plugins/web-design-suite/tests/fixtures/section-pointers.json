@@ -516,6 +516,12 @@
   "heading": "Search"
  },
  {
+  "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "9",
+  "heading": "Who talks to the database"
+ },
+ {
   "from": "content-model-to-ui/references/field-mapping.md",
   "to": "content-model-to-ui/references/screen-patterns.md",
   "section": "2",

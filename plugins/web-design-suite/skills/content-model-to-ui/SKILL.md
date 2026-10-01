@@ -287,6 +287,7 @@ Within this skill:
 | the states that decide whether it feels finished | `references/screen-patterns.md` §12 |
 | form UX — order, timing, guarding, autosave | `references/screen-patterns.md` §13 |
 | RLS as a UI concern | `references/supabase-integration.md` §2 |
+| which key goes where: browser, FastAPI as the user, FastAPI as the service | `references/supabase-integration.md` §9 |
 | pagination, realtime, optimistic writes, search | `references/supabase-integration.md` §4–§8 |
 
 ---
