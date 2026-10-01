@@ -76,6 +76,24 @@
     did not work in the case it was for.
   It also says that a public Storage bucket is world-readable whatever the policies
   say. Every Supabase fact was re-read at supabase.com on 2026-10-01.
+- **The schema tool could not see row-level security** (DL-A6, DL-C1). It skipped
+  `ENABLE ROW LEVEL SECURITY` and `CREATE POLICY`, listed "RLS policies" as missing
+  from DDL that held them, and assumed RLS was on everywhere. `introspect_schema` now
+  reads both statements and column revokes, records them per table, and opens
+  `--summary` with a SECURITY block:
+  - `BLOCK`: a table with RLS off, or a policy that lets a signed-in user write every
+    row because its condition is `true`.
+  - `warn`: RLS on with no policy for a signed-in user, or authority columns (`role`,
+    `is_admin`, `org_id`) that a user who may update a row can change, with the
+    `revoke` that closes it.
+  The findings are in the model (`security`), the "Is RLS on?" question defaults from
+  the DDL, and `scaffold_ui` repeats the blocking findings and writes each table's
+  forbidden-state notes from that table's own RLS. It does not refuse to write the
+  screens. From generated types or a JSON dump the block says "unknown".
+- **The skill's own command failed on two migration files** (N14).
+  `introspect_schema supabase/migrations/*.sql` was an argparse error as soon as the
+  folder held more than one file. Several DDL files are now read as one schema, in
+  the order given, which is also how a later migration's policies reach the table.
 
 ### Changed
 
@@ -103,6 +121,9 @@
 - DL-B1, DL-A5 and DL-C4: `test_docs.SupabaseGuidance.test_the_access_boundary_is_stated`
   holds what the reference must say and must no longer say. Against 3.2.1 it fails
   in 16 subtests. The two dated figures it quotes are in the evidence register.
+- DL-A6, DL-C1 and N14: nine tests in `test_content_and_a11y.SchemaSecurityPass`. Against
+  3.2.1 all nine fail. Controls inside them: a public read policy, a policy for the
+  service role and an owner check are not findings.
 - `test_docs` runs `test_harness` on the floor interpreter, and `test_harness` checks
   the temporary folders and `TempDirTest.write` there. On 3.9, 3.2.1's harness errored
   in 181 tests.

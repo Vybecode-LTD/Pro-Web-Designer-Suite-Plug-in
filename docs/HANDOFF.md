@@ -1,30 +1,27 @@
 # Handoff
 
-**2026-10-01**, in the session that opened PR #7 (SB-A24 and N13, the scripts on Sass) and the first W1 pull request, stacked on it.
+**2026-10-01**, in the session that merged PRs #7 and #8 and opened the W1 security pass.
 
 ## State
 
 - **3.2.1 is released** (`v3.2.1`, `63932cf`) and installed from it, in the local marketplace and in the cache that sessions load. 3.3.0 is in progress and unreleased.
-- **Merged for 3.3.0:** PR #4 (Python 3.9, N6), PR #5 (SB-A9 and N11) and PR #6 (N12). CodeRabbit left no review of the last commits of #5 and #6, so there was nothing to fold in.
-- **Open: PR #7, SB-A24 and N13, branch `fix/sb-a24-audit-scss`.** The rules are in `design-rules.json` under `sass`. The audit is the only gate that reads Sass: the stylelint config lints `.css` and ships no Sass syntax.
-  - A rule inside a `@mixin` or `@function` is not unlayered CSS. The references' own `_mq.scss` failed.
-  - A Sass variable holding a length, a hex or functional colour, a duration or an easing curve fails as `sass-literal` outside a token file.
-  - **Found on the way (N13):** the braces of an interpolation (`.card-#{$name}`) closed the layer around them, and indented Sass (`.sass`), which has no braces, passed as clean in the audit, the migration census and `a11y_static`. All three now list a `.sass` file as not read.
-  - **From the reviews of PR #7** (CodeRabbit and Codex): a mixin that holds a whole rule is unlayered when included at the root of its own file; `0px 13px` no longer hides the `13px` (older than Sass: the audit read only the first length); a quoted string in a Sass variable or an interpolation is text; `$breakpointSmall` is a breakpoint.
-  - **Not done, and the user's call:** CodeRabbit asked for stylelint and ESLint to follow the Sass rules. Neither reads Sass today, and `test_rules_spec` now holds that statement. Teaching stylelint Sass means shipping `postcss-scss` in the config, a new dependency for every project that uses it.
-  - 364 tests pass on 3.14 and 3.9. Nine of the eleven new tests fail on `v3.2.1`. The other two pass on both: one holds the stylelint statement, and one guards a bug that existed only inside the PR.
-- **Open: W1's reference, branch `feat/w1-supabase-boundary`, stacked on PR #7.** DL-A5 and DL-C4 are done, and DL-B1 in the reference: `supabase-integration.md` §9 says which key goes where, and §2, §4 and §7 are corrected. Every Supabase fact was re-read on 2026-10-01 (`dev plans/w1-supabase-facts.md`). 365 tests pass; the new one fails on `v3.2.1` in 16 subtests.
-- **Decisions in SB-A24** a reviewer may question; each is one condition in `audit_css`:
-  - A breakpoint is known by its name: `$bp`, `$bp-*`, `$breakpoint*`.
-  - A variable local to a `@function` is not checked (`$ratio * 1rem` is a unit conversion).
-  - A named colour in a Sass variable is not checked, because a list of names (`$sides: top, right`) would be misread.
-  - A mixin defined in another file is not followed to its include.
+- **Merged for 3.3.0:** PR #4 (Python 3.9, N6), #5 (SB-A9, N11), #6 (N12), #7 (SB-A24 and N13, the scripts on Sass) and #8 (W1's reference: DL-A5, DL-C4, and DL-B1 in `supabase-integration.md` §9).
+- **Open: W1's security pass, branch `feat/w1-security-pass`** (DL-A6, DL-C1, N14).
+  - `introspect_schema` reads `ENABLE ROW LEVEL SECURITY`, `CREATE POLICY` and column revokes, and opens `--summary` with a SECURITY block: `BLOCK` for a table with RLS off or a policy whose write condition is `true`; `warn` for RLS with no user policy, or authority columns a user can change.
+  - The findings are in the model (`security`). The "Is RLS on?" question defaults from the DDL, and `scaffold_ui` repeats the blocking findings.
+  - N14, found on the way: the skill's own command passed `supabase/migrations/*.sql`, which failed on two files. Several DDL files are now one schema.
+  - 374 tests pass on 3.14 and 3.9. The nine new tests fail on `v3.2.1`.
+- **Decisions the user has not made:**
+  - `scaffold_ui` warns about blocking findings but still writes the screens. Refusing to write them would break every schema whose policies are kept elsewhere.
+  - stylelint reads no Sass, so the audit is the only Sass gate (`test_rules_spec` holds the statement). Teaching stylelint Sass means shipping `postcss-scss`.
+  - Which Supabase project the `db pull` and `gen types` fixtures come from (DL-C2). Nothing from a real project goes into this public repository without the user choosing it.
+- **A fact that changed the review's advice:** an UPDATE policy with no `WITH CHECK` is not unchecked. Postgres uses the `USING` expression for the new row (postgresql.org, CREATE POLICY, read 2026-10-01). So the security pass does not flag it; it flags authority columns instead.
 - **The review's repro inputs stay local** (the user's decision): `dev plans/web-design-suite-review/fixtures/` is ignored through `.git/info/exclude`, never committed.
 
 ## Next steps
 
-1. **Merge PR #7, then the W1 reference PR**, when the user says so. Reply to the review threads on #7 only if the user asks: the fixes are in `88b3cfc`.
-2. **The rest of W1:** the security pass in `introspect_schema` (DL-A6, DL-C1), `policies.todo.sql` with a smoke-test stub (DL-B2), the generated `lib/supabase.ts` (the rest of DL-B1), and real `db pull` and `gen types` files as fixtures (DL-A7, DL-C2, DL-B8). The fixtures need a real Supabase project to pull from: ask the user which one.
+1. **Merge the security-pass PR** when the user says so, after answering its reviews.
+2. **The rest of W1, in the scaffold:** `policies.todo.sql` per table with a smoke-test stub (DL-B2), and the generated `lib/supabase.ts` (the rest of DL-B1). Then the parser on real `db pull` and `gen types` files (DL-A7, DL-C2, DL-B8), which waits on the user's choice of project.
 3. **The rest of W2:** N1 to N3, SB-A8, A11, A15, A23, A25, SB-C2 and C9. Then W3 and W4, and release 3.3.0.
 4. **Fold the PR-by-PR sequencing into the plan**, as the user asked for a plan covering every open issue. CLAUDE.md's active-work line has the current order.
 

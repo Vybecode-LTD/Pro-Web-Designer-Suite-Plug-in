@@ -339,7 +339,7 @@ The interview. `introspect_schema.py` emits every one of these as an answerable 
 | **Viewer zone or record zone?** | §8 | Viewer |
 | **How many rows will this parent hold?** | The only input that decides select vs combobox vs picker | Inferred from the parent's shape, at `medium` confidence at best |
 | **Which parent column labels a reference?** | Usually the title. Not always | The parent's own title answer |
-| **Is RLS on?** | Changes the generated code, not just the copy — see `supabase-integration.md` §2 | Yes |
+| **Is RLS on?** | Sets what the generated forbidden state's notes say; the state is generated either way — see `supabase-integration.md` §2 | What the DDL states per table; "yes" from a source that cannot say |
 
 The honest summary: **the schema gets you to a defensible default for every column, and to the right answer for about three quarters of them.** The remaining quarter is where the product actually lives, and no amount of cleverness in the mapper will find it. What the mapper can do — and does — is make that quarter visible, small, and answerable in one sitting.
 

@@ -40,7 +40,7 @@ Three sources, three fidelities. `introspect_schema.py` reads all three and reco
 | Enums | yes | yes | with a join to `pg_enum` |
 | Column comments | yes | no | yes |
 | Row counts | **no** | **no** | **no** |
-| RLS policies | if the dump includes them | no | separate (`pg_policies`) |
+| RLS and policies | yes: `ENABLE ROW LEVEL SECURITY`, `CREATE POLICY` and column revokes are read | **no** | separate (`pg_policies`); not read |
 
 **Prefer the DDL.** Measured on the fixture in this skill's verification: the DDL and a full `information_schema` dump produce byte-identical models. The generated-types source produces an identical *structural* model — same tables, columns, nullability, foreign keys, enums, join-table detection, many-to-many edges, controls and list placement — but loses **14 validation rules across 13 columns** (every `maxLength`, every `unique`, every CHECK-derived `min`/`max`), loses ownership (no `ON DELETE`, so every one-to-many degrades from `inline-subtable` to `linked-list`), and cannot see that a `timestamp` column is missing its time zone.
 
@@ -58,6 +58,13 @@ pg_dump --schema-only --no-owner --no-privileges -n public "$DATABASE_URL" > /tm
 supabase gen types typescript --project-id "$PROJECT_ID" > database.types.ts
 python -m scripts.introspect_schema database.types.ts -o model.json
 ```
+
+**The summary opens with a SECURITY block**, because the screens are only as safe as the tables behind them. From DDL it lists, per table:
+
+- `BLOCK`: row-level security is off, so anyone holding the publishable key can read and write every row; or a policy lets a signed-in user write every row because its condition is `true`.
+- `warn`: RLS is on with no policy for a signed-in user (every query returns nothing); or a user who may update a row may change an authority column (`role`, `is_admin`, `org_id`), because no column revoke and no `WITH CHECK` names it.
+
+It reads only what the file states. A table the file never enables RLS on is reported as off, so introspect the migrations together, policies included. From generated types or a JSON dump the block says "unknown": check the database. `scaffold_ui` repeats the blocking findings when it writes the screens; it does not refuse to write them.
 
 If you are building the JSON dump yourself, join the constraint tables. A dump of `information_schema.columns` alone is the generated-types source with extra steps.
 

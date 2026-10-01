@@ -236,7 +236,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-A3 | high | fixed in 3.1.0 | the RLS write-failure model is wrong. |
 | DL-A4 | medium | fixed in 3.1.0 | two samples are buggy. |
 | DL-A5 | medium | fixed in 3.3.0: `test_docs.SupabaseGuidance.test_the_access_boundary_is_stated` | unsafe or stale guidance. |
-| DL-A6 | medium | W1 (3.3.0) | the tool cannot see RLS. |
+| DL-A6 | medium | fixed in 3.3.0: `test_content_and_a11y.SchemaSecurityPass` | the tool cannot see RLS. |
 | DL-A7 | medium | W1 (3.3.0) | Supabase's own schema outputs are silently misread. |
 | DL-A8 | medium | W7 (3.4.0) | interview answers are ignored. |
 | DL-A9 | medium | W7 (3.4.0) | generated forms lack promised a11y wiring |
@@ -260,7 +260,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-B6 | medium | W7 (3.4.0) | Checks the docs promise but nothing runs: email dark-mode contrast, the MSO font block, the no-`<style>` layout, source literals, generated-form ARIA. |
 | DL-B7 | low | W7 (3.4.0) | deliverability is dated. |
 | DL-B8 | low | W1 (3.3.0) | unverifiable claims. |
-| DL-C1 | M | W1 (3.3.0) | A security pass in `introspect_schema`: classify sensitive columns, parse RLS and policies, print a SECURITY block first. |
+| DL-C1 | M | fixed: 3.1.0 classified the sensitive columns (DL-A1, DL-A2); 3.3.0 parses RLS and policies and prints the SECURITY block (`test_content_and_a11y.SchemaSecurityPass`) | A security pass in `introspect_schema`: classify sensitive columns, parse RLS and policies, print a SECURITY block first. |
 | DL-C2 | M | W1 (3.3.0) | A sturdier schema parser, tested on real `db pull` and `gen types` files. |
 | DL-C3 | M | W7 (3.4.0) | Email: fix A10–A12, then add a dark pass and a no-`<style>` check to `lint_email`, and `render_email.py`. |
 | DL-C4 | S | fixed in 3.3.0, with DL-A5 and DL-B1's reference | rewrite supabase-integration.md §2/§4/§6 |

@@ -340,6 +340,159 @@ class SupabaseSecurityDefaults(TempDirTest):
         self.assertNotIn("'role'", draft)                 # still protected
 
 
+RLS_DDL = SAAS_DDL + """\
+CREATE TABLE notes (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    body text NOT NULL,
+    owner_id uuid NOT NULL REFERENCES profiles(id)
+);
+ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ONLY public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "own profile" ON public.profiles FOR ALL TO authenticated
+    USING ((id = (select auth.uid())));
+CREATE POLICY notes_read ON notes FOR SELECT USING (true);
+CREATE POLICY notes_write ON notes AS PERMISSIVE FOR UPDATE TO authenticated
+    USING (true) WITH CHECK ((owner_id = auth.uid()));
+CREATE POLICY notes_insert ON notes FOR INSERT TO authenticated WITH CHECK (owner_id = auth.uid());
+CREATE POLICY org_service ON organizations FOR ALL TO service_role USING (true);
+"""
+
+GEN_TYPES = """\
+export type Database = {
+  public: {
+    Tables: {
+      notes: {
+        Row: { id: string; body: string }
+        Insert: { id?: string; body: string }
+        Update: { id?: string; body?: string }
+        Relationships: []
+      }
+    }
+    Enums: {}
+  }
+}
+"""
+
+
+class SchemaSecurityPass(TempDirTest):
+    """DL-A6 and DL-C1: the parser skipped `ENABLE ROW LEVEL SECURITY` and
+    `CREATE POLICY`, listed "RLS policies" as missing from DDL that held them,
+    and assumed RLS was on everywhere."""
+
+    def introspect(self, ddl, name="schema.sql", *args):
+        self.write(name, ddl)
+        proc = run_py("content-model-to-ui", "introspect_schema", name, "-o", "model.json",
+                      "--summary", *args, cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        return proc, json.loads((self.tmp / "model.json").read_text(encoding="utf-8"))
+
+    def found(self, model):
+        return sorted((f["table"], f["level"], f["code"]) for f in model["security"]["findings"])
+
+    def test_rls_and_policies_are_read_from_the_ddl(self):
+        _, model = self.introspect(RLS_DDL)
+        tables = {t["name"]: t for t in model["tables"]}
+        self.assertEqual({"organizations": True, "profiles": True, "projects": False, "notes": True},
+                         {name: t["rls"] for name, t in tables.items()})
+        own = tables["profiles"]["policies"][0]
+        self.assertEqual(("own profile", "all", ["authenticated"], "(id = (select auth.uid()))", None),
+                         (own["name"], own["command"], own["roles"], own["using"], own["with_check"]))
+        write = next(p for p in tables["notes"]["policies"] if p["name"] == "notes_write")
+        self.assertEqual(("update", "true", "(owner_id = auth.uid())"),
+                         (write["command"], write["using"], write["with_check"]))
+        self.assertEqual(["public"], tables["notes"]["policies"][0]["roles"])      # no TO: everyone
+        self.assertIn("row-level security", model["fidelity"]["carries"])
+        self.assertNotIn("RLS policies", model["fidelity"]["missing"])
+
+    def test_the_findings_name_the_holes_and_only_the_holes(self):
+        _, model = self.introspect(RLS_DDL)
+        self.assertEqual([("notes", "block", "open-write"),           # UPDATE ... USING (true)
+                          ("organizations", "warn", "no-policy"),     # its one policy is the service's
+                          ("profiles", "warn", "authority-writable"),
+                          ("projects", "block", "rls-off")], self.found(model))
+        # Not holes: a public read, a policy for the service role, and an
+        # owner check that names the authority column.
+        message = next(f["message"] for f in model["security"]["findings"] if f["code"] == "open-write")
+        self.assertIn("notes_write", message)
+        self.assertNotIn("notes_read", json.dumps(model["security"]))
+
+    def test_a_column_revoke_closes_the_authority_warning(self):
+        revoke = "REVOKE UPDATE (role, is_admin, credits, org_id) ON profiles FROM authenticated;\n"
+        _, model = self.introspect(RLS_DDL + revoke)
+        self.assertNotIn(("profiles", "warn", "authority-writable"), self.found(model))
+        # Revoked from anon alone, a signed-in user still holds the columns.
+        _, model = self.introspect(RLS_DDL + revoke.replace("authenticated", "anon"))
+        self.assertIn(("profiles", "warn", "authority-writable"), self.found(model))
+
+    def test_the_summary_opens_with_the_security_block(self):
+        proc, _ = self.introspect(RLS_DDL)
+        lines = proc.stdout.decode("utf-8").splitlines()
+        self.assertTrue(lines[0].startswith("SECURITY"), lines[:3])
+        block = "\n".join(lines[:lines.index("")])
+        self.assertRegex(block, r"BLOCK\s+projects\s+row-level security is off")
+        self.assertRegex(block, r"BLOCK\s+notes\s+policy \"notes_write\"")
+        self.assertIn("2 blocking", block)
+
+    def test_ddl_with_no_rls_statement_says_so(self):
+        proc, model = self.introspect(SAAS_DDL)
+        self.assertIn("no row-level security statement at all", proc.stdout.decode("utf-8"))
+        self.assertEqual({"rls-off"}, {f["code"] for f in model["security"]["findings"]})
+
+    def test_a_source_that_cannot_say_is_reported_as_unknown(self):
+        proc, model = self.introspect(GEN_TYPES, "database.types.ts")
+        self.assertTrue(proc.stdout.decode("utf-8").startswith("SECURITY    unknown"), output(proc))
+        self.assertEqual([], model["security"]["findings"])
+        self.assertIsNone(model["tables"][0]["rls"])
+        self.assertIn("RLS policies", model["fidelity"]["missing"])
+
+    def test_several_migration_files_are_one_schema(self):
+        # The skill's own command passes `supabase/migrations/*.sql`, which the
+        # tool refused as soon as there were two files; and the policies are
+        # usually in a later migration than the table.
+        self.write("migrations/001_tables.sql", SAAS_DDL.rstrip().rstrip(";"))    # no final `;`
+        self.write("migrations/002_rls.sql", "ALTER TABLE projects ENABLE ROW LEVEL SECURITY;\n"
+                   "CREATE POLICY own ON projects FOR ALL TO authenticated USING (owner_id = auth.uid());\n")
+        proc = run_py("content-model-to-ui", "introspect_schema", "migrations/001_tables.sql",
+                      "migrations/002_rls.sql", "-o", "model.json", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        model = json.loads((self.tmp / "model.json").read_text(encoding="utf-8"))
+        self.assertEqual({"organizations": False, "profiles": False, "projects": True},
+                         {t["name"]: t["rls"] for t in model["tables"]})
+        # Only DDL is read together.
+        self.write("database.types.ts", GEN_TYPES)
+        proc = run_py("content-model-to-ui", "introspect_schema", "migrations/001_tables.sql",
+                      "database.types.ts", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("database.types.ts alone", output(proc))
+
+    def test_the_rls_question_defaults_from_the_ddl(self):
+        def default(model):
+            return next(q for q in model["questions"] if q["id"] == "app.rls_enabled")
+
+        _, model = self.introspect(RLS_DDL)
+        self.assertIs(default(model)["default"], False)
+        self.assertIn("off on projects", default(model)["why"])
+        _, model = self.introspect(RLS_DDL + "ALTER TABLE projects ENABLE ROW LEVEL SECURITY;\n")
+        self.assertIs(default(model)["default"], True)
+        _, model = self.introspect(GEN_TYPES, "database.types.ts")
+        self.assertIs(default(model)["default"], True)
+        self.assertIn("cannot say", default(model)["why"])
+
+    def test_the_scaffold_names_the_blocking_findings_and_follows_each_table(self):
+        self.introspect(RLS_DDL)
+        proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "src", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn("SECURITY projects: row-level security is off", output(proc))
+        self.assertIn("2 blocking security finding(s)", output(proc))
+
+        def states(entity):
+            return next((self.tmp / "src").rglob(f"{entity}States.tsx")).read_text(encoding="utf-8")
+
+        self.assertIn("RLS was reported as off", states("Projects"))
+        self.assertIn("Row-level security is on for this table", states("Profiles"))
+
+
 class A11yStaticScaleAndScope(TempDirTest):
     """XC-A6 and GT-A4."""
 
