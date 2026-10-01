@@ -69,7 +69,7 @@ The Supabase access boundary is the only high-severity work left. And the hook i
 The scaffold decides which columns are writable and emits client-only validation. But it says nothing about keys, row-level security or server-side checks.
 
 Target:
-- *Done for 3.3.0.* A security pass in `introspect_schema` that reads RLS and policies, and prints a SECURITY block first (DL-C1). `scaffold_ui` repeats the blocking findings but still writes the screens: refusing to write them is a decision for the user.
+- *Done for 3.3.0.* A security pass in `introspect_schema` that reads RLS and policies, and prints a SECURITY block first (DL-C1). `scaffold_ui` repeats the blocking findings and still writes the screens; `--strict` refuses, for CI (the user's decision, 2026-10-01).
 - *Done for 3.3.0 (N15, from the review of PR #9).* The reference told readers to revoke `update` on single columns, which Postgres ignores while a table-level grant stands (Supabase's default). The reference and the security pass now say: revoke on the table, grant the columns back.
 - *Done for 3.3.0 (N14, found on the way).* The skill's command, `introspect_schema supabase/migrations/*.sql`, failed on more than one file. Several DDL files are now read as one schema.
 - A `policies.todo.sql` per table, with a smoke-test stub (DL-B2).

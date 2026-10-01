@@ -64,7 +64,7 @@ python -m scripts.introspect_schema database.types.ts -o model.json
 - `BLOCK`: row-level security is off, so anyone holding the publishable key can read and write every row; or a policy lets a signed-in user write every row because its condition is `true`.
 - `warn`: RLS is on with no policy for a signed-in user (every query returns nothing); or a user who may update a row may change an authority column (`role`, `is_admin`, `org_id`), because the table-level grant covers it and no policy pins it to the caller. The finding gives the revoke and grant that close it.
 
-It reads only what the file states. A table the file never enables RLS on is reported as off, so introspect the migrations together, policies included: `DROP POLICY`, `GRANT` and `REVOKE` are replayed in order. From generated types or a JSON dump the block says "unknown": check the database. `scaffold_ui` repeats the blocking findings when it writes the screens; it does not refuse to write them.
+It reads only what the file states. A table the file never enables RLS on is reported as off, so introspect the migrations together, policies included: `DROP POLICY`, `GRANT` and `REVOKE` are replayed in order. From generated types or a JSON dump the block says "unknown": check the database. `scaffold_ui` repeats the blocking findings when it writes the screens. By default it still writes them, because a schema whose policies live in a file it was not shown would otherwise be refused; with `--strict` it writes nothing and exits 1, which is the setting for CI.
 
 If you are building the JSON dump yourself, join the constraint tables. A dump of `information_schema.columns` alone is the generated-types source with extra steps.
 

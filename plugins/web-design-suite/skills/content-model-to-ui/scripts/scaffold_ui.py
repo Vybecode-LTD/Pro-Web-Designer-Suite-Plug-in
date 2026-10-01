@@ -49,8 +49,11 @@ Then, always:
 
     python -m scripts.audit_design src/ --strict
 
-Exit codes: 0 written (or dry-run printed) · 1 the model is unusable ·
-2 bad invocation.
+    # In CI: refuse when the schema has a blocking security finding
+    python -m scripts.scaffold_ui model.json --out src --strict
+
+Exit codes: 0 written (or dry-run printed) · 1 the model is unusable, or
+--strict met a blocking security finding · 2 bad invocation.
 """
 
 from __future__ import annotations
@@ -2641,6 +2644,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="print the tree and sizes, write nothing")
     ap.add_argument("--force", action="store_true",
                     help="overwrite files that already exist")
+    ap.add_argument("--strict", action="store_true",
+                    help="write nothing and exit 1 when the schema has a blocking "
+                         "security finding (for CI)")
     args = ap.parse_args(argv)
 
     mp = Path(args.model)
@@ -2694,10 +2700,16 @@ def main(argv: list[str] | None = None) -> int:
                 if f["level"] == "block" and (entities is None or f["table"] in entities)]
     for f in blocking:
         print(f"scaffold_ui: SECURITY {f['table']}: {f['message']}", file=sys.stderr)
+    if blocking and args.strict:
+        print(f"scaffold_ui: {len(blocking)} blocking security finding(s) in the schema, and "
+              f"--strict is set: nothing written. Fix the database, or introspect the "
+              f"migrations that hold the policies (supabase-integration.md §2, §9).",
+              file=sys.stderr)
+        return 1
     if blocking:
         print(f"scaffold_ui: {len(blocking)} blocking security finding(s) in the schema. "
               f"The screens are generated, but fix the database before they ship "
-              f"(supabase-integration.md §2, §9).", file=sys.stderr)
+              f"(supabase-integration.md §2, §9). --strict refuses instead.", file=sys.stderr)
 
     if args.dry_run:
         total = 0

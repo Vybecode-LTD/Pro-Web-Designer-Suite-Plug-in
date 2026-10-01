@@ -549,6 +549,15 @@ class SchemaSecurityPass(TempDirTest):
 
         self.assertIn("RLS was reported as off", states("Projects"))
         self.assertIn("Row-level security is on for this table", states("Profiles"))
+        # --strict refuses, for CI; a table with no blocking finding still passes it.
+        proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "strict", "--strict",
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 1, output(proc))
+        self.assertIn("nothing written", output(proc))
+        self.assertFalse((self.tmp / "strict").exists())
+        proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "strict", "--strict",
+                      "--entity", "profiles", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
         # Codex on PR #9: the pre-filled answer is "no" for a mixed schema, and
         # one answer for the whole application must not overrule a table's fact.
         answers = self.write("answers.json", json.dumps({"app.rls_enabled": False}))

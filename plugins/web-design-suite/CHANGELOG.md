@@ -91,8 +91,8 @@
   restrictive policy narrows the permissive ones and grants nothing.
   The findings are in the model (`security`), the "Is RLS on?" question defaults from
   the DDL, and `scaffold_ui` repeats the blocking findings and writes each table's
-  forbidden-state notes from that table's own RLS. It does not refuse to write the
-  screens. From generated types or a JSON dump the block says "unknown".
+  forbidden-state notes from that table's own RLS. It still writes the screens by
+  default; `scaffold_ui --strict` writes nothing and exits 1, for CI. From generated types or a JSON dump the block says "unknown".
 - **The reference's column revoke did nothing** (N15, from CodeRabbit on PR #9). It
   told readers to protect `is_admin` with `revoke update (role, is_admin, …) on
   profiles from authenticated`, and secrets with a column-level `revoke select`.
