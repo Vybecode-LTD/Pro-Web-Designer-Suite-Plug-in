@@ -30,6 +30,22 @@
 - **A singular `token.css` or `brand-token.css` was a token file** to the audit, so it
   was never checked; the spec's globs and stylelint name only `tokens`. Both copies of
   the test now follow the spec, and its examples include the two names.
+- **The audit misread Sass** (SB-A24). The rules are in `design-rules.json` under
+  `sass`; the audit is the only gate that reads Sass.
+  - A partial holding only mixins, such as the references' own `_mq.scss`, failed as
+    unlayered, because a mixin holds rules. A `@mixin` or `@function` body emits
+    nothing where it is written, so the layer is now checked where it is included.
+  - A Sass variable holding a literal passed (`$card-padding: 24px`, then
+    `padding: $card-padding`). Outside a token file, a variable that holds a length,
+    a hex or functional colour, a duration or an easing curve now fails as
+    `sass-literal`, in a map as in a single value. A breakpoint (`$bp`, `$bp-*`,
+    `$breakpoint*`) and a variable local to a `@function` are left alone.
+  - The braces of an interpolation closed the layer around them, so after
+    `.card-#{$name} { … }` the next rule was unlayered, and a declaration whose value
+    was an interpolation (`margin-inline: #{$gutter}`) was never read.
+  - Indented Sass (`.sass`) was reported clean whatever it held: the audit follows
+    braces and that syntax has none. A `.sass` file is now listed as skipped, and a
+    folder holding nothing else is the "0 files audited" error.
 
 ### Changed
 
@@ -45,6 +61,11 @@
   control.
 - N12: `test_token_migration.AddressesAreNotComments`, the census and the codemod.
   Against 3.2.1 both fail, in five subtests.
+- SB-A24: five `AuditPrecision` tests and `test_rules_spec.test_sass`, which runs the
+  spec's Sass examples through the audit. Against 3.2.1 all six fail, `test_sass` in
+  eight subtests. Its example of an interpolation inside a layer passes there, because
+  3.2.1 never reported a rule after a closed block; it fails on `5fd068e`, the commit
+  before this fix.
 - `test_docs` runs `test_harness` on the floor interpreter, and `test_harness` checks
   the temporary folders and `TempDirTest.write` there. On 3.9, 3.2.1's harness errored
   in 181 tests.

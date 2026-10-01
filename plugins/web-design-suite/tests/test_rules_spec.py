@@ -91,6 +91,27 @@ class TheAuditFollowsTheSpec(TempDirTest):
                 with self.subTest(kind=kind, tool=tool, not_=path):
                     self.assertFalse(check(pathlib.Path(path)))
 
+    def sass_findings(self, scss: str) -> set[tuple[str, str]]:
+        """A partial as written: no layer around it, and neither a token file
+        nor a component file."""
+        path = self.tmp / "src" / "styles" / "_partial.scss"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(scss + "\n", encoding="utf-8")
+        found, _, _ = self.audit.audit_run([str(path)])
+        return {(f.law, f.rule) for f in found}
+
+    def test_sass(self):
+        # SB-A24: a rule inside a @mixin was unlayered CSS, an interpolation's
+        # braces closed the layer around it, and a variable holding a literal
+        # passed.
+        for kind, finding in (("definitions", ("L5", "unlayered")), ("variables", ("L1", "sass-literal"))):
+            for scss in SPEC["sass"][kind]["allowed"]:
+                with self.subTest(kind=kind, allowed=scss):
+                    self.assertEqual(set(), self.sass_findings(scss))
+            for scss in SPEC["sass"][kind]["refused"]:
+                with self.subTest(kind=kind, refused=scss):
+                    self.assertEqual({finding}, self.sass_findings(scss))
+
     def test_nesting(self):
         for css in SPEC["nesting"]["allowed"]:
             with self.subTest(allowed=css):
