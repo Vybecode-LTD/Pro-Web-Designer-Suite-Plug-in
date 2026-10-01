@@ -74,7 +74,7 @@ Target:
 - *Done for 3.3.0 (N14, found on the way).* The skill's command, `introspect_schema supabase/migrations/*.sql`, failed on more than one file. Several DDL files are now read as one schema.
 - A `policies.todo.sql` per table, with a smoke-test stub (DL-B2).
 - *Done for 3.3.0.* A rewrite of supabase-integration.md §2, §4 and §6 (DL-C4), with a new §9, "Who talks to the database". It covers which key goes where, the publishable and secret key formats, forwarding the user's token from FastAPI, `search_path` on security-definer functions, and `app_metadata` only.
-- Real `db pull` and `gen types` files as fixtures, so the parser is tested on what Supabase emits (DL-C2, DL-B8).
+- *Done for 3.3.0.* Real `db pull` and `gen types` files as fixtures, so the parser is tested on what Supabase emits (DL-C2, DL-B8): the worked example as a migration, a real `pg_dump` of it and its generated types, plus Brewr's real `gen types`. Brewr's real dump is still to add, when the user runs `pg_dump`.
 
 Re-check every Supabase fact at supabase.com on the day, and register it.
 
@@ -82,12 +82,12 @@ Re-check every Supabase fact at supabase.com on the day, and register it.
 |---|---|---|
 | DL-A5 | medium | unsafe or stale guidance. *Done for 3.3.0.* |
 | DL-A6 | medium | the tool cannot see RLS. *Done for 3.3.0.* |
-| DL-A7 | medium | Supabase's own schema outputs are silently misread. |
+| DL-A7 | medium | Supabase's own schema outputs are silently misread. *Done for 3.3.0.* |
 | DL-B1 | high | no data-access boundary. *Partly done: the reference states it (§9); the scaffold does not yet generate `lib/supabase.ts`.* |
 | DL-B2 | high | authorization and server validation belong to nobody. |
-| DL-B8 | low | unverifiable claims. |
+| DL-B8 | low | unverifiable claims. *Done for 3.3.0.* |
 | DL-C1 | M | A security pass in `introspect_schema`: classify sensitive columns, parse RLS and policies, print a SECURITY block first. *Done for 3.3.0.* |
-| DL-C2 | M | A sturdier schema parser, tested on real `db pull` and `gen types` files. |
+| DL-C2 | M | A sturdier schema parser, tested on real `db pull` and `gen types` files. *Done for 3.3.0.* |
 | DL-C4 | S | rewrite supabase-integration.md §2/§4/§6 *Done for 3.3.0.* |
 
 ### W2 · One rule spec for all three gates

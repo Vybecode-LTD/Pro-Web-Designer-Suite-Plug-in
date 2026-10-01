@@ -448,6 +448,19 @@ def strip_sql_comments(text: str) -> str:
     return "".join(out)
 
 
+RE_DOLLAR_TAG = re.compile(r"\$(?:[A-Za-z_]\w*)?\$")
+
+
+def dollar_quote_end(text: str, i: int) -> int | None:
+    """The index just past a `$$ … $$` (or `$tag$ … $tag$`) body that opens
+    at `i`, as pg_dump writes every function: the `;` inside end nothing."""
+    m = RE_DOLLAR_TAG.match(text, i)
+    if not m:
+        return None
+    close = text.find(m.group(0), m.end())
+    return len(text) if close == -1 else close + len(m.group(0))
+
+
 def split_top_level(text: str, sep: str) -> list[str]:
     """Split on `sep` at paren depth 0, respecting quotes."""
     parts: list[str] = []
@@ -456,6 +469,11 @@ def split_top_level(text: str, sep: str) -> list[str]:
     i, n = 0, len(text)
     while i < n:
         ch = text[i]
+        end = dollar_quote_end(text, i) if ch == "$" else None
+        if end is not None:
+            buf.append(text[i:end])
+            i = end
+            continue
         if ch in "'\"":
             quote = ch
             buf.append(ch)
@@ -494,6 +512,55 @@ def unquote_ident(s: str) -> str:
     return s
 
 
+# Words that stay quoted: Postgres's reserved keywords, plus those this
+# parser reads as the start of a clause. Quoting is what makes them names.
+KEEP_QUOTED = set("""
+    all analyse analyze and any array as asc asymmetric authorization binary both case cast check
+    collate collation column concurrently constraint create cross current_catalog current_date
+    current_role current_schema current_time current_timestamp current_user default deferrable
+    desc distinct do else end except exclude false fetch for foreign freeze from full generated
+    grant group having ilike in initially inner intersect into is isnull join lateral leading
+    left like limit localtime localtimestamp natural not notnull null offset on only or order
+    outer overlaps placing primary references returning right select session_user similar some
+    symmetric system_user table tablesample then to trailing true union unique user using
+    variadic verbose when where window with""".split())
+RE_SIMPLE_IDENT = re.compile(r"[a-z_][a-z0-9_$]*")
+
+
+def unquote_identifiers(text: str) -> str:
+    """`"public"."products"` -> `public.products`, `"text"` -> `text`.
+
+    `pg_dump --quote-all-identifiers`, which `supabase db pull` uses, quotes
+    every name, types included (DL-A7). A name that needs its quotes (capitals,
+    spaces, a reserved word) keeps them; strings and `$$` bodies are left as
+    they are."""
+    out: list[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        end = dollar_quote_end(text, i) if ch == "$" else None
+        if end is None and ch == "'":
+            end = i + 1
+            while end < n and (text[end] != "'" or text[end + 1:end + 2] == "'"):
+                end += 2 if text[end] == "'" else 1
+            end += 1
+        if end is not None:
+            out.append(text[i:end])
+            i = end
+            continue
+        if ch == '"':
+            close = text.find('"', i + 1)
+            close = n if close == -1 else close
+            name = text[i + 1:close]
+            simple = RE_SIMPLE_IDENT.fullmatch(name) and name not in KEEP_QUOTED
+            out.append(name if simple else text[i:close + 1])
+            i = close + 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def bare_table_name(qualified: str) -> str:
     """`public.products` and `"public"."products"` both become `products`."""
     parts = [unquote_ident(p) for p in split_top_level(qualified.strip(), ".")]
@@ -502,11 +569,13 @@ def bare_table_name(qualified: str) -> str:
 
 def normalise_type(raw: str) -> tuple[str, int | None, int | None, int | None, bool]:
     """-> (normalised type, max_length, precision, scale, is_array)"""
-    t = raw.strip().lower()
+    t = raw.strip().lower().replace('"', "")
     is_array = False
     while t.endswith("[]"):
         is_array = True
         t = t[:-2].strip()
+    # `public.order_status`, `pg_catalog.text`, `extensions.citext` (DL-A7).
+    t = re.sub(r"^(?:[a-z_][\w$]*\.)+(?=[a-z_])", "", t)
     if t.startswith("array<") or t.startswith("_"):
         is_array = True
         t = t[6:].rstrip(">") if t.startswith("array<") else t[1:]
@@ -533,28 +602,33 @@ def normalise_type(raw: str) -> tuple[str, int | None, int | None, int | None, b
 COL_MODIFIER_SPLIT = _p(r"\s+")
 
 RE_CREATE_TABLE = _p(r"^\s*create\s+(?:unlogged\s+|temp\s+|temporary\s+)?table"
-                     r"(?:\s+if\s+not\s+exists)?\s+([\w\".]+)\s*\(")
-RE_CREATE_ENUM = _p(r"^\s*create\s+type\s+([\w\".]+)\s+as\s+enum\s*\((.*)\)\s*$")
+                     r"(?:\s+if\s+not\s+exists)?\s+((?:\"[^\"]+\"|[\w.])+)\s*\(")
+RE_CREATE_ENUM = _p(r"^\s*create\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+as\s+enum\s*\((.*)\)\s*$")
 RE_CREATE_INDEX = _p(r"^\s*create\s+(unique\s+)?index(?:\s+concurrently)?"
-                     r"(?:\s+if\s+not\s+exists)?\s+[\w\".]+\s+on\s+([\w\".]+)"
+                     r"(?:\s+if\s+not\s+exists)?\s+(?:\"[^\"]+\"|[\w.])+\s+on\s+((?:\"[^\"]+\"|[\w.])+)"
                      r"(?:\s+using\s+\w+)?\s*\((.*?)\)\s*(where\b.*)?$")
-RE_ALTER_ADD = _p(r"^\s*alter\s+table(?:\s+only)?\s+([\w\".]+)\s+add\s+"
-                  r"(?:constraint\s+[\w\"]+\s+)?(.*)$")
-RE_COMMENT_COL = _p(r"^\s*comment\s+on\s+column\s+([\w\".]+)\s+is\s+'(.*)'\s*$")
-RE_COMMENT_TABLE = _p(r"^\s*comment\s+on\s+table\s+([\w\".]+)\s+is\s+'(.*)'\s*$")
-RE_FK_CLAUSE = _p(r"foreign\s+key\s*\(([^)]*)\)\s*references\s+([\w\".]+)"
+RE_ALTER_TABLE = _p(r"^\s*alter\s+table(?:\s+if\s+exists)?(?:\s+only)?\s+((?:\"[^\"]+\"|[\w.])+)\s+(.*)$")
+RE_ADD_CONSTRAINT = _p(r"^add\s+(?:constraint\s+(?:\"[^\"]+\"|\w+)\s+)?"
+                       r"(?=(?:primary\s+key|foreign\s+key|unique|check|exclude)\b)")
+RE_ADD_COLUMN = _p(r"^add\s+(?:column\s+)?(?:if\s+not\s+exists\s+)?(.*)$")
+RE_DROP_COLUMN = _p(r"^drop\s+(?:column\s+)?(?:if\s+exists\s+)?(\"[^\"]+\"|\w+)")
+RE_ALTER_COLUMN = _p(r"^alter\s+(?:column\s+)?(\"[^\"]+\"|\w+)\s+(.*)$")
+RE_RENAME = _p(r"^rename\s+(?:(?:column\s+)?(?!to\b)(\"[^\"]+\"|\w+)\s+)?to\s+(\"[^\"]+\"|\w+)$")
+RE_COMMENT_COL = _p(r"^\s*comment\s+on\s+column\s+((?:\"[^\"]+\"|[\w.])+)\s+is\s+'(.*)'\s*$")
+RE_COMMENT_TABLE = _p(r"^\s*comment\s+on\s+table\s+((?:\"[^\"]+\"|[\w.])+)\s+is\s+'(.*)'\s*$")
+RE_FK_CLAUSE = _p(r"foreign\s+key\s*\(([^)]*)\)\s*references\s+((?:\"[^\"]+\"|[\w.])+)"
                   r"\s*(?:\(([^)]*)\))?(.*)$")
 RE_PK_CLAUSE = _p(r"^primary\s+key\s*\(([^)]*)\)")
 RE_UNIQUE_CLAUSE = _p(r"^unique\s*(?:nulls\s+(?:not\s+)?distinct\s*)?\(([^)]*)\)")
 RE_CHECK_CLAUSE = _p(r"^check\s*\((.*)\)\s*$")
-RE_INLINE_REFS = _p(r"\breferences\s+([\w\".]+)\s*(?:\(([^)]*)\))?(.*)$")
+RE_INLINE_REFS = _p(r"\breferences\s+((?:\"[^\"]+\"|[\w.])+)\s*(?:\(([^)]*)\))?(.*)$")
 # Row-level security (DL-A6): the statements the parser used to skip.
-RE_ALTER_RLS = _p(r"^\s*alter\s+table(?:\s+if\s+exists)?(?:\s+only)?\s+([\w\".]+)\s+"
+RE_ALTER_RLS = _p(r"^\s*alter\s+table(?:\s+if\s+exists)?(?:\s+only)?\s+((?:\"[^\"]+\"|[\w.])+)\s+"
                   r"(enable|disable|force|no\s+force)\s+row\s+level\s+security\s*$")
-RE_CREATE_POLICY = _p(r"^\s*create\s+policy\s+(\"[^\"]+\"|\w+)\s+on\s+([\w\".]+)\s*(.*)$")
-RE_REVOKE = _p(r"^\s*revoke\s+(.+?)\s+on\s+(?:table\s+)?([\w\".]+)\s+from\s+(.+)$")
-RE_GRANT = _p(r"^\s*grant\s+(.+?)\s+on\s+(?:table\s+)?([\w\".]+)\s+to\s+(.+)$")
-RE_DROP_POLICY = _p(r"^\s*drop\s+policy(?:\s+if\s+exists)?\s+(\"[^\"]+\"|\w+)\s+on\s+([\w\".]+)")
+RE_CREATE_POLICY = _p(r"^\s*create\s+policy\s+(\"[^\"]+\"|\w+)\s+on\s+((?:\"[^\"]+\"|[\w.])+)\s*(.*)$")
+RE_REVOKE = _p(r"^\s*revoke\s+(.+?)\s+on\s+(?:table\s+)?((?:\"[^\"]+\"|[\w.])+)\s+from\s+(.+)$")
+RE_GRANT = _p(r"^\s*grant\s+(.+?)\s+on\s+(?:table\s+)?((?:\"[^\"]+\"|[\w.])+)\s+to\s+(.+)$")
+RE_DROP_POLICY = _p(r"^\s*drop\s+policy(?:\s+if\s+exists)?\s+(\"[^\"]+\"|\w+)\s+on\s+((?:\"[^\"]+\"|[\w.])+)")
 RE_POLICY_AS = _p(r"\s*as\s+(permissive|restrictive)\b")
 RE_POLICY_FOR = _p(r"\s*for\s+(all|select|insert|update|delete)\b")
 RE_POLICY_TO = _p(r"\s*to\s+(.+?)(?=\s+using\s*\(|\s+with\s+check\s*\(|\s*$)")
@@ -769,6 +843,8 @@ def parse_ddl(text: str) -> Model:
     model = Model()
     rls_statements = 0
     clean = strip_sql_comments(text)
+    clean = re.sub(r"(?m)^[ \t]*\\.*$", "", clean)      # psql meta-commands: pg_dump 18's \restrict
+    clean = unquote_identifiers(clean)
     statements = [s.strip() for s in split_top_level(clean, ";") if s.strip()]
 
     for stmt in statements:
@@ -839,10 +915,12 @@ def parse_ddl(text: str) -> Model:
                 _apply_privileges(t, "grant", m.group(1), m.group(3))
             continue
 
-        m = RE_ALTER_ADD.match(one_line)
+        m = RE_ALTER_TABLE.match(one_line)
         if m:
-            _apply_table_constraint(model, bare_table_name(m.group(1)),
-                                    m.group(2).strip().rstrip(";"))
+            t = model.table(bare_table_name(m.group(1)))
+            if t:
+                for action in split_top_level(m.group(2), ","):
+                    _apply_alter_action(model, t, action.strip())
             continue
 
         m = RE_COMMENT_COL.match(one_line)
@@ -939,10 +1017,7 @@ def _parse_column_def(item: str, table: Table, model: Model) -> Column | None:
                  max_length=length, numeric_precision=precision,
                  numeric_scale=scale, is_array=is_array)
 
-    if ptype in model.enums:
-        col.enum = ptype
-    if raw_type.strip().lower().rstrip("[]") in model.enums:
-        col.enum = raw_type.strip().lower().rstrip("[]")
+    col.enum = _enum_named(model, ptype)
 
     low = mods.lower()
     # A plain substring test over the whole modifier text also matches a
@@ -959,7 +1034,7 @@ def _parse_column_def(item: str, table: Table, model: Model) -> Column | None:
         col.nullable = False
         col.default = "sequence"
         col.generated = True
-    if re.search(r"(?i)generated\s+always\s+as\s+identity", low):
+    if re.search(r"(?i)generated\s+(always|by\s+default)\s+as\s+identity", low):
         col.generated = True
         col.nullable = False
     if re.search(r"(?i)generated\s+(always|by\s+default)\s+as\s+\(", low):
@@ -1051,10 +1126,68 @@ def _apply_constraint_to_table(model: Model, table: Table, clause: str) -> None:
             target.checks.append(expr)
 
 
-def _apply_table_constraint(model: Model, table_name: str, clause: str) -> None:
-    table = model.table(table_name)
-    if table:
-        _apply_constraint_to_table(model, table, clause)
+def _apply_alter_action(model: Model, table: Table, action: str) -> None:
+    """One action of `ALTER TABLE`, replayed in order: migrations add and
+    change columns after the CREATE, and a dump adds every key and identity
+    that way."""
+    m = RE_ADD_CONSTRAINT.match(action)
+    if m:
+        _apply_constraint_to_table(model, table, action[m.end():])
+        return
+    if re.match(r"(?i)drop\s+constraint\b", action):
+        return
+    m = RE_ADD_COLUMN.match(action)
+    if m:
+        col = _parse_column_def(m.group(1).strip(), table, model)
+        if col and not table.col(col.name):
+            table.columns.append(col)
+        return
+    m = RE_DROP_COLUMN.match(action)
+    if m:
+        name = unquote_ident(m.group(1))
+        table.columns = [c for c in table.columns if c.name != name]
+        return
+    m = RE_RENAME.match(action)
+    if m:
+        old, new = (unquote_ident(g) if g else None for g in m.groups())
+        if old is None:                               # the table itself
+            for t in model.tables:
+                for c in t.columns:
+                    if c.foreign_key and c.foreign_key["table"] == table.name:
+                        c.foreign_key["table"] = new
+            table.name = new
+        elif table.col(old):
+            table.col(old).name = new
+            table.primary_key = [new if n == old else n for n in table.primary_key]
+            table.unique_indexes = [[new if n == old else n for n in idx] for idx in table.unique_indexes]
+        return
+    m = RE_ALTER_COLUMN.match(action)
+    col = table.col(unquote_ident(m.group(1))) if m else None
+    if not col:
+        return
+    change = m.group(2).strip()
+    if re.match(r"(?i)add\s+generated\s+(always|by\s+default)\s+as\s+identity\b", change):
+        col.generated, col.nullable = True, False
+    elif re.match(r"(?i)set\s+default\s+nextval\s*\(", change):
+        col.generated, col.nullable, col.default = True, False, "sequence"
+    elif re.match(r"(?i)set\s+default\s", change):
+        col.default = change[len("set default"):].strip()
+    elif re.match(r"(?i)drop\s+default\b", change):
+        col.default = None
+    elif re.match(r"(?i)(set|drop)\s+not\s+null\b", change):
+        col.nullable = change.lower().startswith("drop")
+    else:
+        tm = re.match(r"(?i)(?:set\s+data\s+)?type\s+(.+?)(?:\s+(?:using|collate)\s.*)?$", change)
+        if tm:
+            raw = tm.group(1).strip()
+            col.type, col.max_length, col.numeric_precision, col.numeric_scale, col.is_array = \
+                normalise_type(raw)
+            col.raw_type, col.enum = raw, _enum_named(model, col.type)
+
+
+def _enum_named(model: Model, type_name: str) -> str | None:
+    """The enum a normalised (lower-case, unqualified) type names, if any."""
+    return next((name for name in model.enums if name.lower() == type_name), None)
 
 
 def _check_target(expr: str, table: Table) -> Column | None:
@@ -1080,6 +1213,10 @@ def parse_gen_types(text: str, schema: str = "public") -> Model:
             f"Could not find a `{schema}: {{ … }}` block. `supabase gen types "
             f"typescript` nests everything under a schema key; pass --schema "
             f"with the one you want.")
+    # Prettier wraps a union that does not fit on its line: the name ends the
+    # line and each member starts one of its own with `|` (DL-A7).
+    block = re.sub(r"\n[ \t]*\|", " |", block)
+    block = re.sub(r":[ \t]*\|", ":", block)
 
     enums_block = _ts_block(block, r"\bEnums\s*:\s*\{")
     if enums_block:
@@ -1896,6 +2033,11 @@ def _validate(ui: dict[str, Any], col: Column, table: Table, model: Model) -> No
             rule({"<=": "max", "<": "exclusiveMax",
                   ">=": "min", ">": "exclusiveMin"}[op], num,
                  f"CHECK ({expr})")
+        bm = re.search(rf"(?<![\w.]){re.escape(col.name)}\s+between\s+(-?[\d.]+)\s+and\s+(-?[\d.]+)",
+                       expr, re.I)
+        if bm:
+            for kind, val in (("min", bm.group(1)), ("max", bm.group(2))):
+                rule(kind, float(val) if "." in val else int(val), f"CHECK ({expr})")
         lm = re.search(r"(?:char_)?length\s*\(\s*" + re.escape(col.name) +
                        r"\s*\)\s*(<=|<|>=|>)\s*(\d+)", expr, re.I)
         if lm:

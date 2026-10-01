@@ -39,7 +39,10 @@ Every quote below was found word for word on 2026-10-01, in the page's `.md` for
   - "Referential integrity checks, such as unique or primary key constraints and foreign key references, always bypass row security to ensure that data integrity is maintained."
   - Example: "RLS silently prevents updating other rows" -> `UPDATE 0`
   - WITH CHECK violation -> `ERROR:  new row violates WITH CHECK OPTION for "passwd"`
-- Still to re-read, for the parser work (DL-C2): the supabase CLI dump format (`--quote-all-identifiers`) and the `gen types` format.
+- Re-read 2026-10-01 for the parser work (DL-C2):
+  - supabase/cli `apps/cli-go/pkg/migration/scripts/dump_schema.sh` (commit `cad0957`), which `db dump` and `db pull` run: `pg_dump --schema-only --quote-all-identifier --role "postgres" --exclude-schema …`, then seds that comment out `\restrict` and `\unrestrict`, and turn `CREATE TABLE "` into `CREATE TABLE IF NOT EXISTS "` (and `OR REPLACE` for views, functions and triggers).
+  - `gen types`: the Supabase connector's `generate_typescript_types` on Brewr, kept whole as `tests/fixtures/supabase/brewr.types.ts`. Sorted tables and columns, `Relationships` only within the exposed schemas, and prettier's wrapping (a union too long for its line puts each member on its own `|` line).
+  - pg_dump 18.4 opens and closes a dump with `\restrict <key>` and `\unrestrict <key>`, psql meta-commands with no `;`.
 - https://supabase.com/docs/guides/realtime/postgres-changes
   - "Caution: RLS policies are not applied to `DELETE` statements, because there is no way for Postgres to verify that a user has access to a deleted record."
   - "You can only filter Delete events when tracking Postgres Changes if the table has the `replica identity` set to `full`."
