@@ -1,34 +1,51 @@
 # Handoff
 
-**2026-10-01**, in the session that merged PRs #7 to #10.
+**2026-10-01**, in the session that opened PR #12.
 
 ## State
 
-- **3.2.1 is released** (`v3.2.1`, `63932cf`) and installed from it, in the local marketplace and in the cache that sessions load. 3.3.0 is in progress and unreleased.
-- **Merged for 3.3.0:** PR #4 (Python 3.9, N6), #5 (SB-A9, N11), #6 (N12), #7 (SB-A24 and N13, the scripts on Sass) and #8 (W1's reference: DL-A5, DL-C4, and DL-B1 in `supabase-integration.md` §9).
-- **Merged as PR #9: W1's security pass** (DL-A6, DL-C1, N14, N15).
-  - `introspect_schema` reads `ENABLE ROW LEVEL SECURITY`, `CREATE POLICY` and column revokes, and opens `--summary` with a SECURITY block: `BLOCK` for a table with RLS off or a policy whose write condition is `true`; `warn` for RLS with no user policy, or authority columns a user can change.
-  - The findings are in the model (`security`). The "Is RLS on?" question defaults from the DDL, and `scaffold_ui` repeats the blocking findings.
-  - N14, found on the way: the skill's own command passed `supabase/migrations/*.sql`, which failed on two files. Several DDL files are now one schema.
-  - N15, from the reviews: a column-level revoke does nothing while a table-level grant stands, which is Supabase's default. The reference's own advice was wrong and is corrected; the pass tracks `GRANT`, `REVOKE` and `DROP POLICY` in order, and treats a column as safe only when a policy pins it to the caller.
-  - 377 tests pass on 3.14 and 3.9. The twelve new tests fail on `v3.2.1`.
+- **3.2.1 is released** (`v3.2.1`, `63932cf`) and installed. 3.3.0 is in progress and unreleased.
+- **Merged for 3.3.0:** PRs #4 to #10. Those are N6, SB-A9 with N11, N12, SB-A24 with N13, W1's reference, W1's security pass and `scaffold_ui --strict`.
+- **Open: PR #12, the parser on real output** (DL-A7, DL-C2, DL-B8). Branch `fix/w1-schema-sources`. It has no CI checks; it waits for review and the user's merge.
+  - `introspect_schema` now reads `pg_dump --quote-all-identifiers` (what `supabase db pull` runs) and `ALTER TABLE` replays (identity, add, drop, alter and rename). It also handles `$$` bodies, pg_dump 18's `\restrict`, prettier's wrapped unions in `gen types`, and `BETWEEN`.
+  - The fixtures are in `tests/fixtures/supabase/` (README there):
+    - the worked example as a migration;
+    - a real `pg_dump` of it from local Postgres 18;
+    - its generated types;
+    - Brewr's real `gen types`.
+  - §1 of `supabase-integration.md` is now measured on those fixtures. Two of its claims were wrong.
+  - 392 tests pass on 3.14 and 3.9. Of the 15 new ones, 13 fail on `v3.2.1`; the other 2 are controls.
+- **Brewr** (`ccsgoijoouggdepsweus`) is **still active**, waiting for the user's `pg_dump`. The command is under Next steps. Pause it (`pause_project`) once the dump is in, or when the user says so.
 - **Decisions the user has not made:**
-  - stylelint reads no Sass, so the audit is the only Sass gate (`test_rules_spec` holds the statement). Teaching stylelint Sass means shipping `postcss-scss`.
-- **Decided by the user on 2026-10-01:**
-  - `scaffold_ui` warns about blocking findings and still writes the screens; `--strict` writes nothing and exits 1, for CI (merged as PR #10).
-  - The `db pull` and `gen types` fixtures (DL-C2) come from the user's shelved Supabase project "Brewr". Read the files for anything private before committing them: the repository is public.
-- **A fact that changed the review's advice:** an UPDATE policy with no `WITH CHECK` is not unchecked. Postgres uses the `USING` expression for the new row (postgresql.org, CREATE POLICY, read 2026-10-01). So the security pass does not flag it; it flags authority columns instead.
-- **The review's repro inputs stay local** (the user's decision): `dev plans/web-design-suite-review/fixtures/` is ignored through `.git/info/exclude`, never committed.
+  - stylelint reads no Sass. Teaching it means shipping `postcss-scss`.
+  - Scope: I recommended finishing phases 3 to 5, releasing, and moving phase 6 (broader coverage) to a backlog. No answer yet.
 
 ## Next steps
 
-1. **Pull the parser fixtures from Brewr** (DL-A7, DL-C2, DL-B8). The project is `ccsgoijoouggdepsweus`, in a second organisation, so `list_projects` does not show it; `get_project` does. It was restored on 2026-10-01 for this and has 25 tables, all with RLS on and no rows.
-   - `gen types`: the Supabase connector's `generate_typescript_types`. About 25 tables of output, so do it at the start of a session.
-   - The DDL: the local Supabase CLI is broken (no `supabase-go`) and there is no Docker, but `pg_dump` 18 is on PATH. The user runs it, because it needs the database password: `pg_dump --schema-only --quote-all-identifiers --no-owner -n public "<session pooler URI from the dashboard's Connect button>" > toolingrewr-schema.sql`.
-   - Read both files for anything private before committing them, then pause the project again (`pause_project`) unless the user says otherwise.
-2. **The rest of W1, in the scaffold:** `policies.todo.sql` per table with a smoke-test stub (DL-B2), and the generated `lib/supabase.ts` (the rest of DL-B1). Then the parser on real `db pull` and `gen types` files (DL-A7, DL-C2, DL-B8), which waits on the user's choice of project.
+1. **PR #13: the rest of W1 in the scaffold** (DL-B2, the rest of DL-B1). Base it on main once #12 is merged, because it uses #12's fixtures. The design below was proven on Postgres 18 on 2026-10-01.
+   - **`features/<t>/<t>.policies.todo.sql`, one per entity.** Each file enables RLS. It then proposes policies from the first of these that matches:
+     - a primary key that references `auth.users` gets `id = (select auth.uid())`;
+     - an owner column gets the same check on that column. An owner column is a foreign key to `users`, or to a table whose key is `auth.users`, or a column named `user_id`, `owner_id`, `author_id`, `created_by` or `customer_id`;
+     - a child of an owned parent gets an `exists (…)` check;
+     - a tenant column (`org_id` and the like) gets a TODO with the security-definer helper template from `w1-supabase-facts.md`;
+     - anything else gets select for `authenticated` and no writes.
+   - **Grants in the same file:** `revoke insert, update … from authenticated`, then grant insert on the writable columns plus the owner column, and update on the writable columns only. "Writable" means `emit_types`' `Draft` list (`ans.in_form`, not readonly), so the database and the form agree.
+   - **`<t>.policies.test.sql`:** plain SQL in a transaction that rolls back. It asserts:
+     - `relrowsecurity` is on;
+     - `anon` sees 0 rows;
+     - as `authenticated` (`set local role`, plus `set_config('request.jwt.claims', …)`), no foreign rows are visible;
+     - `update … set <authority column> = <itself> where false` raises `insufficient_privilege`, and the same update on a writable column passes. The privilege check runs even with `where false`.
+   - **A real-Postgres test**, skipped when `initdb` is not on PATH:
+     - its stub's `auth.uid()` reads `request.jwt.claims`, as Supabase's does;
+     - it applies every policies file and runs every test file;
+     - re-introspecting the DDL plus the policies must give no findings;
+     - a `using (true)` variant must make the smoke test fail.
+   - **`lib/supabase.ts`** is the §9 snippet, plus a throw when the key starts with `sb_secret_`.
+   - **Docs:** update §9's "The scaffold does not write them" and SKILL.md's "does not decide: … permissions".
+2. **Brewr's real dump**, when the user has run this in cmd (Session pooler URI from the dashboard's Connect button):
+   `pg_dump --schema-only --quote-all-identifiers --no-owner -n public "<URI>" > "%USERPROFILE%\Downloads\brewr-schema.sql"`
+   Read it for anything private. Add it as `tests/fixtures/supabase/brewr.dump.sql`, with a test that it agrees with `brewr.types.ts`, then pause Brewr.
 3. **The rest of W2:** N1 to N3, SB-A8, A11, A15, A23, A25, SB-C2 and C9. Then W3 and W4, and release 3.3.0.
-4. **Fold the PR-by-PR sequencing into the plan**, as the user asked for a plan covering every open issue. CLAUDE.md's active-work line has the current order.
 
 ## Blockers
 
@@ -36,11 +53,12 @@ None.
 
 ## Warnings
 
-- **Cost.** The user caps a session at 500 thousand tokens. Keep a session to one or two PRs, report token use as you go, and do not fan out to subagents or run max-effort reviews unless asked.
-- **Fail-before from Git Bash.** `tar -x -C` needs a POSIX path (`cygpath -u`); `WDS_PLUGIN_ROOT` takes a Windows path (`cygpath -w`). In cmd, CLAUDE.md's commands apply as written.
-- **Don't edit the plugin while the suite runs.** Every test spawns the scripts afresh, so a mid-run edit mixes versions. Stop the run and start again.
-- **Heredocs in the Bash tool** lose backslashes: a Python edit script with `\)` or `C:\…` in it fails to parse. Use the Edit tool for those.
+- **Cost.** The cap is 500 thousand tokens a session; this one stopped at about 350 thousand. Keep a session to one or two PRs and report usage as you go. Don't fan out to subagents.
+- **Local Postgres 18** is installed (`initdb`, `pg_ctl`, `psql` on PATH). For a scratch cluster: `initdb -D <scratch>/pgdata -U postgres -A trust`, then `pg_ctl -D … -o "-p 54329" start`. Roles are per cluster, so create them once. Stop the cluster when done.
+- **pg_dump on Windows writes CRLF.** Convert a dump to LF before committing it.
+- **Fail-before from Git Bash.** `tar -x -C` needs a POSIX path (`cygpath -u`), and `WDS_PLUGIN_ROOT` a Windows one (`cygpath -w`).
+- **Don't edit a script while the suite runs.** Every test spawns the scripts afresh, and a test edited mid-run is loaded by the next interpreter's run.
+- **Heredocs in the Bash tool lose backslashes.** For regex edits, write a small Python file with the Write tool.
 - **The installed plugin is a copy, and sessions load a cache of it.** Update both after every release.
-- **Worktrees.** Never run `npm ci` in a worktree whose `tooling/*/node_modules` is a junction; remove junctions with `os.rmdir` before `git worktree remove`.
-- **Don't trust the review's ✔ marks.** Use the inventory.
-- **The repository is public** (since 2026-09-28, MIT). Commit nothing private: no secrets, and nothing from the user's other work. Its history already names paths on this machine and two other projects; the user chose to leave that as it is (decision 1).
+- **Never run `npm ci` in a worktree** whose `tooling/*/node_modules` is a junction.
+- **The repository is public.** Commit nothing private.
