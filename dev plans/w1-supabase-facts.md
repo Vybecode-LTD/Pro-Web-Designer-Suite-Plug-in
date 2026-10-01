@@ -8,6 +8,9 @@ Every quote below was found word for word on 2026-10-01, in the page's `.md` for
 - https://supabase.com/docs/guides/database/postgres/row-level-security
   - A change to `app_metadata` "will not be reflected using `auth.jwt()` until the user's JWT is refreshed."
   - The template: `create function private.user_list_ids() … security definer set search_path = '' stable`, then `revoke execute on function private.user_list_ids() from public; grant usage on schema private to authenticated; grant execute … to authenticated`.
+- https://supabase.com/docs/guides/realtime/authorization
+  - "By creating RLS policies on the `realtime.messages` table you can control the access users have to a Channel topic"
+  - "To enforce private channels you need to disable the 'Allow public access' setting in Realtime Settings"
 - https://supabase.com/docs/guides/storage/buckets/fundamentals
   - "When a bucket is designated as 'Public,' it effectively bypasses access controls for both retrieving and serving files within the bucket. This means that anyone who possesses the asset URL can readily access the file. Access control is still enforced for other types of operations including uploading, deleting, moving, and copying."
 

@@ -199,7 +199,7 @@ Realtime is a list-state problem before it is a transport problem.
 What arrives is the primary key and nothing else. `REPLICA IDENTITY FULL` does not change that on a table with RLS: the `old` record still holds only the key (Supabase's Realtime troubleshooting guide). So:
 
 - **Treat a `DELETE` event as "a row with this id is gone", and nothing more.** Remove the row only if that id is in the list you hold. Render nothing from `old`.
-- **The id itself is what leaks.** With a sequential key, another tenant's subscriber can count your deletes. Use `uuid` keys on any table that is both multi-tenant and realtime.
+- **The event itself is what leaks.** Every subscriber gets one event per delete, so another tenant can count yours, whatever the key looks like. A `uuid` key only stops the id from saying how many rows exist. Where delete activity must stay private, do not put the table on Postgres Changes: send the change on a private Broadcast channel per tenant, authorized by policies on `realtime.messages`.
 - **Do not filter deletes.** A filter on delete events needs replica identity `full`, and under RLS the old row is still only the key.
 
 **At scale, switch transport.** Supabase's guidance is to use Broadcast instead of Postgres Changes past about 3,000 concurrent subscribers on the same changes.

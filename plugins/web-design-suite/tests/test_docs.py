@@ -167,7 +167,8 @@ class SupabaseGuidance(unittest.TestCase):
                 "supabase-integration.md").read_text(encoding="utf-8")
         for wrong in ("returns boolean security definer`",           # in public, no search_path
                       "The JWT's claims, or",                         # user_metadata is user-writable
-                      "REPLICA IDENTITY FULL` gives you the old row"):  # not under RLS
+                      "REPLICA IDENTITY FULL` gives you the old row",  # not under RLS
+                      "The id itself is what leaks"):                 # a uuid hides no delete count
             with self.subTest(wrong=wrong):
                 self.assertNotIn(wrong, text)
         for right in ("## 9. Who talks to the database", "sb_publishable_", "sb_secret_", "bypassrls",
