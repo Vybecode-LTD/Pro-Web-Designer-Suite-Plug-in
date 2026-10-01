@@ -1,4 +1,20 @@
-# W1 facts, re-read at source on 2026-09-25 (for tests/fixtures/evidence.json)
+# W1 facts, re-read at source on 2026-09-25 and again on 2026-10-01 (for tests/fixtures/evidence.json)
+
+Every quote below was found word for word on 2026-10-01, in the page's `.md` form (the same URL with `.md` appended). Added that day:
+
+- https://supabase.com/docs/guides/api/api-keys
+  - "Send publishable and secret keys on the `apikey` header, not on `Authorization: Bearer`."
+  - Publishable key: "Safe to expose online: web page, mobile or desktop app, GitHub actions, CLIs, source code."
+- https://supabase.com/docs/guides/database/postgres/row-level-security
+  - A change to `app_metadata` "will not be reflected using `auth.jwt()` until the user's JWT is refreshed."
+  - The template: `create function private.user_list_ids() … security definer set search_path = '' stable`, then `revoke execute on function private.user_list_ids() from public; grant usage on schema private to authenticated; grant execute … to authenticated`.
+- https://supabase.com/docs/guides/realtime/authorization
+  - "By creating RLS policies on the `realtime.messages` table you can control the access users have to a Channel topic"
+  - "To enforce private channels you need to disable the 'Allow public access' setting in Realtime Settings"
+- https://supabase.com/docs/guides/storage/buckets/fundamentals
+  - "When a bucket is designated as 'Public,' it effectively bypasses access controls for both retrieving and serving files within the bucket. This means that anyone who possesses the asset URL can readily access the file. Access control is still enforced for other types of operations including uploading, deleting, moving, and copying."
+
+## Read on 2026-09-25
 
 - https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys
   - "Supabase is deprecating the `anon` and `service_role` keys by the end of 2026."
@@ -17,7 +33,7 @@
   - "Referential integrity checks, such as unique or primary key constraints and foreign key references, always bypass row security to ensure that data integrity is maintained."
   - Example: "RLS silently prevents updating other rows" -> `UPDATE 0`
   - WITH CHECK violation -> `ERROR:  new row violates WITH CHECK OPTION for "passwd"`
-- Still to re-read: Realtime postgres-changes DELETE + RLS (troubleshooting page), throwOnError, `.or()` sanitisation, supabase CLI dump format (--quote-all-identifiers), gen types format.
+- Still to re-read, for the parser work (DL-C2): the supabase CLI dump format (`--quote-all-identifiers`) and the `gen types` format.
 - https://supabase.com/docs/guides/realtime/postgres-changes
   - "Caution: RLS policies are not applied to `DELETE` statements, because there is no way for Postgres to verify that a user has access to a deleted record."
   - "You can only filter Delete events when tracking Postgres Changes if the table has the `replica identity` set to `full`."

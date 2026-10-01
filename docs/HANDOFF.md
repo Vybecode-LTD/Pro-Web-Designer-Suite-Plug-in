@@ -1,6 +1,6 @@
 # Handoff
 
-**2026-10-01**, in the session that opened PR #7 (SB-A24 and N13, the scripts on Sass).
+**2026-10-01**, in the session that opened PR #7 (SB-A24 and N13, the scripts on Sass) and the first W1 pull request, stacked on it.
 
 ## State
 
@@ -13,6 +13,7 @@
   - **From the reviews of PR #7** (CodeRabbit and Codex): a mixin that holds a whole rule is unlayered when included at the root of its own file; `0px 13px` no longer hides the `13px` (older than Sass: the audit read only the first length); a quoted string in a Sass variable or an interpolation is text; `$breakpointSmall` is a breakpoint.
   - **Not done, and the user's call:** CodeRabbit asked for stylelint and ESLint to follow the Sass rules. Neither reads Sass today, and `test_rules_spec` now holds that statement. Teaching stylelint Sass means shipping `postcss-scss` in the config, a new dependency for every project that uses it.
   - 364 tests pass on 3.14 and 3.9. Nine of the eleven new tests fail on `v3.2.1`. The other two pass on both: one holds the stylelint statement, and one guards a bug that existed only inside the PR.
+- **Open: W1's reference, branch `feat/w1-supabase-boundary`, stacked on PR #7.** DL-A5 and DL-C4 are done, and DL-B1 in the reference: `supabase-integration.md` §9 says which key goes where, and §2, §4 and §7 are corrected. Every Supabase fact was re-read on 2026-10-01 (`dev plans/w1-supabase-facts.md`). 365 tests pass; the new one fails on `v3.2.1` in 16 subtests.
 - **Decisions in SB-A24** a reviewer may question; each is one condition in `audit_css`:
   - A breakpoint is known by its name: `$bp`, `$bp-*`, `$breakpoint*`.
   - A variable local to a `@function` is not checked (`$ratio * 1rem` is a unit conversion).
@@ -22,8 +23,8 @@
 
 ## Next steps
 
-1. **Answer CodeRabbit on PR #7**, then merge it when the user says so.
-2. **W1**, the Supabase access boundary. The facts are in `dev plans/w1-supabase-facts.md`; re-read them at their source on the day.
+1. **Merge PR #7, then the W1 reference PR**, when the user says so. Reply to the review threads on #7 only if the user asks: the fixes are in `88b3cfc`.
+2. **The rest of W1:** the security pass in `introspect_schema` (DL-A6, DL-C1), `policies.todo.sql` with a smoke-test stub (DL-B2), the generated `lib/supabase.ts` (the rest of DL-B1), and real `db pull` and `gen types` files as fixtures (DL-A7, DL-C2, DL-B8). The fixtures need a real Supabase project to pull from: ask the user which one.
 3. **The rest of W2:** N1 to N3, SB-A8, A11, A15, A23, A25, SB-C2 and C9. Then W3 and W4, and release 3.3.0.
 4. **Fold the PR-by-PR sequencing into the plan**, as the user asked for a plan covering every open issue. CLAUDE.md's active-work line has the current order.
 

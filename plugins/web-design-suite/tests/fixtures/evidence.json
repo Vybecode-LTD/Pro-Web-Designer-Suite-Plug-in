@@ -226,6 +226,28 @@
       "docs": [
         "web-design-studio/references/accessibility.md"
       ]
+    },
+    {
+      "figure": "end of 2026",
+      "claim": "when Supabase stops supporting the legacy anon and service_role API keys",
+      "source": "Supabase docs, Migrating to publishable and secret API keys",
+      "url": "https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys",
+      "checked": "2026-10-01",
+      "quote": "Supabase is deprecating the `anon` and `service_role` keys by the end of 2026.",
+      "docs": [
+        "content-model-to-ui/references/supabase-integration.md"
+      ]
+    },
+    {
+      "figure": "3,000 concurrent subscribers",
+      "claim": "the point past which Supabase recommends Broadcast over Postgres Changes",
+      "source": "Supabase docs, Realtime: Postgres Changes",
+      "url": "https://supabase.com/docs/guides/realtime/postgres-changes",
+      "checked": "2026-10-01",
+      "quote": "If you expect more than ~3,000 concurrent subscribers on the same changes, use Broadcast to stream database changes",
+      "docs": [
+        "content-model-to-ui/references/supabase-integration.md"
+      ]
     }
   ],
   "not_statistics": [

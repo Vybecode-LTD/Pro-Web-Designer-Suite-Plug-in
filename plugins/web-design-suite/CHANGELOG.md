@@ -59,6 +59,23 @@
   `a11y_static` reported clean for `outline: none`. Both now say which `.sass` files
   they did not read. The census prints its notes when it finds nothing, too; they
   used to appear only beside a result.
+- **The Supabase reference had no access boundary** (DL-B1, DL-A5, DL-C4), the first
+  of the two high-severity gaps. `supabase-integration.md` now says which key each
+  process holds (§9): the publishable key in the browser, and FastAPI either as the
+  user, forwarding the caller's token so row-level security applies, or as the
+  service, where no policy runs and the endpoint must do the policy's job. It says
+  that every `VITE_` variable is public, and where validation and authorization are
+  enforced. Three pieces of guidance were unsafe or wrong and are corrected:
+  - The permission RPC was a `security definer` function in the exposed schema with
+    no `search_path`. The template now keeps it in a private schema, pins
+    `search_path = ''` and revokes `execute` from `public`.
+  - "The JWT's claims" were trusted whole. Authorization data comes from
+    `app_metadata` only, and a claim is as old as the token.
+  - Realtime `DELETE` events are not policy-filtered, and `REPLICA IDENTITY FULL`
+    does not return the old row on a table with RLS, so the fix the reference offered
+    did not work in the case it was for.
+  It also says that a public Storage bucket is world-readable whatever the policies
+  say. Every Supabase fact was re-read at supabase.com on 2026-10-01.
 
 ### Changed
 
@@ -83,6 +100,9 @@
   the stylelint config reads no Sass, and passes on both.
 - N13: `test_token_migration` and `test_content_and_a11y` each hold a `.sass` file.
   Against 3.2.1 both fail; a `.scss` file with the same rule is the control.
+- DL-B1, DL-A5 and DL-C4: `test_docs.SupabaseGuidance.test_the_access_boundary_is_stated`
+  holds what the reference must say and must no longer say. Against 3.2.1 it fails
+  in 16 subtests. The two dated figures it quotes are in the evidence register.
 - `test_docs` runs `test_harness` on the floor interpreter, and `test_harness` checks
   the temporary folders and `TempDirTest.write` there. On 3.9, 3.2.1's harness errored
   in 181 tests.
