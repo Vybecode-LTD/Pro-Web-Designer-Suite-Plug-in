@@ -87,7 +87,10 @@ MARKUP_EXT = {".html", ".htm", ".xhtml", ".vue", ".svelte", ".astro", ".php",
               ".erb", ".hbs", ".handlebars", ".twig", ".liquid", ".jinja",
               ".j2", ".ejs"}
 JSX_EXT = {".jsx", ".tsx", ".js", ".ts", ".mjs", ".cjs"}
-CSS_EXT = {".css", ".scss", ".sass", ".less", ".pcss"}
+CSS_EXT = {".css", ".scss", ".less", ".pcss"}
+# Indented Sass has no braces for the CSS checks to follow, so reading it
+# would pass it; it is listed as skipped instead (N13).
+INDENTED_SASS_EXT = ".sass"
 
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit",
@@ -1532,7 +1535,7 @@ def iter_files(paths: list[str]) -> Iterator[Path]:
                            if d not in SKIP_DIRS and not d.startswith(".")]
                 for f in sorted(files):
                     fp = Path(root) / f
-                    if fp.suffix.lower() in AUDITABLE_EXT:
+                    if fp.suffix.lower() in AUDITABLE_EXT | {INDENTED_SASS_EXT}:
                         yield fp
 
 
@@ -1541,7 +1544,8 @@ def audit(paths: list[str]) -> list[Finding]:
 
 
 def audit_run(paths: list[str]) -> tuple[list[Finding], list[Path]]:
-    """(findings, files named explicitly that are not markup, JSX or CSS).
+    """(findings, files that are not markup, JSX or CSS: those named
+    explicitly, and indented Sass wherever it is).
 
     A hook passes every staged file; README.md or render.py must be skipped
     and listed, not parsed as HTML and failed."""
@@ -1672,10 +1676,14 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     findings, skipped = audit_run(paths)
-    if skipped:
-        names = ", ".join(str(p) for p in skipped[:5]) + (" …" if len(skipped) > 5 else "")
-        print(f"a11y_static: skipped {len(skipped)} file(s) that are not markup, JSX "
-              f"or CSS: {names}", file=sys.stderr)
+    for group, why in (([p for p in skipped if p.suffix.lower() != INDENTED_SASS_EXT],
+                        "that are not markup, JSX or CSS"),
+                       ([p for p in skipped if p.suffix.lower() == INDENTED_SASS_EXT],
+                        "of indented Sass, which it cannot read (check the compiled CSS, "
+                        "or use .scss)")):
+        if group:
+            names = ", ".join(str(p) for p in group[:5]) + (" …" if len(group) > 5 else "")
+            print(f"a11y_static: skipped {len(group)} file(s) {why}: {names}", file=sys.stderr)
 
     if args.category:
         wanted = {c.upper() for c in args.category}

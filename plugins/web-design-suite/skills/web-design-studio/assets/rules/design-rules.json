@@ -35,6 +35,45 @@
     ],
     "refused": [".badge { color: GrayText; }", ".panel { border: var(--stroke-default) solid ButtonBorder; }"]
   },
+  "sass": {
+    "gates": "audit_design alone reads Sass. The stylelint config lints .css files and ships no Sass syntax, and ESLint reads no stylesheet. The audit reads SCSS; indented Sass (.sass) has no braces for it to follow, so it lists each such file as skipped and never passes one.",
+    "definitions": {
+      "rule": "A @mixin or @function body emits nothing where it is written, so a rule inside one is not unlayered CSS (Law 5); the layer is checked where the mixin is included. A mixin that holds a whole rule emits it there, so including one at the root of a file is unlayered CSS, directly or through another mixin that includes it; a mixin defined in another file is not followed. An interpolation, #{…}, is text in a selector, a prelude or a value: its braces open and close no rule.",
+      "allowed": [
+        "@mixin focus-ring { &:where(:focus-visible) { outline: var(--stroke-focus) solid var(--border-focus); } }",
+        "@mixin cq($name, $min) { @container #{$name} (inline-size >= #{$min}) { @content; } }",
+        "@layer components { @each $name in (sm, lg) { .card-#{$name} { padding: var(--pad-card); } } .card { color: var(--fg-strong); } }",
+        "@mixin card { .card { padding: var(--pad-card); } }\n@layer components { @include card; }",
+        "@mixin card { .card { padding: var(--pad-card); } }\n@mixin wrapper { @include card; }\n@layer components { @include wrapper; }"
+      ],
+      "refused": [
+        "@mixin card { padding: var(--pad-card); }\n.card { @include card; }",
+        "@mixin card { .card { padding: var(--pad-card); } }\n@include card;",
+        "@mixin card { .card { padding: var(--pad-card); } }\n@mixin wrapper { @include card; }\n@include wrapper;"
+      ]
+    },
+    "variables": {
+      "rule": "Law 1: a Sass variable that holds a length, a hex or functional colour, a duration or an easing curve is a literal under another name; a quoted string is text, whatever it spells. It is fixed at compile time, so no theme re-points it, --density cannot reach it and DevTools does not show it. It is refused outside a token file, in a map as in a single value. Two kinds are left alone: a breakpoint ($bp, $bp-*, $breakpoint*), which must be a Sass value because a media query condition cannot read a custom property, and a variable local to a @function, which is a step in a computation.",
+      "allowed": [
+        "$bp: (sm: 30rem, md: 48rem, lg: 64rem);",
+        "$breakpoint-md: 48rem;",
+        "$breakpointSmall: 48rem;",
+        "$loading-label: \"Please wait 200ms\";",
+        "$statuses: success, warning, danger;",
+        "$columns: 12;",
+        "@function rem($px) { $ratio: math.div($px, 16px); @return $ratio * 1rem; }"
+      ],
+      "refused": [
+        "$card-padding: 24px;",
+        "$card-bg: #ffffff;",
+        "$card-overlay: rgba($brand, 0.5);",
+        "$card-fade: 200ms;",
+        "$card-ease: cubic-bezier(0.2, 0, 0, 1);",
+        "$sizes: (sm: 12px, md: 16px);",
+        "$insets: (none: 0px, sm: 12px);"
+      ]
+    }
+  },
   "file_classes": {
     "token_files": {
       "globs": ["**/tokens.css", "**/*-tokens.css", "**/*.tokens.css", "**/tokens/*.css", "**/theme.css", "**/*-theme.css"],

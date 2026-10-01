@@ -417,7 +417,9 @@ $bp: (sm: 30rem, md: 48rem, lg: 64rem, xl: 80rem, xxl: 96rem);
 
 **`@extend`.** Never. It rewrites selector lists across the whole compilation, so a rule in file A silently changes the selector of a rule in file B; the emitted selectors appear in no source file; and it moves declarations to the position of the *extended* rule, which breaks every assumption about source order. Use a mixin (duplicated output, honest behaviour) or `composes` (multiple class names, honest behaviour).
 
-**Sass variables for values that should be custom properties.** `$card-padding: 24px` cannot be themed, cannot respond to `--density`, and cannot be inspected in DevTools. The only legitimate Sass variables are the ones that must exist at compile time: breakpoints, and loop inputs.
+**Sass variables for values that should be custom properties.** `$card-padding: 24px` cannot be themed, cannot respond to `--density`, and cannot be inspected in DevTools. The only legitimate Sass variables are the ones that must exist at compile time: breakpoints, and loop inputs. `audit_design` holds this: outside a token file, a Sass variable that holds a length, a colour, a duration or an easing curve fails as `sass-literal`, unless it is a breakpoint (`$bp`, `$bp-*`, `$breakpoint*`).
+
+**The indented syntax.** Write `.scss`, not `.sass`. `audit_design` follows braces, so it lists a `.sass` file as skipped and checks nothing in it.
 
 ---
 

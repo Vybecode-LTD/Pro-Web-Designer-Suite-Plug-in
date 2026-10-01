@@ -31,14 +31,16 @@ Usage
 
 What it reads
 -------------
-    .css .scss .sass .less .pcss        every declaration
+    .css .scss .less .pcss              every declaration
     .js .jsx .ts .tsx .mjs .cjs         inline styles, class strings, colours
     .html .htm .vue .svelte .astro      <style> blocks, style="" attributes,
                                         class attributes (HTML email is left
                                         to email-template-system's lint_email)
 
 A file named explicitly with any other extension is skipped and listed, never
-guessed at. A folder with nothing auditable in it is an error, not "clean".
+guessed at. So is indented Sass (.sass): it has no braces for the scanner to
+follow, and reading it would pass it as clean. A folder with nothing auditable
+in it is an error, not "clean".
 
 Adopting it on a legacy codebase
 --------------------------------
@@ -81,6 +83,16 @@ TEMPLATE_EXT = {".html", ".htm", ".vue", ".svelte", ".astro"}
 # Files whose CSS is plain CSS, where `//` is not a comment (line_comments).
 PLAIN_CSS_EXT = {".css", ".pcss", ".html", ".htm"}
 KEYFRAMES_AT = re.compile(r"@(-[a-z]+-)?keyframes\b", re.I)
+# Sass (design-rules.json: sass). A @mixin or @function body emits nothing
+# where it is written. A variable holding a literal is a literal; a breakpoint
+# has to be one, because a media query condition cannot read a custom property.
+SASS_DEFINITION_AT = re.compile(r"@(mixin|function)\b", re.I)
+SASS_FUNCTION_AT = re.compile(r"@function\b", re.I)
+SASS_VARIABLE = re.compile(r"^([\w-]+\.)?\$[\w-]+$")
+SASS_BREAKPOINT = re.compile(r"\$(?:bp(?:[-_][\w-]*)?|breakpoint[\w-]*)$", re.I)
+SASS_MIXIN_NAME = re.compile(r"@mixin\s+([\w-]+)", re.I)
+SASS_INCLUDE_NAME = re.compile(r"@include\s+([\w-]+)(?![\w.-])", re.I)
+SASS_STRING = re.compile(r"""(['"])(?:\\.|(?!\1).)*\1""", re.S)
 
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit",
@@ -464,6 +476,28 @@ def scan_css(text: str) -> Iterator[CssDecl | tuple]:
             if i < n:
                 buf.append(text[i]); i += 1
             continue
+        if ch == "#" and text.startswith("{", i + 1):
+            # Sass interpolation, `.card-#{$name}`: text, whose braces open
+            # and close nothing (SB-A24).
+            j, nested = i + 1, 0
+            while j < n:
+                if text[j] in "\"'":              # a brace in a string is text
+                    quote = text[j]
+                    j += 1
+                    while j < n and text[j] != quote:
+                        j += 2 if text[j] == "\\" else 1
+                elif text[j] == "{":
+                    nested += 1
+                elif text[j] == "}":
+                    nested -= 1
+                    if nested == 0:
+                        break
+                j += 1
+            chunk = text[i:j + 1]
+            line += chunk.count("\n")
+            buf.append(chunk)
+            i = j + 1
+            continue
         if ch == "(":
             paren += 1
         elif ch == ")":
@@ -502,7 +536,7 @@ def scan_css(text: str) -> Iterator[CssDecl | tuple]:
             stmt = "".join(buf).strip()
             buf = []
             if stmt.startswith("@"):
-                yield ("at_statement", stmt, line, tuple(at_stack))
+                yield ("at_statement", stmt, line, tuple(at_stack), rule_depth())
             elif ":" in stmt:
                 p, _, v = stmt.partition(":")
                 yield CssDecl(p.strip().lower(), v.strip(), line,
@@ -591,13 +625,11 @@ def raw_colour(value: str) -> tuple[str, str] | None:
 
 
 def has_raw_length(value: str) -> str | None:
-    v = strip_var_refs(value)
-    m = LENGTH_LITERAL.search(v)
-    if not m:
-        return None
-    if re.fullmatch(r"-?0+(\.0+)?(px|rem|em)?", m.group(0), re.I):
-        return None
-    return m.group(0)
+    # Every length, not the first: `0px 13px` hid the 13px behind the zero.
+    for m in LENGTH_LITERAL.finditer(strip_var_refs(value)):
+        if not re.fullmatch(r"-?0+(\.0+)?(px|rem|em)?", m.group(0), re.I):
+            return m.group(0)
+    return None
 
 
 def owl_selector(selectors: tuple[str, ...]) -> bool:
@@ -661,6 +693,14 @@ def audit_css(path: Path, text: str) -> list[Finding]:
     first_rule_line = 0
     first_unlayered_line = 0
     declared_props: set[str] = set()
+    emitting_mixins: set[str] = set()     # mixins in this file that hold a whole rule
+
+    def outside_a_layer(at_rules: Iterable[str]) -> bool:
+        # A keyframe (`from`, `to`, `50%`) is not a style rule; the references
+        # and the scaffold keep @keyframes outside layers. A Sass @mixin or
+        # @function emits nothing where it is written (SB-A24).
+        return not any(a.startswith("@layer") or KEYFRAMES_AT.match(a) or SASS_DEFINITION_AT.match(a)
+                       for a in at_rules)
 
     def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str) -> None:
         tags = line_ignores.get(line, set()) | file_ignores
@@ -687,6 +727,18 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                             "Use: @layer reset, tokens, base, layout, components, "
                             "utilities, overrides; extra layers may be inserted, "
                             "but the canonical ones must keep their relative order.")
+                # A mixin that holds a whole rule emits it where it is included,
+                # so at the root of a file the rule is unlayered. Only a mixin
+                # defined in this file is known (design-rules.json: sass).
+                included = SASS_INCLUDE_NAME.match(stmt)
+                if included and included.group(1).lower() in emitting_mixins and ev[4] == 0:
+                    # Inside another mixin, the rule is emitted wherever that
+                    # one is included, so the wrapper holds a whole rule too.
+                    wrappers = [m.group(1).lower() for m in map(SASS_MIXIN_NAME.match, ev[3]) if m]
+                    if wrappers:
+                        emitting_mixins.update(wrappers)
+                    elif not token_file and not first_unlayered_line and outside_a_layer(ev[3]):
+                        first_unlayered_line = ev[2]
             elif kind == "rule_open":
                 sel, line, depth, at_rules = ev[1], ev[2], ev[3], ev[4]
                 if not first_rule_line:
@@ -715,12 +767,10 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                         "Use a class; layers already decide who wins.")
                 # The at-rules open around this rule, not every one seen so
                 # far: a rule after a closed @layer block is unlayered (SB-A9).
-                # A keyframe (`from`, `to`, `50%`) is not a style rule; the
-                # references and the scaffold keep @keyframes outside layers.
-                if not token_file and depth == 1 and not first_unlayered_line and not any(
-                    a.startswith("@layer") or KEYFRAMES_AT.match(a) for a in at_rules
-                ):
+                if not token_file and depth == 1 and not first_unlayered_line and outside_a_layer(at_rules):
                     first_unlayered_line = line
+                if depth == 1 and not sel.lstrip().startswith("&"):
+                    emitting_mixins.update(m.group(1).lower() for m in map(SASS_MIXIN_NAME.match, at_rules) if m)
             elif kind == "rule_close":
                 pass
             continue
@@ -761,6 +811,24 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                         "Bind it to a --motion-* pair so duration and easing "
                         "stay together and prefers-reduced-motion still "
                         "applies.")
+
+        # ---- L1 Sass variables ----------------------------------------------
+        # `$card-padding: 24px` is the literal Law 1 forbids, moved one line
+        # up (SB-A24; design-rules.json: sass.variables).
+        if (SASS_VARIABLE.match(prop) and not token_file and not SASS_BREAKPOINT.search(prop)
+                and not any(SASS_FUNCTION_AT.match(a) for a in d.at_rules)):
+            bare = SASS_STRING.sub('""', value)          # a string is text, not a value
+            rest = strip_var_refs(bare)
+            colour = raw_colour(bare)
+            if (has_raw_length(bare) or (colour and colour[0] == "raw-color")
+                    or TIME_LITERAL.search(rest) or BEZIER_LITERAL.search(rest)):
+                add(line, "L1", "sass-literal", "error",
+                    f"Sass variable `{prop}` holds a literal: `{value.strip()}`.",
+                    "A Sass variable is fixed at compile time: no theme re-points "
+                    "it, --density cannot reach it and DevTools does not show it. "
+                    "Declare the value as a token and read it with var(). Only a "
+                    "breakpoint ($bp-*) has to be a Sass value, because a media "
+                    "query condition cannot read a custom property.")
 
         # ---- L5 !important -------------------------------------------------
         if "!important" in value.lower():
@@ -1421,6 +1489,7 @@ def is_html_email(text: str) -> bool:
 
 SKIP_NOT_AUDITABLE = "not CSS, JS or HTML"
 SKIP_EMAIL = "HTML email: lint it with email-template-system's lint_email"
+SKIP_INDENTED_SASS = "indented Sass, which this audit cannot read: audit the compiled CSS, or use .scss"
 
 
 def audit(paths: list[str]) -> list[Finding]:
@@ -1437,6 +1506,9 @@ def audit_run(paths: list[str]) -> tuple[list[Finding], int, list[tuple[Path, st
         kind = file_kind(fp)
         if kind is None:
             skipped.append((fp, SKIP_NOT_AUDITABLE))
+            continue
+        if fp.suffix.lower() == ".sass":
+            skipped.append((fp, SKIP_INDENTED_SASS))
             continue
         try:
             # utf-8-sig: PowerShell 5.1's Set-Content -Encoding utf8 writes a
@@ -1563,7 +1635,7 @@ def main(argv: list[str] | None = None) -> int:
 
     findings, audited, skipped = audit_run(paths)
 
-    for why in (SKIP_NOT_AUDITABLE, SKIP_EMAIL):
+    for why in (SKIP_NOT_AUDITABLE, SKIP_EMAIL, SKIP_INDENTED_SASS):
         group = [p for p, reason in skipped if reason == why]
         if group:
             names = ", ".join(str(p) for p in group[:5]) + (" …" if len(group) > 5 else "")

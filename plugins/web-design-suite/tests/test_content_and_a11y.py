@@ -372,6 +372,17 @@ class A11yStaticScaleAndScope(TempDirTest):
         self.assertEqual(proc.returncode, 0, output(proc))
         self.assertIn("skipped", output(proc).lower())
 
+    def test_indented_sass_is_skipped_not_passed(self):
+        # N13: the CSS checks follow braces and indented Sass has none, so
+        # `outline: none` in a .sass file was reported clean without a word.
+        self.write("src/card.sass", ".card:focus\n  outline: none\n")
+        self.write("src/card.scss", ".card:focus { outline: none; }\n")
+        proc = run_py("a11y-audit-runner", "a11y_static", "src", cwd=self.tmp)
+        self.assertIn("skipped 1 file(s) of indented Sass", output(proc))
+        report = proc.stdout.decode("utf-8")
+        self.assertIn("card.scss", report, output(proc))           # the control: braces are read
+        self.assertNotIn("card.sass", report)
+
 
 if __name__ == "__main__":
     unittest.main()

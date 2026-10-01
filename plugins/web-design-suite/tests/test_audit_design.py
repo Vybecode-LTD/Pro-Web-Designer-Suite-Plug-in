@@ -36,10 +36,19 @@ Regressions covered:
 - A rule after a closed @layer block was never reported as unlayered.
 - A root-level components/ folder, the common Next.js layout, did not hold
   component files, so Law 2 was skipped.
+
+3.3.0 (SB-A24, the audit on Sass):
+- A partial holding only mixins failed as unlayered, because a mixin holds
+  rules.
+- A Sass variable holding a literal (`$card-padding: 24px`) passed.
+- The braces of an interpolation (`.card-#{$name}`) closed the layer around
+  them, so the next rule was unlayered.
+- Indented Sass (.sass) has no braces to follow and was reported clean.
 """
 from __future__ import annotations
 
 import json
+import re
 import unittest
 
 from wds_support import SKILLS, TempDirTest, output, run_py
@@ -419,6 +428,87 @@ class AuditPrecision(TempDirTest):
         self.write("components/card.css",
                    "@layer components {\n  .card { margin-block-start: var(--gap-grouped); }\n}\n")
         self.assertEqual([("L2", "child-margin", 2)], self.found("components"))
+
+    def test_the_references_sass_partial_passes(self):
+        # SB-A24: `_mq.scss` from stack-css-modules §9 emits no CSS, and failed
+        # as unlayered because its mixins hold rules.
+        doc = (SKILLS / "web-design-studio" / "references" / "stack-css-modules.md").read_text(encoding="utf-8")
+        partial = re.search(r"```scss\n(// src/styles/_mq\.scss.*?)```", doc, re.S)
+        self.assertIsNotNone(partial, "§9 no longer shows _mq.scss")
+        self.write("src/styles/_mq.scss", partial.group(1))
+        self.assertEqual([], self.found("src"))
+
+    def test_a_mixin_is_checked_where_it_is_included(self):
+        # The control for the test above: a mixin's body is still read for
+        # literals, and the rule that includes it still needs a layer.
+        self.write("src/styles/_card.scss", "@mixin card {\n  & .title { padding: 13px; }\n}\n")
+        self.write("src/styles/card.scss", "@use 'card' as *;\n.card { @include card; }\n")
+        self.assertEqual([("L1", "raw-spacing", 2), ("L5", "unlayered", 2)], self.found("src"))
+
+    def test_a_sass_variable_holding_a_literal_is_refused(self):
+        # SB-A24: `$card-padding: 24px; … padding: $card-padding`, which §9
+        # bans, passed clean.
+        module = ("$card-padding: 24px;\n"
+                  "$card-bg: #ffffff;\n"
+                  "$card-fade: 200ms !default;\n"
+                  "$bp-md: 48rem;\n"
+                  "$columns: 12;\n"
+                  "@layer components {\n"
+                  "  .card { padding: $card-padding; background: $card-bg; transition: opacity $card-fade; }\n"
+                  "}\n")
+        self.write("src/components/Card.module.scss", module)
+        self.write("src/styles/tokens.scss", module)         # the token file is where literals live
+        self.assertEqual([("L1", "sass-literal", 1), ("L1", "sass-literal", 2), ("L1", "sass-literal", 3)],
+                         self.found("src"))
+
+    def test_sass_interpolation_opens_no_rule(self):
+        # Found with SB-A24: the braces of `#{$name}` closed the layer around
+        # them, so the next rule was unlayered; in a value they opened a rule
+        # and the declaration was never read.
+        self.write("src/components/card.scss",
+                   "@layer components {\n"
+                   "  @each $name in (sm, lg) {\n"
+                   "    .card-#{$name} { padding: var(--pad-card); }\n"
+                   "  }\n"
+                   "  .card { inline-size: calc(100% - #{$gutter}); margin-inline: #{$gutter}; padding: 13px; }\n"
+                   "}\n")
+        self.assertEqual([("L1", "raw-spacing", 5), ("L2", "child-margin", 5)], self.found("src"))
+
+    def test_a_brace_in_a_string_does_not_extend_an_interpolation(self):
+        # CodeRabbit on PR #7: a quoted `{` inside `#{…}` was counted as
+        # nesting, so the interpolation swallowed the rest of the file.
+        self.write("src/components/card.scss",
+                   "@layer components {\n"
+                   '  #{map.get(("{": ".card"), "{")} {\n'
+                   "    padding: 13px;\n"
+                   "  }\n"
+                   "}\n")
+        self.assertEqual([("L1", "raw-spacing", 3)], self.found("src"))
+
+    def test_a_zero_with_a_unit_does_not_hide_the_length_after_it(self):
+        # CodeRabbit on PR #7, and older than Sass: only the first length in a
+        # value was looked at, so `0px 13px` passed.
+        self.write("src/components/card.css",
+                   "@layer components {\n"
+                   "  .card { padding: 0px 13px; }\n"
+                   "  .card__media { padding: 0px 0rem; }\n"
+                   "}\n")
+        self.assertEqual([("L1", "raw-spacing", 2)], self.found("src"))
+
+    def test_indented_sass_is_skipped_not_passed(self):
+        # Found with SB-A24: the scanner follows braces and indented Sass has
+        # none, so a .sass file full of literals was reported clean.
+        self.write("ind/components/card.sass", ".card\n  padding: 24px\n  color: #ff0000\n")
+        proc = run_py("web-design-studio", "audit_design", "ind", "--strict", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("indented Sass", output(proc))
+        self.assertIn("0 files", output(proc))
+        # Beside a file the audit does read, it is listed and the rest is audited.
+        self.write("ind/components/card.scss", "@layer components {\n  .card { padding: var(--pad-card); }\n}\n")
+        proc = run_py("web-design-studio", "audit_design", "ind", "--strict", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn("skipped 1 file(s) (indented Sass", output(proc))
+        self.assertIn("across 1 file(s)", output(proc))
 
 
 class JsxClassesAndCssInJs(TempDirTest):

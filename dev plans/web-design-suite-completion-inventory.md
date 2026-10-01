@@ -87,7 +87,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-A21 | medium | fixed in 3.2.0 | Stale or wrong facts. |
 | SB-A22 | medium | fixed in 3.2.0, item 1 | the references' snippets fail the suite's own audit |
 | SB-A23 | low-medium | W2 (3.3.0) | The files disagree on how to wrap imports in layers. |
-| SB-A24 | low-medium | W2 (3.3.0) | SCSS: a `@mixin`-only partial fails L5, while `$card-padding: 24px` passes. |
+| SB-A24 | low-medium | fixed in 3.3.0: `test_audit_design.AuditPrecision` (`test_the_references_sass_partial_passes`, `test_a_mixin_is_checked_where_it_is_included`, `test_a_sass_variable_holding_a_literal_is_refused`, `test_sass_interpolation_opens_no_rule`, `test_indented_sass_is_skipped_not_passed`) and `test_rules_spec.test_sass` | SCSS: a `@mixin`-only partial fails L5, while `$card-padding: 24px` passes. |
 | SB-A25 | low | partly done (the `url(#fade)` false positive and the multi-line pragma no longer reproduce, 3.2.1 review; release to attribute); the rest in W2 (3.3.0) | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. |
 | SB-B1 | — | fixed in 3.1.0, with PS-A4 | templates aren't audited. |
 | SB-B2 | — | fixed in 3.2.0 and 3.2.1 (real-tool tests) | no executable tests for the configs. |
@@ -95,7 +95,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-B4 | — | partly done; the rest in W3 (3.3.0) | the contract is missing roles the references need. |
 | SB-B5 | — | W12 (3.6.0+) | parts of Tailwind v4 aren't covered. |
 | SB-B6 | — | W12 (3.6.0+) | SCSS and other stacks. |
-| SB-C1 | S-M | partly done (3.1.0: A3, A4, A10; 3.3.0: A9); SB-A24 is left, in W2 (3.3.0) | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. |
+| SB-C1 | S-M | fixed: 3.1.0 did SB-A3, A4 and A10, and 3.3.0 did SB-A9 and A24 | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. |
 | SB-C2 | M · high | partly done; the rest in W2 (3.3.0) | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. |
 | SB-C3 | S-M · high | W12 (3.6.0+) | Ship a `tw_probe` script and a `/tw-probe` skill command. |
 | SB-C4 | S · high | W12 (3.6.0+) | Replace Part 5 with eslint-plugin-better-tailwindcss 4.7 (peers ESLint 7–10 and Tailwind 3.3/4.1). |

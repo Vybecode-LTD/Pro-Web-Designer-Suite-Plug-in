@@ -12,7 +12,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`, then this plan.
 2. Install the test tools once: `npm ci` in `tooling/main` and in `tooling/tailwind-v3` (`tooling/README.md`).
-3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 353 tests OK before you change anything; if it does not, fix that first.
+3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 364 tests OK before you change anything; if it does not, fix that first.
 4. Work the phases in order. Inside a phase the workstreams are independent, so take them one at a time and ship the phase as one release.
 5. When a workstream is done, update its rows in the inventory: the release, and the test that holds each fix.
 
@@ -45,18 +45,18 @@ Ask before the phase that needs each one.
 ## Where things stand
 
 3.2.1 is released (`v3.2.1`, 2026-09-26), and 3.3.0 is in progress on `main`:
-- **Tests:** 353, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
+- **Tests:** 364, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
 - **Linux (WSL):** the suite passes with the Node tests skipped, because that Linux has no Node.
 - **macOS:** never run.
 - **Real tools:** the shipped ESLint config, the stylelint config, both Tailwind blocks of Part 5, Tailwind 4 and tailwind-merge all run in the suite, at the versions pinned in `tooling/`.
 
 | | Total | Fixed | Partly done | Planned here |
 |---|---|---|---|---|
-| A. Issues | 138 | 80 | 0 | 58 |
+| A. Issues | 138 | 81 | 0 | 57 |
 | B. Gaps | 52 | 5 | 4 | 43 |
-| C. Improvements | 75 | 23 | 6 | 46 |
+| C. Improvements | 75 | 24 | 5 | 46 |
 
-Open issues: 58 (32 medium, 16 low, 10 low-medium). None is high severity. The two high-severity items left are gaps, DL-B1 and DL-B2, which is why W1 comes first.
+Open issues: 57 (32 medium, 16 low, 9 low-medium). None is high severity. The two high-severity items left are gaps, DL-B1 and DL-B2, which is why W1 comes first.
 
 ---
 
@@ -124,6 +124,10 @@ Add a stylelint snippet test like `DesignEslintConfig.test_the_references_tsx_sn
 - **N11.** *Done for 3.3.0.* Its file classes had drifted from the spec: its token-file pattern predated 3.2.0 (four of the spec's six examples missed), and its component test shared SB-A9's `components/` bug. It now uses the audit's patterns, and `test_rules_spec.test_file_classes` holds both copies.
 - **N12.** *Done for 3.3.0.* `extract_literals.blank_css_comments` read `//` as a comment in plain CSS, as the audit did (SB-A9 (a)). After `url(https://…)` the census filed the literals that followed under `background`, and the codemod rewrote none of them. It now reads comments as the audit does; `test_token_migration.AddressesAreNotComments` holds it.
 
+**N13 · found while fixing SB-A24.** *Done for 3.3.0.* Sass the scripts could not read.
+- **The audit.** The braces of an interpolation (`.card-#{$name}`) closed the layer around them, and indented Sass (`.sass`), which has no braces, passed as clean. The audit now reads an interpolation as text and lists a `.sass` file as skipped.
+- **The other scripts.** Three more listed `.sass` and follow braces. On a `.sass` file full of literals (measured 2026-10-01), `extract_literals` reported "no hardcoded design values found" and `a11y_static` reported clean for `outline: none`. Both now say which `.sass` files they did not read (`test_token_migration`, `test_content_and_a11y`). `perf_audit` only weighs the file, which is right.
+
 | ID | Severity or size | What is wrong or missing |
 |---|---|---|
 | SB-A8 | medium | The canonical `index.css` puts third-party CSS on top of every layer. |
@@ -131,9 +135,9 @@ Add a stylelint snippet test like `DesignEslintConfig.test_the_references_tsx_sn
 | SB-A11 | medium | Docs promise checks that don't exist; for example, the audit does not diff `--breakpoint-*` against `--bp-*`. |
 | SB-A15 | medium | The stylelint allowlist has holes. |
 | SB-A23 | low-medium | The files disagree on how to wrap imports in layers. |
-| SB-A24 | low-medium | SCSS: a `@mixin`-only partial fails L5, while `$card-padding: 24px` passes. |
+| SB-A24 | low-medium | SCSS: a `@mixin`-only partial fails L5, while `$card-padding: 24px` passes. *Done for 3.3.0, with the Sass rules in the spec (`sass`).* |
 | SB-A25 | low | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. |
-| SB-C1 | S-M | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. *Partly done: 3.1.0 did SB-A3, A4 and A10, and 3.3.0 did SB-A9; SB-A24 is left.* |
+| SB-C1 | S-M | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. *Done: 3.1.0 did SB-A3, A4 and A10, and 3.3.0 did SB-A9 and A24.* |
 | SB-C2 | M · high | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. *Partly done: 3.2.0 shipped the spec with tests; the generator and conformance fixtures are left.* |
 | SB-C9 | S · medium | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. |
 

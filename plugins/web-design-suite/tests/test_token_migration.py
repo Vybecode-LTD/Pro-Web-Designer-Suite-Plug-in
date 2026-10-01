@@ -195,6 +195,17 @@ class VendorScopeAndScale(TempDirTest):
         _, data = self.extract("src")
         self.assertTrue(any("vendor" in p for p in data["problems"]), data["problems"])
 
+    def test_indented_sass_is_reported_not_counted_as_clean(self):
+        # N13: the census follows braces and indented Sass has none, so a .sass
+        # file full of literals was "no hardcoded design values found".
+        self.write("src/components/card.sass", ".card\n  padding: 13px\n  color: #123456\n")
+        _, data = self.extract("src")
+        self.assertEqual([], data["literals"])
+        self.assertTrue(any("indented Sass" in p and "card.sass" in p for p in data["problems"]),
+                        data["problems"])
+        proc = run_py("design-token-migration", "extract_literals", "src", cwd=self.tmp)
+        self.assertIn("did not read 1 indented Sass file(s)", output(proc))
+
     def test_the_codemod_rewrites_files_named_explicitly_and_can_include_vendor(self):
         mapping = self.write("mapping.json", json.dumps(self.MAPPING))
         lib = self.write("src/lib/components/button.css", ".b { margin: 13px; }\n")
