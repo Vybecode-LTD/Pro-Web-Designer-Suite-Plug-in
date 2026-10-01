@@ -38,16 +38,18 @@
   "sass": {
     "gates": "audit_design alone reads Sass. The stylelint config lints .css files and ships no Sass syntax, and ESLint reads no stylesheet. The audit reads SCSS; indented Sass (.sass) has no braces for it to follow, so it lists each such file as skipped and never passes one.",
     "definitions": {
-      "rule": "A @mixin or @function body emits nothing where it is written, so a rule inside one is not unlayered CSS (Law 5); the layer is checked where the mixin is included. A mixin that holds a whole rule emits it there, so including one at the root of a file is unlayered CSS; a mixin defined in another file is not followed. An interpolation, #{…}, is text in a selector, a prelude or a value: its braces open and close no rule.",
+      "rule": "A @mixin or @function body emits nothing where it is written, so a rule inside one is not unlayered CSS (Law 5); the layer is checked where the mixin is included. A mixin that holds a whole rule emits it there, so including one at the root of a file is unlayered CSS, directly or through another mixin that includes it; a mixin defined in another file is not followed. An interpolation, #{…}, is text in a selector, a prelude or a value: its braces open and close no rule.",
       "allowed": [
         "@mixin focus-ring { &:where(:focus-visible) { outline: var(--stroke-focus) solid var(--border-focus); } }",
         "@mixin cq($name, $min) { @container #{$name} (inline-size >= #{$min}) { @content; } }",
         "@layer components { @each $name in (sm, lg) { .card-#{$name} { padding: var(--pad-card); } } .card { color: var(--fg-strong); } }",
-        "@mixin card { .card { padding: var(--pad-card); } }\n@layer components { @include card; }"
+        "@mixin card { .card { padding: var(--pad-card); } }\n@layer components { @include card; }",
+        "@mixin card { .card { padding: var(--pad-card); } }\n@mixin wrapper { @include card; }\n@layer components { @include wrapper; }"
       ],
       "refused": [
         "@mixin card { padding: var(--pad-card); }\n.card { @include card; }",
-        "@mixin card { .card { padding: var(--pad-card); } }\n@include card;"
+        "@mixin card { .card { padding: var(--pad-card); } }\n@include card;",
+        "@mixin card { .card { padding: var(--pad-card); } }\n@mixin wrapper { @include card; }\n@include wrapper;"
       ]
     },
     "variables": {
