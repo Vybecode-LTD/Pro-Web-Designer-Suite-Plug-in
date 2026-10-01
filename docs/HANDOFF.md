@@ -6,22 +6,23 @@
 
 - **3.2.1 is released** (`v3.2.1`, `63932cf`) and installed from it, in the local marketplace and in the cache that sessions load. 3.3.0 is in progress and unreleased.
 - **Merged for 3.3.0:** PR #4 (Python 3.9, N6), #5 (SB-A9, N11), #6 (N12), #7 (SB-A24 and N13, the scripts on Sass) and #8 (W1's reference: DL-A5, DL-C4, and DL-B1 in `supabase-integration.md` §9).
-- **Open: W1's security pass, branch `feat/w1-security-pass`** (DL-A6, DL-C1, N14).
+- **Merged as PR #9: W1's security pass** (DL-A6, DL-C1, N14, N15).
   - `introspect_schema` reads `ENABLE ROW LEVEL SECURITY`, `CREATE POLICY` and column revokes, and opens `--summary` with a SECURITY block: `BLOCK` for a table with RLS off or a policy whose write condition is `true`; `warn` for RLS with no user policy, or authority columns a user can change.
   - The findings are in the model (`security`). The "Is RLS on?" question defaults from the DDL, and `scaffold_ui` repeats the blocking findings.
   - N14, found on the way: the skill's own command passed `supabase/migrations/*.sql`, which failed on two files. Several DDL files are now one schema.
   - N15, from the reviews: a column-level revoke does nothing while a table-level grant stands, which is Supabase's default. The reference's own advice was wrong and is corrected; the pass tracks `GRANT`, `REVOKE` and `DROP POLICY` in order, and treats a column as safe only when a policy pins it to the caller.
   - 377 tests pass on 3.14 and 3.9. The twelve new tests fail on `v3.2.1`.
 - **Decisions the user has not made:**
-  - `scaffold_ui` warns about blocking findings but still writes the screens. Refusing to write them would break every schema whose policies are kept elsewhere.
   - stylelint reads no Sass, so the audit is the only Sass gate (`test_rules_spec` holds the statement). Teaching stylelint Sass means shipping `postcss-scss`.
-  - Which Supabase project the `db pull` and `gen types` fixtures come from (DL-C2). Nothing from a real project goes into this public repository without the user choosing it.
+- **Decided by the user on 2026-10-01:**
+  - `scaffold_ui` warns about blocking findings and still writes the screens; `--strict` writes nothing and exits 1, for CI (branch `feat/w1-scaffold-strict`).
+  - The `db pull` and `gen types` fixtures (DL-C2) come from the user's shelved Supabase project "Brewr". Read the files for anything private before committing them: the repository is public.
 - **A fact that changed the review's advice:** an UPDATE policy with no `WITH CHECK` is not unchecked. Postgres uses the `USING` expression for the new row (postgresql.org, CREATE POLICY, read 2026-10-01). So the security pass does not flag it; it flags authority columns instead.
 - **The review's repro inputs stay local** (the user's decision): `dev plans/web-design-suite-review/fixtures/` is ignored through `.git/info/exclude`, never committed.
 
 ## Next steps
 
-1. **Merge the security-pass PR** when the user says so, after answering its reviews.
+1. **Merge the `--strict` PR** when the user says so.
 2. **The rest of W1, in the scaffold:** `policies.todo.sql` per table with a smoke-test stub (DL-B2), and the generated `lib/supabase.ts` (the rest of DL-B1). Then the parser on real `db pull` and `gen types` files (DL-A7, DL-C2, DL-B8), which waits on the user's choice of project.
 3. **The rest of W2:** N1 to N3, SB-A8, A11, A15, A23, A25, SB-C2 and C9. Then W3 and W4, and release 3.3.0.
 4. **Fold the PR-by-PR sequencing into the plan**, as the user asked for a plan covering every open issue. CLAUDE.md's active-work line has the current order.
