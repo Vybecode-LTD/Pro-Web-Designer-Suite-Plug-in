@@ -49,8 +49,11 @@ Then, always:
 
     python -m scripts.audit_design src/ --strict
 
-Exit codes: 0 written (or dry-run printed) · 1 the model is unusable ·
-2 bad invocation.
+    # In CI: refuse when the schema has a blocking security finding
+    python -m scripts.scaffold_ui model.json --out src --strict
+
+Exit codes: 0 written (or dry-run printed) · 1 the model is unusable, or
+--strict met a blocking security finding · 2 bad invocation.
 """
 
 from __future__ import annotations
