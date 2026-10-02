@@ -266,6 +266,13 @@
     the N29 example through the audit, which refused it already.
 - `load_script` moves into `wds_support`, for the test that holds the scaffold's copy
   of the reserved words equal to the parser's.
+- What the reviews of #16 found, against its first commit (`0a0c249`): five tests fail
+  there, and twelve controls pass on both.
+  - A rename or a drop no longer reaches into a call (`lower(note)` is not a column
+    `lower`) or into a quoted name (`"old.part"` is not `old`).
+  - A table constraint listed before its column now applies.
+  - The smoke test quotes every name it puts in a string (a table named `it's`).
+  - The no-write check counts a role that `anon` or `authenticated` inherits.
 
 ## 3.2.1 — 2026-09-25
 

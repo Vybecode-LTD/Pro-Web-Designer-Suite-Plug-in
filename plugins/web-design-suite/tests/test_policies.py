@@ -92,6 +92,8 @@ create table "window" (id uuid primary key default gen_random_uuid(),
 create table {LONG} (id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users (id), "limit" integer not null);
 create table lookups (id uuid primary key default gen_random_uuid(), label text not null);
+create table "it's" (id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users (id), body text);
 """
 
 
@@ -369,6 +371,19 @@ class PoliciesRunOnPostgres(Scaffolded):
         proc = self.smoke(db, src, "categories")
         self.assertEqual(0, proc.returncode, output(proc))
         self.psql_ok(db, 'create policy "anyone writes" on public.categories for all using (true);')
+        proc = self.smoke(db, src, "categories")
+        self.assertNotEqual(0, proc.returncode)
+        self.assertIn("a policy lets the browser write public.categories", output(proc))
+
+    def test_a_write_policy_for_a_role_the_browser_inherits_is_the_browsers(self):
+        # The review of #16: authenticated, a member of an editor role, holds
+        # the editor's policies too.
+        db, src = self.database(SHOP_TABLES, SHOP_SEED)
+        self.psql_ok(db, "do $$ begin create role wds_editor nologin; "
+                         "exception when duplicate_object then null; end $$;")
+        self.psql_ok(db, "grant wds_editor to authenticated; "
+                         'create policy "editors write" on public.categories for insert to wds_editor '
+                         "with check (true);")
         proc = self.smoke(db, src, "categories")
         self.assertNotEqual(0, proc.returncode)
         self.assertIn("a policy lets the browser write public.categories", output(proc))

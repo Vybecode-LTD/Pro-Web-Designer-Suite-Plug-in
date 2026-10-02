@@ -2647,6 +2647,11 @@ def sql_text(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
+def raise_text(value: str) -> str:
+    """A RAISE message: a string literal in which `%` is a placeholder."""
+    return sql_text(value.replace("%", "%%"))
+
+
 def pg_schema(model: dict[str, Any]) -> str:
     """The schema introspect_schema read (`--schema`), where the policies go (N20)."""
     return (model.get("source") or {}).get("pg_schema") or "public"
@@ -2813,14 +2818,14 @@ def emit_policy_test(table: dict[str, Any], model: dict[str, Any], ans: Answers)
            f'--   psql "<connection string>" -v ON_ERROR_STOP=1 -f {name}.policies.test.sql',
            "begin;", "",
            "do $$ begin",
-           f"  assert (select relrowsecurity from pg_class where oid = '{q}'::regclass),",
-           f"    'row-level security is off on {q}';",
+           f"  assert (select relrowsecurity from pg_class where oid = {sql_text(q)}::regclass),",
+           f"    {sql_text(f'row-level security is off on {q}')};",
            "end $$;", "",
            "-- A visitor with the publishable key and no session. TODO(test): if the table is",
            "-- public on purpose, delete this check.",
            "set local role anon;",
            "do $$ begin",
-           f"  assert not exists (select 1 from {q}), 'anon can read {q}';",
+           f"  assert not exists (select 1 from {q}), {sql_text(f'anon can read {q}')};",
            "end $$;",
            "reset role;", "",
            "-- A signed-in user. TODO(test): put an id from your seed here to test real rows.",
@@ -2830,16 +2835,19 @@ def emit_policy_test(table: dict[str, Any], model: dict[str, Any], ans: Answers)
     if kind in ("self", "owner", "child"):
         out += ["do $$ begin",
                 f"  assert not exists (select 1 from {q} where ({owner_check(own, name, schema)}) is not true),",
-                f"    'a signed-in user can read {name} rows that are not theirs';",
+                f"    {sql_text(f'a signed-in user can read {name} rows that are not theirs')};",
                 "end $$;", ""]
     elif kind == "none":
         # Only a policy the browser's roles hold: one for service_role is the
-        # server's (N23). `public` is every role, and the default.
+        # server's (N23). `public` is every role, and the default; any other
+        # role counts when anon or authenticated is a member of it, directly or
+        # through another role, since its policies then apply to them too.
         out += ["do $$ begin",
                 f"  assert not exists (select 1 from pg_policies where schemaname = {sql_text(schema)}",
                 f"    and tablename = {sql_text(name)} and cmd <> 'SELECT'",
-                "    and roles && array['public', 'anon', 'authenticated']::name[]),",
-                f"    'a policy lets the browser write {q}';",
+                "    and exists (select 1 from unnest(roles) as r(role) where case when r.role = 'public' then true",
+                "      else pg_has_role('anon', r.role, 'MEMBER') or pg_has_role('authenticated', r.role, 'MEMBER') end)),",
+                f"    {sql_text(f'a policy lets the browser write {q}')};",
                 "end $$;", ""]
     writable = ans.writable(table)
     protected = _protected(table, own, writable) if kind != "none" else []
@@ -2850,13 +2858,13 @@ def emit_policy_test(table: dict[str, Any], model: dict[str, Any], ans: Answers)
         for c in map(sql_ident, protected):
             out += ["  begin",
                     f"    update {q} set {c} = {c} where false;",
-                    f"    raise exception 'a signed-in user can change {name}.{c}';",
+                    f"    raise exception {raise_text(f'a signed-in user can change {name}.{c}')};",
                     "  exception when insufficient_privilege then null;",
                     "  end;"]
             if c != sql_ident(own.get("column") or ""):
                 out += ["  begin",
                         f"    insert into {q} ({c}) select {c} from {q} where false;",
-                        f"    raise exception 'a signed-in user can set {name}.{c} on insert';",
+                        f"    raise exception {raise_text(f'a signed-in user can set {name}.{c} on insert')};",
                         "  exception when insufficient_privilege then null;",
                         "  end;"]
         if writable and kind != "none":
