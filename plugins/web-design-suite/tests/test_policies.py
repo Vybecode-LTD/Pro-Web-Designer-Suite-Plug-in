@@ -94,6 +94,8 @@ create table {LONG} (id uuid primary key default gen_random_uuid(),
 create table lookups (id uuid primary key default gen_random_uuid(), label text not null);
 create table "it's" (id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users (id), body text);
+create table "cash$$flow" (id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users (id), amount integer);
 """
 
 
@@ -379,6 +381,15 @@ class PoliciesRunOnPostgres(Scaffolded):
         # The review of #16: authenticated, a member of an editor role, holds
         # the editor's policies too.
         db, src = self.database(SHOP_TABLES, SHOP_SEED)
+        # The control: a membership WITH INHERIT FALSE gives the browser none of
+        # the role's policies without SET ROLE, so its write policy passes.
+        self.psql_ok(db, "do $$ begin create role wds_reader nologin; "
+                         "exception when duplicate_object then null; end $$;")
+        self.psql_ok(db, "grant wds_reader to authenticated with inherit false; "
+                         'create policy "readers write" on public.categories for insert to wds_reader '
+                         "with check (true);")
+        proc = self.smoke(db, src, "categories")
+        self.assertEqual(0, proc.returncode, output(proc))
         self.psql_ok(db, "do $$ begin create role wds_editor nologin; "
                          "exception when duplicate_object then null; end $$;")
         self.psql_ok(db, "grant wds_editor to authenticated; "

@@ -2840,13 +2840,14 @@ def emit_policy_test(table: dict[str, Any], model: dict[str, Any], ans: Answers)
     elif kind == "none":
         # Only a policy the browser's roles hold: one for service_role is the
         # server's (N23). `public` is every role, and the default; any other
-        # role counts when anon or authenticated is a member of it, directly or
-        # through another role, since its policies then apply to them too.
+        # role counts when anon or authenticated has its privileges, directly or
+        # through roles they inherit (USAGE: a grant WITH INHERIT FALSE does not
+        # count, since its policies do not apply without SET ROLE).
         out += ["do $$ begin",
                 f"  assert not exists (select 1 from pg_policies where schemaname = {sql_text(schema)}",
                 f"    and tablename = {sql_text(name)} and cmd <> 'SELECT'",
                 "    and exists (select 1 from unnest(roles) as r(role) where case when r.role = 'public' then true",
-                "      else pg_has_role('anon', r.role, 'MEMBER') or pg_has_role('authenticated', r.role, 'MEMBER') end)),",
+                "      else pg_has_role('anon', r.role, 'USAGE') or pg_has_role('authenticated', r.role, 'USAGE') end)),",
                 f"    {sql_text(f'a policy lets the browser write {q}')};",
                 "end $$;", ""]
     writable = ans.writable(table)
@@ -2872,7 +2873,15 @@ def emit_policy_test(table: dict[str, Any], model: dict[str, Any], ans: Answers)
             out.append(f"  update {q} set {w} = {w} where false;  -- the form's columns stay writable")
         out += ["end $$;", ""]
     out.append("rollback;")
-    return "\n".join(out) + "\n"
+    text = "\n".join(out) + "\n"
+    # A name may hold `$$`, which would end a `do $$` body early: use a
+    # delimiter the body does not contain.
+    body = text.replace("do $$ begin", "").replace("end $$;", "")
+    tag, n = "$$", 0
+    while tag in body:
+        n += 1
+        tag = f"$wds{n}$"
+    return text.replace("do $$ begin", f"do {tag} begin").replace("end $$;", f"end {tag};")
 
 
 def build_files(model: dict[str, Any], ans: Answers, stack: str,
