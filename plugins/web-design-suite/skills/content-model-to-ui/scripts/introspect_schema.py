@@ -1140,9 +1140,15 @@ def _apply_constraint_to_table(model: Model, table: Table, clause: str) -> None:
             target.checks.append(expr)
 
 
-# An expression as pieces: a string literal, a quoted name, or a run of
-# anything else. The closing quote is optional, so the pieces cover the text.
-SQL_PIECES = re.compile(r"'(?:[^']|'')*'?|\"(?:[^\"]|\"\")*\"?|[^'\"]+")
+# An expression as pieces: a dollar-quoted literal (tagged or not), a string
+# literal, a quoted name, or a run of anything else. The closing quote is
+# optional, so the pieces cover the text.
+SQL_PIECES = re.compile(
+    r"(?P<dollar>\$\$.*?(?:\$\$|\Z)|\$(?P<tag>[A-Za-z_]\w*)\$.*?(?:\$(?P=tag)\$|\Z))"
+    r"|(?P<string>'(?:[^']|'')*'?)"
+    r"|(?P<quoted>\"(?:[^\"]|\"\")*\"?)"
+    r"|(?P<other>(?:[^'\"$]|\$(?!\$|[A-Za-z_]\w*\$))+)",
+    re.S)
 
 
 def _ident(name: str) -> str:
@@ -1160,10 +1166,11 @@ def _column_refs(expr: str, name: str):
     `lower(note)` is not a column `lower`."""
     bare = (re.compile(rf"(?<![\w$]){re.escape(name)}(?![\w$])(?!\s*\()")
             if _ident(name) == name else None)
-    for piece in SQL_PIECES.findall(expr):
-        if piece.startswith("'"):
+    for m in SQL_PIECES.finditer(expr):
+        piece = m.group(0)
+        if m.group("dollar") or m.group("string"):
             yield piece, False, None
-        elif piece.startswith('"'):
+        elif m.group("quoted"):
             yield piece, piece[1:-1].replace('""', '"') == name, None
         else:
             yield piece, bool(bare and bare.search(piece)), bare

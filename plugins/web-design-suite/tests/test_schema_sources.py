@@ -209,7 +209,8 @@ class MigrationsThatDumpsRewrite(SchemaSources):
                    "create unique index a_region on a (region);\n"
                    "create table b (id uuid primary key, a_code text references a (code));\n"
                    "create table pairs (x uuid, y uuid, label text, primary key (x, y));\n"
-                   'create table d (id uuid primary key, old int, "old.part" int check ("old.part" > 0));\n'
+                   'create table d (id uuid primary key, old int, "old.part" int check ("old.part" > 0),'
+                   ' memo text check (memo <> $q$an old note$q$));\n'
                    "alter table a drop column code cascade;\n"
                    "alter table pairs drop column x;\n"
                    "alter table d drop column old;\n")
@@ -223,6 +224,7 @@ class MigrationsThatDumpsRewrite(SchemaSources):
         self.assertFalse(columns(model)["pairs.y"]["primary_key"])
         # A quoted name is one name: "old.part" is not the column `old` (review of #16).
         self.assertEqual(['"old.part" > 0'], columns(model)["d.old.part"]["checks"])
+        self.assertEqual(["memo <> $q$an old note$q$"], columns(model)["d.memo"]["checks"])
 
     def test_renaming_a_column_renames_what_names_it(self):
         # N18: Postgres retargets other tables' foreign keys and rewrites the CHECKs.
@@ -231,7 +233,7 @@ class MigrationsThatDumpsRewrite(SchemaSources):
                    " qty int, check (qty > 0));\n"
                    "create table b (id uuid primary key, a_code text references a (code));\n"
                    "create table c (id uuid primary key, lower text, note text check (lower(note) <> ''),"
-                   ' old int, "old.part" int check ("old.part" > 0));\n'
+                   ' old int, "old.part" int check ("old.part" > 0), remark text check (remark <> $$hello old world$$));\n'
                    "alter table a rename column code to sku;\n"
                    "alter table a rename qty to amount;\n"
                    "alter table c rename column lower to lowered;\n"
@@ -245,6 +247,7 @@ class MigrationsThatDumpsRewrite(SchemaSources):
         # A call is not a column, and a quoted name is one name (review of #16).
         self.assertEqual(["lower(note) <> ''"], cols["c.note"]["checks"])
         self.assertEqual(['"old.part" > 0'], cols["c.old.part"]["checks"])
+        self.assertEqual(["remark <> $$hello old world$$"], cols["c.remark"]["checks"])
 
     def test_a_not_null_constraint_is_not_a_column(self):
         # N19: Postgres 18 names a not-null constraint; the parser read the

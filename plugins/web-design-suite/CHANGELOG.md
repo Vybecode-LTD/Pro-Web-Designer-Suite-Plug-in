@@ -301,6 +301,10 @@
   - A table constraint listed before its column now applies.
   - The smoke test quotes every name it puts in a string (a table named `it's`).
   - The no-write check counts a role that `anon` or `authenticated` inherits.
+  - A second review: a rename or a drop leaves dollar-quoted literals alone; the smoke
+    test picks a `do` delimiter no name contains (a table named `cash$$flow`); and the
+    no-write check counts inherited privileges (`USAGE`), so a membership granted
+    `WITH INHERIT FALSE` is not the browser's. Four tests fail on `81b50f9`.
 - N5, the PR tools and the build, from `tools/fail_before.py` against 3.2.1: nine
   fixed and eleven controls.
   - `test_file_modes` reads git's modes (the index, or the commit `WDS_PLUGIN_REV`
