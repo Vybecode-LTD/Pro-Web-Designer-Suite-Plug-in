@@ -9,12 +9,14 @@ Nothing is written into the plugin.
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import pathlib
 import shutil
 import subprocess
 import sys
 import unittest
+from unittest import mock
 
 from wds_support import PLUGIN, TempDirTest, env, output
 
@@ -194,6 +196,23 @@ class CheckChoosesTheTests(unittest.TestCase):
                 self.assertIsNone(self.affected(path))
 
 
+class CheckReportsOnAnyConsole(unittest.TestCase):
+
+    def test_a_failure_prints_where_the_console_cannot_encode_it(self):
+        # A failing check's output reached a cp1252 stdout (a redirect on
+        # Windows) holding a character cp1252 has no byte for, and printing it
+        # raised UnicodeEncodeError, so no report came at all.
+        check = load_tool("check")
+        failed = subprocess.CompletedProcess([], 1, "§ → café".encode("utf-8"), b"")
+        out = io.TextIOWrapper(io.BytesIO(), encoding="cp1252", newline="\n")
+        with mock.patch.object(check.subprocess, "run", return_value=failed), mock.patch.object(sys, "stdout", out):
+            self.assertEqual(1, check.main(["--all"]))
+            out.flush()
+        report = out.buffer.getvalue().decode("cp1252")
+        self.assertIn("--- check_pointers ---\n§ ? café\n", report)
+        self.assertIn("FAIL  check_pointers", report)
+
+
 class CheckReadsTheChanges(FakeRepository):
 
     def test_committed_staged_unstaged_and_untracked_with_their_whole_names(self):
@@ -214,7 +233,8 @@ class SyncRules(TempDirTest):
 
     SPEC = "skills/web-design-studio/assets/rules/design-rules.json"
     GATES = ("skills/web-design-studio/scripts/audit_design.py",
-             "skills/web-design-studio/assets/configs/stylelint.config.mjs")
+             "skills/web-design-studio/assets/configs/stylelint.config.mjs",
+             "skills/web-design-studio/assets/configs/eslint.design.config.mjs")
 
     def setUp(self):
         super().setUp()
@@ -235,10 +255,11 @@ class SyncRules(TempDirTest):
         spec.write_bytes(spec.read_bytes().replace(b'"max_depth": 2,', b'"max_depth": 3,'))
         proc = self.sync("--check")
         self.assertEqual(1, proc.returncode, output(proc))
-        for rel in self.GATES:
+        for rel in self.GATES[:2]:                     # ESLint's block holds no nesting depth
             self.assertIn(f"stale: {rel}", output(proc))
+        self.assertNotIn(f"stale: {self.GATES[2]}", output(proc))
         self.assertEqual(0, self.sync().returncode)
-        audit, stylelint = self.gates()
+        audit, stylelint, _ = self.gates()
         self.assertIn(b"\nMAX_NESTING = 3\n", audit)
         self.assertIn(b"\nconst MAX_NESTING = 3;\n", stylelint)
         self.assertNotIn(b"\r\n", audit + stylelint)
@@ -257,6 +278,44 @@ class SyncRules(TempDirTest):
         self.assertEqual(1, len(found), output(proc))
         self.assertIn("exceeds the limit of 3", found[0]["message"])
         self.assertIn("past depth 3 ", found[0]["fix"])
+
+    def edit_spec(self, change) -> None:
+        spec = self.root / self.SPEC
+        data = json.loads(spec.read_text(encoding="utf-8"))
+        change(data)
+        spec.write_text(json.dumps(data), encoding="utf-8")
+
+    def test_the_value_allowlists_are_written_from_the_spec(self):
+        # N2, part 2: a family's values and the component margins are spec data.
+        def change(spec):
+            spec["values"]["families"]["spacing"]["allow"][2]["values"].insert(2, "auto")
+            spec["margins_in_components"]["values"].remove("0 auto")
+        self.edit_spec(change)
+        self.assertEqual(0, self.sync().returncode)
+        stylelint = self.gates()[1].decode("utf-8")
+        self.assertIn("\n  gap: [VAR_SEQ, '0', 'auto', ...KEYWORDS],\n", stylelint)
+        self.assertIn("\n  margin: ['0', 'auto', 'auto 0', CANCEL, ...KEYWORDS],\n", stylelint)
+        self.assertEqual(0, self.sync("--check").returncode)
+
+    def test_a_colour_function_reaches_the_audit_and_eslint(self):
+        self.edit_spec(lambda spec: spec["values"]["colour_functions"].append("color-mix"))
+        self.assertEqual(0, self.sync().returncode)
+        audit, _, eslint = (text.split(b"BEGIN design-rules")[1].split(b"END design-rules")[0]
+                            for text in self.gates())
+        self.assertIn(b'"color-mix"', audit)
+        self.assertIn(b"'color-mix'", eslint)
+        css = self.write("mix.css", "@layer components {\n.a { color: color-mix(in oklch, red, blue); }\n}\n")
+        proc = subprocess.run([sys.executable, "-B", str(self.root / self.GATES[0]), str(css), "--json"],
+                              capture_output=True, env=env(), timeout=60)
+        self.assertIn("raw-color", [f["rule"] for f in json.loads(proc.stdout)], output(proc))
+
+    def test_a_name_the_spec_does_not_define_writes_nothing(self):
+        self.edit_spec(lambda spec: spec["values"]["families"]["type"]["allow"][0]["values"].append("VAR_TYPO"))
+        before = self.gates()
+        proc = self.sync()
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("VAR_TYPO is neither a shape", output(proc))
+        self.assertEqual(before, self.gates())
 
     def test_a_rewrite_of_a_tree_in_step_changes_nothing(self):
         before = self.gates()

@@ -61,6 +61,7 @@ import re
 import subprocess
 import unittest
 
+from test_rules_spec import hold_to_the_spec, spec_examples
 from wds_support import (NODE, SKILLS, TOOLING_MAIN, TOOLING_V3, class_temp_dir, env, output,
                          tailwind_part5, tool_modules, tool_roots)
 
@@ -196,6 +197,7 @@ class DesignEslintConfig(unittest.TestCase):
         for n, cls_ in enumerate(LITERAL_UTILITIES):
             linted[f"src/components/Utility{n}.tsx"] = component(f'<div className="flex {cls_}" />')
         linted["src/components/NoAlt.tsx"] = component('<img src="/hero.png" />')
+        linted.update({ex.name: ex.text for ex in spec_examples() if "eslint" in ex.gates})
         cls.snippet_at = {}
         for n, (doc, line, lang, body) in enumerate(snippets()):
             if lang in ("tsx", "jsx"):
@@ -230,6 +232,14 @@ class DesignEslintConfig(unittest.TestCase):
         for n, jsx in enumerate(REFUSED_STYLES):
             with self.subTest(jsx=jsx):
                 self.assertIn(STYLE_RULE, self.rules_in(f"src/components/Refused{n}.tsx"))
+
+    def test_every_example_of_the_spec(self):
+        """N2: every example of every section ESLint enforces (test_rules_spec)."""
+        def problems_of(ex):
+            messages = self.messages[ex.name]
+            return ([str(m["ruleId"]) for m in messages if m.get("severity") == 2],
+                    [f"{m['ruleId']} ({m.get('severity')})" for m in messages])
+        hold_to_the_spec(self, "eslint", problems_of)
 
     def test_literal_utilities_are_refused(self):
         for n, cls_ in enumerate(LITERAL_UTILITIES):
@@ -460,7 +470,8 @@ class StylelintConfig(unittest.TestCase):
                  **{f"src/styles/{css.name}": css.read_text(encoding="utf-8")
                     for css in sorted(STARTER_STYLES.glob("*.css"))},
                  **{name: css for name, (css, _) in REFUSED_CSS.items()},
-                 **ALLOWED_CSS}
+                 **ALLOWED_CSS,
+                 **{ex.name: ex.text for ex in spec_examples() if "stylelint" in ex.gates}}
         write_files(tmp, files)
         linted = [name for name in files if name.endswith(".css")]
         proc = subprocess.run([NODE, str(pathlib.Path(STYLELINT_MODULES) / "stylelint" / "bin" / "stylelint.mjs"),
@@ -498,6 +509,13 @@ class StylelintConfig(unittest.TestCase):
         for name in ALLOWED_CSS:
             with self.subTest(file=name):
                 self.assertEqual([], self.problems(name))
+
+    def test_every_example_of_the_spec(self):
+        """N2: every example of every section stylelint enforces (test_rules_spec)."""
+        def problems_of(ex):
+            problems = self.problems(ex.name)
+            return problems, problems
+        hold_to_the_spec(self, "stylelint", problems_of)
 
 
 def documented_examples(block: str, rule: str) -> list[str]:

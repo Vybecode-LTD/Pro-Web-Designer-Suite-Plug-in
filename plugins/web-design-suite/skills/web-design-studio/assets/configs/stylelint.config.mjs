@@ -57,8 +57,8 @@ import stylelint from 'stylelint';
  *               on a `.card` would lose to the card's own padding and the
  *               utility would appear not to work.
  *   overrides   the documented one-off. Last, so it needs no !important.
- * The order, the nesting depth and the system colours below come from
- * assets/rules/design-rules.json. */
+ * The order, the nesting depth, the system colours and the value
+ * allowlists (Part 3) below come from assets/rules/design-rules.json. */
 // BEGIN design-rules: written by tools/sync_rules.py from assets/rules/design-rules.json; edit the spec, then rerun it
 const LAYER_ORDER = [
   'reset', 'vendor', 'tokens', 'theme', 'base', 'layout', 'components', 'utilities', 'overrides',
@@ -69,6 +69,78 @@ const SYSTEM_COLOR_NAMES = [
   'canvas', 'canvastext', 'field', 'fieldtext', 'graytext', 'highlight', 'highlighttext',
   'linktext', 'mark', 'marktext', 'selecteditem', 'selecteditemtext', 'visitedtext',
 ];
+const KEYWORDS = ['inherit', 'initial', 'unset', 'revert', 'revert-layer'];
+const COLOUR_WORDS = String.raw`/^(?:${['currentcolor', 'transparent', ...SYSTEM_COLOR_NAMES].join('|')})$/i`;
+const VAR_SEQ = String.raw`/^(?:var\(--[a-z0-9-]+\)\s*)+$/`;
+const VAR_ONE = String.raw`/^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$/`;
+const VAR_CALC = String.raw`/^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$/`;
+const CANCEL = String.raw`/^calc\(\s*(?:var\(--[a-z0-9-]+\)\s*\*\s*-1|-1\s*\*\s*var\(--[a-z0-9-]+\))\s*\)$/`;
+const VALUE_ALLOWLIST = {
+  // spacing: Laws 1, 3, 6
+  padding: [VAR_SEQ, VAR_CALC, '0', ...KEYWORDS],
+  'padding-inline': [VAR_SEQ, VAR_CALC, '0', ...KEYWORDS],
+  'padding-block': [VAR_SEQ, VAR_CALC, '0', ...KEYWORDS],
+  'padding-top': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  'padding-right': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  'padding-bottom': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  'padding-left': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  'padding-inline-start': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  'padding-inline-end': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  'padding-block-start': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  'padding-block-end': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  gap: [VAR_SEQ, '0', ...KEYWORDS],
+  'row-gap': [VAR_ONE, '0', ...KEYWORDS],
+  'column-gap': [VAR_ONE, '0', ...KEYWORDS],
+  // type: Laws 1, 3
+  'font-size': [VAR_ONE, ...KEYWORDS],
+  'line-height': [VAR_ONE, ...KEYWORDS],
+  'font-weight': [VAR_ONE, ...KEYWORDS],
+  'font-family': [VAR_ONE, ...KEYWORDS],
+  font: [VAR_ONE, ...KEYWORDS],
+  'letter-spacing': [VAR_ONE, 'normal', ...KEYWORDS],
+  // radius: Law 1
+  'border-radius': [VAR_SEQ, VAR_CALC, '0', '50%', ...KEYWORDS],
+  'border-start-start-radius': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  'border-start-end-radius': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  'border-end-start-radius': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  'border-end-end-radius': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  // elevation: Laws 1, 6
+  'box-shadow': [VAR_ONE, 'none', ...KEYWORDS],
+  // colour: Laws 1, 6
+  color: [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  'background-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  'outline-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  'text-decoration-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  'border-color': [VAR_SEQ, COLOUR_WORDS, ...KEYWORDS],
+  fill: [VAR_ONE, COLOUR_WORDS, 'none', ...KEYWORDS],
+  stroke: [VAR_ONE, COLOUR_WORDS, 'none', ...KEYWORDS],
+  'accent-color': [VAR_ONE, 'auto', ...KEYWORDS],
+  // stacking: Law 3
+  'z-index': [VAR_ONE, '0', 'auto', ...KEYWORDS],
+  // motion: Law 1
+  'transition-duration': [VAR_SEQ, '0s', ...KEYWORDS],
+  'animation-duration': [VAR_SEQ, '0s', ...KEYWORDS],
+  'transition-timing-function': [VAR_SEQ, ...KEYWORDS],
+  'animation-timing-function': [VAR_SEQ, ...KEYWORDS],
+  // sizing: Law 1
+  'max-inline-size': [VAR_ONE, 'none', '100%', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
+  'max-width': [VAR_ONE, 'none', '100%', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
+  'min-block-size': [VAR_ONE, '0', '100%', '100dvh', '100dvb', '100svh', '100svb', 'auto', ...KEYWORDS],
+  'min-inline-size': [VAR_ONE, '0', '100%', 'auto', ...KEYWORDS],
+};
+const MARGIN_ALLOWLIST = {
+  margin: ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
+  'margin-top': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
+  'margin-right': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
+  'margin-bottom': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
+  'margin-left': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
+  'margin-inline': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
+  'margin-block': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
+  'margin-inline-start': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
+  'margin-inline-end': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
+  'margin-block-start': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
+  'margin-block-end': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
+};
 // END design-rules
 
 /* =========================================================================
@@ -312,199 +384,39 @@ const systemColorPlugin = createPlugin(systemColorRuleName, systemColorRule);
 /* =========================================================================
  * PART 3 — THE VALUE ALLOWLISTS (LAW 1, LAW 3, LAW 6)
  * =========================================================================
+ * VALUE_ALLOWLIST and MARGIN_ALLOWLIST, with the shapes and lists they use,
+ * are written into the design-rules block at the top of this file from
+ * assets/rules/design-rules.json (`values` and `margins_in_components`).
+ * Why each family takes what it takes is written there, beside it
+ * (`values.families.*.why`), and so is what each shape means
+ * (`values.shapes`). Change the spec and rerun tools/sync_rules.py; never
+ * edit the block.
+ *
+ * HOW THE RULE READS THEM
+ * -----------------------
  * `declaration-property-value-allowed-list` compares the WHOLE declaration
  * value against each entry. A plain string must match exactly; a string
  * wrapped in slashes is compiled with `new RegExp` and is UNANCHORED unless
- * you anchor it yourself — which is the single most common way these rules
- * are written too loosely to catch anything. Every regex below is anchored
- * with `^` and `$`.
+ * you anchor it yourself, which is the most common way these rules end up
+ * too loose to catch anything. Every shape is anchored with `^` and `$`, so
+ * no literal can ride along on a token: `padding: var(--pad-card) 2px` is
+ * refused. COLOUR_WORDS carries the `i` flag, because CSS keywords are
+ * case-insensitive and a plain string matches one spelling only. The system
+ * colours in it are refused outside `@media (forced-colors: active)` by
+ * design/system-colors-in-forced-colors (Part 2): this allowlist cannot see
+ * the media query.
  *
- * READ THE REGEXES
- * ----------------
- *   VAR_SEQ   ^(?:var\(--[a-z0-9-]+\)\s*)+$
- *             One or more `var(--token)` references, whitespace-separated,
- *             and NOTHING else. `^`…`$` means no stray literal can ride
- *             along, so `padding: var(--pad-card) 2px` is caught while
- *             `padding: var(--pad-block-md) var(--pad-inline-md)` passes.
- *             `[a-z0-9-]` also enforces the kebab-case token naming
- *             convention: `var(--padCard)` is rejected as a typo, because
- *             a `var()` pointing at a token that does not exist resolves to
- *             nothing and the declaration is dropped in silence.
- *
- *   VAR_ONE   ^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$
- *             Exactly one token, with or without a fallback. Used for
- *             properties where a sequence is meaningless (`font-size`,
- *             `z-index`, `line-height`). A fallback is not checked: the
- *             token is the value (design-rules.json, var_fallback), as in
- *             audit_design.
- *
- *   CANCEL    ^calc\(\s*(var(--t)\s*\*\s*-1|-1\s*\*\s*var(--t))\s*\)$
- *             Law 2's third exception: a margin that cancels a known
- *             token, `calc(var(--card-inset) * -1)`. Only `-1`: any other
- *             factor invents a step (Law 3).
- *
- *   VAR_CALC  ^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$
- *             A token MINUS or PLUS a token, nothing else — no bare
- *             numbers, no multiplication. This exists for exactly one job:
- *             the nested-radius rule from tokens.css §7, where inner radius
- *             = outer radius − inner padding. Multiplication is excluded on
- *             purpose: `calc(var(--space-4) * 1.5)` is inventing a step
- *             between steps, which is Law 3's whole prohibition wearing a
- *             `calc()` as a disguise. (Density scaling also multiplies —
- *             that is why it lives in tokens.css, in one place, where it is
- *             a system decision rather than a component's improvisation.)
- * ========================================================================= */
-
-const VAR_SEQ = String.raw`/^(?:var\(--[a-z0-9-]+\)\s*)+$/`;
-const VAR_ONE = String.raw`/^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$/`;
-const CANCEL = String.raw`/^calc\(\s*(?:var\(--[a-z0-9-]+\)\s*\*\s*-1|-1\s*\*\s*var\(--[a-z0-9-]+\))\s*\)$/`;
-const VAR_CALC = String.raw`/^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$/`;
-
-/* CSS-wide keywords. Not design values; they are the language, and they are
- * how a component says "do not participate" rather than "be this colour". */
-const KEYWORDS = ['inherit', 'initial', 'unset', 'revert', 'revert-layer'];
-
-/* COLOUR_WORDS  The colour keywords that are not a colour from the palette,
- * in any case (CSS keywords are case-insensitive, and a plain string in this
- * rule matches one spelling only). `currentColor` and `transparent` follow
- * the text or paint nothing. The CSS system colours (`Canvas`, `ButtonText`,
- * `Highlight`…) are the only correct values in
- * `@media (forced-colors: active)`, where the user's palette replaces the
- * page's; this allowlist cannot see the media query, so the
- * design/system-colors-in-forced-colors rule (Part 2) refuses them anywhere
- * else. */
-const COLOUR_WORDS = String.raw`/^(?:currentcolor|transparent|${SYSTEM_COLOR_NAMES.join('|')})$/i`;
-
-const VALUE_ALLOWLIST = {
-  /* ---- Spacing. Law 1 + Law 3 + Law 6 --------------------------------
-   * `0` is on the scale (`--space-0`) and is spelled `0` far more often
-   * than `var(--space-0)`; fighting that is pedantry, not rigour. Nothing
-   * else unitless or unitful gets through. */
-  padding: [VAR_SEQ, VAR_CALC, '0', ...KEYWORDS],
-  'padding-top': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
-  'padding-right': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
-  'padding-bottom': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
-  'padding-left': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
-  'padding-inline': [VAR_SEQ, VAR_CALC, '0', ...KEYWORDS],
-  'padding-block': [VAR_SEQ, VAR_CALC, '0', ...KEYWORDS],
-  'padding-inline-start': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
-  'padding-inline-end': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
-  'padding-block-start': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
-  'padding-block-end': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
-
-  /* Law 2 lives here too: `gap` is the ONLY sanctioned way to space
-   * siblings, so it had better be on-scale. */
-  gap: [VAR_SEQ, '0', ...KEYWORDS],
-  'row-gap': [VAR_ONE, '0', ...KEYWORDS],
-  'column-gap': [VAR_ONE, '0', ...KEYWORDS],
-
-  /* ---- Typography. Law 1 + Law 3 -------------------------------------
-   * No `em`, no `%`, no `1.4`. Type size and leading are the two values
-   * every project drifts on first, because "just a bit bigger" always
-   * feels harmless and is never reversible.
-   *
-   * `1` is NOT allowed for line-height even though `--leading-none: 1`.
-   * Writing the literal is how the next person learns the scale is
-   * optional. */
-  'font-size': [VAR_ONE, ...KEYWORDS],
-  'line-height': [VAR_ONE, ...KEYWORDS],
-  'letter-spacing': [VAR_ONE, 'normal', ...KEYWORDS],
-  'font-weight': [VAR_ONE, ...KEYWORDS],
-  'font-family': [VAR_ONE, ...KEYWORDS],
-  /* The `font` shorthand is how Tier 2's `--type-*` roles are consumed:
-   * `font: var(--type-h2)` sets weight, size, leading and family in one
-   * declaration that cannot half-apply. */
-  font: [VAR_ONE, ...KEYWORDS],
-
-  /* ---- Radius. Law 1 -------------------------------------------------
-   * `50%` is the one genuine exception: a perfect circle is a geometric
-   * relationship, not a design value, and `--radius-full` (9999px) gives
-   * you a pill, not a circle, on a non-square box. */
-  'border-radius': [VAR_SEQ, VAR_CALC, '0', '50%', ...KEYWORDS],
-  'border-start-start-radius': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
-  'border-start-end-radius': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
-  'border-end-start-radius': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
-  'border-end-end-radius': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
-
-  /* ---- Elevation. Law 1 + Law 6 --------------------------------------
-   * Reach for `--elevation-card`, not `--shadow-sm`. A hand-written
-   * shadow is always a single layer and always reads as a sticker; the
-   * tokens are physically consistent PAIRS (contact + ambient). */
-  'box-shadow': [VAR_ONE, 'none', ...KEYWORDS],
-
-  /* ---- Color. Law 1 + Law 6 ------------------------------------------
-   * `currentColor` and `transparent` are keywords, not colours, and the
-   * system colours belong to forced-colors mode (COLOUR_WORDS). Note what
-   * is NOT here: no `oklch()`, no hex, no `rgb()` — not even a "temporary"
-   * one, because a hex in a component is the one thing dark mode cannot
-   * follow, and it will be found six months later by a client. */
-  color: [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
-  'background-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
-  'border-color': [VAR_SEQ, COLOUR_WORDS, ...KEYWORDS],
-  'outline-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
-  'text-decoration-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
-  fill: [VAR_ONE, COLOUR_WORDS, 'none', ...KEYWORDS],
-  stroke: [VAR_ONE, COLOUR_WORDS, 'none', ...KEYWORDS],
-  'accent-color': [VAR_ONE, 'auto', ...KEYWORDS],
-
-  /* ---- Stacking. Law 3 -----------------------------------------------
-   * The z-index ladder in tokens.css is CLOSED and ordered by what
-   * occupies each rung. A literal `z-index: 9999` is not a value, it is a
-   * surrender, and the next person writes 10000. */
-  'z-index': [VAR_ONE, '0', 'auto', ...KEYWORDS],
-
-  /* ---- Motion. Law 1 -------------------------------------------------
-   * Duration and easing are role-paired in tokens.css ("they travel
-   * together or you get drift"). `0s` is allowed for the genuine case of
-   * disabling one transition among several in a shorthand list.
-   *
-   * Note that `prefers-reduced-motion` collapses every duration token to
-   * 1ms in tokens.css. A literal `200ms` here opts the component OUT of
-   * that, which is a vestibular-safety failure, not a style nit. */
-  'transition-duration': [VAR_SEQ, '0s', ...KEYWORDS],
-  'animation-duration': [VAR_SEQ, '0s', ...KEYWORDS],
-  'transition-timing-function': [VAR_SEQ, ...KEYWORDS],
-  'animation-timing-function': [VAR_SEQ, ...KEYWORDS],
-
-  /* ---- Sizing that is really spacing. Law 1 ---------------------------
-   * Line length is a spacing decision. `max-inline-size: 65ch` in a
-   * component is the same mistake as `padding: 13px`, and it is the one
-   * people defend hardest. */
-  'max-inline-size': [VAR_ONE, 'none', '100%', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
-  'max-width': [VAR_ONE, 'none', '100%', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
-  /* The small- and dynamic-viewport units: `100svb` does not jump when
-   * mobile browser chrome hides, which is why the page shell uses it. */
-  'min-block-size': [VAR_ONE, '0', '100%', '100dvh', '100dvb', '100svh', '100svb', 'auto', ...KEYWORDS],
-  'min-inline-size': [VAR_ONE, '0', '100%', 'auto', ...KEYWORDS],
-};
-
-/* Law 2, as a value allowlist rather than a property ban.
- *
+ * LAW 2, AS AN ALLOWLIST RATHER THAN A PROPERTY BAN
+ * -------------------------------------------------
  * A blanket `property-disallowed-list: [/^margin/]` would also forbid
- * `margin: 0` (a legitimate reset) and `margin-inline: auto` (a container
- * centring ITSELF, which is not a child pushing a sibling). Both are
- * correct, and a rule that flags correct code is a rule that gets switched
- * off wholesale. So: the margin properties exist, and their value set is
- * `0` and `auto`.
- *
- * This is scoped to component files in Part 5. Layout primitives are the
- * parent, and the parent is allowed to place things — though even there,
- * `gap` is almost always the better instrument. */
-const MARGIN_ALLOWLIST = Object.fromEntries(
-  [
-    'margin',
-    'margin-top',
-    'margin-right',
-    'margin-bottom',
-    'margin-left',
-    'margin-inline',
-    'margin-block',
-    'margin-inline-start',
-    'margin-inline-end',
-    'margin-block-start',
-    'margin-block-end',
-  ].map((prop) => [prop, ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS]])
-);
+ * `margin: 0` (a reset) and `margin-inline: auto` (a container centring
+ * ITSELF, not a child pushing a sibling). Both are correct, and a rule that
+ * flags correct code gets switched off wholesale. So the margin properties
+ * exist, and in a component file (Part 5) their values are MARGIN_ALLOWLIST:
+ * `0`, `auto` and a cancelled token. Layout primitives are the parent, and
+ * the parent may place things, though `gap` is almost always the better
+ * instrument.
+ * ========================================================================= */
 
 /* =========================================================================
  * PART 4 — THE CONFIG

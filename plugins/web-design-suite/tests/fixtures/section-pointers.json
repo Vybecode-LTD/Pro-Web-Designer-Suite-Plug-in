@@ -1693,12 +1693,6 @@
  },
  {
   "from": "web-design-studio/assets/configs/stylelint.config.mjs",
-  "to": "web-design-studio/assets/starter/styles/tokens.css",
-  "section": "7",
-  "heading": "RADIUS, BORDER, ELEVATION"
- },
- {
-  "from": "web-design-studio/assets/configs/stylelint.config.mjs",
   "to": "web-design-studio/references/stack-tailwind.md",
   "section": "2",
   "heading": "Tailwind v4: wiring `@theme`"
