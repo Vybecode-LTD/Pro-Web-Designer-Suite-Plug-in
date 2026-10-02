@@ -1,0 +1,60 @@
+# A pushed v* tag releases the plugin. This workflow is the only thing that
+# creates a GitHub release: it builds the zip and the .skill files from the
+# tagged commit, with their SHA-256 sums, and attaches them.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # The whole history, so the builder can list what was removed since the
+      # previous tag.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: false
+
+      - name: The tag is plugin.json's version
+        id: version
+        run: |
+          version=$(uv run --no-project --python 3.14 python -c "import json; print(json.load(open('plugins/web-design-suite/.claude-plugin/plugin.json', encoding='utf-8'))['version'])")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::the tag is $GITHUB_REF_NAME, but plugin.json says $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build the zip, the .skill files and SHA256SUMS
+        run: uv run --no-project --python 3.14 python -B tooling/release/build.py dist --rev "$GITHUB_REF_NAME"
+
+      - name: The release notes are the CHANGELOG's section for this version
+        run: |
+          uv run --no-project --python 3.14 python - "${{ steps.version.outputs.version }}" > notes.md <<'EOF'
+          import re, sys
+          text = open("plugins/web-design-suite/CHANGELOG.md", encoding="utf-8").read()
+          m = re.search(r"^## " + re.escape(sys.argv[1]) + r"\b.*?$(.*?)(?=^## |\Z)", text, re.M | re.S)
+          if not m:
+              sys.exit("the CHANGELOG has no section for " + sys.argv[1])
+          print(m.group(1).strip())
+          EOF
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag \
+            --title "web-design-suite ${{ steps.version.outputs.version }}" --notes-file notes.md

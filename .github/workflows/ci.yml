@@ -1,0 +1,98 @@
+# The suite, on Windows, Linux and macOS, at the Python floor (3.9) and the
+# newest (3.14), with the pinned Node tools from tooling/. Every download in
+# this file (Python, the npm packages, Playwright's headless shell and its
+# system libraries, the Claude Code CLI) happens on GitHub's runners.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  suite:
+    name: ${{ matrix.os }} · Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.9", "3.14"]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      # uv fetches the interpreter, so 3.9 comes from the same place on every
+      # runner, arm64 macOS included, and the command is the one used locally.
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: false
+
+      # ESLint 10 needs Node 20.19+, 22.13+ or 24+.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            tooling/main/package-lock.json
+            tooling/tailwind-v3/package-lock.json
+
+      - name: Install the pinned tools
+        run: |
+          npm ci --prefix tooling/main
+          npm ci --prefix tooling/tailwind-v3
+
+      # Linux only: the headless shell the browser tests use, and the
+      # preinstalled Postgres for test_policies.PoliciesRunOnPostgres.
+      - name: Install the headless shell, and put Postgres on PATH
+        if: runner.os == 'Linux'
+        run: |
+          (cd tooling/main && npx playwright install --only-shell --with-deps chromium)
+          ls -d /usr/lib/postgresql/*/bin | sort -V | tail -n 1 >> "$GITHUB_PATH"
+
+      - name: The suite
+        working-directory: plugins/web-design-suite
+        run: uv run --no-project --python ${{ matrix.python }} python -B -m unittest discover -s tests
+
+      - name: Pointers, quoted starter code, and the audit on the plugin's own skills
+        working-directory: plugins/web-design-suite
+        run: |
+          uv run --no-project --python ${{ matrix.python }} python -B tools/check_pointers.py
+          uv run --no-project --python ${{ matrix.python }} python -B tools/sync_snippets.py --check
+          uv run --no-project --python ${{ matrix.python }} python -B skills/web-design-studio/scripts/audit_design.py skills --strict
+
+      - name: Every open item is scheduled once
+        run: uv run --no-project --python ${{ matrix.python }} python -B "dev plans/check_execution_plan.py"
+
+  validate:
+    name: claude plugin validate --strict
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      # Validation reads the manifests only: it needs no sign-in and no key.
+      - name: Install the Claude Code CLI
+        run: npm install --global @anthropic-ai/claude-code
+      - name: Validate the marketplace, the plugin folder and plugin.json
+        run: |
+          claude --version
+          claude plugin validate --strict .
+          claude plugin validate --strict plugins/web-design-suite
+          claude plugin validate --strict plugins/web-design-suite/.claude-plugin/plugin.json
