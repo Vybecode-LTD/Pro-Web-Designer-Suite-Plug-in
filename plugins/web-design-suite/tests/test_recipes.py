@@ -586,12 +586,15 @@ MEGAMENU_FRAME = (".nav { position: relative; margin-block-start: 120px; }"
 
 MEGAMENU_SCENARIO = r"""
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+// The page's timers run on a fake clock that only the scenario advances, so
+// the hover-intent delays see the planned timing on a slow runner too.
+await page.clock.install();
 await page.goto(pathToFileURL(process.argv[2]).href);
 const expanded = async (id) => (await page.getAttribute('#' + id, 'aria-expanded')) === 'true';
 const glide = async (from, to, steps, ms) => {
   for (let i = 1; i <= steps; i++) {
     await page.mouse.move(from.x + (to.x - from.x) * i / steps, from.y + (to.y - from.y) * i / steps);
-    await page.waitForTimeout(ms);
+    await page.clock.runFor(ms);
   }
 };
 await page.evaluate(() => {
@@ -609,26 +612,26 @@ const result = {};
 // trigger A (~120 ms over it), and down into the panel.
 await page.mouse.move(b.x + b.width / 2, b.y - 40);
 await glide({ x: b.x + b.width / 2, y: b.y - 40 }, { x: b.x + b.width / 2, y: bottom - 10 }, 4, 20);
-await page.waitForTimeout(100);
+await page.clock.runFor(100);
 result.hoverOpensB = await expanded('trigger-b');
 await glide({ x: b.x + b.width / 2, y: bottom - 10 }, { x: a.x + a.width / 2, y: bottom - 2 }, 12, 20);
 await glide({ x: a.x + a.width / 2, y: bottom - 2 }, { x: a.x + a.width / 2 - 20, y: bottom + 40 }, 4, 20);
-await page.waitForTimeout(400);
+await page.clock.runFor(400);
 result.diagonalKeepsB = (await expanded('trigger-b')) && (await page.evaluate(() => window.aOpened)) === 0;
 
 // Leave, then hover A from above and click it: the click must not close it.
 await page.mouse.move(a.x + a.width / 2, bottom + 300);
 await page.mouse.move(900, 20);
-await page.waitForTimeout(100);
+await page.clock.runFor(100);
 await glide({ x: a.x + a.width / 2, y: a.y - 40 }, { x: a.x + a.width / 2, y: a.y + a.height / 2 }, 4, 20);
-await page.waitForTimeout(100);
+await page.clock.runFor(100);
 await page.mouse.down(); await page.mouse.up();
-await page.waitForTimeout(100);
+await page.clock.runFor(100);
 result.clickAfterHoverKeepsOpen = await expanded('trigger-a');
 
 // Along the bar, sideways, the switch is prompt.
 await glide({ x: a.x + a.width / 2, y: a.y + a.height / 2 }, { x: b.x + b.width / 2, y: b.y + b.height / 2 }, 6, 15);
-await page.waitForTimeout(120);
+await page.clock.runFor(120);
 result.sidewaysSwitchIsPrompt = await expanded('trigger-b');
 console.log(JSON.stringify(result));
 await browser.close();
