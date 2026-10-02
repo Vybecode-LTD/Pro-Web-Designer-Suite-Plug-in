@@ -186,6 +186,70 @@ class MigrationsThatDumpsRewrite(SchemaSources):
                           "Mixed Case.id": "uuid"},
                          {k: c["type"] for k, c in columns(model).items()})
 
+    def test_a_quoted_name_with_a_dollar_is_read(self):
+        # N16: a dump quotes every name, and `$` was unquoted into a name the column
+        # parser, which reads word characters, dropped without a word.
+        self.write("schema.sql", 'CREATE TABLE "public"."t" ("id" "uuid" NOT NULL, '
+                   '"amount$usd" integer NOT NULL);\n'
+                   'ALTER TABLE ONLY "public"."t" ALTER COLUMN "amount$usd" SET DEFAULT 0;\n')
+        cols = columns(self.introspect("schema.sql"))
+        self.assertEqual(["t.amount$usd", "t.id"], sorted(cols))
+        self.assertEqual(("integer", False, "0"), (cols["t.amount$usd"]["type"],
+                                                   cols["t.amount$usd"]["nullable"],
+                                                   cols["t.amount$usd"]["default"]))
+
+    def test_dropping_a_column_drops_what_uses_it(self):
+        # N17: Postgres drops every index and constraint that uses the column, the
+        # whole primary key included; another table's foreign key needs CASCADE,
+        # which drops it as well.
+        self.write("schema.sql",
+                   "create table a (id uuid primary key, code text unique, region text,"
+                   " qty int check (qty > 0 or code is null));\n"
+                   "create unique index a_code_region on a (code, region);\n"
+                   "create unique index a_region on a (region);\n"
+                   "create table b (id uuid primary key, a_code text references a (code));\n"
+                   "create table pairs (x uuid, y uuid, label text, primary key (x, y));\n"
+                   "alter table a drop column code cascade;\n"
+                   "alter table pairs drop column x;\n")
+        model = self.introspect("schema.sql")
+        tables = {t["name"]: t for t in model["tables"]}
+        self.assertEqual([["region"]], tables["a"]["unique_indexes"])
+        self.assertEqual([], columns(model)["a.qty"]["checks"])
+        self.assertIsNone(columns(model)["b.a_code"]["foreign_key"])
+        self.assertEqual([], tables["b"]["relationships"])
+        self.assertEqual([], tables["pairs"]["primary_key"])
+        self.assertFalse(columns(model)["pairs.y"]["primary_key"])
+
+    def test_renaming_a_column_renames_what_names_it(self):
+        # N18: Postgres retargets other tables' foreign keys and rewrites the CHECKs.
+        self.write("schema.sql",
+                   "create table a (id uuid primary key, code text unique check (code <> 'code'),"
+                   " qty int, check (qty > 0));\n"
+                   "create table b (id uuid primary key, a_code text references a (code));\n"
+                   "alter table a rename column code to sku;\n"
+                   "alter table a rename qty to amount;\n")
+        cols = columns(self.introspect("schema.sql"))
+        self.assertEqual(("a", "sku"), (cols["b.a_code"]["foreign_key"]["table"],
+                                        cols["b.a_code"]["foreign_key"]["column"]))
+        self.assertEqual(["sku <> 'code'"], cols["a.sku"]["checks"])
+        self.assertEqual(["amount > 0"], cols["a.amount"]["checks"])
+        self.assertIn(("exclusiveMin", 0), rules(cols["a.amount"]))
+
+    def test_a_not_null_constraint_is_not_a_column(self):
+        # N19: Postgres 18 names a not-null constraint; the parser read the
+        # unknown ADD CONSTRAINT as ADD COLUMN, and made a column named `constraint`.
+        self.write("schema.sql",
+                   "create table t (id uuid primary key, name text, nick text, bio text,"
+                   " constraint t_bio_nn not null bio);\n"
+                   "alter table t add constraint t_name_nn not null name;\n"
+                   "alter table t add not null nick;\n"
+                   "alter table t add constraint t_wat exclusion of some future kind;\n")
+        cols = columns(self.introspect("schema.sql"))
+        self.assertEqual(["t.bio", "t.id", "t.name", "t.nick"], sorted(cols))
+        for name in ("t.bio", "t.name", "t.nick"):
+            with self.subTest(column=name):
+                self.assertFalse(cols[name]["nullable"])
+
 
 class GeneratedTypesAgreeOnStructure(SchemaSources):
     """supabase-integration.md §1, as a test: what the generated types keep,

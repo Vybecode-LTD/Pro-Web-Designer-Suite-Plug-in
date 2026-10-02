@@ -97,6 +97,12 @@ const layerMessages = utils.ruleMessages(layerRuleName, {
   undeclaredImport: (name) =>
     `Law 5 (layers, not specificity): \`layer(${name})\` imports into a layer the @layer statement does not name. ` +
     `A layer first named by its import is appended after overrides, so these rules beat every rule you write. Name it in the statement.`,
+  importBeforeStatement: (name) =>
+    `Law 5 (layers, not specificity): \`layer(${name})\` comes before the @layer statement, so it names "${name}" first ` +
+    `and the statement no longer decides where it goes. Move the statement above every @import.`,
+  ruleBeforeStatement: () =>
+    `Law 5 (layers, not specificity): a rule comes before the @layer statement. A layer's position is fixed the first time ` +
+    `its name is used, so the statement must be the first thing in the entry stylesheet, before every @import and every rule.`,
   nestedLayer: (name) =>
     `Law 5 (layers, not specificity): "@layer ${name}" nested inside another layer creates a sub-layer whose rank is not obvious from the order statement. Flatten it.`,
 });
@@ -107,6 +113,7 @@ const layerOrderRule = (primary) => (root, result) => {
   }
 
   let seenStatement = false;
+  let statement = null;
   const declaredNames = new Set();
 
   root.walkAtRules(/^layer$/i, (atRule) => {
@@ -124,6 +131,7 @@ const layerOrderRule = (primary) => (root, result) => {
         return;
       }
       seenStatement = true;
+      statement = atRule;
 
       const declared = atRule.params
         .split(',')
@@ -185,9 +193,15 @@ const layerOrderRule = (primary) => (root, result) => {
 
   /* An import into a layer the statement leaves out (SB-A8). */
   if (!seenStatement) return;
+  const before = (node) =>
+    node.source.start.line < statement.source.start.line ||
+    (node.source.start.line === statement.source.start.line &&
+      node.source.start.column < statement.source.start.column);
+  let importAbove = null;
   root.walkAtRules(/^import$/i, (atRule) => {
     const m = /\blayer\(\s*([\w.-]+)\s*\)/i.exec(atRule.params);
-    if (m && !declaredNames.has(m[1])) {
+    if (!m) return;
+    if (!declaredNames.has(m[1])) {
       utils.report({
         message: layerMessages.undeclaredImport(m[1]),
         node: atRule,
@@ -195,7 +209,26 @@ const layerOrderRule = (primary) => (root, result) => {
         ruleName: layerRuleName,
       });
     }
+    if (!importAbove && before(atRule)) importAbove = m[1];
   });
+
+  /* The statement comes first: a rule above it (N29), or an import into a
+     layer (N25), names its layers before the statement can. One report per
+     file, as the audit's layer-statement-position. */
+  let ruleAbove = false;
+  root.walkRules((rule) => {
+    if (before(rule)) ruleAbove = true;
+  });
+  if (ruleAbove || importAbove) {
+    utils.report({
+      message: ruleAbove
+        ? layerMessages.ruleBeforeStatement()
+        : layerMessages.importBeforeStatement(importAbove),
+      node: statement,
+      result,
+      ruleName: layerRuleName,
+    });
+  }
 };
 
 layerOrderRule.ruleName = layerRuleName;

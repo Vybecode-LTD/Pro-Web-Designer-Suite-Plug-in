@@ -524,7 +524,9 @@ KEEP_QUOTED = set("""
     outer overlaps placing primary references returning right select session_user similar some
     symmetric system_user table tablesample then to trailing true union unique user using
     variadic verbose when where window with""".split())
-RE_SIMPLE_IDENT = re.compile(r"[a-z_][a-z0-9_$]*")
+# No `$`: Postgres allows it in a bare name, but this parser reads names as
+# word characters, so `"amount$usd"` keeps its quotes (N16).
+RE_SIMPLE_IDENT = re.compile(r"[a-z_][a-z0-9_]*")
 
 
 def unquote_identifiers(text: str) -> str:
@@ -608,8 +610,8 @@ RE_CREATE_INDEX = _p(r"^\s*create\s+(unique\s+)?index(?:\s+concurrently)?"
                      r"(?:\s+if\s+not\s+exists)?\s+(?:\"[^\"]+\"|[\w.])+\s+on\s+((?:\"[^\"]+\"|[\w.])+)"
                      r"(?:\s+using\s+\w+)?\s*\((.*?)\)\s*(where\b.*)?$")
 RE_ALTER_TABLE = _p(r"^\s*alter\s+table(?:\s+if\s+exists)?(?:\s+only)?\s+((?:\"[^\"]+\"|[\w.])+)\s+(.*)$")
-RE_ADD_CONSTRAINT = _p(r"^add\s+(?:constraint\s+(?:\"[^\"]+\"|\w+)\s+)?"
-                       r"(?=(?:primary\s+key|foreign\s+key|unique|check|exclude)\b)")
+RE_ADD_CONSTRAINT = _p(r"^add\s+(?:constraint\s+(?:\"[^\"]+\"|[\w$]+)\s+)?"
+                       r"(?=(?:primary\s+key|foreign\s+key|unique|check|exclude|not\s+null)\b)")
 RE_ADD_COLUMN = _p(r"^add\s+(?:column\s+)?(?:if\s+not\s+exists\s+)?(.*)$")
 RE_DROP_COLUMN = _p(r"^drop\s+(?:column\s+)?(?:if\s+exists\s+)?(\"[^\"]+\"|\w+)")
 RE_ALTER_COLUMN = _p(r"^alter\s+(?:column\s+)?(\"[^\"]+\"|\w+)\s+(.*)$")
@@ -621,6 +623,8 @@ RE_FK_CLAUSE = _p(r"foreign\s+key\s*\(([^)]*)\)\s*references\s+((?:\"[^\"]+\"|[\
 RE_PK_CLAUSE = _p(r"^primary\s+key\s*\(([^)]*)\)")
 RE_UNIQUE_CLAUSE = _p(r"^unique\s*(?:nulls\s+(?:not\s+)?distinct\s*)?\(([^)]*)\)")
 RE_CHECK_CLAUSE = _p(r"^check\s*\((.*)\)\s*$")
+# Postgres 18 names a not-null constraint: `constraint t_name_nn not null name` (N19).
+RE_NOT_NULL_CLAUSE = _p(r"^not\s+null\s+(\"[^\"]+\"|\w+)")
 RE_INLINE_REFS = _p(r"\breferences\s+((?:\"[^\"]+\"|[\w.])+)\s*(?:\(([^)]*)\))?(.*)$")
 # Row-level security (DL-A6): the statements the parser used to skip.
 RE_ALTER_RLS = _p(r"^\s*alter\s+table(?:\s+if\s+exists)?(?:\s+only)?\s+((?:\"[^\"]+\"|[\w.])+)\s+"
@@ -982,7 +986,7 @@ def _parse_create_table(stmt: str, model: Model) -> Table:
             item = re.sub(r"(?i)^constraint\s+[\w\"]+\s+", "", item)
             low = item.lower()
         if low.startswith(("primary key", "foreign key", "unique", "check",
-                           "exclude", "like ")):
+                           "exclude", "like ", "not null ")):
             _apply_constraint_to_table(model, table, item)
             continue
         col = _parse_column_def(item, table, model)
@@ -1118,12 +1122,69 @@ def _apply_constraint_to_table(model: Model, table: Table, clause: str) -> None:
                 "on_delete": _on_delete(m.group(4) or ""),
             }
         return
+    m = RE_NOT_NULL_CLAUSE.match(clause)
+    if m:
+        col = table.col(unquote_ident(m.group(1)))
+        if col:
+            col.nullable = False
+        return
     m = RE_CHECK_CLAUSE.match(clause)
     if m:
         expr = m.group(1).strip()
         target = _check_target(expr, table)
         if target:
             target.checks.append(expr)
+
+
+def _names(expr: str, name: str) -> bool:
+    """Whether an expression names the column, outside its string literals."""
+    return any(i % 2 == 0 and re.search(rf"(?<![\w$]){re.escape(name)}(?![\w$])", part)
+               for i, part in enumerate(expr.split("'")))
+
+
+def _rename_in(expr: str, old: str, new: str) -> str:
+    """The expression with the column renamed, whole names only, and its
+    string literals as they were."""
+    parts = expr.split("'")
+    return "'".join(re.sub(rf"(?<![\w$]){re.escape(old)}(?![\w$])", lambda _: new, part)
+                    if i % 2 == 0 else part for i, part in enumerate(parts))
+
+
+def _drop_column(model: Model, table: Table, name: str) -> None:
+    """What Postgres drops with a column: every index and constraint that
+    uses it, the whole primary key included, and with CASCADE, which it needs
+    for them, other tables' foreign keys into it (N17)."""
+    table.columns = [c for c in table.columns if c.name != name]
+    if name in table.primary_key:
+        for c in table.columns:
+            if c.name in table.primary_key:
+                c.primary_key = False
+        table.primary_key = []
+    table.unique_indexes = [idx for idx in table.unique_indexes if name not in idx]
+    for c in table.columns:
+        c.checks = [expr for expr in c.checks if not _names(expr, name)]
+    for t in model.tables:
+        for c in t.columns:
+            if c.foreign_key and (c.foreign_key["table"], c.foreign_key["column"]) == (table.name, name):
+                c.foreign_key = None
+    if table.update_columns is not None:
+        table.update_columns = [c for c in table.update_columns if c != name]
+
+
+def _rename_column(model: Model, table: Table, old: str, new: str) -> None:
+    """Postgres keeps a column's keys, indexes, CHECKs and grants through a
+    rename, and retargets other tables' foreign keys into it (N18)."""
+    table.col(old).name = new
+    table.primary_key = [new if n == old else n for n in table.primary_key]
+    table.unique_indexes = [[new if n == old else n for n in idx] for idx in table.unique_indexes]
+    for c in table.columns:
+        c.checks = [_rename_in(expr, old, new) for expr in c.checks]
+    for t in model.tables:
+        for c in t.columns:
+            if c.foreign_key and (c.foreign_key["table"], c.foreign_key["column"]) == (table.name, old):
+                c.foreign_key["column"] = new
+    if table.update_columns is not None:
+        table.update_columns = [new if c == old else c for c in table.update_columns]
 
 
 def _apply_alter_action(model: Model, table: Table, action: str) -> None:
@@ -1134,7 +1195,8 @@ def _apply_alter_action(model: Model, table: Table, action: str) -> None:
     if m:
         _apply_constraint_to_table(model, table, action[m.end():])
         return
-    if re.match(r"(?i)drop\s+constraint\b", action):
+    # A constraint this parser does not know is still never a column (N19).
+    if re.match(r"(?i)(?:add|drop)\s+constraint\b", action):
         return
     m = RE_ADD_COLUMN.match(action)
     if m:
@@ -1144,8 +1206,7 @@ def _apply_alter_action(model: Model, table: Table, action: str) -> None:
         return
     m = RE_DROP_COLUMN.match(action)
     if m:
-        name = unquote_ident(m.group(1))
-        table.columns = [c for c in table.columns if c.name != name]
+        _drop_column(model, table, unquote_ident(m.group(1)))
         return
     m = RE_RENAME.match(action)
     if m:
@@ -1157,9 +1218,7 @@ def _apply_alter_action(model: Model, table: Table, action: str) -> None:
                         c.foreign_key["table"] = new
             table.name = new
         elif table.col(old):
-            table.col(old).name = new
-            table.primary_key = [new if n == old else n for n in table.primary_key]
-            table.unique_indexes = [[new if n == old else n for n in idx] for idx in table.unique_indexes]
+            _rename_column(model, table, old, new)
         return
     m = RE_ALTER_COLUMN.match(action)
     col = table.col(unquote_ident(m.group(1))) if m else None

@@ -110,7 +110,11 @@ Three rules keep this from rotting.
         @import url("../vendor/datepicker.css") layer(vendor);
       Then one line per component file, after the layers above:
         @import url("components/card.css");
-      With CSS Modules there are none: each component imports its own. */
+      With CSS Modules there are none: each component imports its own.
+      Last, once the project has them, the closed set of utilities and the
+      dated overrides. Each opens its own @layer block, so import it bare:
+        @import url("utilities.css");
+        @import url("overrides.css"); */
 ```
 
 ### Why the layer statement must come first

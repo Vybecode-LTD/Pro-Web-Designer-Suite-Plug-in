@@ -62,6 +62,7 @@ Exit codes: 0 written (or dry-run printed) · 1 the model is unusable, or
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -2617,9 +2618,50 @@ UID = "(select auth.uid())"
 TEST_USER = "00000000-0000-4000-8000-000000000001"
 
 
+# Words that stay quoted: Postgres's reserved keywords, plus those
+# introspect_schema reads as the start of a clause. The scripts stand alone, so
+# this is a copy of introspect_schema.KEEP_QUOTED, and a test holds them equal (N21).
+KEEP_QUOTED = set("""
+    all analyse analyze and any array as asc asymmetric authorization binary both case cast check
+    collate collation column concurrently constraint create cross current_catalog current_date
+    current_role current_schema current_time current_timestamp current_user default deferrable
+    desc distinct do else end except exclude false fetch for foreign freeze from full generated
+    grant group having ilike in initially inner intersect into is isnull join lateral leading
+    left like limit localtime localtimestamp natural not notnull null offset on only or order
+    outer overlaps placing primary references returning right select session_user similar some
+    symmetric system_user table tablesample then to trailing true union unique user using
+    variadic verbose when where window with""".split())
+# Postgres cuts a longer name to this many bytes (NAMEDATALEN - 1).
+NAME_BYTES = 63
+
+
 def sql_ident(name: str) -> str:
-    return name if re.fullmatch(r"[a-z_][a-z0-9_]*", name) and name not in {
-        "order", "user", "group", "default", "check", "table", "from", "to", "end"} else f'"{name}"'
+    """A name as SQL writes it: bare only when Postgres reads it back as the same name."""
+    if re.fullmatch(r"[a-z_][a-z0-9_]*", name) and name not in KEEP_QUOTED:
+        return name
+    return '"' + name.replace('"', '""') + '"'
+
+
+def sql_text(value: str) -> str:
+    """A string literal."""
+    return "'" + value.replace("'", "''") + "'"
+
+
+def pg_schema(model: dict[str, Any]) -> str:
+    """The schema introspect_schema read (`--schema`), where the policies go (N20)."""
+    return (model.get("source") or {}).get("pg_schema") or "public"
+
+
+def policy_name(table: str, label: str) -> str:
+    """`<table>: <label>`, kept to 63 bytes. Postgres cuts a longer name, so a
+    long table's four names became one and the second CREATE POLICY failed
+    (N22). A shortened table part ends in a hash of the whole name."""
+    name = f"{table}: {label}"
+    if len(name.encode("utf-8")) <= NAME_BYTES:
+        return name
+    tail = f"~{hashlib.sha256(table.encode('utf-8')).hexdigest()[:8]}: {label}"
+    head = table.encode("utf-8")[:NAME_BYTES - len(tail.encode("utf-8"))].decode("utf-8", "ignore")
+    return head + tail
 
 
 def _key_into_auth(model: dict[str, Any], col: dict[str, Any]) -> bool:
@@ -2674,17 +2716,17 @@ def ownership(table: dict[str, Any], model: dict[str, Any],
     return {"kind": "none", "column": None, "why": "no column says who a row belongs to"}
 
 
-def owner_check(own: dict[str, Any], table: str, ref: str = "", depth: int = 1) -> str:
+def owner_check(own: dict[str, Any], table: str, schema: str, ref: str = "", depth: int = 1) -> str:
     """The condition that holds when the row is the caller's. `ref` names the
     row's table inside a parent's subquery, where each level has its alias."""
     qual = f"{ref}." if ref else ""
     if own["kind"] in ("self", "owner"):
         return f"{qual}{sql_ident(own['column'])} = {UID}"
     alias = f"p{depth}"
-    return (f"exists (select 1 from public.{sql_ident(own['parent'])} {alias} "
+    return (f"exists (select 1 from {sql_ident(schema)}.{sql_ident(own['parent'])} {alias} "
             f"where {alias}.{sql_ident(own['parent_column'])} = "
             f"{ref or sql_ident(table)}.{sql_ident(own['column'])} "
-            f"and {owner_check(own['up'], own['parent'], alias, depth + 1)})")
+            f"and {owner_check(own['up'], own['parent'], schema, alias, depth + 1)})")
 
 
 def _protected(table: dict[str, Any], own: dict[str, Any], writable: list[str]) -> list[str]:
@@ -2697,7 +2739,8 @@ def _protected(table: dict[str, Any], own: dict[str, Any], writable: list[str]) 
 
 def emit_policies(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str:
     name = table["name"]
-    q = f"public.{sql_ident(name)}"
+    schema = pg_schema(model)
+    q = f"{sql_ident(schema)}.{sql_ident(name)}"
     own = ownership(table, model)
     kind = own["kind"]
     out = [f"-- TODO(policy): {name}. Proposed from the schema, which cannot say who may do",
@@ -2711,13 +2754,14 @@ def emit_policies(table: dict[str, Any], model: dict[str, Any], ans: Answers) ->
     out += ["", f"alter table {q} enable row level security;", ""]
 
     if kind in ("self", "owner", "child"):
-        check = owner_check(own, name)
+        check = owner_check(own, name, schema)
         for verb, cmd, clauses in (
                 ("reads", "select", (("using", check),)),
                 ("inserts", "insert", (("with check", check),)),
                 ("updates", "update", (("using", check), ("with check", check))),
                 ("deletes", "delete", (("using", check),))):
-            out.append(f'create policy "{name}: owner {verb}" on {q}\n  for {cmd} to authenticated\n'
+            out.append(f"create policy {sql_ident(policy_name(name, f'owner {verb}'))} on {q}\n"
+                       f"  for {cmd} to authenticated\n"
                        + "\n".join(f"  {kw} ({cond})" for kw, cond in clauses) + ";")
             out.append("")
     elif kind == "tenant":
@@ -2727,15 +2771,15 @@ def emit_policies(table: dict[str, Any], model: dict[str, Any], ans: Answers) ->
                 f"-- does not expose. Until then RLS is on with no policy: nobody can read or write.",
                 f"--   create function private.user_{own['column']}s() returns setof uuid",
                 f"--     language sql security definer set search_path = '' stable",
-                f"--     as $$ select {col} from public.memberships where user_id = {UID} $$;",
+                f"--     as $$ select {col} from {sql_ident(schema)}.memberships where user_id = {UID} $$;",
                 f"--   revoke execute on function private.user_{own['column']}s() from public;",
                 f"--   grant usage on schema private to authenticated;",
                 f"--   grant execute on function private.user_{own['column']}s() to authenticated;",
-                f'--   create policy "{name}: members read" on {q}',
+                f"--   create policy {sql_ident(policy_name(name, 'members read'))} on {q}",
                 f"--     for select to authenticated using ({col} in (select private.user_{own['column']}s()));",
                 ""]
     else:
-        out += [f'create policy "{name}: signed-in users read" on {q}',
+        out += [f"create policy {sql_ident(policy_name(name, 'signed-in users read'))} on {q}",
                 "  for select to authenticated", "  using (true);", "",
                 "-- No write policy: the browser cannot change these rows. Writes go through the",
                 "-- server, with the secret key. If users should write here, the table needs an",
@@ -2759,7 +2803,8 @@ def emit_policies(table: dict[str, Any], model: dict[str, Any], ans: Answers) ->
 
 def emit_policy_test(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str:
     name = table["name"]
-    q = f"public.{sql_ident(name)}"
+    schema = pg_schema(model)
+    q = f"{sql_ident(schema)}.{sql_ident(name)}"
     own = ownership(table, model)
     kind = own["kind"]
     out = [f"-- Smoke test for {name}.policies.todo.sql, once those statements have run.",
@@ -2784,13 +2829,16 @@ def emit_policy_test(table: dict[str, Any], model: dict[str, Any], ans: Answers)
            ""]
     if kind in ("self", "owner", "child"):
         out += ["do $$ begin",
-                f"  assert not exists (select 1 from {q} where ({owner_check(own, name)}) is not true),",
+                f"  assert not exists (select 1 from {q} where ({owner_check(own, name, schema)}) is not true),",
                 f"    'a signed-in user can read {name} rows that are not theirs';",
                 "end $$;", ""]
     elif kind == "none":
+        # Only a policy the browser's roles hold: one for service_role is the
+        # server's (N23). `public` is every role, and the default.
         out += ["do $$ begin",
-                "  assert not exists (select 1 from pg_policies where schemaname = 'public'",
-                f"    and tablename = '{name}' and cmd <> 'SELECT'),",
+                f"  assert not exists (select 1 from pg_policies where schemaname = {sql_text(schema)}",
+                f"    and tablename = {sql_text(name)} and cmd <> 'SELECT'",
+                "    and roles && array['public', 'anon', 'authenticated']::name[]),",
                 f"    'a policy lets the browser write {q}';",
                 "end $$;", ""]
     writable = ans.writable(table)

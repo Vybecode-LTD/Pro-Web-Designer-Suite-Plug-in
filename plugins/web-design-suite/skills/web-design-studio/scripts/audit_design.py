@@ -1023,12 +1023,19 @@ def audit_css(path: Path, text: str) -> list[Finding]:
             "unwrapped file quietly makes its rules unoverridable. Wrap the "
             "file in @layer components { … } (or the layer it belongs to).")
 
+    first_layered_import = min((line for line, _ in import_layers), default=0)
     if saw_layer_statement and first_rule_line and layer_statement_line > first_rule_line:
         add(layer_statement_line, "L5", "layer-statement-position", "error",
             "The @layer statement appears after rules have already been seen.",
             "A layer's position is fixed the first time its name is used, so "
             "the statement must be the first thing in the entry stylesheet, "
             "before every @import and every rule.")
+    elif saw_layer_statement and first_layered_import and layer_statement_line > first_layered_import:
+        # The import names its layer first, whatever the statement then says (N25).
+        add(layer_statement_line, "L5", "layer-statement-position", "error",
+            f"The @layer statement comes after `@import … layer()` on line {first_layered_import}.",
+            "A layer's position is fixed the first time its name is used, and "
+            "that import used it first. Move the statement above every @import.")
 
     # A layer first named by its import is appended after every declared one,
     # so the vendor's rules beat yours (SB-A8, design-rules.json: layers).
