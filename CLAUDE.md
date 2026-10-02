@@ -20,7 +20,7 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
   - 406 on #14's branch, passing on Python 3.9 and 3.14 on Windows.
   - Linux passes with the Node tests skipped.
   - macOS has never been run.
-- **Active work:** phase 3 (3.3.0) of `dev plans/web-design-suite-completion-plan.md`, as small PRs. Next: merge #12 to #14 in order, then the rest of W2 (N1 to N3 first; `docs/HANDOFF.md`).
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`, which schedules every open item in 43 PRs (P1–P43). Next: merge #12 to #15 in order, get the user's answers to its §2, then P1 (CI and the lean tooling).
 - **Open from the review** (the inventory has each item): 55 issues, none high; 42 gaps plus 5 partly done; 44 improvements plus 5 partly done.
 
 ## Commands

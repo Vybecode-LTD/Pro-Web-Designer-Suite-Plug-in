@@ -30,7 +30,8 @@
 
 ## Next steps
 
-1. **After the merges:** check that `main` has all three, then delete the branches.
+0. **The plan is now `dev plans/web-design-suite-execution-plan.md`** (PR #15): 43 PRs in order, starting with P1 (CI and the lean tooling). Get the user's answers to its §2 first; the steps below are its P2 to P8.
+1. **After the merges:** check that `main` has all four, then delete the branches.
 2. **The rest of W2:**
    - **N1:** decide each row of the gates-disagree table in the plan, spec first, and make all three gates follow it.
    - **N2:** `tools/sync_rules.py --check`, and conformance fixtures through the real tools.
