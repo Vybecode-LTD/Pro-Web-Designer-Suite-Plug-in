@@ -662,9 +662,14 @@ def has_raw_length(value: str) -> str | None:
     return None
 
 
+OWL = re.compile(r">\s*\*\s*\+\s*\*")
+
+
 def owl_selector(selectors: tuple[str, ...]) -> bool:
-    """The parent-owned flow idiom: `> * + *` written in the PARENT's rule."""
-    return any(re.search(r"\+\s*\*|\*\s*\+", s) for s in selectors)
+    """The parent-owned flow idiom, the whole `> * + *`, in the rule that holds
+    the declaration: the PARENT's rule spacing its children. `.card + *` is a
+    component spacing its next sibling, which the owl is not."""
+    return bool(selectors) and bool(OWL.search(selectors[-1]))
 
 
 def generated_content(selectors: tuple[str, ...]) -> bool:
@@ -696,8 +701,9 @@ def margin_cancels_token(value: str) -> bool:
 def scales_a_token(value: str) -> bool:
     """A factor on a token: `calc(var(--pad-card) * 1.5)`, or `/ 2`, is a step
     the scale does not have (Law 3; design-rules.json: values.shapes). `* -1`,
-    which cancels a token, is the one factor allowed."""
-    return bool(re.search(r"[*/]", CANCELLED_TOKEN.sub(" var() ", value)))
+    which cancels a token, is the one factor allowed, and a var() fallback is
+    not checked (var_fallback): `var(--pad-card, calc(1rem / 2))` passes."""
+    return bool(re.search(r"[*/]", strip_var_refs(CANCELLED_TOKEN.sub(" var() ", value))))
 
 
 def allowed_value(value: str, allowed: tuple) -> bool:

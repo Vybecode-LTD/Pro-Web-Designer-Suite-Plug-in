@@ -44,12 +44,20 @@ All CSS reads Tier-2 tokens only; component-specific values are Tier-3 variables
     transform: translateY(-100%);
     transition: transform var(--motion-exit);
   }
-  /* The page reserves the header's height in base.css, not here: a component
-     styles itself, never <body> (navigation-patterns.md §4). */
+  /* The page reserves the header's height: the base rule below. A component
+     styles itself, never <body>. */
 
   /* The skip link is the starter's .skip-link (layout.css), not a second copy
      here: one class, one home. Its --z-toast sits above --z-sticky, so it
      clears this header. */
+}
+```
+
+The fixed header leaves the flow, so the page reserves its height. That rule is the page's, in `base`:
+
+```css
+@layer base {
+  body { padding-block-start: var(--nav-offset); }   /* navigation-patterns.md §4 publishes --nav-offset */
 }
 ```
 

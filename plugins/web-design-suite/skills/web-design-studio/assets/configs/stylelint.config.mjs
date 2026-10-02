@@ -463,7 +463,9 @@ const marginMessages = utils.ruleMessages(marginRuleName, {
     `Let the parent space it with gap, or write the margin in the parent's owl rule (> * + *). ` +
     `Legal here: 0, auto, and calc(var(--token) * -1) to cancel a known token.`,
 });
-const OWL_SELECTOR = /\+\s*\*|\*\s*\+/;
+/* The whole owl, `> * + *`: `.card + *` is a component spacing its next
+ * sibling, which the owl is not. */
+const OWL_SELECTOR = />\s*\*\s*\+\s*\*/;
 
 /* An allowlist entry as declaration-property-value-allowed-list reads it: a
  * string in slashes is a regular expression, anything else an exact value. */
@@ -480,7 +482,11 @@ const marginRule = (primary) => (root, result) => {
   root.walkDecls((decl) => {
     const entries = MARGIN_ALLOWLIST[decl.prop.toLowerCase()];
     if (!entries || allowedBy(entries, decl.value.trim())) return;
-    if (decl.parent?.type === 'rule' && OWL_SELECTOR.test(decl.parent.selector)) return;
+    // The rule that holds the declaration, through any @media or @supports
+    // around it, as the audit reads it.
+    let rule = decl.parent;
+    while (rule && rule.type !== 'rule') rule = rule.parent;
+    if (rule && OWL_SELECTOR.test(rule.selector)) return;
     utils.report({
       message: marginMessages.rejected(decl.prop, decl.value),
       node: decl,

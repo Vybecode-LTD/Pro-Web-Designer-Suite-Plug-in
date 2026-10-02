@@ -19,7 +19,7 @@
   },
   "margins_in_components": {
     "gates": ["audit", "stylelint"],
-    "rule": "Law 2: a component never sets its own outer margin. Legal: auto (alignment), 0, calc(var(--token) * -1) to cancel a known token, and an owl selector written in the parent's own rule.",
+    "rule": "Law 2: a component never sets its own outer margin. Legal: auto (alignment), 0, calc(var(--token) * -1) to cancel a known token, and the owl, the whole `> * + *` in the parent's own rule, through any @media around the margin. `.card + *` is not the owl: it is the component spacing its next sibling.",
     "properties": ["margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "margin-inline", "margin-block",
                    "margin-inline-start", "margin-inline-end", "margin-block-start", "margin-block-end"],
     "values": ["0", "auto", "0 auto", "auto 0", "CANCEL", "KEYWORDS"],
@@ -28,7 +28,9 @@
     "owl_selectors": [".stack > * + *", ".flow > * + *"],
     "refused_selectors": [".card *", ".card p", ".card > svg", ".card:is(h2, h3)"],
     "allowed_selectors": [".card:nth-child(2n + 1)", ".card__icon:where(:hover, :focus-visible)",
-                          ".card[data-state=\"open\"]", ".card::before", ".card:lang(en)"]
+                          ".card[data-state=\"open\"]", ".card::before", ".card:lang(en)"],
+    "allowed": [".stack > * + * { @media (width >= 48rem) { margin-block-start: var(--gap-grouped); } }"],
+    "refused": [".card + * { margin-block-start: var(--gap-related); }"]
   },
   "var_fallback": {
     "gates": ["audit", "stylelint"],
@@ -156,7 +158,8 @@
           {"properties": ["row-gap", "column-gap"], "values": ["VAR_ONE", "0", "KEYWORDS"]}
         ],
         "allowed": ["padding: var(--pad-card) var(--pad-card-lg)", "padding-inline: 0", "gap: var(--gap-related)",
-                    "padding-block-start: calc(var(--pad-card) - var(--stroke-hairline))"],
+                    "padding-block-start: calc(var(--pad-card) - var(--stroke-hairline))",
+                    "padding-top: var(--pad-card, calc(1rem / 2))"],
         "refused": ["padding: 13px", "padding: var(--pad-card) 2px", "gap: 1rem", "padding: calc(var(--space-4) * 1.5)",
                     "padding: calc(var(--pad-card) * 1.5)", "gap: calc(var(--gap-related) * 3)",
                     "padding-inline: calc(var(--pad-card) / 2)"]

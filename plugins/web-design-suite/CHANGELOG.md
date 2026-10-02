@@ -218,6 +218,11 @@
     layout CSS sits in its layer, and the hero's `18ch` measure is a Tier-3 socket. The
     starter's `sub`/`sup` at `0.75em` and the `cqi` fallback example keep their literal,
     with the audit's pragma beside stylelint's.
+  - From #20's review: the factor check now skips a `var()` fallback, as the spec does
+    (`var(--pad-card, calc(1rem / 2))`); the owl is the whole `> * + *` in both gates,
+    so `.card + *` can no longer space a component's next sibling; stylelint finds the
+    owl through an `@media` around the margin, as the audit did; and the header recipe
+    keeps the page's reservation for the fixed header, as a `base` rule of its own.
 
 ### Added
 
@@ -421,6 +426,10 @@
   a move could land after the hover-intent look had run. Each step of the scenario
   now waits, in real time, until the page has seen its move. Its markup carries the
   reference's new classes.
+  It failed again on macOS with 3.9: `page.clock.install()` alone lets the fake clock flow
+  in real time, so a slow runner overran the menu's 300 ms cap. A real 60 ms delay per
+  step reproduced it locally. The scenario now pauses the clock once the page has
+  loaded, and keeps that delay as a guard: it passes with the pause, and fails without.
 
 ## 3.2.1 — 2026-09-25
 

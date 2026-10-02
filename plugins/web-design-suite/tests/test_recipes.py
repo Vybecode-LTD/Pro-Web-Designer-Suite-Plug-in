@@ -586,10 +586,14 @@ MEGAMENU_FRAME = (".nav { position: relative; margin-block-start: 120px; }"
 
 MEGAMENU_SCENARIO = r"""
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
-// The page's timers run on a fake clock that only the scenario advances, so
-// the hover-intent delays see the planned timing on a slow runner too.
+// The page's clock is paused once it has loaded, so only the scenario moves
+// time: the timers, performance.now() and the 300 ms cap see the planned
+// timing however slow the runner. install() alone lets the fake clock flow in
+// real time, and a slow macOS runner overran the cap (reproduced with a real
+// 60 ms delay per step).
 await page.clock.install();
 await page.goto(pathToFileURL(process.argv[2]).href);
+await page.clock.pauseAt(Date.now() + 1000);
 const expanded = async (id) => (await page.getAttribute('#' + id, 'aria-expanded')) === 'true';
 // The clock does not decide when Chromium delivers a move: on a loaded runner
 // one could land after runFor() fired the hover-intent look, which then saw a
@@ -608,6 +612,9 @@ const glide = async (from, to, steps, ms) => {
     const x = from.x + (to.x - from.x) * i / steps, y = from.y + (to.y - from.y) * i / steps;
     await page.mouse.move(x, y);
     await seen(x, y);
+    // A loaded runner, on purpose: 60 ms of real time per step fails the scenario
+    // wherever the page's clock flows in real time (macOS CI), so it must not.
+    await new Promise((done) => setTimeout(done, 60));
     await page.clock.runFor(ms);
   }
 };

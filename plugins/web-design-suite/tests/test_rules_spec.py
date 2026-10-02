@@ -105,6 +105,8 @@ def spec_examples() -> list[Example]:
                     rule(f"{selector} {{ margin-block-start: var(--gap-related); }}"))
         for selector in margins[f"{verdict}_selectors"]:
             add("margins_in_components", verdict, selector, rule(f"{selector} {{ color: var(--fg-strong); }}"))
+        for css in margins.get(verdict, []):                  # whole rules: the owl in @media, `+ *`
+            add("margins_in_components", verdict, css, rule(css))
         for family, values in SPEC["values"]["families"].items():
             for declaration in values[verdict]:
                 add(f"values.{family}", verdict, declaration, rule(f".card {{ {declaration}; }}"))
