@@ -83,6 +83,11 @@ TEMPLATE_EXT = {".html", ".htm", ".vue", ".svelte", ".astro"}
 # Files whose CSS is plain CSS, where `//` is not a comment (line_comments).
 PLAIN_CSS_EXT = {".css", ".pcss", ".html", ".htm"}
 KEYFRAMES_AT = re.compile(r"@(-[a-z]+-)?keyframes\b", re.I)
+# Law 5's order (design-rules.json: layers). `theme` is Tailwind v4's.
+LAYER_ORDER = ["reset", "vendor", "tokens", "theme", "base", "layout",
+               "components", "utilities", "overrides"]
+LAYER_STATEMENT = "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;"
+IMPORT_LAYER = re.compile(r"@import\b.*?\blayer\(\s*([\w.-]+)\s*\)", re.I | re.S)
 # Sass (design-rules.json: sass). A @mixin or @function body emits nothing
 # where it is written. A variable holding a literal is a literal; a breakpoint
 # has to be one, because a media query condition cannot read a custom property.
@@ -690,6 +695,8 @@ def audit_css(path: Path, text: str) -> list[Finding]:
     component_file = is_component_file(path)
     saw_layer_statement = False
     layer_statement_line = 0
+    stated_layers: set[str] = set()
+    import_layers: list[tuple[int, str]] = []
     first_rule_line = 0
     first_unlayered_line = 0
     declared_props: set[str] = set()
@@ -718,15 +725,16 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     saw_layer_statement = True
                     layer_statement_line = ev[2]
                     declared = [s.strip() for s in stmt[6:].strip().rstrip(";").split(",")]
-                    canonical = ["reset", "tokens", "base", "layout",
-                                 "components", "utilities", "overrides"]
-                    present = [d for d in declared if d in canonical]
-                    if present != [c for c in canonical if c in present]:
+                    stated_layers.update(declared)
+                    present = [d for d in declared if d in LAYER_ORDER]
+                    if present != [c for c in LAYER_ORDER if c in present]:
                         add(ev[2], "L5", "layer-order", "error",
                             f"Layer statement is out of order: {', '.join(declared)}.",
-                            "Use: @layer reset, tokens, base, layout, components, "
-                            "utilities, overrides; extra layers may be inserted, "
-                            "but the canonical ones must keep their relative order.")
+                            f"Use: {LAYER_STATEMENT} A layer may be left out and others "
+                            "inserted, but these keep their relative order.")
+                imported = IMPORT_LAYER.match(stmt)
+                if imported:
+                    import_layers.append((ev[2], imported.group(1)))
                 # A mixin that holds a whole rule emits it where it is included,
                 # so at the root of a file the rule is unlayered. Only a mixin
                 # defined in this file is known (design-rules.json: sass).
@@ -1021,6 +1029,16 @@ def audit_css(path: Path, text: str) -> list[Finding]:
             "A layer's position is fixed the first time its name is used, so "
             "the statement must be the first thing in the entry stylesheet, "
             "before every @import and every rule.")
+
+    # A layer first named by its import is appended after every declared one,
+    # so the vendor's rules beat yours (SB-A8, design-rules.json: layers).
+    if saw_layer_statement:
+        for line, layer in import_layers:
+            if layer not in stated_layers:
+                add(line, "L5", "layer-undeclared", "error",
+                    f"`layer({layer})` imports into a layer the @layer statement does not name.",
+                    f"A layer first named by its import lands after `overrides`, so these "
+                    f"rules beat every rule you write. Name it in the statement: {LAYER_STATEMENT}")
 
     return findings
 

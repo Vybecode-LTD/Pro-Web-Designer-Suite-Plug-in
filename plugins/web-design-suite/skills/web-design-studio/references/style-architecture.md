@@ -137,7 +137,7 @@ Layers decouple *override order* from *selector strength*. A single-class select
 ### The order
 
 ```css
-@layer reset, tokens, base, layout, components, utilities, overrides;
+@layer reset, vendor, tokens, base, layout, components, utilities, overrides;
 ```
 
 Declared once, as the **first statement** in the entry stylesheet, before any `@import`. A layer's position in the cascade is fixed the first time its name is seen, so if a component file creates `components` before the statement runs, the order is wrong and nothing later fixes it.
@@ -160,18 +160,29 @@ Declared once, as the **first statement** in the entry stylesheet, before any `@
 
 ### Importing into a layer
 
+<!-- snippet: index.css#entry -->
 ```css
-/* index.css — the layer statement comes first, always. */
-@layer reset, tokens, base, layout, components, utilities, overrides;
+/* 1. The order, first: before every import and every rule. `vendor` is
+      named before there is any vendor CSS, because a layer first named by
+      its import is appended after `overrides`, where its rules beat every
+      rule you write. */
+@layer reset, vendor, tokens, base, layout, components, utilities, overrides;
 
-@import url("./reset.css")      layer(reset);
-@import url("./tokens.css")     layer(tokens);
-@import url("./base.css")       layer(base);
-@import url("./layout.css")     layer(layout);
-@import url("./utilities.css")  layer(utilities);
+/* 2. Each of these opens its own @layer block, so import it bare:
+      `layer(base)` around base.css would nest it as `base.base`. */
+@import url("reset.css");
+@import url("tokens.css");
+@import url("base.css");
+@import url("layout.css");
+
+/* 3. CSS you do not control names no layer: wrap it as it loads.
+        @import url("../vendor/datepicker.css") layer(vendor);
+      Then one line per component file, after the layers above:
+        @import url("components/card.css");
+      With CSS Modules there are none: each component imports its own. */
 ```
 
-Note that `reset.css` and the rest *also* declare their own `@layer reset { … }` internally. That is deliberate belt-and-braces: the file is correct whether it is imported into a layer or pasted into a build. Double-wrapping produces a nested layer named `reset.reset`, which sorts inside `reset` and behaves identically — but be aware of it if you ever need to target the layer by name from elsewhere.
+Each of those files opens its own `@layer reset { … }` (or `tokens`, `base`, `layout`), so it is imported bare. Wrapping one in `layer(reset)` as well nests it as `reset.reset`: it still sorts inside `reset`, but `@layer reset { … }` written elsewhere no longer targets the same slot. Use `layer()` only for a file that names no layer: vendor CSS, and Tailwind's own files.
 
 ---
 
@@ -476,7 +487,7 @@ Layers solve this completely, because **a layer declared earlier loses to every 
 @import url("flatpickr/dist/flatpickr.css") layer(vendor);
 ```
 
-That `#id !important` rule now loses to `.calendar__day` in `components`. No `!important` war, no wrapper divs, no forking the vendor CSS.
+That `#id` selector now loses to `.calendar__day` in `components`: layer order is checked before specificity. No specificity war, no wrapper divs, no forking the vendor CSS. Its `!important` still wins, because important declarations reverse the order of layers: strip those at build time (`stack-vanilla-css.md` §5).
 
 Same technique for legacy CSS during a migration: put the old stylesheet in a `legacy` layer below `components`, and new work automatically wins without anyone having to delete the old file first. This makes incremental migration actually incremental.
 

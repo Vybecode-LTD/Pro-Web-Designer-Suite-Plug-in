@@ -303,7 +303,7 @@ The order that works:
 
 1. **Declare the layer statement once**, first, before every `@import`, in the entry stylesheet:
    ```css
-   @layer reset, tokens, base, layout, components, utilities, overrides;
+   @layer reset, vendor, tokens, base, layout, components, utilities, overrides;
    ```
    A layer's position is fixed the first time its name is used, so this line must come before anything that uses one.
 2. **Wrap each existing file in the layer it belongs to.** Mechanical, one file per commit, no value changes in the same commit.

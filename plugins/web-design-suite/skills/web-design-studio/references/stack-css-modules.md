@@ -189,16 +189,26 @@ import { App } from './App';
 createRoot(document.getElementById('root')!).render(<App />);
 ```
 
+<!-- snippet: index.css#entry -->
 ```css
-/* src/styles/index.css */
-@layer reset, tokens, base, layout, components, utilities, overrides;
+/* 1. The order, first: before every import and every rule. `vendor` is
+      named before there is any vendor CSS, because a layer first named by
+      its import is appended after `overrides`, where its rules beat every
+      rule you write. */
+@layer reset, vendor, tokens, base, layout, components, utilities, overrides;
 
-@import url('./reset.css');
-@import url('./tokens.css');
-@import url('./base.css');
-@import url('./layout.css');
-@import url('./utilities.css');
-@import url('./overrides.css');
+/* 2. Each of these opens its own @layer block, so import it bare:
+      `layer(base)` around base.css would nest it as `base.base`. */
+@import url("reset.css");
+@import url("tokens.css");
+@import url("base.css");
+@import url("layout.css");
+
+/* 3. CSS you do not control names no layer: wrap it as it loads.
+        @import url("../vendor/datepicker.css") layer(vendor);
+      Then one line per component file, after the layers above:
+        @import url("components/card.css");
+      With CSS Modules there are none: each component imports its own. */
 ```
 
 Note what is **not** here: component CSS. Modules are imported by their components and the bundler collects them. That is the source of the ordering problem in §6.
@@ -238,7 +248,7 @@ Declare the layer order in a place that is guaranteed to be parsed before any Ja
 ```html
 <!-- index.html -->
 <head>
-  <style>@layer reset, tokens, base, layout, components, utilities, overrides;</style>
+  <style>@layer reset, vendor, tokens, base, layout, components, utilities, overrides;</style>
   <script type="module" src="/src/main.tsx"></script>
 </head>
 ```

@@ -18,7 +18,7 @@
 
      src/styles/index.css
      ---------------------------------------------------------------
-     @layer reset, tokens, theme, base, layout, components, utilities, overrides;
+     @layer reset, vendor, tokens, theme, base, layout, components, utilities, overrides;
 
      @import "tailwindcss/preflight.css" layer(reset);
      @import "tailwindcss/theme.css"     layer(theme);
@@ -26,8 +26,8 @@
 
      @import "./tokens.css";              -- itself wrapped in @layer tokens
      @import "./theme.css";               -- this file
-     @import "./base.css"   layer(base);
-     @import "./layout.css" layer(layout);
+     @import "./base.css";                -- these open their own @layer:
+     @import "./layout.css";              -- import them bare
      @import "./components/card.css";     -- each wrapped in
      @import "./components/button.css";   -- @layer components
      ---------------------------------------------------------------

@@ -1,0 +1,32 @@
+/* =========================================================================
+   INDEX (Tailwind v4) — the entry stylesheet of a Tailwind project
+   =========================================================================
+
+   Law 5 with Tailwind's layers in it. stack-tailwind.md §2.1 quotes this
+   file, and tools/sync_snippets.py keeps the quote identical to it. The
+   entry without Tailwind is assets/starter/styles/index.css.
+   ========================================================================= */
+
+/* @snippet entry */
+/* 1. The order, first. `@import "tailwindcss"` would state Tailwind's own
+      four layers instead, so its files are imported one by one. `vendor`
+      is named before there is any vendor CSS: a layer first named by its
+      import is appended after `overrides`. */
+@layer reset, vendor, tokens, theme, base, layout, components, utilities, overrides;
+
+/* 2. Tailwind's files name no layer: wrap each as it loads. */
+@import "tailwindcss/preflight.css" layer(reset);
+@import "tailwindcss/theme.css"     layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* 3. These open their own @layer block, so import them bare. */
+@import "./tokens.css";
+@import "./theme.css";                  /* assets/configs/theme.css */
+@import "./base.css";
+@import "./layout.css";
+
+/* 4. CSS you do not control names no layer: wrap it as it loads.
+        @import "../vendor/datepicker.css" layer(vendor);
+      Then one line per component file:
+        @import "./components/card.css"; */
+/* @end-snippet */

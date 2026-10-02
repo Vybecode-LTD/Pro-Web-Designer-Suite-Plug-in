@@ -41,7 +41,7 @@ These are the whole skill compressed. Everything in `references/` is one of them
 
 **4. One home per component's styles.** A reviewer who has never seen a component must be able to predict its appearance from one file. Inline `style` is permitted only when every key is a CSS custom property — that passes a runtime *number* into the cascade without moving a visual *decision* out of the stylesheet.
 
-**5. Layers, not specificity.** `@layer reset, tokens, base, layout, components, utilities, overrides;` — declared once, first, before any import. Override order is decided by the layer statement, never by winning a selector fight. No `!important`, no ID selectors, nesting depth 2 maximum.
+**5. Layers, not specificity.** `@layer reset, vendor, tokens, base, layout, components, utilities, overrides;` — declared once, first, before any import. Override order is decided by the layer statement, never by winning a selector fight. No `!important`, no ID selectors, nesting depth 2 maximum.
 
 **6. Semantic before primitive.** Components read role tokens (`--pad-card`, `--fg-muted`), never primitives (`--space-6`, `--neutral-600`). Right value, wrong tier is still wrong: the day "more air in cards" lands, you want to change one role, not grep a repo.
 

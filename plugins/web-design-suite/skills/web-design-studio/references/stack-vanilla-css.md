@@ -91,25 +91,26 @@ Three rules keep this from rotting.
 
 ## 4. `index.css` and the import order
 
+<!-- snippet: index.css#entry -->
 ```css
-/* index.css — the only file in the project that decides order. */
+/* 1. The order, first: before every import and every rule. `vendor` is
+      named before there is any vendor CSS, because a layer first named by
+      its import is appended after `overrides`, where its rules beat every
+      rule you write. */
+@layer reset, vendor, tokens, base, layout, components, utilities, overrides;
 
-/* 1. Layer order. FIRST LINE. Before every import. */
-@layer reset, tokens, base, layout, components, utilities, overrides;
-
-/* 2. Imports, in reading order. These files declare their own layer. */
+/* 2. Each of these opens its own @layer block, so import it bare:
+      `layer(base)` around base.css would nest it as `base.base`. */
 @import url("reset.css");
 @import url("tokens.css");
 @import url("base.css");
 @import url("layout.css");
-@import url("components/button.css");
-@import url("components/card.css");
-@import url("components/field.css");
-@import url("utilities.css");
-@import url("overrides.css");
 
-/* 3. Third-party CSS, forced into a layer it cannot escape. */
-@import url("../vendor/datepicker.css") layer(vendor);
+/* 3. CSS you do not control names no layer: wrap it as it loads.
+        @import url("../vendor/datepicker.css") layer(vendor);
+      Then one line per component file, after the layers above:
+        @import url("components/card.css");
+      With CSS Modules there are none: each component imports its own. */
 ```
 
 ### Why the layer statement must come first
@@ -138,7 +139,7 @@ Two acceptable answers:
 2. **Parallel `<link>`s.** There is no `layer` attribute on `<link>`, so each file must self-declare its layer, and a tiny inline style must establish the order before any of them arrive:
 
 ```html
-<style>@layer reset, tokens, base, layout, components, utilities, overrides;</style>
+<style>@layer reset, vendor, tokens, base, layout, components, utilities, overrides;</style>
 <link rel="stylesheet" href="/styles/reset.css">
 <link rel="stylesheet" href="/styles/tokens.css">
 <!-- … -->
@@ -213,7 +214,7 @@ An ID, a double class, and `!important` on all three. In an unlayered codebase t
 Add one line to your layer statement and one to your imports:
 
 ```css
-@layer reset, tokens, vendor, base, layout, components, utilities, overrides;
+@layer reset, vendor, tokens, base, layout, components, utilities, overrides;
 
 @import url("../vendor/datepicker.css") layer(vendor);
 ```
@@ -238,7 +239,7 @@ Now write the component normally:
 
 A single class in `components` now beats an ID in `vendor`, because **layer order is checked before specificity**. Specificity is only consulted to break ties *within* one layer.
 
-The `!important` declarations are the one part that still bites: important declarations reverse layer order, so the vendor's important rules beat your normal ones. Handle it once, in the import, by stripping them at build time (`postcss-discard-important` scoped to that file) — or, if you cannot, accept that this vendor requires three `!important`s in `overrides.css` and document why. Do not let it spread.
+The `!important` declarations are the one part that still bites: important declarations reverse layer order, so the vendor's important rules beat your normal ones. Handle it once, in the import, by stripping them at build time (`postcss-discard-important` scoped to that file) — or, if you cannot, patch those declarations in a vendored copy and document why. An `!important` of your own does not help: in `overrides` it loses to the vendor's, because the order is reversed. Do not let it spread.
 
 ### `revert-layer`
 

@@ -12,7 +12,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`, then this plan.
 2. Install the test tools once: `npm ci` in `tooling/main` and in `tooling/tailwind-v3` (`tooling/README.md`).
-3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 392 tests OK before you change anything; if it does not, fix that first.
+3. From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` (`-B`: no bytecode in the plugin). It must report 406 tests OK before you change anything; if it does not, fix that first.
 4. Work the phases in order. Inside a phase the workstreams are independent, so take them one at a time and ship the phase as one release.
 5. When a workstream is done, update its rows in the inventory: the release, and the test that holds each fix.
 
@@ -45,7 +45,7 @@ Ask before the phase that needs each one.
 ## Where things stand
 
 3.2.1 is released (`v3.2.1`, 2026-09-26), and 3.3.0 is in progress on `main`:
-- **Tests:** 392, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
+- **Tests:** 406, passing on Python 3.9 and 3.14 on Windows. 3.2.1's 339 passed on 3.10 to 3.14.
 - **Linux (WSL):** the suite passes with the Node tests skipped, because that Linux has no Node.
 - **macOS:** never run.
 - **Real tools:** the shipped ESLint config, the stylelint config, both Tailwind blocks of Part 5, Tailwind 4 and tailwind-merge all run in the suite, at the versions pinned in `tooling/`.
@@ -74,7 +74,7 @@ Target:
 - *Done for 3.3.0 (N14, found on the way).* The skill's command, `introspect_schema supabase/migrations/*.sql`, failed on more than one file. Several DDL files are now read as one schema.
 - *Done for 3.3.0.* A `policies.todo.sql` per table, with a smoke test that runs on a real Postgres in the suite (DL-B2), and the generated `lib/supabase.ts` (DL-B1).
 - *Done for 3.3.0.* A rewrite of supabase-integration.md §2, §4 and §6 (DL-C4), with a new §9, "Who talks to the database". It covers which key goes where, the publishable and secret key formats, forwarding the user's token from FastAPI, `search_path` on security-definer functions, and `app_metadata` only.
-- *Done for 3.3.0.* Real `db pull` and `gen types` files as fixtures, so the parser is tested on what Supabase emits (DL-C2, DL-B8): the worked example as a migration, a real `pg_dump` of it and its generated types, plus Brewr's real `gen types`. Brewr's real dump is still to add, when the user runs `pg_dump`.
+- *Done for 3.3.0.* Real `db pull` and `gen types` files as fixtures, so the parser is tested on what Supabase emits (DL-C2, DL-B8): the worked example as a migration, a real `pg_dump` of it and its generated types, plus Brewr's real `gen types`. A real dump of Brewr was dropped: the user has no password for its database.
 
 Re-check every Supabase fact at supabase.com on the day, and register it.
 
@@ -132,16 +132,16 @@ Add a stylelint snippet test like `DesignEslintConfig.test_the_references_tsx_sn
 
 | ID | Severity or size | What is wrong or missing |
 |---|---|---|
-| SB-A8 | medium | The canonical `index.css` puts third-party CSS on top of every layer. |
+| SB-A8 | medium | The canonical `index.css` puts third-party CSS on top of every layer. *Done for 3.3.0.* |
 | SB-A9 | medium | The scanner has bugs that hide violations. *Done for 3.3.0; part (d) was SS-A19, fixed in 3.1.0.* |
 | SB-A11 | medium | Docs promise checks that don't exist; for example, the audit does not diff `--breakpoint-*` against `--bp-*`. |
 | SB-A15 | medium | The stylelint allowlist has holes. |
-| SB-A23 | low-medium | The files disagree on how to wrap imports in layers. |
+| SB-A23 | low-medium | The files disagree on how to wrap imports in layers. *Done for 3.3.0.* |
 | SB-A24 | low-medium | SCSS: a `@mixin`-only partial fails L5, while `$card-padding: 24px` passes. *Done for 3.3.0, with the Sass rules in the spec (`sass`).* |
 | SB-A25 | low | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. |
 | SB-C1 | S-M | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. *Done: 3.1.0 did SB-A3, A4 and A10, and 3.3.0 did SB-A9 and A24.* |
 | SB-C2 | M · high | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. *Partly done: 3.2.0 shipped the spec with tests; the generator and conformance fixtures are left.* |
-| SB-C9 | S · medium | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. |
+| SB-C9 | S · medium | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. *Partly done for 3.3.0: vanilla, modules and Tailwind v4; v3 is left.* |
 
 ### W3 · Studio systems: generators, roles and starter files
 

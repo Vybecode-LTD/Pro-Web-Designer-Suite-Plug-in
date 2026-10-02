@@ -74,6 +74,33 @@
       ]
     }
   },
+  "layers": {
+    "order": [
+      "reset",
+      "vendor",
+      "tokens",
+      "theme",
+      "base",
+      "layout",
+      "components",
+      "utilities",
+      "overrides"
+    ],
+    "statement": "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;",
+    "rule": "Law 5. The entry stylesheet names the layers once, first, in this order: a layer may be left out but never moved, and other layers may sit between them. `theme` is Tailwind v4's generated theme and only a Tailwind entry names it. `vendor` holds CSS you do not control, imported with `layer(vendor)`. The statement names it even before there is any, because a layer first named by its import is appended after `overrides`, where the vendor's rules beat every rule you write (SB-A8). So every layer a file imports into must be in that file's statement. The canonical entries are web-design-studio/assets/starter/styles/index.css and assets/configs/index.tailwind.css.",
+    "imports": "A file that opens its own `@layer` block, as every starter file does, is imported bare: `@import url(\"base.css\") layer(base)` nests it as `base.base` (SB-A23). `layer()` is for files that name no layer: vendor CSS and Tailwind's own files.",
+    "allowed": [
+      "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;",
+      "@layer reset, tokens, base, layout, components;",
+      "@layer reset, vendor, tokens, theme, base, layout, components, utilities, overrides;",
+      "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;\n@import url(\"vendor/datepicker.css\") layer(vendor);"
+    ],
+    "refused": [
+      "@layer reset, tokens, vendor, base, layout, components, utilities, overrides;",
+      "@layer vendor, reset, tokens, base, layout, components, utilities, overrides;",
+      "@layer reset, tokens, base, layout, components, utilities, overrides;\n@import url(\"vendor/datepicker.css\") layer(vendor);"
+    ]
+  },
   "file_classes": {
     "token_files": {
       "globs": ["**/tokens.css", "**/*-tokens.css", "**/*.tokens.css", "**/tokens/*.css", "**/theme.css", "**/*-theme.css"],

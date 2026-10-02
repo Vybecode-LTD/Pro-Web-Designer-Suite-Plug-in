@@ -71,7 +71,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-A5 | high | fixed in 3.1.0 | The v4 theme leaves literal values available that no gate stops, while the docs say they are gone or lint-banned. |
 | SB-A6 | high | fixed in 3.1.0 | The handoff describes a token pipeline the suite does not ship. |
 | SB-A7 | high | fixed in 3.1.0 | The claim "v3 emits into three native cascade layers" is false. |
-| SB-A8 | medium | W2 (3.3.0) | The canonical `index.css` puts third-party CSS on top of every layer. |
+| SB-A8 | medium | fixed in 3.3.0: `test_rules_spec` (`test_layers`, `TheDocsStateTheSpecsOrder`), `test_real_tools.StylelintConfig` | The canonical `index.css` puts third-party CSS on top of every layer. |
 | SB-A9 | medium | fixed in 3.3.0: (a) to (c) by `test_audit_design.AuditPrecision` (`test_a_url_does_not_hide_the_rest_of_the_file`, `test_line_comments_stay_comments_where_they_are_comments`, `test_a_rule_after_a_closed_layer_is_unlayered`, `test_a_root_level_components_folder_holds_components`) and `test_rules_spec` `test_file_classes`; (d) is SS-A19, fixed in 3.1.0 | The scanner has bugs that hide violations. |
 | SB-A10 | medium | fixed in 3.1.0 | The Tailwind and JSX checks date from v3 and catch less than ESLint. |
 | SB-A11 | medium | W2 (3.3.0) | Docs promise checks that don't exist; for example, the audit does not diff `--breakpoint-*` against `--bp-*`. |
@@ -86,7 +86,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-A20 | medium | fixed in 3.2.0 | Defects in the reference code. |
 | SB-A21 | medium | fixed in 3.2.0 | Stale or wrong facts. |
 | SB-A22 | medium | fixed in 3.2.0, item 1 | the references' snippets fail the suite's own audit |
-| SB-A23 | low-medium | W2 (3.3.0) | The files disagree on how to wrap imports in layers. |
+| SB-A23 | low-medium | fixed in 3.3.0: the canonical entries, quoted (`test_doc_snippets.QuotedStarterCode`) | The files disagree on how to wrap imports in layers. |
 | SB-A24 | low-medium | fixed in 3.3.0: `test_audit_design.AuditPrecision` (`test_the_references_sass_partial_passes`, `test_a_mixin_is_checked_where_it_is_included`, `test_a_sass_variable_holding_a_literal_is_refused`, `test_sass_interpolation_opens_no_rule`, `test_indented_sass_is_skipped_not_passed`) and `test_rules_spec.test_sass` | SCSS: a `@mixin`-only partial fails L5, while `$card-padding: 24px` passes. |
 | SB-A25 | low | partly done (the `url(#fade)` false positive and the multi-line pragma no longer reproduce, 3.2.1 review; release to attribute); the rest in W2 (3.3.0) | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. |
 | SB-B1 | — | fixed in 3.1.0, with PS-A4 | templates aren't audited. |
@@ -103,7 +103,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-C6 | M · medium | W9 (3.5.0) | Add build-half cases to the XC-C1 eval suite: "Tailwind button with loading state", "vanilla card with stretched link", "mega menu", "add a vendor datepicker stylesheet". |
 | SB-C7 | S · medium | fixed in 3.2.0 | Harden the hook: filter by extension; fail instead of skipping when a config is missing unless `DESIGN_GATE_ALLOW_SKIP=1`; resolve configs at the repo root with fallbacks; pass `--no-warn-ignored`; use `git rev-parse --g |
 | SB-C8 | S · medium | fixed in 3.2.0 | Improve token efficiency (with XC-C7). |
-| SB-C9 | S · medium | W2 (3.3.0) | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. |
+| SB-C9 | S · medium | partly done (3.3.0: `starter/styles/index.css` and `configs/index.tailwind.css`, quoted by five references); the Tailwind v3 entry is still written inline in stack-tailwind | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. |
 | SB-C10 | S · low | W12 (3.6.0+) | In `audit_js`, `line_of()` costs O(n) per finding: a 1 MB JSX file with 20k findings took 12.6 s, against 5.1 s for 0.9 MB of CSS with 40k findings. |
 | LC-A1 | high | fixed in 3.1.0 | The docs say that if Figma's native DTCG export is live, "it works today". |
 | LC-A2 | high | fixed in 3.1.0 | The docs say "Both scripts read" `VariableComposedColor`. |
@@ -261,7 +261,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-B7 | low | W7 (3.4.0) | deliverability is dated. |
 | DL-B8 | low | fixed in 3.3.0: `test_schema_sources.TheWorkedExampleIsTheFixture`, `GeneratedTypesAgreeOnStructure` | unverifiable claims. |
 | DL-C1 | M | fixed: 3.1.0 classified the sensitive columns (DL-A1, DL-A2); 3.3.0 parses RLS and policies and prints the SECURITY block (`test_content_and_a11y.SchemaSecurityPass`) | A security pass in `introspect_schema`: classify sensitive columns, parse RLS and policies, print a SECURITY block first. |
-| DL-C2 | M | done in 3.3.0: `test_schema_sources` (a real `db pull` of Brewr still to add) | A sturdier schema parser, tested on real `db pull` and `gen types` files. |
+| DL-C2 | M | done in 3.3.0: `test_schema_sources` | A sturdier schema parser, tested on real `db pull` and `gen types` files. |
 | DL-C3 | M | W7 (3.4.0) | Email: fix A10–A12, then add a dark pass and a no-`<style>` check to `lint_email`, and `render_email.py`. |
 | DL-C4 | S | fixed in 3.3.0, with DL-A5 and DL-B1's reference | rewrite supabase-integration.md §2/§4/§6 |
 | DL-C5 | S | W7 (3.4.0) | `lint_email --source`: flag literals, `var()` fallbacks and dropped tokens. |

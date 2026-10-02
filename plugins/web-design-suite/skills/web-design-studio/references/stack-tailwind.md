@@ -123,20 +123,29 @@ The single-line import hardcodes Tailwind's own layer order —
 `theme, base, components, utilities` — which cannot express Law 5's seven
 layers. Split it:
 
+<!-- snippet: web-design-studio/assets/configs/index.tailwind.css#entry -->
 ```css
-/* src/styles/index.css */
+/* 1. The order, first. `@import "tailwindcss"` would state Tailwind's own
+      four layers instead, so its files are imported one by one. `vendor`
+      is named before there is any vendor CSS: a layer first named by its
+      import is appended after `overrides`. */
+@layer reset, vendor, tokens, theme, base, layout, components, utilities, overrides;
 
-@layer reset, tokens, theme, base, layout, components, utilities, overrides;
-
+/* 2. Tailwind's files name no layer: wrap each as it loads. */
 @import "tailwindcss/preflight.css" layer(reset);
 @import "tailwindcss/theme.css"     layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
-@import "./tokens.css";                 /* itself wrapped in @layer tokens */
-@import "./theme.css";                  /* the binding layer               */
-@import "./base.css"   layer(base);
-@import "./layout.css" layer(layout);
-@import "./components/card.css";        /* each wrapped in @layer components */
+/* 3. These open their own @layer block, so import them bare. */
+@import "./tokens.css";
+@import "./theme.css";                  /* assets/configs/theme.css */
+@import "./base.css";
+@import "./layout.css";
+
+/* 4. CSS you do not control names no layer: wrap it as it loads.
+        @import "../vendor/datepicker.css" layer(vendor);
+      Then one line per component file:
+        @import "./components/card.css"; */
 ```
 
 Two details that are not obvious:
@@ -1279,7 +1288,7 @@ plugins):
 /* tailwind-utilities.css */ @tailwind components; @tailwind utilities;
 
 /* index.css */
-@layer reset, tokens, base, layout, components, utilities, overrides;
+@layer reset, vendor, tokens, base, layout, components, utilities, overrides;
 @import url("./tailwind-base.css") layer(base);
 @import url("./tailwind-utilities.css") layer(utilities);
 ```
