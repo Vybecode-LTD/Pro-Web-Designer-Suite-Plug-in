@@ -977,6 +977,7 @@ def _parse_create_table(stmt: str, model: Model) -> Table:
     body = stmt[head_end + 1:body_end]
     table = Table(name=name)
 
+    constraints = []
     for item in split_top_level(body, ","):
         item = re.sub(r"\s+", " ", item).strip()
         if not item:
@@ -985,13 +986,16 @@ def _parse_create_table(stmt: str, model: Model) -> Table:
         if low.startswith("constraint "):
             item = re.sub(r"(?i)^constraint\s+[\w\"]+\s+", "", item)
             low = item.lower()
-        if low.startswith(("primary key", "foreign key", "unique", "check",
-                           "exclude", "like ", "not null ")):
-            _apply_constraint_to_table(model, table, item)
+        if low.startswith("like "):                   # another table's columns: not read
+            continue
+        if low.startswith(("primary key", "foreign key", "unique", "check", "exclude", "not null ")):
+            constraints.append(item)                  # a constraint may come before its column
             continue
         col = _parse_column_def(item, table, model)
         if col:
             table.columns.append(col)
+    for item in constraints:
+        _apply_constraint_to_table(model, table, item)
 
     return table
 
@@ -1136,18 +1140,52 @@ def _apply_constraint_to_table(model: Model, table: Table, clause: str) -> None:
             target.checks.append(expr)
 
 
+# An expression as pieces: a string literal, a quoted name, or a run of
+# anything else. The closing quote is optional, so the pieces cover the text.
+SQL_PIECES = re.compile(r"'(?:[^']|'')*'?|\"(?:[^\"]|\"\")*\"?|[^'\"]+")
+
+
+def _ident(name: str) -> str:
+    """A column name as an expression writes it: bare when it can be."""
+    if RE_SIMPLE_IDENT.fullmatch(name) and name not in KEEP_QUOTED:
+        return name
+    return '"' + name.replace('"', '""') + '"'
+
+
+def _column_refs(expr: str, name: str):
+    """Each piece of the expression, with whether it refers to the column, and
+    the pattern of a bare reference inside it. A quoted name refers to the
+    column when it is the whole name, so `"old.part"` is not `old`; a bare
+    word only for a name that can be bare, and never when a call follows, so
+    `lower(note)` is not a column `lower`."""
+    bare = (re.compile(rf"(?<![\w$]){re.escape(name)}(?![\w$])(?!\s*\()")
+            if _ident(name) == name else None)
+    for piece in SQL_PIECES.findall(expr):
+        if piece.startswith("'"):
+            yield piece, False, None
+        elif piece.startswith('"'):
+            yield piece, piece[1:-1].replace('""', '"') == name, None
+        else:
+            yield piece, bool(bare and bare.search(piece)), bare
+
+
 def _names(expr: str, name: str) -> bool:
-    """Whether an expression names the column, outside its string literals."""
-    return any(i % 2 == 0 and re.search(rf"(?<![\w$]){re.escape(name)}(?![\w$])", part)
-               for i, part in enumerate(expr.split("'")))
+    """Whether an expression refers to the column."""
+    return any(refers for _, refers, _ in _column_refs(expr, name))
 
 
 def _rename_in(expr: str, old: str, new: str) -> str:
-    """The expression with the column renamed, whole names only, and its
-    string literals as they were."""
-    parts = expr.split("'")
-    return "'".join(re.sub(rf"(?<![\w$]){re.escape(old)}(?![\w$])", lambda _: new, part)
-                    if i % 2 == 0 else part for i, part in enumerate(parts))
+    """The expression with its references to the column renamed, and every
+    other piece as it was."""
+    out = []
+    for piece, refers, bare in _column_refs(expr, old):
+        if not refers:
+            out.append(piece)
+        elif bare is None:
+            out.append(_ident(new))
+        else:
+            out.append(bare.sub(lambda _: _ident(new), piece))
+    return "".join(out)
 
 
 def _drop_column(model: Model, table: Table, name: str) -> None:
