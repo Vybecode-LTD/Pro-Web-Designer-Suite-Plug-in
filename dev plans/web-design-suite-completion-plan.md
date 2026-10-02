@@ -74,7 +74,7 @@ Target:
 - *Done for 3.3.0 (N14, found on the way).* The skill's command, `introspect_schema supabase/migrations/*.sql`, failed on more than one file. Several DDL files are now read as one schema.
 - *Done for 3.3.0.* A `policies.todo.sql` per table, with a smoke test that runs on a real Postgres in the suite (DL-B2), and the generated `lib/supabase.ts` (DL-B1).
 - *Done for 3.3.0.* A rewrite of supabase-integration.md §2, §4 and §6 (DL-C4), with a new §9, "Who talks to the database". It covers which key goes where, the publishable and secret key formats, forwarding the user's token from FastAPI, `search_path` on security-definer functions, and `app_metadata` only.
-- *Done for 3.3.0.* Real `db pull` and `gen types` files as fixtures, so the parser is tested on what Supabase emits (DL-C2, DL-B8): the worked example as a migration, a real `pg_dump` of it and its generated types, plus Brewr's real `gen types`. A real dump of Brewr was dropped: the user has no password for its database.
+- *Done for 3.3.0.* Real Postgres and Supabase output as fixtures, so the parser is tested on what they emit (DL-C2, DL-B8): the worked example as a migration, a real `pg_dump` of it made with the flags `supabase db pull` uses (a test applies the CLI's own edits to it), its generated types, and Brewr's real `gen types`. There is no `db pull` file itself (N28). A real dump of Brewr was dropped: the user has no password for its database.
 
 Re-check every Supabase fact at supabase.com on the day, and register it.
 
@@ -180,6 +180,22 @@ These were found in phase 2 and 3.2.1:
 - **N8.** The plugin README's install section names only a local folder. Add the GitHub route, `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, which anyone can use now that the repository is public.
 - **N9.** Add a repository-level check that the root `.claude-plugin/marketplace.json` and the plugin's own agree on name, description, category and keywords.
 - **N10.** The review's ✔ marks are stale. The inventory replaces them, so point the review's header at the inventory.
+
+These were found in the reviews of PRs #12 to #15 (Codex and CodeRabbit, 2026-10-01 and 02). Each was rated P2 or minor and judged real; P0 of the execution plan fixes N16 to N25. One finding is not taken: CodeRabbit's note that `w1-supabase-facts.md` should spell `--quote-all-identifiers`. That line quotes the Supabase CLI's script, which spells it `--quote-all-identifier`.
+
+- **N16.** A quoted name with a `$` in it (`"amount$usd"`) is unquoted by `introspect_schema.unquote_identifiers`, and the column parser, which reads only word characters in an unquoted name, then drops the column without a word.
+- **N17.** `ALTER TABLE … DROP COLUMN` removes the column but leaves it in the table's primary key and unique indexes, and other tables' foreign keys still point at it. Postgres drops the indexes and constraints that use the column.
+- **N18.** `RENAME COLUMN` renames the column in its own table only. Other tables' foreign keys, and the CHECKs on the column, keep the old name; Postgres retargets them.
+- **N19.** An `ADD CONSTRAINT` the parser does not know falls through to `ADD COLUMN`. Postgres 18's named not-null constraint (`alter table t add constraint t_name_nn not null name`) becomes a column named `constraint`.
+- **N20.** `scaffold_ui` names `public` in every policy, grant and smoke test, even for a model introspected with `--schema app` (`source.pg_schema` in the model).
+- **N21.** `scaffold_ui.sql_ident` quotes nine reserved words. A table named `select` or a column named `where` gives invalid SQL. It needs the full list, as `introspect_schema.KEEP_QUOTED` has, with a test that the two lists match.
+- **N22.** A policy is named `"<table>: owner reads"`. For a table name of 55 bytes or more, Postgres truncates the four names at 63 bytes to the same name, and the second `CREATE POLICY` fails.
+- **N23.** The smoke test's "no write policy" check counts a write policy for a server role (`to service_role`) as one the browser holds. It should read `pg_policies.roles`.
+- **N24.** The canonical `index.css` stops after `layout.css`. The vanilla stack documents `utilities.css` and `overrides.css`, and a project that copies the entry would never import them.
+- **N25.** An `@import … layer(vendor)` placed before the `@layer` statement fixes `vendor` first, whatever the statement then says. The audit and stylelint check the statement's position against rules only.
+- **N26.** *Done for 3.3.0 (PR #15).* `check_execution_plan.py` counted an item closed as "will not do" as open.
+- **N27.** *Done for 3.3.0 (PR #15).* DL-C7's parts span four PRs, and the execution plan named only the agent. P27 now says where each part lands.
+- **N28.** *Done for 3.3.0 (PR #15).* W1's target said "real `db pull` files". The dump is a real `pg_dump` made with the flags `db pull` uses, and a test applies the CLI's edits to it; there is no `db pull` file.
 
 ---
 

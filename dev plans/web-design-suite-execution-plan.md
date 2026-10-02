@@ -1,6 +1,6 @@
 # web-design-suite: the execution plan
 
-**Written 2026-10-02, after PRs #12 to #14.** It covers every open item in the [inventory](web-design-suite-completion-inventory.md) and every open N-item in the [completion plan](web-design-suite-completion-plan.md): 145 review items, two of them partly done, and nine N-items.
+**Written 2026-10-02, after PRs #12 to #14.** It covers every open item in the [inventory](web-design-suite-completion-inventory.md) and every open N-item in the [completion plan](web-design-suite-completion-plan.md): 145 review items, two of them partly done, and nineteen N-items, ten of them from the reviews of PRs #12 to #15.
 
 The completion plan says what each item needs; this plan says in which PR it gets done, in which order, and how to do it cheaply. Where the two disagree on order, this plan wins. `check_execution_plan.py`, beside this file, fails if an open item is missing from the schedule below or placed twice. Run it after every change to either file.
 
@@ -59,10 +59,11 @@ Size: S is about a quarter of a session, M about a third, L about half. A sessio
 
 ### Phase 3 · 3.3.0: safe defaults and one set of rules
 
-PRs #12 to #14 are open; merge them first.
+PRs #12 to #15 were merged on 2026-10-02. P0 fixes what their reviews found.
 
 | PR | What | Items | Main files | Size |
 |---|---|---|---|---|
+| P0 | What the reviews of #12 to #15 found: the parser's `$` names, `DROP` and `RENAME COLUMN`, unknown `ADD CONSTRAINT`; the scaffold's schema, reserved words, policy-name length and write-policy roles; the entry's missing sheets; an import before the layer statement | N16, N17, N18, N19, N20, N21, N22, N23, N24, N25 | `introspect_schema.py`, `scaffold_ui.py`, `audit_design.py`, `stylelint.config.mjs`, `design-rules.json`, `starter/styles/index.css` | M |
 | P1 | CI, the release build, and the lean tooling | XC-C6, XC-B3, N5 | `.github/workflows/`, `tooling/release/`, `tools/fail_before.py`, `tools/check.py`, git file modes | L |
 | P2 | The rule spec generates the gates' rule sections, with conformance fixtures through the real tools | N2, SB-C2 | `tools/sync_rules.py`, `design-rules.json`, `tests/test_rules_spec.py`, `test_real_tools.py` | M-L |
 | P3 | The gates agree: the eight constructs, and the holes in the stylelint allowlist | N1, SB-A15 | `design-rules.json`, the audit, `stylelint.config.mjs`, `eslint.design.config.mjs` | M |
@@ -103,7 +104,7 @@ Re-read `web-design-suite-review/claude-code-capabilities.md` against the curren
 | P24 | The project contract: `.design-suite.json`, read by every script, the hook and the commands, and a `contract.json` generated from the project's tokens | XC-C8, LC-C1, LC-B3 | a shared config reader, every script's argument parsing | M |
 | P25 | Hooks: the opt-in design gate on Edit and Write, a block on edits to generated files, `diff_system` after a tokens edit, and a `UserPromptSubmit` router that names the right skill when the listing has dropped the descriptions | XC-C2, LC-C8, SS-C6 | `hooks/hooks.json`, `hooks/*.py` | M |
 | P26 | Workflow commands and CI bootstrap: gate, install-gate (which writes the CI template for all three gates in a pinned Playwright container, with a baseline-update job), new-system, critique, migrate, release-check, figma-sync, and the audit-to-deck chain | XC-C3, LC-C9, PS-C11, LC-B4, GT-C12 | `skills/<command>/SKILL.md` with `disable-model-invocation: true`, templates | M-L |
-| P27 | Subagents: design-critic, gate-runner, supabase-security-reviewer, codemod-batch-reviewer | XC-C4, PS-C4, GT-C9, DL-C7 | `agents/*.md` | M |
+| P27 | Subagents: design-critic, gate-runner, supabase-security-reviewer, codemod-batch-reviewer. GT-C9 and DL-C7 close here, and their other parts land with their kind: GT-C9's hook in P25; DL-C7's email-template hook in P25, its schema-to-screens and email-build commands in P26, and its delivery evals in P30 | XC-C4, PS-C4, GT-C9, DL-C7 | `agents/*.md` | M |
 | P28 | An MCP server for the gates, `bin/` commands on PATH, and an LSP spike for live diagnostics. Ship the LSP only if it works on Windows | XC-B1 | `.mcp.json`, `mcp/`, `bin/`, `.lsp.json` | M |
 | P29 | The eval framework and the routing cases, with "must not fire" cases between sibling skills | XC-C1, XC-B2 | `evals/`, the CI job | M-L |
 | P30 | Outcome evals for every area, against a no-plugin baseline: the systems, the build half, the gates, the lifecycle and persuasion | SS-C7, SB-C6, GT-C10, LC-C10, PS-C7 | `evals/<area>/` | L |
@@ -187,7 +188,7 @@ At the sizes above:
 
 | Phase | PRs | Sessions |
 |---|---|---|
-| 3 | 8 and a release | about 3.5 |
+| 3 | 9 and a release | about 4 |
 | 4 | 15 and a release | about 6 |
 | 5 | 7 and a release | about 3.5 |
 | 6 | 13 and a release | about 6 |
@@ -204,7 +205,7 @@ Update this table in each PR.
 
 | Phase | PRs done | Items closed | Release |
 |---|---|---|---|
-| 3 | #12 to #14 open | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23 (in open PRs) | — |
+| 3 | #12 to #15 merged (2026-10-02) | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N26 to N28; DL-B2 and SB-C9 in part | — |
 | 4 | — | — | — |
 | 5 | — | — | — |
 | 6 | — | — | — |

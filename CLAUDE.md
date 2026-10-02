@@ -12,16 +12,16 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is public (since 2026-09-28), and MIT-licensed like the plugin.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
-## Current state (2026-10-01)
+## Current state (2026-10-02)
 
-- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress: the Python 3.9 floor (N6, PR #4), the audit's false cleans (SB-A9 with N11, PR #5) and the migration tool's copy of them (N12, PR #6) are merged; the scripts on Sass (SB-A24 with N13, PR #7) and W1's reference (DL-A5, DL-B1's §9, DL-C4, PR #8) are merged too. W1's security pass and `scaffold_ui --strict` (PRs #9, #10) are merged; open and stacked: #12 (the parser on real `db pull` and `gen types` output), #13 (the scaffold's policies and `lib/supabase.ts`) and #14 (the canonical entry stylesheets and `vendor` in the layer order).
+- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress: the Python 3.9 floor (N6, PR #4), the audit's false cleans (SB-A9 with N11, PR #5) and the migration tool's copy of them (N12, PR #6) are merged; the scripts on Sass (SB-A24 with N13, PR #7) and W1's reference (DL-A5, DL-B1's §9, DL-C4, PR #8) are merged too. W1's security pass and `scaffold_ui --strict` (PRs #9, #10) are merged; merged on 2026-10-02: #12 (the parser on real `db pull` and `gen types` output), #13 (the scaffold's policies and `lib/supabase.ts`), #14 (the canonical entry stylesheets and `vendor` in the layer order) and #15 (the execution plan).
 - **Installed:** 3.2.1 from `63932cf`. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
 - **Tests:**
-  - 406 on #14's branch, passing on Python 3.9 and 3.14 on Windows.
+  - 406, passing on Python 3.9 and 3.14 on Windows.
   - Linux passes with the Node tests skipped.
   - macOS has never been run.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`, which schedules every open item in 43 PRs (P1–P43). Next: merge #12 to #15 in order, then P1 (CI and the lean tooling). The plan's §2 was decided on 2026-10-02: yes to all, and evals capped at $15 per full run.
-- **Open from the review** (the inventory has each item): 55 issues, none high; 42 gaps plus 5 partly done; 44 improvements plus 5 partly done.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`, which schedules every open item in 44 PRs (P0–P43). Next: P0 (what the reviews of #12 to #15 found), then P1 (CI and the lean tooling). Start each session from `dev plans/next-session-prompt.md`. The plan's §2 was decided on 2026-10-02: yes to all, and evals capped at $15 per full run.
+- **Open:** 164 items, every one scheduled in the execution plan: 145 from the review (the inventory has each) and 19 N-items (the completion plan has each).
 
 ## Commands
 
