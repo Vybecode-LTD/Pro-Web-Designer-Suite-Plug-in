@@ -608,13 +608,15 @@ const b = await page.locator('#trigger-b').boundingBox();
 const bottom = a.y + a.height;
 const result = {};
 
-// Open B by hover, then head for B's panel along the bar's lower edge, across
-// trigger A (~120 ms over it), and down into the panel.
+// Open B by hover, then head for B's panel low along the bar, across trigger A
+// (~120 ms over it), and down into the panel. Each step goes one pixel down for
+// ten across: at two thirds of a pixel, some steps rounded to none, and a step
+// straight sideways is not heading into the panel (CI, macOS).
 await page.mouse.move(b.x + b.width / 2, b.y - 40);
-await glide({ x: b.x + b.width / 2, y: b.y - 40 }, { x: b.x + b.width / 2, y: bottom - 10 }, 4, 20);
+await glide({ x: b.x + b.width / 2, y: b.y - 40 }, { x: b.x + b.width / 2, y: bottom - 14 }, 4, 20);
 await page.clock.runFor(100);
 result.hoverOpensB = await expanded('trigger-b');
-await glide({ x: b.x + b.width / 2, y: bottom - 10 }, { x: a.x + a.width / 2, y: bottom - 2 }, 12, 20);
+await glide({ x: b.x + b.width / 2, y: bottom - 14 }, { x: a.x + a.width / 2, y: bottom - 2 }, 12, 20);
 await glide({ x: a.x + a.width / 2, y: bottom - 2 }, { x: a.x + a.width / 2 - 20, y: bottom + 40 }, 4, 20);
 await page.clock.runFor(400);
 result.diagonalKeepsB = (await expanded('trigger-b')) && (await page.evaluate(() => window.aOpened)) === 0;

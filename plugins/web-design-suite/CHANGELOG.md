@@ -327,7 +327,9 @@
   re-read from the disk on POSIX. On a loaded macOS runner, the mega-menu scenario in
   `test_recipes.NavigationCodeInABrowser` dwelt over a trigger past the recipe's
   switching delay, because it timed the pointer with real waits. Its page now runs on
-  Playwright's fake clock, which only the scenario advances.
+  Playwright's fake clock, which only the scenario advances. Its diagonal also went two
+  thirds of a pixel down per step, so some steps rounded to straight sideways, which
+  is not heading into the panel; each step now goes a whole pixel down.
 
 ## 3.2.1 — 2026-09-25
 
