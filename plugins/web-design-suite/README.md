@@ -132,7 +132,7 @@ python "$WDS/web-design-studio/scripts/audit_design.py" ./src --write-baseline .
 
 ## What the gate actually catches
 
-`audit_design.py` is stdlib-only Python 3 and understands cascade layers, component vs token files, and the documented exceptions (`margin:auto`, the owl selector in a parent's rule, `calc(var(--t) * -1)`, `em` as a ratio, `vw` as relational). It reads stylesheets, JS/TS/JSX, and the `<style>` blocks, `style=""` attributes and class lists of HTML, Vue, Svelte and Astro files (HTML email is `lint_email`'s job). A literal beside a `var()` is still a literal, and rules inside `@media` / `@container` are checked like any other. A folder with nothing auditable in it is an error, not a pass.
+`audit_design.py` is stdlib-only Python 3 and understands cascade layers, component vs token files, and the documented exceptions (`margin:auto`, the owl selector in a parent's rule, `calc(var(--t) * -1)`, `em` as a ratio for an offset and `font-size: 1em` for an icon, `vw` as relational). It reads stylesheets, JS/TS/JSX, and the `<style>` blocks, `style=""` attributes and class lists of HTML, Vue, Svelte and Astro files (HTML email is `lint_email`'s job). A literal beside a `var()` is still a literal, and rules inside `@media` / `@container` are checked like any other. A folder with nothing auditable in it is an error, not a pass.
 
 - **L1** raw lengths, colors, shadows, durations, easings, radii, z-indexes, font sizes and weights — including literals **disguised inside a Tier-3 socket declaration**, which look tokenized and are not
 - **L2** child margins in components, and Tailwind `space-x/y-*`

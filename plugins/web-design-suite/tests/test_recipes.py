@@ -572,12 +572,12 @@ MEGAMENU_BODY = """
     <button type="button" class="nav__trigger" id="trigger-a" aria-expanded="false"
             aria-controls="panel-a">Apparel</button>
     <div class="megamenu" id="panel-a" aria-labelledby="trigger-a" hidden>
-      <div class="megamenu__col"><ul><li><a href="#a1">Coats</a></li></ul></div></div></li>
+      <div class="megamenu__col"><ul class="megamenu__list"><li><a class="megamenu__link" href="#a1">Coats</a></li></ul></div></div></li>
   <li class="nav__item">
     <button type="button" class="nav__trigger" id="trigger-b" aria-expanded="false"
             aria-controls="panel-b">Shoes</button>
     <div class="megamenu" id="panel-b" aria-labelledby="trigger-b" hidden>
-      <div class="megamenu__col"><ul><li><a href="#b1">Trail</a></li></ul></div></div></li>
+      <div class="megamenu__col"><ul class="megamenu__list"><li><a class="megamenu__link" href="#b1">Trail</a></li></ul></div></div></li>
 </ul></nav>"""
 # Layout the reference leaves to the page: a positioned bar with room above it.
 MEGAMENU_FRAME = (".nav { position: relative; margin-block-start: 120px; }"
@@ -591,14 +591,29 @@ const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
 await page.clock.install();
 await page.goto(pathToFileURL(process.argv[2]).href);
 const expanded = async (id) => (await page.getAttribute('#' + id, 'aria-expanded')) === 'true';
+// The clock does not decide when Chromium delivers a move: on a loaded runner
+// one could land after runFor() fired the hover-intent look, which then saw a
+// still pointer and switched menus (CI, macOS). Each step waits, in real time,
+// until the page has seen its move.
+const seen = async (x, y) => {
+  for (let n = 0; n < 200; n++) {
+    const at = await page.evaluate(() => window.lastMove);
+    if (at && Math.abs(at.x - x) < 1 && Math.abs(at.y - y) < 1) return;
+    await new Promise((done) => setTimeout(done, 5));
+  }
+  throw new Error(`the page never saw the move to ${x}, ${y}`);
+};
 const glide = async (from, to, steps, ms) => {
   for (let i = 1; i <= steps; i++) {
-    await page.mouse.move(from.x + (to.x - from.x) * i / steps, from.y + (to.y - from.y) * i / steps);
+    const x = from.x + (to.x - from.x) * i / steps, y = from.y + (to.y - from.y) * i / steps;
+    await page.mouse.move(x, y);
+    await seen(x, y);
     await page.clock.runFor(ms);
   }
 };
 await page.evaluate(() => {
   window.aOpened = 0;
+  addEventListener('pointermove', (e) => { window.lastMove = { x: e.clientX, y: e.clientY }; }, true);
   const a = document.getElementById('trigger-a');
   new MutationObserver(() => { if (a.getAttribute('aria-expanded') === 'true') window.aOpened++; })
     .observe(a, { attributes: true });

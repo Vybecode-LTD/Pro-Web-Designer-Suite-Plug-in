@@ -130,8 +130,12 @@ def as_files(lang: str, body: str) -> list[tuple[str, str]]:
     rest = "".join(p for p in parts if not is_token_content(p))
     files = [("styles/tokens.css", tokens)] if tokens.strip() else []
     if re.sub(r"/\*.*?\*/", "", rest, flags=re.S).strip():
-        files.append(("components/snippet.css",
-                      rest if "@layer" in rest else "@layer components {\n" + rest + "\n}\n"))
+        # A block written in another layer lives in that layer's file, not a
+        # component's: `@layer layout { .prose > h2 {…} }` is a flow container.
+        other = re.search(r"@layer\s+(reset|base|layout|utilities|overrides)\s*\{", rest)
+        name = (f"styles/{other.group(1)}.css" if other and "@layer components" not in rest
+                else "components/snippet.css")
+        files.append((name, rest if "@layer" in rest else "@layer components {\n" + rest + "\n}\n"))
     return files
 
 

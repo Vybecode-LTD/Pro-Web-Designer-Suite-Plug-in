@@ -247,18 +247,20 @@ The `60%` is a **ratio, not a scale value** — one of the licensed non-token va
 N equal columns that flip to stacked below an intrinsic threshold.
 
 ```css
-.switcher {
-  --switcher-gap: var(--gap-grouped);
-  --switcher-threshold: var(--width-form);
-  display: flex; flex-wrap: wrap; gap: var(--switcher-gap);
+@layer layout {
+  .switcher {
+    --switcher-gap: var(--gap-grouped);
+    --switcher-threshold: var(--width-form);
+    display: flex; flex-wrap: wrap; gap: var(--switcher-gap);
+  }
+  .switcher > * {
+    flex-grow: 1;
+    flex-basis: calc((var(--switcher-threshold) - 100%) * 999);
+    min-inline-size: 0;
+  }
+  .switcher > :nth-last-child(n + 5),
+  .switcher > :nth-last-child(n + 5) ~ * { flex-basis: 100%; }
 }
-.switcher > * {
-  flex-grow: 1;
-  flex-basis: calc((var(--switcher-threshold) - 100%) * 999);
-  min-inline-size: 0;
-}
-.switcher > :nth-last-child(n + 5),
-.switcher > :nth-last-child(n + 5) ~ * { flex-basis: 100%; }
 ```
 
 Same clamp mechanism as Split, but every child shares one basis so the columns stay equal. It switches **all at once** — three columns become three rows, never two-plus-one. That is the difference from Grid, and it is the right behaviour for peer content (three pricing tiers are equals; an orphaned third tier on its own row reads as an afterthought).
@@ -314,17 +316,19 @@ Column *count* is derived from available width, so seven items lay out sensibly 
 ### 2.10 Frame
 
 ```css
-.frame {
-  --frame-ratio: 16 / 9;
-  --frame-fit: cover;
-  --frame-position: 50% 50%;
-  aspect-ratio: var(--frame-ratio);
-  overflow: hidden; display: block;
-}
-.frame > :is(img, video, canvas, svg, iframe, picture),
-.frame > picture > img {
-  inline-size: 100%; block-size: 100%;
-  object-fit: var(--frame-fit); object-position: var(--frame-position);
+@layer layout {
+  .frame {
+    --frame-ratio: 16 / 9;
+    --frame-fit: cover;
+    --frame-position: 50% 50%;
+    aspect-ratio: var(--frame-ratio);
+    overflow: hidden; display: block;
+  }
+  .frame > :is(img, video, canvas, svg, iframe, picture),
+  .frame > picture > img {
+    inline-size: 100%; block-size: 100%;
+    object-fit: var(--frame-fit); object-position: var(--frame-position);
+  }
 }
 ```
 

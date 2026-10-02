@@ -314,7 +314,7 @@ Measure with `fontkit`, `capsize` or `fontaine`; `next/font/local` computes them
 **Tabular numerals are non-negotiable in data.** Proportional figures have per-digit widths, so a column jitters and cannot be scanned. Any number that sits in a column, updates in place, or is compared to another number gets them.
 
 ```css
-.table td, .stat__value, .timer, .price {
+.table__cell, .stat__value, .timer, .price {
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;   /* legacy engines only */
 }
@@ -325,10 +325,12 @@ Prefer `font-variant-numeric` over `font-feature-settings`. The former composes 
 **Ligatures.** Leave standard ligatures on in headings and body — they exist to fix the `fi`/`fl` collision and their absence is visible. `discretionary-ligatures` is a display-only flourish; a `ct` swash in a button label is noise. For code, default to **off**: coding ligatures (`=>` → `⇒`) help readers who know them, mislead readers who do not, and break character alignment in diffs. Let developers opt in in their own editor.
 
 ```css
-code, pre, .code {
-  font: var(--type-code);
-  font-variant-ligatures: none;
-  font-variant-numeric: tabular-nums slashed-zero;
+@layer base {
+  code, pre, .code {
+    font: var(--type-code);
+    font-variant-ligatures: none;
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
 }
 ```
 
@@ -450,9 +452,10 @@ Both import the **same** `tokens.css`. Nothing in the type scale changes. What c
 @layer components {
   /* Marketing */
   .hero__title {
+    --hero-title-measure: 18ch;       /* Tier 3: a display measure is much shorter */
     font: var(--type-display);
     letter-spacing: var(--tracking-tighter);
-    max-inline-size: 18ch;            /* display measure is much shorter */
+    max-inline-size: var(--hero-title-measure);
     text-wrap: balance;
   }
   .hero__sub {
@@ -460,7 +463,7 @@ Both import the **same** `tokens.css`. Nothing in the type scale changes. What c
     color: var(--fg-muted);
     max-inline-size: var(--measure-narrow);
   }
-  .eyebrow, .table th {
+  .eyebrow, .table__head {
     font: var(--type-label);
     text-transform: uppercase;
     letter-spacing: var(--tracking-caps);
@@ -468,7 +471,7 @@ Both import the **same** `tokens.css`. Nothing in the type scale changes. What c
   }
 
   /* Dashboard */
-  .table td {
+  .table__cell {
     font: var(--type-ui);
     font-variant-numeric: tabular-nums lining-nums;
     padding: var(--pad-block-sm) var(--pad-inline-sm);

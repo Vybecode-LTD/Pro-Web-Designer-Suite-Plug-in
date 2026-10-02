@@ -401,12 +401,13 @@ def in_layer(layer: str, css: str) -> str:
 
 
 ALLOWED_LIST = "declaration-property-value-allowed-list"
+MARGIN_RULE = "design/component-margins"
 
 # Fixtures for the stylelint config: a file of the project and, for a refusal,
 # the rule that must report it.
 REFUSED_CSS = {
     "src/components/Literal.css": (in_layer("components", ".card { padding: 13px; }"), ALLOWED_LIST),
-    "src/components/Hex.css": (in_layer("components", ".card { color: #fff; }"), "color-no-hex"),
+    "src/components/Hex.css": (in_layer("components", ".card { color: #fff; }"), "design/color-no-hex"),
     "src/components/Important.css": (in_layer("components", ".card { color: var(--fg-default) !important; }"),
                                      "declaration-no-important"),
     "src/components/Id.css": (in_layer("components", "#card { color: var(--fg-default); }"), "selector-max-id"),
@@ -415,13 +416,13 @@ REFUSED_CSS = {
     "src/components/Geometry.css": (
         in_layer("components", ".card { max-inline-size: calc(100% - var(--gutter-page) * 2); }"), ALLOWED_LIST),
     "src/components/OwnMargin.css": (in_layer("components", ".card { margin-block-start: var(--gap-related); }"),
-                                     ALLOWED_LIST),
+                                     MARGIN_RULE),
     "src/components/Apply.css": (in_layer("components", ".card { @apply p-card; }"), "at-rule-disallowed-list"),
     # 3.2.1 review. A component in a layout folder is still a component (Law 2):
     # an override for layout files, after the component one, took Law 2 away.
     "src/components/layout/Header.css": (
-        in_layer("components", ".header { margin-block-start: var(--gap-related); }"), ALLOWED_LIST),
-    "packages/ui/layout.css": (in_layer("components", ".panel { margin-block-start: 1.5rem; }"), ALLOWED_LIST),
+        in_layer("components", ".header { margin-block-start: var(--gap-related); }"), MARGIN_RULE),
+    "packages/ui/layout.css": (in_layer("components", ".panel { margin-block-start: 1.5rem; }"), MARGIN_RULE),
     # A layout file may not multiply a token either (Law 3) ...
     "src/styles/layout/Factor.css": (
         in_layer("layout", ".center { padding-inline: calc(var(--space-4) * 1.5); }"), ALLOWED_LIST),

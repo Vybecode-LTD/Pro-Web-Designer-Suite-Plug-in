@@ -839,6 +839,9 @@ The `@supports` wrapper is strictly optional here — an unsupporting browser ig
 ```css
 .card__title {
   font: var(--type-h4);              /* parsed everywhere */
+  /* stylelint-disable-next-line declaration-property-value-allowed-list -- design-audit-ignore-next-line: L1 --
+     a cqi length cannot sit in a token: var() makes an unsupported value invalid at computed-value
+     time, which resets font-size instead of falling back to the declaration above. */
   font-size: clamp(1rem, 4cqi, 1.75rem);   /* dropped where unsupported */
 }
 ```
@@ -853,7 +856,7 @@ Selector support is detected with `@supports selector(…)`, not a property test
 
 @supports selector(:has(*)) {
   /* Enhancement: the field group reacts to its own contents. */
-  .field:has(:where(input, textarea):user-invalid) {
+  .field:has(.field__control:user-invalid) {
     --field-border: var(--border-strong);
     --field-fg:     var(--fg-danger);
   }

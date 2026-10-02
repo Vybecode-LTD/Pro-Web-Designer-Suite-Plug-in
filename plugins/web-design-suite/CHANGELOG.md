@@ -187,6 +187,38 @@
   the same style as in the default cell, leaving out what never changes a pixel (the
   cursor, pointer events, selection, motion timing).
 
+- **The three gates agree on every example in the spec** (N1, N30). The conformance
+  tests' list of known disagreements is empty:
+  - The audit refuses a factor on a token in spacing and radius,
+    `calc(var(--pad-card) * 1.5)` or `/ 2` (L3 `token-factor`), as stylelint did;
+    `* -1`, which cancels a token, is still allowed. Positioning is geometry and may
+    divide.
+  - The audit's type check skipped every length ending in "em", and `rem` ends in "em",
+    so `font-size: 1.125rem` passed. It now refuses both, except `font-size: 1em`, which
+    sizes an icon to its text and which stylelint now allows too.
+  - The audit reads the spec's sizing family, so `max-inline-size: 65ch` and
+    `max-width: 600px` are refused (L1 `raw-size`), as stylelint refused them.
+  - In a component file the audit refuses an element selector (`.card p`,
+    `.card > svg`, `:is(h2, h3)`) and a `*` after a space (`.card *`), as stylelint's
+    `selector-max-type` and `selector-max-universal` do (L2 `foreign-selector`). The owl
+    is still allowed.
+  - A system colour outside `@media (forced-colors: active)` is refused by the audit
+    too (L1 `system-color`), in the properties the spec now lists for both gates.
+  - `transition-duration: 0s` is no longer a literal duration to the audit, a named
+    colour is an error rather than a warning, and a design literal in an inline custom
+    property (`style={{ '--gap': '12px' }}`) is refused (L1 `inline-literal`), with the
+    units ESLint uses; both gates read them from the spec.
+  - stylelint allows a hex in a `var()` fallback, which the spec leaves unchecked:
+    `design/color-no-hex` replaces `color-no-hex`. It also allows a margin in an owl rule
+    in a component file: `design/component-margins` replaces the component override's
+    margin allowlist, and knows the owl.
+  - Thirteen reference snippets broke these rules and now follow them: element selectors
+    became classes (`.megamenu__link`, `.toc__link`, `.drawer__link`,
+    `.work-card__link`, `.table__cell`, `.check-input`, `.field__control`), base and
+    layout CSS sits in its layer, and the hero's `18ch` measure is a Tier-3 socket. The
+    starter's `sub`/`sup` at `0.75em` and the `cqi` fallback example keep their literal,
+    with the audit's pragma beside stylelint's.
+
 ### Added
 
 - **One canonical entry stylesheet per stack** (SB-C9, SS-C9 in part). The starter
@@ -250,6 +282,17 @@
   failing check's `§` reached it as an invalid byte and the report crashed printing it,
   so no report came. The checks now write UTF-8, and a character the console cannot
   encode prints as `?` (`test_tools.CheckReportsOnAnyConsole`, which fails on `9053727`).
+
+### Upgrading
+
+- **The audit is stricter** (N1, N30): a `rem` or `em` font size, a literal size in
+  `max-inline-size`, `max-width`, `min-block-size` or `min-inline-size`, an element
+  selector in a component file, a named colour, a system colour outside forced-colors
+  mode, and a design literal in an inline custom property are errors now. Each is what
+  stylelint or ESLint already refused.
+- **Two stylelint rules were renamed.** A disable comment for `color-no-hex` names
+  `design/color-no-hex` now, and one for a component's margin names
+  `design/component-margins` instead of `declaration-property-value-allowed-list`.
 
 ### Tests
 
@@ -365,6 +408,19 @@
   Playwright's fake clock, which only the scenario advances. Its diagonal also went two
   thirds of a pixel down per step, so some steps rounded to straight sideways, which
   is not heading into the panel; each step now goes a whole pixel down.
+- P3 part 1 (N1, N30): the spec's examples now hold every row of N1 and every case of
+  N30, and `KNOWN_DISAGREEMENTS` is empty, so the conformance tests hold all three gates
+  to every example; new allowed selectors (`:nth-child(2n + 1)`, `:lang(en)`, `:where()`
+  and attributes) guard the audit's selector check against false positives. The
+  snippet test files a block written in `@layer base` or `layout` in that layer's file,
+  not a component's.
+  Against `a7157c2`, #19's head: the audit's and stylelint's conformance legs and the
+  renamed-rule fixtures fail (3 tests, 26 subtests), and 29 tests are controls.
+- The mega-menu's safe-triangle test failed once more on macOS with 3.14 (#19's CI),
+  under the fake clock: the clock does not decide when Chromium delivers a move, so
+  a move could land after the hover-intent look had run. Each step of the scenario
+  now waits, in real time, until the page has seen its move. Its markup carries the
+  reference's new classes.
 
 ## 3.2.1 — 2026-09-25
 

@@ -476,7 +476,7 @@ Job 3 (attention — confirm the hit registered). `--motion-instant`.
 ```css
 .check-path { stroke-dasharray: 22; stroke-dashoffset: 22;
               transition: stroke-dashoffset var(--motion-instant); }
-input:checked + .check .check-path { stroke-dashoffset: 0; }
+.check-input:checked + .check .check-path { stroke-dashoffset: 0; }
 ```
 **Must not** delay the underlying form state. **Must not** animate on initial render — a form restoring 12 checked boxes should not draw 12 ticks.
 

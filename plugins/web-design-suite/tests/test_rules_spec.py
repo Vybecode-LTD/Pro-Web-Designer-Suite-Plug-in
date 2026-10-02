@@ -103,9 +103,8 @@ def spec_examples() -> list[Example]:
             for selector in margins["owl_selectors"]:
                 add("margins_in_components", verdict, selector,
                     rule(f"{selector} {{ margin-block-start: var(--gap-related); }}"))
-        else:
-            for selector in margins["refused_selectors"]:
-                add("margins_in_components", verdict, selector, rule(f"{selector} {{ color: var(--fg-strong); }}"))
+        for selector in margins[f"{verdict}_selectors"]:
+            add("margins_in_components", verdict, selector, rule(f"{selector} {{ color: var(--fg-strong); }}"))
         for family, values in SPEC["values"]["families"].items():
             for declaration in values[verdict]:
                 add(f"values.{family}", verdict, declaration, rule(f".card {{ {declaration}; }}"))
@@ -117,21 +116,7 @@ def spec_examples() -> list[Example]:
 # Where a gate still gives the opposite verdict, keyed by (gate, the example as
 # the spec writes it), with the item that brings it in line. Each must still
 # disagree: when a fix makes a gate agree, its entry goes.
-KNOWN_DISAGREEMENTS: dict[tuple[str, str], str] = {
-    ("stylelint", "var(--fg-muted, #666666)"): "N1 row 6: color-no-hex reads a var() fallback (P3)",
-    ("stylelint", ".stack > * + *"): "N1 row 7: the owl's margin is refused as a value (P3)",
-    ("stylelint", ".flow > * + *"): "N1 row 7: the owl's margin is refused as a value (P3)",
-    ("audit", ".card p"): "N1 row 5: a type selector in a component file (P3)",
-    ("audit", ".badge { color: GrayText; }"): "N1 row 8: a system colour outside forced-colors mode (P3)",
-    ("audit", ".panel { border: var(--stroke-default) solid ButtonBorder; }"): "N1 row 8 (P3)",
-    ("audit", ".card *"): "N30: a universal selector after a space in a component file (P3)",
-    ("audit", "transition-duration: 0s"): "N30: 0s is read as a literal duration (P3)",
-    ("audit", "font-size: 1.125rem"): "N30: the type check skips any length ending in em, rem too (P3)",
-    ("audit", "color: red"): "N30: a named colour is only a warning (P3)",
-    ("audit", "max-width: 600px"): "N30: the audit reads no sizing property (P3)",
-    ("audit", "<div style={{ '--gap': '12px' }} />"): "N30: a literal in an inline custom property (P3)",
-    ("audit", "<div style={{ '--tint': 'hwb(20 10% 30%)' }} />"): "N30: as above (P3)",
-}
+KNOWN_DISAGREEMENTS: dict[tuple[str, str], str] = {}
 
 
 def hold_to_the_spec(test: unittest.TestCase, gate: str, problems_of) -> None:

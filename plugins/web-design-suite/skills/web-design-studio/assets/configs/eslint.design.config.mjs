@@ -179,6 +179,9 @@ const SPACE_BETWEEN = /(?<![-\w])(?:space-[xy]-|divide-[xy]?(?:-|\b))/;
 const COLOUR_FUNCTIONS = [
   'rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color',
 ];
+const LITERAL_UNITS = [
+  'px', 'rem', 'em', 'ch', 'ex', 'vw', 'vh', 'vmin', 'vmax', '%', 'deg', 's', 'ms',
+];
 // END design-rules
 const RAW_COLOR = new RegExp(
   /(?:^|[\s(:,'"`[])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z])/.source +
@@ -286,12 +289,12 @@ const stylePropCustomPropertiesOnly = {
     },
   },
   create(context) {
-    /* A design literal: a length, a raw hex, or a colour function from the
-     * spec (COLOUR_FUNCTIONS). Bare numbers, identifiers, member expressions
-     * and calls are runtime values and are exactly what this exception
-     * exists to carry. */
+    /* A design literal: a number with a unit, a raw hex, or a colour
+     * function, from the spec (LITERAL_UNITS, COLOUR_FUNCTIONS), as the audit
+     * reads one. Bare numbers, identifiers, member expressions and calls are
+     * runtime values and are exactly what this exception exists to carry. */
     const DESIGN_LITERAL = new RegExp(
-      /^-?\d*\.?\d+(px|rem|em|ch|ex|vw|vh|vmin|vmax|%|deg|s|ms)$|^#[0-9a-fA-F]{3,8}$/.source +
+      String.raw`^-?\d*\.?\d+(?:${LITERAL_UNITS.join('|')})$|^#[0-9a-fA-F]{3,8}$` +
         String.raw`|^(?:${COLOUR_FUNCTIONS.join('|')})\(`,
     );
 
