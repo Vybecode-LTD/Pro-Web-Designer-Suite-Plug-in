@@ -1,6 +1,6 @@
 ---
 name: web-design-studio
-description: Design systems and front-end architecture, enforced by an audit that fails the build. Covers tokens.css, a closed spacing and type scale, OKLCH colour with measured contrast, cascade layers, layout primitives and density. Use for new builds, redesigns and CSS architecture. Not for page copy (landing-page-conversion) or reviewing finished work (design-critique-gate).
+description: Build design systems and front-end architecture enforced by an audit, with tokens, a closed type and spacing scale, OKLCH colour, cascade layers and layout primitives. Not for page copy or critique.
 ---
 
 # Web Design Studio

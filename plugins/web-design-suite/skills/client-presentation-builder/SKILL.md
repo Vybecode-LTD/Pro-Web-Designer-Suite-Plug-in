@@ -1,6 +1,6 @@
 ---
 name: client-presentation-builder
-description: Present design work to a client or team as reasoning rather than taste. Builds decks, design rationale, before-and-after comparisons and answers to objections from the evidence the other skills produce. Not for critiquing the design itself (design-critique-gate), or for a .pptx file for its own sake.
+description: Present design work to a client or team as reasoning, not taste, with decks, rationale, before-and-after comparisons and answers to objections. Not for critiquing the design (design-critique-gate).
 ---
 
 # Client Presentation Builder

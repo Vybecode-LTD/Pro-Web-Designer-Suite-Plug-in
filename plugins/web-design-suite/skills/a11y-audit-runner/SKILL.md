@@ -1,6 +1,6 @@
 ---
 name: a11y-audit-runner
-description: Automated accessibility testing against WCAG 2.2 AA, with axe-core, keyboard, focus, contrast and zoom checks in CI, plus the manual pass automation cannot replace. Use for accessibility audits, VPAT or ACR evidence, and 'is my site accessible'. Not for general design critique (design-critique-gate).
+description: Test a site against WCAG 2.2 AA with axe-core, keyboard, focus, contrast and zoom checks in CI, plus the manual pass. Use for accessibility audits and VPAT evidence. Not for design critique.
 ---
 
 # Accessibility Audit Runner

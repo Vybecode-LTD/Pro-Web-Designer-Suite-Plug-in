@@ -1,6 +1,6 @@
 ---
 name: design-token-migration
-description: Migrate an existing codebase onto design tokens, from a census of every hardcoded value, clustered into tokens.css, to a reviewable codemod proven by a before-and-after audit. Use for 'our CSS is a mess', magic numbers and near-identical greys. Not for building a new system (web-design-studio) or versioning a shipped one (design-system-versioning).
+description: Migrate an existing codebase onto design tokens, from a census of hardcoded values to tokens.css and a codemod proven by an audit. Use for magic numbers and near-identical greys. Not for new systems.
 ---
 
 # Design Token Migration

@@ -1,6 +1,6 @@
 ---
 name: component-state-matrix
-description: Render every component at every state, density and theme on one proof sheet, and screenshot-diff it in CI. Use for visual regression, 'did I implement all the states', dark-mode and density checks, and a component gallery without Storybook. Not for documenting component APIs (design-system-docs) or accessibility audits (a11y-audit-runner).
+description: Render every component at every state, density and theme on one proof sheet, and screenshot-diff it in CI. Use for visual regression and missing states. Not for API docs (design-system-docs).
 ---
 
 # Component State Matrix

@@ -1,6 +1,6 @@
 ---
 name: landing-page-conversion
-description: Write and structure landing, pricing and product pages, from positioning and message hierarchy to section order and block copy, wired to the design system and audited for conversion. Use for 'why isn't this converting' and hero or CTA copy. Honest persuasion only. Not for visual critique (design-critique-gate) or site-wide CSS (web-design-studio).
+description: Write and structure landing, pricing and product pages, from positioning to section order and copy, audited for conversion. Honest persuasion only. Not for visual critique (design-critique-gate).
 ---
 
 # Landing Page Conversion

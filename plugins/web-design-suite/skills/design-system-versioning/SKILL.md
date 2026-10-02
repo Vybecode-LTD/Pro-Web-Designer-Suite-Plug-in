@@ -1,6 +1,6 @@
 ---
 name: design-system-versioning
-description: Version a design system without breaking its consumers. Classifies each token or component change as major, minor or patch by what renders differently, and generates the changelog, migration guide and codemods. Not for versioning ordinary libraries or apps, or for a first migration onto tokens (design-token-migration).
+description: Version a design system without breaking consumers. Classifies each change as major, minor or patch by what renders differently, and writes the changelog, migration guide and codemods. Not for apps.
 ---
 
 # Design System Versioning
