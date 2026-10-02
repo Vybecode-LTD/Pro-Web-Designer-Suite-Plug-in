@@ -18,7 +18,8 @@
     - The first run failed only on `setup-uv@v10`, a tag that does not exist (now `@v10.2.0`).
     - The second run found one real platform bug, fixed: `snapshot_matrix` missed an unstyled state on Linux and macOS. It also found two tests that assumed Windows.
     - The third run was green on Windows. On Linux and macOS the matrix check still missed the unstyled state, because twin cells never match pixel for pixel there. It now compares computed styles instead (`STYLE_SIGNATURE_FN`).
-    - The fourth run, with that change, was in progress at handoff. Auto-fix is on for this session's PRs, so the app reports a failure.
+    - The fourth run was green on five of six jobs: the computed-style check works on Linux and macOS. macOS with 3.14 failed a timing-sensitive browser test (the mega-menu's safe triangle), whose real waits a loaded runner stretched; the scenario now runs on Playwright's fake clock.
+    - The fifth run, with that change, was in progress at handoff. Auto-fix is on for #17, so the app reports a failure there; #18 needs it switched on too.
   - **#18, P2 part 1, stacked on #17:** `tools/sync_rules.py` writes the spec's layer order and statement, nesting depth and system colours into a `BEGIN design-rules` block in the audit and the stylelint config. `--check` runs in `check.py` and CI. Four new tests fail on 3.2.1; `check.py` (the whole suite) passed on 3.14.
 - **Tests:** 435. **The plan:** 151 open items, all scheduled (`check_execution_plan.py`).
 - **Decided by the user on 2026-10-02:** a session may run up to 750 thousand tokens, with no compacting.
