@@ -62,13 +62,21 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 - **Postgres 18** is installed locally (`initdb`, `pg_ctl`, `psql`). `test_policies.PoliciesRunOnPostgres` makes its own scratch cluster, with its socket in its own folder. On Windows, `pg_ctl start` from Python must not capture output.
 - **The CLAUDE.md commands** are for the Bash tool. `claude plugin validate`, `update`, `details` and `tag` need the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\claude.exe`.
 
-## 3. First: P1's CI, if it is not green
+## 3. First: the three open PRs
 
-#17 was red on its first run only because `astral-sh/setup-uv@v10` does not exist (fixed: `@v10.2.0`). The second run was in progress at handoff. Expect failures that never showed on Windows: Linux has never run the Node tests, and macOS has never run at all.
+#16 (P0), #17 (P1) and #18 (P2 part 1) are stacked, each on the one before, and the session docs (this file, the handoff, `CLAUDE.md`) live on #18's branch until the stack is merged. At handoff:
 
-- Read the failures with `gh run view <run id> --log-failed`, saved to the scratchpad, then `grep -E 'FAIL:|ERROR:|Ran |##\[error\]'`.
-- Each failure is either a test that assumes Windows, which you fix in the test, or a real platform bug, which you fix in the plugin with a regression test, as any other.
-- When all six suite jobs and `validate` are green, record it: the completion plan's rule "CI (decision D1)" is then in force, and #17's description gets the acceptance results (CI green; `fail_before.py test_file_modes` shows N5 fixed against v3.2.1; two builds of one commit are byte-identical).
+- **#16** had two rounds of review fixes (`81b50f9`, `ee8f2bd`: CHECK rewrites that skip calls, quoted names and dollar-quoted literals; table constraints before their columns; names with `'` or `$$` in the smoke test; write policies through inherited roles, by `USAGE`). Every review thread is answered and resolved.
+- **#17's CI** found and fixed, over five runs:
+  - the missing `setup-uv@v10` tag;
+  - `snapshot_matrix` missing unstyled states on Linux and macOS (now a computed-style check);
+  - two tests that assumed Windows;
+  - a flaky mega-menu test (a fake clock, and a diagonal that goes a whole pixel down per step).
+
+  Runs 6 onwards were in progress.
+- **Auto-fix** was on for #16 and #17, so the app may wake the session with a `<ci-monitor-event>`: fix, verify, push, and reply on each review thread, as the event says.
+
+Read each PR's state with the app's `get_status`, or `gh pr checks <n>` once (never in a loop). Fix what is red, under §0's rules. Each failure is either a test that assumes one platform, which you fix in the test, or a real platform bug, which you fix in the plugin with a regression test. A fix on #16 or #17 must be merged up the stack (#16 into #17, #17 into #18). Then ask the user to merge #16, #17 and #18, in that order. When all six suite jobs are green, decision D1 is in force (the completion plan's rule "CI (decision D1)"), and #17's description gets its acceptance results.
 
 ## 4. P2 part 2: the spec generates the gates' rule sections (N2, SB-C2)
 
