@@ -74,7 +74,7 @@ Target:
 - *Done for 3.3.0 (N14, found on the way).* The skill's command, `introspect_schema supabase/migrations/*.sql`, failed on more than one file. Several DDL files are now read as one schema.
 - *Done for 3.3.0.* A `policies.todo.sql` per table, with a smoke test that runs on a real Postgres in the suite (DL-B2), and the generated `lib/supabase.ts` (DL-B1).
 - *Done for 3.3.0.* A rewrite of supabase-integration.md §2, §4 and §6 (DL-C4), with a new §9, "Who talks to the database". It covers which key goes where, the publishable and secret key formats, forwarding the user's token from FastAPI, `search_path` on security-definer functions, and `app_metadata` only.
-- *Done for 3.3.0.* Real `db pull` and `gen types` files as fixtures, so the parser is tested on what Supabase emits (DL-C2, DL-B8): the worked example as a migration, a real `pg_dump` of it and its generated types, plus Brewr's real `gen types`. Brewr's real dump is still to add, when the user runs `pg_dump`.
+- *Done for 3.3.0.* Real `db pull` and `gen types` files as fixtures, so the parser is tested on what Supabase emits (DL-C2, DL-B8): the worked example as a migration, a real `pg_dump` of it and its generated types, plus Brewr's real `gen types`. A real dump of Brewr was dropped: the user has no password for its database.
 
 Re-check every Supabase fact at supabase.com on the day, and register it.
 

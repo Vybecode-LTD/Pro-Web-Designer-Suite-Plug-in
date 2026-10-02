@@ -20,7 +20,7 @@
      - two wrong claims about a vendor's `!important`, corrected.
   - GitHub retargets each when the one below merges. If it doesn't, rebase onto `main`. Each branch carries the previous one's commits.
 - **Tests:** 406 on #14's branch, passing on 3.14 and 3.9 (392 on #12, 403 on #13).
-- **Brewr** (`ccsgoijoouggdepsweus`) is **still active**. The user's `pg_dump` produced an empty file (0 bytes), so it failed. Ask them to run it without `> file` to see the error; the `[YOUR-PASSWORD]` placeholder is the likely cause.
+- **Brewr's dump is dropped** (2026-10-01): the user has no database password for it, and `shop.dump.sql` already covers real `pg_dump` output. Brewr (`ccsgoijoouggdepsweus`) is still active, waiting on the user's word to pause it (`pause_project`).
 - **Decisions the user has not made:**
   - stylelint reads no Sass (it would need `postcss-scss`).
   - Scope: I recommended finishing phases 3 to 5 and moving phase 6 to a backlog. No answer yet.
@@ -31,7 +31,7 @@
 ## Next steps
 
 1. **After the merges:** check that `main` has all three, then delete the branches.
-2. **Brewr's real dump**, once it works: read it for anything private, then add it as `tests/fixtures/supabase/brewr.dump.sql` (LF) with a test that it agrees with `brewr.types.ts`. Then `pause_project`.
+2. **Pause Brewr** if the user agreed.
 3. **The rest of W2:**
    - **N1:** decide each row of the gates-disagree table in the plan, spec first, and make all three gates follow it.
    - **N2:** `tools/sync_rules.py --check`, and conformance fixtures through the real tools.
