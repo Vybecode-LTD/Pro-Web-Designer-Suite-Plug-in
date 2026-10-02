@@ -754,12 +754,12 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 if not first_rule_line:
                     first_rule_line = line
                 # depth counts the top-level rule as 1; nesting starts below it,
-                # as stylelint counts (design-rules.json: max_depth 2).
+                # as stylelint counts (design-rules.json: nesting.max_depth).
                 if depth - 1 > MAX_NESTING:
                     add(line, "L5", "nesting-depth", "error",
                         f"Nesting depth {depth - 1} exceeds the limit of {MAX_NESTING}.",
                         "Native nesting desugars through :is(), which takes the "
-                        "specificity of its most specific argument — past depth 2 "
+                        f"specificity of its most specific argument — past depth {MAX_NESTING} "
                         "nobody can predict the resulting number. Flatten it.")
                 if COMPOUND_SEL.search(sel):
                     add(line, "L5", "compound-specificity", "warning",

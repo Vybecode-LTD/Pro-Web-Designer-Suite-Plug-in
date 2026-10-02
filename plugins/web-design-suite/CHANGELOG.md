@@ -323,7 +323,10 @@
   gates (a spec change is stale until rewritten, a rewrite of a tree in step changes
   nothing, a gate without its block is an error), and
   `test_rules_spec.test_the_specs_data_is_written_into_the_gates`, which replaces two
-  tests that read the stylelint config's layout as text. All four fail on 3.2.1.
+  tests that read the stylelint config's layout as text. All four fail on 3.2.1. A fifth,
+  from #18's review: the audit's nesting fix said "past depth 2" whatever the spec's
+  limit; it now names the generated limit (`test_the_audit_explains_the_limit_the_spec_sets`,
+  which fails on `eb4cccc`, with the other three `SyncRules` tests as controls).
 - The first CI run, on Linux and macOS: `test_browser_runtime.MatrixSeesStateChanges`
   failed there and passes now, which holds the `snapshot_matrix` fix; on Windows it
   passes on both. Two tests assumed Windows: `test_harness` took a relative path across

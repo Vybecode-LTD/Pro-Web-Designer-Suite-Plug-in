@@ -9,6 +9,7 @@ Nothing is written into the plugin.
 from __future__ import annotations
 
 import importlib.util
+import json
 import pathlib
 import shutil
 import subprocess
@@ -242,6 +243,20 @@ class SyncRules(TempDirTest):
         self.assertIn(b"\nconst MAX_NESTING = 3;\n", stylelint)
         self.assertNotIn(b"\r\n", audit + stylelint)
         self.assertEqual(0, self.sync("--check").returncode)
+
+    def test_the_audit_explains_the_limit_the_spec_sets(self):
+        # The finding's message and its fix both name the generated limit, so a
+        # spec change cannot leave the fix quoting the old one (#18's review).
+        spec = self.root / self.SPEC
+        spec.write_bytes(spec.read_bytes().replace(b'"max_depth": 2,', b'"max_depth": 3,'))
+        self.assertEqual(0, self.sync().returncode)
+        css = self.write("deep.css", "@layer components {\n.a { .b { .c { .d { .e { color: red; } } } } }\n}\n")
+        proc = subprocess.run([sys.executable, "-B", str(self.root / self.GATES[0]), str(css), "--json",
+                               "--law", "L5"], capture_output=True, env=env(), timeout=60)
+        found = [f for f in json.loads(proc.stdout) if f["rule"] == "nesting-depth"]
+        self.assertEqual(1, len(found), output(proc))
+        self.assertIn("exceeds the limit of 3", found[0]["message"])
+        self.assertIn("past depth 3 ", found[0]["fix"])
 
     def test_a_rewrite_of_a_tree_in_step_changes_nothing(self):
         before = self.gates()
