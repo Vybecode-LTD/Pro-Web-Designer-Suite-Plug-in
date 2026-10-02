@@ -72,7 +72,7 @@ Target:
 - *Done for 3.3.0.* A security pass in `introspect_schema` that reads RLS and policies, and prints a SECURITY block first (DL-C1). `scaffold_ui` repeats the blocking findings and still writes the screens; `--strict` refuses, for CI (the user's decision, 2026-10-01).
 - *Done for 3.3.0 (N15, from the review of PR #9).* The reference told readers to revoke `update` on single columns, which Postgres ignores while a table-level grant stands (Supabase's default). The reference and the security pass now say: revoke on the table, grant the columns back.
 - *Done for 3.3.0 (N14, found on the way).* The skill's command, `introspect_schema supabase/migrations/*.sql`, failed on more than one file. Several DDL files are now read as one schema.
-- A `policies.todo.sql` per table, with a smoke-test stub (DL-B2).
+- *Done for 3.3.0.* A `policies.todo.sql` per table, with a smoke test that runs on a real Postgres in the suite (DL-B2), and the generated `lib/supabase.ts` (DL-B1).
 - *Done for 3.3.0.* A rewrite of supabase-integration.md §2, §4 and §6 (DL-C4), with a new §9, "Who talks to the database". It covers which key goes where, the publishable and secret key formats, forwarding the user's token from FastAPI, `search_path` on security-definer functions, and `app_metadata` only.
 - *Done for 3.3.0.* Real `db pull` and `gen types` files as fixtures, so the parser is tested on what Supabase emits (DL-C2, DL-B8): the worked example as a migration, a real `pg_dump` of it and its generated types, plus Brewr's real `gen types`. Brewr's real dump is still to add, when the user runs `pg_dump`.
 
@@ -83,8 +83,8 @@ Re-check every Supabase fact at supabase.com on the day, and register it.
 | DL-A5 | medium | unsafe or stale guidance. *Done for 3.3.0.* |
 | DL-A6 | medium | the tool cannot see RLS. *Done for 3.3.0.* |
 | DL-A7 | medium | Supabase's own schema outputs are silently misread. *Done for 3.3.0.* |
-| DL-B1 | high | no data-access boundary. *Partly done: the reference states it (§9); the scaffold does not yet generate `lib/supabase.ts`.* |
-| DL-B2 | high | authorization and server validation belong to nobody. |
+| DL-B1 | high | no data-access boundary. *Done for 3.3.0: the reference (§9) and the generated `lib/supabase.ts`.* |
+| DL-B2 | high | authorization and server validation belong to nobody. *Partly done for 3.3.0: per-table policies, grants and a smoke test; a server-side schema mirroring the constraints is left.* |
 | DL-B8 | low | unverifiable claims. *Done for 3.3.0.* |
 | DL-C1 | M | A security pass in `introspect_schema`: classify sensitive columns, parse RLS and policies, print a SECURITY block first. *Done for 3.3.0.* |
 | DL-C2 | M | A sturdier schema parser, tested on real `db pull` and `gen types` files. *Done for 3.3.0.* |

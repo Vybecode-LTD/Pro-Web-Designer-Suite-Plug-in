@@ -14,7 +14,10 @@ interactive states, and `audit_design.py --strict` clean.
 
 It is NOT a finished product. Every state component carries a `TODO(copy)`
 naming the sentence a human has to write, every control the scaffold cannot
-honestly render is a marked stub rather than a guess, and no data layer is
+honestly render is a marked stub rather than a guess. For the database it
+writes a proposal, not a decision: `db/policies/` holds per table the RLS,
+policies and column grants it guesses from the keys, each with a smoke
+test, and `lib/supabase.ts` the browser's one client. Beyond that no data layer is
 generated at all — the components take their rows as props so that the fetch,
 the cache and the mutation stay yours.
 
@@ -198,6 +201,12 @@ class Answers:
             kept = self.get(f"{table['name']}.authority_columns")
             return kept is not None and col["name"] not in kept
         return False
+
+    def writable(self, table: dict[str, Any]) -> list[str]:
+        """The columns a form submits: the Draft type, and the columns the
+        policies file grants back to a signed-in user."""
+        return [c["name"] for c in table["columns"]
+                if self.in_form(table, c) and c["name"] not in self.readonly(table)]
 
     def empty(self, table: dict[str, Any]) -> dict[str, str]:
         d = {"headline": f"No {table['name'].replace('_', ' ')} yet",
@@ -1140,9 +1149,7 @@ def emit_types(table: dict[str, Any], model: dict[str, Any],
         body.append(f"  {prop_key(c['name'])}: {ts_type(c, enum_names)};")
     body.append("}")
 
-    writable = [c["name"] for c in table["columns"]
-                if ans.in_form(table, c)
-                and c["name"] not in ans.readonly(table)]
+    writable = ans.writable(table)
     draft = (f"/** What a form submits: the writable columns only. Omitting\n"
              f" *  the rest is what stops a form quietly PATCHing a column\n"
              f" *  the database owns. */\n"
@@ -2565,6 +2572,253 @@ def tailwindify(tsx: str, component: str) -> str:
 # Driver
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# The database side (supabase-integration.md §9): the browser's one client
+# (DL-B1), and per table a policies proposal with its smoke test (DL-B2).
+# ---------------------------------------------------------------------------
+
+SUPABASE_TS = """\
+// The browser's only Supabase client (supabase-integration.md §9). It holds the
+// publishable key, which is safe in a bundle because row-level security decides
+// what it may do. Every VITE_ variable is public: a secret key never goes in one.
+//
+// database.types.ts comes from the database itself:
+//   supabase gen types typescript --project-id <project-ref> > src/lib/database.types.ts
+import { createClient } from '@supabase/supabase-js';
+import type { Database } from './database.types';
+
+const url = import.meta.env.VITE_SUPABASE_URL;
+const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+if (!url || !publishableKey) {
+  throw new Error('Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (sb_publishable_…) in .env.local.');
+}
+if (publishableKey.startsWith('sb_secret_') || legacyRole(publishableKey) === 'service_role') {
+  // That key bypasses row-level security, and this file ships to every browser.
+  throw new Error('VITE_SUPABASE_PUBLISHABLE_KEY holds a secret key. Keep it on the server.');
+}
+
+/** The role inside a legacy JWT key (`anon` or `service_role`), if it is one. */
+function legacyRole(key: string): string | undefined {
+  try {
+    const payload = key.split('.')[1] ?? '';
+    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))).role;
+  } catch {
+    return undefined;
+  }
+}
+
+export const supabase = createClient<Database>(url, publishableKey);
+"""
+
+OWNER_NAMES = ("owner_id", "user_id", "author_id", "created_by", "profile_id")
+TENANT_COLUMN = re.compile(r"^(org|organization|tenant|workspace|team|account)_id$")
+UID = "(select auth.uid())"
+TEST_USER = "00000000-0000-4000-8000-000000000001"
+
+
+def sql_ident(name: str) -> str:
+    return name if re.fullmatch(r"[a-z_][a-z0-9_]*", name) and name not in {
+        "order", "user", "group", "default", "check", "table", "from", "to", "end"} else f'"{name}"'
+
+
+def _key_into_auth(model: dict[str, Any], col: dict[str, Any]) -> bool:
+    """A foreign key to `users` that is not a table of this schema: auth.users."""
+    fk = col.get("foreign_key")
+    return bool(fk) and fk["table"] == "users" and not any(
+        t["name"] == "users" for t in model["tables"])
+
+
+def ownership(table: dict[str, Any], model: dict[str, Any],
+              seen: frozenset[str] = frozenset()) -> dict[str, Any]:
+    """Whose a row is, as far as the schema says: `self` (the row is the user),
+    `owner` (a column holds the user), `tenant`, `child` (its parent's owner),
+    or `none`. A guess from keys and names, which is why the file is a TODO."""
+    seen = seen | {table["name"]}
+    tables = {t["name"]: t for t in model["tables"]}
+    cols = table["columns"]
+
+    def parent(c: dict[str, Any]) -> dict[str, Any] | None:
+        fk = c.get("foreign_key")
+        p = tables.get(fk["table"]) if fk else None
+        return p if p and p["name"] not in seen else None
+
+    for c in cols:
+        if c["primary_key"] and len(table["primary_key"]) == 1 and _key_into_auth(model, c):
+            return {"kind": "self", "column": c["name"],
+                    "why": f"{c['name']} is the user's own id, a key into auth.users"}
+    owners = []
+    for c in cols:
+        if c["primary_key"] and len(table["primary_key"]) == 1:
+            continue
+        p = parent(c)
+        if _key_into_auth(model, c):
+            owners.append((0, c, f"{c['name']} is a key into auth.users"))
+        elif p and ownership(p, model, seen)["kind"] == "self":
+            owners.append((0, c, f"{c['name']} is a key into {p['name']}, whose id is the user's"))
+        elif c["name"] in OWNER_NAMES and c["type"] == "uuid":
+            owners.append((1, c, f"{c['name']} is named for an owner"))
+    if owners:
+        _, c, why = min(owners, key=lambda o: (o[0], o[1]["nullable"]))
+        return {"kind": "owner", "column": c["name"], "why": why}
+    for c in cols:
+        if TENANT_COLUMN.match(c["name"]):
+            return {"kind": "tenant", "column": c["name"], "why": f"{c['name']} names a tenant"}
+    for c in cols:
+        p = parent(c) if not c["nullable"] else None
+        up = ownership(p, model, seen) if p else None
+        if up and up["kind"] in ("self", "owner", "child"):
+            return {"kind": "child", "column": c["name"], "parent": p["name"],
+                    "parent_column": c["foreign_key"]["column"], "up": up,
+                    "why": f"{c['name']} makes it part of a row of {p['name']}, where {up['why']}"}
+    return {"kind": "none", "column": None, "why": "no column says who a row belongs to"}
+
+
+def owner_check(own: dict[str, Any], table: str, ref: str = "", depth: int = 1) -> str:
+    """The condition that holds when the row is the caller's. `ref` names the
+    row's table inside a parent's subquery, where each level has its alias."""
+    qual = f"{ref}." if ref else ""
+    if own["kind"] in ("self", "owner"):
+        return f"{qual}{sql_ident(own['column'])} = {UID}"
+    alias = f"p{depth}"
+    return (f"exists (select 1 from public.{sql_ident(own['parent'])} {alias} "
+            f"where {alias}.{sql_ident(own['parent_column'])} = "
+            f"{ref or sql_ident(table)}.{sql_ident(own['column'])} "
+            f"and {owner_check(own['up'], own['parent'], alias, depth + 1)})")
+
+
+def _protected(table: dict[str, Any], own: dict[str, Any], writable: list[str]) -> list[str]:
+    """Columns a user must not set: authority, credentials, and the owner."""
+    return [c["name"] for c in table["columns"]
+            if c["name"] not in writable and not c["generated"]
+            and (c["ui"].get("authority") or c["ui"].get("never_display")
+                 or c["name"] == own.get("column"))]
+
+
+def emit_policies(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str:
+    name = table["name"]
+    q = f"public.{sql_ident(name)}"
+    own = ownership(table, model)
+    kind = own["kind"]
+    out = [f"-- TODO(policy): {name}. Proposed from the schema, which cannot say who may do",
+           "-- what. Read each statement and fix what is wrong, then move the file into a",
+           "-- migration: nothing here runs until you do. Then run",
+           f"-- {name}.policies.test.sql against the database (supabase-integration.md §9).",
+           f"-- Whose a row is: {own['why']}."]
+    if table.get("policies"):
+        out.append(f"-- The schema already has {len(table['policies'])} policy(ies) on {name}: "
+                   f"compare them before you replace anything.")
+    out += ["", f"alter table {q} enable row level security;", ""]
+
+    if kind in ("self", "owner", "child"):
+        check = owner_check(own, name)
+        for verb, cmd, clauses in (
+                ("reads", "select", (("using", check),)),
+                ("inserts", "insert", (("with check", check),)),
+                ("updates", "update", (("using", check), ("with check", check))),
+                ("deletes", "delete", (("using", check),))):
+            out.append(f'create policy "{name}: owner {verb}" on {q}\n  for {cmd} to authenticated\n'
+                       + "\n".join(f"  {kw} ({cond})" for kw, cond in clauses) + ";")
+            out.append("")
+    elif kind == "tenant":
+        col = sql_ident(own["column"])
+        out += [f"-- TODO(policy): a policy needs the caller's tenants, which this schema does",
+                f"-- not show. The usual shape is a security-definer helper in a schema the API",
+                f"-- does not expose. Until then RLS is on with no policy: nobody can read or write.",
+                f"--   create function private.user_{own['column']}s() returns setof uuid",
+                f"--     language sql security definer set search_path = '' stable",
+                f"--     as $$ select {col} from public.memberships where user_id = {UID} $$;",
+                f"--   revoke execute on function private.user_{own['column']}s() from public;",
+                f"--   grant usage on schema private to authenticated;",
+                f"--   grant execute on function private.user_{own['column']}s() to authenticated;",
+                f'--   create policy "{name}: members read" on {q}',
+                f"--     for select to authenticated using ({col} in (select private.user_{own['column']}s()));",
+                ""]
+    else:
+        out += [f'create policy "{name}: signed-in users read" on {q}',
+                "  for select to authenticated", "  using (true);", "",
+                "-- No write policy: the browser cannot change these rows. Writes go through the",
+                "-- server, with the secret key. If users should write here, the table needs an",
+                "-- owner column first.", ""]
+
+    if kind != "none":
+        writable = ans.writable(table)
+        inserted = writable + [c for c in (own["column"],) if c and c not in writable]
+        out += ["-- Columns. Supabase grants every column to signed-in users, and a column revoke",
+                "-- does nothing while that table-level grant stands. So take the table back, and",
+                f"-- grant the columns the form writes ({pascal(singular(name))}Draft) and the owner.",
+                "-- TODO(policy): a user may set each of these on their own rows. Strike any",
+                "-- the server should own, such as a status or a total.",
+                f"revoke insert, update on {q} from authenticated;"]
+        if inserted:
+            out.append(f"grant insert ({', '.join(map(sql_ident, inserted))}) on {q} to authenticated;")
+        if writable:
+            out.append(f"grant update ({', '.join(map(sql_ident, writable))}) on {q} to authenticated;")
+    return "\n".join(out).rstrip() + "\n"
+
+
+def emit_policy_test(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str:
+    name = table["name"]
+    q = f"public.{sql_ident(name)}"
+    own = ownership(table, model)
+    kind = own["kind"]
+    out = [f"-- Smoke test for {name}.policies.todo.sql, once those statements have run.",
+           "-- It changes nothing: everything happens in a transaction that rolls back.",
+           "-- Run it as the database owner, and read silence as a pass:",
+           f'--   psql "<connection string>" -v ON_ERROR_STOP=1 -f {name}.policies.test.sql',
+           "begin;", "",
+           "do $$ begin",
+           f"  assert (select relrowsecurity from pg_class where oid = '{q}'::regclass),",
+           f"    'row-level security is off on {q}';",
+           "end $$;", "",
+           "-- A visitor with the publishable key and no session. TODO(test): if the table is",
+           "-- public on purpose, delete this check.",
+           "set local role anon;",
+           "do $$ begin",
+           f"  assert not exists (select 1 from {q}), 'anon can read {q}';",
+           "end $$;",
+           "reset role;", "",
+           "-- A signed-in user. TODO(test): put an id from your seed here to test real rows.",
+           "set local role authenticated;",
+           f"""set local request.jwt.claims = '{{"sub": "{TEST_USER}", "role": "authenticated"}}';""",
+           ""]
+    if kind in ("self", "owner", "child"):
+        out += ["do $$ begin",
+                f"  assert not exists (select 1 from {q} where ({owner_check(own, name)}) is not true),",
+                f"    'a signed-in user can read {name} rows that are not theirs';",
+                "end $$;", ""]
+    elif kind == "none":
+        out += ["do $$ begin",
+                "  assert not exists (select 1 from pg_policies where schemaname = 'public'",
+                f"    and tablename = '{name}' and cmd <> 'SELECT'),",
+                f"    'a policy lets the browser write {q}';",
+                "end $$;", ""]
+    writable = ans.writable(table)
+    protected = _protected(table, own, writable) if kind != "none" else []
+    if protected or (writable and kind != "none"):
+        out += ["-- Columns. Postgres checks a column privilege before it touches a row, so",
+                "-- `where false` is enough to prove each one.",
+                "do $$ begin"]
+        for c in map(sql_ident, protected):
+            out += ["  begin",
+                    f"    update {q} set {c} = {c} where false;",
+                    f"    raise exception 'a signed-in user can change {name}.{c}';",
+                    "  exception when insufficient_privilege then null;",
+                    "  end;"]
+            if c != sql_ident(own.get("column") or ""):
+                out += ["  begin",
+                        f"    insert into {q} ({c}) select {c} from {q} where false;",
+                        f"    raise exception 'a signed-in user can set {name}.{c} on insert';",
+                        "  exception when insufficient_privilege then null;",
+                        "  end;"]
+        if writable and kind != "none":
+            w = sql_ident(writable[0])
+            out.append(f"  update {q} set {w} = {w} where false;  -- the form's columns stay writable")
+        out += ["end $$;", ""]
+    out.append("rollback;")
+    return "\n".join(out) + "\n"
+
+
 def build_files(model: dict[str, Any], ans: Answers, stack: str,
                 entities: set[str] | None) -> dict[str, str]:
     files: dict[str, str] = {}
@@ -2617,6 +2871,17 @@ def build_files(model: dict[str, Any], ans: Answers, stack: str,
             if css:
                 files[f"{base}/{comp}.module.css"] = sheet
         files[f"{base}/index.ts"] = emit_index(table, ans)
+
+    # The database side. A join table needs its policies too: the
+    # many-to-many control reads and writes it.
+    files["lib/supabase.ts"] = SUPABASE_TS
+    for table in model["tables"]:
+        linked = {c["foreign_key"]["table"] for c in table["columns"] if c.get("foreign_key")}
+        if entities and table["name"] not in entities and not (
+                table["kind"] == "join" and linked & entities):
+            continue
+        files[f"db/policies/{table['name']}.policies.todo.sql"] = emit_policies(table, model, ans)
+        files[f"db/policies/{table['name']}.policies.test.sql"] = emit_policy_test(table, model, ans)
 
     return files
 

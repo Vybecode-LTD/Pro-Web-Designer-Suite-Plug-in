@@ -252,8 +252,8 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-A19 | low | fixed in 3.1.0, as XC-A4 and XC-A8 | Invocation and Windows portability (instances of XC-A4 and XC-A8). |
 | DL-A20 | low | W7 (3.4.0) | authoring notes ship in the email. |
 | DL-A21 | low | W7 (3.4.0) | Consistency: "same 18 steps" and the email tokens' weight note are wrong. |
-| DL-B1 | high | partly done (3.3.0: the reference's §9, held by `test_docs.SupabaseGuidance.test_the_access_boundary_is_stated`); the scaffold's generated `lib/supabase.ts` is left, in W1 (3.3.0) | no data-access boundary. |
-| DL-B2 | high | W1 (3.3.0) | authorization and server validation belong to nobody. |
+| DL-B1 | high | fixed in 3.3.0: the reference's §9 (`test_docs.SupabaseGuidance.test_the_access_boundary_is_stated`) and the generated `lib/supabase.ts` (`test_policies`) | no data-access boundary. |
+| DL-B2 | high | partly done (3.3.0: per-table policies, column grants and a smoke test, `test_policies`); a server-side schema (pydantic or zod) mirroring the constraints is left | authorization and server validation belong to nobody. |
 | DL-B3 | medium | W13 (3.6.0+) | stacks the description implies but doesn't serve. |
 | DL-B4 | medium | W13 (3.6.0+) | email frameworks. |
 | DL-B5 | medium | W13 (3.6.0+) | email translation and RTL. |

@@ -247,7 +247,7 @@ Stated plainly, because a generator that overstates its reach is worse than one 
 
 - Any copy at all. Every string that a user reads and that is not a column label is a `TODO(copy)`
 - Information architecture — which screens a person needs to get their job done, and in what order
-- Navigation, permissions, roles, or who can do what
+- Navigation, roles, or who can do what. It proposes row-level security for each table in `db/policies/`, with a smoke test, guessed from the keys: a human corrects it before it ships (`references/supabase-integration.md` §9)
 - The data layer: fetching, caching, realtime, optimistic writes, error taxonomy
 - Whether the schema is any good. A float money column, a naive `timestamp`, a `status text` with no constraint — it flags all three and fixes none of them, because they are schema bugs and fixing them in the UI is how they become permanent
 
