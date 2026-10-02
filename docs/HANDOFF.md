@@ -8,7 +8,7 @@
 
 - **3.2.1 is released** (`v3.2.1`, `63932cf`) and installed. 3.3.0 is in progress on `main`, unreleased.
 - **Open, waiting for the user to merge (in this order):**
-  - **#16, P0:** what the reviews of #12 to #15 found, N16 to N25, and N29, a gap found on the way. The schema parser (`$` names, `DROP` and `RENAME COLUMN`, Postgres 18's named not-null), the scaffold's policies (the model's schema, every reserved word, 63-byte policy names, write policies for server roles), and the layer statement (the entry names `utilities.css` and `overrides.css`; an import or a rule above the statement is refused by the spec, the audit and stylelint). Fail-before against `8ed2e84`: 15 tests fail, 20 controls. 419 tests passed on Python 3.14 and 3.9 locally.
+  - **#16, P0:** what the reviews of #12 to #15 found, N16 to N25, and N29, a gap found on the way. The schema parser (`$` names, `DROP` and `RENAME COLUMN`, Postgres 18's named not-null), the scaffold's policies (the model's schema, every reserved word, 63-byte policy names, write policies for server roles), and the layer statement (the entry names `utilities.css` and `overrides.css`; an import or a rule above the statement is refused by the spec, the audit and stylelint). Fail-before against `8ed2e84`: 15 tests fail, 20 controls. 419 tests passed on Python 3.14 and 3.9 locally. Its reviews (Codex, CodeRabbit) found five more edge cases, fixed in `81b50f9` with five tests that fail on its first commit; all eight threads are answered and resolved.
   - **#17, P1, stacked on #16:**
     - CI (`.github/workflows/ci.yml`): the suite and the static checks on Windows, Linux and macOS, at Python 3.9 and 3.14, with Node; and `claude plugin validate --strict`.
     - The release: `tooling/release/build.py` (the zip, 13 `.skill` files, `SHA256SUMS`) and `release.yml`, which a pushed `v*` tag runs. It is the only thing that creates a release.
@@ -35,7 +35,7 @@
 
 ## Warnings
 
-- **Cost.** This session used about 570 thousand tokens. Long thinking is the largest cost: decide, then act.
+- **Cost.** This session used about 650 thousand tokens. Long thinking is the largest cost: decide, then act.
 - **Bash heredocs eat backslashes** (three times this session). Write anything with a backslash with the Write or Edit tool.
 - **Don't edit, rename or delete a file the suite reads while it runs.** A rename mid-run gave ten false failures this session.
 - **Never poll CI.** Read it with the app's `get_status` at natural points.
