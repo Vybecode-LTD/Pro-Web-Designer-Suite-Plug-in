@@ -225,6 +225,11 @@
   `.github/workflows/release.yml` build them and create the GitHub release, with the
   CHANGELOG's section as its notes; nothing else creates a release.
 - **The 17 scripts with a shebang are executable** (N5), as the nine from 3.0.0 were.
+- **The spec writes its data into the gates** (N2, part 1). `tools/sync_rules.py`
+  writes the layer order and statement, the nesting depth and the system colours from
+  `design-rules.json` into a marked block in the audit and the stylelint config, and
+  `--check` fails CI when a gate drifts from the spec. The system colours' names moved
+  into the spec. Generating the value allowlists and ESLint's patterns is part 2.
 - **Two tools for each PR.** `tools/fail_before.py` runs named tests against an earlier
   revision and this tree, and prints fixed, control, still failing or regression for
   each. `tools/check.py` runs the static checks and the tests a change affects.
@@ -303,6 +308,11 @@
     the same builder in both runs: they are controls.
 - `test_policies` keeps the scratch cluster's socket in its own folder: Debian's and
   Ubuntu's Postgres put it in `/var/run/postgresql`, which only `postgres` may write.
+- N2, part 1: `test_tools.SyncRules`, three tests on a copy of the spec and the two
+  gates (a spec change is stale until rewritten, a rewrite of a tree in step changes
+  nothing, a gate without its block is an error), and
+  `test_rules_spec.test_the_specs_data_is_written_into_the_gates`, which replaces two
+  tests that read the stylelint config's layout as text. All four fail on 3.2.1.
 - The first CI run, on Linux and macOS: `test_browser_runtime.MatrixSeesStateChanges`
   failed there and passes now, which holds the `snapshot_matrix` fix; on Windows it
   passes on both. Two tests assumed Windows: `test_harness` took a relative path across

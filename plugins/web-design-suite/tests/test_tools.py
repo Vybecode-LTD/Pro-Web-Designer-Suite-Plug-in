@@ -207,5 +207,56 @@ class CheckReadsTheChanges(FakeRepository):
                          check.changed_files(self.first))
 
 
+class SyncRules(TempDirTest):
+    """tools/sync_rules.py (N2): the spec's data written into the gates, on a
+    copy of the three files in a temporary folder."""
+
+    SPEC = "skills/web-design-studio/assets/rules/design-rules.json"
+    GATES = ("skills/web-design-studio/scripts/audit_design.py",
+             "skills/web-design-studio/assets/configs/stylelint.config.mjs")
+
+    def setUp(self):
+        super().setUp()
+        self.root = self.tmp / "plugin"
+        for rel in (self.SPEC, *self.GATES):
+            (self.root / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(PLUGIN / rel, self.root / rel)
+
+    def sync(self, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run([sys.executable, "-B", str(TOOLS / "sync_rules.py"), "--root", str(self.root), *args],
+                              capture_output=True, env=env(), timeout=60)
+
+    def gates(self) -> list[bytes]:
+        return [(self.root / rel).read_bytes() for rel in self.GATES]
+
+    def test_a_spec_change_is_stale_until_rewritten(self):
+        spec = self.root / self.SPEC
+        spec.write_bytes(spec.read_bytes().replace(b'"max_depth": 2,', b'"max_depth": 3,'))
+        proc = self.sync("--check")
+        self.assertEqual(1, proc.returncode, output(proc))
+        for rel in self.GATES:
+            self.assertIn(f"stale: {rel}", output(proc))
+        self.assertEqual(0, self.sync().returncode)
+        audit, stylelint = self.gates()
+        self.assertIn(b"\nMAX_NESTING = 3\n", audit)
+        self.assertIn(b"\nconst MAX_NESTING = 3;\n", stylelint)
+        self.assertNotIn(b"\r\n", audit + stylelint)
+        self.assertEqual(0, self.sync("--check").returncode)
+
+    def test_a_rewrite_of_a_tree_in_step_changes_nothing(self):
+        before = self.gates()
+        proc = self.sync()
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual("", proc.stdout.decode("utf-8"))
+        self.assertEqual(before, self.gates())
+
+    def test_a_gate_without_its_block_is_an_error(self):
+        audit = self.root / self.GATES[0]
+        audit.write_bytes(audit.read_bytes().replace(b"# BEGIN design-rules", b"# begin"))
+        proc = self.sync("--check")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("0 design-rules blocks, not one", output(proc))
+
+
 if __name__ == "__main__":
     unittest.main()

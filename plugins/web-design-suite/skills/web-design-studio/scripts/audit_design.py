@@ -83,10 +83,15 @@ TEMPLATE_EXT = {".html", ".htm", ".vue", ".svelte", ".astro"}
 # Files whose CSS is plain CSS, where `//` is not a comment (line_comments).
 PLAIN_CSS_EXT = {".css", ".pcss", ".html", ".htm"}
 KEYFRAMES_AT = re.compile(r"@(-[a-z]+-)?keyframes\b", re.I)
-# Law 5's order (design-rules.json: layers). `theme` is Tailwind v4's.
-LAYER_ORDER = ["reset", "vendor", "tokens", "theme", "base", "layout",
-               "components", "utilities", "overrides"]
+# Law 5's order (design-rules.json: layers; `theme` is Tailwind v4's), and the
+# nesting allowed below the top-level rule (design-rules.json: nesting).
+# BEGIN design-rules: written by tools/sync_rules.py from assets/rules/design-rules.json; edit the spec, then rerun it
+LAYER_ORDER = [
+    "reset", "vendor", "tokens", "theme", "base", "layout", "components", "utilities", "overrides",
+]
 LAYER_STATEMENT = "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;"
+MAX_NESTING = 2
+# END design-rules
 IMPORT_LAYER = re.compile(r"@import\b.*?\blayer\(\s*([\w.-]+)\s*\)", re.I | re.S)
 # Sass (design-rules.json: sass). A @mixin or @function body emits nothing
 # where it is written. A variable holding a literal is a literal; a breakpoint
@@ -125,9 +130,6 @@ COMPONENT_FILE_PAT = re.compile(
     # Matched against a lower-case path with forward slashes.
     r"\.module\.|(^|/)(components|ui)/|(^|/)components\.css$"
 )
-
-# Nesting below the top-level rule (design-rules.json).
-MAX_NESTING = 2
 
 
 def pseudo_classes_only(selector: str) -> bool:

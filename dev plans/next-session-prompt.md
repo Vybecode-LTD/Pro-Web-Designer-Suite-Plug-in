@@ -1,6 +1,6 @@
 # Start here: the next session
 
-**Written 2026-10-02**, at the end of the session that opened PR #16 (P0) and PR #17 (P1, stacked on #16). Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **finish P1's CI if it is not green**, then **P2**, then **P3** if the budget allows.
+**Written 2026-10-02**, at the end of the session that opened PR #16 (P0), PR #17 (P1, stacked on #16) and PR #18 (P2 part 1, stacked on #17). Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **finish P1's CI if it is not green**, then **P2 part 2**, then **P3** if the budget allows.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers. The repository is `C:\DEV\Pro-Web-Designer-Suite-Plug-in` (public on GitHub, `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, MIT). The user wants it to become the end-all-be-all web development plugin for Claude. Every remaining item is scheduled in `dev plans/web-design-suite-execution-plan.md`, as PRs P2 to P43 (P0 and P1 are #16 and #17).
 
@@ -45,15 +45,15 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state all --limit 4
    ```
-   - If the user merged #16 and #17, check out `main` and pull.
-   - If not, ask the user to merge #16, then #17. GitHub retargets #17 to `main` when #16's branch is deleted.
+   - If the user merged #16, #17 and #18, check out `main` and pull.
+   - If not, ask the user to merge them in order: #16, #17, #18. GitHub retargets each to `main` when the branch below it is deleted.
    - If #17's CI is not green, fixing it comes first (§3).
 4. `python -B "dev plans/check_execution_plan.py"` must say `151 open items, 151 scheduled`. CI on `main` is the baseline; for a local one, `python -B plugins/web-design-suite/tools/check.py --all`.
 5. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
 
-- **The plugin** is `plugins/web-design-suite/`: `skills/<13 skills>/`, `tests/` (about 440 tests, standard-library `unittest`, helpers in `tests/wds_support.py`: `TempDirTest`, `run_py`, `env()`, `output`, `load_script`), and `tools/`: `check_pointers.py`, `sync_snippets.py`, `fail_before.py`, `check.py`.
+- **The plugin** is `plugins/web-design-suite/`: `skills/<13 skills>/`, `tests/` (about 440 tests, standard-library `unittest`, helpers in `tests/wds_support.py`: `TempDirTest`, `run_py`, `env()`, `output`, `load_script`), and `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
 - **`fail_before.py`** unpacks the revision with `git archive` into a temporary folder and sets `WDS_PLUGIN_ROOT` and `WDS_PLUGIN_REV` for the first run. A failing `setUpClass` counts against each test of its class. Things outside the plugin (`tooling/`) are the same in both runs, so their tests show as controls.
 - **`check.py`** picks the affected tests from the files changed since `git merge-base origin/main HEAD` (`--base REF` to change it): a test module runs itself; a skill file runs the modules naming its skill folder or stem; a shared file (`wds_support.py`, `design-rules.json`, `assets/configs/`, `tools/`, `tooling/main`) runs everything.
 - **CI** (`.github/workflows/ci.yml`): Windows, Linux and macOS × Python 3.9 and 3.14 through `uv run --no-project --python <v>`, Node 22, `npm ci` of both tooling folders; Linux adds Playwright's headless shell and the image's Postgres. A separate job runs `claude plugin validate --strict` (no sign-in needed). `astral-sh/setup-uv` publishes no major tag: pin a full version.
@@ -70,20 +70,16 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 - Each failure is either a test that assumes Windows, which you fix in the test, or a real platform bug, which you fix in the plugin with a regression test, as any other.
 - When all six suite jobs and `validate` are green, record it: the completion plan's rule "CI (decision D1)" is then in force, and #17's description gets the acceptance results (CI green; `fail_before.py test_file_modes` shows N5 fixed against v3.2.1; two builds of one commit are byte-identical).
 
-## 4. P2: the rule spec generates the gates' rule sections (N2, SB-C2)
+## 4. P2 part 2: the spec generates the gates' rule sections (N2, SB-C2)
 
-Branch `feat/p2-rule-sync` from `main` (or stacked on #17). Read N2 in the completion plan (`**N2 ·`), and SB-C2 and SB-A14 in `dev plans/web-design-suite-review/studio-build.md` (lines 33 and 69).
+Part 1 is PR #18, stacked on #17: `tools/sync_rules.py` writes the layer order and statement, the nesting depth and the system colours (now `system_colors.names` in the spec) into one `BEGIN design-rules` … `END design-rules` block in the audit and in the stylelint config. Its `--check` runs in `check.py` and CI, and `test_tools.SyncRules` tests it. The markers avoid "@generated", which makes the audit and the migration tool skip a file.
 
-`design-rules.json` has these sections today: `nesting`, `zero`, `margins_in_components`, `var_fallback`, `system_colors`, `sass`, `layers`, `file_classes`. Each holds a rule, and most hold `allowed` and `refused` examples. The audit (`audit_design.py`, 1730 lines), the stylelint config (`stylelint.config.mjs`, 820) and the ESLint config (`eslint.design.config.mjs`, 860) each restate parts by hand, and `test_rules_spec` compares them as text.
+Part 2 makes the rule sections themselves come from the spec, so P3 to P5 are spec edits and a rerun. Branch `feat/p2-rule-sections`, stacked on #18 if it is not merged. Read N2 in the completion plan (`**N2 ·`), and SB-C2 and SB-A14 in `dev plans/web-design-suite-review/studio-build.md` (lines 33 and 69).
 
-1. **`tools/sync_rules.py`**, standard library only, Python 3.9:
-   - It rewrites marked regions in the three gates from the spec, the way `sync_snippets.py` rewrites `@snippet` regions: a region opens with `// @generated design-rules:<section>` (`# @generated …` in Python) and closes with `@end-generated`.
-   - Start with what is pure data: the layer order and statement, the file-class globs (the audit and `design-token-migration/scripts/extract_literals.py` both keep a copy), the nesting depth, the zero rule, the system colours.
-   - `--check` exits 1 and lists each stale region; without it, it rewrites them. Output is UTF-8 with LF, byte for byte (see how `sync_snippets` is tested).
-   - `check.py` already runs `sync_rules.py --check` once the file exists. Add it to CI's static checks.
-2. **Conformance**: one test that runs every `allowed` and `refused` example of every section through the real audit, stylelint and, for JSX and inline styles, ESLint, and holds each tool to the spec. `test_real_tools.StylelintConfig` and `test_rules_spec.TheAuditFollowsTheSpec` already do this for `layers` and `system_colors`: generalise them, and drop the text comparisons the generated regions make redundant.
-3. **Tests** in `tests/test_rules_sync.py`: `--check` passes on the tree; it fails on a stale region in a copy in a temporary folder; a rewrite is idempotent.
-4. **Close:** the CHANGELOG under 3.3.0 ("Changed" for the generated regions, "Tests"); SB-C2 is "fixed in 3.3.0" in the inventory, N2 is `*Done for 3.3.0.*`; the execution plan's P2 row and §9; the checker must then say 149.
+1. **Model the value rules in the spec.** `design-rules.json` has `nesting`, `zero`, `margins_in_components`, `var_fallback`, `system_colors`, `sass`, `layers` and `file_classes`, each with a rule and examples. What it lacks is the value allowlist itself: which values each property family takes (tokens through `var()`, `0`, the keywords), which the stylelint config spells as regexes in `declaration-property-value-allowed-list` (about lines 220 to 320), and which the ESLint config spells as patterns for inline styles. Read both, write the families into the spec, and have `sync_rules.py` write them into each gate's block, as it does the layer order.
+2. **The file classes stay as they are, unless the spec grows Sass.** The audit's and the migration tool's regexes also take `.scss`, while the spec's globs are the CSS-only ones stylelint uses. `test_rules_spec.test_file_classes` and `test_file_globs` hold all three to the spec's examples.
+3. **Conformance**: one test that runs every `allowed` and `refused` example of every section through the real audit, stylelint and, for JSX and inline styles, ESLint, and holds each tool to the spec. `test_real_tools.StylelintConfig` and `test_rules_spec.TheAuditFollowsTheSpec` do this today for `layers` and `system_colors`: generalise them, and drop the text comparisons that the generated blocks make redundant.
+4. **Close:** the CHANGELOG under 3.3.0; SB-C2 is "fixed in 3.3.0" in the inventory and N2 is `*Done for 3.3.0.*`; the execution plan's P2 row and §9. The checker must then say 149.
 
 ## 5. P3: the gates agree (N1, SB-A15)
 

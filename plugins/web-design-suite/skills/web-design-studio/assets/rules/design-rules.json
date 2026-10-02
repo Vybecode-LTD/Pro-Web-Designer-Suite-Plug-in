@@ -27,6 +27,7 @@
     "allowed": ["var(--fg-muted)", "var(--fg-muted, #666666)", "var(--card-pad, var(--pad-card))"]
   },
   "system_colors": {
+    "names": ["accentcolor", "accentcolortext", "activetext", "buttonborder", "buttonface", "buttontext", "canvas", "canvastext", "field", "fieldtext", "graytext", "highlight", "highlighttext", "linktext", "mark", "marktext", "selecteditem", "selecteditemtext", "visitedtext"],
     "rule": "A CSS system colour (Canvas, ButtonText, Highlight and the rest) is correct only inside @media (forced-colors: active), where the user's palette replaces the page's. Anywhere else it is a colour no token controls, no theme re-points and no contrast check measures. CSS keywords are case-insensitive, so every spelling counts. stylelint enforces this with design/system-colors-in-forced-colors; audit_design still accepts a system colour anywhere (completion plan, W2 N1).",
     "allowed": [
       "@media (forced-colors: active) { .card { border-color: ButtonText; } }",

@@ -108,7 +108,7 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 | A margin inside an owl rule in a component file | accepts | refuses the value | the owl is allowed, so stylelint is wrong |
 | A CSS system colour outside `@media (forced-colors: active)` (`color: Canvas`) | accepts | refuses (`design/system-colors-in-forced-colors`, 3.2.1) | refused (3.2.1), so the audit is wrong |
 
-**N2 · The rest of item 9.**
+**N2 · The rest of item 9.** *Part 1 in PR #18: `tools/sync_rules.py` writes the layer order and statement, the nesting depth and the system colours into a marked block in the audit and the stylelint config, with `--check` in CI. The allowlists, ESLint's patterns and the conformance fixtures remain.*
 - `tools/sync_rules.py --check`, which generates each tool's rule sections from the spec.
 - Conformance fixtures from the spec, run through the real audit, ESLint and stylelint. `test_rules_spec` still reads the configs as text.
 
