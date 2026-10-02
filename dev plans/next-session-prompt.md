@@ -57,7 +57,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - `test_doc_snippets` files a reference block written in `@layer base`, `layout`, `reset`, `utilities` or `overrides` in that layer's file, and any other in `components/snippet.css`.
 - **The escape hatch** is one comment for both tools: `/* stylelint-disable-next-line <rule> -- design-audit-ignore-next-line: L1 -- <why> */` on the line above. The starter's `sub`/`sup` and the `cqi` example in `stack-vanilla-css.md` use it.
 - **CI** (`.github/workflows/ci.yml`): Windows, Linux and macOS × Python 3.9 and 3.14, Node 22, plus `claude plugin validate --strict`. The mega-menu browser test was flaky on macOS 3.14. #20 fixes it: each step waits until the page has seen its move before the fake clock advances (`test_recipes`, `seen()`).
-- **An open question for the user:** the skill descriptions are 301 to 368 characters, while the claude.ai help center gives 200 for an upload. It fits P27/P28.
+- **The skill descriptions** are 200 characters or fewer, to fit a claude.ai upload (the user's call, 2026-10-02): PR #21, independent of the stack, and `test_skill_budget` holds the limit. A routing change they cause is P27/P28's to measure.
 
 ## 3. First: the open PRs
 
@@ -66,7 +66,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 - #19's CI had one failure: the mega-menu flake on macOS 3.14. The failed job was re-run; #20 has the real fix.
 - #20's CI was running.
 
-Read each PR's state. Fix what is red: a test that assumes one platform you fix in the test, a platform bug in the plugin, with a regression test. A fix to a lower PR is merged up the stack. Answer and resolve review threads. Then ask the user to merge, in order.
+#21 (the skill descriptions) branches from `main` and is independent of the stack. Read each PR's state. Fix what is red: a test that assumes one platform you fix in the test, a platform bug in the plugin, with a regression test. A fix to a lower PR is merged up the stack. Answer and resolve review threads. Then ask the user to merge, in order.
 
 ## 4. P3 part 2: the stylelint allowlist's holes (SB-A15) and N31
 

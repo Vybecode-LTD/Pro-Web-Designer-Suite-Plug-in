@@ -20,9 +20,10 @@
 1. **The user:** merge #16, #17, #18, #19 and #20, in that order, once each is green. Five stacked PRs is more than decision D7's three: merging soon keeps the next session's PRs off a deep stack.
 2. **The next session:** check #20's CI and #19's re-run, fix anything red (a fix to a lower PR is merged up the stack), then P3 part 2: SB-A15 (the stylelint allowlist's holes) and N31, as the prompt describes. Then P4.
 
+**Also open, independent of the stack: #21**, every skill description condensed to 200 characters or fewer, so each fits a claude.ai upload (the user's call, 2026-10-02). `test_skill_budget` holds the limit. It can merge before or after the stack.
+
 ## Open questions for the user
 
-- **Skill descriptions and claude.ai uploads.** All 13 descriptions are 301 to 368 characters; the claude.ai help center gives 200 for an uploaded skill, the platform 1024. `build.py` warns and still builds. Shortening them touches routing (P27/P28).
 - **SB-A15's design choices** are listed in the prompt with a recommendation each (positional properties, which sizes, `color-mix()`/`light-dark()`, `theme.css`). The session can take the recommendations unless the user says otherwise.
 
 ## Warnings
