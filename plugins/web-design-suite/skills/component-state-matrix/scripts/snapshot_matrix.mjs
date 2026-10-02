@@ -281,6 +281,31 @@ const STUB_JS = `
 `;
 
 // ---------------------------------------------------------------------------
+// A cell's computed style — runs in the page. Every element of the cell, the
+// cell included, with its ::before and ::after, as one string. Properties
+// that never change a pixel (the cursor, pointer events, selection, motion
+// timing) are left out, so a state that changes only those has no style.
+const STYLE_SIGNATURE_FN = (id) => {
+  const SKIP = /^(cursor|pointer-events|user-select|-webkit-user-select|touch-action|will-change|transition|animation)/;
+  const cell = document.querySelector(`[data-cell-id="${CSS.escape(id)}"]`);
+  if (!cell) return null;
+  const style = (el, pseudo) => {
+    const cs = getComputedStyle(el, pseudo);
+    const out = [];
+    for (let i = 0; i < cs.length; i++) {
+      if (!SKIP.test(cs[i])) out.push(`${cs[i]}:${cs.getPropertyValue(cs[i])}`);
+    }
+    return out.join(';');
+  };
+  const parts = [];
+  const walk = (el) => {
+    parts.push(el.tagName, style(el, null), style(el, '::before'), style(el, '::after'));
+    for (const child of el.children) walk(child);
+  };
+  walk(cell);
+  return parts.join('\n');
+};
+
 // The comparator — runs in the browser, on a canvas.
 // ---------------------------------------------------------------------------
 // Per-pixel RGB equality is the wrong metric: it treats a 1/255 shift in a
@@ -289,7 +314,7 @@ const STUB_JS = `
 // metric (luma weighted far above chroma, because that is how eyes work) plus a
 // 3x3 neighbourhood escape so sub-pixel antialiasing does not count.
 
-const COMPARE_FN = async ({ aURL, bURL, pixelThreshold, common = false }) => {
+const COMPARE_FN = async ({ aURL, bURL, pixelThreshold }) => {
   const load = async (url) => {
     const bmp = await createImageBitmap(await (await fetch(url)).blob());
     const c = new OffscreenCanvas(bmp.width, bmp.height);
@@ -297,24 +322,10 @@ const COMPARE_FN = async ({ aURL, bURL, pixelThreshold, common = false }) => {
     ctx.drawImage(bmp, 0, 0);
     return { w: bmp.width, h: bmp.height, d: ctx.getImageData(0, 0, bmp.width, bmp.height).data };
   };
-  let A = await load(aURL);
-  let B = await load(bURL);
+  const A = await load(aURL);
+  const B = await load(bURL);
   if (A.w !== B.w || A.h !== B.h) {
-    // Two cells side by side sit at different fractional offsets, so one can
-    // come out a pixel wider or taller than its twin. With `common`, compare
-    // the area they share.
-    if (!common || Math.abs(A.w - B.w) > 1 || Math.abs(A.h - B.h) > 1) {
-      return { sizeChanged: true, a: [A.w, A.h], b: [B.w, B.h] };
-    }
-    const cw = Math.min(A.w, B.w);
-    const ch = Math.min(A.h, B.h);
-    const crop = (I) => {
-      const d = new Uint8ClampedArray(cw * ch * 4);
-      for (let y = 0; y < ch; y++) d.set(I.d.subarray(y * I.w * 4, (y * I.w + cw) * 4), y * cw * 4);
-      return { w: cw, h: ch, d };
-    };
-    A = crop(A);
-    B = crop(B);
+    return { sizeChanged: true, a: [A.w, A.h], b: [B.w, B.h] };
   }
   const { w, h } = A;
   // Max possible YIQ distance, used to normalise into 0..1.
@@ -577,27 +588,22 @@ async function main() {
     });
   }
 
-  // A hover, active or focus-visible cell that renders like its default cell
-  // has no style for that state. That needs no baseline: it is wrong on the
-  // first run, and a baseline recorded from it would enshrine it. "Like" is
-  // the baseline comparison's own tolerance, not pixel identity: on Linux and
-  // macOS text is antialiased by where it sits, so twin cells drawn side by
-  // side differ in a few edge pixels, while a real state style changes many.
+  // A hover, active or focus-visible cell whose every element, ::before and
+  // ::after included, computes the same style as in its default cell has no
+  // style for that state. That needs no baseline: it is wrong on the first
+  // run, and a baseline recorded from it would enshrine it. Styles, not
+  // pixels: the cells sit side by side at different subpixel offsets, and on
+  // Linux and macOS text is antialiased by where it sits, so twin cells never
+  // match pixel for pixel there.
   const STATE_SEG = /--st_(hover|active|focus-visible)(?=--|$)/;
-  for (const [id, buf] of shots) {
+  for (const id of shots.keys()) {
     const m = STATE_SEG.exec(id);
     if (!m) continue;
     const defaultId = id.replace(STATE_SEG, '--st_default');
-    const base = shots.get(defaultId);
-    if (!base) continue;
-    const res = await cmp.evaluate(COMPARE_FN, {
-      aURL: 'data:image/png;base64,' + base.toString('base64'),
-      bURL: 'data:image/png;base64,' + buf.toString('base64'),
-      pixelThreshold: opts.pixelThreshold,
-      common: true,
-    });
-    if (res.sizeChanged || res.ratio > opts.threshold) continue;
-    const note = `renders exactly like ${defaultId}: the ${m[1]} state has no visible style`;
+    if (!shots.has(defaultId)) continue;
+    const mine = await page.evaluate(STYLE_SIGNATURE_FN, id);
+    if (mine === null || mine !== await page.evaluate(STYLE_SIGNATURE_FN, defaultId)) continue;
+    const note = `computes the same style as ${defaultId}: the ${m[1]} state has no visible style`;
     const row = rows.find((r) => r.id === id);
     if (row) {
       row.status = 'fail';

@@ -180,10 +180,12 @@
     refused example in the spec.
 - **On Linux and macOS, `snapshot_matrix` missed a state with no style** (found by the
   first CI run). It called a hover, active or focus-visible cell unstyled only when it
-  was pixel-identical to its default cell. There, text is antialiased by where it sits,
-  so twin cells drawn side by side differ in a few edge pixels, or by a pixel in size,
-  and the check never fired. It now uses the baseline comparison's own tolerances, and
-  compares the area two cells share when they differ by one pixel.
+  was pixel-identical to its default cell. The cells sit side by side at different
+  subpixel offsets, and there text is antialiased by where it sits, so twin cells never
+  matched and the check never fired. It now compares computed styles: a state is
+  unstyled when every element of its cell, `::before` and `::after` included, computes
+  the same style as in the default cell, leaving out what never changes a pixel (the
+  cursor, pointer events, selection, motion timing).
 
 ### Added
 
