@@ -1,47 +1,43 @@
 # Handoff
 
-**2026-10-02**, at the end of the session that opened and merged PRs #12 to #15.
+**2026-10-02**, at the end of the session that opened PR #16 (P0) and PR #17 (P1).
 
-**The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, and P0 and P1 in detail.
+**The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then P2 and P3 in detail.
 
 ## State
 
 - **3.2.1 is released** (`v3.2.1`, `63932cf`) and installed. 3.3.0 is in progress on `main`, unreleased.
-- **Merged on 2026-10-02:**
-  - **#12:** the schema parser reads real `pg_dump` and `gen types` output (DL-A7, DL-C2, DL-B8).
-  - **#13:** the scaffold proposes each table's policies, with a smoke test, and writes `lib/supabase.ts` (DL-B2 in part, DL-B1).
-  - **#14:** the canonical entry stylesheets, and `vendor` in the layer order (SB-A8, SB-A23, SB-C9 in part).
-  - **#15:** the execution plan.
-- **Tests:** 406, passing on Python 3.14 and 3.9 on Windows. macOS has never run, and Linux has never run the Node tests; P1's CI fixes both.
-- **The plan:** `dev plans/web-design-suite-execution-plan.md` schedules all 164 open items in 44 PRs, P0 to P43, and `check_execution_plan.py` holds it at 164 of 164.
-  - **P0** is new: what the reviews of #12 to #15 found, N16 to N25, ten small real bugs.
-  - CodeRabbit's note on `--quote-all-identifier` is not taken: that line quotes the Supabase CLI's script, which spells it that way.
-- **Decided by the user on 2026-10-02:** keep phase 6, and yes to every decision in the plan's §2:
-  - CI replaces the two local full runs, from P1 on;
-  - N1's five rows are decided;
-  - SCSS goes into stylelint (P37);
-  - a spike picks the Tailwind lint plugin (P36);
-  - phase 6 ships as 4.0.0;
-  - PRs stack;
-  - evals are capped at **$15 per full run**.
-- **Brewr** (`ccsgoijoouggdepsweus`) is paused, and its dump is dropped: the user has no database password, and `shop.dump.sql` covers real `pg_dump` output.
+- **Open, waiting for the user to merge (in this order):**
+  - **#16, P0:** what the reviews of #12 to #15 found, N16 to N25, and N29, a gap found on the way. The schema parser (`$` names, `DROP` and `RENAME COLUMN`, Postgres 18's named not-null), the scaffold's policies (the model's schema, every reserved word, 63-byte policy names, write policies for server roles), and the layer statement (the entry names `utilities.css` and `overrides.css`; an import or a rule above the statement is refused by the spec, the audit and stylelint). Fail-before against `8ed2e84`: 15 tests fail, 20 controls. 419 tests passed on Python 3.14 and 3.9 locally.
+  - **#17, P1, stacked on #16:**
+    - CI (`.github/workflows/ci.yml`): the suite and the static checks on Windows, Linux and macOS, at Python 3.9 and 3.14, with Node; and `claude plugin validate --strict`.
+    - The release: `tooling/release/build.py` (the zip, 13 `.skill` files, `SHA256SUMS`) and `release.yml`, which a pushed `v*` tag runs. It is the only thing that creates a release.
+    - The PR tools: `tools/fail_before.py` and `tools/check.py`.
+    - N5: 17 scripts made executable, held by `test_file_modes`.
+  - **CI on #17:**
+    - The first run failed only on `setup-uv@v10`, a tag that does not exist (now `@v10.2.0`).
+    - The second run found one real platform bug, fixed: `snapshot_matrix` missed an unstyled state on Linux and macOS. It also found two tests that assumed Windows.
+    - The third run was in progress at handoff.
+- **Tests:** 432. **The plan:** 151 open items, all scheduled (`check_execution_plan.py`).
+- **Decided by the user on 2026-10-02:** a session may run up to 750 thousand tokens, with no compacting.
 
 ## Next steps
 
-1. **P0**, then **P1**, as `dev plans/next-session-prompt.md` describes them.
-2. **Then P2 to P8** and release 3.3.0 (R1), by the execution plan.
+1. **The user:** merge #16, then #17 once its CI is green. #17's base becomes `main` when #16's branch is deleted.
+2. **The next session:** if #17's CI is not green, fix it first. Then P2 (the spec generates the gates' rule sections) and P3 (the gates agree), as the prompt describes.
 
-## Blockers
+## Open questions for the user
 
-None.
+- **Skill descriptions and claude.ai uploads.** All 13 descriptions are 301 to 368 characters. The platform's limit is 1024, but the claude.ai help center gives 200 for an uploaded skill. `build.py` warns and still builds the `.skill` files. Shortening them touches routing, so it is the user's call; it fits P27/P28.
 
 ## Warnings
 
-- **Cost.** The cap is 500 thousand tokens a session unless the user says otherwise; this one was allowed 750 thousand and used about 720 thousand. Report usage as you go, and don't fan out to subagents.
-- **Heredocs in the Bash tool** drop backslashes and turn `\b` into a backspace byte. Write scripts that contain backslashes with the Write tool.
+- **Cost.** This session used about 500 thousand tokens. Long thinking is the largest cost: decide, then act.
+- **Bash heredocs eat backslashes** (three times this session). Write anything with a backslash with the Write or Edit tool.
+- **Don't edit, rename or delete a file the suite reads while it runs.** A rename mid-run gave ten false failures this session.
+- **Never poll CI.** Read it with the app's `get_status` at natural points.
 - **`pg_ctl start` from Python on Windows** must not capture output. See `tests/test_policies.py`.
 - **pg_dump on Windows writes CRLF.** Convert a dump to LF before committing it.
 - **Register any new `§` pointer** with `tools/check_pointers.py --write-register`, then read the register's diff.
-- **Don't edit a script while the suite runs.**
 - **The installed plugin is a copy, and sessions load a cache of it.** Update both after every release.
 - **The repository is public.** Commit nothing private.
