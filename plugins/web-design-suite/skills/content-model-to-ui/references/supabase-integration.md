@@ -42,17 +42,23 @@ Three sources, three fidelities. `introspect_schema.py` reads all three and reco
 | Row counts | **no** | **no** | **no** |
 | RLS and policies | yes: `ENABLE ROW LEVEL SECURITY`, `CREATE POLICY` and column revokes are read | **no** | separate (`pg_policies`); not read |
 
-**Prefer the DDL.** Measured on the fixture in this skill's verification: the DDL and a full `information_schema` dump produce byte-identical models. The generated-types source produces an identical *structural* model — same tables, columns, nullability, foreign keys, enums, join-table detection, many-to-many edges, controls and list placement — but loses **14 validation rules across 13 columns** (every `maxLength`, every `unique`, every CHECK-derived `min`/`max`), loses ownership (no `ON DELETE`, so every one-to-many degrades from `inline-subtable` to `linked-list`), and cannot see that a `timestamp` column is missing its time zone.
+**Prefer the DDL.** Measured on the worked example's seven tables, which the plugin's tests carry in three forms (`tests/fixtures/supabase/`, held by `tests/test_schema_sources.py`):
 
-That last one is worth stating plainly: **the generated-types file loses exactly the information the mapper wants most.** It is the easiest source to obtain and the weakest one. Use it when the DDL is genuinely unavailable, and expect a longer questions list.
+- **The migration and a dump of it agree.** `shop.dump.sql` is the migration loaded into Postgres and dumped with `--quote-all-identifiers`, as `supabase db pull` writes it. Both give the same type, key, control, placement and validation for every column, and the same policies and findings.
+- **The generated types keep the structure:** tables, columns, nullability, foreign keys, enums, join tables, many-to-many edges, controls and list placement.
+- **They lose the rest.** That is **12 validation rules across 9 columns** (every `maxLength` and `unique`, and the bounds a CHECK sets). Ownership goes too: with no `ON DELETE`, the cascade child `order_items` drops from `inline-subtable` to `linked-list`. A key into `auth.users` is missing, because the API does not expose that schema. And a `timestamp` column with no time zone looks like any other.
+
+A JSON dump carries what its query selects, and no more: the table above says what each join adds.
+
+That loss is worth stating plainly: **the generated-types file loses exactly the information the mapper wants most.** It is the easiest source to obtain and the weakest one. Use it when the DDL is genuinely unavailable, and expect a longer questions list.
 
 ```bash
-# Best: the migration files you already have
-cat supabase/migrations/*.sql > /tmp/schema.sql
-python -m scripts.introspect_schema /tmp/schema.sql -o model.json --summary
+# Best: the migration files you already have, read together and in order
+python -m scripts.introspect_schema supabase/migrations/*.sql -o model.json --summary
 
-# Or a live dump, structure only
-pg_dump --schema-only --no-owner --no-privileges -n public "$DATABASE_URL" > /tmp/schema.sql
+# Or a live dump, structure only, in the format of `supabase db pull`.
+# Keep the privileges: the security pass reads GRANT and REVOKE.
+pg_dump --schema-only --quote-all-identifiers --no-owner -n public "$DATABASE_URL" > schema.sql
 
 # Weakest, but always available
 supabase gen types typescript --project-id "$PROJECT_ID" > database.types.ts

@@ -4,7 +4,7 @@ One schema taken from introspection to generated screens.
 
 ## 1. Worked example
 
-The fixture this skill is verified against: seven tables, a join table, two enums, integer cents, a nullable foreign key, a jsonb bag, a slug behind a unique index, a storage-backed image, and one naive `timestamp`. What `--summary` says about `products`:
+The fixture this skill is verified against, shipped as `tests/fixtures/supabase/shop.sql`: seven tables, a join table, two enums, integer cents, a nullable foreign key, a jsonb bag, a slug behind a unique index, a storage-backed image, and one naive `timestamp`. What `--summary` says about `products` (`tests/test_schema_sources.py` checks that it still does):
 
 ```
      products   title=title  layout=table
@@ -31,9 +31,10 @@ The fixture this skill is verified against: seven tables, a join table, two enum
      ·DF   available_on      date               -> date-picker
             `date` — a calendar day with no time and no zone. Rendering it as a datetime
             shifts it by a day for half the planet.
-     LD·   created_at        timestamptz        -> readonly-timestamp
+     ·D·   created_at        timestamp with time zone  -> readonly-timestamp
             a system timestamp — the database writes it, so it is displayed and never edited
        rel  many-to-one   -> categories            [select]
+       rel  one-to-many   -> order_items           [linked-list]
        rel  many-to-many  -> tags via product_tags [multi-select]
 
 L=list D=detail F=form   ? medium confidence   ! low, needs a human
