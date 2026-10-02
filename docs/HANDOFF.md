@@ -21,16 +21,14 @@
   - GitHub retargets each when the one below merges. If it doesn't, rebase onto `main`. Each branch carries the previous one's commits.
 - **Tests:** 406 on #14's branch, passing on 3.14 and 3.9 (392 on #12, 403 on #13).
 - **Brewr's dump is dropped** (2026-10-01): the user has no database password for it, and `shop.dump.sql` already covers real `pg_dump` output. Brewr (`ccsgoijoouggdepsweus`) was paused at the user's word the same day.
-- **Decisions the user has not made:**
-  - stylelint reads no Sass (it would need `postcss-scss`).
-  - Scope: I recommended finishing phases 3 to 5 and moving phase 6 to a backlog. No answer yet.
+- **Decided by the user on 2026-10-02:** keep phase 6, and yes to every decision in the execution plan's §2. That includes CI instead of the two local full runs (from P1 on), SCSS in stylelint (P37), and evals capped at $15 per full run.
 - **Left open in this work:**
   - DL-B2's server-side schema (pydantic or zod mirroring the constraints);
   - SB-C9's Tailwind v3 entry, which is still inline in stack-tailwind.
 
 ## Next steps
 
-0. **The plan is now `dev plans/web-design-suite-execution-plan.md`** (PR #15): 43 PRs in order, starting with P1 (CI and the lean tooling). Get the user's answers to its §2 first; the steps below are its P2 to P8.
+0. **The plan is now `dev plans/web-design-suite-execution-plan.md`** (PR #15): 43 PRs in order, starting with P1 (CI and the lean tooling). Its §2 was decided on 2026-10-02 (yes to all; evals capped at $15 a run). The steps below are its P2 to P8.
 1. **After the merges:** check that `main` has all four, then delete the branches.
 2. **The rest of W2:**
    - **N1:** decide each row of the gates-disagree table in the plan, spec first, and make all three gates follow it.

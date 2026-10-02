@@ -26,9 +26,9 @@ The plugin is done when all of these hold:
 6. **The docs are true and portable.** Every command works in cmd, PowerShell and bash. Every outside fact is re-read at its source and registered in `evidence.json`. Every quote of starter code is generated from the starter.
 7. **It is released and installed:** tagged, released by CI, and mirrored into the local marketplace and the cache.
 
-## 2. Decisions to make now, in one pass
+## 2. Decisions
 
-The user answers these once. Each has a recommendation, so a "yes to all" works.
+**All decided by the user on 2026-10-02: yes to every recommendation below, and D5's cap is $15 per full run.**
 
 | # | Decision | Recommendation | Blocks |
 |---|---|---|---|
@@ -36,7 +36,7 @@ The user answers these once. Each has a recommendation, so a "yes to all" works.
 | D2 | **N1, the five rows where the gates disagree and the spec is silent.** Rows 6 to 8 already follow the spec, so only the tools change there. | (1) and (2) refuse a factor on a role token: a scaled token is an invented step (Law 3). `* -1` stays allowed, as the spec already says. (3) refuse `em` font sizes except `1em`, which sizes an icon to its text. (4) refuse a literal `65ch`: use the measure token. (5) refuse type selectors in component files. They belong in `base` or a flow container. | P3 |
 | D3 | **Sass in stylelint** (open since 3.3.0). | Yes: ship `postcss-scss`, in P37, so SCSS gets the same three gates. | P37 |
 | D4 | **The Tailwind lint plugin** (decision 3 of the completion plan). | Decide inside P36, after a spike that runs both plugins over the same fixtures. Switching replaces Part 5 of the ESLint config, so it is breaking: it goes in a major release. | P36 |
-| D5 | **The eval cost cap** (decision 4). | A cap per full run, set by the user. Routing cases are cheap and run on every release; outcome cases run before each release and when a skill changes. | P29, P30 |
+| D5 | **The eval cost cap** (decision 4). | **$15 per full run** (the user, 2026-10-02). A run that would pass it stops first. Routing cases are cheap and run on every release; outcome cases run before each release and when a skill changes. | P29, P30 |
 | D6 | **Phase 6's release number.** | 4.0.0, because of D4. | R4 |
 | D7 | **Stacked PRs, merged in batches.** | Yes: up to three stacked PRs, merged in order, as #12 to #14. It saves a review round per PR. | all |
 | D8 | **Phase 7.** | Approve the method in §7 now; approve each new skill when its evidence is in. | P44+ |
@@ -196,7 +196,6 @@ That is about 19 sessions, before phase 7. It is an estimate: P1 and P2 should m
 
 To go faster without spending more per session:
 - **Merge in batches** (D7).
-- **Answer section 2 in one message.**
 - **Let CI do the long runs** (D1).
 
 ## 9. Progress

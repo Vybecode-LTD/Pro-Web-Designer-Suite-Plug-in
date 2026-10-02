@@ -8,7 +8,7 @@ Every release is also a tagged commit, from `v3.0.0` on. So `git diff v3.1.0 v3.
 
 | File | What it is |
 |---|---|
-| **`web-design-suite-execution-plan.md`** | **The schedule for everything left** (2026-10-02). Every open item and N-item in one of 43 PRs, P1–P43, over phases 3 to 6 and four releases. It also has the decisions to make in one pass, the efficiency rules, the lean protocol per PR, and phase 7, an eval-driven method for going past the review. |
+| **`web-design-suite-execution-plan.md`** | **The schedule for everything left** (2026-10-02). Every open item and N-item in one of 43 PRs, P1–P43, over phases 3 to 6 and four releases. It also has the decisions the user made on 2026-10-02, the efficiency rules, the lean protocol per PR, and phase 7, an eval-driven method for going past the review. |
 | `check_execution_plan.py` | Fails if an open item is missing from the execution plan's schedule or placed twice. Run it after changing the plan or the inventory. |
 | `web-design-suite-completion-plan.md` | **What each item needs.** Phases 3 to 6 (3.3.0 onward) in fourteen workstreams, W1–W14. It covers every open review item and what phase 2 and 3.2.1 found. It also has the rules of the work, the decisions only the user can make, and the release procedure. |
 | `web-design-suite-completion-inventory.md` | All 265 review items, each with its status: fixed in a release, or planned in a workstream. It replaces the review's ✔ marks; update a row when its item is fixed. |
