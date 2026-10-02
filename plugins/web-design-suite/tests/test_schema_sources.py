@@ -209,8 +209,10 @@ class MigrationsThatDumpsRewrite(SchemaSources):
                    "create unique index a_region on a (region);\n"
                    "create table b (id uuid primary key, a_code text references a (code));\n"
                    "create table pairs (x uuid, y uuid, label text, primary key (x, y));\n"
+                   'create table d (id uuid primary key, old int, "old.part" int check ("old.part" > 0));\n'
                    "alter table a drop column code cascade;\n"
-                   "alter table pairs drop column x;\n")
+                   "alter table pairs drop column x;\n"
+                   "alter table d drop column old;\n")
         model = self.introspect("schema.sql")
         tables = {t["name"]: t for t in model["tables"]}
         self.assertEqual([["region"]], tables["a"]["unique_indexes"])
@@ -219,6 +221,8 @@ class MigrationsThatDumpsRewrite(SchemaSources):
         self.assertEqual([], tables["b"]["relationships"])
         self.assertEqual([], tables["pairs"]["primary_key"])
         self.assertFalse(columns(model)["pairs.y"]["primary_key"])
+        # A quoted name is one name: "old.part" is not the column `old` (review of #16).
+        self.assertEqual(['"old.part" > 0'], columns(model)["d.old.part"]["checks"])
 
     def test_renaming_a_column_renames_what_names_it(self):
         # N18: Postgres retargets other tables' foreign keys and rewrites the CHECKs.
@@ -226,14 +230,21 @@ class MigrationsThatDumpsRewrite(SchemaSources):
                    "create table a (id uuid primary key, code text unique check (code <> 'code'),"
                    " qty int, check (qty > 0));\n"
                    "create table b (id uuid primary key, a_code text references a (code));\n"
+                   "create table c (id uuid primary key, lower text, note text check (lower(note) <> ''),"
+                   ' old int, "old.part" int check ("old.part" > 0));\n'
                    "alter table a rename column code to sku;\n"
-                   "alter table a rename qty to amount;\n")
+                   "alter table a rename qty to amount;\n"
+                   "alter table c rename column lower to lowered;\n"
+                   "alter table c rename column old to new;\n")
         cols = columns(self.introspect("schema.sql"))
         self.assertEqual(("a", "sku"), (cols["b.a_code"]["foreign_key"]["table"],
                                         cols["b.a_code"]["foreign_key"]["column"]))
         self.assertEqual(["sku <> 'code'"], cols["a.sku"]["checks"])
         self.assertEqual(["amount > 0"], cols["a.amount"]["checks"])
         self.assertIn(("exclusiveMin", 0), rules(cols["a.amount"]))
+        # A call is not a column, and a quoted name is one name (review of #16).
+        self.assertEqual(["lower(note) <> ''"], cols["c.note"]["checks"])
+        self.assertEqual(['"old.part" > 0'], cols["c.old.part"]["checks"])
 
     def test_a_not_null_constraint_is_not_a_column(self):
         # N19: Postgres 18 names a not-null constraint; the parser read the
@@ -243,12 +254,15 @@ class MigrationsThatDumpsRewrite(SchemaSources):
                    " constraint t_bio_nn not null bio);\n"
                    "alter table t add constraint t_name_nn not null name;\n"
                    "alter table t add not null nick;\n"
-                   "alter table t add constraint t_wat exclusion of some future kind;\n")
+                   "alter table t add constraint t_wat exclusion of some future kind;\n"
+                   # A table constraint may come before its column (review of #16).
+                   "create table u (constraint u_x_nn not null x, primary key (id), x text, id uuid);\n")
         cols = columns(self.introspect("schema.sql"))
-        self.assertEqual(["t.bio", "t.id", "t.name", "t.nick"], sorted(cols))
-        for name in ("t.bio", "t.name", "t.nick"):
+        self.assertEqual(["t.bio", "t.id", "t.name", "t.nick", "u.id", "u.x"], sorted(cols))
+        for name in ("t.bio", "t.name", "t.nick", "u.x"):
             with self.subTest(column=name):
                 self.assertFalse(cols[name]["nullable"])
+        self.assertTrue(cols["u.id"]["primary_key"])
 
 
 class GeneratedTypesAgreeOnStructure(SchemaSources):
