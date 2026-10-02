@@ -60,7 +60,8 @@ class ReleaseBuild(TempDirTest):
         tool.chmod(0o755)                   # where git reads modes from the disk (core.filemode) ...
         self.write(f"{P}/scripts/old.py", "print(0)\n")
         self.write(f"{P}/skills/alpha/SKILL.md", skill_md("alpha"))
-        self.write(f"{P}/skills/alpha/scripts/run.py", "#!/usr/bin/env python3\nprint(2)\n")
+        run = self.write(f"{P}/skills/alpha/scripts/run.py", "#!/usr/bin/env python3\nprint(2)\n")
+        run.chmod(0o755)                    # on POSIX, the second commit's `git add .` reads modes from the disk
         self.write(f"{P}/skills/alpha/evals/case.yaml", "prompt: x\n")
         self.write(f"{P}/skills/alpha/references/evals/notes.md", "kept: only a top-level evals/ is left out\n")
         self.write(f"{P}/skills/beta/SKILL.md", skill_md("beta", "Builds betas."))

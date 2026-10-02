@@ -55,7 +55,7 @@ The plugin is done when all of these hold:
 
 ## 4. The schedule
 
-Size: S is about a quarter of a session, M about a third, L about half. A session is the user's usual 500 thousand tokens. Each PR follows §6.
+Size: S is about a quarter of a session, M about a third, L about half. A session is up to 750 thousand tokens, with no compacting (the user, 2026-10-02); the sizes were set against 500 thousand. Each PR follows §6.
 
 ### Phase 3 · 3.3.0: safe defaults and one set of rules
 

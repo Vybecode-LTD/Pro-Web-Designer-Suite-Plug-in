@@ -178,6 +178,12 @@
   - stylelint never checked where the statement stands, so a rule above it passed,
     though the audit refused it. `design/layer-order` refuses it now, from a second
     refused example in the spec.
+- **On Linux and macOS, `snapshot_matrix` missed a state with no style** (found by the
+  first CI run). It called a hover, active or focus-visible cell unstyled only when it
+  was pixel-identical to its default cell. There, text is antialiased by where it sits,
+  so twin cells drawn side by side differ in a few edge pixels, or by a pixel in size,
+  and the check never fired. It now uses the baseline comparison's own tolerances, and
+  compares the area two cells share when they differ by one pixel.
 
 ### Added
 
@@ -281,6 +287,25 @@
     the N29 example through the audit, which refused it already.
 - `load_script` moves into `wds_support`, for the test that holds the scaffold's copy
   of the reserved words equal to the parser's.
+- N5, the PR tools and the build, from `tools/fail_before.py` against 3.2.1: nine
+  fixed and eleven controls.
+  - `test_file_modes` reads git's modes (the index, or the commit `WDS_PLUGIN_REV`
+    names) and fails on 3.2.1, where 17 scripts with a shebang were 100644.
+  - `test_tools`, eight tests, all fixed. `fail_before.py` runs on a fake repository of
+    two commits with a fix, a control, a test that still fails, a regression, failing
+    subtests, a skip and a failing `setUpClass`. `check.py`'s choice of tests is checked
+    on its own, and its list of changed files keeps a path with a space whole.
+  - `test_release_build` ports the zip builder's seven tests to `build.py` and adds four:
+    each `.skill` file, the sums, a skill the platform refuses, and a long description
+    as a warning. The builder lives in `tooling/`, outside the plugin, so all eleven run
+    the same builder in both runs: they are controls.
+- `test_policies` keeps the scratch cluster's socket in its own folder: Debian's and
+  Ubuntu's Postgres put it in `/var/run/postgresql`, which only `postgres` may write.
+- The first CI run, on Linux and macOS: `test_browser_runtime.MatrixSeesStateChanges`
+  failed there and passes now, which holds the `snapshot_matrix` fix; on Windows it
+  passes on both. Two tests assumed Windows: `test_harness` took a relative path across
+  drives (the runner's checkout is on `D:`), and `test_release_build` set a mode git
+  re-read from the disk on POSIX.
 
 ## 3.2.1 — 2026-09-25
 

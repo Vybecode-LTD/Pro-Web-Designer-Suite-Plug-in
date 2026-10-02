@@ -289,7 +289,7 @@ const STUB_JS = `
 // metric (luma weighted far above chroma, because that is how eyes work) plus a
 // 3x3 neighbourhood escape so sub-pixel antialiasing does not count.
 
-const COMPARE_FN = async ({ aURL, bURL, pixelThreshold }) => {
+const COMPARE_FN = async ({ aURL, bURL, pixelThreshold, common = false }) => {
   const load = async (url) => {
     const bmp = await createImageBitmap(await (await fetch(url)).blob());
     const c = new OffscreenCanvas(bmp.width, bmp.height);
@@ -297,10 +297,24 @@ const COMPARE_FN = async ({ aURL, bURL, pixelThreshold }) => {
     ctx.drawImage(bmp, 0, 0);
     return { w: bmp.width, h: bmp.height, d: ctx.getImageData(0, 0, bmp.width, bmp.height).data };
   };
-  const A = await load(aURL);
-  const B = await load(bURL);
+  let A = await load(aURL);
+  let B = await load(bURL);
   if (A.w !== B.w || A.h !== B.h) {
-    return { sizeChanged: true, a: [A.w, A.h], b: [B.w, B.h] };
+    // Two cells side by side sit at different fractional offsets, so one can
+    // come out a pixel wider or taller than its twin. With `common`, compare
+    // the area they share.
+    if (!common || Math.abs(A.w - B.w) > 1 || Math.abs(A.h - B.h) > 1) {
+      return { sizeChanged: true, a: [A.w, A.h], b: [B.w, B.h] };
+    }
+    const cw = Math.min(A.w, B.w);
+    const ch = Math.min(A.h, B.h);
+    const crop = (I) => {
+      const d = new Uint8ClampedArray(cw * ch * 4);
+      for (let y = 0; y < ch; y++) d.set(I.d.subarray(y * I.w * 4, (y * I.w + cw) * 4), y * cw * 4);
+      return { w: cw, h: ch, d };
+    };
+    A = crop(A);
+    B = crop(B);
   }
   const { w, h } = A;
   // Max possible YIQ distance, used to normalise into 0..1.
@@ -563,9 +577,12 @@ async function main() {
     });
   }
 
-  // A hover, active or focus-visible cell that is pixel-identical to its
-  // default cell has no style for that state. That needs no baseline: it is
-  // wrong on the first run, and a baseline recorded from it would enshrine it.
+  // A hover, active or focus-visible cell that renders like its default cell
+  // has no style for that state. That needs no baseline: it is wrong on the
+  // first run, and a baseline recorded from it would enshrine it. "Like" is
+  // the baseline comparison's own tolerance, not pixel identity: on Linux and
+  // macOS text is antialiased by where it sits, so twin cells drawn side by
+  // side differ in a few edge pixels, while a real state style changes many.
   const STATE_SEG = /--st_(hover|active|focus-visible)(?=--|$)/;
   for (const [id, buf] of shots) {
     const m = STATE_SEG.exec(id);
@@ -576,9 +593,10 @@ async function main() {
     const res = await cmp.evaluate(COMPARE_FN, {
       aURL: 'data:image/png;base64,' + base.toString('base64'),
       bURL: 'data:image/png;base64,' + buf.toString('base64'),
-      pixelThreshold: 0,
+      pixelThreshold: opts.pixelThreshold,
+      common: true,
     });
-    if (res.sizeChanged || res.mismatched > 0) continue;
+    if (res.sizeChanged || res.ratio > opts.threshold) continue;
     const note = `renders exactly like ${defaultId}: the ${m[1]} state has no visible style`;
     const row = rows.find((r) => r.id === id);
     if (row) {
