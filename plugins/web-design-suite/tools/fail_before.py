@@ -48,7 +48,14 @@ PLUGIN = "plugins/web-design-suite"
 # was skipped. Reading results this way, rather than unittest's text, holds
 # from Python 3.9 to 3.14.
 RUNNER = """
-import json, sys, unittest
+import json, re, sys, unittest
+
+def each(suite):
+    for test in suite:
+        if isinstance(test, unittest.TestSuite):
+            yield from each(test)
+        else:
+            yield test
 
 class Result(unittest.TestResult):
     def __init__(self):
@@ -64,7 +71,15 @@ class Result(unittest.TestResult):
     def addFailure(self, test, err):
         self.row(test)["failed"] += 1
     def addError(self, test, err):
-        self.row(test)["failed"] += 1
+        if isinstance(test, unittest.TestCase):
+            self.row(test)["failed"] += 1
+            return
+        # A class or module fixture failed ("setUpClass (module.Class)"):
+        # it counts against every test under it, none of which ran.
+        scope = re.search(r"\\((.*)\\)", str(test))
+        under = [k for k in self.rows if scope and k.startswith(scope.group(1) + ".")]
+        for key in under or [str(test)]:
+            self.rows.setdefault(key, {"ok": False, "failed": 0, "skipped": None})["failed"] += 1
     def addSkip(self, test, reason):
         self.row(test)["skipped"] = reason
     def addExpectedFailure(self, test, err):
@@ -76,7 +91,10 @@ class Result(unittest.TestResult):
             self.row(test)["failed"] += 1
 
 result = Result()
-unittest.defaultTestLoader.loadTestsFromNames(sys.argv[2:]).run(result)
+suite = unittest.defaultTestLoader.loadTestsFromNames(sys.argv[2:])
+for test in each(suite):
+    result.row(test)
+suite.run(result)
 with open(sys.argv[1], "w", encoding="utf-8") as f:
     json.dump(result.rows, f)
 """

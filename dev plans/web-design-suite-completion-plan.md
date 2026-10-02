@@ -22,6 +22,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 - **Reproduce first.** Some items were fixed under another ID (the inventory marks those known). If an item no longer reproduces, record which release fixed it and which test holds it; do not write a fix for it.
 - **Read the item in its detail file** (`web-design-suite-review/<area>.md`) before you touch it. The detail files give where, why, and usually how. The tables below carry only the first sentence.
 - **Two Python versions.** Before each commit that changes the plugin, run the full suite from `plugins/web-design-suite` on Python 3.14, `uv run --no-project --python 3.14 python -B -m unittest discover -s tests`, and on the floor, the same with `3.9`. The command is the same in cmd, PowerShell and Git Bash. *From P1 of the execution plan on (D1, 2026-10-02), CI runs the full suite on Windows, Linux and macOS, on both Pythons, on every push. A PR then runs only its affected tests locally.*
+- **CI (decision D1).** In force once CI is green on all six jobs of PR #17: CI then runs the full suite on Windows, Linux and macOS, at Python 3.9 and 3.14, for every PR, and replaces the two local full runs. Locally, run `python tools/check.py` (the static checks and the affected tests) and `python tools/fail_before.py <test ids>` (the fail-before table, against the latest tag or `--rev`).
 - **One set of rules.** A change to what a gate accepts goes into `skills/web-design-studio/assets/rules/design-rules.json` first. Then it goes into the audit, the stylelint config and the ESLint config, with a real-tool test in `test_real_tools.py`.
 - **Facts from outside the plugin** (laws, standards, vendor limits, prices, dates) are re-read at their source on the day and registered in `tests/fixtures/evidence.json` with their quote.
 - **Git.** One branch per phase, conventional commits, and a PR. Tag after the merge. Read the staged diff before every commit: never commit a secret.
@@ -174,7 +175,7 @@ These are from the review:
 These were found in phase 2 and 3.2.1:
 
 - **N4.** `accessibility.md` is 60.1 KB, at the limit of one Read. Split it the way 3.2.0 split navigation-patterns.md, and keep `test_skill_budget` passing.
-- **N5.** Only the nine scripts that were executable in 3.0.0 are marked executable (the hook is one of them). Mark the other 17 scripts that have a shebang, and add a test that reads git's file modes. Since 3.2.1 the zip builder takes modes from git, so the zip carries them.
+- **N5.** *Done for 3.3.0 (PR #17).* Only the nine scripts that were executable in 3.0.0 are marked executable (the hook is one of them). Mark the other 17 scripts that have a shebang, and add a test that reads git's file modes. Since 3.2.1 the zip builder takes modes from git, so the zip carries them.
 - **N6.** *Done for 3.3.0.* Python 3.9 is the floor (decision 2). The harness no longer needs 3.10, `test_docs.PythonFloor` runs `test_harness` on 3.9, and the README states 3.9.
 - **N7.** TypeScript 7 is npm's latest, and typescript-eslint 8.70 accepts TypeScript below 6.1. A project that installs typescript-eslint without pinning TypeScript gets a peer conflict. Say so wherever the docs install typescript-eslint.
 - **N8.** The plugin README's install section names only a local folder. Add the GitHub route, `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, which anyone can use now that the repository is public.
@@ -485,15 +486,14 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 
 1. Write the CHANGELOG entry first, then set the version in `plugins/web-design-suite/.claude-plugin/plugin.json`.
 2. Verify:
-   - the full suite on Python 3.14 and 3.9, the floor;
-   - the fail-before run against the previous tag;
-   - Linux through WSL: `wsl -e sh -c "cd /mnt/c/DEV/Pro-Web-Designer-Suite-Plug-in/plugins/web-design-suite && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests"`;
-   - `claude plugin validate --strict` on the repository root, on the plugin folder, and on `plugin.json`.
+   - CI is green on every job of the release PR: the suite on Windows, Linux and macOS at Python 3.9 and 3.14, the static checks, and `claude plugin validate --strict`;
+   - the fail-before table for the release's fixes: `python tools/fail_before.py <test ids> --rev <previous tag>`;
+   - `claude plugin tag --dry-run plugins/web-design-suite` on the merged commit: it checks that `plugin.json` and the marketplace entry agree. The release's tag stays `vX.Y.Z`; the CLI's own would be `web-design-suite--vX.Y.Z`.
 
    Use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\claude.exe`; the one on PATH is older.
 3. Write the report as `dev plans/web-design-suite-<version>-report.md`, modelled on the 3.1.0 and 3.2.0 reports. Update the inventory and the `dev plans` README.
-4. Build the zip from the merged commit with `python tooling/release/build_zip.py <previous release zip> <out zip> --rev <commit or tag>` (until phase 5 replaces it). It packs only what git tracks, with git's file modes, dated at the commit, so a rebuild is byte-identical; entries keep the previous zip's order, and removed files are listed. It refuses, and writes nothing, if the plugin holds a link or a submodule, or a file `git archive` leaves out. Write the output into `Downloads`, which is not redirected to OneDrive. Then extract the zip into one folder and `git archive` of the same commit into another with `tar --strip-components=1`, so each holds a `web-design-suite` folder, and `diff -r` the two.
-5. Open the PR, merge, then tag `vX.Y.Z` on main and push the tag.
+4. To see the release before tagging, build it locally from the merged commit: `python tooling/release/build.py <empty folder> --rev <commit>`. It writes `web-design-suite-<version>.zip`, one `.skill` file per skill and `SHA256SUMS`, from what git tracks, with git's file modes, dated at the commit, so a rebuild is byte-identical. It refuses, and writes nothing, if the plugin holds a link or a submodule, a file `git archive` leaves out, or a skill the platform would refuse. Write it into `Downloads`, which is not redirected to OneDrive. Never publish this build: CI makes the release.
+5. Merge the PR, then tag `vX.Y.Z` on main and push the tag. `.github/workflows/release.yml` checks that the tag is `plugin.json`'s version, builds the same files on GitHub's runner, and creates the GitHub release with them and the CHANGELOG's section as its notes. It is the only thing that creates a release: never run `gh release create` by hand.
 6. Update the installed copy.
    - Mirror the release into `C:\Users\vybec\.claude\local-marketplaces\web-design-suite\`, removing files that were deleted: extract the zip from step 4 (or `git archive` of the release commit) and mirror that, never the working folder, which can hold a `__pycache__` or a `node_modules`. That folder is the marketplace that `claude plugin update` installs from, so never move or delete it; sessions load the cached copy the last bullet names.
    - Check it with `diff -r`, then run `claude plugin update web-design-suite@web-design-suite`.

@@ -60,6 +60,19 @@ class Fake(unittest.TestCase):
 
     def test_the_root_and_its_commit_come_together(self):
         self.assertEqual("WDS_PLUGIN_ROOT" in os.environ, "WDS_PLUGIN_REV" in os.environ)
+
+
+class FakeFixture(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        assert value() == "2", "the fixture needs the fix"
+
+    def test_under_a_fixture_one(self):
+        pass
+
+    def test_under_a_fixture_two(self):
+        pass
 '''
 
 
@@ -122,8 +135,11 @@ class FailBefore(FakeRepository):
             "test_subtests": ("FAIL (3)", "ok", "fixed"),
             "test_skipped": ("skipped", "skipped", "skipped"),
             "test_the_root_and_its_commit_come_together": ("ok", "ok", "control"),
+            # A failing setUpClass counts against each test of its class.
+            "test_under_a_fixture_one": ("FAIL (1)", "ok", "fixed"),
+            "test_under_a_fixture_two": ("FAIL (1)", "ok", "fixed"),
         }, rows)
-        self.assertIn("2 fixed, 2 controls, 1 still failing, 1 regressions, 1 skipped; against", output(proc))
+        self.assertIn("4 fixed, 2 controls, 1 still failing, 1 regressions, 1 skipped; against", output(proc))
         self.assertIn("before (v0.1.0)", output(proc))
         self.assertEqual(before, self.files())                  # no bytecode, no unpacked copy
 

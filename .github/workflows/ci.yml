@@ -38,7 +38,7 @@ jobs:
 
       # uv fetches the interpreter, so 3.9 comes from the same place on every
       # runner, arm64 macOS included, and the command is the one used locally.
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0   # this action publishes no major tag
         with:
           enable-cache: false
 

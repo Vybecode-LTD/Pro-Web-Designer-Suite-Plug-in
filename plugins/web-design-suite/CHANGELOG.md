@@ -205,6 +205,21 @@
   macOS still ships; now the tests do too. The harness no longer uses
   `TemporaryDirectory(ignore_cleanup_errors=)`, `write_text(newline=)` or a slice of
   `Path.parents`, all 3.10+, and the README states the new floor.
+- **CI** (XC-B3). `.github/workflows/ci.yml` runs the suite and the static checks on
+  Windows, Linux and macOS, at Python 3.9 and 3.14, with the pinned Node tools, and
+  `claude plugin validate --strict` on the marketplace, the plugin and `plugin.json`.
+  Linux adds Playwright's headless shell and Postgres, so the browser and policy tests
+  run there too.
+- **The release build** (XC-C6). `tooling/release/build.py` replaces `build_zip.py`. It
+  makes the plugin's zip, one `.skill` file per skill, packaged as Anthropic's
+  skill-creator packages one and carrying the plugin's LICENSE, and `SHA256SUMS`, all
+  from git and byte-identical on a rebuild. A pushed `v*` tag makes
+  `.github/workflows/release.yml` build them and create the GitHub release, with the
+  CHANGELOG's section as its notes; nothing else creates a release.
+- **The 17 scripts with a shebang are executable** (N5), as the nine from 3.0.0 were.
+- **Two tools for each PR.** `tools/fail_before.py` runs named tests against an earlier
+  revision and this tree, and prints fixed, control, still failing or regression for
+  each. `tools/check.py` runs the static checks and the tests a change affects.
 
 ### Tests
 
