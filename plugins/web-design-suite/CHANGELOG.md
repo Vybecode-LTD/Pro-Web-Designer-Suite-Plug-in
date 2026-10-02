@@ -307,7 +307,10 @@
   failed there and passes now, which holds the `snapshot_matrix` fix; on Windows it
   passes on both. Two tests assumed Windows: `test_harness` took a relative path across
   drives (the runner's checkout is on `D:`), and `test_release_build` set a mode git
-  re-read from the disk on POSIX.
+  re-read from the disk on POSIX. On a loaded macOS runner, the mega-menu scenario in
+  `test_recipes.NavigationCodeInABrowser` dwelt over a trigger past the recipe's
+  switching delay, because it timed the pointer with real waits. Its page now runs on
+  Playwright's fake clock, which only the scenario advances.
 
 ## 3.2.1 — 2026-09-25
 
