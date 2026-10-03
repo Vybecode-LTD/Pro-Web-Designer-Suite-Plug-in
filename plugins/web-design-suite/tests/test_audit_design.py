@@ -529,11 +529,14 @@ class AuditPrecision(TempDirTest):
                    "  .card__body { padding-inline: $space 5%; inline-size: calc(100% - #{$gutter}); }\n"
                    "  .card__media { padding: $space; inline-size: tokens.$media-size;"
                    " transition: opacity $fade $ease-in; }\n"
+                   "  .card__foot { padding: #{5%}; padding-block: #{$space}; }\n"
                    "}\n")
-        # CodeRabbit on #23: a percentage beside a variable is refused too, and
-        # a size derived from one is geometry, which goes in a socket.
+        # CodeRabbit on #23: a percentage beside a variable is refused too, a
+        # size derived from one is geometry, which goes in a socket, and an
+        # interpolation emits its expression: #{5%} is a literal.
         self.assertEqual([("L1", "raw-duration", 2), ("L1", "raw-size", 3), ("L1", "raw-spacing", 2),
-                          ("L1", "raw-spacing", 3), ("L1", "raw-stroke", 2)], self.found("src"))
+                          ("L1", "raw-spacing", 3), ("L1", "raw-spacing", 5), ("L1", "raw-stroke", 2)],
+                         self.found("src"))
 
     def test_indented_sass_is_skipped_not_passed(self):
         # Found with SB-A24: the scanner follows braces and indented Sass has

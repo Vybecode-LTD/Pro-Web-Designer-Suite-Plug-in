@@ -276,9 +276,10 @@
     `var(--gap-related) auto` sets the component's own block margin.
   - The audit's spacing, stroke, motion and sizing checks read the spec's allowlists, so
     they refuse what stylelint refuses. A value that holds a Sass variable or an
-    interpolation is judged with each reference read as a token, so `padding: $space 13px`
-    and `$space 5%` are refused as their CSS forms are, and the variable is
-    `sass-literal`'s (from the reviews of #23).
+    interpolation is judged with each variable read as a token and each interpolation
+    as the expression it emits, so `padding: $space 13px`, `$space 5%` and `#{5%}` are
+    refused as their CSS forms are, and the variable is `sass-literal`'s (from the
+    reviews of #23).
   - Seven reference blocks, two starter rules and two generated stylesheets broke the new
     rules and now follow them. Three inset focus rings used `* -2`, against the starter's
     `* -1`. The scroll-driven progress bar names its easing token. The table of contents'
