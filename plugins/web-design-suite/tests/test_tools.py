@@ -289,22 +289,25 @@ class SyncRules(TempDirTest):
         # N2, part 2: a family's values and the component margins are spec data.
         def change(spec):
             spec["values"]["families"]["spacing"]["allow"][2]["values"].insert(2, "auto")
-            spec["margins_in_components"]["values"].remove("0 auto")
+            spec["margins_in_components"]["values"][0:1] = ["0", "auto"]      # a shape becomes two values
         self.edit_spec(change)
         self.assertEqual(0, self.sync().returncode)
         stylelint = self.gates()[1].decode("utf-8")
         self.assertIn("\n  gap: [VAR_SEQ, '0', 'auto', ...KEYWORDS],\n", stylelint)
-        self.assertIn("\n  margin: ['0', 'auto', 'auto 0', CANCEL, ...KEYWORDS],\n", stylelint)
+        self.assertIn("\n  margin: ['0', 'auto', CANCEL, ...KEYWORDS],\n", stylelint)
+        self.assertIn('\nMARGIN_VALUES = ("0", "auto", CANCEL, *KEYWORDS)\n', self.gates()[0].decode("utf-8"))
         self.assertEqual(0, self.sync("--check").returncode)
 
-    def test_a_colour_function_reaches_the_audit_and_eslint(self):
-        self.edit_spec(lambda spec: spec["values"]["colour_functions"].append("color-mix"))
+    def test_a_colour_function_reaches_the_gates(self):
+        # SB-A15: stylelint reads the list too (design/no-literal-colour-function).
+        self.edit_spec(lambda spec: spec["values"]["colour_functions"].append("device-cmyk"))
         self.assertEqual(0, self.sync().returncode)
-        audit, _, eslint = (text.split(b"BEGIN design-rules")[1].split(b"END design-rules")[0]
-                            for text in self.gates())
-        self.assertIn(b'"color-mix"', audit)
-        self.assertIn(b"'color-mix'", eslint)
-        css = self.write("mix.css", "@layer components {\n.a { color: color-mix(in oklch, red, blue); }\n}\n")
+        audit, stylelint, eslint = (text.split(b"BEGIN design-rules")[1].split(b"END design-rules")[0]
+                                    for text in self.gates())
+        self.assertIn(b'"device-cmyk"', audit)
+        self.assertIn(b"'device-cmyk'", stylelint)
+        self.assertIn(b"'device-cmyk'", eslint)
+        css = self.write("mix.css", "@layer components {\n.a { color: device-cmyk(0 81% 81% 30%); }\n}\n")
         proc = subprocess.run([sys.executable, "-B", str(self.root / self.GATES[0]), str(css), "--json"],
                               capture_output=True, env=env(), timeout=60)
         self.assertIn("raw-color", [f["rule"] for f in json.loads(proc.stdout)], output(proc))

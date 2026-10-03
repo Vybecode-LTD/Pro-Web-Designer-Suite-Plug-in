@@ -154,7 +154,8 @@
   /* Narrower reading column inside the content column, without a wrapper. */
   .page-grid > .bleed-prose {
     grid-column: content;
-    inline-size: min(100%, var(--measure-prose));
+    inline-size: 100%;
+    max-inline-size: var(--measure-prose);
     margin-inline: auto;
   }
 
@@ -874,7 +875,7 @@
     /* Derived: the parent, less the margin on each side. */
     --imposter-max: calc(100% - var(--imposter-margin) * 2);
     max-inline-size: var(--imposter-max);
-    max-block-size: var(--imposter-max);
+    max-block-size: var(--imposter-max-block, var(--imposter-max));
     overflow: auto;
     z-index: var(--z-raised);
   }
@@ -883,7 +884,7 @@
   .imposter-anchor { position: relative; }
 
   .imposter--fixed   { position: fixed; z-index: var(--z-modal); }
-  .imposter--contain { max-block-size: calc(100svb - var(--imposter-margin) * 2); }
+  .imposter--contain { --imposter-max-block: calc(100svb - var(--imposter-margin) * 2); }
   .imposter--top     { inset-block-start: var(--imposter-margin); translate: -50% 0; }
   .imposter--bottom  { inset-block: auto var(--imposter-margin); translate: -50% 0; }
 

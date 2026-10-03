@@ -470,6 +470,7 @@ class StylelintConfig(unittest.TestCase):
                  **{name: path.read_text(encoding="utf-8") for name, path in CANONICAL_ENTRIES.items()},
                  **{f"src/styles/{css.name}": css.read_text(encoding="utf-8")
                     for css in sorted(STARTER_STYLES.glob("*.css"))},
+                 "src/tailwind/theme.css": (CONFIGS / "theme.css").read_text(encoding="utf-8"),
                  **{name: css for name, (css, _) in REFUSED_CSS.items()},
                  **ALLOWED_CSS,
                  **{ex.name: ex.text for ex in spec_examples() if "stylelint" in ex.gates}}
@@ -500,6 +501,13 @@ class StylelintConfig(unittest.TestCase):
         for name, path in CANONICAL_ENTRIES.items():
             with self.subTest(entry=path.name):
                 self.assertEqual([], self.problems(name))
+
+    def test_theme_css_passes_the_override_that_guards_it(self):
+        """SB-A15: the theme-file override switched the allowlist off, so a binding
+        to 28px or oklch() passed the file stack-tailwind.md says the gate guards.
+        Its custom properties now take the spec's bindings, and theme.css's own
+        `--animate-*` read the motion tokens instead of 1s and 2s."""
+        self.assertEqual([], self.problems("src/tailwind/theme.css"))
 
     def test_what_the_laws_refuse_is_refused(self):
         for name, (_, rule) in REFUSED_CSS.items():

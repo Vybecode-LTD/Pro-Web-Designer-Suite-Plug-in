@@ -177,7 +177,8 @@ const SPACE_BETWEEN = /(?<![-\w])(?:space-[xy]-|divide-[xy]?(?:-|\b))/;
  * (values.colour_functions), as the audit's do. */
 // BEGIN design-rules: written by tools/sync_rules.py from assets/rules/design-rules.json; edit the spec, then rerun it
 const COLOUR_FUNCTIONS = [
-  'rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color',
+  'rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color', 'color-mix',
+  'light-dark',
 ];
 const LITERAL_UNITS = [
   'px', 'rem', 'em', 'ch', 'ex', 'vw', 'vh', 'vmin', 'vmax', '%', 'deg', 's', 'ms',

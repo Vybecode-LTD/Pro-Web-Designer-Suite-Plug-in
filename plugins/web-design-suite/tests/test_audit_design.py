@@ -315,12 +315,15 @@ class AuditPrecision(TempDirTest):
     def test_a_zero_margin_claims_no_space(self):
         """SB-A14: a child resetting its margin to 0 asserts no space, and
         stylelint already allowed it; the audit called it an outer margin."""
-        for value in ("0", "0px", "0 auto", "0 0 0 0"):
+        for value in ("0", "0 auto", "0 0 0 0"):
             with self.subTest(value=value):
                 self.assertNotIn(("L2", "child-margin"),
                                  self.rules(f".card__media {{ margin-block-end: {value}; }}"))
         self.assertIn(("L2", "child-margin"),
                       self.rules(".card__media { margin-block-end: var(--gap-related); }"))
+        # 3.3.0: 0 is spelled 0. stylelint refuses `0px` (length-zero-no-unit and
+        # the allowlists), and so does the audit now (N31).
+        self.assertIn(("L1", "raw-spacing"), self.rules(".card__media { margin-block-end: 0px; }"))
 
     def test_a_pragma_wrapped_over_two_lines_covers_the_next_declaration(self):
         """Comments were keyed by the line they START on, so a wrapped pragma
@@ -487,7 +490,10 @@ class AuditPrecision(TempDirTest):
                    "  }\n"
                    "  .card { inline-size: calc(100% - #{$gutter}); margin-inline: #{$gutter}; padding: 13px; }\n"
                    "}\n")
-        self.assertEqual([("L1", "raw-spacing", 5), ("L2", "child-margin", 5)], self.found("src"))
+        # The calc() is a size derived from a variable: geometry, refused as
+        # its CSS form is, since 3.3.0.
+        self.assertEqual([("L1", "raw-size", 5), ("L1", "raw-spacing", 5), ("L2", "child-margin", 5)],
+                         self.found("src"))
 
     def test_a_brace_in_a_string_does_not_extend_an_interpolation(self):
         # CodeRabbit on PR #7: a quoted `{` inside `#{…}` was counted as
@@ -508,7 +514,29 @@ class AuditPrecision(TempDirTest):
                    "  .card { padding: 0px 13px; }\n"
                    "  .card__media { padding: 0px 0rem; }\n"
                    "}\n")
-        self.assertEqual([("L1", "raw-spacing", 2)], self.found("src"))
+        # Line 3 holds no length but zeros. Since 3.3.0 a zero with a unit is
+        # refused too, as stylelint refuses it: 0 is spelled 0 (N31).
+        self.assertEqual([("L1", "raw-spacing", 2), ("L1", "raw-spacing", 3)], self.found("src"))
+
+    def test_a_literal_beside_a_sass_variable_is_still_refused(self):
+        # Codex on #23: the value allowlists skipped every value that held a Sass
+        # reference, so `padding: $space 13px` passed, which the audit refused
+        # before, and stylelint reads no SCSS. What is beside the variables is
+        # judged; the variables are sass-literal's.
+        self.write("src/components/card.scss",
+                   "@layer components {\n"
+                   "  .card { padding: $space 13px; transition: opacity $fade 200ms; border: 1px solid $line; }\n"
+                   "  .card__body { padding-inline: $space 5%; inline-size: calc(100% - #{$gutter}); }\n"
+                   "  .card__media { padding: $space; inline-size: tokens.$media-size;"
+                   " transition: opacity $fade $ease-in; }\n"
+                   "  .card__foot { padding: #{5%}; padding-block: #{$space}; }\n"
+                   "}\n")
+        # CodeRabbit on #23: a percentage beside a variable is refused too, a
+        # size derived from one is geometry, which goes in a socket, and an
+        # interpolation emits its expression: #{5%} is a literal.
+        self.assertEqual([("L1", "raw-duration", 2), ("L1", "raw-size", 3), ("L1", "raw-spacing", 2),
+                          ("L1", "raw-spacing", 3), ("L1", "raw-spacing", 5), ("L1", "raw-stroke", 2)],
+                         self.found("src"))
 
     def test_indented_sass_is_skipped_not_passed(self):
         # Found with SB-A24: the scanner follows braces and indented Sass has

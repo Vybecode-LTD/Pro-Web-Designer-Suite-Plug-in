@@ -230,6 +230,64 @@
     (`test_a_baselined_inline_literal_does_not_hide_a_new_one_beside_it`, which fails on
     `bc911b4`).
 
+- **The holes in the stylelint allowlist are closed, and the gates agree on them**
+  (SB-A15, N31). Each hole is now examples in the spec, which the conformance tests run
+  through the audit and stylelint:
+  - A colour function of literals is refused in every property: a `background` or
+    `border` shorthand, a gradient, a filter. `design/no-literal-colour-function`
+    replaces `function-disallowed-list`, which named only `rgb`, `rgba`, `hsl`, `hsla`
+    and `hwb`. It reads the spec's colour functions, which now include `color-mix()` and
+    `light-dark()`, and allows a colour derived from a token, a function with a `var()`
+    among its arguments (`oklch(from var(--bg-accent) l c h / 0.5)`), as the audit does.
+  - Line weights are a family, `stroke`. `border-width`, the side and logical widths,
+    `outline-width` and `outline-offset` take a `--stroke-*` token or `0`, and the
+    `border*` and `outline` shorthands take tokens, a style keyword, `currentColor` or
+    `transparent`. The audit refuses a literal width too (L1 `raw-stroke`); it read only
+    the colour there.
+  - A margin outside a component takes the spacing scale: the spacing family lists the
+    margin properties. In a component, Law 2 still holds it to alignment, a cancelled
+    token, the owl, and now the component's own `::before` and `::after`.
+  - Sizing covers every width and height. The maxima and minima, `inline-size`,
+    `block-size`, `width` and `height` take a token, `100%`, `auto`, an intrinsic keyword
+    or `1em`. A size derived from tokens goes in a socket.
+  - The `transition` and `animation` shorthands take the motion tokens: a list of
+    properties or keyframe names, tokens, keywords such as `allow-discrete`, `0s` and an
+    iteration count. A time, a curve or an easing keyword (`ease-in`, `linear`, in any
+    case: names are lowercase kebab-case) is refused there and in the timing-function longhands, by both gates; the audit missed
+    the keywords.
+  - theme.css's custom properties take a token, a colour word or a keyword, and the
+    literals its §0 documents: a breakpoint in rem, never a `var()`, which a media query
+    cannot read, and an aspect ratio. A breakpoint may be a CSS-wide keyword too, so
+    `--breakpoint-*: initial` still clears Tailwind's own, and a prefix with a rule of
+    its own answers to it alone (`--aspect-video: currentColor` is refused). The
+    override switched the
+    allowlist off, so
+    `--spacing-card: 28px` passed. The audit checks them too (L1 `binding-literal`), and
+    theme.css's `--animate-spin` and `--animate-pulse` read `--dur-loop`, not `1s` and
+    `2s`.
+  - Positions (`top`, `left`, `inset*`) are geometry, which the spec gives to the audit
+    alone. The audit took `1rem` there for an em, and read only the first length, so
+    `inset: -0.4em 12px` passed.
+  - N31: `0` among tokens is allowed (`padding: 0 var(--pad-card)`), as the zero rule
+    says, and `0px` is refused, as stylelint's `length-zero-no-unit` refused it. A share
+    of the container in a spacing property (`calc(100% - var(--gutter-page))`, `5%`) is
+    refused by the audit too. The audit no longer exempts a component's margin in a rule
+    whose selector names `prose`, or any margin that holds an `auto`:
+    `var(--gap-related) auto` sets the component's own block margin.
+  - The audit's spacing, stroke, motion and sizing checks read the spec's allowlists, so
+    they refuse what stylelint refuses. A value that holds a Sass variable or an
+    interpolation is judged with each variable read as a token and each interpolation
+    as the expression it emits, so `padding: $space 13px`, `$space 5%` and `#{5%}` are
+    refused as their CSS forms are, and the variable is `sass-literal`'s (from the
+    reviews of #23).
+  - Seven reference blocks, two starter rules and two generated stylesheets broke the new
+    rules and now follow them. Three inset focus rings used `* -2`, against the starter's
+    `* -1`. The scroll-driven progress bar names its easing token. The table of contents'
+    and the progress bar's derived sizes, the imposter's contained height and the
+    scaffold's skeleton sizes are sockets. The reading column and the presentation deck's
+    slides are `100%` up to the measure. The visually-hidden utility's 1px box carries
+    both tools' pragma.
+
 ### Added
 
 - **One canonical entry stylesheet per stack** (SB-C9, SS-C9 in part). The starter
@@ -305,6 +363,15 @@
   selector in a component file, a named colour, a system colour outside forced-colors
   mode, and a design literal in an inline custom property are errors now. Each is what
   stylelint or ESLint already refused.
+- **Both gates are stricter** (SB-A15, N31). The audit and stylelint now refuse a colour
+  function of literals in any property, a literal border or outline width, a literal
+  margin outside a component, a literal width or height, a time, curve or easing keyword
+  in a `transition` or `animation`, a zero with a unit (`0px`), and a literal in a theme
+  file's custom properties. Run both over your project before upgrading: each finding
+  names the token to use, and a size derived from tokens moves into a socket. A disable
+  comment that names `function-disallowed-list` needs `design/no-literal-colour-function`
+  instead. theme.css's `animate-spin` now turns in `--dur-loop` (900ms, was 1s), and
+  `animate-pulse` breathes in it too (was 2s).
 - **Two stylelint rules were renamed.** A disable comment for `color-no-hex` names
   `design/color-no-hex` now, and one for a component's margin names
   `design/component-margins` instead of `declaration-property-value-allowed-list`.
@@ -446,6 +513,17 @@
   in real time, so a slow runner overran the menu's 300 ms cap. A real 60 ms delay per
   step reproduced it locally. The scenario now pauses the clock once the page has
   loaded, and keeps that delay as a guard: it passes with the pause, and fails without.
+- P3 part 2 (SB-A15, N31): the spec's examples hold every hole: the colour functions in
+  any property, the `stroke` family, margins in a layout file (a family's `layout`
+  examples), the wider sizing family, the motion shorthands, the theme bindings (files of
+  their own, `*-theme.css`), the audit-only `geometry`, and N31's zeros, shares and
+  margins. stylelint also lints theme.css as shipped
+  (`test_theme_css_passes_the_override_that_guards_it`), and the spec's binding file class
+  is held against the audit and the config's override. Against `cde5e05` (`main`): the
+  audit's conformance leg fails 31 subtests and stylelint's 36, the file classes one,
+  and the two unit tests that let a zero with a unit pass one each (5 tests); 6 are
+  controls, among them the references' snippets, the starter's own stylelint run and
+  ESLint's leg. Against `v3.2.1`, 8 fail and 3 are controls.
 
 ## 3.2.1 — 2026-09-25
 

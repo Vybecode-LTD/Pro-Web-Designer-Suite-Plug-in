@@ -872,7 +872,8 @@ the *styling* stays in the stylesheet and only the *number* crosses:
 ```css
 @layer components {
   .progress::after {
-    inline-size: calc(var(--progress) * 1%);
+    --progress-size: calc(var(--progress) * 1%);   /* derived: the number as a share */
+    inline-size: var(--progress-size);
     background: var(--bg-accent);
     transition: inline-size var(--motion-enter);
   }
@@ -1115,12 +1116,15 @@ The slowest failure, and the one with no single commit to point at. Someone adds
 `--color-brand-blue: #2563eb` to `@theme` because the client sent a hex. Six
 months later a third of the theme is literals and the token file is decorative.
 
-**Gate.** Stylelint's `color-no-hex` and `function-disallowed-list` stay ON for
-`theme.css`. The file has exactly four literal exceptions — breakpoints, CSS-wide
-keywords, keyframe geometry, aspect ratios — each documented in `theme.css` §0, each
-justified by a property of CSS rather than a deadline. A hex is never one of
-them: a breakpoint *must* be a literal because media queries cannot read custom
-properties; a color never must be.
+**Gate.** Stylelint's `design/color-no-hex` and `design/no-literal-colour-function`
+stay ON for `theme.css`, and its custom properties take the spec's bindings
+(`design-rules.json`: `bindings`), which the audit checks too (`binding-literal`):
+a token, `currentColor`, `transparent` or a CSS-wide keyword. The file has exactly
+four literal exceptions — breakpoints, CSS-wide keywords, keyframe geometry, aspect
+ratios — each documented in `theme.css` §0, each justified by a property of CSS
+rather than a deadline. A hex is never one of them: a breakpoint *must* be a literal
+because media queries cannot read custom properties; a color never must be. So
+`--color-brand-blue: #2563eb` and `--spacing-card: 28px` both fail the gate.
 
 ---
 

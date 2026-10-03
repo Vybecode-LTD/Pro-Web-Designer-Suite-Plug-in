@@ -71,11 +71,20 @@ const SYSTEM_COLOR_NAMES = [
 ];
 const SYSTEM_COLOR_PROPERTY = new RegExp(String.raw`^(?:color|fill|stroke|stop-color|flood-color|lighting-color|accent-color|caret-color|background(?:-color)?|border(?:-[a-z]+)*|outline(?:-color)?|text-decoration(?:-color)?|text-emphasis(?:-color)?|column-rule(?:-color)?|box-shadow|text-shadow)$`, 'i');
 const KEYWORDS = ['inherit', 'initial', 'unset', 'revert', 'revert-layer'];
+const COLOUR_FUNCTIONS = [
+  'rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color', 'color-mix',
+  'light-dark',
+];
 const COLOUR_WORDS = String.raw`/^(?:${['currentcolor', 'transparent', ...SYSTEM_COLOR_NAMES].join('|')})$/i`;
-const VAR_SEQ = String.raw`/^(?:var\(--[a-z0-9-]+\)\s*)+$/`;
+const VAR_SEQ = String.raw`/^(?:var\(--[a-z0-9-]+\)|0)(?:\s+(?:var\(--[a-z0-9-]+\)|0))*$/`;
 const VAR_ONE = String.raw`/^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$/`;
 const VAR_CALC = String.raw`/^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$/`;
 const CANCEL = String.raw`/^calc\(\s*(?:var\(--[a-z0-9-]+\)\s*\*\s*-1|-1\s*\*\s*var\(--[a-z0-9-]+\))\s*\)$/`;
+const ALIGN = String.raw`/^(?:0|auto)(?:\s+(?:0|auto)){0,3}$/`;
+const STROKE = String.raw`/^(?:var\(--[a-z0-9-]+\)|0|none|solid|dashed|dotted|double|currentColor|currentcolor|transparent)(?:\s+(?:var\(--[a-z0-9-]+\)|0|none|solid|dashed|dotted|double|currentColor|currentcolor|transparent))*$/`;
+const MOTION_LIST = String.raw`/^(?:(?:var\(--[a-z0-9-]+\)|0s|\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\w-]))[a-z_-][a-z0-9_-]*)(?:\s*,\s*|\s+))*(?:var\(--[a-z0-9-]+\)|0s|\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\w-]))[a-z_-][a-z0-9_-]*)$/`;
+const BREAKPOINT = String.raw`/^\d+(?:\.\d+)?rem$/`;
+const RATIO = String.raw`/^\d+(?:\.\d+)?\s*/\s*\d+(?:\.\d+)?$/`;
 const VALUE_ALLOWLIST = {
   // spacing: Laws 1, 3, 6
   padding: [VAR_SEQ, VAR_CALC, '0', ...KEYWORDS],
@@ -90,8 +99,20 @@ const VALUE_ALLOWLIST = {
   'padding-block-start': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
   'padding-block-end': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
   gap: [VAR_SEQ, '0', ...KEYWORDS],
+  'grid-gap': [VAR_SEQ, '0', ...KEYWORDS],
   'row-gap': [VAR_ONE, '0', ...KEYWORDS],
   'column-gap': [VAR_ONE, '0', ...KEYWORDS],
+  margin: [VAR_SEQ, VAR_CALC, CANCEL, ALIGN, ...KEYWORDS],
+  'margin-inline': [VAR_SEQ, VAR_CALC, CANCEL, ALIGN, ...KEYWORDS],
+  'margin-block': [VAR_SEQ, VAR_CALC, CANCEL, ALIGN, ...KEYWORDS],
+  'margin-top': [VAR_ONE, VAR_CALC, CANCEL, '0', 'auto', ...KEYWORDS],
+  'margin-right': [VAR_ONE, VAR_CALC, CANCEL, '0', 'auto', ...KEYWORDS],
+  'margin-bottom': [VAR_ONE, VAR_CALC, CANCEL, '0', 'auto', ...KEYWORDS],
+  'margin-left': [VAR_ONE, VAR_CALC, CANCEL, '0', 'auto', ...KEYWORDS],
+  'margin-inline-start': [VAR_ONE, VAR_CALC, CANCEL, '0', 'auto', ...KEYWORDS],
+  'margin-inline-end': [VAR_ONE, VAR_CALC, CANCEL, '0', 'auto', ...KEYWORDS],
+  'margin-block-start': [VAR_ONE, VAR_CALC, CANCEL, '0', 'auto', ...KEYWORDS],
+  'margin-block-end': [VAR_ONE, VAR_CALC, CANCEL, '0', 'auto', ...KEYWORDS],
   // type: Laws 1, 3
   'font-size': [VAR_ONE, '1em', ...KEYWORDS],
   'line-height': [VAR_ONE, ...KEYWORDS],
@@ -105,6 +126,32 @@ const VALUE_ALLOWLIST = {
   'border-start-end-radius': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
   'border-end-start-radius': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
   'border-end-end-radius': [VAR_ONE, VAR_CALC, '0', ...KEYWORDS],
+  // stroke: Law 1
+  'border-width': [VAR_SEQ, '0', ...KEYWORDS],
+  'border-block-width': [VAR_SEQ, '0', ...KEYWORDS],
+  'border-inline-width': [VAR_SEQ, '0', ...KEYWORDS],
+  'border-top-width': [VAR_ONE, '0', ...KEYWORDS],
+  'border-right-width': [VAR_ONE, '0', ...KEYWORDS],
+  'border-bottom-width': [VAR_ONE, '0', ...KEYWORDS],
+  'border-left-width': [VAR_ONE, '0', ...KEYWORDS],
+  'border-block-start-width': [VAR_ONE, '0', ...KEYWORDS],
+  'border-block-end-width': [VAR_ONE, '0', ...KEYWORDS],
+  'border-inline-start-width': [VAR_ONE, '0', ...KEYWORDS],
+  'border-inline-end-width': [VAR_ONE, '0', ...KEYWORDS],
+  'outline-width': [VAR_ONE, '0', ...KEYWORDS],
+  'outline-offset': [VAR_ONE, CANCEL, '0', ...KEYWORDS],
+  border: [STROKE, ...KEYWORDS],
+  'border-top': [STROKE, ...KEYWORDS],
+  'border-right': [STROKE, ...KEYWORDS],
+  'border-bottom': [STROKE, ...KEYWORDS],
+  'border-left': [STROKE, ...KEYWORDS],
+  'border-block': [STROKE, ...KEYWORDS],
+  'border-block-start': [STROKE, ...KEYWORDS],
+  'border-block-end': [STROKE, ...KEYWORDS],
+  'border-inline': [STROKE, ...KEYWORDS],
+  'border-inline-start': [STROKE, ...KEYWORDS],
+  'border-inline-end': [STROKE, ...KEYWORDS],
+  outline: [STROKE, ...KEYWORDS],
   // elevation: Laws 1, 6
   'box-shadow': [VAR_ONE, 'none', ...KEYWORDS],
   // colour: Laws 1, 6
@@ -120,27 +167,43 @@ const VALUE_ALLOWLIST = {
   'z-index': [VAR_ONE, '0', 'auto', ...KEYWORDS],
   // motion: Law 1
   'transition-duration': [VAR_SEQ, '0s', ...KEYWORDS],
-  'animation-duration': [VAR_SEQ, '0s', ...KEYWORDS],
+  'animation-duration': [VAR_SEQ, '0s', 'auto', ...KEYWORDS],
   'transition-timing-function': [VAR_SEQ, ...KEYWORDS],
   'animation-timing-function': [VAR_SEQ, ...KEYWORDS],
+  transition: [MOTION_LIST, ...KEYWORDS],
+  animation: [MOTION_LIST, ...KEYWORDS],
   // sizing: Law 1
   'max-inline-size': [VAR_ONE, 'none', '100%', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
   'max-width': [VAR_ONE, 'none', '100%', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
+  'max-block-size': [VAR_ONE, 'none', '100%', '100dvh', '100dvb', '100svh', '100svb', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
+  'max-height': [VAR_ONE, 'none', '100%', '100dvh', '100dvb', '100svh', '100svb', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
   'min-block-size': [VAR_ONE, '0', '100%', '100dvh', '100dvb', '100svh', '100svb', 'auto', ...KEYWORDS],
-  'min-inline-size': [VAR_ONE, '0', '100%', 'auto', ...KEYWORDS],
+  'min-height': [VAR_ONE, '0', '100%', '100dvh', '100dvb', '100svh', '100svb', 'auto', ...KEYWORDS],
+  'min-inline-size': [VAR_ONE, '0', '100%', 'auto', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
+  'min-width': [VAR_ONE, '0', '100%', 'auto', 'max-content', 'min-content', 'fit-content', ...KEYWORDS],
+  'inline-size': [VAR_ONE, '0', '100%', 'auto', 'max-content', 'min-content', 'fit-content', '1em', ...KEYWORDS],
+  width: [VAR_ONE, '0', '100%', 'auto', 'max-content', 'min-content', 'fit-content', '1em', ...KEYWORDS],
+  'block-size': [VAR_ONE, '0', '100%', '100dvh', '100dvb', '100svh', '100svb', 'auto', 'max-content', 'min-content', 'fit-content', '1em', ...KEYWORDS],
+  height: [VAR_ONE, '0', '100%', '100dvh', '100dvb', '100svh', '100svb', 'auto', 'max-content', 'min-content', 'fit-content', '1em', ...KEYWORDS],
 };
 const MARGIN_ALLOWLIST = {
-  margin: ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
-  'margin-top': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
-  'margin-right': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
-  'margin-bottom': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
-  'margin-left': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
-  'margin-inline': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
-  'margin-block': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
-  'margin-inline-start': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
-  'margin-inline-end': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
-  'margin-block-start': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
-  'margin-block-end': ['0', 'auto', '0 auto', 'auto 0', CANCEL, ...KEYWORDS],
+  margin: [ALIGN, CANCEL, ...KEYWORDS],
+  'margin-top': [ALIGN, CANCEL, ...KEYWORDS],
+  'margin-right': [ALIGN, CANCEL, ...KEYWORDS],
+  'margin-bottom': [ALIGN, CANCEL, ...KEYWORDS],
+  'margin-left': [ALIGN, CANCEL, ...KEYWORDS],
+  'margin-inline': [ALIGN, CANCEL, ...KEYWORDS],
+  'margin-block': [ALIGN, CANCEL, ...KEYWORDS],
+  'margin-inline-start': [ALIGN, CANCEL, ...KEYWORDS],
+  'margin-inline-end': [ALIGN, CANCEL, ...KEYWORDS],
+  'margin-block-start': [ALIGN, CANCEL, ...KEYWORDS],
+  'margin-block-end': [ALIGN, CANCEL, ...KEYWORDS],
+};
+const BINDING_ALLOWLIST = {
+  '/^--breakpoint-/': [BREAKPOINT, ...KEYWORDS],
+  '/^--aspect-/': [RATIO, VAR_ONE, ...KEYWORDS],
+  '/^--animate-/': [MOTION_LIST],
+  '/^--(?!breakpoint-|aspect-|animate-)/': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
 };
 // END design-rules
 
@@ -447,14 +510,69 @@ hexRule.meta = { url: 'assets/rules/design-rules.json' };
 const hexPlugin = createPlugin(hexRuleName, hexRule);
 
 /* -------------------------------------------------------------------------
+ * design/no-literal-colour-function: a colour function of literals (LAW 1)
+ * -------------------------------------------------------------------------
+ * `oklch(64.5% 0.188 42)`, `color-mix(in oklch, white, black)` and
+ * `light-dark(#fff, #111)` are literal colours, in a `background` shorthand,
+ * a gradient stop or a filter as much as in `color`. A function with a var()
+ * among its arguments is derived, and the token decides it:
+ * `oklch(from var(--bg-accent) l c h / 0.5)`. COLOUR_FUNCTIONS comes from the
+ * spec (values.colour_functions), which the audit's raw-color reads too; a
+ * var() fallback is not checked (var_fallback). This replaces
+ * function-disallowed-list, which named five functions and could not tell a
+ * derived colour from a literal one (SB-A15).
+ * ------------------------------------------------------------------------- */
+const colourFnRuleName = 'design/no-literal-colour-function';
+const colourFnMessages = utils.ruleMessages(colourFnRuleName, {
+  rejected: (fn) =>
+    `Law 1 (tokens or nothing): "${fn}()" of literals is a colour written by hand. Use a role token, ` +
+    `or derive from one: ${fn}(from var(--token) …). A literal colour belongs in tokens.css.`,
+});
+const COLOUR_FUNCTION = new RegExp(`(?<![\\w-])(${COLOUR_FUNCTIONS.join('|')})\\(`, 'gi');
+const VAR_CALL = /(?<![\w-])var\(/i;
+
+const colourFnRule = (primary) => (root, result) => {
+  if (!utils.validateOptions(result, colourFnRuleName, { actual: primary, possible: [true] })) {
+    return;
+  }
+  root.walkDecls((decl) => {
+    const value = withoutFallbacks(decl.value);
+    for (const match of value.matchAll(COLOUR_FUNCTION)) {
+      const open = match.index + match[0].length - 1;
+      let depth = 0;
+      let close = open;
+      for (; close < value.length; close++) {
+        if (value[close] === '(') depth++;
+        else if (value[close] === ')' && --depth === 0) break;
+      }
+      if (VAR_CALL.test(value.slice(open, close))) continue;
+      utils.report({
+        message: colourFnMessages.rejected(match[1]),
+        node: decl,
+        word: match[1],
+        result,
+        ruleName: colourFnRuleName,
+      });
+    }
+  });
+};
+
+colourFnRule.ruleName = colourFnRuleName;
+colourFnRule.messages = colourFnMessages;
+colourFnRule.meta = { url: 'assets/rules/design-rules.json' };
+
+const colourFnPlugin = createPlugin(colourFnRuleName, colourFnRule);
+
+/* -------------------------------------------------------------------------
  * design/component-margins: LAW 2, switched on for component files in Part 5
  * -------------------------------------------------------------------------
  * A component never sets its own outer margin, so in a component file a
- * margin takes MARGIN_ALLOWLIST: 0, auto, or a cancelled token. The other
- * legal margin is the owl, written in the parent's own rule
- * (`.stack > * + *`), where the parent spaces its children. The value
- * allowlist cannot see the selector, so this rule does the job and knows the
- * owl, as the audit does (design-rules.json: margins_in_components).
+ * margin takes MARGIN_ALLOWLIST: 0s and autos, or a cancelled token. The
+ * other legal margins are the owl, written in the parent's own rule
+ * (`.stack > * + *`), where the parent spaces its children, and a margin on
+ * the component's own ::before or ::after. The value allowlist cannot see the
+ * selector, so this rule does the job and knows both, as the audit does
+ * (design-rules.json: margins_in_components).
  * ------------------------------------------------------------------------- */
 const marginRuleName = 'design/component-margins';
 const marginMessages = utils.ruleMessages(marginRuleName, {
@@ -466,6 +584,14 @@ const marginMessages = utils.ruleMessages(marginRuleName, {
 /* The whole owl, `> * + *`: `.card + *` is a component spacing its next
  * sibling, which the owl is not. */
 const OWL_SELECTOR = />\s*\*\s*\+\s*\*/;
+/* The component's own generated content, which sits inside it: every
+ * selector of the rule names ::before, ::after or ::marker (`&::after` nested
+ * in `.card` does; `.card::before, .card__title` does not). */
+const generatedContent = (selector) =>
+  selector
+    .replace(/\([^()]*\)/g, '()')
+    .split(',')
+    .every((part) => /::(?:before|after|marker)\s*$/i.test(part.trim()));
 
 /* An allowlist entry as declaration-property-value-allowed-list reads it: a
  * string in slashes is a regular expression, anything else an exact value. */
@@ -486,7 +612,7 @@ const marginRule = (primary) => (root, result) => {
     // around it, as the audit reads it.
     let rule = decl.parent;
     while (rule && rule.type !== 'rule') rule = rule.parent;
-    if (rule && OWL_SELECTOR.test(rule.selector)) return;
+    if (rule && (OWL_SELECTOR.test(rule.selector) || generatedContent(rule.selector))) return;
     utils.report({
       message: marginMessages.rejected(decl.prop, decl.value),
       node: decl,
@@ -546,7 +672,7 @@ const marginPlugin = createPlugin(marginRuleName, marginRule);
 
 export default {
   extends: ['stylelint-config-standard'],
-  plugins: [designPlugin, systemColorPlugin, hexPlugin, marginPlugin],
+  plugins: [designPlugin, systemColorPlugin, hexPlugin, colourFnPlugin, marginPlugin],
 
   rules: {
     /* ---- LAW 5: layers, not specificity ------------------------------ */
@@ -596,11 +722,12 @@ export default {
     'declaration-property-value-allowed-list': VALUE_ALLOWLIST,
 
     /* Belt and braces on colour. The allowlist above covers the properties
-     * that matter; these catch a hex anywhere else at all — a gradient
-     * stop, a `filter: drop-shadow()`, an SVG attribute, a mask. */
+     * that matter; these catch a literal colour anywhere else at all — a
+     * `background` or `border` shorthand, a gradient stop, a
+     * `filter: drop-shadow()`, an SVG attribute, a mask. */
     [hexRuleName]: true,
+    [colourFnRuleName]: true,
     'color-named': 'never',
-    'function-disallowed-list': ['rgb', 'rgba', 'hsl', 'hsla', 'hwb'],
 
     /* Tokens are kebab-case. A `var()` pointing at a name that does not
      * exist resolves to nothing and the declaration is dropped in silence —
@@ -719,8 +846,8 @@ export default {
       rules: {
         'declaration-property-value-allowed-list': null,
         [hexRuleName]: null,
+        [colourFnRuleName]: null,
         'color-named': null,
-        'function-disallowed-list': null,
         /* Tier-1 steps are `--space-0-5`, `--text-2xs`, `--radius-2xl`:
          * digits inside segments, which the strict pattern rejects. */
         'custom-property-pattern': '^[a-z0-9]+(-[a-z0-9]+)*$',
@@ -734,16 +861,20 @@ export default {
     /* ---------------------------------------------------------------------
      * 2. theme.css / tailwind bindings — the binding layer.
      *
-     * Allowed the four literal exceptions documented in theme.css §0
-     * (breakpoints, CSS-wide keywords, keyframe geometry, aspect ratios)
-     * and nothing else. `design/color-no-hex` stays ON: a breakpoint has to be a
-     * literal because media queries cannot read custom properties; a colour
-     * never has to be.
+     * A custom property here binds a token and decides nothing: it takes a
+     * token, a colour word or a CSS-wide keyword, and the literals documented
+     * in theme.css §0, a breakpoint in rem and an aspect ratio
+     * (BINDING_ALLOWLIST, from design-rules.json: bindings). A breakpoint has to be a literal,
+     * and never a var(), because media queries cannot read custom properties;
+     * a colour never has to be, so `design/color-no-hex` and
+     * `design/no-literal-colour-function` stay ON. Keyframe geometry, §0's
+     * third exception, is not a custom property, and the allowlist names
+     * only custom properties.
      * ------------------------------------------------------------------ */
     {
       files: ['**/theme.css', '**/*-theme.css'],
       rules: {
-        'declaration-property-value-allowed-list': null,
+        'declaration-property-value-allowed-list': BINDING_ALLOWLIST,
         'custom-property-pattern': null, // `--text-h1--line-height` is Tailwind's syntax
         'at-rule-disallowed-list': null,
       },

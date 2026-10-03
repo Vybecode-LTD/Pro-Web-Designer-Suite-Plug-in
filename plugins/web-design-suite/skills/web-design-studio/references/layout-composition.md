@@ -405,7 +405,7 @@ Honest about its overflow, which is what makes it better than a carousel: the sc
   /* Derived: the parent, less the margin on each side. */
   --imposter-max: calc(100% - var(--imposter-margin) * 2);
   max-inline-size: var(--imposter-max);
-  max-block-size: var(--imposter-max);
+  max-block-size: var(--imposter-max-block, var(--imposter-max));
   overflow: auto;
   z-index: var(--z-raised);
 }
