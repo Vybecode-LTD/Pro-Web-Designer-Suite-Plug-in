@@ -142,6 +142,93 @@
   in `overrides` beat it. Important declarations reverse the layer order, so the
   vendor's win in both cases. The references now say to strip them at build time, or
   patch a vendored copy.
+- **The schema parser misread four kinds of statement** (N16 to N19, from the reviews of #12):
+  - A quoted name with a `$` (`"amount$usd"`, which every dump quotes) lost its quotes,
+    and the column parser, which reads a bare name as word characters, then dropped the
+    column without a word. Such a name keeps its quotes now.
+  - `DROP COLUMN` left the column in the primary key, in unique indexes, and in other
+    tables' foreign keys. Postgres drops every index and constraint that uses the
+    column, the whole primary key with it, and needs `CASCADE` for the foreign keys
+    into it, which it then drops. The model does the same, CHECKs included.
+  - `RENAME COLUMN` left other tables' foreign keys and the CHECKs on the old name.
+    Postgres retargets both, and so does the model; string literals stay as they are.
+  - Postgres 18 names a not-null constraint: `add constraint t_name_nn not null name`.
+    The parser read it as `ADD COLUMN` and made a column named `constraint`. It now
+    makes the column not-null, in `ALTER TABLE` and `CREATE TABLE`, and an
+    `ADD CONSTRAINT` it does not know is skipped, never read as a column.
+- **The scaffold's policies failed on four kinds of schema** (N20 to N23, from the reviews of #13):
+  - A model introspected with `--schema app` got every policy, grant and smoke test on
+    `public`. They use the model's schema now.
+  - `sql_ident` quoted nine reserved words, so a table named `select` or a column named
+    `where` gave invalid SQL. It quotes every word Postgres reserves now, from a copy of
+    the parser's list.
+  - Postgres cuts a name at 63 bytes, so a table name of 55 bytes or more gave its four
+    policies one name, and the second `CREATE POLICY` failed. A name that would be cut
+    now shortens the table part, which ends in a hash of the whole name.
+  - The smoke test's "no write policy" check counted a policy for `service_role`, which
+    the browser never holds. It counts only policies for `public`, `anon` or
+    `authenticated` now.
+- **The layer statement** (N24 and N25 from the reviews of #14, and N29):
+  - The canonical `index.css` stopped after `layout.css`, so a project that copied it
+    never imported `utilities.css` or `overrides.css`. It names both now, imported last
+    once the project has them, and the four references that quote it follow.
+  - An `@import … layer(vendor)` above the `@layer` statement names `vendor` first,
+    whatever the statement then says. The spec refuses it now, and so do the audit
+    (`layer-statement-position`) and stylelint (`design/layer-order`).
+  - stylelint never checked where the statement stands, so a rule above it passed,
+    though the audit refused it. `design/layer-order` refuses it now, from a second
+    refused example in the spec.
+- **On Linux and macOS, `snapshot_matrix` missed a state with no style** (found by the
+  first CI run). It called a hover, active or focus-visible cell unstyled only when it
+  was pixel-identical to its default cell. The cells sit side by side at different
+  subpixel offsets, and there text is antialiased by where it sits, so twin cells never
+  matched and the check never fired. It now compares computed styles: a state is
+  unstyled when every element of its cell, `::before` and `::after` included, computes
+  the same style as in the default cell, leaving out what never changes a pixel (the
+  cursor, pointer events, selection, motion timing).
+
+- **The three gates agree on every example in the spec** (N1, N30). The conformance
+  tests' list of known disagreements is empty:
+  - The audit refuses a factor on a token in spacing and radius,
+    `calc(var(--pad-card) * 1.5)` or `/ 2` (L3 `token-factor`), as stylelint did;
+    `* -1`, which cancels a token, is still allowed. Positioning is geometry and may
+    divide.
+  - The audit's type check skipped every length ending in "em", and `rem` ends in "em",
+    so `font-size: 1.125rem` passed. It now refuses both, except `font-size: 1em`, which
+    sizes an icon to its text and which stylelint now allows too.
+  - The audit reads the spec's sizing family, so `max-inline-size: 65ch` and
+    `max-width: 600px` are refused (L1 `raw-size`), as stylelint refused them.
+  - In a component file the audit refuses an element selector (`.card p`,
+    `.card > svg`, `:is(h2, h3)`) and a `*` after a space (`.card *`), as stylelint's
+    `selector-max-type` and `selector-max-universal` do (L2 `foreign-selector`). The owl
+    is still allowed.
+  - A system colour outside `@media (forced-colors: active)` is refused by the audit
+    too (L1 `system-color`), in the properties the spec now lists for both gates.
+  - `transition-duration: 0s` is no longer a literal duration to the audit, a named
+    colour is an error rather than a warning, and a design literal in an inline custom
+    property (`style={{ '--gap': '12px' }}`) is refused (L1 `inline-literal`), with the
+    units ESLint uses; both gates read them from the spec.
+  - stylelint allows a hex in a `var()` fallback, which the spec leaves unchecked:
+    `design/color-no-hex` replaces `color-no-hex`. It also allows a margin in an owl rule
+    in a component file: `design/component-margins` replaces the component override's
+    margin allowlist, and knows the owl.
+  - Thirteen reference snippets broke these rules and now follow them: element selectors
+    became classes (`.megamenu__link`, `.toc__link`, `.drawer__link`,
+    `.work-card__link`, `.table__cell`, `.check-input`, `.field__control`), base and
+    layout CSS sits in its layer, and the hero's `18ch` measure is a Tier-3 socket. The
+    starter's `sub`/`sup` at `0.75em` and the `cqi` fallback example keep their literal,
+    with the audit's pragma beside stylelint's.
+  - From #20's review: the factor check now skips a `var()` fallback, as the spec does
+    (`var(--pad-card, calc(1rem / 2))`); the owl is the whole `> * + *` in both gates,
+    so `.card + *` can no longer space a component's next sibling; stylelint finds the
+    owl through an `@media` around the margin, as the audit did; and the header recipe
+    keeps the page's reservation for the fixed header, as a `base` rule of its own.
+  - From CodeRabbit's review of #20: each `inline-literal` finding names its property
+    and value as its snippet, which is its baseline key's text. With the style's line
+    there, a key kept only its first 120 characters, so a baselined literal hid a new
+    one added further along a long line
+    (`test_a_baselined_inline_literal_does_not_hide_a_new_one_beside_it`, which fails on
+    `bc911b4`).
 
 ### Added
 
@@ -173,6 +260,54 @@
   macOS still ships; now the tests do too. The harness no longer uses
   `TemporaryDirectory(ignore_cleanup_errors=)`, `write_text(newline=)` or a slice of
   `Path.parents`, all 3.10+, and the README states the new floor.
+- **CI** (XC-B3). `.github/workflows/ci.yml` runs the suite and the static checks on
+  Windows, Linux and macOS, at Python 3.9 and 3.14, with the pinned Node tools, and
+  `claude plugin validate --strict` on the marketplace, the plugin and `plugin.json`.
+  Linux adds Playwright's headless shell and Postgres, so the browser and policy tests
+  run there too.
+- **The release build** (XC-C6). `tooling/release/build.py` replaces `build_zip.py`. It
+  makes the plugin's zip, one `.skill` file per skill, packaged as Anthropic's
+  skill-creator packages one and carrying the plugin's LICENSE, and `SHA256SUMS`, all
+  from git and byte-identical on a rebuild. A pushed `v*` tag makes
+  `.github/workflows/release.yml` build them and create the GitHub release, with the
+  CHANGELOG's section as its notes; nothing else creates a release.
+- **The 17 scripts with a shebang are executable** (N5), as the nine from 3.0.0 were.
+- **The spec writes its data into the gates** (N2, SB-C2). `tools/sync_rules.py` writes
+  `design-rules.json` into a marked block in each of the three gates, and `--check`
+  fails CI when a gate drifts from the spec:
+  - the audit: the layer order and statement, the nesting depth, and the colour
+    functions it reads as a colour written by hand;
+  - the stylelint config: the layer order, the nesting depth, the system colours, and
+    the value allowlists, which were hand-written: the four value shapes (`VAR_SEQ`,
+    `VAR_ONE`, `VAR_CALC`, `CANCEL`), the keywords, the colour words, the 43 properties
+    of eight families (spacing, type, radius, elevation, colour, stacking, motion,
+    sizing) and the component margins;
+  - the ESLint config: the colour functions, for its raw-colour rule and its
+    inline-style rule. The inline-style rule missed `hwb()` and `color()`; the
+    raw-colour rule already refused both there, so no verdict changes.
+
+  Why each family takes what it takes moved from the stylelint config's comments into
+  the spec, beside the data. Each section of the spec now names the gates that
+  enforce it (`gates`). A spec entry the tool cannot write, such as an unknown shape,
+  is an error, and nothing is written.
+- **Two tools for each PR.** `tools/fail_before.py` runs named tests against an earlier
+  revision and this tree, and prints fixed, control, still failing or regression for
+  each. `tools/check.py` runs the static checks and the tests a change affects. Its
+  report prints on any console: with its output redirected on Windows (cp1252), a
+  failing check's `§` reached it as an invalid byte and the report crashed printing it,
+  so no report came. The checks now write UTF-8, and a character the console cannot
+  encode prints as `?` (`test_tools.CheckReportsOnAnyConsole`, which fails on `9053727`).
+
+### Upgrading
+
+- **The audit is stricter** (N1, N30): a `rem` or `em` font size, a literal size in
+  `max-inline-size`, `max-width`, `min-block-size` or `min-inline-size`, an element
+  selector in a component file, a named colour, a system colour outside forced-colors
+  mode, and a design literal in an inline custom property are errors now. Each is what
+  stylelint or ESLint already refused.
+- **Two stylelint rules were renamed.** A disable comment for `color-no-hex` names
+  `design/color-no-hex` now, and one for a component's margin names
+  `design/component-margins` instead of `declaration-property-value-allowed-list`.
 
 ### Tests
 
@@ -220,6 +355,97 @@
   `--check`) are tested writing a file: UTF-8, LF, byte for byte. With 3.2.1's tools
   both tests error on 3.9, where `write_text` has no `newline`.
 - The budget test passes `maxsplit` to `re.split` by keyword, as Python 3.13 asks.
+- N16 to N25 and N29, against `8ed2e84`, the `main` before the fix, since none of this
+  code is in 3.2.1. Fifteen tests fail there, in 26 failures and 2 errors:
+  - `test_schema_sources`: one test per parser fix, four in all.
+  - `test_policies`: eight tests. Four run on the scratch Postgres: a schema of its own,
+    and reserved words with a 60-byte table name, each apply and pass their smoke tests;
+    every word `pg_get_keywords()` reserves is on the list; and a write policy for
+    `service_role` passes the smoke test while one for every role fails it.
+  - `test_rules_spec`: the entry names a file for every layer (N24), and `test_layers`
+    on the new refused example (N25).
+  - `test_real_tools.StylelintConfig` on the two new refused examples (N25, N29).
+  - The 20 tests in the same classes that pass on both are the controls. Among them is
+    the N29 example through the audit, which refused it already.
+- `load_script` moves into `wds_support`, for the test that holds the scaffold's copy
+  of the reserved words equal to the parser's.
+- What the reviews of #16 found, against its first commit (`0a0c249`): five tests fail
+  there, and twelve controls pass on both.
+  - A rename or a drop no longer reaches into a call (`lower(note)` is not a column
+    `lower`) or into a quoted name (`"old.part"` is not `old`).
+  - A table constraint listed before its column now applies.
+  - The smoke test quotes every name it puts in a string (a table named `it's`).
+  - The no-write check counts a role that `anon` or `authenticated` inherits.
+  - A second review: a rename or a drop leaves dollar-quoted literals alone; the smoke
+    test picks a `do` delimiter no name contains (a table named `cash$$flow`); and the
+    no-write check counts inherited privileges (`USAGE`), so a membership granted
+    `WITH INHERIT FALSE` is not the browser's. Four tests fail on `81b50f9`.
+- N5, the PR tools and the build, from `tools/fail_before.py` against 3.2.1: nine
+  fixed and eleven controls.
+  - `test_file_modes` reads git's modes (the index, or the commit `WDS_PLUGIN_REV`
+    names) and fails on 3.2.1, where 17 scripts with a shebang were 100644.
+  - `test_tools`, eight tests, all fixed. `fail_before.py` runs on a fake repository of
+    two commits with a fix, a control, a test that still fails, a regression, failing
+    subtests, a skip and a failing `setUpClass`. `check.py`'s choice of tests is checked
+    on its own, and its list of changed files keeps a path with a space whole.
+  - `test_release_build` ports the zip builder's seven tests to `build.py` and adds four:
+    each `.skill` file, the sums, a skill the platform refuses, and a long description
+    as a warning. The builder lives in `tooling/`, outside the plugin, so all eleven run
+    the same builder in both runs: they are controls.
+- `test_policies` keeps the scratch cluster's socket in its own folder: Debian's and
+  Ubuntu's Postgres put it in `/var/run/postgresql`, which only `postgres` may write.
+- N2, part 1: `test_tools.SyncRules`, three tests on a copy of the spec and the two
+  gates (a spec change is stale until rewritten, a rewrite of a tree in step changes
+  nothing, a gate without its block is an error), and
+  `test_rules_spec.test_the_specs_data_is_written_into_the_gates`, which replaces two
+  tests that read the stylelint config's layout as text. All four fail on 3.2.1. A fifth,
+  from #18's review: the audit's nesting fix said "past depth 2" whatever the spec's
+  limit; it now names the generated limit (`test_the_audit_explains_the_limit_the_spec_sets`,
+  which fails on `eb4cccc`, with the other three `SyncRules` tests as controls).
+- N2, part 2: the conformance tests. One builder turns every `allowed` and `refused`
+  example in the spec into a file, and each gate its section names must give the
+  spec's verdict: the audit in `test_rules_spec.TheAuditFollowsTheSpec.test_every_example`,
+  stylelint and ESLint in `test_real_tools`'s `test_every_example_of_the_spec`. They
+  replace five tests that read the stylelint config as text. Where a gate still
+  disagrees, `KNOWN_DISAGREEMENTS` names the item that fixes it, and the test fails
+  once the gate agrees: three are stylelint's (N1 rows 6 and 7), ten the audit's (N1
+  rows 5 and 8, and seven new ones, N30, for P3). Against `9053727`, PR #18's head:
+  three new `SyncRules` tests fail (the allowlists, the colour functions, and an
+  unknown name that writes nothing), and 25 tests are controls, the conformance tests
+  among them, so the generated blocks change no gate's verdict on any example.
+  From #19's review: a shape the spec added and a family used was named in the
+  stylelint allowlist but never declared, so the config could not load while `--check`
+  passed. The block now writes every shape in the spec, and an allowlist that reads a
+  name the block has not written first is an error
+  (`test_a_new_shape_is_written_before_the_allowlist_that_reads_it`, which fails on
+  `a7157c2`).
+- The first CI run, on Linux and macOS: `test_browser_runtime.MatrixSeesStateChanges`
+  failed there and passes now, which holds the `snapshot_matrix` fix; on Windows it
+  passes on both. Two tests assumed Windows: `test_harness` took a relative path across
+  drives (the runner's checkout is on `D:`), and `test_release_build` set a mode git
+  re-read from the disk on POSIX. On a loaded macOS runner, the mega-menu scenario in
+  `test_recipes.NavigationCodeInABrowser` dwelt over a trigger past the recipe's
+  switching delay, because it timed the pointer with real waits. Its page now runs on
+  Playwright's fake clock, which only the scenario advances. Its diagonal also went two
+  thirds of a pixel down per step, so some steps rounded to straight sideways, which
+  is not heading into the panel; each step now goes a whole pixel down.
+- P3 part 1 (N1, N30): the spec's examples now hold every row of N1 and every case of
+  N30, and `KNOWN_DISAGREEMENTS` is empty, so the conformance tests hold all three gates
+  to every example; new allowed selectors (`:nth-child(2n + 1)`, `:lang(en)`, `:where()`
+  and attributes) guard the audit's selector check against false positives. The
+  snippet test files a block written in `@layer base` or `layout` in that layer's file,
+  not a component's.
+  Against `a7157c2`, #19's head: the audit's and stylelint's conformance legs and the
+  renamed-rule fixtures fail (3 tests, 26 subtests), and 29 tests are controls.
+- The mega-menu's safe-triangle test failed once more on macOS with 3.14 (#19's CI),
+  under the fake clock: the clock does not decide when Chromium delivers a move, so
+  a move could land after the hover-intent look had run. Each step of the scenario
+  now waits, in real time, until the page has seen its move. Its markup carries the
+  reference's new classes.
+  It failed again on macOS with 3.9: `page.clock.install()` alone lets the fake clock flow
+  in real time, so a slow runner overran the menu's 300 ms cap. A real 60 ms delay per
+  step reproduced it locally. The scenario now pauses the clock once the page has
+  loaded, and keeps that delay as a guard: it passes with the pause, and fails without.
 
 ## 3.2.1 — 2026-09-25
 

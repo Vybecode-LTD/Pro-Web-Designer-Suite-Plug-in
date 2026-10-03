@@ -608,7 +608,7 @@ named. Ships.
   }
   .work-card:hover,
   .work-card:focus-within { box-shadow: var(--elevation-raised); }
-  .work-card a:focus-visible { outline: var(--stroke-focus) solid var(--border-focus); outline-offset: var(--stroke-focus); }
+  .work-card__link:focus-visible { outline: var(--stroke-focus) solid var(--border-focus); outline-offset: var(--stroke-focus); }
 
   /* The FLIP re-flow is the invented part. It is an enhancement: the class is
      added by script only when motion is allowed, so reduced-motion users get the

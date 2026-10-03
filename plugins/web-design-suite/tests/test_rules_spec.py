@@ -17,17 +17,25 @@ Regressions covered — SB-A14, the three gates disagreed about the laws:
   `tokens/colour.css`).
 - Zero: two references demanded `--space-0`, which the audit flags as a
   Tier-1 leak; every gate accepts a literal 0.
+
+N2 (3.3.0): tools/sync_rules.py writes the spec's data into the gates, and
+every `allowed` and `refused` example runs through each gate its section
+names: the audit here, stylelint and ESLint in test_real_tools. Where a gate
+still disagrees with the spec, KNOWN_DISAGREEMENTS says so and names the item
+that fixes it; the test fails when a gate starts agreeing, so the list only
+shrinks.
 """
 from __future__ import annotations
 
-import importlib.util
+import collections
 import json
 import pathlib
 import re
+import subprocess
 import sys
 import unittest
 
-from wds_support import SKILLS, TempDirTest
+from wds_support import PLUGIN, SKILLS, TempDirTest, env, load_script, output
 
 HERE = pathlib.Path(__file__).resolve().parent
 # The spec comes from this suite's own plugin; the tools checked against it are
@@ -35,14 +43,6 @@ HERE = pathlib.Path(__file__).resolve().parent
 SPEC = json.loads((HERE.parent / "skills" / "web-design-studio" / "assets" / "rules" / "design-rules.json")
                   .read_text(encoding="utf-8"))
 CONFIGS = SKILLS / "web-design-studio" / "assets" / "configs"
-
-
-def load_script(skill: str, name: str):
-    spec = importlib.util.spec_from_file_location(f"wds_{name}_rules", SKILLS / skill / "scripts" / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 def load_audit():
@@ -61,18 +61,89 @@ def matches_any(path: str, globs: list[str]) -> bool:
     return any(glob_match(path if "/" in path else "x/" + path, g) for g in globs)
 
 
+Example = collections.namedtuple("Example", "section verdict source name text gates")
+
+
+def in_layer(layer: str, css: str) -> str:
+    return f"@layer {layer} {{\n{css}\n}}\n"
+
+
+def jsx_component(jsx: str) -> str:
+    return f"export const C = ({{ pct, span }}) => {jsx};\n"
+
+
+def spec_examples() -> list[Example]:
+    """Every `allowed` and `refused` example in the spec, each as a file of its
+    own for the gates its section names: a rule in a component file, a whole
+    entry stylesheet, or a JSX component. The Sass examples, which only the
+    audit reads, are test_sass's."""
+    examples: list[Example] = []
+
+    def add(section: str, verdict: str, source: str, text: str, ext: str = "css") -> None:
+        n = len(examples)
+        name = (f"src/entries/{verdict}-{n}/index.css" if section == "layers"
+                else f"src/components/{section.replace('.', '-')}-{verdict}-{n}.{ext}")
+        examples.append(Example(section, verdict, source, name, text, tuple(SPEC[section.split(".")[0]]["gates"])))
+
+    def rule(css: str) -> str:
+        return in_layer("components", css)
+
+    margins = SPEC["margins_in_components"]
+    for verdict in ("allowed", "refused"):
+        for section in ("nesting", "zero", "system_colors"):
+            for css in SPEC[section].get(verdict, []):
+                add(section, verdict, css, rule(css))
+        for css in SPEC["layers"][verdict]:
+            add("layers", verdict, css, css + "\n")
+        for value in SPEC["var_fallback"].get(verdict, []):
+            add("var_fallback", verdict, value, rule(f".card {{ color: {value}; }}"))
+        for value in margins[f"{verdict}_values"]:      # margin-block takes one value or two
+            add("margins_in_components", verdict, value, rule(f".card__media {{ margin-block: {value}; }}"))
+        if verdict == "allowed":
+            for selector in margins["owl_selectors"]:
+                add("margins_in_components", verdict, selector,
+                    rule(f"{selector} {{ margin-block-start: var(--gap-related); }}"))
+        for selector in margins[f"{verdict}_selectors"]:
+            add("margins_in_components", verdict, selector, rule(f"{selector} {{ color: var(--fg-strong); }}"))
+        for css in margins.get(verdict, []):                  # whole rules: the owl in @media, `+ *`
+            add("margins_in_components", verdict, css, rule(css))
+        for family, values in SPEC["values"]["families"].items():
+            for declaration in values[verdict]:
+                add(f"values.{family}", verdict, declaration, rule(f".card {{ {declaration}; }}"))
+        for jsx in SPEC["inline_styles"][verdict]:
+            add("inline_styles", verdict, jsx, jsx_component(jsx), ext="tsx")
+    return examples
+
+
+# Where a gate still gives the opposite verdict, keyed by (gate, the example as
+# the spec writes it), with the item that brings it in line. Each must still
+# disagree: when a fix makes a gate agree, its entry goes.
+KNOWN_DISAGREEMENTS: dict[tuple[str, str], str] = {}
+
+
+def hold_to_the_spec(test: unittest.TestCase, gate: str, problems_of) -> None:
+    """Each example of a section `gate` enforces: an allowed one draws no
+    problem at all from it, a refused one at least one error. `problems_of`
+    maps an Example to (errors, every problem) as short strings."""
+    examples = [e for e in spec_examples() if gate in e.gates]
+    test.assertTrue(examples, f"no section names {gate}")
+    for ex in examples:
+        with test.subTest(gate=gate, section=ex.section, **{ex.verdict: ex.source}):
+            errors, problems = problems_of(ex)
+            known = KNOWN_DISAGREEMENTS.get((gate, ex.source))
+            agrees = not problems if ex.verdict == "allowed" else bool(errors)
+            if known:
+                test.assertFalse(agrees, f"{gate} now agrees with the spec ({known}): "
+                                         "remove it from KNOWN_DISAGREEMENTS")
+            else:
+                test.assertTrue(agrees, problems or "nothing reported")
+
+
 class TheAuditFollowsTheSpec(TempDirTest):
 
     @classmethod
     def setUpClass(cls):
         cls.audit = load_audit()
-
-    def findings(self, css: str, name: str = "components/card.css") -> set[tuple[str, str]]:
-        path = self.tmp / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("@layer components {\n" + css + "\n}\n", encoding="utf-8")
-        found, _, _ = self.audit.audit_run([str(path)])
-        return {(f.law, f.rule) for f in found}
 
     def test_file_classes(self):
         # SB-A9: a root-level components/ folder, the common Next.js layout,
@@ -112,49 +183,16 @@ class TheAuditFollowsTheSpec(TempDirTest):
                 with self.subTest(kind=kind, refused=scss):
                     self.assertEqual({finding}, self.sass_findings(scss))
 
-    def test_nesting(self):
-        for css in SPEC["nesting"]["allowed"]:
-            with self.subTest(allowed=css):
-                self.assertNotIn(("L5", "nesting-depth"), self.findings(css))
-        for css in SPEC["nesting"]["refused"]:
-            with self.subTest(refused=css):
-                self.assertIn(("L5", "nesting-depth"), self.findings(css))
-
-    def test_zero_and_margins_and_fallbacks(self):
-        for css in SPEC["zero"]["allowed"]:
-            with self.subTest(zero=css):
-                self.assertEqual(set(), self.findings(css))
-        for value in SPEC["margins_in_components"]["allowed_values"]:
-            with self.subTest(margin=value):
-                self.assertNotIn(("L2", "child-margin"),
-                                 self.findings(f".card__media {{ margin-block-end: {value}; }}"))
-        for value in SPEC["margins_in_components"]["refused_values"]:
-            with self.subTest(refused_margin=value):
-                self.assertTrue(self.findings(f".card__media {{ margin-block-end: {value}; }}"))
-        for selector in SPEC["margins_in_components"]["owl_selectors"]:
-            with self.subTest(owl=selector):
-                self.assertNotIn(("L2", "child-margin"),
-                                 self.findings(f"{selector} {{ margin-block-start: var(--gap-related); }}"))
-        for value in SPEC["var_fallback"]["allowed"]:
-            with self.subTest(fallback=value):
-                self.assertEqual(set(), self.findings(f".card {{ color: {value}; }}"))
-
-    def test_layers(self):
-        # SB-A8: `vendor` was missing from the order, so an entry that imported
-        # into it put third-party CSS above every layer, and three references
-        # gave three different places for it.
-        self.assertEqual(SPEC["layers"]["order"], self.audit.LAYER_ORDER)
-        self.assertEqual(SPEC["layers"]["statement"], self.audit.LAYER_STATEMENT)
-        layer_rules = {("L5", "layer-order"), ("L5", "layer-undeclared")}
-        for kind in ("allowed", "refused"):
-            for n, css in enumerate(SPEC["layers"][kind]):
-                with self.subTest(**{kind: css}):
-                    path = self.tmp / f"{kind}{n}" / "index.css"
-                    path.parent.mkdir()
-                    path.write_text(css + "\n", encoding="utf-8")
-                    found, _, _ = self.audit.audit_run([str(path)])
-                    hit = {(f.law, f.rule) for f in found} & layer_rules
-                    self.assertEqual(kind == "refused", len(hit) == 1, found)
+    def test_every_example(self):
+        # SB-A8 and N25 (layers), SB-A14 (nesting, zero, margins, fallbacks),
+        # N2 (the value families and inline styles): every example of every
+        # section the audit enforces, through the audit as shipped.
+        def problems_of(ex: Example) -> tuple[list[str], list[str]]:
+            path = self.write(ex.name, ex.text)
+            found, _, _ = self.audit.audit_run([str(path)])
+            return ([f"{f.law} {f.rule}" for f in found if f.severity == "error"],
+                    [f"{f.law} {f.rule} ({f.severity})" for f in found])
+        hold_to_the_spec(self, "audit", problems_of)
 
 
 class TheDocsStateTheSpecsOrder(unittest.TestCase):
@@ -181,21 +219,29 @@ class TheDocsStateTheSpecsOrder(unittest.TestCase):
         self.assertGreater(full, 20)
         self.assertEqual([], wrong)
 
+    def test_the_entry_names_a_file_for_every_layer(self):
+        """N24: the canonical entry stopped after layout.css, so a project that
+        copied it never imported utilities.css or overrides.css."""
+        entry = (SKILLS / "web-design-studio" / "assets" / "starter" / "styles" / "index.css").read_text(
+            encoding="utf-8")
+        for layer in SPEC["layers"]["order"]:
+            with self.subTest(layer=layer):
+                if layer == "theme":                    # only a Tailwind entry names it
+                    continue
+                spelled = {"vendor": ') layer(vendor);', "components": '@import url("components/'}
+                self.assertIn(spelled.get(layer, f'@import url("{layer}.css");'), entry)
+
 
 class StylelintFollowsTheSpec(unittest.TestCase):
-    """The config's values, read from the file, with the value regexes run in
-    Python (they are JavaScript regexes of the portable kind), so these hold
-    wherever stylelint is absent. test_real_tools.StylelintConfig runs the
-    real stylelint over the same config."""
+    """What the generated blocks do not carry, read from the config: the file
+    globs and the overrides. The values, the layer order, the nesting depth and
+    the system colours are written from the spec (N2), and
+    test_real_tools.StylelintConfig runs every example through the real
+    stylelint."""
 
     @classmethod
     def setUpClass(cls):
         cls.config = (CONFIGS / "stylelint.config.mjs").read_text(encoding="utf-8")
-
-    def js_regex(self, name: str) -> re.Pattern:
-        m = re.search(rf"const {name} = String\.raw`/(.+?)/`;", self.config)
-        self.assertIsNotNone(m, f"{name} is not declared")
-        return re.compile(m.group(1))
 
     def override_files(self, contains: str) -> list[str]:
         for m in re.finditer(r"files:\s*\[([^\]]*)\]", self.config):
@@ -225,64 +271,22 @@ class StylelintFollowsTheSpec(unittest.TestCase):
         self.assertEqual(4, len(re.findall(r"^    \{\n      files:", self.config, re.M)))
         self.assertIn("There are four", self.config)
 
-    def test_the_layer_order_is_the_specs(self):
+    def test_the_specs_data_is_written_into_the_gates(self):
         """SB-A8: the config's LAYER_ORDER had no `vendor`, so it refused the
-        corrected statement as an unknown layer; and nothing checked that a
-        layer an entry imports into is in its statement
-        (test_real_tools.StylelintConfig runs the spec's examples)."""
-        block = re.search(r"const LAYER_ORDER = \[(.*?)\];", self.config, re.S).group(1)
-        self.assertEqual(SPEC["layers"]["order"], re.findall(r"^\s*'(\w+)',", block, re.M))
-        self.assertIn("undeclaredImport", self.config)
-
-    def test_system_colours_are_scoped_to_forced_colors(self):
-        """3.2.1 allowed the system colours in every colour property of every
-        file, as exact PascalCase strings. A rule now scopes them to
-        `@media (forced-colors: active)`, and the allowlist reads them in any
-        case (test_real_tools.StylelintConfig runs the spec's examples)."""
-        self.assertRegex(self.config, r"systemColorRuleName = 'design/system-colors-in-forced-colors'")
-        self.assertIn("[systemColorRuleName]: true", self.config)
-        self.assertIn("plugins: [designPlugin, systemColorPlugin]", self.config)
+        corrected statement as an unknown layer. N2: tools/sync_rules.py writes
+        the spec's data into the audit, the stylelint config and the ESLint
+        config, and its --check fails when one drifts. The three tests that read
+        this config's allowlists as text are gone: the block is the spec."""
+        proc = subprocess.run([sys.executable, "-B", str(PLUGIN / "tools" / "sync_rules.py"), "--check"],
+                              capture_output=True, env=env())
+        self.assertEqual(0, proc.returncode, output(proc))
 
     def test_sass_is_left_to_the_audit(self):
         """The spec says stylelint reads no Sass (`sass.gates`), so the Sass
         rules live in the audit alone. The day this config takes a Sass syntax,
         it has to follow those rules too, with a real-tool test."""
-        self.assertIn("stylelint", SPEC["sass"]["gates"])
+        self.assertEqual(["audit"], SPEC["sass"]["gates"])
         self.assertNotRegex(self.config, r"(?i)s[ac]ss")
-
-    def test_nesting_limit(self):
-        m = re.search(r"'max-nesting-depth':\s*\[\s*(\d+),\s*\{([^}]*)\}", self.config)
-        self.assertIsNotNone(m)
-        self.assertEqual(int(m.group(1)), SPEC["nesting"]["max_depth"])
-        self.assertIn("'pseudo-classes'", m.group(2))
-
-    def test_a_var_fallback_is_accepted(self):
-        var_one = self.js_regex("VAR_ONE")
-        for value in SPEC["var_fallback"]["allowed"][:2]:
-            with self.subTest(value=value):
-                self.assertTrue(var_one.search(value))
-
-    def test_margins_in_components(self):
-        block = re.search(r"const MARGIN_ALLOWLIST = .*?\.map\(\(prop\) => \[prop, \[(.*?)\]\]\)",
-                          self.config, re.S)
-        self.assertIsNotNone(block)
-        strings = set(re.findall(r"'([^']+)'", block.group(1)))
-        regexes = [self.js_regex(name) for name in re.findall(r"\b([A-Z_]{4,})\b", block.group(1))
-                   if name != "KEYWORDS"]
-
-        def allowed(value):
-            return value in strings or any(rx.search(value) for rx in regexes)
-
-        for value in SPEC["margins_in_components"]["allowed_values"]:
-            with self.subTest(allowed=value):
-                self.assertTrue(allowed(value))
-        for value in SPEC["margins_in_components"]["refused_values"]:
-            with self.subTest(refused=value):
-                self.assertFalse(allowed(value))
-
-    def test_the_owl_is_allowed_in_components(self):
-        self.assertRegex(self.config, r"'selector-max-universal':\s*\[\s*0,\s*\{\s*ignoreAfterCombinators:"
-                                      r"\s*\['>',\s*'\+'\]")
 
 
 class TheDocsFollowTheSpec(unittest.TestCase):

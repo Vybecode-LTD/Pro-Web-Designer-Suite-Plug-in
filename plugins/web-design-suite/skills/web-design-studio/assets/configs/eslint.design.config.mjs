@@ -171,9 +171,22 @@ const SPACE_BETWEEN = /(?<![-\w])(?:space-[xy]-|divide-[xy]?(?:-|\b))/;
  * KNOWN FALSE POSITIVE: a fragment identifier whose characters are all hex
  * — `href="#abc"`, `href="#defaced"`. Disable on the line with a
  * justification; it will be rare enough to be worth the noise everywhere
- * else. */
-const RAW_COLOR =
-  /(?:^|[\s(:,'"`[])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z])|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\s*\(/;
+ * else.
+ *
+ * The colour functions come from assets/rules/design-rules.json
+ * (values.colour_functions), as the audit's do. */
+// BEGIN design-rules: written by tools/sync_rules.py from assets/rules/design-rules.json; edit the spec, then rerun it
+const COLOUR_FUNCTIONS = [
+  'rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color',
+];
+const LITERAL_UNITS = [
+  'px', 'rem', 'em', 'ch', 'ex', 'vw', 'vh', 'vmin', 'vmax', '%', 'deg', 's', 'ms',
+];
+// END design-rules
+const RAW_COLOR = new RegExp(
+  /(?:^|[\s(:,'"`[])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z])/.source +
+    String.raw`|\b(?:${COLOUR_FUNCTIONS.join('|')})\s*\(`,
+);
 
 /* =========================================================================
  * PART 2 — SELECTOR SCOPES
@@ -276,11 +289,14 @@ const stylePropCustomPropertiesOnly = {
     },
   },
   create(context) {
-    /* A design literal: a length, a color, or a raw hex. Bare numbers,
-     * identifiers, member expressions and calls are runtime values and are
-     * exactly what this exception exists to carry. */
-    const DESIGN_LITERAL =
-      /^-?\d*\.?\d+(px|rem|em|ch|ex|vw|vh|vmin|vmax|%|deg|s|ms)$|^#[0-9a-fA-F]{3,8}$|^(rgba?|hsla?|oklch|oklab|lab|lch)\(/;
+    /* A design literal: a number with a unit, a raw hex, or a colour
+     * function, from the spec (LITERAL_UNITS, COLOUR_FUNCTIONS), as the audit
+     * reads one. Bare numbers, identifiers, member expressions and calls are
+     * runtime values and are exactly what this exception exists to carry. */
+    const DESIGN_LITERAL = new RegExp(
+      String.raw`^-?\d*\.?\d+(?:${LITERAL_UNITS.join('|')})$|^#[0-9a-fA-F]{3,8}$` +
+        String.raw`|^(?:${COLOUR_FUNCTIONS.join('|')})\(`,
+    );
 
     const keyNameOf = (prop) => {
       if (prop.computed) return null;

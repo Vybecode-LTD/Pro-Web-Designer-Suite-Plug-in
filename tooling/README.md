@@ -6,6 +6,7 @@ The real tools the plugin's tests run its configs and browser scripts through, a
 |---|---|---|
 | `main/` | ESLint 10 with eslint-plugin-jsx-a11y (via the `overrides` entry the ESLint config's header documents), typescript-eslint with TypeScript 6.0, eslint-plugin-tailwindcss 4, Tailwind 4 and `@tailwindcss/node`, tailwind-merge, stylelint 17 with stylelint-config-standard 40, Playwright 1.63 and axe-core 4.13 | Almost every real-tool and browser test |
 | `tailwind-v3/` | ESLint 10, eslint-plugin-tailwindcss 3 and Tailwind 3 (one `node_modules` can hold only one `tailwindcss`) | The Tailwind v3 block of the ESLint config's Part 5 |
+| `release/` | `build.py`: the plugin's zip, one `.skill` file per skill and `SHA256SUMS`, from what git holds at a revision, byte-identical on a rebuild. Standard-library Python | `.github/workflows/release.yml`, on a pushed `v*` tag, and `tests/test_release_build.py` |
 
 Install both once:
 

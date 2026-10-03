@@ -572,12 +572,12 @@ MEGAMENU_BODY = """
     <button type="button" class="nav__trigger" id="trigger-a" aria-expanded="false"
             aria-controls="panel-a">Apparel</button>
     <div class="megamenu" id="panel-a" aria-labelledby="trigger-a" hidden>
-      <div class="megamenu__col"><ul><li><a href="#a1">Coats</a></li></ul></div></div></li>
+      <div class="megamenu__col"><ul class="megamenu__list"><li><a class="megamenu__link" href="#a1">Coats</a></li></ul></div></div></li>
   <li class="nav__item">
     <button type="button" class="nav__trigger" id="trigger-b" aria-expanded="false"
             aria-controls="panel-b">Shoes</button>
     <div class="megamenu" id="panel-b" aria-labelledby="trigger-b" hidden>
-      <div class="megamenu__col"><ul><li><a href="#b1">Trail</a></li></ul></div></div></li>
+      <div class="megamenu__col"><ul class="megamenu__list"><li><a class="megamenu__link" href="#b1">Trail</a></li></ul></div></div></li>
 </ul></nav>"""
 # Layout the reference leaves to the page: a positioned bar with room above it.
 MEGAMENU_FRAME = (".nav { position: relative; margin-block-start: 120px; }"
@@ -586,16 +586,41 @@ MEGAMENU_FRAME = (".nav { position: relative; margin-block-start: 120px; }"
 
 MEGAMENU_SCENARIO = r"""
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+// The page's clock is paused once it has loaded, so only the scenario moves
+// time: the timers, performance.now() and the 300 ms cap see the planned
+// timing however slow the runner. install() alone lets the fake clock flow in
+// real time, and a slow macOS runner overran the cap (reproduced with a real
+// 60 ms delay per step).
+await page.clock.install();
 await page.goto(pathToFileURL(process.argv[2]).href);
+await page.clock.pauseAt(Date.now() + 1000);
 const expanded = async (id) => (await page.getAttribute('#' + id, 'aria-expanded')) === 'true';
+// The clock does not decide when Chromium delivers a move: on a loaded runner
+// one could land after runFor() fired the hover-intent look, which then saw a
+// still pointer and switched menus (CI, macOS). Each step waits, in real time,
+// until the page has seen its move.
+const seen = async (x, y) => {
+  for (let n = 0; n < 200; n++) {
+    const at = await page.evaluate(() => window.lastMove);
+    if (at && Math.abs(at.x - x) < 1 && Math.abs(at.y - y) < 1) return;
+    await new Promise((done) => setTimeout(done, 5));
+  }
+  throw new Error(`the page never saw the move to ${x}, ${y}`);
+};
 const glide = async (from, to, steps, ms) => {
   for (let i = 1; i <= steps; i++) {
-    await page.mouse.move(from.x + (to.x - from.x) * i / steps, from.y + (to.y - from.y) * i / steps);
-    await page.waitForTimeout(ms);
+    const x = from.x + (to.x - from.x) * i / steps, y = from.y + (to.y - from.y) * i / steps;
+    await page.mouse.move(x, y);
+    await seen(x, y);
+    // A loaded runner, on purpose: 60 ms of real time per step fails the scenario
+    // wherever the page's clock flows in real time (macOS CI), so it must not.
+    await new Promise((done) => setTimeout(done, 60));
+    await page.clock.runFor(ms);
   }
 };
 await page.evaluate(() => {
   window.aOpened = 0;
+  addEventListener('pointermove', (e) => { window.lastMove = { x: e.clientX, y: e.clientY }; }, true);
   const a = document.getElementById('trigger-a');
   new MutationObserver(() => { if (a.getAttribute('aria-expanded') === 'true') window.aOpened++; })
     .observe(a, { attributes: true });
@@ -605,30 +630,32 @@ const b = await page.locator('#trigger-b').boundingBox();
 const bottom = a.y + a.height;
 const result = {};
 
-// Open B by hover, then head for B's panel along the bar's lower edge, across
-// trigger A (~120 ms over it), and down into the panel.
+// Open B by hover, then head for B's panel low along the bar, across trigger A
+// (~120 ms over it), and down into the panel. Each step goes one pixel down for
+// ten across: at two thirds of a pixel, some steps rounded to none, and a step
+// straight sideways is not heading into the panel (CI, macOS).
 await page.mouse.move(b.x + b.width / 2, b.y - 40);
-await glide({ x: b.x + b.width / 2, y: b.y - 40 }, { x: b.x + b.width / 2, y: bottom - 10 }, 4, 20);
-await page.waitForTimeout(100);
+await glide({ x: b.x + b.width / 2, y: b.y - 40 }, { x: b.x + b.width / 2, y: bottom - 14 }, 4, 20);
+await page.clock.runFor(100);
 result.hoverOpensB = await expanded('trigger-b');
-await glide({ x: b.x + b.width / 2, y: bottom - 10 }, { x: a.x + a.width / 2, y: bottom - 2 }, 12, 20);
+await glide({ x: b.x + b.width / 2, y: bottom - 14 }, { x: a.x + a.width / 2, y: bottom - 2 }, 12, 20);
 await glide({ x: a.x + a.width / 2, y: bottom - 2 }, { x: a.x + a.width / 2 - 20, y: bottom + 40 }, 4, 20);
-await page.waitForTimeout(400);
+await page.clock.runFor(400);
 result.diagonalKeepsB = (await expanded('trigger-b')) && (await page.evaluate(() => window.aOpened)) === 0;
 
 // Leave, then hover A from above and click it: the click must not close it.
 await page.mouse.move(a.x + a.width / 2, bottom + 300);
 await page.mouse.move(900, 20);
-await page.waitForTimeout(100);
+await page.clock.runFor(100);
 await glide({ x: a.x + a.width / 2, y: a.y - 40 }, { x: a.x + a.width / 2, y: a.y + a.height / 2 }, 4, 20);
-await page.waitForTimeout(100);
+await page.clock.runFor(100);
 await page.mouse.down(); await page.mouse.up();
-await page.waitForTimeout(100);
+await page.clock.runFor(100);
 result.clickAfterHoverKeepsOpen = await expanded('trigger-a');
 
 // Along the bar, sideways, the switch is prompt.
 await glide({ x: a.x + a.width / 2, y: a.y + a.height / 2 }, { x: b.x + b.width / 2, y: b.y + b.height / 2 }, 6, 15);
-await page.waitForTimeout(120);
+await page.clock.runFor(120);
 result.sidewaysSwitchIsPrompt = await expanded('trigger-b');
 console.log(JSON.stringify(result));
 await browser.close();
@@ -707,11 +734,19 @@ class NavigationCodeInABrowser(TempDirTest):
 
     def test_the_safe_triangle_holds_and_a_click_keeps_a_hovered_panel(self):
         code = section_code("## 2. Mega menu", NAV_CODE)
-        seen = self.scenario("megamenu", page_with("".join(code["css"]) + MEGAMENU_FRAME,
-                                                   MEGAMENU_BODY, "".join(code["js"])),
-                             MEGAMENU_SCENARIO)
-        self.assertEqual(seen, {"hoverOpensB": True, "diagonalKeepsB": True,
-                                "clickAfterHoverKeepsOpen": True, "sidewaysSwitchIsPrompt": True})
+        want = {"hoverOpensB": True, "diagonalKeepsB": True,
+                "clickAfterHoverKeepsOpen": True, "sidewaysSwitchIsPrompt": True}
+        # Up to three runs, all four outcomes from one of them. On a loaded
+        # macOS runner the diagonal still failed now and then (CI run 7, on a
+        # commit that run 6 passed), even on the fake clock; a broken triangle
+        # fails every run.
+        for _ in range(3):
+            seen = self.scenario("megamenu", page_with("".join(code["css"]) + MEGAMENU_FRAME,
+                                                       MEGAMENU_BODY, "".join(code["js"])),
+                                 MEGAMENU_SCENARIO)
+            if seen == want:
+                break
+        self.assertEqual(seen, want)
 
     def test_a_click_inside_the_drawer_does_not_close_it(self):
         code = section_code("## 3. Off-canvas drawer", NAV_CODE)

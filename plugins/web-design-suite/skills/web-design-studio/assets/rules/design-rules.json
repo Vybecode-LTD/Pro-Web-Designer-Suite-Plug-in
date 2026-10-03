@@ -1,33 +1,47 @@
 {
-  "about": "The one spec the three gates share: audit_design.py, stylelint.config.mjs and eslint.design.config.mjs. Each tool carries its own copy of these values; tests/test_rules_spec.py fails when a copy disagrees with this file. Change the rule here first, then in each tool. Source of the rules: token-contract.md, the Nine Laws.",
+  "about": "The one spec the three gates share: audit_design.py, stylelint.config.mjs and eslint.design.config.mjs. tools/sync_rules.py writes its data (the layer order, the nesting depth, the system colours, the value shapes and allowlists, the colour functions) into a marked block in each gate, and its --check fails when a block drifts from this file. Each section's `gates` names the tools that enforce it, and the conformance tests (tests/test_rules_spec.py, tests/test_real_tools.py) run every `allowed` and `refused` example through each of them. Change a rule here first, rerun the tool, then change whatever gate code the data cannot express. Source of the rules: token-contract.md, the Nine Laws.",
   "nesting": {
+    "gates": ["audit", "stylelint"],
     "max_depth": 2,
     "counts": "Nested style rules below the top-level rule. @media, @supports, @layer, @container and @scope do not count, and neither does a rule whose selector is only pseudo-classes (`:hover`, as opposed to `&:hover`).",
     "allowed": [
       ".card { & .title { &:hover { color: var(--fg-strong); } } }",
-      ".card { & .title { & .icon { :hover { color: var(--fg-strong); } } } }"
+      ".card { & .title { & :where(.icon) { :hover { color: var(--fg-strong); } } } }"
     ],
     "refused": [
       ".a { & .b { & .c { & .d { color: var(--fg-strong); } } } }"
     ]
   },
   "zero": {
-    "rule": "A literal 0 is allowed wherever a length token is. --space-0 exists for token files and layout primitives; component code writes 0.",
+    "gates": ["audit", "stylelint"],
+    "rule":"A literal 0 is allowed wherever a length token is. --space-0 exists for token files and layout primitives; component code writes 0.",
     "allowed": [".card { padding: 0; }", ".card__media { margin-block-end: 0; }"]
   },
   "margins_in_components": {
-    "rule": "Law 2: a component never sets its own outer margin. Legal: auto (alignment), 0, calc(var(--token) * -1) to cancel a known token, and an owl selector written in the parent's own rule.",
+    "gates": ["audit", "stylelint"],
+    "rule": "Law 2: a component never sets its own outer margin. Legal: auto (alignment), 0, calc(var(--token) * -1) to cancel a known token, and the owl, the whole `> * + *` in the parent's own rule, through any @media around the margin. `.card + *` is not the owl: it is the component spacing its next sibling.",
+    "properties": ["margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "margin-inline", "margin-block",
+                   "margin-inline-start", "margin-inline-end", "margin-block-start", "margin-block-end"],
+    "values": ["0", "auto", "0 auto", "auto 0", "CANCEL", "KEYWORDS"],
     "allowed_values": ["0", "auto", "0 auto", "auto 0", "calc(var(--card-inset) * -1)", "calc(-1 * var(--card-inset))"],
     "refused_values": ["16px", "var(--gap-related)", "calc(var(--card-inset) * -2)"],
     "owl_selectors": [".stack > * + *", ".flow > * + *"],
-    "refused_selectors": [".card *", ".card p"]
+    "refused_selectors": [".card *", ".card p", ".card > svg", ".card:is(h2, h3)"],
+    "allowed_selectors": [".card:nth-child(2n + 1)", ".card__icon:where(:hover, :focus-visible)",
+                          ".card[data-state=\"open\"]", ".card::before", ".card:lang(en)"],
+    "allowed": [".stack > * + * { @media (width >= 48rem) { margin-block-start: var(--gap-grouped); } }"],
+    "refused": [".card + * { margin-block-start: var(--gap-related); }"]
   },
   "var_fallback": {
+    "gates": ["audit", "stylelint"],
     "rule": "A var() fallback is not checked: the token is the value, and the fallback only renders when the token is missing.",
-    "allowed": ["var(--fg-muted)", "var(--fg-muted, #666666)", "var(--card-pad, var(--pad-card))"]
+    "allowed": ["var(--fg-muted)", "var(--fg-muted, #666)", "var(--card-pad, var(--pad-card))"]
   },
   "system_colors": {
-    "rule": "A CSS system colour (Canvas, ButtonText, Highlight and the rest) is correct only inside @media (forced-colors: active), where the user's palette replaces the page's. Anywhere else it is a colour no token controls, no theme re-points and no contrast check measures. CSS keywords are case-insensitive, so every spelling counts. stylelint enforces this with design/system-colors-in-forced-colors; audit_design still accepts a system colour anywhere (completion plan, W2 N1).",
+    "gates": ["audit", "stylelint"],
+    "names": ["accentcolor", "accentcolortext", "activetext", "buttonborder", "buttonface", "buttontext", "canvas", "canvastext", "field", "fieldtext", "graytext", "highlight", "highlighttext", "linktext", "mark", "marktext", "selecteditem", "selecteditemtext", "visitedtext"],
+    "rule": "A CSS system colour (Canvas, ButtonText, Highlight and the rest) is correct only inside @media (forced-colors: active), where the user's palette replaces the page's. Anywhere else it is a colour no token controls, no theme re-points and no contrast check measures. CSS keywords are case-insensitive, so every spelling counts. stylelint enforces this with design/system-colors-in-forced-colors and the audit as L1 system-color, both in the properties `properties` matches; others are left alone, because `canvas` or `mark` may be a grid-area or an animation name.",
+    "properties": "^(?:color|fill|stroke|stop-color|flood-color|lighting-color|accent-color|caret-color|background(?:-color)?|border(?:-[a-z]+)*|outline(?:-color)?|text-decoration(?:-color)?|text-emphasis(?:-color)?|column-rule(?:-color)?|box-shadow|text-shadow)$",
     "allowed": [
       "@media (forced-colors: active) { .card { border-color: ButtonText; } }",
       "@media (forced-colors: active) { .card { outline-color: highlight; } }",
@@ -36,7 +50,8 @@
     "refused": [".badge { color: GrayText; }", ".panel { border: var(--stroke-default) solid ButtonBorder; }"]
   },
   "sass": {
-    "gates": "audit_design alone reads Sass. The stylelint config lints .css files and ships no Sass syntax, and ESLint reads no stylesheet. The audit reads SCSS; indented Sass (.sass) has no braces for it to follow, so it lists each such file as skipped and never passes one.",
+    "gates": ["audit"],
+    "about": "audit_design alone reads Sass. The stylelint config lints .css files and ships no Sass syntax, and ESLint reads no stylesheet. The audit reads SCSS; indented Sass (.sass) has no braces for it to follow, so it lists each such file as skipped and never passes one.",
     "definitions": {
       "rule": "A @mixin or @function body emits nothing where it is written, so a rule inside one is not unlayered CSS (Law 5); the layer is checked where the mixin is included. A mixin that holds a whole rule emits it there, so including one at the root of a file is unlayered CSS, directly or through another mixin that includes it; a mixin defined in another file is not followed. An interpolation, #{…}, is text in a selector, a prelude or a value: its braces open and close no rule.",
       "allowed": [
@@ -75,6 +90,7 @@
     }
   },
   "layers": {
+    "gates": ["audit", "stylelint"],
     "order": [
       "reset",
       "vendor",
@@ -87,7 +103,7 @@
       "overrides"
     ],
     "statement": "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;",
-    "rule": "Law 5. The entry stylesheet names the layers once, first, in this order: a layer may be left out but never moved, and other layers may sit between them. `theme` is Tailwind v4's generated theme and only a Tailwind entry names it. `vendor` holds CSS you do not control, imported with `layer(vendor)`. The statement names it even before there is any, because a layer first named by its import is appended after `overrides`, where the vendor's rules beat every rule you write (SB-A8). So every layer a file imports into must be in that file's statement. The canonical entries are web-design-studio/assets/starter/styles/index.css and assets/configs/index.tailwind.css.",
+    "rule": "Law 5. The entry stylesheet names the layers once, first, in this order: a layer may be left out but never moved, and other layers may sit between them. `theme` is Tailwind v4's generated theme and only a Tailwind entry names it. `vendor` holds CSS you do not control, imported with `layer(vendor)`. The statement names it even before there is any, because a layer first named by its import is appended after `overrides`, where the vendor's rules beat every rule you write (SB-A8). So every layer a file imports into must be in that file's statement, and the statement comes before the import: an `@import … layer(vendor)` above it names `vendor` first, whatever the statement then says. The canonical entries are web-design-studio/assets/starter/styles/index.css and assets/configs/index.tailwind.css.",
     "imports": "A file that opens its own `@layer` block, as every starter file does, is imported bare: `@import url(\"base.css\") layer(base)` nests it as `base.base` (SB-A23). `layer()` is for files that name no layer: vendor CSS and Tailwind's own files.",
     "allowed": [
       "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;",
@@ -98,8 +114,141 @@
     "refused": [
       "@layer reset, tokens, vendor, base, layout, components, utilities, overrides;",
       "@layer vendor, reset, tokens, base, layout, components, utilities, overrides;",
-      "@layer reset, tokens, base, layout, components, utilities, overrides;\n@import url(\"vendor/datepicker.css\") layer(vendor);"
+      "@layer reset, tokens, base, layout, components, utilities, overrides;\n@import url(\"vendor/datepicker.css\") layer(vendor);",
+      "@import url(\"vendor/datepicker.css\") layer(vendor);\n@layer reset, vendor, tokens, base, layout, components, utilities, overrides;",
+      "@layer base { body { margin: 0; } }\n@layer reset, vendor, tokens, base, layout, components, utilities, overrides;"
     ]
+  },
+  "values": {
+    "gates": ["audit", "stylelint"],
+    "rule": "Laws 1, 3 and 6: a design property takes a token through var(), or one of the few values that are not a design decision: 0, the CSS-wide keywords, and the keywords its family lists. stylelint allows exactly these values, property by property (declaration-property-value-allowed-list compares the whole value); the audit refuses the literals they leave out. An allowlist names what is correct, so 13px, 0.8125rem and clamp(12px, 2vw, 14px) are refused alike, and so is the spelling nobody has thought of yet.",
+    "lists": "In a family's `values`, KEYWORDS is `keywords`, COLOUR_WORDS is `colour_words` and every system colour (system_colors.names) in any case, and a shape's name stands for its pattern. Every other entry is a value matched exactly.",
+    "shapes": {
+      "VAR_SEQ": {
+        "pattern": "^(?:var\\(--[a-z0-9-]+\\)\\s*)+$",
+        "means": "One or more var(--token) references, whitespace-separated, and nothing else, so `var(--pad-card) 2px` is refused. Names are kebab-case: var(--padCard) is a typo, and a var() that names no token drops its declaration in silence."
+      },
+      "VAR_ONE": {
+        "pattern": "^var\\(--[a-z0-9-]+(\\s*,\\s*.+)?\\)$",
+        "means": "Exactly one token, with or without a fallback, which is not checked (var_fallback). For the properties where a sequence means nothing: font-size, z-index, line-height."
+      },
+      "VAR_CALC": {
+        "pattern": "^calc\\(\\s*var\\(--[a-z0-9-]+\\)\\s*[-+]\\s*var\\(--[a-z0-9-]+\\)\\s*\\)$",
+        "means": "A token plus or minus a token, for the nested-radius rule: inner radius = outer radius - inner padding. No bare number and no factor: calc(var(--space-4) * 1.5) invents a step between steps, Law 3's prohibition inside a calc(). Density scales by multiplying, once, in tokens.css, where it is a system decision."
+      },
+      "CANCEL": {
+        "pattern": "^calc\\(\\s*(?:var\\(--[a-z0-9-]+\\)\\s*\\*\\s*-1|-1\\s*\\*\\s*var\\(--[a-z0-9-]+\\))\\s*\\)$",
+        "means": "A margin that cancels a known token, Law 2's third exception (margins_in_components). Only -1: any other factor invents a step."
+      }
+    },
+    "keywords": ["inherit", "initial", "unset", "revert", "revert-layer"],
+    "colour_words": ["currentcolor", "transparent"],
+    "colour_functions": ["rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch", "color"],
+    "colour_functions_rule": "A colour written as one of these functions is a literal, unless a token decides it (oklch(from var(--x) l c h / 0.5)). The audit and ESLint read this list; stylelint's function-disallowed-list does not yet (SB-A15).",
+    "families": {
+      "spacing": {
+        "laws": "1, 3, 6",
+        "why": "Spacing is the scale or nothing. 0 is on the scale and is spelled 0 (zero). gap is the one sanctioned way to space siblings (Law 2), so it takes the scale too.",
+        "allow": [
+          {"properties": ["padding", "padding-inline", "padding-block"], "values": ["VAR_SEQ", "VAR_CALC", "0", "KEYWORDS"]},
+          {"properties": ["padding-top", "padding-right", "padding-bottom", "padding-left", "padding-inline-start",
+                          "padding-inline-end", "padding-block-start", "padding-block-end"],
+           "values": ["VAR_ONE", "VAR_CALC", "0", "KEYWORDS"]},
+          {"properties": ["gap"], "values": ["VAR_SEQ", "0", "KEYWORDS"]},
+          {"properties": ["row-gap", "column-gap"], "values": ["VAR_ONE", "0", "KEYWORDS"]}
+        ],
+        "allowed": ["padding: var(--pad-card) var(--pad-card-lg)", "padding-inline: 0", "gap: var(--gap-related)",
+                    "padding-block-start: calc(var(--pad-card) - var(--stroke-hairline))",
+                    "padding-top: var(--pad-card, calc(1rem / 2))"],
+        "refused": ["padding: 13px", "padding: var(--pad-card) 2px", "gap: 1rem", "padding: calc(var(--space-4) * 1.5)",
+                    "padding: calc(var(--pad-card) * 1.5)", "gap: calc(var(--gap-related) * 3)",
+                    "padding-inline: calc(var(--pad-card) / 2)"]
+      },
+      "type": {
+        "laws": "1, 3",
+        "why": "No em, no %, no bare 1.4: size and leading are the values every project drifts on first. The one em is font-size: 1em, which sizes an icon to the text beside it. line-height takes no literal 1, though --leading-none is 1: the literal teaches the next person that the scale is optional. The font shorthand is how the --type-* roles are read, four values in one declaration that cannot half-apply.",
+        "allow": [
+          {"properties": ["font-size"], "values": ["VAR_ONE", "1em", "KEYWORDS"]},
+          {"properties": ["line-height", "font-weight", "font-family", "font"], "values": ["VAR_ONE", "KEYWORDS"]},
+          {"properties": ["letter-spacing"], "values": ["VAR_ONE", "normal", "KEYWORDS"]}
+        ],
+        "allowed": ["font: var(--type-body)", "letter-spacing: normal", "font-weight: var(--weight-semibold)",
+                    "font-size: 1em"],
+        "refused": ["font-size: 18px", "font-size: 1.125rem", "font-size: 0.75em", "letter-spacing: 0.05em"]
+      },
+      "radius": {
+        "laws": "1",
+        "why": "50% is the one exception: a circle is geometry, not a design value, and --radius-full (9999px) makes a pill, not a circle, on a box that is not square.",
+        "allow": [
+          {"properties": ["border-radius"], "values": ["VAR_SEQ", "VAR_CALC", "0", "50%", "KEYWORDS"]},
+          {"properties": ["border-start-start-radius", "border-start-end-radius", "border-end-start-radius",
+                          "border-end-end-radius"],
+           "values": ["VAR_ONE", "VAR_CALC", "0", "KEYWORDS"]}
+        ],
+        "allowed": ["border-radius: 50%", "border-radius: var(--radius-md)",
+                    "border-start-start-radius: calc(var(--radius-lg) - var(--pad-card))"],
+        "refused": ["border-radius: 6px"]
+      },
+      "elevation": {
+        "laws": "1, 6",
+        "why": "Read --elevation-card, not --shadow-sm. A hand-written shadow is one layer and reads as a sticker; the tokens are physically consistent pairs, contact and ambient.",
+        "allow": [{"properties": ["box-shadow"], "values": ["VAR_ONE", "none", "KEYWORDS"]}],
+        "allowed": ["box-shadow: var(--elevation-card)", "box-shadow: none"],
+        "refused": ["box-shadow: 0 2px 8px var(--border-default)"]
+      },
+      "colour": {
+        "laws": "1, 6",
+        "why": "currentColor and transparent are keywords, not colours, and the system colours belong to forced-colors mode (system_colors). No hex, no rgb(), no oklch(), not even a temporary one: a literal colour in a component is the one thing dark mode cannot follow.",
+        "allow": [
+          {"properties": ["color", "background-color", "outline-color", "text-decoration-color"],
+           "values": ["VAR_ONE", "COLOUR_WORDS", "KEYWORDS"]},
+          {"properties": ["border-color"], "values": ["VAR_SEQ", "COLOUR_WORDS", "KEYWORDS"]},
+          {"properties": ["fill", "stroke"], "values": ["VAR_ONE", "COLOUR_WORDS", "none", "KEYWORDS"]},
+          {"properties": ["accent-color"], "values": ["VAR_ONE", "auto", "KEYWORDS"]}
+        ],
+        "allowed": ["color: var(--fg-strong)", "color: currentColor", "background-color: transparent", "fill: none",
+                    "border-color: var(--border-default) var(--border-accent)"],
+        "refused": ["color: #333333", "background-color: rgb(0 0 0)", "color: oklch(50% 0.1 250)", "color: red"]
+      },
+      "stacking": {
+        "laws": "3",
+        "why": "The z-index ladder in tokens.css is closed and ordered by what occupies each rung. z-index: 9999 is not a value but a surrender, and the next person writes 10000.",
+        "allow": [{"properties": ["z-index"], "values": ["VAR_ONE", "0", "auto", "KEYWORDS"]}],
+        "allowed": ["z-index: var(--z-modal)", "z-index: auto"],
+        "refused": ["z-index: 9999"]
+      },
+      "motion": {
+        "laws": "1",
+        "why": "Duration and easing are role-paired in tokens.css: they travel together or they drift. 0s switches one transition off among several. tokens.css collapses every duration token to 1ms under prefers-reduced-motion, so a literal 200ms opts the component out: a vestibular-safety failure, not a style nit.",
+        "allow": [
+          {"properties": ["transition-duration", "animation-duration"], "values": ["VAR_SEQ", "0s", "KEYWORDS"]},
+          {"properties": ["transition-timing-function", "animation-timing-function"], "values": ["VAR_SEQ", "KEYWORDS"]}
+        ],
+        "allowed": ["transition-duration: 0s"],
+        "refused": ["transition-duration: 200ms", "transition-timing-function: cubic-bezier(0.2, 0, 0, 1)"]
+      },
+      "sizing": {
+        "laws": "1",
+        "why": "Line length is a spacing decision: max-inline-size: 65ch in a component is the same mistake as padding: 13px, and the one people defend hardest. The page shell may use the small and dynamic viewport units: 100svb does not jump when mobile browser chrome hides.",
+        "allow": [
+          {"properties": ["max-inline-size", "max-width"],
+           "values": ["VAR_ONE", "none", "100%", "max-content", "min-content", "fit-content", "KEYWORDS"]},
+          {"properties": ["min-block-size"],
+           "values": ["VAR_ONE", "0", "100%", "100dvh", "100dvb", "100svh", "100svb", "auto", "KEYWORDS"]},
+          {"properties": ["min-inline-size"], "values": ["VAR_ONE", "0", "100%", "auto", "KEYWORDS"]}
+        ],
+        "allowed": ["max-inline-size: var(--measure-prose)", "min-block-size: 100svb", "max-width: 100%"],
+        "refused": ["max-width: 600px", "max-inline-size: 65ch"]
+      }
+    }
+  },
+  "inline_styles": {
+    "gates": ["audit", "eslint"],
+    "rule": "Law 4: the style prop is a second home for a component's styles, where no stylesheet, theme, media query or audit reaches. Its one legal use passes a value only the runtime knows into CSS as a custom property; a design literal there is Law 1 coming back through that exception. A design literal is a string holding a number with one of `literal_units`, a hex, or a colour function (values.colour_functions).",
+    "literal_units": ["px", "rem", "em", "ch", "ex", "vw", "vh", "vmin", "vmax", "%", "deg", "s", "ms"],
+    "allowed": ["<div style={{ '--progress': pct }} />", "<div style={span ? { '--card-span': span } : undefined} />"],
+    "refused": ["<div style={{ padding: 13 }} />", "<div style={{ '--gap': '12px' }} />",
+                "<div style={{ '--tint': 'hwb(20 10% 30%)' }} />"]
   },
   "file_classes": {
     "token_files": {

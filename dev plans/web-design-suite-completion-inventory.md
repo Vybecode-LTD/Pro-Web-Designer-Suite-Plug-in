@@ -15,7 +15,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | XC-A9 | medium | fixed in 3.1.0 | Audit baseline keys stop matching when the same folder is spelled differently. |
 | XC-B1 | — | W9 (3.5.0) | The plugin ships only skills: no agents, hooks, commands or MCP/LSP servers, so Law 9 is never applied to Claude's own edits. |
 | XC-B2 | — | W9 (3.5.0) | No eval suite, so nothing shows the skills fire on the right prompts or beat the no-plugin baseline. |
-| XC-B3 | — | partly done; the rest in W9 (3.5.0) | The tests are regression and guard tests only: no smoke test per documented command, no CI, no declared minimum Python. |
+| XC-B3 | — | fixed in 3.3.0: `.github/workflows/ci.yml` runs the suite and the static checks on Windows, Linux and macOS, at Python 3.9 and 3.14, with Node (PR #17); the floor is declared since PR #4 | The tests are regression and guard tests only: no smoke test per documented command, no CI, no declared minimum Python. |
 | XC-B4 | — | fixed in 3.1.0 (CHANGELOG) and 3.2.1 (CLAUDE.md for contributors) | no CHANGELOG (the suite teaches semver and changelogs for design systems but keeps |
 | XC-B5 | — | W4 (3.3.0) | The docs are bash-first (backslash continuations, `&&`, `/tmp/`, `$(…)`, `python3`): fine through Git Bash, broken when pasted into cmd or PowerShell 5.1. |
 | XC-B6 | — | fixed in 3.2.0 | discoverability in a heavy environment: in this machine's sessions the 13 skills |
@@ -24,7 +24,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | XC-C3 | M · high | W9 (3.5.0) | User-invocable workflows as skills with `disable-model-invocation: true`: /gate, /install-gate, /critique, /new-system and more. |
 | XC-C4 | M · medium | W9 (3.5.0) | Subagents (design-critic, a11y-auditor), so heavy references load in an isolated context. |
 | XC-C5 | S · high | fixed in 3.2.0 | promote this review's harnesses to permanent tests: every documented |
-| XC-C6 | M · medium | W9 (3.5.0) | Build and release: a build tool for the zip and the 13 `.skill` files, `claude plugin tag`, and a CI matrix of Windows/Linux/macOS × Python 3.9–3.14 with Node. |
+| XC-C6 | M · medium | fixed in 3.3.0: `tooling/release/build.py` (`test_release_build`), `.github/workflows/ci.yml` and `release.yml` (PR #17). The evals join CI with P29 | Build and release: a build tool for the zip and the 13 `.skill` files, `claude plugin tag`, and a CI matrix of Windows/Linux/macOS × Python 3.9–3.14 with Node. |
 | XC-C7 | M · medium | fixed in 3.2.0 | token efficiency: SKILL.md files are 17–28 KB (≈4.4–6.9k tokens per |
 | XC-C8 | M · medium | W9 (3.5.0) | One project config file, `.design-suite.json`, read by every script, the hook and the commands. |
 | XC-C9 | S · low | W4 (3.3.0) | Cross-platform docs: PowerShell/cmd equivalents for the few shell-only recipes, or one `python -m scripts.gate` entry point. |
@@ -96,7 +96,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-B5 | — | W12 (3.6.0+) | parts of Tailwind v4 aren't covered. |
 | SB-B6 | — | W12 (3.6.0+) | SCSS and other stacks. |
 | SB-C1 | S-M | fixed: 3.1.0 did SB-A3, A4 and A10, and 3.3.0 did SB-A9 and A24 | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. |
-| SB-C2 | M · high | partly done; the rest in W2 (3.3.0) | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. |
+| SB-C2 | M · high | fixed in 3.3.0 (N2: PRs #18 and #19; `test_rules_spec`, `test_real_tools`, `test_tools.SyncRules`) | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. |
 | SB-C3 | S-M · high | W12 (3.6.0+) | Ship a `tw_probe` script and a `/tw-probe` skill command. |
 | SB-C4 | S · high | W12 (3.6.0+) | Replace Part 5 with eslint-plugin-better-tailwindcss 4.7 (peers ESLint 7–10 and Tailwind 3.3/4.1). |
 | SB-C5 | S · high | fixed in 3.2.0 | Add doc-snippet CI: extract ```css/```tsx blocks, run audit + ESLint, and allow a `/* anti-example */` marker (extends XC-C5 and SS-C3). |

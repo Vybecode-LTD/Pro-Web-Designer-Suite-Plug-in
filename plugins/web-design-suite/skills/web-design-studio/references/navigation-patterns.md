@@ -355,7 +355,9 @@ Same problem at the right edge: the last item's trailing padding makes the bar l
   --nav-offset: calc(var(--tap-min) + var(--pad-block-md) * 2);
   scroll-padding-top: calc(var(--nav-offset) + var(--gap-grouped));
 }
-:is(h2, h3, h4)[id] { scroll-margin-top: calc(var(--nav-offset) + var(--gap-grouped)); }
+@layer base {
+  :is(h2, h3, h4)[id] { scroll-margin-top: calc(var(--nav-offset) + var(--gap-grouped)); }
+}
 ```
 
 ---

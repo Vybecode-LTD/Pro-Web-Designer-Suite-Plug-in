@@ -22,6 +22,7 @@ The [inventory](web-design-suite-completion-inventory.md) lists all 265 review i
 - **Reproduce first.** Some items were fixed under another ID (the inventory marks those known). If an item no longer reproduces, record which release fixed it and which test holds it; do not write a fix for it.
 - **Read the item in its detail file** (`web-design-suite-review/<area>.md`) before you touch it. The detail files give where, why, and usually how. The tables below carry only the first sentence.
 - **Two Python versions.** Before each commit that changes the plugin, run the full suite from `plugins/web-design-suite` on Python 3.14, `uv run --no-project --python 3.14 python -B -m unittest discover -s tests`, and on the floor, the same with `3.9`. The command is the same in cmd, PowerShell and Git Bash. *From P1 of the execution plan on (D1, 2026-10-02), CI runs the full suite on Windows, Linux and macOS, on both Pythons, on every push. A PR then runs only its affected tests locally.*
+- **CI (decision D1).** In force once CI is green on all six jobs of PR #17: CI then runs the full suite on Windows, Linux and macOS, at Python 3.9 and 3.14, for every PR, and replaces the two local full runs. Locally, run `python tools/check.py` (the static checks and the affected tests) and `python tools/fail_before.py <test ids>` (the fail-before table, against the latest tag or `--rev`).
 - **One set of rules.** A change to what a gate accepts goes into `skills/web-design-studio/assets/rules/design-rules.json` first. Then it goes into the audit, the stylelint config and the ESLint config, with a real-tool test in `test_real_tools.py`.
 - **Facts from outside the plugin** (laws, standards, vendor limits, prices, dates) are re-read at their source on the day and registered in `tests/fixtures/evidence.json` with their quote.
 - **Git.** One branch per phase, conventional commits, and a PR. Tag after the merge. Read the staged diff before every commit: never commit a secret.
@@ -94,7 +95,7 @@ Re-check every Supabase fact at supabase.com on the day, and register it.
 
 This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.2.1.
 
-**N1 · The gates disagree.** Measured 2026-09-25 with stylelint 17.15. For each row, decide the rule in `design-rules.json` and make all three gates follow it. *Decided 2026-10-02 (execution plan D2): rows 1 and 2 refuse a factor on a role token, and `* -1` stays allowed; row 3 refuses `em` font sizes except `1em`; row 4 refuses a literal `ch` measure in favour of the measure token; row 5 refuses type selectors in component files. Rows 6 to 8 follow the spec.*
+**N1 · The gates disagree.** *Done for 3.3.0 (PR #20): every row follows the spec in all three gates, and each is an example the conformance tests run.* Measured 2026-09-25 with stylelint 17.15. For each row, decide the rule in `design-rules.json` and make all three gates follow it. *Decided 2026-10-02 (execution plan D2): rows 1 and 2 refuse a factor on a role token, and `* -1` stays allowed; row 3 refuses `em` font sizes except `1em`; row 4 refuses a literal `ch` measure in favour of the measure token; row 5 refuses type selectors in component files. Rows 6 to 8 follow the spec.*
 
 | Construct | audit_design | stylelint config | The spec today |
 |---|---|---|---|
@@ -107,9 +108,21 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 | A margin inside an owl rule in a component file | accepts | refuses the value | the owl is allowed, so stylelint is wrong |
 | A CSS system colour outside `@media (forced-colors: active)` (`color: Canvas`) | accepts | refuses (`design/system-colors-in-forced-colors`, 3.2.1) | refused (3.2.1), so the audit is wrong |
 
-**N2 · The rest of item 9.**
-- `tools/sync_rules.py --check`, which generates each tool's rule sections from the spec.
-- Conformance fixtures from the spec, run through the real audit, ESLint and stylelint. `test_rules_spec` still reads the configs as text.
+**N2 · The rest of item 9.** *Done for 3.3.0 (PRs #18 and #19).*
+- `tools/sync_rules.py` writes the spec's data into one marked block in each gate, and `--check` runs in `check.py` and CI. The audit gets the layer order and statement, the nesting depth and the colour functions. The stylelint config gets those it uses, the system colours, the value shapes, the keywords, the colour words, the allowlists of 43 properties in eight families, and the component margins. The ESLint config gets the colour functions, for its raw-colour rule and its inline-style rule. Why each family takes what it takes moved from the config's comments into the spec (`values.families.*.why`).
+- Each section of the spec names the gates that enforce it (`gates`). One builder turns every `allowed` and `refused` example into a file, and the audit (`test_rules_spec`), stylelint and ESLint (`test_real_tools`) must give the spec's verdict on each. Where one does not yet, `KNOWN_DISAGREEMENTS` names the item that fixes it, and the test fails once the gate agrees. The tests that read the stylelint config as text are gone.
+
+**N30 · What the conformance test found (P2).** *Done for 3.3.0 (PR #20), with N1: `KNOWN_DISAGREEMENTS` is empty.* The audit gave the opposite verdict on seven of the spec's examples that neither N1 nor SB-A15 lists. Each is in `KNOWN_DISAGREEMENTS`:
+- `transition-duration: 0s` is refused as a literal duration, though the spec and stylelint allow `0s`;
+- `.card *` in a component file passes, though stylelint refuses it (`selector-max-universal`);
+- `font-size: 1.125rem` passes: the type check skips any length ending in "em", and "rem" does;
+- `color: red` is only a warning (`named-color`), so a run without `--strict` passes it;
+- `max-width: 600px` passes: the audit reads no sizing property;
+- a design literal in an inline custom property (`style={{ '--gap': '12px' }}`, or a colour function) passes, though ESLint refuses it.
+
+**N31 · Found while closing N1 (P3 part 1).** Two more disagreements, outside the spec's examples. Each needs the spec's answer, as examples, before the gate that differs changes:
+- **A literal `0` among tokens.** `padding: 0 var(--pad-card)` passes the audit, and the spec's zero rule allows it, but stylelint's `VAR_SEQ` takes only `var()`s and refuses it; so do `gap` and `border-radius`. Likewise `calc(100% - var(--gutter-page))` in a spacing property: stylelint takes no calc() but a token plus or minus a token, and the audit passes it.
+- **Margins the audit exempts.** The audit lets a component set a margin on its generated content (`.card::before`) and in a rule whose selector names `prose`. `design/component-margins` refuses both, and the spec says neither.
 
 **N3 · The references' CSS against the stylelint config.** 56 of the 170 CSS snippet files fail it (3.2.1). The failures by rule:
 - 27 `selector-max-type`;
@@ -140,7 +153,7 @@ Add a stylelint snippet test like `DesignEslintConfig.test_the_references_tsx_sn
 | SB-A24 | low-medium | SCSS: a `@mixin`-only partial fails L5, while `$card-padding: 24px` passes. *Done for 3.3.0, with the Sass rules in the spec (`sass`).* |
 | SB-A25 | low | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. |
 | SB-C1 | S-M | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. *Done: 3.1.0 did SB-A3, A4 and A10, and 3.3.0 did SB-A9 and A24.* |
-| SB-C2 | M · high | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. *Partly done: 3.2.0 shipped the spec with tests; the generator and conformance fixtures are left.* |
+| SB-C2 | M · high | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. *Done for 3.3.0 (N2): 3.2.0 shipped the spec, and 3.3.0 the generator and the conformance tests.* |
 | SB-C9 | S · medium | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. *Partly done for 3.3.0: vanilla, modules and Tailwind v4; v3 is left.* |
 
 ### W3 · Studio systems: generators, roles and starter files
@@ -174,7 +187,7 @@ These are from the review:
 These were found in phase 2 and 3.2.1:
 
 - **N4.** `accessibility.md` is 60.1 KB, at the limit of one Read. Split it the way 3.2.0 split navigation-patterns.md, and keep `test_skill_budget` passing.
-- **N5.** Only the nine scripts that were executable in 3.0.0 are marked executable (the hook is one of them). Mark the other 17 scripts that have a shebang, and add a test that reads git's file modes. Since 3.2.1 the zip builder takes modes from git, so the zip carries them.
+- **N5.** *Done for 3.3.0 (PR #17).* Only the nine scripts that were executable in 3.0.0 are marked executable (the hook is one of them). Mark the other 17 scripts that have a shebang, and add a test that reads git's file modes. Since 3.2.1 the zip builder takes modes from git, so the zip carries them.
 - **N6.** *Done for 3.3.0.* Python 3.9 is the floor (decision 2). The harness no longer needs 3.10, `test_docs.PythonFloor` runs `test_harness` on 3.9, and the README states 3.9.
 - **N7.** TypeScript 7 is npm's latest, and typescript-eslint 8.70 accepts TypeScript below 6.1. A project that installs typescript-eslint without pinning TypeScript gets a peer conflict. Say so wherever the docs install typescript-eslint.
 - **N8.** The plugin README's install section names only a local folder. Add the GitHub route, `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, which anyone can use now that the repository is public.
@@ -183,19 +196,20 @@ These were found in phase 2 and 3.2.1:
 
 These were found in the reviews of PRs #12 to #15 (Codex and CodeRabbit, 2026-10-01 and 02). Each was rated P2 or minor and judged real; P0 of the execution plan fixes N16 to N25. One finding is not taken: CodeRabbit's note that `w1-supabase-facts.md` should spell `--quote-all-identifiers`. That line quotes the Supabase CLI's script, which spells it `--quote-all-identifier`.
 
-- **N16.** A quoted name with a `$` in it (`"amount$usd"`) is unquoted by `introspect_schema.unquote_identifiers`, and the column parser, which reads only word characters in an unquoted name, then drops the column without a word.
-- **N17.** `ALTER TABLE … DROP COLUMN` removes the column but leaves it in the table's primary key and unique indexes, and other tables' foreign keys still point at it. Postgres drops the indexes and constraints that use the column.
-- **N18.** `RENAME COLUMN` renames the column in its own table only. Other tables' foreign keys, and the CHECKs on the column, keep the old name; Postgres retargets them.
-- **N19.** An `ADD CONSTRAINT` the parser does not know falls through to `ADD COLUMN`. Postgres 18's named not-null constraint (`alter table t add constraint t_name_nn not null name`) becomes a column named `constraint`.
-- **N20.** `scaffold_ui` names `public` in every policy, grant and smoke test, even for a model introspected with `--schema app` (`source.pg_schema` in the model).
-- **N21.** `scaffold_ui.sql_ident` quotes nine reserved words. A table named `select` or a column named `where` gives invalid SQL. It needs the full list, as `introspect_schema.KEEP_QUOTED` has, with a test that the two lists match.
-- **N22.** A policy is named `"<table>: owner reads"`. For a table name of 55 bytes or more, Postgres truncates the four names at 63 bytes to the same name, and the second `CREATE POLICY` fails.
-- **N23.** The smoke test's "no write policy" check counts a write policy for a server role (`to service_role`) as one the browser holds. It should read `pg_policies.roles`.
-- **N24.** The canonical `index.css` stops after `layout.css`. The vanilla stack documents `utilities.css` and `overrides.css`, and a project that copies the entry would never import them.
-- **N25.** An `@import … layer(vendor)` placed before the `@layer` statement fixes `vendor` first, whatever the statement then says. The audit and stylelint check the statement's position against rules only.
+- **N16.** *Done for 3.3.0 (PR #16).* A quoted name with a `$` in it (`"amount$usd"`) is unquoted by `introspect_schema.unquote_identifiers`, and the column parser, which reads only word characters in an unquoted name, then drops the column without a word.
+- **N17.** *Done for 3.3.0 (PR #16).* `ALTER TABLE … DROP COLUMN` removes the column but leaves it in the table's primary key and unique indexes, and other tables' foreign keys still point at it. Postgres drops the indexes and constraints that use the column.
+- **N18.** *Done for 3.3.0 (PR #16).* `RENAME COLUMN` renames the column in its own table only. Other tables' foreign keys, and the CHECKs on the column, keep the old name; Postgres retargets them.
+- **N19.** *Done for 3.3.0 (PR #16).* An `ADD CONSTRAINT` the parser does not know falls through to `ADD COLUMN`. Postgres 18's named not-null constraint (`alter table t add constraint t_name_nn not null name`) becomes a column named `constraint`.
+- **N20.** *Done for 3.3.0 (PR #16).* `scaffold_ui` names `public` in every policy, grant and smoke test, even for a model introspected with `--schema app` (`source.pg_schema` in the model).
+- **N21.** *Done for 3.3.0 (PR #16).* `scaffold_ui.sql_ident` quotes nine reserved words. A table named `select` or a column named `where` gives invalid SQL. It needs the full list, as `introspect_schema.KEEP_QUOTED` has, with a test that the two lists match.
+- **N22.** *Done for 3.3.0 (PR #16).* A policy is named `"<table>: owner reads"`. For a table name of 55 bytes or more, Postgres truncates the four names at 63 bytes to the same name, and the second `CREATE POLICY` fails.
+- **N23.** *Done for 3.3.0 (PR #16).* The smoke test's "no write policy" check counts a write policy for a server role (`to service_role`) as one the browser holds. It should read `pg_policies.roles`.
+- **N24.** *Done for 3.3.0 (PR #16).* The canonical `index.css` stops after `layout.css`. The vanilla stack documents `utilities.css` and `overrides.css`, and a project that copies the entry would never import them.
+- **N25.** *Done for 3.3.0 (PR #16).* An `@import … layer(vendor)` placed before the `@layer` statement fixes `vendor` first, whatever the statement then says. The audit and stylelint check the statement's position against rules only.
 - **N26.** *Done for 3.3.0 (PR #15).* `check_execution_plan.py` counted an item closed as "will not do" as open.
 - **N27.** *Done for 3.3.0 (PR #15).* DL-C7's parts span four PRs, and the execution plan named only the agent. P27 now says where each part lands.
 - **N28.** *Done for 3.3.0 (PR #15).* W1's target said "real `db pull` files". The dump is a real `pg_dump` made with the flags `db pull` uses, and a test applies the CLI's edits to it; there is no `db pull` file.
+- **N29.** *Done for 3.3.0 (PR #16).* stylelint's `design/layer-order` never checked where the `@layer` statement stands, so a rule above it passed, while the audit's `layer-statement-position` refused it. Found while fixing N25.
 
 ---
 
@@ -484,15 +498,14 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 
 1. Write the CHANGELOG entry first, then set the version in `plugins/web-design-suite/.claude-plugin/plugin.json`.
 2. Verify:
-   - the full suite on Python 3.14 and 3.9, the floor;
-   - the fail-before run against the previous tag;
-   - Linux through WSL: `wsl -e sh -c "cd /mnt/c/DEV/Pro-Web-Designer-Suite-Plug-in/plugins/web-design-suite && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests"`;
-   - `claude plugin validate --strict` on the repository root, on the plugin folder, and on `plugin.json`.
+   - CI is green on every job of the release PR: the suite on Windows, Linux and macOS at Python 3.9 and 3.14, the static checks, and `claude plugin validate --strict`;
+   - the fail-before table for the release's fixes: `python tools/fail_before.py <test ids> --rev <previous tag>`;
+   - `claude plugin tag --dry-run plugins/web-design-suite` on the merged commit: it checks that `plugin.json` and the marketplace entry agree. The release's tag stays `vX.Y.Z`; the CLI's own would be `web-design-suite--vX.Y.Z`.
 
    Use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\claude.exe`; the one on PATH is older.
 3. Write the report as `dev plans/web-design-suite-<version>-report.md`, modelled on the 3.1.0 and 3.2.0 reports. Update the inventory and the `dev plans` README.
-4. Build the zip from the merged commit with `python tooling/release/build_zip.py <previous release zip> <out zip> --rev <commit or tag>` (until phase 5 replaces it). It packs only what git tracks, with git's file modes, dated at the commit, so a rebuild is byte-identical; entries keep the previous zip's order, and removed files are listed. It refuses, and writes nothing, if the plugin holds a link or a submodule, or a file `git archive` leaves out. Write the output into `Downloads`, which is not redirected to OneDrive. Then extract the zip into one folder and `git archive` of the same commit into another with `tar --strip-components=1`, so each holds a `web-design-suite` folder, and `diff -r` the two.
-5. Open the PR, merge, then tag `vX.Y.Z` on main and push the tag.
+4. To see the release before tagging, build it locally from the merged commit: `python tooling/release/build.py <empty folder> --rev <commit>`. It writes `web-design-suite-<version>.zip`, one `.skill` file per skill and `SHA256SUMS`, from what git tracks, with git's file modes, dated at the commit, so a rebuild is byte-identical. It refuses, and writes nothing, if the plugin holds a link or a submodule, a file `git archive` leaves out, or a skill the platform would refuse. Write it into `Downloads`, which is not redirected to OneDrive. Never publish this build: CI makes the release.
+5. Merge the PR, then tag `vX.Y.Z` on main and push the tag. `.github/workflows/release.yml` checks that the tag is `plugin.json`'s version, builds the same files on GitHub's runner, and creates the GitHub release with them and the CHANGELOG's section as its notes. It is the only thing that creates a release: never run `gh release create` by hand.
 6. Update the installed copy.
    - Mirror the release into `C:\Users\vybec\.claude\local-marketplaces\web-design-suite\`, removing files that were deleted: extract the zip from step 4 (or `git archive` of the release commit) and mirror that, never the working folder, which can hold a `__pycache__` or a `node_modules`. That folder is the marketplace that `claude plugin update` installs from, so never move or delete it; sessions load the cached copy the last bullet names.
    - Check it with `diff -r`, then run `claude plugin update web-design-suite@web-design-suite`.

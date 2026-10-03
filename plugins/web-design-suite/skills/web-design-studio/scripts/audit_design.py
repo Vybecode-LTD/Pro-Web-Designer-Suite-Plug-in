@@ -83,10 +83,35 @@ TEMPLATE_EXT = {".html", ".htm", ".vue", ".svelte", ".astro"}
 # Files whose CSS is plain CSS, where `//` is not a comment (line_comments).
 PLAIN_CSS_EXT = {".css", ".pcss", ".html", ".htm"}
 KEYFRAMES_AT = re.compile(r"@(-[a-z]+-)?keyframes\b", re.I)
-# Law 5's order (design-rules.json: layers). `theme` is Tailwind v4's.
-LAYER_ORDER = ["reset", "vendor", "tokens", "theme", "base", "layout",
-               "components", "utilities", "overrides"]
+# Law 5's order (design-rules.json: layers; `theme` is Tailwind v4's), the
+# nesting allowed below the top-level rule (nesting), and the colour functions
+# that write a colour by hand (values.colour_functions).
+# BEGIN design-rules: written by tools/sync_rules.py from assets/rules/design-rules.json; edit the spec, then rerun it
+LAYER_ORDER = [
+    "reset", "vendor", "tokens", "theme", "base", "layout", "components", "utilities", "overrides",
+]
 LAYER_STATEMENT = "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;"
+MAX_NESTING = 2
+SYSTEM_COLOR_NAMES = [
+    "accentcolor", "accentcolortext", "activetext", "buttonborder", "buttonface", "buttontext",
+    "canvas", "canvastext", "field", "fieldtext", "graytext", "highlight", "highlighttext",
+    "linktext", "mark", "marktext", "selecteditem", "selecteditemtext", "visitedtext",
+]
+SYSTEM_COLOR_PROPERTY = re.compile(r"^(?:color|fill|stroke|stop-color|flood-color|lighting-color|accent-color|caret-color|background(?:-color)?|border(?:-[a-z]+)*|outline(?:-color)?|text-decoration(?:-color)?|text-emphasis(?:-color)?|column-rule(?:-color)?|box-shadow|text-shadow)$", re.I)
+KEYWORDS = ["inherit", "initial", "unset", "revert", "revert-layer"]
+COLOUR_FUNCTIONS = ["rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch", "color"]
+LITERAL_UNITS = ["px", "rem", "em", "ch", "ex", "vw", "vh", "vmin", "vmax", "%", "deg", "s", "ms"]
+VAR_SEQ = re.compile(r"^(?:var\(--[a-z0-9-]+\)\s*)+$")
+VAR_ONE = re.compile(r"^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$")
+VAR_CALC = re.compile(r"^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$")
+CANCEL = re.compile(r"^calc\(\s*(?:var\(--[a-z0-9-]+\)\s*\*\s*-1|-1\s*\*\s*var\(--[a-z0-9-]+\))\s*\)$")
+SIZING_VALUES = {
+    "max-inline-size": (VAR_ONE, "none", "100%", "max-content", "min-content", "fit-content", *KEYWORDS),
+    "max-width": (VAR_ONE, "none", "100%", "max-content", "min-content", "fit-content", *KEYWORDS),
+    "min-block-size": (VAR_ONE, "0", "100%", "100dvh", "100dvb", "100svh", "100svb", "auto", *KEYWORDS),
+    "min-inline-size": (VAR_ONE, "0", "100%", "auto", *KEYWORDS),
+}
+# END design-rules
 IMPORT_LAYER = re.compile(r"@import\b.*?\blayer\(\s*([\w.-]+)\s*\)", re.I | re.S)
 # Sass (design-rules.json: sass). A @mixin or @function body emits nothing
 # where it is written. A variable holding a literal is a literal; a breakpoint
@@ -125,9 +150,6 @@ COMPONENT_FILE_PAT = re.compile(
     # Matched against a lower-case path with forward slashes.
     r"\.module\.|(^|/)(components|ui)/|(^|/)components\.css$"
 )
-
-# Nesting below the top-level rule (design-rules.json).
-MAX_NESTING = 2
 
 
 def pseudo_classes_only(selector: str) -> bool:
@@ -229,7 +251,13 @@ RELATIONAL_UNIT = re.compile(
 )
 LENGTH_LITERAL = re.compile(r"(?<![\w.#-])-?\d*\.?\d+(px|rem|em|pt|pc|in|cm|mm|q)\b", re.I)
 HEX_COLOR = re.compile(r"#[0-9a-fA-F]{3,8}\b")
-FUNC_COLOR = re.compile(r"\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\s*\(", re.I)
+FUNC_COLOR = re.compile(r"\b(" + "|".join(COLOUR_FUNCTIONS) + r")\s*\(", re.I)
+SYSTEM_COLOR_SET = set(SYSTEM_COLOR_NAMES)
+# A design literal in an inline custom property, as ESLint's
+# style-prop-custom-properties-only reads one (design-rules.json: inline_styles).
+DESIGN_LITERAL = re.compile(r"^-?\d*\.?\d+(?:" + "|".join(map(re.escape, LITERAL_UNITS)) + r")$"
+                            r"|^#[0-9a-fA-F]{3,8}$|^(?:" + "|".join(COLOUR_FUNCTIONS) + r")\(")
+CUSTOM_PROPERTY_STRING = re.compile(r"""(['"])(--[\w-]+)\1\s*:\s*(['"`])((?:(?!\3).)*)\3""")
 NAMED_COLOR = re.compile(
     r"\b(red|blue|green|black|white|gray|grey|yellow|orange|purple|pink|brown|"
     r"cyan|magenta|silver|gold|navy|teal|olive|maroon|lime|aqua|fuchsia)\b", re.I
@@ -637,9 +665,14 @@ def has_raw_length(value: str) -> str | None:
     return None
 
 
+OWL = re.compile(r">\s*\*\s*\+\s*\*")
+
+
 def owl_selector(selectors: tuple[str, ...]) -> bool:
-    """The parent-owned flow idiom: `> * + *` written in the PARENT's rule."""
-    return any(re.search(r"\+\s*\*|\*\s*\+", s) for s in selectors)
+    """The parent-owned flow idiom, the whole `> * + *`, in the rule that holds
+    the declaration: the PARENT's rule spacing its children. `.card + *` is a
+    component spacing its next sibling, which the owl is not."""
+    return bool(selectors) and bool(OWL.search(selectors[-1]))
 
 
 def generated_content(selectors: tuple[str, ...]) -> bool:
@@ -666,6 +699,56 @@ def margin_cancels_token(value: str) -> bool:
     """`calc(var(--token) * -1)` keeps the relationship; `-24px` does not.
     Matched as that shape: a bare "-1" substring also matched --space-16."""
     return bool(CANCELLED_TOKEN.search(value))
+
+
+def scales_a_token(value: str) -> bool:
+    """A factor on a token: `calc(var(--pad-card) * 1.5)`, or `/ 2`, is a step
+    the scale does not have (Law 3; design-rules.json: values.shapes). `* -1`,
+    which cancels a token, is the one factor allowed, and a var() fallback is
+    not checked (var_fallback): `var(--pad-card, calc(1rem / 2))` passes."""
+    return bool(re.search(r"[*/]", strip_var_refs(CANCELLED_TOKEN.sub(" var() ", value))))
+
+
+def allowed_value(value: str, allowed: tuple) -> bool:
+    """Whether `value` is one a family allows (design-rules.json:
+    values.families), as stylelint's allowlist reads it: a shape matches it,
+    or a string equals it."""
+    value = re.sub(r"\s*!important\s*$", "", value.strip(), flags=re.I)
+    return any(a.match(value) if hasattr(a, "match") else a == value for a in allowed)
+
+
+ZERO_TIME = re.compile(r"0*\.?0+m?s", re.I)
+# The pseudo-classes whose argument is a selector list; any other argument
+# (:nth-child(2n + 1), :lang(en)) is not a selector.
+SELECTOR_ARGUMENT = re.compile(r"(?:is|where|not|has|matches|any|-webkit-any|-moz-any|host|host-context|"
+                               r"slotted|global|local)", re.I)
+
+
+def foreign_selector(selector: str) -> str | None:
+    """What a component file's selector reaches that the component does not
+    own: an element (`p`, `svg`, `:is(h2, h3)`), or `*` after a space or `~`.
+    `*` after `>` or `+` is the owl's, written in the parent's own rule; this
+    is how stylelint reads selector-max-type 0 and selector-max-universal 0
+    there (design-rules.json: margins_in_components)."""
+    s = re.sub(r"""(["'])(?:\\.|(?!\1).)*\1""", '""', selector)
+    s = re.sub(r"\[[^\]]*\]", "[]", s)
+    s = re.sub(r":([\w-]+)\(([^()]*)\)",
+               lambda m: m.group(0) if SELECTOR_ARGUMENT.fullmatch(m.group(1)) else f":{m.group(1)}()", s)
+    s = re.sub(r"::?[\w-]+", "", s)
+    s = re.sub(r"[.#][\w-]+", "", s)
+    element = re.search(r"(?:^|[\s>+~(,])\s*([a-zA-Z][\w-]*)", s)
+    if element:
+        return f"the element `{element.group(1)}`"
+    for m in re.finditer(r"\*", s):
+        before = s[:m.start()].rstrip()
+        if not before or before[-1] not in ">+":
+            return "every element inside it (`*`)"
+    return None
+
+
+def in_forced_colors(at_rules: Iterable[str]) -> bool:
+    return any(a.lower().startswith("@media") and re.search(r"forced-colors\s*:\s*active", a, re.I)
+               for a in at_rules)
 
 
 # ---------------------------------------------------------------------------
@@ -752,13 +835,22 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 if not first_rule_line:
                     first_rule_line = line
                 # depth counts the top-level rule as 1; nesting starts below it,
-                # as stylelint counts (design-rules.json: max_depth 2).
+                # as stylelint counts (design-rules.json: nesting.max_depth).
                 if depth - 1 > MAX_NESTING:
                     add(line, "L5", "nesting-depth", "error",
                         f"Nesting depth {depth - 1} exceeds the limit of {MAX_NESTING}.",
                         "Native nesting desugars through :is(), which takes the "
-                        "specificity of its most specific argument — past depth 2 "
+                        f"specificity of its most specific argument — past depth {MAX_NESTING} "
                         "nobody can predict the resulting number. Flatten it.")
+                foreign = (foreign_selector(sel) if component_file
+                           and not any(KEYFRAMES_AT.match(a) for a in at_rules) else None)
+                if foreign:
+                    add(line, "L2", "foreign-selector", "error",
+                        f"`{sel[:70]}` styles {foreign}, which this component does not own.",
+                        "A component styles itself and its own parts, by class. An element "
+                        "selector, or a `*` after a space, reaches into whatever renders "
+                        "inside it: Law 2 broken from the other direction. Give the part a "
+                        "class. The owl (`> * + *`) in the parent's own rule is the exception.")
                 if COMPOUND_SEL.search(sel):
                     add(line, "L5", "compound-specificity", "warning",
                         f"Selector chains 4+ classes: `{sel[:70]}`.",
@@ -878,6 +970,25 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     "/ --gap-distinct for space between siblings, --pad-* for "
                     "inset. See references/spacing-system.md §6.")
 
+        # ---- L3 a factor on a token ----------------------------------------
+        # Spacing and radius take steps of a scale. Positioning (inset, top…)
+        # is geometry, which may divide: half the gap to a tap target's size.
+        positional = prop.startswith(("inset", "top", "right", "bottom", "left"))
+        if (prop in RADIUS_PROPS or (prop in SPACING_PROPS and not positional)) and scales_a_token(value):
+            add(line, "L3", "token-factor", "error",
+                f"`{prop}: {value.strip()}` scales a token: a step the scale does not have.",
+                "Pick the step you mean, a role or a step on the scale. Density "
+                "scales by multiplying, once, in tokens.css. `* -1`, to cancel a "
+                "token, is the one factor allowed.")
+
+        # ---- L1 sizing --------------------------------------------------------
+        if prop in SIZING_VALUES and not allowed_value(value, SIZING_VALUES[prop]):
+            add(line, "L1", "raw-size", "error",
+                f"`{prop}: {value.strip()}` is a literal size.",
+                "Line length and the widths of things are spacing decisions: use the "
+                "measure token (--measure-prose), 100%, none or an intrinsic keyword "
+                "(design-rules.json: values.families.sizing).")
+
         # ---- L2 outer margins in components --------------------------------
         if (component_file and prop in OUTER_MARGIN_PROPS
                 and not margin_is_alignment(value)
@@ -905,10 +1016,21 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     "/ --bg-accent. A hardcoded colour is a colour that dark "
                     "mode cannot re-point, which is how a theme silently breaks.")
             elif colour:
-                add(line, "L1", "named-color", "warning",
+                add(line, "L1", "named-color", "error",
                     f"`{prop}: {value.strip()}` uses a CSS named colour.",
                     "Named colours are outside the ramp and outside the "
                     "contrast budget. Use a role token.")
+
+        # ---- L1 system colours outside forced-colors mode ------------------
+        if SYSTEM_COLOR_PROPERTY.match(prop) and not in_forced_colors(d.at_rules):
+            word = next((w for w in re.split(r"[\s,/()]+", value) if w.lower() in SYSTEM_COLOR_SET), None)
+            if word:
+                add(line, "L1", "system-color", "error",
+                    f"`{word}` is a CSS system colour, outside @media (forced-colors: active).",
+                    "A system colour is right only in forced-colors mode, where the "
+                    "user's palette replaces the page's. Anywhere else it is a colour no "
+                    "token controls, no theme re-points and no contrast check measures. "
+                    "Use a role token (design-rules.json: system_colors).")
 
         # ---- L1 shadows ------------------------------------------------------
         if (prop in SHADOW_PROPS
@@ -935,9 +1057,12 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     "Use --weight-regular / -medium / -semibold / -bold (weight "
                     "has no Tier-2 role), or a --type-* role, which carries the "
                     "weight in its font shorthand.")
+            # The one em: font-size: 1em sizes an icon to the text beside it.
+            # (Every other em was skipped here, and every rem with it, since
+            # "rem" ends in "em": N1 and N30.)
             elif (has_raw_length(value)
                   and not RELATIONAL_UNIT.match(value.strip())
-                  and not (has_raw_length(value) or "").lower().endswith("em")):
+                  and not (prop == "font-size" and value.strip().lower() == "1em")):
                 add(line, "L1", "raw-type", "error",
                     f"`{prop}: {value.strip()}` is off the type scale.",
                     "Use a --type-* role (--type-body, --type-h2, --type-ui). "
@@ -953,7 +1078,8 @@ def audit_css(path: Path, text: str) -> list[Finding]:
         # ---- L1 motion -------------------------------------------------------
         if prop in MOTION_PROPS:
             rest = strip_var_refs(value)
-            if TIME_LITERAL.search(rest):
+            # 0s switches one transition off among several: not a duration.
+            if any(not ZERO_TIME.fullmatch(t) for t in TIME_LITERAL.findall(rest)):
                 add(line, "L1", "raw-duration", "error",
                     f"`{prop}: {value.strip()}` hardcodes a duration.",
                     "Use --motion-hover / --motion-enter / --motion-exit / "
@@ -1023,12 +1149,19 @@ def audit_css(path: Path, text: str) -> list[Finding]:
             "unwrapped file quietly makes its rules unoverridable. Wrap the "
             "file in @layer components { … } (or the layer it belongs to).")
 
+    first_layered_import = min((line for line, _ in import_layers), default=0)
     if saw_layer_statement and first_rule_line and layer_statement_line > first_rule_line:
         add(layer_statement_line, "L5", "layer-statement-position", "error",
             "The @layer statement appears after rules have already been seen.",
             "A layer's position is fixed the first time its name is used, so "
             "the statement must be the first thing in the entry stylesheet, "
             "before every @import and every rule.")
+    elif saw_layer_statement and first_layered_import and layer_statement_line > first_layered_import:
+        # The import names its layer first, whatever the statement then says (N25).
+        add(layer_statement_line, "L5", "layer-statement-position", "error",
+            f"The @layer statement comes after `@import … layer()` on line {first_layered_import}.",
+            "A layer's position is fixed the first time its name is used, and "
+            "that import used it first. Move the statement above every @import.")
 
     # A layer first named by its import is appended after every declared one,
     # so the vendor's rules beat yours (SB-A8, design-rules.json: layers).
@@ -1125,11 +1258,13 @@ def audit_js(path: Path, text: str) -> list[Finding]:
 
     line_of = _line_finder(clean)
 
-    def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str) -> None:
+    def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str, snippet: str = "") -> None:
         tags = line_ignores.get(line, set()) | file_ignores
         if law in tags or rule.upper() in tags or "ALL" in tags:
             return
-        snippet = lines[line - 1].strip() if 0 < line <= len(lines) else ""
+        # A finding may name its own snippet, which is also its baseline key's
+        # text: several findings on one line stay distinct.
+        snippet = snippet or (lines[line - 1].strip() if 0 < line <= len(lines) else "")
         findings.append(Finding(str(path), line, law, rule, sev, msg, fix, snippet))
 
     _audit_jsx_styles(clean, line_of, add)
@@ -1175,6 +1310,14 @@ def _audit_jsx_styles(clean: str, line_of, add) -> None:
         offenders = [k for k in names if not k.startswith("--")]
         if not names:
             continue
+        for pair in CUSTOM_PROPERTY_STRING.finditer(inner):
+            if DESIGN_LITERAL.match(pair.group(4).strip()):
+                add(line_of(m.start()), "L1", "inline-literal", "error",
+                    f"Inline `style` passes `{pair.group(2)}: '{pair.group(4)}'`, a design literal.",
+                    "The custom property carries a value only the runtime knows. Pass "
+                    "a number and do the arithmetic in CSS with calc(), or point the "
+                    "property at a token: var(--gap-related).",
+                    snippet=f"{pair.group(2)}: {pair.group(4)}")
         if offenders:
             add(line_of(m.start()), "L4", "inline-style", "error",
                 f"Inline `style` sets visual propert{'y' if len(offenders) == 1 else 'ies'}: "
@@ -1347,11 +1490,11 @@ def audit_template(path: Path, text: str) -> list[Finding]:
                     keep=False)
     line_of = _line_finder(text)
 
-    def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str) -> None:
+    def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str, snippet: str = "") -> None:
         tags = line_ignores.get(line, set()) | file_ignores
         if law in tags or rule.upper() in tags or "ALL" in tags:
             return
-        snippet = lines[line - 1].strip() if 0 < line <= len(lines) else ""
+        snippet = snippet or (lines[line - 1].strip() if 0 < line <= len(lines) else "")
         findings.append(Finding(str(path), line, law, rule, sev, msg, fix, snippet))
 
     for m in TAG_STYLE_ATTR.finditer(markup):

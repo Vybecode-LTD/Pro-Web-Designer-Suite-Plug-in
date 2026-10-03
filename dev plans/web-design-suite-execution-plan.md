@@ -55,7 +55,7 @@ The plugin is done when all of these hold:
 
 ## 4. The schedule
 
-Size: S is about a quarter of a session, M about a third, L about half. A session is the user's usual 500 thousand tokens. Each PR follows §6.
+Size: S is about a quarter of a session, M about a third, L about half. A session is up to 750 thousand tokens, with no compacting (the user, 2026-10-02); the sizes were set against 500 thousand. Each PR follows §6.
 
 ### Phase 3 · 3.3.0: safe defaults and one set of rules
 
@@ -63,10 +63,11 @@ PRs #12 to #15 were merged on 2026-10-02. P0 fixes what their reviews found.
 
 | PR | What | Items | Main files | Size |
 |---|---|---|---|---|
-| P0 | What the reviews of #12 to #15 found: the parser's `$` names, `DROP` and `RENAME COLUMN`, unknown `ADD CONSTRAINT`; the scaffold's schema, reserved words, policy-name length and write-policy roles; the entry's missing sheets; an import before the layer statement | N16, N17, N18, N19, N20, N21, N22, N23, N24, N25 | `introspect_schema.py`, `scaffold_ui.py`, `audit_design.py`, `stylelint.config.mjs`, `design-rules.json`, `starter/styles/index.css` | M |
-| P1 | CI, the release build, and the lean tooling | XC-C6, XC-B3, N5 | `.github/workflows/`, `tooling/release/`, `tools/fail_before.py`, `tools/check.py`, git file modes | L |
-| P2 | The rule spec generates the gates' rule sections, with conformance fixtures through the real tools | N2, SB-C2 | `tools/sync_rules.py`, `design-rules.json`, `tests/test_rules_spec.py`, `test_real_tools.py` | M-L |
-| P3 | The gates agree: the eight constructs, and the holes in the stylelint allowlist | N1, SB-A15 | `design-rules.json`, the audit, `stylelint.config.mjs`, `eslint.design.config.mjs` | M |
+| P0, #16 | What the reviews of #12 to #15 found: the parser's `$` names, `DROP` and `RENAME COLUMN`, unknown `ADD CONSTRAINT`; the scaffold's schema, reserved words, policy-name length and write-policy roles; the entry's missing sheets; an import or a rule before the layer statement | N16, N17, N18, N19, N20, N21, N22, N23, N24, N25, N29 | `introspect_schema.py`, `scaffold_ui.py`, `audit_design.py`, `stylelint.config.mjs`, `design-rules.json`, `starter/styles/index.css` | M |
+| P1, #17 | CI, the release build, and the lean tooling | XC-C6, XC-B3, N5 | `.github/workflows/`, `tooling/release/`, `tools/fail_before.py`, `tools/check.py`, git file modes | L |
+| P2, #18 and #19 | The rule spec generates the gates' rule sections, with conformance fixtures through the real tools. #18 is the generator and the data blocks; #19 the value allowlists, ESLint's colour functions and the conformance tests, which found N30 | N2, SB-C2 | `tools/sync_rules.py`, `design-rules.json`, `tests/test_rules_spec.py`, `test_real_tools.py` | M-L |
+| P3 part 1, #20 | The gates agree on every example of the spec: N1's eight constructs, and what P2's conformance test found. `KNOWN_DISAGREEMENTS` is empty | N1, N30 | the audit, `stylelint.config.mjs`, `eslint.design.config.mjs`, `design-rules.json` | M |
+| P3 | The holes in the stylelint allowlist, and the two disagreements found in part 1 (part 2) | SB-A15, N31 | `design-rules.json`, the audit, `stylelint.config.mjs`, `eslint.design.config.mjs` | M |
 | P4 | Audit accuracy, the checks the docs promise, its speed on large JSX, and SARIF output | SB-A11, SB-A25, SB-C10 | `audit_design.py` | M |
 | P5 | The references' CSS passes stylelint, and the Tailwind v3 entry | N3, SB-C9 | `web-design-studio/references/*.md`, `assets/configs/` | M |
 | P6 | The generators reproduce the starter: type, colour and fluid type, tested against each other | SS-A9, SS-B5, SS-B6, SS-B7, SS-C5 | `generate_*.py`, `tokens.css`, `test_numbers.py` | L |
@@ -205,7 +206,7 @@ Update this table in each PR.
 
 | Phase | PRs done | Items closed | Release |
 |---|---|---|---|
-| 3 | #12 to #15 merged (2026-10-02) | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N26 to N28; DL-B2 and SB-C9 in part | — |
+| 3 | #12 to #15 merged (2026-10-02); P0 as #16, P1 as #17, P2 as #18 and #19, P3 part 1 as #20 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30; DL-B2 and SB-C9 in part | — |
 | 4 | — | — | — |
 | 5 | — | — | — |
 | 6 | — | — | — |
