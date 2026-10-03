@@ -23,9 +23,11 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import subprocess
+import sys
 import unittest
 
-from wds_support import SKILLS, TempDirTest, load_script
+from wds_support import PLUGIN, SKILLS, TempDirTest, env, load_script, output
 
 HERE = pathlib.Path(__file__).resolve().parent
 # The spec comes from this suite's own plugin; the tools checked against it are
@@ -228,14 +230,18 @@ class StylelintFollowsTheSpec(unittest.TestCase):
         self.assertEqual(4, len(re.findall(r"^    \{\n      files:", self.config, re.M)))
         self.assertIn("There are four", self.config)
 
-    def test_the_layer_order_is_the_specs(self):
+    def test_the_specs_data_is_written_into_the_gates(self):
         """SB-A8: the config's LAYER_ORDER had no `vendor`, so it refused the
         corrected statement as an unknown layer; and nothing checked that a
-        layer an entry imports into is in its statement
+        layer an entry imports into is in its statement. N2: the layer order,
+        the nesting depth and the system colours are now written from the spec
+        by tools/sync_rules.py, whose --check fails when a gate drifts
         (test_real_tools.StylelintConfig runs the spec's examples)."""
-        block = re.search(r"const LAYER_ORDER = \[(.*?)\];", self.config, re.S).group(1)
-        self.assertEqual(SPEC["layers"]["order"], re.findall(r"^\s*'(\w+)',", block, re.M))
+        proc = subprocess.run([sys.executable, "-B", str(PLUGIN / "tools" / "sync_rules.py"), "--check"],
+                              capture_output=True, env=env())
+        self.assertEqual(0, proc.returncode, output(proc))
         self.assertIn("undeclaredImport", self.config)
+        self.assertRegex(self.config, r"'max-nesting-depth':\s*\[\s*MAX_NESTING,\s*\{[^}]*'pseudo-classes'")
 
     def test_system_colours_are_scoped_to_forced_colors(self):
         """3.2.1 allowed the system colours in every colour property of every
@@ -252,12 +258,6 @@ class StylelintFollowsTheSpec(unittest.TestCase):
         it has to follow those rules too, with a real-tool test."""
         self.assertIn("stylelint", SPEC["sass"]["gates"])
         self.assertNotRegex(self.config, r"(?i)s[ac]ss")
-
-    def test_nesting_limit(self):
-        m = re.search(r"'max-nesting-depth':\s*\[\s*(\d+),\s*\{([^}]*)\}", self.config)
-        self.assertIsNotNone(m)
-        self.assertEqual(int(m.group(1)), SPEC["nesting"]["max_depth"])
-        self.assertIn("'pseudo-classes'", m.group(2))
 
     def test_a_var_fallback_is_accepted(self):
         var_one = self.js_regex("VAR_ONE")

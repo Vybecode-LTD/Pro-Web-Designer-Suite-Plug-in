@@ -68,11 +68,12 @@ jobs:
         working-directory: plugins/web-design-suite
         run: uv run --no-project --python ${{ matrix.python }} python -B -m unittest discover -s tests
 
-      - name: Pointers, quoted starter code, and the audit on the plugin's own skills
+      - name: Pointers, quoted starter code, the spec's data in the gates, and the audit on the plugin's own skills
         working-directory: plugins/web-design-suite
         run: |
           uv run --no-project --python ${{ matrix.python }} python -B tools/check_pointers.py
           uv run --no-project --python ${{ matrix.python }} python -B tools/sync_snippets.py --check
+          uv run --no-project --python ${{ matrix.python }} python -B tools/sync_rules.py --check
           uv run --no-project --python ${{ matrix.python }} python -B skills/web-design-studio/scripts/audit_design.py skills --strict
 
       - name: Every open item is scheduled once

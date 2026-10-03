@@ -43,21 +43,33 @@ import stylelint from 'stylelint';
  * PART 1 — THE CANONICAL LAYER ORDER (LAW 5)
  * ========================================================================= */
 
+/* The layers, weakest first:
+ *   reset       Preflight / normalize. Beaten by literally everything.
+ *   vendor      CSS you do not control, imported with layer(vendor). Named
+ *               even before there is any: a layer first named by its import
+ *               lands after overrides and beats everything (SB-A8).
+ *   tokens      tokens.css. Declarations only, no selectors that paint.
+ *   theme       Tailwind's generated @theme output (v4 only).
+ *   base        element defaults: html, body, headings, links.
+ *   layout      page-level primitives: stack, grid, sidebar, gutter.
+ *   components  one file per component. The bulk of hand-written CSS.
+ *   utilities   Tailwind's utilities. Must beat components, or a `p-card-lg`
+ *               on a `.card` would lose to the card's own padding and the
+ *               utility would appear not to work.
+ *   overrides   the documented one-off. Last, so it needs no !important.
+ * The order, the nesting depth and the system colours below come from
+ * assets/rules/design-rules.json. */
+// BEGIN design-rules: written by tools/sync_rules.py from assets/rules/design-rules.json; edit the spec, then rerun it
 const LAYER_ORDER = [
-  'reset',      // Preflight / normalize. Beaten by literally everything.
-  'vendor',     // CSS you do not control, imported with layer(vendor). Named
-                //   even before there is any: a layer first named by its
-                //   import lands after overrides and beats everything (SB-A8).
-  'tokens',     // tokens.css. Declarations only, no selectors that paint.
-  'theme',      // Tailwind's generated @theme output (v4 only).
-  'base',       // element defaults: html, body, headings, links.
-  'layout',     // page-level primitives: stack, grid, sidebar, gutter.
-  'components', // one file per component. The bulk of hand-written CSS.
-  'utilities',  // Tailwind's utilities. Must beat components, or a
-                //   `p-card-lg` on a `.card` would lose to the card's own
-                //   padding and the utility would appear not to work.
-  'overrides',  // the documented one-off. Last, so it needs no !important.
+  'reset', 'vendor', 'tokens', 'theme', 'base', 'layout', 'components', 'utilities', 'overrides',
 ];
+const MAX_NESTING = 2;
+const SYSTEM_COLOR_NAMES = [
+  'accentcolor', 'accentcolortext', 'activetext', 'buttonborder', 'buttonface', 'buttontext',
+  'canvas', 'canvastext', 'field', 'fieldtext', 'graytext', 'highlight', 'highlighttext',
+  'linktext', 'mark', 'marktext', 'selecteditem', 'selecteditemtext', 'visitedtext',
+];
+// END design-rules
 
 /* =========================================================================
  * PART 2 — LOCAL PLUGIN: LAYER ORDER (LAW 5)
@@ -250,12 +262,7 @@ const designPlugin = createPlugin(layerRuleName, layerOrderRule);
  * outside it, shorthands included (`border: 1px solid ButtonText`).
  * ------------------------------------------------------------------------- */
 
-const SYSTEM_COLOR_NAMES = [
-  'accentcolor', 'accentcolortext', 'activetext', 'buttonborder', 'buttonface',
-  'buttontext', 'canvas', 'canvastext', 'field', 'fieldtext', 'graytext',
-  'highlight', 'highlighttext', 'linktext', 'mark', 'marktext', 'selecteditem',
-  'selecteditemtext', 'visitedtext',
-];
+/* SYSTEM_COLOR_NAMES is in PART 1's design-rules block. */
 const systemColorRuleName = 'design/system-colors-in-forced-colors';
 const systemColorMessages = utils.ruleMessages(systemColorRuleName, {
   outside: (word) =>
@@ -533,7 +540,7 @@ export default {
      * same fight `!important` loses. Media queries, `@supports`, `@layer`
      * and `@container` do not count: they add no specificity. */
     'max-nesting-depth': [
-      2,
+      MAX_NESTING,
       {
         ignore: ['pseudo-classes'],
         ignoreAtRules: ['media', 'supports', 'layer', 'container', 'scope'],

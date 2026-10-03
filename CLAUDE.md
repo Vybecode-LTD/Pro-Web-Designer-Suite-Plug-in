@@ -14,10 +14,10 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-10-02)
 
-- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress: the Python 3.9 floor (N6, PR #4), the audit's false cleans (SB-A9 with N11, PR #5) and the migration tool's copy of them (N12, PR #6) are merged; the scripts on Sass (SB-A24 with N13, PR #7) and W1's reference (DL-A5, DL-B1's §9, DL-C4, PR #8) are merged too. W1's security pass and `scaffold_ui --strict` (PRs #9, #10) are merged; merged on 2026-10-02: #12 (the parser on real `db pull` and `gen types` output), #13 (the scaffold's policies and `lib/supabase.ts`), #14 (the canonical entry stylesheets and `vendor` in the layer order) and #15 (the execution plan). Open on 2026-10-02: #16 (P0: what the reviews of #12 to #15 found, N16 to N25 and N29) and #17 (P1, stacked on #16: CI, the release build, `fail_before.py` and `check.py`, N5).
+- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress: the Python 3.9 floor (N6, PR #4), the audit's false cleans (SB-A9 with N11, PR #5) and the migration tool's copy of them (N12, PR #6) are merged; the scripts on Sass (SB-A24 with N13, PR #7) and W1's reference (DL-A5, DL-B1's §9, DL-C4, PR #8) are merged too. W1's security pass and `scaffold_ui --strict` (PRs #9, #10) are merged; merged on 2026-10-02: #12 (the parser on real `db pull` and `gen types` output), #13 (the scaffold's policies and `lib/supabase.ts`), #14 (the canonical entry stylesheets and `vendor` in the layer order) and #15 (the execution plan). Open on 2026-10-02: #16 (P0: what the reviews of #12 to #15 found, N16 to N25 and N29) and #17 (P1, stacked on #16: CI, the release build, `fail_before.py` and `check.py`, N5), and #18 (P2 part 1, stacked on #17: `tools/sync_rules.py`).
 - **Installed:** 3.2.1 from `63932cf`. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** 432. CI (#17) runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node; its first runs found one platform bug (fixed) and two Windows-only tests (fixed). Locally, `tools/check.py`; the full suite passed on 3.14 and 3.9 on Windows.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`, which schedules every open item in PRs P2–P43 (P0 and P1 are #16 and #17). Next: green CI on #17 if it is not, then P2 (the spec generates the gates' rule sections) and P3 (the gates agree). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Tests:** 435. CI (#17) runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node; its first runs found one platform bug (fixed) and two Windows-only tests (fixed). Locally, `tools/check.py`; the full suite passed on 3.14 and 3.9 on Windows.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`, which schedules every open item in PRs P2–P43 (P0 and P1 are #16 and #17). Next: green CI if it is not, then P2 part 2 (the spec generates the value allowlists and ESLint's patterns) and P3 (the gates agree). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
 - **Open:** 151 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
@@ -33,6 +33,7 @@ python -B tools/fail_before.py <test ids> [--rev REV]      # the fail-before tab
 python -B -m unittest discover -s tests                     # the whole suite; -B keeps bytecode out of the plugin
 python tools/check_pointers.py        # § pointers; --write-register after editing one, then read the diff
 python tools/sync_snippets.py --check # starter code quoted in the references
+python tools/sync_rules.py --check    # the spec's data in the gates; without --check it rewrites the blocks
 python skills/web-design-studio/scripts/audit_design.py skills --strict
 cd ../.. && python -B tooling/release/build.py <empty folder> [--rev REV]   # the zip, the .skill files, SHA256SUMS
 ```
@@ -61,7 +62,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 ## Conventions
 
 - **Regression tests.** Every fix gets a regression test, seen failing on the previous release's tag and passing now. The reports list the fail-before counts, and the controls and guards.
-- **One set of rules.** A gate change goes into `skills/web-design-studio/assets/rules/design-rules.json` first. Then the audit, the stylelint config and the ESLint config follow, each with a real-tool test in `tests/test_real_tools.py`.
+- **One set of rules.** A gate change goes into `skills/web-design-studio/assets/rules/design-rules.json` first. Then the audit, the stylelint config and the ESLint config follow, each with a real-tool test in `tests/test_real_tools.py`. Data the spec writes into a gate's `BEGIN design-rules` block (the layer order, the nesting depth, the system colours) changes by rerunning `tools/sync_rules.py`, never by hand.
 - **Facts.** A figure from outside the plugin is re-read at its source and registered, with its quote, in `tests/fixtures/evidence.json`.
 - **Size limits.** A SKILL.md stays at or under 20,500 bytes and a reference under 60.5 KB (`tests/test_skill_budget.py`).
 - **Git.** One branch per phase, conventional commits and a PR. Tag after the merge. Read the staged diff before each commit.
