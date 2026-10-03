@@ -136,7 +136,7 @@
   },
   "values": {
     "gates": ["audit", "stylelint"],
-    "rule": "Laws 1, 3 and 6: a design property takes a token through var(), or one of the few values that are not a design decision: 0, the CSS-wide keywords, and the keywords its family lists. stylelint allows exactly these values, property by property (declaration-property-value-allowed-list compares the whole value). The audit reads the same allowlists for the spacing, stroke, motion and sizing families (SPACING_VALUES and the rest), and refuses the literals the other families leave out; a value holding a Sass variable is judged by the literals beside it, since the audit cannot resolve the variable (sass.variables). An allowlist names what is correct, so 13px, 0.8125rem and clamp(12px, 2vw, 14px) are refused alike, and so is the spelling nobody has thought of yet.",
+    "rule": "Laws 1, 3 and 6: a design property takes a token through var(), or one of the few values that are not a design decision: 0, the CSS-wide keywords, and the keywords its family lists. stylelint allows exactly these values, property by property (declaration-property-value-allowed-list compares the whole value). The audit reads the same allowlists for the spacing, stroke, motion and sizing families (SPACING_VALUES and the rest), and refuses the literals the other families leave out; a value holding a Sass variable is judged with each reference read as a token, since the audit cannot resolve it (sass.variables): `padding: $space 5%` is refused as `var(--x) 5%` would be. An allowlist names what is correct, so 13px, 0.8125rem and clamp(12px, 2vw, 14px) are refused alike, and so is the spelling nobody has thought of yet.",
     "lists": "In a family's `values`, KEYWORDS is `keywords`, COLOUR_WORDS is `colour_words` and every system colour (system_colors.names) in any case, and a shape's name stands for its pattern. Every other entry is a value matched exactly.",
     "shapes": {
       "VAR_SEQ": {
@@ -349,19 +349,20 @@
   },
   "bindings": {
     "gates": ["audit", "stylelint"],
-    "rule": "A theme file (file_classes.binding_files, Tailwind v4's theme.css) binds Tailwind's theme to the tokens and decides nothing (theme.css §0): a custom property there takes a token, currentColor, transparent or a CSS-wide keyword. Two literals are allowed, each because of CSS: a breakpoint in rem, which must be a literal and never a var(), because a media query condition cannot read a custom property, and an aspect ratio, a container format. A breakpoint may also be a CSS-wide keyword: `--breakpoint-*: initial` clears Tailwind's own, and `--breakpoint-2xl: initial` one of them. An --animate-* binding is an animation shorthand, so it takes the motion tokens (MOTION_LIST). Keyframe geometry, §0's third exception, is not a custom property. Only custom properties are held to this: the theme file's other rules (its @utility blocks, its keyframes) answer to the gates' other rules. stylelint's theme-file override reads BINDING_ALLOWLIST, and the audit, for which a theme file is a token file, checks its custom properties against BINDING_VALUES (L1 binding-literal).",
+    "rule": "A theme file (file_classes.binding_files, Tailwind v4's theme.css) binds Tailwind's theme to the tokens and decides nothing (theme.css §0): a custom property there takes a token, currentColor, transparent or a CSS-wide keyword. Each prefix with a rule of its own answers to that rule alone, so the colour words never reach a breakpoint, a ratio or an animation. Two literals are allowed, each because of CSS: a breakpoint in rem, which must be a literal and never a var(), because a media query condition cannot read a custom property, and an aspect ratio, a container format. A breakpoint may also be a CSS-wide keyword: `--breakpoint-*: initial` clears Tailwind's own, and `--breakpoint-2xl: initial` one of them. An --animate-* binding is an animation shorthand, so it takes the motion tokens (MOTION_LIST). Keyframe geometry, §0's third exception, is not a custom property. Only custom properties are held to this: the theme file's other rules (its @utility blocks, its keyframes) answer to the gates' other rules. stylelint's theme-file override reads BINDING_ALLOWLIST, and the audit, for which a theme file is a token file, checks its custom properties against BINDING_VALUES (L1 binding-literal).",
     "allow": [
       {"properties": ["/^--breakpoint-/"], "values": ["BREAKPOINT", "KEYWORDS"]},
-      {"properties": ["/^--aspect-/"], "values": ["RATIO"]},
+      {"properties": ["/^--aspect-/"], "values": ["RATIO", "VAR_ONE", "KEYWORDS"]},
       {"properties": ["/^--animate-/"], "values": ["MOTION_LIST"]},
-      {"properties": ["/^--(?!breakpoint-)/"], "values": ["VAR_ONE", "COLOUR_WORDS", "KEYWORDS"]}
+      {"properties": ["/^--(?!breakpoint-|aspect-|animate-)/"], "values": ["VAR_ONE", "COLOUR_WORDS", "KEYWORDS"]}
     ],
     "allowed": ["--breakpoint-md: 48rem", "--breakpoint-*: initial", "--breakpoint-2xl: initial",
                 "--aspect-video: 16 / 9", "--color-current: currentColor",
                 "--color-bg-surface: var(--bg-surface)", "--*: initial", "--spacing-card: var(--pad-card)",
                 "--animate-spin: spin var(--motion-loop) infinite"],
     "refused": ["--spacing-card: 28px", "--color-brand: oklch(64.5% 0.188 42)", "--animate-spin: spin 1s linear infinite",
-                "--breakpoint-md: var(--bp-md)", "--radius-card: calc(var(--radius-md) * 2)"]
+                "--breakpoint-md: var(--bp-md)", "--radius-card: calc(var(--radius-md) * 2)",
+                "--aspect-video: currentColor", "--animate-spin: currentColor"]
   },
   "file_classes": {
     "binding_files": {

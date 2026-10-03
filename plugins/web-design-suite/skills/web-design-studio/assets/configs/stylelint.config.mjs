@@ -201,9 +201,9 @@ const MARGIN_ALLOWLIST = {
 };
 const BINDING_ALLOWLIST = {
   '/^--breakpoint-/': [BREAKPOINT, ...KEYWORDS],
-  '/^--aspect-/': [RATIO],
+  '/^--aspect-/': [RATIO, VAR_ONE, ...KEYWORDS],
   '/^--animate-/': [MOTION_LIST],
-  '/^--(?!breakpoint-)/': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
+  '/^--(?!breakpoint-|aspect-|animate-)/': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
 };
 // END design-rules
 
