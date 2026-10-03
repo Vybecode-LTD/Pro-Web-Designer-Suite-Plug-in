@@ -89,8 +89,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--all", action="store_true", help="run the whole suite as the last check")
     parser.add_argument("--base", help="compare with this ref instead of origin/main")
     args = parser.parse_args(argv)
-
-    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+    # A report must print on any console: a cp1252 one (a redirect on Windows)
+    # has no byte for many characters a check prints, and the checks write
+    # UTF-8, which is how their output is read back.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
+    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONIOENCODING": "utf-8"}
     py = [sys.executable, "-B"]
     tests = PLUGIN_ROOT / "tests"
     repo_plan = PLUGIN_ROOT.parents[1] / "dev plans" / "check_execution_plan.py"

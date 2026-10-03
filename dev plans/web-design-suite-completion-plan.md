@@ -108,9 +108,17 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 | A margin inside an owl rule in a component file | accepts | refuses the value | the owl is allowed, so stylelint is wrong |
 | A CSS system colour outside `@media (forced-colors: active)` (`color: Canvas`) | accepts | refuses (`design/system-colors-in-forced-colors`, 3.2.1) | refused (3.2.1), so the audit is wrong |
 
-**N2 · The rest of item 9.** *Part 1 in PR #18: `tools/sync_rules.py` writes the layer order and statement, the nesting depth and the system colours into a marked block in the audit and the stylelint config, with `--check` in CI. The allowlists, ESLint's patterns and the conformance fixtures remain.*
-- `tools/sync_rules.py --check`, which generates each tool's rule sections from the spec.
-- Conformance fixtures from the spec, run through the real audit, ESLint and stylelint. `test_rules_spec` still reads the configs as text.
+**N2 · The rest of item 9.** *Done for 3.3.0 (PRs #18 and #19).*
+- `tools/sync_rules.py` writes the spec's data into one marked block in each gate, and `--check` runs in `check.py` and CI. The audit gets the layer order and statement, the nesting depth and the colour functions. The stylelint config gets those it uses, the system colours, the value shapes, the keywords, the colour words, the allowlists of 43 properties in eight families, and the component margins. The ESLint config gets the colour functions, for its raw-colour rule and its inline-style rule. Why each family takes what it takes moved from the config's comments into the spec (`values.families.*.why`).
+- Each section of the spec names the gates that enforce it (`gates`). One builder turns every `allowed` and `refused` example into a file, and the audit (`test_rules_spec`), stylelint and ESLint (`test_real_tools`) must give the spec's verdict on each. Where one does not yet, `KNOWN_DISAGREEMENTS` names the item that fixes it, and the test fails once the gate agrees. The tests that read the stylelint config as text are gone.
+
+**N30 · What the conformance test found (P2).** The audit gives the opposite verdict on seven of the spec's examples that neither N1 nor SB-A15 lists. Each is in `KNOWN_DISAGREEMENTS`:
+- `transition-duration: 0s` is refused as a literal duration, though the spec and stylelint allow `0s`;
+- `.card *` in a component file passes, though stylelint refuses it (`selector-max-universal`);
+- `font-size: 1.125rem` passes: the type check skips any length ending in "em", and "rem" does;
+- `color: red` is only a warning (`named-color`), so a run without `--strict` passes it;
+- `max-width: 600px` passes: the audit reads no sizing property;
+- a design literal in an inline custom property (`style={{ '--gap': '12px' }}`, or a colour function) passes, though ESLint refuses it.
 
 **N3 · The references' CSS against the stylelint config.** 56 of the 170 CSS snippet files fail it (3.2.1). The failures by rule:
 - 27 `selector-max-type`;
@@ -141,7 +149,7 @@ Add a stylelint snippet test like `DesignEslintConfig.test_the_references_tsx_sn
 | SB-A24 | low-medium | SCSS: a `@mixin`-only partial fails L5, while `$card-padding: 24px` passes. *Done for 3.3.0, with the Sass rules in the spec (`sass`).* |
 | SB-A25 | low | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. |
 | SB-C1 | S-M | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. *Done: 3.1.0 did SB-A3, A4 and A10, and 3.3.0 did SB-A9 and A24.* |
-| SB-C2 | M · high | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. *Partly done: 3.2.0 shipped the spec with tests; the generator and conformance fixtures are left.* |
+| SB-C2 | M · high | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. *Done for 3.3.0 (N2): 3.2.0 shipped the spec, and 3.3.0 the generator and the conformance tests.* |
 | SB-C9 | S · medium | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. *Partly done for 3.3.0: vanilla, modules and Tailwind v4; v3 is left.* |
 
 ### W3 · Studio systems: generators, roles and starter files

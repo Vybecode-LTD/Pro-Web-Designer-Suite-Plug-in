@@ -13,11 +13,17 @@ outside them is the gate's own. A block holds the constants its gate uses
   LAYER_ORDER, LAYER_STATEMENT   layers.order, layers.statement
   MAX_NESTING                    nesting.max_depth
   SYSTEM_COLOR_NAMES             system_colors.names
+  KEYWORDS, COLOUR_FUNCTIONS     values.keywords, values.colour_functions
+  COLOUR_WORDS                   values.colour_words and the system colours
+  SHAPES                         every shape in values.shapes, each a constant
+                                 of its own name (VAR_SEQ, VAR_ONE, …)
+  VALUE_ALLOWLIST                values.families: each property and its values
+  MARGIN_ALLOWLIST               margins_in_components.properties and .values
 (The markers avoid "@generated": the audit and the migration tool skip a
 file that says it in its first 800 characters.)
 Files are written as UTF-8 with LF line endings, byte for byte the same on
-every rerun. Exit codes: 0 in step (or rewritten), 1 stale (--check) or a
-gate without its block.
+every rerun. Exit codes: 0 in step (or rewritten), 1 stale (--check), a gate
+without its block, or a spec this tool cannot write.
 """
 from __future__ import annotations
 
@@ -29,13 +35,22 @@ import sys
 
 PLUGIN = pathlib.Path(__file__).resolve().parents[1]
 SPEC = "skills/web-design-studio/assets/rules/design-rules.json"
-# Each gate, its language, and the constants it uses.
+# Each gate, its language, and the constants it uses, in the order they are
+# written (COLOUR_WORDS reads SYSTEM_COLOR_NAMES, the allowlists the shapes).
 TARGETS = {
-    "skills/web-design-studio/scripts/audit_design.py": ("py", ("LAYER_ORDER", "LAYER_STATEMENT", "MAX_NESTING")),
+    "skills/web-design-studio/scripts/audit_design.py":
+        ("py", ("LAYER_ORDER", "LAYER_STATEMENT", "MAX_NESTING", "COLOUR_FUNCTIONS")),
     "skills/web-design-studio/assets/configs/stylelint.config.mjs":
-        ("js", ("LAYER_ORDER", "MAX_NESTING", "SYSTEM_COLOR_NAMES")),
+        ("js", ("LAYER_ORDER", "MAX_NESTING", "SYSTEM_COLOR_NAMES", "KEYWORDS", "COLOUR_WORDS",
+                "SHAPES", "VALUE_ALLOWLIST", "MARGIN_ALLOWLIST")),
+    "skills/web-design-studio/assets/configs/eslint.design.config.mjs": ("js", ("COLOUR_FUNCTIONS",)),
 }
 NOTE = "written by tools/sync_rules.py from assets/rules/design-rules.json; edit the spec, then rerun it"
+LISTS = ("KEYWORDS", "COLOUR_WORDS")         # the names a family's `values` may use besides the shapes
+
+
+class SpecError(ValueError):
+    """The spec holds something this tool cannot write into a gate."""
 
 
 def wrapped(items: list[str], head: str, tail: str, indent: str, width: int = 100) -> str:
@@ -55,14 +70,57 @@ def wrapped(items: list[str], head: str, tail: str, indent: str, width: int = 10
     return head.rstrip() + "\n" + "\n".join(lines) + "\n" + tail.lstrip()
 
 
+def js_string(text: str) -> str:
+    if "'" in text or "\\" in text:
+        raise SpecError(f"cannot write {text!r} as a plain JavaScript string")
+    return f"'{text}'"
+
+
+def js_entry(entry: str, shapes: dict, written: tuple[str, ...]) -> str:
+    """One allowed value: a shape or a list by name, else the value itself. A
+    name must be one the block writes before the allowlist that reads it, or
+    the config would name a constant it never declares."""
+    if entry in shapes or entry in LISTS:
+        if entry not in written:
+            raise SpecError(f"an allowlist reads {entry}, which the block does not write before it")
+        return "...KEYWORDS" if entry == "KEYWORDS" else entry
+    if re.fullmatch(r"[A-Z][A-Z_]*", entry):
+        raise SpecError(f"{entry} is neither a shape in values.shapes nor one of {', '.join(LISTS)}")
+    return js_string(entry)
+
+
+def js_allowlist(name: str, groups: list[tuple[str, list[dict]]], shapes: dict, written: tuple[str, ...]) -> str:
+    """`const NAME = { property: [values], … };`, one line per property, under
+    a comment for each named group."""
+    lines = [f"const {name} = {{"]
+    for title, allow in groups:
+        if title:
+            lines.append(f"  // {title}")
+        for group in allow:
+            values = ", ".join(js_entry(v, shapes, written) for v in group["values"])
+            for prop in group["properties"]:
+                key = prop if re.fullmatch(r"[a-z]+", prop) else js_string(prop)
+                lines.append(f"  {key}: [{values}],")
+    return "\n".join(lines + ["};"])
+
+
 def block(spec: dict, lang: str, names: tuple[str, ...]) -> str:
-    values = {"LAYER_ORDER": spec["layers"]["order"], "LAYER_STATEMENT": spec["layers"]["statement"],
-              "MAX_NESTING": int(spec["nesting"]["max_depth"]), "SYSTEM_COLOR_NAMES": spec["system_colors"]["names"]}
+    values = spec["values"]
+    shapes = values["shapes"]
+    data = {"LAYER_ORDER": spec["layers"]["order"], "LAYER_STATEMENT": spec["layers"]["statement"],
+            "MAX_NESTING": int(spec["nesting"]["max_depth"]), "SYSTEM_COLOR_NAMES": spec["system_colors"]["names"],
+            "KEYWORDS": values["keywords"], "COLOUR_FUNCTIONS": values["colour_functions"]}
     py = lang == "py"
-    text = (lambda s: json.dumps(s)) if py else (lambda s: f"'{s}'")
+    text = (lambda s: json.dumps(s)) if py else js_string
+    names = tuple(n for name in names for n in (tuple(shapes) if name == "SHAPES" else (name,)))
     lines = []
     for name in names:
-        value = values[name]
+        if name in shapes or name in ("COLOUR_WORDS", "VALUE_ALLOWLIST", "MARGIN_ALLOWLIST"):
+            if py:
+                raise SpecError(f"{name} has no Python form yet")
+            lines.append(js_constant(name, spec, names))
+            continue
+        value = data[name]
         head, tail = (f"{name} = ", "") if py else (f"const {name} = ", ";")
         if isinstance(value, list):
             lines.append(wrapped([text(v) for v in value], head + "[", "]" + tail, "    " if py else "  "))
@@ -70,6 +128,31 @@ def block(spec: dict, lang: str, names: tuple[str, ...]) -> str:
             lines.append(head + (str(value) if isinstance(value, int) else text(value)) + tail)
     mark = "#" if py else "//"
     return f"{mark} BEGIN design-rules: {NOTE}\n" + "\n".join(lines) + f"\n{mark} END design-rules"
+
+
+def js_constant(name: str, spec: dict, names: tuple[str, ...]) -> str:
+    """The JavaScript forms of the value rules: a shape, the colour words, or
+    an allowlist for declaration-property-value-allowed-list."""
+    values = spec["values"]
+    shapes = values["shapes"]
+    written = names[:names.index(name)]
+    if name in shapes:
+        pattern = shapes[name]["pattern"]
+        if "`" in pattern or "${" in pattern:
+            raise SpecError(f"the {name} pattern cannot sit in a String.raw template")
+        return f"const {name} = String.raw`/{pattern}/`;"
+    if name == "COLOUR_WORDS":
+        if "SYSTEM_COLOR_NAMES" not in written:
+            raise SpecError("COLOUR_WORDS reads SYSTEM_COLOR_NAMES, so the block must write that first")
+        words = ", ".join(js_string(w) for w in values["colour_words"])
+        return f"const COLOUR_WORDS = String.raw`/^(?:${{[{words}, ...SYSTEM_COLOR_NAMES].join('|')}})$/i`;"
+    if name == "VALUE_ALLOWLIST":
+        groups = [(f"{family}: Law{'s' if ',' in rule['laws'] else ''} {rule['laws']}", rule["allow"])
+                  for family, rule in values["families"].items()]
+        return js_allowlist(name, groups, shapes, written)
+    margins = spec["margins_in_components"]
+    return js_allowlist(name, [("", [{"properties": margins["properties"], "values": margins["values"]}])],
+                        shapes, written)
 
 
 BLOCK = re.compile(r"^(#|//) BEGIN design-rules\b.*?^\1 END design-rules[^\n]*", re.M | re.S)
@@ -82,15 +165,20 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     spec = json.loads((args.root / SPEC).read_text(encoding="utf-8"))
+    try:                                     # every block first, so a bad spec writes nothing
+        blocks = {rel: block(spec, lang, names) for rel, (lang, names) in TARGETS.items()}
+    except SpecError as exc:
+        print(f"sync_rules: {SPEC}: {exc}", file=sys.stderr)
+        return 1
     stale, missing = [], []
-    for rel, (lang, names) in TARGETS.items():
+    for rel in TARGETS:
         path = args.root / rel
         text = path.read_text(encoding="utf-8")
         found = BLOCK.findall(text)
         if len(found) != 1:
             missing.append(f"{rel}: {len(found)} design-rules blocks, not one")
             continue
-        new = BLOCK.sub(lambda _: block(spec, lang, names), text)
+        new = BLOCK.sub(lambda _: blocks[rel], text)
         if new != text:
             stale.append(rel)
             if not args.check:

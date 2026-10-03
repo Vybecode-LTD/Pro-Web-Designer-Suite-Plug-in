@@ -225,14 +225,31 @@
   `.github/workflows/release.yml` build them and create the GitHub release, with the
   CHANGELOG's section as its notes; nothing else creates a release.
 - **The 17 scripts with a shebang are executable** (N5), as the nine from 3.0.0 were.
-- **The spec writes its data into the gates** (N2, part 1). `tools/sync_rules.py`
-  writes the layer order and statement, the nesting depth and the system colours from
-  `design-rules.json` into a marked block in the audit and the stylelint config, and
-  `--check` fails CI when a gate drifts from the spec. The system colours' names moved
-  into the spec. Generating the value allowlists and ESLint's patterns is part 2.
+- **The spec writes its data into the gates** (N2, SB-C2). `tools/sync_rules.py` writes
+  `design-rules.json` into a marked block in each of the three gates, and `--check`
+  fails CI when a gate drifts from the spec:
+  - the audit: the layer order and statement, the nesting depth, and the colour
+    functions it reads as a colour written by hand;
+  - the stylelint config: the layer order, the nesting depth, the system colours, and
+    the value allowlists, which were hand-written: the four value shapes (`VAR_SEQ`,
+    `VAR_ONE`, `VAR_CALC`, `CANCEL`), the keywords, the colour words, the 43 properties
+    of eight families (spacing, type, radius, elevation, colour, stacking, motion,
+    sizing) and the component margins;
+  - the ESLint config: the colour functions, for its raw-colour rule and its
+    inline-style rule. The inline-style rule missed `hwb()` and `color()`; the
+    raw-colour rule already refused both there, so no verdict changes.
+
+  Why each family takes what it takes moved from the stylelint config's comments into
+  the spec, beside the data. Each section of the spec now names the gates that
+  enforce it (`gates`). A spec entry the tool cannot write, such as an unknown shape,
+  is an error, and nothing is written.
 - **Two tools for each PR.** `tools/fail_before.py` runs named tests against an earlier
   revision and this tree, and prints fixed, control, still failing or regression for
-  each. `tools/check.py` runs the static checks and the tests a change affects.
+  each. `tools/check.py` runs the static checks and the tests a change affects. Its
+  report prints on any console: with its output redirected on Windows (cp1252), a
+  failing check's `§` reached it as an invalid byte and the report crashed printing it,
+  so no report came. The checks now write UTF-8, and a character the console cannot
+  encode prints as `?` (`test_tools.CheckReportsOnAnyConsole`, which fails on `9053727`).
 
 ### Tests
 
@@ -327,6 +344,23 @@
   from #18's review: the audit's nesting fix said "past depth 2" whatever the spec's
   limit; it now names the generated limit (`test_the_audit_explains_the_limit_the_spec_sets`,
   which fails on `eb4cccc`, with the other three `SyncRules` tests as controls).
+- N2, part 2: the conformance tests. One builder turns every `allowed` and `refused`
+  example in the spec into a file, and each gate its section names must give the
+  spec's verdict: the audit in `test_rules_spec.TheAuditFollowsTheSpec.test_every_example`,
+  stylelint and ESLint in `test_real_tools`'s `test_every_example_of_the_spec`. They
+  replace five tests that read the stylelint config as text. Where a gate still
+  disagrees, `KNOWN_DISAGREEMENTS` names the item that fixes it, and the test fails
+  once the gate agrees: three are stylelint's (N1 rows 6 and 7), ten the audit's (N1
+  rows 5 and 8, and seven new ones, N30, for P3). Against `9053727`, PR #18's head:
+  three new `SyncRules` tests fail (the allowlists, the colour functions, and an
+  unknown name that writes nothing), and 25 tests are controls, the conformance tests
+  among them, so the generated blocks change no gate's verdict on any example.
+  From #19's review: a shape the spec added and a family used was named in the
+  stylelint allowlist but never declared, so the config could not load while `--check`
+  passed. The block now writes every shape in the spec, and an allowlist that reads a
+  name the block has not written first is an error
+  (`test_a_new_shape_is_written_before_the_allowlist_that_reads_it`, which fails on
+  `a7157c2`).
 - The first CI run, on Linux and macOS: `test_browser_runtime.MatrixSeesStateChanges`
   failed there and passes now, which holds the `snapshot_matrix` fix; on Windows it
   passes on both. Two tests assumed Windows: `test_harness` took a relative path across

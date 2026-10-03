@@ -83,14 +83,16 @@ TEMPLATE_EXT = {".html", ".htm", ".vue", ".svelte", ".astro"}
 # Files whose CSS is plain CSS, where `//` is not a comment (line_comments).
 PLAIN_CSS_EXT = {".css", ".pcss", ".html", ".htm"}
 KEYFRAMES_AT = re.compile(r"@(-[a-z]+-)?keyframes\b", re.I)
-# Law 5's order (design-rules.json: layers; `theme` is Tailwind v4's), and the
-# nesting allowed below the top-level rule (design-rules.json: nesting).
+# Law 5's order (design-rules.json: layers; `theme` is Tailwind v4's), the
+# nesting allowed below the top-level rule (nesting), and the colour functions
+# that write a colour by hand (values.colour_functions).
 # BEGIN design-rules: written by tools/sync_rules.py from assets/rules/design-rules.json; edit the spec, then rerun it
 LAYER_ORDER = [
     "reset", "vendor", "tokens", "theme", "base", "layout", "components", "utilities", "overrides",
 ]
 LAYER_STATEMENT = "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;"
 MAX_NESTING = 2
+COLOUR_FUNCTIONS = ["rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch", "color"]
 # END design-rules
 IMPORT_LAYER = re.compile(r"@import\b.*?\blayer\(\s*([\w.-]+)\s*\)", re.I | re.S)
 # Sass (design-rules.json: sass). A @mixin or @function body emits nothing
@@ -231,7 +233,7 @@ RELATIONAL_UNIT = re.compile(
 )
 LENGTH_LITERAL = re.compile(r"(?<![\w.#-])-?\d*\.?\d+(px|rem|em|pt|pc|in|cm|mm|q)\b", re.I)
 HEX_COLOR = re.compile(r"#[0-9a-fA-F]{3,8}\b")
-FUNC_COLOR = re.compile(r"\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\s*\(", re.I)
+FUNC_COLOR = re.compile(r"\b(" + "|".join(COLOUR_FUNCTIONS) + r")\s*\(", re.I)
 NAMED_COLOR = re.compile(
     r"\b(red|blue|green|black|white|gray|grey|yellow|orange|purple|pink|brown|"
     r"cyan|magenta|silver|gold|navy|teal|olive|maroon|lime|aqua|fuchsia)\b", re.I

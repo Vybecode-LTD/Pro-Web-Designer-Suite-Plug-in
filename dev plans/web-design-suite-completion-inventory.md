@@ -96,7 +96,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-B5 | — | W12 (3.6.0+) | parts of Tailwind v4 aren't covered. |
 | SB-B6 | — | W12 (3.6.0+) | SCSS and other stacks. |
 | SB-C1 | S-M | fixed: 3.1.0 did SB-A3, A4 and A10, and 3.3.0 did SB-A9 and A24 | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. |
-| SB-C2 | M · high | partly done; the rest in W2 (3.3.0) | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. |
+| SB-C2 | M · high | fixed in 3.3.0 (N2: PRs #18 and #19; `test_rules_spec`, `test_real_tools`, `test_tools.SyncRules`) | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. |
 | SB-C3 | S-M · high | W12 (3.6.0+) | Ship a `tw_probe` script and a `/tw-probe` skill command. |
 | SB-C4 | S · high | W12 (3.6.0+) | Replace Part 5 with eslint-plugin-better-tailwindcss 4.7 (peers ESLint 7–10 and Tailwind 3.3/4.1). |
 | SB-C5 | S · high | fixed in 3.2.0 | Add doc-snippet CI: extract ```css/```tsx blocks, run audit + ESLint, and allow a `/* anti-example */` marker (extends XC-C5 and SS-C3). |
