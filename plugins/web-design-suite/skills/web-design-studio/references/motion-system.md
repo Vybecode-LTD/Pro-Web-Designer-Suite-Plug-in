@@ -394,7 +394,9 @@ CSS can now drive an animation's progress from scroll position instead of from t
 /* A reading-progress bar tied to the document's scroll. */
 .progress-bar {
   transform-origin: left center;
-  animation: grow auto linear;          /* `auto` duration: the timeline owns it */
+  animation-name: grow;
+  animation-duration: auto;             /* the timeline owns it */
+  animation-timing-function: var(--ease-linear);   /* progress tracks the scroll */
   animation-timeline: scroll(root block);
 }
 @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }

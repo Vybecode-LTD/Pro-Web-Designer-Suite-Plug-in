@@ -74,15 +74,19 @@ def jsx_component(jsx: str) -> str:
 
 def spec_examples() -> list[Example]:
     """Every `allowed` and `refused` example in the spec, each as a file of its
-    own for the gates its section names: a rule in a component file, a whole
-    entry stylesheet, or a JSX component. The Sass examples, which only the
-    audit reads, are test_sass's."""
+    own for the gates its section names: a rule in a component file, a rule in
+    a layout file (a family's `layout` examples), a whole entry stylesheet, a
+    theme file's binding, or a JSX component. The Sass examples, which only
+    the audit reads, are test_sass's."""
     examples: list[Example] = []
 
-    def add(section: str, verdict: str, source: str, text: str, ext: str = "css") -> None:
+    def add(section: str, verdict: str, source: str, text: str, ext: str = "css", folder: str = "") -> None:
         n = len(examples)
+        stem = f"{section.replace('.', '-')}-{verdict}-{n}"
         name = (f"src/entries/{verdict}-{n}/index.css" if section == "layers"
-                else f"src/components/{section.replace('.', '-')}-{verdict}-{n}.{ext}")
+                else f"src/styles/{stem}-theme.css" if section == "bindings"
+                else f"src/styles/{folder}/{stem}.{ext}" if folder
+                else f"src/components/{stem}.{ext}")
         examples.append(Example(section, verdict, source, name, text, tuple(SPEC[section.split(".")[0]]["gates"])))
 
     def rule(css: str) -> str:
@@ -110,6 +114,13 @@ def spec_examples() -> list[Example]:
         for family, values in SPEC["values"]["families"].items():
             for declaration in values[verdict]:
                 add(f"values.{family}", verdict, declaration, rule(f".card {{ {declaration}; }}"))
+            for declaration in values.get("layout", {}).get(verdict, []):     # outside a component
+                add(f"values.{family}", verdict, declaration,
+                    in_layer("layout", f".center {{ {declaration}; }}"), folder="layout")
+        for declaration in SPEC["geometry"][verdict]:
+            add("geometry", verdict, declaration, rule(f".card {{ {declaration}; }}"))
+        for declaration in SPEC["bindings"][verdict]:
+            add("bindings", verdict, declaration, f"@theme inline {{\n  {declaration};\n}}\n")
         for jsx in SPEC["inline_styles"][verdict]:
             add("inline_styles", verdict, jsx, jsx_component(jsx), ext="tsx")
     return examples
@@ -152,6 +163,7 @@ class TheAuditFollowsTheSpec(TempDirTest):
         migration = load_script("design-token-migration", "extract_literals")
         for kind, tool, check in (("token_files", "audit", self.audit.is_token_file),
                                   ("component_files", "audit", self.audit.is_component_file),
+                                  ("binding_files", "audit", self.audit.is_binding_file),
                                   ("token_files", "migration", migration.is_token_file),
                                   ("component_files", "migration", migration.is_component_file)):
             spec = SPEC["file_classes"][kind]
@@ -161,6 +173,9 @@ class TheAuditFollowsTheSpec(TempDirTest):
             for path in spec["not"]:
                 with self.subTest(kind=kind, tool=tool, not_=path):
                     self.assertFalse(check(pathlib.Path(path)))
+        for path in SPEC["file_classes"]["binding_files"]["examples"]:     # a theme file is a token file too
+            with self.subTest(binding_file_is_a_token_file=path):
+                self.assertTrue(self.audit.is_token_file(pathlib.Path(path)))
 
     def sass_findings(self, scss: str) -> set[tuple[str, str]]:
         """A partial as written: no layer around it, and neither a token file
@@ -252,6 +267,7 @@ class StylelintFollowsTheSpec(unittest.TestCase):
 
     def test_file_globs(self):
         globs = {"token_files": self.override_files("tokens.css") + self.override_files("theme.css"),
+                 "binding_files": self.override_files("theme.css"),
                  "component_files": self.override_files("components")}
         for kind, found in globs.items():
             self.assertEqual(sorted(SPEC["file_classes"][kind]["globs"]), sorted(found), kind)

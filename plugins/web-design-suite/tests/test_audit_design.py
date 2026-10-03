@@ -315,12 +315,15 @@ class AuditPrecision(TempDirTest):
     def test_a_zero_margin_claims_no_space(self):
         """SB-A14: a child resetting its margin to 0 asserts no space, and
         stylelint already allowed it; the audit called it an outer margin."""
-        for value in ("0", "0px", "0 auto", "0 0 0 0"):
+        for value in ("0", "0 auto", "0 0 0 0"):
             with self.subTest(value=value):
                 self.assertNotIn(("L2", "child-margin"),
                                  self.rules(f".card__media {{ margin-block-end: {value}; }}"))
         self.assertIn(("L2", "child-margin"),
                       self.rules(".card__media { margin-block-end: var(--gap-related); }"))
+        # 3.3.0: 0 is spelled 0. stylelint refuses `0px` (length-zero-no-unit and
+        # the allowlists), and so does the audit now (N31).
+        self.assertIn(("L1", "raw-spacing"), self.rules(".card__media { margin-block-end: 0px; }"))
 
     def test_a_pragma_wrapped_over_two_lines_covers_the_next_declaration(self):
         """Comments were keyed by the line they START on, so a wrapped pragma
@@ -508,7 +511,9 @@ class AuditPrecision(TempDirTest):
                    "  .card { padding: 0px 13px; }\n"
                    "  .card__media { padding: 0px 0rem; }\n"
                    "}\n")
-        self.assertEqual([("L1", "raw-spacing", 2)], self.found("src"))
+        # Line 3 holds no length but zeros. Since 3.3.0 a zero with a unit is
+        # refused too, as stylelint refuses it: 0 is spelled 0 (N31).
+        self.assertEqual([("L1", "raw-spacing", 2), ("L1", "raw-spacing", 3)], self.found("src"))
 
     def test_indented_sass_is_skipped_not_passed(self):
         # Found with SB-A24: the scanner follows braces and indented Sass has

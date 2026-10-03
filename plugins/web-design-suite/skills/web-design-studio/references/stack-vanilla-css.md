@@ -617,7 +617,7 @@ The card exists to demonstrate the two problems buttons do not have: **full-blee
     &:where(:focus-visible) {
       box-shadow: none;
       outline: var(--stroke-focus) solid var(--border-focus);
-      outline-offset: calc(var(--stroke-focus) * -2);
+      outline-offset: calc(var(--stroke-focus) * -1);
     }
   }
 
@@ -725,7 +725,9 @@ The set that passes:
      some engines skip it. This is the version that works. */
   .u-visually-hidden:not(:focus-visible) {
     position: absolute;
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- design-audit-ignore-next-line: L1 -- the technique's 1px box, not a design size */
     inline-size: 1px;
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- design-audit-ignore-next-line: L1 -- the technique's 1px box, not a design size */
     block-size: 1px;
     padding: 0;
     overflow: hidden;

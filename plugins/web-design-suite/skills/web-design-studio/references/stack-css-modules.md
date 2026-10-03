@@ -411,7 +411,7 @@ $bp: (sm: 30rem, md: 48rem, lg: 64rem, xl: 80rem, xxl: 96rem);
   &:where(:focus-visible) {
     @if $clipped {
       outline: var(--stroke-focus) solid var(--border-focus);
-      outline-offset: calc(var(--stroke-focus) * -2);
+      outline-offset: calc(var(--stroke-focus) * -1);
       box-shadow: none;
     } @else {
       /* The reset's ring: an outline no component box-shadow can remove. */
@@ -741,7 +741,7 @@ Note what the `.tsx` does *not* contain: no conditional class names, no style ob
     &:where(:focus-visible) {
       box-shadow: none;
       outline: var(--stroke-focus) solid var(--border-focus);
-      outline-offset: calc(var(--stroke-focus) * -2);
+      outline-offset: calc(var(--stroke-focus) * -1);
     }
   }
 }

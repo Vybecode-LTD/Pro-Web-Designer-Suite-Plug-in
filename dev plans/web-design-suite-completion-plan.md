@@ -120,7 +120,7 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 - `max-width: 600px` passes: the audit reads no sizing property;
 - a design literal in an inline custom property (`style={{ '--gap': '12px' }}`, or a colour function) passes, though ESLint refuses it.
 
-**N31 · Found while closing N1 (P3 part 1).** Two more disagreements, outside the spec's examples. Each needs the spec's answer, as examples, before the gate that differs changes:
+**N31 · Found while closing N1 (P3 part 1).** *Done for 3.3.0 (PR #23): `0` among tokens is allowed, a share of the container is refused in both gates, a component may space its own `::before` and `::after`, and the audit's `prose` exemption is gone.* Two more disagreements, outside the spec's examples. Each needs the spec's answer, as examples, before the gate that differs changes:
 - **A literal `0` among tokens.** `padding: 0 var(--pad-card)` passes the audit, and the spec's zero rule allows it, but stylelint's `VAR_SEQ` takes only `var()`s and refuses it; so do `gap` and `border-radius`. Likewise `calc(100% - var(--gutter-page))` in a spacing property: stylelint takes no calc() but a token plus or minus a token, and the audit passes it.
 - **Margins the audit exempts.** The audit lets a component set a margin on its generated content (`.card::before`) and in a rule whose selector names `prose`. `design/component-margins` refuses both, and the spec says neither.
 

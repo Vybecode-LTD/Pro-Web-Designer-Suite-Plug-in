@@ -99,18 +99,109 @@ SYSTEM_COLOR_NAMES = [
 ]
 SYSTEM_COLOR_PROPERTY = re.compile(r"^(?:color|fill|stroke|stop-color|flood-color|lighting-color|accent-color|caret-color|background(?:-color)?|border(?:-[a-z]+)*|outline(?:-color)?|text-decoration(?:-color)?|text-emphasis(?:-color)?|column-rule(?:-color)?|box-shadow|text-shadow)$", re.I)
 KEYWORDS = ["inherit", "initial", "unset", "revert", "revert-layer"]
-COLOUR_FUNCTIONS = ["rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch", "color"]
+COLOUR_FUNCTIONS = [
+    "rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch", "color", "color-mix",
+    "light-dark",
+]
 LITERAL_UNITS = ["px", "rem", "em", "ch", "ex", "vw", "vh", "vmin", "vmax", "%", "deg", "s", "ms"]
-VAR_SEQ = re.compile(r"^(?:var\(--[a-z0-9-]+\)\s*)+$")
+GEOMETRY_PROPERTIES = [
+    "top", "right", "bottom", "left", "inset", "inset-block", "inset-block-start",
+    "inset-block-end", "inset-inline", "inset-inline-start", "inset-inline-end",
+]
+COLOUR_WORDS = re.compile("^(?:" + "|".join(["currentcolor", "transparent", *SYSTEM_COLOR_NAMES]) + ")$", re.I)
+VAR_SEQ = re.compile(r"^(?:var\(--[a-z0-9-]+\)|0)(?:\s+(?:var\(--[a-z0-9-]+\)|0))*$")
 VAR_ONE = re.compile(r"^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$")
 VAR_CALC = re.compile(r"^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$")
 CANCEL = re.compile(r"^calc\(\s*(?:var\(--[a-z0-9-]+\)\s*\*\s*-1|-1\s*\*\s*var\(--[a-z0-9-]+\))\s*\)$")
+ALIGN = re.compile(r"^(?:0|auto)(?:\s+(?:0|auto)){0,3}$")
+STROKE = re.compile(r"^(?:var\(--[a-z0-9-]+\)|0|none|solid|dashed|dotted|double|currentColor|currentcolor|transparent)(?:\s+(?:var\(--[a-z0-9-]+\)|0|none|solid|dashed|dotted|double|currentColor|currentcolor|transparent))*$")
+MOTION_LIST = re.compile(r"^(?:(?:var\(--[a-z0-9-]+\)|0s|\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\w-]))[a-zA-Z_-][\w-]*)(?:\s*,\s*|\s+))*(?:var\(--[a-z0-9-]+\)|0s|\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\w-]))[a-zA-Z_-][\w-]*)$")
+BREAKPOINT = re.compile(r"^\d+(?:\.\d+)?rem$")
+RATIO = re.compile(r"^\d+(?:\.\d+)?\s*/\s*\d+(?:\.\d+)?$")
+SPACING_VALUES = {
+    "padding": (VAR_SEQ, VAR_CALC, "0", *KEYWORDS),
+    "padding-inline": (VAR_SEQ, VAR_CALC, "0", *KEYWORDS),
+    "padding-block": (VAR_SEQ, VAR_CALC, "0", *KEYWORDS),
+    "padding-top": (VAR_ONE, VAR_CALC, "0", *KEYWORDS),
+    "padding-right": (VAR_ONE, VAR_CALC, "0", *KEYWORDS),
+    "padding-bottom": (VAR_ONE, VAR_CALC, "0", *KEYWORDS),
+    "padding-left": (VAR_ONE, VAR_CALC, "0", *KEYWORDS),
+    "padding-inline-start": (VAR_ONE, VAR_CALC, "0", *KEYWORDS),
+    "padding-inline-end": (VAR_ONE, VAR_CALC, "0", *KEYWORDS),
+    "padding-block-start": (VAR_ONE, VAR_CALC, "0", *KEYWORDS),
+    "padding-block-end": (VAR_ONE, VAR_CALC, "0", *KEYWORDS),
+    "gap": (VAR_SEQ, "0", *KEYWORDS),
+    "grid-gap": (VAR_SEQ, "0", *KEYWORDS),
+    "row-gap": (VAR_ONE, "0", *KEYWORDS),
+    "column-gap": (VAR_ONE, "0", *KEYWORDS),
+    "margin": (VAR_SEQ, VAR_CALC, CANCEL, ALIGN, *KEYWORDS),
+    "margin-inline": (VAR_SEQ, VAR_CALC, CANCEL, ALIGN, *KEYWORDS),
+    "margin-block": (VAR_SEQ, VAR_CALC, CANCEL, ALIGN, *KEYWORDS),
+    "margin-top": (VAR_ONE, VAR_CALC, CANCEL, "0", "auto", *KEYWORDS),
+    "margin-right": (VAR_ONE, VAR_CALC, CANCEL, "0", "auto", *KEYWORDS),
+    "margin-bottom": (VAR_ONE, VAR_CALC, CANCEL, "0", "auto", *KEYWORDS),
+    "margin-left": (VAR_ONE, VAR_CALC, CANCEL, "0", "auto", *KEYWORDS),
+    "margin-inline-start": (VAR_ONE, VAR_CALC, CANCEL, "0", "auto", *KEYWORDS),
+    "margin-inline-end": (VAR_ONE, VAR_CALC, CANCEL, "0", "auto", *KEYWORDS),
+    "margin-block-start": (VAR_ONE, VAR_CALC, CANCEL, "0", "auto", *KEYWORDS),
+    "margin-block-end": (VAR_ONE, VAR_CALC, CANCEL, "0", "auto", *KEYWORDS),
+}
+STROKE_VALUES = {
+    "border-width": (VAR_SEQ, "0", *KEYWORDS),
+    "border-block-width": (VAR_SEQ, "0", *KEYWORDS),
+    "border-inline-width": (VAR_SEQ, "0", *KEYWORDS),
+    "border-top-width": (VAR_ONE, "0", *KEYWORDS),
+    "border-right-width": (VAR_ONE, "0", *KEYWORDS),
+    "border-bottom-width": (VAR_ONE, "0", *KEYWORDS),
+    "border-left-width": (VAR_ONE, "0", *KEYWORDS),
+    "border-block-start-width": (VAR_ONE, "0", *KEYWORDS),
+    "border-block-end-width": (VAR_ONE, "0", *KEYWORDS),
+    "border-inline-start-width": (VAR_ONE, "0", *KEYWORDS),
+    "border-inline-end-width": (VAR_ONE, "0", *KEYWORDS),
+    "outline-width": (VAR_ONE, "0", *KEYWORDS),
+    "outline-offset": (VAR_ONE, CANCEL, "0", *KEYWORDS),
+    "border": (STROKE, *KEYWORDS),
+    "border-top": (STROKE, *KEYWORDS),
+    "border-right": (STROKE, *KEYWORDS),
+    "border-bottom": (STROKE, *KEYWORDS),
+    "border-left": (STROKE, *KEYWORDS),
+    "border-block": (STROKE, *KEYWORDS),
+    "border-block-start": (STROKE, *KEYWORDS),
+    "border-block-end": (STROKE, *KEYWORDS),
+    "border-inline": (STROKE, *KEYWORDS),
+    "border-inline-start": (STROKE, *KEYWORDS),
+    "border-inline-end": (STROKE, *KEYWORDS),
+    "outline": (STROKE, *KEYWORDS),
+}
+MOTION_VALUES = {
+    "transition-duration": (VAR_SEQ, "0s", *KEYWORDS),
+    "animation-duration": (VAR_SEQ, "0s", "auto", *KEYWORDS),
+    "transition-timing-function": (VAR_SEQ, *KEYWORDS),
+    "animation-timing-function": (VAR_SEQ, *KEYWORDS),
+    "transition": (MOTION_LIST, *KEYWORDS),
+    "animation": (MOTION_LIST, *KEYWORDS),
+}
 SIZING_VALUES = {
     "max-inline-size": (VAR_ONE, "none", "100%", "max-content", "min-content", "fit-content", *KEYWORDS),
     "max-width": (VAR_ONE, "none", "100%", "max-content", "min-content", "fit-content", *KEYWORDS),
+    "max-block-size": (VAR_ONE, "none", "100%", "100dvh", "100dvb", "100svh", "100svb", "max-content", "min-content", "fit-content", *KEYWORDS),
+    "max-height": (VAR_ONE, "none", "100%", "100dvh", "100dvb", "100svh", "100svb", "max-content", "min-content", "fit-content", *KEYWORDS),
     "min-block-size": (VAR_ONE, "0", "100%", "100dvh", "100dvb", "100svh", "100svb", "auto", *KEYWORDS),
-    "min-inline-size": (VAR_ONE, "0", "100%", "auto", *KEYWORDS),
+    "min-height": (VAR_ONE, "0", "100%", "100dvh", "100dvb", "100svh", "100svb", "auto", *KEYWORDS),
+    "min-inline-size": (VAR_ONE, "0", "100%", "auto", "max-content", "min-content", "fit-content", *KEYWORDS),
+    "min-width": (VAR_ONE, "0", "100%", "auto", "max-content", "min-content", "fit-content", *KEYWORDS),
+    "inline-size": (VAR_ONE, "0", "100%", "auto", "max-content", "min-content", "fit-content", "1em", *KEYWORDS),
+    "width": (VAR_ONE, "0", "100%", "auto", "max-content", "min-content", "fit-content", "1em", *KEYWORDS),
+    "block-size": (VAR_ONE, "0", "100%", "100dvh", "100dvb", "100svh", "100svb", "auto", "max-content", "min-content", "fit-content", "1em", *KEYWORDS),
+    "height": (VAR_ONE, "0", "100%", "100dvh", "100dvb", "100svh", "100svb", "auto", "max-content", "min-content", "fit-content", "1em", *KEYWORDS),
 }
+MARGIN_VALUES = (ALIGN, CANCEL, *KEYWORDS)
+BINDING_VALUES = (
+    (re.compile(r"^--breakpoint-"), (BREAKPOINT,)),
+    (re.compile(r"^--aspect-"), (RATIO,)),
+    (re.compile(r"^--animate-"), (MOTION_LIST,)),
+    (re.compile(r"^--(?!breakpoint-)"), (VAR_ONE, COLOUR_WORDS, *KEYWORDS)),
+)
 # END design-rules
 IMPORT_LAYER = re.compile(r"@import\b.*?\blayer\(\s*([\w.-]+)\s*\)", re.I | re.S)
 # Sass (design-rules.json: sass). A @mixin or @function body emits nothing
@@ -123,6 +214,9 @@ SASS_BREAKPOINT = re.compile(r"\$(?:bp(?:[-_][\w-]*)?|breakpoint[\w-]*)$", re.I)
 SASS_MIXIN_NAME = re.compile(r"@mixin\s+([\w-]+)", re.I)
 SASS_INCLUDE_NAME = re.compile(r"@include\s+([\w-]+)(?![\w.-])", re.I)
 SASS_STRING = re.compile(r"""(['"])(?:\\.|(?!\1).)*\1""", re.S)
+# A Sass variable or interpolation in a value: the audit cannot resolve it, so
+# the value allowlists leave it to the variable's own check (sass-literal).
+SASS_REFERENCE = re.compile(r"(?<![\w-])\$[\w-]+|#\{")
 
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit",
@@ -166,22 +260,12 @@ CONFIG_FILE_PAT = re.compile(
 
 GENERATED_MARKERS = ("@generated", "DO NOT EDIT", "AUTO-GENERATED", "Auto-generated")
 
-# Properties whose value must resolve through a token.
-SPACING_PROPS = {
-    "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
-    "margin-block", "margin-block-start", "margin-block-end",
-    "margin-inline", "margin-inline-start", "margin-inline-end",
-    "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
-    "padding-block", "padding-block-start", "padding-block-end",
-    "padding-inline", "padding-inline-start", "padding-inline-end",
-    "gap", "row-gap", "column-gap", "grid-gap", "inset",
-    "top", "right", "bottom", "left",
-    "inset-block", "inset-block-start", "inset-block-end",
-    "inset-inline", "inset-inline-start", "inset-inline-end",
-}
+# The spacing properties take the spacing family's values (SPACING_VALUES);
+# positions are geometry (GEOMETRY_PROPERTIES). Both come from the spec.
+GEOMETRY_PROPS = set(GEOMETRY_PROPERTIES)
 
 # Outer margins — the Law 2 set. Padding is inset and is fine.
-OUTER_MARGIN_PROPS = {p for p in SPACING_PROPS if p.startswith("margin")}
+OUTER_MARGIN_PROPS = {p for p in SPACING_VALUES if p.startswith("margin")}
 
 COLOR_PROPS = {
     "color", "background", "background-color", "border-color", "outline-color",
@@ -199,9 +283,6 @@ COLOR_SHORTHANDS = {
 }
 
 TYPE_PROPS = {"font-size", "line-height", "letter-spacing", "font-weight", "font"}
-MOTION_PROPS = {"transition", "transition-duration", "animation",
-                "animation-duration", "transition-timing-function",
-                "animation-timing-function"}
 MOTION_SHORTHANDS = {"transition", "animation"}
 RADIUS_PROPS = {"border-radius", "border-start-start-radius",
                 "border-start-end-radius", "border-end-start-radius",
@@ -264,6 +345,7 @@ NAMED_COLOR = re.compile(
 )
 TIME_LITERAL = re.compile(r"(?<![\w.-])\d*\.?\d+m?s\b", re.I)
 BEZIER_LITERAL = re.compile(r"\bcubic-bezier\s*\(|\bsteps\s*\(", re.I)
+EASING_WORD = re.compile(r"(?<![\w-])(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\w-])", re.I)
 VAR_REF = re.compile(r"var\(\s*(--[\w-]+)")
 ID_SELECTOR = re.compile(r"(?<![\w\\\[\"'=])#[a-zA-Z_][\w-]*")
 
@@ -590,6 +672,15 @@ def is_token_file(path: Path) -> bool:
     return bool(TOKEN_FILE_PAT.search(str(path).replace(os.sep, "/")))
 
 
+# theme.css and *-theme.css: a token file whose custom properties bind the
+# tokens and decide nothing (design-rules.json: file_classes.binding_files).
+BINDING_FILE_PAT = re.compile(r"(^|/)([\w.-]*-)?theme\.css$")
+
+
+def is_binding_file(path: Path) -> bool:
+    return bool(BINDING_FILE_PAT.search(str(path).replace(os.sep, "/")))
+
+
 def is_component_file(path: Path) -> bool:
     """A component file is where Laws 2 and 6 bite hardest."""
     return bool(COMPONENT_FILE_PAT.search(str(path).replace(os.sep, "/").lower()))
@@ -678,27 +769,31 @@ def owl_selector(selectors: tuple[str, ...]) -> bool:
 def generated_content(selectors: tuple[str, ...]) -> bool:
     """`::before` / `::after` are the component's own generated content. Its
     rule decides what the pseudo-element sits beside, so a margin there is
-    inner spacing, not a child claiming room outside itself."""
-    return bool(selectors) and all(
-        re.search(r"::(?:before|after|marker)\s*$", s.strip()) for s in selectors)
-
-
-def margin_is_alignment(value: str) -> bool:
-    """auto aligns, and 0 asserts no space at all: neither is a child claiming
-    room around itself. (`margin: 0 auto` is both.)"""
-    parts = value.lower().replace("!important", "").split()
-    return "auto" in parts or (bool(parts) and all(
-        re.fullmatch(r"[+-]?0*\.?0+(?:[a-z]+|%)?", p) for p in parts))
+    inner spacing, not a child claiming room outside itself. Every selector
+    of the rule that holds the declaration must name one: `&::after` nested
+    in `.card` does, `.card::before, .card__title` does not
+    (design-rules.json: margins_in_components)."""
+    listed = re.sub(r"\([^()]*\)", "()", selectors[-1]) if selectors else ""
+    return bool(listed) and all(re.search(r"::(?:before|after|marker)\s*$", s.strip()) for s in listed.split(","))
 
 
 CANCELLED_TOKEN = re.compile(
     r"calc\(\s*(?:var\(\s*--[\w-]+\s*\)\s*\*\s*-1|-1\s*\*\s*var\(\s*--[\w-]+\s*\))\s*\)", re.I)
 
 
-def margin_cancels_token(value: str) -> bool:
-    """`calc(var(--token) * -1)` keeps the relationship; `-24px` does not.
-    Matched as that shape: a bare "-1" substring also matched --space-16."""
-    return bool(CANCELLED_TOKEN.search(value))
+def em_length(raw: str) -> bool:
+    """An em, which rides on the text's own size; a rem does not, though its
+    name ends in "em" too."""
+    return bool(re.search(r"\d(?:em)$", raw, re.I))
+
+
+def raw_position(value: str) -> str | None:
+    """The first literal length in a position that is not an em (geometry):
+    `-0.4em 12px` still hardcodes 12px."""
+    for m in LENGTH_LITERAL.finditer(strip_var_refs(value)):
+        if not re.fullmatch(r"-?0+(\.0+)?(px|rem|em)?", m.group(0), re.I) and not em_length(m.group(0)):
+            return m.group(0)
+    return None
 
 
 def scales_a_token(value: str) -> bool:
@@ -775,6 +870,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
             line_ignores[ln + 1] = {t.strip().upper() for t in m.group(1).split(",") if t.strip()}
 
     token_file = is_token_file(path)
+    binding_file = is_binding_file(path)
     component_file = is_component_file(path)
     saw_layer_statement = False
     layer_statement_line = 0
@@ -877,9 +973,21 @@ def audit_css(path: Path, text: str) -> list[Finding]:
 
         d: CssDecl = ev
         prop, value, line = d.prop, d.value, d.line
+        sass_value = bool(SASS_REFERENCE.search(value))
 
         if prop.startswith("--"):
             declared_props.add(prop)
+            # A theme file binds the tokens and decides nothing, so its custom
+            # properties take a token, a colour word or a keyword, and the
+            # literals CSS forces: a breakpoint, an aspect ratio (bindings).
+            if binding_file and not any(key.match(d.prop) and allowed_value(value, allowed)
+                                        for key, allowed in BINDING_VALUES):
+                add(line, "L1", "binding-literal", "error",
+                    f"Theme binding `{d.prop}` is `{value.strip()}`, not a token.",
+                    "A theme file binds the framework's theme to tokens.css and "
+                    "decides nothing: point it at a token, var(--…). The literals it "
+                    "may hold are a breakpoint in rem and an aspect ratio (theme.css "
+                    "§0; design-rules.json: bindings).")
             # A Tier-3 socket is where a component binds a role to a part.
             # `--card-inset: var(--pad-card)` is the whole point;
             # `--card-inset: 28px` is the same literal the rest of Law 1
@@ -942,47 +1050,66 @@ def audit_css(path: Path, text: str) -> list[Finding]:
         if token_file:
             continue
 
-        # ---- L1 / L3 spacing -----------------------------------------------
-        # Inside @media / @container / @supports too: the prelude is never a
-        # declaration, and responsive rules are where literals collect.
-        if prop in SPACING_PROPS:
-            raw = has_raw_length(value)
-            # em is a RATIO to the current font size, so an em offset tracks
-            # type instead of bypassing the scale. Legitimate for positioning
-            # (sup/sub, optical nudges), never for layout gaps.
-            if raw and raw.lower().endswith("em") and prop not in (
-                    OUTER_MARGIN_PROPS | {"gap", "row-gap", "column-gap",
-                                          "grid-gap"}) and not prop.startswith("padding"):
-                raw = None
-            if raw:
-                on_scale_note = ""
-                if raw.lower().endswith("px"):
-                    try:
-                        px = float(raw[:-2])
-                        if px % 4 != 0:
-                            on_scale_note = f" {raw} is not even on the 4px grid."
-                    except ValueError:
-                        pass
-                add(line, "L1", "raw-spacing", "error",
-                    f"`{prop}: {value}` uses the literal `{raw}`.{on_scale_note}",
-                    "Pick the relationship, not the pixels: --gap-fused / "
-                    "--gap-tight / --gap-related / --gap-grouped / --gap-separate "
-                    "/ --gap-distinct for space between siblings, --pad-* for "
-                    "inset. See references/spacing-system.md §6.")
-
         # ---- L3 a factor on a token ----------------------------------------
         # Spacing and radius take steps of a scale. Positioning (inset, top…)
         # is geometry, which may divide: half the gap to a tap target's size.
-        positional = prop.startswith(("inset", "top", "right", "bottom", "left"))
-        if (prop in RADIUS_PROPS or (prop in SPACING_PROPS and not positional)) and scales_a_token(value):
+        factor = (prop in RADIUS_PROPS or prop in SPACING_VALUES) and scales_a_token(value)
+        if factor:
             add(line, "L3", "token-factor", "error",
                 f"`{prop}: {value.strip()}` scales a token: a step the scale does not have.",
                 "Pick the step you mean, a role or a step on the scale. Density "
                 "scales by multiplying, once, in tokens.css. `* -1`, to cancel a "
                 "token, is the one factor allowed.")
 
+        # ---- L1 spacing ------------------------------------------------------
+        # Inside @media / @container / @supports too: the prelude is never a
+        # declaration, and responsive rules are where literals collect. The
+        # values are the spacing family's, as stylelint reads them, so a share
+        # of the container (5%, calc(100% - var(--gutter-page))) is refused
+        # with the pixels (N31).
+        if (prop in SPACING_VALUES and not factor and not sass_value
+                and not allowed_value(value, SPACING_VALUES[prop])):
+            raw = has_raw_length(value)
+            on_scale_note = ""
+            if raw and raw.lower().endswith("px"):
+                try:
+                    if float(raw[:-2]) % 4 != 0:
+                        on_scale_note = f" {raw} is not even on the 4px grid."
+                except ValueError:
+                    pass
+            add(line, "L1", "raw-spacing", "error",
+                (f"`{prop}: {value}` uses the literal `{raw}`.{on_scale_note}" if raw else
+                 f"`{prop}: {value.strip()}` is not a step of the spacing scale."),
+                "Pick the relationship, not the pixels: --gap-fused / "
+                "--gap-tight / --gap-related / --gap-grouped / --gap-separate "
+                "/ --gap-distinct for space between siblings, --pad-* for "
+                "inset. A share of the container belongs to a layout primitive, "
+                "in a socket. See references/spacing-system.md §6.")
+
+        # ---- L1 positions ----------------------------------------------------
+        # Geometry, so a percentage, a factor and calc() are allowed. em is a
+        # RATIO to the current font size, so an em offset tracks type instead
+        # of bypassing the scale (sup/sub, optical nudges); a rem does not
+        # (design-rules.json: geometry).
+        if prop in GEOMETRY_PROPS:
+            raw = raw_position(value)
+            if raw:
+                add(line, "L1", "raw-spacing", "error",
+                    f"`{prop}: {value}` uses the literal `{raw}`.",
+                    "Place it with a token (a gap or inset role), 0, a percentage, "
+                    "or calc() over tokens. An em is allowed: it rides on the text.")
+
+        # ---- L1 strokes ------------------------------------------------------
+        if prop in STROKE_VALUES and not sass_value and not allowed_value(value, STROKE_VALUES[prop]):
+            add(line, "L1", "raw-stroke", "error",
+                f"`{prop}: {value.strip()}` is not a stroke token.",
+                "Line weights are --stroke-hairline / --stroke-default / --stroke-thick "
+                "/ --stroke-focus; a shorthand takes them with a style (solid, dashed, "
+                "dotted, double) and a colour role, currentColor or transparent "
+                "(design-rules.json: values.families.stroke).")
+
         # ---- L1 sizing --------------------------------------------------------
-        if prop in SIZING_VALUES and not allowed_value(value, SIZING_VALUES[prop]):
+        if prop in SIZING_VALUES and not sass_value and not allowed_value(value, SIZING_VALUES[prop]):
             add(line, "L1", "raw-size", "error",
                 f"`{prop}: {value.strip()}` is a literal size.",
                 "Line length and the widths of things are spacing decisions: use the "
@@ -990,12 +1117,14 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 "(design-rules.json: values.families.sizing).")
 
         # ---- L2 outer margins in components --------------------------------
+        # Alignment (0s and autos), a cancelled token, the owl and the
+        # component's own generated content (design-rules.json:
+        # margins_in_components). A `.prose` selector is no exemption: a flow
+        # container belongs in a layout file (N31).
         if (component_file and prop in OUTER_MARGIN_PROPS
-                and not margin_is_alignment(value)
-                and not margin_cancels_token(value)
+                and not allowed_value(value, MARGIN_VALUES)
                 and not owl_selector(d.selectors)
-                and not generated_content(d.selectors)
-                and "prose" not in " ".join(d.selectors).lower()):
+                and not generated_content(d.selectors)):
             add(line, "L2", "child-margin", "error",
                 f"`{prop}` on a component. A child may not set its own outer margin.",
                 "The parent owns the space between siblings — set `gap` on the "
@@ -1076,7 +1205,9 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 "inset being related — see references/spacing-system.md §8.")
 
         # ---- L1 motion -------------------------------------------------------
-        if prop in MOTION_PROPS:
+        # The motion family's values, as stylelint reads them: a time, a curve
+        # or an easing keyword is a choice the tokens make (values.families.motion).
+        if prop in MOTION_VALUES and not sass_value and not allowed_value(value, MOTION_VALUES[prop]):
             rest = strip_var_refs(value)
             # 0s switches one transition off among several: not a duration.
             if any(not ZERO_TIME.fullmatch(t) for t in TIME_LITERAL.findall(rest)):
@@ -1085,11 +1216,16 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     "Use --motion-hover / --motion-enter / --motion-exit / "
                     "--motion-expand. A literal duration also ignores "
                     "prefers-reduced-motion, which the tokens handle for you.")
-            elif BEZIER_LITERAL.search(rest):
+            elif BEZIER_LITERAL.search(rest) or EASING_WORD.search(rest):
                 add(line, "L1", "raw-easing", "error",
-                    f"`{prop}` hardcodes an easing curve.",
+                    f"`{prop}: {value.strip()}` hardcodes an easing curve.",
                     "Use --ease-out (arriving), --ease-in (leaving), "
                     "--ease-in-out (moving within view), or a --motion-* pair.")
+            else:
+                add(line, "L1", "raw-motion", "error",
+                    f"`{prop}: {value.strip()}` is not a motion token.",
+                    "Use a --motion-* pair, or the --dur-* and --ease-* tokens "
+                    "(design-rules.json: values.families.motion).")
         if prop == "transition" and re.match(r"^\s*all\b", value, re.I):
             add(line, "L1", "transition-all", "warning",
                 "`transition: all` animates properties you did not choose.",

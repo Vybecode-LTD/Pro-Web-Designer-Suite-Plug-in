@@ -532,9 +532,11 @@
 
   /* Animations. `--*: initial` removed the stock `--animate-*` and, with
      them, Tailwind's generated keyframes — so both halves are restored
-     here. Keyframe geometry is literal exception #3. */
-  --animate-spin:  spin  1s   var(--ease-linear) infinite;
-  --animate-pulse: pulse 2s   var(--ease-in-out) infinite;
+     here. Keyframe geometry is literal exception #3; the timing is not an
+     exception, so the loops read --dur-loop, the one duration reduced
+     motion leaves running (Tailwind's stock 1s and 2s were literals). */
+  --animate-spin:  spin  var(--motion-loop) infinite;
+  --animate-pulse: pulse var(--dur-loop) var(--ease-in-out) infinite;
   --animate-enter: enter var(--dur-base) var(--ease-out) both;
 
 

@@ -1504,7 +1504,8 @@ DECK_CSS = """@layer layout {
     display: none;
     flex-direction: column;
     gap: var(--slide-gap);
-    inline-size: min(100%, var(--width-content));
+    inline-size: 100%;
+    max-inline-size: var(--width-content);
     margin-inline: auto;
     padding: var(--slide-inset);
     border: var(--stroke-default) solid var(--slide-border);

@@ -373,7 +373,9 @@ addEventListener('scroll', () => {
   .toc {
     position: sticky; inset-block-start: calc(var(--nav-offset) + var(--gap-grouped));
     display: grid; gap: var(--gap-tight);
-    max-block-size: calc(100dvh - var(--nav-offset) - var(--gap-distinct));
+    /* Derived: the viewport, less the header and the gap below it. */
+    --toc-max: calc(100dvh - var(--nav-offset) - var(--gap-distinct));
+    max-block-size: var(--toc-max);
     overflow-y: auto; overscroll-behavior: contain;
   }
   /* Each link is a .toc__link and each list a .toc__list: the component styles

@@ -78,7 +78,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-A12 | medium | fixed in 3.1.0 | "Off-scale classes … the build errors on them" and "`p-7` is a build error" are false. |
 | SB-A13 | medium | fixed in 3.2.0 | `style-prop-custom-properties-only` rejects the legal pattern that the references document. |
 | SB-A14 | medium | fixed in 3.2.0 | the three gates disagree about the laws |
-| SB-A15 | medium | W2 (3.3.0) | The stylelint allowlist has holes. |
+| SB-A15 | medium | fixed in 3.3.0: every hole is examples in the spec, run through the audit and stylelint (`test_rules_spec.TheAuditFollowsTheSpec.test_every_example`, `test_real_tools.StylelintConfig.test_every_example_of_the_spec`, `test_theme_css_passes_the_override_that_guards_it`), PR #23. SCSS in stylelint is P37's (D3) | The stylelint allowlist has holes. |
 | SB-A16 | medium | fixed in 3.1.0 | Five hook failures, all run in a scratch repo. |
 | SB-A17 | medium | fixed in 3.2.0 | Several version facts are out of date (registry, 2026-09-23). |
 | SB-A18 | medium | fixed in 3.2.0 | The documented tailwind-merge config drops classes. |

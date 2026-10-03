@@ -16,11 +16,15 @@ outside them is the gate's own. A block holds the constants its gate uses
   SYSTEM_COLOR_PROPERTY          system_colors.properties
   KEYWORDS, COLOUR_FUNCTIONS     values.keywords, values.colour_functions
   LITERAL_UNITS                  inline_styles.literal_units
+  GEOMETRY_PROPERTIES            geometry.properties
   COLOUR_WORDS                   values.colour_words and the system colours
   SHAPES                         every shape in values.shapes, each a constant
                                  of its own name (VAR_SEQ, VAR_ONE, …)
   VALUE_ALLOWLIST                values.families: each property and its values
   MARGIN_ALLOWLIST               margins_in_components.properties and .values
+  MARGIN_VALUES                  margins_in_components.values (the audit's form)
+  BINDING_ALLOWLIST              bindings.allow, keyed by property pattern
+  BINDING_VALUES                 the same, as (pattern, allowed) pairs for the audit
   <FAMILY>_VALUES                one family's properties and values (SIZING_VALUES)
 (The markers avoid "@generated": the audit and the migration tool skip a
 file that says it in its first 800 characters.)
@@ -43,10 +47,13 @@ SPEC = "skills/web-design-studio/assets/rules/design-rules.json"
 TARGETS = {
     "skills/web-design-studio/scripts/audit_design.py":
         ("py", ("LAYER_ORDER", "LAYER_STATEMENT", "MAX_NESTING", "SYSTEM_COLOR_NAMES", "SYSTEM_COLOR_PROPERTY",
-                "KEYWORDS", "COLOUR_FUNCTIONS", "LITERAL_UNITS", "SHAPES", "SIZING_VALUES")),
+                "KEYWORDS", "COLOUR_FUNCTIONS", "LITERAL_UNITS", "GEOMETRY_PROPERTIES", "COLOUR_WORDS", "SHAPES",
+                "SPACING_VALUES", "STROKE_VALUES", "MOTION_VALUES", "SIZING_VALUES", "MARGIN_VALUES",
+                "BINDING_VALUES")),
     "skills/web-design-studio/assets/configs/stylelint.config.mjs":
         ("js", ("LAYER_ORDER", "MAX_NESTING", "SYSTEM_COLOR_NAMES", "SYSTEM_COLOR_PROPERTY", "KEYWORDS",
-                "COLOUR_WORDS", "SHAPES", "VALUE_ALLOWLIST", "MARGIN_ALLOWLIST")),
+                "COLOUR_FUNCTIONS", "COLOUR_WORDS", "SHAPES", "VALUE_ALLOWLIST", "MARGIN_ALLOWLIST",
+                "BINDING_ALLOWLIST")),
     "skills/web-design-studio/assets/configs/eslint.design.config.mjs":
         ("js", ("COLOUR_FUNCTIONS", "LITERAL_UNITS")),
 }
@@ -114,7 +121,8 @@ def block(spec: dict, lang: str, names: tuple[str, ...]) -> str:
     data = {"LAYER_ORDER": spec["layers"]["order"], "LAYER_STATEMENT": spec["layers"]["statement"],
             "MAX_NESTING": int(spec["nesting"]["max_depth"]), "SYSTEM_COLOR_NAMES": spec["system_colors"]["names"],
             "KEYWORDS": values["keywords"], "COLOUR_FUNCTIONS": values["colour_functions"],
-            "LITERAL_UNITS": spec["inline_styles"]["literal_units"]}
+            "LITERAL_UNITS": spec["inline_styles"]["literal_units"],
+            "GEOMETRY_PROPERTIES": spec["geometry"]["properties"]}
     py = lang == "py"
     text = (lambda s: json.dumps(s)) if py else js_string
     names = tuple(n for name in names for n in (tuple(values["shapes"]) if name == "SHAPES" else (name,)))
@@ -155,30 +163,61 @@ def family_of(name: str, spec: dict) -> dict | None:
     return spec["values"]["families"].get(m.group(1).lower()) if m else None
 
 
+def py_entries(values: list[str], shapes: dict, before: tuple[str, ...], reader: str) -> str:
+    """Allowed values as the inside of a Python tuple: a shape or a list by
+    name, which the block must write first, else the value as a string."""
+    entries = []
+    for entry in values:
+        if entry in shapes or entry in LISTS:
+            written_before(entry, before, reader)
+            entries.append(f"*{entry}" if entry == "KEYWORDS" else entry)
+        elif re.fullmatch(r"[A-Z][A-Z_]*", entry):
+            raise SpecError(f"{entry} has no Python form for {reader}")
+        else:
+            entries.append(json.dumps(entry))
+    return ", ".join(entries) + ("," if len(entries) == 1 else "")
+
+
+def property_pattern(prop: str, reader: str) -> str:
+    """A `/…/` property key's source, for re.compile."""
+    m = re.fullmatch(r"/(.+)/", prop)
+    if not m:
+        raise SpecError(f"{reader}: {prop!r} is not a /pattern/ property key")
+    return m.group(1)
+
+
 def py_constant(name: str, spec: dict, before: tuple[str, ...]) -> str:
-    """The Python forms: a shape, the system-colour properties, or one family
-    as {property: (allowed, …)}, a shape compiled and a value matched exactly."""
+    """The Python forms: a shape, the system-colour properties, the colour
+    words, the component margins, the theme bindings as (pattern, allowed)
+    pairs, or one family as {property: (allowed, …)}, a shape compiled and a
+    value matched exactly."""
     shapes = spec["values"]["shapes"]
     if name in shapes:
         return f"{name} = re.compile({raw_pattern(name, shapes[name]['pattern'], 'py')})"
     if name == "SYSTEM_COLOR_PROPERTY":
         return f"{name} = re.compile({raw_pattern(name, spec['system_colors']['properties'], 'py')}, re.I)"
+    if name == "COLOUR_WORDS":
+        written_before("SYSTEM_COLOR_NAMES", before, name)
+        words = ", ".join(json.dumps(w) for w in spec["values"]["colour_words"])
+        return f'{name} = re.compile("^(?:" + "|".join([{words}, *SYSTEM_COLOR_NAMES]) + ")$", re.I)'
+    if name == "MARGIN_VALUES":
+        return f"{name} = ({py_entries(spec['margins_in_components']['values'], shapes, before, name)})"
+    if name == "BINDING_VALUES":
+        lines = [f"{name} = ("]
+        for group in spec["bindings"]["allow"]:
+            entries = py_entries(group["values"], shapes, before, name)
+            for prop in group["properties"]:
+                pattern = raw_pattern(name, property_pattern(prop, name), "py")
+                lines.append(f"    (re.compile({pattern}), ({entries})),")
+        return "\n".join(lines + [")"])
     family = family_of(name, spec)
     if family is None:
         raise SpecError(f"{name} has no Python form")
     lines = [f"{name} = {{"]
     for group in family["allow"]:
-        entries = []
-        for entry in group["values"]:
-            if entry == "KEYWORDS" or entry in shapes:
-                written_before(entry, before, name)
-                entries.append(f"*{entry}" if entry == "KEYWORDS" else entry)
-            elif re.fullmatch(r"[A-Z][A-Z_]*", entry):
-                raise SpecError(f"{entry} has no Python form for {name}")
-            else:
-                entries.append(json.dumps(entry))
+        entries = py_entries(group["values"], shapes, before, name)
         for prop in group["properties"]:
-            lines.append(f"    {json.dumps(prop)}: ({', '.join(entries)}),")
+            lines.append(f"    {json.dumps(prop)}: ({entries}),")
     return "\n".join(lines + ["}"])
 
 
@@ -204,6 +243,11 @@ def js_constant(name: str, spec: dict, before: tuple[str, ...]) -> str:
         margins = spec["margins_in_components"]
         return js_allowlist(name, [("", [{"properties": margins["properties"], "values": margins["values"]}])],
                             shapes, before)
+    if name == "BINDING_ALLOWLIST":
+        for group in spec["bindings"]["allow"]:
+            for prop in group["properties"]:
+                property_pattern(prop, name)
+        return js_allowlist(name, [("", spec["bindings"]["allow"])], shapes, before)
     raise SpecError(f"{name} has no JavaScript form")
 
 

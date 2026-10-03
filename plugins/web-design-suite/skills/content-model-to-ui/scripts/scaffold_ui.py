@@ -831,15 +831,18 @@ SKELETON_CSS = """\
     --skeleton-lines:  1;
     --skeleton-radius: var(--radius-sm);
     --skeleton-bg:     var(--bg-sunken);
-
-    display: block;
-    inline-size: calc(100% * var(--skeleton-width));
-    /* `1lh` is this element's OWN line box, so the placeholder is exactly as
+    /* Derived sizes are geometry, so they live in sockets the sizes read.
+       `1lh` is this element's OWN line box, so the placeholder is exactly as
        tall as the text it stands in for. Deriving it from a leading token
        instead would read Tier 1 from component code (Law 6) AND would drift
        the moment the type role changed. */
+    --skeleton-inline: calc(100% * var(--skeleton-width));
+    --skeleton-block:  calc(1lh * var(--skeleton-lines));
+
+    display: block;
+    inline-size: var(--skeleton-inline);
     font: var(--type-body);
-    block-size: calc(1lh * var(--skeleton-lines));
+    block-size: var(--skeleton-block);
     border-radius: var(--skeleton-radius);
     background-color: var(--skeleton-bg);
   }

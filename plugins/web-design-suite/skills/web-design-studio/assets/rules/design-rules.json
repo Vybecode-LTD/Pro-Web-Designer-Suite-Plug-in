@@ -1,5 +1,5 @@
 {
-  "about": "The one spec the three gates share: audit_design.py, stylelint.config.mjs and eslint.design.config.mjs. tools/sync_rules.py writes its data (the layer order, the nesting depth, the system colours, the value shapes and allowlists, the colour functions) into a marked block in each gate, and its --check fails when a block drifts from this file. Each section's `gates` names the tools that enforce it, and the conformance tests (tests/test_rules_spec.py, tests/test_real_tools.py) run every `allowed` and `refused` example through each of them. Change a rule here first, rerun the tool, then change whatever gate code the data cannot express. Source of the rules: token-contract.md, the Nine Laws.",
+  "about": "The one spec the three gates share: audit_design.py, stylelint.config.mjs and eslint.design.config.mjs. tools/sync_rules.py writes its data (the layer order, the nesting depth, the system colours, the value shapes and allowlists, the colour functions, the theme bindings, the geometry properties) into a marked block in each gate, and its --check fails when a block drifts from this file. Each section's `gates` names the tools that enforce it, and the conformance tests (tests/test_rules_spec.py, tests/test_real_tools.py) run every `allowed` and `refused` example through each of them. Change a rule here first, rerun the tool, then change whatever gate code the data cannot express. Source of the rules: token-contract.md, the Nine Laws.",
   "nesting": {
     "gates": ["audit", "stylelint"],
     "max_depth": 2,
@@ -19,18 +19,33 @@
   },
   "margins_in_components": {
     "gates": ["audit", "stylelint"],
-    "rule": "Law 2: a component never sets its own outer margin. Legal: auto (alignment), 0, calc(var(--token) * -1) to cancel a known token, and the owl, the whole `> * + *` in the parent's own rule, through any @media around the margin. `.card + *` is not the owl: it is the component spacing its next sibling.",
+    "rule": "Law 2: a component never sets its own outer margin. Legal: alignment, 0s and autos only (`0 auto`, `0 0 0 auto`), calc(var(--token) * -1) to cancel a known token, the owl, the whole `> * + *` in the parent's own rule, through any @media around the margin, and a margin on the component's own generated content (::before, ::after, ::marker), which sits inside it. `.card + *` is not the owl: it is the component spacing its next sibling. `var(--gap-related) auto` is not alignment: the token sets the component's own block margin. A selector that names `prose` is no exemption: a `.prose` flow container is a layout, and belongs in a layout file, where its owl is allowed anyway.",
     "properties": ["margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "margin-inline", "margin-block",
                    "margin-inline-start", "margin-inline-end", "margin-block-start", "margin-block-end"],
-    "values": ["0", "auto", "0 auto", "auto 0", "CANCEL", "KEYWORDS"],
+    "values": ["ALIGN", "CANCEL", "KEYWORDS"],
     "allowed_values": ["0", "auto", "0 auto", "auto 0", "calc(var(--card-inset) * -1)", "calc(-1 * var(--card-inset))"],
-    "refused_values": ["16px", "var(--gap-related)", "calc(var(--card-inset) * -2)"],
+    "refused_values": ["16px", "var(--gap-related)", "calc(var(--card-inset) * -2)", "var(--gap-related) auto", "0px auto"],
     "owl_selectors": [".stack > * + *", ".flow > * + *"],
     "refused_selectors": [".card *", ".card p", ".card > svg", ".card:is(h2, h3)"],
     "allowed_selectors": [".card:nth-child(2n + 1)", ".card__icon:where(:hover, :focus-visible)",
                           ".card[data-state=\"open\"]", ".card::before", ".card:lang(en)"],
-    "allowed": [".stack > * + * { @media (width >= 48rem) { margin-block-start: var(--gap-grouped); } }"],
-    "refused": [".card + * { margin-block-start: var(--gap-related); }"]
+    "allowed": [".stack > * + * { @media (width >= 48rem) { margin-block-start: var(--gap-grouped); } }",
+                ".card__close { margin: 0 0 0 auto; }",
+                ".card::before { margin-inline-end: var(--gap-related); }",
+                ".card { &::after { margin-inline-start: var(--gap-related); } }"],
+    "refused": [".card + * { margin-block-start: var(--gap-related); }",
+                ".card__title { margin: var(--gap-related) auto; }",
+                ".prose { margin-block: var(--gap-grouped); }",
+                ".card::before, .card__title { margin-inline-end: var(--gap-related); }"]
+  },
+  "geometry": {
+    "gates": ["audit"],
+    "properties": ["top", "right", "bottom", "left", "inset", "inset-block", "inset-block-start", "inset-block-end",
+                   "inset-inline", "inset-inline-start", "inset-inline-end"],
+    "rule": "A position is geometry, not a step of a scale: `calc((var(--tap-min) - 100%) / -2)` centres a hit area on its box, and a percentage, a factor of a token, or an em (sup and sub ride on their text) is how geometry is written. So the audit refuses only a literal length that is not an em, and stylelint has no allowlist for these properties, because no shape can name every correct calc(). The audit reads the list from GEOMETRY_PROPERTIES.",
+    "allowed": ["inset-block-start: calc((var(--tap-min) - 100%) / -2)", "inset: 0", "top: 50%",
+                "inset-block-start: -0.4em", "inset-inline-end: var(--gap-related)"],
+    "refused": ["top: 13px", "inset-inline-start: 1rem", "inset: -0.4em 12px"]
   },
   "var_fallback": {
     "gates": ["audit", "stylelint"],
@@ -121,12 +136,12 @@
   },
   "values": {
     "gates": ["audit", "stylelint"],
-    "rule": "Laws 1, 3 and 6: a design property takes a token through var(), or one of the few values that are not a design decision: 0, the CSS-wide keywords, and the keywords its family lists. stylelint allows exactly these values, property by property (declaration-property-value-allowed-list compares the whole value); the audit refuses the literals they leave out. An allowlist names what is correct, so 13px, 0.8125rem and clamp(12px, 2vw, 14px) are refused alike, and so is the spelling nobody has thought of yet.",
+    "rule": "Laws 1, 3 and 6: a design property takes a token through var(), or one of the few values that are not a design decision: 0, the CSS-wide keywords, and the keywords its family lists. stylelint allows exactly these values, property by property (declaration-property-value-allowed-list compares the whole value). The audit reads the same allowlists for the spacing, stroke, motion and sizing families (SPACING_VALUES and the rest), and refuses the literals the other families leave out; a value holding a Sass variable is left to sass.variables. An allowlist names what is correct, so 13px, 0.8125rem and clamp(12px, 2vw, 14px) are refused alike, and so is the spelling nobody has thought of yet.",
     "lists": "In a family's `values`, KEYWORDS is `keywords`, COLOUR_WORDS is `colour_words` and every system colour (system_colors.names) in any case, and a shape's name stands for its pattern. Every other entry is a value matched exactly.",
     "shapes": {
       "VAR_SEQ": {
-        "pattern": "^(?:var\\(--[a-z0-9-]+\\)\\s*)+$",
-        "means": "One or more var(--token) references, whitespace-separated, and nothing else, so `var(--pad-card) 2px` is refused. Names are kebab-case: var(--padCard) is a typo, and a var() that names no token drops its declaration in silence."
+        "pattern": "^(?:var\\(--[a-z0-9-]+\\)|0)(?:\\s+(?:var\\(--[a-z0-9-]+\\)|0))*$",
+        "means": "One or more var(--token) references, whitespace-separated, and nothing else but 0, which is on every length scale (zero): `0 var(--pad-card)` is allowed and `var(--pad-card) 2px` is refused. Names are kebab-case: var(--padCard) is a typo, and a var() that names no token drops its declaration in silence."
       },
       "VAR_ONE": {
         "pattern": "^var\\(--[a-z0-9-]+(\\s*,\\s*.+)?\\)$",
@@ -139,30 +154,62 @@
       "CANCEL": {
         "pattern": "^calc\\(\\s*(?:var\\(--[a-z0-9-]+\\)\\s*\\*\\s*-1|-1\\s*\\*\\s*var\\(--[a-z0-9-]+\\))\\s*\\)$",
         "means": "A margin that cancels a known token, Law 2's third exception (margins_in_components). Only -1: any other factor invents a step."
+      },
+      "ALIGN": {
+        "pattern": "^(?:0|auto)(?:\\s+(?:0|auto)){0,3}$",
+        "means": "A margin that aligns and spaces nothing: one to four 0s and autos. `0 auto` centres, `0 0 0 auto` pushes to the end. A token beside an auto spaces the box, so it is not alignment."
+      },
+      "STROKE": {
+        "pattern": "^(?:var\\(--[a-z0-9-]+\\)|0|none|solid|dashed|dotted|double|currentColor|currentcolor|transparent)(?:\\s+(?:var\\(--[a-z0-9-]+\\)|0|none|solid|dashed|dotted|double|currentColor|currentcolor|transparent))*$",
+        "means": "A border or outline shorthand: tokens (a --stroke-* width, a colour role), 0, a style keyword and the colour words currentColor and transparent, so `1px solid var(--border-default)` and `var(--stroke-default) solid #ddd` are refused. A system colour goes in border-color or outline-color, inside forced-colors (system_colors)."
+      },
+      "MOTION_LIST": {
+        "pattern": "^(?:(?:var\\(--[a-z0-9-]+\\)|0s|\\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\\w-]))[a-zA-Z_-][\\w-]*)(?:\\s*,\\s*|\\s+))*(?:var\\(--[a-z0-9-]+\\)|0s|\\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\\w-]))[a-zA-Z_-][\\w-]*)$",
+        "means": "A transition or animation shorthand: a comma-separated list of items, each a property or keyframe name and keywords (allow-discrete, infinite, both, none, …), tokens, 0s and an iteration count. The timing comes from tokens, so a time (200ms), a curve (cubic-bezier(), steps()) and an easing keyword (ease-in, linear) are refused: `translate var(--motion-expand), display var(--motion-expand) allow-discrete` is allowed."
+      },
+      "BREAKPOINT": {
+        "pattern": "^\\d+(?:\\.\\d+)?rem$",
+        "means": "A breakpoint in rem, the one literal length a theme binding takes (bindings)."
+      },
+      "RATIO": {
+        "pattern": "^\\d+(?:\\.\\d+)?\\s*/\\s*\\d+(?:\\.\\d+)?$",
+        "means": "An aspect ratio such as `16 / 9`, a container format rather than a design value (bindings)."
       }
     },
     "keywords": ["inherit", "initial", "unset", "revert", "revert-layer"],
     "colour_words": ["currentcolor", "transparent"],
-    "colour_functions": ["rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch", "color"],
-    "colour_functions_rule": "A colour written as one of these functions is a literal, unless a token decides it (oklch(from var(--x) l c h / 0.5)). The audit and ESLint read this list; stylelint's function-disallowed-list does not yet (SB-A15).",
+    "colour_functions": ["rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch", "color", "color-mix", "light-dark"],
+    "colour_functions_rule": "A colour written as one of these functions is a literal, unless a token decides it: a function with a var() among its arguments, as in oklch(from var(--x) l c h / 0.5) or color-mix(in oklch, var(--bg-accent) 20%, transparent), is derived. A mix of literals is a literal. A var() fallback is not checked (var_fallback). The audit (raw-color), stylelint (design/no-literal-colour-function, in every property) and ESLint (inline styles) read this list; token files are exempt.",
     "families": {
       "spacing": {
         "laws": "1, 3, 6",
-        "why": "Spacing is the scale or nothing. 0 is on the scale and is spelled 0 (zero). gap is the one sanctioned way to space siblings (Law 2), so it takes the scale too.",
+        "why": "Spacing is the scale or nothing. 0 is on the scale and is spelled 0 (zero), alone or among tokens. gap is the one sanctioned way to space siblings (Law 2), so it takes the scale too, and so does a margin outside a component, in a layout or base file; in a component, margins_in_components holds it to Law 2. A share of the container (calc(100% - var(--gutter-page)), 5%) is not a spacing step: a layout primitive carries it in a socket. `layout` holds examples written in a layout file, where a margin may take a token.",
         "allow": [
           {"properties": ["padding", "padding-inline", "padding-block"], "values": ["VAR_SEQ", "VAR_CALC", "0", "KEYWORDS"]},
           {"properties": ["padding-top", "padding-right", "padding-bottom", "padding-left", "padding-inline-start",
                           "padding-inline-end", "padding-block-start", "padding-block-end"],
            "values": ["VAR_ONE", "VAR_CALC", "0", "KEYWORDS"]},
-          {"properties": ["gap"], "values": ["VAR_SEQ", "0", "KEYWORDS"]},
-          {"properties": ["row-gap", "column-gap"], "values": ["VAR_ONE", "0", "KEYWORDS"]}
+          {"properties": ["gap", "grid-gap"], "values": ["VAR_SEQ", "0", "KEYWORDS"]},
+          {"properties": ["row-gap", "column-gap"], "values": ["VAR_ONE", "0", "KEYWORDS"]},
+          {"properties": ["margin", "margin-inline", "margin-block"], "values": ["VAR_SEQ", "VAR_CALC", "CANCEL", "ALIGN", "KEYWORDS"]},
+          {"properties": ["margin-top", "margin-right", "margin-bottom", "margin-left", "margin-inline-start",
+                          "margin-inline-end", "margin-block-start", "margin-block-end"],
+           "values": ["VAR_ONE", "VAR_CALC", "CANCEL", "0", "auto", "KEYWORDS"]}
         ],
         "allowed": ["padding: var(--pad-card) var(--pad-card-lg)", "padding-inline: 0", "gap: var(--gap-related)",
                     "padding-block-start: calc(var(--pad-card) - var(--stroke-hairline))",
-                    "padding-top: var(--pad-card, calc(1rem / 2))"],
+                    "padding-top: var(--pad-card, calc(1rem / 2))", "padding: 0 var(--pad-card)",
+                    "gap: 0 var(--gap-related)"],
         "refused": ["padding: 13px", "padding: var(--pad-card) 2px", "gap: 1rem", "padding: calc(var(--space-4) * 1.5)",
                     "padding: calc(var(--pad-card) * 1.5)", "gap: calc(var(--gap-related) * 3)",
-                    "padding-inline: calc(var(--pad-card) / 2)"]
+                    "padding-inline: calc(var(--pad-card) / 2)", "padding-inline: calc(100% - var(--gutter-page))",
+                    "padding-inline: 5%", "padding: 0px var(--pad-card)"],
+        "layout": {
+          "allowed": ["margin-block-start: var(--space-section)", "margin: 0 auto", "margin-inline: auto",
+                      "margin-inline-start: calc(var(--space-0-5) * -1)", "margin: var(--space-section) 0"],
+          "refused": ["margin-block-start: 24px", "margin-block: var(--space-section) 13px",
+                      "margin-inline: calc(var(--gap-related) * 2)", "margin-inline: calc(50% - var(--gutter-page))"]
+        }
       },
       "type": {
         "laws": "1, 3",
@@ -186,8 +233,32 @@
            "values": ["VAR_ONE", "VAR_CALC", "0", "KEYWORDS"]}
         ],
         "allowed": ["border-radius: 50%", "border-radius: var(--radius-md)",
-                    "border-start-start-radius: calc(var(--radius-lg) - var(--pad-card))"],
+                    "border-start-start-radius: calc(var(--radius-lg) - var(--pad-card))",
+                    "border-radius: var(--radius-md) var(--radius-md) 0 0"],
         "refused": ["border-radius: 6px"]
+      },
+      "stroke": {
+        "laws": "1",
+        "why": "Line weights are tokens: --stroke-hairline, --stroke-default, --stroke-thick and --stroke-focus are the system's whole set, and forced-colors mode repaints each one. A hand-typed 1px drifts to 1.5px and 3px within a few commits, and thin, medium and thick are the browser's weights, not the system's. A border or outline shorthand takes the tokens, a style keyword and a colour token (STROKE). outline-offset may cancel a token, to draw a ring inside the edge.",
+        "allow": [
+          {"properties": ["border-width", "border-block-width", "border-inline-width"], "values": ["VAR_SEQ", "0", "KEYWORDS"]},
+          {"properties": ["border-top-width", "border-right-width", "border-bottom-width", "border-left-width",
+                          "border-block-start-width", "border-block-end-width", "border-inline-start-width",
+                          "border-inline-end-width", "outline-width"],
+           "values": ["VAR_ONE", "0", "KEYWORDS"]},
+          {"properties": ["outline-offset"], "values": ["VAR_ONE", "CANCEL", "0", "KEYWORDS"]},
+          {"properties": ["border", "border-top", "border-right", "border-bottom", "border-left", "border-block",
+                          "border-block-start", "border-block-end", "border-inline", "border-inline-start",
+                          "border-inline-end", "outline"],
+           "values": ["STROKE", "KEYWORDS"]}
+        ],
+        "allowed": ["border: var(--stroke-hairline) solid var(--border-default)", "outline: var(--stroke-focus) solid transparent",
+                    "border-block-end-width: var(--stroke-thick)", "border: 0", "outline: none",
+                    "border-inline-start: var(--stroke-thick) dashed currentColor",
+                    "outline-offset: calc(var(--stroke-focus) * -1)", "border-width: 0 0 var(--stroke-hairline)"],
+        "refused": ["border: 1px solid var(--border-default)", "border-inline-start: 3px solid var(--border-accent)",
+                    "outline-width: 2px", "outline-offset: 2px", "border: thin solid var(--border-default)",
+                    "border-width: var(--stroke-default) 2px", "outline-offset: calc(var(--stroke-focus) * -2)"]
       },
       "elevation": {
         "laws": "1, 6",
@@ -207,8 +278,14 @@
           {"properties": ["accent-color"], "values": ["VAR_ONE", "auto", "KEYWORDS"]}
         ],
         "allowed": ["color: var(--fg-strong)", "color: currentColor", "background-color: transparent", "fill: none",
-                    "border-color: var(--border-default) var(--border-accent)"],
-        "refused": ["color: #333333", "background-color: rgb(0 0 0)", "color: oklch(50% 0.1 250)", "color: red"]
+                    "border-color: var(--border-default) var(--border-accent)", "background: var(--bg-surface)",
+                    "background: linear-gradient(var(--bg-surface), var(--bg-sunken))",
+                    "background: oklch(from var(--bg-accent) l c h / 0.5)",
+                    "background: color-mix(in oklch, var(--bg-accent) 20%, transparent)"],
+        "refused": ["color: #333333", "background-color: rgb(0 0 0)", "color: oklch(50% 0.1 250)", "color: red",
+                    "background: oklch(98% 0.01 250)", "background: linear-gradient(var(--bg-surface), lab(98% 0 0))",
+                    "background: light-dark(oklch(98% 0.01 250), oklch(20% 0.01 250))",
+                    "background: color-mix(in oklch, var(--bg-accent, oklch(50% 0.1 250)) 20%, oklch(98% 0.01 250))"]
       },
       "stacking": {
         "laws": "3",
@@ -219,26 +296,45 @@
       },
       "motion": {
         "laws": "1",
-        "why": "Duration and easing are role-paired in tokens.css: they travel together or they drift. 0s switches one transition off among several. tokens.css collapses every duration token to 1ms under prefers-reduced-motion, so a literal 200ms opts the component out: a vestibular-safety failure, not a style nit.",
+        "why": "Duration and easing are role-paired in tokens.css: they travel together or they drift. 0s switches one transition off among several. tokens.css collapses every duration token to 1ms under prefers-reduced-motion, so a literal 200ms opts the component out: a vestibular-safety failure, not a style nit. An easing keyword (ease-in, linear) is a curve chosen by hand, as cubic-bezier() is. A scroll-driven animation's duration is auto: its timeline owns it.",
         "allow": [
-          {"properties": ["transition-duration", "animation-duration"], "values": ["VAR_SEQ", "0s", "KEYWORDS"]},
-          {"properties": ["transition-timing-function", "animation-timing-function"], "values": ["VAR_SEQ", "KEYWORDS"]}
+          {"properties": ["transition-duration"], "values": ["VAR_SEQ", "0s", "KEYWORDS"]},
+          {"properties": ["animation-duration"], "values": ["VAR_SEQ", "0s", "auto", "KEYWORDS"]},
+          {"properties": ["transition-timing-function", "animation-timing-function"], "values": ["VAR_SEQ", "KEYWORDS"]},
+          {"properties": ["transition", "animation"], "values": ["MOTION_LIST", "KEYWORDS"]}
         ],
-        "allowed": ["transition-duration: 0s"],
-        "refused": ["transition-duration: 200ms", "transition-timing-function: cubic-bezier(0.2, 0, 0, 1)"]
+        "allowed": ["transition-duration: 0s", "transition: none", "animation-duration: auto",
+                    "transition: opacity var(--motion-enter), display var(--motion-enter) allow-discrete",
+                    "animation: rise var(--motion-enter) both", "animation: shimmer var(--motion-loop) infinite"],
+        "refused": ["transition-duration: 200ms", "transition-timing-function: cubic-bezier(0.2, 0, 0, 1)",
+                    "transition-timing-function: ease-in-out", "transition: opacity 200ms",
+                    "transition: opacity var(--motion-enter), transform var(--motion-enter) ease-in",
+                    "animation: spin 1s linear infinite", "animation: grow auto linear"]
       },
       "sizing": {
         "laws": "1",
-        "why": "Line length is a spacing decision: max-inline-size: 65ch in a component is the same mistake as padding: 13px, and the one people defend hardest. The page shell may use the small and dynamic viewport units: 100svb does not jump when mobile browser chrome hides.",
+        "why": "Line length is a spacing decision: max-inline-size: 65ch in a component is the same mistake as padding: 13px, and the one people defend hardest. So are the sizes of things: a box takes a token (--tap-min, a measure, a socket), 100%, auto or an intrinsic keyword, and 1em sizes an icon to its text. The page shell may use the small and dynamic viewport units in the block axis: 100svb does not jump when mobile browser chrome hides. A size derived from tokens, calc(100% - var(--gutter-page) * 2), is geometry: it goes in a socket the property reads, as the starter's layout.css does.",
         "allow": [
           {"properties": ["max-inline-size", "max-width"],
            "values": ["VAR_ONE", "none", "100%", "max-content", "min-content", "fit-content", "KEYWORDS"]},
-          {"properties": ["min-block-size"],
+          {"properties": ["max-block-size", "max-height"],
+           "values": ["VAR_ONE", "none", "100%", "100dvh", "100dvb", "100svh", "100svb", "max-content", "min-content",
+                      "fit-content", "KEYWORDS"]},
+          {"properties": ["min-block-size", "min-height"],
            "values": ["VAR_ONE", "0", "100%", "100dvh", "100dvb", "100svh", "100svb", "auto", "KEYWORDS"]},
-          {"properties": ["min-inline-size"], "values": ["VAR_ONE", "0", "100%", "auto", "KEYWORDS"]}
+          {"properties": ["min-inline-size", "min-width"],
+           "values": ["VAR_ONE", "0", "100%", "auto", "max-content", "min-content", "fit-content", "KEYWORDS"]},
+          {"properties": ["inline-size", "width"],
+           "values": ["VAR_ONE", "0", "100%", "auto", "max-content", "min-content", "fit-content", "1em", "KEYWORDS"]},
+          {"properties": ["block-size", "height"],
+           "values": ["VAR_ONE", "0", "100%", "100dvh", "100dvb", "100svh", "100svb", "auto", "max-content",
+                      "min-content", "fit-content", "1em", "KEYWORDS"]}
         ],
-        "allowed": ["max-inline-size: var(--measure-prose)", "min-block-size: 100svb", "max-width: 100%"],
-        "refused": ["max-width: 600px", "max-inline-size: 65ch"]
+        "allowed": ["max-inline-size: var(--measure-prose)", "min-block-size: 100svb", "max-width: 100%",
+                    "inline-size: 1em", "block-size: 100dvh", "width: 100%", "height: auto",
+                    "min-height: var(--tap-min)", "max-block-size: none", "inline-size: var(--drawer-size)"],
+        "refused": ["max-width: 600px", "max-inline-size: 65ch", "inline-size: 320px", "height: 48px",
+                    "width: 50vw", "max-block-size: calc(100dvh - var(--gap-distinct) * 2)", "min-width: 12rem"]
       }
     }
   },
@@ -250,7 +346,28 @@
     "refused": ["<div style={{ padding: 13 }} />", "<div style={{ '--gap': '12px' }} />",
                 "<div style={{ '--tint': 'hwb(20 10% 30%)' }} />"]
   },
+  "bindings": {
+    "gates": ["audit", "stylelint"],
+    "rule": "A theme file (file_classes.binding_files, Tailwind v4's theme.css) binds Tailwind's theme to the tokens and decides nothing (theme.css §0): a custom property there takes a token, currentColor, transparent or a CSS-wide keyword. Two literals are allowed, each because of CSS: a breakpoint in rem, which must be a literal and never a var(), because a media query condition cannot read a custom property, and an aspect ratio, a container format. An --animate-* binding is an animation shorthand, so it takes the motion tokens (MOTION_LIST). Keyframe geometry, §0's third exception, is not a custom property. Only custom properties are held to this: the theme file's other rules (its @utility blocks, its keyframes) answer to the gates' other rules. stylelint's theme-file override reads BINDING_ALLOWLIST, and the audit, for which a theme file is a token file, checks its custom properties against BINDING_VALUES (L1 binding-literal).",
+    "allow": [
+      {"properties": ["/^--breakpoint-/"], "values": ["BREAKPOINT"]},
+      {"properties": ["/^--aspect-/"], "values": ["RATIO"]},
+      {"properties": ["/^--animate-/"], "values": ["MOTION_LIST"]},
+      {"properties": ["/^--(?!breakpoint-)/"], "values": ["VAR_ONE", "COLOUR_WORDS", "KEYWORDS"]}
+    ],
+    "allowed": ["--breakpoint-md: 48rem", "--aspect-video: 16 / 9", "--color-current: currentColor",
+                "--color-bg-surface: var(--bg-surface)", "--*: initial", "--spacing-card: var(--pad-card)",
+                "--animate-spin: spin var(--motion-loop) infinite"],
+    "refused": ["--spacing-card: 28px", "--color-brand: oklch(64.5% 0.188 42)", "--animate-spin: spin 1s linear infinite",
+                "--breakpoint-md: var(--bp-md)", "--radius-card: calc(var(--radius-md) * 2)"]
+  },
   "file_classes": {
+    "binding_files": {
+      "globs": ["**/theme.css", "**/*-theme.css"],
+      "about": "Theme files bind a framework's theme to the tokens (bindings). Each is also a token file: the audit and the migration tool leave its literals to this rule.",
+      "examples": ["assets/configs/theme.css", "dark-theme.css", "src/styles/theme.css"],
+      "not": ["theming.css", "src/styles/tokens.css", "mytheme.css", "theme.scss.bak"]
+    },
     "token_files": {
       "globs": ["**/tokens.css", "**/*-tokens.css", "**/*.tokens.css", "**/tokens/*.css", "**/theme.css", "**/*-theme.css"],
       "examples": ["src/styles/tokens.css", "brand-tokens.css", "design.tokens.css", "src/tokens/colour.css", "assets/configs/theme.css", "dark-theme.css"],
