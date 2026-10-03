@@ -14,14 +14,11 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-10-02)
 
-- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress: the Python 3.9 floor (N6, PR #4), the audit's false cleans (SB-A9 with N11, PR #5) and the migration tool's copy of them (N12, PR #6) are merged; the scripts on Sass (SB-A24 with N13, PR #7) and W1's reference (DL-A5, DL-B1's §9, DL-C4, PR #8) are merged too. W1's security pass and `scaffold_ui --strict` (PRs #9, #10) are merged; merged on 2026-10-02: #12 (the parser on real `db pull` and `gen types` output), #13 (the scaffold's policies and `lib/supabase.ts`), #14 (the canonical entry stylesheets and `vendor` in the layer order) and #15 (the execution plan).
+- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress: the Python 3.9 floor (N6, PR #4), the audit's false cleans (SB-A9 with N11, PR #5) and the migration tool's copy of them (N12, PR #6) are merged; the scripts on Sass (SB-A24 with N13, PR #7) and W1's reference (DL-A5, DL-B1's §9, DL-C4, PR #8) are merged too. W1's security pass and `scaffold_ui --strict` (PRs #9, #10) are merged; merged on 2026-10-02: #12 (the parser on real `db pull` and `gen types` output), #13 (the scaffold's policies and `lib/supabase.ts`), #14 (the canonical entry stylesheets and `vendor` in the layer order) and #15 (the execution plan). Open on 2026-10-02: #16 (P0: what the reviews of #12 to #15 found, N16 to N25 and N29) and #17 (P1, stacked on #16: CI, the release build, `fail_before.py` and `check.py`, N5).
 - **Installed:** 3.2.1 from `63932cf`. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:**
-  - 406, passing on Python 3.9 and 3.14 on Windows.
-  - Linux passes with the Node tests skipped.
-  - macOS has never been run.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`, which schedules every open item in 44 PRs (P0–P43). Next: P0 (what the reviews of #12 to #15 found), then P1 (CI and the lean tooling). Start each session from `dev plans/next-session-prompt.md`. The plan's §2 was decided on 2026-10-02: yes to all, and evals capped at $15 per full run.
-- **Open:** 164 items, every one scheduled in the execution plan: 145 from the review (the inventory has each) and 19 N-items (the completion plan has each).
+- **Tests:** 432. CI (#17) runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node; its first runs found one platform bug (fixed) and two Windows-only tests (fixed). Locally, `tools/check.py`; the full suite passed on 3.14 and 3.9 on Windows.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`, which schedules every open item in PRs P2–P43 (P0 and P1 are #16 and #17). Next: green CI on #17 if it is not, then P2 (the spec generates the gates' rule sections) and P3 (the gates agree). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 151 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
@@ -31,16 +28,20 @@ For the Bash tool (Git Bash), from the repository root:
 npm ci --prefix tooling/main          # once; it downloads no browser (tooling/README.md)
 npm ci --prefix tooling/tailwind-v3   # once
 cd plugins/web-design-suite
-python -B -m unittest discover -s tests                     # the suite: 406 tests; -B keeps bytecode out of the plugin
-WDS_PLUGIN_ROOT=<unpacked older release> python -B -m unittest discover -s tests   # fail-before
+python -B tools/check.py              # every PR: pointers, snippets, the plan, the audit, budgets, the affected tests
+python -B tools/fail_before.py <test ids> [--rev REV]      # the fail-before table; REV defaults to the latest v* tag
+python -B -m unittest discover -s tests                     # the whole suite; -B keeps bytecode out of the plugin
 python tools/check_pointers.py        # § pointers; --write-register after editing one, then read the diff
 python tools/sync_snippets.py --check # starter code quoted in the references
 python skills/web-design-studio/scripts/audit_design.py skills --strict
+cd ../.. && python -B tooling/release/build.py <empty folder> [--rev REV]   # the zip, the .skill files, SHA256SUMS
 ```
 
-Get an older release with `git archive v3.2.1 plugins/web-design-suite | tar --strip-components=1 -x -C <scratch folder>`, which unpacks the plugin as `<scratch folder>/web-design-suite`. In cmd.exe the fail-before run is `set "WDS_PLUGIN_ROOT=<folder>" && python -B -m unittest discover -s tests`.
+CI (`.github/workflows/ci.yml`) runs the whole suite on Windows, Linux and macOS at Python 3.9 and 3.14 for every PR, so locally `check.py` is enough (decision D1). A pushed `v*` tag makes `release.yml` build and create the GitHub release; nothing else creates one.
 
-The Python floor runs with `uv run --no-project --python 3.9 python -B -m unittest discover -s tests`, which works in cmd as well. Linux runs through WSL, from PowerShell; the release procedure in the plan gives the exact command.
+`fail_before.py` unpacks the revision through `git archive` and sets `WDS_PLUGIN_ROOT` and `WDS_PLUGIN_REV` for the first run. By hand, the same is `set "WDS_PLUGIN_ROOT=<unpacked plugin>" && python -B -m unittest <ids>` in cmd.exe.
+
+The Python floor runs with `uv run --no-project --python 3.9 python -B -m unittest discover -s tests`, which works in cmd as well.
 
 For `claude plugin validate --strict`, `update` and `details`, use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\claude.exe`. The one on PATH is older.
 
@@ -76,7 +77,8 @@ plugins/web-design-suite/         the plugin (the only folder that ships)
   tests/                          the suite; fixtures/ holds the pointer and evidence registers
   tools/                          check_pointers.py, sync_snippets.py
   CHANGELOG.md, README.md, LICENSE
-tooling/                          pinned tools for the tests (main/, tailwind-v3/); release/build_zip.py
+tooling/                          pinned tools for the tests (main/, tailwind-v3/); release/build.py
+.github/workflows/                ci.yml (the suite on three platforms), release.yml (a v* tag makes the release)
 dev plans/                        the review, the phase plans and reports, the completion plan and inventory
 docs/HANDOFF.md                   the current state and the next steps, one page
 ```

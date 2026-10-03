@@ -281,6 +281,31 @@ const STUB_JS = `
 `;
 
 // ---------------------------------------------------------------------------
+// A cell's computed style — runs in the page. Every element of the cell, the
+// cell included, with its ::before and ::after, as one string. Properties
+// that never change a pixel (the cursor, pointer events, selection, motion
+// timing) are left out, so a state that changes only those has no style.
+const STYLE_SIGNATURE_FN = (id) => {
+  const SKIP = /^(cursor|pointer-events|user-select|-webkit-user-select|touch-action|will-change|transition|animation)/;
+  const cell = document.querySelector(`[data-cell-id="${CSS.escape(id)}"]`);
+  if (!cell) return null;
+  const style = (el, pseudo) => {
+    const cs = getComputedStyle(el, pseudo);
+    const out = [];
+    for (let i = 0; i < cs.length; i++) {
+      if (!SKIP.test(cs[i])) out.push(`${cs[i]}:${cs.getPropertyValue(cs[i])}`);
+    }
+    return out.join(';');
+  };
+  const parts = [];
+  const walk = (el) => {
+    parts.push(el.tagName, style(el, null), style(el, '::before'), style(el, '::after'));
+    for (const child of el.children) walk(child);
+  };
+  walk(cell);
+  return parts.join('\n');
+};
+
 // The comparator — runs in the browser, on a canvas.
 // ---------------------------------------------------------------------------
 // Per-pixel RGB equality is the wrong metric: it treats a 1/255 shift in a
@@ -563,23 +588,22 @@ async function main() {
     });
   }
 
-  // A hover, active or focus-visible cell that is pixel-identical to its
-  // default cell has no style for that state. That needs no baseline: it is
-  // wrong on the first run, and a baseline recorded from it would enshrine it.
+  // A hover, active or focus-visible cell whose every element, ::before and
+  // ::after included, computes the same style as in its default cell has no
+  // style for that state. That needs no baseline: it is wrong on the first
+  // run, and a baseline recorded from it would enshrine it. Styles, not
+  // pixels: the cells sit side by side at different subpixel offsets, and on
+  // Linux and macOS text is antialiased by where it sits, so twin cells never
+  // match pixel for pixel there.
   const STATE_SEG = /--st_(hover|active|focus-visible)(?=--|$)/;
-  for (const [id, buf] of shots) {
+  for (const id of shots.keys()) {
     const m = STATE_SEG.exec(id);
     if (!m) continue;
     const defaultId = id.replace(STATE_SEG, '--st_default');
-    const base = shots.get(defaultId);
-    if (!base) continue;
-    const res = await cmp.evaluate(COMPARE_FN, {
-      aURL: 'data:image/png;base64,' + base.toString('base64'),
-      bURL: 'data:image/png;base64,' + buf.toString('base64'),
-      pixelThreshold: 0,
-    });
-    if (res.sizeChanged || res.mismatched > 0) continue;
-    const note = `renders exactly like ${defaultId}: the ${m[1]} state has no visible style`;
+    if (!shots.has(defaultId)) continue;
+    const mine = await page.evaluate(STYLE_SIGNATURE_FN, id);
+    if (mine === null || mine !== await page.evaluate(STYLE_SIGNATURE_FN, defaultId)) continue;
+    const note = `computes the same style as ${defaultId}: the ${m[1]} state has no visible style`;
     const row = rows.find((r) => r.id === id);
     if (row) {
       row.status = 'fail';

@@ -178,6 +178,14 @@
   - stylelint never checked where the statement stands, so a rule above it passed,
     though the audit refused it. `design/layer-order` refuses it now, from a second
     refused example in the spec.
+- **On Linux and macOS, `snapshot_matrix` missed a state with no style** (found by the
+  first CI run). It called a hover, active or focus-visible cell unstyled only when it
+  was pixel-identical to its default cell. The cells sit side by side at different
+  subpixel offsets, and there text is antialiased by where it sits, so twin cells never
+  matched and the check never fired. It now compares computed styles: a state is
+  unstyled when every element of its cell, `::before` and `::after` included, computes
+  the same style as in the default cell, leaving out what never changes a pixel (the
+  cursor, pointer events, selection, motion timing).
 
 ### Added
 
@@ -205,6 +213,21 @@
   macOS still ships; now the tests do too. The harness no longer uses
   `TemporaryDirectory(ignore_cleanup_errors=)`, `write_text(newline=)` or a slice of
   `Path.parents`, all 3.10+, and the README states the new floor.
+- **CI** (XC-B3). `.github/workflows/ci.yml` runs the suite and the static checks on
+  Windows, Linux and macOS, at Python 3.9 and 3.14, with the pinned Node tools, and
+  `claude plugin validate --strict` on the marketplace, the plugin and `plugin.json`.
+  Linux adds Playwright's headless shell and Postgres, so the browser and policy tests
+  run there too.
+- **The release build** (XC-C6). `tooling/release/build.py` replaces `build_zip.py`. It
+  makes the plugin's zip, one `.skill` file per skill, packaged as Anthropic's
+  skill-creator packages one and carrying the plugin's LICENSE, and `SHA256SUMS`, all
+  from git and byte-identical on a rebuild. A pushed `v*` tag makes
+  `.github/workflows/release.yml` build them and create the GitHub release, with the
+  CHANGELOG's section as its notes; nothing else creates a release.
+- **The 17 scripts with a shebang are executable** (N5), as the nine from 3.0.0 were.
+- **Two tools for each PR.** `tools/fail_before.py` runs named tests against an earlier
+  revision and this tree, and prints fixed, control, still failing or regression for
+  each. `tools/check.py` runs the static checks and the tests a change affects.
 
 ### Tests
 
@@ -277,6 +300,30 @@
     test picks a `do` delimiter no name contains (a table named `cash$$flow`); and the
     no-write check counts inherited privileges (`USAGE`), so a membership granted
     `WITH INHERIT FALSE` is not the browser's. Four tests fail on `81b50f9`.
+- N5, the PR tools and the build, from `tools/fail_before.py` against 3.2.1: nine
+  fixed and eleven controls.
+  - `test_file_modes` reads git's modes (the index, or the commit `WDS_PLUGIN_REV`
+    names) and fails on 3.2.1, where 17 scripts with a shebang were 100644.
+  - `test_tools`, eight tests, all fixed. `fail_before.py` runs on a fake repository of
+    two commits with a fix, a control, a test that still fails, a regression, failing
+    subtests, a skip and a failing `setUpClass`. `check.py`'s choice of tests is checked
+    on its own, and its list of changed files keeps a path with a space whole.
+  - `test_release_build` ports the zip builder's seven tests to `build.py` and adds four:
+    each `.skill` file, the sums, a skill the platform refuses, and a long description
+    as a warning. The builder lives in `tooling/`, outside the plugin, so all eleven run
+    the same builder in both runs: they are controls.
+- `test_policies` keeps the scratch cluster's socket in its own folder: Debian's and
+  Ubuntu's Postgres put it in `/var/run/postgresql`, which only `postgres` may write.
+- The first CI run, on Linux and macOS: `test_browser_runtime.MatrixSeesStateChanges`
+  failed there and passes now, which holds the `snapshot_matrix` fix; on Windows it
+  passes on both. Two tests assumed Windows: `test_harness` took a relative path across
+  drives (the runner's checkout is on `D:`), and `test_release_build` set a mode git
+  re-read from the disk on POSIX. On a loaded macOS runner, the mega-menu scenario in
+  `test_recipes.NavigationCodeInABrowser` dwelt over a trigger past the recipe's
+  switching delay, because it timed the pointer with real waits. Its page now runs on
+  Playwright's fake clock, which only the scenario advances. Its diagonal also went two
+  thirds of a pixel down per step, so some steps rounded to straight sideways, which
+  is not heading into the panel; each step now goes a whole pixel down.
 
 ## 3.2.1 — 2026-09-25
 

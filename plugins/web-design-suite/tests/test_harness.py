@@ -70,6 +70,11 @@ class ToolLocations(TempDirTest):
 
     def test_a_set_variable_wins_and_is_resolved(self):
         named = self.folder("named", "eslint")
+        # Relative to a folder on the same drive: on a CI runner the checkout
+        # is on D: and the temporary folder on C:, and relpath cannot cross.
+        here = os.getcwd()
+        os.chdir(named.parent)
+        self.addCleanup(os.chdir, here)
         with mock.patch.dict(os.environ, {"WDS_X": os.path.relpath(named)}):
             self.assertEqual([str(named.resolve())], tool_roots("WDS_X", self.folder("toolchain", "eslint")))
 

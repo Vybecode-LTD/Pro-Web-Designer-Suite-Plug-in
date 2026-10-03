@@ -14,6 +14,7 @@ when `initdb`, `pg_ctl` and `psql` are on PATH, and skips otherwise.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import re
 import shutil
@@ -263,7 +264,10 @@ class PoliciesRunOnPostgres(Scaffolded):
         # No pipes: the server pg_ctl starts would inherit them, and on Windows
         # the call would wait for the server to exit. Its output goes to `log`.
         cls.data = data
-        subprocess.run(["pg_ctl", "-D", str(data), "-o", f"-p {cls.port} -c listen_addresses=127.0.0.1",
+        # Debian's and Ubuntu's builds put the socket in /var/run/postgresql,
+        # which only the postgres user may write; the tests connect over TCP.
+        sockets = "" if os.name == "nt" else f" -c unix_socket_directories={cls.root}"
+        subprocess.run(["pg_ctl", "-D", str(data), "-o", f"-p {cls.port} -c listen_addresses=127.0.0.1{sockets}",
                         "-l", str(cls.root / "log"), "-w", "-t", "60", "start"], check=True,
                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                        timeout=90, env=env())
