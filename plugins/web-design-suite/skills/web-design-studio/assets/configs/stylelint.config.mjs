@@ -943,12 +943,13 @@ export default {
      * `@apply` copies a utility's declarations into a rule. The moment it
      * does, three things Tailwind exists to prevent come back:
      *
-     *   - SPECIFICITY RETURNS. A utility is a single class in the
-     *     `utilities` layer and beats component CSS by layer order.
-     *     `@apply`-ed into `.card .title`, the same declarations now carry
-     *     that selector's specificity and live in the `components` layer —
-     *     so `p-card-lg` on the element no longer overrides it, and you get
-     *     the classic "the utility isn't working" ticket.
+     *   - SPECIFICITY RETURNS, in v3. v3 has no cascade layers, so a utility
+     *     wins by coming last, at one class of specificity. `@apply`-ed into
+     *     `.card .title`, the same declarations carry that selector's
+     *     specificity, so `p-card-lg` on the element no longer overrides
+     *     them: the classic "the utility isn't working" ticket. Under this
+     *     suite's v4 layer order the `utilities` layer still wins, whatever
+     *     the specificity; what returns there is the next two.
      *   - ORDER RETURNS. Tailwind sorts utilities into a known cascade.
      *     `@apply` output is emitted where you wrote it, so which of two
      *     conflicting declarations wins now depends on file import order.

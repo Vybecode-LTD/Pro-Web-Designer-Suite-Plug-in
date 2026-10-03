@@ -28,6 +28,8 @@ Usage
     python -m scripts.audit_design src/ --json
     python -m scripts.audit_design src/ --strict          # warnings fail too
     python -m scripts.audit_design $(git diff --cached --name-only)
+    git diff --name-only -z origin/main... | python -m scripts.audit_design --files-from -
+    python -m scripts.audit_design src/ --sarif > design.sarif   # for a code-scanning upload
 
 What it reads
 -------------
@@ -64,6 +66,8 @@ from __future__ import annotations
 
 import argparse
 import bisect
+import collections
+import hashlib
 import json
 import os
 import re
@@ -707,6 +711,19 @@ def _close_paren(text: str, open_at: int) -> int:
     return len(text)
 
 
+def without_where(selector: str) -> str:
+    """The selector without its :where() arguments, which add no specificity
+    at all: `:where(.a .b .c .d)` fights nothing (SB-A25)."""
+    out: list[str] = []
+    low, i = selector.lower(), 0
+    while True:
+        j = low.find(":where(", i)
+        if j < 0:
+            return "".join(out) + selector[i:]
+        out.append(selector[i:j])
+        i = _close_paren(selector, j + 6) + 1
+
+
 def strip_var_refs(value: str) -> str:
     """`value` with every var(…) reference — fallback included, however deeply
     nested — replaced by a ` var() ` marker. What is left is what the author
@@ -966,7 +983,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                         "selector, or a `*` after a space, reaches into whatever renders "
                         "inside it: Law 2 broken from the other direction. Give the part a "
                         "class. The owl (`> * + *`) in the parent's own rule is the exception.")
-                if COMPOUND_SEL.search(sel):
+                if COMPOUND_SEL.search(without_where(sel)):
                     add(line, "L5", "compound-specificity", "warning",
                         f"Selector chains 4+ classes: `{sel[:70]}`.",
                         "A selector this long is usually trying to WIN rather "
@@ -1679,6 +1696,57 @@ def audit_template(path: Path, text: str) -> list[Finding]:
 CLASS_IN_SEL = re.compile(r"\.(-?[_a-zA-Z][\w-]*)")
 
 
+def breakpoint_drift(files: list[tuple[Path, str]]) -> list[Finding]:
+    """L1 `breakpoint-drift` (SB-A11). A media query cannot read a custom
+    property, so a theme file keeps each breakpoint as a literal,
+    `--breakpoint-md`, beside tokens.css's `--bp-md`. With both files in the
+    run, each copy must hold the token's value: at 50rem against 48rem,
+    Tailwind's `md:` and the CSS's own queries break 32px apart. A run over
+    several projects pairs each theme with the token file nearest it."""
+    breakpoints: dict[Path, dict[str, str]] = {}     # token file -> its --bp-*
+    copies: list[tuple[Path, int, str, str, str]] = []
+    for path, text in files:
+        if not is_token_file(path):
+            continue
+        lines = text.splitlines()
+        clean, _ = strip_css_comments(text, line_comments(path))
+        for ev in scan_css(clean):
+            if isinstance(ev, tuple):
+                continue
+            m = re.fullmatch(r"--(bp|breakpoint)-([\w-]+)", ev.prop)
+            if not m:
+                continue
+            if m.group(1) == "breakpoint" and is_binding_file(path):
+                snippet = lines[ev.line - 1].strip() if 0 < ev.line <= len(lines) else ""
+                copies.append((path, ev.line, m.group(2), ev.value.strip(), snippet))
+            elif m.group(1) == "bp" and not is_binding_file(path):
+                breakpoints.setdefault(path, {}).setdefault(m.group(2), ev.value.strip())
+
+    def shared_folders(a: Path, b: Path) -> int:
+        n = 0
+        for x, y in zip(a.resolve().parent.parts, b.resolve().parent.parts):
+            if x.lower() != y.lower():
+                break
+            n += 1
+        return n
+
+    findings = []
+    for path, line, name, value, snippet in copies if breakpoints else ():
+        nearest = max(sorted(breakpoints), key=lambda token_file: shared_folders(path, token_file))
+        token = breakpoints[nearest].get(name)
+        if token is not None and re.sub(r"\s+", "", token) == re.sub(r"\s+", "", value):
+            continue
+        findings.append(Finding(
+            str(path), line, "L1", "breakpoint-drift", "error",
+            (f"`--breakpoint-{name}: {value}` has no `--bp-{name}` in {nearest.name}." if token is None else
+             f"`--breakpoint-{name}: {value}` drifts from {nearest.name}'s `--bp-{name}: {token}`."),
+            "A media query cannot read a token, so the theme keeps a copy of each breakpoint. "
+            "Keep the copy the token's value, or Tailwind's variants and the CSS's own media "
+            "queries break at different widths. Change one, change both.",
+            snippet))
+    return findings
+
+
 def audit_cross_file(files: list[tuple[Path, str]]) -> list[Finding]:
     """Law 4 and Law 2 failures that are invisible file-by-file.
 
@@ -1692,7 +1760,7 @@ def audit_cross_file(files: list[tuple[Path, str]]) -> list[Finding]:
     files is two different classes and is not a finding. Only globally-scoped
     sheets can genuinely collide.
     """
-    findings: list[Finding] = []
+    findings: list[Finding] = breakpoint_drift(files)
     # class -> prop -> [(file, line)]
     owners: dict[str, dict[str, list[tuple[str, int]]]] = {}
     seen_lines: dict[str, list[str]] = {}
@@ -1868,6 +1936,49 @@ LAW_NAMES = {
 }
 
 
+SARIF_VERSION = "2.1.0"          # the one version GitHub code scanning reads
+TOOL_URI = "https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in"
+
+
+def sarif(findings: list[Finding]) -> dict:
+    """The findings as a SARIF log, for a code-scanning upload (SB-C10). A
+    rule is the law and its id, `L1/raw-spacing`. Paths are relative to the
+    working directory, which a CI step runs from the repository root, and the
+    fingerprint is the baseline key, which leaves the line number out, so an
+    alert survives an edit above it."""
+    cwd = Path.cwd().resolve()
+    rules: dict[str, int] = {}
+    driver_rules, results, seen = [], [], collections.Counter()
+    for f in findings:
+        rule_id = f"{f.law}/{f.rule}"
+        if rule_id not in rules:
+            rules[rule_id] = len(driver_rules)
+            driver_rules.append({"id": rule_id, "name": f.rule,
+                                 "shortDescription": {"text": f"{f.law} {LAW_NAMES.get(f.law, '')}: {f.rule}"},
+                                 "properties": {"law": f.law}})
+        path = Path(f.file).resolve()
+        try:
+            location = {"uri": path.relative_to(cwd).as_posix(), "uriBaseId": "%SRCROOT%"}
+        except ValueError:                           # outside the run's folder
+            location = {"uri": path.as_uri()}
+        key = f.key(cwd)
+        seen[key] += 1                               # two identical lines are two alerts
+        results.append({
+            "ruleId": rule_id,
+            "ruleIndex": rules[rule_id],
+            "level": "error" if f.severity == "error" else "warning",
+            "message": {"text": f"{f.message} {f.fix}".strip()},
+            "locations": [{"physicalLocation": {"artifactLocation": location,
+                                                 "region": {"startLine": max(f.line, 1), "startColumn": 1}}}],
+            "partialFingerprints": {
+                "designAuditKey/v1": hashlib.sha256(f"{key}#{seen[key]}".encode("utf-8")).hexdigest()},
+        })
+    return {"$schema": "https://json.schemastore.org/sarif-2.1.0.json", "version": SARIF_VERSION,
+            "runs": [{"tool": {"driver": {"name": "audit_design", "informationUri": TOOL_URI,
+                                          "rules": driver_rules}},
+                      "results": results}]}
+
+
 def report(findings: list[Finding], *, use_color: bool, show_fix: bool,
            audited: int | None = None) -> str:
     if not findings:
@@ -1926,9 +2037,16 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m scripts.audit_design",
         description="Enforce the web-design-studio laws. Law 9: nothing ships un-audited.",
     )
-    ap.add_argument("paths", nargs="*", default=["."],
-                    help="files or directories to audit (default: .)")
-    ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument("paths", nargs="*", default=[],
+                    help="files or directories to audit (default: ., unless --files-from lists them)")
+    ap.add_argument("--files-from", metavar="FILE",
+                    help="also audit the paths listed in FILE, one per line or NUL-separated ('-' reads "
+                         "stdin), such as `git diff --name-only`; a listed path that no longer exists "
+                         "is skipped")
+    output_format = ap.add_mutually_exclusive_group()
+    output_format.add_argument("--json", action="store_true", help="machine-readable output")
+    output_format.add_argument("--sarif", action="store_true",
+                               help="SARIF output, for a code-scanning upload (GitHub reads it)")
     ap.add_argument("--strict", action="store_true", help="warnings fail the run too")
     ap.add_argument("--quiet", action="store_true", help="suppress the fix guidance")
     ap.add_argument("--no-color", action="store_true")
@@ -1941,11 +2059,27 @@ def main(argv: list[str] | None = None) -> int:
                     help="only report these laws (repeatable)")
     args = ap.parse_args(argv)
 
-    paths = args.paths or ["."]
+    paths = list(args.paths) or ([] if args.files_from else ["."])
     missing = [p for p in paths if not Path(p).exists()]
     if missing:
         print(f"audit_design: no such path: {', '.join(missing)}", file=sys.stderr)
         return 2
+    if args.files_from:
+        # A changed-files list names deleted files too, so a listed path that
+        # is gone is skipped, not an error (SB-C10).
+        try:
+            raw = (sys.stdin.buffer.read() if args.files_from == "-"
+                   else Path(args.files_from).read_bytes()).decode("utf-8", "replace")
+        except OSError as exc:
+            print(f"audit_design: cannot read {args.files_from}: {exc.strerror}", file=sys.stderr)
+            return 2
+        listed = [name.strip() for name in re.split(r"[\r\n\0]+", raw) if name.strip()]
+        gone = [name for name in listed if not Path(name).exists()]
+        if gone:
+            names = ", ".join(gone[:5]) + (" …" if len(gone) > 5 else "")
+            print(f"audit_design: skipped {len(gone)} listed path(s) that do not exist: {names}",
+                  file=sys.stderr)
+        paths += [name for name in listed if name not in gone]
 
     findings, audited, skipped = audit_run(paths)
 
@@ -1964,6 +2098,8 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         if args.json:
             print("[]")
+        elif args.sarif:
+            print(json.dumps(sarif([]), indent=2))
         else:
             print("design audit: nothing to audit (no CSS, JS or HTML among the files given).")
         return 0
@@ -2001,6 +2137,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         print(json.dumps([asdict(f) for f in findings], indent=2))
+    elif args.sarif:
+        print(json.dumps(sarif(findings), indent=2))
     else:
         use_color = not args.no_color and sys.stdout.isatty()
         sys.stdout.write(report(findings, use_color=use_color, show_fix=not args.quiet,

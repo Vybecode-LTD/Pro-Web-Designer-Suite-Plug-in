@@ -615,5 +615,124 @@ class JsxClassesAndCssInJs(TempDirTest):
             ");\n"), [])
 
 
+class ThePromisedChecks(TempDirTest):
+    """SB-A11: theme.css, tailwind.config.ts and stack-tailwind.md said the audit
+    diffs `--breakpoint-*` against `--bp-*` and fails on drift. It did not:
+    a theme at 50rem passed beside tokens at 48rem."""
+
+    def found(self, *paths):
+        proc = run_py("web-design-studio", "audit_design", *paths, "--json", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return [(re.split(r"[\\/]", f["file"])[-1], f["line"], f["rule"]) for f in json.loads(proc.stdout)]
+
+    def test_a_theme_breakpoint_that_drifts_from_its_token_fails(self):
+        self.write("app/src/styles/tokens.css", "@layer tokens {\n  :root {\n    --bp-md: 48rem;\n"
+                                                "    --bp-lg: 64rem;\n  }\n}\n")
+        self.write("app/src/styles/theme.css", "@theme {\n  --breakpoint-*: initial;\n  --breakpoint-md: 50rem;\n"
+                                               "  --breakpoint-lg: 64rem;\n  --breakpoint-3xl: 120rem;\n}\n")
+        # Another project's tokens, further away, are not this theme's.
+        self.write("deck/tokens.css", ":root { --bp-md: 50rem; --bp-3xl: 120rem; }\n")
+        self.assertEqual([("theme.css", 3, "breakpoint-drift"), ("theme.css", 5, "breakpoint-drift")],
+                         self.found("app", "deck"))
+
+    def test_the_docs_promise_no_check_that_does_not_exist(self):
+        """SB-A11 and SB-A25: sentences that credited a gate with a check none
+        runs, or a WCAG criterion a rule does not hold. Each is corrected, so
+        each promise must not come back."""
+        promises = {
+            "web-design-studio/assets/configs/tailwind.config.ts":
+                ["greps this file", "The Stylelint config bans", "spin 1s", "pulse 2s"],
+            "web-design-studio/assets/configs/theme.css":
+                ["The audit flags it", "the audit catches", "`scripts/audit_design.py` compares them"],
+            "web-design-studio/references/stack-tailwind.md":
+                ["which is why the audit checks it", "review and the audit catch", "Law 9 — contrast"],
+            "web-design-studio/assets/configs/eslint.design.config.mjs":
+                ['"Click here" and a bare arrow', "WCAG 2.2.2 — motion. `<marquee>`, autoplaying video"],
+            "web-design-studio/references/handoff-conventions.md":
+                ["localsConvention: 'camelCase'`", "it is deprecated for new code"],
+        }
+        for rel, phrases in promises.items():
+            text = (SKILLS / rel).read_text(encoding="utf-8")
+            for phrase in phrases:
+                with self.subTest(doc=rel, phrase=phrase):
+                    self.assertNotIn(phrase, text)
+
+    def test_the_stated_checklist_count_is_the_checklists(self):
+        """SB-A25 (6): three docs said 92 checks; review-checklist.md has 91."""
+        checklist = (SKILLS / "web-design-studio" / "references" / "review-checklist.md").read_text(encoding="utf-8")
+        rows = len(re.findall(r"^\| \d+\.\d+ \|", checklist, re.M))
+        stated = [(doc.relative_to(SKILLS).as_posix(), int(n)) for doc in sorted(SKILLS.glob("*/SKILL.md"))
+                  for n in re.findall(r"(\d+) checks", doc.read_text(encoding="utf-8"))]
+        self.assertEqual(3, len(stated))
+        for doc, count in stated:
+            with self.subTest(doc=doc):
+                self.assertEqual(rows, count)
+
+    def test_the_shipped_theme_mirrors_the_starters_tokens(self):
+        styles = SKILLS / "web-design-studio" / "assets"
+        self.assertEqual([], [f for f in self.found(styles / "starter" / "styles" / "tokens.css",
+                                                    styles / "configs" / "theme.css")
+                              if f[2] == "breakpoint-drift"])
+
+
+class TheAuditInCi(TempDirTest):
+    """SB-C10: a CI step hands the audit the files a change touched, and uploads
+    its findings to code scanning."""
+
+    def setUp(self):
+        super().setUp()
+        self.write("src/components/bad.css", "@layer components {\n  .bad { padding: 13px; }\n}\n")
+        self.write("src/components/good.css", "@layer components {\n  .good { padding: var(--pad-card); }\n}\n")
+
+    def audit(self, *args, stdin=None):
+        return run_py("web-design-studio", "audit_design", *args, cwd=self.tmp, stdin=stdin)
+
+    def test_files_from_stdin_audits_the_list_and_skips_a_deleted_file(self):
+        proc = self.audit("--files-from", "-", "--json",
+                          stdin=b"src/components/bad.css\nsrc/components/gone.css\n\nsrc/components/good.css\n")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertEqual([("bad.css", 2, "raw-spacing")],
+                         [(re.split(r"[\\/]", f["file"])[-1], f["line"], f["rule"]) for f in json.loads(proc.stdout)])
+        self.assertIn("skipped 1 listed path(s) that do not exist: src/components/gone.css",
+                      proc.stderr.decode("utf-8"))
+
+    def test_files_from_reads_a_nul_separated_list(self):
+        self.write("changed.txt", "src/components/good.css\0src/components/bad.css\0")
+        proc = self.audit("--files-from", "changed.txt", "--json")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertEqual(["raw-spacing"], [f["rule"] for f in json.loads(proc.stdout)])
+
+    def test_an_empty_list_audits_nothing_and_passes(self):
+        proc = self.audit("--files-from", "-", stdin=b"")
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("nothing to audit", proc.stdout.decode("utf-8"))
+
+    def test_sarif_is_what_code_scanning_reads(self):
+        proc = self.audit("src", "--sarif")
+        self.assertEqual(1, proc.returncode, output(proc))
+        log = json.loads(proc.stdout)
+        self.assertEqual("2.1.0", log["version"])
+        run = log["runs"][0]
+        self.assertEqual("audit_design", run["tool"]["driver"]["name"])
+        [result] = run["results"]
+        self.assertEqual("L1/raw-spacing", result["ruleId"])
+        self.assertEqual(result["ruleId"], run["tool"]["driver"]["rules"][result["ruleIndex"]]["id"])
+        self.assertEqual("error", result["level"])
+        location = result["locations"][0]["physicalLocation"]
+        self.assertEqual({"uri": "src/components/bad.css", "uriBaseId": "%SRCROOT%"}, location["artifactLocation"])
+        self.assertEqual({"startLine": 2, "startColumn": 1}, location["region"])
+        self.assertRegex(result["partialFingerprints"]["designAuditKey/v1"], r"^[0-9a-f]{64}$")
+        self.assertEqual(2, self.audit("src", "--sarif", "--json").returncode)     # one format at a time
+
+    def test_where_adds_no_specificity(self):
+        # SB-A25 (2): `:where()` has zero specificity, so four classes inside it
+        # are not a selector built to win.
+        self.write("src/components/where.css", "@layer components {\n  :where(.a .b .c .d) { color: var(--fg-strong); }\n"
+                                               "  .a .b .c .d { color: var(--fg-strong); }\n}\n")
+        proc = self.audit("src/components/where.css", "--json")
+        self.assertEqual([("compound-specificity", 3)],
+                         [(f["rule"], f["line"]) for f in json.loads(proc.stdout)])
+
+
 if __name__ == "__main__":
     unittest.main()
