@@ -1,35 +1,63 @@
 # Handoff
 
-**2026-10-03**, after PRs #16 to #21 were merged into `main`. Nothing is open.
+**2026-10-03, second session**, after PRs #23 and #24 were merged into `main`.
 
-**The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then P3 part 2 (SB-A15 and N31) in detail.
+**The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then P5 (N3, the rest of SB-C9, and N32) in detail.
 
 ## State
 
 - **3.2.1 is released** (`v3.2.1`, `63932cf`) and installed. 3.3.0 is in progress on `main`, unreleased.
-- **Merged on 2026-10-03,** in order, each as a merge commit with CI green on its head, every review thread resolved, and GitHub reporting it clean:
-  - #16, P0: what the reviews of #12 to #15 found (N16 to N25, N29);
-  - #17, P1: CI on three platforms, the release build, `fail_before.py`, `check.py`, N5;
-  - #18 and #19, P2: the spec writes its data into the gates, value allowlists included, and every example in it runs through the audit, stylelint and ESLint (N2, SB-C2);
-  - #20, P3 part 1: the three gates agree on every example (N1, N30), and the mega-menu flake is fixed;
-  - #21: every skill description is 200 characters or fewer (the user's call).
-- **The last reviews** found six more real bugs, all fixed; five have a test that fails before, and the sixth was the header recipe's missing rule, a docs fix:
-  - From Codex on #20: the factor check read `var()` fallbacks; half an owl (`.card + *`) was the owl; stylelint missed the owl inside `@media`; and the header recipe lost the page's reservation.
-  - From Codex on #19: `sync_rules.py` emitted a new shape by name but never declared it. Both gates' blocks now write every shape.
-  - From CodeRabbit on #20: an inline literal's baseline key could hide a new literal further along the line.
-- **Tests:** 438. **The plan:** 149 open items, all scheduled (`check_execution_plan.py`).
-- **The user's rule since 2026-10-03:** Claude merges, without asking, once a PR is ready, and never in a way that breaks other pending work (the prompt's §0 has the procedure).
+- **Merged this session,** each as a merge commit, with CI green on its head, every review thread resolved, and GitHub reporting it clean:
+  - #23, P3 part 2 (SB-A15, N31). Every hole in the stylelint allowlist is now examples in the spec, run through the audit and the real stylelint:
+    - `design/no-literal-colour-function`;
+    - the `stroke` family;
+    - margins outside components;
+    - the full sizing family;
+    - the motion shorthands (`MOTION_LIST`);
+    - theme bindings (`bindings`, `binding-literal`);
+    - the audit-only `geometry`;
+    - N31's zeros, shares and margins.
+
+    The audit's spacing, stroke, motion and sizing checks read the spec's allowlists.
+  - #24, P4 (SB-A11, SB-A25, SB-C10). It added the breakpoint diff (`breakpoint-drift`), `--files-from` and `--sarif`, and stopped `:where()` warning. Every other promise the docs made about the gates is corrected.
+- **The reviews of #23 found six real issues in seven comments, all fixed.** The five bugs each have a test that fails on the head before the fix:
+  - From Codex: a Sass value skipped the allowlists, so `padding: $space 13px` passed; and `EASE-IN` passed as a name.
+  - From CodeRabbit:
+    - `padding: $space 5%` passed;
+    - `#{5%}` passed as a token;
+    - `--aspect-video: currentColor` passed through the generic binding key;
+    - N31's bullets read as pending (a docs fix).
+  - Found while writing P4's tests: Tailwind's `--breakpoint-*: initial` was refused.
+- **The reviews of #24 found eleven more, all fixed with tests:**
+  - the breakpoint diff ran one way only;
+  - a theme's ignore pragmas did not reach it;
+  - a NUL-separated `--files-from` list was split on newlines too;
+  - the SARIF run lacked `originalUriBaseIds`;
+  - SARIF carried a fingerprint code scanning does not read. It now sets none, and `upload-sarif` computes one;
+  - the diff read only the first declaration of each name, though the cascade keeps the last;
+  - a generated theme was not skipped;
+  - a Tailwind theme with no copies, or tokens with no breakpoints, dropped out of the diff. Counting them showed that themes split across files each lacked the other's names, so the themes paired with one token file now mirror it together;
+  - a theme whose project had no token file in the run was paired with another project's;
+  - a nested package's tokens were paired with its parent project's theme. A theme now pairs only with token files whose nearest `package.json` folder is its own;
+  - `--files-from` read its list as UTF-8, so on Linux a file name that is not UTF-8 lost its bytes, and the file went unaudited. Its test runs on Linux only, since Windows and macOS file names are always Unicode.
+
+  Two more comments came outside the diff:
+  - the completion plan's W12 list still named SARIF as future work. It is now marked done.
+  - the spec holds no selector-specificity limit. That predates #24, so it is N32, scheduled in P5.
+- **Tests:** 458. **The plan:** 145 open items, all scheduled (`check_execution_plan.py`).
 
 ## Next steps
 
-1. **The next session:** read `main`'s latest CI run, then P3 part 2: SB-A15 (the stylelint allowlist's holes) and N31, as the prompt describes. Then P4.
+1. **The next session:** P5, the references' CSS through the real stylelint (N3), the Tailwind v3 entry (the rest of SB-C9), and the specificity limits in the spec (N32), as the prompt describes. Then P6.
 2. **3.3.0** ships after P8 (release R1).
 
 ## Warnings
 
-- **Never `gh pr merge --delete-branch` on a branch another PR targets.** It closed #17 during these merges; #17 was restored by pushing its base back, `gh pr reopen` and `gh pr edit --base main`. Merge, retarget the next PR, then delete the branch.
-- **Another session acted on the same PRs.** While the stack was being merged, a commit from another Claude session (`88ca21f`, retries for the mega-menu test) landed on #17's branch, most likely through Auto-fix. CI covered it, and it fits #20's fix, but one session per set of PRs is safer: turn Auto-fix off in a session that is done.
-- **Browser tests and the fake clock.** `page.clock.install()` lets time flow in real time until `pauseAt()`. Pause after load, and wait until the page has seen an event before advancing the clock.
-- **A stricter audit reaches the references.** `test_doc_snippets` audits every CSS block in them; a new check needs the references fixed in the same PR, or the block placed in its layer.
-- **Bash heredocs eat backslashes.** Write anything with a backslash with the Write or Edit tool, or put it in a script file.
+- **Stacked PRs.** #24 was stacked on #23. Merge bottom-up, retarget the next PR to `main`, then delete the merged branch. Never use `gh pr merge --delete-branch` on a branch another PR targets.
+- **A review fix on a lower PR goes into that PR**, then merge its branch into the PR above it. Don't rewrite a pushed branch.
+- **The theme files are token files to the audit**, which checks only their custom properties (`bindings`). stylelint's theme override checks the same set, and nothing else in them.
+- **A stricter gate reaches the references, the starter, the scaffold and the deck.** `test_doc_snippets`, the starter's own runs, `ScaffoldAuditsClean` and `test_presentation` all audit generated or quoted CSS.
+- **Bash heredocs eat backslashes.** Write anything with a backslash through the Write or Edit tool, or a script file.
+- **Don't grep `tooling/`**: its `node_modules` makes the search run for minutes.
+- **A Linux-only test runs under WSL:** `wsl.exe -d Ubuntu --exec sh -c '…'` (Python 3.14), with `WDS_PLUGIN_ROOT` set to an unpacked revision for the before run. Use `--exec`: without it, WSL's own shell expands each `$` before `sh` sees the script.
 - **The repository is public.** Commit nothing private.
