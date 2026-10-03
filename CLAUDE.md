@@ -12,11 +12,11 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is public (since 2026-09-28), and MIT-licensed like the plugin.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
-## Current state (2026-10-02)
+## Current state (2026-10-03)
 
-- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress: PRs #4 to #15 are merged. Open on 2026-10-02, stacked in this order: #16 (P0: the reviews of #12 to #15), #17 (P1: CI, the release build, `fail_before.py` and `check.py`), #18 (P2 part 1: `tools/sync_rules.py`), #19 (P2 part 2: the spec's value allowlists, and conformance tests through all three gates) and #20 (P3 part 1: the gates agree on every example in the spec).
+- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress: PRs #4 to #21 are merged (#16 to #21 on 2026-10-03: P0, P1, P2, P3 part 1, and the skill descriptions), and nothing is open.
 - **Installed:** 3.2.1 from `63932cf`. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** 436. CI (#17) runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, and is green, so decision D1 is in force: locally, `tools/check.py`.
+- **Tests:** 438. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
 - **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P3 part 2 (SB-A15, the stylelint allowlist's holes, and N31), then P4. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
 - **Open:** 149 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
@@ -65,7 +65,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 - **One set of rules.** A gate change goes into `skills/web-design-studio/assets/rules/design-rules.json` first. Then the audit, the stylelint config and the ESLint config follow, each with a real-tool test in `tests/test_real_tools.py`. Data the spec writes into a gate's `BEGIN design-rules` block (the layer order, the nesting depth, the system colours, the value shapes and allowlists, the colour functions, the literal units) changes by rerunning `tools/sync_rules.py`, never by hand. Every example in the spec runs through each gate its section names (`test_rules_spec`, `test_real_tools`).
 - **Facts.** A figure from outside the plugin is re-read at its source and registered, with its quote, in `tests/fixtures/evidence.json`.
 - **Size limits.** A SKILL.md stays at or under 20,500 bytes and a reference under 60.5 KB (`tests/test_skill_budget.py`).
-- **Git.** One branch per phase, conventional commits and a PR. Tag after the merge. Read the staged diff before each commit.
+- **Git.** One branch per phase, conventional commits and a PR. Read the staged diff before each commit. Claude merges, once CI is green, every review thread is resolved and the PR is clean, with a merge commit; a stack merges bottom-up, retargeting the next PR to `main` before the merged branch is deleted (never `gh pr merge --delete-branch` on a branch another PR targets). Tag a release after its merge.
 - **Docs.** Plans and reports go in `dev plans/`. Update the docs in the same PR as the code, and keep this file lean.
 
 ## Map

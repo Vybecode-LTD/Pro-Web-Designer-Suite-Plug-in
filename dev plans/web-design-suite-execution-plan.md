@@ -151,7 +151,7 @@ Each of these moved into the PR that already has its file open:
 2. **Reproduce, then write the failing tests.** Run `python tools/fail_before.py <test ids>` (from P1). It prints, per test, the result on the previous tag and now. A test that passes on both is a control, and says so.
 3. **Fix**, and run `python tools/check.py`: the static checks and the affected tests, locally, on 3.14.
 4. **In the same PR:** the docs, the CHANGELOG entry, the inventory rows (the release and the test that holds each fix), and this plan's progress table.
-5. **Commit and push.** The CI matrix runs the full suite on Windows, Linux and macOS, on 3.9 and 3.14 (D1). CI failures get fixed and pushed without asking, as the user set on 2026-10-01; merging still needs the user.
+5. **Commit and push.** The CI matrix runs the full suite on Windows, Linux and macOS, on 3.9 and 3.14 (D1). CI failures get fixed and pushed without asking, as the user set on 2026-10-01. Merging is Claude's too, since 2026-10-03: once CI is green on the PR's head, every review thread is resolved and GitHub reports it clean, never in a way that breaks other pending work (the next session's prompt, §0, has the safe order for a stack).
 6. **Facts.** Any figure from outside the plugin is re-read at its source that day and registered in `evidence.json` with its quote. Batch the fetches: one pass per PR.
 7. **Stack** up to three PRs (D7). Write the handoff at the end of each session.
 
@@ -206,7 +206,7 @@ Update this table in each PR.
 
 | Phase | PRs done | Items closed | Release |
 |---|---|---|---|
-| 3 | #12 to #15 merged (2026-10-02); P0 as #16, P1 as #17, P2 as #18 and #19, P3 part 1 as #20 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30; DL-B2 and SB-C9 in part | — |
+| 3 | #12 to #21 merged (2026-10-02 and 03): P0 #16, P1 #17, P2 #18 and #19, P3 part 1 #20, and the skill descriptions #21 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30; DL-B2 and SB-C9 in part | — |
 | 4 | — | — | — |
 | 5 | — | — | — |
 | 6 | — | — | — |

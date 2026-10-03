@@ -1,37 +1,35 @@
 # Handoff
 
-**2026-10-02**, at the end of the session that answered #18's review, opened PR #19 (P2 part 2) and PR #20 (P3 part 1), and left five PRs stacked.
+**2026-10-03**, after PRs #16 to #21 were merged into `main`. Nothing is open.
 
 **The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then P3 part 2 (SB-A15 and N31) in detail.
 
 ## State
 
 - **3.2.1 is released** (`v3.2.1`, `63932cf`) and installed. 3.3.0 is in progress on `main`, unreleased.
-- **Open, waiting for the user to merge, in this order** (each is stacked on the one before; GitHub retargets each to `main` when the branch below it is deleted):
-  - **#16, P0:** what the reviews of #12 to #15 found (N16 to N25, N29). Reviewed, every thread resolved. It has no CI of its own: the workflow arrives in #17.
-  - **#17, P1:** CI on three platforms, the release build, `fail_before.py`, `check.py`, N5. CI green on all six suite jobs, so decision D1 is in force; its description has the acceptance results.
-  - **#18, P2 part 1:** `tools/sync_rules.py` and the first data blocks. Codex's one thread was real (the audit's nesting hint said "past depth 2" whatever the spec set), fixed in `9053727` with a test that fails before, and resolved. CI green.
-  - **#19, P2 part 2 (N2, SB-C2):** the spec's `values` (shapes, keywords, colour words, colour functions, eight families of 43 properties) written into the gates; each section names its `gates`. A conformance test runs every example through the audit, stylelint and ESLint, and found N30. `check.py` now prints on a cp1252 console. CI: one flake on macOS 3.14 (the mega-menu test), and the failed job was re-run.
-  - **#20, P3 part 1 (N1, N30):** the three gates agree on every example; `KNOWN_DISAGREEMENTS` is empty. The audit is stricter (a factor on a token, `em`/`rem` font sizes, the sizing family, element selectors in component files, system colours, inline literals); stylelint gains `design/color-no-hex` and `design/component-margins`; 13 reference snippets were fixed. It also fixes the mega-menu flake properly. CI was running at handoff.
-- **Tests:** 436. **The plan:** 149 open items, all scheduled (`check_execution_plan.py`). N2, SB-C2, N1 and N30 closed this session; N30 and N31 were found by the new conformance test and in fixing N1.
+- **Merged on 2026-10-03,** in order, each as a merge commit with CI green on its head, every review thread resolved, and GitHub reporting it clean:
+  - #16, P0: what the reviews of #12 to #15 found (N16 to N25, N29);
+  - #17, P1: CI on three platforms, the release build, `fail_before.py`, `check.py`, N5;
+  - #18 and #19, P2: the spec writes its data into the gates, value allowlists included, and every example in it runs through the audit, stylelint and ESLint (N2, SB-C2);
+  - #20, P3 part 1: the three gates agree on every example (N1, N30), and the mega-menu flake is fixed;
+  - #21: every skill description is 200 characters or fewer (the user's call).
+- **The last reviews** found six more real bugs, all fixed; five have a test that fails before, and the sixth was the header recipe's missing rule, a docs fix:
+  - From Codex on #20: the factor check read `var()` fallbacks; half an owl (`.card + *`) was the owl; stylelint missed the owl inside `@media`; and the header recipe lost the page's reservation.
+  - From Codex on #19: `sync_rules.py` emitted a new shape by name but never declared it. Both gates' blocks now write every shape.
+  - From CodeRabbit on #20: an inline literal's baseline key could hide a new literal further along the line.
+- **Tests:** 438. **The plan:** 149 open items, all scheduled (`check_execution_plan.py`).
+- **The user's rule since 2026-10-03:** Claude merges, without asking, once a PR is ready, and never in a way that breaks other pending work (the prompt's §0 has the procedure).
 
 ## Next steps
 
-1. **The user:** merge #16, #17, #18, #19 and #20, in that order, once each is green. Five stacked PRs is more than decision D7's three: merging soon keeps the next session's PRs off a deep stack.
-2. **The next session:** check #20's CI and #19's re-run, fix anything red (a fix to a lower PR is merged up the stack), then P3 part 2: SB-A15 (the stylelint allowlist's holes) and N31, as the prompt describes. Then P4.
-
-**Also open, independent of the stack: #21**, every skill description condensed to 200 characters or fewer, so each fits a claude.ai upload (the user's call, 2026-10-02). `test_skill_budget` holds the limit. It can merge before or after the stack.
-
-## Open questions for the user
-
-- **SB-A15's design choices** are listed in the prompt with a recommendation each (positional properties, which sizes, `color-mix()`/`light-dark()`, `theme.css`). The session can take the recommendations unless the user says otherwise.
+1. **The next session:** read `main`'s latest CI run, then P3 part 2: SB-A15 (the stylelint allowlist's holes) and N31, as the prompt describes. Then P4.
+2. **3.3.0** ships after P8 (release R1).
 
 ## Warnings
 
-- **Cost.** This session used about 530 thousand tokens: about 90 thousand is the fixed overhead before the first message, and the full-suite runs, each about 6 to 10 minutes, add waiting rather than tokens.
-- **`check.py` runs the whole suite** whenever a shared file changed since `main` (anything in `tools/`, `design-rules.json`, the configs): with the stack unmerged, that is every run.
-- **A stricter audit reaches the references.** `test_doc_snippets` audits every CSS block in the references; a new check needs the references fixed in the same PR, or the block placed in its layer (`@layer base`/`layout`).
-- **Browser tests and the fake clock.** Playwright's clock decides the page's timers, not when Chromium delivers input. Wait until the page has seen an event before advancing the clock (`test_recipes`'s `seen()`).
-- **Bash heredocs eat backslashes.** Write anything with a backslash with the Write or Edit tool, or splice it from a file.
-- **Don't edit a file the suite reads while it runs.** Plan docs are safe; the CHANGELOG and README are read by `test_docs`.
+- **Never `gh pr merge --delete-branch` on a branch another PR targets.** It closed #17 during these merges; #17 was restored by pushing its base back, `gh pr reopen` and `gh pr edit --base main`. Merge, retarget the next PR, then delete the branch.
+- **Another session acted on the same PRs.** While the stack was being merged, a commit from another Claude session (`88ca21f`, retries for the mega-menu test) landed on #17's branch, most likely through Auto-fix. CI covered it, and it fits #20's fix, but one session per set of PRs is safer: turn Auto-fix off in a session that is done.
+- **Browser tests and the fake clock.** `page.clock.install()` lets time flow in real time until `pauseAt()`. Pause after load, and wait until the page has seen an event before advancing the clock.
+- **A stricter audit reaches the references.** `test_doc_snippets` audits every CSS block in them; a new check needs the references fixed in the same PR, or the block placed in its layer.
+- **Bash heredocs eat backslashes.** Write anything with a backslash with the Write or Edit tool, or put it in a script file.
 - **The repository is public.** Commit nothing private.
