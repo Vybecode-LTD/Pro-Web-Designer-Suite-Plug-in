@@ -206,7 +206,7 @@ Update this table in each PR.
 
 | Phase | PRs done | Items closed | Release |
 |---|---|---|---|
-| 3 | #12 to #15 merged (2026-10-02); P0 as #16, P1 as #17, P2 as #18 and #19, P3 part 1 as #20 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30; DL-B2 and SB-C9 in part | — |
+| 3 | #12 to #21 merged (2026-10-02 and 03): P0 #16, P1 #17, P2 #18 and #19, P3 part 1 #20, and the skill descriptions #21 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30; DL-B2 and SB-C9 in part | — |
 | 4 | — | — | — |
 | 5 | — | — | — |
 | 6 | — | — | — |
