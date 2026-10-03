@@ -258,7 +258,9 @@
   - theme.css's custom properties take a token, a colour word or a keyword, and the
     literals its §0 documents: a breakpoint in rem, never a `var()`, which a media query
     cannot read, and an aspect ratio. A breakpoint may be a CSS-wide keyword too, so
-    `--breakpoint-*: initial` still clears Tailwind's own. The override switched the
+    `--breakpoint-*: initial` still clears Tailwind's own, and a prefix with a rule of
+    its own answers to it alone (`--aspect-video: currentColor` is refused). The
+    override switched the
     allowlist off, so
     `--spacing-card: 28px` passed. The audit checks them too (L1 `binding-literal`), and
     theme.css's `--animate-spin` and `--animate-pulse` read `--dur-loop`, not `1s` and
@@ -274,8 +276,9 @@
     `var(--gap-related) auto` sets the component's own block margin.
   - The audit's spacing, stroke, motion and sizing checks read the spec's allowlists, so
     they refuse what stylelint refuses. A value that holds a Sass variable or an
-    interpolation is judged by what is written beside it: `padding: $space 13px` is
-    refused, and the variable is `sass-literal`'s (from Codex's review of #23).
+    interpolation is judged with each reference read as a token, so `padding: $space 13px`
+    and `$space 5%` are refused as their CSS forms are, and the variable is
+    `sass-literal`'s (from the reviews of #23).
   - Seven reference blocks, two starter rules and two generated stylesheets broke the new
     rules and now follow them. Three inset focus rings used `* -2`, against the starter's
     `* -1`. The scroll-driven progress bar names its easing token. The table of contents'
