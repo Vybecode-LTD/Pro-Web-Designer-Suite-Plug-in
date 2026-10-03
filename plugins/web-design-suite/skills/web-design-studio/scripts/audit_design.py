@@ -219,9 +219,16 @@ SASS_MIXIN_NAME = re.compile(r"@mixin\s+([\w-]+)", re.I)
 SASS_INCLUDE_NAME = re.compile(r"@include\s+([\w-]+)(?![\w.-])", re.I)
 SASS_STRING = re.compile(r"""(['"])(?:\\.|(?!\1).)*\1""", re.S)
 # A Sass variable or interpolation in a value: the audit cannot resolve it, so
-# the value allowlists leave it to the variable's own check (sass-literal).
-SASS_REFERENCE = re.compile(r"(?<![\w-])\$[\w-]+|#\{")
-SASS_REFERENCES = re.compile(r"#\{[^{}]*\}|(?<![\w-])(?:[\w-]+\.)?\$[\w-]+")   # each one, module included
+# the value allowlists read it as the CSS it stands for (sass_as_css).
+SASS_VARIABLE_REF = re.compile(r"(?<![\w-])(?:[\w-]+\.)?\$[\w-]+")      # $space, tokens.$space
+SASS_INTERPOLATION = re.compile(r"#\{([^{}]*)\}")
+
+
+def sass_as_css(value: str) -> str:
+    """`value` as the CSS it stands for, as far as the audit can tell: each
+    Sass variable read as a token, and each interpolation as the expression
+    it emits, so `#{$gutter}` is a token and `#{5%}` a literal."""
+    return SASS_INTERPOLATION.sub(lambda m: m.group(1).strip(), SASS_VARIABLE_REF.sub("var(--sass)", value))
 
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit",
@@ -824,11 +831,11 @@ def scales_a_token(value: str) -> bool:
 
 def off_family(value: str, allowed: tuple) -> bool:
     """Whether a family refuses `value`. The audit cannot resolve a Sass
-    reference, so each one is read as a token, and the rest is judged as in
-    CSS: `padding: $space 13px` and `padding: $space 5%` are refused as
+    variable, so each one is read as a token, an interpolation as the
+    expression it emits, and the rest is judged as in CSS: `padding: $space 13px` and `padding: $space 5%` are refused as
     `var(--x) 13px` would be, and the variable itself is sass-literal's
     (design-rules.json: sass.variables)."""
-    return not allowed_value(SASS_REFERENCES.sub("var(--sass)", value), allowed)
+    return not allowed_value(sass_as_css(value), allowed)
 
 
 def allowed_value(value: str, allowed: tuple) -> bool:
@@ -1233,7 +1240,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
         # The motion family's values, as stylelint reads them: a time, a curve
         # or an easing keyword is a choice the tokens make (values.families.motion).
         if prop in MOTION_VALUES and off_family(value, MOTION_VALUES[prop]):
-            rest = strip_var_refs(SASS_REFERENCES.sub(" ", value))
+            rest = strip_var_refs(sass_as_css(value))
             # 0s switches one transition off among several: not a duration.
             if any(not ZERO_TIME.fullmatch(t) for t in TIME_LITERAL.findall(rest)):
                 add(line, "L1", "raw-duration", "error",
