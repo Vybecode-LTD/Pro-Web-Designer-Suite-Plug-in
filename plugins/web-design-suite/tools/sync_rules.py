@@ -15,8 +15,8 @@ outside them is the gate's own. A block holds the constants its gate uses
   SYSTEM_COLOR_NAMES             system_colors.names
   KEYWORDS, COLOUR_FUNCTIONS     values.keywords, values.colour_functions
   COLOUR_WORDS                   values.colour_words and the system colours
-  VAR_SEQ, VAR_ONE, VAR_CALC,    values.shapes
-  CANCEL
+  SHAPES                         every shape in values.shapes, each a constant
+                                 of its own name (VAR_SEQ, VAR_ONE, …)
   VALUE_ALLOWLIST                values.families: each property and its values
   MARGIN_ALLOWLIST               margins_in_components.properties and .values
 (The markers avoid "@generated": the audit and the migration tool skip a
@@ -42,7 +42,7 @@ TARGETS = {
         ("py", ("LAYER_ORDER", "LAYER_STATEMENT", "MAX_NESTING", "COLOUR_FUNCTIONS")),
     "skills/web-design-studio/assets/configs/stylelint.config.mjs":
         ("js", ("LAYER_ORDER", "MAX_NESTING", "SYSTEM_COLOR_NAMES", "KEYWORDS", "COLOUR_WORDS",
-                "VAR_SEQ", "VAR_ONE", "VAR_CALC", "CANCEL", "VALUE_ALLOWLIST", "MARGIN_ALLOWLIST")),
+                "SHAPES", "VALUE_ALLOWLIST", "MARGIN_ALLOWLIST")),
     "skills/web-design-studio/assets/configs/eslint.design.config.mjs": ("js", ("COLOUR_FUNCTIONS",)),
 }
 NOTE = "written by tools/sync_rules.py from assets/rules/design-rules.json; edit the spec, then rerun it"
@@ -76,18 +76,20 @@ def js_string(text: str) -> str:
     return f"'{text}'"
 
 
-def js_entry(entry: str, shapes: dict) -> str:
-    """One allowed value: a shape or a list by name, else the value itself."""
-    if entry == "KEYWORDS":
-        return "...KEYWORDS"
+def js_entry(entry: str, shapes: dict, written: tuple[str, ...]) -> str:
+    """One allowed value: a shape or a list by name, else the value itself. A
+    name must be one the block writes before the allowlist that reads it, or
+    the config would name a constant it never declares."""
     if entry in shapes or entry in LISTS:
-        return entry
+        if entry not in written:
+            raise SpecError(f"an allowlist reads {entry}, which the block does not write before it")
+        return "...KEYWORDS" if entry == "KEYWORDS" else entry
     if re.fullmatch(r"[A-Z][A-Z_]*", entry):
         raise SpecError(f"{entry} is neither a shape in values.shapes nor one of {', '.join(LISTS)}")
     return js_string(entry)
 
 
-def js_allowlist(name: str, groups: list[tuple[str, list[dict]]], shapes: dict) -> str:
+def js_allowlist(name: str, groups: list[tuple[str, list[dict]]], shapes: dict, written: tuple[str, ...]) -> str:
     """`const NAME = { property: [values], … };`, one line per property, under
     a comment for each named group."""
     lines = [f"const {name} = {{"]
@@ -95,7 +97,7 @@ def js_allowlist(name: str, groups: list[tuple[str, list[dict]]], shapes: dict) 
         if title:
             lines.append(f"  // {title}")
         for group in allow:
-            values = ", ".join(js_entry(v, shapes) for v in group["values"])
+            values = ", ".join(js_entry(v, shapes, written) for v in group["values"])
             for prop in group["properties"]:
                 key = prop if re.fullmatch(r"[a-z]+", prop) else js_string(prop)
                 lines.append(f"  {key}: [{values}],")
@@ -110,6 +112,7 @@ def block(spec: dict, lang: str, names: tuple[str, ...]) -> str:
             "KEYWORDS": values["keywords"], "COLOUR_FUNCTIONS": values["colour_functions"]}
     py = lang == "py"
     text = (lambda s: json.dumps(s)) if py else js_string
+    names = tuple(n for name in names for n in (tuple(shapes) if name == "SHAPES" else (name,)))
     lines = []
     for name in names:
         if name in shapes or name in ("COLOUR_WORDS", "VALUE_ALLOWLIST", "MARGIN_ALLOWLIST"):
@@ -132,22 +135,24 @@ def js_constant(name: str, spec: dict, names: tuple[str, ...]) -> str:
     an allowlist for declaration-property-value-allowed-list."""
     values = spec["values"]
     shapes = values["shapes"]
+    written = names[:names.index(name)]
     if name in shapes:
         pattern = shapes[name]["pattern"]
         if "`" in pattern or "${" in pattern:
             raise SpecError(f"the {name} pattern cannot sit in a String.raw template")
         return f"const {name} = String.raw`/{pattern}/`;"
     if name == "COLOUR_WORDS":
-        if "SYSTEM_COLOR_NAMES" not in names[:names.index(name)]:
+        if "SYSTEM_COLOR_NAMES" not in written:
             raise SpecError("COLOUR_WORDS reads SYSTEM_COLOR_NAMES, so the block must write that first")
         words = ", ".join(js_string(w) for w in values["colour_words"])
         return f"const COLOUR_WORDS = String.raw`/^(?:${{[{words}, ...SYSTEM_COLOR_NAMES].join('|')}})$/i`;"
     if name == "VALUE_ALLOWLIST":
         groups = [(f"{family}: Law{'s' if ',' in rule['laws'] else ''} {rule['laws']}", rule["allow"])
                   for family, rule in values["families"].items()]
-        return js_allowlist(name, groups, shapes)
+        return js_allowlist(name, groups, shapes, written)
     margins = spec["margins_in_components"]
-    return js_allowlist(name, [("", [{"properties": margins["properties"], "values": margins["values"]}])], shapes)
+    return js_allowlist(name, [("", [{"properties": margins["properties"], "values": margins["values"]}])],
+                        shapes, written)
 
 
 BLOCK = re.compile(r"^(#|//) BEGIN design-rules\b.*?^\1 END design-rules[^\n]*", re.M | re.S)
