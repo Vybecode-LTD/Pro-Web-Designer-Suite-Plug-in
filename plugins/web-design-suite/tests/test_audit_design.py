@@ -234,6 +234,21 @@ class AuditPrecision(TempDirTest):
                 self.assertEqual(json.loads(proc.stdout), [], output(proc))
                 self.assertEqual(proc.returncode, 0)
 
+    def test_a_baselined_inline_literal_does_not_hide_a_new_one_beside_it(self):
+        # #20's review: every inline-literal finding took its style's line as the
+        # snippet, and a baseline key keeps the first 120 characters of it, so a
+        # literal added to a baselined style further along a long line was hidden.
+        classes = " ".join(f"card--variant-{n}" for n in range(8))
+        jsx = "export const C = () => <div className=\"" + classes + "\" style={{{{ {} }}}} />;\n"
+        self.write("src/Card.tsx", jsx.format("'--gap': '12px'"))
+        proc = run_py("web-design-studio", "audit_design", "src/", "--write-baseline", ".design-baseline.json",
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.write("src/Card.tsx", jsx.format("'--gap': '12px', '--pad': '16px'"))
+        proc = run_py("web-design-studio", "audit_design", "src/", "--json", cwd=self.tmp)
+        found = [f["snippet"] for f in json.loads(proc.stdout) if f["rule"] == "inline-literal"]
+        self.assertEqual(["--pad: 16px"], found, output(proc))
+
     def test_a_named_baseline_that_does_not_exist_is_reported(self):
         self.audit(".card { padding: var(--pad-card); }")
         proc = run_py("web-design-studio", "audit_design", "src", "--baseline", "nope.json",

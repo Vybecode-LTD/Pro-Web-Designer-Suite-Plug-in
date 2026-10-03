@@ -1258,11 +1258,13 @@ def audit_js(path: Path, text: str) -> list[Finding]:
 
     line_of = _line_finder(clean)
 
-    def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str) -> None:
+    def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str, snippet: str = "") -> None:
         tags = line_ignores.get(line, set()) | file_ignores
         if law in tags or rule.upper() in tags or "ALL" in tags:
             return
-        snippet = lines[line - 1].strip() if 0 < line <= len(lines) else ""
+        # A finding may name its own snippet, which is also its baseline key's
+        # text: several findings on one line stay distinct.
+        snippet = snippet or (lines[line - 1].strip() if 0 < line <= len(lines) else "")
         findings.append(Finding(str(path), line, law, rule, sev, msg, fix, snippet))
 
     _audit_jsx_styles(clean, line_of, add)
@@ -1314,7 +1316,8 @@ def _audit_jsx_styles(clean: str, line_of, add) -> None:
                     f"Inline `style` passes `{pair.group(2)}: '{pair.group(4)}'`, a design literal.",
                     "The custom property carries a value only the runtime knows. Pass "
                     "a number and do the arithmetic in CSS with calc(), or point the "
-                    "property at a token: var(--gap-related).")
+                    "property at a token: var(--gap-related).",
+                    snippet=f"{pair.group(2)}: {pair.group(4)}")
         if offenders:
             add(line_of(m.start()), "L4", "inline-style", "error",
                 f"Inline `style` sets visual propert{'y' if len(offenders) == 1 else 'ies'}: "
@@ -1487,11 +1490,11 @@ def audit_template(path: Path, text: str) -> list[Finding]:
                     keep=False)
     line_of = _line_finder(text)
 
-    def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str) -> None:
+    def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str, snippet: str = "") -> None:
         tags = line_ignores.get(line, set()) | file_ignores
         if law in tags or rule.upper() in tags or "ALL" in tags:
             return
-        snippet = lines[line - 1].strip() if 0 < line <= len(lines) else ""
+        snippet = snippet or (lines[line - 1].strip() if 0 < line <= len(lines) else "")
         findings.append(Finding(str(path), line, law, rule, sev, msg, fix, snippet))
 
     for m in TAG_STYLE_ATTR.finditer(markup):

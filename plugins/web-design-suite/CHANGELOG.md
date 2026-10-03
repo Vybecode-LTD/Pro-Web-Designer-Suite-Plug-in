@@ -223,6 +223,12 @@
     so `.card + *` can no longer space a component's next sibling; stylelint finds the
     owl through an `@media` around the margin, as the audit did; and the header recipe
     keeps the page's reservation for the fixed header, as a `base` rule of its own.
+  - From CodeRabbit's review of #20: each `inline-literal` finding names its property
+    and value as its snippet, which is its baseline key's text. With the style's line
+    there, a key kept only its first 120 characters, so a baselined literal hid a new
+    one added further along a long line
+    (`test_a_baselined_inline_literal_does_not_hide_a_new_one_beside_it`, which fails on
+    `bc911b4`).
 
 ### Added
 
