@@ -1,6 +1,6 @@
 ---
 name: perf-budget-gate
-description: Derive, set and enforce web performance budgets, and fail the build when they break, with static weight and markup checks on every commit and measured Core Web Vitals on each PR. Use for 'the site is slow', LCP, CLS, INP and page weight. Not for back-end or database performance, or accessibility scores (a11y-audit-runner).
+description: Set web performance budgets and fail the build when they break, with page-weight checks on every commit and measured Core Web Vitals (LCP, CLS, INP) on each PR. Not for back-end performance.
 ---
 
 # Performance Budget Gate

@@ -1,6 +1,6 @@
 ---
 name: design-critique-gate
-description: Adversarial design review before a senior designer or a client sees the work, with ranked findings that name the mechanism behind each problem and keep taste apart from defect. Use for 'does this look professional' and a pre-presentation QA pass. Not for accessibility conformance (a11y-audit-runner) or conversion copy (landing-page-conversion).
+description: Adversarial design review before a client sees the work, with ranked findings that name the mechanism behind each problem. Use for 'does this look professional'. Not for accessibility audits.
 ---
 
 # Design Critique Gate

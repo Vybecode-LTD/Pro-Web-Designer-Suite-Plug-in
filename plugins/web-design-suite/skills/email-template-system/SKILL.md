@@ -1,6 +1,6 @@
 ---
 name: email-template-system
-description: Build HTML email that survives Outlook, Gmail and dark mode by compiling the design system's tokens into inlined, table-based markup. Use for templates, transactional mail, newsletters, and 'it looks broken in Outlook' or 'Gmail clipped my email'. HTML and code only. Not for email copywriting or ESP campaign setup.
+description: Build HTML email that survives Outlook, Gmail and dark mode, compiling the design tokens into inlined, table-based markup. Use for templates and newsletters. Not for copywriting or ESP setup.
 ---
 
 # Email Template System

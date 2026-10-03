@@ -1,6 +1,6 @@
 ---
 name: content-model-to-ui
-description: Turn a database schema into an on-system UI spec and a React scaffold, with CRUD screens, schema-derived forms, list and detail pages and admin panels. Use for Supabase or Postgres tables that need screens. Not for designing the content model itself, for charts and dashboards, or for marketing pages.
+description: Turn a Supabase or Postgres schema into an on-system UI spec and React scaffold, with CRUD screens, forms, list and detail pages and admin panels. Not for dashboards or marketing pages.
 ---
 
 # Content Model to UI

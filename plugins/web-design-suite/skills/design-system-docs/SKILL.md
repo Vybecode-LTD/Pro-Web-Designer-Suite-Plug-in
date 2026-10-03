@@ -1,6 +1,6 @@
 ---
 name: design-system-docs
-description: Generate a design system's documentation from its own source. A token reference with measured contrast, component API tables from each component's CSS sockets, and a style guide that fails CI when it drifts. Use for 'document our design system'. Not for general library or API docs, or project READMEs.
+description: Generate a design system's docs from its own source, including a token reference with measured contrast, component API tables and a style guide that fails CI on drift. Not for library docs or READMEs.
 ---
 
 # Design System Docs

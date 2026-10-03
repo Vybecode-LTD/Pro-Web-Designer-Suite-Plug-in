@@ -1,6 +1,6 @@
 ---
 name: figma-variables-sync
-description: Keep a Figma file and a codebase on one token vocabulary. Audit a design file before building it, generate tokens.css from a Figma export, push code tokens back as variables, and catch drift in CI. Not for building the page from the design (web-design-studio) or reviewing its taste (design-critique-gate).
+description: Keep Figma and code on one token vocabulary. Audits a design file, generates tokens.css from a Figma export, pushes tokens back as variables, and catches drift in CI. Not for building pages.
 ---
 
 # Figma Variables Sync

@@ -24,7 +24,9 @@ SKILL_BYTES = 20_500
 # The Read tool stopped navigation-patterns.md at ~61 KB (25,000 tokens), for
 # this suite's density of inline code; keep every reference under that.
 REFERENCE_BYTES = 60_500
-DESCRIPTION_CHARS = 420
+# claude.ai's help center gives 200 characters for the description of an
+# uploaded skill (the platform takes 1,024), so every skill fits an upload.
+DESCRIPTION_CHARS = 200
 
 
 def frontmatter_description(text: str) -> str:
@@ -49,8 +51,6 @@ class SkillBudget(unittest.TestCase):
             with self.subTest(skill=skill.parent.name):
                 self.assertLessEqual(len(description), DESCRIPTION_CHARS)
                 self.assertIn("Not for", description)
-                first = re.split(r"(?<=[.!?])\s", description, maxsplit=1)[0]
-                self.assertLessEqual(len(first), 200, "the first sentence must work alone")
 
     def test_the_landing_page_rules_that_must_survive_come_first(self):
         text = (SKILLS / "landing-page-conversion" / "SKILL.md").read_text(encoding="utf-8")

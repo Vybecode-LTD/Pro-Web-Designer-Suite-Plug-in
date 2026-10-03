@@ -252,6 +252,10 @@
 
 ### Changed
 
+- **Every skill's description fits a claude.ai upload.** The 13 descriptions were 301 to
+  368 characters; claude.ai's help center gives 200 for an uploaded skill, and the
+  platform 1,024. Each now says what the skill does and what it is not for in 185 to
+  200 characters, and `test_skill_budget` holds every one to 200.
 - **Python 3.9 or newer**, down from 3.10. The scripts already ran on 3.9, the Python
   macOS still ships; now the tests do too. The harness no longer uses
   `TemporaryDirectory(ignore_cleanup_errors=)`, `write_text(newline=)` or a slice of
