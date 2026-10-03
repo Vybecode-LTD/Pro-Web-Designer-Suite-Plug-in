@@ -291,8 +291,10 @@
 - **The docs promised checks that nobody ran** (SB-A11, SB-A25). Each one now exists,
   or its sentence says what does run:
   - The audit diffs a theme file's `--breakpoint-*` against the token file's `--bp-*`
-    when both are in its run, and fails on drift (L1 `breakpoint-drift`). A run over
-    several projects pairs each theme with the token file nearest it. theme.css and
+    when both are in its run, and fails on drift (L1 `breakpoint-drift`), both ways: a
+    token the theme leaves out is drift too, unless the theme drops it with
+    `initial`, and the theme's ignore pragmas apply. A run over several projects pairs
+    each theme with the token file nearest it. theme.css and
     stack-tailwind.md said it did; it never had. The v3 `tailwind.config.ts`, which
     the audit does not read, now says its `screens` are kept in step by hand.
   - Nothing compares theme.css's type bindings with the `--type-*` roles, no gate
@@ -318,9 +320,11 @@
   a listed path that no longer exists, a deleted file, is skipped. `--sarif` writes
   the findings as SARIF, the format GitHub code scanning reads (checked 2026-10-03 at
   docs.github.com: "Code scanning only supports SARIF version `2.1.0`"), with a
-  rule per law and id, paths relative to the working directory, and a fingerprint
-  that leaves the line number out, as the baseline does. The line lookup SB-C10
-  asked for was already a bisect.
+  rule per law and id, and paths relative to the working directory under a
+  `%SRCROOT%` the run defines. It sets no fingerprint: code scanning reads only its
+  own, which `upload-sarif` computes from the source (from the reviews of #24). A
+  NUL-separated list keeps each name exactly. The line lookup SB-C10 asked for was
+  already a bisect.
 
 - **One canonical entry stylesheet per stack** (SB-C9, SS-C9 in part). The starter
   ships `index.css`, and the configs ship `index.tailwind.css` for Tailwind v4. Five

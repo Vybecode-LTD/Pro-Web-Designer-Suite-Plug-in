@@ -51,7 +51,7 @@ import json
 import re
 import unittest
 
-from wds_support import SKILLS, TempDirTest, output, run_py
+from wds_support import SKILLS, TempDirTest, load_script, output, run_py
 
 
 class AuditDesign(TempDirTest):
@@ -677,6 +677,25 @@ class ThePromisedChecks(TempDirTest):
             with self.subTest(doc=doc):
                 self.assertEqual(rows, count)
 
+    def test_breakpoints_match_in_both_directions_and_obey_the_pragmas(self):
+        # Codex and CodeRabbit on #24: a token the theme left out passed, and an
+        # ignore pragma in the theme did not reach the cross-file finding.
+        self.write("one/tokens.css", ":root { --bp-md: 48rem; --bp-lg: 64rem; --bp-xl: 80rem; }\n")
+        self.write("one/theme.css", "@theme {\n  --breakpoint-md: 48rem;\n  --breakpoint-xl: initial;\n}\n")
+        self.write("two/tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.write("two/theme.css", "/* design-audit-ignore-file: L1 */\n@theme {\n  --breakpoint-md: 50rem;\n}\n")
+        self.write("three/tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.write("three/theme.css", "@theme {\n  /* design-audit-ignore-next-line: L1 -- the old site's */\n"
+                                       "  --breakpoint-md: 50rem;\n}\n")
+        self.assertEqual([("theme.css", 2, "breakpoint-drift")], self.found("one", "two", "three"))
+
+    def test_a_nul_separated_list_keeps_each_name_exactly(self):
+        # Codex and CodeRabbit on #24: the list was split on newlines too, and
+        # every name stripped, so a real path became two that do not exist.
+        audit = load_script("web-design-studio", "audit_design")
+        self.assertEqual(["a\nb.css", " c.css"], audit.listed_paths("a\nb.css\0 c.css\0"))
+        self.assertEqual(["a.css", "b c.css"], audit.listed_paths("a.css\r\n\r\nb c.css\n"))
+
     def test_the_shipped_theme_mirrors_the_starters_tokens(self):
         styles = SKILLS / "web-design-studio" / "assets"
         self.assertEqual([], [f for f in self.found(styles / "starter" / "styles" / "tokens.css",
@@ -730,7 +749,10 @@ class TheAuditInCi(TempDirTest):
         location = result["locations"][0]["physicalLocation"]
         self.assertEqual({"uri": "src/components/bad.css", "uriBaseId": "%SRCROOT%"}, location["artifactLocation"])
         self.assertEqual({"startLine": 2, "startColumn": 1}, location["region"])
-        self.assertRegex(result["partialFingerprints"]["designAuditKey/v1"], r"^[0-9a-f]{64}$")
+        # CodeRabbit on #24: the base the relative URIs name is defined, and no
+        # fingerprint is invented, since code scanning reads only its own.
+        self.assertRegex(run["originalUriBaseIds"]["%SRCROOT%"]["uri"], r"^file:.*/$")
+        self.assertNotIn("partialFingerprints", result)
         self.assertEqual(2, self.audit("src", "--sarif", "--json").returncode)     # one format at a time
 
     def test_where_adds_no_specificity(self):

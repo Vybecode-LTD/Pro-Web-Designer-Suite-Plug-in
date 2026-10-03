@@ -66,8 +66,6 @@ from __future__ import annotations
 
 import argparse
 import bisect
-import collections
-import hashlib
 import json
 import os
 import re
@@ -884,24 +882,29 @@ def in_forced_colors(at_rules: Iterable[str]) -> bool:
 # CSS rules
 # ---------------------------------------------------------------------------
 
+def pragmas(comments: dict[int, str]) -> tuple[set[str], dict[int, set[str]]]:
+    """The ignore pragmas in a file's comments: the tags for the whole file,
+    and the tags for each line a next-line pragma names."""
+    file_tags: set[str] = set()
+    line_tags: dict[int, set[str]] = {}
+    for ln, body in comments.items():
+        m = IGNORE_FILE.search(body)
+        if m:
+            file_tags |= {t.strip().upper() for t in m.group(1).split(",") if t.strip()}
+        m = IGNORE_LINE.search(body)
+        if m:
+            line_tags[ln + 1] = {t.strip().upper() for t in m.group(1).split(",") if t.strip()}
+    return file_tags, line_tags
+
+
 def audit_css(path: Path, text: str) -> list[Finding]:
     findings: list[Finding] = []
     lines = text.splitlines()
     clean, comments = strip_css_comments(text, line_comments(path))
 
-    file_ignores = set()
-    for body in comments.values():
-        m = IGNORE_FILE.search(body)
-        if m:
-            file_ignores |= {t.strip().upper() for t in m.group(1).split(",") if t.strip()}
+    file_ignores, line_ignores = pragmas(comments)
     if any(mark in text[:800] for mark in GENERATED_MARKERS):
         return []
-
-    line_ignores: dict[int, set[str]] = {}
-    for ln, body in comments.items():
-        m = IGNORE_LINE.search(body)
-        if m:
-            line_ignores[ln + 1] = {t.strip().upper() for t in m.group(1).split(",") if t.strip()}
 
     token_file = is_token_file(path)
     binding_file = is_binding_file(path)
@@ -1698,27 +1701,31 @@ def breakpoint_drift(files: list[tuple[Path, str]]) -> list[Finding]:
     """L1 `breakpoint-drift` (SB-A11). A media query cannot read a custom
     property, so a theme file keeps each breakpoint as a literal,
     `--breakpoint-md`, beside tokens.css's `--bp-md`. With both files in the
-    run, each copy must hold the token's value: at 50rem against 48rem,
-    Tailwind's `md:` and the CSS's own queries break 32px apart. A run over
-    several projects pairs each theme with the token file nearest it."""
+    run, the two sets must match: a copy that differs from its token or has
+    none, and a token the theme leaves out, are drift. A theme drops one on
+    purpose with a keyword (`--breakpoint-2xl: initial`). A run over several
+    projects pairs each theme with the token file nearest it, and the theme's
+    ignore pragmas apply."""
     breakpoints: dict[Path, dict[str, str]] = {}     # token file -> its --bp-*
-    copies: list[tuple[Path, int, str, str, str]] = []
+    themes: dict[Path, dict] = {}                     # theme file -> its copies, lines and pragmas
     for path, text in files:
         if not is_token_file(path):
             continue
         lines = text.splitlines()
-        clean, _ = strip_css_comments(text, line_comments(path))
+        clean, comments = strip_css_comments(text, line_comments(path))
+        theme = {"copies": {}, "lines": lines, "pragmas": pragmas(comments)} if is_binding_file(path) else None
         for ev in scan_css(clean):
             if isinstance(ev, tuple):
                 continue
             m = re.fullmatch(r"--(bp|breakpoint)-([\w-]+)", ev.prop)
             if not m:
                 continue
-            if m.group(1) == "breakpoint" and is_binding_file(path):
-                snippet = lines[ev.line - 1].strip() if 0 < ev.line <= len(lines) else ""
-                copies.append((path, ev.line, m.group(2), ev.value.strip(), snippet))
-            elif m.group(1) == "bp" and not is_binding_file(path):
+            if m.group(1) == "breakpoint" and theme is not None:
+                theme["copies"].setdefault(m.group(2), (ev.line, ev.value.strip()))
+            elif m.group(1) == "bp" and theme is None:
                 breakpoints.setdefault(path, {}).setdefault(m.group(2), ev.value.strip())
+        if theme is not None and theme["copies"]:
+            themes[path] = theme
 
     def shared_folders(a: Path, b: Path) -> int:
         n = 0
@@ -1729,19 +1736,37 @@ def breakpoint_drift(files: list[tuple[Path, str]]) -> list[Finding]:
         return n
 
     findings = []
-    for path, line, name, value, snippet in copies if breakpoints else ():
+    for path, theme in themes.items() if breakpoints else ():
         nearest = max(sorted(breakpoints), key=lambda token_file: shared_folders(path, token_file))
-        token = breakpoints[nearest].get(name)
-        if token is not None and re.sub(r"\s+", "", token) == re.sub(r"\s+", "", value):
-            continue
-        findings.append(Finding(
-            str(path), line, "L1", "breakpoint-drift", "error",
-            (f"`--breakpoint-{name}: {value}` has no `--bp-{name}` in {nearest.name}." if token is None else
-             f"`--breakpoint-{name}: {value}` drifts from {nearest.name}'s `--bp-{name}: {token}`."),
-            "A media query cannot read a token, so the theme keeps a copy of each breakpoint. "
-            "Keep the copy the token's value, or Tailwind's variants and the CSS's own media "
-            "queries break at different widths. Change one, change both.",
-            snippet))
+        tokens = breakpoints[nearest]
+        file_tags, line_tags = theme["pragmas"]
+        first = min(line for line, _ in theme["copies"].values())
+        drift = []
+        for name, (line, value) in theme["copies"].items():
+            token = tokens.get(name)
+            if value.lower() in KEYWORDS:                  # removed on purpose
+                continue
+            if token is None:
+                drift.append((line, f"`--breakpoint-{name}: {value}` has no `--bp-{name}` in {nearest.name}."))
+            elif re.sub(r"\s+", "", token) != re.sub(r"\s+", "", value):
+                drift.append((line, f"`--breakpoint-{name}: {value}` drifts from {nearest.name}'s "
+                                    f"`--bp-{name}: {token}`."))
+        for name, token in tokens.items():
+            if name not in theme["copies"]:
+                drift.append((first, f"{nearest.name}'s `--bp-{name}: {token}` has no `--breakpoint-{name}` "
+                                     f"here, so Tailwind has no `{name}:` variant."))
+        for line, message in sorted(drift):
+            tags = line_tags.get(line, set()) | file_tags
+            if {"L1", "BREAKPOINT-DRIFT", "ALL"} & tags:
+                continue
+            lines = theme["lines"]
+            findings.append(Finding(
+                str(path), line, "L1", "breakpoint-drift", "error", message,
+                "A media query cannot read a token, so the theme keeps a copy of each breakpoint. "
+                "Keep the copies the tokens' values, one for each, or Tailwind's variants and the "
+                "CSS's own media queries break at different widths. Drop one on purpose with "
+                "`initial`. Change one, change both.",
+                lines[line - 1].strip() if 0 < line <= len(lines) else ""))
     return findings
 
 
@@ -1941,12 +1966,13 @@ TOOL_URI = "https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in"
 def sarif(findings: list[Finding]) -> dict:
     """The findings as a SARIF log, for a code-scanning upload (SB-C10). A
     rule is the law and its id, `L1/raw-spacing`. Paths are relative to the
-    working directory, which a CI step runs from the repository root, and the
-    fingerprint is the baseline key, which leaves the line number out, so an
-    alert survives an edit above it."""
+    working directory, which a CI step runs from the repository root, under a
+    `%SRCROOT%` the run defines. There is no fingerprint: code scanning uses
+    only `primaryLocationLineHash`, which upload-sarif computes from the
+    source files when it is missing (docs.github.com, 2026-10-03)."""
     cwd = Path.cwd().resolve()
     rules: dict[str, int] = {}
-    driver_rules, results, seen = [], [], collections.Counter()
+    driver_rules, results = [], []
     for f in findings:
         rule_id = f"{f.law}/{f.rule}"
         if rule_id not in rules:
@@ -1959,8 +1985,6 @@ def sarif(findings: list[Finding]) -> dict:
             location = {"uri": path.relative_to(cwd).as_posix(), "uriBaseId": "%SRCROOT%"}
         except ValueError:                           # outside the run's folder
             location = {"uri": path.as_uri()}
-        key = f.key(cwd)
-        seen[key] += 1                               # two identical lines are two alerts
         results.append({
             "ruleId": rule_id,
             "ruleIndex": rules[rule_id],
@@ -1968,12 +1992,11 @@ def sarif(findings: list[Finding]) -> dict:
             "message": {"text": f"{f.message} {f.fix}".strip()},
             "locations": [{"physicalLocation": {"artifactLocation": location,
                                                  "region": {"startLine": max(f.line, 1), "startColumn": 1}}}],
-            "partialFingerprints": {
-                "designAuditKey/v1": hashlib.sha256(f"{key}#{seen[key]}".encode("utf-8")).hexdigest()},
         })
     return {"$schema": "https://json.schemastore.org/sarif-2.1.0.json", "version": SARIF_VERSION,
             "runs": [{"tool": {"driver": {"name": "audit_design", "informationUri": TOOL_URI,
                                           "rules": driver_rules}},
+                      "originalUriBaseIds": {"%SRCROOT%": {"uri": cwd.as_uri().rstrip("/") + "/"}},
                       "results": results}]}
 
 
@@ -2030,6 +2053,15 @@ def _wrap(s: str, width: int) -> list[str]:
     return out
 
 
+def listed_paths(raw: str) -> list[str]:
+    """The paths a --files-from list names. With a NUL in it (`git diff -z`)
+    it is NUL-separated and each name is kept exactly, newlines and spaces
+    included; otherwise one path per line (Codex and CodeRabbit on #24)."""
+    if "\0" in raw:
+        return [name for name in raw.split("\0") if name]
+    return [name.rstrip("\r") for name in raw.split("\n") if name.strip()]
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="python -m scripts.audit_design",
@@ -2071,7 +2103,7 @@ def main(argv: list[str] | None = None) -> int:
         except OSError as exc:
             print(f"audit_design: cannot read {args.files_from}: {exc.strerror}", file=sys.stderr)
             return 2
-        listed = [name.strip() for name in re.split(r"[\r\n\0]+", raw) if name.strip()]
+        listed = listed_paths(raw)
         gone = [name for name in listed if not Path(name).exists()]
         if gone:
             names = ", ".join(gone[:5]) + (" …" if len(gone) > 5 else "")
