@@ -9,6 +9,7 @@ for example an unpacked earlier release, to see which bugs it still has.
 """
 from __future__ import annotations
 
+import importlib.util
 import os
 import pathlib
 import re
@@ -139,6 +140,16 @@ def run_node(skill: str, script: str, *args, cwd, env_changes=None, timeout=120)
     return subprocess.run([NODE, str(SKILLS / skill / "scripts" / script), *map(str, args)],
                           cwd=cwd, env=env(**(env_changes or {})),
                           capture_output=True, timeout=timeout)
+
+
+def load_script(skill: str, name: str):
+    """A plugin script as a module, for a test that reads its tables. It is
+    registered in sys.modules, which its dataclasses need."""
+    spec = importlib.util.spec_from_file_location(f"wds_{name}", SKILLS / skill / "scripts" / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def output(proc: subprocess.CompletedProcess) -> str:

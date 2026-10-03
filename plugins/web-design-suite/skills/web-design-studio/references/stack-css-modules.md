@@ -208,7 +208,11 @@ createRoot(document.getElementById('root')!).render(<App />);
         @import url("../vendor/datepicker.css") layer(vendor);
       Then one line per component file, after the layers above:
         @import url("components/card.css");
-      With CSS Modules there are none: each component imports its own. */
+      With CSS Modules there are none: each component imports its own.
+      Last, once the project has them, the closed set of utilities and the
+      dated overrides. Each opens its own @layer block, so import it bare:
+        @import url("utilities.css");
+        @import url("overrides.css"); */
 ```
 
 Note what is **not** here: component CSS. Modules are imported by their components and the bundler collects them. That is the source of the ordering problem in §6.

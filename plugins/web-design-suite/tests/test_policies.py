@@ -21,7 +21,7 @@ import socket
 import subprocess
 import unittest
 
-from wds_support import TempDirTest, class_temp_dir, env, output, run_py
+from wds_support import TempDirTest, class_temp_dir, env, load_script, output, run_py
 
 FIXTURES = pathlib.Path(__file__).resolve().parent / "fixtures" / "supabase"
 SHOP = (FIXTURES / "shop.sql").read_text(encoding="utf-8")
@@ -67,12 +67,44 @@ insert into public.order_items (order_id, product_id, quantity, unit_price_cents
 """
 
 
+# A schema of its own (N20), with the grants Supabase's docs give for one the
+# API exposes; the parser passes over them.
+APP = """\
+create schema app;
+grant usage on schema app to anon, authenticated, service_role;
+alter default privileges in schema app grant all on tables to anon, authenticated, service_role;
+create table app.profiles (id uuid primary key references auth.users (id), name text not null);
+create table app.notes (id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references app.profiles (id), body text not null);
+create table app.note_links (id uuid primary key default gen_random_uuid(),
+  note_id uuid not null references app.notes (id), url text not null);
+create table app.tags (id uuid primary key default gen_random_uuid(), label text not null);
+"""
+
+# Reserved words as names (N21), and a name long enough that Postgres would
+# cut the four policy names to one (N22).
+LONG = "customer_subscription_renewal_reminder_preferences_by_region"
+AWKWARD = f"""\
+create table "select" (id uuid primary key default gen_random_uuid(),
+  "where" text not null, owner_id uuid not null references auth.users (id));
+create table "window" (id uuid primary key default gen_random_uuid(),
+  select_id uuid not null references "select" (id), "for" text);
+create table {LONG} (id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users (id), "limit" integer not null);
+create table lookups (id uuid primary key default gen_random_uuid(), label text not null);
+create table "it's" (id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users (id), body text);
+create table "cash$$flow" (id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users (id), amount integer);
+"""
+
+
 class Scaffolded(TempDirTest):
 
-    def scaffold(self, ddl, *args):
+    def scaffold(self, ddl, *args, schema=None):
         self.write("schema.sql", ddl)
         proc = run_py("content-model-to-ui", "introspect_schema", "schema.sql", "-o", "model.json",
-                      cwd=self.tmp)
+                      *(["--schema", schema] if schema else []), cwd=self.tmp)
         self.assertEqual(proc.returncode, 0, output(proc))
         proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "src", *args,
                       cwd=self.tmp)
@@ -163,6 +195,42 @@ class PoliciesAreProposed(Scaffolded):
         self.assertEqual(["product_tags", "products"],
                          sorted(p.name.split(".")[0] for p in (src / "db" / "policies").glob("*.todo.sql")))
 
+    def test_the_schema_is_the_models(self):
+        # N20: a model introspected with --schema app put every statement on public.
+        src = self.scaffold(APP, schema="app")
+        for path in sorted((src / "db" / "policies").iterdir()):
+            with self.subTest(file=path.name):
+                self.assertNotIn("public.", path.read_text(encoding="utf-8"))
+        self.assertIn("alter table app.notes enable row level security;", self.policies(src, "notes"))
+        self.assertIn("exists (select 1 from app.notes p1 ", self.policies(src, "note_links"))
+        test = (src / "db" / "policies" / "tags.policies.test.sql").read_text(encoding="utf-8")
+        self.assertIn("where schemaname = 'app'", test)
+
+    def test_a_reserved_word_keeps_its_quotes(self):
+        # N21: sql_ident quoted nine reserved words, so `select` and `where` were bare.
+        src = self.scaffold(AWKWARD)
+        text = self.policies(src, "select")
+        self.assertIn('alter table public."select" enable row level security;', text)
+        self.assertIn('create policy "select: owner reads" on public."select"', text)
+        self.assertEqual(['"where"'], grants(text, "update"))
+        self.assertIn('exists (select 1 from public."select" p1 where p1.id = "window".select_id',
+                      self.policies(src, "window"))
+
+    def test_the_scaffold_quotes_what_the_parser_keeps_quoted(self):
+        # N21: the scripts stand alone, so each keeps its own copy of the list.
+        self.assertEqual(load_script("content-model-to-ui", "introspect_schema").KEEP_QUOTED,
+                         load_script("content-model-to-ui", "scaffold_ui").KEEP_QUOTED)
+
+    def test_policy_names_fit_in_63_bytes(self):
+        # N22: Postgres cuts a name at 63 bytes, which made a long table's four names one.
+        src = self.scaffold(AWKWARD)
+        names = re.findall(r'^create policy "([^"]+)"', self.policies(src, LONG), re.M)
+        self.assertEqual(4, len(set(names)), names)
+        for name in names:
+            with self.subTest(name=name):
+                self.assertLessEqual(len(name.encode("utf-8")), 63)
+                self.assertTrue(name.startswith(LONG[:30]))
+
     def test_the_browser_client_holds_the_publishable_key_only(self):
         src = self.scaffold(SHOP_TABLES)
         client = (src / "lib" / "supabase.ts").read_text(encoding="utf-8")
@@ -221,12 +289,12 @@ class PoliciesRunOnPostgres(Scaffolded):
         if proc.returncode:
             raise AssertionError(output(proc))
 
-    def database(self, ddl, seed=""):
+    def database(self, ddl, seed="", schema=None):
         db = f"t{self.id().rsplit('.', 1)[-1][-40:]}".lower()
         self.psql_ok("postgres", f"drop database if exists {db}")
         self.psql_ok("postgres", f"create database {db}")
         self.psql_ok(db, STUB + ddl + seed)
-        src = self.scaffold(ddl)
+        src = self.scaffold(ddl, schema=schema)
         proposals = sorted((src / "db" / "policies").glob("*.todo.sql"))
         self.assertGreaterEqual(len(proposals), 4)
         for path in proposals:
@@ -270,6 +338,66 @@ class PoliciesRunOnPostgres(Scaffolded):
                 proc = self.smoke(db, src, table)
                 self.assertNotEqual(0, proc.returncode)
                 self.assertIn(message, output(proc))
+
+    def test_a_schema_of_its_own_applies_and_passes_its_tests(self):
+        # N20.
+        db, src = self.database(APP, schema="app")
+        for path in sorted((src / "db" / "policies").glob("*.test.sql")):
+            with self.subTest(test=path.name):
+                proc = self.psql(db, file=path)
+                self.assertEqual(0, proc.returncode, output(proc))
+
+    def test_reserved_words_and_long_names_apply_and_pass_their_tests(self):
+        # N21 and N22.
+        db, src = self.database(AWKWARD)
+        for path in sorted((src / "db" / "policies").glob("*.test.sql")):
+            with self.subTest(test=path.name):
+                proc = self.psql(db, file=path)
+                self.assertEqual(0, proc.returncode, output(proc))
+
+    def test_every_reserved_word_is_on_the_list(self):
+        # N21: Postgres's own list, the words it reserves outright or for
+        # functions and types. Neither can name a table or column unquoted.
+        proc = self.psql("postgres", "copy (select word from pg_get_keywords() "
+                                     "where catcode in ('R', 'T')) to stdout")
+        self.assertEqual(0, proc.returncode, output(proc))
+        words = set(proc.stdout.decode("utf-8").split())
+        self.assertGreater(len(words), 90)
+        self.assertEqual(set(), words - load_script("content-model-to-ui", "scaffold_ui").KEEP_QUOTED)
+
+    def test_a_write_policy_for_the_server_is_not_the_browsers(self):
+        # N23: the smoke test counted a service_role policy as one the browser holds.
+        db, src = self.database(SHOP_TABLES, SHOP_SEED)
+        self.psql_ok(db, 'create policy "the server writes" on public.categories '
+                         "for insert to service_role with check (true);")
+        proc = self.smoke(db, src, "categories")
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.psql_ok(db, 'create policy "anyone writes" on public.categories for all using (true);')
+        proc = self.smoke(db, src, "categories")
+        self.assertNotEqual(0, proc.returncode)
+        self.assertIn("a policy lets the browser write public.categories", output(proc))
+
+    def test_a_write_policy_for_a_role_the_browser_inherits_is_the_browsers(self):
+        # The review of #16: authenticated, a member of an editor role, holds
+        # the editor's policies too.
+        db, src = self.database(SHOP_TABLES, SHOP_SEED)
+        # The control: a membership WITH INHERIT FALSE gives the browser none of
+        # the role's policies without SET ROLE, so its write policy passes.
+        self.psql_ok(db, "do $$ begin create role wds_reader nologin; "
+                         "exception when duplicate_object then null; end $$;")
+        self.psql_ok(db, "grant wds_reader to authenticated with inherit false; "
+                         'create policy "readers write" on public.categories for insert to wds_reader '
+                         "with check (true);")
+        proc = self.smoke(db, src, "categories")
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.psql_ok(db, "do $$ begin create role wds_editor nologin; "
+                         "exception when duplicate_object then null; end $$;")
+        self.psql_ok(db, "grant wds_editor to authenticated; "
+                         'create policy "editors write" on public.categories for insert to wds_editor '
+                         "with check (true);")
+        proc = self.smoke(db, src, "categories")
+        self.assertNotEqual(0, proc.returncode)
+        self.assertIn("a policy lets the browser write public.categories", output(proc))
 
 
 if __name__ == "__main__":

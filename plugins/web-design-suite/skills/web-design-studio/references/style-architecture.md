@@ -179,7 +179,11 @@ Declared once, as the **first statement** in the entry stylesheet, before any `@
         @import url("../vendor/datepicker.css") layer(vendor);
       Then one line per component file, after the layers above:
         @import url("components/card.css");
-      With CSS Modules there are none: each component imports its own. */
+      With CSS Modules there are none: each component imports its own.
+      Last, once the project has them, the closed set of utilities and the
+      dated overrides. Each opens its own @layer block, so import it bare:
+        @import url("utilities.css");
+        @import url("overrides.css"); */
 ```
 
 Each of those files opens its own `@layer reset { … }` (or `tokens`, `base`, `layout`), so it is imported bare. Wrapping one in `layer(reset)` as well nests it as `reset.reset`: it still sorts inside `reset`, but `@layer reset { … }` written elsewhere no longer targets the same slot. Use `layer()` only for a file that names no layer: vendor CSS, and Tailwind's own files.

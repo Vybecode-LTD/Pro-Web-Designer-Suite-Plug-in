@@ -183,19 +183,20 @@ These were found in phase 2 and 3.2.1:
 
 These were found in the reviews of PRs #12 to #15 (Codex and CodeRabbit, 2026-10-01 and 02). Each was rated P2 or minor and judged real; P0 of the execution plan fixes N16 to N25. One finding is not taken: CodeRabbit's note that `w1-supabase-facts.md` should spell `--quote-all-identifiers`. That line quotes the Supabase CLI's script, which spells it `--quote-all-identifier`.
 
-- **N16.** A quoted name with a `$` in it (`"amount$usd"`) is unquoted by `introspect_schema.unquote_identifiers`, and the column parser, which reads only word characters in an unquoted name, then drops the column without a word.
-- **N17.** `ALTER TABLE … DROP COLUMN` removes the column but leaves it in the table's primary key and unique indexes, and other tables' foreign keys still point at it. Postgres drops the indexes and constraints that use the column.
-- **N18.** `RENAME COLUMN` renames the column in its own table only. Other tables' foreign keys, and the CHECKs on the column, keep the old name; Postgres retargets them.
-- **N19.** An `ADD CONSTRAINT` the parser does not know falls through to `ADD COLUMN`. Postgres 18's named not-null constraint (`alter table t add constraint t_name_nn not null name`) becomes a column named `constraint`.
-- **N20.** `scaffold_ui` names `public` in every policy, grant and smoke test, even for a model introspected with `--schema app` (`source.pg_schema` in the model).
-- **N21.** `scaffold_ui.sql_ident` quotes nine reserved words. A table named `select` or a column named `where` gives invalid SQL. It needs the full list, as `introspect_schema.KEEP_QUOTED` has, with a test that the two lists match.
-- **N22.** A policy is named `"<table>: owner reads"`. For a table name of 55 bytes or more, Postgres truncates the four names at 63 bytes to the same name, and the second `CREATE POLICY` fails.
-- **N23.** The smoke test's "no write policy" check counts a write policy for a server role (`to service_role`) as one the browser holds. It should read `pg_policies.roles`.
-- **N24.** The canonical `index.css` stops after `layout.css`. The vanilla stack documents `utilities.css` and `overrides.css`, and a project that copies the entry would never import them.
-- **N25.** An `@import … layer(vendor)` placed before the `@layer` statement fixes `vendor` first, whatever the statement then says. The audit and stylelint check the statement's position against rules only.
+- **N16.** *Done for 3.3.0 (PR #16).* A quoted name with a `$` in it (`"amount$usd"`) is unquoted by `introspect_schema.unquote_identifiers`, and the column parser, which reads only word characters in an unquoted name, then drops the column without a word.
+- **N17.** *Done for 3.3.0 (PR #16).* `ALTER TABLE … DROP COLUMN` removes the column but leaves it in the table's primary key and unique indexes, and other tables' foreign keys still point at it. Postgres drops the indexes and constraints that use the column.
+- **N18.** *Done for 3.3.0 (PR #16).* `RENAME COLUMN` renames the column in its own table only. Other tables' foreign keys, and the CHECKs on the column, keep the old name; Postgres retargets them.
+- **N19.** *Done for 3.3.0 (PR #16).* An `ADD CONSTRAINT` the parser does not know falls through to `ADD COLUMN`. Postgres 18's named not-null constraint (`alter table t add constraint t_name_nn not null name`) becomes a column named `constraint`.
+- **N20.** *Done for 3.3.0 (PR #16).* `scaffold_ui` names `public` in every policy, grant and smoke test, even for a model introspected with `--schema app` (`source.pg_schema` in the model).
+- **N21.** *Done for 3.3.0 (PR #16).* `scaffold_ui.sql_ident` quotes nine reserved words. A table named `select` or a column named `where` gives invalid SQL. It needs the full list, as `introspect_schema.KEEP_QUOTED` has, with a test that the two lists match.
+- **N22.** *Done for 3.3.0 (PR #16).* A policy is named `"<table>: owner reads"`. For a table name of 55 bytes or more, Postgres truncates the four names at 63 bytes to the same name, and the second `CREATE POLICY` fails.
+- **N23.** *Done for 3.3.0 (PR #16).* The smoke test's "no write policy" check counts a write policy for a server role (`to service_role`) as one the browser holds. It should read `pg_policies.roles`.
+- **N24.** *Done for 3.3.0 (PR #16).* The canonical `index.css` stops after `layout.css`. The vanilla stack documents `utilities.css` and `overrides.css`, and a project that copies the entry would never import them.
+- **N25.** *Done for 3.3.0 (PR #16).* An `@import … layer(vendor)` placed before the `@layer` statement fixes `vendor` first, whatever the statement then says. The audit and stylelint check the statement's position against rules only.
 - **N26.** *Done for 3.3.0 (PR #15).* `check_execution_plan.py` counted an item closed as "will not do" as open.
 - **N27.** *Done for 3.3.0 (PR #15).* DL-C7's parts span four PRs, and the execution plan named only the agent. P27 now says where each part lands.
 - **N28.** *Done for 3.3.0 (PR #15).* W1's target said "real `db pull` files". The dump is a real `pg_dump` made with the flags `db pull` uses, and a test applies the CLI's edits to it; there is no `db pull` file.
+- **N29.** *Done for 3.3.0 (PR #16).* stylelint's `design/layer-order` never checked where the `@layer` statement stands, so a rule above it passed, while the audit's `layer-statement-position` refused it. Found while fixing N25.
 
 ---
 

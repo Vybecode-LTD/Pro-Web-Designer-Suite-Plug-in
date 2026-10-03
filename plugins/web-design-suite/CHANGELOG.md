@@ -142,6 +142,42 @@
   in `overrides` beat it. Important declarations reverse the layer order, so the
   vendor's win in both cases. The references now say to strip them at build time, or
   patch a vendored copy.
+- **The schema parser misread four kinds of statement** (N16 to N19, from the reviews of #12):
+  - A quoted name with a `$` (`"amount$usd"`, which every dump quotes) lost its quotes,
+    and the column parser, which reads a bare name as word characters, then dropped the
+    column without a word. Such a name keeps its quotes now.
+  - `DROP COLUMN` left the column in the primary key, in unique indexes, and in other
+    tables' foreign keys. Postgres drops every index and constraint that uses the
+    column, the whole primary key with it, and needs `CASCADE` for the foreign keys
+    into it, which it then drops. The model does the same, CHECKs included.
+  - `RENAME COLUMN` left other tables' foreign keys and the CHECKs on the old name.
+    Postgres retargets both, and so does the model; string literals stay as they are.
+  - Postgres 18 names a not-null constraint: `add constraint t_name_nn not null name`.
+    The parser read it as `ADD COLUMN` and made a column named `constraint`. It now
+    makes the column not-null, in `ALTER TABLE` and `CREATE TABLE`, and an
+    `ADD CONSTRAINT` it does not know is skipped, never read as a column.
+- **The scaffold's policies failed on four kinds of schema** (N20 to N23, from the reviews of #13):
+  - A model introspected with `--schema app` got every policy, grant and smoke test on
+    `public`. They use the model's schema now.
+  - `sql_ident` quoted nine reserved words, so a table named `select` or a column named
+    `where` gave invalid SQL. It quotes every word Postgres reserves now, from a copy of
+    the parser's list.
+  - Postgres cuts a name at 63 bytes, so a table name of 55 bytes or more gave its four
+    policies one name, and the second `CREATE POLICY` failed. A name that would be cut
+    now shortens the table part, which ends in a hash of the whole name.
+  - The smoke test's "no write policy" check counted a policy for `service_role`, which
+    the browser never holds. It counts only policies for `public`, `anon` or
+    `authenticated` now.
+- **The layer statement** (N24 and N25 from the reviews of #14, and N29):
+  - The canonical `index.css` stopped after `layout.css`, so a project that copied it
+    never imported `utilities.css` or `overrides.css`. It names both now, imported last
+    once the project has them, and the four references that quote it follow.
+  - An `@import … layer(vendor)` above the `@layer` statement names `vendor` first,
+    whatever the statement then says. The spec refuses it now, and so do the audit
+    (`layer-statement-position`) and stylelint (`design/layer-order`).
+  - stylelint never checked where the statement stands, so a rule above it passed,
+    though the audit refused it. `design/layer-order` refuses it now, from a second
+    refused example in the spec.
 
 ### Added
 
@@ -216,6 +252,31 @@
   `--check`) are tested writing a file: UTF-8, LF, byte for byte. With 3.2.1's tools
   both tests error on 3.9, where `write_text` has no `newline`.
 - The budget test passes `maxsplit` to `re.split` by keyword, as Python 3.13 asks.
+- N16 to N25 and N29, against `8ed2e84`, the `main` before the fix, since none of this
+  code is in 3.2.1. Fifteen tests fail there, in 26 failures and 2 errors:
+  - `test_schema_sources`: one test per parser fix, four in all.
+  - `test_policies`: eight tests. Four run on the scratch Postgres: a schema of its own,
+    and reserved words with a 60-byte table name, each apply and pass their smoke tests;
+    every word `pg_get_keywords()` reserves is on the list; and a write policy for
+    `service_role` passes the smoke test while one for every role fails it.
+  - `test_rules_spec`: the entry names a file for every layer (N24), and `test_layers`
+    on the new refused example (N25).
+  - `test_real_tools.StylelintConfig` on the two new refused examples (N25, N29).
+  - The 20 tests in the same classes that pass on both are the controls. Among them is
+    the N29 example through the audit, which refused it already.
+- `load_script` moves into `wds_support`, for the test that holds the scaffold's copy
+  of the reserved words equal to the parser's.
+- What the reviews of #16 found, against its first commit (`0a0c249`): five tests fail
+  there, and twelve controls pass on both.
+  - A rename or a drop no longer reaches into a call (`lower(note)` is not a column
+    `lower`) or into a quoted name (`"old.part"` is not `old`).
+  - A table constraint listed before its column now applies.
+  - The smoke test quotes every name it puts in a string (a table named `it's`).
+  - The no-write check counts a role that `anon` or `authenticated` inherits.
+  - A second review: a rename or a drop leaves dollar-quoted literals alone; the smoke
+    test picks a `do` delimiter no name contains (a table named `cash$$flow`); and the
+    no-write check counts inherited privileges (`USAGE`), so a membership granted
+    `WITH INHERIT FALSE` is not the browser's. Four tests fail on `81b50f9`.
 
 ## 3.2.1 — 2026-09-25
 

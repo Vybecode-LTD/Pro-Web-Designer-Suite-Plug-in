@@ -20,14 +20,12 @@ Regressions covered — SB-A14, the three gates disagreed about the laws:
 """
 from __future__ import annotations
 
-import importlib.util
 import json
 import pathlib
 import re
-import sys
 import unittest
 
-from wds_support import SKILLS, TempDirTest
+from wds_support import SKILLS, TempDirTest, load_script
 
 HERE = pathlib.Path(__file__).resolve().parent
 # The spec comes from this suite's own plugin; the tools checked against it are
@@ -35,14 +33,6 @@ HERE = pathlib.Path(__file__).resolve().parent
 SPEC = json.loads((HERE.parent / "skills" / "web-design-studio" / "assets" / "rules" / "design-rules.json")
                   .read_text(encoding="utf-8"))
 CONFIGS = SKILLS / "web-design-studio" / "assets" / "configs"
-
-
-def load_script(skill: str, name: str):
-    spec = importlib.util.spec_from_file_location(f"wds_{name}_rules", SKILLS / skill / "scripts" / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 def load_audit():
@@ -145,7 +135,8 @@ class TheAuditFollowsTheSpec(TempDirTest):
         # gave three different places for it.
         self.assertEqual(SPEC["layers"]["order"], self.audit.LAYER_ORDER)
         self.assertEqual(SPEC["layers"]["statement"], self.audit.LAYER_STATEMENT)
-        layer_rules = {("L5", "layer-order"), ("L5", "layer-undeclared")}
+        # N25: an import into a layer, above the statement, names that layer first.
+        layer_rules = {("L5", "layer-order"), ("L5", "layer-undeclared"), ("L5", "layer-statement-position")}
         for kind in ("allowed", "refused"):
             for n, css in enumerate(SPEC["layers"][kind]):
                 with self.subTest(**{kind: css}):
@@ -180,6 +171,18 @@ class TheDocsStateTheSpecsOrder(unittest.TestCase):
                     wrong.append(f"{path.name}: {m.group(0)} (out of order)")
         self.assertGreater(full, 20)
         self.assertEqual([], wrong)
+
+    def test_the_entry_names_a_file_for_every_layer(self):
+        """N24: the canonical entry stopped after layout.css, so a project that
+        copied it never imported utilities.css or overrides.css."""
+        entry = (SKILLS / "web-design-studio" / "assets" / "starter" / "styles" / "index.css").read_text(
+            encoding="utf-8")
+        for layer in SPEC["layers"]["order"]:
+            with self.subTest(layer=layer):
+                if layer == "theme":                    # only a Tailwind entry names it
+                    continue
+                spelled = {"vendor": ') layer(vendor);', "components": '@import url("components/'}
+                self.assertIn(spelled.get(layer, f'@import url("{layer}.css");'), entry)
 
 
 class StylelintFollowsTheSpec(unittest.TestCase):

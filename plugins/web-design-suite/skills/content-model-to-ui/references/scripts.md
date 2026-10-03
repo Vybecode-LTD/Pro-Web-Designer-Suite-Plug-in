@@ -10,7 +10,7 @@ Normalise a schema, propose a UI for every column, and emit the interview.
 |---|---|
 | `-o`, `--out FILE` | write `model.json` |
 | `--format auto\|ddl\|ts\|json` | override extension detection |
-| `--schema NAME` | which schema to read from a generated types file (default `public`) |
+| `--schema NAME` | which schema to read from a generated types file (default `public`). The model records it, and the scaffold writes its policies, grants and smoke tests for that schema |
 | `--summary` | the SECURITY block (from DDL), then the human-readable proposal: control, signal and confidence per column |
 | `--questions` | the interview alone, as markdown |
 | `--answers-template FILE` | every question pre-filled with its default, ready to edit |
