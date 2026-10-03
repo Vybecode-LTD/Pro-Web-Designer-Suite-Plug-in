@@ -288,7 +288,43 @@
     slides are `100%` up to the measure. The visually-hidden utility's 1px box carries
     both tools' pragma.
 
+- **The docs promised checks that nobody ran** (SB-A11, SB-A25). Each one now exists,
+  or its sentence says what does run:
+  - The audit diffs a theme file's `--breakpoint-*` against the token file's `--bp-*`
+    when both are in its run, and fails on drift (L1 `breakpoint-drift`), both ways: a
+    token the theme leaves out is drift too, unless the theme drops it with
+    `initial`, and the theme's ignore pragmas apply. A run over several projects pairs
+    each theme with the token file nearest it. theme.css and
+    stack-tailwind.md said it did; it never had. The v3 `tailwind.config.ts`, which
+    the audit does not read, now says its `screens` are kept in step by hand.
+  - Nothing compares theme.css's type bindings with the `--type-*` roles, no gate
+    tells an ink from a fill by its class name (`text-danger`), the audit does not
+    grep `tailwind.config.ts` for literals, and contrast is `check_roles.py`'s, not
+    the audit's: the sentences that said otherwise say so. The `/<number>` modifiers
+    are the audit's (`tw-opacity-modifier`), not stylelint's, which never sees a class.
+  - `:where(.a .b .c .d)` has no specificity, so it no longer draws a
+    `compound-specificity` warning. The v3 config's `spin` and `pulse` read
+    `--dur-loop`, as theme.css's do. The checklist has 91 checks, not 92, in three
+    docs. The `@apply` "specificity returns" argument holds for v3 only: under this
+    suite's layer order the utilities layer still wins. Two ESLint comments named the
+    wrong criterion: `anchor-is-valid` does not read link text, and
+    `media-has-caption` is WCAG 1.2.2. handoff-conventions.md now asks for
+    `camelCaseOnly`, as stack-css-modules.md does, and quotes react.dev: `forwardRef`
+    "will be deprecated in a future release".
+
 ### Added
+
+- **The audit in CI** (SB-C10). `--files-from FILE` audits the paths a file or stdin
+  (`-`) lists, one per line or NUL-separated, such as
+  `git diff --name-only -z origin/main... | python -m scripts.audit_design --files-from -`;
+  a listed path that no longer exists, a deleted file, is skipped. `--sarif` writes
+  the findings as SARIF, the format GitHub code scanning reads (checked 2026-10-03 at
+  docs.github.com: "Code scanning only supports SARIF version `2.1.0`"), with a
+  rule per law and id, and paths relative to the working directory under a
+  `%SRCROOT%` the run defines. It sets no fingerprint: code scanning reads only its
+  own, which `upload-sarif` computes from the source (from the reviews of #24). A
+  NUL-separated list keeps each name exactly. The line lookup SB-C10 asked for was
+  already a bisect.
 
 - **One canonical entry stylesheet per stack** (SB-C9, SS-C9 in part). The starter
   ships `index.css`, and the configs ship `index.tailwind.css` for Tailwind v4. Five
@@ -358,6 +394,9 @@
 
 ### Upgrading
 
+- **A theme file's breakpoints must match the tokens** (SB-A11): when one audit run reads
+  a theme file and a token file, each `--breakpoint-*` that differs from its `--bp-*`,
+  or has none, is an error (`breakpoint-drift`). Audit the folder that holds both.
 - **The audit is stricter** (N1, N30): a `rem` or `em` font size, a literal size in
   `max-inline-size`, `max-width`, `min-block-size` or `min-inline-size`, an element
   selector in a component file, a named colour, a system colour outside forced-colors
@@ -524,6 +563,11 @@
   and the two unit tests that let a zero with a unit pass one each (5 tests); 6 are
   controls, among them the references' snippets, the starter's own stylelint run and
   ESLint's leg. Against `v3.2.1`, 8 fail and 3 are controls.
+- P4 (SB-A11, SB-A25, SB-C10): `test_audit_design.ThePromisedChecks` and `TheAuditInCi`.
+  Against `fc92cf7`, #23's head: the breakpoint diff, the CLI's list and SARIF, and
+  `:where()` fail (6 tests), and so do the doc promises (14 subtests) and the stated
+  checklist count (3); the shipped theme's breakpoints, which mirror the starter's
+  tokens, are the control.
 
 ## 3.2.1 — 2026-09-25
 

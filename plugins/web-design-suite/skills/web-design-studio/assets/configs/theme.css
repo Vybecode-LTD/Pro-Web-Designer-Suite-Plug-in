@@ -56,7 +56,8 @@
    1. BREAKPOINTS (`--breakpoint-*`). Media query *conditions* cannot read
       custom properties — `@media (width >= var(--bp-md))` is invalid and is
       dropped silently. The value must be a literal. Mirrors `--bp-*` in
-      tokens.css; `scripts/audit_design.py` diffs the two and fails if they
+      tokens.css; `scripts/audit_design.py` diffs the two, when both are in its
+      run, and fails if they
       drift. Change one, change both.
 
    2. CSS-WIDE KEYWORDS (`transparent`, `currentColor`, `inherit`). Not
@@ -196,8 +197,9 @@
    Tailwind has ONE color namespace. `--color-x` generates `bg-x`, `text-x`,
    `border-x`, `ring-x`, `fill-x`, `divide-x`, `from-x` … all of them, with
    no way to say "this role is a fill, never an ink". So the names below are
-   chosen for the position they are MEANT to occupy, and the audit catches
-   the rest (`bg-muted` is syntactically valid and semantically wrong).
+   chosen for the position they are MEANT to occupy, and review catches
+   the rest (`bg-muted` is syntactically valid and semantically wrong): no
+   gate can tell a fill from an ink by its class name.
 
    NOTE THE NAME COLLISIONS AND WHAT THEY BOUGHT US. Tailwind's namespaces
    are `--color-*`, `--text-*`, `--radius-*`, `--shadow-*`, `--ease-*`,
@@ -246,7 +248,8 @@
        bg-danger      -> --bg-danger  (danger-500, a solid fill)
        text-danger-fg -> --fg-danger  (danger-700, legible on a light bg)
      Using `text-danger` instead of `text-danger-fg` puts 500-weight text on
-     a light surface and drops you under 4.5:1. The audit flags it. */
+     a light surface and drops you under 4.5:1. No gate sees it: review
+     for a `text-` class on a role that has a `-fg` twin. */
   --color-disabled-fg: var(--fg-disabled);  /* text-disabled-fg             */
 
   /* ---- Intent fills. Use with bg-*. -------------------------------- */
@@ -357,7 +360,7 @@
      lines below are the same decision, re-expressed in the four properties
      Tailwind's namespace takes. They are not a second source of truth, but
      they are a second PLACE, so when a type role changes, change both.
-     `scripts/audit_design.py` compares them.
+     Nothing compares them, so change both.
 
      In hand-written component CSS prefer the shorthand — `font:
      var(--type-h2)` is one declaration that cannot half-apply.

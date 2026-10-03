@@ -216,8 +216,9 @@ block without a word. Every responsive rule silently stops applying.
 
 This is a genuine duplication and the only honest way to handle it is to make
 drift detectable rather than pretend it cannot happen:
-`scripts/audit_design.py` diffs `--breakpoint-*` against `--bp-*` and fails on
-mismatch. Change one, change both.
+`scripts/audit_design.py` diffs `--breakpoint-*` against `--bp-*`, when both
+files are in its run, and fails on mismatch (`breakpoint-drift`). Change one,
+change both.
 
 ### 2.5 `--container-*` is a trap; use `@utility` instead
 
@@ -449,11 +450,12 @@ The convention where a role needs both: **bare name = the fill, `-fg` suffix =
 the ink.** `bg-danger` is the 500-weight solid; `text-danger-fg` is the
 700-weight that clears 4.5:1 on a light surface. Writing `text-danger` puts
 500-weight text on a light background and drops you under contrast — it is
-syntactically valid and wrong, which is why the audit checks it.
+syntactically valid and wrong, and no gate can see it, so review for it: a
+`text-` class on a role that has a `-fg` twin is this bug.
 
 The leak is real and worth naming: `bg-muted` and `text-canvas` are also
 generated and are also nonsense. One namespace cannot encode position. Design
-review and the audit catch these; the type system cannot.
+review catches these; neither the type system nor a gate can.
 
 **Typography.** Each role ships size + leading + tracking + weight from one
 class, via Tailwind's `--text-x--line-height` companions:
@@ -819,12 +821,14 @@ you want it to be.
 `@apply` copies a utility's declarations into a rule. The moment it does, three
 things Tailwind exists to prevent come back:
 
-**Specificity returns.** A utility is a single class in the `utilities` layer
-and beats component CSS by layer order. `@apply`-ed into `.card .title`, those
-same declarations now carry that selector's specificity and live in the
-`components` layer — so `p-card-lg` on the element no longer overrides them.
-This is precisely the "the utility isn't working" ticket, and it is caused by
-the thing that was supposed to make utilities more maintainable.
+**Specificity returns, in v3.** v3 has no cascade layers, so a utility wins by
+coming last, at one class of specificity. `@apply`-ed into `.card .title`, those
+same declarations carry that selector's specificity, so `p-card-lg` on the
+element no longer overrides them. This is precisely the "the utility isn't
+working" ticket, caused by the thing that was supposed to make utilities more
+maintainable. Under this suite's v4 layer order the `utilities` layer still
+wins, whatever the specificity; what returns there is the order and the cost
+below.
 
 **Order returns.** Tailwind sorts utilities into a known, stable cascade.
 `@apply` output is emitted where you wrote it, so which of two conflicting
@@ -1137,7 +1141,7 @@ because media queries cannot read custom properties; a color never must be. So
 | `eslint.design.config.mjs` | on save, pre-commit, CI | Laws 1, 2, 3, 4, 5, 6, 8 |
 | `stylelint.config.mjs` | on save, pre-commit, CI | Laws 1, 2, 3, 5, 6 in CSS |
 | `pre-commit-design-gate.sh` | every commit | all of the above, staged files only |
-| `scripts/audit_design.py` | pre-commit, CI | Law 9 — contrast, token coverage, breakpoint drift |
+| `scripts/audit_design.py` | pre-commit, CI | Laws 1 to 6 in CSS, JS and templates, and breakpoint drift; `scripts/check_roles.py` measures contrast |
 
 Three properties matter more than the rule list:
 
