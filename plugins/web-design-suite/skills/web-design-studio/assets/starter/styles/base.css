@@ -174,7 +174,7 @@
      `--leading-none` collapses the raised glyph's line box, which is what
      stops a footnote marker from increasing the leading of its paragraph. */
   :where(sub, sup) {
-    /* stylelint-disable-next-line declaration-property-value-allowed-list -- Tier-1 reach, see above */
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- design-audit-ignore-next-line: L1 -- Tier-1 reach, see above */
     font-size: 0.75em;
     line-height: var(--leading-none);
     position: relative;

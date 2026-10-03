@@ -69,6 +69,7 @@ const SYSTEM_COLOR_NAMES = [
   'canvas', 'canvastext', 'field', 'fieldtext', 'graytext', 'highlight', 'highlighttext',
   'linktext', 'mark', 'marktext', 'selecteditem', 'selecteditemtext', 'visitedtext',
 ];
+const SYSTEM_COLOR_PROPERTY = new RegExp(String.raw`^(?:color|fill|stroke|stop-color|flood-color|lighting-color|accent-color|caret-color|background(?:-color)?|border(?:-[a-z]+)*|outline(?:-color)?|text-decoration(?:-color)?|text-emphasis(?:-color)?|column-rule(?:-color)?|box-shadow|text-shadow)$`, 'i');
 const KEYWORDS = ['inherit', 'initial', 'unset', 'revert', 'revert-layer'];
 const COLOUR_WORDS = String.raw`/^(?:${['currentcolor', 'transparent', ...SYSTEM_COLOR_NAMES].join('|')})$/i`;
 const VAR_SEQ = String.raw`/^(?:var\(--[a-z0-9-]+\)\s*)+$/`;
@@ -92,7 +93,7 @@ const VALUE_ALLOWLIST = {
   'row-gap': [VAR_ONE, '0', ...KEYWORDS],
   'column-gap': [VAR_ONE, '0', ...KEYWORDS],
   // type: Laws 1, 3
-  'font-size': [VAR_ONE, ...KEYWORDS],
+  'font-size': [VAR_ONE, '1em', ...KEYWORDS],
   'line-height': [VAR_ONE, ...KEYWORDS],
   'font-weight': [VAR_ONE, ...KEYWORDS],
   'font-family': [VAR_ONE, ...KEYWORDS],
@@ -342,9 +343,9 @@ const systemColorMessages = utils.ruleMessages(systemColorRuleName, {
     `@media (forced-colors: active). Anywhere else it is a colour no token controls, no theme re-points ` +
     `and no contrast check measures. Use a role token.`,
 });
-/* Properties whose values can hold a colour. Others are left alone: `canvas`
- * or `mark` may be a grid-area or an animation name. */
-const COLOUR_PROPERTY = /^(?:color|fill|stroke|stop-color|flood-color|lighting-color|accent-color|caret-color|background(?:-color)?|border(?:-[a-z]+)*|outline(?:-color)?|text-decoration(?:-color)?|text-emphasis(?:-color)?|column-rule(?:-color)?|box-shadow|text-shadow)$/i;
+/* SYSTEM_COLOR_PROPERTY (the block) names the properties whose values can
+ * hold a colour. Others are left alone: `canvas` or `mark` may be a
+ * grid-area or an animation name. */
 const SYSTEM_COLOR_WORD = new RegExp(`^(?:${SYSTEM_COLOR_NAMES.join('|')})$`, 'i');
 
 const inForcedColors = (node) => {
@@ -361,7 +362,7 @@ const systemColorRule = (primary) => (root, result) => {
   if (!utils.validateOptions(result, systemColorRuleName, { actual: primary, possible: [true] })) {
     return;
   }
-  root.walkDecls(COLOUR_PROPERTY, (decl) => {
+  root.walkDecls(SYSTEM_COLOR_PROPERTY, (decl) => {
     const word = decl.value.split(/[\s,/()]+/).find((w) => SYSTEM_COLOR_WORD.test(w));
     if (word && !inForcedColors(decl)) {
       utils.report({
@@ -380,6 +381,126 @@ systemColorRule.messages = systemColorMessages;
 systemColorRule.meta = { url: 'references/accessibility.md' };
 
 const systemColorPlugin = createPlugin(systemColorRuleName, systemColorRule);
+
+/* -------------------------------------------------------------------------
+ * design/color-no-hex: a hex anywhere but a var() fallback (LAW 1)
+ * -------------------------------------------------------------------------
+ * stylelint's own color-no-hex also reads the fallback in
+ * `var(--fg-muted, #666)`, but a fallback renders only when the token is
+ * missing, and the spec leaves it unchecked (design-rules.json:
+ * var_fallback), as the audit does. This is color-no-hex without the
+ * fallbacks. A `#` in a quoted string or a url() is not a colour.
+ * ------------------------------------------------------------------------- */
+const hexRuleName = 'design/color-no-hex';
+const hexMessages = utils.ruleMessages(hexRuleName, {
+  rejected: (hex) =>
+    `Law 1 (tokens or nothing): "${hex}" is a colour written by hand. Use a role token. ` +
+    `A hex belongs in tokens.css, or in a var() fallback, which is not checked.`,
+});
+const HEX_WORD = /(?:^|[^\w#&-])(#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4}))(?![\w-])/gi;
+
+/* The value with quoted strings and url() blanked, and each var() cut to its
+ * name: `var(--a, #fff)` becomes `var(--a)`. */
+const withoutFallbacks = (value) => {
+  const text = value.replace(/(["'])(?:\\.|(?!\1).)*\1/g, '""').replace(/url\([^)]*\)/gi, 'url()');
+  const varOpen = /\bvar\(/gi;
+  let out = '';
+  let i = 0;
+  for (let found = varOpen.exec(text); found; found = varOpen.exec(text)) {
+    const start = found.index + found[0].length;
+    let depth = 1;
+    let comma = -1;
+    let j = start;
+    for (; j < text.length && depth > 0; j++) {
+      if (text[j] === '(') depth++;
+      else if (text[j] === ')') depth--;
+      else if (text[j] === ',' && depth === 1 && comma < 0) comma = j;
+    }
+    out += text.slice(i, start) + (comma < 0 ? text.slice(start, j) : `${text.slice(start, comma)})`);
+    i = j;
+    varOpen.lastIndex = j;
+  }
+  return out + text.slice(i);
+};
+
+const hexRule = (primary) => (root, result) => {
+  if (!utils.validateOptions(result, hexRuleName, { actual: primary, possible: [true] })) {
+    return;
+  }
+  root.walkDecls((decl) => {
+    for (const match of withoutFallbacks(decl.value).matchAll(HEX_WORD)) {
+      utils.report({
+        message: hexMessages.rejected(match[1]),
+        node: decl,
+        word: match[1],
+        result,
+        ruleName: hexRuleName,
+      });
+    }
+  });
+};
+
+hexRule.ruleName = hexRuleName;
+hexRule.messages = hexMessages;
+hexRule.meta = { url: 'assets/rules/design-rules.json' };
+
+const hexPlugin = createPlugin(hexRuleName, hexRule);
+
+/* -------------------------------------------------------------------------
+ * design/component-margins: LAW 2, switched on for component files in Part 5
+ * -------------------------------------------------------------------------
+ * A component never sets its own outer margin, so in a component file a
+ * margin takes MARGIN_ALLOWLIST: 0, auto, or a cancelled token. The other
+ * legal margin is the owl, written in the parent's own rule
+ * (`.stack > * + *`), where the parent spaces its children. The value
+ * allowlist cannot see the selector, so this rule does the job and knows the
+ * owl, as the audit does (design-rules.json: margins_in_components).
+ * ------------------------------------------------------------------------- */
+const marginRuleName = 'design/component-margins';
+const marginMessages = utils.ruleMessages(marginRuleName, {
+  rejected: (prop, value) =>
+    `Law 2 (parents own the gaps): "${prop}: ${value}" sets this component's own outer margin. ` +
+    `Let the parent space it with gap, or write the margin in the parent's owl rule (> * + *). ` +
+    `Legal here: 0, auto, and calc(var(--token) * -1) to cancel a known token.`,
+});
+/* The whole owl, `> * + *`: `.card + *` is a component spacing its next
+ * sibling, which the owl is not. */
+const OWL_SELECTOR = />\s*\*\s*\+\s*\*/;
+
+/* An allowlist entry as declaration-property-value-allowed-list reads it: a
+ * string in slashes is a regular expression, anything else an exact value. */
+const allowedBy = (entries, value) =>
+  entries.some((entry) => {
+    const pattern = /^\/(.*)\/([a-z]*)$/s.exec(entry);
+    return pattern ? new RegExp(pattern[1], pattern[2]).test(value) : entry === value;
+  });
+
+const marginRule = (primary) => (root, result) => {
+  if (!utils.validateOptions(result, marginRuleName, { actual: primary, possible: [true] })) {
+    return;
+  }
+  root.walkDecls((decl) => {
+    const entries = MARGIN_ALLOWLIST[decl.prop.toLowerCase()];
+    if (!entries || allowedBy(entries, decl.value.trim())) return;
+    // The rule that holds the declaration, through any @media or @supports
+    // around it, as the audit reads it.
+    let rule = decl.parent;
+    while (rule && rule.type !== 'rule') rule = rule.parent;
+    if (rule && OWL_SELECTOR.test(rule.selector)) return;
+    utils.report({
+      message: marginMessages.rejected(decl.prop, decl.value),
+      node: decl,
+      result,
+      ruleName: marginRuleName,
+    });
+  });
+};
+
+marginRule.ruleName = marginRuleName;
+marginRule.messages = marginMessages;
+marginRule.meta = { url: 'assets/rules/design-rules.json' };
+
+const marginPlugin = createPlugin(marginRuleName, marginRule);
 
 /* =========================================================================
  * PART 3 — THE VALUE ALLOWLISTS (LAW 1, LAW 3, LAW 6)
@@ -412,10 +533,11 @@ const systemColorPlugin = createPlugin(systemColorRuleName, systemColorRule);
  * `margin: 0` (a reset) and `margin-inline: auto` (a container centring
  * ITSELF, not a child pushing a sibling). Both are correct, and a rule that
  * flags correct code gets switched off wholesale. So the margin properties
- * exist, and in a component file (Part 5) their values are MARGIN_ALLOWLIST:
- * `0`, `auto` and a cancelled token. Layout primitives are the parent, and
- * the parent may place things, though `gap` is almost always the better
- * instrument.
+ * exist, and in a component file (Part 5) design/component-margins (Part 2)
+ * holds them to MARGIN_ALLOWLIST: `0`, `auto` and a cancelled token, except
+ * in an owl rule, which a value allowlist cannot see. Layout primitives are
+ * the parent, and the parent may place things, though `gap` is almost always
+ * the better instrument.
  * ========================================================================= */
 
 /* =========================================================================
@@ -424,7 +546,7 @@ const systemColorPlugin = createPlugin(systemColorRuleName, systemColorRule);
 
 export default {
   extends: ['stylelint-config-standard'],
-  plugins: [designPlugin, systemColorPlugin],
+  plugins: [designPlugin, systemColorPlugin, hexPlugin, marginPlugin],
 
   rules: {
     /* ---- LAW 5: layers, not specificity ------------------------------ */
@@ -476,7 +598,7 @@ export default {
     /* Belt and braces on colour. The allowlist above covers the properties
      * that matter; these catch a hex anywhere else at all — a gradient
      * stop, a `filter: drop-shadow()`, an SVG attribute, a mask. */
-    'color-no-hex': true,
+    [hexRuleName]: true,
     'color-named': 'never',
     'function-disallowed-list': ['rgb', 'rgba', 'hsl', 'hsla', 'hwb'],
 
@@ -596,7 +718,7 @@ export default {
       files: ['**/tokens.css', '**/*-tokens.css', '**/*.tokens.css', '**/tokens/*.css'],
       rules: {
         'declaration-property-value-allowed-list': null,
-        'color-no-hex': null,
+        [hexRuleName]: null,
         'color-named': null,
         'function-disallowed-list': null,
         /* Tier-1 steps are `--space-0-5`, `--text-2xs`, `--radius-2xl`:
@@ -614,7 +736,7 @@ export default {
      *
      * Allowed the four literal exceptions documented in theme.css §0
      * (breakpoints, CSS-wide keywords, keyframe geometry, aspect ratios)
-     * and nothing else. `color-no-hex` stays ON: a breakpoint has to be a
+     * and nothing else. `design/color-no-hex` stays ON: a breakpoint has to be a
      * literal because media queries cannot read custom properties; a colour
      * never has to be.
      * ------------------------------------------------------------------ */
@@ -646,7 +768,7 @@ export default {
      * because each tool reads "next line" as the line after the comment:
      *
      *   .tooltip__arrow {
-     *     /* stylelint-disable-next-line declaration-property-value-allowed-list --
+     *     /* stylelint-disable-next-line design/component-margins --
      *        design-audit-ignore-next-line: L1, L2 --
      *        Law 2 escape: optical alignment. The arrow's bounding box sits
      *        1px below its visual centre because of the border join; no
@@ -669,10 +791,7 @@ export default {
         '**/components.css',
       ],
       rules: {
-        'declaration-property-value-allowed-list': {
-          ...VALUE_ALLOWLIST,
-          ...MARGIN_ALLOWLIST,
-        },
+        [marginRuleName]: true,
         /* A component styling anything but itself and its own parts is
          * reaching outside its box. `> *`, `+ *` and descendant element
          * selectors are how one component quietly starts owning another's

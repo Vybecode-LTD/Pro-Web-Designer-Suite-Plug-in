@@ -19,24 +19,29 @@
   },
   "margins_in_components": {
     "gates": ["audit", "stylelint"],
-    "rule": "Law 2: a component never sets its own outer margin. Legal: auto (alignment), 0, calc(var(--token) * -1) to cancel a known token, and an owl selector written in the parent's own rule.",
+    "rule": "Law 2: a component never sets its own outer margin. Legal: auto (alignment), 0, calc(var(--token) * -1) to cancel a known token, and the owl, the whole `> * + *` in the parent's own rule, through any @media around the margin. `.card + *` is not the owl: it is the component spacing its next sibling.",
     "properties": ["margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "margin-inline", "margin-block",
                    "margin-inline-start", "margin-inline-end", "margin-block-start", "margin-block-end"],
     "values": ["0", "auto", "0 auto", "auto 0", "CANCEL", "KEYWORDS"],
     "allowed_values": ["0", "auto", "0 auto", "auto 0", "calc(var(--card-inset) * -1)", "calc(-1 * var(--card-inset))"],
     "refused_values": ["16px", "var(--gap-related)", "calc(var(--card-inset) * -2)"],
     "owl_selectors": [".stack > * + *", ".flow > * + *"],
-    "refused_selectors": [".card *", ".card p"]
+    "refused_selectors": [".card *", ".card p", ".card > svg", ".card:is(h2, h3)"],
+    "allowed_selectors": [".card:nth-child(2n + 1)", ".card__icon:where(:hover, :focus-visible)",
+                          ".card[data-state=\"open\"]", ".card::before", ".card:lang(en)"],
+    "allowed": [".stack > * + * { @media (width >= 48rem) { margin-block-start: var(--gap-grouped); } }"],
+    "refused": [".card + * { margin-block-start: var(--gap-related); }"]
   },
   "var_fallback": {
     "gates": ["audit", "stylelint"],
     "rule": "A var() fallback is not checked: the token is the value, and the fallback only renders when the token is missing.",
-    "allowed": ["var(--fg-muted)", "var(--fg-muted, #666666)", "var(--card-pad, var(--pad-card))"]
+    "allowed": ["var(--fg-muted)", "var(--fg-muted, #666)", "var(--card-pad, var(--pad-card))"]
   },
   "system_colors": {
     "gates": ["audit", "stylelint"],
     "names": ["accentcolor", "accentcolortext", "activetext", "buttonborder", "buttonface", "buttontext", "canvas", "canvastext", "field", "fieldtext", "graytext", "highlight", "highlighttext", "linktext", "mark", "marktext", "selecteditem", "selecteditemtext", "visitedtext"],
-    "rule": "A CSS system colour (Canvas, ButtonText, Highlight and the rest) is correct only inside @media (forced-colors: active), where the user's palette replaces the page's. Anywhere else it is a colour no token controls, no theme re-points and no contrast check measures. CSS keywords are case-insensitive, so every spelling counts. stylelint enforces this with design/system-colors-in-forced-colors; audit_design still accepts a system colour anywhere (completion plan, W2 N1).",
+    "rule": "A CSS system colour (Canvas, ButtonText, Highlight and the rest) is correct only inside @media (forced-colors: active), where the user's palette replaces the page's. Anywhere else it is a colour no token controls, no theme re-points and no contrast check measures. CSS keywords are case-insensitive, so every spelling counts. stylelint enforces this with design/system-colors-in-forced-colors and the audit as L1 system-color, both in the properties `properties` matches; others are left alone, because `canvas` or `mark` may be a grid-area or an animation name.",
+    "properties": "^(?:color|fill|stroke|stop-color|flood-color|lighting-color|accent-color|caret-color|background(?:-color)?|border(?:-[a-z]+)*|outline(?:-color)?|text-decoration(?:-color)?|text-emphasis(?:-color)?|column-rule(?:-color)?|box-shadow|text-shadow)$",
     "allowed": [
       "@media (forced-colors: active) { .card { border-color: ButtonText; } }",
       "@media (forced-colors: active) { .card { outline-color: highlight; } }",
@@ -153,18 +158,23 @@
           {"properties": ["row-gap", "column-gap"], "values": ["VAR_ONE", "0", "KEYWORDS"]}
         ],
         "allowed": ["padding: var(--pad-card) var(--pad-card-lg)", "padding-inline: 0", "gap: var(--gap-related)",
-                    "padding-block-start: calc(var(--pad-card) - var(--stroke-hairline))"],
-        "refused": ["padding: 13px", "padding: var(--pad-card) 2px", "gap: 1rem", "padding: calc(var(--space-4) * 1.5)"]
+                    "padding-block-start: calc(var(--pad-card) - var(--stroke-hairline))",
+                    "padding-top: var(--pad-card, calc(1rem / 2))"],
+        "refused": ["padding: 13px", "padding: var(--pad-card) 2px", "gap: 1rem", "padding: calc(var(--space-4) * 1.5)",
+                    "padding: calc(var(--pad-card) * 1.5)", "gap: calc(var(--gap-related) * 3)",
+                    "padding-inline: calc(var(--pad-card) / 2)"]
       },
       "type": {
         "laws": "1, 3",
-        "why": "No em, no %, no bare 1.4: size and leading are the values every project drifts on first. line-height takes no literal 1, though --leading-none is 1: the literal teaches the next person that the scale is optional. The font shorthand is how the --type-* roles are read, four values in one declaration that cannot half-apply.",
+        "why": "No em, no %, no bare 1.4: size and leading are the values every project drifts on first. The one em is font-size: 1em, which sizes an icon to the text beside it. line-height takes no literal 1, though --leading-none is 1: the literal teaches the next person that the scale is optional. The font shorthand is how the --type-* roles are read, four values in one declaration that cannot half-apply.",
         "allow": [
-          {"properties": ["font-size", "line-height", "font-weight", "font-family", "font"], "values": ["VAR_ONE", "KEYWORDS"]},
+          {"properties": ["font-size"], "values": ["VAR_ONE", "1em", "KEYWORDS"]},
+          {"properties": ["line-height", "font-weight", "font-family", "font"], "values": ["VAR_ONE", "KEYWORDS"]},
           {"properties": ["letter-spacing"], "values": ["VAR_ONE", "normal", "KEYWORDS"]}
         ],
-        "allowed": ["font: var(--type-body)", "letter-spacing: normal", "font-weight: var(--weight-semibold)"],
-        "refused": ["font-size: 18px", "font-size: 1.125rem"]
+        "allowed": ["font: var(--type-body)", "letter-spacing: normal", "font-weight: var(--weight-semibold)",
+                    "font-size: 1em"],
+        "refused": ["font-size: 18px", "font-size: 1.125rem", "font-size: 0.75em", "letter-spacing: 0.05em"]
       },
       "radius": {
         "laws": "1",
@@ -228,13 +238,14 @@
           {"properties": ["min-inline-size"], "values": ["VAR_ONE", "0", "100%", "auto", "KEYWORDS"]}
         ],
         "allowed": ["max-inline-size: var(--measure-prose)", "min-block-size: 100svb", "max-width: 100%"],
-        "refused": ["max-width: 600px"]
+        "refused": ["max-width: 600px", "max-inline-size: 65ch"]
       }
     }
   },
   "inline_styles": {
     "gates": ["audit", "eslint"],
-    "rule": "Law 4: the style prop is a second home for a component's styles, where no stylesheet, theme, media query or audit reaches. Its one legal use passes a value only the runtime knows into CSS as a custom property; a design literal there (a length, a hex, a colour function) is Law 1 coming back through that exception.",
+    "rule": "Law 4: the style prop is a second home for a component's styles, where no stylesheet, theme, media query or audit reaches. Its one legal use passes a value only the runtime knows into CSS as a custom property; a design literal there is Law 1 coming back through that exception. A design literal is a string holding a number with one of `literal_units`, a hex, or a colour function (values.colour_functions).",
+    "literal_units": ["px", "rem", "em", "ch", "ex", "vw", "vh", "vmin", "vmax", "%", "deg", "s", "ms"],
     "allowed": ["<div style={{ '--progress': pct }} />", "<div style={span ? { '--card-span': span } : undefined} />"],
     "refused": ["<div style={{ padding: 13 }} />", "<div style={{ '--gap': '12px' }} />",
                 "<div style={{ '--tint': 'hwb(20 10% 30%)' }} />"]

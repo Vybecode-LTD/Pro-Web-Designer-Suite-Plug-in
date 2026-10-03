@@ -44,11 +44,20 @@ All CSS reads Tier-2 tokens only; component-specific values are Tier-3 variables
     transform: translateY(-100%);
     transition: transform var(--motion-exit);
   }
-  body  { padding-block-start: var(--nav-offset); } /* reserve it; navigation-patterns.md §4 */
+  /* The page reserves the header's height: the base rule below. A component
+     styles itself, never <body>. */
 
   /* The skip link is the starter's .skip-link (layout.css), not a second copy
      here: one class, one home. Its --z-toast sits above --z-sticky, so it
      clears this header. */
+}
+```
+
+The fixed header leaves the flow, so the page reserves its height. That rule is the page's, in `base`:
+
+```css
+@layer base {
+  body { padding-block-start: var(--nav-offset); }   /* navigation-patterns.md §4 publishes --nav-offset */
 }
 ```
 
@@ -99,9 +108,9 @@ header.addEventListener('focusin', () => setHidden(false));  // never hide what'
       <div class="megamenu" id="panel-shoes" aria-labelledby="trigger-shoes" hidden>
         <div class="megamenu__col">
           <p class="megamenu__heading" id="mm-run">Running</p>
-          <ul aria-labelledby="mm-run">
-            <li><a href="/shoes/running">All running shoes</a></li>
-            <li><a href="/shoes/trail">Trail</a></li>
+          <ul class="megamenu__list" aria-labelledby="mm-run">
+            <li><a class="megamenu__link" href="/shoes/running">All running shoes</a></li>
+            <li><a class="megamenu__link" href="/shoes/trail">Trail</a></li>
           </ul>
         </div>
       </div>
@@ -127,12 +136,12 @@ Note what is absent: no `role="menu"`, no `role="menuitem"`, no `aria-haspopup="
   }
   .megamenu[hidden]     { display: none; }
   .megamenu__col        { display: grid; gap: var(--gap-tight); }
-  .megamenu__col ul     { display: grid; gap: var(--gap-related); }
+  .megamenu__list       { display: grid; gap: var(--gap-related); }
   .megamenu__heading    { font: var(--type-label); color: var(--fg-muted);
                           letter-spacing: var(--tracking-caps); text-transform: uppercase; }
-  .megamenu a           { display: flex; align-items: center; min-height: var(--tap-min);
+  .megamenu__link       { display: flex; align-items: center; min-height: var(--tap-min);
                           padding-inline: var(--pad-inline-xs); border-radius: var(--radius-sm); }
-  .megamenu a:hover     { background: var(--bg-hover); }
+  .megamenu__link:hover { background: var(--bg-hover); }
 }
 ```
 
@@ -238,7 +247,7 @@ bar.addEventListener('focusout', (e) => {
 <dialog id="nav-drawer" class="drawer" aria-labelledby="drawer-title">
   <h2 id="drawer-title" tabindex="-1">Navigation</h2>
   <button type="button" data-close>Close</button>
-  <nav aria-label="Main"><ul class="drawer__list">…</ul></nav>
+  <nav aria-label="Main"><ul class="drawer__list"><li><a class="drawer__link" href="/">Home</a></li>…</ul></nav>
 </dialog>
 ```
 
@@ -268,9 +277,9 @@ bar.addEventListener('focusout', (e) => {
   @starting-style { .drawer[open]::backdrop { opacity: 0; } }
 
   .drawer__list   { display: grid; gap: var(--gap-related); }
-  .drawer__list a { display: flex; align-items: center; min-height: var(--tap-min);
-                    padding: var(--pad-block-md) var(--pad-inline-md);
-                    border-radius: var(--radius-md); }
+  .drawer__link { display: flex; align-items: center; min-height: var(--tap-min);
+                  padding: var(--pad-block-md) var(--pad-inline-md);
+                  border-radius: var(--radius-md); }
 }
 ```
 
@@ -367,13 +376,15 @@ addEventListener('scroll', () => {
     max-block-size: calc(100dvh - var(--nav-offset) - var(--gap-distinct));
     overflow-y: auto; overscroll-behavior: contain;
   }
-  .toc a {
+  /* Each link is a .toc__link and each list a .toc__list: the component styles
+     its own parts by class, never the elements inside it (Law 2). */
+  .toc__link {
     font: var(--type-ui); color: var(--fg-muted);
     padding-block: var(--pad-block-xs); padding-inline-start: var(--pad-inline-sm);
     border-inline-start: var(--stroke-thick) solid var(--border-subtle);
     transition: color var(--motion-hover), border-color var(--motion-hover);
   }
-  .toc a[aria-current] { color: var(--fg-default); border-inline-start-color: var(--border-accent); }
-  .toc ul ul           { padding-inline-start: var(--pad-inline-md); }
+  .toc__link[aria-current] { color: var(--fg-default); border-inline-start-color: var(--border-accent); }
+  .toc__list .toc__list    { padding-inline-start: var(--pad-inline-md); }
 }
 ```

@@ -324,6 +324,9 @@ class SyncRules(TempDirTest):
         self.assertLess(declared, stylelint.index("\nconst VALUE_ALLOWLIST = {\n"))
         self.assertIn("\n  'max-width': [VAR_ONE, 'none', '100%', 'max-content', 'min-content', 'fit-content', "
                       "PERCENT, ...KEYWORDS],\n", stylelint)
+        # The audit reads the sizing family too, so its block declares the shape as well.
+        audit = self.gates()[0].decode("utf-8")
+        self.assertLess(audit.index('\nPERCENT = re.compile(r"^\\d+%$")\n'), audit.index("\nSIZING_VALUES = {\n"))
 
     def test_a_name_the_spec_does_not_define_writes_nothing(self):
         self.edit_spec(lambda spec: spec["values"]["families"]["type"]["allow"][0]["values"].append("VAR_TYPO"))

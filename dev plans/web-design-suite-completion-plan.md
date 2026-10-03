@@ -95,7 +95,7 @@ Re-check every Supabase fact at supabase.com on the day, and register it.
 
 This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.2.1.
 
-**N1 · The gates disagree.** Measured 2026-09-25 with stylelint 17.15. For each row, decide the rule in `design-rules.json` and make all three gates follow it. *Decided 2026-10-02 (execution plan D2): rows 1 and 2 refuse a factor on a role token, and `* -1` stays allowed; row 3 refuses `em` font sizes except `1em`; row 4 refuses a literal `ch` measure in favour of the measure token; row 5 refuses type selectors in component files. Rows 6 to 8 follow the spec.*
+**N1 · The gates disagree.** *Done for 3.3.0 (PR #20): every row follows the spec in all three gates, and each is an example the conformance tests run.* Measured 2026-09-25 with stylelint 17.15. For each row, decide the rule in `design-rules.json` and make all three gates follow it. *Decided 2026-10-02 (execution plan D2): rows 1 and 2 refuse a factor on a role token, and `* -1` stays allowed; row 3 refuses `em` font sizes except `1em`; row 4 refuses a literal `ch` measure in favour of the measure token; row 5 refuses type selectors in component files. Rows 6 to 8 follow the spec.*
 
 | Construct | audit_design | stylelint config | The spec today |
 |---|---|---|---|
@@ -112,13 +112,17 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 - `tools/sync_rules.py` writes the spec's data into one marked block in each gate, and `--check` runs in `check.py` and CI. The audit gets the layer order and statement, the nesting depth and the colour functions. The stylelint config gets those it uses, the system colours, the value shapes, the keywords, the colour words, the allowlists of 43 properties in eight families, and the component margins. The ESLint config gets the colour functions, for its raw-colour rule and its inline-style rule. Why each family takes what it takes moved from the config's comments into the spec (`values.families.*.why`).
 - Each section of the spec names the gates that enforce it (`gates`). One builder turns every `allowed` and `refused` example into a file, and the audit (`test_rules_spec`), stylelint and ESLint (`test_real_tools`) must give the spec's verdict on each. Where one does not yet, `KNOWN_DISAGREEMENTS` names the item that fixes it, and the test fails once the gate agrees. The tests that read the stylelint config as text are gone.
 
-**N30 · What the conformance test found (P2).** The audit gives the opposite verdict on seven of the spec's examples that neither N1 nor SB-A15 lists. Each is in `KNOWN_DISAGREEMENTS`:
+**N30 · What the conformance test found (P2).** *Done for 3.3.0 (PR #20), with N1: `KNOWN_DISAGREEMENTS` is empty.* The audit gave the opposite verdict on seven of the spec's examples that neither N1 nor SB-A15 lists. Each is in `KNOWN_DISAGREEMENTS`:
 - `transition-duration: 0s` is refused as a literal duration, though the spec and stylelint allow `0s`;
 - `.card *` in a component file passes, though stylelint refuses it (`selector-max-universal`);
 - `font-size: 1.125rem` passes: the type check skips any length ending in "em", and "rem" does;
 - `color: red` is only a warning (`named-color`), so a run without `--strict` passes it;
 - `max-width: 600px` passes: the audit reads no sizing property;
 - a design literal in an inline custom property (`style={{ '--gap': '12px' }}`, or a colour function) passes, though ESLint refuses it.
+
+**N31 · Found while closing N1 (P3 part 1).** Two more disagreements, outside the spec's examples. Each needs the spec's answer, as examples, before the gate that differs changes:
+- **A literal `0` among tokens.** `padding: 0 var(--pad-card)` passes the audit, and the spec's zero rule allows it, but stylelint's `VAR_SEQ` takes only `var()`s and refuses it; so do `gap` and `border-radius`. Likewise `calc(100% - var(--gutter-page))` in a spacing property: stylelint takes no calc() but a token plus or minus a token, and the audit passes it.
+- **Margins the audit exempts.** The audit lets a component set a margin on its generated content (`.card::before`) and in a rule whose selector names `prose`. `design/component-margins` refuses both, and the spec says neither.
 
 **N3 · The references' CSS against the stylelint config.** 56 of the 170 CSS snippet files fail it (3.2.1). The failures by rule:
 - 27 `selector-max-type`;
