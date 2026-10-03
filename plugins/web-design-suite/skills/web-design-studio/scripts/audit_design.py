@@ -115,7 +115,7 @@ VAR_CALC = re.compile(r"^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+
 CANCEL = re.compile(r"^calc\(\s*(?:var\(--[a-z0-9-]+\)\s*\*\s*-1|-1\s*\*\s*var\(--[a-z0-9-]+\))\s*\)$")
 ALIGN = re.compile(r"^(?:0|auto)(?:\s+(?:0|auto)){0,3}$")
 STROKE = re.compile(r"^(?:var\(--[a-z0-9-]+\)|0|none|solid|dashed|dotted|double|currentColor|currentcolor|transparent)(?:\s+(?:var\(--[a-z0-9-]+\)|0|none|solid|dashed|dotted|double|currentColor|currentcolor|transparent))*$")
-MOTION_LIST = re.compile(r"^(?:(?:var\(--[a-z0-9-]+\)|0s|\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\w-]))[a-zA-Z_-][\w-]*)(?:\s*,\s*|\s+))*(?:var\(--[a-z0-9-]+\)|0s|\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\w-]))[a-zA-Z_-][\w-]*)$")
+MOTION_LIST = re.compile(r"^(?:(?:var\(--[a-z0-9-]+\)|0s|\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\w-]))[a-z_-][a-z0-9_-]*)(?:\s*,\s*|\s+))*(?:var\(--[a-z0-9-]+\)|0s|\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\w-]))[a-z_-][a-z0-9_-]*)$")
 BREAKPOINT = re.compile(r"^\d+(?:\.\d+)?rem$")
 RATIO = re.compile(r"^\d+(?:\.\d+)?\s*/\s*\d+(?:\.\d+)?$")
 SPACING_VALUES = {
@@ -217,6 +217,7 @@ SASS_STRING = re.compile(r"""(['"])(?:\\.|(?!\1).)*\1""", re.S)
 # A Sass variable or interpolation in a value: the audit cannot resolve it, so
 # the value allowlists leave it to the variable's own check (sass-literal).
 SASS_REFERENCE = re.compile(r"(?<![\w-])\$[\w-]+|#\{")
+SASS_REFERENCES = re.compile(r"#\{[^{}]*\}|(?<![\w-])\$[\w-]+")       # each one, to blank it
 
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit",
@@ -804,6 +805,24 @@ def scales_a_token(value: str) -> bool:
     return bool(re.search(r"[*/]", strip_var_refs(CANCELLED_TOKEN.sub(" var() ", value))))
 
 
+def motion_literal(value: str) -> bool:
+    """A time other than 0s, a curve or an easing keyword, beside any tokens."""
+    rest = strip_var_refs(value)
+    return (any(not ZERO_TIME.fullmatch(t) for t in TIME_LITERAL.findall(rest))
+            or bool(BEZIER_LITERAL.search(rest) or EASING_WORD.search(rest)))
+
+
+def off_family(value: str, allowed: tuple, literal) -> bool:
+    """Whether a family refuses `value`. A value that holds a Sass reference
+    cannot be matched against the allowlist, because the audit cannot resolve
+    the variable, so it is judged by what is written beside the references: a
+    literal there is refused (`padding: $space 13px`), and the variable itself
+    is sass-literal's (design-rules.json: sass.variables)."""
+    if SASS_REFERENCE.search(value):
+        return bool(literal(SASS_REFERENCES.sub(" ", value)))
+    return not allowed_value(value, allowed)
+
+
 def allowed_value(value: str, allowed: tuple) -> bool:
     """Whether `value` is one a family allows (design-rules.json:
     values.families), as stylelint's allowlist reads it: a shape matches it,
@@ -973,7 +992,6 @@ def audit_css(path: Path, text: str) -> list[Finding]:
 
         d: CssDecl = ev
         prop, value, line = d.prop, d.value, d.line
-        sass_value = bool(SASS_REFERENCE.search(value))
 
         if prop.startswith("--"):
             declared_props.add(prop)
@@ -1067,8 +1085,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
         # values are the spacing family's, as stylelint reads them, so a share
         # of the container (5%, calc(100% - var(--gutter-page))) is refused
         # with the pixels (N31).
-        if (prop in SPACING_VALUES and not factor and not sass_value
-                and not allowed_value(value, SPACING_VALUES[prop])):
+        if prop in SPACING_VALUES and not factor and off_family(value, SPACING_VALUES[prop], has_raw_length):
             raw = has_raw_length(value)
             on_scale_note = ""
             if raw and raw.lower().endswith("px"):
@@ -1100,7 +1117,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     "or calc() over tokens. An em is allowed: it rides on the text.")
 
         # ---- L1 strokes ------------------------------------------------------
-        if prop in STROKE_VALUES and not sass_value and not allowed_value(value, STROKE_VALUES[prop]):
+        if prop in STROKE_VALUES and off_family(value, STROKE_VALUES[prop], has_raw_length):
             add(line, "L1", "raw-stroke", "error",
                 f"`{prop}: {value.strip()}` is not a stroke token.",
                 "Line weights are --stroke-hairline / --stroke-default / --stroke-thick "
@@ -1109,7 +1126,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 "(design-rules.json: values.families.stroke).")
 
         # ---- L1 sizing --------------------------------------------------------
-        if prop in SIZING_VALUES and not sass_value and not allowed_value(value, SIZING_VALUES[prop]):
+        if prop in SIZING_VALUES and off_family(value, SIZING_VALUES[prop], has_raw_length):
             add(line, "L1", "raw-size", "error",
                 f"`{prop}: {value.strip()}` is a literal size.",
                 "Line length and the widths of things are spacing decisions: use the "
@@ -1207,8 +1224,8 @@ def audit_css(path: Path, text: str) -> list[Finding]:
         # ---- L1 motion -------------------------------------------------------
         # The motion family's values, as stylelint reads them: a time, a curve
         # or an easing keyword is a choice the tokens make (values.families.motion).
-        if prop in MOTION_VALUES and not sass_value and not allowed_value(value, MOTION_VALUES[prop]):
-            rest = strip_var_refs(value)
+        if prop in MOTION_VALUES and off_family(value, MOTION_VALUES[prop], motion_literal):
+            rest = strip_var_refs(SASS_REFERENCES.sub(" ", value))
             # 0s switches one transition off among several: not a duration.
             if any(not ZERO_TIME.fullmatch(t) for t in TIME_LITERAL.findall(rest)):
                 add(line, "L1", "raw-duration", "error",

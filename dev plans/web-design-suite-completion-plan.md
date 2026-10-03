@@ -120,7 +120,7 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 - `max-width: 600px` passes: the audit reads no sizing property;
 - a design literal in an inline custom property (`style={{ '--gap': '12px' }}`, or a colour function) passes, though ESLint refuses it.
 
-**N31 · Found while closing N1 (P3 part 1).** *Done for 3.3.0 (PR #23): `0` among tokens is allowed, a share of the container is refused in both gates, a component may space its own `::before` and `::after`, and the audit's `prose` exemption is gone.* Two more disagreements, outside the spec's examples. Each needs the spec's answer, as examples, before the gate that differs changes:
+**N31 · Found while closing N1 (P3 part 1).** *Done for 3.3.0 (PR #23): `0` among tokens is allowed, a share of the container is refused in both gates, a component may space its own `::before` and `::after`, and the audit's `prose` exemption is gone.* The two disagreements, as they were found, outside the spec's examples:
 - **A literal `0` among tokens.** `padding: 0 var(--pad-card)` passes the audit, and the spec's zero rule allows it, but stylelint's `VAR_SEQ` takes only `var()`s and refuses it; so do `gap` and `border-radius`. Likewise `calc(100% - var(--gutter-page))` in a spacing property: stylelint takes no calc() but a token plus or minus a token, and the audit passes it.
 - **Margins the audit exempts.** The audit lets a component set a margin on its generated content (`.card::before`) and in a rule whose selector names `prose`. `design/component-margins` refuses both, and the spec says neither.
 
@@ -148,7 +148,7 @@ Add a stylelint snippet test like `DesignEslintConfig.test_the_references_tsx_sn
 | SB-A8 | medium | The canonical `index.css` puts third-party CSS on top of every layer. *Done for 3.3.0.* |
 | SB-A9 | medium | The scanner has bugs that hide violations. *Done for 3.3.0; part (d) was SS-A19, fixed in 3.1.0.* |
 | SB-A11 | medium | Docs promise checks that don't exist; for example, the audit does not diff `--breakpoint-*` against `--bp-*`. |
-| SB-A15 | medium | The stylelint allowlist has holes. |
+| SB-A15 | medium | The stylelint allowlist has holes. *Done for 3.3.0 (PR #23); SCSS in stylelint is P37's.* |
 | SB-A23 | low-medium | The files disagree on how to wrap imports in layers. *Done for 3.3.0.* |
 | SB-A24 | low-medium | SCSS: a `@mixin`-only partial fails L5, while `$card-padding: 24px` passes. *Done for 3.3.0, with the Sass rules in the spec (`sass`).* |
 | SB-A25 | low | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. |

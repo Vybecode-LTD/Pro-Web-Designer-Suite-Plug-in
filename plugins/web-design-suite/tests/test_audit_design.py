@@ -515,6 +515,20 @@ class AuditPrecision(TempDirTest):
         # refused too, as stylelint refuses it: 0 is spelled 0 (N31).
         self.assertEqual([("L1", "raw-spacing", 2), ("L1", "raw-spacing", 3)], self.found("src"))
 
+    def test_a_literal_beside_a_sass_variable_is_still_refused(self):
+        # Codex on #23: the value allowlists skipped every value that held a Sass
+        # reference, so `padding: $space 13px` passed, which the audit refused
+        # before, and stylelint reads no SCSS. What is beside the variables is
+        # judged; the variables are sass-literal's.
+        self.write("src/components/card.scss",
+                   "@layer components {\n"
+                   "  .card { padding: $space 13px; transition: opacity $fade 200ms; border: 1px solid $line; }\n"
+                   "  .card__media { padding: $space; inline-size: calc(100% - #{$gutter});"
+                   " transition: opacity $fade $ease-in; }\n"
+                   "}\n")
+        self.assertEqual([("L1", "raw-duration", 2), ("L1", "raw-spacing", 2), ("L1", "raw-stroke", 2)],
+                         self.found("src"))
+
     def test_indented_sass_is_skipped_not_passed(self):
         # Found with SB-A24: the scanner follows braces and indented Sass has
         # none, so a .sass file full of literals was reported clean.

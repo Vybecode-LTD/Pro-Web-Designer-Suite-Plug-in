@@ -136,7 +136,7 @@
   },
   "values": {
     "gates": ["audit", "stylelint"],
-    "rule": "Laws 1, 3 and 6: a design property takes a token through var(), or one of the few values that are not a design decision: 0, the CSS-wide keywords, and the keywords its family lists. stylelint allows exactly these values, property by property (declaration-property-value-allowed-list compares the whole value). The audit reads the same allowlists for the spacing, stroke, motion and sizing families (SPACING_VALUES and the rest), and refuses the literals the other families leave out; a value holding a Sass variable is left to sass.variables. An allowlist names what is correct, so 13px, 0.8125rem and clamp(12px, 2vw, 14px) are refused alike, and so is the spelling nobody has thought of yet.",
+    "rule": "Laws 1, 3 and 6: a design property takes a token through var(), or one of the few values that are not a design decision: 0, the CSS-wide keywords, and the keywords its family lists. stylelint allows exactly these values, property by property (declaration-property-value-allowed-list compares the whole value). The audit reads the same allowlists for the spacing, stroke, motion and sizing families (SPACING_VALUES and the rest), and refuses the literals the other families leave out; a value holding a Sass variable is judged by the literals beside it, since the audit cannot resolve the variable (sass.variables). An allowlist names what is correct, so 13px, 0.8125rem and clamp(12px, 2vw, 14px) are refused alike, and so is the spelling nobody has thought of yet.",
     "lists": "In a family's `values`, KEYWORDS is `keywords`, COLOUR_WORDS is `colour_words` and every system colour (system_colors.names) in any case, and a shape's name stands for its pattern. Every other entry is a value matched exactly.",
     "shapes": {
       "VAR_SEQ": {
@@ -164,8 +164,8 @@
         "means": "A border or outline shorthand: tokens (a --stroke-* width, a colour role), 0, a style keyword and the colour words currentColor and transparent, so `1px solid var(--border-default)` and `var(--stroke-default) solid #ddd` are refused. A system colour goes in border-color or outline-color, inside forced-colors (system_colors)."
       },
       "MOTION_LIST": {
-        "pattern": "^(?:(?:var\\(--[a-z0-9-]+\\)|0s|\\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\\w-]))[a-zA-Z_-][\\w-]*)(?:\\s*,\\s*|\\s+))*(?:var\\(--[a-z0-9-]+\\)|0s|\\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\\w-]))[a-zA-Z_-][\\w-]*)$",
-        "means": "A transition or animation shorthand: a comma-separated list of items, each a property or keyframe name and keywords (allow-discrete, infinite, both, none, …), tokens, 0s and an iteration count. The timing comes from tokens, so a time (200ms), a curve (cubic-bezier(), steps()) and an easing keyword (ease-in, linear) are refused: `translate var(--motion-expand), display var(--motion-expand) allow-discrete` is allowed."
+        "pattern": "^(?:(?:var\\(--[a-z0-9-]+\\)|0s|\\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\\w-]))[a-z_-][a-z0-9_-]*)(?:\\s*,\\s*|\\s+))*(?:var\\(--[a-z0-9-]+\\)|0s|\\d+|(?!(?:ease(?:-in|-out|-in-out)?|linear|step-start|step-end)(?![\\w-]))[a-z_-][a-z0-9_-]*)$",
+        "means": "A transition or animation shorthand: a comma-separated list of items, each a property or keyframe name and keywords (allow-discrete, infinite, both, none, …), tokens, 0s and an iteration count. Names are lowercase kebab-case, so no spelling of an easing keyword (EASE-IN, Linear) passes as a name. The timing comes from tokens, so a time (200ms), a curve (cubic-bezier(), steps()) and an easing keyword (ease-in, linear) are refused: `translate var(--motion-expand), display var(--motion-expand) allow-discrete` is allowed."
       },
       "BREAKPOINT": {
         "pattern": "^\\d+(?:\\.\\d+)?rem$",
@@ -309,7 +309,8 @@
         "refused": ["transition-duration: 200ms", "transition-timing-function: cubic-bezier(0.2, 0, 0, 1)",
                     "transition-timing-function: ease-in-out", "transition: opacity 200ms",
                     "transition: opacity var(--motion-enter), transform var(--motion-enter) ease-in",
-                    "animation: spin 1s linear infinite", "animation: grow auto linear"]
+                    "animation: spin 1s linear infinite", "animation: grow auto linear",
+                    "transition: opacity var(--motion-enter) EASE-IN", "animation: spin var(--motion-loop) Linear infinite"]
       },
       "sizing": {
         "laws": "1",

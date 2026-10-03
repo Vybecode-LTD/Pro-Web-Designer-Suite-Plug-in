@@ -252,8 +252,8 @@
     or `1em`. A size derived from tokens goes in a socket.
   - The `transition` and `animation` shorthands take the motion tokens: a list of
     properties or keyframe names, tokens, keywords such as `allow-discrete`, `0s` and an
-    iteration count. A time, a curve or an easing keyword (`ease-in`, `linear`) is
-    refused there and in the timing-function longhands, by both gates; the audit missed
+    iteration count. A time, a curve or an easing keyword (`ease-in`, `linear`, in any
+    case: names are lowercase kebab-case) is refused there and in the timing-function longhands, by both gates; the audit missed
     the keywords.
   - theme.css's custom properties take a token, a colour word or a keyword, and the
     literals its §0 documents: a breakpoint in rem, never a `var()`, which a media query
@@ -274,7 +274,8 @@
     `var(--gap-related) auto` sets the component's own block margin.
   - The audit's spacing, stroke, motion and sizing checks read the spec's allowlists, so
     they refuse what stylelint refuses. A value that holds a Sass variable or an
-    interpolation is left to the variable's own check, `sass-literal`.
+    interpolation is judged by what is written beside it: `padding: $space 13px` is
+    refused, and the variable is `sass-literal`'s (from Codex's review of #23).
   - Seven reference blocks, two starter rules and two generated stylesheets broke the new
     rules and now follow them. Three inset focus rings used `* -2`, against the starter's
     `* -1`. The scroll-driven progress bar names its easing token. The table of contents'
