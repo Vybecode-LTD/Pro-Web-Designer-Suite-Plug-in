@@ -403,6 +403,12 @@
   three new `SyncRules` tests fail (the allowlists, the colour functions, and an
   unknown name that writes nothing), and 25 tests are controls, the conformance tests
   among them, so the generated blocks change no gate's verdict on any example.
+  From #19's review: a shape the spec added and a family used was named in the
+  stylelint allowlist but never declared, so the config could not load while `--check`
+  passed. The block now writes every shape in the spec, and an allowlist that reads a
+  name the block has not written first is an error
+  (`test_a_new_shape_is_written_before_the_allowlist_that_reads_it`, which fails on
+  `a7157c2`).
 - The first CI run, on Linux and macOS: `test_browser_runtime.MatrixSeesStateChanges`
   failed there and passes now, which holds the `snapshot_matrix` fix; on Windows it
   passes on both. Two tests assumed Windows: `test_harness` took a relative path across

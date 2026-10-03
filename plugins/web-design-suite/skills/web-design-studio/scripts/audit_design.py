@@ -101,7 +101,10 @@ SYSTEM_COLOR_PROPERTY = re.compile(r"^(?:color|fill|stroke|stop-color|flood-colo
 KEYWORDS = ["inherit", "initial", "unset", "revert", "revert-layer"]
 COLOUR_FUNCTIONS = ["rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch", "color"]
 LITERAL_UNITS = ["px", "rem", "em", "ch", "ex", "vw", "vh", "vmin", "vmax", "%", "deg", "s", "ms"]
+VAR_SEQ = re.compile(r"^(?:var\(--[a-z0-9-]+\)\s*)+$")
 VAR_ONE = re.compile(r"^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$")
+VAR_CALC = re.compile(r"^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$")
+CANCEL = re.compile(r"^calc\(\s*(?:var\(--[a-z0-9-]+\)\s*\*\s*-1|-1\s*\*\s*var\(--[a-z0-9-]+\))\s*\)$")
 SIZING_VALUES = {
     "max-inline-size": (VAR_ONE, "none", "100%", "max-content", "min-content", "fit-content", *KEYWORDS),
     "max-width": (VAR_ONE, "none", "100%", "max-content", "min-content", "fit-content", *KEYWORDS),

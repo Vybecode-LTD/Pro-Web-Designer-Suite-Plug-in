@@ -309,6 +309,25 @@ class SyncRules(TempDirTest):
                               capture_output=True, env=env(), timeout=60)
         self.assertIn("raw-color", [f["rule"] for f in json.loads(proc.stdout)], output(proc))
 
+    def test_a_new_shape_is_written_before_the_allowlist_that_reads_it(self):
+        # #19's review: a shape the spec added and a family used was named in
+        # the allowlist but never declared, so the config could not load while
+        # --check passed.
+        def change(spec):
+            spec["values"]["shapes"]["PERCENT"] = {"pattern": "^\\d+%$", "means": "a percentage"}
+            spec["values"]["families"]["sizing"]["allow"][0]["values"].insert(-1, "PERCENT")
+        self.edit_spec(change)
+        self.assertEqual(0, self.sync().returncode)
+        stylelint = self.gates()[1].decode("utf-8")
+        declared = stylelint.find("\nconst PERCENT = String.raw`/^\\d+%$/`;\n")
+        self.assertGreater(declared, 0)
+        self.assertLess(declared, stylelint.index("\nconst VALUE_ALLOWLIST = {\n"))
+        self.assertIn("\n  'max-width': [VAR_ONE, 'none', '100%', 'max-content', 'min-content', 'fit-content', "
+                      "PERCENT, ...KEYWORDS],\n", stylelint)
+        # The audit reads the sizing family too, so its block declares the shape as well.
+        audit = self.gates()[0].decode("utf-8")
+        self.assertLess(audit.index('\nPERCENT = re.compile(r"^\\d+%$")\n'), audit.index("\nSIZING_VALUES = {\n"))
+
     def test_a_name_the_spec_does_not_define_writes_nothing(self):
         self.edit_spec(lambda spec: spec["values"]["families"]["type"]["allow"][0]["values"].append("VAR_TYPO"))
         before = self.gates()

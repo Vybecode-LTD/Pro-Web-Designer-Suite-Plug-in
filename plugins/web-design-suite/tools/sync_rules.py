@@ -17,8 +17,8 @@ outside them is the gate's own. A block holds the constants its gate uses
   KEYWORDS, COLOUR_FUNCTIONS     values.keywords, values.colour_functions
   LITERAL_UNITS                  inline_styles.literal_units
   COLOUR_WORDS                   values.colour_words and the system colours
-  VAR_SEQ, VAR_ONE, VAR_CALC,    values.shapes
-  CANCEL
+  SHAPES                         every shape in values.shapes, each a constant
+                                 of its own name (VAR_SEQ, VAR_ONE, …)
   VALUE_ALLOWLIST                values.families: each property and its values
   MARGIN_ALLOWLIST               margins_in_components.properties and .values
   <FAMILY>_VALUES                one family's properties and values (SIZING_VALUES)
@@ -43,10 +43,10 @@ SPEC = "skills/web-design-studio/assets/rules/design-rules.json"
 TARGETS = {
     "skills/web-design-studio/scripts/audit_design.py":
         ("py", ("LAYER_ORDER", "LAYER_STATEMENT", "MAX_NESTING", "SYSTEM_COLOR_NAMES", "SYSTEM_COLOR_PROPERTY",
-                "KEYWORDS", "COLOUR_FUNCTIONS", "LITERAL_UNITS", "VAR_ONE", "SIZING_VALUES")),
+                "KEYWORDS", "COLOUR_FUNCTIONS", "LITERAL_UNITS", "SHAPES", "SIZING_VALUES")),
     "skills/web-design-studio/assets/configs/stylelint.config.mjs":
         ("js", ("LAYER_ORDER", "MAX_NESTING", "SYSTEM_COLOR_NAMES", "SYSTEM_COLOR_PROPERTY", "KEYWORDS",
-                "COLOUR_WORDS", "VAR_SEQ", "VAR_ONE", "VAR_CALC", "CANCEL", "VALUE_ALLOWLIST", "MARGIN_ALLOWLIST")),
+                "COLOUR_WORDS", "SHAPES", "VALUE_ALLOWLIST", "MARGIN_ALLOWLIST")),
     "skills/web-design-studio/assets/configs/eslint.design.config.mjs":
         ("js", ("COLOUR_FUNCTIONS", "LITERAL_UNITS")),
 }
@@ -81,18 +81,20 @@ def js_string(text: str) -> str:
     return f"'{text}'"
 
 
-def js_entry(entry: str, shapes: dict) -> str:
-    """One allowed value: a shape or a list by name, else the value itself."""
-    if entry == "KEYWORDS":
-        return "...KEYWORDS"
+def js_entry(entry: str, shapes: dict, written: tuple[str, ...]) -> str:
+    """One allowed value: a shape or a list by name, else the value itself. A
+    name must be one the block writes before the allowlist that reads it, or
+    the config would name a constant it never declares."""
     if entry in shapes or entry in LISTS:
-        return entry
+        if entry not in written:
+            raise SpecError(f"an allowlist reads {entry}, which the block does not write before it")
+        return "...KEYWORDS" if entry == "KEYWORDS" else entry
     if re.fullmatch(r"[A-Z][A-Z_]*", entry):
         raise SpecError(f"{entry} is neither a shape in values.shapes nor one of {', '.join(LISTS)}")
     return js_string(entry)
 
 
-def js_allowlist(name: str, groups: list[tuple[str, list[dict]]], shapes: dict) -> str:
+def js_allowlist(name: str, groups: list[tuple[str, list[dict]]], shapes: dict, written: tuple[str, ...]) -> str:
     """`const NAME = { property: [values], … };`, one line per property, under
     a comment for each named group."""
     lines = [f"const {name} = {{"]
@@ -100,7 +102,7 @@ def js_allowlist(name: str, groups: list[tuple[str, list[dict]]], shapes: dict) 
         if title:
             lines.append(f"  // {title}")
         for group in allow:
-            values = ", ".join(js_entry(v, shapes) for v in group["values"])
+            values = ", ".join(js_entry(v, shapes, written) for v in group["values"])
             for prop in group["properties"]:
                 key = prop if re.fullmatch(r"[a-z]+", prop) else js_string(prop)
                 lines.append(f"  {key}: [{values}],")
@@ -115,6 +117,7 @@ def block(spec: dict, lang: str, names: tuple[str, ...]) -> str:
             "LITERAL_UNITS": spec["inline_styles"]["literal_units"]}
     py = lang == "py"
     text = (lambda s: json.dumps(s)) if py else js_string
+    names = tuple(n for name in names for n in (tuple(values["shapes"]) if name == "SHAPES" else (name,)))
     lines = []
     for n, name in enumerate(names):
         if name not in data:
@@ -196,11 +199,11 @@ def js_constant(name: str, spec: dict, before: tuple[str, ...]) -> str:
     if name == "VALUE_ALLOWLIST":
         groups = [(f"{family}: Law{'s' if ',' in rule['laws'] else ''} {rule['laws']}", rule["allow"])
                   for family, rule in values["families"].items()]
-        return js_allowlist(name, groups, shapes)
+        return js_allowlist(name, groups, shapes, before)
     if name == "MARGIN_ALLOWLIST":
         margins = spec["margins_in_components"]
         return js_allowlist(name, [("", [{"properties": margins["properties"], "values": margins["values"]}])],
-                            shapes)
+                            shapes, before)
     raise SpecError(f"{name} has no JavaScript form")
 
 
