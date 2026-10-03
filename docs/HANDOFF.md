@@ -13,7 +13,7 @@
   - #18 and #19, P2: the spec writes its data into the gates, value allowlists included, and every example in it runs through the audit, stylelint and ESLint (N2, SB-C2);
   - #20, P3 part 1: the three gates agree on every example (N1, N30), and the mega-menu flake is fixed;
   - #21: every skill description is 200 characters or fewer (the user's call).
-- **The last reviews** found five more real bugs, each fixed with a test that fails before:
+- **The last reviews** found six more real bugs, each fixed with a test that fails before:
   - From Codex on #20: the factor check read `var()` fallbacks; half an owl (`.card + *`) was the owl; stylelint missed the owl inside `@media`; and the header recipe lost the page's reservation.
   - From Codex on #19: `sync_rules.py` emitted a new shape by name but never declared it. Both gates' blocks now write every shape.
   - From CodeRabbit on #20: an inline literal's baseline key could hide a new literal further along the line.

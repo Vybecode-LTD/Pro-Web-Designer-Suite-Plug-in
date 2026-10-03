@@ -40,7 +40,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 2. Read the execution plan's §2 and §6, and its phase 3 table in §4.
 3. Check the state, with the Bash tool (this is the session's own command, not one for the user, so Git Bash paths are right):
    ```bash
-   cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state all --limit 6
+   cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open
    ```
    - Check out `main` and pull. If a PR is open, read its state first (§3).
 4. `python -B "dev plans/check_execution_plan.py"` must say `149 open items, 149 scheduled`.
