@@ -200,7 +200,7 @@ const MARGIN_ALLOWLIST = {
   'margin-block-end': [ALIGN, CANCEL, ...KEYWORDS],
 };
 const BINDING_ALLOWLIST = {
-  '/^--breakpoint-/': [BREAKPOINT],
+  '/^--breakpoint-/': [BREAKPOINT, ...KEYWORDS],
   '/^--aspect-/': [RATIO],
   '/^--animate-/': [MOTION_LIST],
   '/^--(?!breakpoint-)/': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],

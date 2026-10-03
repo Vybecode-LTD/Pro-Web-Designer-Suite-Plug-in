@@ -257,7 +257,9 @@
     the keywords.
   - theme.css's custom properties take a token, a colour word or a keyword, and the
     literals its §0 documents: a breakpoint in rem, never a `var()`, which a media query
-    cannot read, and an aspect ratio. The override switched the allowlist off, so
+    cannot read, and an aspect ratio. A breakpoint may be a CSS-wide keyword too, so
+    `--breakpoint-*: initial` still clears Tailwind's own. The override switched the
+    allowlist off, so
     `--spacing-card: 28px` passed. The audit checks them too (L1 `binding-literal`), and
     theme.css's `--animate-spin` and `--animate-pulse` read `--dur-loop`, not `1s` and
     `2s`.

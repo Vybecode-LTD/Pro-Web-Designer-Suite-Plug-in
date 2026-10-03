@@ -197,7 +197,7 @@ SIZING_VALUES = {
 }
 MARGIN_VALUES = (ALIGN, CANCEL, *KEYWORDS)
 BINDING_VALUES = (
-    (re.compile(r"^--breakpoint-"), (BREAKPOINT,)),
+    (re.compile(r"^--breakpoint-"), (BREAKPOINT, *KEYWORDS)),
     (re.compile(r"^--aspect-"), (RATIO,)),
     (re.compile(r"^--animate-"), (MOTION_LIST,)),
     (re.compile(r"^--(?!breakpoint-)"), (VAR_ONE, COLOUR_WORDS, *KEYWORDS)),

@@ -348,14 +348,15 @@
   },
   "bindings": {
     "gates": ["audit", "stylelint"],
-    "rule": "A theme file (file_classes.binding_files, Tailwind v4's theme.css) binds Tailwind's theme to the tokens and decides nothing (theme.css §0): a custom property there takes a token, currentColor, transparent or a CSS-wide keyword. Two literals are allowed, each because of CSS: a breakpoint in rem, which must be a literal and never a var(), because a media query condition cannot read a custom property, and an aspect ratio, a container format. An --animate-* binding is an animation shorthand, so it takes the motion tokens (MOTION_LIST). Keyframe geometry, §0's third exception, is not a custom property. Only custom properties are held to this: the theme file's other rules (its @utility blocks, its keyframes) answer to the gates' other rules. stylelint's theme-file override reads BINDING_ALLOWLIST, and the audit, for which a theme file is a token file, checks its custom properties against BINDING_VALUES (L1 binding-literal).",
+    "rule": "A theme file (file_classes.binding_files, Tailwind v4's theme.css) binds Tailwind's theme to the tokens and decides nothing (theme.css §0): a custom property there takes a token, currentColor, transparent or a CSS-wide keyword. Two literals are allowed, each because of CSS: a breakpoint in rem, which must be a literal and never a var(), because a media query condition cannot read a custom property, and an aspect ratio, a container format. A breakpoint may also be a CSS-wide keyword: `--breakpoint-*: initial` clears Tailwind's own, and `--breakpoint-2xl: initial` one of them. An --animate-* binding is an animation shorthand, so it takes the motion tokens (MOTION_LIST). Keyframe geometry, §0's third exception, is not a custom property. Only custom properties are held to this: the theme file's other rules (its @utility blocks, its keyframes) answer to the gates' other rules. stylelint's theme-file override reads BINDING_ALLOWLIST, and the audit, for which a theme file is a token file, checks its custom properties against BINDING_VALUES (L1 binding-literal).",
     "allow": [
-      {"properties": ["/^--breakpoint-/"], "values": ["BREAKPOINT"]},
+      {"properties": ["/^--breakpoint-/"], "values": ["BREAKPOINT", "KEYWORDS"]},
       {"properties": ["/^--aspect-/"], "values": ["RATIO"]},
       {"properties": ["/^--animate-/"], "values": ["MOTION_LIST"]},
       {"properties": ["/^--(?!breakpoint-)/"], "values": ["VAR_ONE", "COLOUR_WORDS", "KEYWORDS"]}
     ],
-    "allowed": ["--breakpoint-md: 48rem", "--aspect-video: 16 / 9", "--color-current: currentColor",
+    "allowed": ["--breakpoint-md: 48rem", "--breakpoint-*: initial", "--breakpoint-2xl: initial",
+                "--aspect-video: 16 / 9", "--color-current: currentColor",
                 "--color-bg-surface: var(--bg-surface)", "--*: initial", "--spacing-card: var(--pad-card)",
                 "--animate-spin: spin var(--motion-loop) infinite"],
     "refused": ["--spacing-card: 28px", "--color-brand: oklch(64.5% 0.188 42)", "--animate-spin: spin 1s linear infinite",
