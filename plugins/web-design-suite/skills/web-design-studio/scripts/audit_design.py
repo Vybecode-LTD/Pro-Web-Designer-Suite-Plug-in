@@ -814,16 +814,16 @@ def parse_selector(selector: str) -> list[tuple]:
             element = selector.startswith("::", i)
             start = i + (2 if element else 1)
             i = _ident_end(selector, start)
-            name, args = selector[start:i].lower(), None
+            name, args, inner = selector[start:i].lower(), None, None
             if i < n and selector[i] == "(":
                 close = _close_paren(selector, i)
                 inner = selector[i + 1:close]
-                if not element and SELECTOR_ARGUMENT.fullmatch(name):
+                if SELECTOR_ARGUMENT.fullmatch(name):          # ::slotted() takes one too
                     args = [parse_selector(s) for s in split_list(inner)]
                 elif name in ("nth-child", "nth-last-child") and NTH_OF.search(inner):
                     args = [parse_selector(s) for s in split_list(NTH_OF.split(inner, 1)[1])]
                 i = close + 1
-            push(("pseudo", name, element or name in LEGACY_PSEUDO_ELEMENT, args))
+            push(("pseudo", name, element or name in LEGACY_PSEUDO_ELEMENT, args, inner))
         elif ch == "#" or ch.isalpha() or ch in "-_\\" or ord(ch) > 127:
             push(("simple", "type" if ch != "#" else "interpolation"))
             i = _ident_end(selector, i)
@@ -832,11 +832,19 @@ def parse_selector(selector: str) -> list[tuple]:
     return parts
 
 
+VIEW_TRANSITION_PART = {"view-transition-group", "view-transition-image-pair", "view-transition-old",
+                        "view-transition-new"}
+TAKES_HEAVIEST = {"is", "not", "has", "matches", "-moz-any"}
+ADDS_ARGUMENT = {"host", "host-context", "nth-child", "nth-last-child"}
+
+
 def specificity(parts: list[tuple], amp: tuple[int, int, int] = (0, 0, 0)) -> tuple[int, int, int]:
-    """Selectors 4 specificity: `:where()` scores zero, `:is()`, `:not()` and
-    `:has()` their heaviest argument, `:nth-child(… of S)` a pseudo-class and
-    S, `:host()` a pseudo-class and its argument, and `&` its parent (`amp`),
-    as stylelint's selector-max-specificity counts."""
+    """Selectors 4 specificity, case by case as @csstools/selector-specificity
+    computes it for stylelint's selector-max-specificity: `:where()` scores
+    zero; `:is()`, `:not()`, `:has()` their heaviest argument; `:host()` and
+    `:nth-child(… of S)` a pseudo-class and the argument; `:global()` the sum
+    of its arguments; `::slotted()` a pseudo-element and its argument; a
+    `::view-transition-*(*)` nothing; `&` its parent (`amp`)."""
     a = b = c = 0
     for part in parts:
         add = (0, 0, 0)
@@ -844,12 +852,19 @@ def specificity(parts: list[tuple], amp: tuple[int, int, int] = (0, 0, 0)) -> tu
             add = {"id": (1, 0, 0), "class": (0, 1, 0), "attr": (0, 1, 0), "type": (0, 0, 1),
                    "amp": amp}.get(part[1], (0, 0, 0))
         elif part[0] == "pseudo":
-            _, name, element, args = part
-            heaviest = max((specificity(arg, amp) for arg in args or []), default=(0, 0, 0))
-            add = ((0, 0, 1) if element else (0, 0, 0) if name == "where"
-                   else heaviest if args is not None and name not in ("host", "host-context", "nth-child",
-                                                                       "nth-last-child")
-                   else (heaviest[0], heaviest[1] + 1, heaviest[2]))
+            _, name, element, args, inner = part
+            weights = [specificity(arg, amp) for arg in args or []]
+            heaviest = max(weights, default=(0, 0, 0))
+            if element:
+                bare = name in VIEW_TRANSITION_PART and (inner or "").strip() in ("", "*")
+                add = (0, 0, 0) if bare else (heaviest[0], heaviest[1], heaviest[2] + 1)
+            elif name in ("global", "local"):
+                add = tuple(sum(w[k] for w in weights) for k in range(3))
+            elif name in TAKES_HEAVIEST:
+                add = heaviest
+            elif name != "where":       # :any(), :-webkit-any() and the rest: one pseudo-class
+                plus = heaviest if name in ADDS_ARGUMENT else (0, 0, 0)
+                add = (plus[0], plus[1] + 1, plus[2])
         a, b, c = a + add[0], b + add[1], c + add[2]
     return a, b, c
 
@@ -1062,7 +1077,10 @@ def audit_css(path: Path, text: str) -> list[Finding]:
     first_unlayered_line = 0
     declared_props: set[str] = set()
     emitting_mixins: set[str] = set()     # mixins in this file that hold a whole rule
-    weights: list[tuple[int, int, int]] = []    # each open rule's heaviest selector, for `&`
+    # One entry per open block, as scan_css stacks them: a rule's heaviest
+    # selector, None for an at-rule. A rule's parent is the nearest rule below
+    # it, whatever the nesting depth counts (a `:hover` rule adds no depth).
+    weights: list[tuple[int, int, int] | None] = []
 
     def outside_a_layer(at_rules: Iterable[str]) -> bool:
         # A keyframe (`from`, `to`, `50%`) is not a style rule; the references
@@ -1134,11 +1152,11 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 # A nested rule's weight is its parent's plus its own, and its
                 # `&` scores the parent's; its compounds count as written.
                 parsed = [(s, parse_selector(s)) for s in split_list(sel)]
-                parent = weights[depth - 2] if 1 < depth <= len(weights) + 1 else None
+                parent = next((w for w in reversed(weights) if w is not None), None)
                 own = [specificity(p, parent) if parent and "&" in s
                        else tuple(x + y for x, y in zip(parent or (0, 0, 0), specificity(p))) for s, p in parsed]
-                weights[depth - 1:] = [max(own, default=(0, 0, 0))]
                 heaviest = max(own, default=(0, 0, 0))
+                weights.append(heaviest)
                 if heaviest > SPECIFICITY_CAP and not any(KEYFRAMES_AT.match(a) for a in at_rules):
                     add(line, "L5", "compound-specificity", "error",
                         f"Specificity {','.join(map(str, heaviest))} is over the cap of {MAX_SPECIFICITY}: "
@@ -1168,8 +1186,11 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     first_unlayered_line = line
                 if depth == 1 and not sel.lstrip().startswith("&"):
                     emitting_mixins.update(m.group(1).lower() for m in map(SASS_MIXIN_NAME.match, at_rules) if m)
+            elif kind == "at_open":
+                weights.append(None)
             elif kind == "rule_close":
-                pass
+                if weights:
+                    weights.pop()
             continue
 
         d: CssDecl = ev

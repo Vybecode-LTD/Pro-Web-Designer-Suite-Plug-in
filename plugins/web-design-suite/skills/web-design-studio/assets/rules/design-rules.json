@@ -31,6 +31,7 @@
       ".a.b.c.d",
       ".a.b.c p span",
       ".card:is(.a.b.c)",
+      ".a.b.c::slotted(.d)",
       ".nav .nav__list .nav__item a",
       ".card .header .title .icon",
       ":where(.a .b .c .d)"

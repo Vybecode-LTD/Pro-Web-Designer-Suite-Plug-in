@@ -636,7 +636,10 @@
   references fail 24 subtests, the audit's conformance leg 6, stylelint's 1, the
   allowed fixtures 2 and the canonical entries 1, and the two audit tests fail
   (7 tests); the starter's own runs, the references through the audit and the
-  quotes are the controls (5). Against `v3.2.1`, 9 fail and 3 are controls.
+  quotes are the controls (5). Against `v3.2.1`, 9 fail and 3 are controls. The
+  review of #26 added two, each failing on `5ac2223`: a `:hover` rule, which adds
+  no nesting depth, was weighed without the rule it sits in, and `::slotted()` without
+  its argument. stylelint's leg, which already weighed both, is the control.
 
 ## 3.2.1 — 2026-09-25
 

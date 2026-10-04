@@ -848,12 +848,15 @@ class TheAuditInCi(TempDirTest):
         # N32: stylelint resolves nesting before it weighs a selector. `.d` under
         # `& .c` under `.a.b` is `.a.b .c .d`, 0,4,0; `&.e` under `.a.b` is
         # 0,3,0; `&__f` in Sass renames its parent, so it weighs one class.
+        # Codex on #26: a `:hover` rule adds no nesting depth, so finding its
+        # parent by depth skipped `& .k.l`; it is `.j .k.l :hover`, 0,4,0.
         self.write("src/styles/layout/nested.scss",
                    "@layer layout {\n  .a.b {\n    & .c {\n      .d { color: var(--fg-strong); }\n    }\n"
                    "    &.e { color: var(--fg-strong); }\n  }\n"
-                   "  .g.h.i { &__f { color: var(--fg-strong); } }\n}\n")
+                   "  .g.h.i { &__f { color: var(--fg-strong); } }\n"
+                   "  .j { & .k.l { :hover { color: var(--fg-strong); } } }\n}\n")
         proc = self.audit("src/styles/layout/nested.scss", "--json")
-        self.assertEqual([("compound-specificity", 4)],
+        self.assertEqual([("compound-specificity", 4), ("compound-specificity", 9)],
                          [(f["rule"], f["line"]) for f in json.loads(proc.stdout)])
 
 
