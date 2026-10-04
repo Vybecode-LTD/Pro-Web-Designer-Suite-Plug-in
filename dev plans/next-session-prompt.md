@@ -109,7 +109,7 @@ P7's items are SB-B4, SS-B2, SS-C9, SS-A17 and SS-A18. Read each paragraph first
 **Traps.**
 - **The contract has 14 copies**: `shared/token-contract.md` is the master, and 13 skills hold copies that `test_contract.ContractCopies` holds byte-identical. Edit the master, then copy it to every `skills/*/references/token-contract.md`.
 - **The deck's `deck-tokens.css` is byte-identical to the starter's `tokens.css`** (`test_the_decks_tokens_are_the_starters_tokens`). Copy it after every edit.
-- **Every consumer must know every role** (`test_contract.EveryConsumerKnowsEveryRole`): the starter, the Tailwind theme, the Figma sync, the email system and the scaffold. A new role reaches all of them.
+- **Every consumer must know every role.** `test_contract.EveryConsumerKnowsEveryRole` holds four to the contract: the starter's tokens, the Figma importer, the email token map, and design-token-migration's proposal (`proposed_tokens_css()`). Nothing holds the Tailwind theme (`assets/configs/theme.css`) or content-model-to-ui's scaffold to the roles: check those two by hand, and add a test if a new role belongs in them.
 - **The colour generator now reproduces the starter's ramps** (`test_numbers.ColourRamps`). A ramp change in tokens.css must keep SKILL.md's Phase 1 commands reproducing it.
 
 **Tests:** each new role's pair passes `check_roles.py`; each new file is audited and passes stylelint; `test_contract` holds the roles everywhere; and a test reads each fixed comment's claim back from the file it describes, as `test_numbers` does for ratios. Run `fail_before.py` against `v3.2.1` and `main`.
