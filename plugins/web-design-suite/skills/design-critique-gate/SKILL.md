@@ -84,7 +84,7 @@ fixing it changes everything beneath.
 | 6 | **Color and contrast** | Measured, never judged | 3 min |
 | 7 | **States and edges** | Seven states, plus empty / loading / error / long / RTL | 4 min |
 | 8 | **Interaction and motion** | Affordance, feedback, keyboard, reduced motion | 3 min |
-| 9 | **Conformance** | The auditor and the 92 checks | 2 min |
+| 9 | **Conformance** | The auditor and the 91 checks | 2 min |
 | 10 | **Presentation readiness** | Can you defend every non-obvious decision out loud? | 3 min |
 
 ### 1 — Premise
@@ -207,7 +207,7 @@ Cite, do not re-implement. This layer is two commands:
 python -m scripts.audit_design <path> --json > audit.json     # web-design-studio
 ```
 
-then work `web-design-studio/references/review-checklist.md` — all 92 checks, twelve
+then work `web-design-studio/references/review-checklist.md` — all 91 checks, twelve
 groups. Fold the machine output into the critique rather than reporting it separately:
 
 ```bash

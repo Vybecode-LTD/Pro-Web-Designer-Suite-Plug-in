@@ -211,7 +211,7 @@ same laws underneath; they differ only in how a class name is produced.
 
 | Approach | Use when | Convention | Gotcha |
 |---|---|---|---|
-| **CSS Modules, camelCase** — *the default for this studio* | React 19 + Vite, any client, any team size | `.root`, `.label`, `.isLoading` → `styles.root`. Every component's outermost class is `.root` | camelCase because `styles.is-loading` is a syntax error. Enable `localsConvention: 'camelCase'` in Vite and never dash a class |
+| **CSS Modules, camelCase** — *the default for this studio* | React 19 + Vite, any client, any team size | `.root`, `.label`, `.isLoading` → `styles.root`. Every component's outermost class is `.root` | camelCase because `styles.is-loading` is a syntax error. Enable `localsConvention: 'camelCaseOnly'` in Vite (stack-css-modules.md) and never dash a class |
 | **Tailwind, utility-first** | Client's team already lives in Tailwind, or the project is heavily marketing-page shaped | Utilities inline; extract to a component the moment a class list repeats twice, never to `@apply` | Tailwind's default scale is NOT our scale. Map the theme to semantic tokens (§1.4) or Law 3 dies quietly. `@apply` recreates a stylesheet with worse tooling — banned |
 | **BEM, plain CSS** | No build-step control, a CMS theme, or a handoff to a non-JS team | `.card`, `.card__title`, `.card--featured`. One block per file | Depth stops at one element. `.card__header__title` means the header is a block |
 
@@ -324,7 +324,7 @@ is not on it.
 3. **`className` merges, never replaces.** `className={cx(styles.root, className)}`,
    consumer last so it can win inside the same layer. A component that drops the passed
    `className` will be forked by the first person who needs to position it.
-4. **`ref` is a prop (React 19).** No `forwardRef` — it is deprecated for new code on 19.
+4. **`ref` is a prop (React 19).** No `forwardRef`: React 19 does not need it, and react.dev says it will be deprecated in a future release.
 
    ```tsx
    export function Button({ ref, variant = 'solid', size = 'md', tone = 'neutral',

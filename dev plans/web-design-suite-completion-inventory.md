@@ -74,7 +74,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-A8 | medium | fixed in 3.3.0: `test_rules_spec` (`test_layers`, `TheDocsStateTheSpecsOrder`), `test_real_tools.StylelintConfig` | The canonical `index.css` puts third-party CSS on top of every layer. |
 | SB-A9 | medium | fixed in 3.3.0: (a) to (c) by `test_audit_design.AuditPrecision` (`test_a_url_does_not_hide_the_rest_of_the_file`, `test_line_comments_stay_comments_where_they_are_comments`, `test_a_rule_after_a_closed_layer_is_unlayered`, `test_a_root_level_components_folder_holds_components`) and `test_rules_spec` `test_file_classes`; (d) is SS-A19, fixed in 3.1.0 | The scanner has bugs that hide violations. |
 | SB-A10 | medium | fixed in 3.1.0 | The Tailwind and JSX checks date from v3 and catch less than ESLint. |
-| SB-A11 | medium | W2 (3.3.0) | Docs promise checks that don't exist; for example, the audit does not diff `--breakpoint-*` against `--bp-*`. |
+| SB-A11 | medium | fixed in 3.3.0: the audit diffs the breakpoints (L1 `breakpoint-drift`), and every other promise is corrected (`test_audit_design.ThePromisedChecks`), PR #24 | Docs promise checks that don't exist; for example, the audit does not diff `--breakpoint-*` against `--bp-*`. |
 | SB-A12 | medium | fixed in 3.1.0 | "Off-scale classes … the build errors on them" and "`p-7` is a build error" are false. |
 | SB-A13 | medium | fixed in 3.2.0 | `style-prop-custom-properties-only` rejects the legal pattern that the references document. |
 | SB-A14 | medium | fixed in 3.2.0 | the three gates disagree about the laws |
@@ -88,7 +88,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-A22 | medium | fixed in 3.2.0, item 1 | the references' snippets fail the suite's own audit |
 | SB-A23 | low-medium | fixed in 3.3.0: the canonical entries, quoted (`test_doc_snippets.QuotedStarterCode`) | The files disagree on how to wrap imports in layers. |
 | SB-A24 | low-medium | fixed in 3.3.0: `test_audit_design.AuditPrecision` (`test_the_references_sass_partial_passes`, `test_a_mixin_is_checked_where_it_is_included`, `test_a_sass_variable_holding_a_literal_is_refused`, `test_sass_interpolation_opens_no_rule`, `test_indented_sass_is_skipped_not_passed`) and `test_rules_spec.test_sass` | SCSS: a `@mixin`-only partial fails L5, while `$card-padding: 24px` passes. |
-| SB-A25 | low | partly done (the `url(#fade)` false positive and the multi-line pragma no longer reproduce, 3.2.1 review; release to attribute); the rest in W2 (3.3.0) | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. |
+| SB-A25 | low | fixed in 3.3.0: points 1, 3 and 4 by 3.2.1 (guarded by `test_audit_design`), 5 by PR #23, and the rest by PR #24 (`ThePromisedChecks`, `TheAuditInCi.test_where_adds_no_specificity`) | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. |
 | SB-B1 | — | fixed in 3.1.0, with PS-A4 | templates aren't audited. |
 | SB-B2 | — | fixed in 3.2.0 and 3.2.1 (real-tool tests) | no executable tests for the configs. |
 | SB-B3 | — | W5 (3.4.0) | focus, forced-colors and density aren't checked by any gate in the build flow. |
@@ -104,7 +104,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-C7 | S · medium | fixed in 3.2.0 | Harden the hook: filter by extension; fail instead of skipping when a config is missing unless `DESIGN_GATE_ALLOW_SKIP=1`; resolve configs at the repo root with fallbacks; pass `--no-warn-ignored`; use `git rev-parse --g |
 | SB-C8 | S · medium | fixed in 3.2.0 | Improve token efficiency (with XC-C7). |
 | SB-C9 | S · medium | partly done (3.3.0: `starter/styles/index.css` and `configs/index.tailwind.css`, quoted by five references); the Tailwind v3 entry is still written inline in stack-tailwind | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. |
-| SB-C10 | S · low | W12 (3.6.0+) | In `audit_js`, `line_of()` costs O(n) per finding: a 1 MB JSX file with 20k findings took 12.6 s, against 5.1 s for 0.9 MB of CSS with 40k findings. |
+| SB-C10 | S · low | fixed in 3.3.0: the line lookup was already a bisect; `--files-from` and `--sarif` (`test_audit_design.TheAuditInCi`), PR #24 | In `audit_js`, `line_of()` costs O(n) per finding: a 1 MB JSX file with 20k findings took 12.6 s, against 5.1 s for 0.9 MB of CSS with 40k findings. |
 | LC-A1 | high | fixed in 3.1.0 | The docs say that if Figma's native DTCG export is live, "it works today". |
 | LC-A2 | high | fixed in 3.1.0 | The docs say "Both scripts read" `VariableComposedColor`. |
 | LC-A3 | high | fixed in 3.1.0 | The audit and the generator compare every file against the studio's own ramps, and no flag accepts the project's `tokens.css`. |

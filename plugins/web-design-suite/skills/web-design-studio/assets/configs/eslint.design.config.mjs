@@ -520,8 +520,10 @@ const a11yConfig = {
       { assert: 'either', depth: 3 },
     ],
 
-    /* WCAG 2.4.4 / 2.4.9 — link purpose. "Click here" and a bare arrow
-     * glyph both fail. */
+    /* An <a> must go somewhere: `anchor-is-valid` refuses one with no
+     * href, `#` or `javascript:`, which is a button pretending. It does not
+     * read link text: "Click here" (WCAG 2.4.4) is review's, since
+     * `anchor-ambiguous-text` is off. */
     'jsx-a11y/anchor-is-valid': 'error',
 
     /* Focus must never be removed without a replacement. Our replacement is
@@ -530,9 +532,10 @@ const a11yConfig = {
     'jsx-a11y/no-autofocus': 'error',
     'jsx-a11y/tabindex-no-positive': 'error',
 
-    /* WCAG 2.2.2 — motion. `<marquee>`, autoplaying video and distracting
-     * animation, including the ones a designer asked for. */
+    /* WCAG 2.2.2 — motion: `<marquee>` and `<blink>`, including the ones a
+     * designer asked for. */
     'jsx-a11y/no-distracting-elements': 'error',
+    /* WCAG 1.2.2 — captions: <audio> and <video> carry a captions track. */
     'jsx-a11y/media-has-caption': 'error',
   },
 };

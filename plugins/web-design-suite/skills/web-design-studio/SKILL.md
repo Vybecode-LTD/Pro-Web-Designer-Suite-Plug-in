@@ -110,7 +110,7 @@ Pick each gap with the procedure in `references/spacing-system.md` §6. Say out 
 python -m scripts.audit_design src/ --strict
 ```
 
-Then run `references/review-checklist.md` top to bottom: 92 checks across tokens, spacing, architecture, type, color, responsive, states, accessibility, motion, performance, content and handoff. A failed check is fixed **at the system level** — a token, a primitive, a role — never patched locally. A local patch is precisely how the drift starts.
+Then run `references/review-checklist.md` top to bottom: 91 checks across tokens, spacing, architecture, type, color, responsive, states, accessibility, motion, performance, content and handoff. A failed check is fixed **at the system level** — a token, a primitive, a role — never patched locally. A local patch is precisely how the drift starts.
 
 ### Phase 6 — Handoff
 
@@ -175,6 +175,9 @@ All stdlib-only Python 3, no dependencies.
 python -m scripts.audit_design src/                    # audit
 python -m scripts.audit_design src/ --strict           # warnings fail too
 python -m scripts.audit_design src/ --json             # machine-readable
+python -m scripts.audit_design src/ --sarif > design.sarif   # for a code-scanning upload
+git diff --name-only -z origin/main... | python -m scripts.audit_design --files-from -
+                                                       # CI: the files a change touched
 python -m scripts.audit_design src/ --write-baseline .design-baseline.json
                                                        # adopt on a legacy repo:
                                                        # only NEW findings fail

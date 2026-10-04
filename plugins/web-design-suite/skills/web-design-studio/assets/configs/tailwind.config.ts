@@ -42,9 +42,9 @@ import plugin from 'tailwindcss/plugin';
 
 /* -------------------------------------------------------------------------
  * `t('--foo')` is a one-character-cheaper `var(--foo)` and, more usefully,
- * a single choke point: the audit script greps this file for any string
- * that is not a `t()` call, so a stray literal cannot hide in 400 lines of
- * config. Law 1.
+ * a single choke point: every value here is a `t()` call, so a stray
+ * literal stands out in review instead of hiding in 400 lines of config.
+ * Law 1. (The audit does not read this file.)
  * ---------------------------------------------------------------------- */
 const t = (token: `--${string}`): string => `var(${token})`;
 
@@ -81,8 +81,8 @@ export default {
   theme: {
     /* ---------------------------------------------------------------------
      * SCREENS — literal exception #1. Media query conditions cannot read
-     * custom properties, so these must mirror `--bp-*` by hand.
-     * `scripts/audit_design.py` diffs the two and fails on drift.
+     * custom properties, so these must mirror `--bp-*` by hand. The audit
+     * diffs theme.css's copy (v4), not this file's: change both.
      * ------------------------------------------------------------------ */
     screens: {
       sm: '30rem',   /*  480px — mirrors --bp-sm  */
@@ -165,7 +165,7 @@ export default {
      * surface, which is why no component needs a per-variant hover color.
      * If you genuinely need a new translucency, add a Tier-2 role.
      *
-     * The Stylelint config bans `/<number>` modifiers on these classes for
+     * The audit refuses `/<number>` modifiers on these classes for
      * exactly this reason. v4 has no such limitation — `color-mix()` makes
      * the modifier work against complete colors — which is one more reason
      * to push clients off v3.
@@ -501,8 +501,8 @@ export default {
         },
       },
       animation: {
-        spin: `spin 1s ${t('--ease-linear')} infinite`,
-        pulse: `pulse 2s ${t('--ease-in-out')} infinite`,
+        spin: `spin ${t('--motion-loop')} infinite`,
+        pulse: `pulse ${t('--dur-loop')} ${t('--ease-in-out')} infinite`,
         enter: `enter ${t('--dur-base')} ${t('--ease-out')} both`,
       },
     },
