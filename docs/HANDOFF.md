@@ -1,42 +1,36 @@
 # Handoff
 
-**2026-10-04**, after PR #26 (P5) and this docs PR, #27, were merged into `main`.
+**2026-10-04**, after P6 (#28, #29) and this docs PR were merged into `main`.
 
-**The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then P6 in two parts: type in detail, then colour.
+**The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then P7 in detail (the contract's missing roles, the files the starter refers to, and the comments the files contradict), then P8 if the budget allows.
 
 ## State
 
 - **3.2.1 is released** (`v3.2.1`, `63932cf`) and installed. 3.3.0 is in progress on `main`, unreleased.
-- **Merged this session:** #26, P5 (N3, SB-C9, N32), as a merge commit, with CI green on its head, every review thread resolved, and GitHub reporting it clean.
-  - **N3.** The references' CSS now passes the real stylelint, not only the audit: `StylelintConfig.test_the_references_css_snippets_pass_the_config`. 28 of 159 blocks failed after P3.
-    - The references changed where the spec refuses what they showed.
-    - Escape hatches now name both tools.
-    - The config now accepts sub-layers inside a canonical layer (a new spec example) and CSS Modules' `composes` and `:global`.
-  - **SB-C9.** `assets/configs/index.tailwind-v3.css` is the canonical v3 entry, quoted by stack-tailwind §11.6. Preflight goes in `reset`, as in v4.
-  - **N32.** `design-rules.json: selectors` holds the specificity cap, 0,3,1, and three compound selectors, written into both gates by `sync_rules.py`. The audit weighs selectors as stylelint's library does.
-    - `compound-specificity` is an error now, and `compound-selectors` is new.
-    - `:where(.a .b .c .d)` is refused, which departs from the session prompt: stylelint already refused it, and `:where()` removes weight, not DOM knowledge.
-    - The strict audit then found one shipped selector over the cap, in landing-page `page-sections.css`.
-- **The reviews of #26 found five real bugs in three rounds, all fixed with tests that fail on the head they reviewed:**
-  - a `:hover` rule's parent was found by nesting depth, which pseudo-only rules do not add;
-  - `::slotted()` lost its argument's weight;
-  - a quoted `)` ended a `:where()` early;
-  - a quoted `&` read as nesting;
-  - the completion plan's W2 row still said SB-C9 was partly done.
-- **Tests:** 460. **The plan:** 142 open items, all scheduled (`check_execution_plan.py`).
+- **Merged this session:** P6, in two stacked PRs with merge commits, each with CI green on its head, every review thread resolved, and GitHub reporting it clean.
+  - **#28, the type generator** (SS-B5, and the type halves of SS-A9, SS-B7 and SS-C5).
+    - `--preset studio` prints tokens.css's `--text-*` exactly, and it is the default when no scale flag is given.
+    - A ratio run with a step or a fluid minimum under 11px exits 2, and names the ways out computed for that run. `--allow-small` forces it.
+    - typography.md §10 adds Barvian's 2.5× bound (registered in `evidence.json`) and the starter hero's zoom figures; §15 checks both.
+    - Codex found that `--snap-px` could round a fluid span past 2.5×; every emitted span is checked now.
+  - **#29, the colour generator** (SS-B6, and the colour halves of SS-A9, SS-B7 and SS-C5).
+    - `--gamut p3`, `--neutral-hue` and `--anchor-seed` are new, and `NEUTRAL_L[500]` is 0.535.
+    - SKILL.md's Phase 1 commands now print the starter's 24 ramp steps.
+    - `generate_type_scale.py --fluid-space` prints the fluid spacing.
+- **Why the generator moved, not the starter.** The starter's accent holds one hue and has P3 tints, on purpose. Regenerating it with the defaults would have changed ten steps and every contrast claim on them.
+- **Tests:** 485. **The plan:** 137 open items, all scheduled (`check_execution_plan.py`).
 
 ## Next steps
 
-1. **The next session:** P6 part 1, the type generator's `--preset studio`, the fluid-type zoom rule (SS-B5) and the tests that hold docs, tokens and generator together. Then part 2, colour (SS-B6 and the rest), as the prompt describes.
-2. **3.3.0** ships after P8 (release R1).
+1. **The next session:** P7 (SB-B4, SS-B2, SS-C9, SS-A17, SS-A18). Check what 3.2.0 already added before building.
+2. Then P8 (hygiene, and docs that work in cmd and PowerShell), then R1, the 3.3.0 release.
 
 ## Warnings
 
-- **Decide P6's default first.** SS-C5 says to refuse type steps under 11px, but the generator's default run produces 9.26px. The prompt recommends making the studio preset the default.
-- **stylelint 17's compound counter** walks into every functional pseudo-class, and reads an An+B's `+` as a combinator. A quantity query (`:nth-last-child(n + 5) ~ *`) keeps its disable comment, in the starter and in layout-composition.md.
-- **The theme files are token files to the audit**, which checks only their custom properties (`bindings`). stylelint's theme override checks the same set, and nothing else in them.
-- **A stricter gate reaches the references, the starter, the scaffold, the deck and every shipped stylesheet.** `test_doc_snippets`, the stylelint snippet test, the starter's own runs, `ScaffoldAuditsClean`, `test_presentation` and the strict audit of the skills all read them.
+- **Three status colours are outside even Display P3:** `--warning-700`, `--danger-100` and `--info-100`, found in P6 and not yet an item. The next session's prompt says how to handle them.
+- **The generators are held to the starter now.** A change to tokens.css's ramps or type scale must keep SKILL.md's Phase 1 commands reproducing it (`test_numbers.TypeScale`, `ColourRamps`).
+- **The contract has 14 byte-identical copies, and the deck's tokens are the starter's, byte for byte.** Edit the master, then copy.
+- **The token counter resets** on a user message and on a `<ci-monitor-event>`: keep a running total.
 - **Bash heredocs eat backslashes.** Write anything with a backslash through the Write or Edit tool, or a script file.
-- **Don't grep `tooling/`**: its `node_modules` makes the search run for minutes. Reading one named file there is fine.
-- **The token counter resets** when the user sends a message: keep a running total.
+- **Don't grep `tooling/`**: its `node_modules` makes the search run for minutes.
 - **The repository is public.** Commit nothing private.
