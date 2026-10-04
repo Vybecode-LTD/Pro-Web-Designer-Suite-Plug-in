@@ -48,6 +48,7 @@ Regressions covered:
 from __future__ import annotations
 
 import json
+import os
 import re
 import unittest
 
@@ -790,6 +791,20 @@ class TheAuditInCi(TempDirTest):
     def test_files_from_reads_a_nul_separated_list(self):
         self.write("changed.txt", "src/components/good.css\0src/components/bad.css\0")
         proc = self.audit("--files-from", "changed.txt", "--json")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertEqual(["raw-spacing"], [f["rule"] for f in json.loads(proc.stdout)])
+
+    def test_a_listed_name_that_is_not_utf8_is_still_audited(self):
+        # CodeRabbit on #24: the list was read as UTF-8, so on Linux a name in
+        # another encoding lost its bytes, was taken for a deleted file, and
+        # went unaudited.
+        name = b"src/components/caf\xe9.css"
+        try:
+            (self.tmp / os.fsdecode(name)).write_text("@layer components {\n  .bad { padding: 13px; }\n}\n",
+                                                      encoding="utf-8")
+        except (UnicodeError, OSError):
+            self.skipTest("this file system names files in Unicode")
+        proc = self.audit("--files-from", "-", "--json", stdin=name + b"\0")
         self.assertEqual(1, proc.returncode, output(proc))
         self.assertEqual(["raw-spacing"], [f["rule"] for f in json.loads(proc.stdout)])
 

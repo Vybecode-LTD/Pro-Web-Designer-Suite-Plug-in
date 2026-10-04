@@ -327,7 +327,8 @@
   rule per law and id, and paths relative to the working directory under a
   `%SRCROOT%` the run defines. It sets no fingerprint: code scanning reads only its
   own, which `upload-sarif` computes from the source (from the reviews of #24). A
-  NUL-separated list keeps each name exactly. The line lookup SB-C10 asked for was
+  NUL-separated list keeps each name exactly, even a Linux name that is not UTF-8.
+  The line lookup SB-C10 asked for was
   already a bisect.
 
 - **One canonical entry stylesheet per stack** (SB-C9, SS-C9 in part). The starter
@@ -573,11 +574,13 @@
   Against `fc92cf7`, #23's head: the breakpoint diff, the CLI's list and SARIF, and
   `:where()` fail (6 tests), and so do the doc promises (14 subtests) and the stated
   checklist count (3); the shipped theme's breakpoints, which mirror the starter's
-  tokens, are the control. The reviews of #24 added eight, each failing on the head it
+  tokens, are the control. The reviews of #24 added nine, each failing on the head it
   reviewed: the breakpoint diff's other direction and pragmas, and the NUL list,
   against `c3b154e` (2); a repeated declaration, a generated theme, an empty side and
   a theme split across files, against `6c64c24` (4); another project's tokens,
-  against `98cf7b8` (1); and a nested package's, against `b71ed10` (1).
+  against `98cf7b8` (1); a nested package's, against `b71ed10` (1); and a listed name
+  that is not UTF-8, against `5a7fbae` on Linux (1). Windows and macOS skip that
+  one: their file names are always Unicode.
 
 ## 3.2.1 — 2026-09-25
 

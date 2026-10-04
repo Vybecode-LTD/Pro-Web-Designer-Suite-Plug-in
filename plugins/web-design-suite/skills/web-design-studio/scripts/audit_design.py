@@ -2129,11 +2129,14 @@ def main(argv: list[str] | None = None) -> int:
         # A changed-files list names deleted files too, so a listed path that
         # is gone is skipped, not an error (SB-C10).
         try:
-            raw = (sys.stdin.buffer.read() if args.files_from == "-"
-                   else Path(args.files_from).read_bytes()).decode("utf-8", "replace")
+            data = sys.stdin.buffer.read() if args.files_from == "-" else Path(args.files_from).read_bytes()
         except OSError as exc:
             print(f"audit_design: cannot read {args.files_from}: {exc.strerror}", file=sys.stderr)
             return 2
+        try:
+            raw = os.fsdecode(data)          # a Linux name that is not UTF-8 keeps its bytes
+        except UnicodeDecodeError:           # Windows names are Unicode: no such name exists
+            raw = data.decode("utf-8", "replace")
         listed = listed_paths(raw)
         gone = [name for name in listed if not Path(name).exists()]
         if gone:
