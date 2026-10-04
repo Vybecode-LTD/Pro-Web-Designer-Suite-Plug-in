@@ -1753,11 +1753,11 @@ def breakpoint_drift(files: list[tuple[Path, str]]) -> list[Finding]:
         """The nearest folder above a file that holds a package.json."""
         return next((folder for folder in path.resolve().parents if (folder / "package.json").is_file()), None)
 
+    roots = {token_file: project(token_file) for token_file in tokens}
     mirrors: dict[Path, list[Path]] = {}             # token file -> the themes paired with it
     for path in sorted(themes):
-        root = project(path)
-        own = sorted(token_file for token_file in tokens
-                     if root is None or root in token_file.resolve().parents)
+        root = project(path)                         # a nested package is a project of its own
+        own = sorted(token_file for token_file in tokens if roots[token_file] == root)
         own = [token_file for token_file in own if tokens[token_file]] or own
         if own:                                      # another project's tokens are not this theme's
             nearest = max(own, key=lambda token_file: shared_folders(path, token_file))

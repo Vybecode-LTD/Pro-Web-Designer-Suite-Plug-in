@@ -733,6 +733,17 @@ class ThePromisedChecks(TempDirTest):
         self.write("web/styles/tokens.css", ":root { --bp-md: 48rem; }\n")
         self.assertEqual([("theme.css", 2, "breakpoint-drift")], self.drift("app", "deck", "web"))
 
+    def test_a_nested_packages_tokens_are_not_its_parents(self):
+        # CodeRabbit on #24: a package nested in the theme's project lies under
+        # its root too, and its tokens were taken for the parent's.
+        self.write("site/package.json", "{}\n")
+        self.write("site/theme.css", "@theme {\n  --breakpoint-md: 48rem;\n  --breakpoint-lg: 60rem;\n}\n")
+        self.write("site/styles/tokens.css", ":root { --bp-md: 48rem; --bp-lg: 64rem; }\n")
+        self.write("site/packages/kit/package.json", "{}\n")
+        self.write("site/packages/kit/tokens.css", ":root { --bp-md: 40rem; }\n")
+        # The parent's tokens are the pair: lg drifts from them, and md does not.
+        self.assertEqual([("theme.css", 3, "breakpoint-drift")], self.drift("site"))
+
     def test_themes_paired_with_one_token_file_mirror_it_together(self):
         # Tailwind reads every @theme block, so a theme split across two files
         # is one set of copies. Each file alone lacked the other's.

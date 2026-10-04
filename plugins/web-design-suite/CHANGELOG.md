@@ -573,11 +573,11 @@
   Against `fc92cf7`, #23's head: the breakpoint diff, the CLI's list and SARIF, and
   `:where()` fail (6 tests), and so do the doc promises (14 subtests) and the stated
   checklist count (3); the shipped theme's breakpoints, which mirror the starter's
-  tokens, are the control. The reviews of #24 added seven, each failing on the head it
+  tokens, are the control. The reviews of #24 added eight, each failing on the head it
   reviewed: the breakpoint diff's other direction and pragmas, and the NUL list,
   against `c3b154e` (2); a repeated declaration, a generated theme, an empty side and
   a theme split across files, against `6c64c24` (4); another project's tokens,
-  against `98cf7b8` (1).
+  against `98cf7b8` (1); and a nested package's, against `b71ed10` (1).
 
 ## 3.2.1 — 2026-09-25
 
