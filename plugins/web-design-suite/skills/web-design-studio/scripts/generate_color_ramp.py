@@ -426,6 +426,24 @@ def clamp_rgb(rgb: Tuple[float, float, float]) -> Tuple[float, float, float]:
     return tuple(max(0.0, min(1.0, v)) for v in rgb)  # type: ignore[return-value]
 
 
+def srgb_fallbacks(L: float, C: float, H: float) -> List[Tuple[float, float, float]]:
+    """How an sRGB screen may show a color: its channels clipped, or its chroma
+    reduced at the same L and H (CSS Color 4's gamut mapping). Browsers do
+    either, so a color outside sRGB has two; a color inside it, one."""
+    clipped = clamp_rgb(oklch_to_rgb(L, C, H))
+    if in_srgb_gamut(L, C, H):
+        return [clipped]
+    return [clipped, clamp_rgb(oklch_to_rgb(*gamut_map(L, C, H)))]
+
+
+def worst_contrast(
+    a: Tuple[float, float, float], b: Tuple[float, float, float]
+) -> float:
+    """The lower ratio over each color's sRGB fallbacks, so a color outside
+    sRGB never passes on the kinder of the two."""
+    return min(contrast_ratio_rgb(x, y) for x in srgb_fallbacks(*a) for y in srgb_fallbacks(*b))
+
+
 # ---------------------------------------------------------------------------
 # Ramp construction
 # ---------------------------------------------------------------------------
@@ -620,9 +638,9 @@ def contrast_report(name: str, ramp: Sequence[Swatch], canvas: Tuple[float, floa
     ui_safe: List[str] = []
 
     for s in ramp:
-        c_white = contrast_ratio_oklch((s.L, s.C, s.H), WHITE)
-        c_black = contrast_ratio_oklch((s.L, s.C, s.H), BLACK)
-        c_canvas = contrast_ratio_oklch((s.L, s.C, s.H), canvas)
+        c_white = worst_contrast((s.L, s.C, s.H), WHITE)
+        c_black = worst_contrast((s.L, s.C, s.H), BLACK)
+        c_canvas = worst_contrast((s.L, s.C, s.H), canvas)
 
         token = f"--{name}-{s.step}"
         body = verdict(c_canvas, 4.5)
@@ -689,9 +707,9 @@ def contrast_report(name: str, ramp: Sequence[Swatch], canvas: Tuple[float, floa
         lines.append(f"  Chroma pulled in to fit {room}: none — whole ramp is in gamut.")
     if gamut == "p3":
         lines.append(
-            "  Contrast is measured on each color clamped to sRGB, as an sRGB screen"
+            "  A step outside sRGB is measured on the worse of its two sRGB fallbacks,"
         )
-        lines.append("  shows it; the hex beside each step is that sRGB color.")
+        lines.append("  channels clipped or chroma reduced; its hex is the clipped one.")
 
     return "\n".join(lines)
 

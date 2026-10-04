@@ -169,9 +169,9 @@ exactly this case and stays quiet about the other.
 
 `--gamut p3` maps into Display P3 instead, which holds more chroma than sRGB at every
 lightness. The starter's accent is P3: steps 50–300 and 600–800 are wider than sRGB.
-Browsers show them on P3 screens and map them back on sRGB ones. The contrast matrix still
-measures each color clamped to sRGB, as an sRGB screen shows it. The starter's ramps are
-the output of:
+Browsers show them on P3 screens and map them back on sRGB ones, by clipping each channel
+or by reducing chroma, depending on the browser. So the contrast matrix measures a step
+outside sRGB both ways and reports the worse. The starter's ramps are the output of:
 
 ```bash
 python -m scripts.generate_color_ramp 'oklch(64.5% 0.188 42)' --name accent --hue-shift 0 --gamut p3

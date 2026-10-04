@@ -348,6 +348,18 @@ class ColourRamps(TempDirTest):
         self.assertIn("--accent-500 is oklch(64.5% 0.208 36)  #f14d1a: 0.024 from the seed", report)
         self.assertIn("--anchor-seed puts it at its nearest step", report)
 
+    def test_a_p3_step_is_measured_on_its_worse_srgb_fallback(self):
+        """Codex on #29: a P3 step was measured with its channels clipped to
+        sRGB, so a hot pink's --accent-400 read 3.00:1 and UI-safe. With its
+        chroma reduced into sRGB, as a browser may show it, it is 2.58:1."""
+        proc = self.generate("oklch(64.5% 0.295 0)", "--hue-shift", "0", "--gamut", "p3")
+        self.assertEqual(proc.returncode, 0, output(proc))
+        lines = proc.stderr.decode("utf-8").splitlines()
+        row = next(line for line in lines if line.strip().startswith("--accent-400 "))
+        self.assertIn(" 2.58 ", row.split("|")[2])
+        ui_safe = next(line for line in lines if "Safe for UI / large text:" in line)
+        self.assertNotRegex(ui_safe, r"--accent-400\b")
+
     def test_color_system_md_quotes_the_report(self):
         doc = " ".join((STUDIO / "references" / "color-system.md").read_text(encoding="utf-8").split())
         seed = self.gen.parse_color("#e8440a")

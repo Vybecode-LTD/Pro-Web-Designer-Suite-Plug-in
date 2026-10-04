@@ -387,7 +387,8 @@
 ### Added
 
 - **The generators' options for the starter** (SS-C5). `generate_color_ramp.py` gains
-  `--gamut p3` (reduce chroma into Display P3, not sRGB), `--neutral-hue` and
+  `--gamut p3` (reduce chroma into Display P3, not sRGB; the contrast matrix measures a
+  step outside sRGB on the worse of its two sRGB fallbacks), `--neutral-hue` and
   `--anchor-seed`. `generate_type_scale.py --fluid-space` prints the starter's four
   `--space-fluid-*` steps, solved for the type's viewport anchors, which `tokens.css`
   already told readers to regenerate there.
@@ -709,6 +710,11 @@
   that report, and `--fluid-space` prints the starter's fluid spacing. Against
   `v3.2.1` and against `38d11cc` (#28's head), 11 fail; every documented colour
   command running is the control (1).
+  Codex's review of #29 added one: a P3 step was measured with its channels clipped
+  to sRGB, so a hot pink's `--accent-400` read 3.00:1 and UI-safe; with its chroma
+  reduced, as a browser may show it, it is 2.58:1. The matrix now takes the worse of
+  the two (`test_a_p3_step_is_measured_on_its_worse_srgb_fallback`, failing on
+  `9db30d0`).
 
 ## 3.2.1 — 2026-09-25
 
