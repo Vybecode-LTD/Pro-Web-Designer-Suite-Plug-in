@@ -59,5 +59,9 @@
 - **A stricter gate reaches the references, the starter, the scaffold and the deck.** `test_doc_snippets`, the starter's own runs, `ScaffoldAuditsClean` and `test_presentation` all audit generated or quoted CSS.
 - **Bash heredocs eat backslashes.** Write anything with a backslash through the Write or Edit tool, or a script file.
 - **Don't grep `tooling/`**: its `node_modules` makes the search run for minutes.
-- **A Linux-only test runs under WSL:** `wsl.exe -d Ubuntu --exec sh -c '…'` (Python 3.14), with `WDS_PLUGIN_ROOT` set to an unpacked revision for the before run. Use `--exec`: without it, WSL's own shell expands each `$` before `sh` sees the script.
+- **A Linux-only test runs under WSL** (Ubuntu, Python 3.14), with `WDS_PLUGIN_ROOT` set to an unpacked revision for the before run:
+  - in cmd.exe, double-quote the script: `wsl -d Ubuntu --exec sh -c "cd /mnt/c/DEV && …"`;
+  - in the Bash tool, single-quote it, or Git Bash expands each `$` first: `wsl.exe -d Ubuntu --exec sh -c 'cd /mnt/c/DEV && …'`.
+
+  Use `--exec` either way. Without it, WSL's own shell expands each `$` before `sh` sees the script.
 - **The repository is public.** Commit nothing private.
