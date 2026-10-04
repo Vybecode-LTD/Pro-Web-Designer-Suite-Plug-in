@@ -1,6 +1,6 @@
 # Start here: the next session
 
-**Written 2026-10-03**, after PRs #23 and #24 were merged into `main`. Nothing is open. Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P5** (N3, the rest of SB-C9, and N32), then **P6** if the budget allows.
+**Written 2026-10-04**, after PRs #23 and #24 were merged into `main`. Nothing is open. Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P5** (N3, the rest of SB-C9, and N32), then **P6** if the budget allows.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers. The repository is `C:\DEV\Pro-Web-Designer-Suite-Plug-in` (public on GitHub, `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, MIT). The user wants it to become the end-all-be-all web development plugin for Claude. Every remaining item is scheduled in `dev plans/web-design-suite-execution-plan.md`.
 
@@ -86,7 +86,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 ## 3. First: the state of `main`
 
-#23 and #24 were merged on 2026-10-03, and nothing was open at handoff. Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own.
+#23 was merged on 2026-10-03 and #24 on 2026-10-04, and nothing was open at handoff. Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own.
 
 If a PR is open, read its state, then:
 - fix what is red: a test that assumes one platform is fixed in the test, and a platform bug in the plugin gets a fix with a regression test;

@@ -1,6 +1,6 @@
 # Handoff
 
-**2026-10-03, second session**, after PRs #23 and #24 were merged into `main`.
+**2026-10-04**, after PRs #23 (2026-10-03) and #24 (2026-10-04) were merged into `main`.
 
 **The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then P5 (N3, the rest of SB-C9, and N32) in detail.
 
