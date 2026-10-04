@@ -914,6 +914,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         fluid_min_ratio=args.fluid_min_ratio,
     )
 
+    # --snap-px rounds a fluid step's two ends apart, so the emitted span is
+    # checked, not only the requested one. The tolerance absorbs the 3-decimal
+    # rounding of the minimum.
+    wide = [
+        (s.token, s.fluid["min_px"], s.fluid["max_px"]) for s in steps
+        if s.fluid and s.fluid["max_px"] > (FLUID_SPAN_MAX + 5e-4) * s.fluid["min_px"]
+    ]
+    if wide:
+        spans = ", ".join(
+            f"{t} spans {fmt(lo, 2)}px to {fmt(hi, 2)}px, {hi / lo:.2f} times its minimum"
+            for t, lo, hi in wide
+        )
+        print(
+            f"error: {spans}. A fluid size whose maximum is more than "
+            f"{FLUID_SPAN_MAX} times its minimum can fail WCAG SC 1.4.4 "
+            "(references/typography.md §10). Pass a smaller --fluid-min-ratio, "
+            "or drop --snap-px, which rounds the two ends apart.",
+            file=sys.stderr,
+        )
+        return 2
+
     small = smallest_sizes(steps)
     if small:
         sizes = ", ".join(f"{t} is {fmt(px, 2)}px" for t, px in small)

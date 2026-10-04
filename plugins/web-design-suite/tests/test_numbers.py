@@ -217,6 +217,16 @@ class TypeScale(TempDirTest):
         self.assertEqual(proc.returncode, 2, output(proc))
         self.assertIn("SC 1.4.4", output(proc))
 
+    def test_a_snapped_fluid_span_over_2_5_times_is_refused(self):
+        """Codex on #28: --snap-px rounds a fluid step's two ends apart, so a
+        2.485 shrink emitted 16 -> 40.5px, a 2.53 times span."""
+        proc = self.generate("--base", "16.2", "--ratio", "1.1", "--dual-ratio", "2.485",
+                             "--steps-down", "0", "--steps-up", "1", "--snap-px",
+                             "--fluid", "380", "1440", "--fluid-steps", "1", "--fluid-min-ratio", "2.485")
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("--text-lg spans 16px to 40.5px, 2.53 times its minimum", output(proc))
+        self.assertEqual(proc.stdout, b"")
+
 
     def test_fluid_space_prints_the_starters_fluid_spacing(self):
         proc = self.generate("--fluid-space", "--format", "css")
