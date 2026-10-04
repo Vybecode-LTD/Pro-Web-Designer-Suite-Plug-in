@@ -1702,30 +1702,43 @@ def breakpoint_drift(files: list[tuple[Path, str]]) -> list[Finding]:
     property, so a theme file keeps each breakpoint as a literal,
     `--breakpoint-md`, beside tokens.css's `--bp-md`. With both files in the
     run, the two sets must match: a copy that differs from its token or has
-    none, and a token the theme leaves out, are drift. A theme drops one on
-    purpose with a keyword (`--breakpoint-2xl: initial`). A run over several
-    projects pairs each theme with the token file nearest it, and the theme's
+    none, and a token no theme copies, are drift. Every copy is checked, and
+    a token's value is its last declaration, as in the cascade. A theme drops
+    one on purpose with a keyword (`--breakpoint-2xl: initial`). A Tailwind
+    theme (`@theme`) with no copies still counts, since Tailwind then keeps
+    its own widths, and the themes paired with one token file mirror it
+    together, as Tailwind reads every @theme. Each theme pairs with the
+    nearest token file that declares breakpoints, or the nearest token file
+    if none does. A generated theme answers to its generator, and a theme's
     ignore pragmas apply."""
-    breakpoints: dict[Path, dict[str, str]] = {}     # token file -> its --bp-*
-    themes: dict[Path, dict] = {}                     # theme file -> its copies, lines and pragmas
+    tokens: dict[Path, dict[str, str]] = {}           # token file -> its --bp-*
+    themes: dict[Path, dict] = {}                     # theme file -> its copies, lines, pragmas, anchor
     for path, text in files:
         if not is_token_file(path):
             continue
-        lines = text.splitlines()
+        binding = is_binding_file(path)
+        if binding and any(mark in text[:800] for mark in GENERATED_MARKERS):
+            continue
         clean, comments = strip_css_comments(text, line_comments(path))
-        theme = {"copies": {}, "lines": lines, "pragmas": pragmas(comments)} if is_binding_file(path) else None
+        found: dict[str, list[tuple[int, str]]] = {}
         for ev in scan_css(clean):
             if isinstance(ev, tuple):
                 continue
             m = re.fullmatch(r"--(bp|breakpoint)-([\w-]+)", ev.prop)
-            if not m:
-                continue
-            if m.group(1) == "breakpoint" and theme is not None:
-                theme["copies"].setdefault(m.group(2), (ev.line, ev.value.strip()))
-            elif m.group(1) == "bp" and theme is None:
-                breakpoints.setdefault(path, {}).setdefault(m.group(2), ev.value.strip())
-        if theme is not None and theme["copies"]:
-            themes[path] = theme
+            if m and (m.group(1) == "breakpoint") == binding:
+                found.setdefault(m.group(2), []).append((ev.line, ev.value.strip()))
+        if not binding:
+            tokens[path] = {name: declared[-1][1] for name, declared in found.items()}
+            continue
+        at_theme = re.search(r"@theme\b", clean)
+        if found:
+            anchor = min(line for declared in found.values() for line, _ in declared)
+        elif at_theme:
+            anchor = clean.count("\n", 0, at_theme.start()) + 1
+        else:
+            continue                                  # a theme file Tailwind does not read
+        themes[path] = {"copies": found, "lines": text.splitlines(), "pragmas": pragmas(comments),
+                        "anchor": anchor}
 
     def shared_folders(a: Path, b: Path) -> int:
         n = 0
@@ -1735,31 +1748,40 @@ def breakpoint_drift(files: list[tuple[Path, str]]) -> list[Finding]:
             n += 1
         return n
 
+    sources = {path: values for path, values in tokens.items() if values} or tokens
+    mirrors: dict[Path, list[Path]] = {}             # token file -> the themes paired with it
+    for path in sorted(themes) if sources else ():
+        nearest = max(sorted(sources), key=lambda token_file: shared_folders(path, token_file))
+        mirrors.setdefault(nearest, []).append(path)
+
     findings = []
-    for path, theme in themes.items() if breakpoints else ():
-        nearest = max(sorted(breakpoints), key=lambda token_file: shared_folders(path, token_file))
-        tokens = breakpoints[nearest]
-        file_tags, line_tags = theme["pragmas"]
-        first = min(line for line, _ in theme["copies"].values())
+    for source, paired in mirrors.items():
+        values = sources[source]
         drift = []
-        for name, (line, value) in theme["copies"].items():
-            token = tokens.get(name)
-            if value.lower() in KEYWORDS:                  # removed on purpose
+        for path in paired:
+            for name, declared in themes[path]["copies"].items():
+                token = values.get(name)
+                for line, value in declared:
+                    if value.lower() in KEYWORDS:          # removed on purpose
+                        continue
+                    if token is None:
+                        drift.append((path, line, f"`--breakpoint-{name}: {value}` has no `--bp-{name}` "
+                                                  f"in {source.name}."))
+                    elif re.sub(r"\s+", "", token) != re.sub(r"\s+", "", value):
+                        drift.append((path, line, f"`--breakpoint-{name}: {value}` drifts from "
+                                                  f"{source.name}'s `--bp-{name}: {token}`."))
+        copied = {name for path in paired for name in themes[path]["copies"]}
+        home = next((path for path in paired if themes[path]["copies"]), paired[0])
+        for name, token in values.items():
+            if name not in copied:
+                drift.append((home, themes[home]["anchor"],
+                              f"{source.name}'s `--bp-{name}: {token}` has no `--breakpoint-{name}` in a "
+                              f"theme, so Tailwind's `{name}:` keeps its own width, or does not exist."))
+        for path, line, message in sorted(drift):
+            file_tags, line_tags = themes[path]["pragmas"]
+            if {"L1", "BREAKPOINT-DRIFT", "ALL"} & (line_tags.get(line, set()) | file_tags):
                 continue
-            if token is None:
-                drift.append((line, f"`--breakpoint-{name}: {value}` has no `--bp-{name}` in {nearest.name}."))
-            elif re.sub(r"\s+", "", token) != re.sub(r"\s+", "", value):
-                drift.append((line, f"`--breakpoint-{name}: {value}` drifts from {nearest.name}'s "
-                                    f"`--bp-{name}: {token}`."))
-        for name, token in tokens.items():
-            if name not in theme["copies"]:
-                drift.append((first, f"{nearest.name}'s `--bp-{name}: {token}` has no `--breakpoint-{name}` "
-                                     f"here, so Tailwind has no `{name}:` variant."))
-        for line, message in sorted(drift):
-            tags = line_tags.get(line, set()) | file_tags
-            if {"L1", "BREAKPOINT-DRIFT", "ALL"} & tags:
-                continue
-            lines = theme["lines"]
+            lines = themes[path]["lines"]
             findings.append(Finding(
                 str(path), line, "L1", "breakpoint-drift", "error", message,
                 "A media query cannot read a token, so the theme keeps a copy of each breakpoint. "

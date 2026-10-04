@@ -292,9 +292,12 @@
   or its sentence says what does run:
   - The audit diffs a theme file's `--breakpoint-*` against the token file's `--bp-*`
     when both are in its run, and fails on drift (L1 `breakpoint-drift`), both ways: a
-    token the theme leaves out is drift too, unless the theme drops it with
-    `initial`, and the theme's ignore pragmas apply. A run over several projects pairs
-    each theme with the token file nearest it. theme.css and
+    token no theme copies is drift too, unless a theme drops it with `initial`. Every
+    copy is checked, and a token's value is its last declaration. A Tailwind theme
+    with no copies still counts, since Tailwind then keeps its own widths, and themes
+    split across files mirror the tokens together. A generated theme is skipped, and
+    a theme's ignore pragmas apply. A run over several projects pairs each theme with
+    the nearest token file that declares breakpoints. theme.css and
     stack-tailwind.md said it did; it never had. The v3 `tailwind.config.ts`, which
     the audit does not read, now says its `screens` are kept in step by hand.
   - Nothing compares theme.css's type bindings with the `--type-*` roles, no gate
@@ -396,7 +399,9 @@
 
 - **A theme file's breakpoints must match the tokens** (SB-A11): when one audit run reads
   a theme file and a token file, each `--breakpoint-*` that differs from its `--bp-*`,
-  or has none, is an error (`breakpoint-drift`). Audit the folder that holds both.
+  or has none, is an error (`breakpoint-drift`). So is a `--bp-*` no theme copies, which
+  a Tailwind theme with no copies leaves at Tailwind's own width; drop one on purpose
+  with `initial`. Audit the folder that holds both.
 - **The audit is stricter** (N1, N30): a `rem` or `em` font size, a literal size in
   `max-inline-size`, `max-width`, `min-block-size` or `min-inline-size`, an element
   selector in a component file, a named colour, a system colour outside forced-colors
@@ -567,7 +572,10 @@
   Against `fc92cf7`, #23's head: the breakpoint diff, the CLI's list and SARIF, and
   `:where()` fail (6 tests), and so do the doc promises (14 subtests) and the stated
   checklist count (3); the shipped theme's breakpoints, which mirror the starter's
-  tokens, are the control.
+  tokens, are the control. The reviews of #24 added six, each failing on the head it
+  reviewed: the breakpoint diff's other direction and pragmas, and the NUL list,
+  against `c3b154e` (2); a repeated declaration, a generated theme, an empty side and
+  a theme split across files, against `6c64c24` (4).
 
 ## 3.2.1 — 2026-09-25
 

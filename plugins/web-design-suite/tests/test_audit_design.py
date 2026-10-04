@@ -689,6 +689,45 @@ class ThePromisedChecks(TempDirTest):
                                        "  --breakpoint-md: 50rem;\n}\n")
         self.assertEqual([("theme.css", 2, "breakpoint-drift")], self.found("one", "two", "three"))
 
+    def drift(self, *paths):
+        return [f for f in self.found(*paths) if f[2] == "breakpoint-drift"]
+
+    def test_every_copy_is_checked_and_the_last_token_is_the_value(self):
+        # CodeRabbit on #24: only the first declaration of a name was read, on
+        # both sides, though the cascade keeps the last.
+        self.write("one/tokens.css", ":root { --bp-md: 40rem; --bp-md: 48rem; }\n")
+        self.write("one/theme.css", "@theme {\n  --breakpoint-md: 48rem;\n}\n")
+        self.write("two/tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.write("two/theme.css", "@theme {\n  --breakpoint-md: 48rem;\n  --breakpoint-md: 50rem;\n}\n")
+        self.assertEqual([("theme.css", 3, "breakpoint-drift")], self.drift("one", "two"))
+
+    def test_a_generated_theme_answers_to_its_generator(self):
+        # CodeRabbit on #24: every other check skips a generated file.
+        self.write("tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.write("theme.css", "/* @generated from tokens.json */\n@theme {\n  --breakpoint-md: 50rem;\n}\n")
+        self.assertEqual([], self.drift("."))
+
+    def test_an_empty_side_is_still_compared(self):
+        # CodeRabbit on #24: a Tailwind theme with no copies keeps Tailwind's own
+        # widths, and a theme's copies beside tokens with no breakpoints have
+        # no token. Both dropped out of the diff. A theme file without @theme
+        # mirrors nothing.
+        self.write("one/tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.write("one/theme.css", "@theme {\n  --color-ink: var(--colour-ink);\n}\n")
+        self.write("one/dark-theme.css", ":root {\n  --colour-ink: var(--grey-50);\n}\n")
+        self.assertEqual([("theme.css", 1, "breakpoint-drift")], self.drift("one"))
+        self.write("two/tokens.css", ":root { --space-1: 0.25rem; }\n")
+        self.write("two/theme.css", "@theme {\n  --breakpoint-md: 48rem;\n}\n")
+        self.assertEqual([("theme.css", 2, "breakpoint-drift")], self.drift("two"))
+
+    def test_themes_paired_with_one_token_file_mirror_it_together(self):
+        # Tailwind reads every @theme block, so a theme split across two files
+        # is one set of copies. Each file alone lacked the other's.
+        self.write("tokens.css", ":root { --bp-sm: 30rem; --bp-md: 48rem; }\n")
+        self.write("a-theme.css", "@theme {\n  --breakpoint-sm: 30rem;\n}\n")
+        self.write("b-theme.css", "@theme {\n  --breakpoint-md: 48rem;\n}\n")
+        self.assertEqual([], self.drift("."))
+
     def test_a_nul_separated_list_keeps_each_name_exactly(self):
         # Codex and CodeRabbit on #24: the list was split on newlines too, and
         # every name stripped, so a real path became two that do not exist.
