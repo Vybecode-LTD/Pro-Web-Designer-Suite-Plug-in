@@ -25,6 +25,7 @@
       ".tabs [aria-selected=\"true\"]",
       ".menu:has(> .menu__item)",
       ":where(.a.b.c.d)",
+      ":where([data-label=\")\"].a.b.c.d)",
       ".card :where(.a .b)"
     ],
     "refused": [

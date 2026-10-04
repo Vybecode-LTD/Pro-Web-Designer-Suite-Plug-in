@@ -705,15 +705,26 @@ VAR_MARK = " var() "
 
 
 def _close_paren(text: str, open_at: int) -> int:
-    """Index of the `)` matching the `(` at `open_at` (len(text) if unmatched)."""
-    depth = 0
-    for k in range(open_at, len(text)):
-        if text[k] == "(":
+    """Index of the `)` matching the `(` at `open_at` (len(text) if unmatched).
+    A parenthesis in a string or after a backslash is text: `:where([data-x=")"])`
+    closes at its last `)` (CodeRabbit on #26)."""
+    depth, quote, k = 0, "", open_at
+    while k < len(text):
+        ch = text[k]
+        if ch == "\\":
+            k += 2
+            continue
+        if quote:
+            quote = "" if ch == quote else quote
+        elif ch in "\"'":
+            quote = ch
+        elif ch == "(":
             depth += 1
-        elif text[k] == ")":
+        elif ch == ")":
             depth -= 1
             if depth == 0:
                 return k
+        k += 1
     return len(text)
 
 
@@ -867,6 +878,17 @@ def specificity(parts: list[tuple], amp: tuple[int, int, int] = (0, 0, 0)) -> tu
                 add = (plus[0], plus[1] + 1, plus[2])
         a, b, c = a + add[0], b + add[1], c + add[2]
     return a, b, c
+
+
+def has_nesting(parts: list[tuple]) -> bool:
+    """Whether a parsed selector holds `&`, in a pseudo-class's argument too. A
+    quoted `&` (`[data-x="&"]`) is an attribute's value (CodeRabbit on #26)."""
+    return any(part == ("simple", "amp") or (part[0] == "pseudo" and any(map(has_nesting, part[3] or [])))
+               for part in parts)
+
+
+def _plus(a: tuple[int, int, int], b: tuple[int, int, int]) -> tuple[int, int, int]:
+    return a[0] + b[0], a[1] + b[1], a[2] + b[2]
 
 
 def _nodes(parts: list[tuple]) -> list[str]:
@@ -1151,10 +1173,10 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 # N32: the spec's two selector limits, as stylelint reads them.
                 # A nested rule's weight is its parent's plus its own, and its
                 # `&` scores the parent's; its compounds count as written.
-                parsed = [(s, parse_selector(s)) for s in split_list(sel)]
+                parsed = [parse_selector(s) for s in split_list(sel)]
                 parent = next((w for w in reversed(weights) if w is not None), None)
-                own = [specificity(p, parent) if parent and "&" in s
-                       else tuple(x + y for x, y in zip(parent or (0, 0, 0), specificity(p))) for s, p in parsed]
+                own = [specificity(p, parent) if parent and has_nesting(p)
+                       else _plus(parent or (0, 0, 0), specificity(p)) for p in parsed]
                 heaviest = max(own, default=(0, 0, 0))
                 weights.append(heaviest)
                 if heaviest > SPECIFICITY_CAP and not any(KEYFRAMES_AT.match(a) for a in at_rules):
@@ -1166,7 +1188,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                         "element is and move the rule to the right layer, or wrap the "
                         "context in :where(), which weighs nothing. If it is reaching "
                         "into another component, use that component's Tier-3 properties.")
-                most = max((compounds(p) for _, p in parsed), default=1)
+                most = max(map(compounds, parsed), default=1)
                 if most > MAX_COMPOUNDS:
                     add(line, "L5", "compound-selectors", "error",
                         f"{most} compound selectors, over the cap of {MAX_COMPOUNDS}: `{sel[:70]}`.",
