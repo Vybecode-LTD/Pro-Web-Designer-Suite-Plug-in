@@ -193,6 +193,10 @@ PRESETS = {
     },
 }
 
+# The starter's fluid spacing (tokens.css), min -> max px. It shares the type's
+# viewport anchors, so --fluid-space solves it for the same pair.
+FLUID_SPACE = {"sm": (16, 24), "md": (24, 48), "lg": (40, 88), "xl": (64, 144)}
+
 # The flags that shape a ratio run. Any one of them leaves the preset behind.
 SCALE_FLAGS = (
     "base", "ratio", "dual_ratio", "steps_up", "steps_down", "snap_px",
@@ -571,6 +575,19 @@ def emit_css(steps: List[Step], args, up_ratio: float) -> str:
         out.append(f"    {decl:<{pad}}/* {fmt(s.px, 2):>6}px  {s.role} */")
         if s.fluid:
             out.append(f"    /* ^ {s.fluid['algebra']} */")
+    if args.fluid_space:
+        min_vw, max_vw = args.anchors
+        out.append("")
+        out.append(f"    /* Fluid spacing, on the same {fmt(min_vw, 0)} -> "
+                   f"{fmt(max_vw, 0)}px anchors */")
+        space = {
+            f"--space-fluid-{name}:": fluid_clamp(lo, hi, min_vw, max_vw, args.root)
+            for name, (lo, hi) in FLUID_SPACE.items()
+        }
+        width = max(len(token) for token in space) + 1
+        for token, solved in space.items():
+            out.append(f"    {token:<{width}} {solved['css']};  /* "
+                       f"{fmt(solved['min_px'], 2)} -> {fmt(solved['max_px'], 2)} */")
     out.append("")
     out.append("    /* Recommended pairing per step. These are the tokens the")
     out.append("       Tier-2 `--type-*` roles should compose, not new values. */")
@@ -780,6 +797,12 @@ def build_parser() -> argparse.ArgumentParser:
              "up ratio (one scale step down). Larger = more dramatic shrink, "
              f"up to {FLUID_SPAN_MAX}: past it, zoom cannot double the text.",
     )
+    p.add_argument(
+        "--fluid-space", action="store_true",
+        help="Also print the starter's fluid spacing (--space-fluid-sm..xl), "
+             "solved for the same viewport anchors. CSS only; a ratio run "
+             "needs --fluid.",
+    )
     p.add_argument("--format", choices=sorted(EMITTERS), default="css",
                    help="Output format (default css).")
     p.add_argument("--preview", action="store_true",
@@ -793,6 +816,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.root <= 0:
         parser.error("--root must be positive.")
+    if args.fluid_space and (args.preview or args.format != "css"):
+        parser.error("--fluid-space prints CSS: drop --preview, or use --format css.")
     given = [f for f in SCALE_FLAGS if getattr(args, f) is not None]
     if args.preset and given:
         flags = ", ".join("--" + f.replace("_", "-") for f in given)
@@ -812,6 +837,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         args.dual_ratio = str(preset["dual_ratio"])
         args.steps_down = -min(s.index for s in steps)
         args.steps_up = max(s.index for s in steps)
+        args.anchors = preset["fluid"]
         return emit(steps, args, preset["dual_ratio"])
 
     for flag, value in RATIO_DEFAULTS.items():
@@ -849,6 +875,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 f"--fluid-steps {args.fluid_steps} exceeds the "
                 f"{args.steps_up + args.steps_down + 1} steps in this scale."
             )
+    if args.fluid_space and args.fluid is None:
+        parser.error(
+            "--fluid-space solves the spacing for the type's viewport anchors: "
+            "add --fluid MIN_VW MAX_VW, or drop the scale flags for the preset's "
+            "380 and 1440."
+        )
+    args.anchors = args.fluid
     if args.fluid_min_ratio is not None and args.fluid_min_ratio <= 1:
         parser.error("--fluid-min-ratio must be > 1.")
     if args.fluid_min_ratio is not None and args.fluid_min_ratio > FLUID_SPAN_MAX:

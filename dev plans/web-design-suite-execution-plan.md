@@ -71,7 +71,7 @@ PRs #12 to #15 were merged on 2026-10-02. P0 fixes what their reviews found.
 | P4, #24 | Audit accuracy, the checks the docs promise, its speed on large JSX, and SARIF output | SB-A11, SB-A25, SB-C10 | `audit_design.py` | M |
 | P5, #26 | The references' CSS passes stylelint, the Tailwind v3 entry, and the specificity limits in the spec | N3, SB-C9, N32 | `web-design-studio/references/*.md`, `assets/configs/` | M |
 | P6 part 1, #28 | The type generator reproduces the starter (`--preset studio`, the default), refuses steps under 11px, and fluid type's zoom bound; SS-A9, SS-B7 and SS-C5's type halves | SS-B5 | `generate_type_scale.py`, `typography.md`, `test_numbers.py` | M |
-| P6 | The colour generator reproduces the starter: the seed anchored, the neutral's lightness and hue, fluid spacing, tested against `tokens.css` | SS-A9, SS-B6, SS-B7, SS-C5 | `generate_color_ramp.py`, `tokens.css`, `test_numbers.py` | M |
+| P6 part 2, #29 | The colour generator reproduces the starter: the seed anchored, the neutral's lightness and hue, P3, fluid spacing, tested against `tokens.css` | SS-A9, SS-B6, SS-B7, SS-C5 | `generate_color_ramp.py`, `tokens.css`, `test_numbers.py` | M |
 | P7 | The contract's missing roles, the files the starter refers to, and two wrong comments | SB-B4, SS-B2, SS-C9, SS-A17, SS-A18 | `token-contract.md` (14 copies), `tokens.css`, `reset.css`, starter files | M |
 | P8 | Hygiene and docs that work in cmd and PowerShell | XC-A2, XC-A5, XC-B5, XC-C9, N4, N7, N8, N9, N10 | READMEs, `accessibility.md`, `marketplace.json` | M |
 | R1 | Release 3.3.0 | — | — | M |
@@ -207,7 +207,7 @@ Update this table in each PR.
 
 | Phase | PRs done | Items closed | Release |
 |---|---|---|---|
-| 3 | #12 to #28 merged (2026-10-02 to 04): P0 #16, P1 #17, P2 #18 and #19, P3 part 1 #20, and the skill descriptions #21; P3 part 2 #23, P4 #24, P5 #26; P6 part 1 #28 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30, SB-A15, N31, SB-A11, SB-A25, SB-C10, N3, N32, SB-C9, SS-B5; DL-B2 in part; the type halves of SS-A9, SS-B7 and SS-C5 | — |
+| 3 | #12 to #29 merged (2026-10-02 to 04): P0 #16, P1 #17, P2 #18 and #19, P3 part 1 #20, and the skill descriptions #21; P3 part 2 #23, P4 #24, P5 #26; P6 part 1 #28 and part 2 #29 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30, SB-A15, N31, SB-A11, SB-A25, SB-C10, N3, N32, SB-C9, SS-B5, SS-A9, SS-B6, SS-B7, SS-C5; DL-B2 in part | — |
 | 4 | — | — | — |
 | 5 | — | — | — |
 | 6 | — | — | — |

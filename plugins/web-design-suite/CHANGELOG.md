@@ -371,9 +371,27 @@
   `--text-6xl` grows only 1.33× at 200% and first reaches 2× at 400%. §15 checks both.
   The generator refuses a `--fluid-min-ratio` over 2.5, and any fluid step that
   `--snap-px` rounding leaves over 2.5 times its minimum.
+- **The colour generator reproduces the starter** (SS-A9, SS-B7). SKILL.md's Phase 1
+  seeded both ramps from `#e8440a`. The accent drifted in hue and lost chroma to sRGB,
+  where the starter's holds hue 42 and keeps its P3 tints and shades. The neutral took
+  the seed's hue, 36, which reads pink, where the starter's is 75. And the generator
+  put the neutral's 500 at L 58%, which regenerates the 4.08:1 `--fg-subtle` failure
+  `tokens.css` fixed by hand: it is 53.5% now, 4.60:1 on `--bg-sunken`. Phase 1's two
+  commands, and color-system.md's, print the starter's 24 ramp steps exactly.
+- **A brand's exact colour was lost** (SS-B6). The ramp replaced the seed's lightness,
+  so `#e8440a` became `--accent-500: #f14d1a` and was in no step, without a word.
+  `--anchor-seed` makes the seed itself the step nearest it in lightness, written
+  precisely enough to name the same hex. Without it, the report gives step 500's
+  distance from the seed and points at the flag.
 
 ### Added
 
+- **The generators' options for the starter** (SS-C5). `generate_color_ramp.py` gains
+  `--gamut p3` (reduce chroma into Display P3, not sRGB; the contrast matrix measures a
+  step outside sRGB on the worse of its two sRGB fallbacks), `--neutral-hue` and
+  `--anchor-seed`. `generate_type_scale.py --fluid-space` prints the starter's four
+  `--space-fluid-*` steps, solved for the type's viewport anchors, which `tokens.css`
+  already told readers to regenerate there.
 - **The audit in CI** (SB-C10). `--files-from FILE` audits the paths a file or stdin
   (`-`) lists, one per line or NUL-separated, such as
   `git diff --name-only -z origin/main... | python -m scripts.audit_design --files-from -`;
@@ -494,6 +512,9 @@
   `--allow-small` to emit it with a warning. `--snap-px` is not one: it rounds 9.26px
   to 9. A run with no scale flags now prints the starter's scale instead of the 1.2
   ratio run, and `--preset` cannot be combined with a scale flag.
+- **A regenerated neutral's 500 is darker** (SS-A9): L 53.5%, not 58%, as in the
+  starter. A neutral generated before 3.3.0 and used for placeholder text measures
+  4.08:1 on `--bg-sunken`; regenerate it.
 
 ### Tests
 
@@ -680,6 +701,25 @@
   Codex's review of #28 added one: `--snap-px` rounds a fluid step's two ends apart,
   so a 2.485 shrink emitted 16→40.5px, a 2.53× span
   (`test_a_snapped_fluid_span_over_2_5_times_is_refused`, failing on `38d11cc`).
+- P6 part 2 (SS-B6, and the colour halves of SS-A9, SS-B7 and SS-C5): `test_numbers`
+  gains `ColourRamps` (10 tests) and two `TypeScale` tests. SKILL.md's and
+  color-system.md's colour commands print the starter's 24 ramp steps, every colour
+  command in the docs runs, the generated neutral's 500 clears 4.5:1 on `--bg-sunken`,
+  `--neutral-hue` sets the hue, `--anchor-seed` keeps `#e8440a` exactly at its nearest
+  step, the report gives step 500's distance from the seed, color-system.md quotes
+  that report, and `--fluid-space` prints the starter's fluid spacing. Against
+  `v3.2.1` and against `38d11cc` (#28's head), 11 fail; every documented colour
+  command running is the control (1).
+  Codex's review of #29 added one: a P3 step was measured with its channels clipped
+  to sRGB, so a hot pink's `--accent-400` read 3.00:1 and UI-safe; with its chroma
+  reduced, as a browser may show it, it is 2.58:1. The matrix now takes the worse of
+  the two (`test_a_p3_step_is_measured_on_its_worse_srgb_fallback`, failing on
+  `9db30d0`).
+  CodeRabbit's added another: chroma under 0.0005 was written as none, so the
+  anchored step of `oklch(33.9% 0.0003 140)` read `oklch(33.9% 0 0)`, not the `#373837`
+  the report named. The anchored step keeps its chroma now, and a seed no `oklch()` of
+  six decimals can name is refused
+  (`test_an_anchored_near_grey_keeps_its_hex_in_its_css`, failing on `bcca304`).
 
 ## 3.2.1 — 2026-09-25
 
