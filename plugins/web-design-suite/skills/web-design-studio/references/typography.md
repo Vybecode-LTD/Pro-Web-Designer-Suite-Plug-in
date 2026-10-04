@@ -32,7 +32,7 @@ The generator implements this as `--ratio` (down) and `--dual-ratio` (up):
 
 ```bash
 python scripts/generate_type_scale.py --base 16 --ratio minor-third \
-  --dual-ratio major-third --steps-down 3 --steps-up 7 --snap-px --preview
+  --dual-ratio major-third --steps-down 2 --steps-up 7 --snap-px --preview
 ```
 
 ### Where the shipped tokens deviate from pure math
@@ -44,6 +44,8 @@ python scripts/generate_type_scale.py --base 16 --ratio minor-third \
 | Sub-base steps | 13.33 / 11.11 / 9.26 | 14 / 12 / 11 | Sub-16px type must land on whole pixels; 9px is unusable at any ratio |
 | `--text-lg` | 16 × 1.25 = 20 | 18 | A lead-paragraph role, not a rung of the heading chain |
 | `--text-5xl/6xl` maxima | ~55 / ~69 | 72 / 110 | Hand-amplified for a marketing hero (§10) |
+
+The generator prints both. With no scale flags it prints the shipped scale, exactly: that is its studio preset, `--preset studio`. Any scale flag gives a ratio run, the pure math, and a ratio run refuses a step under 11px: three steps down at 1.2 is 9.26px, and `--snap-px` only rounds that to 9. Drop a step, narrow the ratio, or pass `--allow-small` to emit it anyway.
 
 **An override is legitimate when you can say in one sentence what it buys you.** "It felt tight" is not that sentence. Override the ratio itself when the *content* changes shape: a docs site with six heading levels drops to 1.125–1.2 above base; a brand site amplifies the top two steps only and leaves the body end alone.
 
@@ -360,7 +362,11 @@ c = 44 − 0.026415 × 380 = 33.962px        → 2.1226rem
 --text-5xl: clamp(2.75rem, 2.1226rem + 2.642vw, 4.5rem);
 ```
 
-`generate_type_scale.py --fluid 380 1440` emits exactly this with the algebra in a comment beside it. **The intercept must be in `rem`, not `px`:** a pure-`vw` middle term ignores the user's font-size preference entirely and fails WCAG 1.4.4.
+`generate_type_scale.py` emits exactly this, with the algebra in a comment beside it: its studio preset for the starter's two fluid steps, and `--fluid 380 1440` for a ratio run. **The intercept must be in `rem`, not `px`:** a pure-`vw` middle term ignores the user's font-size preference entirely and fails WCAG 1.4.4.
+
+**A `rem` intercept is necessary, not sufficient.** Zoom enlarges the `rem` part, but it also narrows the CSS viewport, so the `vw` part shrinks as the user zooms in. SC 1.4.4 asks that text can reach twice its size, and browsers stop at 500% zoom. Maxwell Barvian worked out the bound ([Addressing Accessibility Concerns With Using Fluid Type](https://www.smashingmagazine.com/2023/11/addressing-accessibility-concerns-fluid-type/), Smashing Magazine, 2023): a fluid size always passes when its maximum is at most 2.5 times its minimum.
+
+The starter's two fluid steps are inside the bound, at 72 / 44 = 1.64× and 110 / 56 = 1.96×. Inside the bound is not the same as growing on demand. In a 1440px window, `--text-6xl` grows only 1.33× at 200% zoom: the CSS viewport is 720px, so it computes to 73.3px, 146.6 screen pixels against 110. It first reaches 2× at the browser's 400% step, clamped to its 56px minimum: 224 against 110, 2.04×. So test fluid type by zooming your widest window, not by its ratio alone. The generator refuses a `--fluid-min-ratio` over 2.5.
 
 **The shipped tokens hold to this.** Every fluid step in tokens.css, spacing and type, is solved for 380→1440: put its `c` and `m` back into `size(vw)` and it reaches its minimum at 380px and its maximum at 1440px. The suite's tests solve each one on every change, because a clamp whose intercept is a little low still looks plausible, and meets its bounds 20px late. One anchor pair per file: two pairs is how a system drifts.
 
@@ -497,6 +503,8 @@ Both import the **same** `tokens.css`. Nothing in the type scale changes. What c
 - [ ] No component sets outer margin; `.prose` is the only owl, with no `margin-block-end` and no margin on its first child.
 - [ ] Uppercase runs carry `--tracking-caps`; lowercase body carries 0.
 - [ ] Fluid only above `--text-3xl`; every clamp middle term has a `rem` intercept.
+- [ ] Every fluid size's maximum is at most 2.5× its minimum (§10).
+- [ ] Zoomed in your widest window, every fluid size reaches 2× its unzoomed size by 500%, the browsers' limit (§10).
 - [ ] Numeric columns use `tabular-nums`.
 - [ ] Fallback `@font-face` has *measured* overrides; CLS verified on a throttled connection, not by eye.
 - [ ] At most 2 families + 1 mono; at most 3 weights.
