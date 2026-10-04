@@ -554,7 +554,7 @@ export default styles;
 
     &:where([data-variant='danger']) {
       --btn-bg:     var(--bg-danger);
-      --btn-fg:     var(--fg-on-accent);
+      --btn-fg:     var(--fg-on-danger);
       --btn-border: transparent;
     }
 

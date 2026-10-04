@@ -130,7 +130,8 @@ for _n in TIER2:
 # pair, a duration+easing pair) or a clamp(). Figma variables are single scalars,
 # so these cannot cross the boundary in either direction. Naming them here is
 # what turns silent data loss into a printed warning.
-COMPOSITE_ONLY = {n for n in TIER2 if n.startswith(("type-", "motion-", "elevation-"))}
+COMPOSITE_ONLY = {n for n in TIER2 if n.startswith(("type-", "motion-", "elevation-"))
+                  and not n.startswith("motion-travel-")}   # a distance, one FLOAT
 COMPOSITE_ONLY |= {n for n in TIER1 if n.startswith(("shadow-", "ease-", "space-fluid-"))}
 COMPOSITE_ONLY |= {"text-5xl", "text-6xl"}
 

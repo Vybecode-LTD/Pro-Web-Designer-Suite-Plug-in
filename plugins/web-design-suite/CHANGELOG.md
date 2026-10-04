@@ -750,6 +750,13 @@
   `test_figma_sync.StatusInks` measures an ink on its fill. Against `v3.2.1` and against
   `80108ae` (`main`), all 3 fail; `EveryConsumerKnowsEveryRole`, which passes on both
   contracts, is the control (5).
+  Codex's review of #31 added two:
+  - the filled danger and success variants kept `--fg-on-accent`, near-black in dark
+    and 4.38:1 on `--bg-danger`, and the state matrix put `--fg-on-inverse` on the
+    warning fill. The scaffold, the stack references and the matrix now use each fill's
+    ink (`StatusFillsCarryTheirInk`, 7 subtests failing on `590ab8e`);
+  - the Figma export dropped the travel roles as composites, and the versioning report
+    did not measure the invalid border on the sunken input.
 
 ## 3.2.1 — 2026-09-25
 

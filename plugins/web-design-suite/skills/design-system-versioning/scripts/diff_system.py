@@ -1106,7 +1106,7 @@ CONTRAST_PAIRS_EXTRA = (
 UI_ROLES = ("--border-focus", "--border-strong", "--border-accent", "--border-invalid",
             "--bg-accent", "--bg-accent-hover", "--bg-danger", "--bg-success",
             "--bg-warning")
-UI_SURFACES = ("--bg-canvas", "--bg-surface")
+UI_SURFACES = ("--bg-canvas", "--bg-surface", "--bg-sunken")   # inputs sit on sunken
 
 TEXT_THRESHOLDS = ((4.5, "body text (SC 1.4.3)"), (3.0, "large text (SC 1.4.3)"))
 UI_THRESHOLDS = ((3.0, "UI boundary / focus indicator (SC 1.4.11, 2.4.13)"),)
