@@ -757,6 +757,9 @@
     ink (`StatusFillsCarryTheirInk`, 7 subtests failing on `590ab8e`);
   - the Figma export dropped the travel roles as composites, and the versioning report
     did not measure the invalid border on the sunken input.
+  CodeRabbit's added two, in the Figma audit: an `on-*` ink whose fill is not in the file
+  was not measured at all (it is measured on the system's fill now), and
+  `motion-travel-sm = 8` was read as 8ms (`StatusInks`, 2 tests failing on `654034c`).
 
 ## 3.2.1 — 2026-09-25
 

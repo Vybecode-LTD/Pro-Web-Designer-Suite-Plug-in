@@ -201,6 +201,24 @@ class StatusInks(TempDirTest):
         return [f for f in json.loads(proc.stdout)["findings"]
                 if f["code"] == "CONTRAST_FAIL" and "on-danger" in json.dumps(f)]
 
+    def audit(self, data) -> list:
+        src = self.write("export.tokens.json", json.dumps(data))
+        proc = run_py("figma-variables-sync", "figma_audit", src, "--format", "json", cwd=self.tmp)
+        return json.loads(proc.stdout)["findings"]
+
+    def test_an_ink_with_no_fill_in_the_file_is_measured_on_the_systems_fill(self):
+        """CodeRabbit on #31: with no bg/danger, the ink was not measured at all."""
+        findings = self.audit({"fg": {"$type": "color", "on-danger": {"$value": "#ff8080"}},
+                               "bg": {"$type": "color", "canvas": {"$value": "#ffffff"}}})
+        self.assertTrue([f for f in findings
+                         if f["code"] == "CONTRAST_FAIL" and "on-danger" in json.dumps(f)], findings)
+
+    def test_a_travel_distance_is_audited_as_spacing(self):
+        """CodeRabbit on #31: motion-travel-sm = 8 was read as 8ms."""
+        findings = self.audit({"motion": {"$type": "number", "travel": {
+            "xs": {"$value": 4}, "sm": {"$value": 8}, "md": {"$value": 16}}}})
+        self.assertFalse([f for f in findings if "DURATION" in f["code"]], findings)
+
     def test_an_on_status_ink_is_measured_on_its_fill(self):
         self.assertEqual(self.contrast_failures("#d92f35"), [])      # 4.76:1 on the fill
         self.assertEqual(len(self.contrast_failures("#ff9999")), 1)  # 2.07:1 on the fill

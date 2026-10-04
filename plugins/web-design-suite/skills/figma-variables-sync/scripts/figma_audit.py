@@ -166,6 +166,10 @@ DEFAULT_SURFACE = {
              "bg-sunken": RAMPS["neutral"]["1000"], "bg-raised": RAMPS["neutral"]["900"],
              "bg-inverse": RAMPS["neutral"]["100"], "bg-accent": RAMPS["accent"]["500"]},
 }
+# The status fills keep their step in both themes, so an `on-*` ink with no fill
+# in the file is measured on the system's fill, not skipped.
+for _theme in DEFAULT_SURFACE.values():
+    _theme.update({f"bg-{s}": RAMPS[s]["500"] for s in ("success", "warning", "danger")})
 
 # A ramp step and a hex are not the same number: 8-bit quantisation costs about
 # 0.002 in OKLab. 0.006 is comfortably above the rounding floor and far below a
@@ -823,6 +827,8 @@ def float_kind(var: FVar) -> Optional[str]:
     if "GAP" in scopes or "PARAGRAPH_SPACING" in scopes or "PARAGRAPH_INDENT" in scopes:
         return "spacing"
     n = var.slug
+    if "motion-travel" in n:          # a distance on the spacing scale, not a duration
+        return "spacing"
     for regex, kind in (
         (RADIUS_NAME_RE, "radius"), (LEADING_RE, "leading"), (TRACKING_RE, "tracking"),
         (WEIGHT_RE, "weight"), (STROKE_RE, "stroke"), (DURATION_RE, "duration"),
