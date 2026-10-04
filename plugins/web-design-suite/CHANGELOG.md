@@ -369,7 +369,8 @@
   intercept sufficient for SC 1.4.4. It now adds Barvian's bound, a maximum at most 2.5
   times the minimum, and what zoom does to the starter's hero: in a 1440px window,
   `--text-6xl` grows only 1.33× at 200% and first reaches 2× at 400%. §15 checks both.
-  The generator refuses a `--fluid-min-ratio` over 2.5.
+  The generator refuses a `--fluid-min-ratio` over 2.5, and any fluid step that
+  `--snap-px` rounding leaves over 2.5 times its minimum.
 
 ### Added
 
@@ -668,7 +669,7 @@
   `:where()` early, and a quoted `&` read as nesting (against `781e4ea`). stylelint's
   leg, which already read all four, is the control.
 - P6 part 1 (SS-B5, and the type halves of SS-A9, SS-B7 and SS-C5): `test_numbers`
-  gains `TypeScale` (10 tests) and `FluidTypeZoom` (2). The preset and the default
+  gains `TypeScale` (11 tests) and `FluidTypeZoom` (2). The preset and the default
   print `tokens.css`'s `--text-*`, SKILL.md's Phase 1 command does too, every type
   command in the docs exits 0 with nothing on stderr, a step or a fluid minimum under
   11px is refused with its ways out unless `--allow-small`, the preset refuses scale
@@ -676,6 +677,9 @@
   within 2.5 times its minimum, and the figures typography.md §10 quotes recompute from
   it. Against `v3.2.1` and against `ca4f206` (`main`), 10 fail; the 2.5 bound on
   `tokens.css` and a 1.125 run, the refusal's own way out, are the controls (2).
+  Codex's review of #28 added one: `--snap-px` rounds a fluid step's two ends apart,
+  so a 2.485 shrink emitted 16→40.5px, a 2.53× span
+  (`test_a_snapped_fluid_span_over_2_5_times_is_refused`, failing on `38d11cc`).
 
 ## 3.2.1 — 2026-09-25
 
