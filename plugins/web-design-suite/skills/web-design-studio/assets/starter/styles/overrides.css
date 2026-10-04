@@ -1,0 +1,18 @@
+/* =========================================================================
+   OVERRIDES — the last layer, and empty on a healthy project
+   =========================================================================
+
+   Corrections to third-party widgets only. Each rule names the widget, the
+   version and the condition for deleting it, with a date, as in
+
+     datepicker 4.2: its popover ignores color-scheme. Remove when 4.3
+     ships the fix. Added 2026-10-04.
+
+   Your own components never go here. Beating your own CSS from this layer
+   means the component is wrong; fix it there. `[hidden]` is not here
+   either: its `!important` sits in reset, the first layer, which beats
+   every later one (reset.css, section 9).
+
+   The layer is named in index.css's order statement, so this file holds no
+   block until it holds a correction: open `@layer overrides { }` here then.
+   ========================================================================= */

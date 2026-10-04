@@ -37,7 +37,7 @@ These are the whole skill compressed. Everything in `references/` is one of them
 
 **2. Parents own the gaps.** A child never sets its own outer margin. The space between siblings is set by the parent, with `gap`. A component cannot know what it sits next to, so a margin declared inside it is a fact asserted from a position of ignorance — and it is the single largest source of "why is this one 8px lower."
 
-**3. The scale is closed.** 18 spacing steps, 11 type steps, 5 leadings, 6 elevations, 5 durations, 8 z-indexes. There is nothing between the steps. The constraint is the mechanism; the moment you add a step to settle a disagreement, the scale becomes a menu and stops doing its job.
+**3. The scale is closed.** 18 spacing steps, 11 type steps, 5 leadings, 6 elevations, 6 durations, 8 z-indexes. There is nothing between the steps. The constraint is the mechanism; the moment you add a step to settle a disagreement, the scale becomes a menu and stops doing its job.
 
 **4. One home per component's styles.** A reviewer who has never seen a component must be able to predict its appearance from one file. Inline `style` is permitted only when every key is a CSS custom property — that passes a runtime *number* into the cascade without moving a visual *decision* out of the stylesheet.
 
