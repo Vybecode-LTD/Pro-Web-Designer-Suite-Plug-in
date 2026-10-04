@@ -165,7 +165,7 @@ Measured again after P3: 28 of 159 blocks failed, and 9 more are fragments (`{ �
 | SB-A25 | low | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. *Done for 3.3.0 (PRs #23 and #24).* |
 | SB-C1 | S-M | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. *Done: 3.1.0 did SB-A3, A4 and A10, and 3.3.0 did SB-A9 and A24.* |
 | SB-C2 | M · high | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. *Done for 3.3.0 (N2): 3.2.0 shipped the spec, and 3.3.0 the generator and the conformance tests.* |
-| SB-C9 | S · medium | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. *Partly done for 3.3.0: vanilla, modules and Tailwind v4; v3 is left.* |
+| SB-C9 | S · medium | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. *Done for 3.3.0: vanilla and modules (`starter/styles/index.css`), Tailwind v4 (`configs/index.tailwind.css`) and Tailwind v3 (`configs/index.tailwind-v3.css`).* |
 
 ### W3 · Studio systems: generators, roles and starter files
 
