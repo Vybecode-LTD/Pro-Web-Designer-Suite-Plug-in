@@ -445,7 +445,7 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 - Modern CSS: `@starting-style`, the top layer, `cqi`.
 - Migration coverage for CSS-in-JS and Sass functions.
 - The rollout recipes.
-- The audit's speed on large JSX, and SARIF output.
+- The audit's speed on large JSX, and SARIF output. *Done for 3.3.0 (PR #24, SB-C10).*
 - Decision 3: which Tailwind lint plugin.
 
 | ID | Severity or size | What is wrong or missing |

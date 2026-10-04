@@ -48,10 +48,11 @@ Regressions covered:
 from __future__ import annotations
 
 import json
+import os
 import re
 import unittest
 
-from wds_support import SKILLS, TempDirTest, output, run_py
+from wds_support import SKILLS, TempDirTest, load_script, output, run_py
 
 
 class AuditDesign(TempDirTest):
@@ -529,11 +530,14 @@ class AuditPrecision(TempDirTest):
                    "  .card__body { padding-inline: $space 5%; inline-size: calc(100% - #{$gutter}); }\n"
                    "  .card__media { padding: $space; inline-size: tokens.$media-size;"
                    " transition: opacity $fade $ease-in; }\n"
+                   "  .card__foot { padding: #{5%}; padding-block: #{$space}; }\n"
                    "}\n")
-        # CodeRabbit on #23: a percentage beside a variable is refused too, and
-        # a size derived from one is geometry, which goes in a socket.
+        # CodeRabbit on #23: a percentage beside a variable is refused too, a
+        # size derived from one is geometry, which goes in a socket, and an
+        # interpolation emits its expression: #{5%} is a literal.
         self.assertEqual([("L1", "raw-duration", 2), ("L1", "raw-size", 3), ("L1", "raw-spacing", 2),
-                          ("L1", "raw-spacing", 3), ("L1", "raw-stroke", 2)], self.found("src"))
+                          ("L1", "raw-spacing", 3), ("L1", "raw-spacing", 5), ("L1", "raw-stroke", 2)],
+                         self.found("src"))
 
     def test_indented_sass_is_skipped_not_passed(self):
         # Found with SB-A24: the scanner follows braces and indented Sass has
@@ -674,6 +678,88 @@ class ThePromisedChecks(TempDirTest):
             with self.subTest(doc=doc):
                 self.assertEqual(rows, count)
 
+    def test_breakpoints_match_in_both_directions_and_obey_the_pragmas(self):
+        # Codex and CodeRabbit on #24: a token the theme left out passed, and an
+        # ignore pragma in the theme did not reach the cross-file finding.
+        self.write("one/tokens.css", ":root { --bp-md: 48rem; --bp-lg: 64rem; --bp-xl: 80rem; }\n")
+        self.write("one/theme.css", "@theme {\n  --breakpoint-md: 48rem;\n  --breakpoint-xl: initial;\n}\n")
+        self.write("two/tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.write("two/theme.css", "/* design-audit-ignore-file: L1 */\n@theme {\n  --breakpoint-md: 50rem;\n}\n")
+        self.write("three/tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.write("three/theme.css", "@theme {\n  /* design-audit-ignore-next-line: L1 -- the old site's */\n"
+                                       "  --breakpoint-md: 50rem;\n}\n")
+        self.assertEqual([("theme.css", 2, "breakpoint-drift")], self.found("one", "two", "three"))
+
+    def drift(self, *paths):
+        return [f for f in self.found(*paths) if f[2] == "breakpoint-drift"]
+
+    def test_every_copy_is_checked_and_the_last_token_is_the_value(self):
+        # CodeRabbit on #24: only the first declaration of a name was read, on
+        # both sides, though the cascade keeps the last.
+        self.write("one/tokens.css", ":root { --bp-md: 40rem; --bp-md: 48rem; }\n")
+        self.write("one/theme.css", "@theme {\n  --breakpoint-md: 48rem;\n}\n")
+        self.write("two/tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.write("two/theme.css", "@theme {\n  --breakpoint-md: 48rem;\n  --breakpoint-md: 50rem;\n}\n")
+        self.assertEqual([("theme.css", 3, "breakpoint-drift")], self.drift("one", "two"))
+
+    def test_a_generated_theme_answers_to_its_generator(self):
+        # CodeRabbit on #24: every other check skips a generated file.
+        self.write("tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.write("theme.css", "/* @generated from tokens.json */\n@theme {\n  --breakpoint-md: 50rem;\n}\n")
+        self.assertEqual([], self.drift("."))
+
+    def test_an_empty_side_is_still_compared(self):
+        # CodeRabbit on #24: a Tailwind theme with no copies keeps Tailwind's own
+        # widths, and a theme's copies beside tokens with no breakpoints have
+        # no token. Both dropped out of the diff. A theme file without @theme
+        # mirrors nothing.
+        self.write("one/tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.write("one/theme.css", "@theme {\n  --color-ink: var(--colour-ink);\n}\n")
+        self.write("one/dark-theme.css", ":root {\n  --colour-ink: var(--grey-50);\n}\n")
+        self.assertEqual([("theme.css", 1, "breakpoint-drift")], self.drift("one"))
+        self.write("two/tokens.css", ":root { --space-1: 0.25rem; }\n")
+        self.write("two/theme.css", "@theme {\n  --breakpoint-md: 48rem;\n}\n")
+        self.assertEqual([("theme.css", 2, "breakpoint-drift")], self.drift("two"))
+
+    def test_a_theme_pairs_only_with_its_own_projects_tokens(self):
+        # CodeRabbit on #24: a theme whose project had no token file in the run
+        # was paired with another project's. A project is the nearest folder
+        # with a package.json, so two folders of one project still pair.
+        self.write("app/package.json", "{}\n")
+        self.write("app/theme.css", "@theme {\n  --breakpoint-md: 50rem;\n}\n")
+        self.write("deck/package.json", "{}\n")
+        self.write("deck/tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.write("web/package.json", "{}\n")
+        self.write("web/app/theme.css", "@theme {\n  --breakpoint-md: 50rem;\n}\n")
+        self.write("web/styles/tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.assertEqual([("theme.css", 2, "breakpoint-drift")], self.drift("app", "deck", "web"))
+
+    def test_a_nested_packages_tokens_are_not_its_parents(self):
+        # CodeRabbit on #24: a package nested in the theme's project lies under
+        # its root too, and its tokens were taken for the parent's.
+        self.write("site/package.json", "{}\n")
+        self.write("site/theme.css", "@theme {\n  --breakpoint-md: 48rem;\n  --breakpoint-lg: 60rem;\n}\n")
+        self.write("site/styles/tokens.css", ":root { --bp-md: 48rem; --bp-lg: 64rem; }\n")
+        self.write("site/packages/kit/package.json", "{}\n")
+        self.write("site/packages/kit/tokens.css", ":root { --bp-md: 40rem; }\n")
+        # The parent's tokens are the pair: lg drifts from them, and md does not.
+        self.assertEqual([("theme.css", 3, "breakpoint-drift")], self.drift("site"))
+
+    def test_themes_paired_with_one_token_file_mirror_it_together(self):
+        # Tailwind reads every @theme block, so a theme split across two files
+        # is one set of copies. Each file alone lacked the other's.
+        self.write("tokens.css", ":root { --bp-sm: 30rem; --bp-md: 48rem; }\n")
+        self.write("a-theme.css", "@theme {\n  --breakpoint-sm: 30rem;\n}\n")
+        self.write("b-theme.css", "@theme {\n  --breakpoint-md: 48rem;\n}\n")
+        self.assertEqual([], self.drift("."))
+
+    def test_a_nul_separated_list_keeps_each_name_exactly(self):
+        # Codex and CodeRabbit on #24: the list was split on newlines too, and
+        # every name stripped, so a real path became two that do not exist.
+        audit = load_script("web-design-studio", "audit_design")
+        self.assertEqual(["a\nb.css", " c.css"], audit.listed_paths("a\nb.css\0 c.css\0"))
+        self.assertEqual(["a.css", "b c.css"], audit.listed_paths("a.css\r\n\r\nb c.css\n"))
+
     def test_the_shipped_theme_mirrors_the_starters_tokens(self):
         styles = SKILLS / "web-design-studio" / "assets"
         self.assertEqual([], [f for f in self.found(styles / "starter" / "styles" / "tokens.css",
@@ -708,6 +794,20 @@ class TheAuditInCi(TempDirTest):
         self.assertEqual(1, proc.returncode, output(proc))
         self.assertEqual(["raw-spacing"], [f["rule"] for f in json.loads(proc.stdout)])
 
+    def test_a_listed_name_that_is_not_utf8_is_still_audited(self):
+        # CodeRabbit on #24: the list was read as UTF-8, so on Linux a name in
+        # another encoding lost its bytes, was taken for a deleted file, and
+        # went unaudited.
+        name = b"src/components/caf\xe9.css"
+        try:
+            (self.tmp / os.fsdecode(name)).write_text("@layer components {\n  .bad { padding: 13px; }\n}\n",
+                                                      encoding="utf-8")
+        except (UnicodeError, OSError):
+            self.skipTest("this file system names files in Unicode")
+        proc = self.audit("--files-from", "-", "--json", stdin=name + b"\0")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertEqual(["raw-spacing"], [f["rule"] for f in json.loads(proc.stdout)])
+
     def test_an_empty_list_audits_nothing_and_passes(self):
         proc = self.audit("--files-from", "-", stdin=b"")
         self.assertEqual(0, proc.returncode, output(proc))
@@ -727,7 +827,10 @@ class TheAuditInCi(TempDirTest):
         location = result["locations"][0]["physicalLocation"]
         self.assertEqual({"uri": "src/components/bad.css", "uriBaseId": "%SRCROOT%"}, location["artifactLocation"])
         self.assertEqual({"startLine": 2, "startColumn": 1}, location["region"])
-        self.assertRegex(result["partialFingerprints"]["designAuditKey/v1"], r"^[0-9a-f]{64}$")
+        # CodeRabbit on #24: the base the relative URIs name is defined, and no
+        # fingerprint is invented, since code scanning reads only its own.
+        self.assertRegex(run["originalUriBaseIds"]["%SRCROOT%"]["uri"], r"^file:.*/$")
+        self.assertNotIn("partialFingerprints", result)
         self.assertEqual(2, self.audit("src", "--sarif", "--json").returncode)     # one format at a time
 
     def test_where_adds_no_specificity(self):

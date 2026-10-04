@@ -217,8 +217,8 @@ block without a word. Every responsive rule silently stops applying.
 This is a genuine duplication and the only honest way to handle it is to make
 drift detectable rather than pretend it cannot happen:
 `scripts/audit_design.py` diffs `--breakpoint-*` against `--bp-*`, when both
-files are in its run, and fails on mismatch (`breakpoint-drift`). Change one,
-change both.
+files are in its run and in one project (under the same `package.json`), and
+fails on mismatch (`breakpoint-drift`). Change one, change both.
 
 ### 2.5 `--container-*` is a trap; use `@utility` instead
 

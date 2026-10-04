@@ -276,9 +276,10 @@
     `var(--gap-related) auto` sets the component's own block margin.
   - The audit's spacing, stroke, motion and sizing checks read the spec's allowlists, so
     they refuse what stylelint refuses. A value that holds a Sass variable or an
-    interpolation is judged with each reference read as a token, so `padding: $space 13px`
-    and `$space 5%` are refused as their CSS forms are, and the variable is
-    `sass-literal`'s (from the reviews of #23).
+    interpolation is judged with each variable read as a token and each interpolation
+    as the expression it emits, so `padding: $space 13px`, `$space 5%` and `#{5%}` are
+    refused as their CSS forms are, and the variable is `sass-literal`'s (from the
+    reviews of #23).
   - Seven reference blocks, two starter rules and two generated stylesheets broke the new
     rules and now follow them. Three inset focus rings used `* -2`, against the starter's
     `* -1`. The scroll-driven progress bar names its easing token. The table of contents'
@@ -290,8 +291,14 @@
 - **The docs promised checks that nobody ran** (SB-A11, SB-A25). Each one now exists,
   or its sentence says what does run:
   - The audit diffs a theme file's `--breakpoint-*` against the token file's `--bp-*`
-    when both are in its run, and fails on drift (L1 `breakpoint-drift`). A run over
-    several projects pairs each theme with the token file nearest it. theme.css and
+    when both are in its run, and fails on drift (L1 `breakpoint-drift`), both ways: a
+    token no theme copies is drift too, unless a theme drops it with `initial`. Every
+    copy is checked, and a token's value is its last declaration. A Tailwind theme
+    with no copies still counts, since Tailwind then keeps its own widths, and themes
+    split across files mirror the tokens together. A generated theme is skipped, and
+    a theme's ignore pragmas apply. A theme pairs only with a token file of its own
+    project, the nearest folder above it with a `package.json`, and among those with
+    the nearest that declares breakpoints. theme.css and
     stack-tailwind.md said it did; it never had. The v3 `tailwind.config.ts`, which
     the audit does not read, now says its `screens` are kept in step by hand.
   - Nothing compares theme.css's type bindings with the `--type-*` roles, no gate
@@ -317,9 +324,12 @@
   a listed path that no longer exists, a deleted file, is skipped. `--sarif` writes
   the findings as SARIF, the format GitHub code scanning reads (checked 2026-10-03 at
   docs.github.com: "Code scanning only supports SARIF version `2.1.0`"), with a
-  rule per law and id, paths relative to the working directory, and a fingerprint
-  that leaves the line number out, as the baseline does. The line lookup SB-C10
-  asked for was already a bisect.
+  rule per law and id, and paths relative to the working directory under a
+  `%SRCROOT%` the run defines. It sets no fingerprint: code scanning reads only its
+  own, which `upload-sarif` computes from the source (from the reviews of #24). A
+  NUL-separated list keeps each name exactly, even a Linux name that is not UTF-8.
+  The line lookup SB-C10 asked for was
+  already a bisect.
 
 - **One canonical entry stylesheet per stack** (SB-C9, SS-C9 in part). The starter
   ships `index.css`, and the configs ship `index.tailwind.css` for Tailwind v4. Five
@@ -391,7 +401,9 @@
 
 - **A theme file's breakpoints must match the tokens** (SB-A11): when one audit run reads
   a theme file and a token file, each `--breakpoint-*` that differs from its `--bp-*`,
-  or has none, is an error (`breakpoint-drift`). Audit the folder that holds both.
+  or has none, is an error (`breakpoint-drift`). So is a `--bp-*` no theme copies, which
+  a Tailwind theme with no copies leaves at Tailwind's own width; drop one on purpose
+  with `initial`. Audit the folder that holds both.
 - **The audit is stricter** (N1, N30): a `rem` or `em` font size, a literal size in
   `max-inline-size`, `max-width`, `min-block-size` or `min-inline-size`, an element
   selector in a component file, a named colour, a system colour outside forced-colors
@@ -562,7 +574,13 @@
   Against `fc92cf7`, #23's head: the breakpoint diff, the CLI's list and SARIF, and
   `:where()` fail (6 tests), and so do the doc promises (14 subtests) and the stated
   checklist count (3); the shipped theme's breakpoints, which mirror the starter's
-  tokens, are the control.
+  tokens, are the control. The reviews of #24 added nine, each failing on the head it
+  reviewed: the breakpoint diff's other direction and pragmas, and the NUL list,
+  against `c3b154e` (2); a repeated declaration, a generated theme, an empty side and
+  a theme split across files, against `6c64c24` (4); another project's tokens,
+  against `98cf7b8` (1); a nested package's, against `b71ed10` (1); and a listed name
+  that is not UTF-8, against `5a7fbae` on Linux (1). Windows and macOS skip that
+  one: their file names are always Unicode.
 
 ## 3.2.1 — 2026-09-25
 
