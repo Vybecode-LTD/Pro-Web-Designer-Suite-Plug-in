@@ -184,9 +184,9 @@ This is Gestalt proximity, encoded. Human perception groups by distance before i
 
 ### The one rule that catches most errors
 
-> **Space between groups must be visibly larger than space within groups — at least 1.5×, ideally 2×.**
+> **Space between groups must be visibly larger than space within groups — at least one rung up the ladder, ideally 2×.**
 
-Adjacent rungs on the ladder are 1.33–1.66× apart, which is the minimum that reads as intentional. If you need a boundary to be unmistakable, skip a rung.
+Adjacent rungs on the ladder are 1.33–1.66× apart (related to grouped, 12 to 16px, is the tightest), which is the minimum that reads as intentional. If you need a boundary to be unmistakable, skip a rung.
 
 Look at the ladder as a picture of the failure it prevents:
 
@@ -285,7 +285,7 @@ Run this every time you are about to type a spacing value. It takes five seconds
    go up one level. (Exceptions: §3.)
 
 5. Does the value you landed on differ from the gap one level up?
-   It must, by at least 1.5x. If it does not, one of the two is wrong.
+   It must, by at least one rung. If it does not, one of the two is wrong.
 
 6. Run the auditor before you call it done.
 ```

@@ -45,11 +45,11 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SS-A14 | medium | fixed in 3.1.0 | Every command is python -m scripts.X (SKILL.md:66-72, :159-173; :58 even omits the path). |
 | SS-A15 | low | fixed in 3.2.0 | The fluid spacing anchors aren't what the comments say, and typography's "sanity check" is stale. |
 | SS-A16 | low | fixed in 3.2.0 | Factual slips (all verified). |
-| SS-A17 | low | W3 (3.3.0) | tokens.css:9 says components never read Tier 1, but the contract allows some primitives (token-contract.md:95). |
-| SS-A18 | low | W3 (3.3.0) | 374-384 says `html:has(:target)` limits smooth scrolling to anchor clicks. |
+| SS-A17 | low | fixed in 3.3.0: `test_contract.TheStarterKeepsItsWord` | tokens.css:9 says components never read Tier 1, but the contract allows some primitives (token-contract.md:95). |
+| SS-A18 | low | fixed in 3.3.0: `test_contract.TheStarterKeepsItsWord` | 374-384 says `html:has(:target)` limits smooth scrolling to anchor clicks. |
 | SS-A19 | medium | fixed in 3.1.0 | Cause: audit_design.py:1040 reads utf-8 rather than utf-8-sig, so ﻿@layer counts as an unlayered rule. |
 | SS-B1 | — | fixed in 3.2.0 | There is no gate for role-pair contrast. |
-| SS-B2 | — | partly done: the on-status inks and `--motion-travel-*` in 3.3.0 (`test_check_roles`, `test_figma_sync.StatusInks`); the starter's files in P7 part 2 | Tier-2 roles and starter files are missing. |
+| SS-B2 | — | fixed in 3.3.0: `test_check_roles`, `test_figma_sync.StatusInks`, `test_contract.TheStarterKeepsItsWord` | Tier-2 roles and starter files are missing. |
 | SS-B3 | — | W10 (3.6.0+) | Theming without JavaScript. |
 | SS-B4 | — | W12 (3.6.0+) | Modern CSS the systems references should teach: `@starting-style`, the top layer against the z-index ladder, `cqi`, `font-size-adjust`, `color-mix()`. |
 | SS-B5 | — | fixed in 3.3.0: `test_numbers.FluidTypeZoom`, `TypeScale.test_a_fluid_span_over_2_5_times_is_refused` | Fluid type and zoom (SC 1.4.4) is only half taught. |
@@ -63,7 +63,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SS-C6 | — | W9 (3.5.0) | Use Claude Code plugin features (M, P1). |
 | SS-C7 | — | W9 (3.5.0) | An eval suite of script-graded cases, run against a no-plugin baseline. |
 | SS-C8 | — | fixed in 3.2.0 | Size: 17.7 KB / 2,616 words ≈ 4.4k tokens. |
-| SS-C9 | — | W3 (3.3.0) | Ship what the starter refers to (S, P1). |
+| SS-C9 | — | fixed in 3.3.0: `test_contract.TheStarterKeepsItsWord` | Ship what the starter refers to (S, P1). |
 | SB-A1 | high | fixed in 3.1.0 | The canonical Button shows no focus ring when reached by keyboard. |
 | SB-A2 | high | fixed in 3.1.0 | `@utility focus-ring { outline: none; box-shadow: var(--shadow-focus) }` takes away the forced-colors fallback. |
 | SB-A3 | high | fixed in 3.1.0 | Any `var(` anywhere in a value turns off every L1 check for that declaration. |

@@ -100,6 +100,64 @@ class StatusFillsCarryTheirInk(unittest.TestCase):
         self.assertIn("--bg-sunken", diff.UI_SURFACES)
 
 
+STARTER_DIR = SKILLS / "web-design-studio" / "assets" / "starter"
+
+
+def css_code(text: str) -> str:
+    return re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+
+
+class TheStarterKeepsItsWord(unittest.TestCase):
+    """P7 (SS-A17, SS-A18, SS-B2, SS-C9): comments the files contradicted, and
+    files the starter referred to but did not ship."""
+
+    def setUp(self):
+        self.tokens = (STARTER_DIR / "styles" / "tokens.css").read_text(encoding="utf-8")
+        self.declared = declared(self.tokens)
+
+    def count(self, prefix: str, exclude=()) -> int:
+        return len({d for d in self.declared if d.startswith(prefix)
+                    and not any(d.startswith(x) for x in exclude)})
+
+    def test_law_3_counts_recompute_from_the_starter(self):
+        line = next(l for l in CONTRACT.read_text(encoding="utf-8").splitlines() if "The scale is closed" in l)
+        stated = {kind: int(n) for n, kind in re.findall(r"(\d+) (spacing|type|leadings|elevations|durations|z-indexes)", line)}
+        actual = {"spacing": self.count("--space-", ("--space-fluid-", "--space-block", "--space-section",
+                                                     "--space-subsection")),
+                  "type": self.count("--text-"), "leadings": self.count("--leading-"),
+                  "elevations": self.count("--elevation-"), "durations": self.count("--dur-"),
+                  "z-indexes": self.count("--z-")}
+        self.assertEqual(stated, actual)
+
+    def test_the_tokens_comments_name_what_exists(self):
+        for name in ("--gray-800", "--btn-pad-x"):
+            with self.subTest(name=name):
+                self.assertNotIn(name, self.tokens)
+        words = {"four": 4, "five": 5, "six": 6}
+        said = re.search(r"These (\w+) cover everything", self.tokens).group(1)
+        self.assertEqual(words[said], self.count("--leading-"))
+
+    def test_the_starter_ships_what_it_refers_to(self):
+        index = css_code((STARTER_DIR / "styles" / "index.css").read_text(encoding="utf-8"))
+        for name in ("utilities.css", "overrides.css"):
+            with self.subTest(file=name):
+                self.assertTrue((STARTER_DIR / "styles" / name).is_file())
+                self.assertIn(f'@import url("{name}");', index)
+        self.assertIn(".visually-hidden {", (STARTER_DIR / "styles" / "utilities.css").read_text(encoding="utf-8"))
+        self.assertTrue((STARTER_DIR / "theme-init.js").is_file())
+        self.assertIn("theme-init.js", self.tokens)
+        for path in SKILLS.rglob("*"):
+            if path.suffix in {".md", ".py", ".css", ".tsx", ".html"}:
+                with self.subTest(file=path.name):
+                    self.assertEqual(path.read_text(encoding="utf-8").count("u-visually-hidden"), 0)
+
+    def test_reset_neither_smooths_every_scroll_nor_resizes_on_scroll(self):
+        reset = css_code((STARTER_DIR / "styles" / "reset.css").read_text(encoding="utf-8"))
+        self.assertNotIn("scroll-behavior", reset)
+        self.assertNotIn("dvh", reset)
+        self.assertIn("min-block-size: 100svh;", reset)
+
+
 class ContractCopies(unittest.TestCase):
 
     def test_the_fourteen_contract_copies_are_identical(self):

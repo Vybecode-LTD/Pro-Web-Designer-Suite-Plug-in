@@ -387,6 +387,22 @@
   `--border-focus`, and content-model-to-ui's scaffold drew it in `--border-accent`. Both
   read `--border-invalid` now. The Figma audit measured an on-status ink on the canvas,
   not on its fill, and the docs and versioning tools now measure each ink on its fill.
+- **The starter referred to files it did not ship, and its comments contradicted it**
+  (SS-B2, SS-C9, SS-A17, SS-A18).
+  - `utilities.css` (one `.visually-hidden`; pattern-invention.md, the stack
+    references and the scaffold said `.u-visually-hidden`), `overrides.css` (the empty
+    last layer, with its convention) and `theme-init.js` (the no-flash theme script,
+    which now survives blocked storage) ship, and index.css imports both stylesheets.
+    `[hidden]` stays in reset, the first layer, where its `!important` beats every later
+    one.
+  - tokens.css named `--gray-800` and `--btn-pad-x`, said components never read Tier 1
+    and themes re-point "Tier 2 ONLY", and counted four leadings above five. Law 3
+    counted five durations; there are six. motion-system.md never named `--dur-loop`,
+    spacing-system.md asked 1.5× between levels the ladder spaces 1.33×, and
+    style-architecture.md re-pointed one step of a white-label's ramp.
+  - reset.css: `html:has(:target)` smoothed every later scroll once any fragment was
+    targeted, so the rule is gone (smooth an in-page link from its click handler), and
+    `body` uses `100svh`, not `100dvh`, as layout-composition.md says.
 
 ### Added
 
@@ -760,6 +776,11 @@
   CodeRabbit's added two, in the Figma audit: an `on-*` ink whose fill is not in the file
   was not measured at all (it is measured on the system's fill now), and
   `motion-travel-sm = 8` was read as 8ms (`StatusInks`, 2 tests failing on `654034c`).
+- P7 part 2 (SS-B2, SS-C9, SS-A17, SS-A18): `test_contract.TheStarterKeepsItsWord`
+  recomputes Law 3's counts from tokens.css, reads the comments' names and leading
+  count, checks the shipped files and their imports and that no `u-visually-hidden`
+  remains, and holds reset.css to no smooth scrolling and `svh`. Against `v3.2.1` and
+  against `3cb09cc` (#31's head), all 4 fail. The starter's own audit now reads 7 files.
 
 ## 3.2.1 — 2026-09-25
 
