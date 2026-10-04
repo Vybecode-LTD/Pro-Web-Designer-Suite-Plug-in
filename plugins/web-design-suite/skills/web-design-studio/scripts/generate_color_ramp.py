@@ -315,11 +315,14 @@ def _trim(value: str) -> str:
     return value.rstrip("0").rstrip(".") if "." in value else value
 
 
-def format_oklch(L: float, C: float, H: float, places: int = 1) -> str:
+def format_oklch(
+    L: float, C: float, H: float, places: int = 1, keep_chroma: bool = False
+) -> str:
     """Match the formatting used in assets/starter/styles/tokens.css. `places`
-    is the decimals of L% and H; C gets two more."""
+    is the decimals of L% and H; C gets two more. Chroma under 0.0005 is
+    written as none, unless `keep_chroma`."""
     lightness = _trim(f"{L * 100:.{places}f}")
-    if C < 5e-4:
+    if C < 5e-4 and not keep_chroma:
         # A true achromatic swatch. Carrying a hue on it is noise.
         return f"oklch({lightness}% 0 0)"
     hue = _trim(f"{H:.{places}f}") or "0"
@@ -336,11 +339,12 @@ def format_exact(L: float, C: float, H: float) -> str:
     """The shortest oklch() that still names the same sRGB hex. The anchored
     step uses it, so the brand's hex survives the round trip."""
     want = oklch_to_hex(L, C, H)
-    for places in range(1, 6):
-        css = format_oklch(L, C, H, places)
-        if oklch_to_hex(*parse_color(css)) == want:
-            return css
-    return css
+    for places in range(1, 7):
+        for keep_chroma in (False, True):
+            css = format_oklch(L, C, H, places, keep_chroma)
+            if oklch_to_hex(*parse_color(css)) == want:
+                return css
+    raise ColorError(f"no oklch() of up to 6 decimals names {want}; pass the seed as a hex.")
 
 
 def delta_e_ok(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> float:

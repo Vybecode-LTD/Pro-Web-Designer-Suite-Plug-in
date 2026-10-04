@@ -348,6 +348,16 @@ class ColourRamps(TempDirTest):
         self.assertIn("--accent-500 is oklch(64.5% 0.208 36)  #f14d1a: 0.024 from the seed", report)
         self.assertIn("--anchor-seed puts it at its nearest step", report)
 
+    def test_an_anchored_near_grey_keeps_its_hex_in_its_css(self):
+        """CodeRabbit on #29: chroma under 0.0005 was written as none, so the
+        anchored step of oklch(33.9% 0.0003 140) read oklch(33.9% 0 0), which
+        is not the #373837 the report named."""
+        proc = self.generate("oklch(33.9% 0.0003 140)", "--anchor-seed", "--format", "json")
+        self.assertEqual(proc.returncode, 0, output(proc))
+        step = json.loads(proc.stdout)["accent"][str(self.gen.nearest_step(0.339, self.gen.DEFAULT_STEPS))]
+        self.assertEqual(step["hex"], "#373837")
+        self.assertEqual(self.gen.oklch_to_hex(*self.gen.parse_color(step["oklch"])), "#373837")
+
     def test_a_p3_step_is_measured_on_its_worse_srgb_fallback(self):
         """Codex on #29: a P3 step was measured with its channels clipped to
         sRGB, so a hot pink's --accent-400 read 3.00:1 and UI-safe. With its

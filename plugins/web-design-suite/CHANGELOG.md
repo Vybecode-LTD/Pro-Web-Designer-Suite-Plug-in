@@ -715,6 +715,11 @@
   reduced, as a browser may show it, it is 2.58:1. The matrix now takes the worse of
   the two (`test_a_p3_step_is_measured_on_its_worse_srgb_fallback`, failing on
   `9db30d0`).
+  CodeRabbit's added another: chroma under 0.0005 was written as none, so the
+  anchored step of `oklch(33.9% 0.0003 140)` read `oklch(33.9% 0 0)`, not the `#373837`
+  the report named. The anchored step keeps its chroma now, and a seed no `oklch()` of
+  six decimals can name is refused
+  (`test_an_anchored_near_grey_keeps_its_hex_in_its_css`, failing on `bcca304`).
 
 ## 3.2.1 — 2026-09-25
 
