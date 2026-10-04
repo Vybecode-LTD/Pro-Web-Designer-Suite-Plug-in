@@ -425,7 +425,8 @@
     flex: none;
     transition: rotate var(--motion-expand);
   }
-  .faq__item[open] > .faq__question > .faq__marker { rotate: 180deg; }
+  /* The path names the structure; :where() keeps it under the cap (0,3,0). */
+  .faq__item[open] > .faq__question > :where(.faq__marker) { rotate: 180deg; }
 
   .faq__answer {
     padding: var(--pad-well);

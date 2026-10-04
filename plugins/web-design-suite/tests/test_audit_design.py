@@ -835,11 +835,31 @@ class TheAuditInCi(TempDirTest):
 
     def test_where_adds_no_specificity(self):
         # SB-A25 (2): `:where()` has zero specificity, so four classes inside it
-        # are not a selector built to win.
+        # are not a selector built to win. N32: they are still four compound
+        # selectors, as stylelint counts them, and the spec caps those at three.
         self.write("src/components/where.css", "@layer components {\n  :where(.a .b .c .d) { color: var(--fg-strong); }\n"
-                                               "  .a .b .c .d { color: var(--fg-strong); }\n}\n")
+                                               "  .a .b .c .d { color: var(--fg-strong); }\n"
+                                               "  :where(.a.b.c.d) { color: var(--fg-strong); }\n}\n")
         proc = self.audit("src/components/where.css", "--json")
-        self.assertEqual([("compound-specificity", 3)],
+        self.assertEqual([("compound-selectors", 2), ("compound-selectors", 3), ("compound-specificity", 3)],
+                         sorted((f["rule"], f["line"]) for f in json.loads(proc.stdout)))
+
+    def test_a_nested_rule_is_weighed_with_its_parents(self):
+        # N32: stylelint resolves nesting before it weighs a selector. `.d` under
+        # `& .c` under `.a.b` is `.a.b .c .d`, 0,4,0; `&.e` under `.a.b` is
+        # 0,3,0; `&__f` in Sass renames its parent, so it weighs one class.
+        # Codex on #26: a `:hover` rule adds no nesting depth, so finding its
+        # parent by depth skipped `& .k.l`; it is `.j .k.l :hover`, 0,4,0.
+        # CodeRabbit on #26: a quoted `&` is an attribute's value, so the rule
+        # under `.m.n` is still relative to it: 0,4,0.
+        self.write("src/styles/layout/nested.scss",
+                   "@layer layout {\n  .a.b {\n    & .c {\n      .d { color: var(--fg-strong); }\n    }\n"
+                   "    &.e { color: var(--fg-strong); }\n  }\n"
+                   "  .g.h.i { &__f { color: var(--fg-strong); } }\n"
+                   "  .j { & .k.l { :hover { color: var(--fg-strong); } } }\n"
+                   "  .m.n { [data-label=\"&\"].o { color: var(--fg-strong); } }\n}\n")
+        proc = self.audit("src/styles/layout/nested.scss", "--json")
+        self.assertEqual([("compound-specificity", 4), ("compound-specificity", 9), ("compound-specificity", 10)],
                          [(f["rule"], f["line"]) for f in json.loads(proc.stdout)])
 
 

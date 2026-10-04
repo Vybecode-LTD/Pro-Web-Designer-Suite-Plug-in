@@ -26,15 +26,13 @@
  *
  * REQUIRED PEER SETUP
  * -------------------
- *   npm i -D tailwindcss@^3 postcss autoprefixer prettier-plugin-tailwindcss
+ *   npm i -D tailwindcss@^3 postcss postcss-import autoprefixer prettier-plugin-tailwindcss
  *
- *   postcss.config.js:  { plugins: { tailwindcss: {}, autoprefixer: {} } }
- *   src/styles/index.css:
- *     @layer reset, vendor, tokens, base, layout, components, utilities, overrides;
- *     @import "./tokens.css";
- *     @tailwind base;        // v3 emits into its own `base`/`components`/
- *     @tailwind components;  // `utilities` layers; see the note at the
- *     @tailwind utilities;   // bottom of this file about reconciling them.
+ *   postcss.config.js:
+ *     { plugins: { 'postcss-import': {}, tailwindcss: {}, autoprefixer: {} } }
+ *   src/styles/index.css: assets/configs/index.tailwind-v3.css, which wraps
+ *     Tailwind's output in native layers (the note at the bottom of this file
+ *     says why).
  * ========================================================================= */
 
 import type { Config } from 'tailwindcss';
@@ -636,13 +634,10 @@ export default {
  *   tailwind-base.css        @tailwind base;
  *   tailwind-utilities.css   @tailwind components; @tailwind utilities;
  *
- *   index.css
- *   @layer reset, vendor, tokens, base, layout, components, utilities, overrides;
- *   @import url("./tailwind-base.css") layer(base);
- *   @import url("./tailwind-utilities.css") layer(utilities);
+ * The entry that does it is assets/configs/index.tailwind-v3.css.
  *
  * Check the built CSS once: preflight's `button { … }` must sit inside
- * `@layer base`. If your toolchain cannot do that, keep ALL hand-written
+ * `@layer reset`. If your toolchain cannot do that, keep ALL hand-written
  * CSS unlayered too and order it by import — Law 5 then holds only by
  * convention. v4 removes the problem: it emits native layers itself.
  *

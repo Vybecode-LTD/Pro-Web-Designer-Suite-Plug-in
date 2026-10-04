@@ -120,7 +120,7 @@ The file is a JSON array of violation keys. It only shrinks. Two rules keep it h
 2. **Never add an entry by hand.** If a genuine exception exists, it gets an inline pragma with a named reason, visible in review:
 
 ```css
-/* design-audit-ignore-next-line: L2 -- CMS-controlled rich text, see ADR-014 */
+/* stylelint-disable-next-line design/component-margins, selector-max-type -- design-audit-ignore-next-line: L2 -- CMS-controlled rich text, see ADR-014 */
 .cms-body h2 { margin-block-start: var(--space-subsection); }
 ```
 

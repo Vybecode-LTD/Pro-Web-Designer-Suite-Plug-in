@@ -332,7 +332,7 @@ Fix: for text-only containers, reduce block padding by roughly half the leading 
   .quote {
     /* Leading adds ~0.3em of empty band top and bottom. Trim it so the
        optical inset matches the horizontal one. */
-    /* design-audit-ignore-next-line: L1 -- optical: the leading band, until text-box-trim below takes over */
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- design-audit-ignore-next-line: L1 -- optical: the leading band, until text-box-trim below takes over */
     padding-block: calc(var(--pad-card) - 0.3em);
     padding-inline: var(--pad-card);
   }
@@ -413,8 +413,10 @@ A card with `--radius-xl` (16px) and `--pad-card` (24px) holding an image: the i
 .card__media {
   /* Concentric corners. max() keeps it sane when the inset exceeds the
      radius — at that point the child is far enough from the corner that
-     a small independent radius reads fine. */
-  border-radius: max(var(--radius-sm), calc(var(--card-radius) - var(--card-inset)));
+     a small independent radius reads fine. Geometry over tokens goes in
+     a socket, as the starter's layout primitives do. */
+  --card-media-radius: max(var(--radius-sm), calc(var(--card-radius) - var(--card-inset)));
+  border-radius: var(--card-media-radius);
 }
 ```
 

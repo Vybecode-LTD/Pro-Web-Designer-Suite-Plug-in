@@ -538,7 +538,7 @@ Banding comes from three causes, and all three have fixes.
   content: "";
   position: absolute;
   inset: 0;
-  /* design-audit-ignore-next-line: L1 -- behind .hero's content, inside its own stacking context (isolation: isolate); not a page layer */
+  /* stylelint-disable-next-line declaration-property-value-allowed-list -- design-audit-ignore-next-line: L1 -- behind .hero's content, inside its own stacking context (isolation: isolate); not a page layer */
   z-index: -1;
   opacity: 0.03;                    /* 0.02-0.04. Above 0.05 it reads as dirt. */
   pointer-events: none;

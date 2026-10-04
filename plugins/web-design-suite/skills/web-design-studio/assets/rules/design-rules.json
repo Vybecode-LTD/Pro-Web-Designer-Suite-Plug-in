@@ -12,6 +12,32 @@
       ".a { & .b { & .c { & .d { color: var(--fg-strong); } } } }"
     ]
   },
+  "selectors": {
+    "gates": ["audit", "stylelint"],
+    "max_specificity": "0,3,1",
+    "max_compounds": 3,
+    "rule": "Law 5: a selector says what an element is; layers decide who wins. Its specificity stays at or under 0,3,1, compared column by column: three classes, attributes or pseudo-classes, and one element. `:where()` scores zero, `:is()`, `:not()` and `:has()` score their heaviest argument, and a nested rule's `&` scores its parent's, as Selectors 4 says. A selector holds at most three compound selectors, counted as written, inside a functional pseudo-class too: `:where()` takes away the weight, not the knowledge of the DOM. stylelint 17 also counts the `+` of an An+B (`:nth-last-child(n + 5)`), so a quantity query carries its disable comment there. An id is refused on its own.",
+    "allowed": [
+      ".card .card__title",
+      ".a.b.c",
+      ".prose .note.is-open p",
+      ".list > .item + .item",
+      ".tabs [aria-selected=\"true\"]",
+      ".menu:has(> .menu__item)",
+      ":where(.a.b.c.d)",
+      ":where([data-label=\")\"].a.b.c.d)",
+      ".card :where(.a .b)"
+    ],
+    "refused": [
+      ".a.b.c.d",
+      ".a.b.c p span",
+      ".card:is(.a.b.c)",
+      ".a.b.c::slotted(.d)",
+      ".nav .nav__list .nav__item a",
+      ".card .header .title .icon",
+      ":where(.a .b .c .d)"
+    ]
+  },
   "zero": {
     "gates": ["audit", "stylelint"],
     "rule":"A literal 0 is allowed wherever a length token is. --space-0 exists for token files and layout primitives; component code writes 0.",
@@ -118,13 +144,14 @@
       "overrides"
     ],
     "statement": "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;",
-    "rule": "Law 5. The entry stylesheet names the layers once, first, in this order: a layer may be left out but never moved, and other layers may sit between them. `theme` is Tailwind v4's generated theme and only a Tailwind entry names it. `vendor` holds CSS you do not control, imported with `layer(vendor)`. The statement names it even before there is any, because a layer first named by its import is appended after `overrides`, where the vendor's rules beat every rule you write (SB-A8). So every layer a file imports into must be in that file's statement, and the statement comes before the import: an `@import … layer(vendor)` above it names `vendor` first, whatever the statement then says. The canonical entries are web-design-studio/assets/starter/styles/index.css and assets/configs/index.tailwind.css.",
+    "rule": "Law 5. The entry stylesheet names the layers once, first, in this order: a layer may be left out but never moved, and other layers may sit between them. `theme` is Tailwind v4's generated theme and only a Tailwind entry names it. A layer may hold sub-layers, ordered inside it (`@layer components { @layer base, skin; }`, then `@layer components.skin { … }`): they rank inside their parent and cannot leave it, so the order holds (stack-vanilla-css.md). `vendor` holds CSS you do not control, imported with `layer(vendor)`. The statement names it even before there is any, because a layer first named by its import is appended after `overrides`, where the vendor's rules beat every rule you write (SB-A8). So every layer a file imports into must be in that file's statement, and the statement comes before the import: an `@import … layer(vendor)` above it names `vendor` first, whatever the statement then says. The canonical entries are web-design-studio/assets/starter/styles/index.css, and assets/configs/index.tailwind.css and index.tailwind-v3.css.",
     "imports": "A file that opens its own `@layer` block, as every starter file does, is imported bare: `@import url(\"base.css\") layer(base)` nests it as `base.base` (SB-A23). `layer()` is for files that name no layer: vendor CSS and Tailwind's own files.",
     "allowed": [
       "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;",
       "@layer reset, tokens, base, layout, components;",
       "@layer reset, vendor, tokens, theme, base, layout, components, utilities, overrides;",
-      "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;\n@import url(\"vendor/datepicker.css\") layer(vendor);"
+      "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;\n@import url(\"vendor/datepicker.css\") layer(vendor);",
+      "@layer reset, tokens, base, layout, components, utilities;\n@layer components {\n  @layer base, skin;\n}\n@layer components.base { .card { --card-bg: var(--bg-surface); } }\n@layer components.skin { .card { --card-bg: var(--bg-sunken); } }"
     ],
     "refused": [
       "@layer reset, tokens, vendor, base, layout, components, utilities, overrides;",

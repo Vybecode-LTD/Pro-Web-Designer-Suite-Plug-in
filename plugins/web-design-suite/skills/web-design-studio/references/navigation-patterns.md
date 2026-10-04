@@ -350,7 +350,7 @@ Same problem at the right edge: the last item's trailing padding makes the bar l
 **Publish the header height once**, so anchors, sticky sidebars and scroll-spy all read the same number. Register it as a `<length>`, so that script reads it back in pixels. Unregistered, it reads back as its `calc()` text:
 
 ```css
-@property --nav-offset { syntax: '<length>'; inherits: true; initial-value: 0px; }
+@property --nav-offset { syntax: '<length>'; inherits: true; initial-value: 0; }
 :root {
   --nav-offset: calc(var(--tap-min) + var(--pad-block-md) * 2);
   scroll-padding-top: calc(var(--nav-offset) + var(--gap-grouped));

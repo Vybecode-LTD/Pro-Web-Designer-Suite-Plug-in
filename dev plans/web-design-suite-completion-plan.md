@@ -124,9 +124,13 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 - **A literal `0` among tokens.** `padding: 0 var(--pad-card)` passes the audit, and the spec's zero rule allows it, but stylelint's `VAR_SEQ` takes only `var()`s and refuses it; so do `gap` and `border-radius`. Likewise `calc(100% - var(--gutter-page))` in a spacing property: stylelint takes no calc() but a token plus or minus a token, and the audit passes it.
 - **Margins the audit exempts.** The audit lets a component set a margin on its generated content (`.card::before`) and in a rule whose selector names `prose`. `design/component-margins` refuses both, and the spec says neither.
 
-**N32 · The specificity limits are not in the spec (CodeRabbit on #24).** The audit's `compound-specificity` (four chained classes, outside `:where()`) and stylelint's `selector-max-specificity: '0,3,1'` and `selector-max-compound-selectors: 3` are each written into their gate by hand. `design-rules.json` has no selector section, so no example holds the two gates to each other. They agree on `:where()`, which both score as zero, but nothing tests that.
+**N32 · The specificity limits are not in the spec (CodeRabbit on #24).** *Done for 3.3.0.* The audit's `compound-specificity` (four chained classes, outside `:where()`) and stylelint's `selector-max-specificity: '0,3,1'` and `selector-max-compound-selectors: 3` were each written into their gate by hand, and no example held the two gates to each other.
+- `design-rules.json: selectors` now holds both limits, 0,3,1 and three compound selectors, with eight allowed and six refused examples, run through the audit and the real stylelint. `tools/sync_rules.py` writes the limits into both gates.
+- The audit weighs a selector as Selectors 4 and stylelint do: `:where()` scores zero, `:is()`, `:not()` and `:has()` their heaviest argument, and a nested rule's `&` its parent's. `compound-specificity` is an error now, as stylelint's is, and the new `compound-selectors` counts compounds as stylelint 17 does.
+- They did not agree on `:where()`: stylelint counts the compounds inside it, so it refuses `:where(.a .b .c .d)`. The spec sides with it, since `:where()` takes away the weight but not the knowledge of the DOM. `:where(.a.b.c.d)` is allowed.
+- stylelint also counts the `+` of an An+B (`:nth-last-child(n + 5)`) as a combinator; the audit does not. The spec says so, and the starter's and layout-composition's quantity queries keep their disable comment.
 
-**N3 · The references' CSS against the stylelint config.** 56 of the 170 CSS snippet files fail it (3.2.1). The failures by rule:
+**N3 · The references' CSS against the stylelint config.** *Done for 3.3.0.* 56 of the 170 CSS snippet files failed it at 3.2.1. The failures by rule:
 - 27 `selector-max-type`;
 - 20 value allowlist;
 - 11 `design/layer-order`;
@@ -135,7 +139,12 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 - 5 `no-duplicate-selectors`;
 - a handful of others.
 
-Add a stylelint snippet test like `DesignEslintConfig.test_the_references_tsx_snippets_pass_the_design_config`. Then fix the snippets or the config, as N1 decides.
+Measured again after P3: 28 of 159 blocks failed, and 9 more are fragments (`{ … }` outlines). `StylelintConfig.test_the_references_css_snippets_pass_the_config` now lints every block in the files the audit puts it in, and counts the fragments. What changed:
+- **The references,** where the spec refuses what they showed. A box-shadow bar and a radius formula go through a socket. A `0px` and a `#ffffff` are gone. A view transition's pseudo-elements are styled in `base`. Rules that broke `no-descending-specificity` were reordered, and a selector over the cap uses `:where()`. Side-by-side alternatives are split into blocks of their own, and the anti-examples are marked.
+- **Escape hatches** that named only the audit now name stylelint too, in the one comment both read.
+- **The test's placement** (`test_doc_snippets.as_files`, which the audit's snippet test shares): `@font-face` lives with the tokens, a Tailwind `@theme` in `theme.css`, CSS Modules' syntax in a `.module.css`, and a block's other layers in their own files.
+- **The config,** where the spec allows what it refused. Sub-layers inside a canonical layer (`@layer components { @layer base, skin; }`, as stack-vanilla-css teaches) are now a spec example; the rule had read the nested statement as the file's own. CSS Modules' `composes` and `:global` are known words.
+- **SB-C9's v3 entry** replaced the last inline entry, the one the remaining `@import` failures came from.
 
 **N11 and N12 · found while fixing SB-A9.** The token migration tool keeps its own copies of the audit's scanner helpers.
 - **N11.** *Done for 3.3.0.* Its file classes had drifted from the spec: its token-file pattern predated 3.2.0 (four of the spec's six examples missed), and its component test shared SB-A9's `components/` bug. It now uses the audit's patterns, and `test_rules_spec.test_file_classes` holds both copies.
@@ -156,7 +165,7 @@ Add a stylelint snippet test like `DesignEslintConfig.test_the_references_tsx_sn
 | SB-A25 | low | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. *Done for 3.3.0 (PRs #23 and #24).* |
 | SB-C1 | S-M | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. *Done: 3.1.0 did SB-A3, A4 and A10, and 3.3.0 did SB-A9 and A24.* |
 | SB-C2 | M · high | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. *Done for 3.3.0 (N2): 3.2.0 shipped the spec, and 3.3.0 the generator and the conformance tests.* |
-| SB-C9 | S · medium | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. *Partly done for 3.3.0: vanilla, modules and Tailwind v4; v3 is left.* |
+| SB-C9 | S · medium | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. *Done for 3.3.0: vanilla and modules (`starter/styles/index.css`), Tailwind v4 (`configs/index.tailwind.css`) and Tailwind v3 (`configs/index.tailwind-v3.css`).* |
 
 ### W3 · Studio systems: generators, roles and starter files
 

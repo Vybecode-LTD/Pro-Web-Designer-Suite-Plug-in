@@ -258,8 +258,11 @@ N equal columns that flip to stacked below an intrinsic threshold.
     flex-basis: calc((var(--switcher-threshold) - 100%) * 999);
     min-inline-size: 0;
   }
+  /* stylelint-disable selector-max-compound-selectors -- a quantity query
+     counts the children; it is the technique, not knowledge of anyone's DOM. */
   .switcher > :nth-last-child(n + 5),
   .switcher > :nth-last-child(n + 5) ~ * { flex-basis: 100%; }
+  /* stylelint-enable selector-max-compound-selectors */
 }
 ```
 
@@ -497,7 +500,7 @@ Children set `--span` per instance. They never write `grid-column` themselves â€
 **`1fr` means `minmax(auto, 1fr)`, and `auto` as a *minimum* resolves to min-content.** So a single long word, a `<pre>`, a `<table>` or an un-wrapped URL in one column expands that column past its share, and the grid stops being a grid. It is the most-reported "my grid overflows" bug in existence and the fix is one word:
 
 ```css
-grid-template-columns: repeat(var(--grid-columns), minmax(0, 1fr));
+.grid--12 { grid-template-columns: repeat(var(--grid-columns), minmax(0, 1fr)); }
 ```
 
 The same automatic-minimum rule applies to flex items, where the fix is `min-inline-size: 0` on the child. `layout.css` applies one or the other in every primitive that can hit it: `.row > *`, `.grid > *`, `.split > *`, `.switcher > *`, `.with-sidebar__rail`.

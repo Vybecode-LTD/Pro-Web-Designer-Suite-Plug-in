@@ -492,8 +492,10 @@ they are where the insight comes from, and the distinctive variant is where it g
   /* Auditioning state is carried by colour AND a left bar AND the live region —
      three channels, so none of them is load-bearing alone. */
   .preset[data-auditioning="true"] {
+    /* A bar, not an elevation: geometry over tokens goes in a socket. */
+    --preset-bar: inset var(--stroke-thick) 0 0 0 var(--border-accent);
     background: var(--bg-selected);
-    box-shadow: inset var(--stroke-thick) 0 0 0 var(--border-accent);
+    box-shadow: var(--preset-bar);
   }
 
   .preset[data-held="true"] .preset__name::after {

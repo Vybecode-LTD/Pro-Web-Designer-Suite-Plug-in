@@ -212,7 +212,7 @@ python -m scripts.generate_type_scale --base 16 --ratio 1.2 --fluid 380 1440 --p
 | `base.css` | Element defaults, prose rhythm with heading asymmetry, all in `:where()` |
 | `layout.css` | Every layout primitive, each with Tier-3 sockets |
 
-`assets/configs/` holds the enforcement: `theme.css` (Tailwind v4 `@theme`), `tailwind.config.ts` (v3), `eslint.design.config.mjs`, `stylelint.config.mjs`, `pre-commit-design-gate.sh`.
+`assets/configs/` holds the enforcement: `theme.css` (Tailwind v4 `@theme`), `tailwind.config.ts` (v3), the Tailwind entries `index.tailwind.css` (v4) and `index.tailwind-v3.css`, `eslint.design.config.mjs`, `stylelint.config.mjs`, `pre-commit-design-gate.sh`.
 
 ---
 

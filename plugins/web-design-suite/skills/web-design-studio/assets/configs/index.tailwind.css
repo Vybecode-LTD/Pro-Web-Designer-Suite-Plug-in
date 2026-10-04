@@ -4,7 +4,8 @@
 
    Law 5 with Tailwind's layers in it. stack-tailwind.md §2.1 quotes this
    file, and tools/sync_snippets.py keeps the quote identical to it. The
-   entry without Tailwind is assets/starter/styles/index.css.
+   entry without Tailwind is assets/starter/styles/index.css; the v3 entry
+   is assets/configs/index.tailwind-v3.css.
    ========================================================================= */
 
 /* @snippet entry */

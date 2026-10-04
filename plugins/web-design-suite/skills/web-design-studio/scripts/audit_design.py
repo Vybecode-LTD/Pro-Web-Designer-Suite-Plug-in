@@ -94,6 +94,8 @@ LAYER_ORDER = [
 ]
 LAYER_STATEMENT = "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;"
 MAX_NESTING = 2
+MAX_SPECIFICITY = "0,3,1"
+MAX_COMPOUNDS = 3
 SYSTEM_COLOR_NAMES = [
     "accentcolor", "accentcolortext", "activetext", "buttonborder", "buttonface", "buttontext",
     "canvas", "canvastext", "field", "fieldtext", "graytext", "highlight", "highlighttext",
@@ -330,10 +332,9 @@ TIER2_EXCEPTIONS = {
     "--space-fluid-sm", "--space-fluid-md", "--space-fluid-lg", "--space-fluid-xl",
 }
 
-# Four or more classes chained in one selector is specificity built to win a
-# fight that layers already settled (stylelint's selector-max-specificity
-# 0,3,1 draws the same line).
-COMPOUND_SEL = re.compile(r"(\.[\w-]+(?:\s*[>+~]?\s*)){3,}\.[\w-]+")
+# Specificity over the spec's cap is built to win a fight that layers already
+# settled; stylelint's selector-max-specificity reads the same cap (N32).
+SPECIFICITY_CAP = tuple(int(n) for n in MAX_SPECIFICITY.split(","))
 
 # Non-tokenizable units. Viewport and container units express a relationship to
 # the viewport, not a spacing decision; % is relational; ch/ex are typographic.
@@ -704,29 +705,210 @@ VAR_MARK = " var() "
 
 
 def _close_paren(text: str, open_at: int) -> int:
-    """Index of the `)` matching the `(` at `open_at` (len(text) if unmatched)."""
-    depth = 0
-    for k in range(open_at, len(text)):
-        if text[k] == "(":
+    """Index of the `)` matching the `(` at `open_at` (len(text) if unmatched).
+    A parenthesis in a string or after a backslash is text: `:where([data-x=")"])`
+    closes at its last `)` (CodeRabbit on #26)."""
+    depth, quote, k = 0, "", open_at
+    while k < len(text):
+        ch = text[k]
+        if ch == "\\":
+            k += 2
+            continue
+        if quote:
+            quote = "" if ch == quote else quote
+        elif ch in "\"'":
+            quote = ch
+        elif ch == "(":
             depth += 1
-        elif text[k] == ")":
+        elif ch == ")":
             depth -= 1
             if depth == 0:
                 return k
+        k += 1
     return len(text)
 
 
-def without_where(selector: str) -> str:
-    """The selector without its :where() arguments, which add no specificity
-    at all: `:where(.a .b .c .d)` fights nothing (SB-A25)."""
+def split_list(text: str) -> list[str]:
+    """A selector list split at its own commas, not those inside (), [] or a string."""
+    out, depth, quote, start, i = [], 0, "", 0, 0
+    while i < len(text):
+        ch = text[i]
+        if ch == "\\":
+            i += 2
+            continue
+        if quote:
+            quote = "" if ch == quote else quote
+        elif ch in "\"'":
+            quote = ch
+        elif ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            out.append(text[start:i])
+            start = i + 1
+        i += 1
+    out.append(text[start:])
+    return [s.strip() for s in out if s.strip()]
+
+
+LEGACY_PSEUDO_ELEMENT = {"before", "after", "first-line", "first-letter"}
+NTH_OF = re.compile(r"\bof\b", re.I)
+
+
+def _ident_end(text: str, i: int) -> int:
+    """Where the identifier at `i` ends: escapes and Sass's `#{…}` belong to it."""
+    while i < len(text):
+        if text[i] == "\\":
+            i += 2
+        elif text.startswith("#{", i):
+            close = text.find("}", i)
+            i = len(text) if close < 0 else close + 1
+        elif text[i].isalnum() or text[i] in "-_" or ord(text[i]) > 127:
+            i += 1
+        else:
+            break
+    return min(i, len(text))
+
+
+def parse_selector(selector: str) -> list[tuple]:
+    """One complex selector as a list of parts (N32): ("comb",) for a
+    combinator, ("simple", kind) for an id, class, attr, type, universal or
+    `&`, and ("pseudo", name, is_element, args) for a pseudo-class or
+    pseudo-element, where args are the parsed selectors a functional
+    pseudo-class takes (`:is()`, `:not()`, `:has()`, `:where()`, the `of S` of
+    `:nth-child()`), or None."""
+    parts: list[tuple] = []
+    space = False
+    i, n = 0, len(selector)
+
+    def push(part: tuple) -> None:
+        nonlocal space
+        if space and parts and parts[-1] != ("comb",):
+            parts.append(("comb",))
+        space = False
+        parts.append(part)
+
+    while i < n:
+        ch = selector[i]
+        if ch.isspace():
+            space, i = True, i + 1
+        elif ch in ">+~":
+            if not parts or parts[-1] != ("comb",):
+                parts.append(("comb",))
+            space, i = False, i + 1
+        elif ch == "#" and not selector.startswith("#{", i):
+            push(("simple", "id"))
+            i = _ident_end(selector, i + 1)
+        elif ch in ".%":                     # a class, or a Sass placeholder
+            push(("simple", "class"))
+            i = _ident_end(selector, i + 1)
+        elif ch == "[":
+            push(("simple", "attr"))
+            quote, i = "", i + 1
+            while i < n and (quote or selector[i] != "]"):
+                if selector[i] == "\\":
+                    i += 1
+                elif quote:
+                    quote = "" if selector[i] == quote else quote
+                elif selector[i] in "\"'":
+                    quote = selector[i]
+                i += 1
+            i += 1
+        elif ch == "&":                      # `&__title` is the parent, renamed
+            push(("simple", "amp"))
+            i = _ident_end(selector, i + 1)
+        elif ch == "*":
+            push(("simple", "universal"))
+            i += 1
+        elif ch == ":":
+            element = selector.startswith("::", i)
+            start = i + (2 if element else 1)
+            i = _ident_end(selector, start)
+            name, args, inner = selector[start:i].lower(), None, None
+            if i < n and selector[i] == "(":
+                close = _close_paren(selector, i)
+                inner = selector[i + 1:close]
+                if SELECTOR_ARGUMENT.fullmatch(name):          # ::slotted() takes one too
+                    args = [parse_selector(s) for s in split_list(inner)]
+                elif name in ("nth-child", "nth-last-child") and NTH_OF.search(inner):
+                    args = [parse_selector(s) for s in split_list(NTH_OF.split(inner, 1)[1])]
+                i = close + 1
+            push(("pseudo", name, element or name in LEGACY_PSEUDO_ELEMENT, args, inner))
+        elif ch == "#" or ch.isalpha() or ch in "-_\\" or ord(ch) > 127:
+            push(("simple", "type" if ch != "#" else "interpolation"))
+            i = _ident_end(selector, i)
+        else:
+            i += 1
+    return parts
+
+
+VIEW_TRANSITION_PART = {"view-transition-group", "view-transition-image-pair", "view-transition-old",
+                        "view-transition-new"}
+TAKES_HEAVIEST = {"is", "not", "has", "matches", "-moz-any"}
+ADDS_ARGUMENT = {"host", "host-context", "nth-child", "nth-last-child"}
+
+
+def specificity(parts: list[tuple], amp: tuple[int, int, int] = (0, 0, 0)) -> tuple[int, int, int]:
+    """Selectors 4 specificity, case by case as @csstools/selector-specificity
+    computes it for stylelint's selector-max-specificity: `:where()` scores
+    zero; `:is()`, `:not()`, `:has()` their heaviest argument; `:host()` and
+    `:nth-child(… of S)` a pseudo-class and the argument; `:global()` the sum
+    of its arguments; `::slotted()` a pseudo-element and its argument; a
+    `::view-transition-*(*)` nothing; `&` its parent (`amp`)."""
+    a = b = c = 0
+    for part in parts:
+        add = (0, 0, 0)
+        if part[0] == "simple":
+            add = {"id": (1, 0, 0), "class": (0, 1, 0), "attr": (0, 1, 0), "type": (0, 0, 1),
+                   "amp": amp}.get(part[1], (0, 0, 0))
+        elif part[0] == "pseudo":
+            _, name, element, args, inner = part
+            weights = [specificity(arg, amp) for arg in args or []]
+            heaviest = max(weights, default=(0, 0, 0))
+            if element:
+                bare = name in VIEW_TRANSITION_PART and (inner or "").strip() in ("", "*")
+                add = (0, 0, 0) if bare else (heaviest[0], heaviest[1], heaviest[2] + 1)
+            elif name in ("global", "local"):
+                add = tuple(sum(w[k] for w in weights) for k in range(3))
+            elif name in TAKES_HEAVIEST:
+                add = heaviest
+            elif name != "where":       # :any(), :-webkit-any() and the rest: one pseudo-class
+                plus = heaviest if name in ADDS_ARGUMENT else (0, 0, 0)
+                add = (plus[0], plus[1] + 1, plus[2])
+        a, b, c = a + add[0], b + add[1], c + add[2]
+    return a, b, c
+
+
+def has_nesting(parts: list[tuple]) -> bool:
+    """Whether a parsed selector holds `&`, in a pseudo-class's argument too. A
+    quoted `&` (`[data-x="&"]`) is an attribute's value (CodeRabbit on #26)."""
+    return any(part == ("simple", "amp") or (part[0] == "pseudo" and any(map(has_nesting, part[3] or [])))
+               for part in parts)
+
+
+def _plus(a: tuple[int, int, int], b: tuple[int, int, int]) -> tuple[int, int, int]:
+    return a[0] + b[0], a[1] + b[1], a[2] + b[2]
+
+
+def _nodes(parts: list[tuple]) -> list[str]:
     out: list[str] = []
-    low, i = selector.lower(), 0
-    while True:
-        j = low.find(":where(", i)
-        if j < 0:
-            return "".join(out) + selector[i:]
-        out.append(selector[i:j])
-        i = _close_paren(selector, j + 6) + 1
+    for part in parts:
+        out.append(part[0])
+        for arg in (part[3] or []) if part[0] == "pseudo" else []:
+            out.append("selector")
+            out.extend(_nodes(arg))
+    return out
+
+
+def compounds(parts: list[tuple]) -> int:
+    """Compound selectors, counted as stylelint 17's selector-max-compound-selectors
+    counts them: every combinator, inside a functional pseudo-class too, but not
+    one at either end or one followed by another. Unlike stylelint, an An+B's
+    `+` (`:nth-last-child(n + 5)`) is not a combinator."""
+    nodes = _nodes(parts)
+    return 1 + sum(1 for k, node in enumerate(nodes)
+                   if node == "comb" and 0 < k < len(nodes) - 1 and nodes[k + 1] != "comb")
 
 
 def strip_var_refs(value: str) -> str:
@@ -917,6 +1099,10 @@ def audit_css(path: Path, text: str) -> list[Finding]:
     first_unlayered_line = 0
     declared_props: set[str] = set()
     emitting_mixins: set[str] = set()     # mixins in this file that hold a whole rule
+    # One entry per open block, as scan_css stacks them: a rule's heaviest
+    # selector, None for an at-rule. A rule's parent is the nearest rule below
+    # it, whatever the nesting depth counts (a `:hover` rule adds no depth).
+    weights: list[tuple[int, int, int] | None] = []
 
     def outside_a_layer(at_rules: Iterable[str]) -> bool:
         # A keyframe (`from`, `to`, `50%`) is not a style rule; the references
@@ -984,14 +1170,32 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                         "selector, or a `*` after a space, reaches into whatever renders "
                         "inside it: Law 2 broken from the other direction. Give the part a "
                         "class. The owl (`> * + *`) in the parent's own rule is the exception.")
-                if COMPOUND_SEL.search(without_where(sel)):
-                    add(line, "L5", "compound-specificity", "warning",
-                        f"Selector chains 4+ classes: `{sel[:70]}`.",
-                        "A selector this long is usually trying to WIN rather "
-                        "than to describe an element. Layers already decide who "
-                        "wins — say what the element is and move the rule to the "
-                        "right layer. If it is reaching into another component, "
-                        "use that component's Tier-3 properties instead.")
+                # N32: the spec's two selector limits, as stylelint reads them.
+                # A nested rule's weight is its parent's plus its own, and its
+                # `&` scores the parent's; its compounds count as written.
+                parsed = [parse_selector(s) for s in split_list(sel)]
+                parent = next((w for w in reversed(weights) if w is not None), None)
+                own = [specificity(p, parent) if parent and has_nesting(p)
+                       else _plus(parent or (0, 0, 0), specificity(p)) for p in parsed]
+                heaviest = max(own, default=(0, 0, 0))
+                weights.append(heaviest)
+                if heaviest > SPECIFICITY_CAP and not any(KEYFRAMES_AT.match(a) for a in at_rules):
+                    add(line, "L5", "compound-specificity", "error",
+                        f"Specificity {','.join(map(str, heaviest))} is over the cap of {MAX_SPECIFICITY}: "
+                        f"`{sel[:70]}`.",
+                        "A selector this heavy is trying to WIN rather than to describe "
+                        "an element. Layers already decide who wins — say what the "
+                        "element is and move the rule to the right layer, or wrap the "
+                        "context in :where(), which weighs nothing. If it is reaching "
+                        "into another component, use that component's Tier-3 properties.")
+                most = max(map(compounds, parsed), default=1)
+                if most > MAX_COMPOUNDS:
+                    add(line, "L5", "compound-selectors", "error",
+                        f"{most} compound selectors, over the cap of {MAX_COMPOUNDS}: `{sel[:70]}`.",
+                        "Each compound is a level of DOM knowledge, so a markup change "
+                        "that should be free becomes a CSS change. Give the element a "
+                        "class of its own. :where() takes away the weight, not the "
+                        "knowledge: its compounds count too.")
                 m = ID_SELECTOR.search(sel)
                 if m and not sel.strip().startswith("@"):
                     add(line, "L5", "id-selector", "error",
@@ -1004,8 +1208,11 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     first_unlayered_line = line
                 if depth == 1 and not sel.lstrip().startswith("&"):
                     emitting_mixins.update(m.group(1).lower() for m in map(SASS_MIXIN_NAME.match, at_rules) if m)
+            elif kind == "at_open":
+                weights.append(None)
             elif kind == "rule_close":
-                pass
+                if weights:
+                    weights.pop()
             continue
 
         d: CssDecl = ev
