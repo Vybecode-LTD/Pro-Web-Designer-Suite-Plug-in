@@ -75,10 +75,10 @@ The numbers that hold up in practice:
 | List item enter (staggered) | 8–16px | `--motion-enter` per item | — | See stagger, §4 |
 | Skeleton shimmer, spinner | looping | `--motion-loop` | — | Loops need constant velocity, not easing |
 
-**Travel distance is a spacing decision.** A menu that slides in from 8px should reference the spacing scale, not the number 8. The shipped `tokens.css` has no motion-travel role, so declare one — Tier 2 roles are explicitly cheap to add:
+**Travel distance is a spacing decision.** A menu that slides in from 8px should reference the spacing scale, not the number 8. The starter's `tokens.css` declares three travel roles, Tier 2:
 
 ```css
-/* Add to your project's tokens.css, Tier 2. Not in the starter. */
+/* tokens.css, Tier 2 */
 --motion-travel-xs: var(--space-1);   /*  4px — hover lift, press nudge    */
 --motion-travel-sm: var(--space-2);   /*  8px — tooltip, menu, popover     */
 --motion-travel-md: var(--space-4);   /* 16px — card, sheet, toast         */

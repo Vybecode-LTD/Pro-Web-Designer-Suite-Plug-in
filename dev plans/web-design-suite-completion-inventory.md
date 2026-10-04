@@ -49,7 +49,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SS-A18 | low | W3 (3.3.0) | 374-384 says `html:has(:target)` limits smooth scrolling to anchor clicks. |
 | SS-A19 | medium | fixed in 3.1.0 | Cause: audit_design.py:1040 reads utf-8 rather than utf-8-sig, so ﻿@layer counts as an unlayered rule. |
 | SS-B1 | — | fixed in 3.2.0 | There is no gate for role-pair contrast. |
-| SS-B2 | — | partly done; the rest in W3 (3.3.0) | Tier-2 roles and starter files are missing. |
+| SS-B2 | — | partly done: the on-status inks and `--motion-travel-*` in 3.3.0 (`test_check_roles`, `test_figma_sync.StatusInks`); the starter's files in P7 part 2 | Tier-2 roles and starter files are missing. |
 | SS-B3 | — | W10 (3.6.0+) | Theming without JavaScript. |
 | SS-B4 | — | W12 (3.6.0+) | Modern CSS the systems references should teach: `@starting-style`, the top layer against the z-index ladder, `cqi`, `font-size-adjust`, `color-mix()`. |
 | SS-B5 | — | fixed in 3.3.0: `test_numbers.FluidTypeZoom`, `TypeScale.test_a_fluid_span_over_2_5_times_is_refused` | Fluid type and zoom (SC 1.4.4) is only half taught. |
@@ -92,7 +92,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-B1 | — | fixed in 3.1.0, with PS-A4 | templates aren't audited. |
 | SB-B2 | — | fixed in 3.2.0 and 3.2.1 (real-tool tests) | no executable tests for the configs. |
 | SB-B3 | — | W5 (3.4.0) | focus, forced-colors and density aren't checked by any gate in the build flow. |
-| SB-B4 | — | partly done; the rest in W3 (3.3.0) | the contract is missing roles the references need. |
+| SB-B4 | — | fixed in 3.3.0: `--border-invalid` (`test_contract.InvalidFieldsLookInvalid`, `test_check_roles`); translucency needs no role, since the ESLint config refuses `/NN` and names the roles | the contract is missing roles the references need. |
 | SB-B5 | — | W12 (3.6.0+) | parts of Tailwind v4 aren't covered. |
 | SB-B6 | — | W12 (3.6.0+) | SCSS and other stacks. |
 | SB-C1 | S-M | fixed: 3.1.0 did SB-A3, A4 and A10, and 3.3.0 did SB-A9 and A24 | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. |

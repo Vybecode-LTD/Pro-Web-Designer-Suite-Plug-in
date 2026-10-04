@@ -1162,7 +1162,7 @@ CHROME_CSS = r"""
     padding: var(--pad-block-xs) var(--pad-inline-xs);
     border-radius: var(--radius-full);
     background: var(--bg-warning);
-    color: var(--fg-on-inverse);
+    color: var(--fg-on-warning);
     font: var(--type-label);
   }
 
@@ -1203,8 +1203,8 @@ CHROME_CSS = r"""
   }
 
   /* ---- 3. VARIANTS ----------------------------------------------------- */
-  /* Status text on a quiet pill, not white on a solid status fill: no one text
-     role clears 4.5:1 on --bg-success or --bg-danger in both themes. */
+  /* Status text on a quiet pill, not a solid status fill: a mark on every row
+     reads quieter than a column of solid badges. */
   .msheet__mark--ok  { background: var(--bg-raised);   color: var(--fg-success); }
   .msheet__mark--gap { background: var(--bg-raised);   color: var(--fg-danger); }
   .msheet__mark--na  { background: var(--bg-disabled); color: var(--fg-muted); }

@@ -383,9 +383,29 @@
   `--anchor-seed` makes the seed itself the step nearest it in lightness, written
   precisely enough to name the same hex. Without it, the report gives step 500's
   distance from the seed and points at the flag.
+- **An invalid field looked focused** (SB-B4). accessibility.md drew `aria-invalid` in
+  `--border-focus`, and content-model-to-ui's scaffold drew it in `--border-accent`. Both
+  read `--border-invalid` now. The Figma audit measured an on-status ink on the canvas,
+  not on its fill, and the docs and versioning tools now measure each ink on its fill.
 
 ### Added
 
+- **Roles the references needed** (SB-B4, SS-B2). Seven, in the contract (all 14 copies),
+  the starter and the deck, both Tailwind configs, the Figma importer, the email map and
+  the migration proposal:
+  - `--fg-on-success`, `--fg-on-warning` and `--fg-on-danger`, the ink on a filled status
+    badge. White measures 3.41:1 on the success fill and 2.25:1 on the warning fill, so
+    a filled badge had no legal text colour; the inks are near-black, near-black and
+    white (6.10, 9.24 and 4.75:1).
+  - `--border-invalid`, an invalid field's boundary: `--danger-500`, and `--danger-400` in
+    dark.
+  - `--motion-travel-xs/-sm/-md`, travel distance as steps of the spacing scale, which
+    motion-system.md told readers to add themselves.
+
+  `check_roles.py` holds each fill to its ink at 4.5:1, and the invalid border to 3:1 on
+  every surface (100 pairs, from 88). Translucency needed no role: the ESLint config
+  already refuses a `/NN` opacity modifier and points to `--bg-hover`, `--bg-active` and
+  `--bg-scrim`.
 - **The generators' options for the starter** (SS-C5). `generate_color_ramp.py` gains
   `--gamut p3` (reduce chroma into Display P3, not sRGB; the contrast matrix measures a
   step outside sRGB on the worse of its two sRGB fallbacks), `--neutral-hue` and
@@ -515,6 +535,10 @@
 - **A regenerated neutral's 500 is darker** (SS-A9): L 53.5%, not 58%, as in the
   starter. A neutral generated before 3.3.0 and used for placeholder text measures
   4.08:1 on `--bg-sunken`; regenerate it.
+- **`check_roles.py` needs the new roles** (SB-B4, SS-B2). Its built-in pairs read
+  `--fg-on-success`, `--fg-on-warning`, `--fg-on-danger` and `--border-invalid`; a
+  `tokens.css` without them exits 2 ("not declared"). Declare them (the starter's
+  bindings are a start), or pass your own list with `--pairs FILE`.
 
 ### Tests
 
@@ -720,6 +744,22 @@
   the report named. The anchored step keeps its chroma now, and a seed no `oklch()` of
   six decimals can name is refused
   (`test_an_anchored_near_grey_keeps_its_hex_in_its_css`, failing on `bcca304`).
+- P7 part 1 (SB-B4, and SS-B2's roles): `test_check_roles` holds the status inks and the
+  invalid border (`test_status_inks_and_the_invalid_border_are_held`),
+  `test_contract.InvalidFieldsLookInvalid` reads every `aria-invalid` border rule, and
+  `test_figma_sync.StatusInks` measures an ink on its fill. Against `v3.2.1` and against
+  `80108ae` (`main`), all 3 fail; `EveryConsumerKnowsEveryRole`, which passes on both
+  contracts, is the control (5).
+  Codex's review of #31 added two:
+  - the filled danger and success variants kept `--fg-on-accent`, near-black in dark
+    and 4.38:1 on `--bg-danger`, and the state matrix put `--fg-on-inverse` on the
+    warning fill. The scaffold, the stack references and the matrix now use each fill's
+    ink (`StatusFillsCarryTheirInk`, 7 subtests failing on `590ab8e`);
+  - the Figma export dropped the travel roles as composites, and the versioning report
+    did not measure the invalid border on the sunken input.
+  CodeRabbit's added two, in the Figma audit: an `on-*` ink whose fill is not in the file
+  was not measured at all (it is measured on the system's fill now), and
+  `motion-travel-sm = 8` was read as 8ms (`StatusInks`, 2 tests failing on `654034c`).
 
 ## 3.2.1 — 2026-09-25
 

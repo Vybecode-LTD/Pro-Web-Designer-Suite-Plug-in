@@ -82,12 +82,12 @@ Theme and brand overrides re-point **Tier 2 only**. A theme block containing a c
 **Page rhythm** — `--space-section`, `--space-subsection`, `--space-block`, `--gutter-page`
 **Surfaces** — `--bg-canvas --bg-surface --bg-raised --bg-sunken --bg-inverse --bg-scrim`
 **Interaction** — `--bg-hover --bg-active --bg-selected --bg-disabled`
-**Foreground** — `--fg-default --fg-strong --fg-muted --fg-subtle --fg-disabled --fg-on-accent --fg-on-inverse --fg-accent --fg-link`
-**Borders** — `--border-subtle --border-default --border-strong --border-accent --border-focus`
+**Foreground** — `--fg-default --fg-strong --fg-muted --fg-subtle --fg-disabled --fg-on-accent --fg-on-inverse --fg-on-success --fg-on-warning --fg-on-danger --fg-accent --fg-link`
+**Borders** — `--border-subtle --border-default --border-strong --border-accent --border-focus --border-invalid`
 **Intent** — `--bg-accent --bg-accent-hover --bg-success --bg-warning --bg-danger --fg-success --fg-warning --fg-danger`
 **Type roles** — `--type-display --type-h1 --type-h2 --type-h3 --type-h4 --type-lead --type-body --type-ui --type-label --type-code`
 **Elevation** — `--elevation-flat --elevation-card --elevation-raised --elevation-overlay --elevation-modal --elevation-focus`
-**Motion roles** — `--motion-hover --motion-enter --motion-exit --motion-expand --motion-emphasis --motion-instant --motion-loop`
+**Motion roles** — `--motion-hover --motion-enter --motion-exit --motion-expand --motion-emphasis --motion-instant --motion-loop`; travel distance `--motion-travel-xs/-sm/-md`
 **Z-index ladder** — `--z-base --z-raised --z-sticky --z-dropdown --z-overlay --z-modal --z-toast --z-tooltip`
 
 Note: `--space-section`, `--space-subsection`, `--space-block` and `--space-fluid-*` live in the `--space-*` namespace but **are Tier 2** — the tier is a property of the name's meaning, not its first word.

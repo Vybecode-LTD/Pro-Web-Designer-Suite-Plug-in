@@ -1765,6 +1765,8 @@ CONTRAST_PARTNER = {
     "--fg-disabled": "--bg-canvas", "--fg-accent": "--bg-canvas",
     "--fg-link": "--bg-canvas", "--fg-success": "--bg-canvas",
     "--fg-warning": "--bg-canvas", "--fg-danger": "--bg-canvas",
+    "--fg-on-success": "--bg-success", "--fg-on-warning": "--bg-warning",
+    "--fg-on-danger": "--bg-danger",
 }
 
 TW_COLOR_KEY = {
@@ -1782,6 +1784,8 @@ TW_COLOR_KEY = {
     "--border-focus": "focus",
     "--fg-danger": "danger-fg", "--fg-success": "success-fg",
     "--fg-warning": "warning-fg",
+    "--fg-on-success": "on-success", "--fg-on-warning": "on-warning",
+    "--fg-on-danger": "on-danger", "--border-invalid": "line-invalid",
 }
 
 # Where each Tier-2 color role points in the light theme. Mirrors tokens.css.
@@ -1801,6 +1805,8 @@ ROLE_SOURCE = {
     "--bg-success": ("success", 500), "--bg-warning": ("warning", 500),
     "--bg-danger": ("danger", 500), "--fg-success": ("success", 700),
     "--fg-warning": ("warning", 700), "--fg-danger": ("danger", 700),
+    "--fg-on-success": ("neutral", 1000), "--fg-on-warning": ("neutral", 1000),
+    "--fg-on-danger": ("neutral", 0), "--border-invalid": ("danger", 500),
 }
 
 
@@ -2051,6 +2057,9 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
 {line("--fg-disabled:", "var(--neutral-400);")}
 {line("--fg-on-accent:", "var(--neutral-0);")}
 {line("--fg-on-inverse:", "var(--neutral-50);")}
+{line("--fg-on-success:", "var(--neutral-1000);")}
+{line("--fg-on-warning:", "var(--neutral-1000);")}
+{line("--fg-on-danger:", "var(--neutral-0);")}
 {line("--fg-accent:", "var(--accent-700);")}
 {line("--fg-link:", "var(--accent-700);")}
 
@@ -2059,6 +2068,7 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
 {line("--border-strong:", "var(--neutral-500);")}
 {line("--border-accent:", "var(--accent-500);")}
 {line("--border-focus:", "var(--accent-600);")}
+{line("--border-invalid:", "var(--danger-500);")}
 
 {line("--bg-accent:", "var(--accent-600);")}
 {line("--bg-accent-hover:", "var(--accent-700);")}
@@ -2139,6 +2149,9 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
        block: a spinner that stops reads as a hung page. */
     --dur-loop:        900ms;
     --motion-loop:     var(--dur-loop) var(--ease-linear);
+    --motion-travel-xs: var(--space-1);
+    --motion-travel-sm: var(--space-2);
+    --motion-travel-md: var(--space-4);
 
     /* ---------------------------------------------------------------------
        9. Z-INDEX — a closed ladder. Never write a literal z-index again.
@@ -2199,6 +2212,7 @@ def render_tokens_css(prop: Proposal, neutral: Ramp, accent: Ramp,
     --border-subtle:  var(--neutral-900);
     --border-default: var(--neutral-800);
     --border-strong:  var(--neutral-500);
+    --border-invalid: var(--danger-400);
 
     --bg-accent:       var(--accent-500);
     --bg-accent-hover: var(--accent-400);

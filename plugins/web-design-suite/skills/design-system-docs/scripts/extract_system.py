@@ -1072,6 +1072,9 @@ CONTRAST_PAIRS_EXTRA = (
     ("--fg-on-accent", "--bg-accent-hover"),
     ("--fg-on-accent", "--bg-danger"),
     ("--fg-on-inverse", "--bg-inverse"),
+    ("--fg-on-success", "--bg-success"),
+    ("--fg-on-warning", "--bg-warning"),
+    ("--fg-on-danger", "--bg-danger"),
 )
 
 

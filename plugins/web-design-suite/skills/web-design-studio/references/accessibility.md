@@ -413,6 +413,7 @@ Never `title` — it is a tooltip, not a label, and it does not appear on touch 
 - **`aria-describedby` takes a space-separated list** and can safely reference an element that does not exist yet or is currently empty — so wire help *and* error at render time and only fill the error element when there is one. Swapping `aria-describedby` on and off is a common source of missed announcements.
 - **`aria-invalid="true"` goes on the input**, and comes off when the error clears. Do not set `aria-invalid="false"` before the user has entered anything — several screen readers announce "valid", which is noise.
 - **The error message must state the problem *and*, where the fix is knowable, the fix** (3.3.3). "Invalid" fails. "Enter an email address in the format name@example.com" passes.
+- **An invalid field takes `--border-invalid`, never `--border-focus`**, or it looks focused: 4.23:1 (--danger-500 on --neutral-100) on the sunken input, over 1.4.11's 3:1.
 - **Error text needs an icon or prefix, not just `--fg-danger`** (1.4.1), and `--fg-danger` (`--danger-700`) must clear 4.5:1 on its surface — it does, at 8.14:1 on `--bg-surface`.
 - **Required fields:** use the `required` attribute (which sets `aria-required` implicitly) and mark it in the visible label with a word or a legend-explained asterisk. An asterisk with no legend is not an instruction.
 
@@ -420,7 +421,7 @@ Never `title` — it is a tooltip, not a label, and it does not appear on touch 
 .field { display: grid; gap: var(--gap-tight); }
 .field-help  { font: var(--type-label); color: var(--fg-muted); }
 .field-error { font: var(--type-label); color: var(--fg-danger); }
-.input[aria-invalid="true"] { border-color: var(--border-focus); }
+.input[aria-invalid="true"] { border-color: var(--border-invalid); }
 ```
 (Parents own the gaps — Law 2. The label does not set its own margin.)
 

@@ -15,7 +15,7 @@ import json
 import re
 import unittest
 
-from wds_support import PLUGIN, SKILLS
+from wds_support import PLUGIN, SKILLS, load_script
 
 STUDIO = SKILLS / "web-design-studio"
 CONTRACT = STUDIO / "references" / "token-contract.md"
@@ -45,6 +45,59 @@ def declared(css: str) -> set[str]:
 
 def sha(path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+class InvalidFieldsLookInvalid(unittest.TestCase):
+    """P7 (SB-B4): accessibility.md drew an invalid field in --border-focus, so
+    it looked focused, and the scaffold drew it in --border-accent."""
+
+    def test_every_invalid_field_rule_reads_the_invalid_role(self):
+        files = [SKILLS / "web-design-studio" / "references" / "accessibility.md",
+                 SKILLS / "content-model-to-ui" / "scripts" / "scaffold_ui.py"]
+        seen = 0
+        for path in files:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if '[aria-invalid="true"]' in line and "border" in line and "{" in line:
+                    seen += 1
+                    with self.subTest(file=path.name, rule=line.strip()):
+                        self.assertIn("var(--border-invalid)", line)
+        self.assertGreaterEqual(seen, 3)
+
+
+class StatusFillsCarryTheirInk(unittest.TestCase):
+    """Codex on #31: the filled danger and success variants kept
+    --fg-on-accent, which is near-black in dark (4.38:1 on --bg-danger) and
+    3.41:1 white on the success fill; the state matrix put --fg-on-inverse on
+    the warning fill."""
+
+    FILES = [SKILLS / "content-model-to-ui" / "scripts" / "scaffold_ui.py",
+             SKILLS / "component-state-matrix" / "scripts" / "generate_matrix.py",
+             SKILLS / "web-design-studio" / "references" / "stack-css-modules.md",
+             SKILLS / "web-design-studio" / "references" / "stack-vanilla-css.md",
+             SKILLS / "web-design-studio" / "references" / "stack-tailwind.md"]
+
+    def test_an_ink_on_a_status_fill_is_that_fills_ink(self):
+        seen = 0
+        for path in self.FILES:
+            lines = path.read_text(encoding="utf-8").splitlines()
+            for i, line in enumerate(lines):
+                for intent in re.findall(r"var\(--bg-(success|warning|danger)\)", line):
+                    for ink in re.findall(r"var\(--fg-on-([a-z]+)\)", " ".join(lines[i:i + 3])):
+                        seen += 1
+                        with self.subTest(file=path.name, line=i + 1):
+                            self.assertEqual(ink, intent)
+                for intent, ink in re.findall(r"\bbg-(success|warning|danger)\b[^'\"]*\btext-on-([a-z]+)", line):
+                    seen += 1
+                    with self.subTest(file=path.name, line=i + 1):
+                        self.assertEqual(ink, intent)
+        self.assertGreaterEqual(seen, 7)
+
+    def test_travel_distances_cross_to_figma_and_invalid_borders_are_versioned_on_sunken(self):
+        figma = load_script("figma-variables-sync", "figma_to_tokens")
+        self.assertFalse({n for n in figma.COMPOSITE_ONLY if n.startswith("motion-travel-")})
+        diff = load_script("design-system-versioning", "diff_system")
+        self.assertIn("--border-invalid", diff.UI_ROLES)
+        self.assertIn("--bg-sunken", diff.UI_SURFACES)
 
 
 class ContractCopies(unittest.TestCase):

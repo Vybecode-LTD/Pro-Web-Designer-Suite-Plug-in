@@ -724,7 +724,7 @@ const button = cva(
       {
         variant: 'primary',
         tone: 'danger',
-        class: 'bg-danger text-on-accent hover:bg-danger',
+        class: 'bg-danger text-on-danger hover:bg-danger',
       },
       {
         variant: 'secondary',
@@ -735,7 +735,7 @@ const button = cva(
       {
         variant: 'primary',
         tone: 'success',
-        class: 'bg-success text-on-accent hover:bg-success',
+        class: 'bg-success text-on-success hover:bg-success',
       },
       /* Optical correction, not a new value: an icon-only button at `sm` is
        * square, so the horizontal inset drops a step. */

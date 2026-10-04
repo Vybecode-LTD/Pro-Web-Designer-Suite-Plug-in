@@ -196,6 +196,9 @@ export default {
       link: t('--fg-link'),
       'on-accent': t('--fg-on-accent'),
       'on-inverse': t('--fg-on-inverse'),
+      'on-success': t('--fg-on-success'),
+      'on-warning': t('--fg-on-warning'),
+      'on-danger': t('--fg-on-danger'),
       'disabled-fg': t('--fg-disabled'),
 
       /* Intent fills. */
@@ -217,6 +220,7 @@ export default {
       'line-strong': t('--border-strong'),
       'line-accent': t('--border-accent'),
       focus: t('--border-focus'),
+      'line-invalid': t('--border-invalid'),
 
       /* Tier 1 ramps are NOT exposed. There is no `bg-neutral-800`. If a
        * design needs a step no role names, add a Tier-2 role in tokens.css

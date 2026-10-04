@@ -104,8 +104,10 @@ TIER2 = [
     "bg-canvas", "bg-surface", "bg-raised", "bg-sunken", "bg-inverse", "bg-scrim",
     "bg-hover", "bg-active", "bg-selected", "bg-disabled",
     "fg-default", "fg-strong", "fg-muted", "fg-subtle", "fg-disabled",
-    "fg-on-accent", "fg-on-inverse", "fg-accent", "fg-link",
+    "fg-on-accent", "fg-on-inverse", "fg-on-success", "fg-on-warning", "fg-on-danger",
+    "fg-accent", "fg-link",
     "border-subtle", "border-default", "border-strong", "border-accent", "border-focus",
+    "border-invalid",
     "bg-accent", "bg-accent-hover", "bg-success", "bg-warning", "bg-danger",
     "fg-success", "fg-warning", "fg-danger",
     "type-display", "type-h1", "type-h2", "type-h3", "type-h4",
@@ -114,6 +116,7 @@ TIER2 = [
     "elevation-modal", "elevation-focus",
     "motion-hover", "motion-enter", "motion-exit", "motion-expand", "motion-emphasis",
     "motion-instant", "motion-loop",
+    "motion-travel-xs", "motion-travel-sm", "motion-travel-md",
     "z-base", "z-raised", "z-sticky", "z-dropdown", "z-overlay", "z-modal",
     "z-toast", "z-tooltip",
 ]
@@ -127,7 +130,8 @@ for _n in TIER2:
 # pair, a duration+easing pair) or a clamp(). Figma variables are single scalars,
 # so these cannot cross the boundary in either direction. Naming them here is
 # what turns silent data loss into a printed warning.
-COMPOSITE_ONLY = {n for n in TIER2 if n.startswith(("type-", "motion-", "elevation-"))}
+COMPOSITE_ONLY = {n for n in TIER2 if n.startswith(("type-", "motion-", "elevation-"))
+                  and not n.startswith("motion-travel-")}   # a distance, one FLOAT
 COMPOSITE_ONLY |= {n for n in TIER1 if n.startswith(("shadow-", "ease-", "space-fluid-"))}
 COMPOSITE_ONLY |= {"text-5xl", "text-6xl"}
 

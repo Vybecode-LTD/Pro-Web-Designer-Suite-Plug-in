@@ -380,6 +380,12 @@ it is for:
   The light `--bg-accent` is therefore `--accent-600`, where white measures 4.92:1 (--neutral-0 on
   --accent-600). The dark theme keeps `--accent-500` and turns the label dark: 5.84:1
   (--neutral-1000 on --accent-500).
+- **A filled status badge needs its own ink.** White on the status fills measures 3.41:1
+  (--neutral-0 on --success-500) and 2.25:1 (--neutral-0 on --warning-500), so `--fg-on-success`
+  and `--fg-on-warning` are near-black: 6.10:1 (--neutral-1000 on --success-500) and 9.24:1
+  (--neutral-1000 on --warning-500). `--fg-on-danger` stays white, at 4.75:1 (--neutral-0 on
+  --danger-500). `check_roles.py` holds each fill to its ink at 4.5:1, and an invalid field's
+  `--border-invalid` to 3:1 on every surface.
 
 Both are ordinary outcomes of a mid-lightness palette. Catch them with the script, not in a VPAT.
 

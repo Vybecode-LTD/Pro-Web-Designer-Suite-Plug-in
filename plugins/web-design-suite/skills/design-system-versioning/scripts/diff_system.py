@@ -1094,16 +1094,19 @@ CONTRAST_PAIRS_EXTRA = (
     ("--fg-on-accent", "--bg-accent-hover"),
     ("--fg-on-accent", "--bg-danger"),
     ("--fg-on-inverse", "--bg-inverse"),
+    ("--fg-on-success", "--bg-success"),
+    ("--fg-on-warning", "--bg-warning"),
+    ("--fg-on-danger", "--bg-danger"),
 )
 #: Non-text roles that still carry a contrast obligation. SC 1.4.11 asks 3:1 of
 #: the *boundary* of a control and of a focus indicator, so a focus ring or a
 #: filled button that shifts against the page is exactly as reportable as body
 #: text — and it is the half of the obligation teams forget, because no linter
 #: calls a border "text".
-UI_ROLES = ("--border-focus", "--border-strong", "--border-accent",
+UI_ROLES = ("--border-focus", "--border-strong", "--border-accent", "--border-invalid",
             "--bg-accent", "--bg-accent-hover", "--bg-danger", "--bg-success",
             "--bg-warning")
-UI_SURFACES = ("--bg-canvas", "--bg-surface")
+UI_SURFACES = ("--bg-canvas", "--bg-surface", "--bg-sunken")   # inputs sit on sunken
 
 TEXT_THRESHOLDS = ((4.5, "body text (SC 1.4.3)"), (3.0, "large text (SC 1.4.3)"))
 UI_THRESHOLDS = ((3.0, "UI boundary / focus indicator (SC 1.4.11, 2.4.13)"),)
