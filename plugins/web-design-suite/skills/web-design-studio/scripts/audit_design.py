@@ -1707,9 +1707,10 @@ def breakpoint_drift(files: list[tuple[Path, str]]) -> list[Finding]:
     one on purpose with a keyword (`--breakpoint-2xl: initial`). A Tailwind
     theme (`@theme`) with no copies still counts, since Tailwind then keeps
     its own widths, and the themes paired with one token file mirror it
-    together, as Tailwind reads every @theme. Each theme pairs with the
-    nearest token file that declares breakpoints, or the nearest token file
-    if none does. A generated theme answers to its generator, and a theme's
+    together, as Tailwind reads every @theme. Each theme pairs with a token
+    file of its own project, the nearest folder above it with a package.json:
+    the nearest that declares breakpoints, or the nearest if none does. A
+    generated theme answers to its generator, and a theme's
     ignore pragmas apply."""
     tokens: dict[Path, dict[str, str]] = {}           # token file -> its --bp-*
     themes: dict[Path, dict] = {}                     # theme file -> its copies, lines, pragmas, anchor
@@ -1748,15 +1749,23 @@ def breakpoint_drift(files: list[tuple[Path, str]]) -> list[Finding]:
             n += 1
         return n
 
-    sources = {path: values for path, values in tokens.items() if values} or tokens
+    def project(path: Path) -> Path | None:
+        """The nearest folder above a file that holds a package.json."""
+        return next((folder for folder in path.resolve().parents if (folder / "package.json").is_file()), None)
+
     mirrors: dict[Path, list[Path]] = {}             # token file -> the themes paired with it
-    for path in sorted(themes) if sources else ():
-        nearest = max(sorted(sources), key=lambda token_file: shared_folders(path, token_file))
-        mirrors.setdefault(nearest, []).append(path)
+    for path in sorted(themes):
+        root = project(path)
+        own = sorted(token_file for token_file in tokens
+                     if root is None or root in token_file.resolve().parents)
+        own = [token_file for token_file in own if tokens[token_file]] or own
+        if own:                                      # another project's tokens are not this theme's
+            nearest = max(own, key=lambda token_file: shared_folders(path, token_file))
+            mirrors.setdefault(nearest, []).append(path)
 
     findings = []
     for source, paired in mirrors.items():
-        values = sources[source]
+        values = tokens[source]
         drift = []
         for path in paired:
             for name, declared in themes[path]["copies"].items():

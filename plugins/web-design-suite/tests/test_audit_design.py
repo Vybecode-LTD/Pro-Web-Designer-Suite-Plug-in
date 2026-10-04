@@ -720,6 +720,19 @@ class ThePromisedChecks(TempDirTest):
         self.write("two/theme.css", "@theme {\n  --breakpoint-md: 48rem;\n}\n")
         self.assertEqual([("theme.css", 2, "breakpoint-drift")], self.drift("two"))
 
+    def test_a_theme_pairs_only_with_its_own_projects_tokens(self):
+        # CodeRabbit on #24: a theme whose project had no token file in the run
+        # was paired with another project's. A project is the nearest folder
+        # with a package.json, so two folders of one project still pair.
+        self.write("app/package.json", "{}\n")
+        self.write("app/theme.css", "@theme {\n  --breakpoint-md: 50rem;\n}\n")
+        self.write("deck/package.json", "{}\n")
+        self.write("deck/tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.write("web/package.json", "{}\n")
+        self.write("web/app/theme.css", "@theme {\n  --breakpoint-md: 50rem;\n}\n")
+        self.write("web/styles/tokens.css", ":root { --bp-md: 48rem; }\n")
+        self.assertEqual([("theme.css", 2, "breakpoint-drift")], self.drift("app", "deck", "web"))
+
     def test_themes_paired_with_one_token_file_mirror_it_together(self):
         # Tailwind reads every @theme block, so a theme split across two files
         # is one set of copies. Each file alone lacked the other's.
