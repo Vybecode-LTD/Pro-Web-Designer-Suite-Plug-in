@@ -74,16 +74,17 @@ For an existing site, run `python -m scripts.audit_design` first and read the re
 
 Copy `assets/starter/styles/tokens.css` and adapt it. This is the only phase where you write literal values.
 
-1. **Color.** Derive the accent hue from the brand adjectives using the table in `references/color-system.md` §4, then generate the ramps:
+1. **Color.** The starter's ramps are these commands' output:
    ```bash
-   python -m scripts.generate_color_ramp "#e8440a" --name accent --format css
-   python -m scripts.generate_color_ramp "#e8440a" --neutral --name neutral --format css
+   python -m scripts.generate_color_ramp "oklch(64.5% 0.188 42)" --name accent --hue-shift 0 --gamut p3 --format css
+   python -m scripts.generate_color_ramp "oklch(64.5% 0.188 42)" --neutral --neutral-hue 75 --name neutral --format css
    ```
-   The script prints the WCAG matrix. **Verify contrast, never assume it** — the starter tokens themselves shipped with two failing pairings until the generator caught them.
-2. **Type.** Pick a ratio for the archetype (dense UI 1.125–1.2, editorial 1.25–1.333) and generate:
+   To rebrand, derive the accent hue from the brand adjectives (`references/color-system.md` §4) and swap the seed. A brand hex with `--anchor-seed` stays exact at its nearest step; without it, the report gives step 500's distance from it. Keep `--neutral-hue` near the accent's: an ember hue reads pink in a neutral. The script prints the WCAG matrix. **Verify contrast, never assume it** — the starter tokens themselves shipped with two failing pairings until the generator caught them.
+2. **Type.** Start from the starter's scale, which the generator prints exactly:
    ```bash
-   python -m scripts.generate_type_scale --base 16 --ratio 1.2 --dual-ratio 1.25 --fluid 380 1440 --format css
+   python -m scripts.generate_type_scale --preset studio --format css
    ```
+   To depart from it, pick a ratio for the archetype (dense UI 1.125–1.2, editorial 1.25–1.333) and pass scale flags instead of the preset, such as `--ratio 1.2 --dual-ratio 1.25 --steps-down 2 --snap-px --fluid 380 1440`. A step under 11px is refused: drop a `--steps-down` or narrow `--ratio`. Keep each fluid maximum within 2.5× its minimum (`references/typography.md` §10).
 3. **Spacing.** Leave the scale alone. Adapt only the Tier-2 *roles* if the project's rhythm genuinely differs.
 
 Deliver the token file and get sign-off on it before building anything. A token change after twenty components exist is cheap; a token *disagreement* discovered then is not.
@@ -185,10 +186,10 @@ python -m scripts.check_roles src/styles/tokens.css   # role pairs per theme: te
                                                        # borders and the focus ring 3:1
 
 # Generators. Run these in Phase 1.
-python -m scripts.generate_color_ramp "#e8440a" --name accent --format css
-python -m scripts.generate_color_ramp "#e8440a" --neutral --name neutral
+python -m scripts.generate_color_ramp "#e8440a" --anchor-seed --name accent --format css
+python -m scripts.generate_color_ramp "#e8440a" --neutral --neutral-hue 75 --name neutral
 python -m scripts.generate_color_ramp --check "#ffffff" "oklch(56.5% 0.176 42)"
-python -m scripts.generate_type_scale --base 16 --ratio 1.2 --fluid 380 1440 --preview
+python -m scripts.generate_type_scale --preview      # the starter's scale (--preset studio)
 ```
 
 `check_roles.py` is the palette's gate: it resolves every Tier-2 role in light, dark and `.inverse`, checks the pairs components put together, and prints the role table `references/color-system.md` §6 quotes (`--table`). Run it on every change to `tokens.css`.

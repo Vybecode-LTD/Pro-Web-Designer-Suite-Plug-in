@@ -106,7 +106,7 @@ lands in your project, never inside the plugin. Below, `WDS` is the plugin's
 ```bash
 # 1. Tokens — derive the ramp from the brand, verify contrast
 python "$WDS/web-design-studio/scripts/generate_color_ramp.py" "#e8440a" --name accent --format css
-python "$WDS/web-design-studio/scripts/generate_type_scale.py" --base 16 --ratio 1.2 --fluid 380 1440 --preview
+python "$WDS/web-design-studio/scripts/generate_type_scale.py" --preview    # the starter's type scale
 
 # 2. Build. Copy tokens.css / reset.css / base.css / layout.css.
 

@@ -37,7 +37,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SS-A6 | medium | fixed in 3.1.0 | The references' own CSS examples fail the plugin's gate. |
 | SS-A7 | medium | fixed in 3.2.0 | Gap after a heading: 8px (spacing-system.md:454), 12px (typography.md:170), 16px (base.css:414-416), 12px (layout.css:264 .flow). |
 | SS-A8 | medium | fixed in 3.2.0 | Role table (:280-295) vs tokens: light --bg-accent 500 (tokens: 600); dark --fg-muted 400 (300), dark --fg-subtle 500 (400), dark --border-focus 400 (never re-pointed, so 600). |
-| SS-A9 | medium | W3 (3.3.0) | Type: generate_type_scale.py:26-30 says --snap-px --fluid 380 1440 --fluid-steps 2 reproduces tokens.css "approximately". |
+| SS-A9 | medium | fixed in 3.3.0: `test_numbers.TypeScale`, `ColourRamps` | Type: generate_type_scale.py:26-30 says --snap-px --fluid 380 1440 --fluid-steps 2 reproduces tokens.css "approximately". |
 | SS-A10 | medium | fixed in 3.2.0 | The weight axis of the hierarchy method is illegal under L6. |
 | SS-A11 | medium | fixed in 3.2.0 | The container-query containment facts are out of date. |
 | SS-A12 | medium | fixed in 3.2.0 | style-architecture.md:361-366 uses initial-value: 1.5rem. |
@@ -52,14 +52,14 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SS-B2 | — | partly done; the rest in W3 (3.3.0) | Tier-2 roles and starter files are missing. |
 | SS-B3 | — | W10 (3.6.0+) | Theming without JavaScript. |
 | SS-B4 | — | W12 (3.6.0+) | Modern CSS the systems references should teach: `@starting-style`, the top layer against the z-index ladder, `cqi`, `font-size-adjust`, `color-mix()`. |
-| SS-B5 | — | W3 (3.3.0) | Fluid type and zoom (SC 1.4.4) is only half taught. |
-| SS-B6 | — | W3 (3.3.0) | The brand's exact colour isn't preserved. |
-| SS-B7 | — | partly done; the rest in W3 (3.3.0) | Nothing tests docs, tokens and generators against each other. |
+| SS-B5 | — | fixed in 3.3.0: `test_numbers.FluidTypeZoom`, `TypeScale.test_a_fluid_span_over_2_5_times_is_refused` | Fluid type and zoom (SC 1.4.4) is only half taught. |
+| SS-B6 | — | fixed in 3.3.0: `test_numbers.ColourRamps` (`test_anchor_seed_*`, `test_the_report_gives_the_seeds_distance_from_500`) | The brand's exact colour isn't preserved. |
+| SS-B7 | — | fixed in 3.3.0: `test_numbers.TypeScale`, `FluidTypeZoom`, `ColourRamps` | Nothing tests docs, tokens and generators against each other. |
 | SS-C1 | — | fixed in 3.1.0, with SS-A1 to SS-A4 | Fix token resolution and test it in a browser (effort S–M, P0). |
 | SS-C2 | — | fixed in 3.2.0 | As in SS-B1, wired into the audit and the pre-commit hook. |
 | SS-C3 | — | fixed in 3.2.0 | Make the docs part of the test suite (S–M, P1). |
 | SS-C4 | — | fixed in 3.2.0 | One source for shared CSS (M, P1). |
-| SS-C5 | — | W3 (3.3.0) | Generator upgrades (M, P1). |
+| SS-C5 | — | fixed in 3.3.0: `--preset studio`, the 11px refusal, `--fluid-space`, `--anchor-seed`, `--neutral-hue`, `--gamut p3` (`test_numbers.TypeScale`, `ColourRamps`) | Generator upgrades (M, P1). |
 | SS-C6 | — | W9 (3.5.0) | Use Claude Code plugin features (M, P1). |
 | SS-C7 | — | W9 (3.5.0) | An eval suite of script-graded cases, run against a no-plugin baseline. |
 | SS-C8 | — | fixed in 3.2.0 | Size: 17.7 KB / 2,616 words ≈ 4.4k tokens. |

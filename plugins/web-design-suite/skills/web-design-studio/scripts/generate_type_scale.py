@@ -15,7 +15,7 @@ Run as a file:
     python scripts/generate_type_scale.py --preview
     python scripts/generate_type_scale.py --format css
     python scripts/generate_type_scale.py --base 16 --ratio minor-third \\
-        --dual-ratio major-third --steps-down 3 --steps-up 7 --format css
+        --dual-ratio major-third --steps-down 2 --steps-up 7 --format css
 
 Run as a module (from inside `scripts/`, or with `scripts/` on PYTHONPATH):
 
@@ -23,14 +23,21 @@ Run as a module (from inside `scripts/`, or with `scripts/` on PYTHONPATH):
     python -m generate_type_scale --format json
     PYTHONPATH=scripts python -m generate_type_scale --format tailwind
 
-The shipped tokens.css scale is (approximately) reproduced by:
+Two modes:
 
-    python scripts/generate_type_scale.py --base 16 --ratio minor-third \\
-        --dual-ratio major-third --steps-down 3 --steps-up 7 --snap-px \\
-        --fluid 380 1440 --fluid-steps 2 --format css
+    --preset studio   the shipped tokens.css scale, exactly. It is the default
+                      when no scale flag (--base, --ratio, --dual-ratio,
+                      --steps-up, --steps-down, --snap-px, --fluid,
+                      --fluid-steps, --fluid-min-ratio) is given.
+    a ratio run       any scale flag. The pure math, from those flags.
 
-See the REPRODUCING TOKENS.CSS note at the bottom of this docstring for the
-exact places where the shipped file was hand-tuned away from the generator.
+A ratio run that puts a step under 11px exits 2 and names the ways out: fewer
+--steps-down, a smaller --ratio, or --allow-small to emit it anyway. The
+default ratio (1.2, three steps down) gives 9.26px, and --snap-px only rounds
+that to 9px.
+
+See the REPRODUCING TOKENS.CSS note at the bottom of this docstring for how
+the preset departs from the pure math.
 
 HEURISTICS
 ----------
@@ -77,15 +84,20 @@ Basis for fluid steps:
 
 REPRODUCING TOKENS.CSS
 ----------------------
-1. Sub-base steps in tokens.css are hand-rounded to whole pixels (14 / 12 / 11)
-   rather than strict 1.2 ratio steps (13.33 / 11.11 / 9.26). Use --snap-px.
-   9px is unusable, so the bottom of the scale is deliberately compressed.
+`--preset studio` prints tokens.css's `--text-*` exactly. The scale is
+hand-tuned, so the preset is a table (PRESETS), not a ratio run. It departs
+from the pure math in three places:
+
+1. Sub-base steps are hand-picked whole pixels, 14 / 12 / 11 (base x 0.875,
+   0.75, 0.6875), not strict 1.2 ratio steps (13.33 / 11.11 / 9.26). 9px is
+   unusable, so the bottom of the scale is deliberately compressed.
 2. `--text-lg` (18px) is base x 1.125, not base x the up ratio; 18px is a
    lead-paragraph size, not a scale step. The 1.25 chain runs from there:
-   18 -> 22.5 -> 28.1 -> 35.2 -> 43.9, which snaps to the shipped 22/28/35/44.
-3. The fluid maxima in tokens.css (72px, 110px) are hand-amplified well past the
-   1.25 chain. That is a legitimate Law-3 override for a marketing hero; this
-   script will not invent it. Pass --fluid-min-ratio to widen the fluid span.
+   18 -> 22.5 -> 28.1 -> 35.2 -> 43.9, which rounds to the shipped 22/28/35/44.
+3. The two fluid steps run 44 -> 72px and 56 -> 110px between 380 and 1440px.
+   The maxima are hand-amplified well past the 1.25 chain: a legitimate Law-3
+   override for a marketing hero. Each maximum stays within 2.5x its minimum,
+   the bound that keeps a fluid size zoomable (references/typography.md §10).
 """
 
 from __future__ import annotations
@@ -156,6 +168,43 @@ ROLES = {
     "6xl": "hero",
     "7xl": "oversize display — usability-gate it",
     "8xl": "oversize display — usability-gate it",
+}
+
+# Nothing under this is legible on a real screen (references/typography.md §15).
+SMALLEST_PX = 11.0
+
+# A fluid size whose maximum is more than this times its minimum can fail
+# WCAG SC 1.4.4 at the browser's 500% zoom limit (references/typography.md §10).
+FLUID_SPAN_MAX = 2.5
+
+# The shipped scales, step by step: index -> px, or (min_px, max_px) for a
+# fluid step. tokens.css is hand-tuned, so its preset is data, not a ratio run
+# (REPRODUCING TOKENS.CSS in the docstring says where it departs from the math).
+PRESETS = {
+    "studio": {
+        "base": 16.0,
+        "ratio": 1.2,
+        "dual_ratio": 1.25,
+        "fluid": (380.0, 1440.0),
+        "steps": {
+            -3: 11, -2: 12, -1: 14, 0: 16, 1: 18, 2: 22, 3: 28, 4: 35, 5: 44,
+            6: (44, 72), 7: (56, 110),
+        },
+    },
+}
+
+# The starter's fluid spacing (tokens.css), min -> max px. It shares the type's
+# viewport anchors, so --fluid-space solves it for the same pair.
+FLUID_SPACE = {"sm": (16, 24), "md": (24, 48), "lg": (40, 88), "xl": (64, 144)}
+
+# The flags that shape a ratio run. Any one of them leaves the preset behind.
+SCALE_FLAGS = (
+    "base", "ratio", "dual_ratio", "steps_up", "steps_down", "snap_px",
+    "fluid", "fluid_steps", "fluid_min_ratio",
+)
+RATIO_DEFAULTS = {
+    "base": 16.0, "ratio": "1.2", "steps_up": 7, "steps_down": 3,
+    "snap_px": False, "fluid_steps": 2,
 }
 
 
@@ -327,6 +376,63 @@ def fluid_clamp(
     }
 
 
+def snap_to_px(px: float) -> float:
+    """Integer px below 32 (hinting and rounding actually bite there); nearest
+    half-px above, which rem math renders cleanly."""
+    return round(px) if px < 32 else round(px * 2) / 2
+
+
+def step_px(
+    index: int, base: float, ratio: float, up_ratio: float, snap_px: bool
+) -> float:
+    """The size of one step of a ratio run."""
+    if index == 0:
+        px = base
+    elif index > 0:
+        px = base * (up_ratio ** index)
+    else:
+        px = base / (ratio ** (-index))
+    return snap_to_px(px) if snap_px else px
+
+
+def make_step(
+    index: int,
+    px: float,
+    fluid_data: Optional[dict],
+    base: float,
+    root_px: float,
+    tracking_model: str,
+) -> Step:
+    """One rung, with its recommended leading and tracking."""
+    name = step_name(index)
+    # Leading reads the small end of a fluid step, tracking the large end.
+    lh_basis = fluid_data["min_px"] if fluid_data else px
+    lh_raw = leading_for(lh_basis, base)
+    lh, lh_token = snap(lh_raw, LEADING_TOKENS)
+    ls_raw = tracking_for(px, tracking_model, base)
+    ls, ls_token = snap(ls_raw, TRACKING_TOKENS)
+
+    role = ROLES.get(name, "unassigned — give it a role or delete it")
+    if index < 0:
+        role += " [1-line: --leading-snug]"
+
+    return Step(
+        name=name,
+        token=f"--text-{name}",
+        index=index,
+        px=round(px, 3),
+        rem=round(px / root_px, 4),
+        line_height=lh,
+        line_height_raw=round(lh_raw, 3),
+        leading_token=lh_token,
+        letter_spacing=ls,
+        letter_spacing_raw=round(ls_raw, 4),
+        tracking_token=ls_token,
+        role=role,
+        fluid=fluid_data,
+    )
+
+
 def build_scale(
     base: float,
     ratio: float,
@@ -343,20 +449,6 @@ def build_scale(
     up_ratio = dual_ratio if dual_ratio else ratio
     indices = list(range(-steps_down, steps_up + 1))
 
-    sizes = {}
-    for i in indices:
-        if i == 0:
-            px = base
-        elif i > 0:
-            px = base * (up_ratio ** i)
-        else:
-            px = base / (ratio ** (-i))
-        if snap_px:
-            # Integer px below 32 (hinting and rounding actually bite there);
-            # nearest half-px above, which rem math renders cleanly.
-            px = round(px) if px < 32 else round(px * 2) / 2
-        sizes[i] = px
-
     fluid_indices = set()
     if fluid is not None:
         if fluid_steps > 0:
@@ -364,47 +456,77 @@ def build_scale(
 
     steps: List[Step] = []
     for i in indices:
-        px = sizes[i]
-        name = step_name(i)
-
+        px = step_px(i, base, ratio, up_ratio, snap_px)
         fluid_data = None
         if i in fluid_indices:
             min_vw, max_vw = fluid
             shrink = fluid_min_ratio or up_ratio
             min_px = px / shrink
             if snap_px:
-                min_px = round(min_px) if min_px < 32 else round(min_px * 2) / 2
+                min_px = snap_to_px(min_px)
             fluid_data = fluid_clamp(min_px, px, min_vw, max_vw, root_px)
+        steps.append(make_step(i, px, fluid_data, base, root_px, tracking_model))
+    return steps
 
-        # Leading reads the small end of a fluid step, tracking the large end.
-        lh_basis = fluid_data["min_px"] if fluid_data else px
-        lh_raw = leading_for(lh_basis, base)
-        lh, lh_token = snap(lh_raw, LEADING_TOKENS)
-        ls_raw = tracking_for(px, tracking_model, base)
-        ls, ls_token = snap(ls_raw, TRACKING_TOKENS)
 
-        role = ROLES.get(name, "unassigned — give it a role or delete it")
-        if i < 0:
-            role += " [1-line: --leading-snug]"
-
+def preset_scale(name: str, root_px: float, tracking_model: str) -> List[Step]:
+    """A shipped scale, exactly as its token file has it."""
+    preset = PRESETS[name]
+    min_vw, max_vw = preset["fluid"]
+    steps: List[Step] = []
+    for i, size in sorted(preset["steps"].items()):
+        fluid_data = None
+        if isinstance(size, tuple):
+            fluid_data = fluid_clamp(size[0], size[1], min_vw, max_vw, root_px)
+            size = size[1]
         steps.append(
-            Step(
-                name=name,
-                token=f"--text-{name}",
-                index=i,
-                px=round(px, 3),
-                rem=round(px / root_px, 4),
-                line_height=lh,
-                line_height_raw=round(lh_raw, 3),
-                leading_token=lh_token,
-                letter_spacing=ls,
-                letter_spacing_raw=round(ls_raw, 4),
-                tracking_token=ls_token,
-                role=role,
-                fluid=fluid_data,
-            )
+            make_step(i, float(size), fluid_data, preset["base"], root_px,
+                      tracking_model)
         )
     return steps
+
+
+def smallest_sizes(steps: List[Step]) -> List[tuple]:
+    """(token, px) for every step whose smallest size is under SMALLEST_PX. A
+    fluid step's smallest size is its minimum."""
+    found = []
+    for s in steps:
+        low = s.fluid["min_px"] if s.fluid else s.px
+        if low < SMALLEST_PX:
+            found.append((s.token, low))
+    return found
+
+
+def ways_out(small: List[tuple], steps: List[Step], args) -> List[str]:
+    """What the user can change so no step falls under SMALLEST_PX."""
+    ways = []
+    fluid_tokens = {s.token for s in steps if s.fluid}
+    static = [t for t, _ in small if t not in fluid_tokens]
+    if static and args.base < SMALLEST_PX:
+        ways.append(f"a --base of {fmt(SMALLEST_PX, 0)}px or more")
+    elif static:
+        up = args.up_ratio
+        fit = max(
+            n for n in range(args.steps_down + 1)
+            if step_px(-n, args.base, args.ratio_value, up, args.snap_px)
+            >= SMALLEST_PX
+        )
+        if fit < args.steps_down:
+            ways.append(f"--steps-down {fit}")
+        bound = (args.base / SMALLEST_PX) ** (1.0 / args.steps_down)
+        if bound > 1.0:
+            way = f"a --ratio of {fmt(bound, 3)} or less"
+            named = [(r, n) for n, r in NAMED_RATIOS.items() if r <= bound]
+            if named:
+                r, n = max(named)
+                lowest = args.base / (r ** args.steps_down)
+                way += (f" ({n}, {fmt(r, 3)}, keeps {args.steps_down} steps "
+                        f"down at {fmt(lowest, 2)}px and up)")
+            ways.append(way)
+    if len(static) < len(small):
+        ways.append("fewer --fluid-steps, or a smaller --fluid-min-ratio")
+    ways.append("--allow-small, to emit it anyway")
+    return ways
 
 
 # --------------------------------------------------------------------------- #
@@ -418,9 +540,15 @@ def header_lines(args, up_ratio: float) -> List[str]:
         if args.dual_ratio
         else f"{fmt(args.ratio_value, 3)} throughout"
     )
+    scale = (
+        f"preset {args.preset}: tokens.css's hand-tuned scale, nominally "
+        f"{dual}"
+        if args.preset
+        else f"ratio {dual}"
+    )
     return [
         "Generated by scripts/generate_type_scale.py — do not hand-edit.",
-        f"base {fmt(args.base, 2)}px | ratio {dual} | "
+        f"base {fmt(args.base, 2)}px | {scale} | "
         f"{args.steps_down} down, {args.steps_up} up",
         f"tracking model: {args.tracking_model} "
         f"(ls_em = {TRACKING_MODELS[args.tracking_model][0]}/px "
@@ -447,6 +575,19 @@ def emit_css(steps: List[Step], args, up_ratio: float) -> str:
         out.append(f"    {decl:<{pad}}/* {fmt(s.px, 2):>6}px  {s.role} */")
         if s.fluid:
             out.append(f"    /* ^ {s.fluid['algebra']} */")
+    if args.fluid_space:
+        min_vw, max_vw = args.anchors
+        out.append("")
+        out.append(f"    /* Fluid spacing, on the same {fmt(min_vw, 0)} -> "
+                   f"{fmt(max_vw, 0)}px anchors */")
+        space = {
+            f"--space-fluid-{name}:": fluid_clamp(lo, hi, min_vw, max_vw, args.root)
+            for name, (lo, hi) in FLUID_SPACE.items()
+        }
+        width = max(len(token) for token in space) + 1
+        for token, solved in space.items():
+            out.append(f"    {token:<{width}} {solved['css']};  /* "
+                       f"{fmt(solved['min_px'], 2)} -> {fmt(solved['max_px'], 2)} */")
     out.append("")
     out.append("    /* Recommended pairing per step. These are the tokens the")
     out.append("       Tier-2 `--type-*` roles should compose, not new values. */")
@@ -466,6 +607,7 @@ def emit_css(steps: List[Step], args, up_ratio: float) -> str:
 def emit_json(steps: List[Step], args, up_ratio: float) -> str:
     payload = {
         "meta": {
+            "preset": args.preset,
             "base_px": args.base,
             "ratio_down": args.ratio_value,
             "ratio_up": up_ratio,
@@ -591,21 +733,28 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         epilog=(
             "Examples:\n"
-            "  python -m generate_type_scale --preview\n"
-            "  python -m generate_type_scale --ratio major-third --format css\n"
+            "  python -m generate_type_scale --preview      "
+            "(the studio preset: tokens.css)\n"
+            "  python -m generate_type_scale --ratio major-third "
+            "--steps-down 1 --format css\n"
             "  python -m generate_type_scale --ratio minor-third "
             "--dual-ratio major-third \\\n"
-            "      --snap-px --fluid 380 1440 --format css\n"
+            "      --steps-down 2 --snap-px --fluid 380 1440 --format css\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument(
-        "--base", type=float, default=16.0,
+        "--preset", choices=sorted(PRESETS), default=None,
+        help="A shipped scale, exactly: studio is tokens.css. The default "
+             "when no scale flag is given; it cannot be combined with one.",
+    )
+    p.add_argument(
+        "--base", type=float, default=None,
         help="Base body size in px (default 16). Below 16 fails WCAG in "
              "practice; the script warns.",
     )
     p.add_argument(
-        "--ratio", default="1.2",
+        "--ratio", default=None,
         help="Scale ratio: a number > 1 or one of "
              + ", ".join(sorted(NAMED_RATIOS)) + " (default 1.2 / minor-third).",
     )
@@ -614,16 +763,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Second ratio applied ABOVE the base, as this skill's tokens do "
              "(tight at body sizes, wider for headings). Same accepted values.",
     )
-    p.add_argument("--steps-up", type=int, default=7,
+    p.add_argument("--steps-up", type=int, default=None,
                    help="Steps above the base (default 7 -> lg..6xl).")
-    p.add_argument("--steps-down", type=int, default=3,
+    p.add_argument("--steps-down", type=int, default=None,
                    help="Steps below the base (default 3 -> sm, xs, 2xs).")
     p.add_argument("--root", type=float, default=ROOT_FONT_PX_DEFAULT,
                    help="Browser root font size used for rem math (default 16).")
     p.add_argument(
-        "--snap-px", action="store_true",
-        help="Round each step to whole px below 32px and half px above. "
-             "Matches how tokens.css was authored.",
+        "--snap-px", action="store_true", default=None,
+        help="Round each step to whole px below 32px and half px above. It "
+             "does not lift a step to 11px: 9.26px rounds to 9.",
+    )
+    p.add_argument(
+        "--allow-small", action="store_true",
+        help="Emit a scale with a step under 11px, with a warning. Without "
+             "it, such a scale exits 2.",
     )
     p.add_argument(
         "--tracking-model", choices=sorted(TRACKING_MODELS), default="studio",
@@ -635,12 +789,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit clamp() for the top steps, interpolating between these two "
              "viewport widths in px (e.g. --fluid 380 1440).",
     )
-    p.add_argument("--fluid-steps", type=int, default=2,
+    p.add_argument("--fluid-steps", type=int, default=None,
                    help="How many top steps go fluid (default 2).")
     p.add_argument(
         "--fluid-min-ratio", type=float, default=None,
         help="How far below its desktop size a fluid step starts. Default: the "
-             "up ratio (one scale step down). Larger = more dramatic shrink.",
+             "up ratio (one scale step down). Larger = more dramatic shrink, "
+             f"up to {FLUID_SPAN_MAX}: past it, zoom cannot double the text.",
+    )
+    p.add_argument(
+        "--fluid-space", action="store_true",
+        help="Also print the starter's fluid spacing (--space-fluid-sm..xl), "
+             "solved for the same viewport anchors. CSS only; a ratio run "
+             "needs --fluid.",
     )
     p.add_argument("--format", choices=sorted(EMITTERS), default="css",
                    help="Output format (default css).")
@@ -653,6 +814,36 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    if args.root <= 0:
+        parser.error("--root must be positive.")
+    if args.fluid_space and (args.preview or args.format != "css"):
+        parser.error("--fluid-space prints CSS: drop --preview, or use --format css.")
+    given = [f for f in SCALE_FLAGS if getattr(args, f) is not None]
+    if args.preset and given:
+        flags = ", ".join("--" + f.replace("_", "-") for f in given)
+        parser.error(
+            f"--preset {args.preset} is a fixed scale, so it takes no scale "
+            f"flags. Drop {flags} for the preset, or drop --preset for a "
+            "ratio run."
+        )
+    if not given:
+        args.preset = args.preset or "studio"
+
+    if args.preset:
+        preset = PRESETS[args.preset]
+        steps = preset_scale(args.preset, args.root, args.tracking_model)
+        args.base = preset["base"]
+        args.ratio_value = preset["ratio"]
+        args.dual_ratio = str(preset["dual_ratio"])
+        args.steps_down = -min(s.index for s in steps)
+        args.steps_up = max(s.index for s in steps)
+        args.anchors = preset["fluid"]
+        return emit(steps, args, preset["dual_ratio"])
+
+    for flag, value in RATIO_DEFAULTS.items():
+        if getattr(args, flag) is None:
+            setattr(args, flag, value)
+
     try:
         args.ratio_value = resolve_ratio(args.ratio)
         up_ratio = (
@@ -664,8 +855,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.base <= 0:
         parser.error("--base must be positive.")
-    if args.root <= 0:
-        parser.error("--root must be positive.")
     if args.steps_up < 0 or args.steps_down < 0:
         parser.error("--steps-up and --steps-down cannot be negative.")
     if args.steps_up + args.steps_down == 0:
@@ -686,8 +875,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 f"--fluid-steps {args.fluid_steps} exceeds the "
                 f"{args.steps_up + args.steps_down + 1} steps in this scale."
             )
+    if args.fluid_space and args.fluid is None:
+        parser.error(
+            "--fluid-space solves the spacing for the type's viewport anchors: "
+            "add --fluid MIN_VW MAX_VW, or drop the scale flags for the preset's "
+            "380 and 1440."
+        )
+    args.anchors = args.fluid
     if args.fluid_min_ratio is not None and args.fluid_min_ratio <= 1:
         parser.error("--fluid-min-ratio must be > 1.")
+    if args.fluid_min_ratio is not None and args.fluid_min_ratio > FLUID_SPAN_MAX:
+        parser.error(
+            f"--fluid-min-ratio {fmt(args.fluid_min_ratio, 3)} is over "
+            f"{FLUID_SPAN_MAX}: a fluid size whose maximum is more than "
+            f"{FLUID_SPAN_MAX} times its minimum can fail WCAG SC 1.4.4, "
+            "because even the browser's 500% zoom may not double it "
+            "(references/typography.md §10)."
+        )
     if args.base < 16:
         print(
             f"warning: --base {fmt(args.base, 2)}px puts body copy below 16px. "
@@ -710,15 +914,47 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         fluid_min_ratio=args.fluid_min_ratio,
     )
 
-    smallest = min(s.px for s in steps)
-    if smallest < 11:
+    # --snap-px rounds a fluid step's two ends apart, so the emitted span is
+    # checked, not only the requested one. The tolerance absorbs the 3-decimal
+    # rounding of the minimum.
+    wide = [
+        (s.token, s.fluid["min_px"], s.fluid["max_px"]) for s in steps
+        if s.fluid and s.fluid["max_px"] > (FLUID_SPAN_MAX + 5e-4) * s.fluid["min_px"]
+    ]
+    if wide:
+        spans = ", ".join(
+            f"{t} spans {fmt(lo, 2)}px to {fmt(hi, 2)}px, {hi / lo:.2f} times its minimum"
+            for t, lo, hi in wide
+        )
         print(
-            f"warning: smallest step is {fmt(smallest, 2)}px. Nothing below 11px "
-            "is legible on a real screen — drop a --steps-down, or hand-round "
-            "the bottom of the scale as tokens.css does (14 / 12 / 11).",
+            f"error: {spans}. A fluid size whose maximum is more than "
+            f"{FLUID_SPAN_MAX} times its minimum can fail WCAG SC 1.4.4 "
+            "(references/typography.md §10). Pass a smaller --fluid-min-ratio, "
+            "or drop --snap-px, which rounds the two ends apart.",
             file=sys.stderr,
         )
+        return 2
 
+    small = smallest_sizes(steps)
+    if small:
+        sizes = ", ".join(f"{t} is {fmt(px, 2)}px" for t, px in small)
+        if not args.allow_small:
+            args.up_ratio = up_ratio
+            ways = ways_out(small, steps, args)
+            print(
+                f"error: {sizes}. Nothing under {fmt(SMALLEST_PX, 0)}px is "
+                "legible on a real screen. Ways out: " + "; ".join(ways) + ". "
+                "Or run with no scale flags for the studio preset (tokens.css).",
+                file=sys.stderr,
+            )
+            return 2
+        print(f"warning: {sizes}, emitted because of --allow-small.",
+              file=sys.stderr)
+
+    return emit(steps, args, up_ratio)
+
+
+def emit(steps: List[Step], args, up_ratio: float) -> int:
     if args.preview:
         print(emit_preview(steps, args, up_ratio))
     else:

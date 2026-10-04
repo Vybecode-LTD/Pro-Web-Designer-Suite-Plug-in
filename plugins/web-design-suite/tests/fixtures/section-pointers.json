@@ -1674,6 +1674,12 @@
   "heading": "The component stylesheet shape"
  },
  {
+  "from": "web-design-studio/SKILL.md",
+  "to": "web-design-studio/references/typography.md",
+  "section": "10",
+  "heading": "Fluid type"
+ },
+ {
   "from": "web-design-studio/assets/configs/eslint.design.config.mjs",
   "to": "web-design-studio/references/stack-tailwind.md",
   "section": "2",
@@ -1864,5 +1870,17 @@
   "to": "web-design-studio/references/spacing-system.md",
   "section": "8",
   "heading": "Nested radius and the corner rule"
+ },
+ {
+  "from": "web-design-studio/scripts/generate_type_scale.py",
+  "to": "web-design-studio/references/typography.md",
+  "section": "10",
+  "heading": "Fluid type"
+ },
+ {
+  "from": "web-design-studio/scripts/generate_type_scale.py",
+  "to": "web-design-studio/references/typography.md",
+  "section": "15",
+  "heading": "Audit before it ships (Law 9)"
  }
 ]
