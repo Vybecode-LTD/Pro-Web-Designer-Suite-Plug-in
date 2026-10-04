@@ -96,7 +96,7 @@ P6's items are SS-A9, SS-B5, SS-B6, SS-B7 and SS-C5 (`dev plans/web-design-suite
 1. **A preset.** `generate_type_scale.py --preset studio` emits the starter's `--text-*` exactly: the steps above, the two fluid endpoints, and 380/1440. A preset is the honest form: the scale is hand-tuned, and the note already says so. The docstring's "approximately" goes.
 2. **Steps under 11px.** SS-C5 says to refuse them unless forced, but today's default run (base 16, ratio 1.2, three steps down) gives 9.26px, so a plain refusal breaks every default run. **Decide first**, and say why in the PR. The recommendation:
    - the default, with no scale flags, is the studio preset;
-   - an explicit ratio run that yields a step under 11px exits 2 and names the way out (`--snap-px`, fewer `--steps-down`, or `--allow-small`).
+   - an explicit ratio run that yields a step under 11px exits 2 and names the ways out: fewer `--steps-down`, a smaller ratio (1.125 keeps three steps down at 11.24px and up), or `--allow-small`. `--snap-px` is not one: it rounds 9.26px to 9px (Codex on #27).
 3. **SKILL.md Phase 1** (item 2, "Type") uses the preset, and says how to depart from it.
 4. **typography.md §10** (around line 348, where the rem intercept is called sufficient) adds the ≤2.5× rule with its source and the zoom figures. **§15** (the audit checklist) gains both checks. Register the 2.5 figure in `evidence.json`, with `docs` naming typography.md.
 5. **Tests (SS-B7's type half), in `test_numbers.py`:**
