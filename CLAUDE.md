@@ -14,11 +14,11 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-10-04)
 
-- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress: PRs #4 to #27 are merged (#16 to #23 on 2026-10-03; #24 to #27 on 2026-10-04: P4, P5 and their docs), and nothing is open.
+- **Version:** 3.2.1, released: PR #1 merged as `63932cf` and tagged `v3.2.1`. `main` holds 3.0.0 to 3.2.1 as tagged commits. 3.3.0 is in progress: PRs #4 to #30 are merged (#16 to #23 on 2026-10-03; #24 to #30 on 2026-10-04: P4, P5, P6 in two PRs, #28 and #29, and their docs), and nothing is open.
 - **Installed:** 3.2.1 from `63932cf`. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** 460. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P6, the generators reproduce the starter, in two PRs: type (SS-B5, and the type halves of SS-A9, SS-B7 and SS-C5), then colour (SS-B6 and the rest). Then P7. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 142 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Tests:** 487. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P7, the contract's missing roles (on-status text, an invalid-field border, translucency), the files the starter refers to, and the comments the files contradict. Then P8, then R1 (3.3.0). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 137 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
