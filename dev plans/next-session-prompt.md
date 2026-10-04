@@ -55,7 +55,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 - **The plugin** is `plugins/web-design-suite/`:
   - `skills/<13 skills>/`;
-  - `tests/`: 485 tests, standard-library `unittest`, with helpers in `tests/wds_support.py`;
+  - `tests/`: 487 tests, standard-library `unittest`, with helpers in `tests/wds_support.py`;
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
 - **The spec and its generator.** `design-rules.json` holds `nesting`, `selectors` (new in P5: the specificity cap 0,3,1 and three compound selectors), `zero`, `margins_in_components`, `geometry`, `var_fallback`, `system_colors`, `sass`, `layers`, `values`, `inline_styles`, `bindings` and `file_classes`. `tools/sync_rules.py` writes one `BEGIN design-rules` block per gate (`TARGETS`).
 - **The generators (P6).** `generate_type_scale.py` prints the starter's scale by default (`--preset studio`); any scale flag gives a ratio run, which refuses a step under 11px and a fluid span over 2.5×; `--fluid-space` prints the fluid spacing. `generate_color_ramp.py` reproduces the starter with `--hue-shift 0 --gamut p3` (accent) and `--neutral --neutral-hue 75` (neutral), and `--anchor-seed` keeps a brand hex exact. `test_numbers` holds SKILL.md's Phase 1 commands to `tokens.css`.
@@ -103,6 +103,7 @@ P7's items are SB-B4, SS-B2, SS-C9, SS-A17 and SS-A18. Read each paragraph first
   - motion-system.md puts spinners on `--dur-slower`, which is 1ms under reduced motion (a strobe), and never mentions `--dur-loop`;
   - spacing-system.md requires 1.5× between levels, but related to grouped is 1.33×.
 - **reset.css's scroll behaviour** (SS-A18). Once any fragment is targeted, `html:has(:target)` makes every later `scrollTo()` animate, not only anchor clicks. And `body` uses `100dvh`, against layout-composition.md's rule (svh by default, dvh for fixed overlays only).
+- **Clipping or chroma reduction, for the gate** (found in P6). `check_roles.py` and `generate_color_ramp.py --check` measure a colour outside sRGB with its channels clipped. Since #29, the ramp report measures it both ways and takes the worse, because browsers do either. For the starter's P3 accent steps the two differ by at most 0.03 and no threshold flips, but a more saturated brand could pass falsely. Decide whether the gate takes the worse too. If it does, the role table color-system.md §6 quotes and some `Verified` figures move in the second decimal, and `test_numbers.VerifiedRatios` must follow.
 - **Found in P6, not yet an item:** `--warning-700`, `--danger-100` and `--info-100` in tokens.css are outside even Display P3. Measure them with the P3 check in `generate_color_ramp.in_p3_gamut`, and either bring them inside or say why not. Add it to P7 if it is small; otherwise add an item to the inventory and schedule it (`check_execution_plan.py`).
 
 **Traps.**

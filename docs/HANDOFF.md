@@ -17,8 +17,9 @@
     - `--gamut p3`, `--neutral-hue` and `--anchor-seed` are new, and `NEUTRAL_L[500]` is 0.535.
     - SKILL.md's Phase 1 commands now print the starter's 24 ramp steps.
     - `generate_type_scale.py --fluid-space` prints the fluid spacing.
+    - Its reviews found two bugs, each fixed with a test that fails on the head it reviewed. The P3 contrast matrix passed a colour on its clipped sRGB fallback (Codex), and an anchored near-grey OKLCH seed lost its chroma in the CSS (CodeRabbit).
 - **Why the generator moved, not the starter.** The starter's accent holds one hue and has P3 tints, on purpose. Regenerating it with the defaults would have changed ten steps and every contrast claim on them.
-- **Tests:** 485. **The plan:** 137 open items, all scheduled (`check_execution_plan.py`).
+- **Tests:** 487. **The plan:** 137 open items, all scheduled (`check_execution_plan.py`).
 
 ## Next steps
 
@@ -28,6 +29,7 @@
 ## Warnings
 
 - **Three status colours are outside even Display P3:** `--warning-700`, `--danger-100` and `--info-100`, found in P6 and not yet an item. The next session's prompt says how to handle them.
+- **The gate still clips.** `check_roles.py` measures a colour outside sRGB with its channels clipped; the ramp report now takes the worse of clipping and chroma reduction. P7 decides whether the gate follows (the starter moves by at most 0.03).
 - **The generators are held to the starter now.** A change to tokens.css's ramps or type scale must keep SKILL.md's Phase 1 commands reproducing it (`test_numbers.TypeScale`, `ColourRamps`).
 - **The contract has 14 byte-identical copies, and the deck's tokens are the starter's, byte for byte.** Edit the master, then copy.
 - **The token counter resets** on a user message and on a `<ci-monitor-event>`: keep a running total.
