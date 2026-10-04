@@ -370,9 +370,26 @@
   times the minimum, and what zoom does to the starter's hero: in a 1440px window,
   `--text-6xl` grows only 1.33× at 200% and first reaches 2× at 400%. §15 checks both.
   The generator refuses a `--fluid-min-ratio` over 2.5.
+- **The colour generator reproduces the starter** (SS-A9, SS-B7). SKILL.md's Phase 1
+  seeded both ramps from `#e8440a`. The accent drifted in hue and lost chroma to sRGB,
+  where the starter's holds hue 42 and keeps its P3 tints and shades. The neutral took
+  the seed's hue, 36, which reads pink, where the starter's is 75. And the generator
+  put the neutral's 500 at L 58%, which regenerates the 4.08:1 `--fg-subtle` failure
+  `tokens.css` fixed by hand: it is 53.5% now, 4.60:1 on `--bg-sunken`. Phase 1's two
+  commands, and color-system.md's, print the starter's 24 ramp steps exactly.
+- **A brand's exact colour was lost** (SS-B6). The ramp replaced the seed's lightness,
+  so `#e8440a` became `--accent-500: #f14d1a` and was in no step, without a word.
+  `--anchor-seed` makes the seed itself the step nearest it in lightness, written
+  precisely enough to name the same hex. Without it, the report gives step 500's
+  distance from the seed and points at the flag.
 
 ### Added
 
+- **The generators' options for the starter** (SS-C5). `generate_color_ramp.py` gains
+  `--gamut p3` (reduce chroma into Display P3, not sRGB), `--neutral-hue` and
+  `--anchor-seed`. `generate_type_scale.py --fluid-space` prints the starter's four
+  `--space-fluid-*` steps, solved for the type's viewport anchors, which `tokens.css`
+  already told readers to regenerate there.
 - **The audit in CI** (SB-C10). `--files-from FILE` audits the paths a file or stdin
   (`-`) lists, one per line or NUL-separated, such as
   `git diff --name-only -z origin/main... | python -m scripts.audit_design --files-from -`;
@@ -493,6 +510,9 @@
   `--allow-small` to emit it with a warning. `--snap-px` is not one: it rounds 9.26px
   to 9. A run with no scale flags now prints the starter's scale instead of the 1.2
   ratio run, and `--preset` cannot be combined with a scale flag.
+- **A regenerated neutral's 500 is darker** (SS-A9): L 53.5%, not 58%, as in the
+  starter. A neutral generated before 3.3.0 and used for placeholder text measures
+  4.08:1 on `--bg-sunken`; regenerate it.
 
 ### Tests
 
@@ -676,6 +696,15 @@
   within 2.5 times its minimum, and the figures typography.md §10 quotes recompute from
   it. Against `v3.2.1` and against `ca4f206` (`main`), 10 fail; the 2.5 bound on
   `tokens.css` and a 1.125 run, the refusal's own way out, are the controls (2).
+- P6 part 2 (SS-B6, and the colour halves of SS-A9, SS-B7 and SS-C5): `test_numbers`
+  gains `ColourRamps` (10 tests) and two `TypeScale` tests. SKILL.md's and
+  color-system.md's colour commands print the starter's 24 ramp steps, every colour
+  command in the docs runs, the generated neutral's 500 clears 4.5:1 on `--bg-sunken`,
+  `--neutral-hue` sets the hue, `--anchor-seed` keeps `#e8440a` exactly at its nearest
+  step, the report gives step 500's distance from the seed, color-system.md quotes
+  that report, and `--fluid-space` prints the starter's fluid spacing. Against
+  `v3.2.1` and against `38d11cc` (#28's head), 11 fail; every documented colour
+  command running is the control (1).
 
 ## 3.2.1 — 2026-09-25
 

@@ -117,7 +117,10 @@ NEUTRAL_L: Dict[int, float] = {
     200: 0.922,
     300: 0.865,
     400: 0.715,
-    500: 0.580,
+    # Not the 0.580 an even ramp gives: --fg-subtle (placeholder text, which IS
+    # text under SC 1.4.3) is 500, and it must clear 4.5:1 on --bg-sunken (100).
+    # 0.535 gives 4.60:1 there; 0.580 gave 4.08:1. tokens.css says the same.
+    500: 0.535,
     600: 0.475,
     700: 0.385,
     800: 0.280,
@@ -147,6 +150,15 @@ DEFAULT_NEUTRAL_STEPS: List[int] = [0] + DEFAULT_STEPS + [1000]
 
 # --bg-canvas in the light theme is --neutral-50.
 DEFAULT_CANVAS = "oklch(98.2% 0.003 75)"
+
+# Linear sRGB to linear Display P3: the two standards' primaries share the D65
+# white, so this is P3's XYZ-to-RGB matrix times sRGB's RGB-to-XYZ matrix.
+SRGB_TO_P3: Tuple[Tuple[float, float, float], ...] = (
+    (0.8224621, 0.1775380, 0.0000000),
+    (0.0331941, 0.9668058, 0.0000000),
+    (0.0170827, 0.0723974, 0.9105199),
+)
+GAMUTS = ("srgb", "p3")
 
 
 class ColorError(ValueError):
@@ -303,16 +315,37 @@ def _trim(value: str) -> str:
     return value.rstrip("0").rstrip(".") if "." in value else value
 
 
-def format_oklch(L: float, C: float, H: float) -> str:
-    """Match the formatting used in assets/starter/styles/tokens.css."""
-    lightness = _trim(f"{L * 100:.1f}")
+def format_oklch(L: float, C: float, H: float, places: int = 1) -> str:
+    """Match the formatting used in assets/starter/styles/tokens.css. `places`
+    is the decimals of L% and H; C gets two more."""
+    lightness = _trim(f"{L * 100:.{places}f}")
     if C < 5e-4:
         # A true achromatic swatch. Carrying a hue on it is noise.
         return f"oklch({lightness}% 0 0)"
-    hue = _trim(f"{H:.1f}") or "0"
+    hue = _trim(f"{H:.{places}f}") or "0"
     if hue == "-0":
         hue = "0"
-    return f"oklch({lightness}% {fmt_num(C, 3)} {hue})"
+    return f"oklch({lightness}% {fmt_num(C, places + 2)} {hue})"
+
+
+def oklch_to_hex(L: float, C: float, H: float) -> str:
+    return rgb_to_hex(*clamp_rgb(oklch_to_rgb(L, C, H)))
+
+
+def format_exact(L: float, C: float, H: float) -> str:
+    """The shortest oklch() that still names the same sRGB hex. The anchored
+    step uses it, so the brand's hex survives the round trip."""
+    want = oklch_to_hex(L, C, H)
+    for places in range(1, 6):
+        css = format_oklch(L, C, H, places)
+        if oklch_to_hex(*parse_color(css)) == want:
+            return css
+    return css
+
+
+def delta_e_ok(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> float:
+    """Euclidean distance in OKLab, for two (L, C, H) colours."""
+    return math.dist(oklch_to_oklab(*a), oklch_to_oklab(*b))
 
 
 # ---------------------------------------------------------------------------
@@ -324,23 +357,37 @@ def in_srgb_gamut(L: float, C: float, H: float, eps: float = 1e-4) -> bool:
     return all(-eps <= v <= 1.0 + eps for v in (r, g, b))
 
 
-def gamut_map(L: float, C: float, H: float, iterations: int = 40) -> Tuple[float, float, float]:
-    """Reduce chroma by binary search until the color is inside sRGB.
+def in_p3_gamut(L: float, C: float, H: float, eps: float = 1e-4) -> bool:
+    # The transfer function maps 0..1 onto 0..1, so the linear values decide.
+    lin = oklch_to_linear_rgb(L, C, H)
+    p3 = [sum(row[k] * lin[k] for k in range(3)) for row in SRGB_TO_P3]
+    return all(-eps <= v <= 1.0 + eps for v in p3)
+
+
+IN_GAMUT = {"srgb": in_srgb_gamut, "p3": in_p3_gamut}
+
+
+def gamut_map(
+    L: float, C: float, H: float, iterations: int = 40, gamut: str = "srgb"
+) -> Tuple[float, float, float]:
+    """Reduce chroma by binary search until the color is inside the gamut
+    (sRGB, or Display P3).
 
     L and H are preserved exactly. That is the whole point of doing this in
     OKLCH: clipping RGB channels instead would shift both lightness and hue,
     and a ramp whose step 500 silently got lighter is a ramp that no longer
     matches its neighbours.
     """
+    inside = IN_GAMUT[gamut]
     if C <= 0:
         return (L, 0.0, H)
-    if in_srgb_gamut(L, C, H):
+    if inside(L, C, H):
         return (L, C, H)
 
     lo, hi = 0.0, C
     for _ in range(iterations):
         mid = (lo + hi) / 2.0
-        if in_srgb_gamut(L, mid, H):
+        if inside(L, mid, H):
             lo = mid
         else:
             hi = mid
@@ -408,16 +455,19 @@ def rotate_toward(hue: float, anchor: float, amount: float) -> float:
 
 
 class Swatch:
-    __slots__ = ("step", "L", "C", "H", "rgb", "hex", "css", "requested_c", "clipped")
+    __slots__ = ("step", "L", "C", "H", "rgb", "hex", "css", "requested_c", "clipped",
+                 "anchored")
 
-    def __init__(self, step: int, L: float, C: float, H: float, requested_c: float):
+    def __init__(self, step: int, L: float, C: float, H: float, requested_c: float,
+                 anchored: bool = False):
         self.step = step
         self.L, self.C, self.H = L, C, H
         self.rgb = clamp_rgb(oklch_to_rgb(L, C, H))
         self.hex = rgb_to_hex(*self.rgb)
-        self.css = format_oklch(L, C, H)
+        self.css = format_exact(L, C, H) if anchored else format_oklch(L, C, H)
         self.requested_c = requested_c
         self.clipped = requested_c - C > 1e-3
+        self.anchored = anchored
 
     @property
     def clip_pct(self) -> float:
@@ -432,26 +482,43 @@ def build_ramp(
     neutral: bool = False,
     chroma_scale: float = 1.0,
     hue_shift: float = 1.0,
+    gamut: str = "srgb",
+    neutral_hue: Optional[float] = None,
+    anchor_seed: bool = False,
 ) -> List[Swatch]:
     """Build the ramp from a seed (L, C, H).
 
     Accent mode pins peak chroma at step 500 to the seed's chroma and scales
     every other step by C_CURVE. Neutral mode ignores the seed's chroma
-    entirely and uses the absolute NEUTRAL_C budget at the seed's hue, which is
-    how you get a neutral that belongs to the accent instead of sitting next to
-    it.
+    entirely and uses the absolute NEUTRAL_C budget at the seed's hue (or at
+    `neutral_hue`), which is how you get a neutral that belongs to the accent
+    instead of sitting next to it.
+
+    With `anchor_seed`, the seed itself is the step nearest it in lightness,
+    and the chroma curve is scaled so that step's chroma is the seed's. The
+    curve replaces the seed's lightness otherwise, so a brand hex appears
+    nowhere in the ramp.
     """
     _, seed_c, seed_h = seed
+    if neutral and neutral_hue is not None:
+        seed_h = neutral_hue % 360.0
+    anchor = nearest_step(seed[0], steps) if anchor_seed and not neutral else None
+    peak_c = seed_c / _interp(C_CURVE, anchor) if anchor is not None else seed_c
     out: List[Swatch] = []
 
     for step in steps:
+        if step == anchor:
+            requested_c = seed[1]
+            out.append(Swatch(step, *gamut_map(*seed, gamut=gamut), requested_c,
+                              anchored=True))
+            continue
         if neutral:
             L = _interp(NEUTRAL_L, step)
             C = _interp(NEUTRAL_C, step) * chroma_scale
             H = seed_h if C > 0 else 0.0
         else:
             L = _interp(L_CURVE, step)
-            C = seed_c * _interp(C_CURVE, step) * chroma_scale
+            C = peak_c * _interp(C_CURVE, step) * chroma_scale
             mag = _interp(H_DRIFT, step) * hue_shift
             if step < 500:
                 H = rotate_toward(seed_h, COOL_ANCHOR, mag)
@@ -461,10 +528,15 @@ def build_ramp(
                 H = seed_h
 
         requested_c = C
-        L, C, H = gamut_map(L, C, H)
+        L, C, H = gamut_map(L, C, H, gamut=gamut)
         out.append(Swatch(step, L, C, H, requested_c))
 
     return out
+
+
+def nearest_step(seed_l: float, steps: Sequence[int]) -> int:
+    """The step whose curve lightness is nearest the seed's; the darker on a tie."""
+    return min(steps, key=lambda s: (abs(_interp(L_CURVE, s) - seed_l), -s))
 
 
 # ---------------------------------------------------------------------------
@@ -531,8 +603,10 @@ def verdict(ratio: float, threshold: float) -> str:
     return "PASS" if ratio + 1e-9 >= threshold else "FAIL"
 
 
-def contrast_report(name: str, ramp: Sequence[Swatch], canvas: Tuple[float, float, float]) -> str:
+def contrast_report(name: str, ramp: Sequence[Swatch], canvas: Tuple[float, float, float],
+                    gamut: str = "srgb") -> str:
     canvas_css = format_oklch(*canvas)
+    room = "sRGB" if gamut == "srgb" else "Display P3"
     lines = [
         "",
         "WCAG 2.2 contrast matrix",
@@ -594,7 +668,7 @@ def contrast_report(name: str, ramp: Sequence[Swatch], canvas: Tuple[float, floa
     ]
 
     if clipped:
-        lines.append(f"  Chroma pulled in to fit sRGB:      {', '.join(clipped)}")
+        lines.append(f"  Chroma pulled in to fit {room}: {', '.join(clipped)}")
         lines.append(
             "  (Heavy clipping at 50-200 is normal: sRGB has no saturated near-white."
         )
@@ -612,8 +686,35 @@ def contrast_report(name: str, ramp: Sequence[Swatch], canvas: Tuple[float, floa
                 "   The 400-700 band — where the brand actually lives — is intact.)"
             )
     else:
-        lines.append("  Chroma pulled in to fit sRGB:      none — whole ramp is in gamut.")
+        lines.append(f"  Chroma pulled in to fit {room}: none — whole ramp is in gamut.")
+    if gamut == "p3":
+        lines.append(
+            "  Contrast is measured on each color clamped to sRGB, as an sRGB screen"
+        )
+        lines.append("  shows it; the hex beside each step is that sRGB color.")
 
+    return "\n".join(lines)
+
+
+def seed_report(name: str, seed: Tuple[float, float, float], ramp: Sequence[Swatch]) -> str:
+    """Where the seed went: anchored at a step, or how far step 500 is from it."""
+    seed_hex = oklch_to_hex(*seed)
+    lines = ["", f"Seed  {format_oklch(*seed)}  {seed_hex}"]
+    anchored = [s for s in ramp if s.anchored]
+    if anchored:
+        s = anchored[0]
+        exact = "exactly" if s.hex == seed_hex else f"mapped into the gamut as {s.hex}"
+        lines.append(f"  --{name}-{s.step} is the seed, {exact}: the step nearest it in lightness.")
+        return "\n".join(lines)
+    five = [s for s in ramp if s.step == 500]
+    if five:
+        s = five[0]
+        lines.append(
+            f"  --{name}-500 is {s.css}  {s.hex}: {delta_e_ok(seed, (s.L, s.C, s.H)):.3f} "
+            f"from the seed in OKLab (ΔE_OK), L {100 * (s.L - seed[0]):+.1f} points."
+        )
+        if s.hex != seed_hex:
+            lines.append("  The seed's hex is in no step. --anchor-seed puts it at its nearest step.")
     return "\n".join(lines)
 
 
@@ -734,6 +835,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="Scale the hue drift. 0 disables it, 2 doubles it. Default: 1.0.",
     )
     parser.add_argument(
+        "--gamut",
+        choices=GAMUTS,
+        default="srgb",
+        help="The gamut each step's chroma is reduced into: srgb, or p3 (Display "
+        "P3), whose tints and shades browsers show on wide-gamut screens and map "
+        "back on others. The starter's accent is p3. Default: srgb.",
+    )
+    parser.add_argument(
+        "--neutral-hue",
+        type=float,
+        default=None,
+        help="With --neutral: the neutral's hue, in degrees, instead of the seed's. "
+        "The starter's neutral is 75 under a hue-42 accent; an ember seed's own "
+        "hue (36) reads pink at the light end.",
+    )
+    parser.add_argument(
+        "--anchor-seed",
+        action="store_true",
+        help="Make the seed itself the step nearest it in lightness, so the brand's "
+        "exact color is in the ramp. Without it the curve sets every step's "
+        "lightness, and the report gives the seed's distance from step 500.",
+    )
+    parser.add_argument(
         "--no-contrast",
         action="store_true",
         help="Suppress the contrast matrix and print only the tokens.",
@@ -766,6 +890,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             raise ColorError("--chroma-scale must be greater than 0.")
         if args.hue_shift < 0:
             raise ColorError("--hue-shift must be 0 or greater.")
+        if args.neutral_hue is not None and not args.neutral:
+            raise ColorError("--neutral-hue sets a neutral ramp's hue; add --neutral.")
+        if args.anchor_seed and args.neutral:
+            raise ColorError(
+                "--anchor-seed keeps a brand color in an accent ramp; a neutral "
+                "ramp takes only the seed's hue."
+            )
 
         seed = parse_color(args.seed)
         canvas = parse_color(args.canvas)
@@ -777,6 +908,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             neutral=args.neutral,
             chroma_scale=args.chroma_scale,
             hue_shift=args.hue_shift,
+            gamut=args.gamut,
+            neutral_hue=args.neutral_hue,
+            anchor_seed=args.anchor_seed,
         )
 
         # A neutral ramp is normally audited against its own step 50, because
@@ -789,7 +923,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         print(EMITTERS[args.format](args.name, ramp))
         if not args.no_contrast:
-            print(contrast_report(args.name, ramp, canvas), file=sys.stderr)
+            if not args.neutral:
+                print(seed_report(args.name, seed, ramp), file=sys.stderr)
+            print(contrast_report(args.name, ramp, canvas, args.gamut), file=sys.stderr)
         return 0
 
     except ColorError as exc:

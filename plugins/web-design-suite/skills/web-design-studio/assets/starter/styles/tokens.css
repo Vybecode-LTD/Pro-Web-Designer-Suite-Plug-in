@@ -68,7 +68,8 @@
        Formula: clamp(min, min + (max-min) * ((100vw - 380px) / (1440 - 380)), max)
        expressed in vw terms: the slope m = (max-min)/(1440-380) becomes m*100
        vw, and the intercept min - m*380 becomes rem. If the anchors change,
-       recompute both halves from the formula; do not hand-tune either. */
+       recompute both halves with scripts/generate_type_scale.py --fluid-space
+       (it prints these four); do not hand-tune either. */
 
     --space-fluid-sm:  clamp(1rem,    0.8208rem + 0.755vw, 1.5rem);   /* 16 -> 24  */
     --space-fluid-md:  clamp(1.5rem,  0.9623rem + 2.264vw, 3rem);     /* 24 -> 48  */
@@ -218,7 +219,8 @@
        --------------------------------------------------------------------- */
 
     /* Neutral — warm graphite, not pure gray. Pure #808080 neutrals read as
-       cheap on screens; a few degrees of warmth costs nothing and reads rich. */
+       cheap on screens; a few degrees of warmth costs nothing and reads rich.
+       generate_color_ramp.py SEED --neutral --neutral-hue 75 prints it. */
     --neutral-0:   oklch(100%  0     0);
     --neutral-50:  oklch(98.2% 0.003 75);
     --neutral-100: oklch(96.0% 0.004 75);
@@ -239,7 +241,10 @@
     --neutral-1000: oklch(8.0%  0.004 75);
 
     /* Accent — Ember. Replace the hue (42) and chroma to rebrand; the L
-       values are tuned for contrast and should survive a hue change. */
+       values are tuned for contrast and should survive a hue change.
+       generate_color_ramp.py "oklch(64.5% 0.188 42)" --hue-shift 0
+       --gamut p3 prints it: one hue to rebrand by, and tints and shades
+       wider than sRGB that browsers map back on sRGB screens. */
     --accent-50:  oklch(97.0% 0.020 42);
     --accent-100: oklch(93.5% 0.042 42);
     --accent-200: oklch(88.0% 0.078 42);

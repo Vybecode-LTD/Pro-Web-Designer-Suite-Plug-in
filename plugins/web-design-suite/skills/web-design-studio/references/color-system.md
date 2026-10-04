@@ -150,7 +150,8 @@ One consequence of taking the *shortest* arc: a blue seed (H 263) gets cyan-lean
 (→ 259) and violet-leaning shades (→ 267), exactly how good blue ramps behave; an ember
 seed (H 38) gets red-pink tints (→ 34) and amber shades (→ 43). If a hue looks wrong
 under the rule, pass `--hue-shift 0` and say why in the ramp's comment — never hand-edit
-the output.
+the output. The starter's accent does: one hue at every step is what its comment tells a
+rebrand to replace.
 
 ### 2.4 Gamut mapping
 
@@ -165,6 +166,27 @@ orange, so a −33% clip at step 50 is normal and invisible. Clipping above ~10%
 **400–700** band is the real warning — the seed is more chromatic than the hue can hold
 and the mid-ramp will read flat. Lower the seed's C and regenerate. The script flags
 exactly this case and stays quiet about the other.
+
+`--gamut p3` maps into Display P3 instead, which holds more chroma than sRGB at every
+lightness. The starter's accent is P3: steps 50–300 and 600–800 are wider than sRGB.
+Browsers show them on P3 screens and map them back on sRGB ones. The contrast matrix still
+measures each color clamped to sRGB, as an sRGB screen shows it. The starter's ramps are
+the output of:
+
+```bash
+python -m scripts.generate_color_ramp 'oklch(64.5% 0.188 42)' --name accent --hue-shift 0 --gamut p3
+python -m scripts.generate_color_ramp 'oklch(64.5% 0.188 42)' --name neutral --neutral --neutral-hue 75
+```
+
+### 2.5 Keeping the brand's exact color
+
+The curve sets every step's lightness, so a seed's own lightness survives only if it
+happens to sit on the curve. `#e8440a` is L 62.1%, and step 500 is 64.5%: the ramp's 500
+is `#f14d1a`, and the brand's hex is in no step. The report says so, with the distance
+between the seed and step 500 in OKLab (ΔE_OK 0.024 here). `--anchor-seed` puts the seed
+itself at the step nearest it in lightness, written precisely enough to name the same hex,
+and scales the chroma curve so that step keeps the seed's chroma. Use it when the brand
+color must appear exactly, as on a logo's fill or a product's signature button.
 
 ---
 
@@ -262,10 +284,11 @@ sitting on canvas next to a primary button doesn't read as two unrelated systems
 starter tokens use hue 75 neutrals under a hue 42 accent — close enough to relate, far
 enough to stay clearly neutral.
 
-Generate it, don't guess it:
+Generate it, don't guess it. `--neutral-hue` sets the neutral's hue whatever the seed's
+is, so one seed serves both ramps:
 
 ```bash
-python -m scripts.generate_color_ramp 'oklch(58% 0.009 70)' --name neutral --neutral
+python -m scripts.generate_color_ramp '#e8440a' --name neutral --neutral --neutral-hue 75
 ```
 
 ---
