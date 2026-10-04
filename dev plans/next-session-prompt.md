@@ -83,7 +83,7 @@ If a PR is open, read its state, then:
 
 ## 4. P8: hygiene, and docs that work in cmd and PowerShell
 
-P8's items are XC-A2, XC-A5, XC-B5, XC-C9, N4, N7, N8, N9 and N10. Read each first: the XC items in `dev plans/web-design-suite-review/crosscut.md` (`grep -n "XC-A2\|XC-A5\|XC-B5\|XC-C9"`), and the N items in `dev plans/web-design-suite-completion-plan.md` (around lines 200-206). What each one asks, in short:
+P8's items are XC-A2, XC-A5, XC-B5, XC-C9, N4, N7, N8, N9 and N10. Read each first: the XC items in `dev plans/web-design-suite-review/crosscut.md` (XC-A2 at line 16, XC-A5 at 30, XC-B5 at 83, XC-C9 at 130), and the N items in `dev plans/web-design-suite-completion-plan.md` (around lines 200-206). What each one asks, in short:
 - **XC-A2, N8.** The plugin README's install section uses a placeholder and names only a local folder. Add the GitHub route, `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, which anyone can use now that the repository is public.
 - **XC-A5.** `shared/token-contract.md` is the master copy of the 14 contracts, but nothing says so. Say it in the contract's header and in `CLAUDE.md`'s map, and point `test_contract.ContractCopies` at it.
 - **XC-B5, XC-C9.** The docs are bash-first (backslash continuations, `&&`, `/tmp/`, `$(...)`, `python3`), which breaks when pasted into cmd or PowerShell 5.1. Give the few shell-only recipes cmd and PowerShell forms, or one Python entry point. A test can hold every fenced `bash` block that a user is meant to paste to the forms that work everywhere.
