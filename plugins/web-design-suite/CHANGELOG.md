@@ -781,6 +781,9 @@
   count, checks the shipped files and their imports and that no `u-visually-hidden`
   remains, and holds reset.css to no smooth scrolling and `svh`. Against `v3.2.1` and
   against `3cb09cc` (#31's head), all 4 fail. The starter's own audit now reads 7 files.
+  CodeRabbit's review of #32 added one: SKILL.md still counted five durations; the Law 3
+  test now reads it too (failing on `fc02def`). The contract's "Tier 2 only" now names
+  the two Tier-1 moves tokens.css allows.
 
 ## 3.2.1 — 2026-09-25
 

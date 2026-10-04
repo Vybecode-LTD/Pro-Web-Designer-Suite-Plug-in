@@ -30,7 +30,7 @@ Flow is one-way: **PRIMITIVE → SEMANTIC → COMPONENT → rule.**
 | 2 Semantic | A value bound to a role: `--pad-card`, `--fg-muted`, `--type-h2`, `--elevation-card`, `--motion-enter` | Component CSS |
 | 3 Component | A role narrowed to one part: `--button-pad-inline`, `--card-inset` | That component's own file; also its public CSS API |
 
-Theme and brand overrides re-point **Tier 2 only**. A theme block containing a component class name means a component had a hardcoded value.
+Theme overrides re-point **Tier 2**; the only Tier 1 that moves is the dark theme's `--shadow-*` and a white-label brand's whole ramp and font. A theme block containing a component class name means a component had a hardcoded value.
 
 ---
 

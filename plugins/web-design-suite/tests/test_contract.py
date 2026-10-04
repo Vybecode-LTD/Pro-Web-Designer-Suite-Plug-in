@@ -120,14 +120,22 @@ class TheStarterKeepsItsWord(unittest.TestCase):
                     and not any(d.startswith(x) for x in exclude)})
 
     def test_law_3_counts_recompute_from_the_starter(self):
-        line = next(l for l in CONTRACT.read_text(encoding="utf-8").splitlines() if "The scale is closed" in l)
-        stated = {kind: int(n) for n, kind in re.findall(r"(\d+) (spacing|type|leadings|elevations|durations|z-indexes)", line)}
-        actual = {"spacing": self.count("--space-", ("--space-fluid-", "--space-block", "--space-section",
-                                                     "--space-subsection")),
-                  "type": self.count("--text-"), "leadings": self.count("--leading-"),
-                  "elevations": self.count("--elevation-"), "durations": self.count("--dur-"),
-                  "z-indexes": self.count("--z-")}
-        self.assertEqual(stated, actual)
+        skill = SKILLS / "web-design-studio" / "SKILL.md"
+        for doc in (CONTRACT, skill):
+            line = next(l for l in doc.read_text(encoding="utf-8").splitlines() if "The scale is closed" in l)
+            with self.subTest(doc=doc.name):
+                self.assertEqual(self.stated(line), self.actual())
+
+    @staticmethod
+    def stated(line: str) -> dict:
+        return {kind: int(n) for n, kind in re.findall(r"(\d+) (spacing|type|leadings|elevations|durations|z-indexes)", line)}
+
+    def actual(self) -> dict:
+        return {"spacing": self.count("--space-", ("--space-fluid-", "--space-block", "--space-section",
+                                                  "--space-subsection")),
+                "type": self.count("--text-"), "leadings": self.count("--leading-"),
+                "elevations": self.count("--elevation-"), "durations": self.count("--dur-"),
+                "z-indexes": self.count("--z-")}
 
     def test_the_tokens_comments_name_what_exists(self):
         for name in ("--gray-800", "--btn-pad-x"):
