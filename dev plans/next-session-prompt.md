@@ -98,7 +98,12 @@ P8's items are XC-A2, XC-A5, XC-B5, XC-C9, N4, N7, N8, N9 and N10. Read each fir
 
 ## 5. R1, the 3.3.0 release, if the budget allows
 
-Start it only with about 150 thousand tokens left. Bump the version (the plugin's `plugin.json`, the marketplace entries and the CHANGELOG heading, with the date), build with `python -B tooling/release/build.py <empty folder>` and read its output, then merge and push a `v3.3.0` tag. `release.yml` creates the release; nothing else does. Then reinstall the plugin locally with the desktop app's bundled CLI (`claude plugin update`; `CLAUDE.md` says where it is) and check that a new session loads 3.3.0.
+Start it only with about 150 thousand tokens left. In this order:
+
+1. **The release PR.** Bump the version (the plugin's `plugin.json`, the marketplace entries, and the CHANGELOG heading with the date), and merge it.
+2. **Build the merged commit, not the working tree.** `build.py` takes its tracked files and every archive timestamp from the commit it builds, and `release.yml` builds the tagged commit. So run `python -B tooling/release/build.py <empty folder> --rev <merged SHA>`, and read its output and `SHA256SUMS`.
+3. **Tag that exact commit** `v3.3.0` and push the tag. `release.yml` creates the release; nothing else does. Its checksums should match yours.
+4. **Install it locally.** Sessions install from the local marketplace, `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, which is a copy of `plugins/web-design-suite`, not this checkout. Mirror the released plugin there, and compare it with the release artifact. Only then run the desktop app's bundled CLI (`CLAUDE.md` says where it is): `claude plugin update`, then `claude plugin details`, and check that a new session loads 3.3.0.
 
 ## 6. End of session (never skip)
 
