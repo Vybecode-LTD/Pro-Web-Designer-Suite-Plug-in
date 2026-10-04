@@ -285,12 +285,10 @@ Every component stylesheet has the same five-part shape. Sameness is the point: 
 
   /* ------------------------------------------------------------------
      4. STATES — every interactive component implements all seven.
-        Ordered so that the cascade resolves them the way users expect:
-        hover, focus, active, then the states that must win (disabled).
+        Precedence is a guard, not the order: hover and press never reach
+        a disabled button, so no later rule has to win. The guarded rules
+        are the most specific, so they come last (no-descending-specificity).
      ------------------------------------------------------------------ */
-  .button:hover:not(:disabled)  { --button-overlay: var(--bg-hover); }
-  .button:active:not(:disabled) { --button-overlay: var(--bg-active); }
-
   .button:focus-visible {
     outline: var(--stroke-focus) solid transparent;  /* forced-colors bridge */
     box-shadow: var(--elevation-focus);
@@ -304,6 +302,9 @@ Every component stylesheet has the same five-part shape. Sameness is the point: 
   }
 
   .button[data-state="loading"] { cursor: progress; }
+
+  .button:hover:not(:disabled)  { --button-overlay: var(--bg-hover); }
+  .button:active:not(:disabled) { --button-overlay: var(--bg-active); }
 
   /* ------------------------------------------------------------------
      5. PARTS — addressed by class, never by element.

@@ -1,0 +1,42 @@
+/* =========================================================================
+   INDEX (Tailwind v3) — the entry stylesheet of a Tailwind v3 project
+   =========================================================================
+
+   Law 5 with Tailwind v3's output in it. stack-tailwind.md §11.6 quotes
+   this file, and tools/sync_snippets.py keeps the quote identical to it.
+   The entry without Tailwind is assets/starter/styles/index.css; the v4
+   entry is assets/configs/index.tailwind.css.
+
+   v3 does not emit native cascade layers. Its output is plain, unlayered
+   CSS, which beats every layer, so it is built as two sheets of its own
+   and each is wrapped in a native layer as it loads:
+
+     tailwind-base.css        @tailwind base;
+     tailwind-utilities.css   @tailwind components; @tailwind utilities;
+
+   `layer()` needs postcss-import 15+, before tailwindcss in the PostCSS
+   plugins. Check the built CSS once: preflight's `button { … }` must sit
+   inside `@layer reset`.
+   ========================================================================= */
+
+/* @snippet entry */
+/* 1. The order, first. `vendor` is named before there is any vendor CSS:
+      a layer first named by its import is appended after `overrides`. */
+@layer reset, vendor, tokens, base, layout, components, utilities, overrides;
+
+/* 2. Tailwind's sheets name no layer: wrap each as it loads. Preflight is
+      the reset, as in v4. The focus ring is the `focus-ring` utility in
+      tailwind.config.ts: an outline, which forced-colors mode repaints. */
+@import url("./tailwind-base.css") layer(reset);
+@import url("./tailwind-utilities.css") layer(utilities);
+
+/* 3. These open their own @layer block, so import them bare. */
+@import url("./tokens.css");
+@import url("./base.css");
+@import url("./layout.css");
+
+/* 4. CSS you do not control names no layer: wrap it as it loads.
+        @import url("../vendor/datepicker.css") layer(vendor);
+      Then one line per component file:
+        @import url("./components/card.css"); */
+/* @end-snippet */

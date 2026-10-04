@@ -307,7 +307,8 @@
     the audit's: the sentences that said otherwise say so. The `/<number>` modifiers
     are the audit's (`tw-opacity-modifier`), not stylelint's, which never sees a class.
   - `:where(.a .b .c .d)` has no specificity, so it no longer draws a
-    `compound-specificity` warning. The v3 config's `spin` and `pulse` read
+    `compound-specificity` warning (it is still four compound selectors, which N32
+    refuses). The v3 config's `spin` and `pulse` read
     `--dur-loop`, as theme.css's do. The checklist has 91 checks, not 92, in three
     docs. The `@apply` "specificity returns" argument holds for v3 only: under this
     suite's layer order the utilities layer still wins. Two ESLint comments named the
@@ -315,6 +316,47 @@
     `media-has-caption` is WCAG 1.2.2. handoff-conventions.md now asks for
     `camelCaseOnly`, as stack-css-modules.md does, and quotes react.dev: `forwardRef`
     "will be deprecated in a future release".
+- **The references' CSS passes the stylelint config too (N3).** The audit already
+  held every block meant for copying; stylelint refused 28 of 159, and 56 of 170 at
+  3.2.1. Each kind was settled by the spec:
+  - Where the spec refuses what a block showed, the block changed. A box-shadow bar
+    and a radius formula go through a socket, as the starter's geometry does. An
+    `@property`'s `0px` and a `#ffffff` are gone. A view transition's pseudo-elements
+    are styled in `base`, not in a component. Rules that broke
+    `no-descending-specificity` were reordered, a selector over the cap uses `:where()`,
+    side-by-side alternatives are blocks of their own, and the anti-examples say
+    `example: wrong`.
+  - Escape hatches that named only the audit now name stylelint too, in the one
+    comment both read.
+  - Where the spec allows what the config refused, the config changed. Sub-layers
+    inside a canonical layer, `@layer components { @layer base, skin; }` as
+    stack-vanilla-css teaches, are now a spec example: the rule read the nested
+    statement as the file's own order and refused `skin`. CSS Modules' `composes` and
+    `:global`, which stack-css-modules teaches, are known words.
+- **The Tailwind v3 entry is a file (SB-C9).** `assets/configs/index.tailwind-v3.css`
+  joins the vanilla and v4 entries, with the vendor layer, and stack-tailwind §11.6
+  quotes it instead of writing its own. Preflight goes in `reset`, as in v4. The v3
+  `tailwind.config.ts` set a project up with the `@tailwind` directives under a native
+  layer statement, the unlayered output its own footer warns about, and without the
+  `postcss-import` that `layer()` needs; it now points at the entry.
+- **The selector limits are the spec's (N32).** `design-rules.json: selectors` holds
+  the specificity cap, 0,3,1, and three compound selectors, with examples both gates
+  are held to; `tools/sync_rules.py` writes the limits into each.
+  - The audit weighed a selector by counting four chained classes. It now weighs it as
+    Selectors 4 and stylelint do: `:where()` scores zero, `:is()`, `:not()` and `:has()`
+    their heaviest argument, and a nested rule's `&` its parent's. So `.card:is(.a.b.c)`
+    and `.a.b.c p span`, which passed, are over the cap.
+  - The audit did not count compounds at all; `compound-selectors` does, as stylelint
+    17 counts them, inside a functional pseudo-class too. stylelint refused
+    `:where(.a .b .c .d)` and the audit allowed it: `:where()` takes away the weight,
+    not the knowledge of four levels of DOM, so the spec refuses it.
+    `:where(.a.b.c.d)` is allowed.
+  - stylelint also reads the `+` of an An+B (`:nth-last-child(n + 5)`) as a
+    combinator. The audit does not, and the spec says so: a quantity query keeps its
+    stylelint disable comment.
+  - stack-vanilla-css quoted a stylelint config with a 0,3,0 cap and every heading let
+    into components. It now points at the shipped config. The landing-page sections'
+    FAQ marker weighed 0,4,0, which both gates refuse; its path is in `:where()` now.
 
 ### Added
 
@@ -418,6 +460,11 @@
   comment that names `function-disallowed-list` needs `design/no-literal-colour-function`
   instead. theme.css's `animate-spin` now turns in `--dur-loop` (900ms, was 1s), and
   `animate-pulse` breathes in it too (was 2s).
+- **The audit holds the selector limits** (N32): a selector over 0,3,1, or of more than
+  three compound selectors, is an error (`compound-specificity`, which warned only on
+  four chained classes, and the new `compound-selectors`). Both are what stylelint
+  already refused. Wrap the context in `:where()`, which weighs nothing, or give the
+  element a class of its own.
 - **Two stylelint rules were renamed.** A disable comment for `color-no-hex` names
   `design/color-no-hex` now, and one for a component's margin names
   `design/component-margins` instead of `declaration-property-value-allowed-list`.
@@ -581,6 +628,15 @@
   against `98cf7b8` (1); a nested package's, against `b71ed10` (1); and a listed name
   that is not UTF-8, against `5a7fbae` on Linux (1). Windows and macOS skip that
   one: their file names are always Unicode.
+- P5 (N3, SB-C9, N32): `StylelintConfig.test_the_references_css_snippets_pass_the_config`
+  lints every CSS block of the references in the files the audit puts it in, and the
+  canonical entries' test lints the v3 entry. The spec's `selectors` examples and its
+  sub-layer example run through the audit and the real stylelint, and `TheAuditInCi`
+  holds `:where()` and a nested rule's weight. Against `a5a54e7` (`main`): the
+  references fail 24 subtests, the audit's conformance leg 6, stylelint's 1, the
+  allowed fixtures 2 and the canonical entries 1, and the two audit tests fail
+  (7 tests); the starter's own runs, the references through the audit and the
+  quotes are the controls (5). Against `v3.2.1`, 9 fail and 3 are controls.
 
 ## 3.2.1 — 2026-09-25
 

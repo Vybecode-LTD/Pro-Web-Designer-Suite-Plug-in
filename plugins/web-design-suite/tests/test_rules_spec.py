@@ -75,7 +75,7 @@ def jsx_component(jsx: str) -> str:
 def spec_examples() -> list[Example]:
     """Every `allowed` and `refused` example in the spec, each as a file of its
     own for the gates its section names: a rule in a component file, a rule in
-    a layout file (a family's `layout` examples), a whole entry stylesheet, a
+    a layout file (a family's `layout` examples, and the selectors), a whole entry stylesheet, a
     theme file's binding, or a JSX component. The Sass examples, which only
     the audit reads, are test_sass's."""
     examples: list[Example] = []
@@ -119,6 +119,10 @@ def spec_examples() -> list[Example]:
                     in_layer("layout", f".center {{ {declaration}; }}"), folder="layout")
         for declaration in SPEC["geometry"][verdict]:
             add("geometry", verdict, declaration, rule(f".card {{ {declaration}; }}"))
+        # N32: in a layout file, where an element may close a selector (`p`).
+        for selector in SPEC["selectors"][verdict]:
+            add("selectors", verdict, selector,
+                in_layer("layout", f"{selector} {{ color: var(--fg-strong); }}"), folder="layout")
         for declaration in SPEC["bindings"][verdict]:
             add("bindings", verdict, declaration, f"@theme inline {{\n  {declaration};\n}}\n")
         for jsx in SPEC["inline_styles"][verdict]:

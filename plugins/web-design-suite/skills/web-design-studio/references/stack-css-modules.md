@@ -160,7 +160,7 @@ Note the asymmetry that makes attributes so useful here: **CSS Modules hash clas
 **Never `@import` the token file into a module. Not once.**
 
 ```css
-/* Button.module.css — WRONG */
+/* Button.module.css — example: wrong */
 @import '../../styles/tokens.css';
 ```
 

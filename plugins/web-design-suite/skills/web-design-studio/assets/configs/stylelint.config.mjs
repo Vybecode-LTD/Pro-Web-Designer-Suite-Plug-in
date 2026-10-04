@@ -64,6 +64,8 @@ const LAYER_ORDER = [
   'reset', 'vendor', 'tokens', 'theme', 'base', 'layout', 'components', 'utilities', 'overrides',
 ];
 const MAX_NESTING = 2;
+const MAX_SPECIFICITY = '0,3,1';
+const MAX_COMPOUNDS = 3;
 const SYSTEM_COLOR_NAMES = [
   'accentcolor', 'accentcolortext', 'activetext', 'buttonborder', 'buttonface', 'buttontext',
   'canvas', 'canvastext', 'field', 'fieldtext', 'graytext', 'highlight', 'highlighttext',
@@ -251,8 +253,6 @@ const layerMessages = utils.ruleMessages(layerRuleName, {
   ruleBeforeStatement: () =>
     `Law 5 (layers, not specificity): a rule comes before the @layer statement. A layer's position is fixed the first time ` +
     `its name is used, so the statement must be the first thing in the entry stylesheet, before every @import and every rule.`,
-  nestedLayer: (name) =>
-    `Law 5 (layers, not specificity): "@layer ${name}" nested inside another layer creates a sub-layer whose rank is not obvious from the order statement. Flatten it.`,
 });
 
 const layerOrderRule = (primary) => (root, result) => {
@@ -265,6 +265,12 @@ const layerOrderRule = (primary) => (root, result) => {
   const declaredNames = new Set();
 
   root.walkAtRules(/^layer$/i, (atRule) => {
+    /* Inside a layer, a name is a sub-layer of it (N3): `@layer components {
+     * @layer base, skin; }` orders two sub-layers of components. They rank
+     * inside their parent and cannot leave it, so the canonical order holds;
+     * the parent was checked where it opened. */
+    if (atRule.parent && atRule.parent.type === 'atrule' && /^layer$/i.test(atRule.parent.name)) return;
+
     /* A STATEMENT has no block: `@layer a, b, c;` */
     const isStatement = atRule.nodes === undefined;
 
@@ -319,19 +325,12 @@ const layerOrderRule = (primary) => (root, result) => {
       return;
     }
 
-    /* A BLOCK: `@layer components { … }` */
+    /* A BLOCK: `@layer components { … }`, or a sub-layer by its full name,
+     * `@layer components.skin { … }`, whose parent is what has to be known. */
     const name = atRule.params.trim();
-    if (name && !LAYER_ORDER.includes(name)) {
+    if (name && !LAYER_ORDER.includes(name.split('.')[0].trim())) {
       utils.report({
         message: layerMessages.unknownLayer(name),
-        node: atRule,
-        result,
-        ruleName: layerRuleName,
-      });
-    }
-    if (atRule.parent && atRule.parent.type === 'atrule' && /^layer$/i.test(atRule.parent.name)) {
-      utils.report({
-        message: layerMessages.nestedLayer(name),
         node: atRule,
         result,
         ruleName: layerRuleName,
@@ -713,9 +712,10 @@ export default {
     'no-descending-specificity': true,
 
     /* A cap, not a preference. `.card .header .title span` is four levels
-     * of DOM knowledge in one selector. */
-    'selector-max-compound-selectors': 3,
-    'selector-max-specificity': '0,3,1',
+     * of DOM knowledge in one selector. Both limits are the spec's
+     * (design-rules.json: selectors), as the audit's are (N32). */
+    'selector-max-compound-selectors': MAX_COMPOUNDS,
+    'selector-max-specificity': MAX_SPECIFICITY,
 
     /* ---- LAWS 1, 3, 6: tokens or nothing ----------------------------- */
 
@@ -820,6 +820,11 @@ export default {
     /* `@media (width >= 48rem)` range syntax is the modern spelling and the
      * standard config's media-feature rules do not all understand it. */
     'media-feature-range-notation': null,
+    /* CSS Modules' own syntax, which stack-css-modules.md §4 teaches:
+     * `composes` and `:global`/`:local` are known words, not typos (N3).
+     * Outside a CSS Module nothing writes them, so this is no exemption. */
+    'property-no-unknown': [true, { ignoreProperties: ['composes'] }],
+    'selector-pseudo-class-no-unknown': [true, { ignorePseudoClasses: ['global', 'local'] }],
   },
 
   /* =======================================================================

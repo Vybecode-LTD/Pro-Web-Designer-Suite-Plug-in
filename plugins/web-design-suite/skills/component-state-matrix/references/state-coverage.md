@@ -69,6 +69,7 @@ State is a **real ARIA attribute where one exists**, `data-state` otherwise, and
 .thing:focus-visible {
   outline: var(--stroke-focus) solid var(--border-focus);
   outline-offset: var(--stroke-focus);
+  /* stylelint-disable-next-line declaration-property-value-allowed-list -- the gap ring: a spread of two tokens, as reset.css draws it */
   box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas);   /* the gap, not the ring */
 }
 ```
@@ -179,8 +180,10 @@ States overlap constantly: a disabled button is also hovered, an invalid input i
 /* good — explicit, survives someone inserting a rule between them */
 .button:hover:not(:disabled)  { --button-bg: var(--bg-hover); }
 .button:active:not(:disabled) { --button-bg: var(--bg-active); }
+```
 
-/* bad — works today, breaks the first time the file is edited */
+```css
+/* example: wrong — works today, breaks the first time the file is edited */
 .button:hover   { --button-bg: var(--bg-hover); }
 .button:disabled { --button-bg: var(--bg-disabled); }  /* wins only because it is later */
 ```
@@ -191,10 +194,14 @@ Order-based resolution is invisible: nothing in the source says "this must stay 
 
 ```css
 /* A. overlay — hover composes over whatever the variant set */
-.button { background-image: linear-gradient(var(--button-overlay), var(--button-overlay)); }
-.button { --button-overlay: transparent; }
+.button {
+  --button-overlay: transparent;
+  background-image: linear-gradient(var(--button-overlay), var(--button-overlay));
+}
 .button:hover:not(:disabled) { --button-overlay: var(--bg-hover); }
+```
 
+```css
 /* B. per-variant hover socket — more explicit, more lines */
 .button { --button-bg-hover: var(--bg-hover); }
 .button[data-variant="primary"] { --button-bg-hover: var(--bg-accent-hover); }

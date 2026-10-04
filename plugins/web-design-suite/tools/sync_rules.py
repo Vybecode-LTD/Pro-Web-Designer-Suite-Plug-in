@@ -12,6 +12,7 @@ outside them is the gate's own. A block holds the constants its gate uses
 (TARGETS), from:
   LAYER_ORDER, LAYER_STATEMENT   layers.order, layers.statement
   MAX_NESTING                    nesting.max_depth
+  MAX_SPECIFICITY, MAX_COMPOUNDS selectors.max_specificity, selectors.max_compounds
   SYSTEM_COLOR_NAMES             system_colors.names
   SYSTEM_COLOR_PROPERTY          system_colors.properties
   KEYWORDS, COLOUR_FUNCTIONS     values.keywords, values.colour_functions
@@ -46,14 +47,14 @@ SPEC = "skills/web-design-studio/assets/rules/design-rules.json"
 # written (COLOUR_WORDS reads SYSTEM_COLOR_NAMES, the allowlists the shapes).
 TARGETS = {
     "skills/web-design-studio/scripts/audit_design.py":
-        ("py", ("LAYER_ORDER", "LAYER_STATEMENT", "MAX_NESTING", "SYSTEM_COLOR_NAMES", "SYSTEM_COLOR_PROPERTY",
-                "KEYWORDS", "COLOUR_FUNCTIONS", "LITERAL_UNITS", "GEOMETRY_PROPERTIES", "COLOUR_WORDS", "SHAPES",
-                "SPACING_VALUES", "STROKE_VALUES", "MOTION_VALUES", "SIZING_VALUES", "MARGIN_VALUES",
-                "BINDING_VALUES")),
+        ("py", ("LAYER_ORDER", "LAYER_STATEMENT", "MAX_NESTING", "MAX_SPECIFICITY", "MAX_COMPOUNDS",
+                "SYSTEM_COLOR_NAMES", "SYSTEM_COLOR_PROPERTY", "KEYWORDS", "COLOUR_FUNCTIONS", "LITERAL_UNITS",
+                "GEOMETRY_PROPERTIES", "COLOUR_WORDS", "SHAPES", "SPACING_VALUES", "STROKE_VALUES", "MOTION_VALUES",
+                "SIZING_VALUES", "MARGIN_VALUES", "BINDING_VALUES")),
     "skills/web-design-studio/assets/configs/stylelint.config.mjs":
-        ("js", ("LAYER_ORDER", "MAX_NESTING", "SYSTEM_COLOR_NAMES", "SYSTEM_COLOR_PROPERTY", "KEYWORDS",
-                "COLOUR_FUNCTIONS", "COLOUR_WORDS", "SHAPES", "VALUE_ALLOWLIST", "MARGIN_ALLOWLIST",
-                "BINDING_ALLOWLIST")),
+        ("js", ("LAYER_ORDER", "MAX_NESTING", "MAX_SPECIFICITY", "MAX_COMPOUNDS", "SYSTEM_COLOR_NAMES",
+                "SYSTEM_COLOR_PROPERTY", "KEYWORDS", "COLOUR_FUNCTIONS", "COLOUR_WORDS", "SHAPES", "VALUE_ALLOWLIST",
+                "MARGIN_ALLOWLIST", "BINDING_ALLOWLIST")),
     "skills/web-design-studio/assets/configs/eslint.design.config.mjs":
         ("js", ("COLOUR_FUNCTIONS", "LITERAL_UNITS")),
 }
@@ -120,6 +121,8 @@ def block(spec: dict, lang: str, names: tuple[str, ...]) -> str:
     values = spec["values"]
     data = {"LAYER_ORDER": spec["layers"]["order"], "LAYER_STATEMENT": spec["layers"]["statement"],
             "MAX_NESTING": int(spec["nesting"]["max_depth"]), "SYSTEM_COLOR_NAMES": spec["system_colors"]["names"],
+            "MAX_SPECIFICITY": spec["selectors"]["max_specificity"],
+            "MAX_COMPOUNDS": int(spec["selectors"]["max_compounds"]),
             "KEYWORDS": values["keywords"], "COLOUR_FUNCTIONS": values["colour_functions"],
             "LITERAL_UNITS": spec["inline_styles"]["literal_units"],
             "GEOMETRY_PROPERTIES": spec["geometry"]["properties"]}

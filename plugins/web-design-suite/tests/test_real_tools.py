@@ -149,8 +149,9 @@ def write_files(root: pathlib.Path, files: dict[str, str]) -> None:
 
 
 # The canonical entries (SB-C9): the starter's index.css is linted with the rest of
-# the starter, and the Tailwind v4 entry lives with the configs.
-CANONICAL_ENTRIES = {"src/tailwind/index.css": CONFIGS / "index.tailwind.css"}
+# the starter, and the Tailwind v4 and v3 entries live with the configs.
+CANONICAL_ENTRIES = {"src/tailwind/index.css": CONFIGS / "index.tailwind.css",
+                     "src/tailwind-v3/index.css": CONFIGS / "index.tailwind-v3.css"}
 
 
 ALLOWED_STYLES = ("<div style={{ '--progress': pct } as React.CSSProperties} />",
@@ -447,6 +448,10 @@ REFUSED_CSS = {
 ALLOWED_CSS = {
     "src/components/SmallViewport.css": in_layer("components", ".card { min-block-size: 100svb; }"),
     "src/components/Cancel.css": in_layer("components", ".card { margin-block-start: calc(var(--card-inset) * -1); }"),
+    # N3: what stack-css-modules.md teaches, in a CSS Module.
+    "src/components/Button.module.css": in_layer(
+        "components", ".primary { composes: root from './Base.module.css'; }\n"
+                      ":global(.is-open) .primary { --button-bg: var(--bg-accent); }"),
     # Geometry over tokens goes in a socket, as the starter's layout.css does.
     "src/styles/layout/Socket.css": in_layer(
         "layout", ".center { --center-box: calc(var(--center-max) + var(--center-gutter) * 2); "
@@ -465,15 +470,25 @@ class StylelintConfig(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        from test_doc_snippets import as_files, snippets
         tmp = temp_project(cls, "wds-stylelint-", STYLELINT_MODULES)
         files = {"stylelint.config.mjs": (CONFIGS / "stylelint.config.mjs").read_text(encoding="utf-8"),
-                 **{name: path.read_text(encoding="utf-8") for name, path in CANONICAL_ENTRIES.items()},
+                 **{name: path.read_text(encoding="utf-8") for name, path in CANONICAL_ENTRIES.items()
+                    if path.is_file()},
                  **{f"src/styles/{css.name}": css.read_text(encoding="utf-8")
                     for css in sorted(STARTER_STYLES.glob("*.css"))},
                  "src/tailwind/theme.css": (CONFIGS / "theme.css").read_text(encoding="utf-8"),
                  **{name: css for name, (css, _) in REFUSED_CSS.items()},
                  **ALLOWED_CSS,
                  **{ex.name: ex.text for ex in spec_examples() if "stylelint" in ex.gates}}
+        # N3: each CSS block of the references, in the files the audit puts it in
+        # (test_doc_snippets.as_files): its tokens, its layer's file, a component.
+        cls.snippet_files = {}
+        for n, (doc, line, lang, body) in enumerate(snippets()):
+            if lang == "css":
+                parts = {f"src/snippets/b{n}/{name}": text for name, text in as_files(lang, body)}
+                files.update(parts)
+                cls.snippet_files[f"{doc.relative_to(SKILLS).as_posix()}:{line}"] = list(parts)
         write_files(tmp, files)
         linted = [name for name in files if name.endswith(".css")]
         proc = subprocess.run([NODE, str(pathlib.Path(STYLELINT_MODULES) / "stylelint" / "bin" / "stylelint.mjs"),
@@ -500,6 +515,7 @@ class StylelintConfig(unittest.TestCase):
     def test_the_canonical_entries_pass(self):
         for name, path in CANONICAL_ENTRIES.items():
             with self.subTest(entry=path.name):
+                self.assertTrue(path.is_file(), path)
                 self.assertEqual([], self.problems(name))
 
     def test_theme_css_passes_the_override_that_guards_it(self):
@@ -525,6 +541,21 @@ class StylelintConfig(unittest.TestCase):
             problems = self.problems(ex.name)
             return problems, problems
         hold_to_the_spec(self, "stylelint", problems_of)
+
+    def test_the_references_css_snippets_pass_the_config(self):
+        """N3: what a reference offers for copying passes stylelint too, not only
+        the audit (SB-C5 did ESLint's half). At 3.2.1, 56 of 170 blocks failed.
+        A fragment stylelint cannot parse is left out, and counted."""
+        self.assertGreater(len(self.snippet_files), 150)
+        fragments = 0
+        for where, names in self.snippet_files.items():
+            if any(w["rule"] == "CssSyntaxError" for name in names for w in self.results[name]["warnings"]):
+                fragments += 1
+                continue
+            with self.subTest(snippet=where):
+                self.assertEqual([], [f"{name.split('/', 3)[3]} {p}" for name in names
+                                      for p in self.problems(name)])
+        self.assertLess(fragments, len(self.snippet_files) // 10)
 
 
 def documented_examples(block: str, rule: str) -> list[str]:

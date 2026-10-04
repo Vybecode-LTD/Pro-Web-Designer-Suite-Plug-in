@@ -5,8 +5,9 @@
    Law 5: the layer order is stated once, here, before anything else. The
    references quote this file instead of writing their own (stack-vanilla-css
    §4, stack-css-modules §5, handoff-conventions §1), and
-   tools/sync_snippets.py keeps every quote identical to it. The Tailwind v4
-   entry is assets/configs/index.tailwind.css.
+   tools/sync_snippets.py keeps every quote identical to it. The Tailwind
+   entries are assets/configs/index.tailwind.css (v4) and
+   index.tailwind-v3.css.
    ========================================================================= */
 
 /* @snippet entry */

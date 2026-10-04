@@ -11,11 +11,14 @@ so with a marker in a comment inside the block:
 
 How each block is audited. A CSS block is split into its top-level statements,
 because references often show a token and the rule that uses it together:
-- token content goes to `styles/tokens.css`: `@layer tokens`, a Tailwind
-  `@theme`, and rules on the root, a theme, a density or `.inverse` that
-  declare only custom properties;
-- everything else is an excerpt of a component file, `components/snippet.css`,
-  wrapped in `@layer components { … }` unless it declares its own layers;
+- token content goes to `styles/tokens.css`: `@layer tokens`, `@font-face`,
+  and rules on the root, a theme, a density or `.inverse` that declare only
+  custom properties; a Tailwind `@theme` goes to `styles/theme.css`;
+- a block in another layer goes to that layer's file, `styles/base.css` and
+  so on;
+- everything else is an excerpt of a component file, `components/snippet.css`
+  (`snippet.module.css` when it uses `composes` or `:global`), wrapped in
+  `@layer components { … }` unless it declares its own layers;
 - TSX and JSX are audited as `components/Snippet.tsx`;
 - email CSS is left to email-template-system's own linter, `lint_email`.
 
@@ -104,9 +107,16 @@ def is_bare_declaration(statement: str) -> bool:
     return bool(re.match(r"--[\w-]+\s*:", code_of(statement)))
 
 
+def is_theme(statement: str) -> bool:
+    """A Tailwind v4 `@theme` block: it lives in theme.css, the binding file."""
+    return bool(re.match(r"@theme\b", code_of(statement)))
+
+
 def is_token_content(statement: str) -> bool:
+    # A font face is literals, a family name, a file and measured metrics,
+    # so it lives with the tokens (Law 1). Its descriptors are not properties.
     code = code_of(statement)
-    if re.match(r"@(layer\s+tokens\b|theme\b)", code) or is_bare_declaration(statement):
+    if re.match(r"@(layer\s+tokens\b|theme\b|font-face\b)", code) or is_bare_declaration(statement):
         return True
     m = re.match(r"@(?:media|supports|container)\b[^{]*\{(.*)\}$", code, re.S)
     if m:                                   # e.g. reduced motion re-pointing durations
@@ -119,6 +129,10 @@ def is_token_content(statement: str) -> bool:
     return bool(kinds) and all(kinds)
 
 
+OTHER_LAYER = re.compile(r"@layer\s+(reset|base|layout|utilities|overrides)\s*\{")
+CSS_MODULES = re.compile(r"\bcomposes\s*:|:(?:global|local)\b")
+
+
 def as_files(lang: str, body: str) -> list[tuple[str, str]]:
     """Where the block's parts would live in a project, and their text there."""
     if lang in ("tsx", "jsx"):
@@ -126,17 +140,30 @@ def as_files(lang: str, body: str) -> list[tuple[str, str]]:
     parts = statements(body)
     bare = "".join(p for p in parts if is_bare_declaration(p))
     tokens = (":root {\n" + bare + "\n}\n" if bare.strip() else "") + "".join(
-        p for p in parts if is_token_content(p) and not is_bare_declaration(p))
-    rest = "".join(p for p in parts if not is_token_content(p))
-    files = [("styles/tokens.css", tokens)] if tokens.strip() else []
-    if re.sub(r"/\*.*?\*/", "", rest, flags=re.S).strip():
-        # A block written in another layer lives in that layer's file, not a
-        # component's: `@layer layout { .prose > h2 {…} }` is a flow container.
-        other = re.search(r"@layer\s+(reset|base|layout|utilities|overrides)\s*\{", rest)
-        name = (f"styles/{other.group(1)}.css" if other and "@layer components" not in rest
-                else "components/snippet.css")
-        files.append((name, rest if "@layer" in rest else "@layer components {\n" + rest + "\n}\n"))
-    return files
+        p for p in parts if is_token_content(p) and not is_bare_declaration(p) and not is_theme(p))
+    theme = "".join(p for p in parts if is_theme(p))
+    files = [(name, text) for name, text in (("styles/tokens.css", tokens), ("styles/theme.css", theme))
+             if text.strip()]
+    rest = [p for p in parts if not is_token_content(p)]
+    text = "".join(rest)
+    if not re.sub(r"/\*.*?\*/", "", text, flags=re.S).strip():
+        return files
+    # CSS Modules' own syntax (`composes`, `:global`) is read in a CSS Module.
+    component = "components/snippet.module.css" if CSS_MODULES.search(text) else "components/snippet.css"
+    if "@layer components" in text:
+        # Beside a component's own layer, a block in another layer goes to that
+        # layer's file: view transitions are styled in base (N3).
+        by_file: dict[str, str] = {}
+        for p in rest:
+            other = OTHER_LAYER.match(code_of(p))
+            name = f"styles/{other.group(1)}.css" if other else component
+            by_file[name] = by_file.get(name, "") + p
+        return files + list(by_file.items())
+    # A block written in another layer lives in that layer's file, not a
+    # component's: `@layer layout { .prose > h2 {…} }` is a flow container.
+    other = OTHER_LAYER.search(text)
+    name = f"styles/{other.group(1)}.css" if other else component
+    return files + [(name, text if "@layer" in text else "@layer components {\n" + text + "\n}\n")]
 
 
 class ReferenceSnippetsPassTheGate(TempDirTest):

@@ -370,7 +370,10 @@ hand-written CSS, read the Tier-2 token:
 
 ```css
 .card { background: var(--bg-surface); }    /* correct */
-.card { background: var(--color-surface); } /* do not  */
+```
+
+```css
+.card { background: var(--color-surface); } /* example: wrong */
 ```
 
 ### 3.5 The four-line test
@@ -842,7 +845,10 @@ thrown away the atomic-CSS bargain and kept the class-soup syntax.
 And it buys nothing. These are the same CSS:
 
 ```css
-.btn { @apply px-inline-md py-block-sm rounded-card; }
+.btn { @apply px-inline-md py-block-sm rounded-card; }   /* example: wrong */
+```
+
+```css
 .btn {
   padding: var(--pad-block-sm) var(--pad-inline-md);
   border-radius: var(--radius-lg);
@@ -1287,21 +1293,36 @@ directives straight under a native `@layer` statement and v3's preflight
 (`button { background-color: transparent }`) and every utility override your
 layered CSS, the opposite of Law 5.
 
-Put Tailwind's output into the layers instead: build it as two sheets and import
-them with native `layer()` (postcss-import 15+, before tailwindcss in the PostCSS
-plugins):
+Put Tailwind's output into the layers instead: build it as two sheets,
+`tailwind-base.css` (`@tailwind base;`) and `tailwind-utilities.css`
+(`@tailwind components; @tailwind utilities;`), and import them with native
+`layer()` (postcss-import 15+, before tailwindcss in the PostCSS plugins). The
+entry is `assets/configs/index.tailwind-v3.css`:
 
+<!-- snippet: web-design-studio/assets/configs/index.tailwind-v3.css#entry -->
 ```css
-/* tailwind-base.css */      @tailwind base;
-/* tailwind-utilities.css */ @tailwind components; @tailwind utilities;
-
-/* index.css */
+/* 1. The order, first. `vendor` is named before there is any vendor CSS:
+      a layer first named by its import is appended after `overrides`. */
 @layer reset, vendor, tokens, base, layout, components, utilities, overrides;
-@import url("./tailwind-base.css") layer(base);
+
+/* 2. Tailwind's sheets name no layer: wrap each as it loads. Preflight is
+      the reset, as in v4. The focus ring is the `focus-ring` utility in
+      tailwind.config.ts: an outline, which forced-colors mode repaints. */
+@import url("./tailwind-base.css") layer(reset);
 @import url("./tailwind-utilities.css") layer(utilities);
+
+/* 3. These open their own @layer block, so import them bare. */
+@import url("./tokens.css");
+@import url("./base.css");
+@import url("./layout.css");
+
+/* 4. CSS you do not control names no layer: wrap it as it loads.
+        @import url("../vendor/datepicker.css") layer(vendor);
+      Then one line per component file:
+        @import url("./components/card.css"); */
 ```
 
-Check the built CSS once: preflight's `button { … }` must sit inside `@layer base`.
+Check the built CSS once: preflight's `button { … }` must sit inside `@layer reset`.
 If the toolchain cannot do that, keep all hand-written CSS unlayered too and order
 it by import; Law 5 then holds only by convention. v4 emits native layers itself.
 

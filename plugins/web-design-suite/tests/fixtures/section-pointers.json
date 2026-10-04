@@ -1680,6 +1680,12 @@
   "heading": "Tailwind v4: wiring `@theme`"
  },
  {
+  "from": "web-design-studio/assets/configs/index.tailwind-v3.css",
+  "to": "web-design-studio/references/stack-tailwind.md",
+  "section": "11.6",
+  "heading": "Dark mode and layers"
+ },
+ {
   "from": "web-design-studio/assets/configs/index.tailwind.css",
   "to": "web-design-studio/references/stack-tailwind.md",
   "section": "2.1",
@@ -1690,6 +1696,12 @@
   "to": "web-design-studio/assets/configs/theme.css",
   "section": "0",
   "heading": "THE FOUR LITERAL EXCEPTIONS"
+ },
+ {
+  "from": "web-design-studio/assets/configs/stylelint.config.mjs",
+  "to": "web-design-studio/references/stack-css-modules.md",
+  "section": "4",
+  "heading": "`composes` and `:global`"
  },
  {
   "from": "web-design-studio/assets/configs/stylelint.config.mjs",

@@ -188,6 +188,7 @@ Focus is the keyboard user's cursor. If they cannot see it, the page is unusable
 :focus-visible {
   outline: var(--stroke-focus) solid var(--border-focus);  /* the ring */
   outline-offset: var(--stroke-focus);
+  /* stylelint-disable-next-line declaration-property-value-allowed-list -- ring 1, the gap: a spread of two tokens, drawn here once */
   box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas);  /* the gap */
 }
 ```

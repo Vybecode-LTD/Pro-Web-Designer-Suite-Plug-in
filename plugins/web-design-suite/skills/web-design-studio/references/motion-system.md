@@ -236,24 +236,29 @@ Two implementation routes: FLIP (§5, works everywhere, same-document only) and 
 ```css
 /* Same-document: name the element on both sides. Names must be unique per
    snapshot — two elements with the same view-transition-name at once throws. */
-.hero-image { view-transition-name: hero; }
+@layer components {
+  .hero-image { view-transition-name: hero; }
+}
 
 /* Cross-document: opt both pages in. */
 @view-transition { navigation: auto; }
 
-/* Style the generated pseudo-elements with tokens like anything else. Set the
+/* The generated pseudo-elements belong to the document, not to a component,
+   so they are styled in base, with tokens like anything else. Set the
    longhands: the `animation` shorthand would reset the UA's animation-name. */
-::view-transition-old(hero),
-::view-transition-new(hero) {
-  animation-duration: var(--dur-slow);
-  animation-timing-function: var(--ease-in-out);
-}
-::view-transition-group(root) { animation-duration: var(--dur-base); }
+@layer base {
+  ::view-transition-old(hero),
+  ::view-transition-new(hero) {
+    animation-duration: var(--dur-slow);
+    animation-timing-function: var(--ease-in-out);
+  }
+  ::view-transition-group(root) { animation-duration: var(--dur-base); }
 
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) { animation: none; }
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) { animation: none; }
+  }
 }
 ```
 
@@ -353,8 +358,8 @@ Three things people get wrong:
 
 ```css
 .card { transition: transform var(--motion-hover); }
-.card-grid:hover .card { will-change: transform; }   /* armed only while relevant */
 .card:hover { transform: translateY(calc(var(--motion-travel-xs) * -1)); }
+.card-grid:hover .card { will-change: transform; }   /* armed only while relevant */
 ```
 
 The browser already auto-promotes elements with active `transform`/`opacity` animations. **If you cannot name the frame that `will-change` saves, delete it.**
@@ -478,7 +483,7 @@ Job 3 (attention — confirm the hit registered). `--motion-instant`.
 ```css
 .check-path { stroke-dasharray: 22; stroke-dashoffset: 22;
               transition: stroke-dashoffset var(--motion-instant); }
-.check-input:checked + .check .check-path { stroke-dashoffset: 0; }
+.check-input:checked + .check :where(.check-path) { stroke-dashoffset: 0; }   /* 0,3,0: under the cap */
 ```
 **Must not** delay the underlying form state. **Must not** animate on initial render — a form restoring 12 checked boxes should not draw 12 ticks.
 
