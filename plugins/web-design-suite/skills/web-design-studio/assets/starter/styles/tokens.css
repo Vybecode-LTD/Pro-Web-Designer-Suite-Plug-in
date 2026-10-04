@@ -144,7 +144,8 @@
        ---------------------------------------------------------------------
        Modular scale, ratio 1.200 (minor third) at the body end and 1.250
        above it, so headings separate clearly without the display sizes
-       exploding. Regenerate with scripts/generate_type_scale.py.
+       exploding, then hand-tuned. scripts/generate_type_scale.py prints
+       these steps exactly: its default, the studio preset.
        --------------------------------------------------------------------- */
 
     --font-sans: "Geist Sans", ui-sans-serif, system-ui, -apple-system,

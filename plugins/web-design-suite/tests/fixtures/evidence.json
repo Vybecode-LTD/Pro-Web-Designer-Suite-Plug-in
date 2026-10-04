@@ -248,6 +248,17 @@
       "docs": [
         "content-model-to-ui/references/supabase-integration.md"
       ]
+    },
+    {
+      "figure": "2.5 times",
+      "claim": "the largest ratio of a fluid size's maximum to its minimum that always passes WCAG SC 1.4.4 under browser zoom",
+      "source": "Maxwell Barvian, Addressing Accessibility Concerns With Using Fluid Type, Smashing Magazine, 7 November 2023",
+      "url": "https://www.smashingmagazine.com/2023/11/addressing-accessibility-concerns-fluid-type/",
+      "checked": "2026-10-04",
+      "quote": "If the maximum font size is less than or equal to 2.5 times the minimum font size, then the text will always pass WCAG SC 1.4.4, at least on all modern browsers.",
+      "docs": [
+        "web-design-studio/references/typography.md"
+      ]
     }
   ],
   "not_statistics": [

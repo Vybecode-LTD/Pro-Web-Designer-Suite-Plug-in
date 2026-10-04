@@ -357,6 +357,20 @@
   - stack-vanilla-css quoted a stylelint config with a 0,3,0 cap and every heading let
     into components. It now points at the shipped config. The landing-page sections'
     FAQ marker weighed 0,4,0, which both gates refuse; its path is in `:where()` now.
+- **The type generator reproduces the starter** (SS-A9, SS-C5). Its docstring said a
+  command reproduced `tokens.css` "approximately": it printed 9/11/13/16/20/25/31/39/49
+  and fluid 49→61 and 61→76.5, against the starter's 11/12/14/16/18/22/28/35/44, 44→72
+  and 56→110. SKILL.md's Phase 1 command printed 9.26, 11.11 and 13.33px steps.
+  `--preset studio` now prints the starter's `--text-*` exactly. The scale is
+  hand-tuned, so the preset is a table, and the docstring says where it departs from
+  the math. SKILL.md's Phase 1 runs the preset and says how to depart from it, and
+  every type command in the docs runs clean.
+- **Fluid type and zoom were half taught** (SS-B5). typography.md §10 called a `rem`
+  intercept sufficient for SC 1.4.4. It now adds Barvian's bound, a maximum at most 2.5
+  times the minimum, and what zoom does to the starter's hero: in a 1440px window,
+  `--text-6xl` grows only 1.33× at 200% and first reaches 2× at 400%. §15 checks both.
+  The generator refuses a `--fluid-min-ratio` over 2.5, and any fluid step that
+  `--snap-px` rounding leaves over 2.5 times its minimum.
 
 ### Added
 
@@ -393,6 +407,12 @@
 
 ### Changed
 
+- **The type generator's default is the starter's scale** (SS-C5). With no scale flag
+  (`--base`, `--ratio`, `--dual-ratio`, `--steps-up`, `--steps-down`, `--snap-px`,
+  `--fluid`, `--fluid-steps`, `--fluid-min-ratio`), `generate_type_scale.py` prints
+  `--preset studio`. Any scale flag gives a ratio run, the pure math, as before. The
+  default ratio run, 1.2 with three steps down, reached 9.26px, so a plain refusal of
+  small steps would have broken every run without flags.
 - **Every skill's description fits a claude.ai upload.** The 13 descriptions were 301 to
   368 characters; claude.ai's help center gives 200 for an uploaded skill, and the
   platform 1,024. Each now says what the skill does and what it is not for in 185 to
@@ -468,6 +488,12 @@
 - **Two stylelint rules were renamed.** A disable comment for `color-no-hex` names
   `design/color-no-hex` now, and one for a component's margin names
   `design/component-margins` instead of `declaration-property-value-allowed-list`.
+- **The type generator refuses a step under 11px** (SS-C5). A ratio run that puts any
+  step, or a fluid step's minimum, under 11px exits 2 and names the ways out: fewer
+  `--steps-down`, a smaller `--ratio` (1.125 keeps three steps down, at 11.24px), or
+  `--allow-small` to emit it with a warning. `--snap-px` is not one: it rounds 9.26px
+  to 9. A run with no scale flags now prints the starter's scale instead of the 1.2
+  ratio run, and `--preset` cannot be combined with a scale flag.
 
 ### Tests
 
@@ -642,6 +668,18 @@
   `::slotted()` without its argument (against `5ac2223`); a quoted `)` closed a
   `:where()` early, and a quoted `&` read as nesting (against `781e4ea`). stylelint's
   leg, which already read all four, is the control.
+- P6 part 1 (SS-B5, and the type halves of SS-A9, SS-B7 and SS-C5): `test_numbers`
+  gains `TypeScale` (11 tests) and `FluidTypeZoom` (2). The preset and the default
+  print `tokens.css`'s `--text-*`, SKILL.md's Phase 1 command does too, every type
+  command in the docs exits 0 with nothing on stderr, a step or a fluid minimum under
+  11px is refused with its ways out unless `--allow-small`, the preset refuses scale
+  flags, and a fluid span over 2.5 is refused. Each fluid `--text-*` in `tokens.css` is
+  within 2.5 times its minimum, and the figures typography.md §10 quotes recompute from
+  it. Against `v3.2.1` and against `ca4f206` (`main`), 10 fail; the 2.5 bound on
+  `tokens.css` and a 1.125 run, the refusal's own way out, are the controls (2).
+  Codex's review of #28 added one: `--snap-px` rounds a fluid step's two ends apart,
+  so a 2.485 shrink emitted 16→40.5px, a 2.53× span
+  (`test_a_snapped_fluid_span_over_2_5_times_is_refused`, failing on `38d11cc`).
 
 ## 3.2.1 — 2026-09-25
 
