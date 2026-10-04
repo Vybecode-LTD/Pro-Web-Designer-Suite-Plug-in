@@ -20,7 +20,7 @@
     - `utilities.css`, `overrides.css` and `theme-init.js` ship.
     - The contradicted comments are fixed.
     - reset.css drops `html:has(:target)` smooth scrolling and uses `svh`.
-- **The reviews found 13 real issues across #28 to #32.** Each code fix has a test that fails on the head it reviewed.
+- **The reviews found 12 real issues across #28 to #32**: two each on #28 and #29, one on the docs PR #30, six on #31, one on #32. Each code fix has a test that fails on the head it reviewed.
 - **Tests:** 498. **The plan:** 132 open items, all scheduled (`check_execution_plan.py`).
 
 ## Next steps
