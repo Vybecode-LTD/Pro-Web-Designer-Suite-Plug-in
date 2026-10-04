@@ -403,6 +403,10 @@
   - reset.css: `html:has(:target)` smoothed every later scroll once any fragment was
     targeted, so the rule is gone (smooth an in-page link from its click handler), and
     `body` uses `100svh`, not `100dvh`, as layout-composition.md says.
+- **The vanilla stack's naming rule 4 named classes the starter does not have.** It
+  prefixed the layout primitives (`.l-stack`, `.l-grid`, `.l-center`), and the
+  starter's layout.css defines `.stack`, `.grid` and `.center`. The rule now keeps the
+  starter's names.
 
 ### Added
 
@@ -512,6 +516,13 @@
   failing check's `§` reached it as an invalid byte and the report crashed printing it,
   so no report came. The checks now write UTF-8, and a character the console cannot
   encode prints as `?` (`test_tools.CheckReportsOnAnyConsole`, which fails on `9053727`).
+- **accessibility.md's testing procedure is a reference of its own** (N4).
+  `accessibility-testing.md` has the keyboard, zoom, forced-colors and screen-reader
+  passes, the automated tools and what they miss, and regression tests. accessibility.md
+  was 60,400 bytes against the 60,500 limit and is 52,963 now; its §10 points to the
+  new file, and SKILL.md's reference table lists it.
+- **The token contract names its master copy** (XC-A5): `shared/token-contract.md`,
+  which each skill's copy matches byte for byte. All 14 copies say so.
 
 ### Upgrading
 
@@ -784,6 +795,13 @@
   CodeRabbit's review of #32 added one: SKILL.md still counted five durations; the Law 3
   test now reads it too (failing on `fc02def`). The contract's "Tier 2 only" now names
   the two Tier-1 moves tokens.css allows.
+- P8 part 1 (XC-A5, N9, rule 4): `test_contract.ContractCopies` compares each skill's
+  copy with the master and names the ones that differ, and holds the header to naming
+  the master. `TheStarterKeepsItsWord.test_the_vanilla_stack_names_the_starters_primitives`
+  holds rule 4 to layout.css. `test_docs.Manifests` holds the repository's marketplace
+  to the plugin's in every field but `source`, with a planted difference as its positive
+  control. Against `v3.2.1`, 2 fail; the other 5 are controls (the copies, the deck's
+  tokens and the two manifests agree today).
 
 ## 3.2.1 — 2026-09-25
 

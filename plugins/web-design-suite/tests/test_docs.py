@@ -36,7 +36,7 @@ import subprocess
 import sys
 import unittest
 
-from wds_support import NODE, OFF, PLUGIN, SKILLS, TempDirTest, env, output
+from wds_support import NODE, OFF, PLUGIN, REPO, SKILLS, TempDirTest, env, output
 
 GIT = shutil.which("git")
 GIT_ENV = {"GIT_AUTHOR_NAME": "wds-test", "GIT_AUTHOR_EMAIL": "wds-test@example.invalid",
@@ -313,7 +313,54 @@ class SkillFrontmatter(unittest.TestCase):
                 self.assertLessEqual(len(description), 1024)
 
 
-SHIPPED = sorted({p.stem for p in SKILLS.glob("*/scripts/*") if p.suffix in {".py", ".mjs"}},
+def manifest_differences(ours: dict, theirs: dict) -> list[str]:
+    """The fields two marketplace manifests disagree on, apart from where each
+    finds the plugin (`source` is relative to its own manifest)."""
+    found = [k for k in sorted(set(ours) | set(theirs)) if k != "plugins" and ours.get(k) != theirs.get(k)]
+    a, b = ours.get("plugins", []), theirs.get("plugins", [])
+    if len(a) != len(b):
+        return [*found, "plugins"]
+    for i, (x, y) in enumerate(zip(a, b)):
+        found += [f"plugins[{i}].{k}" for k in sorted(set(x) | set(y)) if k != "source" and x.get(k) != y.get(k)]
+    return found
+
+
+class Manifests(unittest.TestCase):
+    """P8 (N9): the repository's marketplace and the plugin's own describe the
+    same plugin. Nothing compared them, and the root copy is the one GitHub
+    users add."""
+
+    PLUGIN_MARKET = PLUGIN / ".claude-plugin" / "marketplace.json"
+    REPO_MARKET = REPO / ".claude-plugin" / "marketplace.json" if REPO else None
+
+    def load(self, path):
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def test_the_comparison_sees_a_difference(self):
+        ours = self.load(self.PLUGIN_MARKET)
+        theirs = json.loads(json.dumps(ours))
+        theirs["plugins"][0]["keywords"] = theirs["plugins"][0]["keywords"][1:]
+        theirs["plugins"][0]["source"] = "./elsewhere"
+        theirs["description"] = "drifted"
+        self.assertEqual(["description", "plugins[0].keywords"], manifest_differences(ours, theirs))
+
+    def test_the_repositorys_marketplace_matches_the_plugins(self):
+        if not (self.REPO_MARKET and self.REPO_MARKET.is_file()):
+            self.skipTest("the plugin is not inside its repository")
+        ours, theirs = self.load(self.PLUGIN_MARKET), self.load(self.REPO_MARKET)
+        self.assertEqual([], manifest_differences(ours, theirs))
+        self.assertEqual(["./"], [p["source"] for p in ours["plugins"]])
+        self.assertEqual(["./plugins/web-design-suite"], [p["source"] for p in theirs["plugins"]])
+
+    def test_the_marketplace_entry_names_the_plugin(self):
+        plugin = self.load(PLUGIN / ".claude-plugin" / "plugin.json")
+        entry = self.load(self.PLUGIN_MARKET)["plugins"][0]
+        self.assertEqual(plugin["name"], entry["name"])
+        for field in ("license", "homepage", "author"):
+            self.assertEqual(plugin[field], entry[field], field)
+
+
+SHIPPED =sorted({p.stem for p in SKILLS.glob("*/scripts/*") if p.suffix in {".py", ".mjs"}},
                  key=len, reverse=True)
 # A suite script however a doc spells its path: -m scripts.x, scripts/x.py,
 # "${CLAUDE_SKILL_DIR}/scripts/x.py", "$WDS/x.py", <skill>/scripts/x.mjs.

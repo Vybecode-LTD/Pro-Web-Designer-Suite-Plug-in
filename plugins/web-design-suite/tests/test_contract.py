@@ -18,6 +18,7 @@ import unittest
 from wds_support import PLUGIN, SKILLS, load_script
 
 STUDIO = SKILLS / "web-design-studio"
+MASTER = PLUGIN / "shared" / "token-contract.md"
 CONTRACT = STUDIO / "references" / "token-contract.md"
 TOKENS = STUDIO / "assets" / "starter" / "styles" / "tokens.css"
 
@@ -159,6 +160,18 @@ class TheStarterKeepsItsWord(unittest.TestCase):
                 with self.subTest(file=path.name):
                     self.assertEqual(path.read_text(encoding="utf-8").count("u-visually-hidden"), 0)
 
+    def test_the_vanilla_stack_names_the_starters_primitives(self):
+        """P8: stack-vanilla-css.md's naming rule 4 prefixed the primitives
+        (`.l-stack`), which the starter's layout.css does not define."""
+        layout = css_code((STARTER_DIR / "styles" / "layout.css").read_text(encoding="utf-8"))
+        defined = set(re.findall(r"\.([a-z][\w-]*)", layout))
+        guide = (SKILLS / "web-design-studio" / "references" / "stack-vanilla-css.md").read_text(encoding="utf-8")
+        rule = next(l for l in guide.splitlines() if l.startswith("4. **Layout primitives"))
+        named = re.findall(r"`\.([a-z][\w-]*)`", rule)
+        self.assertGreaterEqual(len(named), 3)
+        self.assertEqual([], [n for n in named if n not in defined])
+        self.assertEqual([], re.findall(r"\.l-[a-z]+", guide))
+
     def test_reset_neither_smooths_every_scroll_nor_resizes_on_scroll(self):
         reset = css_code((STARTER_DIR / "styles" / "reset.css").read_text(encoding="utf-8"))
         self.assertNotIn("scroll-behavior", reset)
@@ -168,11 +181,20 @@ class TheStarterKeepsItsWord(unittest.TestCase):
 
 class ContractCopies(unittest.TestCase):
 
-    def test_the_fourteen_contract_copies_are_identical(self):
-        copies = [PLUGIN / "shared" / "token-contract.md", *SKILLS.glob("*/references/token-contract.md")]
-        self.assertEqual(len(copies), 14)
-        self.assertEqual(len({sha(p) for p in copies}), 1,
-                         {p.relative_to(PLUGIN).as_posix(): sha(p)[:12] for p in copies})
+    def test_every_skills_copy_is_the_master_copy(self):
+        """P8 (XC-A5): shared/token-contract.md is the master. Name the copies
+        that differ from it, not just that the fourteen disagree."""
+        copies = sorted(SKILLS.glob("*/references/token-contract.md"))
+        self.assertEqual(len(copies), 13)
+        self.assertEqual([], [p.relative_to(PLUGIN).as_posix() for p in copies if sha(p) != sha(MASTER)],
+                         "copy shared/token-contract.md over these")
+
+    def test_the_contract_says_which_copy_is_the_master(self):
+        """P8 (XC-A5): nothing said shared/token-contract.md was the master, so
+        an edit to one skill's copy left nobody knowing which way to sync."""
+        header = MASTER.read_text(encoding="utf-8").split("\n---\n", 1)[0]
+        self.assertIn("The master copy is `shared/token-contract.md`", header)
+        self.assertIn("`tests/test_contract.py`", header)
 
     def test_the_decks_tokens_are_the_starters_tokens(self):
         deck = SKILLS / "client-presentation-builder" / "assets" / "deck-tokens.css"

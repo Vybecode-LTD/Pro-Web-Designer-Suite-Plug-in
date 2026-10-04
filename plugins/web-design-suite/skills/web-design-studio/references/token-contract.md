@@ -1,6 +1,6 @@
 # The Token Contract
 
-Every skill in the Web Design Suite speaks this vocabulary. It is reproduced in each skill so that a single `.skill` file works standalone, and it is identical in all of them. If you change it, change it everywhere — a fork is how the suite stops being a suite.
+Every skill in the Web Design Suite speaks this vocabulary. It is reproduced in each skill so that a single `.skill` file works standalone. The master copy is `shared/token-contract.md`, at the plugin's root, and each skill's `references/token-contract.md` is a byte-identical copy of it: change the master, copy it over all thirteen, and `tests/test_contract.py` fails until they match. A fork is how the suite stops being a suite.
 
 The canonical implementation is `tokens.css` in the `web-design-studio` skill.
 

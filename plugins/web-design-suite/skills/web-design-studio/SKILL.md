@@ -157,7 +157,8 @@ Read the file when you hit the decision it covers. Do not read them all up front
 | `references/navigation-code.md` | Building a scroll-aware header, a mega menu, a drawer or a scroll-spy: working code |
 | `references/pattern-invention.md` | Inventing anything, or deciding whether an idea is safe to ship |
 | `references/motion-system.md` | Any animation, transition, or scroll behavior |
-| `references/accessibility.md` | Always, and specifically before declaring anything done |
+| `references/accessibility.md` | Always: what WCAG 2.2 AA and this suite require |
+| `references/accessibility-testing.md` | Before declaring anything done: the keyboard, zoom, forced-colors and screen-reader passes, and what scanners miss |
 | `references/handoff-conventions.md` | Repo structure, naming, Figma mapping, multi-dev rules, Claude Code handoff |
 | `references/review-checklist.md` | The final gate, every time |
 | `references/token-contract.md` | The shared vocabulary — identical across all thirteen suite skills |

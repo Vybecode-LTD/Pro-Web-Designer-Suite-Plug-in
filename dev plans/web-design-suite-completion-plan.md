@@ -130,6 +130,8 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 - They did not agree on `:where()`: stylelint counts the compounds inside it, so it refuses `:where(.a .b .c .d)`. The spec sides with it, since `:where()` takes away the weight but not the knowledge of the DOM. `:where(.a.b.c.d)` is allowed.
 - stylelint also counts the `+` of an An+B (`:nth-last-child(n + 5)`) as a combinator; the audit does not. The spec says so, and the starter's and layout-composition's quantity queries keep their disable comment.
 
+**N33 · The vanilla stack's naming rule 4 (found in P7).** *Done for 3.3.0 (PR #34): `test_contract.TheStarterKeepsItsWord.test_the_vanilla_stack_names_the_starters_primitives`.* stack-vanilla-css.md's rule 4 prefixed the layout primitives `.l-stack`, `.l-grid` and `.l-center`, and the starter's layout.css defines `.stack`, `.grid` and `.center`.
+
 **N3 · The references' CSS against the stylelint config.** *Done for 3.3.0.* 56 of the 170 CSS snippet files failed it at 3.2.1. The failures by rule:
 - 27 `selector-max-type`;
 - 20 value allowlist;
@@ -197,13 +199,13 @@ These are from the review:
 
 These were found in phase 2 and 3.2.1:
 
-- **N4.** `accessibility.md` is 60.1 KB, at the limit of one Read. Split it the way 3.2.0 split navigation-patterns.md, and keep `test_skill_budget` passing.
+- **N4.** *Done for 3.3.0 (PR #34): §10, the testing procedure, is `accessibility-testing.md` (8.5 KB), and accessibility.md is 52,963 bytes; `test_skill_budget` and the pointer register hold both.* `accessibility.md` is 60.1 KB, at the limit of one Read. Split it the way 3.2.0 split navigation-patterns.md, and keep `test_skill_budget` passing.
 - **N5.** *Done for 3.3.0 (PR #17).* Only the nine scripts that were executable in 3.0.0 are marked executable (the hook is one of them). Mark the other 17 scripts that have a shebang, and add a test that reads git's file modes. Since 3.2.1 the zip builder takes modes from git, so the zip carries them.
 - **N6.** *Done for 3.3.0.* Python 3.9 is the floor (decision 2). The harness no longer needs 3.10, `test_docs.PythonFloor` runs `test_harness` on 3.9, and the README states 3.9.
 - **N7.** TypeScript 7 is npm's latest, and typescript-eslint 8.70 accepts TypeScript below 6.1. A project that installs typescript-eslint without pinning TypeScript gets a peer conflict. Say so wherever the docs install typescript-eslint.
 - **N8.** The plugin README's install section names only a local folder. Add the GitHub route, `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, which anyone can use now that the repository is public.
-- **N9.** Add a repository-level check that the root `.claude-plugin/marketplace.json` and the plugin's own agree on name, description, category and keywords.
-- **N10.** The review's ✔ marks are stale. The inventory replaces them, so point the review's header at the inventory.
+- **N9.** *Done for 3.3.0 (PR #34): `test_docs.Manifests`, which compares every field but `source` and skips outside the repository.* Add a repository-level check that the root `.claude-plugin/marketplace.json` and the plugin's own agree on name, description, category and keywords.
+- **N10.** *Done for 3.3.0 (PR #34): the review's header says where each item stands now.* The review's ✔ marks are stale. The inventory replaces them, so point the review's header at the inventory.
 
 These were found in the reviews of PRs #12 to #15 (Codex and CodeRabbit, 2026-10-01 and 02). Each was rated P2 or minor and judged real; P0 of the execution plan fixes N16 to N25. One finding is not taken: CodeRabbit's note that `w1-supabase-facts.md` should spell `--quote-all-identifiers`. That line quotes the Supabase CLI's script, which spells it `--quote-all-identifier`.
 

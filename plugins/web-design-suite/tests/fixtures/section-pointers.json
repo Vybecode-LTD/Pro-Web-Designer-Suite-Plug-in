@@ -181,9 +181,9 @@
  },
  {
   "from": "a11y-audit-runner/references/runtime-checks.md",
-  "to": "web-design-studio/references/accessibility.md",
-  "section": "10",
-  "heading": "Testing procedure"
+  "to": "web-design-studio/references/accessibility-testing.md",
+  "section": "3",
+  "heading": "Forced colors / Windows High Contrast"
  },
  {
   "from": "a11y-audit-runner/references/runtime-checks.md",
@@ -1764,10 +1764,34 @@
   "heading": "HIDDEN"
  },
  {
-  "from": "web-design-studio/references/accessibility.md",
+  "from": "web-design-studio/references/accessibility-testing.md",
   "to": "a11y-audit-runner/references/automation-coverage.md",
   "section": "3",
   "heading": "The coverage table"
+ },
+ {
+  "from": "web-design-studio/references/accessibility-testing.md",
+  "to": "web-design-studio/references/accessibility.md",
+  "section": "3",
+  "heading": "Focus"
+ },
+ {
+  "from": "web-design-studio/references/accessibility-testing.md",
+  "to": "web-design-studio/references/accessibility.md",
+  "section": "4",
+  "heading": "Keyboard"
+ },
+ {
+  "from": "web-design-studio/references/accessibility.md",
+  "to": "web-design-studio/references/accessibility-testing.md",
+  "section": "3",
+  "heading": "Forced colors / Windows High Contrast"
+ },
+ {
+  "from": "web-design-studio/references/accessibility.md",
+  "to": "web-design-studio/references/accessibility-testing.md",
+  "section": "5",
+  "heading": "Automated tools — and what they cannot do"
  },
  {
   "from": "web-design-studio/references/accessibility.md",

@@ -8,6 +8,8 @@ It has 13 skills, 21 Python scripts, 3 Node scripts and 72 tests.
 - (B) are there gaps?
 - (C) how could it become a better, more thorough plugin?
 
+**Where each item stands now is not on this page.** The review is a record of 3.0.1 as it was on 2026-09-23, and its marks and notes stopped being kept up to date. The [completion inventory](web-design-suite-completion-inventory.md) has every item's status: the release that fixed it and the test that holds it, or the PR that will. The [execution plan](web-design-suite-execution-plan.md) schedules the open ones.
+
 **How to read this.** This page is the summary. Every finding has an ID, and the full write-up is in the detail folder `web-design-suite-review/`. The ID prefix tells you which file it's in:
 
 | Prefix | Area | Detail file |

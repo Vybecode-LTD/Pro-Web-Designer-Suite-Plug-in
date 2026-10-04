@@ -239,7 +239,7 @@ Within this skill:
 | the evidence trail for a VPAT/ACR | `references/manual-protocol.md` §7 |
 | testing with actual disabled users | `references/manual-protocol.md` §8 |
 
-Deliberately **not** duplicated here: the WCAG 2.2 AA criterion table, the focus contract, the 12-pattern keyboard map, the alt-text decision tree, `aria-hidden` vs `inert`, and the forced-colors symptom table all live in `web-design-studio/references/accessibility.md`. Contrast arithmetic lives in `web-design-studio/references/color-system.md` §7. This skill references them and goes where they stop — into measurement, the gate, and the human procedure.
+Deliberately **not** duplicated here: the WCAG 2.2 AA criterion table, the focus contract, the 12-pattern keyboard map, the alt-text decision tree, and `aria-hidden` vs `inert` live in `web-design-studio/references/accessibility.md`, and the forced-colors symptom table in `accessibility-testing.md` beside it. Contrast arithmetic lives in `web-design-studio/references/color-system.md` §7. This skill references them and goes where they stop — into measurement, the gate, and the human procedure.
 
 ---
 
