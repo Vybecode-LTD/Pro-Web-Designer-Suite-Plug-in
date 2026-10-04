@@ -208,11 +208,12 @@ createRoot(document.getElementById('root')!).render(<App />);
         @import url("../vendor/datepicker.css") layer(vendor);
       Then one line per component file, after the layers above:
         @import url("components/card.css");
-      With CSS Modules there are none: each component imports its own.
-      Last, once the project has them, the closed set of utilities and the
-      dated overrides. Each opens its own @layer block, so import it bare:
-        @import url("utilities.css");
-        @import url("overrides.css"); */
+      With CSS Modules there are none: each component imports its own. */
+
+/* 4. Last, the closed set of utilities and the dated overrides. Each opens
+      its own @layer block, so import it bare. */
+@import url("utilities.css");
+@import url("overrides.css");
 ```
 
 Note what is **not** here: component CSS. Modules are imported by their components and the bundler collects them. That is the source of the ordering problem in §6.
@@ -234,7 +235,7 @@ Every module file wraps its contents in the components layer:
 }
 ```
 
-This is not optional decoration. Without it, module CSS is **unlayered**, and unlayered author styles beat every layer — including `utilities` and `overrides`. A `.u-visually-hidden` utility will stop working against a component and nobody will be able to explain why.
+This is not optional decoration. Without it, module CSS is **unlayered**, and unlayered author styles beat every layer — including `utilities` and `overrides`. A `.visually-hidden` utility will stop working against a component and nobody will be able to explain why.
 
 ### The gotcha
 

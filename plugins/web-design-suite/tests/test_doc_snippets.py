@@ -209,7 +209,7 @@ class QuotedStarterCode(unittest.TestCase):
     def test_the_starter_passes_its_own_audit(self):
         styles = SKILLS / "web-design-studio" / "assets" / "starter" / "styles"
         findings, audited, _ = load_audit().audit_run([str(styles)])
-        self.assertEqual(audited, 5)                    # reset, tokens, base, layout and index
+        self.assertEqual(audited, 7)        # reset, tokens, base, layout, utilities, overrides and index
         self.assertEqual([], [f"{f.file}:{f.line} {f.law} {f.rule}: {f.message}" for f in findings])
 
 

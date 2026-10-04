@@ -148,11 +148,13 @@
   }
 
   body {
-    /* `dvh`, not `vh`: on mobile `100vh` is the LARGEST viewport height, so
-       a full-height element sits under the collapsing URL bar until you
-       scroll. `min-block-size` (not `block-size`) so content longer than the
+    /* `svh`, not `vh`: on mobile `100vh` is the LARGEST viewport height, so
+       a full-height element sits under the collapsing URL bar. Not `dvh`
+       either: it resizes as the bar hides, relaying the page out on every
+       scroll; dvh is for fixed overlays (layout-composition.md).
+       `min-block-size` (not `block-size`) so content longer than the
        viewport still grows the page. */
-    min-block-size: 100dvh;
+    min-block-size: 100svh;
   }
 
   /* Orphan and ragged-line control.
@@ -380,17 +382,13 @@
      8. SCROLLING
      ----------------------------------------------------------------------- */
 
-  /* Smooth scrolling ONLY while a fragment target exists. A blanket
-     `html { scroll-behavior: smooth }` also animates find-in-page, browser
-     restore-scroll-position, and every programmatic scrollTo — which makes
-     "jump to the error field" take 400ms and makes long pages feel broken.
-     `:has(:target)` limits it to the case the user actually asked for:
-     they clicked an in-page anchor. */
-  @media (prefers-reduced-motion: no-preference) {
-    html:has(:target) {
-      scroll-behavior: smooth;
-    }
-  }
+  /* No `scroll-behavior: smooth` on html. It animates find-in-page, restored
+     scroll positions and every programmatic scrollTo, which makes "jump to
+     the error field" take 400ms. `html:has(:target)` does not narrow it: once
+     any fragment is targeted, a shared #section link on load included, every
+     later scroll animates. Smooth one in-page link from its click handler:
+     target.scrollIntoView({ behavior: matchMedia(
+       '(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }). */
 
   /* An anchored element must not land flush against the top of the viewport
      (or worse, under a sticky header). `--space-block` is the Tier-2 role

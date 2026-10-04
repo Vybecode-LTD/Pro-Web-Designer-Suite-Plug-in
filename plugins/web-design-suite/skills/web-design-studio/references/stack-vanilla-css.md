@@ -110,11 +110,12 @@ Three rules keep this from rotting.
         @import url("../vendor/datepicker.css") layer(vendor);
       Then one line per component file, after the layers above:
         @import url("components/card.css");
-      With CSS Modules there are none: each component imports its own.
-      Last, once the project has them, the closed set of utilities and the
-      dated overrides. Each opens its own @layer block, so import it bare:
-        @import url("utilities.css");
-        @import url("overrides.css"); */
+      With CSS Modules there are none: each component imports its own. */
+
+/* 4. Last, the closed set of utilities and the dated overrides. Each opens
+      its own @layer block, so import it bare. */
+@import url("utilities.css");
+@import url("overrides.css");
 ```
 
 ### Why the layer statement must come first
@@ -698,7 +699,7 @@ Four rules. They are boring and they are the entire mechanism.
 
 1. **One block name per file, and the filename is the block name.** `card.css` may define selectors starting `.card` and nothing else. Violations are a one-line grep.
 2. **Block names are globally unique and never generic.** `.card`, not `.item`, `.wrapper`, `.container`, `.content`, `.inner`, `.box`. Generic names are how two features collide.
-3. **Utilities carry a prefix.** `.u-visually-hidden`, `.u-flow`. It makes them visible in markup and prevents a utility ever colliding with a block.
+3. **Utilities have one name each, the starter's.** `.visually-hidden`, as `assets/starter/styles/utilities.css` ships it. A block name is never generic (rule 2), so a utility cannot collide with one.
 4. **Layout primitives carry a prefix too.** `.l-stack`, `.l-grid`, `.l-center`. Layout is a different kind of thing from a component and the markup should say so.
 
 ---
@@ -723,7 +724,7 @@ The set that passes:
      get wrong: `display: none` and `visibility: hidden` remove it from the
      a11y tree; `text-indent: -9999px` breaks RTL; `width/height: 0` makes
      some engines skip it. This is the version that works. */
-  .u-visually-hidden:not(:focus-visible) {
+  .visually-hidden:not(:focus-visible) {
     position: absolute;
     /* stylelint-disable-next-line declaration-property-value-allowed-list -- design-audit-ignore-next-line: L1 -- the technique's 1px box, not a design size */
     inline-size: 1px;

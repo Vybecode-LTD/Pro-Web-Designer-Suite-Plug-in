@@ -73,7 +73,7 @@ The numbers that hold up in practice:
 | Bottom sheet (mobile) | 50–90vh | `--dur-slow` | `--dur-base` | Same, plus the thumb expects gravity — `--ease-out` in, `--ease-in` out |
 | Page / route transition | full viewport | `--dur-slower` | `--dur-base` | Once per navigation; must not delay content (§9) |
 | List item enter (staggered) | 8–16px | `--motion-enter` per item | — | See stagger, §4 |
-| Skeleton shimmer, spinner | looping | `--motion-loop` | — | Loops need constant velocity, not easing |
+| Skeleton shimmer, spinner | looping | `--motion-loop` | — | Loops need constant velocity, not easing. `--dur-loop` (900ms) stays out of the reduced-motion block: a spinner that stops reads as a hung page |
 
 **Travel distance is a spacing decision.** A menu that slides in from 8px should reference the spacing scale, not the number 8. The starter's `tokens.css` declares three travel roles, Tier 2:
 
@@ -595,7 +595,7 @@ The common alternative — `* { transition: none !important; animation: none !im
 - **Infinite loops.** 1ms × infinite is a strobe. Set `animation: none` explicitly (see the skeleton above). Anything with `infinite` in it needs its own reduced-motion rule.
 - **Scroll-driven animations.** No duration to collapse (§6).
 - **WAAPI / JS animations.** `el.animate()` takes its duration from your code. Read it from the token (`tokenMs()` in §5) or check `matchMedia('(prefers-reduced-motion: reduce)').matches` — and listen for `change`, because the preference can flip mid-session.
-- **`scroll-behavior: smooth`.** Wrap it: `@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }`.
+- **`scroll-behavior: smooth`.** Not on `html`: it animates find-in-page and every programmatic scroll. Smooth one in-page link from its click handler, with `behavior: 'auto'` when reduced motion is on (reset.css says how).
 - **Autoplaying video and animated GIF/WebP.** Not CSS at all. Gate autoplay on the media query and provide a play control.
 - **View transitions.** Kill the pseudo-element animations (§4).
 - **Third-party libraries.** Lottie, Rive, video backgrounds, carousel scripts. Each needs an explicit check.

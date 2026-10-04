@@ -5,11 +5,13 @@
    THREE TIERS. Respect the direction of flow; it is what keeps a codebase
    coherent when five people touch it in the same week.
 
-     Tier 1  PRIMITIVE   raw, unopinionated values.  --space-6, --gray-800
-                         Never referenced by a component. Ever.
+     Tier 1  PRIMITIVE   raw, unopinionated values.  --space-6, --neutral-800
+                         Never read by a component, except the primitives
+                         no role names (--radius-*, --stroke-*, --weight-*,
+                         --z-*: the contract lists them).
      Tier 2  SEMANTIC    a value bound to a ROLE.    --pad-card, --fg-muted
-                         This is the only tier component CSS is allowed to read.
-     Tier 3  COMPONENT   a role narrowed to one part. --btn-pad-x
+                         What component CSS reads.
+     Tier 3  COMPONENT   a role narrowed to one part. --btn-bg
                          Declared in the component's own file, sourced from Tier 2.
 
    Flow is one-way: PRIMITIVE -> SEMANTIC -> COMPONENT -> rule.
@@ -23,8 +25,10 @@
      scales die.
    - Add Tier 2 roles freely. They are cheap and they are the vocabulary the
      team actually speaks.
-   - Theme overrides (dark, density, brand) re-point Tier 2 ONLY. Tier 1 is
-     constant across every theme; that is what makes it primitive.
+   - Theme overrides (dark, density) re-point Tier 2. Two kinds of Tier 1
+     move as well: the dark theme's --shadow-* (a shadow on a dark surface is
+     a different material), and a white-label brand's whole ramp and font,
+     never one step of a ramp. Nothing else in Tier 1 changes with a theme.
    ========================================================================= */
 
 @layer tokens {
@@ -170,7 +174,7 @@
     --text-6xl:  clamp(3.5rem,  2.2901rem + 5.094vw, 6.875rem); /* hero      */
 
     /* Leading is a function of size: big type needs proportionally less.
-       These four cover everything; do not invent a fifth. */
+       These five cover everything; do not invent a sixth. */
     --leading-none:    1;      /* single-line numerals, tight display        */
     --leading-tight:   1.15;   /* display + h1/h2                            */
     --leading-snug:    1.3;    /* h3/h4, UI labels, buttons                  */
@@ -480,7 +484,7 @@
 
 
   /* =======================================================================
-     DARK THEME — re-points Tier 2 only. Note there is not one component
+     DARK THEME — re-points Tier 2, and --shadow-*. Note there is not one component
      selector below. That is the whole test of whether your token layer works.
      ======================================================================= */
 
@@ -545,13 +549,8 @@
   }
 
   /* Following the OS: set data-theme from a blocking inline script in <head>,
-     before first paint, so the tokens and the native controls flip TOGETHER:
-
-       <script>
-         var t = localStorage.getItem('theme') ||
-           (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-         document.documentElement.dataset.theme = t;
-       </script>
+     before first paint, so the tokens and the native controls flip TOGETHER.
+     The starter ships it: assets/starter/theme-init.js, inlined in <head>.
 
      Do not flip only `color-scheme` in a prefers-color-scheme query: that
      turned native inputs dark on a page whose tokens stayed light, leaving

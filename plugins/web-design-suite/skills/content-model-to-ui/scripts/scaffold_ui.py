@@ -2164,7 +2164,7 @@ export function ${Entities}FilteredEmpty({ onClearFilters }: { onClearFilters?: 
 export function ${Entities}Loading({ rows = 5 }: { rows?: number }) {
   return (
     <div className={styles.loading} role="status" aria-live="polite">
-      <span className="u-visually-hidden">Loading $human</span>
+      <span className="visually-hidden">Loading $human</span>
       {Array.from({ length: rows }, (_, index) => (
         <div className={styles.loadingRow} key={index}>
           {Array.from({ length: $cols }, (_, cell) => (

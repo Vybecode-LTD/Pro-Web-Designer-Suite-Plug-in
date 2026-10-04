@@ -446,7 +446,7 @@ they are where the insight comes from, and the distinctive variant is where it g
     <!-- … -->
   </ul>
 
-  <p class="u-visually-hidden" aria-live="polite" id="preset-status">Auditioning Glass Plate</p>
+  <p class="visually-hidden" aria-live="polite" id="preset-status">Auditioning Glass Plate</p>
 </div>
 ```
 
@@ -687,7 +687,7 @@ idea and lose the liability.
     <button type="button" role="radio" aria-checked="true"  class="ab-compare__btn"
             data-hold="true">After<span class="ab-compare__hold-hint"> · hold for original</span></button>
   </div>
-  <p class="u-visually-hidden" aria-live="polite">Playing: after processing</p>
+  <p class="visually-hidden" aria-live="polite">Playing: after processing</p>
 </div>
 ```
 

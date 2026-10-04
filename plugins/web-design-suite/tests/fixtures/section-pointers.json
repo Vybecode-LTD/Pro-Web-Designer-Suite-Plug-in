@@ -1758,6 +1758,12 @@
   "heading": "Anti-patterns"
  },
  {
+  "from": "web-design-studio/assets/starter/styles/overrides.css",
+  "to": "web-design-studio/assets/starter/styles/reset.css",
+  "section": "9",
+  "heading": "HIDDEN"
+ },
+ {
   "from": "web-design-studio/references/accessibility.md",
   "to": "a11y-audit-runner/references/automation-coverage.md",
   "section": "3",
