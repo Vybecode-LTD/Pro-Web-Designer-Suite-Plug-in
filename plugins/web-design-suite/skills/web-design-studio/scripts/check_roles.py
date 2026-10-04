@@ -76,6 +76,10 @@ def default_pairs() -> list[dict]:
               for bg in ("--bg-canvas", "--bg-surface", "--bg-sunken")]
     pairs += [{"fg": "--border-focus", "bg": bg, "min": 3.0, "scopes": BOTH}
               for bg in ("--bg-canvas", "--bg-surface", "--bg-sunken")]
+    pairs += [{"fg": f"--fg-on-{intent}", "bg": f"--bg-{intent}", "min": 4.5, "scopes": BOTH}
+              for intent in ("success", "warning", "danger")]
+    pairs += [{"fg": "--border-invalid", "bg": bg, "min": 3.0, "scopes": BOTH}
+              for bg in ("--bg-canvas", "--bg-surface", "--bg-sunken")]
     return pairs
 
 

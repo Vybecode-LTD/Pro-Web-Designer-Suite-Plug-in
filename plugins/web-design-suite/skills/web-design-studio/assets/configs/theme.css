@@ -241,6 +241,9 @@
   --color-link:        var(--fg-link);      /* text-link                    */
   --color-on-accent:   var(--fg-on-accent); /* text-on-accent  on a fill    */
   --color-on-inverse:  var(--fg-on-inverse);/* text-on-inverse on bg-inverse*/
+  --color-on-success:  var(--fg-on-success);/* text-on-success on bg-success*/
+  --color-on-warning:  var(--fg-on-warning);/* text-on-warning on bg-warning*/
+  --color-on-danger:   var(--fg-on-danger); /* text-on-danger  on bg-danger */
 
   /* `disabled` and the four intents each need a fill AND an ink, and one
      namespace cannot hold both under one name. Convention, applied without
@@ -271,6 +274,7 @@
   --color-line-strong: var(--border-strong);  /* border-line-strong         */
   --color-line-accent: var(--border-accent);  /* border-line-accent         */
   --color-focus:       var(--border-focus);   /* ring-focus, outline-focus  */
+  --color-line-invalid: var(--border-invalid); /* border-line-invalid      */
 
   /* Tier 1 ramps are NOT exposed. There is no `bg-neutral-800`, no
      `text-accent-500`. If a design needs a step that no role names, the

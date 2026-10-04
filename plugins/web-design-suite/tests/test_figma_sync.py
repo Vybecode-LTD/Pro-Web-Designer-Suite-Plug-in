@@ -187,5 +187,24 @@ class DeterministicOutput(TempDirTest):
         self.assertIn("1970-01-01", proc.stdout.decode("utf-8"))
 
 
+class StatusInks(TempDirTest):
+    """P7 (SS-B2): text on a status fill is measured on that fill. It was
+    measured on the canvas, so a white --fg-on-danger failed on a white page
+    and passed on any fill."""
+
+    def contrast_failures(self, fill: str) -> list:
+        data = {"fg": {"$type": "color", "on-danger": {"$value": "#ffffff"}},
+                "bg": {"$type": "color", "canvas": {"$value": "#ffffff"},
+                       "danger": {"$value": fill}}}
+        src = self.write("export.tokens.json", json.dumps(data))
+        proc = run_py("figma-variables-sync", "figma_audit", src, "--format", "json", cwd=self.tmp)
+        return [f for f in json.loads(proc.stdout)["findings"]
+                if f["code"] == "CONTRAST_FAIL" and "on-danger" in json.dumps(f)]
+
+    def test_an_on_status_ink_is_measured_on_its_fill(self):
+        self.assertEqual(self.contrast_failures("#d92f35"), [])      # 4.76:1 on the fill
+        self.assertEqual(len(self.contrast_failures("#ff9999")), 1)  # 2.07:1 on the fill
+
+
 if __name__ == "__main__":
     unittest.main()

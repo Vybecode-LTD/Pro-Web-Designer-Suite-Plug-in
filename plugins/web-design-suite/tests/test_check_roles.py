@@ -35,6 +35,19 @@ class CheckRoles(TempDirTest):
         self.assertEqual(proc.returncode, 0, output(proc))
         self.assertIn("every declared pair clears its minimum", output(proc))
 
+    def test_status_inks_and_the_invalid_border_are_held(self):
+        """P7 (SS-B2, SB-B4): white on --bg-warning is 2.25:1, so a filled
+        badge had no legal ink, and an invalid field had no border role."""
+        for name, decl in (("--fg-on-warning", "--fg-on-warning:  var(--neutral-1000);"),
+                           ("--border-invalid", "--border-invalid: var(--danger-500);")):
+            with self.subTest(role=name):
+                css = self.starter().replace(decl, decl.replace(decl.split(":", 1)[1].strip(),
+                                                                "var(--neutral-0);"), 1)
+                self.assertNotEqual(css, self.starter())
+                proc = self.roles(css)
+                self.assertEqual(proc.returncode, 1, output(proc))
+                self.assertIn(name, output(proc))
+
     def test_subtle_text_on_a_lightened_ramp_fails_on_the_well(self):
         css, n = re.subn(r"(--neutral-500:\s*oklch\()53\.5%", r"\g<1>60%", self.starter())
         self.assertEqual(n, 1)

@@ -576,7 +576,7 @@ CONTROL_CSS = """\
     cursor: not-allowed;
   }
 
-  .root[aria-invalid="true"] { --control-border: var(--border-accent); }
+  .root[aria-invalid="true"] { --control-border: var(--border-invalid); }
 
   .root[data-state="loading"] { cursor: progress; }
 
@@ -2436,7 +2436,7 @@ SCAFFOLD_CSS = """\
 
   .scaffold-root[data-state="loading"] { cursor: progress; }
   .scaffold-root[data-state="error"],
-  .scaffold-root[aria-invalid="true"]  { --scaffold-border: var(--border-accent); }
+  .scaffold-root[aria-invalid="true"]  { --scaffold-border: var(--border-invalid); }
 
   .scaffold-spinner {
     inline-size: 1em;

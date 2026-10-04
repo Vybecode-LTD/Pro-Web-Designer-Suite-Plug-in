@@ -47,6 +47,23 @@ def sha(path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+class InvalidFieldsLookInvalid(unittest.TestCase):
+    """P7 (SB-B4): accessibility.md drew an invalid field in --border-focus, so
+    it looked focused, and the scaffold drew it in --border-accent."""
+
+    def test_every_invalid_field_rule_reads_the_invalid_role(self):
+        files = [SKILLS / "web-design-studio" / "references" / "accessibility.md",
+                 SKILLS / "content-model-to-ui" / "scripts" / "scaffold_ui.py"]
+        seen = 0
+        for path in files:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if '[aria-invalid="true"]' in line and "border" in line and "{" in line:
+                    seen += 1
+                    with self.subTest(file=path.name, rule=line.strip()):
+                        self.assertIn("var(--border-invalid)", line)
+        self.assertGreaterEqual(seen, 3)
+
+
 class ContractCopies(unittest.TestCase):
 
     def test_the_fourteen_contract_copies_are_identical(self):

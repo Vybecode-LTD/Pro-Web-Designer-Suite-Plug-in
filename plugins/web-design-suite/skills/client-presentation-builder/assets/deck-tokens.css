@@ -306,6 +306,14 @@
     --fg-disabled:    var(--neutral-400);   /* non-interactive, exempt        */
     --fg-on-accent:   var(--neutral-0);
     --fg-on-inverse:  var(--neutral-50);
+    /* Text on a filled status badge. White fails on two of the three fills
+       (3.41:1 on success, 2.25:1 on warning), so the ink follows the fill.
+       Verified 6.10:1 (--neutral-1000 on --success-500), 9.24:1
+       (--neutral-1000 on --warning-500), 4.75:1 (--neutral-0 on --danger-500).
+       The fills keep their step in dark, so these do too. */
+    --fg-on-success:  var(--neutral-1000);
+    --fg-on-warning:  var(--neutral-1000);
+    --fg-on-danger:   var(--neutral-0);
     --fg-accent:      var(--accent-700);    /* accent text on light surface   */
     --fg-link:        var(--accent-700);
 
@@ -318,6 +326,11 @@
     --border-strong:  var(--neutral-500);   /* control outlines, emphasis     */
     --border-accent:  var(--accent-500);
     --border-focus:   var(--accent-600);
+    /* An invalid field's boundary, never the focus colour: a field that
+       looks focused is not a field that looks wrong. SC 1.4.11 asks 3:1;
+       Verified 4.23:1 (--danger-500 on --neutral-100), the sunken input.
+       Colour is not the only cue (1.4.1): the error message carries an icon. */
+    --border-invalid: var(--danger-500);
 
     /* Intent roles. */
     /* Note the asymmetry: --accent-500 is the BRAND anchor, but a filled
@@ -430,6 +443,12 @@
     --dur-loop:        900ms;
     --motion-loop:     var(--dur-loop) var(--ease-linear);
 
+    /* Travel distance is a spacing decision: a menu slides from a step of
+       the scale, never from translateY(8px). */
+    --motion-travel-xs: var(--space-1);   /*  4px — hover lift, press nudge */
+    --motion-travel-sm: var(--space-2);   /*  8px — tooltip, menu, popover  */
+    --motion-travel-md: var(--space-4);   /* 16px — card, sheet, toast      */
+
 
     /* ---------------------------------------------------------------------
        9. Z-INDEX — a closed ladder. Never write a literal z-index again.
@@ -500,6 +519,7 @@
     --border-subtle:  var(--neutral-900);
     --border-default: var(--neutral-800);
     --border-strong:  var(--neutral-500);   /* 3.89:1 on surface: >= 3:1    */
+    --border-invalid: var(--danger-400);
 
     /* On dark, the accent can move back to 500: the foreground on it is
        near-black (--fg-on-accent), so the fill wants to be lighter, not

@@ -1167,6 +1167,8 @@ class Auditor:
             wanted = ["bg-accent"]
         elif "on-inverse" in fg_slug:
             wanted = ["bg-inverse"]
+        elif intent := re.search(r"on-(success|warning|danger)", fg_slug):
+            wanted = ["bg-" + intent.group(1)]
         else:
             wanted = ["bg-canvas", "bg-surface", "bg-sunken"]
         out: List[Tuple[str, Tuple[float, float, float]]] = []
