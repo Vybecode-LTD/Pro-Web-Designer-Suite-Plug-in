@@ -124,6 +124,8 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 - **A literal `0` among tokens.** `padding: 0 var(--pad-card)` passes the audit, and the spec's zero rule allows it, but stylelint's `VAR_SEQ` takes only `var()`s and refuses it; so do `gap` and `border-radius`. Likewise `calc(100% - var(--gutter-page))` in a spacing property: stylelint takes no calc() but a token plus or minus a token, and the audit passes it.
 - **Margins the audit exempts.** The audit lets a component set a margin on its generated content (`.card::before`) and in a rule whose selector names `prose`. `design/component-margins` refuses both, and the spec says neither.
 
+**N32 · The specificity limits are not in the spec (CodeRabbit on #24).** The audit's `compound-specificity` (four chained classes, outside `:where()`) and stylelint's `selector-max-specificity: '0,3,1'` and `selector-max-compound-selectors: 3` are each written into their gate by hand. `design-rules.json` has no selector section, so no example holds the two gates to each other. They agree on `:where()`, which both score as zero, but nothing tests that.
+
 **N3 · The references' CSS against the stylelint config.** 56 of the 170 CSS snippet files fail it (3.2.1). The failures by rule:
 - 27 `selector-max-type`;
 - 20 value allowlist;

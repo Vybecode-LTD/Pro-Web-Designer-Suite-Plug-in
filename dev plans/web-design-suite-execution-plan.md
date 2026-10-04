@@ -69,7 +69,7 @@ PRs #12 to #15 were merged on 2026-10-02. P0 fixes what their reviews found.
 | P3 part 1, #20 | The gates agree on every example of the spec: N1's eight constructs, and what P2's conformance test found. `KNOWN_DISAGREEMENTS` is empty | N1, N30 | the audit, `stylelint.config.mjs`, `eslint.design.config.mjs`, `design-rules.json` | M |
 | P3 part 2, #23 | The holes in the stylelint allowlist, and the two disagreements found in part 1 | SB-A15, N31 | `design-rules.json`, the audit, `stylelint.config.mjs`, `eslint.design.config.mjs` | M |
 | P4, #24 | Audit accuracy, the checks the docs promise, its speed on large JSX, and SARIF output | SB-A11, SB-A25, SB-C10 | `audit_design.py` | M |
-| P5 | The references' CSS passes stylelint, and the Tailwind v3 entry | N3, SB-C9 | `web-design-studio/references/*.md`, `assets/configs/` | M |
+| P5 | The references' CSS passes stylelint, the Tailwind v3 entry, and the specificity limits in the spec | N3, SB-C9, N32 | `web-design-studio/references/*.md`, `assets/configs/` | M |
 | P6 | The generators reproduce the starter: type, colour and fluid type, tested against each other | SS-A9, SS-B5, SS-B6, SS-B7, SS-C5 | `generate_*.py`, `tokens.css`, `test_numbers.py` | L |
 | P7 | The contract's missing roles, the files the starter refers to, and two wrong comments | SB-B4, SS-B2, SS-C9, SS-A17, SS-A18 | `token-contract.md` (14 copies), `tokens.css`, `reset.css`, starter files | M |
 | P8 | Hygiene and docs that work in cmd and PowerShell | XC-A2, XC-A5, XC-B5, XC-C9, N4, N7, N8, N9, N10 | READMEs, `accessibility.md`, `marketplace.json` | M |
@@ -206,7 +206,7 @@ Update this table in each PR.
 
 | Phase | PRs done | Items closed | Release |
 |---|---|---|---|
-| 3 | #12 to #21 merged (2026-10-02 and 03): P0 #16, P1 #17, P2 #18 and #19, P3 part 1 #20, and the skill descriptions #21; P3 part 2 #23, P4 #24 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30, SB-A15, N31, SB-A11, SB-A25, SB-C10; DL-B2 and SB-C9 in part | — |
+| 3 | #12 to #24 merged (2026-10-02 to 04): P0 #16, P1 #17, P2 #18 and #19, P3 part 1 #20, and the skill descriptions #21; P3 part 2 #23, P4 #24 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30, SB-A15, N31, SB-A11, SB-A25, SB-C10; DL-B2 and SB-C9 in part | — |
 | 4 | — | — | — |
 | 5 | — | — | — |
 | 6 | — | — | — |
