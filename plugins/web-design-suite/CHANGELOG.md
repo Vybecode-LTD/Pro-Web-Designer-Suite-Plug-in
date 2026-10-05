@@ -833,6 +833,10 @@
   shell fences or the browser scripts, and holds every typescript-eslint install to a
   TypeScript 6.0 pin, as the repository's toolchain has. Against `v3.2.1`, 5 fail (24
   subtests); the control and the inherited quick start pass on both.
+  CodeRabbit's review of #35 added two: the fence reader closed a fence on any ``` line
+  and did not read `~~~` fences (`test_fences_pair_as_commonmark_pairs_them`), and an
+  install continued over lines was never checked for its pin
+  (`test_an_install_split_over_lines_is_still_read`). Both fail on `3121d61`.
 
 ## 3.2.1 — 2026-09-25
 
