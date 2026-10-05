@@ -313,15 +313,22 @@ class SkillFrontmatter(unittest.TestCase):
                 self.assertLessEqual(len(description), 1024)
 
 
+ABSENT = object()
+
+
 def manifest_differences(ours: dict, theirs: dict) -> list[str]:
     """The fields two marketplace manifests disagree on, apart from where each
-    finds the plugin (`source` is relative to its own manifest)."""
-    found = [k for k in sorted(set(ours) | set(theirs)) if k != "plugins" and ours.get(k) != theirs.get(k)]
-    a, b = ours.get("plugins", []), theirs.get("plugins", [])
-    if len(a) != len(b):
-        return [*found, "plugins"]
+    finds the plugin (`source` is relative to its own manifest). A field one
+    of them lacks differs from a `null` in the other."""
+    def differ(x: dict, y: dict, key: str) -> bool:
+        return x.get(key, ABSENT) != y.get(key, ABSENT)
+
+    found = [k for k in sorted(set(ours) | set(theirs)) if k != "plugins" and differ(ours, theirs, k)]
+    a, b = ours.get("plugins", ABSENT), theirs.get("plugins", ABSENT)
+    if not (isinstance(a, list) and isinstance(b, list) and len(a) == len(b)):
+        return [*found, "plugins"] if a != b else found
     for i, (x, y) in enumerate(zip(a, b)):
-        found += [f"plugins[{i}].{k}" for k in sorted(set(x) | set(y)) if k != "source" and x.get(k) != y.get(k)]
+        found += [f"plugins[{i}].{k}" for k in sorted(set(x) | set(y)) if k != "source" and differ(x, y, k)]
     return found
 
 
@@ -363,6 +370,14 @@ class Manifests(unittest.TestCase):
         theirs["plugins"][0]["source"] = "./elsewhere"
         theirs["description"] = "drifted"
         self.assertEqual(["description", "plugins[0].keywords"], manifest_differences(ours, theirs))
+
+    def test_an_absent_field_differs_from_a_null_one(self):
+        """CodeRabbit on #34: dict.get read both as None."""
+        self.assertEqual(["homepage"], manifest_differences({"homepage": None, "plugins": []}, {"plugins": []}))
+        self.assertEqual(["plugins[0].tags"], manifest_differences({"plugins": [{"tags": None}]}, {"plugins": [{}]}))
+        self.assertEqual(["plugins"], manifest_differences({"plugins": None}, {}))
+        self.assertEqual([], manifest_differences({"plugins": None}, {"plugins": None}))
+        self.assertEqual([], manifest_differences({"plugins": [{"source": "./"}]}, {"plugins": [{"source": "./x"}]}))
 
     def test_the_repositorys_marketplace_matches_the_plugins(self):
         if not (self.REPO_MARKET and self.REPO_MARKET.is_file()):

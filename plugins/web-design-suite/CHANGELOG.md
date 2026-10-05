@@ -822,6 +822,8 @@
   drift failed it. It now compares only this repository's own plugin
   (`test_a_copy_elsewhere_is_not_held_to_this_repository`; the old test fails on a
   copy with another description).
+  CodeRabbit's added one: the comparison read a missing field and a `null` one alike
+  (`test_an_absent_field_differs_from_a_null_one`, which fails on `e97785c`).
 - P8 part 2 (XC-A2, N8, XC-B5, XC-C9, N7): `test_docs.PasteableCommands` reads every
   shell line of both READMEs for what bash, PowerShell 5.1 and cmd read differently
   (continuations, comments, `&`, `;`, substitutions, assignments, any variable but
