@@ -173,6 +173,19 @@
   null-outs, and extract_system flagged `--weight-*`, which the audit allows. The lists
   are now the rule spec's `tiers` section (prefixes with a role, the role exceptions, the
   null-outs), written into both by `tools/sync_rules.py`; the audit exempts the null-outs.
+- **A colour rename beside a `font-weight` was refused** (LC-A14). apply_codemod's font
+  guard, which stops a `font-size` rewrite into the `font` shorthand from resetting the
+  weight beside it, refused every declaration-scope rewrite in such a rule: deprecate.py's
+  `color: var(--fg-subtle)` to `--fg-faint` beside `font-weight: 600` came back as "`font:
+  var(--fg-faint)` would reset font-weight". The guard applies only to a rewrite into
+  `font:` from another property now.
+- **deprecate.py's scan labelled a one-line rule `manual`** (LC-A14). It read a line as one
+  declaration, so `.meta { color: var(--fg-subtle); }` was "not a plain declaration" and the
+  review's client read "0 codemod · 9 manual" where the codemod rewrites 7; the same rules
+  on several lines were labelled right. It reads each declaration on a line, and no longer
+  predicts the font-guard skip, which a colour rename never meets.
+- **A re-point listed every density and condition** when its default value moved, a side
+  effect of P14's equality check, which needs them only when the default does not move.
 
 ### Changed
 
@@ -185,6 +198,14 @@
   CSS and JSON reader, and the copies had drifted. They now import
   `scripts/browser_common.mjs`, a byte-identical copy of `shared/browser_common.mjs` in
   each of the three skills, so each skill still runs on its own.
+- **The two worked examples are the tools' own output** (LC-C12). design-token-migration's
+  worked run (references/worked-run.md) and design-system-versioning's worked release
+  (SKILL.md) quoted numbers from fixtures that never shipped. They are now
+  `tests/fixtures/worked-run`, eight files, and `tests/fixtures/worked-release.json`, five
+  edits to the starter's tokens.css, and both pages quote what the tools print for them
+  today: 120 literals in 7 files (the vendor sheet is excluded), 68 rules, 91 replacements,
+  119 audit errors before and 37 after; a 3-major, 1-minor, 1-patch release whose re-point
+  crosses 4.5:1 (4.92 to 3.56). The worked release said "four edits" and listed five.
 - **Release builds compare by content** (N34). `tooling/release/compare.py` compares two
   build folders entry by entry: names, and each entry's bytes (read, hashed and checked
   against its CRC), size, date and mode. A build
@@ -332,6 +353,20 @@
   on that head). And the spec's `tiers` examples never ran through the audit, the gate
   their section names; `test_rules_spec` runs them now (a control: the audit already
   agreed).
+- P15 part 2 (LC-A14, LC-C4, LC-C12): `test_versioning.DeprecateRewritesAndCountsAColourRename`
+  runs the review's `fx/dep/client` rules through deprecate.py's mapping, the codemod and
+  the scan, one rule per line and the same rules on several lines;
+  `test_token_migration.TheWorkedRun` reruns worked-run.md against its fixture and
+  `test_versioning.TheWorkedRelease` reruns the worked release, each holding every number
+  the page quotes to the output. Against `v3.3.0`, all 4 fail.
+  Codex's review of #50 found one more, failing on its head: a declaration-scope rewrite
+  replaced through `!important` and dropped it, which the font guard had hidden beside a
+  `font-weight`. The rewrite ends where the value does now. CodeRabbit's found two more in
+  the scan, failing on `28d5b99`: an `!important` declaration, which the codemod rewrites,
+  was labelled manual, and a token named inside a quoted `content` string was split at the
+  string's `;` (or past an escaped `\"` in it, its next review found) and counted as a
+  codemod hit
+  (`test_the_scan_reads_important_and_quoted_text_as_the_codemod_does`).
 
 ## 3.3.0 — 2026-10-04
 

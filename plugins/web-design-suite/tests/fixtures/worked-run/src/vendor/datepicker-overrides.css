@@ -1,0 +1,5 @@
+/* Overrides for the date picker's own stylesheet. */
+.dp-calendar { border-radius: 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); }
+.dp-day { padding: 6px; font-size: 13px; color: #333; }
+.dp-day--selected { background: #2f6df6; color: #fff; }
+.dp-day--today { border: 1px solid #2f6df6; }
