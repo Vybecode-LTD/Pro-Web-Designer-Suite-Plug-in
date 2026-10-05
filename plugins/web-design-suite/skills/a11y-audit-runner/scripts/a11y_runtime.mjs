@@ -1735,7 +1735,9 @@ async function checkReflow(page, opts) {
 // ---------------------------------------------------------------------------
 
 const BUDGET_KEYS = {
-  axe_violations: (f) => f.filter((x) => x.check === 'axe' && !/incomplete/.test(x.rule)).length,
+  // A best-practice finding is never a violation, in a budget either (Codex on #41).
+  axe_violations: (f) => f.filter((x) => x.check === 'axe' && !/incomplete/.test(x.rule) &&
+    x.sc !== 'best practice').length,
   axe_serious: (f) => f.filter((x) => x.check === 'axe' && x.severity === 'error').length,
   axe_incomplete: (f) => f.filter((x) => x.check === 'axe' && /incomplete/.test(x.rule)).length,
   unnamed_controls: (f) => f.filter((x) => x.rule === 'no-accessible-name').length,

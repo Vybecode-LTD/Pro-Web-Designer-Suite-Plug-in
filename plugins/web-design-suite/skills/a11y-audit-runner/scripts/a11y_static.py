@@ -1226,7 +1226,7 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
     h1s = [(lvl, ln) for lvl, ln, _ in heading_seq if lvl == 1]
     if len(h1s) > 1:
         add(h1s[1][1], "S", "multiple-h1", "best practice", "warning",
-            f"{len(h1s)} <h1> elements (lines {', '.join(str(l) for _, l in h1s)}).",
+            f"{len(h1s)} <h1> elements (lines {', '.join(str(ln) for _, ln in h1s)}).",
             "Best practice, not a WCAG failure: no criterion limits a page to "
             "one h1. The h1 is the page's subject and should roughly match the "
             "<title>. Two of them means the outline has two roots, and a user "
