@@ -83,7 +83,7 @@ Items GT-A5, GT-A14, GT-C2 and SB-B3. Read them first: `gates.md` lines 37 (GT-A
 - **GT-A5.** No `bypassCSP`: a page with `Content-Security-Policy: default-src 'self'` crashes at the freeze's `addStyleTag` and exits 1, which means violations. Set `bypassCSP: true` on every context in all three scripts, and map setup failures to exit 2.
 - **GT-A14.** (a) The freeze shortens animations without pausing them, so a spinner beside an `outline: none` button counts as a ring. Pause them, as snapshot_matrix does (P9's shared freeze CSS). (b) Disabled controls are not exempt from contrast, as SC 1.4.3 exempts them.
 - **GT-C2.** The rest of C2: colour parsing, modals, iframes, inert content, after reading what is already done.
-- **SB-B3.** No gate checks focus, forced colours or density in the build flow. A probe that tabs through a page and asserts a visible outline or ring under forced-colors emulation.
+- **SB-B3.** No gate checks focus, forced colours or density in the build flow. A probe that tabs through a page and asserts a visible outline or ring, in normal colours and under forced-colors emulation, at each density the starter offers (`data-density="compact|comfortable|spacious"` on the root). Close SB-B3 only when all three are covered; if density does not fit P10, leave SB-B3 open and reschedule its density part.
 
 P10 is M-L: split it if the diff grows (GT-A5 and GT-A14 first, then GT-C2 and SB-B3), stacked on P9 if P9 is still open.
 
