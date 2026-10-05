@@ -318,6 +318,10 @@
   extract_system and holds both to the spec's lists. Against `v3.3.0`, 4 fail. Two are
   controls: a negative margin with no padding to cancel keeps its gap token, and the spec's
   new `tiers` examples, which `fail_before.py` swaps out with the rest of the plugin.
+  Codex's review of #49 found two more, failing on its head: a cancel matched the padding
+  by size alone, so `margin-inline: -8px` read an 8px block padding's token, and a padding
+  declared for `.a, .panel` was not `.panel`'s. The pairing keeps to the axis and splits
+  selector lists.
 - P15 part 2 (LC-A14, LC-C4, LC-C12): `test_versioning.DeprecateRewritesAndCountsAColourRename`
   runs the review's `fx/dep/client` rules through deprecate.py's mapping, the codemod and
   the scan, one rule per line and the same rules on several lines;

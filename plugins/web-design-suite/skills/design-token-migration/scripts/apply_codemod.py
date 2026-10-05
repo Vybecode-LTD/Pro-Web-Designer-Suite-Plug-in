@@ -409,20 +409,47 @@ def selector_key(selector: str) -> str:
     return " ".join(selector.split())
 
 
-def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Dict[str, Dict[str, dict]]:
-    """Each rule's padding, by selector: {value key: the rule it maps by}."""
-    out: Dict[str, Dict[str, dict]] = {}
+def box_axes(prop: str, count: int, index: int) -> Tuple[str, ...]:
+    """The axes one slot of a padding or margin sets: `block`, `inline` or both."""
+    side = prop.split("-", 1)[1] if "-" in prop else ""
+    if side:
+        return (("inline",) if side.startswith(("inline", "left", "right"))
+                else ("block",) if side.startswith(("block", "top", "bottom")) else ())
+    if count == 1:
+        return ("block", "inline")
+    return ("block",) if index % 2 == 0 else ("inline",)
+
+
+def selector_list(selector: str) -> List[str]:
+    """`.a, .panel` as its members, split at top-level commas only."""
+    out, depth, start = [], 0, 0
+    for i, ch in enumerate(selector):
+        depth += {"(": 1, ")": -1}.get(ch, 0)
+        if ch == "," and depth == 0:
+            out.append(selector[start:i])
+            start = i + 1
+    out.append(selector[start:])
+    return [selector_key(s) for s in out if s.strip()]
+
+
+def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Dict[str, Dict[Tuple[str, str], dict]]:
+    """Each rule's padding, by selector (each member of a selector list):
+    {(axis, value key): the rule it maps by}."""
+    out: Dict[str, Dict[Tuple[str, str], dict]] = {}
     for d in decls:
         if not d.prop.startswith("padding"):
             continue
         value = text[d.value_offset:d.value_offset + len(d.value)]
         slots = split_slots(mask_strings_and_urls(value))
-        for slot, klass in zip(slots, slot_classes(d.prop, slots)):
+        for i, (slot, klass) in enumerate(zip(slots, slot_classes(d.prop, slots))):
             real = value[slot.start:slot.end]
             rule = mapping.value_rule(klass, real)[0] if klass else None
-            if rule:
-                for key in canon_slot(real):
-                    out.setdefault(selector_key(d.selector), {}).setdefault(key, rule)
+            if not rule:
+                continue
+            for member in selector_list(d.selector):
+                for axis in box_axes(d.prop, len(slots), i):
+                    for key in canon_slot(real):
+                        out.setdefault(member, {}).setdefault((axis, key), rule)
     return out
 
 
@@ -443,17 +470,20 @@ def parent_selectors(d) -> List[str]:
     return out
 
 
-def cancelled_padding(d, slot: str, pads: Dict[str, Dict[str, dict]]) -> Optional[dict]:
+def cancelled_padding(d, slot: str, axes: Sequence[str],
+                      pads: Dict[str, Dict[Tuple[str, str], dict]]) -> Optional[dict]:
     """The rule of the padding a negative margin cancels: its parent rule's
-    padding of the same size (extraction-and-clustering.md §10). A negative
-    cancel must read the token the padding reads, or the bleed breaks the day
-    the padding changes; `-16px` in a margin alone clusters to a gap token."""
+    padding of the same size on the same axis, every axis the margin sets
+    agreeing (extraction-and-clustering.md §10). A negative cancel must read the
+    token the padding reads, or the bleed breaks the day the padding changes;
+    `-16px` in a margin alone clusters to a gap token."""
     keys = canon_slot(slot.strip().lstrip("-"))
     for parent in parent_selectors(d):
+        index = pads.get(parent, {})
         for key in keys:
-            hit = pads.get(parent, {}).get(key)
-            if hit:
-                return hit
+            hits = [index.get((axis, key)) for axis in axes]
+            if hits and all(hits) and all(h is hits[0] for h in hits):
+                return hits[0]
     return None
 
 
@@ -550,7 +580,7 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
             if not rule:
                 continue
             if negate and prop.startswith("margin"):
-                rule = cancelled_padding(d, real, pads) or rule
+                rule = cancelled_padding(d, real, box_axes(prop, len(slots), parent), pads) or rule
             edits.append(Edit(
                 base + d.value_offset + slot.start,
                 base + d.value_offset + slot.end,
