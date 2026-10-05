@@ -83,7 +83,8 @@ PRs #12 to #15 were merged on 2026-10-02. P0 fixes what their reviews found.
 | PR | What | Items | Main files | Size |
 |---|---|---|---|---|
 | P9, #38 | One copy of the runtime helpers, vendored into each gate, with a test that the copies match; and the release build compares archives by content (N34) | GT-C13, N34 | `a11y_runtime.mjs`, `measure_vitals.mjs`, `generate_matrix.py` and their helpers | S-M |
-| P10 | a11y_runtime: `bypassCSP`, the two false measurements, colour parsing, modals, iframes, inert content, animation pausing, and a focus, forced-colors and density probe | GT-A5, GT-A14, GT-C2, SB-B3 | `a11y_runtime.mjs` | M-L |
+| P10 part 1, #39 | a11y_runtime: `bypassCSP` where a browser script injects (not in measure_vitals), a crash exits 2, Chrome's one-stop wrap is not a trap, and disabled controls are exempt from contrast; the rest of C2 was done in 3.1.0 and P9 | GT-A5, GT-A14, GT-C2 | `a11y_runtime.mjs`, `snapshot_matrix.mjs`, `measure_vitals.mjs` | M |
+| P10 | a11y_runtime: the focus, forced-colors and density probe, run in the studio's build flow | SB-B3 | `a11y_runtime.mjs`, web-design-studio's Phase 5 | M |
 | P11 | a11y_static's success criteria, the axe tag advice, and the gate docs' corrections | GT-A8, GT-A16, GT-A18, GT-C5 | `a11y_static.py`, a11y and perf references | M |
 | P12 | The snapshot matrix: focus mirroring, custom states, the differs-from-default gate, its model and its baseline lifecycle | GT-A12, GT-A13, GT-C3, GT-B7, GT-B8 | `generate_matrix.py`, `snapshot_matrix` | L |
 | P13 | measure_vitals: Lighthouse's throttle presets, TTFB from CDP, `--interact` without its own handler, `--interact-at`, and field data through `crux_check.py` | GT-A6, GT-A17, GT-C11, GT-B5 | `measure_vitals.mjs`, new `crux_check.py` | M |
@@ -210,6 +211,6 @@ Update this table in each PR.
 | Phase | PRs done | Items closed | Release |
 |---|---|---|---|
 | 3 | #12 to #36 (2026-10-02 to 04): P0 #16, P1 #17, P2 #18 and #19, P3 part 1 #20, and the skill descriptions #21; P3 part 2 #23, P4 #24, P5 #26; P6 part 1 #28 and part 2 #29; P7 part 1 #31 and part 2 #32; P8 part 1 #34 and part 2 #35 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30, SB-A15, N31, SB-A11, SB-A25, SB-C10, N3, N32, SB-C9, SS-B5, SS-A9, SS-B6, SS-B7, SS-C5, SB-B4, SS-B2, SS-C9, SS-A17, SS-A18, N4, XC-A5, N9, N10, N33, XC-A2, XC-B5, XC-C9, N7, N8; DL-B2 in part | 3.3.0, released 2026-10-04: #36 merged as `88a4886`, tagged `v3.3.0`, published by `release.yml` |
-| 4 | #38 (2026-10-04): P9 | GT-C13, N34; GT-A14 (a) | — |
+| 4 | #38 (2026-10-04): P9; #39 (2026-10-05): P10 part 1 | GT-C13, N34, GT-A5, GT-A14, GT-C2 | — |
 | 5 | — | — | — |
 | 6 | — | — | — |

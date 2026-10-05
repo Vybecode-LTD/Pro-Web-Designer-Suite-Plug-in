@@ -98,7 +98,8 @@
  * ----------
  *   0  no error-severity findings, and inside budget if one was given
  *   1  violations found, or a budget breach
- *   2  bad arguments, no usable browser, no axe-core, or the page failed to load
+ *   2  bad arguments, no usable browser, no axe-core, the page failed to load,
+ *      or the run itself failed: a crash is never a finding
  */
 
 import { createRequire } from 'node:module';
@@ -415,8 +416,23 @@ const HELPERS = () => {
   // Not in the accessibility tree at all: inert, aria-hidden, or behind a modal.
   const hiddenFromAT = (el) => !!inertOrHidden(el) || behindModal(el);
 
+  // Whether the page cancelled the last Tab. Chrome wraps Tab from the last
+  // stop to the first inside the page, so on a page with one stop a wrap and
+  // a trap look alike; a trap built on the key cancels it.
+  // The event is kept and read once its dispatch is over, after every
+  // listener the page has, wherever it was added.
+  let lastTab = null;
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') lastTab = e;
+  }, true);
+  const takeTabCancelled = () => {
+    const v = !!(lastTab && lastTab.defaultPrevented);
+    lastTab = null;
+    return v;
+  };
+
   window.__a11y = { FOCUSABLE, cssPath, visible, expectedTabbables, describeActive,
-                    hiddenFromAT, openModal };
+                    hiddenFromAT, openModal, takeTabCancelled };
 };
 
 // ---------------------------------------------------------------------------
@@ -695,7 +711,8 @@ async function tabSequence(page, { steps, shift }) {
   for (let i = 0; i < steps; i++) {
     await page.keyboard.press(shift ? 'Shift+Tab' : 'Tab');
     // eslint-disable-next-line no-await-in-loop
-    const stop = await page.evaluate(() => window.__a11y.describeActive());
+    const stop = await page.evaluate(() => ({ ...window.__a11y.describeActive(),
+                                              cancelled: window.__a11y.takeTabCancelled() }));
     seq.push(stop);
     if (stop.sel === '(document)' && seq.length > 2 &&
         seq[seq.length - 2].sel === '(document)') break;   // left the page
@@ -737,10 +754,13 @@ function analyseTabOrder(forward, reverse, expected, opts) {
     }
   }
   // Focus that does not move at all. An <iframe> reported as the stop is a
-  // cross-origin frame this script cannot look into, not a trap.
+  // cross-origin frame this script cannot look into, not a trap. On a page
+  // with one stop, Chrome's wrap lands on the same element, so there it is a
+  // trap only if the page cancelled the key.
+  const wraps = expected.length === 1;
   for (let i = 1; i < forward.length; i++) {
     if (forward[i].sel === forward[i - 1].sel && forward[i].sel !== '(document)' &&
-        forward[i].tag !== 'iframe') {
+        forward[i].tag !== 'iframe' && (!wraps || forward[i].cancelled)) {
       out.push(finding(
         'taborder', 'focus-stuck', '2.1.2', 'error',
         `Tab did not move focus away from ${forward[i].sel}.`,
@@ -1167,6 +1187,24 @@ const CONTRAST_FN = () => {
     a: 1,
   });
 
+  // SC 1.4.3 exempts text that is part of an inactive component, and axe
+  // skips the same set: a disabled control or fieldset and everything in it,
+  // anything inside aria-disabled="true", and the label of a disabled control.
+  // The first legend of a disabled fieldset is not disabled (HTML), so what
+  // it holds is measured, and so is a control that only looks disabled
+  // (GT-A14).
+  const inactive = (el) => {
+    if (el.closest('[aria-disabled="true"]')) return true;
+    for (let n = el; n; n = n.parentElement) {
+      if (!n.matches(':disabled')) continue;
+      if (n.tagName !== 'FIELDSET') return true;
+      const legend = n.querySelector(':scope > legend');
+      if (!legend || !legend.contains(el)) return true;
+    }
+    const label = el.closest('label');
+    return !!(label && label.control && label.control.matches(':disabled'));
+  };
+
   const out = [];
   const seen = new Set();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -1179,6 +1217,7 @@ const CONTRAST_FN = () => {
     if (/^(script|style|noscript|title)$/i.test(el.tagName)) continue;
     if (!window.__a11y.visible(el)) continue;
     seen.add(el);
+    if (inactive(el)) continue;
 
     const cs = getComputedStyle(el);
     const fg = parse(cs.color);
@@ -1867,6 +1906,9 @@ async function main() {
       locale: 'en-US',
       timezoneId: 'UTC',
       reducedMotion: 'no-preference',
+      // A strict Content-Security-Policy refuses the stylesheet and scripts
+      // this run injects; the audit is of the page, not of its CSP (GT-A5).
+      bypassCSP: true,
     });
     await ctx.addInitScript(HELPERS);
     const page = await ctx.newPage();
@@ -1889,7 +1931,7 @@ async function main() {
 
   try {
     const { ctx, page } = await newPage('none');
-    const cmpCtx = await browser.newContext();
+    const cmpCtx = await browser.newContext({ bypassCSP: true });
     const cmpPage = await cmpCtx.newPage();
     await cmpPage.goto('about:blank');
 
@@ -2133,7 +2175,8 @@ async function main() {
   return (errors || breaches.length) ? 1 : 0;
 }
 
+// 1 means the page has violations, so a run that failed exits 2 (GT-A5).
 main().then((code) => process.exit(code)).catch((err) => {
-  process.stderr.write(`a11y_runtime: ${err && err.stack ? err.stack : err}\n`);
-  process.exit(1);
+  process.stderr.write(`a11y_runtime: the run failed: ${err && err.stack ? err.stack : err}\n`);
+  process.exit(2);
 });

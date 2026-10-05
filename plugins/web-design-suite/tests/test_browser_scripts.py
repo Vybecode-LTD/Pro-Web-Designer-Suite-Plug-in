@@ -12,6 +12,9 @@ Regressions covered:
   instead of the next browser being tried; an explicit one that would not start
   crashed instead of exiting 2 ("no usable browser").
 - axe's fix text was cut at exactly 300 characters, mid-word, straight into the URL.
+- GT-A5: no context bypassed the page's Content-Security-Policy, so a strict
+  one refused the injected freeze stylesheet, and the crash exited 1, the code
+  for violations.
 
 A stub `playwright` module stands in for the real one: its launch() prints the
 executable it was given and exits 42, or throws for the executables listed in
@@ -44,11 +47,33 @@ export const chromium = {
 export default { chromium };
 """
 
+# A browser that starts, prints the options of each context it is asked for,
+# and then fails the way an unexpected error inside the run does.
+STUB_CRASHING_CONTEXT = """\
+const crash = async () => { throw new Error('STUB-CRASH'); };
+export const chromium = {
+  executablePath() { return '/nonexistent/stub-chromium'; },
+  async launch() {
+    return {
+      async newContext(opts) {
+        process.stdout.write('STUB-CONTEXT ' + JSON.stringify(opts ?? {}) + '\\n');
+        return { addInitScript: crash, newPage: crash, async close() {} };
+      },
+      async close() {},
+    };
+  },
+};
+export default { chromium };
+"""
+
 SCRIPTS = {
     "snapshot_matrix": ("component-state-matrix", "snapshot_matrix.mjs"),
     "measure_vitals": ("perf-budget-gate", "measure_vitals.mjs"),
     "a11y_runtime": ("a11y-audit-runner", "a11y_runtime.mjs"),
 }
+# Whether a script injects what a page's CSP governs (a stylesheet, axe), and
+# so bypasses that CSP.
+INJECTS = {"snapshot_matrix": True, "measure_vitals": False, "a11y_runtime": True}
 BROWSER_ENV = {"MATRIX_CHROMIUM": None, "PERF_CHROMIUM": None, "A11Y_CHROMIUM": None,
                "STUB_FAIL_LAUNCH": None}
 SANDBOX_BROWSER = "/opt/pw-browsers/chromium"
@@ -170,6 +195,44 @@ class BrowserScriptResolution(TempDirTest):
                 proc = self.run_script(name, *extra, cwd=elsewhere,
                                        env_changes={"NODE_PATH": None, "npm_config_prefix": str(prefix)})
                 self.assertEqual(proc.returncode, 42, output(proc))
+
+    def test_contexts_bypass_csp_where_they_inject_and_a_crash_exits_2(self):
+        """GT-A5: a page served with `Content-Security-Policy: default-src
+        'self'` refused the injected freeze stylesheet, and the error left
+        through the last-resort handler as exit 1, which means violations.
+        The scripts that inject now bypass the page's CSP, and a run that
+        fails exits 2: a crash is never a finding."""
+        self.write("proj/node_modules/playwright/index.mjs", STUB_CRASHING_CONTEXT)
+        self.write("proj/node_modules/axe-core/axe.min.js", "window.axe = {};")
+        for name in SCRIPTS:
+            with self.subTest(script=name):
+                proc = self.run_script(
+                    name, "--browser", self.fake_browser, cwd=self.tmp / "proj",
+                    env_changes={"NODE_PATH": str(self.tmp / "proj" / "node_modules")})
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn("STUB-CRASH", output(proc))
+                contexts = [json.loads(line.split(" ", 1)[1])
+                            for line in output(proc).splitlines() if line.startswith("STUB-CONTEXT ")]
+                self.assertTrue(contexts, output(proc))
+                self.assertEqual([], [c for c in contexts if bool(c.get("bypassCSP")) is not INJECTS[name]])
+
+
+class ContextOptions(unittest.TestCase):
+    """GT-A5: the stub above sees only the contexts a script opens before it
+    fails, so every `newContext(` call in the source is held to it too. The two
+    scripts that inject a stylesheet or axe bypass the page's CSP; measure_vitals
+    injects only an init script, and a bypass would change what it measures
+    (CodeRabbit on #39)."""
+
+    def test_the_scripts_that_inject_bypass_csp_and_measure_vitals_does_not(self):
+        for name, (skill, script) in SCRIPTS.items():
+            text = (SKILLS / skill / "scripts" / script).read_text(encoding="utf-8")
+            calls = re.findall(r"\.newContext\((\{.*?\})?\)", text, re.S)
+            with self.subTest(script=name):
+                self.assertTrue(calls)
+                bypass = [bool(re.search(r"(?:^|[{,])\s*bypassCSP: true\b", c or "", re.M))
+                          for c in calls]
+                self.assertEqual([INJECTS[name]] * len(calls), bypass)
 
 
 @unittest.skipUnless(NODE, "node is not installed")

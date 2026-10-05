@@ -285,7 +285,7 @@ Deliberately measure performance with reduced motion **off** (that is `perf-budg
 
 ### The algorithm
 
-For every element with a direct non-empty text node:
+For every element with a direct non-empty text node, except the text of an inactive component, which SC 1.4.3 exempts: a disabled control or fieldset and what it holds, anything inside `aria-disabled="true"`, and the label of a disabled control (axe skips the same set). A control that only looks disabled is measured, and §10 says why a human still checks the ones that are skipped.
 
 1. `fg = getComputedStyle(el).color`, with its alpha.
 2. Walk ancestors compositing `background-color` with source-over until one is opaque. **If any ancestor has a `background-image`, stop and report the pair as unmeasurable** — do not guess.

@@ -16,6 +16,9 @@ Regressions covered:
   unreachable-control and no-accessible-name errors for everything behind it;
   focus inside a same-origin iframe was reported as focus-stuck, and axe ran
   in the top frame only.
+- GT-A5: a page whose Content-Security-Policy refused the injected freeze
+  stylesheet crashed the run, with exit 1.
+- GT-A14 (b): the text of disabled controls was held to 1.4.3, which exempts it.
 - GT-A3: the visual matrix's default per-pixel tolerance was coarser than the
   suite's own hover (4%) and pressed (8%) overlays, so deleting :hover or
   :active passed every cell.
@@ -25,6 +28,7 @@ from __future__ import annotations
 import json
 import unittest
 
+from test_browser_scripts import installed_browsers
 from wds_support import NODE, TempDirTest, output, run_node, tool_modules
 
 
@@ -34,6 +38,9 @@ def node_modules() -> str | None:
 
 
 MODULES = node_modules()
+# What a server's `Content-Security-Policy: default-src 'self'` header does,
+# in a file: no inline style or script, so no injected one either.
+CSP_META = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'\">"
 
 
 @unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at "
@@ -82,6 +89,57 @@ class RuntimeInABrowser(TempDirTest):
                 "</main></body></html>")
         self.assertIn("no-visible-focus-indicator", self.rules(self.runtime(html, "--only", "focus")))
 
+    def test_a_page_with_a_strict_csp_is_audited(self):
+        """GT-A5: `default-src 'self'` refused the freeze stylesheet the run
+        injects, and the run crashed with exit 1."""
+        page = self.write("csp.html", "<!doctype html><html lang=en><head><title>csp</title>"
+                                      f"{CSP_META}</head><body><main><h1>Strict</h1>"
+                                      "<button type=button>Save</button></main></body></html>")
+        proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", page, "--json",
+                        *[arg for check in ("axe", "names", "taborder", "forced", "keys", "reflow")
+                          for arg in ("--skip", check)],
+                        cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
+        if proc.returncode == 2 and b"browser" in proc.stderr.lower():
+            self.skipTest("no usable browser: " + output(proc)[-200:])
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertEqual([], [f for f in json.loads(proc.stdout)["findings"] if f["severity"] == "error"])
+
+    def test_disabled_controls_are_exempt_from_contrast(self):
+        """GT-A14 (b): SC 1.4.3 exempts text that is part of an inactive
+        component, as axe does; a control that only looks disabled is not."""
+        faint = "color:#aaa;background:#fff"
+        html = ("<!doctype html><html lang=en><head><title>d</title><style>"
+                f".faint{{{faint}}}</style></head><body><main><h1>Plans</h1>"
+                "<button class=faint disabled>Unavailable now</button>"
+                "<button class=faint aria-disabled=true><span>Coming soon</span></button>"
+                "<fieldset disabled><legend><button class=faint>Legend action</button></legend>"
+                "<label class=faint for=card>Card number</label><input id=card></fieldset>"
+                "<label class=faint for=promo>Promo code</label><input id=promo disabled>"
+                "<button class=faint>Looks disabled</button>"
+                "</main></body></html>")
+        findings = self.runtime(html, "--only", "contrast")
+        flagged = sorted(f["message"].split('"')[1] for f in findings if f["rule"] == "contrast-too-low")
+        # The first legend of a disabled fieldset stays enabled (Codex on #39).
+        self.assertEqual(["Legend action", "Looks disabled"], flagged)
+
+    ONE_STOP = ("<!doctype html><html lang=en><head><title>one</title></head><body><main>"
+                "<h1>One</h1><button type=button>Save</button>{}</main></body></html>")
+
+    def test_a_page_with_one_tab_stop_is_not_a_trap(self):
+        """Chrome wraps Tab from the last stop to the first inside the page, so
+        on a page with one stop, focus stays put: it was reported as
+        `focus-stuck` (CI on #39). A page that cancels Tab still is one."""
+        skips = [arg for check in ("axe", "names", "focus", "forced", "contrast", "keys", "reflow")
+                 for arg in ("--skip", check)]
+        trap = "<script>addEventListener('keydown', e => e.key === 'Tab' && e.target.matches('button') && e.preventDefault())</script>"
+        for browser in [None] + installed_browsers()[:1]:
+            extra = ["--browser", browser] if browser else []
+            with self.subTest(browser=browser or "default"):
+                errors = self.rules(self.runtime(self.ONE_STOP.format(""), *skips, *extra))
+                self.assertNotIn("focus-stuck", errors)
+                errors = self.rules(self.runtime(self.ONE_STOP.format(trap), *skips, *extra))
+                self.assertIn("focus-stuck", errors)
+
     def test_an_open_modal_dialog_is_not_a_trap(self):
         """GT-A2: a cookie banner built the recommended way."""
         html = ('<!doctype html><html lang="en"><head><title>Cookie consent</title></head><body>'
@@ -109,6 +167,33 @@ class RuntimeInABrowser(TempDirTest):
         self.assertNotIn("focus-stuck", errors)
         axe_rules = {f.get("rule") for f in findings if f.get("check") == "axe"}
         self.assertTrue({"label", "button-name"} & axe_rules, axe_rules)
+
+
+@unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
+class VitalsUnderCsp(TempDirTest):
+    """GT-A5, CodeRabbit on #39: measure_vitals injects only an init script,
+    which CSP does not govern, so it measures the page with its CSP in force.
+    A bypass would run what the CSP blocks: here, a script that shifts the
+    page's content down after load."""
+
+    PAGE = ("<!doctype html><html lang=en><head><title>v</title>{}</head><body><main>"
+            "<h1>Prices</h1><p>Plans start at four pounds a month.</p></main><script>"
+            "setTimeout(() => document.body.insertAdjacentHTML('afterbegin',"
+            " '<div style=\"height:400px\">Banner</div>'), 100)</script></body></html>")
+
+    def cls(self, head):
+        page = self.write("page.html", self.PAGE.format(head))
+        proc = run_node("perf-budget-gate", "measure_vitals.mjs", page, "--runs", "1",
+                        "--settle", "1000", "--json", cwd=self.tmp,
+                        env_changes={"NODE_PATH": MODULES}, timeout=240)
+        if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
+            self.skipTest(output(proc)[-200:])
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return json.loads(proc.stdout)["stats"]["cls"]["median"]
+
+    def test_a_script_the_csp_blocks_stays_blocked(self):
+        self.assertGreater(self.cls(""), 0.1)            # the shift is measured when it runs
+        self.assertLess(self.cls(CSP_META), 0.01)
 
 
 @unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
@@ -150,6 +235,15 @@ class MatrixSeesStateChanges(TempDirTest):
         self.assertEqual(proc.returncode, 1, output(proc))
         self.assertIn("st_hover", output(proc))
         self.assertIn("no visible style", output(proc))
+
+    def test_a_sheet_with_a_strict_csp_is_captured(self):
+        """GT-A5, in snapshot_matrix: the freeze stylesheet was refused there too."""
+        sheet = self.sheet()
+        html = sheet.read_text(encoding="utf-8").replace("<title>matrix</title>",
+                                                         "<title>matrix</title>" + CSP_META)
+        sheet.write_text(html, encoding="utf-8")
+        proc = self.snapshot(sheet, "--update-baselines")
+        self.assertEqual(proc.returncode, 0, output(proc))
 
     def test_a_subtle_fill_change_against_the_baseline_is_caught(self):
         proc = self.snapshot(self.sheet(hover="0.04"), "--update-baselines")

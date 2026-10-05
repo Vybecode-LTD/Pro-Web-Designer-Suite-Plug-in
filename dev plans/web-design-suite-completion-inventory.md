@@ -152,7 +152,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-A2 | high | fixed in 3.1.0 | the runtime reports false Level-A errors on two page shapes that are everyday. |
 | GT-A3 | high | fixed in 3.1.0 | the visual gate is blind to the regressions the matrix exists to catch. |
 | GT-A4 | high | fixed in 3.1.0 | the pre-commit snippet ("one hook, three checks", which shows two) has four faults. |
-| GT-A5 | medium | W5 (3.4.0) | no `bypassCSP`. |
+| GT-A5 | medium | fixed in 3.4.0: `test_browser_scripts.BrowserScriptResolution.test_contexts_bypass_csp_where_they_inject_and_a_crash_exits_2`, `ContextOptions`, `test_browser_runtime.VitalsUnderCsp`, `test_browser_runtime.test_a_page_with_a_strict_csp_is_audited`, `test_a_sheet_with_a_strict_csp_is_captured` and `test_a_page_with_one_tab_stop_is_not_a_trap` (PR #39) | no `bypassCSP`. |
 | GT-A6 | medium | W5 (3.4.0) | the throttle presets are not Lighthouse's, and TTFB is never throttled. |
 | GT-A7 | medium | fixed in 3.2.0 | the coverage sources are misstated. |
 | GT-A8 | medium | W5 (3.4.0) | the axe tag advice is wrong in both directions. |
@@ -161,7 +161,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-A11 | medium | fixed in 3.2.0 | the docs say to put the device and network "in a comment" in `perf-budget.json`, and the examples are JSONC. |
 | GT-A12 | medium | W5 (3.4.0) | rules written with `:focus` or `:focus-within` are mirrored to `[data-force-state~="focus"]`. |
 | GT-A13 | medium | W5 (3.4.0) | only the seven fixed states are allowed. |
-| GT-A14 | medium | (a) fixed in 3.4.0: `test_browser_runtime.test_a_spinner_is_not_a_focus_ring` (PR #38); (b) in P10 | two measurements give false results (fixture `$W\e11\probes.html`). |
+| GT-A14 | medium | fixed in 3.4.0: (a) `test_browser_runtime.test_a_spinner_is_not_a_focus_ring` (PR #38); (b) `test_browser_runtime.test_disabled_controls_are_exempt_from_contrast` (PR #39) | two measurements give false results (fixture `$W\e11\probes.html`). |
 | GT-A15 | medium | fixed in 3.2.0 | none of the CI recipes (a11y SKILL.md:285-311; ci-integration.md:53-110; visual-regression.md:191-237) runs as written in every case. |
 | GT-A16 | low-medium | W5 (3.4.0) | two rows of the "same method" table cannot be reproduced with that method (TTFB = 4·RTT + 200 ms, minus 300 + 150 ms). |
 | GT-A17 | low-medium | W5 (3.4.0) | `--interact` adds the interaction's own handler to TBT. |
@@ -177,7 +177,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-B8 | — | W11 (3.6.0+) | The baseline lifecycle. |
 | GT-B9 | — | W11 (3.6.0+) | Chromium only. |
 | GT-C1 | M · P0 | fixed in 3.1.0 and 3.2.0 (browser tests) | A test suite that uses a real browser, skipped when none is available. |
-| GT-C2 | S–M · P0 | partly done; the rest in W5 (3.4.0) | Fix colour parsing, modals, iframes, inert content, `bypassCSP`, animation pausing and the disabled-control exemption. |
+| GT-C2 | S–M · P0 | fixed in 3.4.0: colours, modals, iframes and inert content in 3.1.0 (GT-A1, GT-A2), pausing in PR #38 (GT-A14 (a)), `bypassCSP` and the disabled-control exemption in PR #39 (GT-A5, GT-A14 (b)) | Fix colour parsing, modals, iframes, inert content, `bypassCSP`, animation pausing and the disabled-control exemption. |
 | GT-C3 | M · P0 | partly done; the rest in W5 (3.4.0) | Matrix: the within-run "differs from default" gate, a tuned tolerance, focus mirroring, custom states, `data-state="error"` on non-form templates. |
 | GT-C4 | S · P0 | fixed in 3.1.0, with GT-A4 | One shipped hook with opt-in stages in place of the inline snippets. |
 | GT-C5 | S · P0 | partly done; the rest in W5 (3.4.0) | A correction pass on the docs (A7–A10, A16, A19). |

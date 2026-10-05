@@ -10,6 +10,24 @@
   passed. It now uses the matrix's freeze, which pauses them.
 - **a11y_runtime reads a JSONC budget or keymap**, with comments and trailing commas, as
   measure_vitals and perf_audit already did.
+- **A page with a strict Content-Security-Policy crashed the run** (GT-A5). Under
+  `default-src 'self'` the page refused the freeze stylesheet that a11y_runtime and
+  snapshot_matrix inject, and the error left as exit 1, which means violations. Their
+  contexts now bypass the page's CSP, and a run of any of the three browser scripts that
+  fails exits 2: a crash is never a finding, a regression or a breach. measure_vitals
+  keeps the page's CSP: it injects only an init script, which CSP does not govern, and a
+  bypass would run what the CSP blocks, so it would measure a page no user gets.
+- **Disabled controls were held to contrast** (GT-A14 (b)). SC 1.4.3 exempts the text of
+  an inactive component, and axe skips it; a11y_runtime reported `<button disabled>` as
+  `contrast-too-low`. It now skips a disabled control or fieldset and what it holds,
+  anything inside `aria-disabled="true"`, and the label of a disabled control. What sits
+  in the first legend of a disabled fieldset is still measured, since HTML leaves it
+  enabled, and so is a control that only looks disabled. With GT-A5, this finishes GT-C2: 3.1.0
+  did the colours, modals, iframes and inert content, and P9 the pausing.
+- **A page with one tab stop was a keyboard trap in Chrome.** Chrome (not the headless
+  shell) wraps Tab from the last stop to the first inside the page, so on a page with one
+  stop, focus stayed put, and a11y_runtime reported `focus-stuck` (2.1.2) as an error.
+  There, focus that stays put is a trap only if the page cancelled the key.
 
 ### Changed
 
@@ -36,6 +54,18 @@
   compared (the old tool reports such a pair the same). CodeRabbit's added a fourth: an
   entry damaged alike in both builds read as the same error on both sides, so two
   damaged builds compared the same; an unreadable entry is now always a difference.
+- P10 part 1 (GT-A5, GT-A14 (b)): `test_browser_scripts` runs the three scripts against
+  a stub browser that records each context's options and then fails, and holds every
+  `newContext(` call in their source to the bypass where the script injects;
+  `test_browser_runtime` audits a page and captures a sheet under `default-src 'self'`,
+  and checks disabled controls against a lookalike that is not. Against `v3.3.0`, all 5
+  fail. The reviews of #39 added three, each failing on its first head:
+  - CI found the Chrome wrap: `test_a_page_with_one_tab_stop_is_not_a_trap` runs a
+    one-button page in the default browser and in an installed Chrome or Edge, with a
+    page that cancels Tab as the guard (it fails against `v3.3.0` too).
+  - Codex found the first-legend exception, now in the disabled-controls test.
+  - CodeRabbit found that a bypass in measure_vitals would run a script the CSP blocks:
+    `VitalsUnderCsp` measures such a script's layout shift as none.
 
 ## 3.3.0 — 2026-10-04
 
