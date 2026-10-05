@@ -1,0 +1,10 @@
+{
+  "about": "design-system-versioning SKILL.md's worked release: five edits to the starter's tokens.css (skills/web-design-studio/assets/starter/styles/tokens.css). test_versioning.TheWorkedRelease applies them in order, runs diff_system on the pair, and holds the SKILL.md's quoted report to the output.",
+  "from_version": "1.4.2",
+  "edits": [
+    {"what": "rename", "old": "--fg-subtle:", "new": "--fg-faint:", "all": true},    {"what": "ramp nudge", "old": "--accent-600: oklch(56.5% 0.176 42);", "new": "--accent-600: oklch(59.5% 0.18 42);"},
+    {"what": "re-point", "old": "--bg-accent:      var(--accent-600);", "new": "--bg-accent:      var(--accent-500);"},
+    {"what": "addition", "old": "    --fg-strong:      var(--neutral-950);   /* headings", "new": "    --fg-hint:        var(--neutral-400);\n    --fg-strong:      var(--neutral-950);   /* headings"},
+    {"what": "comment", "old": "/* secondary text >= 4.5:1        */", "new": "/* secondary text, >= 4.5:1 on every surface */"}
+  ]
+}

@@ -588,8 +588,12 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
         # ---- whole-declaration rewrites (font-size -> a --type-* role) -----
         drule = mapping.decl_rule(prop, value_eff.strip())
         if drule:
+            # Only a rewrite INTO the `font` shorthand resets the longhands
+            # beside it. A colour rename (`color: var(--fg-faint)`, from
+            # deprecate.py) keeps its property and resets nothing.
             siblings = block_props.get(d.block_start, set()) - {prop}
-            clash = siblings & FONT_SIBLINGS
+            into_font = drule["replacement"].startswith("font:") and prop != "font"
+            clash = siblings & FONT_SIBLINGS if into_font else set()
             if clash:
                 skips.append(Skip(
                     source_name, line_of(d.decl_offset),
@@ -598,9 +602,9 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
                     f"delete those first, the --type-* role carries them",
                     text[d.decl_offset:d.value_offset + len(d.value)].strip()))
             else:
-                edits.append(Edit(
+                edits.append(Edit(                  # up to `!important`, which stays
                     base + d.decl_offset,
-                    base + d.value_offset + len(d.value),
+                    base + d.value_offset + len(value_eff.rstrip()),
                     drule["replacement"], drule["id"], drule["kind"],
                     line_of(d.decl_offset),
                     text[d.decl_offset:d.value_offset + len(d.value)]))

@@ -118,7 +118,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-A11 | medium | fixed in 3.4.0: `test_token_migration.MigrationPipeline.test_a_negative_cancel_points_at_its_parents_padding_token` (PR #49) | The reference says a negative cancel must "point at the **same token** the padding uses… Never" point elsewhere. |
 | LC-A12 | medium | fixed in 3.4.0: `test_token_migration.MigrationPipeline.test_a_type_tie_snaps_up_even_when_the_smaller_step_is_commoner` (PR #49) | The docs say "15px … becomes 16 (`--type-body`), not 14. |
 | LC-A13 | medium | fixed in 3.1.0 | `git stash && audit_design … > /tmp/before.json && git stash pop`: the audit exits 1 on any legacy code, so `pop` never runs. |
-| LC-A14 | medium | W6 (3.4.0) | deprecate.py emits a colour rename. |
+| LC-A14 | medium | fixed in 3.4.0: `test_versioning.DeprecateRewritesAndCountsAColourRename` (PR #50) | deprecate.py emits a colour rename. |
 | LC-A15 | medium | fixed in 3.1.0, as SB-A12 | The doc says that after replacing the Tailwind theme, "an off-scale class does not exist and the build errors on it". |
 | LC-A16 | medium | fixed in 3.2.0 | Re-pointing --bs-primary does not reach .btn-primary, which sets --bs-btn-bg: #0d6efd literally ([bootstrap.css](https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.css)), or .bg-primary and .text-primary, wh |
 | LC-A17 | medium | W6 (3.4.0) | The model announcement reads "**Design system 2.1.0.** One breaking change: `--bg-accent` moved…". |
@@ -139,7 +139,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-C1 | — | W9 (3.5.0) | Add `contract.json`, emitted by extract_system from the project's tokens.css and read through `--tokens` by figma_audit, figma_to_tokens, cluster_values, audit_design and diff_system. |
 | LC-C2 | — | W10 (3.6.0+) | Add a shared `dtcg.py` for 2025.10 read and write, Tokens Studio sets and themes, and `$deprecated` → ledger, plus a `--format dtcg` output. |
 | LC-C3 | — | fixed in 3.4.0: `test_figma_sync.FigmaCommon` (PR #53); the tier-list half, `test_rules_spec.TheTierListsAgree` (PR #49) | Move the two figma scripts' shared code into `figma_common.py`, and add a parity test for extract_system tier1-leak vs audit_design L6. |
-| LC-C4 | — | W6 (3.4.0) | Add regression tests for LC-A5, A10, A11, A12, A14 and A2, then fix each one: focus-ring detection, the vendor rule, negative-cancel pairing, the type-tie note, the font guard scope, and composed opacity. |
+| LC-C4 | — | fixed in 3.4.0: A11, A12 and A14 with P15 (PR #49, #50), the rest in 3.1.0 | Add regression tests for LC-A5, A10, A11, A12, A14 and A2, then fix each one: focus-ring detection, the vendor rule, negative-cancel pairing, the type-tie note, the font guard scope, and composed opacity. |
 | LC-C5 | — | fixed in 3.4.0: `test_versioning.DiffSystemClassifiesWhatSystemJsonRecords` (PR #48) | diff_system: cover density, conditions, `element` and CSS Modules; record `@layer` in system.json; make an added override major when an existing value moves. |
 | LC-C6 | — | partly done; the rest in W6 (3.4.0) | Instruction fixes: the rebase recipe (LC-A6), a worktree-based before/after audit (LC-A13), the `${CLAUDE_SKILL_DIR}` invocation (LC-A20), one snapshot path with its inputs in config (LC-A18), the README (LC-A21), the ro |
 | LC-C7 | — | W10 (3.6.0+) | A Figma MCP route: a SKILL.md routing row that says "if `get_variable_defs` is available, read with it"; a `--reverse --format plugin-script` output for `use_figma` that renames "Mode 1", sets `scopes: []` on primitives  |
@@ -147,7 +147,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-C9 | — | W9 (3.5.0) | User-invocable workflow skills (`disable-model-invocation: true`): `/wds-migrate-census`, `/wds-release-check` (extract → diff → gate → changelog → guide), `/wds-figma-handoff`, `/wds-docs-check`, each with `allowed-tool |
 | LC-C10 | — | W9 (3.5.0) | A `claude plugin eval` suite, with a `scaffold_script` for each fixture. |
 | LC-C11 | — | fixed in 3.2.0 | Descriptions and token budget. |
-| LC-C12 | — | W6 (3.4.0) | Ship the 8-file migration fixture and the five-edit release as test fixtures, and have CI regenerate the SKILL.md numbers from them. |
+| LC-C12 | — | fixed in 3.4.0: `tests/fixtures/worked-run` and `worked-release.json`, held by `test_token_migration.TheWorkedRun` and `test_versioning.TheWorkedRelease` (PR #50) | Ship the 8-file migration fixture and the five-edit release as test fixtures, and have CI regenerate the SKILL.md numbers from them. |
 | GT-A1 | high | fixed in 3.1.0 | the runtime contrast check silently skips any colour that is not serialised as `rgb()`/`rgba()`. |
 | GT-A2 | high | fixed in 3.1.0 | the runtime reports false Level-A errors on two page shapes that are everyday. |
 | GT-A3 | high | fixed in 3.1.0 | the visual gate is blind to the regressions the matrix exists to catch. |

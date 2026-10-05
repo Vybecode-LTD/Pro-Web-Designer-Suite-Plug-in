@@ -215,12 +215,11 @@ Publish this list with the guide. A migration guide that promises a clean codemo
 | **A component whose replacement has different DOM** | `<Banner>` → `<Callout>` may need a child restructured, a prop renamed and a slot filled. Rewriting the tag alone produces code that compiles and renders wrong. |
 | **A Tier-3 socket default: `--card-fg: var(--fg-subtle)`** | `apply_codemod` skips custom-property declarations on purpose — they are the system's own layer, not a call site. Re-point these by hand; there are never many. |
 | **A shorthand: `border-bottom: 1px solid var(--fg-subtle)`** | The rule matches a whole declaration value. Enumerating every surrounding text is not a rule, it is a regex nobody can review. |
-| **A rule that also sets `font-weight` or `line-height`** | The engine's font-shorthand guard refuses declaration-scope rewrites there. It reports the skip and exits 1, so nothing is lost silently — but a human edits those. |
 | **A token inside JS or markup** — `style={{ color: "var(--fg-subtle)" }}` | The engine reads styled-components bodies and `className` strings. An arbitrary string in an inline style is not either. (It is also a Law 4 violation, so the fix is bigger than the rename.) |
 | **A consumer's own theme override of the old name** | It is in *their* file, re-pointing *your* role. Only they know whether it should follow the rename. This belongs in `notes`. |
 | **A prop whose type changed shape** — `isLarge: boolean` → `size: 'sm'\|'lg'` | The mapping is not one-to-one and the absent case (`isLarge={false}`) may mean `'sm'` or may mean "default". |
 
-`deprecate.py scan` labels every call site `codemod` or `manual`, with the reason, so the honest list is generated from the consumer's actual code rather than from your memory. It predicts the font-sibling skip too, so a consumer learns about it before running the codemod rather than from a message about font shorthands they never asked for.
+`deprecate.py scan` labels every call site `codemod` or `manual`, with the reason, so the honest list is generated from the consumer's actual code rather than from your memory. It reads each declaration on a line, so a one-line rule is labelled as the codemod treats it, and a colour rename beside a `font-weight` is a codemod hit: the codemod's font guard applies only where a rewrite turns another property into the `font` shorthand.
 
 Set `--codemod manual` on the ledger record for these. The mapping then emits no rule for it and lists it under `unmapped` with the reason, which is more useful than a rule that half-works.
 
