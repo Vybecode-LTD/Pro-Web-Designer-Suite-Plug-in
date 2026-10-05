@@ -166,9 +166,14 @@ def query(target: Dict[str, str], form_factor: str) -> Any:
         raise CheckError(f"the CrUX API could not be reached: {reason}") from None
 
 
-def canonical(url: str) -> tuple:
+def canonical(url: str, kind: str) -> tuple:
+    """Scheme and host without case. An origin's root slash is not a page, but
+    a page's trailing slash is: `/offers` and `/offers/` are two records."""
     parts = urllib.parse.urlsplit(url.strip())
-    return (parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"), parts.query)
+    path = parts.path
+    if kind == "origin" or path == "/":
+        path = path.rstrip("/")
+    return (parts.scheme.lower(), parts.netloc.lower(), path, parts.query)
 
 
 def check_record_key(response: Dict[str, Any], record: Dict[str, Any],
@@ -180,9 +185,13 @@ def check_record_key(response: Dict[str, Any], record: Dict[str, Any],
         raise CheckError("the CrUX response's record has no `key` naming its page.")
     kind, want = next(iter(target.items()))
     got = key.get(kind)
-    original = (response.get("urlNormalizationDetails") or {}).get("originalUrl")
-    if not isinstance(got, str) or canonical(want) not in (
-            canonical(got), canonical(original) if isinstance(original, str) else None):
+    details = response.get("urlNormalizationDetails")
+    if details is not None and not isinstance(details, dict):
+        raise CheckError("the CrUX response's `urlNormalizationDetails` is not an object.")
+    original = (details or {}).get("originalUrl")
+    if not isinstance(got, str) or canonical(want, kind) not in (
+            canonical(got, kind),
+            canonical(original, kind) if isinstance(original, str) else None):
         raise CheckError(f"the response is for {got or key}, not the {kind} {want}.")
     got_ff = key.get("formFactor")
     if got_ff != (None if form_factor == "ALL" else form_factor):

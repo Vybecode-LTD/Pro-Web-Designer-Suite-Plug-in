@@ -153,6 +153,8 @@ class CruxCheck(TempDirTest):
                                (), "not the origin"),
             "another form factor": (lambda r: None, ("--form-factor", "DESKTOP"), "PHONE form factor"),
             "ratio inf": (lambda r: None, ("--ratio", "inf"), "--ratio"),
+            "normalisation a list": (lambda r: r.update(urlNormalizationDetails=[1]), (),
+                                     "`urlNormalizationDetails`"),
         }
         for name, (change, args, needle) in cases.items():
             with self.subTest(name):
@@ -167,6 +169,20 @@ class CruxCheck(TempDirTest):
         self.response_with(lambda r: r["record"]["key"].update(origin="https://SHOP.example/"))
         proc = self.check("--response", "crux.json")
         self.assertEqual(proc.returncode, 1, output(proc))          # compared: LCP is above
+
+    def test_a_page_with_a_trailing_slash_is_another_page(self):
+        """CodeRabbit on #46: `/offers` and `/offers/` are two CrUX records."""
+        def page(saved):
+            self.response_with(lambda r: r["record"].update(
+                key={"formFactor": "PHONE", "url": saved}))
+            return run_py("perf-budget-gate", "crux_check", "--url", "https://shop.example/offers",
+                          "--lab", "vitals.json", "--response", "crux.json", cwd=self.tmp,
+                          env_changes={"CRUX_API_KEY": None, "CRUX_API_URL": None})
+        proc = page("https://shop.example/offers/")
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("not the url", output(proc))
+        proc = page("https://SHOP.example/offers")
+        self.assertEqual(proc.returncode, 1, output(proc))          # the same page, compared
 
     def test_a_plain_http_endpoint_off_this_machine_is_refused(self):
         """CodeRabbit on #46: the key travels in the query string."""

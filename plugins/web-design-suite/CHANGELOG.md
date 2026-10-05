@@ -230,6 +230,8 @@
   an invalid p75, a malformed `metrics` container (a traceback), `--ratio inf`, and a
   saved response for another page or device class were compared or crashed; and a plain
   `http://` `CRUX_API_URL` off this machine would carry the key in clear. They exit 2 now.
+  Its second round found two more: a page's trailing slash was ignored, so a saved
+  `/offers/` passed for `/offers`, and a list for `urlNormalizationDetails` crashed.
 
 ## 3.3.0 — 2026-10-04
 
