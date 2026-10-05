@@ -442,7 +442,7 @@ class PasteableCommands(unittest.TestCase):
 
     def readmes(self):
         yield "README.md", self.README
-        if REPO and (REPO / ".claude-plugin" / "marketplace.json").is_file():
+        if repository_marketplace(PLUGIN, REPO):
             yield "../../README.md", (REPO / "README.md").read_text(encoding="utf-8")
 
     def test_the_check_sees_what_breaks(self):
