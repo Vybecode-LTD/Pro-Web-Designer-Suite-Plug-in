@@ -361,7 +361,8 @@ class DeprecateRewritesAndCountsAColourRename(TempDirTest):
         # token named inside a CSS string is text, not a use.
         self.write("quoted/src/app.css",
                    ".a { color: var(--fg-subtle) !important; }\n"
-                   '.b::after { content: "label; color: var(--fg-subtle);"; }\n')
+                   '.b::after { content: "label; color: var(--fg-subtle);"; }\n'
+                   '.c::after { content: "label\\"; color: var(--fg-subtle);"; }\n')
         self.assertEqual(self.scan("quoted"), {"codemod": 1, "manual": 0})
 
     def test_a_colour_rename_beside_a_font_weight_is_rewritten(self):
