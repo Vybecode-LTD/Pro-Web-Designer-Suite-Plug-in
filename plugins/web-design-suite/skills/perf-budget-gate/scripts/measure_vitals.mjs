@@ -332,7 +332,7 @@ const COLLECTOR = () => {
 };
 
 // Read everything back out. Runs after the settle window.
-const HARVEST = ({ topN, ttfb: networkTtfb }) => {
+const HARVEST = ({ topN, ttfb: networkTtfb, requests: networkRequests }) => {
   const v = window.__vitals || {};
   const nav = performance.getEntriesByType('navigation')[0] || {};
   // The network stack's TTFB when CDP gave one: Navigation Timing's
@@ -354,9 +354,11 @@ const HARVEST = ({ topN, ttfb: networkTtfb }) => {
   // --interact counted the handler twice (GT-A17). A task the input waited
   // behind started before it, or ended before the handlers, and stays: that
   // is the page's work.
+  // The diagnostics below (count, longest, total) keep every long task.
   const ends = (t) => t.start + t.duration;
   const own = v.interactions || [];
-  const tasks = (v.longTasks || []).filter((t) => !own.some((i) =>
+  const allTasks = v.longTasks || [];
+  const tasks = allTasks.filter((t) => !own.some((i) =>
     t.start >= i.at && t.start < i.end && ends(t) > i.handlerStart));
 
   // TBT: blocking time is (duration - 50ms), summed over long tasks between
@@ -368,9 +370,14 @@ const HARVEST = ({ topN, ttfb: networkTtfb }) => {
   const fcp = v.fcp || 0;
   // TTI: the end of the last long task before the first 5-second window
   // after FCP with no long task and at most two requests in flight. When no
-  // such window fits in the run, every long task in it is before TTI.
+  // such window fits in the run, every long task in it is before TTI. The
+  // requests come from CDP, unfinished ones included (an end of null): a
+  // request still in flight has no Resource Timing entry, so a page with
+  // three hanging fetches looked quiet (Codex on #45).
   const now = performance.now();
-  const requests = [[0, nav.responseEnd || 0], ...resources.map((r) => [r.start, r.end])];
+  const requests = (networkRequests ||
+    [[0, nav.responseEnd || 0], ...resources.map((r) => [r.start, r.end])])
+    .map(([a, b]) => [a, b == null ? Infinity : b]);
   const busiest = (s, e) => {
     const marks = requests.filter(([a, b]) => a < e && b > s)
       .flatMap(([a, b]) => [[Math.max(a, s), 1], [Math.min(b, e), -1]])
@@ -382,7 +389,7 @@ const HARVEST = ({ topN, ttfb: networkTtfb }) => {
   };
   let tti = null;
   const candidates = [fcp, ...tasks.map(ends), ...requests.map((r) => r[1])]
-    .filter((s) => s >= fcp).sort((a, b) => a - b);
+    .filter((s) => s >= fcp && Number.isFinite(s)).sort((a, b) => a - b);
   for (const s of candidates) {
     const e = s + 5000;
     if (e > now) break;
@@ -393,9 +400,9 @@ const HARVEST = ({ topN, ttfb: networkTtfb }) => {
   const tbt = tasks
     .filter((t) => ends(t) > fcp && (tti == null || t.start < tti))
     .reduce((sum, t) => sum + Math.max(0, t.duration - 50), 0);
-  const blockingTotal = tasks
+  const blockingTotal = allTasks
     .reduce((sum, t) => sum + Math.max(0, t.duration - 50), 0);
-  const longestTask = tasks.reduce((m, t) => Math.max(m, t.duration), 0);
+  const longestTask = allTasks.reduce((m, t) => Math.max(m, t.duration), 0);
 
   // The four LCP sub-parts, when the LCP element is a resource we can find.
   let phases = null;
@@ -438,7 +445,7 @@ const HARVEST = ({ topN, ttfb: networkTtfb }) => {
     tbt: Math.round(tbt),
     blockingTotal: Math.round(blockingTotal),
     longestTask: Math.round(longestTask),
-    longTaskCount: tasks.length,
+    longTaskCount: allTasks.length,
     inp,
     interactions: v.interactions || [],
     resourceCount: resources.length,
@@ -513,9 +520,21 @@ async function runOnce(browser, opts, url) {
     // Timing's responseStart before it, so `--throttle slow4g` reported a
     // TTFB of 5 ms (GT-A6). Redirects keep the request id, so it counts them.
     let doc = null;
+    // Every GET from its start to its end, for TTI's network-quiet test: a
+    // request still in flight when the run is read keeps an end of null.
+    let flights = new Map();
     cdp.on('Network.requestWillBeSent', (e) => {
       if (!doc && e.type === 'Document') doc = { id: e.requestId, start: e.timestamp, ttfb: null };
+      if (e.request.method === 'GET' && !/^data:/.test(e.request.url) && !flights.has(e.requestId)) {
+        flights.set(e.requestId, [e.timestamp, null]);
+      }
     });
+    const landed = (e) => {
+      const flight = flights.get(e.requestId);
+      if (flight) flight[1] = e.timestamp;
+    };
+    cdp.on('Network.loadingFinished', landed);
+    cdp.on('Network.loadingFailed', landed);
     cdp.on('Network.responseReceived', (e) => {
       const timing = e.response && e.response.timing;
       if (doc && e.requestId === doc.id && doc.ttfb == null && timing && timing.requestTime > 0) {
@@ -529,6 +548,7 @@ async function runOnce(browser, opts, url) {
       // Second load in the same context: HTTP cache is warm, observers are
       // re-installed by addInitScript, counters start from zero.
       doc = null;
+      flights = new Map();
     }
 
     let clickedAt = null;
@@ -553,8 +573,11 @@ async function runOnce(browser, opts, url) {
       }
     }
 
+    // In the page's own timeline, which starts with the document's request.
+    const requests = doc ? [...flights.values()].map(([s, e]) =>
+      [(s - doc.start) * 1000, e == null ? null : (e - doc.start) * 1000]) : null;
     const result = await page.evaluate(HARVEST,
-      { topN: opts.resources, ttfb: doc && doc.ttfb != null ? doc.ttfb : null });
+      { topN: opts.resources, ttfb: doc && doc.ttfb != null ? doc.ttfb : null, requests });
     result.clickedAt = clickedAt;
     await cdp.detach().catch(() => {});
     return result;

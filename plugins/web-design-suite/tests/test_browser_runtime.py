@@ -29,6 +29,7 @@ import functools
 import http.server
 import json
 import threading
+import time
 import unittest
 
 from test_browser_scripts import installed_browsers
@@ -268,6 +269,18 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+    def do_GET(self):
+        """/hang answers after 9 seconds: a request still in flight when the
+        run is read."""
+        if not self.path.startswith("/hang"):
+            return super().do_GET()
+        time.sleep(9)
+        try:
+            self.send_response(204)
+            self.end_headers()
+        except OSError:                   # the browser has gone
+            pass
+
 
 @unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
 class VitalsMeasures(TempDirTest):
@@ -297,6 +310,7 @@ class VitalsMeasures(TempDirTest):
         if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
             self.skipTest(output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
+        self.stderr = proc.stderr.decode("utf-8", "replace")
         return json.loads(proc.stdout)
 
     def test_ttfb_counts_the_emulated_latency(self):
@@ -313,6 +327,9 @@ class VitalsMeasures(TempDirTest):
         out = self.vitals(button, "--throttle", "off", "--settle", "500", "--interact", "button")
         self.assertGreaterEqual(out["stats"]["inp"]["median"], 200)
         self.assertLess(out["stats"]["tbt"]["median"], 50)
+        # Codex on #45: the totals still count the handler's task.
+        self.assertGreaterEqual(out["longTasks"]["count"], 1)
+        self.assertGreaterEqual(out["longTasks"]["blockingTotal"], 150)
 
     def test_tbt_stops_at_tti(self):
         """A long task after five quiet seconds is after TTI; one before is not."""
@@ -321,6 +338,16 @@ class VitalsMeasures(TempDirTest):
         self.assertLess(out["stats"]["tbt"]["median"], 50)
         self.assertIsNotNone(out["stats"]["tti"])
         out = self.vitals(late.replace("{at}", "1000"), "--throttle", "off", "--settle", "7000")
+        self.assertGreaterEqual(out["stats"]["tbt"]["median"], 150)
+
+    def test_requests_in_flight_keep_the_network_busy(self):
+        """Codex on #45: three fetches still in flight when the run was read
+        had no Resource Timing entry, so the page looked quiet, TTI came
+        early, and the task at 6 s fell out of TBT."""
+        page = ("<script>for (let i = 0; i < 3; i++) fetch('/hang?' + i);"
+                "setTimeout(() => { " + self.BUSY.format(ms=250) + " }, 6000);</script>")
+        out = self.vitals(page, "--throttle", "off", "--settle", "7000")
+        self.assertIsNone(out["stats"]["tti"])
         self.assertGreaterEqual(out["stats"]["tbt"]["median"], 150)
 
     def test_interact_at_clicks_while_the_page_hydrates(self):
@@ -336,6 +363,7 @@ class VitalsMeasures(TempDirTest):
         # an event under 16 ms is not reported at all, so INP may be n/a.
         out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "button")
         self.assertLess((out["stats"]["inp"] or {"median": 0})["median"], 200)
+        self.assertNotIn("did not match", self.stderr)          # CodeRabbit on #45: it clicked
 
 
 class MatrixSeesStateChanges(TempDirTest):
