@@ -25,6 +25,7 @@ import zipfile
 import zlib
 
 SKIPPED = {"SHA256SUMS"}
+UNREADABLE = "unreadable"
 
 
 def entries(path: pathlib.Path) -> list[tuple]:
@@ -38,7 +39,7 @@ def entries(path: pathlib.Path) -> list[tuple]:
             try:
                 digest = hashlib.sha256(archive.read(i)).hexdigest()
             except (zipfile.BadZipFile, zlib.error) as err:
-                digest = f"unreadable ({err})"
+                digest = f"{UNREADABLE} ({err})"
             found.append((i.filename, digest, i.file_size, i.date_time, i.external_attr >> 16))
     return found
 
@@ -59,7 +60,12 @@ def differences(a: pathlib.Path, b: pathlib.Path) -> list[str]:
             found.append(f"{name}: the entries differ, or their order does")
             continue
         for p, q in zip(ex, ey):
-            fields = [field for field, u, v in zip(("contents", "size", "date", "mode"), p[1:], q[1:]) if u != v]
+            broken = [f"{name}: {p[0]} is {e[1]} in {folder}" for folder, e in ((a, p), (b, q))
+                      if e[1].startswith(UNREADABLE)]
+            if broken:                       # damaged on both sides alike is still damaged
+                found += broken
+                continue
+            fields =[field for field, u, v in zip(("contents", "size", "date", "mode"), p[1:], q[1:]) if u != v]
             if fields:
                 found.append(f"{name}: {p[0]} differs in {', '.join(fields)}")
     return found

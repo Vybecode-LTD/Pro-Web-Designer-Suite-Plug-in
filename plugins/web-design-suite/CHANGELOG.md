@@ -33,7 +33,9 @@
   `test_release_build` adds two: builds stored instead of deflated compare the same,
   and a changed or missing file is a difference. Codex's review of #38 added a third: a
   payload damaged under an intact directory passed, since only the recorded CRCs were
-  compared (the old tool reports such a pair the same).
+  compared (the old tool reports such a pair the same). CodeRabbit's added a fourth: an
+  entry damaged alike in both builds read as the same error on both sides, so two
+  damaged builds compared the same; an unreadable entry is now always a difference.
 
 ## 3.3.0 — 2026-10-04
 

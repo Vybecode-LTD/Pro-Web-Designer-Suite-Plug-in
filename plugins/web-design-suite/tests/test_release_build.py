@@ -247,7 +247,21 @@ class ReleaseBuild(TempDirTest):
         zip_b.write_bytes(data.replace(b"# plugin\n", b"# pluGin\n"))
         proc = self.compare("a", "b")
         self.assertEqual(1, proc.returncode, output(proc))
-        self.assertIn("web-design-suite/README.md differs in contents", output(proc))
+        self.assertIn("web-design-suite/README.md is unreadable (Bad CRC-32", output(proc))
+
+    @unittest.skipUnless(COMPARE and COMPARE.is_file(), "needs the repository's tooling/release")
+    def test_an_entry_damaged_alike_on_both_sides_is_a_difference(self):
+        """CodeRabbit on #38: the same read error on both sides gave the same
+        "digest", and two damaged builds compared the same."""
+        self.assertEqual(0, self.build("a").returncode)
+        self.recompress("a", "b")
+        self.recompress("a", "c")
+        for folder in ("b", "c"):
+            path = self.tmp / folder / "web-design-suite-9.8.7.zip"
+            path.write_bytes(path.read_bytes().replace(b"# plugin\n", b"# pluGin\n"))
+        proc = self.compare("b", "c")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("web-design-suite/README.md is unreadable", output(proc))
 
 
 if __name__ == "__main__":
