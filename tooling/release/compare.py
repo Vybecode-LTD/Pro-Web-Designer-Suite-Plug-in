@@ -7,7 +7,8 @@ and only then. Python 3.14 on Windows deflates with zlib-ng and the CI's
 Linux Python with zlib, so a local build and the release differ in their
 compressed bytes and in SHA256SUMS while every file inside is the same (N34,
 found when 3.3.0 was released). This compares the two folders' archives
-entry by entry: the entries' names in order, and each one's CRC-32,
+entry by entry: the entries' names in order, and each one's contents (read
+and hashed, which also checks them against the recorded CRC-32),
 uncompressed size, date and Unix mode. A file in either folder that is not
 a zip is compared byte for byte; SHA256SUMS is skipped, since it hashes the
 compressed bytes.
@@ -17,17 +18,29 @@ Exit codes: 0 the same, 1 a difference (each one is printed), 2 bad invocation.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import pathlib
 import sys
 import zipfile
+import zlib
 
 SKIPPED = {"SHA256SUMS"}
 
 
 def entries(path: pathlib.Path) -> list[tuple]:
+    """Each entry's name, then a hash of the bytes it really holds (reading it
+    checks them against the recorded CRC, which a damaged payload fails),
+    its size, date and mode. A recorded CRC alone would pass a payload that
+    changed under an intact directory."""
+    found = []
     with zipfile.ZipFile(path) as archive:
-        return [(i.filename, i.CRC, i.file_size, i.date_time, i.external_attr >> 16)
-                for i in archive.infolist()]
+        for i in archive.infolist():
+            try:
+                digest = hashlib.sha256(archive.read(i)).hexdigest()
+            except (zipfile.BadZipFile, zlib.error) as err:
+                digest = f"unreadable ({err})"
+            found.append((i.filename, digest, i.file_size, i.date_time, i.external_attr >> 16))
+    return found
 
 
 def differences(a: pathlib.Path, b: pathlib.Path) -> list[str]:
@@ -46,7 +59,7 @@ def differences(a: pathlib.Path, b: pathlib.Path) -> list[str]:
             found.append(f"{name}: the entries differ, or their order does")
             continue
         for p, q in zip(ex, ey):
-            fields = [field for field, u, v in zip(("CRC", "size", "date", "mode"), p[1:], q[1:]) if u != v]
+            fields = [field for field, u, v in zip(("contents", "size", "date", "mode"), p[1:], q[1:]) if u != v]
             if fields:
                 found.append(f"{name}: {p[0]} differs in {', '.join(fields)}")
     return found

@@ -231,8 +231,23 @@ class ReleaseBuild(TempDirTest):
         (self.tmp / "b" / "alpha.skill").unlink()
         proc = self.compare("a", "b")
         self.assertEqual(1, proc.returncode, output(proc))
-        self.assertIn("web-design-suite-9.8.7.zip: web-design-suite/README.md differs in CRC, size", output(proc))
+        self.assertIn("web-design-suite-9.8.7.zip: web-design-suite/README.md differs in contents, size",
+                      output(proc))
         self.assertIn("alpha.skill: only in a", output(proc))
+
+    @unittest.skipUnless(COMPARE and COMPARE.is_file(), "needs the repository's tooling/release")
+    def test_a_damaged_payload_under_an_intact_directory_is_a_difference(self):
+        """Codex on #38: the recorded CRCs and sizes were compared, never the
+        bytes, so a payload changed under an untouched directory passed."""
+        self.assertEqual(0, self.build("a").returncode)
+        self.recompress("a", "b")                           # stored, so the payload is the text itself
+        zip_b = self.tmp / "b" / "web-design-suite-9.8.7.zip"
+        data = zip_b.read_bytes()
+        self.assertEqual(1, data.count(b"# plugin\n"))
+        zip_b.write_bytes(data.replace(b"# plugin\n", b"# pluGin\n"))
+        proc = self.compare("a", "b")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("web-design-suite/README.md differs in contents", output(proc))
 
 
 if __name__ == "__main__":

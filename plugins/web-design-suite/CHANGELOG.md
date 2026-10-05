@@ -19,7 +19,8 @@
   `scripts/browser_common.mjs`, a byte-identical copy of `shared/browser_common.mjs` in
   each of the three skills, so each skill still runs on its own.
 - **Release builds compare by content** (N34). `tooling/release/compare.py` compares two
-  build folders entry by entry (names, CRCs, uncompressed sizes, dates, modes). A build
+  build folders entry by entry: names, and each entry's bytes (read, hashed and checked
+  against its CRC), size, date and mode. A build
   is byte-identical to another only with the same zlib: Windows' Python 3.14 uses
   zlib-ng, the CI's zlib, so 3.3.0's release matched no local build's checksums.
 
@@ -30,7 +31,9 @@
   freezes to pausing; `test_browser_runtime.test_a_spinner_is_not_a_focus_ring` runs
   the spinner in a real browser. Against `v3.3.0`, all 4 fail.
   `test_release_build` adds two: builds stored instead of deflated compare the same,
-  and a changed or missing file is a difference.
+  and a changed or missing file is a difference. Codex's review of #38 added a third: a
+  payload damaged under an intact directory passed, since only the recorded CRCs were
+  compared (the old tool reports such a pair the same).
 
 ## 3.3.0 — 2026-10-04
 
