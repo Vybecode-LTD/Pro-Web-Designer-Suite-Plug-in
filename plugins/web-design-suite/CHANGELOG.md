@@ -50,7 +50,7 @@
   experimental ones. Every example now keeps `wcag21a,wcag21aa`. And the default set's
   best-practice rules (`tabindex`, `aria-dialog-name` and others axe rates serious)
   failed the run as errors, though they name no success criterion: a11y_runtime now
-  reports them as warnings, labelled best practice. The report wording names the 2.0,
+  reports them as warnings, labelled best practice, and no budget counts them. The report wording names the 2.0,
   2.1 and 2.2 A and AA rules.
 - **a11y_static's outline and landmark checks are best practice** (GT-A18).
   `multiple-h1`, `heading-skip` and `no-main-landmark` were errors under 1.3.1, 2.4.6
@@ -117,7 +117,9 @@
   for the rules the docs name; `test_browser_runtime.test_a_best_practice_rule_is_a_warning`
   runs `tabindex` beside `image-alt`; `test_content_and_a11y.StaticBestPractice` and
   `test_numbers.ByteBudgets` recompute the rest. Against `v3.3.0`, all 6 fail. The
-  web.dev quote is registered in `evidence.json`.
+  web.dev quote is registered in `evidence.json`. Codex's review of #41 found the `axe_violations`
+  budget still counting best-practice warnings, so a budget of 0 failed on one:
+  `test_a_best_practice_finding_does_not_breach_a_violation_budget` fails on its head.
 
 ## 3.3.0 — 2026-10-04
 

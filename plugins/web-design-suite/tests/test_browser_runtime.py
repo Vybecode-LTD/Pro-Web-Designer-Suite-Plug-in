@@ -177,6 +177,21 @@ class RuntimeInABrowser(TempDirTest):
         findings = self.runtime(self.DENSITY_PAGE, *only("focus", "forced"), "--densities", "none")
         self.assertEqual([], [f for f in findings if f["severity"] == "error"])
 
+    def test_a_best_practice_finding_does_not_breach_a_violation_budget(self):
+        """Codex on #41: `axe_violations` counted the best-practice warnings,
+        so `{"axe_violations": 0}` failed a page whose only finding was one."""
+        page = self.write("bp.html", "<!doctype html><html lang=en><head><title>b</title></head><body>"
+                                     "<main><h1>Order</h1><a href=#a tabindex=2>First</a></main></body></html>")
+        budget = self.write("budget.json", '{"axe_violations": 0}')
+        proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", page, "--json",
+                        "--budget", budget, *only("axe"),
+                        cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
+        if proc.returncode == 2 and b"browser" in proc.stderr.lower():
+            self.skipTest("no usable browser: " + output(proc)[-200:])
+        report = json.loads(proc.stdout)
+        self.assertIn("tabindex", {f["rule"] for f in report["findings"]})
+        self.assertEqual((0, []), (proc.returncode, report["breaches"]), output(proc)[-400:])
+
     def test_a_best_practice_rule_is_a_warning(self):
         """GT-A8: axe rates `tabindex` (best-practice only) serious, and it
         failed the run as an error. It names no success criterion, so it is

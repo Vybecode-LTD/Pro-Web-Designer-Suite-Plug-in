@@ -87,7 +87,7 @@ Each row is the calculation above with its own network: TTFB is four round trips
 | LCP ≤ 4.0s (the "poor" line), Slow 4G (1.6 Mbps, 150 ms RTT) | 550 KB | 1.3 MB |
 | LCP ≤ 2.5s, desktop cable (5 Mbps, 28 ms RTT) | 1.1 MB | 2.6 MB |
 
-On 3G, 1,800 ms of the 2,500 go to the four round trips, and 12.5 KB is less than the HTML document's own budget: no page loads its largest element in 2.5 s there, which is the number telling you to promise 4 s or a lighter page.
+On 3G, 1,800 ms of the 2,500 go to the four round trips, leaving 12.5 KB for the critical path: half the HTML document's share in the allocation above. A page can still make it, a server-rendered one whose largest element is text with its critical CSS inline, but none built to the 250 KB allocation will. Build that light page, or promise 4 s.
 
 The spread is what makes the point. **A byte budget with no device and network attached is not a budget, it is a preference.** Write the profile into the budget file as a comment and into the README, because the first question anyone asks about a number they dislike is "says who".
 
