@@ -153,6 +153,19 @@
   same declarations are `part-renamed-local`, a patch; in global CSS they stay major.
   change-classification.md §11 now says what an added part is: new surface (Q4), unless it
   wraps existing children (Q3).
+- **figma_audit split a records export's modes** (LC-C3). A flat export lists one row per
+  variable and mode. figma_to_tokens merged the rows into one variable with a value per
+  mode; the audit's copy of the reader made each row a variable of its own, in a
+  collection whose default mode, `Value`, no variable had. Both scripts now read through
+  one module (Changed, below), so the audit merges them too.
+- **`--reverse` wrote a body Figma would not take as written** (LC-A22). It carried a
+  `_comment` key, though the body's own comment said Figma rejects unknown top-level keys,
+  and SKILL.md never said to strip it. It never named a collection's first mode, which
+  Figma creates under its own name; Figma's REST example names it with an `UPDATE` on the
+  temporary id, which `--reverse` now sends (`Value`, `Light`, or `Default` beside a `light`
+  theme, so two modes never share a name). And primitives were scoped to the pickers
+  (`ALL_FILLS`, `GAP`), inviting a designer to bind Tier 1, the Law 6 failure: they get
+  `scopes: []` now.
 
 ### Changed
 
@@ -170,9 +183,21 @@
   against its CRC), size, date and mode. A build
   is byte-identical to another only with the same zlib: Windows' Python 3.14 uses
   zlib-ng, the CI's zlib, so 3.3.0's release matched no local build's checksums.
+- **One reader for both Figma scripts** (LC-C3). figma_to_tokens and figma_audit each
+  carried a copy of the same reader (the shape detector, the four parsers, the value and
+  colour helpers and the document model), and the docs said they shared it. It is
+  `scripts/figma_common.py` now, beside `dtcg_values.py`, taking the better of the two
+  copies where they had drifted; each script lost about 400 lines.
 
 ### Tests
 
+- P16 (LC-C3, LC-A22): `test_figma_sync.FigmaCommon` reads a REST export (one with a
+  variable whose collection is missing), a plugin export, a two-mode records export and a
+  DTCG file through both scripts and holds them to one result, and checks that neither
+  script defines a name `figma_common.py` does, so the copies cannot come back.
+  `test_figma_sync.ReverseBody` holds the `--reverse` body to the four arrays, an `UPDATE`
+  naming each collection's first mode, distinct mode names beside a `light` theme, and no
+  scopes on primitives. Against `v3.3.0`, all 6 fail.
 - The test-file exemption: `test_audit_design.TestFilesByThePathBelowTheRoot` audits one JSX
   colour under `neutral/` and under `fixtures/test/`, and a `.test.jsx` and a `__mocks__` file as
   the control. Against `v3.3.0`, 1 fails; the control passes there only because this test's

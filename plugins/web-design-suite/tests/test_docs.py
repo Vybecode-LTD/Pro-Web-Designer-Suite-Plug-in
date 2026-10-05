@@ -590,7 +590,7 @@ class DocumentedFlags(unittest.TestCase):
     def accepted(self) -> dict[str, set[str]]:
         flags = {}
         for script in sorted(SKILLS.glob("*/scripts/*")):
-            if script.suffix == ".py" and script.stem != "dtcg_values":
+            if script.suffix == ".py" and script.stem not in ("dtcg_values", "figma_common"):
                 argv = [sys.executable, str(script), "--help"]
             elif script.suffix == ".mjs" and NODE:
                 argv = [NODE, str(script), "--help"]
