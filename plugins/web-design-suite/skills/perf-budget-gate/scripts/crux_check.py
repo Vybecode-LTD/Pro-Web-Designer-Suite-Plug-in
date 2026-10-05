@@ -31,7 +31,7 @@ The key comes from the CRUX_API_KEY environment variable and never from an
 argument: an argument lands in shell history, process lists and CI logs. It
 is sent only to the API, and never printed. Get one from the Google Cloud
 console (the Chrome UX Report API); CRUX_API_URL points the query at another
-endpoint, such as a proxy.
+endpoint, such as a proxy, over https (plain http only to this machine).
 
 Compared, where both sides have a number: LCP, CLS, FCP, TTFB, and INP when
 the lab run drove an interaction (--interact). TBT has no field counterpart.
@@ -42,7 +42,8 @@ Exit codes
 ----------
     0  every compared metric's field p75 is within the ratio of its lab median
     1  at least one is above it: the lab profile no longer describes the field
-    2  bad arguments, no key, an unreadable lab file, the API refused, or CrUX
+    2  bad arguments, no key, an unreadable or malformed lab file or response,
+       a response for another page or device class, the API refused, or CrUX
        holds no data for the origin or URL
 
 Standard library only. Python 3.9+.
@@ -52,6 +53,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 import urllib.error
@@ -86,17 +88,48 @@ def read_json(path: Path, what: str) -> Any:
         raise CheckError(f"the {what} {path} is not JSON: {exc}") from None
 
 
+def measurement(value: Any) -> Optional[float]:
+    """A finite number of 0 or more (CLS arrives as a string, "0.05"), or None."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        try:
+            value = float(value)
+        except ValueError:
+            return None
+    if isinstance(value, (int, float)) and math.isfinite(value) and value >= 0:
+        return float(value)
+    return None
+
+
 def lab_medians(report: Any) -> Dict[str, float]:
     stats = report.get("stats") if isinstance(report, dict) else None
     if not isinstance(stats, dict):
         raise CheckError("the lab file has no `stats`: write it with "
                          "`measure_vitals.mjs URL --report vitals.json`.")
     out = {}
-    for key in METRICS:
+    for key, (_, label, _) in METRICS.items():
         s = stats.get(key)
-        if isinstance(s, dict) and isinstance(s.get("median"), (int, float)):
-            out[key] = float(s["median"])
+        median = s.get("median") if isinstance(s, dict) else s
+        if median is None:                           # not measured, as INP without --interact
+            continue
+        out[key] = measurement(median)
+        if out[key] is None:
+            raise CheckError(f"the lab file's {label} median is {median!r}, not a finite "
+                             f"number of 0 or more.")
     return out
+
+
+def endpoint() -> str:
+    """The query carries the key, so it goes over HTTPS, or plain HTTP to this
+    machine only (a test server)."""
+    url = os.environ.get("CRUX_API_URL", API)
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme == "https" or (
+            parts.scheme == "http" and parts.hostname in ("localhost", "127.0.0.1", "::1")):
+        return url
+    raise CheckError("CRUX_API_URL must be an https:// URL (or http:// to this machine): "
+                     "the key travels in it.")
 
 
 def query(target: Dict[str, str], form_factor: str) -> Any:
@@ -108,7 +141,7 @@ def query(target: Dict[str, str], form_factor: str) -> Any:
     if form_factor != "ALL":
         body["formFactor"] = form_factor
     body["metrics"] = [m for m, _, _ in METRICS.values()]
-    url = os.environ.get("CRUX_API_URL", API)
+    url = endpoint()
     req = urllib.request.Request(
         url + "?key=" + urllib.parse.quote(key, safe=""),
         data=json.dumps(body).encode("utf-8"), method="POST",
@@ -133,18 +166,53 @@ def query(target: Dict[str, str], form_factor: str) -> Any:
         raise CheckError(f"the CrUX API could not be reached: {reason}") from None
 
 
-def field_p75(response: Any) -> Dict[str, float]:
+def canonical(url: str) -> tuple:
+    parts = urllib.parse.urlsplit(url.strip())
+    return (parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"), parts.query)
+
+
+def check_record_key(response: Dict[str, Any], record: Dict[str, Any],
+                     target: Dict[str, str], form_factor: str) -> None:
+    """A saved response for another page or device class is refused: its
+    numbers would be printed under the requested target."""
+    key = record.get("key")
+    if not isinstance(key, dict):
+        raise CheckError("the CrUX response's record has no `key` naming its page.")
+    kind, want = next(iter(target.items()))
+    got = key.get(kind)
+    original = (response.get("urlNormalizationDetails") or {}).get("originalUrl")
+    if not isinstance(got, str) or canonical(want) not in (
+            canonical(got), canonical(original) if isinstance(original, str) else None):
+        raise CheckError(f"the response is for {got or key}, not the {kind} {want}.")
+    got_ff = key.get("formFactor")
+    if got_ff != (None if form_factor == "ALL" else form_factor):
+        raise CheckError(f"the response is for the {got_ff or 'ALL'} form factor, "
+                         f"not {form_factor}.")
+
+
+def field_p75(response: Any, target: Dict[str, str], form_factor: str) -> Dict[str, float]:
     record = response.get("record") if isinstance(response, dict) else None
     if not isinstance(record, dict):
         raise CheckError("the CrUX response has no `record`.")
-    metrics = record.get("metrics") or {}
+    check_record_key(response, record, target, form_factor)
+    metrics = record.get("metrics", {})
+    if not isinstance(metrics, dict):
+        raise CheckError("the CrUX response's `metrics` is not an object.")
     out = {}
-    for key, (name, _, _) in METRICS.items():
-        p75 = ((metrics.get(name) or {}).get("percentiles") or {}).get("p75")
-        try:
-            out[key] = float(p75)                  # CLS arrives as a string, "0.05"
-        except (TypeError, ValueError):
+    for key, (name, label, _) in METRICS.items():
+        metric = metrics.get(name)
+        if metric is None:                           # CrUX has no data for this one
             continue
+        percentiles = metric.get("percentiles") if isinstance(metric, dict) else None
+        if not isinstance(percentiles, dict):
+            raise CheckError(f"the CrUX response's {name} has no `percentiles` object.")
+        p75 = percentiles.get("p75")
+        if p75 is None:
+            continue
+        out[key] = measurement(p75)
+        if out[key] is None:
+            raise CheckError(f"the CrUX response's {label} p75 is {p75!r}, not a finite "
+                             f"number of 0 or more.")
     return out
 
 
@@ -195,14 +263,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = ap.parse_args(argv)
 
     try:
-        if not args.ratio > 0:
-            raise CheckError("--ratio must be above 0")
+        if not (math.isfinite(args.ratio) and args.ratio > 0):
+            raise CheckError("--ratio must be a finite number above 0")
         lab_report = read_json(Path(args.lab), "lab file")
         lab = lab_medians(lab_report)
         target = {"origin": args.origin} if args.origin else {"url": args.url}
         response = (read_json(Path(args.response), "response")
                     if args.response else query(target, args.form_factor))
-        field = field_p75(response)
+        field = field_p75(response, target, args.form_factor)
         rows = compare(lab, field, args.ratio)
         if not rows:
             raise CheckError("no metric has both a lab median and a field p75 to compare.")

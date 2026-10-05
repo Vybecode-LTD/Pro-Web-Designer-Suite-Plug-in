@@ -226,6 +226,10 @@
   review of #46 found a lab median of 0 left unjudged, so a field CLS of 0.05 against a
   lab CLS of 0 passed: `test_a_lab_median_of_zero_is_exceeded_by_any_field_value` fails
   on its head.
+  CodeRabbit's found five, each failing on its head: a non-finite or boolean lab median,
+  an invalid p75, a malformed `metrics` container (a traceback), `--ratio inf`, and a
+  saved response for another page or device class were compared or crashed; and a plain
+  `http://` `CRUX_API_URL` off this machine would carry the key in clear. They exit 2 now.
 
 ## 3.3.0 — 2026-10-04
 

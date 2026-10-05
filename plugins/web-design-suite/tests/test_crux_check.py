@@ -124,6 +124,58 @@ class CruxCheck(TempDirTest):
                 self.assertIn(needle, output(proc))
                 self.assertNotIn(KEY, output(proc))
 
+    def response_with(self, change):
+        response = json.loads(json.dumps(RESPONSE))
+        change(response)
+        self.write("crux.json", json.dumps(response))
+
+    def test_a_malformed_or_foreign_input_exits_2(self):
+        """CodeRabbit on #46: a non-finite or boolean lab median, an invalid
+        reported p75, a metrics container that is not an object, an infinite
+        ratio, and a saved response for another page or device class were
+        compared, crashed, or passed."""
+        def lab(value):
+            def change(_):
+                data = json.loads(json.dumps(LAB))
+                data["stats"]["lcp"]["median"] = value
+                self.write("vitals.json", json.dumps(data))
+            return change
+        cases = {
+            "lab Infinity": (lab(float("inf")), (), "LCP median"),
+            "lab true": (lab(True), (), "LCP median"),
+            "lab negative": (lab(-5), (), "LCP median"),
+            "p75 invalid": (lambda r: r["record"]["metrics"]["largest_contentful_paint"]
+                            ["percentiles"].update(p75="fast"), (), "LCP p75"),
+            "metrics a list": (lambda r: r["record"].update(metrics=[]), (), "`metrics`"),
+            "percentiles a list": (lambda r: r["record"]["metrics"]["first_contentful_paint"]
+                                   .update(percentiles=[1]), (), "`percentiles`"),
+            "another origin": (lambda r: r["record"]["key"].update(origin="https://other.example"),
+                               (), "not the origin"),
+            "another form factor": (lambda r: None, ("--form-factor", "DESKTOP"), "PHONE form factor"),
+            "ratio inf": (lambda r: None, ("--ratio", "inf"), "--ratio"),
+        }
+        for name, (change, args, needle) in cases.items():
+            with self.subTest(name):
+                self.write("vitals.json", json.dumps(LAB))
+                self.response_with(change)
+                proc = self.check("--response", "crux.json", *args)
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn(needle, output(proc))
+                self.assertNotIn("Traceback", output(proc))
+
+    def test_an_origin_with_a_trailing_slash_is_the_same_origin(self):
+        self.response_with(lambda r: r["record"]["key"].update(origin="https://SHOP.example/"))
+        proc = self.check("--response", "crux.json")
+        self.assertEqual(proc.returncode, 1, output(proc))          # compared: LCP is above
+
+    def test_a_plain_http_endpoint_off_this_machine_is_refused(self):
+        """CodeRabbit on #46: the key travels in the query string."""
+        proc = self.check(env={"CRUX_API_KEY": KEY,
+                               "CRUX_API_URL": "http://crux.example/v1/records:queryRecord"})
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("https://", output(proc))
+        self.assertNotIn(KEY, output(proc))
+
     def test_the_key_comes_from_the_environment_only(self):
         proc = self.check()
         self.assertEqual(proc.returncode, 2, output(proc))
