@@ -45,6 +45,7 @@ Regressions covered:
 from __future__ import annotations
 
 import json
+import re
 import time
 import unittest
 
@@ -259,6 +260,146 @@ class ComponentMatrixRequiresAttrs(TempDirTest):
         none) — only {attrs} is mandatory."""
         proc = self.generate("<input class=\"badge\" {attrs} />")
         self.assertEqual(proc.returncode, 0, output(proc))
+
+
+class MatrixStates(TempDirTest):
+    """GT-A12: a ring written as `.chip:focus` was mirrored to
+    `[data-force-state~="focus"]`, but the focus-visible cell carried
+    "focus-visible" alone, so the ring never rendered while the coverage line
+    said the state was covered. GT-A13: only the seven states were allowed, so
+    selected, current or open could not be rendered, nor "selected + hover";
+    and the error state stamped `aria-invalid` on buttons and spans, where
+    ARIA 1.2 deprecated it as a global attribute."""
+
+    def generate(self, css, template, states, custom=None):
+        self.write("chip.css", css)
+        comp = {"name": "chip", "css": "chip.css", "template": template, "states": states}
+        if custom is not None:
+            comp["custom_states"] = custom
+        self.write("matrix.json", json.dumps({"$schema": "component-state-matrix/1",
+                                              "themes": ["light"], "densities": ["comfortable"],
+                                              "components": [comp]}))
+        proc = run_py("component-state-matrix", "generate_matrix", "matrix.json",
+                      "--out", "sheet.html", cwd=self.tmp)
+        sheet = (self.tmp / "sheet.html").read_text(encoding="utf-8") if proc.returncode == 0 else ""
+        return proc, sheet
+
+    @staticmethod
+    def cells(sheet, tag):
+        return re.findall(rf'<{tag} class="chip"([^>]*)>', sheet)
+
+    def state_cells(self, template, tag, state):
+        css = '.chip {}\n.chip[data-state="error"] { color: #b00; }\n.chip:disabled { opacity: .5; }\n'
+        proc, sheet = self.generate(css, template, ["default", state])
+        self.assertEqual(proc.returncode, 0, output(proc))
+        marker = 'data-state="error"' if state == "error" else "disabled"
+        cells = [a for a in self.cells(sheet, tag) if marker in a]
+        self.assertTrue(cells, sheet[-400:])
+        return cells
+
+    def test_a_focus_ring_renders_in_the_focus_visible_cell(self):
+        proc, sheet = self.generate(".chip { color: #222; }\n.chip:focus { outline: 2px solid #222; }\n",
+                                    '<span class="chip" tabindex="0" {attrs}>{content}</span>',
+                                    ["default", "focus-visible"])
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn('.chip[data-force-state~="focus"]', sheet)
+        forced = [re.search(r'data-force-state="([^"]*)"', a) for a in self.cells(sheet, "span")]
+        values = [m.group(1).split() for m in forced if m]
+        self.assertTrue(values, sheet[-500:])
+        self.assertTrue(all({"focus-visible", "focus", "focus-within"} <= set(v) for v in values), values)
+
+    def test_a_custom_state_and_a_combination_render(self):
+        custom = {"selected": {"attrs": {"aria-selected": "true"}}}
+        states = ["default", "hover", "selected", "selected+hover"]
+        css = ".chip { color: #222; }\n.chip:hover { color: #000; }\n"
+        proc, sheet = self.generate(css, '<span class="chip" {attrs}>{content}</span>', states, custom)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn("chip:selected", output(proc))                 # declared, no rule yet
+        attrs = self.cells(sheet, "span")
+        self.assertTrue(any('aria-selected="true"' in a and 'data-force-state="hover"' in a for a in attrs))
+        self.assertTrue(any('aria-selected="true"' in a and "data-force-state" not in a for a in attrs))
+        proc, sheet = self.generate(css + '.chip[aria-selected="true"] { font-weight: 700; }\n',
+                                    '<span class="chip" {attrs}>{content}</span>', states, custom)
+        self.assertNotIn("chip:selected", output(proc))              # the rule is found
+
+    def test_an_undeclared_state_names_the_way_to_declare_it(self):
+        proc, _ = self.generate(".chip {}\n", '<span class="chip" {attrs}>{content}</span>',
+                                ["default", "selected"])
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("custom_states", output(proc))
+
+    def test_the_error_state_puts_aria_invalid_on_form_controls_only(self):
+        """A button takes no aria-invalid, and a wrapper around an input is not
+        the input: the element carrying {attrs} decides (Codex on #42)."""
+        for template, tag, invalid in (('<span class="chip" {attrs}>{content}</span>', "span", False),
+                                       ('<input class="chip" {attrs}>', "input", True),
+                                       ('<button class="chip" {attrs}>{content}</button>', "button", False),
+                                       ('<div class="chip" {attrs}><input></div>', "div", False)):
+            with self.subTest(tag=tag):
+                errors = self.state_cells(template, tag, "error")
+                self.assertEqual([invalid] * len(errors), ['aria-invalid="true"' in a for a in errors])
+
+    def test_a_wrapper_around_a_form_control_is_not_disabled_by_attribute(self):
+        """Codex on #42: a <div {attrs}> holding an <input> got a `disabled`
+        attribute, which a div cannot have."""
+        for template, tag, real in (('<div class="chip" {attrs}><input></div>', "div", False),
+                                    ('<button class="chip" {attrs}>{content}</button>', "button", True)):
+            with self.subTest(tag=tag):
+                cells = [a for a in self.state_cells(template, tag, "disabled") if "aria-disabled" in a]
+                self.assertTrue(cells)
+                self.assertEqual([real] * len(cells), [bool(re.search(r"(?:^|\s)disabled(?:\s|$)", a)) for a in cells])
+
+    def test_a_combination_whose_states_set_one_attribute_twice_is_refused(self):
+        """Codex on #42: loading+error kept only data-state="error", while the
+        coverage line counted both rules."""
+        proc, _ = self.generate(".chip {}\n", '<span class="chip" {attrs}>{content}</span>',
+                                ["default", "loading+error"])
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("data-state", output(proc))
+
+    def test_a_quoted_bracket_before_attrs_keeps_the_tag(self):
+        """CodeRabbit on #42: `[^<>]*` stopped at a `<` inside a quoted value,
+        so an input with one was not read as a form control."""
+        template = '<input class="chip" data-hint="1<2" {attrs}>'
+        self.assertTrue(all('aria-invalid="true"' in a for a in self.state_cells(template, "input", "error")))
+        self.assertTrue(all(re.search(r"(?:^|\s)disabled(?:\s|$)", a)
+                            for a in self.state_cells(template, "input", "disabled") if "aria-disabled" in a))
+
+    def test_a_conflict_is_judged_on_the_element_that_renders_it(self):
+        """CodeRabbit on #42: error + a state setting aria-invalid="false"
+        conflicts on an input, where error sets aria-invalid, and not on a span."""
+        custom = {"valid": {"attrs": {"aria-invalid": "false"}}}
+        for template, refused in (('<input class="chip" {attrs}>', True),
+                                  ('<span class="chip" {attrs}>{content}</span>', False)):
+            with self.subTest(refused=refused):
+                proc, _ = self.generate(".chip {}\n", template, ["default", "error+valid"], custom)
+                self.assertEqual(proc.returncode, 2 if refused else 0, output(proc))
+
+    def test_form_control_true_keeps_aria_invalid_off_a_div(self):
+        """CodeRabbit on #42: `form_control: true` bypassed error's form tags."""
+        self.write("chip.css", '.chip {}\n.chip[data-state="error"] { color: #b00; }\n')
+        self.write("matrix.json", json.dumps({"$schema": "component-state-matrix/1",
+                                              "themes": ["light"], "densities": ["comfortable"],
+                                              "components": [{"name": "chip", "css": "chip.css",
+                                                              "template": '<div class="chip" {attrs}>x</div>',
+                                                              "states": ["default", "error", "disabled"],
+                                                              "form_control": True}]}))
+        proc = run_py("component-state-matrix", "generate_matrix", "matrix.json", "--out", "sheet.html",
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        cells = self.cells((self.tmp / "sheet.html").read_text(encoding="utf-8"), "div")
+        self.assertFalse([a for a in cells if "aria-invalid" in a])
+        self.assertTrue([a for a in cells if re.search(r"(?:^|\s)disabled(?:\s|$)", a)])
+
+    def test_the_coverage_table_has_a_column_per_state(self):
+        """Codex on #42: the grid had seven state tracks, so a custom state's
+        column wrapped onto a row of its own."""
+        proc, sheet = self.generate(".chip {}\n", '<span class="chip" {attrs}>{content}</span>',
+                                    ["default", "selected"],
+                                    {"selected": {"attrs": {"aria-selected": "true"}}})
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn('class="msheet__table" role="table" style="--msheet-states: 8"', sheet)
+        self.assertIn("repeat(var(--msheet-states, 7), 1fr)", sheet)
 
 
 SAAS_DDL = """\

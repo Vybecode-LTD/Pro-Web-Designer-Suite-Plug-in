@@ -82,7 +82,11 @@ STATE_MODEL: Dict[str, Dict[str, Any]] = {
         "blurb": "pointer over the target; must never be the only affordance",
     },
     "focus-visible": {
-        "attrs": {"data-force-state": "focus-visible"},
+        # A ring written as `:focus` or `:focus-within` is mirrored to its own
+        # token, so the cell carries all three: with "focus-visible" alone a
+        # `.chip:focus` ring never rendered and the cell passed as covered
+        # (GT-A12).
+        "attrs": {"data-force-state": "focus-visible focus focus-within"},
         "force": "focus-visible",
         "detect": [":focus-visible", ":focus"],
         "blurb": "keyboard focus; the ring must survive forced-colors",
@@ -107,7 +111,11 @@ STATE_MODEL: Dict[str, Dict[str, Any]] = {
         "blurb": "work in flight; must hold its own size or the layout jumps",
     },
     "error": {
-        "attrs": {"aria-invalid": "true", "data-state": "error"},
+        # aria-invalid belongs to form controls: ARIA 1.2 deprecated it as a
+        # global attribute, so a button or a card gets data-state alone (GT-A13).
+        "attrs": {"data-state": "error"},
+        "form_attrs": {"aria-invalid": "true"},
+        "form_tags": ["input", "select", "textarea"],
         "force": None,
         "detect": ["[aria-invalid", 'data-state="error"', "[data-invalid"],
         "blurb": "invalid or failed; colour alone never carries this",
@@ -115,6 +123,7 @@ STATE_MODEL: Dict[str, Dict[str, Any]] = {
 }
 
 SEVEN_STATES = list(STATE_MODEL)
+STATE_NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 
 # Longest-first so `:focus-visible` is matched before `:focus`.
 FORCEABLE_PSEUDO = ("focus-visible", "focus-within", "focus", "hover", "active",
@@ -123,7 +132,12 @@ PSEUDO_RE = re.compile(
     r"(?<!:):(" + "|".join(FORCEABLE_PSEUDO) + r")\b"
 )
 
-FORM_TAG_RE = re.compile(r"<\s*(button|input|select|textarea|fieldset|optgroup|option)\b", re.I)
+FORM_TAGS = ("button", "input", "select", "textarea", "fieldset", "optgroup", "option")
+# The element that carries {attrs} is the one a state's attributes land on, so
+# it alone decides whether they are a form control's: a <div {attrs}> wrapping
+# an <input> is not one (Codex on #42).
+# A quoted value may hold < or > (CodeRabbit on #42).
+ATTRS_TAG_RE = re.compile(r"""<\s*([a-zA-Z][\w-]*)\b(?:[^<>"']|"[^"]*"|'[^']*')*?\{attrs\}""")
 
 DEFAULT_THEMES = ["light", "dark"]
 DEFAULT_DENSITIES = ["compact", "comfortable", "spacious"]
@@ -430,21 +444,25 @@ def token_rebind_shim(tokens_css: str, selector: str) -> str:
 
 
 def detect_states(css_text: str, states: Iterable[str],
-                  overrides: Dict[str, List[str]]) -> Dict[str, bool]:
+                  overrides: Dict[str, List[str]],
+                  model: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, bool]:
     """Which states does this component's OWN stylesheet say anything about?
 
     Conservative on purpose. A focus ring can legitimately come from a global
     `:where(:focus-visible)` rule in base.css, so a miss here is a prompt, not a
-    verdict — the cell still renders, and you look at it.
+    verdict — the cell still renders, and you look at it. A combination
+    (`selected+hover`) is covered when each of its states is.
     """
+    model = model if model is not None else STATE_MODEL
     flat = strip_comments(css_text)
     result: Dict[str, bool] = {}
     for st in states:
-        needles = overrides.get(st, STATE_MODEL.get(st, {}).get("detect"))
-        if not needles:
-            result[st] = True
-            continue
-        result[st] = any(nd in flat for nd in needles)
+        parts = st.split("+")
+        hits = []
+        for part in parts:
+            needles = overrides.get(part, model.get(part, {}).get("detect"))
+            hits.append(True if not needles else any(nd in flat for nd in needles))
+        result[st] = all(hits)
     return result
 
 
@@ -470,17 +488,23 @@ class Component:
         self.wrapper = raw.get("wrapper")  # e.g. "<table><tbody>{slot}</tbody></table>"
         self.variants = as_list(raw.get("variants")) or ["default"]
         self.sizes = as_list(raw.get("sizes")) or ["default"]
+        self.custom_states = self.read_custom_states(raw.get("custom_states"), where)
+        self.model: Dict[str, Dict[str, Any]] = {**STATE_MODEL, **self.custom_states}
         self.states = as_list(raw.get("states")) or list(SEVEN_STATES)
-        unknown = [s for s in self.states if s not in STATE_MODEL]
+        unknown = sorted({p for s in self.states for p in s.split("+") if p not in self.model})
         if unknown:
             raise ManifestError(
                 f"{where} ('{self.name}') lists unknown state(s) {unknown}. "
-                f"Known states: {', '.join(SEVEN_STATES)}. If you meant a content "
-                f"state (empty, partial, too-much-content), declare it as a content "
-                f"fixture instead — content states are not interaction states."
+                f"Known states: {', '.join(self.model)}. Declare a state of your own "
+                f"(selected, readonly, current, open) in `custom_states` as "
+                f"{{\"attrs\": {{...}}, \"detect\": [...]}}, and combine two with `+` "
+                f"(\"selected+hover\"). If you meant a content state (empty, partial, "
+                f"too-much-content), declare it as a content fixture instead — "
+                f"content states are not interaction states."
             )
         self.state_detect = raw.get("state_detect", {})
         self.state_attrs = raw.get("state_attrs", {})
+        self.where = where
         self.stage_style = raw.get("stage_style", {}) or {}
         bad_keys = [k for k in self.stage_style if not k.startswith("--")]
         if bad_keys:
@@ -504,7 +528,73 @@ class Component:
         self.css_text = ""
         for p in self.css_paths:
             self.css_text += read_text(p) + "\n"
-        self.coverage = detect_states(self.css_text, self.states, self.state_detect)
+        self.coverage = detect_states(self.css_text, self.states, self.state_detect,
+                                      self.model)
+
+    @staticmethod
+    def read_custom_states(raw: Any, where: str) -> Dict[str, Dict[str, Any]]:
+        """`custom_states`: {"selected": {"attrs": {"aria-selected": "true"},
+        "detect": ["[aria-selected"]}}. Without `detect`, a rule is found by the
+        attribute as written (`aria-selected="true"`)."""
+        if raw is None:
+            return {}
+        if not isinstance(raw, dict):
+            raise ManifestError(f"{where}.custom_states must be an object of name -> "
+                                f"{{\"attrs\": {{...}}, \"detect\": [...]}}.")
+        out: Dict[str, Dict[str, Any]] = {}
+        for name, spec in raw.items():
+            at = f"{where}.custom_states.{name}"
+            if not STATE_NAME_RE.match(name) or name in STATE_MODEL:
+                raise ManifestError(
+                    f"{at}: a custom state's name is lower-case letters, digits and "
+                    f"hyphens, and not one of the seven ({', '.join(SEVEN_STATES)}).")
+            attrs = spec.get("attrs") if isinstance(spec, dict) else None
+            if not isinstance(attrs, dict) or not attrs or not all(
+                    isinstance(k, str) and isinstance(v, str) for k, v in attrs.items()):
+                raise ManifestError(
+                    f"{at}: needs `attrs`, the attributes that put a cell in this state, "
+                    f"as an object of strings (`{{\"aria-selected\": \"true\"}}`). "
+                    f"State lives in attributes, never an `is-*` class.")
+            detect = spec.get("detect")
+            if detect is None:
+                detect = [f"[{k}]" if v == "" else f'{k}="{v}"' for k, v in attrs.items()]
+            elif not isinstance(detect, list) or not all(isinstance(d, str) and d for d in detect):
+                raise ManifestError(f"{at}: `detect` is a list of strings to find in the "
+                                    f"component's stylesheet.")
+            out[name] = {"attrs": dict(attrs), "force": None, "detect": detect,
+                         "blurb": str(spec.get("blurb", "a state this component declares"))}
+        return out
+
+    def state_attrs_for(self, state: str, is_form: Optional[str]) -> Dict[str, str]:
+        """The attributes of one state or a `+` combination, on the element that
+        carries {attrs}. Forced pseudo-states are joined (`hover focus-visible
+        …`). Two states of a combination that set one attribute to two values
+        are refused, as rendered on this element: one would silently replace
+        the other while coverage counted both (Codex and CodeRabbit on #42)."""
+        merged: Dict[str, str] = {}
+        owner: Dict[str, str] = {}
+        forced: List[str] = []
+        for part in state.split("+"):
+            spec = self.model[part]
+            attrs = dict(spec.get("attrs") or {})
+            tags = spec.get("form_tags")
+            if is_form and (tags is None or is_form in tags):
+                attrs.update(spec.get("form_attrs") or {})
+            attrs.update(self.state_attrs.get(part, {}))
+            for k, v in attrs.items():
+                if k == "data-force-state":
+                    forced += [t for t in v.split() if t not in forced]
+                    continue
+                if k in merged and merged[k] != v:
+                    raise ManifestError(
+                        f"{self.where} ('{self.name}') combines '{state}', but '{owner[k]}' "
+                        f"and '{part}' both set `{k}` ({merged[k]!r} and {v!r}) on this "
+                        f"element. Declare the combined state in `custom_states` with the "
+                        f"attributes it really has.")
+                merged[k], owner[k] = v, part
+        if forced:
+            merged["data-force-state"] = " ".join(forced)
+        return merged
 
     def resolved_template(self, templates: Dict[str, str]) -> str:
         if self.template:
@@ -528,10 +618,16 @@ class Component:
             )
         return tpl
 
-    def is_form_control(self, tpl: str) -> bool:
+    def is_form_control(self, tpl: str) -> Optional[str]:
+        """The tag of the element carrying {attrs} when it is a form control, or
+        when the manifest says so with `form_control: true`; else None. A
+        state's own `form_tags` still apply, so `form_control` never puts
+        aria-invalid on a <div> (CodeRabbit on #42)."""
+        m = ATTRS_TAG_RE.search(tpl)
+        tag = m.group(1).lower() if m else ""
         if self.form_control is not None:
-            return bool(self.form_control)
-        return bool(FORM_TAG_RE.search(tpl))
+            return (tag or "*") if self.form_control else None
+        return tag if tag in FORM_TAGS else None
 
 
 class Manifest:
@@ -790,19 +886,14 @@ def esc(s: Any) -> str:
     return html.escape(str(s), quote=True)
 
 
-def attrs_for(comp: Component, cell: Cell, is_form: bool) -> str:
+def attrs_for(comp: Component, cell: Cell, is_form: Optional[str]) -> str:
     pairs: List[Tuple[str, str]] = []
     if cell.variant != "default":
         pairs.append(("data-variant", cell.variant))
     if cell.size != "default":
         pairs.append(("data-size", cell.size))
 
-    spec = dict(STATE_MODEL[cell.state])
-    state_attrs = dict(spec.get("attrs") or {})
-    if cell.state == "disabled" and is_form:
-        state_attrs.update(spec.get("form_attrs") or {})
-    state_attrs.update(comp.state_attrs.get(cell.state, {}))
-    for k, v in state_attrs.items():
+    for k, v in comp.state_attrs_for(cell.state, is_form).items():
         pairs.append((k, v))
 
     out = []
@@ -811,7 +902,7 @@ def attrs_for(comp: Component, cell: Cell, is_form: bool) -> str:
     return " ".join(out)
 
 
-def render_cell(comp: Component, cell: Cell, tpl: str, is_form: bool) -> str:
+def render_cell(comp: Component, cell: Cell, tpl: str, is_form: Optional[str]) -> str:
     body = tpl.replace("{attrs}", attrs_for(comp, cell, is_form))
     body = body.replace("{content}", comp.content[cell.fixture])
     body = body.replace("{cell_id}", cell.cell_id)
@@ -851,7 +942,7 @@ class _IdSet(set):
 
 
 def render_grid(comp: Component, grid: Grid, themes: List[str], tpl: str,
-                is_form: bool, seen_ids: set) -> str:
+                is_form: Optional[str], seen_ids: set) -> str:
     out: List[str] = []
     out.append(f'<section class="msheet__pass" data-pass="{esc(grid.key)}">')
     out.append(f'<h3 class="msheet__pass-title">{esc(grid.title)}</h3>')
@@ -862,7 +953,8 @@ def render_grid(comp: Component, grid: Grid, themes: List[str], tpl: str,
     for _, label in grid.cols:
         out.append(f'<div class="msheet__colhead">{esc(label)}</div>')
     for row_key, row_label in grid.rows:
-        blurb = STATE_MODEL.get(row_key, {}).get("blurb", "")
+        blurb = (" + ".join(comp.model[p].get("blurb", "") for p in row_key.split("+"))
+                 if grid.key == "state" else "")
         missing = grid.key == "state" and not comp.coverage.get(row_key, True)
         cls = "msheet__rowhead" + (" msheet__rowhead--gap" if missing else "")
         out.append(f'<div class="{cls}">'
@@ -887,6 +979,14 @@ def render_grid(comp: Component, grid: Grid, themes: List[str], tpl: str,
     return "\n".join(out)
 
 
+def every_state(components: List[Component]) -> List[str]:
+    """The seven, then each custom state and combination in manifest order."""
+    out = list(SEVEN_STATES)
+    for comp in components:
+        out += [s for s in comp.states if s not in out]
+    return out
+
+
 def render_coverage(components: List[Component]) -> str:
     out = ['<section class="msheet__coverage" id="coverage">',
            '<h2 class="msheet__h2">State coverage</h2>',
@@ -894,8 +994,10 @@ def render_coverage(components: List[Component]) -> str:
            'stylesheet. A gap here is a prompt, not a verdict &mdash; a focus '
            'ring can legitimately come from a global <code>:where(:focus-visible)</code> '
            'rule in <code>base.css</code>. Look at the cell and decide.</p>',
-           '<div class="msheet__table" role="table">']
-    header = ["component"] + SEVEN_STATES
+           '<div class="msheet__table" role="table" style="--msheet-states: COLUMNS">']
+    columns = every_state(components)
+    out[-1] = out[-1].replace("COLUMNS", str(len(columns)))
+    header = ["component"] + columns
     out.append('<div class="msheet__trow msheet__trow--head" role="row">')
     for h in header:
         out.append(f'<div class="msheet__tcell" role="columnheader">{esc(h)}</div>')
@@ -903,7 +1005,7 @@ def render_coverage(components: List[Component]) -> str:
     for comp in components:
         out.append('<div class="msheet__trow" role="row">')
         out.append(f'<div class="msheet__tcell" role="rowheader">{esc(comp.title)}</div>')
-        for st in SEVEN_STATES:
+        for st in columns:
             if st not in comp.states:
                 mark, cls = "—", "msheet__mark msheet__mark--na"
                 title = "not declared in the manifest for this component"
@@ -1177,7 +1279,7 @@ CHROME_CSS = r"""
 
   .msheet__trow {
     display: grid;
-    grid-template-columns: max-content repeat(7, 1fr);
+    grid-template-columns: max-content repeat(var(--msheet-states, 7), 1fr);
     gap: var(--stroke-hairline);
     background: var(--msheet-rule);
   }
@@ -1328,7 +1430,7 @@ def build_html(man: Manifest, comps: List[Component], themes: List[str],
             total += len(grid.rows) * len(grid.cols) * len(themes)
         parts.append("</section>")
 
-    all_states = [s for s in SEVEN_STATES
+    all_states = [s for s in every_state(comps)
                   if any(s in c.states for c in comps)]
     controls = "".join([
         select_control("f-theme", "theme", themes),
@@ -1487,7 +1589,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 cssp.parent.mkdir(parents=True, exist_ok=True)
             cssp.write_text(
                 LAYER_STATEMENT + "\n" + CHROME_CSS
-                + filter_css(themes, densities, SEVEN_STATES) + "\n",
+                + filter_css(themes, densities, every_state(comps)) + "\n",
                 encoding="utf-8")
 
     except ManifestError as exc:
