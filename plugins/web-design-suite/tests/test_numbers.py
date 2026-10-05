@@ -415,5 +415,37 @@ class FluidTypeZoom(unittest.TestCase):
         self.assertIn(f"{zoomed:g} against {widest:g}, {zoomed / widest:.2f}×", text)
 
 
+class ByteBudgets(unittest.TestCase):
+    """GT-A16: two rows of budgets.md's "same method" table could not be
+    reproduced with the method above it (Fast 4G gave 1.9 MB, not 1.5; 3G
+    12.5 KB, not 40), and a third ran high (desktop cable 1.1 MB, not 1.2).
+    Every row is recomputed: TTFB = 4 RTT + 200 ms, minus 300 + 150 ms, times
+    the throughput, and the total is the critical path times 2.4."""
+
+    DOC = SKILLS / "perf-budget-gate" / "references" / "budgets.md"
+
+    @staticmethod
+    def kb(text):
+        value, unit = re.fullmatch(r"([\d.]+) (KB|MB)", text).groups()
+        return float(value) * (1000 if unit == "MB" else 1)
+
+    def test_every_row_of_the_same_method_table_is_the_method(self):
+        table = self.DOC.read_text(encoding="utf-8").split("### The same method", 1)[1]
+        rows = re.findall(r"^\| LCP ≤ ([\d.]+)s.*?\((\d+(?:\.\d+)?) (Mbps|Kbps), (\d+) ms RTT\).*?"
+                          r"\| ([\d.]+ [KM]B) \| ([\d.]+ [KM]B) \|$", table, re.M)
+        self.assertEqual(5, len(rows))
+        for lcp, rate, unit, rtt, critical, total in rows:
+            with self.subTest(row=(lcp, rate, unit, rtt)):
+                kb_per_ms = float(rate) * (1000 if unit == "Mbps" else 1) / 8 / 1000
+                ms = float(lcp) * 1000 - (4 * int(rtt) + 200) - 300 - 150
+                want = ms * kb_per_ms
+                self.assertAlmostEqual(self.kb(critical), want, delta=want * 0.05)
+                self.assertAlmostEqual(self.kb(total), want * 2.4, delta=want * 2.4 * 0.05)
+
+    def test_skill_md_quotes_the_table(self):
+        text = (SKILLS / "perf-budget-gate" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("250 KB on Slow 4G and 1.9 MB on Fast 4G", text)
+
+
 if __name__ == "__main__":
     unittest.main()

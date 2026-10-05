@@ -1176,8 +1176,10 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                 "update it on client-side navigation — a SPA that never changes "
                 "the title tells a screen reader user nothing happened.")
         if saw_main == 0:
-            add(1, "S", "no-main-landmark", "1.3.1 / 2.4.1", "error",
+            add(1, "S", "no-main-landmark", "best practice", "warning",
                 "The document has no <main> landmark.",
+                "Best practice, not a WCAG failure (axe's `landmark-one-main` "
+                "is tagged best-practice only), and still worth fixing. "
                 "Screen reader users jump straight to `main` more than they use "
                 "any other landmark — it is how you skip a header you have "
                 "already heard on nine pages. Exactly one per page, "
@@ -1223,9 +1225,10 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
     # ---- S: heading outline ----------------------------------------------
     h1s = [(lvl, ln) for lvl, ln, _ in heading_seq if lvl == 1]
     if len(h1s) > 1:
-        add(h1s[1][1], "S", "multiple-h1", "1.3.1 / 2.4.6", "error",
+        add(h1s[1][1], "S", "multiple-h1", "best practice", "warning",
             f"{len(h1s)} <h1> elements (lines {', '.join(str(l) for _, l in h1s)}).",
-            "The h1 is the page's subject and should roughly match the "
+            "Best practice, not a WCAG failure: no criterion limits a page to "
+            "one h1. The h1 is the page's subject and should roughly match the "
             "<title>. Two of them means the outline has two roots, and a user "
             "navigating by heading cannot tell which one the page is about. "
             "Choose the level by STRUCTURE, not by size — a visually small "
@@ -1234,10 +1237,12 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
     prev = 0
     for lvl, ln, txt in heading_seq:
         if prev and lvl > prev + 1:
-            add(ln, "S", "heading-skip", "1.3.1", "error",
+            add(ln, "S", "heading-skip", "best practice", "warning",
                 f"Heading level jumps h{prev} → h{lvl}"
                 + (f" (\"{txt[:48]}\")" if txt else "") + ".",
-                "A skipped level tells a screen reader user a section was lost "
+                "Best practice, not a WCAG failure (axe's `heading-order` is "
+                "tagged best-practice only). A skipped level tells a screen "
+                "reader user a section was lost "
                 "and makes them stop to work out whether they missed something. "
                 "Going back UP (h4 → h2) is fine and normal; only going down "
                 "more than one step at a time is a defect. Read the outline on "

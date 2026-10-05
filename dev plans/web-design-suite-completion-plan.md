@@ -264,7 +264,7 @@ SB-B3 adds a focus and forced-colors probe to one of the gates.
 | GT-A18 | low-medium | `multiple-h1`, `heading-skip` and `no-main-landmark` are hard errors attributed to SCs 1.3.1, 2.4.6 and 2.4.1. |
 | GT-C2 | S–M · P0 | Fix colour parsing, modals, iframes, inert content, `bypassCSP`, animation pausing and the disabled-control exemption. *Done: 3.1.0 did colours, modals, iframes and inert content; 3.4.0 did pausing (PR #38), `bypassCSP` and the disabled-control exemption (PR #39).* |
 | GT-C3 | M · P0 | Matrix: the within-run "differs from default" gate, a tuned tolerance, focus mirroring, custom states, `data-state="error"` on non-form templates. *Partly done: 3.1.0 did the differs-from-default gate; focus mirroring (A12) and custom states (A13) are left.* |
-| GT-C5 | S · P0 | A correction pass on the docs (A7–A10, A16, A19). *Partly done: 3.2.0 corrected A7, A9, A10 and A19; A8 and A16 are left.* |
+| GT-C5 | S · P0 | A correction pass on the docs (A7–A10, A16, A19). *Done: 3.2.0 corrected A7, A9, A10 and A19, and 3.4.0 A8 and A16 (PR #41).* |
 
 ### W6 · Lifecycle: versioning, migration and Figma
 

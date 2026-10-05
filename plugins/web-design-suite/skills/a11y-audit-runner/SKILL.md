@@ -133,7 +133,7 @@ Not once, at the end. **Per template, before release, on a schedule.** The proto
 
 Never write "accessible" because CI is green. `references/automation-coverage.md` §7 has the wording to use instead, for a client report, a VPAT/ACR and a procurement questionnaire. The short version:
 
-> *"Automated checks (axe-core 4.13, WCAG 2.2 A/AA rule set) pass with zero violations on all 14 templates. Automated testing covers an estimated third of WCAG success criteria; the manual evaluation recorded in Appendix B covers the remainder. Two criteria are Partially Supported — see the exceptions table."*
+> *"Automated checks (axe-core 4.13, its WCAG 2.0, 2.1 and 2.2 A and AA rules) pass with zero violations on all 14 templates. Automated testing covers an estimated third of WCAG success criteria; the manual evaluation recorded in Appendix B covers the remainder. Two criteria are Partially Supported — see the exceptions table."*
 
 That paragraph survives scrutiny. "Our site is WCAG 2.2 AA compliant, verified by automated testing" does not, and in the EU under the European Accessibility Act it is a statement someone can act on.
 

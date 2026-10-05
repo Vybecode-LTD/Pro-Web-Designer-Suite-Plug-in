@@ -185,7 +185,7 @@ A false positive costs more than a missed finding, because it does not cost one 
 |---|---|---|
 | **`color-contrast` on text over an image** | axe cannot sample the image, so it returns **incomplete** — and many wrappers surface incompletes as failures | Do not disable. Route incompletes to a human queue. This skill reports them separately, as warnings, with the reason |
 | **`color-contrast` on text mid-animation** | The screenshot caught a fade at 40% opacity | Freeze animations before scanning. `a11y_runtime.mjs` injects a 1ms animation/transition override for exactly this |
-| **`region` / "all content in landmarks"** | It is a **best-practice** rule, not a WCAG criterion, and it fires on every fragment and every Storybook story | Scope your tag set. `--tags wcag2a,wcag2aa,wcag22aa` for the gate; add `best-practice` for a full-page review |
+| **`region` / "all content in landmarks"** | It is a **best-practice** rule, not a WCAG criterion, and it fires on every fragment and every Storybook story | Nothing to scope: a best-practice rule is reported as a warning and never fails the run, whatever its impact. To leave them out, `--tags wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa`. Never drop `wcag21a` and `wcag21aa`: in axe 4.13 they hold `autocomplete-valid` (1.3.5) and `avoid-inline-spacing` (1.4.12), and two rules axe marks experimental and runs only when enabled, `label-content-name-mismatch` (2.5.3) and `css-orientation-lock` (1.3.4) |
 | **`landmark-one-main` on a component fixture** | A component is not a page | Same answer: page rules belong to page runs. In `--matrix` mode this skill attributes violations to cells and demotes anything in the sheet's own chrome |
 | **`nested-interactive`** on a genuine composite | A `role="tab"` inside a `role="tablist"` inside a toolbar can look nested | Check it once. If it is a real APG pattern, a per-element suppression with the pattern named beats disabling the rule |
 | **`duplicate-id`** in a framework that generates ids | React 18's `useId` and most SSR frameworks produce unique ids; hand-rolled counters do not | Fix the generator. This is a genuine defect with a low-severity face — it breaks every `aria-labelledby` pointing at it |
@@ -278,7 +278,7 @@ This is not pedantry. In the EU the European Accessibility Act and EN 301 549 ma
 > ✅ **"Automated checks pass."** Scoped, true, and does not imply a conclusion it cannot support.
 >
 > ✅ For a status summary:
-> *"Automated accessibility checks (axe-core 4.13, WCAG 2.2 A/AA rule set) return zero violations across all 14 page templates and 312 component states. Automated checks fully decide 7 of the 55 WCAG 2.2 A and AA success criteria and part of 31 more; the other 48 were evaluated manually on 2026-09-10 using the protocol in Appendix B. Two criteria are Partially Supported — see the exceptions table."*
+> *"Automated accessibility checks (axe-core 4.13, its WCAG 2.0, 2.1 and 2.2 A and AA rules) return zero violations across all 14 page templates and 312 component states. Automated checks fully decide 7 of the 55 WCAG 2.2 A and AA success criteria and part of 31 more; the other 48 were evaluated manually on 2026-09-10 using the protocol in Appendix B. Two criteria are Partially Supported — see the exceptions table."*
 >
 > ✅ For a VPAT/ACR remark:
 > *"Supports. Verified by automated rule (axe-core `color-contrast`) across all templates and by manual sampling of 12 representative components on 2026-09-10."*

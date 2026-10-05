@@ -42,6 +42,25 @@
   checks, so `a11y_runtime.mjs --file page.html --only contrast` ran every check. A page
   now refuses it, with exit 2 and a pointer to `--skip`.
 
+- **The axe tag advice dropped WCAG 2.1, and best practice failed the run** (GT-A8). The
+  docs recommended `--tags wcag2a,wcag2aa,wcag22aa`, which leaves out every 2.1 rule: in
+  axe 4.13, `autocomplete-valid` (1.3.5) and `avoid-inline-spacing` (1.4.12), and two
+  experimental ones. Every example now keeps `wcag21a,wcag21aa`. And the default set's
+  best-practice rules (`tabindex`, `aria-dialog-name` and others axe rates serious)
+  failed the run as errors, though they name no success criterion: a11y_runtime now
+  reports them as warnings, labelled best practice. The report wording names the 2.0,
+  2.1 and 2.2 A and AA rules.
+- **a11y_static's outline and landmark checks are best practice** (GT-A18).
+  `multiple-h1`, `heading-skip` and `no-main-landmark` were errors under 1.3.1, 2.4.6
+  and 2.4.1; axe tags the same checks best-practice only. They are warnings now, labelled
+  best practice; `--strict` still fails on them.
+- **Two rows of perf-budget-gate's "same method" table did not follow the method**
+  (GT-A16). Fast 4G gives 1.9 MB of critical path, not 1.5 (total 4.6 MB), and 3G
+  12.5 KB, not 40 (total 30 KB); desktop cable is 1.1 MB, not 1.2. The table states its
+  method and the Slow 4G profile, and budgets.md no longer says the 800 ms TTFB matches
+  web.dev's 0.8 s "not by coincidence": web.dev calls that threshold a rough guide. With
+  GT-A8, this finishes GT-C5's correction pass.
+
 ### Changed
 
 - **One copy of the browser scripts' shared helpers** (GT-C13). a11y_runtime,
@@ -85,6 +104,12 @@
   on a page and a bad `--densities`. Against `v3.3.0`, 2 fail; the `--densities` test is
   a control, since 3.3.0 refused the unknown option. The runtime tests that passed
   `--only CHECK` to a page now leave the other checks out with `--skip`.
+- P11 (GT-A8, GT-A16, GT-A18): `test_facts.AxeTagAdvice` holds every `--tags` list that
+  names `wcag2a` to naming `wcag21a` and `wcag21aa`, and reads the pinned axe-core's tags
+  for the rules the docs name; `test_browser_runtime.test_a_best_practice_rule_is_a_warning`
+  runs `tabindex` beside `image-alt`; `test_content_and_a11y.StaticBestPractice` and
+  `test_numbers.ByteBudgets` recompute the rest. Against `v3.3.0`, all 6 fail. The
+  web.dev quote is registered in `evidence.json`.
 
 ## 3.3.0 — 2026-10-04
 

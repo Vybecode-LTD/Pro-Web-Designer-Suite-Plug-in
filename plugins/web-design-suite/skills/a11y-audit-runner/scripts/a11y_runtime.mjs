@@ -46,7 +46,7 @@
  * Usage
  * -----
  *   node a11y_runtime.mjs --url http://127.0.0.1:8080/
- *   node a11y_runtime.mjs --file build/index.html --tags wcag2a,wcag2aa,wcag22aa
+ *   node a11y_runtime.mjs --file build/index.html --tags wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa
  *   node a11y_runtime.mjs --url http://127.0.0.1:8080/ --keymap a11y-keymap.json
  *   node a11y_runtime.mjs --matrix build/proof-sheet.html --only "button--"
  *   node a11y_runtime.mjs --url http://127.0.0.1:8080/ --budget a11y-budget.json --json
@@ -63,7 +63,9 @@
  *                         [data-cell-id] cell, so every STATE is audited and
  *                         not merely every page
  *   --tags LIST           axe tag set  (default wcag2a,wcag2aa,wcag21a,
- *                         wcag21aa,wcag22aa,best-practice)
+ *                         wcag21aa,wcag22aa,best-practice). A best-practice
+ *                         rule is not a WCAG criterion: its findings are
+ *                         warnings and never fail the run
  *   --keymap FILE         expected keyboard behaviour per pattern
  *   --budget FILE         a11y-budget.json; non-zero exit on breach
  *   --only SUBSTR         with --matrix, only cells containing SUBSTR (repeatable);
@@ -548,10 +550,14 @@ function axeFindings(res) {
   for (const v of res.violations) {
     const sc = (v.tags.find((t) => /^wcag\d{3}$/.test(t)) || '')
       .replace(/^wcag(\d)(\d)(\d)$/, '$1.$2.$3');
+    // A best-practice rule names no success criterion, so it is reported and
+    // never fails the run, whatever axe rates its impact (GT-A8).
+    const bestPractice = !sc && v.tags.includes('best-practice');
     out.push(finding(
-      'axe', v.id, sc || v.tags.join(','),
-      AXE_SEVERITY[v.impact] || 'warning',
-      `${v.help} — ${v.count} element(s), impact ${v.impact}.`,
+      'axe', v.id, sc || (bestPractice ? 'best practice' : v.tags.join(',')),
+      bestPractice ? 'warning' : (AXE_SEVERITY[v.impact] || 'warning'),
+      `${bestPractice ? 'Best practice, not a WCAG failure: ' : ''}` +
+        `${v.help} — ${v.count} element(s), impact ${v.impact}.`,
       `${clip(v.nodes[0] ? v.nodes[0].summary : '', 300)} ${v.helpUrl}`.trim(),
       { nodes: v.nodes.map((n) => n.target), cells: [...new Set(v.nodes.map((n) => n.cell).filter(Boolean))] }));
   }

@@ -44,7 +44,7 @@ Exit `0` clean · `1` violations · `2` bad invocation.
 node scripts/a11y_runtime.mjs --url http://127.0.0.1:8080/
 node scripts/a11y_runtime.mjs --url http://127.0.0.1:8080/ --keymap a11y-keymap.json
 node scripts/a11y_runtime.mjs --matrix build/proof-sheet.html --only "button--"
-node scripts/a11y_runtime.mjs --file dist/index.html --tags wcag2a,wcag2aa,wcag22aa --json
+node scripts/a11y_runtime.mjs --file dist/index.html --tags wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa --json
 ```
 
 | Check | What it does that source analysis cannot |
@@ -61,7 +61,7 @@ node scripts/a11y_runtime.mjs --file dist/index.html --tags wcag2a,wcag2aa,wcag2
 | Flag | Does |
 |---|---|
 | `--url` · `--file` · `--matrix` | exactly one; they are three different jobs |
-| `--tags LIST` | axe tag set (default `wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice`) |
+| `--tags LIST` | axe tag set (default `wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice`). A best-practice rule names no success criterion, so its findings are warnings and never fail the run, whatever axe rates its impact |
 | `--keymap FILE` | expected keyboard behaviour per pattern |
 | `--budget FILE` | counter limits, as JSON `{"key": limit}`; non-zero exit on breach, and an unknown key exits 2. Keys: `axe_violations`, `axe_serious`, `axe_incomplete`, `unnamed_controls`, `duplicate_names`, `tab_traps`, `unreachable_controls`, `focus_invisible`, `focus_weak`, `forced_colors_lost`, `contrast_failures`, `reflow_failures`, `keymap_failures` |
 | `--only SUBSTR` | with `--matrix`, narrow to matching cells (repeatable). It does not pick checks, so a page refuses it: use `--skip` |
@@ -112,7 +112,7 @@ Static layer, on a fixture with twenty planted violations:
      25  error  K focus-ring-shadow-only       `.shadowring:focus-visible` replaces the
                                                outline with `box-shadow` alone.
      53  error  K positive-tabindex            `tabindex="3"` on <a>.
-     65  error  S heading-skip                 Heading level jumps h1 → h3 ("Findings").
+     65  warn   S heading-skip                 Heading level jumps h1 → h3 ("Findings").
      70  error  N img-no-alt                   <img> has no `alt` attribute (src=chart.png).
      73  error  N alt-is-filename              `alt="team.jpg"` is a filename.
      85  error  F placeholder-as-label         <input> is named only by `placeholder`.
@@ -127,7 +127,7 @@ Static layer, on a fixture with twenty planted violations:
     123  error  K aria-hidden-focusable        `aria-hidden="true"` on <div> which contains
                                                1 focusable element(s).
 
-  24 error(s), 5 warning(s) across 1 file(s).
+  23 error(s), 6 warning(s) across 1 file(s).
 ```
 
 Runtime layer, same page. The tab order listing is the part to read first:

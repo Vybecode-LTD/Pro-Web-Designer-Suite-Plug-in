@@ -168,6 +168,16 @@ class RuntimeInABrowser(TempDirTest):
         findings = self.runtime(self.DENSITY_PAGE, *only("focus", "forced"), "--densities", "none")
         self.assertEqual([], [f for f in findings if f["severity"] == "error"])
 
+    def test_a_best_practice_rule_is_a_warning(self):
+        """GT-A8: axe rates `tabindex` (best-practice only) serious, and it
+        failed the run as an error. It names no success criterion, so it is
+        reported as a warning; a WCAG rule beside it is still an error."""
+        html = ("<!doctype html><html lang=en><head><title>b</title></head><body><main>"
+                "<h1>Order</h1><a href=#a tabindex=2>First</a><img src=chart.png></main></body></html>")
+        axe = {f["rule"]: f for f in self.runtime(html, *only("axe")) if f["check"] == "axe"}
+        self.assertEqual(("warning", "best practice"), (axe["tabindex"]["severity"], axe["tabindex"]["sc"]))
+        self.assertEqual("error", axe["image-alt"]["severity"])
+
     def test_an_open_modal_dialog_is_not_a_trap(self):
         """GT-A2: a cookie banner built the recommended way."""
         html = ('<!doctype html><html lang="en"><head><title>Cookie consent</title></head><body>'

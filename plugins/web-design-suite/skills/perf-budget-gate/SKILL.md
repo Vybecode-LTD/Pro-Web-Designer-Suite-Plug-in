@@ -42,7 +42,7 @@ The difference is not rhetorical. Once a feature exists and works, "it adds 180 
 Three rules follow, and they are the whole discipline:
 
 1. **A number you cannot reconstruct will be argued away.** Every budget must trace back to a promise about a device and a network. `references/budgets.md` §1 has the arithmetic.
-2. **A budget with no device and network attached is not a budget, it is a preference.** The same 2.5-second LCP target yields 250 KB on Slow 4G and 1.5 MB on Fast 4G. Say which one you meant.
+2. **A budget with no device and network attached is not a budget, it is a preference.** The same 2.5-second LCP target yields 250 KB on Slow 4G and 1.9 MB on Fast 4G. Say which one you meant.
 3. **Raising a budget is a reviewed decision, not a line in the commit that needed the room.** `references/budgets.md` §7 is the five-question review and the log entry that makes it stick.
 
 ---
