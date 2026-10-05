@@ -236,6 +236,20 @@ class MigrationPipeline(TempDirTest):
         self.assertIn(f"margin-inline: calc(var({inline16}) * -1)", line[".c__x"])
         self.assertIn(f"margin-block-start: calc(var({all16}) * -1)", line[".g__m, .h__m"])
 
+    def test_a_cancel_reads_the_padding_of_its_own_media_query(self):
+        # CodeRabbit on #49: a padding in one @media is not a margin's elsewhere.
+        self.write("src/a.css", "@media (min-width: 40rem) { .p { padding: 16px; } }\n"
+                                "@media print { .p__x { margin-inline: -16px; } }\n"
+                                "@media print { .q { padding: 16px; } .q__x { margin-inline: -16px; } }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+        all16 = next(r["token"] for r in mapping["rules"]
+                     if "pad-all" in r.get("prop_classes", []) and "16px" in r["match"])
+        lines = self.codemod(self.tmp / "src").splitlines()
+        p_x = next(l for l in lines if l.startswith("+@media print { .p__x"))
+        q_x = next(l for l in lines if l.startswith("+@media print { .q {"))
+        self.assertNotIn(f"var({all16})", p_x)
+        self.assertIn(f".q__x {{ margin-inline: calc(var({all16}) * -1); }}", q_x)
+
     def test_a_negative_margin_with_nothing_to_cancel_keeps_its_own_token(self):
         # Control: no padding in the parent rule, so it is a spacing value of its own.
         self.write("src/a.css", ".row { gap: 16px; }\n.row__item { margin-block-start: -16px; }\n"

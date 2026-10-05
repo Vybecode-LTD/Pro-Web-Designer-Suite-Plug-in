@@ -304,6 +304,8 @@
   tell left from right, a later `padding-inline` did not replace `padding`, and a grouped
   margin selector found no parent. The pairing works by side, in cascade order, for each
   member of either list.
+  Its next review found one more: a padding inside one `@media` decided a margin's cancel
+  in another. Each declaration records its at-rule context, and a margin reads its own.
 
 ## 3.3.0 — 2026-10-04
 
