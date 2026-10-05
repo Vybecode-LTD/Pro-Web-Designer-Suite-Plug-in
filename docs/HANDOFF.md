@@ -22,7 +22,7 @@
 2. **Then:** P16 (LC-A22, LC-C3), then P17 (LC-A17, LC-A23, LC-B8, LC-C6).
 3. Then the rest of Phase 4 (P18 to P23), and R2, the 3.4.0 release.
 4. **Not yet scheduled:** a Law 6 check in stylelint and the ESLint config. Today only the audit reads Law 6 for CSS `var()` reads (the spec's `tiers` names one gate). CodeRabbit asked for it on #49; it is a new gate with spec examples and real-tool tests. Schedule it (Phase 5 or 7) and run `check_execution_plan.py`.
-5. **Offered as its own task:** the audit skips JS checks for any file whose absolute path names `test`, `spec`, `stories`, `mock` or `fixture` (`audit_design.py` around line 1658).
+5. **#52 (open) fixes this; merge it once green:** the audit skipped JS checks for any file whose absolute path names `test`, `spec`, `stories`, `mock` or `fixture` (`audit_design.py` around line 1658).
 
 ## Warnings
 
