@@ -110,7 +110,7 @@ One second, and you have a weight ledger, the largest assets with their intrinsi
 
 ```bash
 python -m http.server 8080 --directory dist &
-node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --runs 5 --throttle slow4g
+node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --runs 5 --throttle lighthouse
 ```
 
 **Do not skip the LCP element line.** Half of all LCP work is spent optimising something that was never the largest paint.
@@ -217,7 +217,7 @@ Escape hatches are comment pragmas, so every exception is visible in review. Tag
 The runtime layer. Real `PerformanceObserver` entries, N runs, median plus spread.
 
 ```bash
-node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --runs 7 --throttle slow4g
+node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --runs 7 --throttle lighthouse
 node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --budget perf-budget.ci.json
 node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --interact "button.buy" --json
 ```
@@ -225,10 +225,11 @@ node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --interact "button.buy" -
 | Flag | Does |
 |---|---|
 | `--runs N` | iterations; the median is reported (default 5) |
-| `--throttle NAME` | `slow4g` (default) · `fast4g` · `cpu4` · `off`, applied via CDP |
+| `--throttle NAME` | `lighthouse` (default: Lighthouse's own throttling) · `slow4g`, `fast4g` (lighter) · `cpu4` · `off`, via CDP |
 | `--budget FILE` | compares the median against `defaults.lab`; non-zero exit on breach |
 | `--page-type NAME` | per-page-type `lab` override |
 | `--interact SEL` | click it after load and measure **real INP** |
+| `--interact-at MS` | click it MS after navigation starts instead, while the page hydrates |
 | `--warm` | measure the second load instead of a cold one |
 | `--settle MS` · `--viewport WxH` · `--dpr N` · `--resources N` · `--json` · `--browser PATH` · `--quiet` | |
 

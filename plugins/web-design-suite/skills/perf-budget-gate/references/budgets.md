@@ -34,6 +34,8 @@ CPU       4× slowdown relative to the machine running the test
 
 Those figures are roughly the bottom quartile of 4G and the top quartile of 3G. If your analytics say your users are on desktop broadband, **use a different profile and say so in the budget file** — the arithmetic below is a method, not a constant.
 
+`measure_vitals.mjs --throttle lighthouse`, the default, applies this profile as Lighthouse's own DevTools throttling does. CDP adds its latency once per request, where a new connection pays the round trip several times (DNS, TCP, TLS, then the request), so Lighthouse multiplies the 150 ms RTT by 3.75 and the throughput by 0.9: 562.5 ms per request, 1.44 Mbps down, 675 Kbps up. Those factors are Lighthouse's constants, now kept in Chrome DevTools' Lantern. `--throttle slow4g`, the default before 3.4.0, applies 150 ms per request at the full 1.6 Mbps: a lighter load than the profile, kept so old numbers stay comparable. Its TTFB is the network stack's, which sees the emulated latency; the page's own Navigation Timing does not.
+
 ### Working backwards to bytes
 
 ```

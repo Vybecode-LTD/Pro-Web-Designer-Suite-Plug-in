@@ -21,7 +21,7 @@ Four mistakes that invalidate everything downstream:
 | A warm cache | The visit that matters is the first one. Measure warm separately, deliberately. |
 | The page you built for | Measure the page that gets traffic, in the state users see it — logged in, with the banner, with the variant. |
 
-`measure_vitals.mjs` defaults to a cold cache and Slow 4G with 4× CPU for exactly these reasons.
+`measure_vitals.mjs` defaults to a cold cache and Lighthouse's own Slow 4G throttling with 4× CPU (`--throttle lighthouse`, `references/budgets.md` §1) for exactly these reasons.
 
 ---
 
@@ -257,7 +257,7 @@ The async load pattern, if you do it:
 
 **INP** is the latency of essentially the worst interaction on the page, in three phases: **input delay** (waiting for the main thread), **processing duration** (your handlers running), and **presentation delay** (waiting for the next frame). Good is ≤ 200 ms at p75 in the field.
 
-**TBT is the lab proxy**, not the metric: the sum of `(duration − 50 ms)` over long tasks after FCP. It has two honest limitations — it flags blocking nobody interacted during, and it misses responsiveness problems that only appear once the page is interactive. Note also that **a long task that finishes before FCP contributes zero TBT** while being the worst thing on the page; `measure_vitals.mjs` reports total blocking time alongside TBT for that reason.
+**TBT is the lab proxy**, not the metric: the sum of `(duration − 50 ms)` over long tasks between FCP and TTI, the end of the last long task before five quiet seconds. `measure_vitals.mjs` leaves out the work of an interaction it drives, which INP counts; the task an input waited behind stays, since it is the page's. TBT has two honest limitations — it flags blocking nobody interacted during, and it misses responsiveness problems that only appear once the page is interactive. Note also that **a long task that finishes before FCP contributes zero TBT** while being the worst thing on the page; `measure_vitals.mjs` reports total blocking time alongside TBT for that reason.
 
 | Phase | Symptom | Mechanism | Fix |
 |---|---|---|---|
@@ -267,7 +267,7 @@ The async load pattern, if you do it:
 
 ### The four usual causes
 
-**Hydration.** The single biggest INP source in modern apps. The server sends HTML, the framework downloads a component tree and re-walks it to attach listeners. Until that finishes, the page looks ready and does nothing — the worst possible state, because users click. Fix by shipping less client JS: server components, islands, or progressive hydration that starts with what is in the viewport.
+**Hydration.** The single biggest INP source in modern apps. The server sends HTML, the framework downloads a component tree and re-walks it to attach listeners. Until that finishes, the page looks ready and does nothing — the worst possible state, because users click. Fix by shipping less client JS: server components, islands, or progressive hydration that starts with what is in the viewport. Measure it with `measure_vitals.mjs --interact SEL --interact-at MS`, which clicks MS after navigation starts, while hydration runs; `--interact` alone clicks after the settle time, the one moment hydration cannot delay.
 
 **One long task at startup.** A 400 ms bundle evaluation blocks every interaction in that window.
 

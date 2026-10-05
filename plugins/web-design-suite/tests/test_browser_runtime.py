@@ -25,7 +25,11 @@ Regressions covered:
 """
 from __future__ import annotations
 
+import functools
+import http.server
 import json
+import threading
+import time
 import unittest
 
 from test_browser_scripts import installed_browsers
@@ -261,6 +265,112 @@ class VitalsUnderCsp(TempDirTest):
 
 
 @unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
+class QuietHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        """/hang answers after 9 seconds: a request still in flight when the
+        run is read."""
+        if not self.path.startswith("/hang"):
+            return super().do_GET()
+        time.sleep(9)
+        try:
+            self.send_response(204)
+            self.end_headers()
+        except OSError:                   # the browser has gone
+            pass
+
+
+@unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
+class VitalsMeasures(TempDirTest):
+    """GT-A6: CDP adds its latency per request, and Navigation Timing's
+    responseStart comes before it, so `--throttle slow4g` reported a TTFB of
+    5 ms; and no preset was Lighthouse's. GT-A17: --interact counted the
+    handler's own long task in TBT, and the TBT window had no TTI bound.
+    GT-C11: nothing clicked while the page was still hydrating."""
+
+    BUSY = "const t = performance.now(); while (performance.now() - t < {ms}) {{}}"
+
+    def setUp(self):
+        super().setUp()
+        handler = functools.partial(QuietHandler, directory=str(self.tmp))
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+
+    def vitals(self, body, *args):
+        self.write("page.html", "<!doctype html><html lang=en><head><title>v</title></head>"
+                                "<body><main><h1>Plans</h1><p>From four pounds a month.</p>"
+                                + body + "</main></body></html>")
+        url = f"http://127.0.0.1:{self.server.server_address[1]}/page.html"
+        proc = run_node("perf-budget-gate", "measure_vitals.mjs", url, "--runs", "1", "--json",
+                        *args, cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
+        if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
+            self.skipTest(output(proc)[-200:])
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        self.stderr = proc.stderr.decode("utf-8", "replace")
+        return json.loads(proc.stdout)
+
+    def test_ttfb_counts_the_emulated_latency(self):
+        out = self.vitals("", "--throttle", "slow4g", "--settle", "300")
+        self.assertGreaterEqual(out["stats"]["ttfb"]["median"], 140)
+        out = self.vitals("", "--settle", "300")                       # the default
+        self.assertEqual(out["throttle"], "lighthouse")
+        self.assertIn("562.5ms per request", out["throttleDetail"])
+        self.assertGreaterEqual(out["stats"]["ttfb"]["median"], 540)
+
+    def test_an_interaction_is_not_counted_in_tbt(self):
+        button = ("<button>Buy</button><script>document.querySelector('button')"
+                  ".addEventListener('click', () => { " + self.BUSY.format(ms=250) + " });</script>")
+        out = self.vitals(button, "--throttle", "off", "--settle", "500", "--interact", "button")
+        self.assertGreaterEqual(out["stats"]["inp"]["median"], 200)
+        self.assertLess(out["stats"]["tbt"]["median"], 50)
+        # Codex on #45: the totals still count the handler's task.
+        self.assertGreaterEqual(out["longTasks"]["count"], 1)
+        self.assertGreaterEqual(out["longTasks"]["blockingTotal"], 150)
+
+    def test_tbt_stops_at_tti(self):
+        """A long task after five quiet seconds is after TTI; one before is not.
+        A 9-second settle leaves a slow runner room for the quiet window
+        (CodeRabbit on #45)."""
+        late = "<script>setTimeout(() => { " + self.BUSY.format(ms=250) + " }, {at});</script>"
+        out = self.vitals(late.replace("{at}", "6000"), "--throttle", "off", "--settle", "9000")
+        self.assertLess(out["stats"]["tbt"]["median"], 50)
+        self.assertIsNotNone(out["stats"]["tti"])
+        out = self.vitals(late.replace("{at}", "1000"), "--throttle", "off", "--settle", "9000")
+        self.assertGreaterEqual(out["stats"]["tbt"]["median"], 150)
+
+    def test_requests_in_flight_keep_the_network_busy(self):
+        """Codex on #45: three fetches still in flight when the run was read
+        had no Resource Timing entry, so the page looked quiet, TTI came
+        early, and the task at 6 s fell out of TBT."""
+        page = ("<script>for (let i = 0; i < 3; i++) fetch('/hang?' + i);"
+                "setTimeout(() => { " + self.BUSY.format(ms=250) + " }, 6000);</script>")
+        out = self.vitals(page, "--throttle", "off", "--settle", "7000")
+        self.assertIsNone(out["stats"]["tti"])
+        self.assertGreaterEqual(out["stats"]["tbt"]["median"], 150)
+
+    def test_interact_at_clicks_while_the_page_hydrates(self):
+        """The click lands during a 3-second task: its wait is INP's, and the
+        task stays in TBT, since it is the page's own work. The task starts
+        1.5 s in, which leaves a slow runner time to find the button first
+        (at 0.5 s, Windows CI found it only after the task, and missed)."""
+        page = ("<button>Buy</button><script>setTimeout(() => { " + self.BUSY.format(ms=3000)
+                + " }, 1500);</script>")
+        out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "button",
+                          "--interact-at", "2500")
+        self.assertLessEqual(out["perRun"][0]["clickedAt"], 2800, "the click came late")
+        self.assertGreaterEqual(out["stats"]["inp"]["median"], 500)
+        self.assertGreaterEqual(out["stats"]["tbt"]["median"], 1000)
+        # --interact clicks only when the page takes it, never inside the
+        # task: an event under 16 ms is not reported at all, so INP may be n/a.
+        out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "button")
+        self.assertLess((out["stats"]["inp"] or {"median": 0})["median"], 200)
+        self.assertNotIn("did not match", self.stderr)          # CodeRabbit on #45: it clicked
+
+
 class MatrixSeesStateChanges(TempDirTest):
     """GT-A3."""
 

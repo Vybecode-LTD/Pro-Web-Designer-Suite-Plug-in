@@ -96,7 +96,7 @@ jobs:
           npx serve dist -l 8080 &
           npx wait-on http://127.0.0.1:8080 -t 30000
           node scripts/measure_vitals.mjs http://127.0.0.1:8080/ \
-            --runs 7 --throttle slow4g \
+            --runs 7 --throttle lighthouse \
             --budget perf-budget.ci.json \
             --report perf-runtime.json
 
@@ -240,7 +240,7 @@ The two gates fail for different reasons and both failures are actionable, so ru
     "gate": "npm run gate:design && npm run gate:perf",
     "gate:design": "python -m scripts.audit_design src/ --strict",
     "gate:perf": "python -m scripts.perf_audit dist/ --src src/ --budget perf-budget.json",
-    "gate:vitals": "node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --runs 7 --throttle slow4g --budget perf-budget.ci.json"
+    "gate:vitals": "node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --runs 7 --throttle lighthouse --budget perf-budget.ci.json"
   }
 }
 ```

@@ -243,6 +243,17 @@ class RuntimeArguments(TempDirTest):
                 self.assertEqual(proc.returncode, 2, output(proc))
                 self.assertIn("--densities", output(proc))
 
+    def test_interact_at_needs_a_target_and_a_time(self):
+        """GT-C11: --interact-at says when to click, --interact what."""
+        page = self.write("page.html", "<!doctype html><title>t</title><main>hi</main>")
+        for args, needle in ((("--interact-at", "500"), "it says when, not what"),
+                             (("--interact", "button", "--interact-at", "-1"), "0 or more")):
+            with self.subTest(args=args):
+                proc = run_node("perf-budget-gate", "measure_vitals.mjs", page, *args,
+                                cwd=self.tmp, env_changes={"NODE_PATH": None})
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn(needle, output(proc))
+
     def test_valid_densities_pass_the_arguments(self):
         """CodeRabbit on #40: the valid forms, held to reaching a later check."""
         for value in ("auto", "none", "compact,spacious"):
@@ -271,6 +282,30 @@ class ContextOptions(unittest.TestCase):
 
 
 @unittest.skipUnless(NODE, "node is not installed")
+@unittest.skipUnless(NODE, "node is not installed")
+class VitalsTiming(unittest.TestCase):
+    """CodeRabbit on #45: CDP marks an unset timing field -1, and the TTFB
+    from CDP added `receiveHeadersEnd` unchecked. measure_vitals'
+    `networkTtfb()` is run here on its own, since a real browser gives a
+    disk-cached document 0.1 ms, not -1."""
+
+    def test_an_unset_header_time_leaves_ttfb_to_navigation_timing(self):
+        source = (SKILLS / "perf-budget-gate" / "scripts" / "measure_vitals.mjs").read_text(
+            encoding="utf-8")
+        found = re.search(r"^function networkTtfb\(.*?^}\n", source, re.S | re.M)
+        self.assertIsNotNone(found, "measure_vitals.mjs has no networkTtfb()")
+        cases = [[100.0, {"requestTime": 100.5, "receiveHeadersEnd": 40}],
+                 [100.0, {"requestTime": 100.5, "receiveHeadersEnd": -1}],
+                 [100.0, {"requestTime": -1, "receiveHeadersEnd": 40}],
+                 [100.0, None]]
+        script = (found.group(0) + "console.log(JSON.stringify(" + json.dumps(cases)
+                  + ".map(([s, t]) => networkTtfb(s, t))));")
+        proc = subprocess.run([NODE, "--input-type=module", "-e", script],
+                              capture_output=True, timeout=60, env=env())
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertEqual(json.loads(proc.stdout), [540, None, None, None])
+
+
 class AxeFixText(unittest.TestCase):
 
     def test_long_fix_text_is_cut_at_a_word_and_marked(self):

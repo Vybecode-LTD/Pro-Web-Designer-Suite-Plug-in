@@ -37,9 +37,28 @@
   components, or 10 with the forced-colours pass; `generate_matrix.py` prints the count
   once a sheet passes 1,000 cells. GitHub's LFS quota and size advice are registered in
   `evidence.json`.
+- **`--interact-at MS`: an interaction during hydration** (GT-C11). measure_vitals'
+  `--interact` clicks once the page has settled, the one moment hydration cannot delay,
+  though diagnosis.md §8 names hydration as the biggest INP source. `--interact-at MS`
+  clicks MS after navigation starts, by the page's own clock, through the browser's input
+  pipeline, so the click queues behind the task that holds the main thread, as a user's
+  does.
 
 ### Fixed
 
+- **TTFB never saw the emulated latency, and no preset was Lighthouse's** (GT-A6). CDP
+  adds its latency once per request, and Navigation Timing's `responseStart` comes before
+  it: `--throttle slow4g` reported a TTFB of 5 ms, which also skewed the LCP sub-parts.
+  TTFB is now the network stack's (`receiveHeadersEnd` from CDP). A `lighthouse` preset
+  applies what Lighthouse's own DevTools throttling does: 562.5 ms per request (150 ms ×
+  3.75), 1.44 Mbps down, 675 Kbps up, 4× CPU. The comment that called `slow4g`
+  "Lighthouse's mobile defaults" is gone; its 150 ms per request is a lighter load.
+- **`--interact` counted the click's own work in TBT, and TBT had no TTI bound** (GT-A17).
+  On the review's slow page, a click took TBT from 0 to 107 ms with INP at 168 ms, the
+  same work counted twice. A long task that starts after an input and runs into its handlers is now left
+  out; the task the input waited behind stays, since it is the page's. TBT also ends at
+  TTI, the end of the last long task before five quiet seconds (no long task, two
+  requests in flight at most), when such a window fits in the run.
 - **A loading spinner counted as a focus ring** (GT-A14 (a)). a11y_runtime shortened
   animations before measuring the ring but did not pause them, so a spinner inside a
   button with `outline: none` kept turning between the two screenshots, and the button
@@ -101,6 +120,10 @@
 
 ### Changed
 
+- **measure_vitals' default throttle is `lighthouse`** (GT-A6). budgets.md derives every
+  budget from Lighthouse's Slow 4G profile, and the old default, `slow4g`, applied a
+  quarter of its latency. Lab numbers rise with the upgrade: pass `--throttle slow4g` to
+  compare with numbers from 3.3.0, then re-baseline on `lighthouse`.
 - **One copy of the browser scripts' shared helpers** (GT-C13). a11y_runtime,
   snapshot_matrix and measure_vitals each carried their own browser resolution, freeze
   CSS and JSON reader, and the copies had drifted. They now import
@@ -171,6 +194,22 @@
   `box-shadow` hover under forced colours (the ring fails, the hover does not, an outline
   ring passes) and keeps the forced-colours baselines apart. Against `v3.3.0`, all 5
   fail. Both browser tests pass in Playwright's Chromium and in an installed Chrome.
+- P13 part 1 (GT-A6, GT-A17, GT-C11): `test_browser_runtime.VitalsMeasures` serves pages
+  over HTTP and measures TTFB under `slow4g` and the default, a 250 ms click handler
+  against TBT, a long task after five quiet seconds and one before, and a click during a
+  2-second task with `--interact-at` (its wait is INP's, the task stays in TBT) and
+  without it; `test_browser_scripts.RuntimeArguments` refuses `--interact-at` without a
+  target or below 0. Against `v3.3.0`, all 5 fail. They pass in Playwright's Chromium and
+  in an installed Chrome; a click timed from Node's clock missed the task in Chrome, whose
+  cold start delays the request, so `--interact-at` counts from the page's time origin.
+  Codex's review of #45 found two, each failing on its head: a request still in flight
+  has no Resource Timing entry, so three hanging fetches looked like a quiet network and
+  TTI came early (`test_requests_in_flight_keep_the_network_busy`; the requests now come
+  from CDP); and the long-task totals dropped the click's task with TBT (they keep it).
+  CodeRabbit's made the `--interact` control assert that the click happened, gave the TTI
+  test a 9-second settle, and found CDP's unset `receiveHeadersEnd` (-1) added to TTFB:
+  `test_browser_scripts.VitalsTiming` runs `networkTtfb()` on its own, and fails with the
+  guard deleted.
 
 ## 3.3.0 — 2026-10-04
 

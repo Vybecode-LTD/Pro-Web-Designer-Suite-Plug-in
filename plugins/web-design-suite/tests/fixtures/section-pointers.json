@@ -1537,6 +1537,12 @@
  },
  {
   "from": "perf-budget-gate/references/diagnosis.md",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "1",
+  "heading": "The derivation: from a promise to a number"
+ },
+ {
+  "from": "perf-budget-gate/references/diagnosis.md",
   "to": "web-design-studio/references/motion-system.md",
   "section": "5",
   "heading": "Performance"
