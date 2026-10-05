@@ -213,6 +213,11 @@ way a token linter earns its reputation for false positives.
 the whole argument for the naming grammar: `--pad-card` gets `GAP` and
 `WIDTH_HEIGHT`, `--fg-muted` gets `TEXT_FILL`, `--border-default` gets
 `STROKE_COLOR`. A well-named token knows where it is allowed to be used.
+Primitives get none (`scopes: []`), so no picker offers `neutral/0` beside
+`bg/surface`: binding Tier 1 is the Law 6 failure. Scopes only filter the
+pickers. Figma's API reference says setting them "does not prevent that variable
+from being bound in other scopes", so the semantic tier still aliases its
+primitives.
 
 ---
 
@@ -564,10 +569,16 @@ mode's or variable's `id`, and in a collection's `initialModeId`, then reference
 it elsewhere in the same body. They are scoped to one request and must be unique
 within it. `--reverse` uses `tmp_collection_*`, `tmp_mode_*`, `tmp_var_*`.
 
-**One subtlety.** A collection's initial mode is created *with the collection*;
-`initialModeId` only names it so you can refer to it. A `VariableModeChange` with
-`"action": "CREATE"` for that same id asks Figma to make it twice. `--reverse`
-names the initial mode on the collection and only `CREATE`s the extra modes.
+**One subtlety.** A collection's initial mode is created *with the collection*,
+under a name Figma picks; `initialModeId` only gives it an id you can refer to.
+To name it, Figma's own example sends a `VariableModeChange` with
+`"action": "UPDATE"` for that id. A `CREATE` for the same id asks Figma to make it
+twice. `--reverse` renames each initial mode (`Value` for primitives; for a themed
+tier `Light`, or `Default` or `Base` when a theme already has that name) and
+`CREATE`s only the extra modes.
+
+The body holds those four arrays and nothing else: no comment key, so the file
+is POSTed as `--reverse` wrote it.
 
 ### What to do when you are not on Enterprise
 
