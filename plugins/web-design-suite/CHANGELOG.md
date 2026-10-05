@@ -2,6 +2,16 @@
 
 ## 3.4.0 — unreleased
 
+### Added
+
+- **The focus ring is measured at every density** (SB-B3). On a page, a11y_runtime
+  measures the ring again at each `data-density` value the page's own stylesheets name,
+  in normal colours and under forced colours, since the density dial rescales the
+  padding that keeps a ring clear of an `overflow: hidden` toolbar. A finding names its
+  density; `--densities LIST` names them by hand, and `none` turns it off. web-design-
+  studio's Phase 5 runs it on the built page, and review-checklist 8.2 and 8.9 say what
+  it measures and what is still by eye.
+
 ### Fixed
 
 - **A loading spinner counted as a focus ring** (GT-A14 (a)). a11y_runtime shortened
@@ -21,6 +31,9 @@
   anything inside `aria-disabled="true"`, and the label of a disabled control. A control
   that only looks disabled is still measured. With GT-A5, this finishes GT-C2: 3.1.0
   did the colours, modals, iframes and inert content, and P9 the pausing.
+- **`--only` on a page was ignored.** It narrows a proof sheet's cells and never picked
+  checks, so `a11y_runtime.mjs --file page.html --only contrast` ran every check. A page
+  now refuses it, with exit 2 and a pointer to `--skip`.
 
 ### Changed
 
@@ -54,6 +67,12 @@
   against a lookalike that is not. Against `v3.3.0`, all 5 fail. measure_vitals ran
   under that CSP at 3.3.0 too, since it injects only an init script; its bypass is
   preventive.
+- P10 part 2 (SB-B3): `test_browser_runtime.test_the_focus_ring_is_measured_at_each_density_the_page_declares`
+  runs a toolbar whose ring is clipped at compact and is a box-shadow at spacious, then
+  again with `--densities none`; `test_browser_scripts.RuntimeArguments` refuses `--only`
+  on a page and a bad `--densities`. Against `v3.3.0`, 2 fail; the `--densities` test is
+  a control, since 3.3.0 refused the unknown option. The runtime tests that passed
+  `--only CHECK` to a page now leave the other checks out with `--skip`.
 
 ## 3.3.0 — 2026-10-04
 

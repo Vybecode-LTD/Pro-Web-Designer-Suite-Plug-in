@@ -134,14 +134,14 @@ later groups are looking at.
 | # | Look at | Failure signature |
 |---|---|---|
 | 8.1 | Tab through the whole page without touching the mouse | A control you can't reach, a trap you can't leave, or focus jumping to the end of the DOM after closing an overlay |
-| 8.2 | The focus indicator on every focusable element, including over accent backgrounds | Invisible, clipped by `overflow: hidden`, or below 3:1. `outline: none` anywhere without a replacement ring is a fail |
+| 8.2 | The focus indicator on every focusable element, including over accent backgrounds, at every density | Invisible, clipped by `overflow: hidden`, or below 3:1. `outline: none` anywhere without a replacement ring is a fail. `a11y_runtime.mjs` measures it at each tab stop and density |
 | 8.3 | Focus order vs visual order | They diverge — usually because a flex/grid `order` or a visual reposition moved something the DOM still lists elsewhere |
 | 8.4 | Element semantics in the DOM | `<div onClick>`. It is unreachable, unannounced, and doesn't fire on Enter/Space |
 | 8.5 | Landmarks | No `<main>`, more than one `<main>`, unlabelled repeated `<nav>`s, or no skip link |
 | 8.6 | Heading outline (read the `h1`–`h6` sequence alone) | No `h1`, multiple `h1`s, a skipped level, or a heading chosen for its size instead of its rank |
 | 8.7 | Every form control | No programmatic label; placeholder used as label; error text not tied via `aria-describedby`; error announced only in color |
 | 8.8 | Icon-only controls | No accessible name. An icon button with nothing but an SVG is a blank to a screen reader |
-| 8.9 | Emulate `forced-colors: active` | Content that disappears — backgrounds carrying meaning, borders removed, SVG fills hard-coded instead of `currentColor` |
+| 8.9 | Emulate `forced-colors: active` | Content that disappears — backgrounds carrying meaning, borders removed, SVG fills hard-coded instead of `currentColor`. `a11y_runtime.mjs` measures the focus ring there; the rest is by eye |
 | 8.10 | Overlays (modal, drawer, menu) | Focus not moved in, not trapped, not returned to the trigger; background not inert; Escape doesn't close |
 
 ## 9. Motion

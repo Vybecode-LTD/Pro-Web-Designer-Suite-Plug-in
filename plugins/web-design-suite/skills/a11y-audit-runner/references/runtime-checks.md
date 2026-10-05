@@ -184,6 +184,8 @@ Compute contrast **per pixel** and report a high percentile — the runner histo
 
 A row where the normal column is healthy and the forced column is zero is a `box-shadow`-only ring. That is a single-line fix and it is in the token contract: pair the shadow with `outline: var(--stroke-focus) solid transparent`. §5.
 
+**Density.** The starter's density dial (`data-density` on the root) rescales every gap and padding, so a ring that fits at comfortable can be clipped at compact by a toolbar's `overflow: hidden`. On a page, the run measures the ring again at each density the page's own stylesheets name, in normal colours and under forced colours, and a finding names the density it was found at. What the default density already reported is not repeated. `--densities compact,spacious` names them when the stylesheet is on another origin (its rules cannot be read), and `--densities none` turns it off. A proof sheet has a cell per density, so the matrix pass covers it already.
+
 ---
 
 ## 5. Forced colors

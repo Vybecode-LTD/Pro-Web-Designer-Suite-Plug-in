@@ -40,6 +40,13 @@ MODULES = node_modules()
 # What a server's `Content-Security-Policy: default-src 'self'` header does,
 # in a file: no inline style or script, so no injected one either.
 CSP_META = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'\">"
+CHECKS = ("axe", "names", "taborder", "focus", "forced", "contrast", "keys", "reflow")
+
+
+def only(*checks):
+    """The arguments that run just these checks: `--only` narrows a proof
+    sheet's cells, and a page now refuses it (it used to ignore it)."""
+    return [arg for c in CHECKS if c not in checks for arg in ("--skip", c)]
 
 
 @unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at "
@@ -68,7 +75,7 @@ class RuntimeInABrowser(TempDirTest):
                 "<p class=t>This paragraph sits under a 72% white scrim.</p>"
                 "<div class=scrim></div></div><p class=faint>Faint grey body text here.</p>"
                 "</main></body></html>")
-        errors = self.rules(self.runtime(html, "--only", "contrast"))
+        errors = self.rules(self.runtime(html, *only("contrast")))
         self.assertIn("contrast-under-overlay", errors)
         self.assertIn("contrast-too-low", errors)
 
@@ -86,7 +93,7 @@ class RuntimeInABrowser(TempDirTest):
                 "</style></head><body><main><h1>Save</h1>"
                 "<button type=button><span class=spin></span>Saving</button>"
                 "</main></body></html>")
-        self.assertIn("no-visible-focus-indicator", self.rules(self.runtime(html, "--only", "focus")))
+        self.assertIn("no-visible-focus-indicator", self.rules(self.runtime(html, *only("focus"))))
 
     def test_a_page_with_a_strict_csp_is_audited(self):
         """GT-A5: `default-src 'self'` refused the freeze stylesheet the run
@@ -95,7 +102,7 @@ class RuntimeInABrowser(TempDirTest):
                                       f"{CSP_META}</head><body><main><h1>Strict</h1>"
                                       "<button type=button>Save</button></main></body></html>")
         proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", page, "--json",
-                        "--only", "focus", "--only", "contrast",
+                        *only("focus", "contrast"),
                         cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"browser" in proc.stderr.lower():
             self.skipTest("no usable browser: " + output(proc)[-200:])
@@ -115,10 +122,32 @@ class RuntimeInABrowser(TempDirTest):
                 "<label class=faint for=promo>Promo code</label><input id=promo disabled>"
                 "<button class=faint>Looks disabled</button>"
                 "</main></body></html>")
-        findings = self.runtime(html, "--only", "contrast")
+        findings = self.runtime(html, *only("contrast"))
         flagged = [f["message"] for f in findings if f["rule"] == "contrast-too-low"]
         self.assertEqual(1, len(flagged), flagged)
         self.assertIn("Looks disabled", flagged[0])
+
+    DENSITY_PAGE = ("<!doctype html><html lang=en><head><title>d</title><style>"
+                    ":root{--density:1}[data-density=compact]{--density:0}"
+                    "[data-density=spacious]{--density:1.5}"
+                    ".bar{display:inline-flex;overflow:hidden;padding:calc(6px * var(--density))}"
+                    "button{font:16px sans-serif;border:1px solid #333;background:#fff;color:#000}"
+                    "button:focus-visible{outline:2px solid #000;outline-offset:2px}"
+                    "[data-density=spacious] button:focus-visible{outline:none;box-shadow:0 0 0 3px #000}"
+                    "</style></head><body><main><h1>Tools</h1>"
+                    "<div class=bar><button type=button>Bold</button></div></main></body></html>")
+
+    def test_the_focus_ring_is_measured_at_each_density_the_page_declares(self):
+        """SB-B3: at compact the toolbar's padding is gone and its overflow
+        clips the ring; at spacious the ring is a box-shadow, which forced
+        colours discard. The default density has a ring in both modes."""
+        findings = self.runtime(self.DENSITY_PAGE, *only("focus", "forced"))
+        lost = {(f["rule"], f.get("density")) for f in findings
+                if f["severity"] == "error" and f["check"] in ("focus", "forced")}
+        self.assertEqual({("no-visible-focus-indicator", "compact"),
+                          ("focus-ring-lost-in-forced-colors", "spacious")}, lost)
+        findings = self.runtime(self.DENSITY_PAGE, *only("focus", "forced"), "--densities", "none")
+        self.assertEqual([], [f for f in findings if f["severity"] == "error"])
 
     def test_an_open_modal_dialog_is_not_a_trap(self):
         """GT-A2: a cookie banner built the recommended way."""
@@ -130,7 +159,7 @@ class RuntimeInABrowser(TempDirTest):
                 '<button type="button">Accept</button><button type="button">Reject</button>'
                 '</dialog><script>document.getElementById("consent").showModal();</script>'
                 '</body></html>')
-        errors = self.rules(self.runtime(html, "--only", "taborder", "--only", "names"))
+        errors = self.rules(self.runtime(html, *only("taborder", "names")))
         for rule in ("keyboard-trap", "unreachable-control", "no-accessible-name"):
             self.assertNotIn(rule, errors)
 
@@ -142,7 +171,7 @@ class RuntimeInABrowser(TempDirTest):
                 "<h1>Checkout</h1><a href='#pay'>Pay</a>"
                 f"<iframe title='Payment form' width=400 height=200 srcdoc=\"{inner}\"></iframe>"
                 "<a href='#terms'>Terms</a></main></body></html>")
-        findings = self.runtime(html, "--only", "taborder", "--only", "axe")
+        findings = self.runtime(html, *only("taborder", "axe"))
         errors = self.rules(findings)
         self.assertNotIn("focus-stuck", errors)
         axe_rules = {f.get("rule") for f in findings if f.get("check") == "axe"}

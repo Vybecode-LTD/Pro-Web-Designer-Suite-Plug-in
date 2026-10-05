@@ -91,7 +91,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-A25 | low | fixed in 3.3.0: points 1, 3 and 4 by 3.2.1 (guarded by `test_audit_design`), 5 by PR #23, and the rest by PR #24 (`ThePromisedChecks`, `TheAuditInCi.test_where_adds_no_specificity`) | Smaller accuracy points: `url(#fade)` false positive, a zero-specificity warning, a pragma inside a multi-line comment. |
 | SB-B1 | — | fixed in 3.1.0, with PS-A4 | templates aren't audited. |
 | SB-B2 | — | fixed in 3.2.0 and 3.2.1 (real-tool tests) | no executable tests for the configs. |
-| SB-B3 | — | W5 (3.4.0) | focus, forced-colors and density aren't checked by any gate in the build flow. |
+| SB-B3 | — | fixed in 3.4.0: `test_browser_runtime.test_the_focus_ring_is_measured_at_each_density_the_page_declares` (PR #40) | focus, forced-colors and density aren't checked by any gate in the build flow. |
 | SB-B4 | — | fixed in 3.3.0: `--border-invalid` (`test_contract.InvalidFieldsLookInvalid`, `test_check_roles`); translucency needs no role, since the ESLint config refuses `/NN` and names the roles | the contract is missing roles the references need. |
 | SB-B5 | — | W12 (3.6.0+) | parts of Tailwind v4 aren't covered. |
 | SB-B6 | — | W12 (3.6.0+) | SCSS and other stacks. |

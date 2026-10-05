@@ -36,6 +36,7 @@
  *   focus      focus-indicator visibility MEASURED — the focused and unfocused
  *              element screenshotted and differenced, in pixels and contrast
  *   forced     the same measurement under forced-colors, reporting what vanished
+ *              (on a page, both repeat at each data-density its stylesheets name)
  *   contrast   text contrast from computed styles, including the overlay case
  *              that static analysis gets wrong
  *   keys       keyboard traversal against an expected key map from a config file
@@ -65,7 +66,11 @@
  *                         wcag21aa,wcag22aa,best-practice)
  *   --keymap FILE         expected keyboard behaviour per pattern
  *   --budget FILE         a11y-budget.json; non-zero exit on breach
- *   --only SUBSTR         with --matrix, only cells containing SUBSTR (repeatable)
+ *   --only SUBSTR         with --matrix, only cells containing SUBSTR (repeatable);
+ *                         it does not pick checks, so a page refuses it
+ *   --densities LIST      on a page, the data-density values to measure focus
+ *                         at as well (default auto: each one the page's own
+ *                         stylesheets name; none turns it off)
  *   --skip CHECK          skip a check: axe names taborder focus forced
  *                         contrast keys reflow  (repeatable)
  *   --max-stops N         how many tab stops to measure focus on   (default 40)
@@ -138,6 +143,7 @@ function parseArgs(argv) {
     only: [], skip: new Set(),
     maxStops: 40, maxCells: 120,
     focusThreshold: 0.005,
+    densities: 'auto',
     viewport: { width: 1280, height: 900 },
     dpr: 1,
     axe: null,
@@ -174,6 +180,16 @@ function parseArgs(argv) {
       case '--max-stops': opts.maxStops = num(need(i, a), a); i++; break;
       case '--max-cells': opts.maxCells = num(need(i, a), a); i++; break;
       case '--focus-threshold': opts.focusThreshold = num(need(i, a), a); i++; break;
+      case '--densities': {
+        const v = need(i, a).trim(); i++;
+        if (v === 'auto' || v === 'none') { opts.densities = v; break; }
+        const list = v.split(',').map((d) => d.trim()).filter(Boolean);
+        if (!list.length || list.some((d) => !/^[\w-]+$/.test(d))) {
+          die(`--densities takes auto, none or a list like compact,spacious; got "${v}"`);
+        }
+        opts.densities = list;
+        break;
+      }
       case '--dpr': opts.dpr = num(need(i, a), a); i++; break;
       case '--axe': opts.axe = need(i, a); i++; break;
       case '--browser': opts.browser = need(i, a); i++; break;
@@ -203,6 +219,15 @@ function parseArgs(argv) {
   if (targets.length > 1) {
     die('pass exactly one of --url, --file and --matrix; they are three ' +
         'different jobs and combining them would silently audit one of them');
+  }
+  // Ignoring an option is how a run reports on less than its caller asked for:
+  // `--only contrast` on a page used to run every check.
+  if (opts.only.length && !opts.matrix) {
+    die('--only narrows the cells of a --matrix proof sheet; it does not pick ' +
+        'checks. Leave a check out with --skip CHECK.');
+  }
+  if (Array.isArray(opts.densities) && opts.matrix) {
+    die('--densities is for a page: a proof sheet already has a cell per density.');
   }
   for (const s of opts.skip) {
     if (!ALL_CHECKS.includes(s)) {
@@ -1013,6 +1038,36 @@ async function measureFocus(page, cmpPage, selectors, opts, label) {
   return results;
 }
 
+// The density values a page's own stylesheets name in a [data-density=…]
+// selector, in the order they appear, and the one its root has now. A
+// cross-origin sheet cannot be read; name its densities with --densities.
+const DENSITIES_FN = () => {
+  const found = [];
+  const walk = (rules) => {
+    for (const r of rules) {
+      if (r.selectorText) {
+        for (const m of r.selectorText.matchAll(/\[data-density\s*[~|^$*]?=\s*["']?([\w-]+)/g)) {
+          if (!found.includes(m[1])) found.push(m[1]);
+        }
+      }
+      if (r.cssRules) walk(r.cssRules);
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try { walk(sheet.cssRules); } catch { /* cross-origin */ }
+  }
+  return { found, current: document.documentElement.getAttribute('data-density') };
+};
+
+async function setDensity(page, density) {
+  await page.evaluate((d) => {
+    if (d === null) document.documentElement.removeAttribute('data-density');
+    else document.documentElement.setAttribute('data-density', d);
+  }, density);
+  await page.evaluate(() => new Promise((r) =>
+    requestAnimationFrame(() => requestAnimationFrame(r))));
+}
+
 function focusFindings(measurements, opts) {
   const out = [];
   for (const m of measurements) {
@@ -1691,6 +1746,9 @@ function textReport(o, opts) {
   if (o.mode === 'matrix') {
     L.push(`  proof sheet: ${o.cellsTotal} cell(s), ${o.cellsMeasured} measured`);
   }
+  if (o.densities && o.densities.length) {
+    L.push(`  focus also measured at data-density ${o.densities.join(', ')}`);
+  }
   L.push('');
 
   const byCheck = new Map();
@@ -1868,6 +1926,8 @@ async function main() {
   let focusTable = [];
   let forcedSurvey = null;
   let ringStats = null;
+  let forcedSupported = false;
+  let densities = [];
   let cellsTotal = 0, cellsMeasured = 0;
 
   const newPage = async (forcedColors) => {
@@ -2060,6 +2120,7 @@ async function main() {
       const { ctx: fctx, page: fpage } = await newPage('active');
       const supported = await fpage.evaluate(() =>
         matchMedia('(forced-colors: active)').matches);
+      forcedSupported = supported;
       if (!supported) {
         findings.push(finding(
           'forced', 'forced-colors-not-emulated', '-', 'warning',
@@ -2092,6 +2153,42 @@ async function main() {
       }
       await fctx.close().catch(() => {});
     }
+
+    // ---- density ----------------------------------------------------------
+    // The starter's density dial (data-density on the root) rescales every
+    // gap and padding, so a ring that fits at one density can be clipped by an
+    // overflow at another. On a page, focus is measured again at each density
+    // its stylesheets name, in normal colours and, when forced runs, under
+    // forced colours (SB-B3). A proof sheet has a cell per density already.
+    // What the default density already reported is not reported again.
+    if (mode === 'page' && stopSelectors.length && opts.densities !== 'none' &&
+        (ran.includes('focus') || ran.includes('forced'))) {
+      const declared = await page.evaluate(DENSITIES_FN);
+      densities = (opts.densities === 'auto' ? declared.found : opts.densities)
+        .filter((d) => d !== declared.current);
+      const known = new Set(findings.map((f) => `${f.rule}|${f.selector}`));
+      const atDensity = (list, d) => list
+        .filter((f) => !known.has(`${f.rule}|${f.selector}`))
+        .map((f) => ({ ...f, density: d,
+          message: `${f.message.replace(/\.$/, '')} at data-density="${d}".` }));
+      const forcedPage = ran.includes('forced') && forcedSupported && densities.length
+        ? await newPage('active') : null;
+      for (const d of densities) {
+        log(`  focus at data-density="${d}"…`);
+        await setDensity(page, d);
+        const normal = await measureFocus(page, cmpPage, stopSelectors, opts, `normal@${d}`);
+        if (ran.includes('focus')) findings.push(...atDensity(focusFindings(normal, opts), d));
+        if (forcedPage) {
+          await setDensity(forcedPage.page, d);
+          const forced = await measureFocus(forcedPage.page, cmpPage, stopSelectors, opts,
+                                            `forced@${d}`);
+          findings.push(...atDensity(forcedColorFindings(normal, forced, opts), d));
+        }
+      }
+      if (densities.length) await setDensity(page, declared.current);
+      if (forcedPage) await forcedPage.ctx.close().catch(() => {});
+    }
+
     if (!focusTable.length && normalFocus.length) {
       focusTable = normalFocus.map((m) => ({
         sel: m.sel, cell: m.cell, normal: m.ok ? m.fraction : null,
@@ -2132,6 +2229,7 @@ async function main() {
     findings,
     tabOrder,
     focusTable,
+    densities,
     forcedSurvey,
     ringStats,
   };

@@ -214,6 +214,33 @@ class BrowserScriptResolution(TempDirTest):
                 self.assertEqual([], [c for c in contexts if c.get("bypassCSP") is not True])
 
 
+@unittest.skipUnless(NODE, "node is not installed")
+class RuntimeArguments(TempDirTest):
+    """An option a run ignores is a report on less than its caller asked for."""
+
+    def run_runtime(self, *args):
+        page = self.write("page.html", "<!doctype html><title>t</title><main>hi</main>")
+        sheet = self.write("sheet.html", "<!doctype html><title>t</title><div data-cell-id=a></div>")
+        args = [str(page) if a == "PAGE" else str(sheet) if a == "SHEET" else a for a in args]
+        return run_node("a11y-audit-runner", "a11y_runtime.mjs", *args, cwd=self.tmp,
+                        env_changes={"NODE_PATH": None})
+
+    def test_only_on_a_page_is_refused(self):
+        """`--only contrast` on a page was ignored, and every check ran."""
+        proc = self.run_runtime("--file", "PAGE", "--only", "contrast")
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("--skip", output(proc))
+
+    def test_densities_take_auto_none_or_a_list_and_only_on_a_page(self):
+        for args in (("--file", "PAGE", "--densities", "compact;spacious"),
+                     ("--file", "PAGE", "--densities", ""),
+                     ("--matrix", "SHEET", "--densities", "compact")):
+            with self.subTest(args=args):
+                proc = self.run_runtime(*args)
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn("--densities", output(proc))
+
+
 class ContextOptions(unittest.TestCase):
     """GT-A5: the stub above sees only the contexts a script opens before it
     fails, so every `newContext(` call in the source is held to it too."""
