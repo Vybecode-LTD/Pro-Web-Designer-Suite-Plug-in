@@ -320,6 +320,17 @@
       "docs": [
         "component-state-matrix/references/visual-regression.md"
       ]
+    },
+    {
+      "figure": "3.75",
+      "claim": "the factor Lighthouse's DevTools throttling multiplies its 150 ms RTT by, as per-request latency, with 0.9 of the throughput: measure_vitals' `lighthouse` preset",
+      "source": "Chrome DevTools frontend, front_end/models/trace/lantern/simulation/Constants.ts (Lighthouse's throttling constants), commit 828ccd43",
+      "url": "https://github.com/ChromeDevTools/devtools-frontend/blob/828ccd43dab24cdf6483a7864994cf7757f8284f/front_end/models/trace/lantern/simulation/Constants.ts",
+      "checked": "2026-10-05",
+      "quote": "const DEVTOOLS_RTT_ADJUSTMENT_FACTOR = 3.75; const DEVTOOLS_THROUGHPUT_ADJUSTMENT_FACTOR = 0.9; [...] mobileSlow4G: { rttMs: 150, throughputKbps: 1.6 * 1024, requestLatencyMs: 150 * DEVTOOLS_RTT_ADJUSTMENT_FACTOR, downloadThroughputKbps: 1.6 * 1024 * DEVTOOLS_THROUGHPUT_ADJUSTMENT_FACTOR, uploadThroughputKbps: 750 * DEVTOOLS_THROUGHPUT_ADJUSTMENT_FACTOR, cpuSlowdownMultiplier: 4, }",
+      "docs": [
+        "perf-budget-gate/references/budgets.md"
+      ]
     }
   ],
   "not_statistics": [

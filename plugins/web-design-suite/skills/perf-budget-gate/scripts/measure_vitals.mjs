@@ -15,10 +15,14 @@
  *         resource load duration, element render delay)
  *   CLS   layout-shift, session-windowed exactly as the metric defines it:
  *         1s gap, 5s cap, largest window wins, hadRecentInput excluded
- *   TBT   longtask, sum of (duration - 50ms) after FCP. This is the LAB
- *         PROXY for INP, not INP. See --interact for a real interaction.
+ *   TBT   longtask, sum of (duration - 50ms) between FCP and TTI (the end of
+ *         the last long task before 5 quiet seconds), leaving out the work
+ *         of an interaction, which INP counts. This is the LAB PROXY for
+ *         INP, not INP. See --interact for a real interaction.
  *   INP   only when --interact drives one; a page nobody touched has no
  *         interaction latency and this prints "n/a" rather than inventing one
+ *   TTFB  the document's, from the network stack (CDP): Navigation Timing
+ *         reports it before the emulated latency
  *
  * It runs N iterations in fresh contexts and reports the MEDIAN plus the
  * spread, because a single run of anything is a rumour.
@@ -32,9 +36,10 @@
  * Usage
  * -----
  *   node measure_vitals.mjs http://localhost:8080/
- *   node measure_vitals.mjs http://localhost:8080/ --runs 7 --throttle slow4g
+ *   node measure_vitals.mjs http://localhost:8080/ --runs 7 --throttle lighthouse
  *   node measure_vitals.mjs http://localhost:8080/ --budget perf-budget.json
  *   node measure_vitals.mjs http://localhost:8080/ --interact "button.buy" --json
+ *   node measure_vitals.mjs http://localhost:8080/ --interact "button.buy" --interact-at 800
  *
  * Serve the page over HTTP. `file://` skips the network stack entirely, so
  * TTFB is ~0, resource priorities do not apply and every number flatters you.
@@ -43,10 +48,15 @@
  * Options
  * -------
  *   --runs N           iterations; median is reported          (default 5)
- *   --throttle NAME    slow4g | fast4g | cpu4 | off            (default slow4g)
+ *   --throttle NAME    lighthouse | slow4g | fast4g | cpu4 | off
+ *                      (default lighthouse: 562.5ms per request, 1.44Mbps,
+ *                      4x CPU, what Lighthouse applies for 150ms RTT at
+ *                      1.6Mbps; slow4g and fast4g are lighter, see THROTTLE)
  *   --budget FILE      perf-budget.json; compares defaults.lab
  *   --page-type NAME   select a per-page-type budget from `pages`
  *   --interact SEL     click this selector after load and measure INP
+ *   --interact-at MS   click it MS after navigation starts instead, while
+ *                      the page still loads and hydrates
  *   --warm             measure the SECOND load (warm cache) instead of a cold one
  *   --settle MS        quiet time after load before reading   (default 3000)
  *   --viewport WxH     viewport                             (default 412x915)
@@ -81,13 +91,21 @@ import path from 'node:path';
 
 import { launchBrowser, loadPlaywright, readJsonFile } from './browser_common.mjs';
 
-// Lighthouse's mobile defaults, in the units CDP wants. 1.6 Mbps down,
-// 750 Kbps up, 150ms RTT, 4x CPU — roughly the bottom quartile of 4G and a
-// mid-tier Android. Numbers verified against GoogleChrome/lighthouse
-// docs/throttling.md.
+// Lighthouse's mobile profile is 150 ms RTT, 1.6 Mbps down, 750 Kbps up and
+// 4x CPU. CDP adds its latency to each request once, where a round trip is
+// paid several times by a new connection (DNS, TCP, TLS, the request), so
+// Lighthouse's own DevTools throttling applies 150 x 3.75 = 562.5 ms per
+// request and 0.9 of the throughput (DEVTOOLS_RTT_ADJUSTMENT_FACTOR and
+// DEVTOOLS_THROUGHPUT_ADJUSTMENT_FACTOR, Lantern's Constants.ts, re-read
+// 2026-10-05). That is `lighthouse`, the default (GT-A6). `slow4g` and
+// `fast4g` are 3.3.0's presets, kept for runs compared with old numbers:
+// their 150 ms and 40 ms per request are lighter than Lighthouse, and than
+// DevTools' Slow 4G (562.5 ms) and Fast 4G (165 ms).
+const KBPS = 1024 / 8;      // Lighthouse's Kbps, in the bytes per second CDP wants
 const THROTTLE = {
-  slow4g: { latency: 150, down: 1.6 * 1024 * 1024 / 8, up: 750 * 1024 / 8, cpu: 4 },
-  fast4g: { latency: 40, down: 9 * 1024 * 1024 / 8, up: 1.5 * 1024 * 1024 / 8, cpu: 4 },
+  lighthouse: { latency: 150 * 3.75, down: 1.6 * 1024 * 0.9 * KBPS, up: 750 * 0.9 * KBPS, cpu: 4 },
+  slow4g: { latency: 150, down: 1.6 * 1024 * KBPS, up: 750 * KBPS, cpu: 4 },
+  fast4g: { latency: 40, down: 9 * 1024 * KBPS, up: 1.5 * 1024 * KBPS, cpu: 4 },
   cpu4:   { latency: 0, down: -1, up: -1, cpu: 4 },
   off:    { latency: 0, down: -1, up: -1, cpu: 1 },
 };
@@ -105,10 +123,11 @@ function parseArgs(argv) {
   const opts = {
     target: null,
     runs: 5,
-    throttle: 'slow4g',
+    throttle: 'lighthouse',
     budget: null,
     pageType: null,
     interact: null,
+    interactAt: null,
     warm: false,
     settle: 3000,
     viewport: { width: 412, height: 915 },
@@ -142,6 +161,7 @@ function parseArgs(argv) {
       case '--budget': opts.budget = need(i, a); i++; break;
       case '--page-type': opts.pageType = need(i, a); i++; break;
       case '--interact': opts.interact = need(i, a); i++; break;
+      case '--interact-at': opts.interactAt = num(need(i, a), a); i++; break;
       case '--warm': opts.warm = true; break;
       case '--settle': opts.settle = num(need(i, a), a); i++; break;
       case '--dpr': opts.dpr = num(need(i, a), a); i++; break;
@@ -169,6 +189,10 @@ function parseArgs(argv) {
         Object.keys(THROTTLE).join(', '));
   }
   if (!(opts.runs >= 1)) die('--runs must be at least 1');
+  if (opts.interactAt != null) {
+    if (!opts.interact) die('--interact-at MS needs --interact SELECTOR: it says when, not what');
+    if (opts.interactAt < 0) die('--interact-at must be 0 or more milliseconds');
+  }
   return opts;
 }
 
@@ -299,29 +323,21 @@ const COLLECTOR = () => {
       inputDelay: Math.round(e.processingStart - e.startTime),
       processing: Math.round(e.processingEnd - e.processingStart),
       presentation: Math.round(e.startTime + e.duration - e.processingEnd),
+      // Absolute times, to keep the interaction's own work out of TBT.
+      at: e.startTime,
+      handlerStart: e.processingStart,
+      end: e.startTime + e.duration,
     });
   }, { durationThreshold: 16 });
 };
 
 // Read everything back out. Runs after the settle window.
-const HARVEST = (topN) => {
+const HARVEST = ({ topN, ttfb: networkTtfb }) => {
   const v = window.__vitals || {};
   const nav = performance.getEntriesByType('navigation')[0] || {};
-  const ttfb = nav.responseStart || 0;
-
-  // TBT: blocking time is (duration - 50ms), summed over long tasks AFTER FCP.
-  // The window starts at FCP by definition, so a 400ms parser-blocking script
-  // that finishes before anything has painted contributes ZERO TBT while being
-  // the worst thing on the page. That is a real gap in the metric, not a bug
-  // here, so the total over every long task is reported alongside it.
-  const fcp = v.fcp || 0;
-  const tasks = v.longTasks || [];
-  const tbt = tasks
-    .filter((t) => t.start + t.duration > fcp)
-    .reduce((sum, t) => sum + Math.max(0, t.duration - 50), 0);
-  const blockingTotal = tasks
-    .reduce((sum, t) => sum + Math.max(0, t.duration - 50), 0);
-  const longestTask = tasks.reduce((m, t) => Math.max(m, t.duration), 0);
+  // The network stack's TTFB when CDP gave one: Navigation Timing's
+  // responseStart comes before the emulated latency (GT-A6).
+  const ttfb = networkTtfb != null ? networkTtfb : (nav.responseStart || 0);
 
   const resources = performance.getEntriesByType('resource').map((r) => ({
     name: r.name,
@@ -332,6 +348,54 @@ const HARVEST = (topN) => {
     duration: Math.round(r.duration),
     end: Math.round(r.responseEnd),
   }));
+
+  // An interaction's own work belongs to INP, not TBT: a long task that
+  // starts after the input and runs into its handlers is left out, or
+  // --interact counted the handler twice (GT-A17). A task the input waited
+  // behind started before it, or ended before the handlers, and stays: that
+  // is the page's work.
+  const ends = (t) => t.start + t.duration;
+  const own = v.interactions || [];
+  const tasks = (v.longTasks || []).filter((t) => !own.some((i) =>
+    t.start >= i.at && t.start < i.end && ends(t) > i.handlerStart));
+
+  // TBT: blocking time is (duration - 50ms), summed over long tasks between
+  // FCP and TTI. The window starts at FCP by definition, so a 400ms
+  // parser-blocking script that finishes before anything has painted
+  // contributes ZERO TBT while being the worst thing on the page. That is a
+  // real gap in the metric, not a bug here, so the total over every long
+  // task is reported alongside it.
+  const fcp = v.fcp || 0;
+  // TTI: the end of the last long task before the first 5-second window
+  // after FCP with no long task and at most two requests in flight. When no
+  // such window fits in the run, every long task in it is before TTI.
+  const now = performance.now();
+  const requests = [[0, nav.responseEnd || 0], ...resources.map((r) => [r.start, r.end])];
+  const busiest = (s, e) => {
+    const marks = requests.filter(([a, b]) => a < e && b > s)
+      .flatMap(([a, b]) => [[Math.max(a, s), 1], [Math.min(b, e), -1]])
+      .sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+    let n = 0;
+    let peak = 0;
+    for (const [, d] of marks) { n += d; peak = Math.max(peak, n); }
+    return peak;
+  };
+  let tti = null;
+  const candidates = [fcp, ...tasks.map(ends), ...requests.map((r) => r[1])]
+    .filter((s) => s >= fcp).sort((a, b) => a - b);
+  for (const s of candidates) {
+    const e = s + 5000;
+    if (e > now) break;
+    if (tasks.some((t) => t.start < e && ends(t) > s) || busiest(s, e) > 2) continue;
+    tti = Math.max(fcp, ...tasks.filter((t) => ends(t) <= s).map(ends));
+    break;
+  }
+  const tbt = tasks
+    .filter((t) => ends(t) > fcp && (tti == null || t.start < tti))
+    .reduce((sum, t) => sum + Math.max(0, t.duration - 50), 0);
+  const blockingTotal = tasks
+    .reduce((sum, t) => sum + Math.max(0, t.duration - 50), 0);
+  const longestTask = tasks.reduce((m, t) => Math.max(m, t.duration), 0);
 
   // The four LCP sub-parts, when the LCP element is a resource we can find.
   let phases = null;
@@ -370,6 +434,7 @@ const HARVEST = (topN) => {
     clsSources: v.clsSources || [],
     fcp: v.fcp,
     ttfb: Math.round(ttfb),
+    tti: tti == null ? null : Math.round(tti),
     tbt: Math.round(tbt),
     blockingTotal: Math.round(blockingTotal),
     longestTask: Math.round(longestTask),
@@ -386,6 +451,33 @@ const HARVEST = (topN) => {
 // ---------------------------------------------------------------------------
 // One run
 // ---------------------------------------------------------------------------
+
+// --interact-at: click while the page still loads, where hydration makes INP
+// worst (references/diagnosis.md §8); --interact alone clicks after the
+// settle time (GT-C11). The target is found as soon as it is visible, and the
+// click goes through the browser's input pipeline at MS after navigation
+// starts, so it queues behind whatever task holds the main thread then, as a
+// user's does. MS counts from the page's own time origin: a cold browser can
+// take half a second to send the request. Returns when it clicked, or null.
+async function clickDuringLoad(page, opts) {
+  try {
+    const origin = await page.evaluate(() => performance.timeOrigin);
+    const target = page.locator(opts.interact).first();
+    await target.waitFor({ state: 'visible', timeout: opts.interactAt + 10000 });
+    const box = await target.boundingBox();
+    if (!box) throw new Error('the target has no layout box');
+    const wait = origin + opts.interactAt - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    const at = Math.round(Date.now() - origin);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    return at;
+  } catch (err) {
+    process.stderr.write(
+      `measure_vitals: --interact "${opts.interact}" with --interact-at ` +
+      `${opts.interactAt} did not click: ${err.message.split('\n')[0]}\n`);
+    return null;
+  }
+}
 
 async function runOnce(browser, opts, url) {
   const t = THROTTLE[opts.throttle];
@@ -416,17 +508,41 @@ async function runOnce(browser, opts, url) {
     });
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: t.cpu });
 
+    // The document's time to first byte, as the network stack saw it:
+    // receiveHeadersEnd comes after CDP's emulated latency, and Navigation
+    // Timing's responseStart before it, so `--throttle slow4g` reported a
+    // TTFB of 5 ms (GT-A6). Redirects keep the request id, so it counts them.
+    let doc = null;
+    cdp.on('Network.requestWillBeSent', (e) => {
+      if (!doc && e.type === 'Document') doc = { id: e.requestId, start: e.timestamp, ttfb: null };
+    });
+    cdp.on('Network.responseReceived', (e) => {
+      const timing = e.response && e.response.timing;
+      if (doc && e.requestId === doc.id && doc.ttfb == null && timing && timing.requestTime > 0) {
+        doc.ttfb = (timing.requestTime - doc.start) * 1000 + timing.receiveHeadersEnd;
+      }
+    });
+
     if (opts.warm) {
       await page.goto(url, { waitUntil: 'load', timeout: 60000 });
       await page.waitForTimeout(500);
       // Second load in the same context: HTTP cache is warm, observers are
       // re-installed by addInitScript, counters start from zero.
+      doc = null;
     }
 
-    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
-    await page.waitForTimeout(opts.settle);
+    let clickedAt = null;
+    if (opts.interactAt != null) {
+      await page.goto(url, { waitUntil: 'commit', timeout: 60000 });
+      clickedAt = await clickDuringLoad(page, opts);
+      await page.waitForLoadState('load', { timeout: 60000 });
+      await page.waitForTimeout(opts.settle);
+    } else {
+      await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+      await page.waitForTimeout(opts.settle);
+    }
 
-    if (opts.interact) {
+    if (opts.interact && opts.interactAt == null) {
       try {
         await page.click(opts.interact, { timeout: 5000 });
         await page.waitForTimeout(500);
@@ -437,7 +553,9 @@ async function runOnce(browser, opts, url) {
       }
     }
 
-    const result = await page.evaluate(HARVEST, opts.resources);
+    const result = await page.evaluate(HARVEST,
+      { topN: opts.resources, ttfb: doc && doc.ttfb != null ? doc.ttfb : null });
+    result.clickedAt = clickedAt;
     await cdp.detach().catch(() => {});
     return result;
   } finally {
@@ -545,7 +663,8 @@ function textReport(o) {
   if (o.longTasks) {
     L.push(`  long tasks    ${o.longTasks.count} task(s), longest ` +
            `${o.longTasks.longest}ms, ${o.longTasks.blockingTotal}ms blocking ` +
-           `in total (TBT counts only what lands after FCP)`);
+           `in total (TBT counts only what lands after FCP, before TTI, ` +
+           'and outside an interaction)');
   }
   L.push('');
   L.push(`  LCP element   ${o.lcpSelector || '(not identified)'}`);
@@ -659,8 +778,15 @@ async function main() {
   for (const key of ['lcp', 'cls', 'tbt', 'ttfb', 'fcp', 'inp']) {
     stats[key] = spread(runs.map((r) => r[key]));
   }
+  stats.tti = spread(runs.map((r) => r.tti));
   if (!stats.inp && opts.interact) {
     notes.push(`--interact "${opts.interact}" produced no interaction entries.`);
+  }
+  const late = runs.map((r) => r.clickedAt).filter((at) => at != null && at > opts.interactAt + 50);
+  if (late.length) {
+    notes.push(
+      `--interact-at ${opts.interactAt}: the target was ready only at ` +
+      `${Math.min(...late)} ms or later in ${late.length} run(s), and was clicked then.`);
   }
   if (!opts.interact) {
     notes.push(
@@ -712,7 +838,7 @@ async function main() {
     throttle: opts.throttle,
     throttleDetail: t.down < 0
       ? `no network shaping, ${t.cpu}x CPU`
-      : `${(t.down * 8 / 1024 / 1024).toFixed(1)}Mbps down, ${t.latency}ms RTT, ${t.cpu}x CPU`,
+      : `${(t.down * 8 / 1024 / 1024).toFixed(2)}Mbps down, ${t.latency}ms per request, ${t.cpu}x CPU`,
     viewport: `${opts.viewport.width}x${opts.viewport.height}@${opts.dpr}x`,
     warm: opts.warm,
     stats,
@@ -733,8 +859,8 @@ async function main() {
     breaches,
     notes,
     perRun: runs.map((r) => ({
-      lcp: r.lcp, cls: r.cls, tbt: r.tbt, ttfb: r.ttfb, fcp: r.fcp,
-      inp: r.inp, longTaskCount: r.longTaskCount,
+      lcp: r.lcp, cls: r.cls, tbt: r.tbt, ttfb: r.ttfb, fcp: r.fcp, tti: r.tti,
+      inp: r.inp, longTaskCount: r.longTaskCount, clickedAt: r.clickedAt,
     })),
   };
 

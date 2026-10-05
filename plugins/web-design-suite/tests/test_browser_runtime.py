@@ -25,7 +25,10 @@ Regressions covered:
 """
 from __future__ import annotations
 
+import functools
+import http.server
 import json
+import threading
 import unittest
 
 from test_browser_scripts import installed_browsers
@@ -261,6 +264,80 @@ class VitalsUnderCsp(TempDirTest):
 
 
 @unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
+class QuietHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+
+@unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
+class VitalsMeasures(TempDirTest):
+    """GT-A6: CDP adds its latency per request, and Navigation Timing's
+    responseStart comes before it, so `--throttle slow4g` reported a TTFB of
+    5 ms; and no preset was Lighthouse's. GT-A17: --interact counted the
+    handler's own long task in TBT, and the TBT window had no TTI bound.
+    GT-C11: nothing clicked while the page was still hydrating."""
+
+    BUSY = "const t = performance.now(); while (performance.now() - t < {ms}) {{}}"
+
+    def setUp(self):
+        super().setUp()
+        handler = functools.partial(QuietHandler, directory=str(self.tmp))
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+
+    def vitals(self, body, *args):
+        self.write("page.html", "<!doctype html><html lang=en><head><title>v</title></head>"
+                                "<body><main><h1>Plans</h1><p>From four pounds a month.</p>"
+                                + body + "</main></body></html>")
+        url = f"http://127.0.0.1:{self.server.server_address[1]}/page.html"
+        proc = run_node("perf-budget-gate", "measure_vitals.mjs", url, "--runs", "1", "--json",
+                        *args, cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
+        if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
+            self.skipTest(output(proc)[-200:])
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return json.loads(proc.stdout)
+
+    def test_ttfb_counts_the_emulated_latency(self):
+        out = self.vitals("", "--throttle", "slow4g", "--settle", "300")
+        self.assertGreaterEqual(out["stats"]["ttfb"]["median"], 140)
+        out = self.vitals("", "--settle", "300")                       # the default
+        self.assertEqual(out["throttle"], "lighthouse")
+        self.assertIn("562.5ms per request", out["throttleDetail"])
+        self.assertGreaterEqual(out["stats"]["ttfb"]["median"], 540)
+
+    def test_an_interaction_is_not_counted_in_tbt(self):
+        button = ("<button>Buy</button><script>document.querySelector('button')"
+                  ".addEventListener('click', () => { " + self.BUSY.format(ms=250) + " });</script>")
+        out = self.vitals(button, "--throttle", "off", "--settle", "500", "--interact", "button")
+        self.assertGreaterEqual(out["stats"]["inp"]["median"], 200)
+        self.assertLess(out["stats"]["tbt"]["median"], 50)
+
+    def test_tbt_stops_at_tti(self):
+        """A long task after five quiet seconds is after TTI; one before is not."""
+        late = "<script>setTimeout(() => { " + self.BUSY.format(ms=250) + " }, {at});</script>"
+        out = self.vitals(late.replace("{at}", "6000"), "--throttle", "off", "--settle", "7000")
+        self.assertLess(out["stats"]["tbt"]["median"], 50)
+        self.assertIsNotNone(out["stats"]["tti"])
+        out = self.vitals(late.replace("{at}", "1000"), "--throttle", "off", "--settle", "7000")
+        self.assertGreaterEqual(out["stats"]["tbt"]["median"], 150)
+
+    def test_interact_at_clicks_while_the_page_hydrates(self):
+        """The click lands during a 2-second task: its wait is INP's, and the
+        task stays in TBT, since it is the page's own work."""
+        page = ("<button>Buy</button><script>setTimeout(() => { " + self.BUSY.format(ms=2000)
+                + " }, 500);</script>")
+        out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "button",
+                          "--interact-at", "1200")
+        self.assertGreaterEqual(out["stats"]["inp"]["median"], 500)
+        self.assertGreaterEqual(out["stats"]["tbt"]["median"], 1000)
+        # --interact waits for the page to take the click, after the task:
+        # an event under 16 ms is not reported at all, so INP may be n/a.
+        out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "button")
+        self.assertLess((out["stats"]["inp"] or {"median": 0})["median"], 200)
+
+
 class MatrixSeesStateChanges(TempDirTest):
     """GT-A3."""
 

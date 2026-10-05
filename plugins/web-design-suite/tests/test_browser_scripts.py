@@ -243,6 +243,17 @@ class RuntimeArguments(TempDirTest):
                 self.assertEqual(proc.returncode, 2, output(proc))
                 self.assertIn("--densities", output(proc))
 
+    def test_interact_at_needs_a_target_and_a_time(self):
+        """GT-C11: --interact-at says when to click, --interact what."""
+        page = self.write("page.html", "<!doctype html><title>t</title><main>hi</main>")
+        for args, needle in ((("--interact-at", "500"), "it says when, not what"),
+                             (("--interact", "button", "--interact-at", "-1"), "0 or more")):
+            with self.subTest(args=args):
+                proc = run_node("perf-budget-gate", "measure_vitals.mjs", page, *args,
+                                cwd=self.tmp, env_changes={"NODE_PATH": None})
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn(needle, output(proc))
+
     def test_valid_densities_pass_the_arguments(self):
         """CodeRabbit on #40: the valid forms, held to reaching a later check."""
         for value in ("auto", "none", "compact,spacious"):
