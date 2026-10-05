@@ -219,7 +219,10 @@
   documents, from a file and from a local server standing in for the API, which records
   the query: the key in the query string and nowhere in the output, a ratio above and
   within, a refusal and no data (exit 2), and a key passed as an argument refused. They
-  never touch the network. Against `v3.3.0`, all 5 fail (there was no script).
+  never touch the network. Against `v3.3.0`, all 5 fail (there was no script). Codex's
+  review of #46 found a lab median of 0 left unjudged, so a field CLS of 0.05 against a
+  lab CLS of 0 passed: `test_a_lab_median_of_zero_is_exceeded_by_any_field_value` fails
+  on its head.
 
 ## 3.3.0 — 2026-10-04
 

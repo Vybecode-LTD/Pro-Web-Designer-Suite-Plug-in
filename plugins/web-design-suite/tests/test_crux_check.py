@@ -84,6 +84,16 @@ class CruxCheck(TempDirTest):
         self.assertNotIn("INP", output(proc))                 # no lab INP to compare
         self.assertNotIn("TBT", output(proc))                 # no field TBT
 
+    def test_a_lab_median_of_zero_is_exceeded_by_any_field_value(self):
+        """Codex on #46: a lab CLS of 0 left the row unjudged, so a field CLS
+        of 0.05 passed. Any value above 0 is above 0 times the ratio."""
+        lab = json.loads(json.dumps(LAB))
+        lab["stats"]["cls"]["median"] = 0
+        self.write("vitals.json", json.dumps(lab))
+        proc = self.check("--response", "crux.json", "--ratio", "2")
+        self.assertEqual(proc.returncode, 1, output(proc))
+        self.assertRegex(output(proc), r"CLS\s+field\s+0\.050\s+lab\s+0\.000\s+from 0\s+above")
+
     def test_within_the_ratio_passes(self):
         proc = self.check("--response", "crux.json", "--ratio", "2", "--json")
         self.assertEqual(proc.returncode, 0, output(proc))

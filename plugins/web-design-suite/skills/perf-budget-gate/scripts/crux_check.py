@@ -35,8 +35,8 @@ endpoint, such as a proxy.
 
 Compared, where both sides have a number: LCP, CLS, FCP, TTFB, and INP when
 the lab run drove an interaction (--interact). TBT has no field counterpart.
-A lab median of 0 cannot be exceeded by a ratio, so that row is reported, not
-judged.
+A lab median of 0 has no ratio, and any field value above 0 is above it: a
+lab CLS of 0 against a field CLS of 0.05 is a lab that misses the shifts.
 
 Exit codes
 ----------
@@ -153,11 +153,13 @@ def compare(lab: Dict[str, float], field: Dict[str, float], ratio: float) -> Lis
     for key, (_, label, unit) in METRICS.items():
         if key not in lab or key not in field:
             continue
+        # A lab median of 0 has no ratio, and any field value above 0 is
+        # above it: a lab CLS of 0 against a field CLS of 0.05 means the lab
+        # misses shifts the users get (Codex on #46).
         row = {"metric": key, "label": label, "unit": unit, "lab": lab[key],
-               "field": field[key], "ratio": None, "verdict": "n/a"}
-        if lab[key] > 0:
-            row["ratio"] = round(field[key] / lab[key], 2)
-            row["verdict"] = "above" if field[key] > ratio * lab[key] else "within"
+               "field": field[key],
+               "ratio": round(field[key] / lab[key], 2) if lab[key] > 0 else None,
+               "verdict": "above" if field[key] > ratio * lab[key] else "within"}
         rows.append(row)
     return rows
 
@@ -220,7 +222,7 @@ def main(argv: Optional[List[str]] = None) -> int:
               f"field p75 against the lab median ({lab_report.get('throttle', 'unknown')} "
               f"throttle); trigger above {args.ratio}x")
         for r in rows:
-            ratio = f"{r['ratio']:.2f}x" if r["ratio"] is not None else "n/a"
+            ratio = f"{r['ratio']:.2f}x" if r["ratio"] is not None else "from 0"
             print(f"  {r['label']:<5} field {fmt(r['field'], r['unit']):>8}  "
                   f"lab {fmt(r['lab'], r['unit']):>8}  {ratio:>6}  {r['verdict']}")
         if above:
