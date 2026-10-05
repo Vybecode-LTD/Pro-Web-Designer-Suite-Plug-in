@@ -881,6 +881,9 @@ class TestFilesByThePathBelowTheRoot(TempDirTest):
             with self.subTest(folder=folder):
                 self.write(f"{folder}/src/Badge.jsx", self.JSX)
                 self.assertEqual(1, self.colours(f"{folder}/src"))
+        # Codex on #52: a letter in any script continues the word.
+        self.write("intl/src/testé/Badge.jsx", self.JSX)
+        self.assertEqual(1, self.colours("intl/src"))
 
     def test_a_test_file_below_the_root_is_still_left_alone(self):
         # Control: the exemption itself stays.

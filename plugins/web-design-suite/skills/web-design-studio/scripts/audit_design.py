@@ -2130,15 +2130,16 @@ def iter_files_with_roots(paths: list[str]) -> Iterator[tuple[Path, Path | None]
 
 
 # `__mocks__`, `tests/`, `fixtures/` and `Badge.test.jsx`: an underscore or a
-# dot ends the word, and a plural is the same word (`latest.js` is not a test).
-TEST_LIKE = re.compile(r"(?<![a-z0-9])(tests?|specs?|stories|mocks?|fixtures?)(?![a-z0-9])", re.I)
+# dot ends the word, a letter or digit in any script does not (`latest.js` and
+# `testé/` are not tests), and a plural is the same word.
+TEST_LIKE = re.compile(r"(?<![^\W_])(tests?|specs?|stories|mocks?|fixtures?)(?![^\W_])", re.I)
 
 
 def test_like(path: Path, root: Path | None = None) -> bool:
     """A test, story, mock or fixture file, which the test tools judge, not
     this audit. Read from the path below the folder being audited (or the path
     as given, for a file named by a relative path): the folders a project sits
-    in, `C:/work/test/app` or a temporary `wds-test-*`, say nothing about it."""
+    in, a checkout under `test/` or a temporary `wds-test-*`, say nothing about it."""
     if root is not None:
         try:
             rel = path.relative_to(root).as_posix()

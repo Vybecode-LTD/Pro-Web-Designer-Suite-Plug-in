@@ -132,8 +132,8 @@
   finishes GT-C3.
 - **The audit dropped its JS colour check for a whole project in a folder named `test`.**
   It leaves test, story, mock and fixture files to the test tools, but matched the words
-  anywhere in the absolute path, so a project in `C:/work/test/app`, `~/fixtures/site` or a
-  temporary `wds-test-*` folder lost `js-raw-color` for every file. It reads the path below
+  anywhere in the absolute path, so a project inside a folder named `test` or `fixtures`, or a
+  temporary `wds-test-*` folder, lost `js-raw-color` for every file. It reads the path below
   the folder being audited now, and plurals and `__mocks__` count, which they never did.
 - **diff_system missed density, media-condition and root-element changes** (LC-A8).
   change-classification.md calls all three major and detected, and system.json records
