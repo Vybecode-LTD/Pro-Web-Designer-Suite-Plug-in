@@ -495,9 +495,17 @@ def scan_one(root: Path, entry: Dict[str, Any]) -> List[Hit]:
             if not needle.search(raw):
                 continue
             # Each declaration on the line, so `.meta { color: var(--x); }`
-            # reads as the declaration it is, however the rule is wrapped.
-            pieces = [p for p in re.split(r"[{};]", raw) if needle.search(p)] \
-                if is_css else [raw]
+            # reads as the declaration it is, however the rule is wrapped. A
+            # quoted string is text: its `;` splits nothing, and a token named
+            # inside it is not a use.
+            pieces = [raw]
+            if is_css:
+                masked = re.sub(r"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'",
+                                lambda q: q.group(0)[0] + " " * (len(q.group(0)) - 2)
+                                + q.group(0)[-1], raw)
+                bounds = [-1] + [s.start() for s in re.finditer(r"[{};]", masked)] + [len(raw)]
+                pieces = [raw[a + 1:b] for a, b in zip(bounds, bounds[1:])
+                          if needle.search(masked[a + 1:b])]
             for piece in pieces:
                 if decl is not None and decl.match(piece):
                     continue            # the declaration itself, not a use
@@ -522,6 +530,8 @@ def classify_hit(raw: str, path: Path, name: str,
     if not m:
         return ("manual", "not a plain declaration")
     prop, value = m.group(1), m.group(2)
+    # apply_codemod rewrites up to `!important` and keeps it.
+    value = re.sub(r"\s*!important\s*$", "", value, flags=re.IGNORECASE)
     if prop not in props:
         return ("manual", f"`{prop}` is not in the rule's property list")
     if value.strip() != f"var({name})":

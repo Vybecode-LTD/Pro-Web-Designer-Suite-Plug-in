@@ -374,6 +374,12 @@
   padding, in the extractor and the pairing alike, so `padding: 16px !important` was
   block padding only, and a later plain declaration beat it. It is one value now, and an
   `!important` one wins its block (`test_an_important_padding_is_one_value_and_wins_its_block`).
+  Its review on `73e7e62` found two more. `padding-inline-start` was the left padding,
+  which it is only left to right: an inline side is read both ways now, and pairs only
+  when the two agree (`test_a_logical_side_pairs_only_when_both_directions_agree`, failing
+  on that head). And the spec's `tiers` examples never ran through the audit, the gate
+  their section names; `test_rules_spec` runs them now (a control: the audit already
+  agreed).
 - P15 part 2 (LC-A14, LC-C4, LC-C12): `test_versioning.DeprecateRewritesAndCountsAColourRename`
   runs the review's `fx/dep/client` rules through deprecate.py's mapping, the codemod and
   the scan, one rule per line and the same rules on several lines;
@@ -382,7 +388,12 @@
   the page quotes to the output. Against `v3.3.0`, all 4 fail.
   Codex's review of #50 found one more, failing on its head: a declaration-scope rewrite
   replaced through `!important` and dropped it, which the font guard had hidden beside a
-  `font-weight`. The rewrite ends where the value does now.
+  `font-weight`. The rewrite ends where the value does now. CodeRabbit's found two more in
+  the scan, failing on `28d5b99`: an `!important` declaration, which the codemod rewrites,
+  was labelled manual, and a token named inside a quoted `content` string was split at the
+  string's `;` (or past an escaped `\"` in it, its next review found) and counted as a
+  codemod hit
+  (`test_the_scan_reads_important_and_quoted_text_as_the_codemod_does`).
 
 ## 3.3.0 — 2026-10-04
 
