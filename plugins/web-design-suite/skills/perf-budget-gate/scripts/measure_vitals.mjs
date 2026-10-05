@@ -466,6 +466,15 @@ const HARVEST = ({ topN, ttfb: networkTtfb, requests: networkRequests }) => {
 // starts, so it queues behind whatever task holds the main thread then, as a
 // user's does. MS counts from the page's own time origin: a cold browser can
 // take half a second to send the request. Returns when it clicked, or null.
+// The document's TTFB in ms from CDP: from the request's first timestamp
+// (seconds) to the end of its headers, or null when CDP left the timing
+// unset (it marks an unset field -1), so Navigation Timing stands in.
+// test_browser_scripts.VitalsTiming runs this function on its own.
+function networkTtfb(start, timing) {
+  if (!timing || !(timing.requestTime > 0) || !(timing.receiveHeadersEnd >= 0)) return null;
+  return (timing.requestTime - start) * 1000 + timing.receiveHeadersEnd;
+}
+
 async function clickDuringLoad(page, opts) {
   try {
     const origin = await page.evaluate(() => performance.timeOrigin);
@@ -536,11 +545,8 @@ async function runOnce(browser, opts, url) {
     cdp.on('Network.loadingFinished', landed);
     cdp.on('Network.loadingFailed', landed);
     cdp.on('Network.responseReceived', (e) => {
-      const timing = e.response && e.response.timing;
-      // CDP marks an unset field -1; then Navigation Timing stands in.
-      if (doc && e.requestId === doc.id && doc.ttfb == null && timing &&
-          timing.requestTime > 0 && timing.receiveHeadersEnd >= 0) {
-        doc.ttfb = (timing.requestTime - doc.start) * 1000 + timing.receiveHeadersEnd;
+      if (doc && e.requestId === doc.id && doc.ttfb == null) {
+        doc.ttfb = networkTtfb(doc.start, e.response && e.response.timing);
       }
     });
 
