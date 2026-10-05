@@ -105,7 +105,7 @@ Items LC-A22 and LC-C3. Read them first in `dev plans/web-design-suite-review/li
 ## 5. P17: the lifecycle instructions
 
 Items LC-A17, LC-A23, LC-B8 and LC-C6. Read them in `lifecycle.md`: lines 58 (A17), 77 to 84 (A23), 106 (B8) and 117 (C6).
-- **LC-A17.** rollout.md's model announcement (about :249) reads "Design system 2.1.0. One breaking change: `--bg-accent` moved": a breaking re-point shipped as a minor, the failure the skill exists to prevent. Make it 3.0.0. Its step 3 commits with `git commit -am` per step, which splits the upgrade against §6's one-commit rollback: commit once, after step 6.
+- **LC-A17.** rollout.md's model announcement (about :249) reads "Design system 2.1.0. One breaking change: `--bg-accent` moved": a breaking re-point shipped as a minor, the failure the skill exists to prevent. Make it 3.0.0, and the migration guide it points to `UPGRADE-3.0.0.md` (it names `UPGRADE-2.1.0.md`). Its step 3 commits with `git commit -am` per step, which splits the upgrade against §6's one-commit rollback: commit once, after step 6.
 - **LC-A23**, the smaller items (versioning SKILL.md's "Four edits" was fixed in #50):
   - deprecation.md (about :136) says `@deprecated` is surfaced by `tsc`; it is not. `@typescript-eslint/no-deprecated` reports it: re-read its docs and register the fact.
   - deprecate.py accepts `--removal 2.2.0` for `--since 2.1.0`, but the contract (deprecation.md:29) puts a removal in the next major, X+1.0.0. Refuse it, with a test.
