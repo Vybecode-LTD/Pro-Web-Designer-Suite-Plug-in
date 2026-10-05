@@ -28,9 +28,9 @@
 
 ## Warnings
 
-- **N34: the release build is byte-identical only with the same zlib.** Windows' Python 3.14 deflates with zlib-ng, the CI's with zlib, so a local build's checksums never match the release's. Compare archives by content (names, CRCs, sizes, dates, modes) until P9 gives the builder that comparison.
+- **N34: the release build is byte-identical only with the same zlib.** Windows' Python 3.14 deflates with zlib-ng, the CI's with zlib, so a local build's checksums never match the release's. Compare archives by content (names, CRCs, uncompressed sizes, dates, modes) until P9 gives the builder that comparison.
 - **The README's `WDS` paths name the version.** A release PR updates them with `plugin.json`; `test_docs.PasteableCommands` fails until it does.
-- **`fail_before.py` swaps the plugin, not the tests.** A fix to test code shows as a control there; show it failing by running the new assertions against the old file (`git show <head>:<path>`), as this session did.
+- **`fail_before.py` swaps the plugin, not the tests.** A fix to test code shows as a control there; show it failing by running the new assertions against the old file (`git show COMMIT:path/to/file`, with the reviewed head and the file's path in place of the two placeholders), as this session did.
 - **Still open from earlier:** `--warning-700`, `--danger-100` and `--info-100` fall outside Display P3; `check_roles.py` measures a colour outside sRGB with its channels clipped.
 - **Resolve only the threads you answered,** and give a background `check.py` `timeout` 3600000.
 - **The token counter resets** on a user message and on a `<ci-monitor-event>`: keep a running total.
