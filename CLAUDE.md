@@ -14,11 +14,11 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-10-05)
 
-- **Version:** 3.3.0 is the latest release (`v3.3.0`, `88a4886`, published by `release.yml`). Phase 4 (3.4.0) is under way: P9 as #38, P10 as #39 and #40, P11 as #41, P12 as #42 and #44, P13 as #45 and #46, P14 as #48, all merged; P15 is open as #49 and #50.
+- **Version:** 3.3.0 is the latest release (`v3.3.0`, `88a4886`, published by `release.yml`). Phase 4 (3.4.0) is under way: P9 to P17 are merged (#38 to #54; P15 as #49 and #50, P16 as #53, P17 as #54). No PR is open.
 - **Installed:** 3.3.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** 591 (604 with #49 and #50). CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: finish #49 and #50, then P16 (the Figma scripts) and P17 (the lifecycle instructions). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 102 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Tests:** 628. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P18 (the email templates and lint, with DL-A13 moved in from P19), then P19 (the email build and its facts). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 90 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
