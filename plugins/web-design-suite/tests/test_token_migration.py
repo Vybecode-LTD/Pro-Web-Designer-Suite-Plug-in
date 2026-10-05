@@ -164,6 +164,166 @@ class MigrationPipeline(TempDirTest):
                               css, cwd=self.tmp)
                 self.assertEqual(proc.returncode, 2, output(proc))
 
+    def codemod(self, src):
+        proc = run_py("design-token-migration", "apply_codemod", "-m",
+                      self.tmp / "proposal" / "mapping.json", src, cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return proc.stdout.decode("utf-8")
+
+    def pad_token(self, mapping):
+        return next(r["token"] for r in mapping["rules"]
+                    if r["kind"] == "spacing" and "padding" in r.get("props", []))
+
+    def test_a_negative_cancel_points_at_its_parents_padding_token(self):
+        # LC-A11, the reference's own example (fx/mig2): the bleed must cancel the
+        # token the padding became, not the one 16px in a margin clusters to.
+        self.write("src/Card.module.css",
+                   ".card { padding: 16px; font-size: 15px; }\n"
+                   ".card__media { margin: -16px -16px 16px; }\n"
+                   ".body { font-size: 15px; }\n")
+        self.write("src/panel.css",
+                   ".panel { padding: 16px; }\n.panel > .bleed { margin-inline: -16px; }\n"
+                   ".well { padding: 16px; .media { margin-block-start: -16px; } }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+        pad = self.pad_token(mapping)
+        gap = next(r["token"] for r in mapping["rules"]
+                   if r["kind"] == "spacing" and "gap" in r.get("prop_classes", []))
+        self.assertNotEqual(pad, gap, mapping["rules"])
+        diff = self.codemod(self.tmp / "src")
+        cancel = f"calc(var({pad}) * -1)"
+        self.assertIn(f"+.card__media {{ margin: {cancel} {cancel} var({gap}); }}", diff)
+        self.assertIn(f"+.panel > .bleed {{ margin-inline: {cancel}; }}", diff)
+        self.assertIn(f".media {{ margin-block-start: {cancel}; }}", diff)
+
+    def test_a_cancel_keeps_to_its_axis_and_reads_a_grouped_selector(self):
+        # Codex on #49: `-8px` inline is not the 8px block padding's cancel, and a
+        # padding declared for `.a, .panel` is `.panel`'s padding.
+        self.write("src/a.css", ".card { padding: 8px 16px; }\n.card__media { margin-inline: -8px; }\n"
+                                ".a, .panel { padding: 16px; }\n.panel > .bleed { margin-inline: -16px; }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+
+        def token(klass, value):
+            return next(r["token"] for r in mapping["rules"]
+                        if klass in r.get("prop_classes", []) and value in r["match"])
+
+        diff = self.codemod(self.tmp / "src")
+        media = next(l for l in diff.splitlines() if l.startswith("+.card__media"))
+        self.assertNotIn(f"var({token('pad-block', '8px')})", media)
+        self.assertIn(f"+.panel > .bleed {{ margin-inline: calc(var({token('pad-all', '16px')}) * -1); }}",
+                      diff)
+
+    def test_a_cancel_keeps_to_its_side_the_cascade_and_each_selector(self):
+        # CodeRabbit on #49: the right margin is not the left padding's cancel; a
+        # later `padding-inline` wins over `padding`; each member of a grouped
+        # margin selector finds its own parent.
+        self.write("src/a.css", ".s { padding-left: 16px; padding-right: 8px; }\n"
+                                ".s__x { margin-right: -16px; }\n"
+                                ".c { padding: 16px; padding-inline: 16px; }\n"
+                                ".c__x { margin-inline: -16px; }\n"
+                                ".g { padding: 16px; }\n.h { padding: 16px; }\n"
+                                ".g__m, .h__m { margin-block-start: -16px; }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+
+        def token(klass, value):
+            return next(r["token"] for r in mapping["rules"]
+                        if klass in r.get("prop_classes", []) and value in r["match"])
+
+        inline16, all16 = token("pad-inline", "16px"), token("pad-all", "16px")
+        self.assertNotEqual(inline16, all16, mapping["rules"])
+        diff = self.codemod(self.tmp / "src")
+        line = {l.split(" {")[0][1:]: l for l in diff.splitlines() if l.startswith("+.")}
+        self.assertNotIn(f"var({inline16})", line[".s__x"])
+        self.assertIn(f"margin-inline: calc(var({inline16}) * -1)", line[".c__x"])
+        self.assertIn(f"margin-block-start: calc(var({all16}) * -1)", line[".g__m, .h__m"])
+
+    def test_a_cancel_reads_the_padding_of_its_own_media_query(self):
+        # CodeRabbit on #49: a padding in one @media is not a margin's elsewhere.
+        self.write("src/a.css", "@media (min-width: 40rem) { .p { padding: 16px; } }\n"
+                                "@media print { .p__x { margin-inline: -16px; } }\n"
+                                "@media print { .q { padding: 16px; } .q__x { margin-inline: -16px; } }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+        all16 = next(r["token"] for r in mapping["rules"]
+                     if "pad-all" in r.get("prop_classes", []) and "16px" in r["match"])
+        lines = self.codemod(self.tmp / "src").splitlines()
+        p_x = next(l for l in lines if l.startswith("+@media print { .p__x"))
+        q_x = next(l for l in lines if l.startswith("+@media print { .q {"))
+        self.assertNotIn(f"var({all16})", p_x)
+        self.assertIn(f".q__x {{ margin-inline: calc(var({all16}) * -1); }}", q_x)
+
+    def test_a_padding_set_in_two_blocks_is_not_cancelled(self):
+        # CodeRabbit on #49: a later `.p` padding wins over a print one in print,
+        # and an unlayered padding wins over a later layered one. Which padding
+        # applies is not certain, so the margin keeps its own gap token.
+        self.write("src/a.css", "@media print { .p { padding: 16px; } }\n.p { padding: 8px; }\n"
+                                "@media print { .p__x { margin-inline: -16px; } }\n"
+                                ".l { padding: 8px; }\n@layer components { .l { padding: 16px; } }\n"
+                                ".l__x { margin-inline: -16px; }\n"
+                                ".n { padding: 16px; @media print { padding: 8px; } }\n"
+                                ".n__x { margin-inline: -16px; }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+        gap = next(r["token"] for r in mapping["rules"]
+                   if r["kind"] == "spacing" and "gap" in r.get("prop_classes", []))
+        lines = self.codemod(self.tmp / "src").splitlines()
+        for name in ("p", "l", "n"):
+            with self.subTest(rule=name):
+                line = next(l for l in lines if f".{name}__x {{" in l and l.startswith("+"))
+                self.assertIn(f"margin-inline: calc(var({gap}) * -1)", line)
+
+    def test_an_important_padding_is_one_value_and_wins_its_block(self):
+        # CodeRabbit on #49: `!important` was split off as a second slot, so
+        # `padding: 16px !important` read as block padding only, and the last
+        # declaration won even beside an earlier `!important` one.
+        self.write("src/a.css", ".i { padding: 16px !important; padding: 8px; }\n"
+                                ".i__x { margin-inline: -16px; }\n"
+                                ".j { padding: 16px !important; }\n.j__x { margin-inline: -16px; }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+        all16 = next(r["token"] for r in mapping["rules"]
+                     if "pad-all" in r.get("prop_classes", []) and "16px" in r["match"])
+        lines = self.codemod(self.tmp / "src").splitlines()
+        for name in ("i", "j"):
+            with self.subTest(rule=name):
+                line = next(l for l in lines if l.startswith(f"+.{name}__x"))
+                self.assertIn(f"margin-inline: calc(var({all16}) * -1)", line)
+
+    def test_a_logical_side_pairs_only_when_both_directions_agree(self):
+        # CodeRabbit on #49: `padding-inline-start` is the left padding only left
+        # to right; in a right-to-left page `.r__x`'s left padding is 8px.
+        self.write("src/a.css", ".r { padding-inline-start: 16px; padding-inline-end: 8px; }\n"
+                                ".r__x { margin-left: -16px; }\n"
+                                ".s { padding-inline-start: 16px; padding-inline-end: 16px; }\n"
+                                ".s__x { margin-inline-start: -16px; }\n"
+                                ".t { padding: 16px; }\n.t__x { margin-inline-start: -16px; }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+
+        def token(klass):
+            return next(r["token"] for r in mapping["rules"]
+                        if klass in r.get("prop_classes", []) and "16px" in r["match"])
+
+        lines = {l.split(" {")[0][1:]: l for l in self.codemod(self.tmp / "src").splitlines()
+                 if l.startswith("+.")}
+        self.assertIn(f"calc(var({token('gap')}) * -1)", lines[".r__x"])
+        self.assertIn(f"calc(var({token('pad-inline')}) * -1)", lines[".s__x"])
+        self.assertIn(f"calc(var({token('pad-all')}) * -1)", lines[".t__x"])
+
+    def test_a_negative_margin_with_nothing_to_cancel_keeps_its_own_token(self):
+        # Control: no padding in the parent rule, so it is a spacing value of its own.
+        self.write("src/a.css", ".row { gap: 16px; }\n.row__item { margin-block-start: -16px; }\n"
+                                ".box { padding: 16px; }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+        gap = next(r["token"] for r in mapping["rules"]
+                   if r["kind"] == "spacing" and "gap" in r.get("prop_classes", []))
+        self.assertIn(f"margin-block-start: calc(var({gap}) * -1)", self.codemod(self.tmp / "src"))
+
+    def test_a_type_tie_snaps_up_even_when_the_smaller_step_is_commoner(self):
+        # LC-A12: "15px becomes 16, text does not shrink", though 14px is commoner.
+        self.write("src/a.css", ".a { font-size: 15px; }\n" + "".join(
+            f".b{i} {{ font-size: 14px; }}\n" for i in range(3)))
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+        rule = next(r for r in mapping["rules"] if r["kind"] == "type" and "15px" in r["match"])
+        self.assertEqual(rule["token"], "--type-body", rule)
+        self.assertEqual(rule["delta_px"], 1.0, rule)
+        self.assertIn("UP to 16px", rule["note"])
+
     def test_the_z_index_note_counts_the_rungs_above_base(self):
         rules = "\n".join(f".z{i} {{ z-index: {v}; }}" for i, v in
                           enumerate((1, 5, 10, 20, 50, 100, 200, 500, 999, 9999)))

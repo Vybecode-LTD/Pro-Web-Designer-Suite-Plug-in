@@ -235,11 +235,13 @@ class SyncRules(TempDirTest):
     GATES = ("skills/web-design-studio/scripts/audit_design.py",
              "skills/web-design-studio/assets/configs/stylelint.config.mjs",
              "skills/web-design-studio/assets/configs/eslint.design.config.mjs")
+    # Not a gate, but sync_rules writes Law 6's lists into it (LC-A19).
+    READERS = ("skills/design-system-docs/scripts/extract_system.py",)
 
     def setUp(self):
         super().setUp()
         self.root = self.tmp / "plugin"
-        for rel in (self.SPEC, *self.GATES):
+        for rel in (self.SPEC, *self.GATES, *self.READERS):
             (self.root / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(PLUGIN / rel, self.root / rel)
 

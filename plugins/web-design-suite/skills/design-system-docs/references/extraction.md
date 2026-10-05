@@ -249,7 +249,7 @@ Absence is the whole game. A linter reads what is written; the interesting failu
 | `missing-state` | the seven, minus what the selectors implement, for interactive components only | An unwritten state produces no rule, so there is no line for a linter to object to. It renders as `default` and looks fine. |
 | `unconsumed-socket` | a socket no declaration reads and no selector re-points | Valid CSS. Silently does nothing, forever, while looking like API. |
 | `orphan-token` | declared, and in nobody's `referenced_by` | A token nothing reads has no effect and no error. |
-| `tier1-leak` | a component value reading a primitive that has a role | Same rule as `audit_design.py` L6, and the two agree by construction — same prefix list, same exception list. |
+| `tier1-leak` | a component value reading a primitive that has a role | Same rule as `audit_design.py` L6, and the two agree by construction: both read the prefix, exception and null-out lists from the rule spec's `tiers` (web-design-studio's `design-rules.json`), and a test holds them to the same verdict on the same file. |
 | `no-theme-coverage` | every socket resolves identically in light and dark | The component looks right in the theme you are in. |
 | `undocumented-component` | in the source, absent from `--prose` | Nothing anywhere says a page is missing. |
 | `orphan-doc` | in `--prose`, absent from the source | The worst of the set: a page telling people to use something that is gone. |
@@ -258,7 +258,7 @@ Two calibrations that keep the list credible:
 
 **Zero is not always a bug.** An unreferenced Tier-1 ramp step is a spare, and gets `info`. An unreferenced Tier-2 role is a decision nobody took, and gets `warning`. Severity that does not discriminate is severity nobody reads.
 
-**Null-outs are not leaks.** `--space-0`, `--radius-none` and `--shadow-none` are exempt from `tier1-leak`: zero is zero, and `--sections-gap: var(--space-0)` asserts no value at all. Without that exemption the studio's own `layout.css` produces five false findings, and five false findings is how a team learns to ignore a report.
+**Null-outs are not leaks.** `--space-0`, `--radius-none` and `--shadow-none` are exempt from `tier1-leak`, and from L6 in the audit: zero is zero, and `--sections-gap: var(--space-0)` asserts no value at all. Without that exemption the studio's own `layout.css` produces five false findings, and five false findings is how a team learns to ignore a report.
 
 ---
 

@@ -972,6 +972,12 @@
   "heading": "Bootstrap, Material and other framework overrides"
  },
  {
+  "from": "design-token-migration/scripts/apply_codemod.py",
+  "to": "design-token-migration/references/extraction-and-clustering.md",
+  "section": "10",
+  "heading": "The hard cases"
+ },
+ {
   "from": "design-token-migration/scripts/cluster_values.py",
   "to": "web-design-studio/references/spacing-system.md",
   "section": "8",

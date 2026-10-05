@@ -153,6 +153,26 @@
   same declarations are `part-renamed-local`, a patch; in global CSS they stay major.
   change-classification.md §11 now says what an added part is: new surface (Q4), unless it
   wraps existing children (Q3).
+- **A negative cancel pointed at a different token from its padding** (LC-A11). In the
+  reference's own example, `.card { padding: 16px }` became `var(--pad-well)` while
+  `.card__media { margin: -16px }` became `calc(var(--gap-grouped) * -1)`, since 16px in a
+  margin clusters to a gap: the bleed breaks the day the padding changes. apply_codemod
+  pairs each negative margin with the padding of its parent rule (the rule it is nested
+  in, the left side of a descendant or child selector, or a BEM element's block) and
+  reads that padding's token, when that padding is set in one block of the file; set in
+  two (another `@media`, an `@layer`, the rule written twice), which one applies is not
+  certain, and the margin keeps its gap token. extraction-and-clustering.md's example
+  named `--pad-card`, 24px, for the 16px padding.
+- **A type tie snapped down when the smaller size was commoner** (LC-A12). The docs promise
+  "15px becomes 16, text does not shrink", but frequency settled the tie first, so with
+  14px commoner 15px became `--type-ui`, with a note saying "snapped UP to 14px" and a
+  delta of -1. Type ties now always snap up, and the note follows the real direction.
+- **The audit and extract_system disagreed about Law 6** (LC-A19). extraction.md says the
+  two agree by construction, but each kept its own lists: in a `.module.css` file the
+  audit refused `var(--space-0)` and `var(--shadow-none)`, which extract_system exempts as
+  null-outs, and extract_system flagged `--weight-*`, which the audit allows. The lists
+  are now the rule spec's `tiers` section (prefixes with a role, the role exceptions, the
+  null-outs), written into both by `tools/sync_rules.py`; the audit exempts the null-outs.
 
 ### Changed
 
@@ -281,6 +301,37 @@
   as local (`exports_styles` now records it); and `element` was the first JSX root after
   the props interface, so a helper above the component lent it its `<span>`. The root is
   read from the component's own body now.
+- P15 part 1 (LC-A11, LC-A12, LC-A19): `test_token_migration.MigrationPipeline` runs the
+  review's `fx/mig2` card through extract, cluster and the codemod, with a child selector
+  and a nested rule beside it, and a type tie against a commoner 14px;
+  `test_rules_spec.TheTierListsAgree` runs the review's `fx/l6` card through the audit and
+  extract_system and holds both to the spec's lists. Against `v3.3.0`, 4 fail. Two are
+  controls: a negative margin with no padding to cancel keeps its gap token, and the spec's
+  new `tiers` examples, which `fail_before.py` swaps out with the rest of the plugin.
+  Codex's review of #49 found two more, failing on its head: a cancel matched the padding
+  by size alone, so `margin-inline: -8px` read an 8px block padding's token, and a padding
+  declared for `.a, .panel` was not `.panel`'s. The pairing keeps to the axis and splits
+  selector lists. CodeRabbit's found three more, failing on that fix: the axis did not
+  tell left from right, a later `padding-inline` did not replace `padding`, and a grouped
+  margin selector found no parent. The pairing works by side, in cascade order, for each
+  member of either list.
+  Its next review found one more: a padding inside one `@media` decided a margin's cancel
+  in another. Each declaration records its at-rule context, and a margin reads its own.
+  The review after that found two more, failing on its head (`edf441f`): a print padding
+  was read in print though a later base padding wins there, and a layered padding
+  replaced an unlayered one that wins the cascade. Rather than model the cascade, the
+  pairing now reads only a padding set in one block of the file; set in two, the margin
+  keeps its gap token (`test_a_padding_set_in_two_blocks_is_not_cancelled`). The next
+  found one more, failing on that fix (`1f141b5`): `!important` was read as a slot of the
+  padding, in the extractor and the pairing alike, so `padding: 16px !important` was
+  block padding only, and a later plain declaration beat it. It is one value now, and an
+  `!important` one wins its block (`test_an_important_padding_is_one_value_and_wins_its_block`).
+  Its review on `73e7e62` found two more. `padding-inline-start` was the left padding,
+  which it is only left to right: an inline side is read both ways now, and pairs only
+  when the two agree (`test_a_logical_side_pairs_only_when_both_directions_agree`, failing
+  on that head). And the spec's `tiers` examples never ran through the audit, the gate
+  their section names; `test_rules_spec` runs them now (a control: the audit already
+  agreed).
 
 ## 3.3.0 — 2026-10-04
 

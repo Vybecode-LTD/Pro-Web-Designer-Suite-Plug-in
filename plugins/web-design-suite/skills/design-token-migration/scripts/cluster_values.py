@@ -1182,11 +1182,6 @@ def cluster_type(lits: Sequence[dict], tol: float, prop: Proposal) -> None:
         if px:
             groups[px].append(l)
 
-    weights: Dict[float, int] = defaultdict(int)
-    for px, items in groups.items():
-        if px in TYPE_PX:
-            weights[px] += len(items)
-
     role_by_px = {px: role for px, _prim, role in TYPE_STEPS}
     prim_by_px = {px: prim for px, prim, _role in TYPE_STEPS}
 
@@ -1194,8 +1189,9 @@ def cluster_type(lits: Sequence[dict], tol: float, prop: Proposal) -> None:
         items = groups[px]
         raws = sorted({l["normalized"] for l in items})
         # Ties snap UP: text never shrinks to settle a tie. 15px becomes 16px
-        # body, not 14px UI text.
-        got = snap_to_scale(px, TYPE_PX, tol, weights, tie_prefers="up")
+        # body, not 14px UI text, however common 14px is: frequency settles a
+        # spacing tie (the crowd is the decision), never a type one.
+        got = snap_to_scale(px, TYPE_PX, tol, None, tie_prefers="up")
         if got is None:
             nearest = min(TYPE_PX, key=lambda s: abs(s - px))
             prop.unmapped.append(Unmapped(
@@ -1230,8 +1226,9 @@ def cluster_type(lits: Sequence[dict], tol: float, prop: Proposal) -> None:
             confidence = "review"
             note = f"moves {abs(delta):g}px — check the heading hierarchy still reads."
         elif was_tie:
-            note = (f"{px:g}px was equidistant; snapped UP to {step:g}px. "
-                    f"Text does not shrink to settle a tie.")
+            note = (f"{px:g}px was equidistant; snapped {'UP' if delta > 0 else 'DOWN'} "
+                    f"to {step:g}px." + (" Text does not shrink to settle a tie."
+                                         if delta > 0 else ""))
         css_items = [l for l in items if l["context"] != "tailwind-arbitrary"]
         tw_items = [l for l in items if l["context"] == "tailwind-arbitrary"]
         if css_items:
