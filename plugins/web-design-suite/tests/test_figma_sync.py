@@ -180,6 +180,26 @@ class DeterministicOutput(TempDirTest):
                 self.assertTrue(text.strip(), output(proc))
                 self.assertFalse([d for d in days if d in text], text[:400])
 
+    def test_the_drift_check_passes_a_generated_file_and_fails_a_hand_edit(self):
+        """LC-B8: SKILL.md says the CI drift check is what keeps tokens.css
+        read-only. Its recipe diffs the generator's stdout against the file
+        step 3 wrote with --out."""
+        src = self.write("export.tokens.json", json.dumps(DTCG_2025))
+        tokens = self.tmp / "src" / "styles" / "tokens.css"
+        run_py("figma-variables-sync", "figma_to_tokens", src, "--format", "css",
+               "--out", tokens, cwd=self.tmp)
+
+        def drift():
+            proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--format", "css",
+                          cwd=self.tmp)
+            return proc.stdout != tokens.read_bytes()
+
+        self.assertFalse(drift(), "an untouched generated file reads as drift")
+        css = tokens.read_bytes()
+        start = css.index(b"--space-6:")
+        tokens.write_bytes(css[:start] + b"--space-6: 26px" + css[css.index(b";", start):])
+        self.assertTrue(drift(), "a hand edit passes the drift check")
+
     def test_source_date_epoch_is_honoured_when_a_date_is_wanted(self):
         src = self.write("export.tokens.json", json.dumps(DTCG_2025))
         proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--format", "css",

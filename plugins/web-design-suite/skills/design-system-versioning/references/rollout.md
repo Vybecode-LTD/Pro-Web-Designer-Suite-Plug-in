@@ -83,19 +83,19 @@ The exact pin trades automatic patches for deliberate upgrades. For a dependency
 What a consumer runs, in order. It is six steps and it is the same every time, which is the point — an upgrade that requires thought each time is an upgrade that gets postponed.
 
 ```bash
-git checkout -b upgrade/ds-2.1.0
+git checkout -b upgrade/ds-3.0.0
 
 # 1. Read the guide. Not the changelog — the guide, which is written for you.
 #    Breaking items only, each with what you will see if you skip it.
-$EDITOR node_modules/@org/ds/UPGRADE-2.1.0.md
+$EDITOR node_modules/@org/ds/UPGRADE-3.0.0.md
 
 # 2. Take the version, exactly.
-npm install @org/ds@2.1.0 --save-exact
+npm install @org/ds@3.0.0 --save-exact
 
 # 3. The mechanical part. Dry run first; it prints a diff and writes nothing.
+#    Do not commit yet: the upgrade is one commit, after step 6 (§6).
 python -m scripts.apply_codemod ./src --mapping node_modules/@org/ds/mapping.json
 python -m scripts.apply_codemod ./src --mapping node_modules/@org/ds/mapping.json --apply
-git commit -am "chore: codemod for design system 2.1.0"
 
 # 4. The code gate. Law 9. Exits non-zero on a violation.
 python -m scripts.audit_design src/ --strict
@@ -106,7 +106,9 @@ node scripts/snapshot_matrix.mjs build/proof-sheet.html \
      --baselines tests/visual/baselines --out build/matrix-report
 
 # 6. Review the visual diff, accept it deliberately, and commit the accepted
-#    baselines IN THE SAME COMMIT as the version bump.
+#    baselines IN THE SAME COMMIT as the version bump and the codemod.
+git add package.json package-lock.json src tests/visual/baselines
+git commit -m "chore: design system 3.0.0"
 ```
 
 Two things that make this reliably survivable:
@@ -156,7 +158,7 @@ The proof sheet renders every component at every state × density × theme, so t
 | Cells you did not expect changed | This is what the tool is for. Read the diff before accepting anything. |
 | A cell changed in dark only | Almost always a theme re-point you skimmed past in the changelog. |
 
-**Accept intentional diffs in the same commit as their cause.** A baseline update on its own is unreviewable — forty PNGs and no explanation. Alongside the version bump it reads as "we took 2.1.0, so these fourteen images changed", and a reviewer can agree or disagree with that sentence.
+**Accept intentional diffs in the same commit as their cause.** A baseline update on its own is unreviewable — forty PNGs and no explanation. Alongside the version bump it reads as "we took 3.0.0, so these fourteen images changed", and a reviewer can agree or disagree with that sentence.
 
 **If a consumer has no baselines, creating them is the first upgrade's real work** — and it is worth it on the first upgrade, not the third, because every subsequent upgrade is then a five-minute look instead of a leap of faith.
 
@@ -244,9 +246,11 @@ A release nobody reads is a release nobody takes, and an untaken release is indi
 
 **The migration guide answers "what do I do".** Breaking items only, in order, each with: what changed, *what you will see if you skip it*, the blast radius, and the command. The "what you will see" line is the one that gets acted on — "`--fg-subtle` was renamed" is information, "every secondary label will render unstyled" is a task.
 
-**The announcement is three sentences and it names the cost.** Not "2.1.0 is out with improvements". This:
+**The announcement is three sentences and it names the cost.** Not "3.0.0 is out with improvements". This:
 
-> **Design system 2.1.0.** One breaking change: `--bg-accent` moved from accent-600 to accent-500, so white text on a filled button now measures 3.56:1 and no longer passes 4.5:1 — if you have small text on an accent fill, you need to look at it. Everything else is additive. Codemod and guide: `UPGRADE-2.1.0.md`; budget about twenty minutes per project.
+> **Design system 3.0.0.** One breaking change: `--bg-accent` moved from accent-600 to accent-500, so white text on a filled button now measures 3.56:1 and no longer passes 4.5:1 — if you have small text on an accent fill, you need to look at it. Everything else is additive. Codemod and guide: `UPGRADE-3.0.0.md`; budget about twenty minutes per project.
+
+A re-point is breaking, so it ships in a major (SKILL.md's table): announcing it as 2.1.0 is the floating-range accident of §2 waiting to happen.
 
 Four properties worth copying: it names the *one* thing that matters, it gives the measured number, it says who is affected, and it estimates the cost. A reader can decide in eight seconds whether to open the guide, which is the only decision the announcement needs to produce.
 

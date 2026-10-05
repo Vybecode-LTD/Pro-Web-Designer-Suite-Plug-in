@@ -1672,11 +1672,13 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
                 if holder:
                     reason = (f"held in `{holder}` — a preprocessor variable or "
                               f"an unclassified property")
-                    rec = (f"Point it at the role instead: "
-                           f"`{holder}: var(--fg-default)` (pick the right "
-                           f"role), or delete it and use the role at the call "
-                           f"site. A variable holding a literal is a token "
-                           f"layer with one tier missing.")
+                    rec = (f"Delete it, and use the role at each call site "
+                           f"(`var(--fg-default)`, or whichever role that site "
+                           f"means). Re-pointed, `{holder}: var(--fg-default)` "
+                           f"is a tier that means nothing "
+                           f"(framework-migrations.md). Keep a variable only "
+                           f"for a value the browser cannot hold, such as a "
+                           f"breakpoint inside `@media`.")
                 else:
                     reason = "a color constant in JavaScript"
                     rec = ("A color in JS is a color dark mode cannot re-point. "
@@ -2340,8 +2342,10 @@ def render_reconciliation(prop: Proposal, payload: dict, args) -> str:
         buf.append("| Original | → Token | Δ | Occurrences | Why |")
         buf.append("|---|---|---:|---:|---|")
         for r in sorted(review, key=lambda r: -r.occurrences):
+            # `delta_px` is the rule's own unit: a duration's is milliseconds.
+            unit = {"duration": "ms", "z-index": ""}.get(r.kind, "px")
             buf.append(f"| `{', '.join(r.match[:3])}` | `{r.token}` | "
-                       f"{r.delta_px:+g}px | {r.occurrences} | "
+                       f"{r.delta_px:+g}{unit} | {r.occurrences} | "
                        f"{r.note or r.kind} |")
         buf.append("")
 

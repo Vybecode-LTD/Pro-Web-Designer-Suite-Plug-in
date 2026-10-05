@@ -186,6 +186,26 @@
   predicts the font-guard skip, which a colour rename never meets.
 - **A re-point listed every density and condition** when its default value moved, a side
   effect of P14's equality check, which needs them only when the default does not move.
+- **The model announcement shipped a breaking change as a minor** (LC-A17). rollout.md's
+  example read "Design system 2.1.0. One breaking change: `--bg-accent` moved", a re-point
+  released as a minor, the failure the skill exists to prevent. It is 3.0.0 now, with
+  `UPGRADE-3.0.0.md`, and so is the upgrade procedure, whose step 3 committed the codemod
+  on its own (`git commit -am`) against §6's one-commit rollback: the upgrade is one
+  commit now, after step 6.
+- **deprecate.py took a removal outside a major** (LC-A23). deprecation.md puts a removal
+  in X+1.0.0, but `--since 2.1.0 --removal 2.2.0` was accepted; only a patch-apart window
+  was refused. A removal that is not a later major is refused now, unless `--force`.
+- **The reconciliation report's smaller errors** (LC-A23). A duration's delta printed as
+  "-30px"; it is in milliseconds. A colour held in a `$`-variable was to be re-pointed
+  (`$brand: var(--fg-default)`), where framework-migrations.md says to delete such
+  variables at their call sites; the report says so now.
+- **The lifecycle docs' smaller errors** (LC-A23, LC-B8). deprecation.md said `tsc`
+  surfaces `@deprecated`; it does not, and the gate is `@typescript-eslint/no-deprecated`.
+  framework-migrations.md said the script reports a `darken()` call's distance to the
+  ramp; it cannot compile Sass, so it lists the calls. MIGRATION_PLAN.md offered "20px
+  `--pad-inline-sm`", which is 12px; migration SKILL.md said "four" algorithms and listed
+  six; and figma-variables-sync called `tokens.css` "`git`-enforced read-only", where the
+  CI drift check is what refuses a hand edit.
 
 ### Changed
 
@@ -214,6 +234,13 @@
 
 ### Tests
 
+- P17 (LC-A17, LC-A23, LC-B8, LC-C6): `test_versioning.DeprecateKeepsRemovalsInAMajor`
+  refuses `--removal` 2.2.0, 2.1.1 and 3.1.0 for `--since 2.1.0` and takes 3.0.0 and 4.0.0;
+  `test_token_migration.MigrationPipeline` checks the report's millisecond delta and its
+  advice for a held colour; `test_figma_sync.DeterministicOutput` runs the drift check on a
+  generated `tokens.css` and on a hand edit. Against `v3.3.0`, 3 fail. Two are controls: a
+  removal in a later major was always taken, and the drift check already worked; it had no
+  test behind the claim. The docs-only fixes have no test.
 - The test-file exemption: `test_audit_design.TestFilesByThePathBelowTheRoot` audits one JSX
   colour under `neutral/` and under `fixtures/test/`, and a `.test.jsx` and a `__mocks__` file as
   the control. Against `v3.3.0`, 1 fails; the control passes there only because this test's

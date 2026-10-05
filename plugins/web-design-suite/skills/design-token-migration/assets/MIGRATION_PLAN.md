@@ -111,7 +111,7 @@ These block Phase 4. Each is a row in `reconciliation.md` and each needs a name 
 
 | # | Decision | Options | Occurrences | Owner | Due |
 |---|---|---|---:|---|---|
-| 1 | `<22px padding>` | `<20px --pad-inline-sm / 24px --pad-card>` | `<n>` | `<name>` | `<date>` |
+| 1 | `<22px padding>` | `<16px --pad-well / 24px --pad-card>` | `<n>` | `<name>` | `<date>` |
 | 2 | `<47px heading>` | `<44px --type-h1 / fluid --text-5xl>` | `<n>` | | |
 | 3 | `<the four near-identical grays>` | `<consolidate to --fg-muted / keep two>` | `<n>` | | |
 | 4 | `<brand accent seed>` | `<derived #xxxxxx / the official brand hex>` | — | | |

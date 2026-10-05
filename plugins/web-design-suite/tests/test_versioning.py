@@ -327,6 +327,29 @@ def multi_line(rule: str) -> str:
     return sel.rstrip() + " {\n" + "".join(f"  {d};\n" for d in decls) + "}"
 
 
+class DeprecateKeepsRemovalsInAMajor(TempDirTest):
+    """LC-A23: deprecation.md puts a removal in X+1.0.0, and deprecate.py took
+    `--removal 2.2.0` for `--since 2.1.0`."""
+
+    def add(self, removal, *extra):
+        return run_py("design-system-versioning", "deprecate", "--ledger", self.tmp / "dep.json",
+                      "add", "--name=--fg-subtle", "--kind", "token", "--since", "2.1.0",
+                      "--removal", removal, "--replacement=--fg-faint", *extra, cwd=self.tmp)
+
+    def test_a_removal_outside_a_major_is_refused(self):
+        for removal in ("2.2.0", "2.1.1", "3.1.0"):
+            with self.subTest(removal=removal):
+                proc = self.add(removal)
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn("3.0.0", output(proc))
+
+    def test_a_removal_in_a_later_major_is_taken(self):
+        for removal in ("3.0.0", "4.0.0"):
+            with self.subTest(removal=removal):
+                self.assertEqual(self.add(removal).returncode, 0)
+        self.assertEqual(self.add("2.2.0", "--force", "--notes", "deliberate").returncode, 0)
+
+
 class DeprecateRewritesAndCountsAColourRename(TempDirTest):
     """LC-A14, the review's `fx/dep/client`: a colour rename beside a
     font-weight, and the scan's labels on one-line rules."""

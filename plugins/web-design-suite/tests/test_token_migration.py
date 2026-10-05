@@ -289,6 +289,21 @@ class MigrationPipeline(TempDirTest):
         self.assertEqual(rule["delta_px"], 1.0, rule)
         self.assertIn("UP to 16px", rule["note"])
 
+    def test_a_duration_moves_by_milliseconds_in_the_report(self):
+        # LC-A23: the review table printed a duration's delta as "-30px".
+        self.write("src/a.css", ".a { transition: opacity 250ms ease; }\n")
+        _, report = self.cluster(self.extract(self.tmp / "src")[0])
+        row = next(l for l in report.splitlines() if l.startswith("| `250ms"))
+        self.assertIn("| -30ms |", row)
+
+    def test_a_held_colour_is_deleted_not_re_pointed(self):
+        # LC-A23: framework-migrations.md says delete a `$brand` variable at the
+        # call sites; the report told the reader to re-point it.
+        self.write("src/a.scss", "$brand: #2f6df6;\n.a { color: $brand; }\n")
+        _, report = self.cluster(self.extract(self.tmp / "src")[0])
+        self.assertNotIn("Point it at the role", report)
+        self.assertIn("delete", report)
+
     def test_the_z_index_note_counts_the_rungs_above_base(self):
         rules = "\n".join(f".z{i} {{ z-index: {v}; }}" for i, v in
                           enumerate((1, 5, 10, 20, 50, 100, 200, 500, 999, 9999)))
