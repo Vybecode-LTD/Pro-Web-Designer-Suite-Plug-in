@@ -145,7 +145,7 @@
 - **A class renamed under CSS Modules was a removed part** (LC-A9). The rendered class is
   hashed, so the doc calls the rename a patch, but the diff reported `part-removed`, major,
   and failed the gate. In a `.module.css` file, a part that went and one that came with the
-  same properties are `part-renamed-local`, a patch; in global CSS they stay major.
+  same declarations are `part-renamed-local`, a patch; in global CSS they stay major.
   change-classification.md §11 now says what an added part is: new surface (Q4), unless it
   wraps existing children (Q3).
 - **A negative cancel pointed at a different token from its padding** (LC-A11). In the
@@ -280,7 +280,11 @@
   densities added and removed, a dark override that crosses 3:1, a local class renamed
   under CSS Modules (with the gate binding), a layer reorder, a system.json from before
   3.4.0, and the vendored token parser. Against `v3.3.0`, 12 fail; 2 are controls (a dark
-  override that resolves as before, and the same rename in global CSS).
+  override that resolves as before, and the same rename in global CSS). Codex's review of
+  #48 found three more, each failing on its head: a re-point equal by default but not
+  under reduced motion was a patch, a root that became a fragment went unreported, and a
+  local rename that also changed a value was paired as a pure rename. system.json's parts
+  now record their declarations (`declares`) so the pairing can compare values.
 - P15 part 1 (LC-A11, LC-A12, LC-A19): `test_token_migration.MigrationPipeline` runs the
   review's `fx/mig2` card through extract, cluster and the codemod, with a child selector
   and a nested rule beside it, and a type tie against a commoner 14px;

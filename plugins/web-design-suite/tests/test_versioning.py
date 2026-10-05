@@ -32,11 +32,13 @@ TOKENS = """\
     --space-6: 1.5rem;
     --density: 1;
     --dur-base: 220ms;
+    --dur-quick: 220ms;
     --bg-canvas: var(--neutral-0);
     --bg-surface: var(--neutral-0);
     --fg-default: var(--neutral-900);
     --fg-muted: var(--neutral-500);
     --pad-card: PAD_CARD;
+    --motion-hover: MOTION;
   }
   [data-theme="dark"] {
     --bg-canvas: var(--neutral-900);
@@ -57,7 +59,7 @@ CARD_CSS = """\
     padding: var(--card-pad);
     background: var(--card-bg);
   }
-  .TITLE { font-weight: 600; color: var(--fg-default); }
+  .TITLE { font-weight: WEIGHT; color: var(--fg-default); }
   .card:hover { --card-bg: var(--bg-canvas); }
 }
 """
@@ -69,13 +71,13 @@ export interface CardProps {
 }
 /** A surface. */
 export function Card({ title }: CardProps) {
-  return <ELEMENT className="card">{title}</ELEMENT>;
+  return RENDER;
 }
 """
 
 V1 = {"pad_card": "calc(var(--space-6) * var(--density))", "dark_extra": "",
       "densities": {"compact": "0.875"}, "reduced": "1ms", "element": "div",
-      "title": "card__title", "module": True,
+      "title": "card__title", "weight": "600", "module": True, "motion": "var(--dur-base)",
       "layers": "reset, tokens, base, components, utilities"}
 
 
@@ -89,16 +91,18 @@ class DiffSystemClassifiesWhatSystemJsonRecords(TempDirTest):
                        for label, value in v["densities"].items())
         tokens = (TOKENS.replace("PAD_CARD", v["pad_card"])
                   .replace("DARK_EXTRA", v["dark_extra"])
-                  .replace("DENSITIES", dens).replace("REDUCED", v["reduced"]))
+                  .replace("DENSITIES", dens).replace("REDUCED", v["reduced"])
+                  .replace("MOTION", v["motion"]))
         self.write(f"{name}/styles/tokens.css", tokens)
         if v["layers"] is not None:
             self.write(f"{name}/styles/index.css",
                        f"@layer {v['layers']};\n@import url(\"tokens.css\");\n")
         css_name = "Card.module.css" if v["module"] else "card.css"
         self.write(f"{name}/src/components/{css_name}",
-                   CARD_CSS.replace("TITLE", v["title"]))
-        self.write(f"{name}/src/components/Card.tsx",
-                   CARD_TSX.replace("ELEMENT", v["element"]))
+                   CARD_CSS.replace("TITLE", v["title"]).replace("WEIGHT", v["weight"]))
+        el = v["element"]
+        render = f'<{el} className="card">{{title}}</{el}>' if el else "<>{title}</>"
+        self.write(f"{name}/src/components/Card.tsx", CARD_TSX.replace("RENDER", render))
         out = root / "system.json"
         proc = run_py("design-system-docs", "extract_system", "styles", "src",
                       "--root", str(root), "--out", str(out), cwd=root)
@@ -145,6 +149,22 @@ class DiffSystemClassifiesWhatSystemJsonRecords(TempDirTest):
         self.assertEqual(change["severity"], "major")
         self.assertEqual(change["component"], "card")
         self.assertEqual((change["before"], change["after"]), ("div", "section"))
+
+    def test_a_root_that_becomes_a_fragment_is_reported(self):
+        # Codex on #48: an undetectable root (a fragment) hid the change.
+        res = self.diff(self.snapshot("v1"), self.snapshot("v2", element=""))
+        change = self.kinds(res).get("element-changed")
+        self.assertIsNotNone(change, res["changes"])
+        self.assertEqual(change["severity"], "major")
+        self.assertEqual(change["before"], "div")
+
+    def test_a_re_point_equal_by_default_but_not_under_reduced_motion_is_major(self):
+        # Codex on #48: 220ms either way, but 1ms against 220ms for reduced motion.
+        res = self.diff(self.snapshot("v1"), self.snapshot("v2", motion="var(--dur-quick)"))
+        change = self.kinds(res).get("tier2-repointed")
+        self.assertIsNotNone(change, res["changes"])
+        self.assertIn("reduced-motion", change["detail"])
+        self.assertEqual(res["bump"]["level"], "major", res["bump"])
 
     def test_the_reviews_v1_to_v3_is_not_a_patch(self):
         res = self.diff(self.snapshot("v1"),
@@ -225,6 +245,14 @@ class DiffSystemClassifiesWhatSystemJsonRecords(TempDirTest):
         proc = run_py("design-system-versioning", "diff_system", old, new,
                       "--deprecations", str(ledger), cwd=self.tmp)
         self.assertEqual(proc.returncode, 0, output(proc))
+
+    def test_a_local_rename_that_also_changes_a_value_is_not_a_patch(self):
+        # Codex on #48: the same properties are not the same rule.
+        res = self.diff(self.snapshot("v1"),
+                        self.snapshot("v2", title="card__heading", weight="700"))
+        kinds = self.kinds(res)
+        self.assertNotIn("part-renamed-local", kinds, res["changes"])
+        self.assertEqual(kinds["part-removed"]["severity"], "major")
 
     def test_the_same_rename_in_global_css_stays_major(self):
         # Control: a global class is a name any consumer can write.

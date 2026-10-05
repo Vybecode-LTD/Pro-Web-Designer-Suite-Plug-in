@@ -1280,8 +1280,11 @@ def build_component(cf: CssFile, cls: str, root: Rule,
                                                "line": r.line, "sets": sets})
         for c in CLASS_RE.findall(sel):
             if c.startswith(cls + "__"):
+                # `declares` (3.4.0) lets diff_system tell a renamed local
+                # class from one renamed and restyled.
                 parts.setdefault(c, {"class": c, "line": r.line,
-                                     "props": sorted(other.keys())})
+                                     "props": sorted(other.keys()),
+                                     "declares": dict(sorted(other.items()))})
         for socket_name, v in sets.items():
             if socket_name in sockets and sel != root.selector:
                 if sel not in sockets[socket_name].repointed_by:
