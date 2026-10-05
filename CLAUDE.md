@@ -14,11 +14,11 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-10-05)
 
-- **Version:** 3.3.0 is the latest release (`v3.3.0`, `88a4886`, published by `release.yml`). Phase 4 (3.4.0) is under way: P9 as #38, P10 as #39 and #40, P11 as #41, P12 part 1 as #42, all merged; `main` is at `a88d6a6`.
+- **Version:** 3.3.0 is the latest release (`v3.3.0`, `88a4886`, published by `release.yml`). Phase 4 (3.4.0) is under way: P9 as #38, P10 as #39 and #40, P11 as #41, P12 as #42 and #44, P13 as #45 and #46, all merged; `main` was at `a47eba5` before the docs PR.
 - **Installed:** 3.3.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** 550. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P12 part 2 (the matrix model and its baseline lifecycle), then P13 (measure_vitals). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 111 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Tests:** 572. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P14 (diff_system's classification), then P15 (the migration tools). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 105 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
