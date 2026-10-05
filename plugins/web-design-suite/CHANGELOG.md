@@ -107,7 +107,9 @@
   a control, since 3.3.0 refused the unknown option. The runtime tests that passed
   `--only CHECK` to a page now leave the other checks out with `--skip`. Codex's review
   of #40 found the dial set on the root alone, which a `<body data-density>` masks: the
-  density test runs both, and fails on the PR's first head. `VitalsUnderCsp`'s control
+  density test runs both, and fails on the PR's first head. CodeRabbit's found that two
+  top regions at different densities skipped one value: a third case, failing on the head
+  before it. `VitalsUnderCsp`'s control
   page now shifts after its first paint, since a shift before it is not counted (it
   failed on a slow macOS runner).
 - P11 (GT-A8, GT-A16, GT-A18): `test_facts.AxeTagAdvice` holds every `--tags` list that
