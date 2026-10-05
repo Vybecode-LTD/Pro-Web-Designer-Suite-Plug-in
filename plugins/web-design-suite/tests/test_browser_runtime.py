@@ -351,16 +351,19 @@ class VitalsMeasures(TempDirTest):
         self.assertGreaterEqual(out["stats"]["tbt"]["median"], 150)
 
     def test_interact_at_clicks_while_the_page_hydrates(self):
-        """The click lands during a 2-second task: its wait is INP's, and the
-        task stays in TBT, since it is the page's own work."""
-        page = ("<button>Buy</button><script>setTimeout(() => { " + self.BUSY.format(ms=2000)
-                + " }, 500);</script>")
+        """The click lands during a 3-second task: its wait is INP's, and the
+        task stays in TBT, since it is the page's own work. The task starts
+        1.5 s in, which leaves a slow runner time to find the button first
+        (at 0.5 s, Windows CI found it only after the task, and missed)."""
+        page = ("<button>Buy</button><script>setTimeout(() => { " + self.BUSY.format(ms=3000)
+                + " }, 1500);</script>")
         out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "button",
-                          "--interact-at", "1200")
+                          "--interact-at", "2500")
+        self.assertLessEqual(out["perRun"][0]["clickedAt"], 2800, "the click came late")
         self.assertGreaterEqual(out["stats"]["inp"]["median"], 500)
         self.assertGreaterEqual(out["stats"]["tbt"]["median"], 1000)
-        # --interact waits for the page to take the click, after the task:
-        # an event under 16 ms is not reported at all, so INP may be n/a.
+        # --interact clicks only when the page takes it, never inside the
+        # task: an event under 16 ms is not reported at all, so INP may be n/a.
         out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "button")
         self.assertLess((out["stats"]["inp"] or {"median": 0})["median"], 200)
         self.assertNotIn("did not match", self.stderr)          # CodeRabbit on #45: it clicked
