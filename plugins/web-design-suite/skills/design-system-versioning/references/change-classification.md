@@ -162,9 +162,9 @@ The part of a design system that nobody remembers is API, until a consumer's sty
 | Remove a part (`__` element) | **major** | Their descendant selector, and their test, match nothing | yes | manual |
 | Add a part | **minor** | Safe, unless a consumer counts children with `> *` or `:nth-child()` | yes | review |
 | Reorder children | **major** | Tab order, `:first-child`, `:nth-child()`, reading order for a screen reader | partial | manual |
-| Change the root element (`div` → `button`) | **major** | Semantics, focusability, default styles, and every `div.card` selector | yes, from the element the props file renders | manual |
+| Change the root element (`div` → `button`, or a fragment) | **major** | Semantics, focusability, default styles, and every `div.card` selector | yes, from the element the props file renders | manual |
 | Rename a class — **global CSS** | **major** | Every consumer selector and snapshot test that named it | yes, as a removed part and an added one | partial codemod |
-| Rename a class — **CSS Modules** | **patch** | Nothing. The generated name was never stable and nobody could write it | yes: in a `.module.css` file, a removed part and an added one with the same properties are paired as `part-renamed-local` | none |
+| Rename a class — **CSS Modules** | **patch** | Nothing. The generated name was never stable and nobody could write it | yes: in a `.module.css` file, a removed part and an added one with the same declarations are paired as `part-renamed-local` | none |
 | Rename the *exported* class key in a module (`styles.card` → `styles.root`) | **major** | That key *is* the API, whatever the hashing does | yes | manual |
 
 **The CSS Modules row is the one worth internalising.** Under global CSS, `.card__title` is a public name the moment it ships: a consumer can write `.card__title { font-size: 12px }` and you cannot stop them. Under CSS Modules the rendered class is `Card_title__a3f9d` and it is not a name anyone can depend on — so renaming the *local* class is invisible, while renaming the key you export (`styles.title`) is exactly as breaking as renaming a prop. The boundary moved; it did not disappear. Know which side of it each name is on before you rename anything.

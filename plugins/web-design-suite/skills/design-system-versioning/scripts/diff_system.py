@@ -681,6 +681,7 @@ class Snapshot:
     layers: List[str] = field(default_factory=list)
     layers_recorded: bool = True                    # False: a system.json from before 3.4.0
     has_components: bool = False
+    _condition_envs: Dict[str, Dict[str, str]] = field(default_factory=dict, repr=False)
 
     def tier(self, name: str) -> int:
         return int(self.tokens.get(name, {}).get("tier", 0))
@@ -726,6 +727,20 @@ class Snapshot:
         ov = _override(tok, "density", density)
         return ov if ov is not None else self.display(name)
 
+    def at_condition(self, name: str, label: str) -> str:
+        """What `name` resolves to for a user with media condition `label`
+        (reduced motion, forced colours): the root values with that
+        condition's overrides on top."""
+        env = self._condition_envs.get(label)
+        if env is None:
+            env = {n: str(t.get("raw", "")) for n, t in self.tokens.items()}
+            for n, tok in self.tokens.items():
+                got = _override(tok, "condition", label)
+                if got is not None:
+                    env[n] = got
+            self._condition_envs[label] = env
+        return str(resolve_display(env.get(name, ""), env).get("display", ""))
+
     def condition_labels(self) -> List[str]:
         return sorted({str(ov.get("label")) for tok in self.tokens.values()
                        for ov in tok.get("overrides", [])
@@ -763,6 +778,7 @@ def _normalize_docs_json(data: Dict[str, Any], label: str, path: str) -> Snapsho
             "line": c.get("line", 0),
             "doc": c.get("doc", ""),
             "element": c.get("element", ""),
+            "prop_file": c.get("prop_file", ""),
             "module": bool(MODULE_FILE.search(str(c.get("file", "")))),
             "sockets": {s["name"]: s for s in c.get("sockets", [])},
             "variants": {v["name"]: v for v in c.get("variants", [])},
@@ -1568,13 +1584,18 @@ def densities_in_both(old: Snapshot, new: Snapshot) -> List[str]:
 
 
 def moves_elsewhere(old: Snapshot, new: Snapshot, name: str) -> List[str]:
-    """Where `name` resolves differently outside the default theme and density."""
+    """Where `name` resolves differently outside the default theme and density:
+    another theme, a density, or a media condition a user can have."""
     out = [f"{theme} {old.display(name, theme)} -> {new.display(name, theme)}"
            for theme in themes_in_both(old, new) if theme != "light"
            and old.display(name, theme) != new.display(name, theme)]
     out += [f"{density} {old.at_density(name, density)} -> {new.at_density(name, density)}"
             for density in densities_in_both(old, new)
             if old.at_density(name, density) != new.at_density(name, density)]
+    for label in sorted(set(old.condition_labels()) | set(new.condition_labels())):
+        before, after = old.at_condition(name, label), new.at_condition(name, label)
+        if before != after:
+            out.append(f"[{label}] {before} -> {after}")
     return out
 
 
@@ -1601,10 +1622,16 @@ def diff_components(old: Snapshot, new: Snapshot, out: List[Change]) -> None:
                           detail=f"{new.components[name].get('file')}"))
     for name in sorted(old_names & new_names):
         a, b = old.components[name], new.components[name]
-        if a.get("element") and b.get("element") and a["element"] != b["element"]:
+        # Only where both snapshots read the props file: there, an empty
+        # element is a root no single tag renders (a fragment), not an unknown.
+        if (a.get("prop_file") and b.get("prop_file")
+                and a.get("element", "") != b.get("element", "")):
+            shown = [f"<{e}>" if e else "(no single root element)"
+                     for e in (a.get("element", ""), b.get("element", ""))]
             out.append(Change(kind="element-changed", subject="element", component=name,
-                              before=str(a["element"]), after=str(b["element"]),
-                              detail=f"<{a['element']}>  ->  <{b['element']}>"))
+                              before=str(a.get("element") or shown[0]),
+                              after=str(b.get("element") or shown[1]),
+                              detail=f"{shown[0]}  ->  {shown[1]}"))
         # Equal in every theme, not only the default one.
         _diff_map(a["sockets"], b["sockets"], name, out, "socket-added",
                   "socket-removed", value=lambda s: str(s.get("default", "")),
@@ -1637,13 +1664,15 @@ def diff_components(old: Snapshot, new: Snapshot, out: List[Change]) -> None:
 
 def local_renames(a: Dict[str, Any], b: Dict[str, Any]) -> List[Tuple[str, str]]:
     """Pairs (old class, new class) under CSS Modules: a part that went and one
-    that came, setting the same properties, each the other's only match. A
-    removal with no such partner is still a removed element."""
-    gone = [k for k in a if k not in b]
-    came = [k for k in b if k not in a]
+    that came, declaring the same properties with the same values, each the
+    other's only match. A removal with no such partner is still a removed
+    element, and so is every part of a snapshot from before 3.4.0, which
+    recorded the properties but not their values."""
+    gone = [k for k in a if k not in b and "declares" in a[k]]
+    came = [k for k in b if k not in a and "declares" in b[k]]
 
-    def shape(part: Dict[str, Any]) -> Tuple[str, ...]:
-        return tuple(sorted(str(p) for p in part.get("props") or []))
+    def shape(part: Dict[str, Any]) -> str:
+        return json.dumps(part.get("declares"), sort_keys=True)
 
     pairs = []
     for old_key in sorted(gone):
