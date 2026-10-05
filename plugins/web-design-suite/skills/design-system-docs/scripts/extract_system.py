@@ -1162,6 +1162,7 @@ class Component:
     doc: str = ""
     element: str = ""
     interactive: bool = False
+    exports_styles: bool = False
     reads_roles: List[str] = field(default_factory=list)
     tier1_reads: List[str] = field(default_factory=list)
     theme_aware: Dict[str, bool] = field(default_factory=dict)
@@ -1280,11 +1281,14 @@ def build_component(cf: CssFile, cls: str, root: Rule,
                                                "line": r.line, "sets": sets})
         for c in CLASS_RE.findall(sel):
             if c.startswith(cls + "__"):
-                # `declares` (3.4.0) lets diff_system tell a renamed local
-                # class from one renamed and restyled.
-                parts.setdefault(c, {"class": c, "line": r.line,
-                                     "props": sorted(other.keys()),
-                                     "declares": dict(sorted(other.items()))})
+                # `declares` (3.4.0), by selector with the class as `&`, from
+                # every rule that styles the part: it lets diff_system tell a
+                # renamed local class from one renamed and restyled.
+                part = parts.setdefault(c, {"class": c, "line": r.line,
+                                            "props": [], "declares": {}})
+                part["props"] = sorted(set(part["props"]) | set(other))
+                key = re.sub(r"\.%s(?![\w-])" % re.escape(c), "&", sel)
+                part["declares"].setdefault(key, {}).update(sorted(other.items()))
         for socket_name, v in sets.items():
             if socket_name in sockets and sel != root.selector:
                 if sel not in sockets[socket_name].repointed_by:
@@ -1400,13 +1404,58 @@ def parse_props_file(path: str, text: str) -> List[Dict[str, Any]]:
                        r"(?:function|const)\s+%s\b" % re.escape(name), text, re.S)
         if fm:
             doc = clean_jsdoc(fm.group(1))
-        element = ""
-        em = re.search(r"return\s*\(?\s*<(\w+)", text[m.end():])
-        if em:
-            element = em.group(1)
         found.append({"component": name, "props": props, "doc": doc,
-                      "element": element, "file": path})
+                      "element": root_element(text, name), "file": path,
+                      "exports_styles": exports_styles(text)})
     return found
+
+
+def root_element(text: str, name: str) -> str:
+    """The tag the component's own body returns first, or "" for a fragment
+    or a body this cannot read. Read from the component, not from the file: a
+    helper declared above it would otherwise lend it the helper's root."""
+    m = re.search(r"\b(?:function|const)\s+%s\b" % re.escape(name), text)
+    if not m:
+        return ""
+    i = text.find("(", m.end())
+    if i < 0:
+        return ""
+    depth, j = 0, i
+    while j < len(text):
+        depth += {"(": 1, ")": -1}.get(text[j], 0)
+        if depth == 0:
+            break
+        j += 1
+    rest = text[j + 1:]
+    arrow = re.match(r"\s*(?::[^={]*)?=>\s*", rest)
+    if arrow:
+        rest = rest[arrow.end():]
+    else:
+        brace = re.match(r"\s*(?::[^{]*)?\{", rest)
+        if not brace:
+            return ""
+        rest = rest[brace.end() - 1:]
+    if rest.startswith("{"):
+        em = re.search(r"\breturn\s*\(?\s*<([A-Za-z][\w.]*)?", rest[:match_brace(rest, 0) + 1])
+    else:
+        em = re.match(r"\(?\s*<([A-Za-z][\w.]*)?", rest)
+    return (em.group(1) or "") if em else ""
+
+
+MODULE_IMPORT_RE = re.compile(
+    r"""import\s+(\w+)\s+from\s+["'][^"']+\.module\.(?:css|scss|sass|less|pcss)["']""")
+
+
+def exports_styles(text: str) -> bool:
+    """Whether the file exports its CSS Modules object, which makes each class
+    key public API: a local rename there is major (change-classification.md §7)."""
+    if re.search(r"""export\s*\{[^}]*\}\s*from\s*["'][^"']+\.module\.\w+["']""", text):
+        return True
+    for name in MODULE_IMPORT_RE.findall(text):
+        if re.search(r"\bexport\s+(?:default\s+%s\b|\{[^}]*\b%s\b[^}]*\}|"
+                     r"(?:const|let|var)\s+\w+\s*=\s*%s\b)" % ((re.escape(name),) * 3), text):
+            return True
+    return False
 
 
 def kebab(name: str) -> str:
@@ -1654,6 +1703,7 @@ class Extractor:
                 comp.props = entry["props"]
                 comp.doc = entry["doc"]
                 comp.element = entry["element"]
+                comp.exports_styles = entry.get("exports_styles", False)
                 comp.prop_file = entry["file"]
                 if comp.element in ("button", "a", "input", "select", "textarea"):
                     comp.interactive = True
@@ -1829,6 +1879,7 @@ class Extractor:
                     "parts": c.parts, "props": c.props,
                     "reads_roles": c.reads_roles,
                     "theme_aware": c.theme_aware,
+                    "exports_styles": c.exports_styles,
                 }
                 for c in self.components
             ],

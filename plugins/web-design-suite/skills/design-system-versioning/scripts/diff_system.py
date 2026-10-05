@@ -780,6 +780,7 @@ def _normalize_docs_json(data: Dict[str, Any], label: str, path: str) -> Snapsho
             "element": c.get("element", ""),
             "prop_file": c.get("prop_file", ""),
             "module": bool(MODULE_FILE.search(str(c.get("file", "")))),
+            "exports_styles": bool(c.get("exports_styles")),
             "sockets": {s["name"]: s for s in c.get("sockets", [])},
             "variants": {v["name"]: v for v in c.get("variants", [])},
             "sizes": {s["name"]: s for s in c.get("sizes", [])},
@@ -1651,7 +1652,9 @@ def diff_components(old: Snapshot, new: Snapshot, out: List[Change]) -> None:
                       sort_keys=True),
                   changed_kind="variant-changed")
         parts_a, parts_b = dict(a["parts"]), dict(b["parts"])
-        if a.get("module") and b.get("module"):
+        # A module whose styles object is exported has made its keys public.
+        if a.get("module") and b.get("module") and not (
+                a.get("exports_styles") or b.get("exports_styles")):
             for gone, came in local_renames(parts_a, parts_b):
                 out.append(Change(kind="part-renamed-local", subject=gone, component=name,
                                   before=gone, after=came,
