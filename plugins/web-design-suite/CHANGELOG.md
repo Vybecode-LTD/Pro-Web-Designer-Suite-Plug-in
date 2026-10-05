@@ -43,6 +43,14 @@
   clicks MS after navigation starts, by the page's own clock, through the browser's input
   pipeline, so the click queues behind the task that holds the main thread, as a user's
   does.
+- **`crux_check.py`: the field against the lab** (GT-B5, GT-C11). perf-budget-gate's
+  trigger for re-deriving a profile, a field p75 more than 1.5× the lab median, had no
+  tool behind it. `crux_check.py` reads the p75 for an origin or a URL from the Chrome UX
+  Report API and holds it against the median in a `measure_vitals.mjs --report` file:
+  LCP, CLS, FCP, TTFB, and INP when the lab drove one. It exits 1 above the ratio and 2
+  when CrUX holds no data. The key comes from `CRUX_API_KEY`, never an argument: `--key`
+  is refused without echoing it, and the key is never printed. `--response FILE` reads a
+  saved response.
 
 ### Fixed
 
@@ -202,6 +210,11 @@
   target or below 0. Against `v3.3.0`, all 5 fail. They pass in Playwright's Chromium and
   in an installed Chrome; a click timed from Node's clock missed the task in Chrome, whose
   cold start delays the request, so `--interact-at` counts from the page's time origin.
+- P13 part 2 (GT-B5, GT-C11): `test_crux_check` reads a response in the shape the CrUX API
+  documents, from a file and from a local server standing in for the API, which records
+  the query: the key in the query string and nowhere in the output, a ratio above and
+  within, a refusal and no data (exit 2), and a key passed as an argument refused. They
+  never touch the network. Against `v3.3.0`, all 5 fail (there was no script).
 
 ## 3.3.0 — 2026-10-04
 

@@ -171,7 +171,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-B2 | — | W11 (3.6.0+) | Authenticated pages. |
 | GT-B3 | — | W11 (3.6.0+) | Shadow DOM. |
 | GT-B4 | — | W11 (3.6.0+) | Multiple URLs and viewports. |
-| GT-B5 | — | W11 (3.6.0+) | The field-data loop. |
+| GT-B5 | — | fixed in 3.4.0: `scripts/crux_check.py` (`test_crux_check`, PR #46) | The field-data loop. |
 | GT-B6 | — | W11 (3.6.0+) | Checks the coverage table lists as automatable but that don't exist. |
 | GT-B7 | — | fixed in 3.4.0: custom states and combinations in PR #42; a fixture's `dir` and `lang`, the `--forced-colors` pass, and what interaction states need, in PR #44 (`test_content_and_a11y.MatrixModel`, `test_browser_runtime.MatrixSeesStateChanges`) | The matrix model. |
 | GT-B8 | — | fixed in 3.4.0: the `workflow_dispatch` recording job and Git LFS past the line, in visual-regression.md §6 and §7; the generator says when a sheet nears it (`test_content_and_a11y.MatrixModel`, PR #44) | The baseline lifecycle. |
@@ -186,7 +186,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-C8 | S · P1 | fixed in 3.2.0, item 13 | Descriptions with a standalone first sentence and a "not for" line. |
 | GT-C9 | M · P1 | W9 (3.5.0) | Plugin components: a `gate-runner` agent, an opt-in PostToolUse hook running a11y_static, user-invoked gate skills. |
 | GT-C10 | M · P1 | W9 (3.5.0) | A `claude plugin eval` suite for the gates, run under WSL2. |
-| GT-C11 | M · P2 | P13 (3.4.0): `crux_check.py`; the `lighthouse` preset, TTFB from CDP and `--interact-at` are done (`test_browser_runtime.VitalsMeasures`, PR #45) | A `lighthouse` throttle preset, TTFB from CDP, `--interact-at MS`, and `crux_check.py`. |
+| GT-C11 | M · P2 | fixed in 3.4.0: the `lighthouse` preset, TTFB from CDP and `--interact-at` in PR #45 (`test_browser_runtime.VitalsMeasures`), `crux_check.py` in PR #46 (`test_crux_check`) | A `lighthouse` throttle preset, TTFB from CDP, `--interact-at MS`, and `crux_check.py`. |
 | GT-C12 | M · P1 | W9 (3.5.0) | One CI template for all three gates in a pinned Playwright container, with a baseline-update job and a tested Windows variant. |
 | GT-C13 | S · P2 | fixed in 3.4.0: `test_browser_scripts.SharedHelpers` (PR #38) | Vendor the shared runtime helpers into each skill as identical copies, with a test that they match. |
 | PS-A1 | high | fixed in 3.1.0 | The deck asserts claims that its own inputs contradict. |

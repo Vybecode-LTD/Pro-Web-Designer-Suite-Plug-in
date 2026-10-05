@@ -1554,6 +1554,18 @@
   "heading": "Web font loading"
  },
  {
+  "from": "perf-budget-gate/scripts/crux_check.py",
+  "to": "perf-budget-gate/references/budgets.md",
+  "section": "1",
+  "heading": "The derivation: from a promise to a number"
+ },
+ {
+  "from": "perf-budget-gate/scripts/crux_check.py",
+  "to": "perf-budget-gate/references/ci-integration.md",
+  "section": "8",
+  "heading": "Closing the loop with field data"
+ },
+ {
   "from": "perf-budget-gate/scripts/measure_vitals.mjs",
   "to": "perf-budget-gate/references/budgets.md",
   "section": "8",

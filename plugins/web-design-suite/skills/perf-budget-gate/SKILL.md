@@ -16,7 +16,7 @@ description: Set web performance budgets and fail the build when they break, wit
 > The commands below are written `python -m scripts.<name>`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (measure_vitals.mjs, perf_audit.py).
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (crux_check.py, measure_vitals.mjs, perf_audit.py).
 
 The suite has a design gate and no performance gate. That asymmetry is exactly how a beautifully-tokenized site ships with a four-second LCP: **the thing that is measured is the thing that gets fixed.**
 
@@ -137,7 +137,7 @@ That last clause is what makes this usable on a legacy codebase. The gate can go
 
 A budget is downstream of a promise. When the promise changes — a new market on worse connections, a decision to support a cheaper device class, a product move from content site to application — **run the arithmetic again from the new target.** Do not adjust the numbers until they feel right; that is how a budget stops meaning anything.
 
-The trigger you will actually hit: **field p75 more than 1.5× your lab median.** That means the lab profile describes a page, device or network your users do not have. `references/ci-integration.md` §8.
+The trigger you will actually hit: **field p75 more than 1.5× your lab median.** That means the lab profile describes a page, device or network your users do not have. `scripts/crux_check.py` checks it; `references/ci-integration.md` §8.
 
 ---
 
@@ -245,6 +245,16 @@ Four things it does that most runtime checks do not:
 **The browser is never downloaded.** It launches with an explicit `executablePath` (`--browser`, else `$PERF_CHROMIUM`, else the first that starts of `/opt/pw-browsers/chromium`, Playwright's own Chromium, an installed Chrome or Edge) and fails with instructions if none of them starts. Install the module with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D -E playwright` to use the Chrome you have. CI pins the browser instead. It installs the Chromium that the locked Playwright was built for, which the script tries first (`references/ci-integration.md` §3).
 
 **Serve the page over HTTP.** `file://` has no network stack — TTFB is ~0, resource priorities do not apply, throttling barely bites, and every number flatters you. The script warns and keeps going if you insist.
+
+---
+
+## `scripts/crux_check.py` — stdlib Python 3, the field check
+
+```bash
+python -m scripts.crux_check --origin https://example.com --lab vitals.json
+```
+
+The Chrome UX Report's field p75 against the lab median in a `measure_vitals.mjs --report` file: LCP, CLS, FCP, TTFB, and INP when the lab drove one. Exit `1` when one is above 1.5× (`--ratio`): re-derive the profile. The key is read from `CRUX_API_KEY`, never an argument. `--response FILE` reads a saved API response.
 
 ---
 

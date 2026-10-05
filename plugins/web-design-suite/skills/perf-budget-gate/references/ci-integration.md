@@ -271,7 +271,18 @@ Everything above gates on a proxy. The thing that actually matters is **p75 of r
 Three habits, in order of value:
 
 1. **Ship a RUM library** (`web-vitals` is ~2 KB) and record LCP, INP and CLS with attribution. Segment by device class, connection and route. This is the only way to know which of your pages is actually slow.
-2. **Check CrUX monthly** for the origin. It is free, it is p75, it is 28-day rolling, and it is what search actually sees.
+2. **Check CrUX monthly** for the origin. It is free, it is p75, it is 28-day rolling, and it is what search actually sees. `crux_check.py` holds it against your lab run, below.
 3. **When lab and field disagree, the field is right.** Your throttle profile, device class or measured page is wrong. Fix the profile — do not argue with the users.
 
 The concrete trigger to re-derive: **field p75 is more than 1.5× your lab median.** That means the lab is measuring a page, a device or a network your users do not have, and every budget downstream of it is aimed at the wrong target. Re-run the derivation in `references/budgets.md` §1 with the device and connection your analytics actually show.
+
+`scripts/crux_check.py` checks that trigger. It reads the p75 for an origin or one URL from the Chrome UX Report API and compares it with the median in a `measure_vitals.mjs --report` file:
+
+```bash
+node scripts/measure_vitals.mjs https://example.com/ --runs 7 --report build/vitals.json
+python -m scripts.crux_check --origin https://example.com --lab build/vitals.json
+```
+
+It compares LCP, CLS, FCP and TTFB, and INP when the lab run drove an interaction (`--interact`); TBT has no field counterpart. It exits 1 when a field p75 is above 1.5× its lab median (`--ratio` changes that), and 2 when CrUX holds no data for the page: too little traffic, so try the origin. `--form-factor` picks PHONE (the default, like measure_vitals' viewport), DESKTOP, TABLET or ALL.
+
+The API key comes from the `CRUX_API_KEY` environment variable, never an argument, which would land in shell history and CI logs; in Actions, a repository secret. `--response FILE` reads a saved response instead of calling the API, for a run with no key or no network.
