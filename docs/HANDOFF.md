@@ -1,43 +1,38 @@
 # Handoff
 
-**2026-10-04**, after P6 (#28, #29), P7 (#31, #32) and their docs PRs were merged into `main`.
+**2026-10-04**, after P8 (#34, #35) and R1 (#36): 3.3.0 is released and installed.
 
-**The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then P8 in detail (hygiene, and docs that work in cmd and PowerShell), then R1, the 3.3.0 release, if the budget allows.
+**The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then Phase 4's first PRs in detail: P9 (one copy of the runtime helpers, and N34) and P10 (a11y_runtime).
 
 ## State
 
-- **3.2.1 is released** (`v3.2.1`, `63932cf`) and installed. 3.3.0 is in progress on `main`, unreleased.
+- **3.3.0 is released.** #36 merged as `88a4886`, tagged `v3.3.0`; `release.yml` published the zip, 13 `.skill` files and `SHA256SUMS`, the repository's first GitHub release. The local marketplace and the plugin cache hold the released 190 files, byte for byte, and `claude plugin details` reports 3.3.0.
 - **Merged this session**, each with CI green on its head, every review thread answered and resolved, and GitHub reporting it clean:
-  - **P6, #28 and #29: the generators reproduce the starter.**
-    - The type scale's default is `--preset studio`, and a step under 11px is refused.
-    - typography.md has the 2.5× fluid-type bound.
-    - The colour generator has `--gamut p3`, `--neutral-hue` and `--anchor-seed`.
-  - **P7 part 1, #31: the contract's missing roles.**
-    - The roles: `--fg-on-success/-warning/-danger`, `--border-invalid` and `--motion-travel-xs/-sm/-md`.
-    - They are in every consumer, and `check_roles.py` holds them (100 pairs).
-    - Invalid fields no longer look focused.
-  - **P7 part 2, #32: the starter's files and comments.**
-    - `utilities.css`, `overrides.css` and `theme-init.js` ship.
-    - The contradicted comments are fixed.
-    - reset.css drops `html:has(:target)` smooth scrolling and uses `svh`.
-- **The reviews found 12 real issues across #28 to #32**: two each on #28 and #29, one on the docs PR #30, six on #31, one on #32. Each code fix has a test that fails on the head it reviewed.
-- **Tests:** 498. **The plan:** 132 open items, all scheduled (`check_execution_plan.py`).
+  - **P8 part 1, #34: hygiene.**
+    - accessibility.md's testing procedure is `accessibility-testing.md`; accessibility.md is 52,963 bytes (was 60,400 against 60,500).
+    - The token contract names `shared/token-contract.md` as the master copy.
+    - `test_docs.Manifests` holds the repository's marketplace to the plugin's.
+    - The review's header points at the inventory; the vanilla stack's rule 4 names the starter's `.stack` (N33).
+  - **P8 part 2, #35: docs that paste into bash, PowerShell and cmd.**
+    - The README installs from GitHub, and gives `WDS` in bash, PowerShell and cmd forms, at the installed version's path.
+    - `python3` and `/tmp/` are gone from the skills' shell fences.
+    - The ESLint config pins `typescript@~6.0` beside typescript-eslint.
+  - **R1, #36:** the version, the README's paths and its `.skill` line, and the CHANGELOG heading.
+- **The reviews found 6 real issues** in #34 to #36: Codex one on #34, CodeRabbit one on #34, three on #35 (the fence reader, continued installs, `python3` at a line's end), one on #36. Each code fix has a test that fails on the head it reviewed. Two suggestions were declined with reasons in their threads.
+- **Tests:** 513. **The plan:** 124 open items, all scheduled (`check_execution_plan.py`).
 
 ## Next steps
 
-1. **The next session:** P8 (XC-A2, XC-A5, XC-B5, XC-C9, N4, N7, N8, N9, N10).
-2. Then R1, the 3.3.0 release, then Phase 4 (3.4.0).
+1. **The next session:** P9 (GT-C13, N34), then P10 (GT-A5, GT-A14, GT-C2, SB-B3).
+2. Then the rest of Phase 4 (P11 to P23), and R2, the 3.4.0 release.
 
 ## Warnings
 
-- **accessibility.md is 60,400 bytes against a 60,500 limit.** N4, in P8, splits it. Until then, any addition there needs a trim.
-- **Two findings are not yet items:**
-  - `--warning-700`, `--danger-100` and `--info-100` fall outside Display P3;
-  - stack-vanilla-css.md prefixes layout primitives `.l-stack`, where the starter's are `.stack`.
-- **The gate still clips.** `check_roles.py` measures a colour outside sRGB with its channels clipped, while the ramp report takes the worse of clipping and chroma reduction.
-- **`check_roles.py` now requires the new roles.** A `tokens.css` without them exits 2 (the CHANGELOG's Upgrading section says so).
-- **Resolve only the threads you answered.** A resolve-all loop on #31 closed two unread findings.
-- **The full local suite can pass 20 minutes** when other projects load the machine. Give a background `check.py` `timeout` 3600000.
+- **N34: the release build is byte-identical only with the same zlib.** Windows' Python 3.14 deflates with zlib-ng, the CI's with zlib, so a local build's checksums never match the release's. Compare archives by content (names, CRCs, uncompressed sizes, dates, modes) until P9 gives the builder that comparison.
+- **The README's `WDS` paths name the version.** A release PR updates them with `plugin.json`; `test_docs.PasteableCommands` fails until it does.
+- **`fail_before.py` swaps the plugin, not the tests.** A fix to test code shows as a control there; show it failing by running the new assertions against the old file (`git show COMMIT:path/to/file`, with the reviewed head and the file's path in place of the two placeholders), as this session did.
+- **Still open from earlier:** `--warning-700`, `--danger-100` and `--info-100` fall outside Display P3; `check_roles.py` measures a colour outside sRGB with its channels clipped.
+- **Resolve only the threads you answered,** and give a background `check.py` `timeout` 3600000.
 - **The token counter resets** on a user message and on a `<ci-monitor-event>`: keep a running total.
-- **Bash heredocs eat backslashes**, and **don't grep `tooling/`**.
+- **Bash heredocs eat backslashes** (twice this session), and **don't grep `tooling/`**.
 - **The repository is public.** Commit nothing private.
