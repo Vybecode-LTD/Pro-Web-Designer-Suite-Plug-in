@@ -1,6 +1,6 @@
 {
   "name": "web-design-suite",
-  "version": "3.2.1",
+  "version": "3.3.0",
   "description": "Thirteen skills for designing and building websites that stay coherent under multiple developers. A closed token system with obsessive spacing discipline, one styling home per component, cascade layers instead of specificity fights, WCAG 2.2 AA contrast that is measured rather than assumed, a gated protocol for inventing new interaction patterns, and runnable validators that fail the build on drift. Covers the whole arc: migrating an inherited codebase onto tokens, syncing with Figma, designing and building, turning a database schema into screens, writing pages that convert, compiling the same tokens to HTML email, proving every state renders, guarding performance budgets, generating documentation that cannot drift, gating accessibility at runtime, versioning the system so changes do not break its consumers, an adversarial critique, and building the client presentation that argues the decisions.",
   "author": {
     "name": "Big Haas",

@@ -89,9 +89,10 @@ The repository is public, so this works for anyone. To install from a release zi
 instead, unpack it and add the unpacked `web-design-suite` folder, the one that holds
 `.claude-plugin/marketplace.json`, in place of the repository's name.
 
-**As individual skills** — a skill folder can be installed on its own, but eight of
-them run web-design-studio's `audit_design.py` as their gate, so install
-web-design-studio beside any of them. (No packaged `.skill` files ship yet.)
+**As individual skills** — from 3.3.0, each GitHub release attaches one `.skill` file
+per skill, packaged as Anthropic's skill-creator packages one, and a skill folder can be
+installed on its own too. Eight of them run web-design-studio's `audit_design.py` as
+their gate, so install web-design-studio beside any of them.
 
 **As a repo** — extract `skills/web-design-studio/assets/starter/styles/` into your project, wire the configs from `assets/configs/`, and point Claude Code at it.
 
@@ -112,9 +113,9 @@ folder. Set `WDS` once per terminal, in your shell's form (with the version you 
 
 | Shell | Set it once | Then |
 |---|---|---|
-| bash, zsh, Git Bash | `WDS="$HOME/.claude/plugins/cache/web-design-suite/web-design-suite/3.2.1/skills"` | paste the commands as they are |
-| PowerShell | `$WDS = "$HOME/.claude/plugins/cache/web-design-suite/web-design-suite/3.2.1/skills"` | paste the commands as they are |
-| cmd | `set "WDS=%USERPROFILE%/.claude/plugins/cache/web-design-suite/web-design-suite/3.2.1/skills"` | write `%WDS%` where a command says `$WDS` |
+| bash, zsh, Git Bash | `WDS="$HOME/.claude/plugins/cache/web-design-suite/web-design-suite/3.3.0/skills"` | paste the commands as they are |
+| PowerShell | `$WDS = "$HOME/.claude/plugins/cache/web-design-suite/web-design-suite/3.3.0/skills"` | paste the commands as they are |
+| cmd | `set "WDS=%USERPROFILE%/.claude/plugins/cache/web-design-suite/web-design-suite/3.3.0/skills"` | write `%WDS%` where a command says `$WDS` |
 
 Each command below is one line, and `"$WDS/…"` is all the shell expands, which bash
 and PowerShell do the same way. (The skills' own docs write commands for bash, which

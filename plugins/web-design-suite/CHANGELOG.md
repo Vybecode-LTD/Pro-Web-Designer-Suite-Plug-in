@@ -1,6 +1,16 @@
 # Changelog
 
-## 3.3.0 — unreleased
+## 3.3.0 — 2026-10-04
+
+Phase 3 of the plan: safe defaults and one set of rules. The audit, stylelint and ESLint
+read one spec, `design-rules.json`: a tool writes its data into each gate, and the three
+agree on every example in it. CI runs the suite on Windows, Linux and macOS at Python
+3.9 and 3.14, and a pushed tag builds the release, which attaches the plugin's zip and
+one `.skill` file per skill for the first time. The generators reproduce the starter's
+type scale and colour ramps, the contract has the roles its references needed, and the
+README's commands paste into bash, PowerShell and cmd. Every fix has a regression test
+that fails on 3.2.1, or on the head a review found it on
+(`python -B -m unittest discover -s tests`: 513 tests).
 
 ### Fixed
 
