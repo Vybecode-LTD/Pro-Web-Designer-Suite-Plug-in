@@ -111,6 +111,8 @@ Pick each gap with the procedure in `references/spacing-system.md` §6. Say out 
 python -m scripts.audit_design src/ --strict
 ```
 
+On the built page, `a11y-audit-runner`'s `a11y_runtime.mjs` tabs through it and measures the focus ring in normal and forced colours at each density the stylesheets name.
+
 Then run `references/review-checklist.md` top to bottom: 91 checks across tokens, spacing, architecture, type, color, responsive, states, accessibility, motion, performance, content and handoff. A failed check is fixed **at the system level** — a token, a primitive, a role — never patched locally. A local patch is precisely how the drift starts.
 
 ### Phase 6 — Handoff

@@ -2,6 +2,18 @@
 
 ## 3.4.0 — unreleased
 
+### Added
+
+- **The focus ring is measured at every density** (SB-B3). On a page, a11y_runtime
+  measures the ring again at each `data-density` value the page's own stylesheets name,
+  in normal colours and under forced colours, since the density dial rescales the
+  padding that keeps a ring clear of an `overflow: hidden` toolbar. It turns the dial
+  where the page keeps it: on the root, or on the outermost `data-density` below it, such
+  as `<body>`; a region marked inside another keeps its own. A finding names its
+  density; `--densities LIST` names them by hand, and `none` turns it off. web-design-
+  studio's Phase 5 runs it on the built page, and review-checklist 8.2 and 8.9 say what
+  it measures and what is still by eye.
+
 ### Fixed
 
 - **A loading spinner counted as a focus ring** (GT-A14 (a)). a11y_runtime shortened
@@ -28,6 +40,9 @@
   shell) wraps Tab from the last stop to the first inside the page, so on a page with one
   stop, focus stayed put, and a11y_runtime reported `focus-stuck` (2.1.2) as an error.
   There, focus that stays put is a trap only if the page cancelled the key.
+- **`--only` on a page was ignored.** It narrows a proof sheet's cells and never picked
+  checks, so `a11y_runtime.mjs --file page.html --only contrast` ran every check. A page
+  now refuses it, with exit 2 and a pointer to `--skip`.
 
 ### Changed
 
@@ -66,6 +81,18 @@
   - Codex found the first-legend exception, now in the disabled-controls test.
   - CodeRabbit found that a bypass in measure_vitals would run a script the CSP blocks:
     `VitalsUnderCsp` measures such a script's layout shift as none.
+- P10 part 2 (SB-B3): `test_browser_runtime.test_the_focus_ring_is_measured_at_each_density_the_page_declares`
+  runs a toolbar whose ring is clipped at compact and is a box-shadow at spacious, then
+  again with `--densities none`; `test_browser_scripts.RuntimeArguments` refuses `--only`
+  on a page and a bad `--densities`. Against `v3.3.0`, 2 fail; the `--densities` test is
+  a control, since 3.3.0 refused the unknown option. The runtime tests that passed
+  `--only CHECK` to a page now leave the other checks out with `--skip`. Codex's review
+  of #40 found the dial set on the root alone, which a `<body data-density>` masks: the
+  density test runs both, and fails on the PR's first head. CodeRabbit's found that two
+  top regions at different densities skipped one value: a third case, failing on the head
+  before it. `VitalsUnderCsp`'s control
+  page now shifts after its first paint, since a shift before it is not counted (it
+  failed on a slow macOS runner).
 
 ## 3.3.0 — 2026-10-04
 

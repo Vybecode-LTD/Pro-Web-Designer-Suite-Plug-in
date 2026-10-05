@@ -121,7 +121,7 @@ node scripts/a11y_runtime.mjs --matrix build/proof-sheet.html
 
 A page-level audit sees each component in exactly one state: whatever it happened to be rendered in. The `component-state-matrix` proof sheet renders every component at every state × density × theme with a stable `data-cell-id` per cell, and this reads that sheet directly.
 
-The payoff is specific and large. **A focus ring can be present in light and absent in dark, present at comfortable density and clipped at compact, present on the default variant and invisible on the primary fill.** Every one of those passes a page-level audit. On the fixture built for this skill — a `.button` whose ring is `box-shadow` only, and a `.chip` whose ring pairs the shadow with a transparent outline — the matrix pass reported **24 of 34 measured rings disappearing in forced-colors**: every single button cell, and not one chip cell. No page audit would have found more than one of them.
+The payoff is specific and large. **A focus ring can be present in light and absent in dark, present at comfortable density and clipped at compact, present on the default variant and invisible on the primary fill.** A page-level audit measures the ring at each density the page's stylesheets name (`--densities`), but it sees one theme and the variants that page happens to show. On the fixture built for this skill — a `.button` whose ring is `box-shadow` only, and a `.chip` whose ring pairs the shadow with a transparent outline — the matrix pass reported **24 of 34 measured rings disappearing in forced-colors**: every single button cell, and not one chip cell. No page audit would have found more than one of them.
 
 ### 4. Run the human pass — `references/manual-protocol.md`
 

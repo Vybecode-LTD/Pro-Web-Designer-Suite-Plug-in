@@ -64,7 +64,8 @@ node scripts/a11y_runtime.mjs --file dist/index.html --tags wcag2a,wcag2aa,wcag2
 | `--tags LIST` | axe tag set (default `wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice`) |
 | `--keymap FILE` | expected keyboard behaviour per pattern |
 | `--budget FILE` | counter limits, as JSON `{"key": limit}`; non-zero exit on breach, and an unknown key exits 2. Keys: `axe_violations`, `axe_serious`, `axe_incomplete`, `unnamed_controls`, `duplicate_names`, `tab_traps`, `unreachable_controls`, `focus_invisible`, `focus_weak`, `forced_colors_lost`, `contrast_failures`, `reflow_failures`, `keymap_failures` |
-| `--only SUBSTR` | with `--matrix`, narrow to matching cells (repeatable) |
+| `--only SUBSTR` | with `--matrix`, narrow to matching cells (repeatable). It does not pick checks, so a page refuses it: use `--skip` |
+| `--densities LIST` | on a page, the `data-density` values to measure focus at as well, in normal and forced colours (default `auto`: each one the page's own stylesheets name; `none` turns it off) |
 | `--skip CHECK` | `axe names taborder focus forced contrast keys reflow` (repeatable) |
 | `--max-stops` · `--max-cells` · `--focus-threshold` · `--viewport` · `--dpr` · `--axe` · `--browser` · `--json` · `--quiet` | |
 
