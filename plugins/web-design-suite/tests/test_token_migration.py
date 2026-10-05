@@ -643,6 +643,12 @@ class LifecycleDocClaims(unittest.TestCase):
         self.assertNotIn("git commit -am", procedure)
         self.assertEqual(procedure.count("git commit"), 1)
 
+    def test_the_deprecated_gate_is_the_lint_rule_not_tsc(self):
+        text = (SKILLS / "design-system-versioning" / "references" / "deprecation.md").read_text(
+            encoding="utf-8")
+        self.assertIn("@typescript-eslint/no-deprecated", text)
+        self.assertNotRegex(text, r"surfaced by[^.]*`tsc`")
+
     def test_the_algorithm_count_matches_its_table(self):
         text = (SKILLS / "design-token-migration" / "SKILL.md").read_text(encoding="utf-8")
         m = re.search(r"(\w+) separate algorithms[^\n]*\n\n(\|.*?)\n\n", text, re.S)

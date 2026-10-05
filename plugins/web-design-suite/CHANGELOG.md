@@ -275,8 +275,8 @@
   (`test_one_colour_in_two_kinds_of_holder_gets_both_kinds_of_advice`).
   `test_token_migration.LifecycleDocClaims` holds the doc fixes: a breaking announcement
   names a major and its guide, and the upgrade commits once; the algorithm count matches
-  its table; and MIGRATION_PLAN's tokens are the sizes it gives them. Against `v3.3.0`, all
-  3 fail.
+  its table; MIGRATION_PLAN's tokens are the sizes it gives them; and deprecation.md names
+  the lint rule, not `tsc`, as the gate for `@deprecated`. Against `v3.3.0`, all 4 fail.
 - P16 (LC-C3, LC-A22): `test_figma_sync.FigmaCommon` reads a REST export (one with a
   variable whose collection is missing), a plugin export, a two-mode records export and a
   DTCG file through both scripts and holds them to one result, and checks that neither
