@@ -802,6 +802,11 @@
   to the plugin's in every field but `source`, with a planted difference as its positive
   control. Against `v3.2.1`, 2 fail; the other 5 are controls (the copies, the deck's
   tokens and the two manifests agree today).
+  Codex's review of #34 added one: under `WDS_PLUGIN_ROOT`, the manifest test compared
+  another copy's marketplace with this checkout's, so an older release's legitimate
+  drift failed it. It now compares only this repository's own plugin
+  (`test_a_copy_elsewhere_is_not_held_to_this_repository`; the old test fails on a
+  copy with another description).
 
 ## 3.2.1 — 2026-09-25
 

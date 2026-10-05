@@ -325,16 +325,36 @@ def manifest_differences(ours: dict, theirs: dict) -> list[str]:
     return found
 
 
+def repository_marketplace(plugin, repo):
+    """The repository's marketplace when `plugin` is this repository's own
+    plugin folder. None for a copy elsewhere, such as an older release under
+    WDS_PLUGIN_ROOT, whose metadata may differ legitimately."""
+    market = repo / ".claude-plugin" / "marketplace.json" if repo else None
+    if not (market and market.is_file()):
+        return None
+    return market if (repo / "plugins" / "web-design-suite").resolve() == plugin.resolve() else None
+
+
 class Manifests(unittest.TestCase):
     """P8 (N9): the repository's marketplace and the plugin's own describe the
     same plugin. Nothing compared them, and the root copy is the one GitHub
     users add."""
 
     PLUGIN_MARKET = PLUGIN / ".claude-plugin" / "marketplace.json"
-    REPO_MARKET = REPO / ".claude-plugin" / "marketplace.json" if REPO else None
+    REPO_MARKET = repository_marketplace(PLUGIN, REPO)
 
     def load(self, path):
         return json.loads(path.read_text(encoding="utf-8"))
+
+    def test_a_copy_elsewhere_is_not_held_to_this_repository(self):
+        """Codex on #34: with WDS_PLUGIN_ROOT on another release, that copy's
+        manifest was compared with this checkout's."""
+        if not (REPO and (REPO / ".claude-plugin" / "marketplace.json").is_file()):
+            self.skipTest("the tests are not inside the repository")
+        self.assertEqual(REPO / ".claude-plugin" / "marketplace.json",
+                         repository_marketplace(REPO / "plugins" / "web-design-suite", REPO))
+        self.assertIsNone(repository_marketplace(REPO / "plugins" / "web-design-suite" / "skills", REPO))
+        self.assertIsNone(repository_marketplace(PLUGIN, None))
 
     def test_the_comparison_sees_a_difference(self):
         ours = self.load(self.PLUGIN_MARKET)
@@ -346,7 +366,7 @@ class Manifests(unittest.TestCase):
 
     def test_the_repositorys_marketplace_matches_the_plugins(self):
         if not (self.REPO_MARKET and self.REPO_MARKET.is_file()):
-            self.skipTest("the plugin is not inside its repository")
+            self.skipTest("the plugin under test is not this repository's own")
         ours, theirs = self.load(self.PLUGIN_MARKET), self.load(self.REPO_MARKET)
         self.assertEqual([], manifest_differences(ours, theirs))
         self.assertEqual(["./"], [p["source"] for p in ours["plugins"]])
