@@ -675,9 +675,11 @@ class Snapshot:
     source: str                                     # system.json | tokens.css
     impl: str                                       # how it was read
     themes: List[str] = field(default_factory=list)
+    densities: List[str] = field(default_factory=list)
     tokens: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     components: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     layers: List[str] = field(default_factory=list)
+    layers_recorded: bool = True                    # False: a system.json from before 3.4.0
     has_components: bool = False
 
     def tier(self, name: str) -> int:
@@ -713,11 +715,33 @@ class Snapshot:
                 return str(ov.get("value", ""))
         return str(tok.get("raw", ""))
 
+    def at_density(self, name: str, density: str) -> str:
+        """What `name` resolves to under [data-density=density]: the resolved
+        density map when the snapshot has one, else the declared override,
+        else the default density's value."""
+        tok = self.tokens.get(name, {})
+        got = (tok.get("density") or {}).get(density)
+        if got is not None:
+            return str(got)
+        ov = _override(tok, "density", density)
+        return ov if ov is not None else self.display(name)
+
+    def condition_labels(self) -> List[str]:
+        return sorted({str(ov.get("label")) for tok in self.tokens.values()
+                       for ov in tok.get("overrides", [])
+                       if ov.get("context") == "condition"})
+
+
+MODULE_FILE = re.compile(r"\.module\.(?:css|scss|sass|less|pcss)$", re.I)
+
 
 def _normalize_docs_json(data: Dict[str, Any], label: str, path: str) -> Snapshot:
     snap = Snapshot(label=label, path=path, source="system.json",
                     impl="design-system-docs/system.json",
-                    themes=list(data.get("themes") or ["light"]))
+                    themes=list(data.get("themes") or ["light"]),
+                    densities=list(data.get("densities") or []),
+                    layers=list(data.get("layers") or []),
+                    layers_recorded="layers" in data)
     for t in data.get("tokens", []):
         snap.tokens[t["name"]] = {
             "tier": t.get("tier", 0),
@@ -729,6 +753,7 @@ def _normalize_docs_json(data: Dict[str, Any], label: str, path: str) -> Snapsho
             "referenced_by": list(t.get("referenced_by") or []),
             "overrides": list(t.get("overrides") or []),
             "resolved": dict(t.get("resolved") or {}),
+            "density": dict(t.get("density") or {}),
             "file": t.get("file", ""),
             "line": t.get("line", 0),
         }
@@ -738,6 +763,7 @@ def _normalize_docs_json(data: Dict[str, Any], label: str, path: str) -> Snapsho
             "line": c.get("line", 0),
             "doc": c.get("doc", ""),
             "element": c.get("element", ""),
+            "module": bool(MODULE_FILE.search(str(c.get("file", "")))),
             "sockets": {s["name"]: s for s in c.get("sockets", [])},
             "variants": {v["name"]: v for v in c.get("variants", [])},
             "sizes": {s["name"]: s for s in c.get("sizes", [])},
@@ -842,6 +868,23 @@ def _snapshot_from_css_vendored(paths: List[Path], label: str) -> Snapshot:
         got = tok["resolved"].get("light", {})
         tok["kind"] = ("color" if "hex" in got else
                        "length" if "px" in got else "other")
+    # Each density is the default environment plus its own overrides, recorded
+    # only where it differs, as design-system-docs records it.
+    for name, tok in snap.tokens.items():
+        tok["density"] = {}
+        for ov in tok["overrides"]:
+            if ov["context"] == "density" and ov["label"] not in snap.densities:
+                snap.densities.append(ov["label"])
+    for density in snap.densities:
+        env = dict(base)
+        for name, tok in snap.tokens.items():
+            got = _override(tok, "density", density)
+            if got is not None:
+                env[name] = got
+        for name, tok in snap.tokens.items():
+            shown = resolve_display(env.get(name, tok["raw"]), env).get("display", "")
+            if shown != tok["resolved"].get("light", {}).get("display", ""):
+                tok["density"][density] = shown
     for name, tok in snap.tokens.items():
         for ref in tok["references"]:
             if ref in snap.tokens and name not in snap.tokens[ref]["referenced_by"]:
@@ -965,8 +1008,10 @@ KINDS: Dict[str, Kind] = {k.id: k for k in [
       "Exactly a re-point, scoped to one theme. Consumers in that theme render "
       "differently; consumers in the other notice nothing, which is why this one "
       "reaches production.", "auto", "review", False),
-    K("theme-override-added", "minor", "Theme re-point added",
-      "A role that did not vary by theme now does. Additive in the default theme.",
+    K("theme-override-added", "major", "Theme re-point added",
+      "A role that followed its root value in that theme now has its own. "
+      "Additive in the default theme, and a re-point in that one: its consumers "
+      "render differently. A patch when it resolves to what it did.",
       "auto", "review", False),
     K("theme-override-removed", "major", "Theme re-point removed",
       "The role falls back to its root value in that theme. Usually a dark-mode "
@@ -976,6 +1021,19 @@ KINDS: Dict[str, Kind] = {k.id: k for k in [
     K("theme-removed", "major", "Theme removed",
       "Every consumer setting data-theme to it silently renders the default.",
       "auto", "manual", True),
+    K("density-changed", "major", "Density scale changed",
+      "Every spacing role at that density moves. Nothing errors; the compact "
+      "view simply packs differently. A patch when nothing resolves differently.",
+      "auto", "review", False),
+    K("density-added", "minor", "Density added",
+      "Nobody's current density changed.", "auto", "none", False),
+    K("density-removed", "major", "Density removed",
+      "Every consumer setting data-density to it silently renders the default "
+      "density.", "auto", "manual", True),
+    K("condition-changed", "major", "Media-condition override changed",
+      "A render change for every user with that setting: reduced motion, forced "
+      "colours, more contrast. The users least able to absorb a surprise, and "
+      "nobody reviewing without the setting sees it.", "auto", "review", False),
     # --- Tier 3 / components ----------------------------------------------
     K("socket-added", "minor", "Tier-3 socket added",
       "New public CSS API with a default that reproduces today's rendering.",
@@ -1024,6 +1082,13 @@ KINDS: Dict[str, Kind] = {k.id: k for k in [
       "Descendant selectors and test queries written against it break, even "
       "though nothing visual changed and nothing type-checks differently.",
       "auto", "manual", True),
+    K("part-renamed-local", "patch", "Local class renamed (CSS Modules)",
+      "The rendered class is hashed, so no consumer could write the old name. "
+      "Major after all if the component exports its styles object: then the "
+      "key is the API.", "auto", "none", False),
+    K("element-changed", "major", "Root element changed",
+      "Semantics, focusability, default styles, and every `div.card` selector "
+      "a consumer wrote.", "auto", "manual", False),
     K("prop-added-optional", "minor", "Optional prop added",
       "Existing call sites still compile.", "auto", "none", False),
     K("prop-added-required", "major", "Required prop added",
@@ -1372,11 +1437,16 @@ def diff_tokens(old: Snapshot, new: Snapshot, out: List[Change],
                 changed_values.add(name)
                 out.append(ch)
             else:
-                same = not base_moved
+                # Equal means equal everywhere: 24px at the default density
+                # and 21px against 24px at compact is a re-point (§11 Q2).
+                elsewhere = moves_elsewhere(old, new, name)
+                same = not base_moved and not elsewhere
+                detail = f"{told.get('raw')}  ->  {tnew.get('raw')}"
+                if elsewhere:
+                    detail += "; " + "; ".join(elsewhere)
                 ch = Change(kind="tier2-repointed-equal" if same else "tier2-repointed",
                             subject=name, before=old.display(name),
-                            after=new.display(name),
-                            detail=f"{told.get('raw')}  ->  {tnew.get('raw')}")
+                            after=new.display(name), detail=detail)
                 if not same:
                     ch.blast = downstream(old, new, name)
                     changed_values.add(name)
@@ -1429,14 +1499,94 @@ def diff_tokens(old: Snapshot, new: Snapshot, out: List[Change],
         if theme not in new.themes:
             out.append(Change(kind="theme-removed", subject=theme))
 
+    diff_densities(old, new, out)
+    diff_conditions(old, new, out)
     return rename, changed_values
 
 
-def _theme_override(tok: Dict[str, Any], theme: str) -> Optional[str]:
+def diff_densities(old: Snapshot, new: Snapshot, out: List[Change]) -> None:
+    """Density overrides on names that survive, per density in both versions.
+
+    An added, changed or removed override is one change, major unless nothing
+    resolves differently at that density. The roles that move with it (a
+    padding that multiplies --density) are its blast radius, quoted in the
+    detail, not changes of their own.
+    """
+    both = set(old.tokens) & set(new.tokens)
+    for density in densities_in_both(old, new):
+        for name in sorted(both):
+            a = _override(old.tokens[name], "density", density)
+            b = _override(new.tokens[name], "density", density)
+            if a == b:
+                continue
+            before = old.at_density(name, density)
+            after = new.at_density(name, density)
+            blast = downstream(old, new, name)
+            moved = [f"{n} {old.at_density(n, density)} -> {new.at_density(n, density)}"
+                     for n in blast.get("roles", []) + blast.get("transitive", [])
+                     if n in both and old.at_density(n, density) != new.at_density(n, density)]
+            detail = (f"[data-density=\"{density}\"]  {a or '(inherits root)'}"
+                      f"  ->  {b or '(inherits root)'}")
+            if moved:
+                detail += "; moves " + ", ".join(moved)
+            severity = "patch" if before == after and not moved else ""
+            ch = Change(kind="density-changed", subject=name, severity=severity,
+                        before=before, after=after, detail=detail)
+            if not severity:
+                ch.blast = blast
+            out.append(ch)
+    for density in new.densities:
+        if density not in old.densities:
+            out.append(Change(kind="density-added", subject=density))
+    for density in old.densities:
+        if density not in new.densities:
+            out.append(Change(kind="density-removed", subject=density))
+
+
+def diff_conditions(old: Snapshot, new: Snapshot, out: List[Change]) -> None:
+    """Overrides under a media condition (reduced motion, forced colours, more
+    contrast), on names that survive. A condition is not opted into the way a
+    theme is: every user with the setting gets it, so an added one is as much
+    a render change as an edited one."""
+    both = set(old.tokens) & set(new.tokens)
+    labels = sorted(set(old.condition_labels()) | set(new.condition_labels()))
+    for label in labels:
+        for name in sorted(both):
+            a = _override(old.tokens[name], "condition", label)
+            b = _override(new.tokens[name], "condition", label)
+            if a == b:
+                continue
+            out.append(Change(
+                kind="condition-changed", subject=name,
+                before=a if a is not None else f"{old.display(name)} (root)",
+                after=b if b is not None else f"{new.display(name)} (root)",
+                detail=f"[{label}]  {a or '(inherits root)'}  ->  {b or '(inherits root)'}"))
+
+
+def densities_in_both(old: Snapshot, new: Snapshot) -> List[str]:
+    return [d for d in new.densities if d in old.densities]
+
+
+def moves_elsewhere(old: Snapshot, new: Snapshot, name: str) -> List[str]:
+    """Where `name` resolves differently outside the default theme and density."""
+    out = [f"{theme} {old.display(name, theme)} -> {new.display(name, theme)}"
+           for theme in themes_in_both(old, new) if theme != "light"
+           and old.display(name, theme) != new.display(name, theme)]
+    out += [f"{density} {old.at_density(name, density)} -> {new.at_density(name, density)}"
+            for density in densities_in_both(old, new)
+            if old.at_density(name, density) != new.at_density(name, density)]
+    return out
+
+
+def _override(tok: Dict[str, Any], context: str, label: str) -> Optional[str]:
     for ov in tok.get("overrides", []):
-        if ov.get("context") == "theme" and ov.get("label") == theme:
+        if ov.get("context") == context and ov.get("label") == label:
             return str(ov.get("value"))
     return None
+
+
+def _theme_override(tok: Dict[str, Any], theme: str) -> Optional[str]:
+    return _override(tok, "theme", theme)
 
 
 def diff_components(old: Snapshot, new: Snapshot, out: List[Change]) -> None:
@@ -1451,9 +1601,14 @@ def diff_components(old: Snapshot, new: Snapshot, out: List[Change]) -> None:
                           detail=f"{new.components[name].get('file')}"))
     for name in sorted(old_names & new_names):
         a, b = old.components[name], new.components[name]
+        if a.get("element") and b.get("element") and a["element"] != b["element"]:
+            out.append(Change(kind="element-changed", subject="element", component=name,
+                              before=str(a["element"]), after=str(b["element"]),
+                              detail=f"<{a['element']}>  ->  <{b['element']}>"))
+        # Equal in every theme, not only the default one.
         _diff_map(a["sockets"], b["sockets"], name, out, "socket-added",
                   "socket-removed", value=lambda s: str(s.get("default", "")),
-                  resolved=lambda s: str((s.get("resolved") or {}).get("light", "")),
+                  resolved=lambda s: json.dumps(s.get("resolved") or {}, sort_keys=True),
                   changed_kind="socket-default-changed",
                   equal_kind="socket-default-equal")
         _diff_map(a["variants"], b["variants"], name, out, "variant-added",
@@ -1468,8 +1623,35 @@ def diff_components(old: Snapshot, new: Snapshot, out: List[Change]) -> None:
                       {"sets": s.get("sets", {}), "declares": s.get("declares", {})},
                       sort_keys=True),
                   changed_kind="variant-changed")
-        _diff_map(a["parts"], b["parts"], name, out, "part-added", "part-removed")
+        parts_a, parts_b = dict(a["parts"]), dict(b["parts"])
+        if a.get("module") and b.get("module"):
+            for gone, came in local_renames(parts_a, parts_b):
+                out.append(Change(kind="part-renamed-local", subject=gone, component=name,
+                                  before=gone, after=came,
+                                  detail=f"{b.get('file')}: .{gone} -> .{came}, "
+                                         f"the same declarations"))
+                del parts_a[gone], parts_b[came]
+        _diff_map(parts_a, parts_b, name, out, "part-added", "part-removed")
         _diff_props(a["props"], b["props"], name, out)
+
+
+def local_renames(a: Dict[str, Any], b: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """Pairs (old class, new class) under CSS Modules: a part that went and one
+    that came, setting the same properties, each the other's only match. A
+    removal with no such partner is still a removed element."""
+    gone = [k for k in a if k not in b]
+    came = [k for k in b if k not in a]
+
+    def shape(part: Dict[str, Any]) -> Tuple[str, ...]:
+        return tuple(sorted(str(p) for p in part.get("props") or []))
+
+    pairs = []
+    for old_key in sorted(gone):
+        hits = [k for k in came if shape(b[k]) == shape(a[old_key])]
+        rivals = [k for k in gone if shape(a[k]) == shape(a[old_key])]
+        if len(hits) == 1 and len(rivals) == 1:
+            pairs.append((old_key, hits[0]))
+    return pairs
 
 
 def _diff_map(a: Dict[str, Any], b: Dict[str, Any], comp: str, out: List[Change],
@@ -1517,11 +1699,21 @@ def _diff_props(a: Dict[str, Any], b: Dict[str, Any], comp: str,
 
 
 def diff_layers(old: Snapshot, new: Snapshot, out: List[Change]) -> Optional[str]:
+    stale = [s.label for s in (old, new) if not s.layers_recorded]
+    if stale:
+        return ("layer order was not compared — the " + " and ".join(stale)
+                + (" system.json predates" if len(stale) == 1 else " system.json files predate")
+                + " 3.4.0, which did not record it. Re-run "
+                "extract_system over the entry stylesheet too (the one with the "
+                "`@layer a, b, c;` statement), or diff that file by eye; a "
+                "reorder is a major change.")
     if not old.layers or not new.layers:
-        return ("layer order was not compared — neither snapshot carries an "
-                "`@layer a, b, c;` order statement. It lives in the entry "
-                "stylesheet, not in tokens.css, and system.json does not record "
-                "it. Diff that one file by eye; a reorder is a major change.")
+        return ("layer order was not compared — "
+                + ("neither snapshot carries" if not (old.layers or new.layers)
+                   else f"the {'old' if not old.layers else 'new'} snapshot lacks")
+                + " an `@layer a, b, c;` order statement. It lives in the entry "
+                "stylesheet, not in tokens.css: snapshot that file too. A reorder "
+                "is a major change.")
     if old.layers != new.layers:
         out.append(Change(kind="layer-order-changed", subject="@layer",
                           before=" | ".join(old.layers),
@@ -1738,7 +1930,7 @@ CHANGELOG_SECTIONS = [
     ("Removed", {"tier1-removed", "tier2-removed", "socket-removed",
                  "component-removed", "variant-removed", "size-removed",
                  "state-removed", "part-removed", "prop-removed", "theme-removed",
-                 "theme-override-removed",
+                 "theme-override-removed", "density-removed",
                  # A rename removes the name a consumer greps for. Filing it
                  # under "Changed" is how someone scanning for what broke misses
                  # the one line that did.
@@ -1746,7 +1938,9 @@ CHANGELOG_SECTIONS = [
     ("Added", {"tier1-added", "tier2-added", "socket-added", "component-added",
                "variant-added", "size-added", "state-added", "part-added",
                "prop-added-optional", "prop-added-required", "theme-added",
-               "breakpoint-added", "theme-override-added"}),
+               "breakpoint-added", "density-added"}),
+    # An added theme override is a re-point in that theme, so it is filed
+    # under Changed with the other re-points.
     ("Changed", None),      # everything else
 ]
 

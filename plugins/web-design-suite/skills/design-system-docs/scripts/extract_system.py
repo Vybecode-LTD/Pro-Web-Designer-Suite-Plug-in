@@ -1754,12 +1754,30 @@ class Extractor:
                                       g.get("component", ""), g.get("token", ""),
                                       g.get("state", "")))
 
+    def layer_order(self) -> List[str]:
+        """Each `@layer a, b, c;` order statement, in the order read.
+
+        It usually sits in the entry stylesheet beside the imports, so every
+        stylesheet given is read for it, not only the token files.
+        diff_system compares it: a reorder re-decides every conflict in the
+        system at once (Law 5)."""
+        out: List[str] = []
+        for cf in self.token_files + self.component_files:
+            for raw, _line in cf.at_statements:
+                m = re.match(r"@layer\s+([^{};]+?)\s*;?$", raw.strip(), re.I)
+                if m:
+                    prelude = " ".join(m.group(1).split())
+                    if prelude not in out:
+                        out.append(prelude)
+        return out
+
     # -- output -----------------------------------------------------------
     def to_dict(self) -> Dict[str, Any]:
         return {
             "schema": SCHEMA,
             "themes": sorted(self.themes),
             "densities": sorted(self.densities),
+            "layers": self.layer_order(),
             "sources": {
                 "tokens": [cf.path for cf in self.token_files],
                 "components": [cf.path for cf in self.component_files],

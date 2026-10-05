@@ -1,0 +1,264 @@
+"""web-design-suite: design-system-versioning's diff_system, classifying what
+design-system-docs' system.json records.
+
+Regressions covered (P14):
+- LC-A8: a density-scale change, a reduced-motion change and a root-element
+  change are "major, auto-detect yes" in change-classification.md, and
+  system.json records all three, but diff_system compared none of them: the
+  review's v1 to v3 reported RECOMMENDED BUMP PATCH "because nothing changed".
+- LC-A9: a new dark-theme override that moves an existing value was minor,
+  although it changes rendering in that theme (the file's own §11 Q2); and a
+  local class renamed under CSS Modules, which the file calls a patch, was
+  reported as part-removed, major, with the gate failing.
+- LC-C5: system.json records the `@layer` order statement, so the diff
+  compares it from two snapshots instead of saying it cannot.
+
+The fixtures are the review's `fx/ver` versions, cut down: a token file, an
+entry stylesheet with the layer order, and one CSS Modules card with its props.
+"""
+from __future__ import annotations
+
+import json
+import unittest
+
+from wds_support import TempDirTest, output, run_py
+
+TOKENS = """\
+@layer tokens {
+  :root {
+    --neutral-0: oklch(100% 0 0);
+    --neutral-500: oklch(53.5% 0.009 75);
+    --neutral-900: oklch(23% 0.005 75);
+    --space-6: 1.5rem;
+    --density: 1;
+    --dur-base: 220ms;
+    --bg-canvas: var(--neutral-0);
+    --bg-surface: var(--neutral-0);
+    --fg-default: var(--neutral-900);
+    --fg-muted: var(--neutral-500);
+    --pad-card: PAD_CARD;
+  }
+  [data-theme="dark"] {
+    --bg-canvas: var(--neutral-900);
+    --bg-surface: var(--neutral-900);
+    --fg-default: var(--neutral-0);DARK_EXTRA
+  }DENSITIES
+  @media (prefers-reduced-motion: reduce) {
+    :root { --dur-base: REDUCED; }
+  }
+}
+"""
+
+CARD_CSS = """\
+@layer components {
+  .card {
+    --card-pad: var(--pad-card);
+    --card-bg: var(--bg-surface);
+    padding: var(--card-pad);
+    background: var(--card-bg);
+  }
+  .TITLE { font-weight: 600; color: var(--fg-default); }
+  .card:hover { --card-bg: var(--bg-canvas); }
+}
+"""
+
+CARD_TSX = """\
+export interface CardProps {
+  /** Heading text */
+  title?: string;
+}
+/** A surface. */
+export function Card({ title }: CardProps) {
+  return <ELEMENT className="card">{title}</ELEMENT>;
+}
+"""
+
+V1 = {"pad_card": "calc(var(--space-6) * var(--density))", "dark_extra": "",
+      "densities": {"compact": "0.875"}, "reduced": "1ms", "element": "div",
+      "title": "card__title", "module": True,
+      "layers": "reset, tokens, base, components, utilities"}
+
+
+class DiffSystemClassifiesWhatSystemJsonRecords(TempDirTest):
+
+    def snapshot(self, name: str, **changes) -> str:
+        """One version of the fixture system, extracted into its system.json."""
+        v = dict(V1, **changes)
+        root = self.tmp / name
+        dens = "".join(f'\n  [data-density="{label}"] {{ --density: {value}; }}'
+                       for label, value in v["densities"].items())
+        tokens = (TOKENS.replace("PAD_CARD", v["pad_card"])
+                  .replace("DARK_EXTRA", v["dark_extra"])
+                  .replace("DENSITIES", dens).replace("REDUCED", v["reduced"]))
+        self.write(f"{name}/styles/tokens.css", tokens)
+        if v["layers"] is not None:
+            self.write(f"{name}/styles/index.css",
+                       f"@layer {v['layers']};\n@import url(\"tokens.css\");\n")
+        css_name = "Card.module.css" if v["module"] else "card.css"
+        self.write(f"{name}/src/components/{css_name}",
+                   CARD_CSS.replace("TITLE", v["title"]))
+        self.write(f"{name}/src/components/Card.tsx",
+                   CARD_TSX.replace("ELEMENT", v["element"]))
+        out = root / "system.json"
+        proc = run_py("design-system-docs", "extract_system", "styles", "src",
+                      "--root", str(root), "--out", str(out), cwd=root)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        return str(out)
+
+    def diff(self, old: str, new: str, *extra: str) -> dict:
+        proc = run_py("design-system-versioning", "diff_system", old, new,
+                      "--format", "json", *extra, cwd=self.tmp)
+        self.assertNotIn("Traceback", output(proc), output(proc))
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return json.loads(proc.stdout)
+
+    def kinds(self, res: dict) -> dict:
+        return {c["kind"]: c for c in res["changes"]}
+
+    # -- LC-A8 ------------------------------------------------------------
+
+    def test_a_density_scale_change_is_major(self):
+        res = self.diff(self.snapshot("v1"),
+                        self.snapshot("v2", densities={"compact": "0.8"}))
+        change = self.kinds(res).get("density-changed")
+        self.assertIsNotNone(change, res["changes"])
+        self.assertEqual(change["severity"], "major")
+        self.assertEqual(change["subject"], "--density")
+        self.assertIn("compact", change["detail"])
+        self.assertIn("--pad-card 21px -> 19.2px", change["detail"])
+        self.assertEqual(res["bump"]["level"], "major", res["bump"])
+
+    def test_a_reduced_motion_change_is_major(self):
+        res = self.diff(self.snapshot("v1"), self.snapshot("v2", reduced="0.01ms"))
+        change = self.kinds(res).get("condition-changed")
+        self.assertIsNotNone(change, res["changes"])
+        self.assertEqual(change["severity"], "major")
+        self.assertEqual(change["subject"], "--dur-base")
+        self.assertIn("reduced-motion", change["detail"])
+        self.assertEqual((change["before"], change["after"]), ("1ms", "0.01ms"))
+        self.assertEqual(res["bump"]["level"], "major", res["bump"])
+
+    def test_a_root_element_change_is_major(self):
+        res = self.diff(self.snapshot("v1"), self.snapshot("v2", element="section"))
+        change = self.kinds(res).get("element-changed")
+        self.assertIsNotNone(change, res["changes"])
+        self.assertEqual(change["severity"], "major")
+        self.assertEqual(change["component"], "card")
+        self.assertEqual((change["before"], change["after"]), ("div", "section"))
+
+    def test_the_reviews_v1_to_v3_is_not_a_patch(self):
+        res = self.diff(self.snapshot("v1"),
+                        self.snapshot("v3", densities={"compact": "0.8"},
+                                      reduced="0.01ms", element="section"))
+        self.assertEqual(res["bump"]["level"], "major", res["bump"])
+        self.assertNotEqual(res["bump"]["reason"], "nothing changed")
+        self.assertLessEqual({"density-changed", "condition-changed", "element-changed"},
+                             set(self.kinds(res)), res["changes"])
+
+    def test_a_re_point_equal_in_light_but_not_at_a_density_is_major(self):
+        # 24px either way at the default density; 21px against 24px at compact.
+        res = self.diff(self.snapshot("v1"),
+                        self.snapshot("v2", pad_card="var(--space-6)"))
+        change = self.kinds(res).get("tier2-repointed")
+        self.assertIsNotNone(change, res["changes"])
+        self.assertNotIn("tier2-repointed-equal", self.kinds(res))
+        self.assertEqual(res["bump"]["level"], "major", res["bump"])
+
+    def test_the_vendored_token_parser_sees_density_and_conditions_too(self):
+        self.snapshot("v1")
+        self.snapshot("v2", densities={"compact": "0.8"}, reduced="0.01ms")
+        res = self.diff(str(self.tmp / "v1" / "styles" / "tokens.css"),
+                        str(self.tmp / "v2" / "styles" / "tokens.css"), "--no-upstream")
+        self.assertEqual(res["new"]["source"], "tokens.css")
+        kinds = self.kinds(res)
+        self.assertEqual(kinds["density-changed"]["severity"], "major", res["changes"])
+        self.assertIn("--pad-card 21px -> 19.2px", kinds["density-changed"]["detail"])
+        self.assertEqual(kinds["condition-changed"]["severity"], "major")
+        self.assertEqual(res["bump"]["level"], "major", res["bump"])
+
+    def test_a_density_added_is_minor_and_one_removed_is_major(self):
+        both = {"compact": "0.875", "spacious": "1.25"}
+        res = self.diff(self.snapshot("v1"), self.snapshot("v2", densities=both))
+        self.assertEqual(self.kinds(res)["density-added"]["severity"], "minor")
+        self.assertNotIn("density-changed", self.kinds(res), res["changes"])
+        self.assertEqual(res["bump"]["level"], "minor", res["bump"])
+
+        res = self.diff(self.snapshot("v3", densities=both), self.snapshot("v4"))
+        self.assertEqual(self.kinds(res)["density-removed"]["severity"], "major")
+        self.assertNotIn("density-changed", self.kinds(res), res["changes"])
+
+    # -- LC-A9 ------------------------------------------------------------
+
+    def test_a_dark_override_that_moves_a_value_is_major(self):
+        dark = "\n    --fg-muted: oklch(40% 0.005 75);"
+        res = self.diff(self.snapshot("v1"), self.snapshot("v4", dark_extra=dark))
+        change = self.kinds(res).get("theme-override-added")
+        self.assertIsNotNone(change, res["changes"])
+        self.assertEqual(change["severity"], "major")
+        self.assertEqual(change["theme"], "dark")
+        self.assertEqual(res["bump"]["level"], "major", res["bump"])
+        crossed = [r for r in res["contrast"]
+                   if r["fg"] == "--fg-muted" and r["theme"] == "dark" and r["crossings"]]
+        self.assertTrue(crossed, res["contrast"])
+
+    def test_a_dark_override_that_resolves_identically_is_a_patch(self):
+        # Control: the root value already resolves this way in dark.
+        dark = "\n    --fg-muted: var(--neutral-500);"
+        res = self.diff(self.snapshot("v1"), self.snapshot("v4", dark_extra=dark))
+        self.assertEqual(self.kinds(res)["theme-override-added"]["severity"], "patch")
+        self.assertEqual(res["bump"]["level"], "patch", res["bump"])
+
+    def test_a_local_class_renamed_under_css_modules_is_a_patch(self):
+        old = self.snapshot("v1")
+        new = self.snapshot("v2", title="card__heading")
+        res = self.diff(old, new)
+        kinds = self.kinds(res)
+        self.assertNotIn("part-removed", kinds, res["changes"])
+        change = kinds.get("part-renamed-local")
+        self.assertIsNotNone(change, res["changes"])
+        self.assertEqual((change["severity"], change["before"], change["after"]),
+                         ("patch", "card__title", "card__heading"))
+        self.assertEqual(res["bump"]["level"], "patch", res["bump"])
+
+        ledger = self.write("deprecations.json", json.dumps(
+            {"schema": "design-system-versioning/deprecations@1", "deprecations": []}))
+        proc = run_py("design-system-versioning", "diff_system", old, new,
+                      "--deprecations", str(ledger), cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+
+    def test_the_same_rename_in_global_css_stays_major(self):
+        # Control: a global class is a name any consumer can write.
+        res = self.diff(self.snapshot("v1", module=False),
+                        self.snapshot("v2", module=False, title="card__heading"))
+        kinds = self.kinds(res)
+        self.assertEqual(kinds["part-removed"]["severity"], "major", res["changes"])
+        self.assertNotIn("part-renamed-local", kinds)
+
+    # -- LC-C5: the layer order -------------------------------------------
+
+    def test_system_json_records_the_layer_order(self):
+        data = json.loads(open(self.snapshot("v1"), encoding="utf-8").read())
+        self.assertEqual(data["layers"], ["reset, tokens, base, components, utilities"])
+
+    def test_a_layer_reorder_between_two_snapshots_is_major(self):
+        res = self.diff(self.snapshot("v1"),
+                        self.snapshot("v2", layers="reset, base, tokens, components, utilities"))
+        change = self.kinds(res).get("layer-order-changed")
+        self.assertIsNotNone(change, res["changes"])
+        self.assertEqual(change["severity"], "major")
+        self.assertFalse([n for n in res["notes"] if "layer order was not compared" in n],
+                         res["notes"])
+
+    def test_an_older_snapshot_without_the_layer_order_says_to_re_extract(self):
+        old = self.snapshot("v1")
+        data = json.loads(open(old, encoding="utf-8").read())
+        del data["layers"]
+        legacy = self.write("legacy/system.json", json.dumps(data))
+        res = self.diff(str(legacy), self.snapshot("v2"))
+        notes = [n for n in res["notes"] if "layer order was not compared" in n]
+        self.assertTrue(notes, res["notes"])
+        self.assertIn("extract_system", notes[0])
+
+
+if __name__ == "__main__":
+    unittest.main()
