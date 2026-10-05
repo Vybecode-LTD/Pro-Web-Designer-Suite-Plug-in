@@ -148,6 +148,24 @@
   same properties are `part-renamed-local`, a patch; in global CSS they stay major.
   change-classification.md §11 now says what an added part is: new surface (Q4), unless it
   wraps existing children (Q3).
+- **A negative cancel pointed at a different token from its padding** (LC-A11). In the
+  reference's own example, `.card { padding: 16px }` became `var(--pad-well)` while
+  `.card__media { margin: -16px }` became `calc(var(--gap-grouped) * -1)`, since 16px in a
+  margin clusters to a gap: the bleed breaks the day the padding changes. apply_codemod
+  pairs each negative margin with the padding of its parent rule (the rule it is nested
+  in, the left side of a descendant or child selector, or a BEM element's block) and
+  reads that padding's token. extraction-and-clustering.md's example named `--pad-card`,
+  24px, for the 16px padding.
+- **A type tie snapped down when the smaller size was commoner** (LC-A12). The docs promise
+  "15px becomes 16, text does not shrink", but frequency settled the tie first, so with
+  14px commoner 15px became `--type-ui`, with a note saying "snapped UP to 14px" and a
+  delta of -1. Type ties now always snap up, and the note follows the real direction.
+- **The audit and extract_system disagreed about Law 6** (LC-A19). extraction.md says the
+  two agree by construction, but each kept its own lists: in a `.module.css` file the
+  audit refused `var(--space-0)` and `var(--shadow-none)`, which extract_system exempts as
+  null-outs, and extract_system flagged `--weight-*`, which the audit allows. The lists
+  are now the rule spec's `tiers` section (prefixes with a role, the role exceptions, the
+  null-outs), written into both by `tools/sync_rules.py`; the audit exempts the null-outs.
 
 ### Changed
 
@@ -263,6 +281,13 @@
   under CSS Modules (with the gate binding), a layer reorder, a system.json from before
   3.4.0, and the vendored token parser. Against `v3.3.0`, 12 fail; 2 are controls (a dark
   override that resolves as before, and the same rename in global CSS).
+- P15 part 1 (LC-A11, LC-A12, LC-A19): `test_token_migration.MigrationPipeline` runs the
+  review's `fx/mig2` card through extract, cluster and the codemod, with a child selector
+  and a nested rule beside it, and a type tie against a commoner 14px;
+  `test_rules_spec.TheTierListsAgree` runs the review's `fx/l6` card through the audit and
+  extract_system and holds both to the spec's lists. Against `v3.3.0`, 4 fail. Two are
+  controls: a negative margin with no padding to cancel keeps its gap token, and the spec's
+  new `tiers` examples, which `fail_before.py` swaps out with the rest of the plugin.
 
 ## 3.3.0 — 2026-10-04
 

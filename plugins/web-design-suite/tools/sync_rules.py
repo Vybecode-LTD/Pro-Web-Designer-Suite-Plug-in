@@ -27,6 +27,8 @@ outside them is the gate's own. A block holds the constants its gate uses
   BINDING_ALLOWLIST              bindings.allow, keyed by property pattern
   BINDING_VALUES                 the same, as (pattern, allowed) pairs for the audit
   <FAMILY>_VALUES                one family's properties and values (SIZING_VALUES)
+  TIER1_WITH_ROLE                tiers.with_role: each Tier-1 prefix with a role, and its advice
+  TIER2_EXCEPTIONS, TIER1_NULLS  tiers.tier2_exceptions, tiers.nulls
 (The markers avoid "@generated": the audit and the migration tool skip a
 file that says it in its first 800 characters.)
 Files are written as UTF-8 with LF line endings, byte for byte the same on
@@ -50,13 +52,17 @@ TARGETS = {
         ("py", ("LAYER_ORDER", "LAYER_STATEMENT", "MAX_NESTING", "MAX_SPECIFICITY", "MAX_COMPOUNDS",
                 "SYSTEM_COLOR_NAMES", "SYSTEM_COLOR_PROPERTY", "KEYWORDS", "COLOUR_FUNCTIONS", "LITERAL_UNITS",
                 "GEOMETRY_PROPERTIES", "COLOUR_WORDS", "SHAPES", "SPACING_VALUES", "STROKE_VALUES", "MOTION_VALUES",
-                "SIZING_VALUES", "MARGIN_VALUES", "BINDING_VALUES")),
+                "SIZING_VALUES", "MARGIN_VALUES", "BINDING_VALUES", "TIER1_WITH_ROLE", "TIER2_EXCEPTIONS",
+                "TIER1_NULLS")),
     "skills/web-design-studio/assets/configs/stylelint.config.mjs":
         ("js", ("LAYER_ORDER", "MAX_NESTING", "MAX_SPECIFICITY", "MAX_COMPOUNDS", "SYSTEM_COLOR_NAMES",
                 "SYSTEM_COLOR_PROPERTY", "KEYWORDS", "COLOUR_FUNCTIONS", "COLOUR_WORDS", "SHAPES", "VALUE_ALLOWLIST",
                 "MARGIN_ALLOWLIST", "BINDING_ALLOWLIST")),
     "skills/web-design-studio/assets/configs/eslint.design.config.mjs":
         ("js", ("COLOUR_FUNCTIONS", "LITERAL_UNITS")),
+    # Not a gate: its tier1-leak gap is audit_design's L6 (LC-A19).
+    "skills/design-system-docs/scripts/extract_system.py":
+        ("py", ("TIER1_WITH_ROLE", "TIER2_EXCEPTIONS", "TIER1_NULLS")),
 }
 NOTE = "written by tools/sync_rules.py from assets/rules/design-rules.json; edit the spec, then rerun it"
 LISTS = ("KEYWORDS", "COLOUR_WORDS")         # the names a family's `values` may use besides the shapes
@@ -125,7 +131,8 @@ def block(spec: dict, lang: str, names: tuple[str, ...]) -> str:
             "MAX_COMPOUNDS": int(spec["selectors"]["max_compounds"]),
             "KEYWORDS": values["keywords"], "COLOUR_FUNCTIONS": values["colour_functions"],
             "LITERAL_UNITS": spec["inline_styles"]["literal_units"],
-            "GEOMETRY_PROPERTIES": spec["geometry"]["properties"]}
+            "GEOMETRY_PROPERTIES": spec["geometry"]["properties"],
+            "TIER2_EXCEPTIONS": spec["tiers"]["tier2_exceptions"], "TIER1_NULLS": spec["tiers"]["nulls"]}
     py = lang == "py"
     text = (lambda s: json.dumps(s)) if py else js_string
     names = tuple(n for name in names for n in (tuple(values["shapes"]) if name == "SHAPES" else (name,)))
@@ -203,6 +210,9 @@ def py_constant(name: str, spec: dict, before: tuple[str, ...]) -> str:
         written_before("SYSTEM_COLOR_NAMES", before, name)
         words = ", ".join(json.dumps(w) for w in spec["values"]["colour_words"])
         return f'{name} = re.compile("^(?:" + "|".join([{words}, *SYSTEM_COLOR_NAMES]) + ")$", re.I)'
+    if name == "TIER1_WITH_ROLE":
+        rows = [f"    {json.dumps(k)}: {json.dumps(v)}," for k, v in spec["tiers"]["with_role"].items()]
+        return "\n".join([f"{name} = {{", *rows, "}"])
     if name == "MARGIN_VALUES":
         return f"{name} = ({py_entries(spec['margins_in_components']['values'], shapes, before, name)})"
     if name == "BINDING_VALUES":

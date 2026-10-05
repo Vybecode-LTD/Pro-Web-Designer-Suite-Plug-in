@@ -405,6 +405,58 @@ def replacement_for(rule: dict, negate: bool) -> str:
     return text
 
 
+def selector_key(selector: str) -> str:
+    return " ".join(selector.split())
+
+
+def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Dict[str, Dict[str, dict]]:
+    """Each rule's padding, by selector: {value key: the rule it maps by}."""
+    out: Dict[str, Dict[str, dict]] = {}
+    for d in decls:
+        if not d.prop.startswith("padding"):
+            continue
+        value = text[d.value_offset:d.value_offset + len(d.value)]
+        slots = split_slots(mask_strings_and_urls(value))
+        for slot, klass in zip(slots, slot_classes(d.prop, slots)):
+            real = value[slot.start:slot.end]
+            rule = mapping.value_rule(klass, real)[0] if klass else None
+            if rule:
+                for key in canon_slot(real):
+                    out.setdefault(selector_key(d.selector), {}).setdefault(key, rule)
+    return out
+
+
+def parent_selectors(d) -> List[str]:
+    """The rules a declaration's rule sits inside: the one it is nested in,
+    the left side of a descendant or child selector (`.panel > .bleed`), and a
+    BEM element's block (`.card__media` in `.card`)."""
+    out = [selector_key(d.parent)] if d.parent else []
+    sel = selector_key(d.selector)
+    if "," in sel:
+        return out
+    m = re.search(r"\s*(?:>|\s)\s*(?=[^\s>]+$)", sel)
+    if m:
+        out.append(sel[:m.start()])
+    m = re.match(r"^(\.[A-Za-z][\w-]*?)__[\w-]+$", sel)
+    if m:
+        out.append(m.group(1))
+    return out
+
+
+def cancelled_padding(d, slot: str, pads: Dict[str, Dict[str, dict]]) -> Optional[dict]:
+    """The rule of the padding a negative margin cancels: its parent rule's
+    padding of the same size (extraction-and-clustering.md §10). A negative
+    cancel must read the token the padding reads, or the bleed breaks the day
+    the padding changes; `-16px` in a margin alone clusters to a gap token."""
+    keys = canon_slot(slot.strip().lstrip("-"))
+    for parent in parent_selectors(d):
+        for key in keys:
+            hit = pads.get(parent, {}).get(key)
+            if hit:
+                return hit
+    return None
+
+
 def plan_css(text: str, mapping: Mapping, *, base: int = 0,
              source_name: str = "", skips: Optional[List[Skip]] = None,
              blanked: Optional[str] = None, slash_comments: bool = True) -> List[Edit]:
@@ -422,6 +474,8 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
 
     def line_of(off: int) -> int:
         return text.count("\n", 0, off) + 1
+
+    pads = padding_rules(text, decls, mapping)
 
     for d in decls:
         prop = d.prop
@@ -491,6 +545,8 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
             rule, negate = mapping.value_rule(klass, real)
             if not rule:
                 continue
+            if negate and prop.startswith("margin"):
+                rule = cancelled_padding(d, real, pads) or rule
             edits.append(Edit(
                 base + d.value_offset + slot.start,
                 base + d.value_offset + slot.end,

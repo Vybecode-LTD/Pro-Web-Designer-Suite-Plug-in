@@ -115,15 +115,15 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-A8 | medium | fixed in 3.4.0: `test_versioning.DiffSystemClassifiesWhatSystemJsonRecords` (PR #48) | The doc says density-scale changes, reduced-motion changes and root-element changes are "major · auto-detect yes". |
 | LC-A9 | medium | fixed in 3.4.0: `test_versioning.DiffSystemClassifiesWhatSystemJsonRecords` (PR #48) | theme-override-added is classified minor, but it changes rendering in that theme, which is major by the file's own test (§11 Q2: "any theme"). |
 | LC-A10 | medium | fixed in 3.1.0 | SvelteKit's `src/lib` is where its components live, and it is silently treated as vendor. |
-| LC-A11 | medium | W6 (3.4.0) | The reference says a negative cancel must "point at the **same token** the padding uses… Never" point elsewhere. |
-| LC-A12 | medium | W6 (3.4.0) | The docs say "15px … becomes 16 (`--type-body`), not 14. |
+| LC-A11 | medium | fixed in 3.4.0: `test_token_migration.MigrationPipeline.test_a_negative_cancel_points_at_its_parents_padding_token` (PR #49) | The reference says a negative cancel must "point at the **same token** the padding uses… Never" point elsewhere. |
+| LC-A12 | medium | fixed in 3.4.0: `test_token_migration.MigrationPipeline.test_a_type_tie_snaps_up_even_when_the_smaller_step_is_commoner` (PR #49) | The docs say "15px … becomes 16 (`--type-body`), not 14. |
 | LC-A13 | medium | fixed in 3.1.0 | `git stash && audit_design … > /tmp/before.json && git stash pop`: the audit exits 1 on any legacy code, so `pop` never runs. |
 | LC-A14 | medium | W6 (3.4.0) | deprecate.py emits a colour rename. |
 | LC-A15 | medium | fixed in 3.1.0, as SB-A12 | The doc says that after replacing the Tailwind theme, "an off-scale class does not exist and the build errors on it". |
 | LC-A16 | medium | fixed in 3.2.0 | Re-pointing --bs-primary does not reach .btn-primary, which sets --bs-btn-bg: #0d6efd literally ([bootstrap.css](https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.css)), or .bg-primary and .text-primary, wh |
 | LC-A17 | medium | W6 (3.4.0) | The model announcement reads "**Design system 2.1.0.** One breaking change: `--bg-accent` moved…". |
 | LC-A18 | medium | fixed in 3.2.0 | The baseline is extracted from styles/ src/components/, but CI extracts from styles/ src/. |
-| LC-A19 | medium | W6 (3.4.0) | The doc says "tier1-leak … agree[s] by construction" with audit_design L6. |
+| LC-A19 | medium | fixed in 3.4.0: `test_rules_spec.TheTierListsAgree` (PR #49) | The doc says "tier1-leak … agree[s] by construction" with audit_design L6. |
 | LC-A20 | medium | fixed in 3.1.0, as XC-A8 | "Run them from this skill's root" combined with cwd-relative defaults writes project artifacts (literals.json, proposal/, the deprecation ledger) into the plugin install, which a plugin update replaces. |
 | LC-A21 | medium | fixed in 3.1.0, as XC-A1 | `extract_literals --format report` writes no literals.json, so `cluster_values literals.json` fails with "no such file", exit 2. |
 | LC-A22 | low | W6 (3.4.0) | Three problems with the POST body `--reverse` generates. |

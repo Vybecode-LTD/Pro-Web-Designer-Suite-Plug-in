@@ -206,6 +206,23 @@ BINDING_VALUES = (
     (re.compile(r"^--animate-"), (MOTION_LIST,)),
     (re.compile(r"^--(?!breakpoint-|aspect-|animate-)"), (VAR_ONE, COLOUR_WORDS, *KEYWORDS)),
 )
+TIER1_WITH_ROLE = {
+    "space-": "a proximity/inset role (--gap-related, --pad-card, --space-section)",
+    "neutral-": "a color role (--bg-surface, --fg-muted, --border-default)",
+    "accent-": "a color role (--bg-accent, --fg-accent, --border-accent)",
+    "success-": "a color role (--bg-success, --fg-success)",
+    "warning-": "a color role (--bg-warning, --fg-warning)",
+    "danger-": "a color role (--bg-danger, --fg-danger)",
+    "info-": "a color role",
+    "text-": "a type role (--type-body, --type-h2, --type-ui)",
+    "leading-": "a type role (--type-*), which carries leading in its shorthand",
+    "shadow-": "an elevation role (--elevation-card, --elevation-modal)",
+}
+TIER2_EXCEPTIONS = [
+    "--space-section", "--space-subsection", "--space-block", "--space-fluid-sm",
+    "--space-fluid-md", "--space-fluid-lg", "--space-fluid-xl",
+]
+TIER1_NULLS = ["--space-0", "--radius-none", "--shadow-none"]
 # END design-rules
 IMPORT_LAYER = re.compile(r"@import\b.*?\blayer\(\s*([\w.-]+)\s*\)", re.I | re.S)
 # Sass (design-rules.json: sass). A @mixin or @function body emits nothing
@@ -303,34 +320,16 @@ RADIUS_PROPS = {"border-radius", "border-start-start-radius",
                 "border-bottom-right-radius"}
 SHADOW_PROPS = {"box-shadow", "text-shadow"}
 
-# Tier-1 primitives that HAVE a Tier-2 role, so reading them from a component
-# is a Law 6 violation. Prefixes without a semantic equivalent (--radius-*,
-# --stroke-*, --weight-*, --z-*, --bp-*, --font-*, --measure-*, --width-*,
-# --tap-min) are deliberately absent: they are primitives with no role layer,
-# and using them directly is correct. Weight is one: the hierarchy method sets
-# weight without changing size, which no --type-* shorthand can do.
-TIER1_WITH_ROLE = {
-    "space-": "a proximity/inset role (--gap-related, --pad-card, --space-section)",
-    "neutral-": "a color role (--bg-surface, --fg-muted, --border-default)",
-    "accent-": "a color role (--bg-accent, --fg-accent, --border-accent)",
-    "success-": "a color role (--bg-success, --fg-success)",
-    "warning-": "a color role (--bg-warning, --fg-warning)",
-    "danger-": "a color role (--bg-danger, --fg-danger)",
-    "info-": "a color role",
-    "text-": "a type role (--type-body, --type-h2, --type-ui)",
-    "leading-": "a type role (--type-*), which carries leading in its shorthand",
-    "shadow-": "an elevation role (--elevation-card, --elevation-modal)",
-}
+# Tier-1 primitives that HAVE a Tier-2 role (TIER1_WITH_ROLE), the roles that
+# start with a Tier-1 prefix (TIER2_EXCEPTIONS: page rhythm lives under
+# --space-* because it reads better there) and the null-outs (TIER1_NULLS) are
+# the spec's `tiers`, in the design-rules block above. design-system-docs'
+# extract_system.py reads the same three, so its tier1-leak gap and L6 agree.
+# Prefixes without a semantic equivalent (--radius-*, --stroke-*, --weight-*,
+# --z-*, --bp-*, --font-*, --measure-*, --width-*, --tap-min) are absent: they
+# are primitives with no role layer, and using them directly is correct.
 # Softer: sometimes you genuinely need one half of a motion pair.
 TIER1_MOTION = {"dur-", "ease-"}
-
-# Tokens that START with a Tier-1 prefix but ARE Tier-2 roles. Page rhythm
-# lives in the --space-* namespace because it reads better there; the tier is
-# a property of the name's meaning, not its first word.
-TIER2_EXCEPTIONS = {
-    "--space-section", "--space-subsection", "--space-block",
-    "--space-fluid-sm", "--space-fluid-md", "--space-fluid-lg", "--space-fluid-xl",
-}
 
 # Specificity over the spec's cap is built to win a fight that layers already
 # settled; stylelint's selector-max-specificity reads the same cap (N32).
@@ -1485,8 +1484,8 @@ def audit_css(path: Path, text: str) -> list[Finding]:
         # ---- L6 Tier-1 leakage ------------------------------------------------
         if component_file or in_layer(d.at_rules, "components"):
             for ref in VAR_REF.findall(value):
-                if ref in TIER2_EXCEPTIONS:
-                    continue
+                if ref in TIER2_EXCEPTIONS or ref in TIER1_NULLS:
+                    continue        # a role, or zero, which is zero
                 bare = ref[2:]
                 for pfx, advice in TIER1_WITH_ROLE.items():
                     if bare.startswith(pfx):

@@ -128,7 +128,7 @@ Batching is not ceremony. A 500-file diff gets rubber-stamped; a 40-file diff of
 
 **The commit between batches is load-bearing, not tidiness.** The codemod refuses files with uncommitted changes, so a loop that runs every `--kind` without committing applies the first batch and skips every file in all the rest. It says so, loudly, on every skipped file, and exits 1 — but if you are piping to `/dev/null` you will not see it.
 
-The codemod handles the cases that break naive find-and-replace: comments, strings, `url()`, `calc()` (it recurses into it — those literals survive every migration because grep cannot see inside parentheses), negative values (`-13px` → `calc(var(--gap-related) * -1)`, which keeps the relationship rather than inventing a negative token), and shorthands where only some slots map (`padding: 22px 26px` correctly maps the inline slot and leaves the ambiguous block slot alone).
+The codemod handles the cases that break naive find-and-replace: comments, strings, `url()`, `calc()` (it recurses into it — those literals survive every migration because grep cannot see inside parentheses), negative values (`-13px` → `calc(var(--gap-related) * -1)`, which keeps the relationship rather than inventing a negative token; a negative margin that cancels its parent rule's padding reads that padding's token), and shorthands where only some slots map (`padding: 22px 26px` correctly maps the inline slot and leaves the ambiguous block slot alone).
 
 It refuses to touch a file with uncommitted changes. It writes to a temp file in the same directory and moves it into place only after brace-balance and declaration-count checks pass. A file is never left half-written.
 

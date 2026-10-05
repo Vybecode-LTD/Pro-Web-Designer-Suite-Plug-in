@@ -503,6 +503,7 @@ class Decl:
     decl_offset: int    # absolute offset of the first char of `prop`
     selector: str
     block_start: int = -1   # offset of the `{` that opens the enclosing rule
+    parent: str = ""        # the selector of the rule it is nested in, if any
 
 
 def scan_css_declarations(text: str, base_offset: int = 0) -> Iterator[Decl]:
@@ -531,7 +532,8 @@ def scan_css_declarations(text: str, base_offset: int = 0) -> Iterator[Decl]:
             return None
         lead_pad = len(head) - len(head.lstrip())
         value_pad = len(tail) - len(tail.lstrip())
-        selector = next((s for s in reversed(sel_stack) if s), "")
+        named = [s for s in sel_stack if s]
+        selector = named[-1] if named else ""
         return Decl(
             prop=prop.lower(),
             value=tail.strip(),
@@ -539,6 +541,7 @@ def scan_css_declarations(text: str, base_offset: int = 0) -> Iterator[Decl]:
             decl_offset=base_offset + buf_start + lead_pad,
             selector=selector,
             block_start=block_stack[-1] if block_stack else -1,
+            parent=named[-2] if len(named) > 1 else "",
         )
 
     while i < n:

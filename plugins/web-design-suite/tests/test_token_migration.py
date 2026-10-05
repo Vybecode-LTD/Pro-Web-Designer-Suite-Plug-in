@@ -164,6 +164,56 @@ class MigrationPipeline(TempDirTest):
                               css, cwd=self.tmp)
                 self.assertEqual(proc.returncode, 2, output(proc))
 
+    def codemod(self, src):
+        proc = run_py("design-token-migration", "apply_codemod", "-m",
+                      self.tmp / "proposal" / "mapping.json", src, cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return proc.stdout.decode("utf-8")
+
+    def pad_token(self, mapping):
+        return next(r["token"] for r in mapping["rules"]
+                    if r["kind"] == "spacing" and "padding" in r.get("props", []))
+
+    def test_a_negative_cancel_points_at_its_parents_padding_token(self):
+        # LC-A11, the reference's own example (fx/mig2): the bleed must cancel the
+        # token the padding became, not the one 16px in a margin clusters to.
+        self.write("src/Card.module.css",
+                   ".card { padding: 16px; font-size: 15px; }\n"
+                   ".card__media { margin: -16px -16px 16px; }\n"
+                   ".body { font-size: 15px; }\n")
+        self.write("src/panel.css",
+                   ".panel { padding: 16px; }\n.panel > .bleed { margin-inline: -16px; }\n"
+                   ".well { padding: 16px; .media { margin-block-start: -16px; } }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+        pad = self.pad_token(mapping)
+        gap = next(r["token"] for r in mapping["rules"]
+                   if r["kind"] == "spacing" and "gap" in r.get("prop_classes", []))
+        self.assertNotEqual(pad, gap, mapping["rules"])
+        diff = self.codemod(self.tmp / "src")
+        cancel = f"calc(var({pad}) * -1)"
+        self.assertIn(f"+.card__media {{ margin: {cancel} {cancel} var({gap}); }}", diff)
+        self.assertIn(f"+.panel > .bleed {{ margin-inline: {cancel}; }}", diff)
+        self.assertIn(f".media {{ margin-block-start: {cancel}; }}", diff)
+
+    def test_a_negative_margin_with_nothing_to_cancel_keeps_its_own_token(self):
+        # Control: no padding in the parent rule, so it is a spacing value of its own.
+        self.write("src/a.css", ".row { gap: 16px; }\n.row__item { margin-block-start: -16px; }\n"
+                                ".box { padding: 16px; }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+        gap = next(r["token"] for r in mapping["rules"]
+                   if r["kind"] == "spacing" and "gap" in r.get("prop_classes", []))
+        self.assertIn(f"margin-block-start: calc(var({gap}) * -1)", self.codemod(self.tmp / "src"))
+
+    def test_a_type_tie_snaps_up_even_when_the_smaller_step_is_commoner(self):
+        # LC-A12: "15px becomes 16, text does not shrink", though 14px is commoner.
+        self.write("src/a.css", ".a { font-size: 15px; }\n" + "".join(
+            f".b{i} {{ font-size: 14px; }}\n" for i in range(3)))
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+        rule = next(r for r in mapping["rules"] if r["kind"] == "type" and "15px" in r["match"])
+        self.assertEqual(rule["token"], "--type-body", rule)
+        self.assertEqual(rule["delta_px"], 1.0, rule)
+        self.assertIn("UP to 16px", rule["note"])
+
     def test_the_z_index_note_counts_the_rungs_above_base(self):
         rules = "\n".join(f".z{i} {{ z-index: {v}; }}" for i, v in
                           enumerate((1, 5, 10, 20, 50, 100, 200, 500, 999, 9999)))

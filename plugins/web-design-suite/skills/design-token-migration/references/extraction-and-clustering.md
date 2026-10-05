@@ -246,7 +246,7 @@ Everything else — the L curve, the chroma falloff, the hue drift — comes fro
 
 Snap to the type scale — 11, 12, 14, 16, 18, 22, 28, 35, 44 px — with the same tolerance mechanism and **one inverted rule: ties snap up.**
 
-`15px` is equidistant from 14 and 16. It becomes 16 (`--type-body`), not 14 (`--type-ui`). Text does not shrink to settle a tie; 16px is the floor for reading copy and the reading experience wins over the tiebreak.
+`15px` is equidistant from 14 and 16. It becomes 16 (`--type-body`), not 14 (`--type-ui`), even when 14px is the commoner size. Text does not shrink to settle a tie; 16px is the floor for reading copy and the reading experience wins over the tiebreak. Frequency settles a spacing tie (the crowd is the decision), never a type one.
 
 The replacement is a **whole-declaration rewrite**, not a value swap:
 
@@ -358,7 +358,7 @@ Exclude it from the census by default so the estimate is honest. Run once with `
 .card__media { margin: -16px -16px 16px; }   /* bleed to the edge */
 ```
 
-That `-16px` is not a spacing decision; it is a *relationship* to the padding. It must become `calc(var(--pad-card) * -1)` — which is also the only form Law 2 permits — and it must point at the **same token** the padding uses, or the next time the card's padding changes the bleed breaks. Never let a negative cancel resolve to a different token from the value it cancels; the codemod emits the `calc(… * -1)` form precisely so that relationship stays visible in the source.
+That `-16px` is not a spacing decision; it is a *relationship* to the padding. It must become `calc(var(--pad-well) * -1)` when the padding became `var(--pad-well)` (16px on the starter scale) — `calc(… * -1)` is also the only form Law 2 permits — and it must point at the **same token** the padding uses, or the next time the card's padding changes the bleed breaks. Never let a negative cancel resolve to a different token from the value it cancels. On its own, `16px` in a margin clusters to a gap token (`--gap-grouped`), so the codemod pairs each negative margin with the padding of its parent rule: the rule it is nested in, the left side of a descendant or child selector (`.panel > .bleed`), or a BEM element's block (`.card__media` in `.card`). A padding of the same size there decides the token. A negative margin with no such padding is a spacing value of its own, and keeps its gap token; check those by eye.
 
 ### Values inside `calc()`
 
