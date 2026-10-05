@@ -98,7 +98,7 @@ Items LC-A11, LC-A12, LC-A14, LC-A19, LC-C4 and LC-C12. Read them in `lifecycle.
 - **LC-C12.** Ship the 8-file migration fixture and the five-edit release as test fixtures, and have CI regenerate the SKILL.md numbers from them.
 - P15 is L: split it (A11, A12 and A19 first; then A14, C4 and C12).
 
-**Close each PR:** the CHANGELOG under `## 3.4.0 — unreleased`, each item "fixed in 3.4.0" in the inventory with its test, the plan's row as `P14, #N` (N the PR's number; a split row keeps its open items under a plain `P14` row, which is what the checker counts), and §9.
+**Close each PR:** the CHANGELOG under `## 3.4.0 — unreleased`, each item "fixed in 3.4.0" in the inventory with its test, the PR's own row in the plan as `Pk, #N` (`P14, #N` for P14, `P15 part 1, #N` for P15's first half; N the PR's number; a split keeps its open items under a plain `Pk` row, which is what the checker counts), and §9.
 
 ## 6. End of session (never skip)
 
