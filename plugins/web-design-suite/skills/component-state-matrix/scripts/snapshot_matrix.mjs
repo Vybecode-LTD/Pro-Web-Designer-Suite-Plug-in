@@ -29,6 +29,10 @@
  *   # narrow while iterating
  *   node snapshot_matrix.mjs build/proof-sheet.html --only "button--" --only "t_dark"
  *
+ *   # the same cells under forced colours, against their own baselines
+ *   node snapshot_matrix.mjs build/proof-sheet.html \
+ *        --baselines tests/visual/baselines --forced-colors
+ *
  *   # loosen once, deliberately, with a reason in the commit message
  *   node snapshot_matrix.mjs sheet.html --threshold 0.004 --pixel-threshold 0.12
  *
@@ -40,12 +44,18 @@
  *   --prune                with --update-baselines, delete baselines with no cell
  *   --threshold N          max fraction of differing pixels per cell (default 0.002)
  *   --pixel-threshold N    perceptual tolerance per pixel, 0..1     (default 0.03)
+ *   --forced-colors        shoot every cell under forced-colors: active, with
+ *                          baselines and report in a forced-colors/ folder
+ *                          inside --baselines and --out
  *
  * Every hover, active and focus-visible cell must also DIFFER from its default
  * cell, in the same run, with no baseline involved: a state that renders
  * exactly like default has no style, and that fails. (At the old 0.10
  * tolerance the suite's own 4% hover and 8% pressed overlays were below the
- * noise floor, so deleting :hover or :active passed every cell.)
+ * noise floor, so deleting :hover or :active passed every cell.) Under
+ * --forced-colors only focus-visible is held to it: forced colours drop
+ * box-shadow and repaint colours, so a hover or a press may legitimately vanish
+ * there, but a focus ring may not.
  *   --allow-new            a cell with no baseline is not a failure
  *   --only SUBSTR          only cells whose id contains SUBSTR (repeatable)
  *   --viewport WxH         browser viewport                 (default 1440x900)
@@ -90,6 +100,7 @@ function parseArgs(argv) {
     // invisible. The antialiasing escape below still absorbs sub-pixel shifts.
     pixelThreshold: 0.03,
     allowNew: false,
+    forcedColors: false,
     only: [],
     viewport: { width: 1440, height: 900 },
     dpr: 1,
@@ -116,6 +127,7 @@ function parseArgs(argv) {
       case '--threshold': opts.threshold = Number(need(i, a)); i++; break;
       case '--pixel-threshold': opts.pixelThreshold = Number(need(i, a)); i++; break;
       case '--allow-new': opts.allowNew = true; break;
+      case '--forced-colors': opts.forcedColors = true; break;
       case '--only': opts.only.push(need(i, a)); i++; break;
       case '--dpr': opts.dpr = Number(need(i, a)); i++; break;
       case '--browser': opts.browser = need(i, a); i++; break;
@@ -139,6 +151,12 @@ function parseArgs(argv) {
   if (!Number.isFinite(opts.pixelThreshold) || opts.pixelThreshold < 0 || opts.pixelThreshold > 1)
     die('--pixel-threshold must be between 0 and 1');
   if (!fs.existsSync(opts.sheet)) die(`no such proof sheet: ${opts.sheet}`);
+  // Own baselines and report, so the two passes never see each other's
+  // files as orphans or overwrite each other's report (GT-B7).
+  if (opts.forcedColors) {
+    opts.baselines = path.join(opts.baselines, 'forced-colors');
+    opts.out = path.join(opts.out, 'forced-colors');
+  }
   return opts;
 }
 
@@ -345,6 +363,7 @@ function writeReport(outDir, rows, opts, started) {
   <span>threshold ${opts.threshold}</span>
   <span>pixel-threshold ${opts.pixelThreshold}</span>
   <span>dpr ${opts.dpr}</span>
+  ${opts.forcedColors ? '<span>forced colours</span>' : ''}
   <span>${((Date.now() - started) / 1000).toFixed(1)}s</span>
   ${Object.entries(counts).map(([k, v]) => `<span>${esc(k)} ${v}</span>`).join('')}
   <span>${bad ? 'FAILING' : 'clean'}</span>
@@ -387,7 +406,7 @@ async function main() {
     viewport: opts.viewport,
     deviceScaleFactor: opts.dpr,
     reducedMotion: 'reduce',
-    forcedColors: 'none',
+    forcedColors: opts.forcedColors ? 'active' : 'none',
     colorScheme: 'light',   // the sheet sets data-theme itself; never inherit the OS
     locale: 'en-US',
     timezoneId: 'UTC',
@@ -491,7 +510,10 @@ async function main() {
   // pixels: the cells sit side by side at different subpixel offsets, and on
   // Linux and macOS text is antialiased by where it sits, so twin cells never
   // match pixel for pixel there.
-  const STATE_SEG = /--st_(hover|active|focus-visible)(?=--|$)/;
+  // Forced colours drop box-shadow and repaint every colour, so only the
+  // focus ring must survive there: a ring drawn with box-shadow fails.
+  const STATE_SEG = opts.forcedColors ? /--st_(focus-visible)(?=--|$)/
+    : /--st_(hover|active|focus-visible)(?=--|$)/;
   for (const id of shots.keys()) {
     const m = STATE_SEG.exec(id);
     if (!m) continue;
@@ -499,7 +521,10 @@ async function main() {
     if (!shots.has(defaultId)) continue;
     const mine = await page.evaluate(STYLE_SIGNATURE_FN, id);
     if (mine === null || mine !== await page.evaluate(STYLE_SIGNATURE_FN, defaultId)) continue;
-    const note = `computes the same style as ${defaultId}: the ${m[1]} state has no visible style`;
+    const note = opts.forcedColors
+      ? `computes the same style as ${defaultId} under forced colours: the focus ring ` +
+        'does not survive them (they drop box-shadow; draw the ring with outline)'
+      : `computes the same style as ${defaultId}: the ${m[1]} state has no visible style`;
     const row = rows.find((r) => r.id === id);
     if (row) {
       row.status = 'fail';

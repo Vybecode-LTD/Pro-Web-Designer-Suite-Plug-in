@@ -402,6 +402,62 @@ class MatrixStates(TempDirTest):
         self.assertIn("repeat(var(--msheet-states, 7), 1fr)", sheet)
 
 
+class MatrixModel(TempDirTest):
+    """GT-B7: fixtures were inner HTML only, so nothing could set `dir`, and
+    the RTL fixture state-coverage.md asks for could not be rendered. GT-B8:
+    nothing said when the baselines outgrow the repository."""
+
+    def generate(self, content, variants=("default",), themes=("light",),
+                 densities=("comfortable",)):
+        self.write("chip.css", ".chip {}\n")
+        self.write("matrix.json", json.dumps({
+            "$schema": "component-state-matrix/1", "themes": list(themes),
+            "densities": list(densities),
+            "components": [{"name": "chip", "css": "chip.css", "variants": list(variants),
+                            "template": '<span class="chip" {attrs}>{content}</span>',
+                            "content": content}]}))
+        proc = run_py("component-state-matrix", "generate_matrix", "matrix.json",
+                      "--out", "sheet.html", cwd=self.tmp)
+        sheet = (self.tmp / "sheet.html").read_text(encoding="utf-8") if proc.returncode == 0 else ""
+        return proc, sheet
+
+    def test_a_fixture_sets_dir_and_lang_on_its_stage(self):
+        proc, sheet = self.generate({"label": "Save",
+                                     "arabic": {"html": "حفظ", "dir": "rtl", "lang": "ar"}})
+        self.assertEqual(proc.returncode, 0, output(proc))
+        stages = re.findall(r'<div class="msheet__stage"[^>]*>', sheet)
+        rtl = [s for s in stages if "--f_arabic--" in s]
+        ltr = [s for s in stages if "--f_label--" in s]
+        self.assertTrue(rtl and ltr, stages[:3])
+        for stage in rtl:
+            self.assertIn(' dir="rtl" lang="ar"', stage)
+        for stage in ltr:
+            self.assertNotIn(" dir=", stage)
+        self.assertIn(">حفظ</span>", sheet)
+
+    def test_a_fixture_with_a_bad_direction_or_key_is_refused(self):
+        for fixture, needle in (({"html": "x", "dir": "right"}, "ltr, rtl or auto"),
+                                ({"html": "x", "lang": "arabic script"}, "language tag"),
+                                ({"html": "x", "direction": "rtl"}, "unknown key"),
+                                ({"dir": "rtl"}, "`html` required")):
+            with self.subTest(fixture=fixture):
+                proc, _ = self.generate({"label": "Save", "odd": fixture})
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn(needle, output(proc))
+
+    def test_a_sheet_near_the_lfs_line_says_so(self):
+        proc, _ = self.generate("Save")
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertNotIn("Git LFS", output(proc))
+        # 60 variants: 7 states x 60 x 2 themes, plus 3 densities x 60 x 2.
+        proc, _ = self.generate("Save", variants=[f"v{i}" for i in range(60)],
+                                themes=("light", "dark"),
+                                densities=("compact", "comfortable", "spacious"))
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn("1,200 cells, 2,400 with the forced-colors pass", output(proc))
+        self.assertIn("Git LFS", output(proc))
+
+
 SAAS_DDL = """\
 CREATE TABLE organizations (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

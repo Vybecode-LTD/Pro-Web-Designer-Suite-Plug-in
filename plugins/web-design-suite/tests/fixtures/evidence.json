@@ -295,6 +295,31 @@
       "docs": [
         "perf-budget-gate/references/budgets.md"
       ]
+    },
+    {
+      "figure": "10 GiB",
+      "claim": "the Git LFS storage, and the LFS bandwidth a month, that GitHub Free includes; a workflow's LFS checkout spends the owner's bandwidth",
+      "source": "GitHub Docs, Git Large File Storage billing",
+      "url": "https://docs.github.com/en/billing/concepts/product-billing/git-lfs",
+      "checked": "2026-10-05",
+      "quote": "The following amounts of storage and bandwidth for downloads are included in your GitHub plan. [Plan, Bandwidth, Storage] GitHub Free: 10 GiB, 10 GiB. [...] If GitHub Actions downloads a 500 MB file that is tracked with Git LFS, it will use 500 MB of the repository owner's bandwidth. [...] If you use more than your included quota of bandwidth per month without a payment method on file, Git LFS support is disabled on your account until the next month.",
+      "docs": [
+        "component-state-matrix/references/visual-regression.md"
+      ]
+    },
+    {
+      "figure": "1 GB",
+      "also": [
+        "5 GB"
+      ],
+      "claim": "the repository size GitHub recommends",
+      "source": "GitHub Docs, About large files on GitHub",
+      "url": "https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github",
+      "checked": "2026-10-05",
+      "quote": "We recommend repositories remain small, ideally less than 1 GB, and less than 5 GB is strongly recommended.",
+      "docs": [
+        "component-state-matrix/references/visual-regression.md"
+      ]
     }
   ],
   "not_statistics": [

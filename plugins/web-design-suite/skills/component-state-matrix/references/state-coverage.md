@@ -74,7 +74,7 @@ State is a **real ARIA attribute where one exists**, `data-state` otherwise, and
 }
 ```
 
-The ring is the `outline`, and that is not a style choice. Windows High Contrast / forced-colors mode discards `box-shadow` entirely and repaints `outline` in the system highlight colour. A component's own `box-shadow`, in a later layer, replaces a shadow ring but cannot touch an outline. Draw the ring as a shadow and it vanishes for exactly the users who most need it.
+The ring is the `outline`, and that is not a style choice. Windows High Contrast / forced-colors mode discards `box-shadow` entirely and repaints `outline` in a system colour. A component's own `box-shadow`, in a later layer, replaces a shadow ring but cannot touch an outline. Draw the ring as a shadow and it vanishes for exactly the users who most need it. `snapshot_matrix.mjs --forced-colors` holds every focus-visible cell to this: under forced colours, one that computes the same style as its default cell fails.
 
 **Must not:**
 - Be removed. Ever. `outline: none` without a replacement is the single most common accessibility defect in production CSS.
@@ -225,7 +225,7 @@ The seven above are things a *user* does to a component. The list below is thing
 | **too-much-content** | three lines where you designed one | the card grows and breaks a grid row; text clips mid-word | 4× the design copy |
 | **too-little-content** | one word where you designed three | the card shrinks below its neighbours and the row looks broken | a single short word |
 | **long-string** | one unbroken token | overflows the box entirely — no space to wrap at | a 45-character word, a filename, an API key |
-| **RTL** | `dir="rtl"` | physical properties (`margin-left`, `left`) do not mirror | the same fixture with `dir="rtl"` |
+| **RTL** | `dir="rtl"` | physical properties (`margin-left`, `left`) do not mirror | the same fixture as `{"html": "…", "dir": "rtl", "lang": "ar"}` |
 | **translated-label** | German is ~35% longer than English | buttons wrap to two lines; nav bars overflow | the real string, or `+35%` padding text |
 
 Three rules that follow from this table:
@@ -235,6 +235,8 @@ Three rules that follow from this table:
 3. **The long-string fixture is not an edge case.** Filenames, email addresses, IDs and URLs are unbroken tokens and they are in every product. `overflow-wrap: anywhere` or `text-overflow: ellipsis` with a `title` — pick one per component and be consistent.
 
 The generator takes these as **content fixtures**, not as states, and renders them on their own pass against density. That is deliberate: a long string interacts with the box, and the box is what density changes. A long string does not interact with hover.
+
+A fixture written as an object, `{"html": "…", "dir": "rtl", "lang": "ar"}`, puts `dir` and `lang` on its cell's stage, so the whole component mirrors: logical properties, `:dir(rtl)` rules and the text's own direction. Give the RTL fixture real right-to-left text, not reversed English: the bidirectional algorithm, not the attribute, is what moves the punctuation and the numbers.
 
 ---
 
@@ -345,6 +347,23 @@ The order to do them in is **manifest first**. Declare the state before you writ
 6. Regenerate; confirm the cell now differs from `default` in both themes and at all three densities.
 7. Wire the attribute in the component's code, and assert on it in the behavioural test — the same attribute the CSS reads, which is the whole reason state lives in attributes.
 8. Accept the new baselines in the same commit as the CSS.
+
+### States that need interaction
+
+A custom state renders whatever attributes can put on the page, which covers most "open" states:
+
+| State | How the sheet renders it |
+|---|---|
+| a menu, disclosure or combobox, open | `{"open": {"attrs": {"aria-expanded": "true"}}}` on the trigger, with the panel's rule keyed on it (`[aria-expanded="true"] + .menu`) |
+| a `<details>`, open | `{"attrs": {"open": ""}}` on the `<details>` that carries `{attrs}` |
+| a tooltip shown on hover or focus | nothing to declare: `.trigger:hover .tip` is mirrored like any other pseudo-class rule, so the hover and focus-visible cells show it |
+| a checkbox, checked | `{"attrs": {"checked": ""}}`: the attribute sets `:checked` |
+
+What no attribute reaches, the sheet cannot render. Test these on the real page, with an interaction test that clicks and then screenshots:
+
+- **A native `<select>`'s list**, and the date and colour pickers. The browser draws them outside the page, so no screenshot of the page holds them. A customisable select (`appearance: base-select`) draws its picker in the page, but only a user action opens it.
+- **The top layer.** A modal `<dialog>` opened with `showModal()`, a `popover` shown with `showPopover()`, and their `::backdrop`. `:modal` and `:popover-open` follow the call, not an attribute; `<dialog open>` renders in place, without the top layer or the backdrop.
+- **States only script or the user sets**: `:indeterminate` (a property, not an attribute) and `:user-invalid` (after the user edits). Key the error rule on `[aria-invalid="true"]` as well, and the error cell shows it.
 
 ### When a state genuinely does not apply
 

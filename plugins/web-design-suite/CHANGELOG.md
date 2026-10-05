@@ -19,6 +19,24 @@
   that put a cell in it, and joins two with `+` (`"selected+hover"`). Only the seven
   were allowed, so state-coverage.md's own procedure for adding a state, its
   per-archetype rows and its "selected + hover" row could not be rendered.
+- **Right-to-left fixtures, and a forced-colours pass** (GT-B7). A content fixture may be
+  `{"html": "…", "dir": "rtl", "lang": "ar"}`: the direction and language go on the
+  cell's stage, so the whole component mirrors. Fixtures were inner HTML only, so the RTL
+  fixture state-coverage.md asks for could not be rendered. `snapshot_matrix.mjs
+  --forced-colors` shoots every cell under `forced-colors: active`, with its own baselines
+  and report in `forced-colors/` folders, and fails a focus-visible cell that computes the
+  same style as its default cell there: a ring drawn with `box-shadow` vanishes under
+  forced colours. state-coverage.md says which interaction states an attribute renders
+  (open menus, `<details>`, tooltips on hover or focus) and which need an interaction
+  test (a native select's list, the top layer, `:user-invalid`).
+- **Baselines recorded where the gate runs, and Git LFS past the line** (GT-B8). The
+  workflow recorded baselines on the developer's machine, whose fonts never match a Linux
+  runner's. visual-regression.md §7 adds a `workflow_dispatch` job that records them in
+  the gate's runner and uploads them, and the gate's LFS checkout with a cache. §6 starts
+  the baselines in Git LFS past about 2,000, which the pruned sheet reaches at 19
+  components, or 10 with the forced-colours pass; `generate_matrix.py` prints the count
+  once a sheet passes 1,000 cells. GitHub's LFS quota and size advice are registered in
+  `evidence.json`.
 
 ### Fixed
 
@@ -147,6 +165,12 @@
   the head before them: a quoted `<` before `{attrs}`, a conflict judged on the element
   that renders it (`error+valid` on an input, not a span), and `form_control: true`
   keeping `aria-invalid` off a `<div>`.
+- P12 part 2 (GT-B7, GT-B8): `test_content_and_a11y.MatrixModel` renders an RTL fixture,
+  refuses a bad `dir`, `lang` or key, and reads the LFS line in the summary;
+  `test_browser_runtime.MatrixSeesStateChanges` runs a `box-shadow` focus ring and a
+  `box-shadow` hover under forced colours (the ring fails, the hover does not, an outline
+  ring passes) and keeps the forced-colours baselines apart. Against `v3.3.0`, all 5
+  fail. Both browser tests pass in Playwright's Chromium and in an installed Chrome.
 
 ## 3.3.0 — 2026-10-04
 
