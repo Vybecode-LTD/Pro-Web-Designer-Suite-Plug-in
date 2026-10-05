@@ -159,8 +159,10 @@
   margin clusters to a gap: the bleed breaks the day the padding changes. apply_codemod
   pairs each negative margin with the padding of its parent rule (the rule it is nested
   in, the left side of a descendant or child selector, or a BEM element's block) and
-  reads that padding's token. extraction-and-clustering.md's example named `--pad-card`,
-  24px, for the 16px padding.
+  reads that padding's token, when that padding is set in one block of the file; set in
+  two (another `@media`, an `@layer`, the rule written twice), which one applies is not
+  certain, and the margin keeps its gap token. extraction-and-clustering.md's example
+  named `--pad-card`, 24px, for the 16px padding.
 - **A type tie snapped down when the smaller size was commoner** (LC-A12). The docs promise
   "15px becomes 16, text does not shrink", but frequency settled the tie first, so with
   14px commoner 15px became `--type-ui`, with a note saying "snapped UP to 14px" and a
@@ -315,6 +317,11 @@
   member of either list.
   Its next review found one more: a padding inside one `@media` decided a margin's cancel
   in another. Each declaration records its at-rule context, and a margin reads its own.
+  The review after that found two more, failing on its head (`edf441f`): a print padding
+  was read in print though a later base padding wins there, and a layered padding
+  replaced an unlayered one that wins the cascade. Rather than model the cascade, the
+  pairing now reads only a padding set in one block of the file; set in two, the margin
+  keeps its gap token (`test_a_padding_set_in_two_blocks_is_not_cancelled`).
 
 ## 3.3.0 — 2026-10-04
 
