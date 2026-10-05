@@ -12,13 +12,13 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is public (since 2026-09-28), and MIT-licensed like the plugin.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
-## Current state (2026-10-04)
+## Current state (2026-10-05)
 
-- **Version:** 3.3.0, released: #36 merged as `88a4886`, tagged `v3.3.0`, and published by `release.yml` with the zip, 13 `.skill` files and `SHA256SUMS` (the first GitHub release). `main` holds 3.0.0 to 3.3.0 as tagged commits. Phase 3 is done: PRs #4 to #36, the last P8 as #34 and #35 and R1 as #36. Phase 4 (3.4.0) has begun: P9 as #38.
+- **Version:** 3.3.0 is the latest release (`v3.3.0`, `88a4886`, published by `release.yml`). Phase 4 (3.4.0) is under way: P9 as #38, P10 as #39 and #40, P11 as #41, P12 part 1 as #42, all merged; `main` is at `a88d6a6`.
 - **Installed:** 3.3.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** 521. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P10 (a11y_runtime: `bypassCSP`, disabled controls, the rest of GT-C2, and a focus, forced-colors and density probe), then P11. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 122 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Tests:** 550. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P12 part 2 (the matrix model and its baseline lifecycle), then P13 (measure_vitals). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 111 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 

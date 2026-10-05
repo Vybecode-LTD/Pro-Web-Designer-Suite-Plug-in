@@ -1,39 +1,32 @@
 # Handoff
 
-**2026-10-04**, after P8 (#34, #35), R1 (#36) and P9 (#38): 3.3.0 is released and installed, and Phase 4 (3.4.0) has begun.
+**2026-10-05**, after P10 (#39, #40), P11 (#41) and P12 part 1 (#42). Phase 4 (3.4.0) is under way; 3.3.0 is the latest release.
 
-**The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then the next PRs in detail: P10 (a11y_runtime) and P11 (a11y_static and the gate docs).
+**The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then the next PRs in detail: P12 part 2 (the matrix model and its baseline lifecycle) and P13 (measure_vitals).
 
 ## State
 
-- **3.3.0 is released.** #36 merged as `88a4886`, tagged `v3.3.0`; `release.yml` published the zip, 13 `.skill` files and `SHA256SUMS`, the repository's first GitHub release. The local marketplace and the plugin cache hold the released 190 files, byte for byte, and `claude plugin details` reports 3.3.0.
-- **Merged this session**, each with CI green on its head, every review thread answered and resolved, and GitHub reporting it clean:
-  - **P8 part 1, #34: hygiene.**
-    - accessibility.md's testing procedure is `accessibility-testing.md`; accessibility.md is 52,963 bytes (was 60,400 against 60,500).
-    - The token contract names `shared/token-contract.md` as the master copy.
-    - `test_docs.Manifests` holds the repository's marketplace to the plugin's.
-    - The review's header points at the inventory; the vanilla stack's rule 4 names the starter's `.stack` (N33).
-  - **P8 part 2, #35: docs that paste into bash, PowerShell and cmd.**
-    - The README installs from GitHub, and gives `WDS` in bash, PowerShell and cmd forms, at the installed version's path.
-    - `python3` and `/tmp/` are gone from the skills' shell fences.
-    - The ESLint config pins `typescript@~6.0` beside typescript-eslint.
-  - **R1, #36:** the version, the README's paths and its `.skill` line, and the CHANGELOG heading.
-  - **P9, #38: one copy of the browser scripts' helpers.** a11y_runtime, snapshot_matrix and measure_vitals import `scripts/browser_common.mjs`, a copy of `shared/browser_common.mjs` in each skill. a11y_runtime now pauses animations, so a spinner no longer counts as a focus ring (GT-A14 (a)), and reads JSONC. `tooling/release/compare.py` compares builds by content (N34): it finds 3.3.0's local build and release the same.
-- **The reviews found 6 real issues** in #34 to #36: Codex one on #34, CodeRabbit one on #34, three on #35 (the fence reader, continued installs, `python3` at a line's end), one on #36. Each code fix has a test that fails on the head it reviewed. Two suggestions were declined with reasons in their threads. On #38, Codex and CodeRabbit found two more in `compare.py` (it trusted recorded CRCs, and two builds damaged alike compared the same); one suggestion was declined.
-- **Tests:** 521. **The plan:** 122 open items, all scheduled (`check_execution_plan.py`).
+- **Merged this session**, each with CI green on its head, every review thread answered and resolved, CodeRabbit finished on the head, and GitHub reporting it clean: #39, #40, #41 and #42, a stack merged bottom-up. `main` is at `a88d6a6`.
+
+- **What the four PRs did:**
+  - **P10 part 1, #39: a strict CSP, crashes, disabled controls.** a11y_runtime and snapshot_matrix bypass a page's CSP, which refused the freeze stylesheet they inject; measure_vitals keeps it, since a bypass would run what the CSP blocks. A crash in any of the three exits 2, never 1. Disabled controls are exempt from contrast (SC 1.4.3), except what sits in a disabled fieldset's first legend. Branded Chrome's Tab wrap on a one-stop page is no longer a keyboard trap. Closes GT-A5, GT-A14, GT-C2.
+  - **P10 part 2, #40: focus at every density.** a11y_runtime measures the focus ring again at each `data-density` the page's stylesheets name, in normal and forced colours, turning the outermost marker; web-design-studio's Phase 5 runs it. `--only` on a page is refused (it never picked checks). Closes SB-B3.
+  - **P11, #41: best practice and the budget table.** Best-practice findings (axe's, and a11y_static's `multiple-h1`, `heading-skip`, `no-main-landmark`) are warnings, labelled best practice. Every `--tags` example keeps WCAG 2.1. perf-budget-gate's "same method" table follows its method (Fast 4G 1.9 MB, 3G 12.5 KB, desktop cable 1.1 MB). Closes GT-A8, GT-A16, GT-A18, GT-C5.
+  - **P12 part 1, #42: matrix states.** The focus-visible cell carries `focus-visible focus focus-within`, so a `:focus` ring renders; `custom_states` and `a+b` combinations; `aria-invalid` on form controls only. Closes GT-A12, GT-A13, GT-C3.
+- **The reviews found 19 real issues** across the four PRs: CI 2 (Chrome's one-stop Tab wrap; a guard that raced the first paint on macOS), Codex 7, CodeRabbit 10. Among them: the CSP bypass would have changed what measure_vitals measures; the density dial sat on `<body>`; best practice still breached an `axe_violations` budget; the matrix judged form controls by the whole template. Each code fix has a test that fails on the head it reviewed.
+- **Tests:** 550. **The plan:** 111 open items, all scheduled (`check_execution_plan.py`).
 
 ## Next steps
 
-1. **The next session:** P10 (GT-A5, GT-A14 (b), GT-C2, SB-B3), then P11 (GT-A8, GT-A16, GT-A18, GT-C5).
-2. Then the rest of Phase 4 (P12 to P23), and R2, the 3.4.0 release.
+1. **The next session:** P12 part 2 (GT-B7's RTL, forced-colors pass and interaction states; GT-B8's baseline recipe and LFS), then P13 (GT-A6, GT-A17, GT-C11, GT-B5).
+2. Then the rest of Phase 4 (P14 to P23), and R2, the 3.4.0 release.
 
 ## Warnings
 
-- **A local build never matches the release's checksums** (Windows' Python 3.14 deflates with zlib-ng, the CI's with zlib). Compare them with `python -B tooling/release/compare.py OUT RELEASE_DIR`.
-- **The README's `WDS` paths name the version.** A release PR updates them with `plugin.json`; `test_docs.PasteableCommands` fails until it does.
-- **`fail_before.py` swaps the plugin, not the tests.** A fix to test code shows as a control there; show it failing by running the new assertions against the old file (`git show COMMIT:path/to/file`, with the reviewed head and the file's path in place of the two placeholders), as this session did.
+- **CI's Windows and macOS jobs run branded Chrome; Linux runs the headless shell.** They differ on Tab past the last stop, and the slower runners expose races: run a new browser test several times locally before pushing.
+- **A local build never matches the release's checksums** (zlib-ng on Windows' Python 3.14, zlib on CI). Compare with `python -B tooling/release/compare.py OUT RELEASE_DIR`.
+- **The README's `WDS` paths name the version.** A release PR updates them with `plugin.json`.
+- **`fail_before.py` swaps the plugin, not the tests,** so a test-only fix shows as a control; a review fix runs with `--rev` the head it fixes.
 - **Still open from earlier:** `--warning-700`, `--danger-100` and `--info-100` fall outside Display P3; `check_roles.py` measures a colour outside sRGB with its channels clipped.
-- **Resolve only the threads you answered,** and give a background `check.py` `timeout` 3600000.
-- **The token counter resets** on a user message and on a `<ci-monitor-event>`: keep a running total.
-- **Bash heredocs eat backslashes** (twice this session), and **don't grep `tooling/`**.
+- **Bash heredocs eat backslashes** (four times this session): write such scripts with the Write tool. **Don't grep `tooling/`.**
 - **The repository is public.** Commit nothing private.
