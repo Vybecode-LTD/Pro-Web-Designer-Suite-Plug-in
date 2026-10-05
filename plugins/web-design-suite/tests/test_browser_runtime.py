@@ -162,8 +162,12 @@ class RuntimeInABrowser(TempDirTest):
         colours discard. The default density has a ring in both modes. The dial
         is turned wherever the page keeps it: on the root, or on <body>, which
         a dial on the root alone could not reach (Codex on #40)."""
+        # Two top regions at different densities have no one current value, so
+        # none is skipped (CodeRabbit on #40).
+        regions = "<header data-density=compact><p>Top</p></header><main data-density=comfortable>"
         for where, page in (("root", self.DENSITY_PAGE),
-                            ("body", self.DENSITY_PAGE.replace("<body>", "<body data-density=comfortable>"))):
+                            ("body", self.DENSITY_PAGE.replace("<body>", "<body data-density=comfortable>")),
+                            ("regions", self.DENSITY_PAGE.replace("<main>", regions))):
             with self.subTest(dial=where):
                 findings = self.runtime(page, *only("focus", "forced"))
                 lost = {(f["rule"], f.get("density")) for f in findings
