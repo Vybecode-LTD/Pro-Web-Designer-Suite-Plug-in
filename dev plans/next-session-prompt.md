@@ -14,7 +14,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - Long thinking costs as much as long output. Decide, then act.
   - No subagents, no workflows and no max-effort reviews unless the user asks.
   - Read files by section (`grep -n`, `sed -n`, Read with offset and limit), never whole review files, and never a whole test file you only need a class of: reading `test_docs.py` whole cost 25 thousand on 2026-10-04.
-  - Run long jobs in the background and wait for the notification; never poll in a loop, and never poll CI. Read a PR's CI with the app's `get_status`, or `gh pr checks <n>` once.
+  - Run long jobs in the background and wait for the notification; never poll in a loop, and never poll CI. Read a PR's CI with the app's `get_status`, or `gh pr checks N` once (N is the PR's number).
   - Never grep `tooling/`: its `node_modules` makes a search run for minutes. Reading one named file in it is fine.
 - **Where things go.** Nothing in OneDrive or its redirected folders (Documents, Desktop, Pictures, Music, Videos). Plans and reports go in `dev plans/`; the scratchpad is for throwaway files. Tests never write into the plugin folder.
 - **The repository is public.** Read the staged diff before every commit, and never commit a secret or anything from the user's other projects.
@@ -34,7 +34,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - Run Python with `-B`. Never run `npm ci` in a worktree whose `tooling/*/node_modules` is a junction.
   - **Don't edit a file the suite reads while it runs.** Plan docs are safe. The CHANGELOG, README, references, configs, tests and the spec are not.
   - Redirect a background `check.py` to a file in the scratchpad (`> check.txt 2>&1`), not through `tail`: the failures are above the tail. Its output arrives only at the end. Give it `timeout` 3600000.
-- **Fail before, pass after.** Every fix gets a regression test, seen failing on the previous release's tag and passing now: `python -B tools/fail_before.py <test ids>` (from `plugins/web-design-suite`; the default REV is the latest `v*` tag, now `v3.3.0`). Where the code under test is newer than that tag, run it with `--rev main` too; a review fix runs against the head it fixes. **`fail_before.py` swaps the plugin, not the tests**, so a fix to test code shows as a control: show it failing by importing the old file (`git show COMMIT:plugins/web-design-suite/tests/FILE.py > tests/FILE_old.py`, with the reviewed head and the test file in place of COMMIT and FILE; call the old function, then delete the copy). Report the counts and name the controls.
+- **Fail before, pass after.** Every fix gets a regression test, seen failing on the previous release's tag and passing now: `python -B tools/fail_before.py TEST_IDS`, with the test ids in place of TEST_IDS (from `plugins/web-design-suite`; the default REV is the latest `v*` tag, now `v3.3.0`). Where the code under test is newer than that tag, run it with `--rev main` too; a review fix runs against the head it fixes. **`fail_before.py` swaps the plugin, not the tests**, so a fix to test code shows as a control: show it failing by importing the old file (`git show COMMIT:plugins/web-design-suite/tests/FILE.py > tests/FILE_old.py`, with the reviewed head and the test file in place of COMMIT and FILE; call the old function, then delete the copy). Report the counts and name the controls.
 - **CI replaces the local full runs (decision D1, in force).** Locally, `python -B tools/check.py`. It runs the whole suite when a shared file changes (`tools/`, `design-rules.json`, the configs), 6 to 9 minutes: run it in the background. Its last step audits the plugin's own skills with `--strict`, as CI does.
 - **One set of rules.** A change to what a gate accepts goes into `skills/web-design-studio/assets/rules/design-rules.json` first, as `allowed` and `refused` examples. The conformance tests then hold the audit, stylelint and ESLint to them. Data the gates restate is written by `tools/sync_rules.py`; code is changed by hand.
 - **Facts from outside** are re-read at their source on the day, and a figure the docs quote goes into `tests/fixtures/evidence.json` with its quote (`test_evidence` holds the docs and the register to each other, both ways; an entry's `docs` may name a config or script too).
@@ -55,12 +55,12 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 ## 2. Useful facts
 
 - **The plugin** is `plugins/web-design-suite/`:
-  - `skills/<13 skills>/`;
+  - `skills/`, one folder per skill (13);
   - `tests/`: 513 tests, standard-library `unittest`, with helpers in `tests/wds_support.py` (`PLUGIN`, `SKILLS`, `REPO`, `TOOLING`);
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
 - **The three browser scripts** are `a11y-audit-runner/scripts/a11y_runtime.mjs`, `component-state-matrix/scripts/snapshot_matrix.mjs` and `perf-budget-gate/scripts/measure_vitals.mjs`. Their tests are `test_browser_runtime.py` and `test_browser_scripts.py`; the real-browser ones need Playwright from `tooling/main` (CI's Linux job has the headless shell).
 - **New in P8.** `accessibility-testing.md` holds what was accessibility.md §10. `test_docs.PasteableCommands` holds the READMEs' commands to what bash, PowerShell and cmd read alike, the README's `WDS` paths to `plugin.json`'s version (a release PR updates both), and every typescript-eslint install to a TypeScript 6.0 pin. `test_docs.Manifests` holds the two marketplace manifests to each other. `test_contract.ContractCopies` compares each skill's contract with `shared/token-contract.md`.
-- **The release** is `python -B tooling/release/build.py <empty folder> --rev <sha>`, then a `v*` tag on that commit; `release.yml` is the only thing that creates a release, with the CHANGELOG's section as its notes. Its checksums will not match a Windows build (N34); compare by content.
+- **The release** is `python -B tooling/release/build.py OUT --rev SHA` (OUT an empty folder, SHA the merged commit), then a `v*` tag on that commit; `release.yml` is the only thing that creates a release, with the CHANGELOG's section as its notes. Its checksums will not match a Windows build (N34); compare by content.
 - **Installing locally:** the local marketplace, `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, is a copy of the released plugin (190 files at 3.3.0). After mirroring a release into it, run the bundled CLI (`CLAUDE.md` says where): `plugin update web-design-suite@web-design-suite`, then `plugin details`.
 - **CI** (`.github/workflows/ci.yml`) runs Windows, Linux and macOS × Python 3.9 and 3.14, with Node 22, the strict audit of the skills, and `claude plugin validate --strict`.
 - **Python 3.9 is the floor**: no `zip(strict=)`, no `match`, no `str.removeprefix`, no `X | Y` outside annotations (the files use `from __future__ import annotations`).
@@ -87,7 +87,7 @@ Items GT-A5, GT-A14, GT-C2 and SB-B3. Read them first: `gates.md` lines 37 (GT-A
 
 P10 is M-L: split it if the diff grows (GT-A5 and GT-A14 first, then GT-C2 and SB-B3), stacked on P9 if P9 is still open.
 
-**Close each PR:** the CHANGELOG under a new `## 3.4.0 — unreleased`, each item "fixed in 3.4.0" in the inventory with its test (an N item gets "*Done for 3.4.0 (PR #n)*" in the completion plan), the plan's row as `P9, #<n>`, and §9. The checker then says 122 after P9 and 118 after P10.
+**Close each PR:** the CHANGELOG under a new `## 3.4.0 — unreleased`, each item "fixed in 3.4.0" in the inventory with its test (an N item gets "*Done for 3.4.0 (PR #n)*" in the completion plan), the plan's row as `P9, #N` (N the PR's number), and §9. The checker then says 122 after P9 and 118 after P10.
 
 ## 6. End of session (never skip)
 
