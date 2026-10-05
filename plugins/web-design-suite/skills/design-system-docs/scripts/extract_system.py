@@ -494,10 +494,28 @@ def _split_colon(raw: str) -> int:
 # why a purely prefix-based classifier gets --space-section wrong.
 # ===========================================================================
 
-TIER2_EXCEPTIONS = {
-    "--space-section", "--space-subsection", "--space-block",
-    "--space-fluid-sm", "--space-fluid-md", "--space-fluid-lg", "--space-fluid-xl",
+# Law 6's lists are the spec's `tiers` (web-design-studio's design-rules.json),
+# the same ones audit_design.py's L6 reads, so the two never disagree about a
+# leak (LC-A19).
+# BEGIN design-rules: written by tools/sync_rules.py from assets/rules/design-rules.json; edit the spec, then rerun it
+TIER1_WITH_ROLE = {
+    "space-": "a proximity/inset role (--gap-related, --pad-card, --space-section)",
+    "neutral-": "a color role (--bg-surface, --fg-muted, --border-default)",
+    "accent-": "a color role (--bg-accent, --fg-accent, --border-accent)",
+    "success-": "a color role (--bg-success, --fg-success)",
+    "warning-": "a color role (--bg-warning, --fg-warning)",
+    "danger-": "a color role (--bg-danger, --fg-danger)",
+    "info-": "a color role",
+    "text-": "a type role (--type-body, --type-h2, --type-ui)",
+    "leading-": "a type role (--type-*), which carries leading in its shorthand",
+    "shadow-": "an elevation role (--elevation-card, --elevation-modal)",
 }
+TIER2_EXCEPTIONS = [
+    "--space-section", "--space-subsection", "--space-block", "--space-fluid-sm",
+    "--space-fluid-md", "--space-fluid-lg", "--space-fluid-xl",
+]
+TIER1_NULLS = ["--space-0", "--radius-none", "--shadow-none"]
+# END design-rules
 
 # Tier-1 name prefixes. --radius/--stroke/--z/--bp/--font/--measure/--width/
 # --tap-min have no Tier-2 equivalent: components read them directly and that
@@ -1109,14 +1127,9 @@ def strip_guards(selector: str) -> str:
 INTERACTIVE_HINTS = (":hover", ":active", ":focus", "cursor: pointer", "cursor:pointer")
 
 #: Tier-1 prefixes that have a Tier-2 role, so a component reading one is a
-#: Law 6 violation. Mirrors TIER1_WITH_ROLE in audit_design.py — same rule,
-#: same list, so the two tools never disagree about what counts as a leak.
-LEAKY_TIER1_PREFIXES = ("--space-", "--neutral-", "--accent-", "--success-", "--warning-",
-                        "--danger-", "--info-", "--text-", "--leading-", "--weight-",
-                        "--shadow-")
-#: Zero is zero. `--space-0` nulls a socket out; it asserts no value, so reading
-#: it from a component is not the tier violation the prefix makes it look like.
-TIER1_NULLS = {"--space-0", "--radius-none", "--shadow-none"}
+#: Law 6 violation, unless it is a null-out (TIER1_NULLS): zero is zero, and
+#: `--sections-gap: var(--space-0)` asserts no value at all.
+LEAKY_TIER1_PREFIXES = tuple("--" + p for p in TIER1_WITH_ROLE)
 
 
 @dataclass

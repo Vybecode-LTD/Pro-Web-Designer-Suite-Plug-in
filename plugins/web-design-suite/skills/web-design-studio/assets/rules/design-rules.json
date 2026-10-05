@@ -43,6 +43,32 @@
     "rule":"A literal 0 is allowed wherever a length token is. --space-0 exists for token files and layout primitives; component code writes 0.",
     "allowed": [".card { padding: 0; }", ".card__media { margin-block-end: 0; }"]
   },
+  "tiers": {
+    "gates": ["audit"],
+    "rule":"Law 6: component code reads roles. Reading a Tier-1 primitive that has a role (with_role, by prefix, with the advice the audit gives) skips a tier. Not leaks: the page-rhythm roles that live under --space- (tier2_exceptions), and the null-outs, which assert no value (nulls). design-system-docs' extract_system.py reads the same three lists for its tier1-leak gap, so the two agree.",
+    "with_role": {
+      "space-": "a proximity/inset role (--gap-related, --pad-card, --space-section)",
+      "neutral-": "a color role (--bg-surface, --fg-muted, --border-default)",
+      "accent-": "a color role (--bg-accent, --fg-accent, --border-accent)",
+      "success-": "a color role (--bg-success, --fg-success)",
+      "warning-": "a color role (--bg-warning, --fg-warning)",
+      "danger-": "a color role (--bg-danger, --fg-danger)",
+      "info-": "a color role",
+      "text-": "a type role (--type-body, --type-h2, --type-ui)",
+      "leading-": "a type role (--type-*), which carries leading in its shorthand",
+      "shadow-": "an elevation role (--elevation-card, --elevation-modal)"
+    },
+    "tier2_exceptions": ["--space-section", "--space-subsection", "--space-block",
+                         "--space-fluid-sm", "--space-fluid-md", "--space-fluid-lg", "--space-fluid-xl"],
+    "nulls": ["--space-0", "--radius-none", "--shadow-none"],
+    "allowed": [".card { --card-gap: var(--space-0); gap: var(--card-gap); }",
+                ".card { box-shadow: var(--shadow-none); }",
+                ".card { padding-block: var(--space-section); }",
+                ".card { padding: var(--pad-card); }"],
+    "refused": [".card { padding: var(--space-4); }",
+                ".card { color: var(--neutral-700); }",
+                ".card { gap: var(--space-0-5); }"]
+  },
   "margins_in_components": {
     "gates": ["audit", "stylelint"],
     "rule": "Law 2: a component never sets its own outer margin. Legal: alignment, 0s and autos only (`0 auto`, `0 0 0 auto`), calc(var(--token) * -1) to cancel a known token, the owl, the whole `> * + *` in the parent's own rule, through any @media around the margin, and a margin on the component's own generated content (::before, ::after, ::marker), which sits inside it. `.card + *` is not the owl: it is the component spacing its next sibling. `var(--gap-related) auto` is not alignment: the token sets the component's own block margin. A selector that names `prose` is no exemption: a `.prose` flow container is a layout, and belongs in a layout file, where its owl is allowed anyway.",

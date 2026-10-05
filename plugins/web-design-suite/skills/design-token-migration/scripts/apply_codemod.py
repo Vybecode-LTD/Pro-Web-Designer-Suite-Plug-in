@@ -405,6 +405,154 @@ def replacement_for(rule: dict, negate: bool) -> str:
     return text
 
 
+def selector_key(selector: str) -> str:
+    return " ".join(selector.split())
+
+
+# The inline sides stay logical: which of left and right `inline-start` is
+# depends on `direction`, which a stylesheet rarely says (horizontal writing
+# assumed for block).
+LONGHAND_SIDES = {
+    "top": ("top",), "right": ("right",), "bottom": ("bottom",), "left": ("left",),
+    "block": ("top", "bottom"), "inline": ("inline-start", "inline-end"),
+    "block-start": ("top",), "block-end": ("bottom",),
+    "inline-start": ("inline-start",), "inline-end": ("inline-end",),
+}
+# The sides that can set one side, left to right and right to left.
+BY_DIRECTION = {
+    "left": (("left", "inline-start"), ("left", "inline-end")),
+    "right": (("right", "inline-end"), ("right", "inline-start")),
+    "inline-start": (("inline-start", "left"), ("inline-start", "right")),
+    "inline-end": (("inline-end", "right"), ("inline-end", "left")),
+}
+SHORTHAND_SIDES = {
+    1: [("top", "right", "bottom", "left")],
+    2: [("top", "bottom"), ("left", "right")],
+    3: [("top",), ("left", "right"), ("bottom",)],
+    4: [("top",), ("right",), ("bottom",), ("left",)],
+}
+
+
+def box_sides(prop: str, count: int, index: int) -> Tuple[str, ...]:
+    """The sides one slot of a padding or margin sets."""
+    if "-" in prop:
+        side = prop.split("-", 1)[1]
+        sides = LONGHAND_SIDES.get(side, ())
+        if side in ("block", "inline") and count == 2:        # start, then end
+            return sides[index:index + 1]
+        return sides
+    slots = SHORTHAND_SIDES.get(count, [])
+    return slots[index] if index < len(slots) else ()
+
+
+def selector_list(selector: str) -> List[str]:
+    """`.a, .panel` as its members, split at top-level commas only."""
+    out, depth, start = [], 0, 0
+    for i, ch in enumerate(selector):
+        depth += {"(": 1, ")": -1}.get(ch, 0)
+        if ch == "," and depth == 0:
+            out.append(selector[start:i])
+            start = i + 1
+    out.append(selector[start:])
+    return [selector_key(s) for s in out if s.strip()]
+
+
+# {selector: {side: [(block, at-rule context, !important, source offset,
+#                     the value's keys, its rule or None)]}}
+Pads = Dict[str, Dict[str, List[Tuple[int, tuple, bool, int, set, Optional[dict]]]]]
+
+
+def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Pads:
+    """Every padding declaration in the file, by selector (each member of a
+    selector list) and side, in source order, with the block it sits in."""
+    out: Pads = {}
+    for d in decls:
+        if not d.prop.startswith("padding"):
+            continue
+        value = text[d.value_offset:d.value_offset + len(d.value)]
+        # `!important` is not a slot: `padding: 16px !important` is one side value.
+        important = "!important" in value.lower()
+        if important:
+            value = value[:value.lower().index("!important")]
+        slots = split_slots(mask_strings_and_urls(value))
+        for i, (slot, klass) in enumerate(zip(slots, slot_classes(d.prop, slots))):
+            real = value[slot.start:slot.end]
+            rule = mapping.value_rule(klass, real)[0] if klass else None
+            for member in selector_list(d.selector):
+                for side in box_sides(d.prop, len(slots), i):
+                    out.setdefault(member, {}).setdefault(side, []).append(
+                        (d.block_start, d.context, important, d.decl_offset,
+                         set(canon_slot(real)), rule))
+    return out
+
+
+def parent_contexts(member: str, nested_in: str) -> List[List[str]]:
+    """Where one member of a margin's selector can find the padding it cancels,
+    in order: the rule it is nested in (every member of that rule's list), the
+    left side of a descendant or child selector (`.panel > .bleed`), and a BEM
+    element's block (`.card__media` in `.card`)."""
+    out = [selector_list(nested_in)] if nested_in else []
+    m = re.search(r"\s*(?:>|\s)\s*(?=[^\s>]+$)", member)
+    if m:
+        out.append([member[:m.start()]])
+    m = re.match(r"^(\.[A-Za-z][\w-]*?)__[\w-]+$", member)
+    if m:
+        out.append([m.group(1)])
+    return out
+
+
+def cancelled_padding(d, slot: str, sides: Sequence[str], pads: Pads) -> Optional[dict]:
+    """The rule of the padding a negative margin cancels: its parent rule's
+    padding of the same size on each side the margin sets, all of them mapping
+    by one rule, for every member of the margin's selector list
+    (extraction-and-clustering.md §10). A negative cancel must read the token the
+    padding reads, or the bleed breaks the day the padding changes; `-16px` in a
+    margin alone clusters to a gap token."""
+    keys = set(canon_slot(slot.strip().lstrip("-")))
+
+    def padding(parent: str, side: str):
+        # Only a padding set in one block of the whole file is certain: the last
+        # `!important` declaration there wins, or else the last one. Set in two
+        # blocks, which wins depends on the @media that applies, the @layer, or
+        # the order, so keep the gap token. A padding inside another media
+        # query never applies here.
+        # An inline side is read both ways, left to right and right to left,
+        # and must come out the same: `padding-inline-start` is the left
+        # padding only when the direction is.
+        sides = pads.get(parent, {})
+        got = []
+        for names in BY_DIRECTION.get(side, ((side,),)):
+            found = sorted((e for n in names for e in sides.get(n, [])), key=lambda e: e[3])
+            if not found or len({entry[0] for entry in found}) > 1:
+                return None
+            _, context, _, _, keys, rule = ([e for e in found if e[2]] or found)[-1]
+            if d.context[:len(context)] != context:
+                return None
+            got.append((keys, rule))
+        same = all(k == got[0][0] and r is got[0][1] for k, r in got)
+        return got[0] if same else None
+
+    def in_parent(parent: str) -> Optional[dict]:
+        found = [padding(parent, side) for side in sides]
+        if not found or not all(f and f[1] and f[0] & keys for f in found):
+            return None
+        rules = {id(f[1]) for f in found}
+        return found[0][1] if len(rules) == 1 else None
+
+    picked = []
+    for member in selector_list(d.selector):
+        hit = None
+        for group in parent_contexts(member, d.parent):
+            hits = [in_parent(p) for p in group]
+            if hits and all(hits) and len({id(h) for h in hits}) == 1:
+                hit = hits[0]
+                break
+        if hit is None:
+            return None
+        picked.append(hit)
+    return picked[0] if picked and len({id(h) for h in picked}) == 1 else None
+
+
 def plan_css(text: str, mapping: Mapping, *, base: int = 0,
              source_name: str = "", skips: Optional[List[Skip]] = None,
              blanked: Optional[str] = None, slash_comments: bool = True) -> List[Edit]:
@@ -422,6 +570,8 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
 
     def line_of(off: int) -> int:
         return text.count("\n", 0, off) + 1
+
+    pads = padding_rules(text, decls, mapping)
 
     for d in decls:
         prop = d.prop
@@ -491,6 +641,8 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
             rule, negate = mapping.value_rule(klass, real)
             if not rule:
                 continue
+            if negate and prop.startswith("margin"):
+                rule = cancelled_padding(d, real, box_sides(prop, len(slots), parent), pads) or rule
             edits.append(Edit(
                 base + d.value_offset + slot.start,
                 base + d.value_offset + slot.end,

@@ -94,7 +94,7 @@ def spec_examples() -> list[Example]:
 
     margins = SPEC["margins_in_components"]
     for verdict in ("allowed", "refused"):
-        for section in ("nesting", "zero", "system_colors"):
+        for section in ("nesting", "zero", "system_colors", "tiers"):
             for css in SPEC[section].get(verdict, []):
                 add(section, verdict, css, rule(css))
         for css in SPEC["layers"][verdict]:
@@ -307,6 +307,48 @@ class StylelintFollowsTheSpec(unittest.TestCase):
         it has to follow those rules too, with a real-tool test."""
         self.assertEqual(["audit"], SPEC["sass"]["gates"])
         self.assertNotRegex(self.config, r"(?i)s[ac]ss")
+
+
+class TheTierListsAgree(TempDirTest):
+    """LC-A19: audit_design's L6 and extract_system's tier1-leak gap read the
+    same prefix, role-exception and null-out lists, the spec's `tiers`, so they
+    give the same verdict on the same line (the review's `fx/l6` card)."""
+
+    CARD = ("@layer components {\n  .card {\n    --card-gap: var(--space-0);\n"
+            "    --card-radius: var(--radius-none);\n    --card-shadow: var(--shadow-none);\n"
+            "    --card-pad: var(--space-6);\n    --card-band: var(--space-section);\n"
+            "    gap: var(--card-gap);\n    border-radius: var(--card-radius);\n"
+            "    box-shadow: var(--card-shadow);\n    padding: var(--card-pad);\n"
+            "    margin-block: var(--card-band);\n  }\n}\n")
+
+    def test_the_audit_and_extract_system_flag_the_same_reads(self):
+        self.write("styles/tokens.css", ":root {\n  --space-0: 0;\n  --space-6: 1.5rem;\n"
+                   "  --radius-none: 0;\n  --shadow-none: none;\n  --space-section: 4rem;\n}\n")
+        card = self.write("src/components/card.module.css", self.CARD)
+        audit = load_script("web-design-studio", "audit_design")
+        found, _, _ = audit.audit_run([str(card)])
+        by_audit = sorted(re.search(r"`(--[\w-]+)`", f.message).group(1)
+                          for f in found if f.rule == "tier1-leak")
+        out = self.tmp / "system.json"
+        proc = subprocess.run([sys.executable, "-B", "-m", "scripts.extract_system", "styles", "src",
+                               "--root", str(self.tmp), "--out", str(out)],
+                              cwd=self.tmp, capture_output=True,
+                              env=env(PYTHONPATH=str(SKILLS / "design-system-docs")))
+        self.assertEqual(0, proc.returncode, output(proc))
+        gaps = json.loads(out.read_text(encoding="utf-8"))["gaps"]
+        by_extract = sorted(g["token"] for g in gaps if g["kind"] == "tier1-leak")
+        self.assertEqual(["--space-6"], by_audit, found)
+        self.assertEqual(by_audit, by_extract)
+
+    def test_both_read_the_specs_lists(self):
+        tiers = SPEC["tiers"]
+        audit = load_script("web-design-studio", "audit_design")
+        extract = load_script("design-system-docs", "extract_system")
+        for module in (audit, extract):
+            with self.subTest(module=module.__name__):
+                self.assertEqual(tiers["with_role"], module.TIER1_WITH_ROLE)
+                self.assertEqual(tiers["tier2_exceptions"], list(module.TIER2_EXCEPTIONS))
+                self.assertEqual(tiers["nulls"], list(module.TIER1_NULLS))
 
 
 class TheDocsFollowTheSpec(unittest.TestCase):
