@@ -26,7 +26,7 @@ import subprocess
 import sys
 import unittest
 
-from wds_support import NODE, NPM, SKILLS, TempDirTest, env, output, run_node
+from wds_support import NODE, NPM, PLUGIN, SKILLS, TempDirTest, env, output, run_node
 
 STUB_PLAYWRIGHT = """\
 export const chromium = {
@@ -186,6 +186,47 @@ class AxeFixText(unittest.TestCase):
         clipped, short = json.loads(proc.stdout.decode("utf-8"))
         self.assertEqual(clipped, "Element has no title attribute Element …")
         self.assertEqual(short, "short")
+
+
+SHARED = PLUGIN / "shared" / "browser_common.mjs"
+MOVED = ("loadPlaywright", "npmGlobalRoot", "nodeModulesAbove", "launchBrowser", "installedBrowsers",
+         "readJsonFile")
+
+
+class SharedHelpers(unittest.TestCase):
+    """P9 (GT-C13): each browser script carried its own copy of the browser
+    resolution, the freeze CSS and the JSON reader, and the copies drifted:
+    a11y_runtime shortened animations without pausing them, and read no
+    JSONC. Now each skill has a byte-identical copy of the master beside its
+    script."""
+
+    def scripts(self):
+        return {name: (SKILLS / skill / "scripts" / script) for name, (skill, script) in SCRIPTS.items()}
+
+    def test_every_skills_copy_is_the_master_copy(self):
+        copies = sorted(SKILLS.glob("*/scripts/browser_common.mjs"))
+        self.assertEqual(sorted(s.parent / "browser_common.mjs" for s in self.scripts().values()), copies)
+        master = SHARED.read_bytes()
+        self.assertEqual([], [p.relative_to(PLUGIN).as_posix() for p in copies if p.read_bytes() != master],
+                         "copy shared/browser_common.mjs over these")
+
+    def test_no_script_restates_a_shared_helper(self):
+        for name, script in self.scripts().items():
+            text = script.read_text(encoding="utf-8")
+            with self.subTest(script=name):
+                self.assertIn("from './browser_common.mjs';", text)
+                self.assertEqual([], [f for f in MOVED if re.search(rf"^(?:async )?function {f}\(", text, re.M)])
+                self.assertNotRegex(text, r"\bconst DEFAULT_BROWSER\b")
+                self.assertNotRegex(text, r"animation-duration\s*:")
+
+    def test_the_freeze_pauses_animations(self):
+        """A shortened animation that still runs moves between two screenshots."""
+        common = SHARED.read_text(encoding="utf-8")
+        freeze = re.search(r"FREEZE_ANIMATIONS_CSS = `(.*?)`", common, re.S).group(1)
+        self.assertIn("animation-play-state: paused !important", freeze)
+        for name in ("a11y_runtime", "snapshot_matrix"):
+            with self.subTest(script=name):
+                self.assertIn("FREEZE_ANIMATIONS_CSS", self.scripts()[name].read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

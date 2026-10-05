@@ -61,12 +61,11 @@
  */
 
 import { createRequire } from 'node:module';
-import { execSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const DEFAULT_BROWSER = '/opt/pw-browsers/chromium';
+import { FREEZE_ANIMATIONS_CSS, launchBrowser, loadPlaywright } from './browser_common.mjs';
 
 // ---------------------------------------------------------------------------
 // Arguments
@@ -143,119 +142,12 @@ function parseArgs(argv) {
 }
 
 // ---------------------------------------------------------------------------
-// Resolving playwright without assuming a local node_modules
-// ---------------------------------------------------------------------------
-
-async function loadPlaywright() {
-  const tried = [];
-  try {
-    return await import('playwright');
-  } catch (err) { tried.push(`import 'playwright' — ${err.code || err.message}`); }
-
-  const roots = [];
-  if (process.env.NODE_PATH) roots.push(...process.env.NODE_PATH.split(path.delimiter));
-  roots.push(...nodeModulesAbove(process.cwd()), npmGlobalRoot());
-
-  for (const root of roots.filter(Boolean)) {
-    for (const entry of ['index.mjs', 'index.js']) {
-      const p = path.join(root, 'playwright', entry);
-      if (!fs.existsSync(p)) continue;
-      try {
-        return await import(pathToFileURL(p).href);
-      } catch (err) { tried.push(`${p} — ${err.message}`); }
-    }
-  }
-  die(
-    'cannot load the `playwright` module.\n' +
-    '  Install it without pulling a browser down:\n' +
-    '      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D playwright\n' +
-    '  or point NODE_PATH at a global install:\n' +
-    '      NODE_PATH="$(npm root -g)" node snapshot_matrix.mjs ...\n' +
-    '  Tried:\n    ' + tried.join('\n    ')
-  );
-}
-
-// npm is npm.cmd on Windows, which execFile cannot start without a shell;
-// execSync always goes through one.
-let npmRoot;
-function npmGlobalRoot() {
-  if (npmRoot === undefined) {
-    try {
-      npmRoot = execSync('npm root -g', {
-        encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 20000,
-      }).trim();
-    } catch { npmRoot = ''; }   // npm may not be on PATH; that is fine
-  }
-  return npmRoot;
-}
-
-// A bare import('playwright') only searches upward from this script, which
-// lives in the plugin, not in the project under test.
-function nodeModulesAbove(dir) {
-  const found = [];
-  for (let d = path.resolve(dir); ; d = path.dirname(d)) {
-    found.push(path.join(d, 'node_modules'));
-    if (path.dirname(d) === d) return found;
-  }
-}
-
-// The browser is never downloaded. An explicit path must exist and start;
-// otherwise the first of these that starts wins: the sandbox default, the
-// browser Playwright itself would launch (its own Chromium or headless shell,
-// if installed), an installed Chrome or Edge. Each is tried in turn because an
-// installed browser can still fail to start.
-async function launchBrowser(chromium, explicit, options) {
-  const candidates = explicit ? [explicit]
-    : [...(fs.existsSync(DEFAULT_BROWSER) ? [DEFAULT_BROWSER] : []), undefined,
-       ...installedBrowsers().filter((p) => fs.existsSync(p))];
-  const tried = [];
-  for (const exe of candidates) {
-    const label = exe || "Playwright's own Chromium";
-    if (exe && !fs.existsSync(exe)) { tried.push(`${label}: no such file`); continue; }
-    try {
-      return { browser: await chromium.launch({ ...options, executablePath: exe }),
-               label, auto: !explicit };
-    } catch (err) {
-      tried.push(`${label}: ${String(err.message || err).split('\n')[0]}`);
-    }
-  }
-  return { tried };
-}
-
-function installedBrowsers() {
-  if (process.platform === 'win32') {
-    const env = process.env;
-    return [env.PROGRAMFILES, env['PROGRAMFILES(X86)'], env.LOCALAPPDATA].filter(Boolean)
-      .flatMap((root) => [
-        path.join(root, 'Google', 'Chrome', 'Application', 'chrome.exe'),
-        path.join(root, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-      ]);
-  }
-  if (process.platform === 'darwin') {
-    return ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-            '/Applications/Chromium.app/Contents/MacOS/Chromium',
-            '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'];
-  }
-  return ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome',
-          '/usr/bin/google-chrome-stable', '/snap/bin/chromium', '/usr/bin/microsoft-edge'];
-}
-
-// ---------------------------------------------------------------------------
 // Determinism
 // ---------------------------------------------------------------------------
 // Every line here removes one source of flake. A visual check that fails at
 // random is worse than no visual check, because the team learns to ignore it.
 
-const FREEZE_CSS = `
-  *, *::before, *::after {
-    animation-play-state: paused !important;
-    animation-delay: -1ms !important;
-    animation-duration: 1ms !important;
-    transition-duration: 1ms !important;
-    transition-delay: 0ms !important;
-    caret-color: transparent !important;
-    scroll-behavior: auto !important;
-  }
+const FREEZE_CSS = FREEZE_ANIMATIONS_CSS + `
   html { scrollbar-width: none; }
   ::-webkit-scrollbar { display: none !important; }
 `;
@@ -472,7 +364,7 @@ async function main() {
   const started = Date.now();
   const log = (s) => { if (!opts.quiet) process.stdout.write(s + '\n'); };
 
-  const { chromium } = await loadPlaywright();
+  const { chromium } = await loadPlaywright(die, 'node snapshot_matrix.mjs ...');
   const launched = await launchBrowser(chromium, opts.browser, {
     args: ['--force-color-profile=srgb', '--disable-lcd-text',
            '--font-render-hinting=none', '--hide-scrollbars'],
