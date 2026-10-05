@@ -243,6 +243,14 @@ class RuntimeArguments(TempDirTest):
                 self.assertEqual(proc.returncode, 2, output(proc))
                 self.assertIn("--densities", output(proc))
 
+    def test_valid_densities_pass_the_arguments(self):
+        """CodeRabbit on #40: the valid forms, held to reaching a later check."""
+        for value in ("auto", "none", "compact,spacious"):
+            with self.subTest(value=value):
+                proc = self.run_runtime("--file", "PAGE", "--densities", value, "--skip", "not-a-check")
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn('--skip "not-a-check" is not a check', output(proc))
+
 
 class ContextOptions(unittest.TestCase):
     """GT-A5: the stub above sees only the contexts a script opens before it

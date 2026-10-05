@@ -7,7 +7,9 @@
 - **The focus ring is measured at every density** (SB-B3). On a page, a11y_runtime
   measures the ring again at each `data-density` value the page's own stylesheets name,
   in normal colours and under forced colours, since the density dial rescales the
-  padding that keeps a ring clear of an `overflow: hidden` toolbar. A finding names its
+  padding that keeps a ring clear of an `overflow: hidden` toolbar. It turns the dial
+  where the page keeps it: on the root, or on the outermost `data-density` below it, such
+  as `<body>`; a region marked inside another keeps its own. A finding names its
   density; `--densities LIST` names them by hand, and `none` turns it off. web-design-
   studio's Phase 5 runs it on the built page, and review-checklist 8.2 and 8.9 say what
   it measures and what is still by eye.
@@ -103,7 +105,11 @@
   again with `--densities none`; `test_browser_scripts.RuntimeArguments` refuses `--only`
   on a page and a bad `--densities`. Against `v3.3.0`, 2 fail; the `--densities` test is
   a control, since 3.3.0 refused the unknown option. The runtime tests that passed
-  `--only CHECK` to a page now leave the other checks out with `--skip`.
+  `--only CHECK` to a page now leave the other checks out with `--skip`. Codex's review
+  of #40 found the dial set on the root alone, which a `<body data-density>` masks: the
+  density test runs both, and fails on the PR's first head. `VitalsUnderCsp`'s control
+  page now shifts after its first paint, since a shift before it is not counted (it
+  failed on a slow macOS runner).
 - P11 (GT-A8, GT-A16, GT-A18): `test_facts.AxeTagAdvice` holds every `--tags` list that
   names `wcag2a` to naming `wcag21a` and `wcag21aa`, and reads the pinned axe-core's tags
   for the rules the docs name; `test_browser_runtime.test_a_best_practice_rule_is_a_warning`
