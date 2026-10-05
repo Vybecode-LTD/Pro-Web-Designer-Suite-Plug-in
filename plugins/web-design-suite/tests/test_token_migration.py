@@ -213,6 +213,30 @@ class MigrationPipeline(TempDirTest):
         self.assertIn(f"+.panel > .bleed {{ margin-inline: calc(var({token('pad-all', '16px')}) * -1); }}",
                       diff)
 
+    def test_a_cancel_keeps_to_its_side_the_cascade_and_each_selector(self):
+        # CodeRabbit on #49: the right margin is not the left padding's cancel; a
+        # later `padding-inline` wins over `padding`; each member of a grouped
+        # margin selector finds its own parent.
+        self.write("src/a.css", ".s { padding-left: 16px; padding-right: 8px; }\n"
+                                ".s__x { margin-right: -16px; }\n"
+                                ".c { padding: 16px; padding-inline: 16px; }\n"
+                                ".c__x { margin-inline: -16px; }\n"
+                                ".g { padding: 16px; }\n.h { padding: 16px; }\n"
+                                ".g__m, .h__m { margin-block-start: -16px; }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+
+        def token(klass, value):
+            return next(r["token"] for r in mapping["rules"]
+                        if klass in r.get("prop_classes", []) and value in r["match"])
+
+        inline16, all16 = token("pad-inline", "16px"), token("pad-all", "16px")
+        self.assertNotEqual(inline16, all16, mapping["rules"])
+        diff = self.codemod(self.tmp / "src")
+        line = {l.split(" {")[0][1:]: l for l in diff.splitlines() if l.startswith("+.")}
+        self.assertNotIn(f"var({inline16})", line[".s__x"])
+        self.assertIn(f"margin-inline: calc(var({inline16}) * -1)", line[".c__x"])
+        self.assertIn(f"margin-block-start: calc(var({all16}) * -1)", line[".g__m, .h__m"])
+
     def test_a_negative_margin_with_nothing_to_cancel_keeps_its_own_token(self):
         # Control: no padding in the parent rule, so it is a spacing value of its own.
         self.write("src/a.css", ".row { gap: 16px; }\n.row__item { margin-block-start: -16px; }\n"

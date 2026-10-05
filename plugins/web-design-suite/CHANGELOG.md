@@ -321,6 +321,10 @@
   Codex's review of #49 found two more, failing on its head: a cancel matched the padding
   by size alone, so `margin-inline: -8px` read an 8px block padding's token, and a padding
   declared for `.a, .panel` was not `.panel`'s. The pairing keeps to the axis and splits
+  selector lists. CodeRabbit's found three more, failing on that fix: the axis did not
+  tell left from right, a later `padding-inline` did not replace `padding`, and a grouped
+  margin selector found no parent. The pairing works by side, in cascade order, for each
+  member of either list.
   selector lists.
 - P15 part 2 (LC-A14, LC-C4, LC-C12): `test_versioning.DeprecateRewritesAndCountsAColourRename`
   runs the review's `fx/dep/client` rules through deprecate.py's mapping, the codemod and

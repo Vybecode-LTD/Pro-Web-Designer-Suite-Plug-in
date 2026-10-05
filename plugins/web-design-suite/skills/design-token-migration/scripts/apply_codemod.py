@@ -409,15 +409,30 @@ def selector_key(selector: str) -> str:
     return " ".join(selector.split())
 
 
-def box_axes(prop: str, count: int, index: int) -> Tuple[str, ...]:
-    """The axes one slot of a padding or margin sets: `block`, `inline` or both."""
-    side = prop.split("-", 1)[1] if "-" in prop else ""
-    if side:
-        return (("inline",) if side.startswith(("inline", "left", "right"))
-                else ("block",) if side.startswith(("block", "top", "bottom")) else ())
-    if count == 1:
-        return ("block", "inline")
-    return ("block",) if index % 2 == 0 else ("inline",)
+LONGHAND_SIDES = {
+    "top": ("top",), "right": ("right",), "bottom": ("bottom",), "left": ("left",),
+    "block": ("top", "bottom"), "inline": ("left", "right"),
+    "block-start": ("top",), "block-end": ("bottom",),
+    "inline-start": ("left",), "inline-end": ("right",),      # left to right
+}
+SHORTHAND_SIDES = {
+    1: [("top", "right", "bottom", "left")],
+    2: [("top", "bottom"), ("left", "right")],
+    3: [("top",), ("left", "right"), ("bottom",)],
+    4: [("top",), ("right",), ("bottom",), ("left",)],
+}
+
+
+def box_sides(prop: str, count: int, index: int) -> Tuple[str, ...]:
+    """The sides one slot of a padding or margin sets."""
+    if "-" in prop:
+        side = prop.split("-", 1)[1]
+        sides = LONGHAND_SIDES.get(side, ())
+        if side in ("block", "inline") and count == 2:        # start, then end
+            return sides[index:index + 1]
+        return sides
+    slots = SHORTHAND_SIDES.get(count, [])
+    return slots[index] if index < len(slots) else ()
 
 
 def selector_list(selector: str) -> List[str]:
@@ -432,10 +447,14 @@ def selector_list(selector: str) -> List[str]:
     return [selector_key(s) for s in out if s.strip()]
 
 
-def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Dict[str, Dict[Tuple[str, str], dict]]:
-    """Each rule's padding, by selector (each member of a selector list):
-    {(axis, value key): the rule it maps by}."""
-    out: Dict[str, Dict[Tuple[str, str], dict]] = {}
+Pads = Dict[str, Dict[str, Tuple[set, Optional[dict]]]]
+
+
+def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Pads:
+    """Each rule's padding, by selector (each member of a selector list), by
+    side: {side: (the value's keys, the rule it maps by, or None)}. Later
+    declarations replace earlier ones, as the cascade does."""
+    out: Pads = {}
     for d in decls:
         if not d.prop.startswith("padding"):
             continue
@@ -444,47 +463,55 @@ def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Dict[str, Dic
         for i, (slot, klass) in enumerate(zip(slots, slot_classes(d.prop, slots))):
             real = value[slot.start:slot.end]
             rule = mapping.value_rule(klass, real)[0] if klass else None
-            if not rule:
-                continue
             for member in selector_list(d.selector):
-                for axis in box_axes(d.prop, len(slots), i):
-                    for key in canon_slot(real):
-                        out.setdefault(member, {}).setdefault((axis, key), rule)
+                for side in box_sides(d.prop, len(slots), i):
+                    out.setdefault(member, {})[side] = (set(canon_slot(real)), rule)
     return out
 
 
-def parent_selectors(d) -> List[str]:
-    """The rules a declaration's rule sits inside: the one it is nested in,
-    the left side of a descendant or child selector (`.panel > .bleed`), and a
-    BEM element's block (`.card__media` in `.card`)."""
-    out = [selector_key(d.parent)] if d.parent else []
-    sel = selector_key(d.selector)
-    if "," in sel:
-        return out
-    m = re.search(r"\s*(?:>|\s)\s*(?=[^\s>]+$)", sel)
+def parent_contexts(member: str, nested_in: str) -> List[List[str]]:
+    """Where one member of a margin's selector can find the padding it cancels,
+    in order: the rule it is nested in (every member of that rule's list), the
+    left side of a descendant or child selector (`.panel > .bleed`), and a BEM
+    element's block (`.card__media` in `.card`)."""
+    out = [selector_list(nested_in)] if nested_in else []
+    m = re.search(r"\s*(?:>|\s)\s*(?=[^\s>]+$)", member)
     if m:
-        out.append(sel[:m.start()])
-    m = re.match(r"^(\.[A-Za-z][\w-]*?)__[\w-]+$", sel)
+        out.append([member[:m.start()]])
+    m = re.match(r"^(\.[A-Za-z][\w-]*?)__[\w-]+$", member)
     if m:
-        out.append(m.group(1))
+        out.append([m.group(1)])
     return out
 
 
-def cancelled_padding(d, slot: str, axes: Sequence[str],
-                      pads: Dict[str, Dict[Tuple[str, str], dict]]) -> Optional[dict]:
+def cancelled_padding(d, slot: str, sides: Sequence[str], pads: Pads) -> Optional[dict]:
     """The rule of the padding a negative margin cancels: its parent rule's
-    padding of the same size on the same axis, every axis the margin sets
-    agreeing (extraction-and-clustering.md §10). A negative cancel must read the
-    token the padding reads, or the bleed breaks the day the padding changes;
-    `-16px` in a margin alone clusters to a gap token."""
-    keys = canon_slot(slot.strip().lstrip("-"))
-    for parent in parent_selectors(d):
-        index = pads.get(parent, {})
-        for key in keys:
-            hits = [index.get((axis, key)) for axis in axes]
-            if hits and all(hits) and all(h is hits[0] for h in hits):
-                return hits[0]
-    return None
+    padding of the same size on each side the margin sets, all of them mapping
+    by one rule, for every member of the margin's selector list
+    (extraction-and-clustering.md §10). A negative cancel must read the token the
+    padding reads, or the bleed breaks the day the padding changes; `-16px` in a
+    margin alone clusters to a gap token."""
+    keys = set(canon_slot(slot.strip().lstrip("-")))
+
+    def in_parent(parent: str) -> Optional[dict]:
+        found = [pads.get(parent, {}).get(side) for side in sides]
+        if not found or not all(f and f[1] and f[0] & keys for f in found):
+            return None
+        rules = {id(f[1]) for f in found}
+        return found[0][1] if len(rules) == 1 else None
+
+    picked = []
+    for member in selector_list(d.selector):
+        hit = None
+        for group in parent_contexts(member, d.parent):
+            hits = [in_parent(p) for p in group]
+            if hits and all(hits) and len({id(h) for h in hits}) == 1:
+                hit = hits[0]
+                break
+        if hit is None:
+            return None
+        picked.append(hit)
+    return picked[0] if picked and len({id(h) for h in picked}) == 1 else None
 
 
 def plan_css(text: str, mapping: Mapping, *, base: int = 0,
@@ -580,7 +607,7 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
             if not rule:
                 continue
             if negate and prop.startswith("margin"):
-                rule = cancelled_padding(d, real, box_axes(prop, len(slots), parent), pads) or rule
+                rule = cancelled_padding(d, real, box_sides(prop, len(slots), parent), pads) or rule
             edits.append(Edit(
                 base + d.value_offset + slot.start,
                 base + d.value_offset + slot.end,
