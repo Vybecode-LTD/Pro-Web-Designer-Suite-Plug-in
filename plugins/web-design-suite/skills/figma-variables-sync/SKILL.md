@@ -56,7 +56,9 @@ Figma, and only one of them, the REST API, requires an Enterprise plan.
 > shapes: `references/figma-mapping.md` §14.
 
 Both scripts read the exported-JSON shapes and the REST shape, and detect which
-they were handed. Nothing in the workflow below requires a token.
+they were handed, through one reader, `scripts/figma_common.py`: the audit and
+the converter cannot disagree about what a file says. Nothing in the workflow
+below requires a token.
 
 ---
 
@@ -242,7 +244,11 @@ That is a body for `POST /v1/files/:file_key/variables` — collections, modes,
 variables and mode values with temporary ids, `{r,g,b,a}` colours in 0..1,
 `{"type":"VARIABLE_ALIAS","id":…}` references, and a `codeSyntax.WEB` of
 `var(--token)` on every variable so Figma's dev mode shows the real name. It
-builds the body; it never calls the API.
+holds only the endpoint's four arrays, so it is POSTed as written. Each
+collection's first mode is named by an `UPDATE` on its temporary id (Figma
+creates it with its own name). Primitives get `scopes: []`, so no picker offers
+them: a designer binds `bg/surface`, never `neutral/0` (Law 6). It builds the
+body; it never calls the API.
 
 **Composites do not cross, in either direction.** `--type-*`, `--motion-*`,
 `--shadow-*`, `--elevation-*` and the `clamp()`ed fluid steps are CSS shorthands;

@@ -12,7 +12,7 @@ and `--bg-surface` are the same token and a round trip has to prove it. Anything
 this script cannot place against a known token name is emitted with its slug and
 flagged loudly, never silently renamed.
 
-INPUT SHAPES (auto-detected, same detector as figma_audit.py)
+INPUT SHAPES (auto-detected by figma_common.py, as for figma_audit.py)
   rest | plugin | dtcg | records      -- see figma_audit.py's docstring
 
 USAGE
@@ -51,11 +51,13 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 # A sibling import would otherwise leave __pycache__ inside the installed
 # plugin, which is read-only as far as a project is concerned.
 sys.dont_write_bytecode = True
+# The reader the audit uses too (LC-C3): the colour maths, as_color, as_px and
+# as_alias, FVar, FCollection, FDoc, slugify and load_document.
 try:                                              # python -m scripts.figma_to_tokens
-    from . import dtcg_values                     # type: ignore[import-not-found]
+    from .figma_common import *                   # type: ignore[import-not-found]  # noqa: F403
 except ImportError:                               # python scripts/figma_to_tokens.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import dtcg_values                            # type: ignore[no-redef]
+    from figma_common import *                    # type: ignore[no-redef]  # noqa: F403
 
 # ===========================================================================
 # The contract's token names. This list is what makes the round trip lossless:
@@ -135,11 +137,6 @@ COMPOSITE_ONLY = {n for n in TIER2 if n.startswith(("type-", "motion-", "elevati
 COMPOSITE_ONLY |= {n for n in TIER1 if n.startswith(("shadow-", "ease-", "space-fluid-"))}
 COMPOSITE_ONLY |= {"text-5xl", "text-6xl"}
 
-TIER_PREFIXES = {
-    "primitive", "primitives", "core", "global", "base", "raw", "foundation",
-    "semantic", "semantics", "alias", "aliases", "theme", "themes", "role", "roles",
-    "component", "components", "token", "tokens", "design", "ds",
-}
 # Category words a designer puts in front of everything. Stripping them is only
 # safe when what remains is a token we recognise, which is why they are tried
 # one at a time and always checked against KNOWN.
@@ -149,57 +146,16 @@ CATEGORY_PREFIXES = {
     "string", "boolean", "float", "value", "values", "scale",
 }
 
-PX_PER_REM = 16.0
 
 # ===========================================================================
-# Colour math -- the same matrices as figma_audit.py and
+# Colour out -- figma_common.py's matrices, the same as
 # web-design-studio/scripts/generate_color_ramp.py.
 # ===========================================================================
-
-
-def srgb_to_linear(c: float) -> float:
-    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
-
-
-def linear_to_srgb(c: float) -> float:
-    return c * 12.92 if c <= 0.0031308 else 1.055 * (c ** (1 / 2.4)) - 0.055
-
-
-def linear_srgb_to_oklab(r: float, g: float, b: float) -> Tuple[float, float, float]:
-    l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
-    m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b
-    s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b
-    l_ = math.copysign(abs(l) ** (1 / 3), l)
-    m_ = math.copysign(abs(m) ** (1 / 3), m)
-    s_ = math.copysign(abs(s) ** (1 / 3), s)
-    return (
-        0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
-        1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
-        0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_,
-    )
-
-
-def oklab_to_linear_srgb(L: float, a: float, b: float) -> Tuple[float, float, float]:
-    l_ = L + 0.3963377774 * a + 0.2158037573 * b
-    m_ = L - 0.1055613458 * a - 0.0638541728 * b
-    s_ = L - 0.0894841775 * a - 1.2914855480 * b
-    l, m, s = l_ ** 3, m_ ** 3, s_ ** 3
-    return (
-        +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
-    )
 
 
 def rgb_to_oklch(r: float, g: float, b: float) -> Tuple[float, float, float]:
     L, a, bb = linear_srgb_to_oklab(srgb_to_linear(r), srgb_to_linear(g), srgb_to_linear(b))
     return (L * 100.0, math.hypot(a, bb), math.degrees(math.atan2(bb, a)) % 360.0)
-
-
-def oklch_to_rgb(L_pct: float, C: float, H: float) -> Tuple[float, float, float]:
-    rad = math.radians(H)
-    lr, lg, lb = oklab_to_linear_srgb(L_pct / 100.0, C * math.cos(rad), C * math.sin(rad))
-    return tuple(min(1.0, max(0.0, linear_to_srgb(c))) for c in (lr, lg, lb))  # type: ignore
 
 
 def _trim(x: float, places: int) -> str:
@@ -252,122 +208,11 @@ def format_oklch(r: float, g: float, b: float, a: float = 1.0) -> str:
     return f"oklch({body})" if a >= 0.999 else f"oklch({body} / {_trim(a, 3)})"
 
 
-def rgb_to_hex(r: float, g: float, b: float) -> str:
-    return "#" + "".join(f"{round(min(1.0, max(0.0, c)) * 255):02x}" for c in (r, g, b))
-
-
 # ===========================================================================
-# Parsing -- deliberately identical to figma_audit.py. The two scripts must
-# agree about what a file says, or the audit passes and the build is wrong.
+# Names. Parsing is figma_common.py's, shared with figma_audit.py: the two
+# scripts must agree about what a file says, or the audit passes and the build
+# is wrong.
 # ===========================================================================
-
-_HEX = re.compile(r"^#?([0-9a-fA-F]{3,8})$")
-_RGB_FN = re.compile(r"^rgba?\(([^)]*)\)$", re.I)
-_OKLCH_FN = re.compile(r"^oklch\(([^)]*)\)$", re.I)
-_NUM_UNIT = re.compile(r"^(-?\d*\.?\d+)\s*(px|rem|em|pt|%|ms|s)?$", re.I)
-
-
-def as_color(value: Any) -> Optional[Tuple[float, float, float, float]]:
-    if isinstance(value, dict):
-        if all(k in value for k in ("r", "g", "b")):
-            try:
-                return (float(value["r"]), float(value["g"]), float(value["b"]),
-                        float(value.get("a", 1.0)))
-            except (TypeError, ValueError):
-                return None
-        if "color" in value:
-            # VariableComposedColor: Figma gives `opacity` as a PERCENTAGE,
-            # 0-100 (developers.figma.com/docs/rest-api/variables-types). Read
-            # as 0-1, every translucent hover and scrim became opaque.
-            base = as_color(value["color"])
-            if base is None:
-                return None
-            if isinstance(value.get("opacity"), (int, float)):
-                return (base[0], base[1], base[2], base[3] * float(value["opacity"]) / 100.0)
-            if isinstance(value.get("alpha"), (int, float)):
-                return (base[0], base[1], base[2], float(value["alpha"]))
-            return base
-        return None
-    if not isinstance(value, str):
-        return None
-    raw = value.strip()
-    m = _HEX.match(raw)
-    if m and raw.startswith("#"):
-        h = m.group(1)
-        if len(h) in (3, 4):
-            h = "".join(c * 2 for c in h)
-        if len(h) == 6:
-            h += "ff"
-        if len(h) != 8:
-            return None
-        v = [int(h[i:i + 2], 16) / 255.0 for i in range(0, 8, 2)]
-        return (v[0], v[1], v[2], v[3])
-    m = _RGB_FN.match(raw)
-    if m:
-        parts = [p.strip() for p in re.split(r"[,\s/]+", m.group(1)) if p.strip()]
-        try:
-            chans = [float(p[:-1]) / 100.0 if p.endswith("%") else float(p) / 255.0
-                     for p in parts[:3]]
-            alpha = 1.0
-            if len(parts) > 3:
-                a = parts[3]
-                alpha = float(a[:-1]) / 100.0 if a.endswith("%") else float(a)
-            return (chans[0], chans[1], chans[2], alpha)
-        except (ValueError, IndexError):
-            return None
-    m = _OKLCH_FN.match(raw)
-    if m:
-        parts = [p.strip() for p in re.split(r"[\s/]+", m.group(1)) if p.strip()]
-        try:
-            L = float(parts[0][:-1]) if parts[0].endswith("%") else float(parts[0]) * 100.0
-            C = float(parts[1])
-            H = float(parts[2].rstrip("deg")) if len(parts) > 2 else 0.0
-            alpha = 1.0
-            if len(parts) > 3:
-                a = parts[3]
-                alpha = float(a[:-1]) / 100.0 if a.endswith("%") else float(a)
-            r, g, b = oklch_to_rgb(L, C, H)
-            return (r, g, b, alpha)
-        except (ValueError, IndexError):
-            return None
-    return None
-
-
-def as_px(value: Any) -> Optional[float]:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    if not isinstance(value, str):
-        return None
-    m = _NUM_UNIT.match(value.strip())
-    if not m:
-        return None
-    n, unit = float(m.group(1)), (m.group(2) or "px").lower()
-    if unit == "px":
-        return n
-    if unit in ("rem", "em"):
-        return n * PX_PER_REM
-    if unit == "pt":
-        return n * 4.0 / 3.0
-    return None
-
-
-def as_alias(value: Any) -> Optional[str]:
-    if isinstance(value, dict):
-        if value.get("type") == "VARIABLE_ALIAS" and "id" in value:
-            return str(value["id"])
-        for key in ("alias", "aliasTo", "variableAlias"):
-            if isinstance(value.get(key), str):
-                return value[key]
-        return None
-    if isinstance(value, str):
-        s = value.strip()
-        if s.startswith("{") and s.endswith("}"):
-            return s[1:-1]
-        if s.startswith("$") and len(s) > 1 and not s.startswith("$#"):
-            return s[1:]
-    return None
 
 
 def natural_key(token: str) -> Tuple:
@@ -376,15 +221,6 @@ def natural_key(token: str) -> Tuple:
     return tuple(
         (1, int(p)) if p.isdigit() else (0, p)
         for p in re.split(r"(\d+)", token) if p != "")
-
-
-def slugify(name: str) -> str:
-    parts = [p.strip() for p in str(name).replace("\\", "/").split("/") if p.strip()]
-    while len(parts) > 1 and parts[0].lower() in TIER_PREFIXES:
-        parts = parts[1:]
-    slug = "-".join(parts).lower()
-    slug = re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
-    return re.sub(r"-{2,}", "-", slug)
 
 
 def to_token_name(figma_name: str) -> Tuple[str, bool]:
@@ -410,254 +246,6 @@ def to_token_name(figma_name: str) -> Tuple[str, bool]:
     if swapped in KNOWN:
         return swapped, True
     return slug, False
-
-
-# ===========================================================================
-# Document model
-# ===========================================================================
-
-
-@dataclass
-class FVar:
-    name: str
-    collection: str
-    resolved_type: str
-    values: Dict[str, Any] = field(default_factory=dict)
-    scopes: List[str] = field(default_factory=list)
-    code_syntax: Dict[str, str] = field(default_factory=dict)
-    description: str = ""
-    var_id: str = ""
-
-
-@dataclass
-class FCollection:
-    name: str
-    modes: List[str] = field(default_factory=list)
-    default_mode: str = ""
-
-
-@dataclass
-class FDoc:
-    shape: str
-    collections: Dict[str, FCollection] = field(default_factory=dict)
-    variables: List[FVar] = field(default_factory=list)
-    by_id: Dict[str, FVar] = field(default_factory=dict)
-    # (token path, why) for DTCG values with no CSS form here; left out, reported.
-    unsupported: List[Tuple[str, str]] = field(default_factory=list)
-
-
-def detect_shape(data: Any) -> str:
-    if isinstance(data, list):
-        return "records"
-    if not isinstance(data, dict):
-        raise ValueError("top level is neither an object nor an array")
-    meta = data.get("meta")
-    if isinstance(meta, dict) and ("variables" in meta or "variableCollections" in meta):
-        return "rest"
-    if isinstance(data.get("collections"), list):
-        return "plugin"
-    if isinstance(data.get("variables"), list):
-        return "records"
-    if isinstance(data.get("variables"), dict) and isinstance(data.get("variableCollections"), dict):
-        return "rest"
-    return "dtcg"
-
-
-def parse_rest(data: dict) -> FDoc:
-    meta = data.get("meta", data)
-    doc = FDoc("rest")
-    mode_names: Dict[str, Dict[str, str]] = {}
-    col_of: Dict[str, str] = {}
-    for cid, col in (meta.get("variableCollections") or {}).items():
-        cname = col.get("name") or cid
-        names, seen = [], set()
-        for m in col.get("modes") or []:
-            mid = m.get("modeId") or m.get("id") or ""
-            mn = m.get("name") or mid or "Mode"
-            if mn in seen:
-                mn = f"{mn} ({mid})"
-            seen.add(mn)
-            names.append(mn)
-            mode_names.setdefault(cid, {})[mid] = mn
-        default_id = col.get("defaultModeId") or ""
-        doc.collections[cname] = FCollection(
-            cname, names,
-            mode_names.get(cid, {}).get(default_id, names[0] if names else "Value"))
-        col_of[cid] = cname
-    for vid, v in (meta.get("variables") or {}).items():
-        cid = v.get("variableCollectionId", "")
-        cname = col_of.get(cid, "tokens")
-        doc.collections.setdefault(cname, FCollection(cname, ["Value"], "Value"))
-        values = {mode_names.get(cid, {}).get(mid, mid): val
-                  for mid, val in (v.get("valuesByMode") or {}).items()}
-        fv = FVar(v.get("name", vid), cname, (v.get("resolvedType") or "").upper(), values,
-                  list(v.get("scopes") or []), dict(v.get("codeSyntax") or {}),
-                  v.get("description") or "", vid)
-        doc.variables.append(fv)
-        doc.by_id[vid] = fv
-        if v.get("key"):
-            doc.by_id.setdefault(str(v["key"]), fv)
-    return doc
-
-
-def parse_plugin(data: dict) -> FDoc:
-    doc = FDoc("plugin")
-    for col in data.get("collections", []):
-        if not isinstance(col, dict):
-            continue
-        cname = col.get("name") or "tokens"
-        mode_labels: List[str] = []
-        merged: Dict[str, FVar] = {}
-
-        def _ingest(entry: dict, mode: str) -> None:
-            if not isinstance(entry, dict) or "name" not in entry:
-                return
-            key = str(entry["name"])
-            fv = merged.get(key)
-            if fv is None:
-                fv = FVar(key, cname,
-                          str(entry.get("type") or entry.get("resolvedType") or "").upper(),
-                          {}, list(entry.get("scopes") or []),
-                          dict(entry.get("codeSyntax") or {}),
-                          entry.get("description") or "",
-                          str(entry.get("id") or key))
-                merged[key] = fv
-                doc.by_id.setdefault(fv.var_id, fv)
-                doc.by_id.setdefault(key, fv)
-            vbm = entry.get("valuesByMode")
-            if isinstance(vbm, dict):
-                for mk, mv in vbm.items():
-                    fv.values[str(mk)] = mv
-                    if str(mk) not in mode_labels:
-                        mode_labels.append(str(mk))
-            elif "value" in entry or "$value" in entry:
-                fv.values[mode] = entry.get("value", entry.get("$value"))
-
-        nested = False
-        for m in col.get("modes") or []:
-            if isinstance(m, dict) and isinstance(m.get("variables"), list):
-                nested = True
-                mname = m.get("name") or m.get("modeId") or "Value"
-                if mname not in mode_labels:
-                    mode_labels.append(mname)
-                for entry in m["variables"]:
-                    _ingest(entry, mname)
-            elif isinstance(m, dict):
-                mn = m.get("name") or m.get("modeId") or "Value"
-                if mn not in mode_labels:
-                    mode_labels.append(mn)
-            elif isinstance(m, str) and m not in mode_labels:
-                mode_labels.append(m)
-        if not nested:
-            for entry in col.get("variables", []) or []:
-                _ingest(entry, mode_labels[0] if mode_labels else "Value")
-        if not mode_labels:
-            mode_labels = ["Value"]
-        default = col.get("defaultMode") or col.get("defaultModeId") or mode_labels[0]
-        doc.collections[cname] = FCollection(
-            cname, mode_labels, default if default in mode_labels else mode_labels[0])
-        doc.variables.extend(merged.values())
-    return doc
-
-
-def parse_records(data: Any, collection: str) -> FDoc:
-    rows = data if isinstance(data, list) else (data.get("variables") or [])
-    doc = FDoc("records")
-    doc.collections[collection] = FCollection(collection, ["Value"], "Value")
-    # Rows are one (collection, name, mode) triple each. Like `parse_plugin`'s
-    # `_ingest`, merge rows that share (collection, name) into one FVar with a
-    # multi-mode `values` dict -- otherwise each mode becomes its own variable,
-    # and `Converter.blocks()` cannot tell "no value for :root" from "this is
-    # the only mode", so it treats every split-off variable as its own default
-    # and every mode collapses onto `:root`.
-    merged: Dict[Tuple[str, str], FVar] = {}
-    for row in rows:
-        if not isinstance(row, dict) or "name" not in row:
-            continue
-        cname = row.get("collection") or collection
-        mode = row.get("mode", "Value")
-        doc.collections.setdefault(cname, FCollection(cname, [], mode))
-        if mode not in doc.collections[cname].modes:
-            doc.collections[cname].modes.append(mode)
-        if not doc.collections[cname].default_mode:
-            doc.collections[cname].default_mode = mode
-        key = (cname, str(row["name"]))
-        fv = merged.get(key)
-        if fv is None:
-            fv = FVar(str(row["name"]), cname,
-                      str(row.get("type") or row.get("resolvedType") or "").upper(),
-                      {}, list(row.get("scopes") or []), {}, row.get("description") or "",
-                      str(row.get("id") or row["name"]))
-            merged[key] = fv
-            doc.variables.append(fv)
-            doc.by_id.setdefault(fv.var_id, fv)
-            doc.by_id.setdefault(fv.name, fv)
-        fv.values[mode] = row.get("value", row.get("$value"))
-    return doc
-
-
-def dtcg_type(declared: Optional[str], value: Any) -> str:
-    if declared:
-        d = declared.lower()
-        if d == "color":
-            return "COLOR"
-        if d in ("dimension", "number", "duration", "fontweight", "font-weight"):
-            return "FLOAT"
-        if d in ("fontfamily", "font-family", "string", "cubicbezier", "shadow", "typography"):
-            return "STRING"
-        if d == "boolean":
-            return "BOOLEAN"
-    if isinstance(value, bool):
-        return "BOOLEAN"
-    if as_color(value) is not None:
-        return "COLOR"
-    if as_px(value) is not None:
-        return "FLOAT"
-    return "STRING"
-
-
-def parse_dtcg(data: dict, collection: str) -> FDoc:
-    doc = FDoc("dtcg")
-    doc.collections[collection] = FCollection(collection, ["Value"], "Value")
-    # 2025.10 objects, $ref, $extends and group $type become the string forms
-    # read below; anything with no CSS form is listed, not guessed at.
-    data, doc.unsupported = dtcg_values.normalise(data)
-    reserved = dtcg_values.META_KEYS | {"$value"}
-
-    def walk(node: Any, path: List[str]) -> None:
-        if isinstance(node, dict) and ("$value" in node or "value" in node):
-            name = "/".join(path)
-            val = node.get("$value", node.get("value"))
-            fv = FVar(name, collection,
-                      dtcg_type(node.get("$type") or node.get("type"), val),
-                      {"Value": val}, [], {},
-                      node.get("$description") or node.get("description") or "", name)
-            doc.variables.append(fv)
-            doc.by_id.setdefault(name, fv)
-            doc.by_id.setdefault(".".join(path), fv)
-            return
-        if isinstance(node, dict):
-            for k, v in node.items():
-                if k == "$root":                   # the group's own token
-                    walk(v, path)
-                elif k not in reserved:
-                    walk(v, path + [str(k)])
-
-    walk(data, [])
-    return doc
-
-
-def load_document(path: Path, forced: Optional[str], collection: str) -> FDoc:
-    data = json.loads(path.read_bytes())
-    shape = forced or detect_shape(data)
-    doc = {"rest": lambda: parse_rest(data), "plugin": lambda: parse_plugin(data),
-           "records": lambda: parse_records(data, collection),
-           "dtcg": lambda: parse_dtcg(data, collection)}[shape]()
-    for v in doc.variables:
-        if v.resolved_type not in ("COLOR", "FLOAT", "STRING", "BOOLEAN"):
-            sample = next((x for x in v.values.values() if as_alias(x) is None), None)
-            v.resolved_type = dtcg_type(None, sample)
-    return doc
 
 
 # ===========================================================================
@@ -1173,7 +761,7 @@ def read_tokens_json(data: Any) -> Tuple[Dict[str, dict], Dict[str, Dict[str, di
     return base, themes
 
 
-def emit_reverse(data: Any, source: str, collection_split: bool = True) -> Tuple[str, List[Problem]]:
+def emit_reverse(data: Any, collection_split: bool = True) -> Tuple[str, List[Problem]]:
     base, themes = read_tokens_json(data)
     problems: List[Problem] = []
 
@@ -1181,6 +769,10 @@ def emit_reverse(data: Any, source: str, collection_split: bool = True) -> Tuple
     for name, entry in base.items():
         tier = entry.get("tier") or KNOWN.get(name) or "semantic"
         tiers.setdefault(tier, {})[name] = entry
+    # Primitives get no scopes, so no picker offers them: a designer binds
+    # `bg/surface`, never the `neutral/0` it aliases (Law 6). Scopes only hide;
+    # the semantic tier still aliases them.
+    primitives = set(tiers["primitive"])
     if not collection_split:
         merged = {}
         for rows in tiers.values():
@@ -1200,7 +792,17 @@ def emit_reverse(data: Any, source: str, collection_split: bool = True) -> Tuple
     def default_mode_for(tier: str) -> str:
         if tier == "primitive" or not theme_names:
             return "Value"
-        return "Light"
+        # `:root` takes a name no theme has (a `light` theme means `:root` was
+        # another one): two modes of one name, or one temporary id, in a
+        # collection is a body Figma refuses.
+        taken = {re.sub(r"[^a-z0-9]+", "_", t.lower()) for t in theme_names}
+        for name in ("Light", "Default", "Base"):
+            if name.lower() not in taken:
+                return name
+        n = 1
+        while f"root_{n}" in taken:
+            n += 1
+        return f"Root {n}"
 
     def to_figma_value(token: str, entry: dict,
                        vtype: str) -> Tuple[Any, Optional[str]]:
@@ -1234,6 +836,8 @@ def emit_reverse(data: Any, source: str, collection_split: bool = True) -> Tuple
             px = entry.get("px")
             if px is None:
                 px = as_px(raw)
+            if px is None:          # a duration, `220ms` or `0.22s`: Figma holds 220
+                px = as_ms(raw)
             if px is None:
                 return None, f"`--{token}` is typed FLOAT but `{raw}` has no numeric value."
             return (round(px, 4) if px % 1 else int(px)), None
@@ -1282,8 +886,12 @@ def emit_reverse(data: Any, source: str, collection_split: bool = True) -> Tuple
         default_mode_id = f"tmp_mode_{tier}_{re.sub(r'[^a-z0-9]+', '_', default_mode.lower())}"
         collections.append({"action": "CREATE", "id": col_id, "name": tier,
                             "initialModeId": default_mode_id})
-        # The initial mode comes into being with the collection; only the extra
-        # modes get a CREATE of their own, or Figma is asked to make it twice.
+        # The initial mode comes into being with the collection, under Figma's
+        # own name; `initialModeId` only gives it an id. An UPDATE names it, as
+        # Figma's REST example does. Only the extra modes get a CREATE of their
+        # own, or Figma is asked to make the first one twice.
+        modes.append({"action": "UPDATE", "id": default_mode_id, "name": default_mode,
+                      "variableCollectionId": col_id})
         mode_id_of[(tier, default_mode)] = default_mode_id
         if tier != "primitive":
             for theme in theme_names:
@@ -1297,7 +905,7 @@ def emit_reverse(data: Any, source: str, collection_split: bool = True) -> Tuple
             variables.append({
                 "action": "CREATE", "id": var_id_of[token], "name": figma_name(token),
                 "variableCollectionId": col_id, "resolvedType": vtype,
-                "scopes": figma_scopes(token),
+                "scopes": [] if token in primitives else figma_scopes(token),
                 "codeSyntax": {"WEB": f"var(--{token})"},
                 **({"description": entry["description"]} if entry.get("description") else {}),
             })
@@ -1317,13 +925,8 @@ def emit_reverse(data: Any, source: str, collection_split: bool = True) -> Tuple
                 mode_values.append({"variableId": var_id_of[token], "modeId": tmid,
                                     "value": tvalue})
 
+    # Only the four arrays the endpoint takes, so the file is POSTed as it is.
     body = {
-        "_comment": [
-            "GENERATED -- body for POST /v1/files/:file_key/variables.",
-            f"source: {source}",
-            "Enterprise plan + file_variables:write scope + edit access to the file.",
-            "Remove this _comment key before POSTing; Figma rejects unknown top-level keys.",
-        ],
         "variableCollections": collections,
         "variableModes": modes,
         "variables": variables,
@@ -1394,7 +997,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         if args.reverse:
             data = json.loads(path.read_bytes())
-            text, problems = emit_reverse(data, str(path), collection_split=not args.flat)
+            text, problems = emit_reverse(data, collection_split=not args.flat)
             write_out(text, args.out)
             report_problems(problems, args.quiet)
             return 1 if problems else 0
