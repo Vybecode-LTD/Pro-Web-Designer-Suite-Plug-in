@@ -43,6 +43,14 @@
   clicks MS after navigation starts, by the page's own clock, through the browser's input
   pipeline, so the click queues behind the task that holds the main thread, as a user's
   does.
+- **`crux_check.py`: the field against the lab** (GT-B5, GT-C11). perf-budget-gate's
+  trigger for re-deriving a profile, a field p75 more than 1.5× the lab median, had no
+  tool behind it. `crux_check.py` reads the p75 for an origin or a URL from the Chrome UX
+  Report API and holds it against the median in a `measure_vitals.mjs --report` file:
+  LCP, CLS, FCP, TTFB, and INP when the lab drove one. It exits 1 above the ratio and 2
+  when CrUX holds no data. The key comes from `CRUX_API_KEY`, never an argument: `--key`
+  is refused without echoing it, and the key is never printed. `--response FILE` reads a
+  saved response.
 
 ### Fixed
 
@@ -210,6 +218,20 @@
   test a 9-second settle, and found CDP's unset `receiveHeadersEnd` (-1) added to TTFB:
   `test_browser_scripts.VitalsTiming` runs `networkTtfb()` on its own, and fails with the
   guard deleted.
+- P13 part 2 (GT-B5, GT-C11): `test_crux_check` reads a response in the shape the CrUX API
+  documents, from a file and from a local server standing in for the API, which records
+  the query: the key in the query string and nowhere in the output, a ratio above and
+  within, a refusal and no data (exit 2), and a key passed as an argument refused. They
+  never touch the network. Against `v3.3.0`, all 5 fail (there was no script). Codex's
+  review of #46 found a lab median of 0 left unjudged, so a field CLS of 0.05 against a
+  lab CLS of 0 passed: `test_a_lab_median_of_zero_is_exceeded_by_any_field_value` fails
+  on its head.
+  CodeRabbit's found five, each failing on its head: a non-finite or boolean lab median,
+  an invalid p75, a malformed `metrics` container (a traceback), `--ratio inf`, and a
+  saved response for another page or device class were compared or crashed; and a plain
+  `http://` `CRUX_API_URL` off this machine would carry the key in clear. They exit 2 now.
+  Its second round found two more: a page's trailing slash was ignored, so a saved
+  `/offers/` passed for `/offers`, and a list for `urlNormalizationDetails` crashed.
 
 ## 3.3.0 — 2026-10-04
 
