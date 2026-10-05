@@ -1532,12 +1532,6 @@
  {
   "from": "perf-budget-gate/scripts/measure_vitals.mjs",
   "to": "perf-budget-gate/references/budgets.md",
-  "section": "6",
-  "heading": "The budget file"
- },
- {
-  "from": "perf-budget-gate/scripts/measure_vitals.mjs",
-  "to": "perf-budget-gate/references/budgets.md",
   "section": "8",
   "heading": "Lab versus field, honestly"
  },

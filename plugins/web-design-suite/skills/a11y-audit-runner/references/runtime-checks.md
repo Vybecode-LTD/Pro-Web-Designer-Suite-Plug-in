@@ -33,7 +33,7 @@ The premise, stated once: **source describes intent, and a browser produces the 
 Four practical requirements before any of this is meaningful:
 
 - **Serve over HTTP.** `file://` blocks `fetch`, breaks module scripts and gives you a document no user will ever receive. `--file` exists for a self-contained artefact like a proof sheet; everything else wants `--url`.
-- **Freeze animation.** A ring measured mid-transition is a false negative and a colour sampled mid-fade is a false positive. The runner injects a 1ms `animation-duration`/`transition-duration` override before measuring, the same determinism trick `snapshot_matrix.mjs` uses.
+- **Freeze animation.** A ring measured mid-transition is a false negative and a colour sampled mid-fade is a false positive. Before measuring, the runner pauses every animation and finishes every transition, with the same freeze `snapshot_matrix.mjs` uses (`scripts/browser_common.mjs`). Shortening an animation is not enough: a spinner that keeps turning changes pixels between the two screenshots, and counts as a ring that is not there.
 - **Wait for fonts.** `document.fonts.ready` before any geometry, or every rect is measured against the fallback face.
 - **Pin the viewport, DPR, locale, timezone and colour scheme.** Measurements you cannot reproduce cannot be regressed against.
 

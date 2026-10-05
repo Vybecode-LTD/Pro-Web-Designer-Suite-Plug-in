@@ -1,8 +1,8 @@
 # Handoff
 
-**2026-10-04**, after P8 (#34, #35) and R1 (#36): 3.3.0 is released and installed.
+**2026-10-04**, after P8 (#34, #35), R1 (#36) and P9 (#38): 3.3.0 is released and installed, and Phase 4 (3.4.0) has begun.
 
-**The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then Phase 4's first PRs in detail: P9 (one copy of the runtime helpers, and N34) and P10 (a11y_runtime).
+**The next session starts from `dev plans/next-session-prompt.md`.** It has the orientation, then the next PRs in detail: P10 (a11y_runtime) and P11 (a11y_static and the gate docs).
 
 ## State
 
@@ -18,17 +18,18 @@
     - `python3` and `/tmp/` are gone from the skills' shell fences.
     - The ESLint config pins `typescript@~6.0` beside typescript-eslint.
   - **R1, #36:** the version, the README's paths and its `.skill` line, and the CHANGELOG heading.
+  - **P9, #38: one copy of the browser scripts' helpers.** a11y_runtime, snapshot_matrix and measure_vitals import `scripts/browser_common.mjs`, a copy of `shared/browser_common.mjs` in each skill. a11y_runtime now pauses animations, so a spinner no longer counts as a focus ring (GT-A14 (a)), and reads JSONC. `tooling/release/compare.py` compares builds by content (N34): it finds 3.3.0's local build and release the same.
 - **The reviews found 6 real issues** in #34 to #36: Codex one on #34, CodeRabbit one on #34, three on #35 (the fence reader, continued installs, `python3` at a line's end), one on #36. Each code fix has a test that fails on the head it reviewed. Two suggestions were declined with reasons in their threads.
-- **Tests:** 513. **The plan:** 124 open items, all scheduled (`check_execution_plan.py`).
+- **Tests:** 519. **The plan:** 122 open items, all scheduled (`check_execution_plan.py`).
 
 ## Next steps
 
-1. **The next session:** P9 (GT-C13, N34), then P10 (GT-A5, GT-A14, GT-C2, SB-B3).
-2. Then the rest of Phase 4 (P11 to P23), and R2, the 3.4.0 release.
+1. **The next session:** P10 (GT-A5, GT-A14 (b), GT-C2, SB-B3), then P11 (GT-A8, GT-A16, GT-A18, GT-C5).
+2. Then the rest of Phase 4 (P12 to P23), and R2, the 3.4.0 release.
 
 ## Warnings
 
-- **N34: the release build is byte-identical only with the same zlib.** Windows' Python 3.14 deflates with zlib-ng, the CI's with zlib, so a local build's checksums never match the release's. Compare archives by content (names, CRCs, uncompressed sizes, dates, modes) until P9 gives the builder that comparison.
+- **A local build never matches the release's checksums** (Windows' Python 3.14 deflates with zlib-ng, the CI's with zlib). Compare them with `python -B tooling/release/compare.py OUT RELEASE_DIR`.
 - **The README's `WDS` paths name the version.** A release PR updates them with `plugin.json`; `test_docs.PasteableCommands` fails until it does.
 - **`fail_before.py` swaps the plugin, not the tests.** A fix to test code shows as a control there; show it failing by running the new assertions against the old file (`git show COMMIT:path/to/file`, with the reviewed head and the file's path in place of the two placeholders), as this session did.
 - **Still open from earlier:** `--warning-700`, `--danger-100` and `--info-100` fall outside Display P3; `check_roles.py` measures a colour outside sRGB with its channels clipped.

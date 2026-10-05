@@ -7,7 +7,10 @@ Everything comes from what git holds at REV (default HEAD), and nothing else:
 - only tracked files, so a local node_modules, .DS_Store or editor backup never ships;
 - git's file modes, so a script git marks executable is executable when unpacked;
 - every entry dated at REV's commit time, in sorted order, so two builds of
-  one commit are the same, byte for byte.
+  one commit are the same, byte for byte, with the same zlib. Python 3.14
+  deflates with zlib-ng on Windows and with zlib on the CI's Linux, so a
+  build there and the release differ in bytes and SHA256SUMS while every
+  file is the same: compare them with tooling/release/compare.py.
 
 It refuses, and writes nothing, when the plugin holds something an archive
 cannot carry everywhere (a symbolic link, a submodule), a tracked file that

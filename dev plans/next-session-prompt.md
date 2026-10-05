@@ -1,6 +1,6 @@
 # Start here: the next session
 
-**Written 2026-10-04**, after P8 (#34, #35) and R1 (#36): 3.3.0 is released (`v3.3.0`, `88a4886`) and installed. No pull request is open. Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: Phase 4 (3.4.0) from its first PRs, **P9** (one copy of the runtime helpers, and N34) and **P10** (a11y_runtime). Then P11 onward, as the budget allows.
+**Written 2026-10-04**, after P8 (#34, #35), R1 (#36) and P9 (#38): 3.3.0 is released (`v3.3.0`, `88a4886`) and installed, and Phase 4 (3.4.0) has begun. No pull request is open. Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P10** (a11y_runtime) and **P11** (a11y_static and the gate docs). Then P12 onward, as the budget allows.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers. The repository is `C:\DEV\Pro-Web-Designer-Suite-Plug-in` (public on GitHub, `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, MIT). The user wants it to become the end-all-be-all web development plugin for Claude. Every remaining item is scheduled in `dev plans/web-design-suite-execution-plan.md`.
 
@@ -49,45 +49,47 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open
    ```
    - Check out `main` and pull. If a PR is open, read its state first (§3).
-4. `python -B "dev plans/check_execution_plan.py"` must say `124 open items, 124 scheduled`.
+4. `python -B "dev plans/check_execution_plan.py"` must say `122 open items, 122 scheduled`.
 5. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
 
 - **The plugin** is `plugins/web-design-suite/`:
   - `skills/`, one folder per skill (13);
-  - `tests/`: 513 tests, standard-library `unittest`, with helpers in `tests/wds_support.py` (`PLUGIN`, `SKILLS`, `REPO`, `TOOLING`);
+  - `tests/`: 519 tests, standard-library `unittest`, with helpers in `tests/wds_support.py` (`PLUGIN`, `SKILLS`, `REPO`, `TOOLING`);
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
-- **The three browser scripts** are `a11y-audit-runner/scripts/a11y_runtime.mjs`, `component-state-matrix/scripts/snapshot_matrix.mjs` and `perf-budget-gate/scripts/measure_vitals.mjs`. Their tests are `test_browser_runtime.py` and `test_browser_scripts.py`; the real-browser ones need Playwright from `tooling/main` (CI's Linux job has the headless shell).
+- **The three browser scripts** are `a11y-audit-runner/scripts/a11y_runtime.mjs`, `component-state-matrix/scripts/snapshot_matrix.mjs` and `perf-budget-gate/scripts/measure_vitals.mjs`. Since P9 they import `scripts/browser_common.mjs` (browser resolution, `FREEZE_ANIMATIONS_CSS`, `readJsonFile`), a copy of `shared/browser_common.mjs` in each skill: change the master and copy it over all three (`test_browser_scripts.SharedHelpers`). Their tests are `test_browser_runtime.py` and `test_browser_scripts.py`; the real-browser ones need Playwright from `tooling/main` (CI's Linux job has the headless shell).
 - **New in P8.** `accessibility-testing.md` holds what was accessibility.md §10. `test_docs.PasteableCommands` holds the READMEs' commands to what bash, PowerShell and cmd read alike, the README's `WDS` paths to `plugin.json`'s version (a release PR updates both), and every typescript-eslint install to a TypeScript 6.0 pin. `test_docs.Manifests` holds the two marketplace manifests to each other. `test_contract.ContractCopies` compares each skill's contract with `shared/token-contract.md`.
-- **The release** is `python -B tooling/release/build.py OUT --rev SHA` (OUT an empty folder, SHA the merged commit), then a `v*` tag on that commit; `release.yml` is the only thing that creates a release, with the CHANGELOG's section as its notes. Its checksums will not match a Windows build (N34); compare by content.
+- **The release** is `python -B tooling/release/build.py OUT --rev SHA` (OUT an empty folder, SHA the merged commit), then a `v*` tag on that commit; `release.yml` is the only thing that creates a release, with the CHANGELOG's section as its notes. Its checksums will not match a Windows build; compare the two with `python -B tooling/release/compare.py OUT RELEASE_DIR`.
 - **Installing locally:** the local marketplace, `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, is a copy of the released plugin (190 files at 3.3.0). After mirroring a release into it, run the bundled CLI (`CLAUDE.md` says where): `plugin update web-design-suite@web-design-suite`, then `plugin details`.
 - **CI** (`.github/workflows/ci.yml`) runs Windows, Linux and macOS × Python 3.9 and 3.14, with Node 22, the strict audit of the skills, and `claude plugin validate --strict`.
 - **Python 3.9 is the floor**: no `zip(strict=)`, no `match`, no `str.removeprefix`, no `X | Y` outside annotations (the files use `from __future__ import annotations`).
 
 ## 3. First: the state of `main`
 
-R1 was merged and released on 2026-10-04, with the docs PR after it. Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own.
+P9 (#38) was merged on 2026-10-04. Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own.
 
 If a PR is open, read its state, then fix what is red, answer and resolve review threads, and merge it under §0's rules.
 
-## 4. P9: one copy of the runtime helpers, and the release comparison
+## 4. P10: a11y_runtime
 
-Items GT-C13 and N34. Read them first: GT-C13 in `dev plans/web-design-suite-review/gates.md` (section C, line 154), N34 in `dev plans/web-design-suite-completion-plan.md` (just above N3).
-- **GT-C13.** The three browser scripts each carry their own browser resolution, freeze CSS and JSON reading, and the freeze CSS already differs between a11y_runtime and snapshot_matrix (a11y_runtime does not pause animations: GT-A14 (a), which P10 fixes). Vendor one copy of the shared helpers into each skill, the way `token-contract.md` is copied, with a master copy and a test that the copies match (as `test_contract.ContractCopies` does). Keep each skill installable on its own: a `.skill` file carries only its own folder. The inventory still files GT-C13 under W9 (3.5.0); the plan moved it to P9, so update the row.
-- **N34.** `tooling/release/build.py` says two builds of one commit are byte-identical, which holds only with the same zlib (Windows' Python 3.14 uses zlib-ng). Say so in its docstring, and give it a comparison of two build folders by content (names, CRCs, uncompressed sizes, dates and modes of every archive's entries), with a test in `test_release_build.py`. R2 then compares the local build with the release that way.
-
-## 5. P10: a11y_runtime
-
-Items GT-A5, GT-A14, GT-C2 and SB-B3. Read them first: `gates.md` lines 37 (GT-A5), 85 (GT-A14) and 131 (C2), and `studio-build.md` line 61 (SB-B3). The inventory says GT-C2 is partly done: read its row, and the tests that already cover modals and iframes, before you start.
-- **GT-A5.** No `bypassCSP`: a page with `Content-Security-Policy: default-src 'self'` crashes at the freeze's `addStyleTag` and exits 1, which means violations. Set `bypassCSP: true` on every context in all three scripts, and map setup failures to exit 2.
-- **GT-A14.** (a) The freeze shortens animations without pausing them, so a spinner beside an `outline: none` button counts as a ring. Pause them, as snapshot_matrix does (P9's shared freeze CSS). (b) Disabled controls are not exempt from contrast, as SC 1.4.3 exempts them.
+Items GT-A5, GT-A14 (b), GT-C2 and SB-B3. Read them first: `gates.md` lines 37 (GT-A5), 85 (GT-A14) and 131 (C2), and `studio-build.md` line 61 (SB-B3). The inventory says GT-C2 is partly done: read its row, and the tests that already cover modals and iframes, before you start.
+- **GT-A5.** No `bypassCSP`: a page with `Content-Security-Policy: default-src 'self'` crashes at the freeze's `addStyleTag` and exits 1, which means violations. Set `bypassCSP: true` on every context in all three scripts (the contexts are created in each script, not in `browser_common.mjs`), and map setup failures to exit 2.
+- **GT-A14.** (a) was fixed in P9 (the shared freeze pauses animations). (b) Disabled controls are not exempt from contrast, as SC 1.4.3 exempts them: `<button disabled>` gets `contrast-too-low` where axe says nothing. When (b) is done, the inventory row becomes "fixed in 3.4.0".
 - **GT-C2.** The rest of C2: colour parsing, modals, iframes, inert content, after reading what is already done.
 - **SB-B3.** No gate checks focus, forced colours or density in the build flow. A probe that tabs through a page and asserts a visible outline or ring, in normal colours and under forced-colors emulation, at each density the starter offers (`data-density="compact|comfortable|spacious"` on the root). Close SB-B3 only when all three are covered; if density does not fit P10, leave SB-B3 open and reschedule its density part.
 
-P10 is M-L: split it if the diff grows (GT-A5 and GT-A14 first, then GT-C2 and SB-B3), stacked on P9 if P9 is still open.
+P10 is M-L: split it if the diff grows (GT-A5 and GT-A14 first, then GT-C2 and SB-B3), each on `main`.
 
-**Close each PR:** the CHANGELOG under a new `## 3.4.0 — unreleased`, each item "fixed in 3.4.0" in the inventory with its test (an N item gets "*Done for 3.4.0 (PR #n)*" in the completion plan), the plan's row as `P9, #N` (N the PR's number), and §9. The checker then says 122 after P9 and 118 after P10.
+## 5. P11: a11y_static's success criteria, and the gate docs' corrections
+
+Items GT-A8, GT-A16, GT-A18 and GT-C5. Read them first in `gates.md`: lines 59 (GT-A8), 96 (GT-A16), 104 (GT-A18) and 134 (C5, the correction pass over A7 to A10, A16 and A19; read the inventory's rows for which are already fixed).
+- **GT-A8.** The axe tag advice is wrong in both directions (a11y SKILL.md, `automation-coverage.md`, and the tags `a11y_runtime.mjs` uses by default).
+- **GT-A16.** Two rows of perf-budget-gate's "same method" table (budgets.md, and perf SKILL.md) cannot be reproduced with that method.
+- **GT-A18.** `a11y_static.py` makes `multiple-h1`, `heading-skip` and `no-main-landmark` hard errors under success criteria; axe tags them best practice. Make them warnings labelled best practice, and keep the docs' argument honest.
+- **GT-C5.** What remains of the correction pass. Re-read every figure at its source on the day, and register it in `evidence.json`.
+
+**Close each PR:** the CHANGELOG under `## 3.4.0 — unreleased`, each item "fixed in 3.4.0" in the inventory with its test (an N item gets "*Done for 3.4.0 (PR #n)*" in the completion plan), the plan's row as `P10, #N` (N the PR's number), and §9. The checker then says 118 after P10 (GT-A14 closes with it) and 114 after P11.
 
 ## 6. End of session (never skip)
 

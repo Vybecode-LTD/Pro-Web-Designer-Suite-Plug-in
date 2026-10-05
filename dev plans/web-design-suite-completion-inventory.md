@@ -161,7 +161,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-A11 | medium | fixed in 3.2.0 | the docs say to put the device and network "in a comment" in `perf-budget.json`, and the examples are JSONC. |
 | GT-A12 | medium | W5 (3.4.0) | rules written with `:focus` or `:focus-within` are mirrored to `[data-force-state~="focus"]`. |
 | GT-A13 | medium | W5 (3.4.0) | only the seven fixed states are allowed. |
-| GT-A14 | medium | W5 (3.4.0) | two measurements give false results (fixture `$W\e11\probes.html`). |
+| GT-A14 | medium | (a) fixed in 3.4.0: `test_browser_runtime.test_a_spinner_is_not_a_focus_ring` (PR #38); (b) in P10 | two measurements give false results (fixture `$W\e11\probes.html`). |
 | GT-A15 | medium | fixed in 3.2.0 | none of the CI recipes (a11y SKILL.md:285-311; ci-integration.md:53-110; visual-regression.md:191-237) runs as written in every case. |
 | GT-A16 | low-medium | W5 (3.4.0) | two rows of the "same method" table cannot be reproduced with that method (TTFB = 4·RTT + 200 ms, minus 300 + 150 ms). |
 | GT-A17 | low-medium | W5 (3.4.0) | `--interact` adds the interaction's own handler to TBT. |
@@ -188,7 +188,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-C10 | M · P1 | W9 (3.5.0) | A `claude plugin eval` suite for the gates, run under WSL2. |
 | GT-C11 | M · P2 | W11 (3.6.0+) | A `lighthouse` throttle preset, TTFB from CDP, `--interact-at MS`, and `crux_check.py`. |
 | GT-C12 | M · P1 | W9 (3.5.0) | One CI template for all three gates in a pinned Playwright container, with a baseline-update job and a tested Windows variant. |
-| GT-C13 | S · P2 | W9 (3.5.0) | Vendor the shared runtime helpers into each skill as identical copies, with a test that they match. |
+| GT-C13 | S · P2 | fixed in 3.4.0: `test_browser_scripts.SharedHelpers` (PR #38) | Vendor the shared runtime helpers into each skill as identical copies, with a test that they match. |
 | PS-A1 | high | fixed in 3.1.0 | The deck asserts claims that its own inputs contradict. |
 | PS-A2 | high | fixed in 3.1.0 | The defence sheet presents suspicions as known flaws and drops confirmed defects. |
 | PS-A3 | high | fixed in 3.1.0 | The audit merge silently deletes whole rule groups. |

@@ -66,6 +66,22 @@ class RuntimeInABrowser(TempDirTest):
         self.assertIn("contrast-under-overlay", errors)
         self.assertIn("contrast-too-low", errors)
 
+    def test_a_spinner_is_not_a_focus_ring(self):
+        """GT-A14 (a), fixed with GT-C13: the freeze shortened animations
+        without pausing them, so a loading spinner inside a button with no
+        focus ring changed pixels between the two shots and counted as one."""
+        html = ("<!doctype html><html lang=en><head><title>s</title><style>"
+                "button{font:16px sans-serif;padding:8px 12px;border:1px solid #333;background:#fff}"
+                "button:focus{outline:none}"
+                ".spin{display:inline-block;width:16px;height:16px;margin-right:6px;"
+                "border:3px solid #333;border-top-color:transparent;border-radius:50%;"
+                "animation:spin .4s linear infinite}"
+                "@keyframes spin{to{transform:rotate(360deg)}}"
+                "</style></head><body><main><h1>Save</h1>"
+                "<button type=button><span class=spin></span>Saving</button>"
+                "</main></body></html>")
+        self.assertIn("no-visible-focus-indicator", self.rules(self.runtime(html, "--only", "focus")))
+
     def test_an_open_modal_dialog_is_not_a_trap(self):
         """GT-A2: a cookie banner built the recommended way."""
         html = ('<!doctype html><html lang="en"><head><title>Cookie consent</title></head><body>'

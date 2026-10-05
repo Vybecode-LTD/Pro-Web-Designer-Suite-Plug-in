@@ -17,6 +17,8 @@ Regressions covered (3.2.1 review, and XC-C6 for 3.3.0):
   repository. It skipped a tracked symbolic link, and a file `export-ignore`
   keeps out of `git archive`, and still reported success.
 - XC-C6: there were no .skill files, and no checksums.
+- N34 (3.4.0): two builds of one commit are byte-identical only with the same
+  zlib, so tooling/release/compare.py compares builds by their archives' contents.
 """
 from __future__ import annotations
 
@@ -31,6 +33,7 @@ from wds_support import TOOLING, TempDirTest, env, output
 
 GIT = shutil.which("git")
 BUILDER = TOOLING / "release" / "build.py" if TOOLING else None
+COMPARE = TOOLING / "release" / "compare.py" if TOOLING else None
 GIT_ENV = {"GIT_AUTHOR_NAME": "wds-test", "GIT_AUTHOR_EMAIL": "wds-test@example.invalid",
            "GIT_COMMITTER_NAME": "wds-test", "GIT_COMMITTER_EMAIL": "wds-test@example.invalid",
            "GIT_AUTHOR_DATE": "2026-09-25T12:00:00Z", "GIT_COMMITTER_DATE": "2026-09-25T12:00:00Z"}
@@ -185,6 +188,51 @@ class ReleaseBuild(TempDirTest):
         self.assertEqual(0, proc.returncode, output(proc))
         self.assertIn("warning: beta: its description has 209 characters; claude.ai's help center gives 200",
                       output(proc))
+
+    def compare(self, a: str, b: str) -> subprocess.CompletedProcess:
+        return subprocess.run([sys.executable, "-B", str(COMPARE), a, b], cwd=self.tmp,
+                              capture_output=True, env=env())
+
+    def recompress(self, src: str, dst: str, change: dict | None = None) -> None:
+        """A copy of a build whose archives are stored, not deflated, as a
+        different zlib would leave them: other bytes, the same files."""
+        (self.tmp / dst).mkdir()
+        for path in sorted((self.tmp / src).iterdir()):
+            target = self.tmp / dst / path.name
+            if not zipfile.is_zipfile(path):
+                target.write_bytes(path.read_bytes())
+                continue
+            with zipfile.ZipFile(path) as a, zipfile.ZipFile(target, "w") as b:
+                for info in a.infolist():
+                    data = (change or {}).get(info.filename, a.read(info))
+                    info.compress_type = zipfile.ZIP_STORED
+                    b.writestr(info, data)
+
+    @unittest.skipUnless(COMPARE and COMPARE.is_file(), "needs the repository's tooling/release")
+    def test_builds_that_compress_differently_compare_the_same(self):
+        """N34: Windows' Python 3.14 deflates with zlib-ng and the CI's with
+        zlib, so 3.3.0's release matched no local build of its commit byte for
+        byte, though every file was the same."""
+        self.assertEqual(0, self.build("a").returncode)
+        self.recompress("a", "b")
+        zips = [p.name for p in (self.tmp / "a").iterdir() if p.suffix in (".zip", ".skill")]
+        self.assertGreaterEqual(len(zips), 3)
+        for name in zips:
+            with self.subTest(file=name):
+                self.assertNotEqual((self.tmp / "a" / name).read_bytes(), (self.tmp / "b" / name).read_bytes())
+        proc = self.compare("a", "b")
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("the same", output(proc))
+
+    @unittest.skipUnless(COMPARE and COMPARE.is_file(), "needs the repository's tooling/release")
+    def test_a_changed_or_missing_file_is_a_difference(self):
+        self.assertEqual(0, self.build("a").returncode)
+        self.recompress("a", "b", change={"web-design-suite/README.md": b"# changed\n"})
+        (self.tmp / "b" / "alpha.skill").unlink()
+        proc = self.compare("a", "b")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("web-design-suite-9.8.7.zip: web-design-suite/README.md differs in CRC, size", output(proc))
+        self.assertIn("alpha.skill: only in a", output(proc))
 
 
 if __name__ == "__main__":

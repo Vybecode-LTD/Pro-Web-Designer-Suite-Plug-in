@@ -1,5 +1,37 @@
 # Changelog
 
+## 3.4.0 — unreleased
+
+### Fixed
+
+- **A loading spinner counted as a focus ring** (GT-A14 (a)). a11y_runtime shortened
+  animations before measuring the ring but did not pause them, so a spinner inside a
+  button with `outline: none` kept turning between the two screenshots, and the button
+  passed. It now uses the matrix's freeze, which pauses them.
+- **a11y_runtime reads a JSONC budget or keymap**, with comments and trailing commas, as
+  measure_vitals and perf_audit already did.
+
+### Changed
+
+- **One copy of the browser scripts' shared helpers** (GT-C13). a11y_runtime,
+  snapshot_matrix and measure_vitals each carried their own browser resolution, freeze
+  CSS and JSON reader, and the copies had drifted. They now import
+  `scripts/browser_common.mjs`, a byte-identical copy of `shared/browser_common.mjs` in
+  each of the three skills, so each skill still runs on its own.
+- **Release builds compare by content** (N34). `tooling/release/compare.py` compares two
+  build folders entry by entry (names, CRCs, uncompressed sizes, dates, modes). A build
+  is byte-identical to another only with the same zlib: Windows' Python 3.14 uses
+  zlib-ng, the CI's zlib, so 3.3.0's release matched no local build's checksums.
+
+### Tests
+
+- P9 (GT-C13, GT-A14 (a), N34): `test_browser_scripts.SharedHelpers` holds the three
+  copies to the master, keeps the moved helpers out of the scripts, and holds both
+  freezes to pausing; `test_browser_runtime.test_a_spinner_is_not_a_focus_ring` runs
+  the spinner in a real browser. Against `v3.3.0`, all 4 fail.
+  `test_release_build` adds two: builds stored instead of deflated compare the same,
+  and a changed or missing file is a difference.
+
 ## 3.3.0 — 2026-10-04
 
 Phase 3 of the plan: safe defaults and one set of rules. The audit, stylelint and ESLint
