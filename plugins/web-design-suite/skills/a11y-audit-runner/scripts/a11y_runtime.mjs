@@ -1085,8 +1085,13 @@ const DENSITIES_FN = () => {
   for (const sheet of document.styleSheets) {
     try { walk(sheet.cssRules); } catch { /* cross-origin */ }
   }
-  const first = document.querySelector('[data-density]');
-  return { found, current: first ? first.getAttribute('data-density') : null };
+  // The dial's value, when every outermost marker shares one; with two top
+  // regions at different densities there is none, and every value is measured
+  // (CodeRabbit on #40).
+  const values = new Set([...document.querySelectorAll('[data-density]')]
+    .filter((el) => !el.parentElement || !el.parentElement.closest('[data-density]'))
+    .map((el) => el.getAttribute('data-density')));
+  return { found, current: values.size === 1 ? [...values][0] : null };
 };
 
 // Turn the dial to `density`, or back to where the page had it with null.
