@@ -73,7 +73,7 @@ Roles are the layer component CSS actually reads. They are the public API in the
 | Rename a role | **major** | Identical to removal, plus a replacement exists that they cannot guess | heuristic | codemod |
 | **Re-point a role** | **major** | Same name, same call site, different pixels | yes | visual diff |
 | Re-point a role to an identical value | **patch** | Nothing today. See the lockstep caveat in §1 | yes | none |
-| Add a theme override to a role | **minor** | Nothing in the default theme; the other theme gains behaviour it lacked | yes | review that theme |
+| Add a theme override to a role | **major**; **patch** if it resolves as before | Nothing in the default theme. In that theme the role stops following its root value, so its consumers render differently: a re-point there (§11 Q2) | yes | visual diff, in that theme |
 | Change a theme override | **major** | Consumers in that theme render differently. Consumers in the other notice nothing — which is why this one reaches production | yes | visual diff, in that theme |
 | Remove a theme override | **major** | The role silently falls back to its root value in that theme. Usually a dark-mode regression that light-mode review cannot see | yes | visual diff, in that theme |
 
@@ -158,13 +158,13 @@ The part of a design system that nobody remembers is API, until a consumer's sty
 
 | Change | Verdict | What a consumer sees | Auto-detect | Burden |
 |---|---|---|---|---|
-| Add a wrapper element | **major** | `.card > .card__body` stops matching. `:first-child` selects something else. A Testing Library query that walked the tree breaks | yes, from parts | manual |
+| Add a wrapper element | **major** | `.card > .card__body` stops matching. `:first-child` selects something else. A Testing Library query that walked the tree breaks | partial: reported as `part-added`; whether it wraps existing children is yours to read | manual |
 | Remove a part (`__` element) | **major** | Their descendant selector, and their test, match nothing | yes | manual |
 | Add a part | **minor** | Safe, unless a consumer counts children with `> *` or `:nth-child()` | yes | review |
 | Reorder children | **major** | Tab order, `:first-child`, `:nth-child()`, reading order for a screen reader | partial | manual |
-| Change the root element (`div` → `button`) | **major** | Semantics, focusability, default styles, and every `div.card` selector | yes, from props | manual |
-| Rename a class — **global CSS** | **major** | Every consumer selector and snapshot test that named it | yes | partial codemod |
-| Rename a class — **CSS Modules** | **patch** | Nothing. The generated name was never stable and nobody could write it | yes | none |
+| Change the root element (`div` → `button`, or a fragment) | **major** | Semantics, focusability, default styles, and every `div.card` selector | yes, from the element the props file renders | manual |
+| Rename a class — **global CSS** | **major** | Every consumer selector and snapshot test that named it | yes, as a removed part and an added one | partial codemod |
+| Rename a class — **CSS Modules** | **patch** | Nothing. The generated name was never stable and nobody could write it | yes: in a `.module.css` file, a removed part and an added one with the same declarations, in every rule that styles them, are paired as `part-renamed-local`; never where the component file exports its styles object | none |
 | Rename the *exported* class key in a module (`styles.card` → `styles.root`) | **major** | That key *is* the API, whatever the hashing does | yes | manual |
 
 **The CSS Modules row is the one worth internalising.** Under global CSS, `.card__title` is a public name the moment it ships: a consumer can write `.card__title { font-size: 12px }` and you cannot stop them. Under CSS Modules the rendered class is `Card_title__a3f9d` and it is not a name anyone can depend on — so renaming the *local* class is invisible, while renaming the key you export (`styles.title`) is exactly as breaking as renaming a prop. The boundary moved; it did not disappear. Know which side of it each name is on before you rename anything.
@@ -195,15 +195,17 @@ The part of a design system that nobody remembers is API, until a consumer's sty
 
 | Change | Verdict | What a consumer sees | Auto-detect | Burden |
 |---|---|---|---|---|
-| **Reorder `@layer`** | **major** | Under Law 5, layer order is what resolves conflicts — not specificity. Reordering re-decides every conflict in the system at once, including conflicts between your CSS and theirs | only if the order statement is in the diff | review everything |
-| Add a layer | **major** | A new layer is inserted into a total order. Where it lands decides who wins | partial | review |
+| **Reorder `@layer`** | **major** | Under Law 5, layer order is what resolves conflicts — not specificity. Reordering re-decides every conflict in the system at once, including conflicts between your CSS and theirs | yes, when both snapshots read the entry stylesheet | review everything |
+| Add a layer | **major** | A new layer is inserted into a total order. Where it lands decides who wins | yes, as a changed order | review |
 | Add a theme | **minor** | Nobody's current theme changed | yes | none |
 | Remove a theme | **major** | Every consumer setting `data-theme` to it silently renders the default | yes | manual |
 | Change a breakpoint | **major** | See §2 | yes | review responsive screens |
-| Change the density scale | **major** | Every spacing role at that density moves | yes | visual diff at that density |
-| Change reduced-motion behaviour | **major** | It is a render change for the users least able to absorb a surprise | yes | review |
+| Add a density | **minor** | Nobody's current density changed | yes | none |
+| Remove a density | **major** | Every consumer setting `data-density` to it silently renders the default density | yes | manual |
+| Change the density scale | **major**; **patch** if nothing resolves differently | Every spacing role at that density moves | yes: an override under `[data-density]`, with the roles it moves | visual diff at that density |
+| Change reduced-motion behaviour | **major** | It is a render change for the users least able to absorb a surprise | yes: any override under a media condition, added, changed or removed (reduced motion, forced colours, more contrast) | review |
 
-**Layer order deserves the loudest warning in this file.** It is one line, it is easy to "tidy", and it changes the resolution of every conflict in the system simultaneously — a blast radius no tool can enumerate, because the affected set is "every pair of rules that ever disagreed". `diff_system.py` compares the order when both snapshots carry an `@layer a, b, c;` statement, and says so when they do not, because the statement lives in the entry stylesheet rather than in `tokens.css`. Diff that file by eye every release.
+**Layer order deserves the loudest warning in this file.** It is one line, it is easy to "tidy", and it changes the resolution of every conflict in the system simultaneously — a blast radius no tool can enumerate, because the affected set is "every pair of rules that ever disagreed". The statement lives in the entry stylesheet, not in `tokens.css`, so give `extract_system.py` that file too: system.json records each `@layer a, b, c;` statement it reads, and `diff_system.py` compares them. It says so when a snapshot has none, or predates 3.4.0 and could not record one.
 
 ---
 
@@ -297,8 +299,8 @@ Then walk the four questions in order and stop at the first **yes**:
 |---|---|---|
 | 1 | Did any name a consumer can write **disappear or change**? Token, socket, class, variant, size, state, prop, theme. | **major** |
 | 2 | Does anything that already existed **resolve to a different value**? Any tier, any theme, any density. Including via a primitive edit upstream. | **major** |
-| 3 | Did **structure or order** change? DOM, child order, root element, `@layer`, breakpoints. | **major** |
-| 4 | Is there **new surface** — a token, socket, variant, size, state, optional prop, theme? | **minor** |
+| 3 | Did existing **structure or order** change? An element removed or wrapped, child order, root element, `@layer`, breakpoints. | **major** |
+| 4 | Is there **new surface** — a token, socket, variant, size, state, part, optional prop, theme, density? | **minor** |
 | — | Otherwise | **patch** |
 
 The whole procedure in one sentence: **if a consumer who changed nothing would see something different, it is major; if they would see nothing different but have something new available, it is minor; otherwise patch.**
@@ -324,10 +326,12 @@ The script prints a `[kind]` on every change. This is the index from that string
 | `tier2-removed` · `tier2-renamed` | major | 3 |
 | `tier2-repointed` | major | 4 |
 | `tier2-repointed-equal` | patch | 1, 4 |
-| `theme-override-added` | minor | 3 |
+| `theme-override-added` | major; patch if it resolves as before | 3 |
 | `theme-override-changed` · `theme-override-removed` | major | 3 |
-| `theme-added` | minor | 9 |
-| `theme-removed` | major | 9 |
+| `theme-added` · `density-added` | minor | 9 |
+| `theme-removed` · `density-removed` | major | 9 |
+| `density-changed` | major; patch if nothing resolves differently | 9 |
+| `condition-changed` | major | 9 |
 | `socket-added` | minor | 5 |
 | `socket-removed` | major | 5 |
 | `socket-default-changed` | major | 5 |
@@ -338,6 +342,8 @@ The script prints a `[kind]` on every change. This is the index from that string
 | `variant-changed` | major | 6, 10.2 |
 | `part-added` | minor | 7 |
 | `part-removed` | major | 7 |
+| `part-renamed-local` | patch | 7 |
+| `element-changed` | major | 7 |
 | `prop-added-optional` | minor | 8 |
 | `prop-added-required` · `prop-removed` · `prop-type-changed` | major | 8 |
 | `prop-default-changed` | major | 8 |

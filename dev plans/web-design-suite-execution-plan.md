@@ -90,7 +90,7 @@ PRs #12 to #15 were merged on 2026-10-02. P0 fixes what their reviews found.
 | P12 part 2, #44 | The snapshot matrix's model (RTL, a forced-colors pass, interaction states) and its baseline lifecycle | GT-B7, GT-B8 | `generate_matrix.py`, `snapshot_matrix` | M-L |
 | P13 part 1, #45 | measure_vitals: Lighthouse's throttling as the default preset, TTFB from CDP, `--interact` without its own handler, TBT bounded by TTI, and `--interact-at` | GT-A6, GT-A17, most of GT-C11 | `measure_vitals.mjs` | M |
 | P13 part 2, #46 | Field data through `crux_check.py`, which finishes GT-C11 | GT-C11, GT-B5 | new `crux_check.py` | S-M |
-| P14 | diff_system's classification: density, theme overrides, conditions, `element`, CSS Modules and `@layer` | LC-A8, LC-A9, LC-C5 | `diff_system.py`, `change-classification.md` | M |
+| P14, #48 | diff_system's classification: density, theme overrides, conditions, `element`, CSS Modules and `@layer` | LC-A8, LC-A9, LC-C5 | `diff_system.py`, `change-classification.md` | M |
 | P15 | The migration tools: the negative cancel, the rounding promise, deprecate.py's colour rename, the tier-1 claim, and the fixture and five-edit release as tests | LC-A11, LC-A12, LC-A14, LC-A19, LC-C4, LC-C12 | `design-token-migration/scripts/`, `design-system-versioning/scripts/deprecate.py` | L |
 | P16 | The Figma scripts share `figma_common.py`, with a parity test, and `--reverse` builds a correct body | LC-A22, LC-C3 | `figma-variables-sync/scripts/` | M |
 | P17 | Lifecycle instructions: the announcement example, the rebase recipe, the before-and-after audit, and claims with no gate | LC-A17, LC-A23, LC-B8, LC-C6 | lifecycle references and SKILL.md files | S-M |
@@ -213,6 +213,6 @@ Update this table in each PR.
 | Phase | PRs done | Items closed | Release |
 |---|---|---|---|
 | 3 | #12 to #36 (2026-10-02 to 04): P0 #16, P1 #17, P2 #18 and #19, P3 part 1 #20, and the skill descriptions #21; P3 part 2 #23, P4 #24, P5 #26; P6 part 1 #28 and part 2 #29; P7 part 1 #31 and part 2 #32; P8 part 1 #34 and part 2 #35 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30, SB-A15, N31, SB-A11, SB-A25, SB-C10, N3, N32, SB-C9, SS-B5, SS-A9, SS-B6, SS-B7, SS-C5, SB-B4, SS-B2, SS-C9, SS-A17, SS-A18, N4, XC-A5, N9, N10, N33, XC-A2, XC-B5, XC-C9, N7, N8; DL-B2 in part | 3.3.0, released 2026-10-04: #36 merged as `88a4886`, tagged `v3.3.0`, published by `release.yml` |
-| 4 | #38 (2026-10-04): P9; #39 (2026-10-05): P10 part 1; #40: P10 part 2; #41: P11; #42: P12 part 1; #44: P12 part 2; #45: P13 part 1; #46: P13 part 2 | GT-C13, N34, GT-A5, GT-A14, GT-C2, SB-B3, GT-A8, GT-A16, GT-A18, GT-C5, GT-A12, GT-A13, GT-C3, GT-B7, GT-B8, GT-A6, GT-A17, GT-C11, GT-B5 | — |
+| 4 | #38 (2026-10-04): P9; #39 (2026-10-05): P10 part 1; #40: P10 part 2; #41: P11; #42: P12 part 1; #44: P12 part 2; #45: P13 part 1; #46: P13 part 2; #48: P14 | GT-C13, N34, GT-A5, GT-A14, GT-C2, SB-B3, GT-A8, GT-A16, GT-A18, GT-C5, GT-A12, GT-A13, GT-C3, GT-B7, GT-B8, GT-A6, GT-A17, GT-C11, GT-B5, LC-A8, LC-A9, LC-C5 | — |
 | 5 | — | — | — |
 | 6 | — | — | — |

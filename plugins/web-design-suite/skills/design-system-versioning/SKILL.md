@@ -206,7 +206,7 @@ Four failures, four different causes, all actionable.
 |---|---|
 | Whether an addition is really an addition | A socket whose default does not reproduce today's rendering is a re-point in additive clothing. The tool prints the resolved default per theme; you compare them. |
 | Whether a rename really is a rename | No CSS file records it. The pairing is a heuristic over identical declarations. Confirm it. |
-| Layer order, from `system.json` | The `@layer a, b, c;` statement lives in the entry stylesheet and the snapshot does not record it. The diff compares it when both inputs are CSS that carries it, and says so when they do not. Diff that one file by eye; a reorder is major. |
+| Layer order, without the entry stylesheet | The `@layer a, b, c;` statement lives there, so a snapshot records it only when `extract_system.py` read that file (and only since 3.4.0). The diff says when it could not compare; then diff that one file by eye. A reorder is major. |
 | Whether a visual change is "too small to matter" | That is a measurement, not a feeling, and the measurement is a proof sheet. |
 | Usage in a repo you did not scan | A clear scan is evidence about the repos you scanned and nothing else. |
 | Anything computed at runtime | A token whose value is set by JavaScript is outside the snapshot entirely. |

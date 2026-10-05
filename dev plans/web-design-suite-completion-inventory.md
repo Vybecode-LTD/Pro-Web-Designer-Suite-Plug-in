@@ -112,8 +112,8 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-A5 | high | fixed in 3.1.0 | The reference says a `0 0 0 3px rgba()` focus ring "belongs to `--shadow-focus` … the classifier will get it wrong, so check for it". |
 | LC-A6 | high | fixed in 3.1.0 | "Rebase daily, never merge", then resolve conflicts with `git checkout --theirs file` and re-run the codemod. |
 | LC-A7 | medium | fixed in 3.2.0 | Two claims are out of date. |
-| LC-A8 | medium | W6 (3.4.0) | The doc says density-scale changes, reduced-motion changes and root-element changes are "major · auto-detect yes". |
-| LC-A9 | medium | W6 (3.4.0) | theme-override-added is classified minor, but it changes rendering in that theme, which is major by the file's own test (§11 Q2: "any theme"). |
+| LC-A8 | medium | fixed in 3.4.0: `test_versioning.DiffSystemClassifiesWhatSystemJsonRecords` (PR #48) | The doc says density-scale changes, reduced-motion changes and root-element changes are "major · auto-detect yes". |
+| LC-A9 | medium | fixed in 3.4.0: `test_versioning.DiffSystemClassifiesWhatSystemJsonRecords` (PR #48) | theme-override-added is classified minor, but it changes rendering in that theme, which is major by the file's own test (§11 Q2: "any theme"). |
 | LC-A10 | medium | fixed in 3.1.0 | SvelteKit's `src/lib` is where its components live, and it is silently treated as vendor. |
 | LC-A11 | medium | W6 (3.4.0) | The reference says a negative cancel must "point at the **same token** the padding uses… Never" point elsewhere. |
 | LC-A12 | medium | W6 (3.4.0) | The docs say "15px … becomes 16 (`--type-body`), not 14. |
@@ -140,7 +140,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-C2 | — | W10 (3.6.0+) | Add a shared `dtcg.py` for 2025.10 read and write, Tokens Studio sets and themes, and `$deprecated` → ledger, plus a `--format dtcg` output. |
 | LC-C3 | — | W6 (3.4.0) | Move the two figma scripts' shared code into `figma_common.py`, and add a parity test for extract_system tier1-leak vs audit_design L6. |
 | LC-C4 | — | W6 (3.4.0) | Add regression tests for LC-A5, A10, A11, A12, A14 and A2, then fix each one: focus-ring detection, the vendor rule, negative-cancel pairing, the type-tie note, the font guard scope, and composed opacity. |
-| LC-C5 | — | W6 (3.4.0) | diff_system: cover density, conditions, `element` and CSS Modules; record `@layer` in system.json; make an added override major when an existing value moves. |
+| LC-C5 | — | fixed in 3.4.0: `test_versioning.DiffSystemClassifiesWhatSystemJsonRecords` (PR #48) | diff_system: cover density, conditions, `element` and CSS Modules; record `@layer` in system.json; make an added override major when an existing value moves. |
 | LC-C6 | — | partly done; the rest in W6 (3.4.0) | Instruction fixes: the rebase recipe (LC-A6), a worktree-based before/after audit (LC-A13), the `${CLAUDE_SKILL_DIR}` invocation (LC-A20), one snapshot path with its inputs in config (LC-A18), the README (LC-A21), the ro |
 | LC-C7 | — | W10 (3.6.0+) | A Figma MCP route: a SKILL.md routing row that says "if `get_variable_defs` is available, read with it"; a `--reverse --format plugin-script` output for `use_figma` that renames "Mode 1", sets `scopes: []` on primitives  |
 | LC-C8 | — | W9 (3.5.0) | Hooks: block edits to files headed "GENERATED — DO NOT EDIT", and on a tokens.css edit run diff_system and return the bump and any contrast crossings. |

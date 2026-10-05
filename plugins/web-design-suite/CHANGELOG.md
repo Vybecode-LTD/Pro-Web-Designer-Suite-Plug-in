@@ -51,6 +51,11 @@
   when CrUX holds no data. The key comes from `CRUX_API_KEY`, never an argument: `--key`
   is refused without echoing it, and the key is never printed. `--response FILE` reads a
   saved response.
+- **system.json records the layer order** (LC-C5). `extract_system.py` writes each
+  `@layer a, b, c;` statement it reads to a new `layers` list, from the entry stylesheet
+  as well as the token files; the schema stays `design-system-docs/system/1`, since the
+  key is additive. `diff_system.py` compares two snapshots' orders, where it could compare
+  only two CSS inputs before, and says so when a snapshot predates 3.4.0.
 
 ### Fixed
 
@@ -125,6 +130,24 @@
   from the element that carries `{attrs}`, not the whole template, so a `<div>` wrapping
   an `<input>` no longer gets `disabled` or `aria-invalid`. With GT-A12 and GT-A13, this
   finishes GT-C3.
+- **diff_system missed density, media-condition and root-element changes** (LC-A8).
+  change-classification.md calls all three major and detected, and system.json records
+  them, but the diff compared none: a release that changed only `--density` at compact,
+  the reduced-motion duration and `<div>` to `<section>` was a patch "because nothing
+  changed". They are `density-changed` (with the roles each moves, `--pad-card 21px ->
+  19.2px`), `condition-changed` and `element-changed`, all major, and a density added or
+  removed is minor or major, as a theme is. A re-point that resolves the same in the
+  default theme but not in another theme or at a density was a patch; it is major.
+- **An added theme override was minor** (LC-A9). It moves the role in that theme, which
+  change-classification.md §11 calls major (Q2): a new dark `--fg-muted` that crossed 3:1
+  downward recommended a minor bump. It is major now, and a patch when it resolves as
+  before.
+- **A class renamed under CSS Modules was a removed part** (LC-A9). The rendered class is
+  hashed, so the doc calls the rename a patch, but the diff reported `part-removed`, major,
+  and failed the gate. In a `.module.css` file, a part that went and one that came with the
+  same declarations are `part-renamed-local`, a patch; in global CSS they stay major.
+  change-classification.md §11 now says what an added part is: new surface (Q4), unless it
+  wraps existing children (Q3).
 
 ### Changed
 
@@ -232,6 +255,23 @@
   `http://` `CRUX_API_URL` off this machine would carry the key in clear. They exit 2 now.
   Its second round found two more: a page's trailing slash was ignored, so a saved
   `/offers/` passed for `/offers`, and a list for `urlNormalizationDetails` crashed.
+- P14 (LC-A8, LC-A9, LC-C5): `test_versioning` builds the review's `fx/ver` system (a
+  token file, an entry stylesheet with the layer order, a CSS Modules card and its props),
+  extracts each version with `extract_system.py` and diffs it: a density, a reduced-motion
+  and a root-element change, the three together, a re-point that moves only at a density,
+  densities added and removed, a dark override that crosses 3:1, a local class renamed
+  under CSS Modules (with the gate binding), a layer reorder, a system.json from before
+  3.4.0, and the vendored token parser. Against `v3.3.0`, 12 fail; 2 are controls (a dark
+  override that resolves as before, and the same rename in global CSS). Codex's review of
+  #48 found three more, each failing on its head: a re-point equal by default but not
+  under reduced motion was a patch, a root that became a fragment went unreported, and a
+  local rename that also changed a value was paired as a pure rename. system.json's parts
+  now record their declarations (`declares`) so the pairing can compare values.
+  CodeRabbit's found three more, each failing on its head: `declares` came from a part's
+  first rule only; a component whose file exports its styles object had its keys paired
+  as local (`exports_styles` now records it); and `element` was the first JSX root after
+  the props interface, so a helper above the component lent it its `<span>`. The root is
+  read from the component's own body now.
 
 ## 3.3.0 — 2026-10-04
 

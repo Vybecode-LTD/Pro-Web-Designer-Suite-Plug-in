@@ -835,6 +835,12 @@
  },
  {
   "from": "design-system-docs/scripts/extract_system.py",
+  "to": "design-system-versioning/references/change-classification.md",
+  "section": "7",
+  "heading": "DOM structure and class names"
+ },
+ {
+  "from": "design-system-docs/scripts/extract_system.py",
   "to": "web-design-studio/references/style-architecture.md",
   "section": "6",
   "heading": "The component stylesheet shape"
