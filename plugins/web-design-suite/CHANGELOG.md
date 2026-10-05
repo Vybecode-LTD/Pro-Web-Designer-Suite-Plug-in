@@ -325,7 +325,6 @@
   tell left from right, a later `padding-inline` did not replace `padding`, and a grouped
   margin selector found no parent. The pairing works by side, in cascade order, for each
   member of either list.
-  selector lists.
 - P15 part 2 (LC-A14, LC-C4, LC-C12): `test_versioning.DeprecateRewritesAndCountsAColourRename`
   runs the review's `fx/dep/client` rules through deprecate.py's mapping, the codemod and
   the scan, one rule per line and the same rules on several lines;
