@@ -447,13 +447,13 @@ def selector_list(selector: str) -> List[str]:
     return [selector_key(s) for s in out if s.strip()]
 
 
-Pads = Dict[str, Dict[str, Tuple[set, Optional[dict]]]]
+Pads = Dict[Tuple[str, tuple], Dict[str, Tuple[set, Optional[dict]]]]
 
 
 def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Pads:
-    """Each rule's padding, by selector (each member of a selector list), by
-    side: {side: (the value's keys, the rule it maps by, or None)}. Later
-    declarations replace earlier ones, as the cascade does."""
+    """Each rule's padding, by selector (each member of a selector list) and
+    at-rule context, by side: {side: (the value's keys, the rule it maps by, or
+    None)}. Later declarations replace earlier ones, as the cascade does."""
     out: Pads = {}
     for d in decls:
         if not d.prop.startswith("padding"):
@@ -465,7 +465,7 @@ def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Pads:
             rule = mapping.value_rule(klass, real)[0] if klass else None
             for member in selector_list(d.selector):
                 for side in box_sides(d.prop, len(slots), i):
-                    out.setdefault(member, {})[side] = (set(canon_slot(real)), rule)
+                    out.setdefault((member, d.context), {})[side] = (set(canon_slot(real)), rule)
     return out
 
 
@@ -493,8 +493,17 @@ def cancelled_padding(d, slot: str, sides: Sequence[str], pads: Pads) -> Optiona
     margin alone clusters to a gap token."""
     keys = set(canon_slot(slot.strip().lstrip("-")))
 
+    def padding(parent: str, side: str):
+        # The margin's own @media first, then each enclosing one, then none:
+        # a padding inside another media query never applies here.
+        for k in range(len(d.context), -1, -1):
+            got = pads.get((parent, d.context[:k]), {}).get(side)
+            if got:
+                return got
+        return None
+
     def in_parent(parent: str) -> Optional[dict]:
-        found = [pads.get(parent, {}).get(side) for side in sides]
+        found = [padding(parent, side) for side in sides]
         if not found or not all(f and f[1] and f[0] & keys for f in found):
             return None
         rules = {id(f[1]) for f in found}

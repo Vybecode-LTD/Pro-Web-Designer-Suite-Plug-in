@@ -504,6 +504,7 @@ class Decl:
     selector: str
     block_start: int = -1   # offset of the `{` that opens the enclosing rule
     parent: str = ""        # the selector of the rule it is nested in, if any
+    context: tuple = ()     # the at-rules it sits in (@media, @supports), not @layer
 
 
 def scan_css_declarations(text: str, base_offset: int = 0) -> Iterator[Decl]:
@@ -516,6 +517,7 @@ def scan_css_declarations(text: str, base_offset: int = 0) -> Iterator[Decl]:
     buf: list[str] = []
     buf_start = 0
     sel_stack: list[str] = []
+    at_stack: list[str] = []
     block_stack: list[int] = []
     i, n, paren = 0, len(text), 0
 
@@ -542,6 +544,8 @@ def scan_css_declarations(text: str, base_offset: int = 0) -> Iterator[Decl]:
             selector=selector,
             block_start=block_stack[-1] if block_stack else -1,
             parent=named[-2] if len(named) > 1 else "",
+            context=tuple(" ".join(h.split()) for h in at_stack
+                          if h and not h.lower().startswith("@layer")),
         )
 
     while i < n:
@@ -568,6 +572,7 @@ def scan_css_declarations(text: str, base_offset: int = 0) -> Iterator[Decl]:
         if ch == "{" and paren == 0:
             head = "".join(buf).strip()
             sel_stack.append("" if head.startswith("@") else head)
+            at_stack.append(head if head.startswith("@") else "")
             block_stack.append(base_offset + i)
             buf, buf_start = [], i + 1
             i += 1
@@ -578,6 +583,8 @@ def scan_css_declarations(text: str, base_offset: int = 0) -> Iterator[Decl]:
                 yield d
             if sel_stack:
                 sel_stack.pop()
+            if at_stack:
+                at_stack.pop()
             if block_stack:
                 block_stack.pop()
             buf, buf_start = [], i + 1
