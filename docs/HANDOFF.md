@@ -19,8 +19,8 @@
     - The ESLint config pins `typescript@~6.0` beside typescript-eslint.
   - **R1, #36:** the version, the README's paths and its `.skill` line, and the CHANGELOG heading.
   - **P9, #38: one copy of the browser scripts' helpers.** a11y_runtime, snapshot_matrix and measure_vitals import `scripts/browser_common.mjs`, a copy of `shared/browser_common.mjs` in each skill. a11y_runtime now pauses animations, so a spinner no longer counts as a focus ring (GT-A14 (a)), and reads JSONC. `tooling/release/compare.py` compares builds by content (N34): it finds 3.3.0's local build and release the same.
-- **The reviews found 6 real issues** in #34 to #36: Codex one on #34, CodeRabbit one on #34, three on #35 (the fence reader, continued installs, `python3` at a line's end), one on #36. Each code fix has a test that fails on the head it reviewed. Two suggestions were declined with reasons in their threads.
-- **Tests:** 519. **The plan:** 122 open items, all scheduled (`check_execution_plan.py`).
+- **The reviews found 6 real issues** in #34 to #36: Codex one on #34, CodeRabbit one on #34, three on #35 (the fence reader, continued installs, `python3` at a line's end), one on #36. Each code fix has a test that fails on the head it reviewed. Two suggestions were declined with reasons in their threads. On #38, Codex and CodeRabbit found two more in `compare.py` (it trusted recorded CRCs, and two builds damaged alike compared the same); one suggestion was declined.
+- **Tests:** 521. **The plan:** 122 open items, all scheduled (`check_execution_plan.py`).
 
 ## Next steps
 

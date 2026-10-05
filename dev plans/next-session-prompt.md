@@ -56,7 +56,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 - **The plugin** is `plugins/web-design-suite/`:
   - `skills/`, one folder per skill (13);
-  - `tests/`: 519 tests, standard-library `unittest`, with helpers in `tests/wds_support.py` (`PLUGIN`, `SKILLS`, `REPO`, `TOOLING`);
+  - `tests/`: 521 tests, standard-library `unittest`, with helpers in `tests/wds_support.py` (`PLUGIN`, `SKILLS`, `REPO`, `TOOLING`);
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
 - **The three browser scripts** are `a11y-audit-runner/scripts/a11y_runtime.mjs`, `component-state-matrix/scripts/snapshot_matrix.mjs` and `perf-budget-gate/scripts/measure_vitals.mjs`. Since P9 they import `scripts/browser_common.mjs` (browser resolution, `FREEZE_ANIMATIONS_CSS`, `readJsonFile`), a copy of `shared/browser_common.mjs` in each skill: change the master and copy it over all three (`test_browser_scripts.SharedHelpers`). Their tests are `test_browser_runtime.py` and `test_browser_scripts.py`; the real-browser ones need Playwright from `tooling/main` (CI's Linux job has the headless shell).
 - **New in P8.** `accessibility-testing.md` holds what was accessibility.md §10. `test_docs.PasteableCommands` holds the READMEs' commands to what bash, PowerShell and cmd read alike, the README's `WDS` paths to `plugin.json`'s version (a release PR updates both), and every typescript-eslint install to a TypeScript 6.0 pin. `test_docs.Manifests` holds the two marketplace manifests to each other. `test_contract.ContractCopies` compares each skill's contract with `shared/token-contract.md`.
