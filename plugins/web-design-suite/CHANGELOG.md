@@ -330,6 +330,9 @@
   the page quotes to the output. Against `v3.3.0`, all 4 fail. TheWorkedRun audits with a
   relative path: the audit skips JS checks for any file whose path, absolute included,
   names a test folder, and the test's temporary folder does.
+  Codex's review of #50 found one more, failing on its head: a declaration-scope rewrite
+  replaced through `!important` and dropped it, which the font guard had hidden beside a
+  `font-weight`. The rewrite ends where the value does now.
 
 ## 3.3.0 — 2026-10-04
 

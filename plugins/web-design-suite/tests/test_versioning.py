@@ -362,6 +362,13 @@ class DeprecateRewritesAndCountsAColourRename(TempDirTest):
         self.assertIn("+.meta-strong { color: var(--fg-faint); font-weight: 600; }", out)
         self.assertNotIn("would reset", out)
 
+    def test_a_rename_keeps_its_important(self):
+        # Codex on #50: the rewrite replaced through `!important` and dropped it.
+        self.write("prio/src/app.css",
+                   ".x { color: var(--fg-subtle) !important; font-weight: 600; }\n")
+        self.assertIn("+.x { color: var(--fg-faint) !important; font-weight: 600; }",
+                      self.codemod("prio"))
+
     def test_the_scan_labels_a_one_line_rule_as_the_codemod_treats_it(self):
         self.write("one/src/app.css", "\n".join(CLIENT) + "\n")
         self.write("many/src/app.css", "\n".join(multi_line(r) for r in CLIENT) + "\n")

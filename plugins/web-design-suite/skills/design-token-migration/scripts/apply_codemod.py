@@ -536,9 +536,9 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
                     f"delete those first, the --type-* role carries them",
                     text[d.decl_offset:d.value_offset + len(d.value)].strip()))
             else:
-                edits.append(Edit(
+                edits.append(Edit(                  # up to `!important`, which stays
                     base + d.decl_offset,
-                    base + d.value_offset + len(d.value),
+                    base + d.value_offset + len(value_eff.rstrip()),
                     drule["replacement"], drule["id"], drule["kind"],
                     line_of(d.decl_offset),
                     text[d.decl_offset:d.value_offset + len(d.value)]))
