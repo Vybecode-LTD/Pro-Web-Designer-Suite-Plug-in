@@ -323,7 +323,7 @@ jobs:
           path: build/baselines
 ```
 
-Then, on your machine:
+GitHub starts a `workflow_dispatch` run only for a workflow file that is on the default branch, so merge `baselines.yml` first, in a PR of its own; until then, only a machine with the gate's OS and image can record the baselines. Then, on your machine, for any branch:
 
 ```bash
 gh workflow run baselines.yml --ref "$(git branch --show-current)"
