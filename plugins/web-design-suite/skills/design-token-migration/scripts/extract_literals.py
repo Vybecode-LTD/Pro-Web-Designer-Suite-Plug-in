@@ -672,6 +672,8 @@ def slot_prop(prop: str, value: str, offset: int) -> str:
     """The property a literal at `offset` within `value` really sets."""
     if prop != "padding":
         return prop
+    if "!important" in value.lower():         # not a slot: `16px !important` is one
+        value = value[:value.lower().index("!important")]
     slots = split_slots(value)
     pattern = BOX_SIDE_PROPS.get(len(slots))
     if not pattern:

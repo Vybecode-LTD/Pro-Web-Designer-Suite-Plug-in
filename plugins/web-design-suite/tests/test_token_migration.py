@@ -270,6 +270,22 @@ class MigrationPipeline(TempDirTest):
                 line = next(l for l in lines if f".{name}__x {{" in l and l.startswith("+"))
                 self.assertIn(f"margin-inline: calc(var({gap}) * -1)", line)
 
+    def test_an_important_padding_is_one_value_and_wins_its_block(self):
+        # CodeRabbit on #49: `!important` was split off as a second slot, so
+        # `padding: 16px !important` read as block padding only, and the last
+        # declaration won even beside an earlier `!important` one.
+        self.write("src/a.css", ".i { padding: 16px !important; padding: 8px; }\n"
+                                ".i__x { margin-inline: -16px; }\n"
+                                ".j { padding: 16px !important; }\n.j__x { margin-inline: -16px; }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+        all16 = next(r["token"] for r in mapping["rules"]
+                     if "pad-all" in r.get("prop_classes", []) and "16px" in r["match"])
+        lines = self.codemod(self.tmp / "src").splitlines()
+        for name in ("i", "j"):
+            with self.subTest(rule=name):
+                line = next(l for l in lines if l.startswith(f"+.{name}__x"))
+                self.assertIn(f"margin-inline: calc(var({all16}) * -1)", line)
+
     def test_a_negative_margin_with_nothing_to_cancel_keeps_its_own_token(self):
         # Control: no padding in the parent rule, so it is a spacing value of its own.
         self.write("src/a.css", ".row { gap: 16px; }\n.row__item { margin-block-start: -16px; }\n"
