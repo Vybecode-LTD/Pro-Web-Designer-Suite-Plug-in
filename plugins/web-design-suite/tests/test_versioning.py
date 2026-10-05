@@ -356,6 +356,14 @@ class DeprecateRewritesAndCountsAColourRename(TempDirTest):
                 for h in per]
         return {v: sum(1 for h in hits if h["verdict"] == v) for v in ("codemod", "manual")}
 
+    def test_the_scan_reads_important_and_quoted_text_as_the_codemod_does(self):
+        # CodeRabbit on #50: the codemod rewrites `!important` declarations, and a
+        # token named inside a CSS string is text, not a use.
+        self.write("quoted/src/app.css",
+                   ".a { color: var(--fg-subtle) !important; }\n"
+                   '.b::after { content: "label; color: var(--fg-subtle);"; }\n')
+        self.assertEqual(self.scan("quoted"), {"codemod": 1, "manual": 0})
+
     def test_a_colour_rename_beside_a_font_weight_is_rewritten(self):
         self.write("client/src/app.css", "\n".join(CLIENT) + "\n")
         out = self.codemod("client")

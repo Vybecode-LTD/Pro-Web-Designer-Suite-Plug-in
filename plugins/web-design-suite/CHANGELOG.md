@@ -361,7 +361,11 @@
   the page quotes to the output. Against `v3.3.0`, all 4 fail.
   Codex's review of #50 found one more, failing on its head: a declaration-scope rewrite
   replaced through `!important` and dropped it, which the font guard had hidden beside a
-  `font-weight`. The rewrite ends where the value does now.
+  `font-weight`. The rewrite ends where the value does now. CodeRabbit's found two more in
+  the scan, failing on `28d5b99`: an `!important` declaration, which the codemod rewrites,
+  was labelled manual, and a token named inside a quoted `content` string was split at the
+  string's `;` and counted as a codemod hit
+  (`test_the_scan_reads_important_and_quoted_text_as_the_codemod_does`).
 
 ## 3.3.0 — 2026-10-04
 
