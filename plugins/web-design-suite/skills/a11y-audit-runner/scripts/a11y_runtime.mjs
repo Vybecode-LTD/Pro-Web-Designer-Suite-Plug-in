@@ -1058,8 +1058,12 @@ async function measureFocus(page, cmpPage, selectors, opts, label) {
 }
 
 // The density values a page's own stylesheets name in a [data-density=…]
-// selector, in the order they appear, and the one its root has now. A
+// selector, in the order they appear, and the one its dial has now. A
 // cross-origin sheet cannot be read; name its densities with --densities.
+// The dial is the outermost data-density: the root's, or, when the root has
+// none, each marker with no marker above it (on <body>, or a page's top
+// region). A marker inside another is a region its author fixed, and keeps
+// its value (Codex on #40).
 const DENSITIES_FN = () => {
   const found = [];
   const walk = (rules) => {
@@ -1075,13 +1079,25 @@ const DENSITIES_FN = () => {
   for (const sheet of document.styleSheets) {
     try { walk(sheet.cssRules); } catch { /* cross-origin */ }
   }
-  return { found, current: document.documentElement.getAttribute('data-density') };
+  const first = document.querySelector('[data-density]');
+  return { found, current: first ? first.getAttribute('data-density') : null };
 };
 
+// Turn the dial to `density`, or back to where the page had it with null.
 async function setDensity(page, density) {
   await page.evaluate((d) => {
-    if (d === null) document.documentElement.removeAttribute('data-density');
-    else document.documentElement.setAttribute('data-density', d);
+    if (!window.__a11yDensityHosts) {
+      const marked = [...document.querySelectorAll('[data-density]')]
+        .filter((el) => !el.parentElement || !el.parentElement.closest('[data-density]'));
+      window.__a11yDensityHosts = marked.length ? marked : [document.documentElement];
+      window.__a11yDensityWas = window.__a11yDensityHosts
+        .map((el) => el.getAttribute('data-density'));
+    }
+    window.__a11yDensityHosts.forEach((el, i) => {
+      const v = d === null ? window.__a11yDensityWas[i] : d;
+      if (v === null) el.removeAttribute('data-density');
+      else el.setAttribute('data-density', v);
+    });
   }, density);
   await page.evaluate(() => new Promise((r) =>
     requestAnimationFrame(() => requestAnimationFrame(r))));
@@ -2212,7 +2228,7 @@ async function main() {
           findings.push(...atDensity(forcedColorFindings(normal, forced, opts), d));
         }
       }
-      if (densities.length) await setDensity(page, declared.current);
+      if (densities.length) await setDensity(page, null);
       if (forcedPage) await forcedPage.ctx.close().catch(() => {});
     }
 

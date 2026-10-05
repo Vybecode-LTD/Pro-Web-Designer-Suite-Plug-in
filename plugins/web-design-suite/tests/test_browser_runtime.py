@@ -147,7 +147,7 @@ class RuntimeInABrowser(TempDirTest):
                 self.assertIn("focus-stuck", errors)
 
     DENSITY_PAGE = ("<!doctype html><html lang=en><head><title>d</title><style>"
-                    ":root{--density:1}[data-density=compact]{--density:0}"
+                    ":root{--density:1}[data-density=compact]{--density:0}[data-density=comfortable]{--density:1}"
                     "[data-density=spacious]{--density:1.5}"
                     ".bar{display:inline-flex;overflow:hidden;padding:calc(6px * var(--density))}"
                     "button{font:16px sans-serif;border:1px solid #333;background:#fff;color:#000}"
@@ -159,12 +159,17 @@ class RuntimeInABrowser(TempDirTest):
     def test_the_focus_ring_is_measured_at_each_density_the_page_declares(self):
         """SB-B3: at compact the toolbar's padding is gone and its overflow
         clips the ring; at spacious the ring is a box-shadow, which forced
-        colours discard. The default density has a ring in both modes."""
-        findings = self.runtime(self.DENSITY_PAGE, *only("focus", "forced"))
-        lost = {(f["rule"], f.get("density")) for f in findings
-                if f["severity"] == "error" and f["check"] in ("focus", "forced")}
-        self.assertEqual({("no-visible-focus-indicator", "compact"),
-                          ("focus-ring-lost-in-forced-colors", "spacious")}, lost)
+        colours discard. The default density has a ring in both modes. The dial
+        is turned wherever the page keeps it: on the root, or on <body>, which
+        a dial on the root alone could not reach (Codex on #40)."""
+        for where, page in (("root", self.DENSITY_PAGE),
+                            ("body", self.DENSITY_PAGE.replace("<body>", "<body data-density=comfortable>"))):
+            with self.subTest(dial=where):
+                findings = self.runtime(page, *only("focus", "forced"))
+                lost = {(f["rule"], f.get("density")) for f in findings
+                        if f["severity"] == "error" and f["check"] in ("focus", "forced")}
+                self.assertEqual({("no-visible-focus-indicator", "compact"),
+                                  ("focus-ring-lost-in-forced-colors", "spacious")}, lost)
         findings = self.runtime(self.DENSITY_PAGE, *only("focus", "forced"), "--densities", "none")
         self.assertEqual([], [f for f in findings if f["severity"] == "error"])
 
@@ -206,13 +211,15 @@ class VitalsUnderCsp(TempDirTest):
 
     PAGE = ("<!doctype html><html lang=en><head><title>v</title>{}</head><body><main>"
             "<h1>Prices</h1><p>Plans start at four pounds a month.</p></main><script>"
-            "setTimeout(() => document.body.insertAdjacentHTML('afterbegin',"
-            " '<div style=\"height:400px\">Banner</div>'), 100)</script></body></html>")
+            # A shift before the first paint is not a layout shift, so it waits for one.
+            "new PerformanceObserver((list, obs) => {{ obs.disconnect(); setTimeout(() =>"
+            " document.body.insertAdjacentHTML('afterbegin', '<div style=\"height:400px\">Banner</div>'),"
+            " 200); }}).observe({{ type: 'paint', buffered: true }});</script></body></html>")
 
     def cls(self, head):
         page = self.write("page.html", self.PAGE.format(head))
         proc = run_node("perf-budget-gate", "measure_vitals.mjs", page, "--runs", "1",
-                        "--settle", "1000", "--json", cwd=self.tmp,
+                        "--settle", "1500", "--json", cwd=self.tmp,
                         env_changes={"NODE_PATH": MODULES}, timeout=240)
         if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
             self.skipTest(output(proc)[-200:])
