@@ -741,7 +741,7 @@ async function main() {
       'measuring a file:// URL. There is no network stack, so TTFB is near ' +
       'zero, resource priorities do not apply and throttling barely bites. ' +
       'The numbers are not comparable to a served page — run a local HTTP ' +
-      'server (python3 -m http.server) and point this at that instead.');
+      'server (python -m http.server) and point this at that instead.');
   }
 
   // Read the budget before measuring: a typo found after N runs costs them all.

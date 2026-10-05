@@ -27,6 +27,13 @@
  *
  *     "overrides": { "eslint-plugin-jsx-a11y": { "eslint": "$eslint" } }
  *
+ *   The composition above also needs typescript-eslint, and a TypeScript it
+ *   accepts. typescript-eslint 8.71.0 takes TypeScript below 6.1.0, and
+ *   npm's latest TypeScript is 7.0.2 (both read on npm, 2026-10-04), so an
+ *   unpinned install is a peer conflict. Pin TypeScript beside it:
+ *
+ *     npm i -D typescript-eslint typescript@~6.0
+ *
  * WHY LINT RULES AND NOT A STYLE GUIDE
  * ------------------------------------
  * Every law in this file is one a competent engineer already agrees with

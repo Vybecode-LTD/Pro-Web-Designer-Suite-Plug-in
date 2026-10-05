@@ -259,6 +259,31 @@
       "docs": [
         "web-design-studio/references/typography.md"
       ]
+    },
+    {
+      "figure": "6.1.0",
+      "also": [
+        "8.71.0"
+      ],
+      "claim": "typescript-eslint's latest release, 8.71.0, accepts TypeScript below 6.1.0 (its peer range is >=4.8.4 <6.1.0)",
+      "source": "npm registry, typescript-eslint 8.71.0 (the version's manifest)",
+      "url": "https://registry.npmjs.org/typescript-eslint/8.71.0",
+      "checked": "2026-10-04",
+      "quote": "\"version\":\"8.71.0\" … \"peerDependencies\":{\"eslint\":\"^8.57.0 || ^9.0.0 || ^10.0.0\",\"typescript\":\">=4.8.4 <6.1.0\"}",
+      "docs": [
+        "web-design-studio/assets/configs/eslint.design.config.mjs"
+      ]
+    },
+    {
+      "figure": "7.0.2",
+      "claim": "npm's latest TypeScript, the version an unpinned install gets",
+      "source": "npm registry, typescript's dist-tags",
+      "url": "https://registry.npmjs.org/-/package/typescript/dist-tags",
+      "checked": "2026-10-04",
+      "quote": "\"latest\":\"7.0.2\"",
+      "docs": [
+        "web-design-studio/assets/configs/eslint.design.config.mjs"
+      ]
     }
   ],
   "not_statistics": [

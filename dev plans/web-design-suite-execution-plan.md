@@ -75,7 +75,7 @@ PRs #12 to #15 were merged on 2026-10-02. P0 fixes what their reviews found.
 | P7 part 1, #31 | The contract's missing roles: the status inks, an invalid-field border and travel distance, in every consumer and the role gate | SB-B4 | `token-contract.md` (14 copies), `tokens.css`, `check_roles.py`, the consumers | M |
 | P7 part 2, #32 | The files the starter refers to, the comments the files contradict, and reset.css's scroll behaviour | SS-B2, SS-C9, SS-A17, SS-A18 | `tokens.css`, `reset.css`, starter files | S |
 | P8 part 1, #34 | Hygiene: accessibility.md's testing procedure in its own file, the contract's master copy, the two marketplaces held to each other, the review's header, and the vanilla stack's rule 4 | N4, XC-A5, N9, N10, N33 | `accessibility.md`, `token-contract.md` (14 copies), `test_contract.py`, `test_docs.py` | S |
-| P8 | Docs that work in cmd and PowerShell: the GitHub install route, TypeScript pinned beside typescript-eslint, and the shell-only recipes | XC-A2, XC-B5, XC-C9, N7, N8 | READMEs, the references' shell blocks, `evidence.json` | M |
+| P8 part 2, #35 | Docs that work in cmd and PowerShell: the GitHub install route, TypeScript pinned beside typescript-eslint, and the shell-only recipes | XC-A2, XC-B5, XC-C9, N7, N8 | READMEs, the references' shell blocks, `evidence.json` | M |
 | R1 | Release 3.3.0 | — | — | M |
 
 ### Phase 4 · 3.4.0: runtime gates, lifecycle, email and persuasion
@@ -209,7 +209,7 @@ Update this table in each PR.
 
 | Phase | PRs done | Items closed | Release |
 |---|---|---|---|
-| 3 | #12 to #34 (2026-10-02 to 04): P0 #16, P1 #17, P2 #18 and #19, P3 part 1 #20, and the skill descriptions #21; P3 part 2 #23, P4 #24, P5 #26; P6 part 1 #28 and part 2 #29; P7 part 1 #31 and part 2 #32; P8 part 1 #34 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30, SB-A15, N31, SB-A11, SB-A25, SB-C10, N3, N32, SB-C9, SS-B5, SS-A9, SS-B6, SS-B7, SS-C5, SB-B4, SS-B2, SS-C9, SS-A17, SS-A18, N4, XC-A5, N9, N10, N33; DL-B2 in part | — |
+| 3 | #12 to #35 (2026-10-02 to 04): P0 #16, P1 #17, P2 #18 and #19, P3 part 1 #20, and the skill descriptions #21; P3 part 2 #23, P4 #24, P5 #26; P6 part 1 #28 and part 2 #29; P7 part 1 #31 and part 2 #32; P8 part 1 #34 and part 2 #35 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30, SB-A15, N31, SB-A11, SB-A25, SB-C10, N3, N32, SB-C9, SS-B5, SS-A9, SS-B6, SS-B7, SS-C5, SB-B4, SS-B2, SS-C9, SS-A17, SS-A18, N4, XC-A5, N9, N10, N33, XC-A2, XC-B5, XC-C9, N7, N8; DL-B2 in part | — |
 | 4 | — | — | — |
 | 5 | — | — | — |
 | 6 | — | — | — |
