@@ -1574,6 +1574,36 @@ def cluster_tracking(lits: Sequence[dict], prop: Proposal) -> None:
 
 # ---------------------------------------------------------------------------
 
+def held_colour(holder: str) -> Tuple[str, str]:
+    """Why a colour held outside a role does not map, and what to do, by what
+    holds it: a preprocessor variable, a custom property, a plain property, or
+    JavaScript."""
+    if holder and holder.startswith(("$", "@")):
+        return (f"held in the preprocessor variable `{holder}`",
+                f"Delete it, and use the role at each call site "
+                f"(`var(--fg-default)`, or whichever role that site means). "
+                f"Re-pointed, `{holder}: var(--fg-default)` is a tier that means "
+                f"nothing (framework-migrations.md). Keep a variable only for a "
+                f"value the browser cannot hold, such as a breakpoint inside "
+                f"`@media`.")
+    if holder and holder.startswith("--"):
+        return (f"held in the custom property `{holder}`",
+                f"Point it at the role instead: `{holder}: var(--fg-default)` "
+                f"(pick the right role). A component's own property defaulting "
+                f"to a role is a Tier-3 socket; holding a literal, it is a tier "
+                f"missing.")
+    if holder:
+        return (f"in `{holder}`, a property with no colour role",
+                f"Replace the colour inside `{holder}` with the role it means at "
+                f"that call site (`var(--fg-default)`, `var(--border-default)`, "
+                f"…); keep the declaration.")
+    return ("a color constant in JavaScript",
+            "A color in JS is a color dark mode cannot re-point. Move the "
+            "decision into CSS and read it back with "
+            "getComputedStyle().getPropertyValue('--fg-muted') if canvas or "
+            "chart code genuinely needs the value.")
+
+
 def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
                         accent_override: Optional[str]) -> Tuple[Ramp, Ramp, Dict[str, Ramp]]:
     freq: Dict[str, int] = defaultdict(int)
@@ -1668,39 +1698,21 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
 
         for klass, items in sorted(by_class.items()):
             if klass in ("other", "var"):
-                holder = items[0]["prop"]
-                if holder and holder.startswith(("$", "@")):
-                    reason = f"held in the preprocessor variable `{holder}`"
-                    rec = (f"Delete it, and use the role at each call site "
-                           f"(`var(--fg-default)`, or whichever role that site "
-                           f"means). Re-pointed, `{holder}: var(--fg-default)` "
-                           f"is a tier that means nothing "
-                           f"(framework-migrations.md). Keep a variable only "
-                           f"for a value the browser cannot hold, such as a "
-                           f"breakpoint inside `@media`.")
-                elif holder and holder.startswith("--"):
-                    reason = f"held in the custom property `{holder}`"
-                    rec = (f"Point it at the role instead: `{holder}: "
-                           f"var(--fg-default)` (pick the right role). A "
-                           f"component's own property defaulting to a role is "
-                           f"a Tier-3 socket; holding a literal, it is a tier "
-                           f"missing.")
-                elif holder:
-                    reason = f"in `{holder}`, a property with no colour role"
-                    rec = (f"Replace the colour inside `{holder}` with the role "
-                           f"it means at that call site (`var(--fg-default)`, "
-                           f"`var(--border-default)`, …); keep the declaration.")
-                else:
-                    reason = "a color constant in JavaScript"
-                    rec = ("A color in JS is a color dark mode cannot re-point. "
-                           "Move the decision into CSS and read it back with "
-                           "getComputedStyle().getPropertyValue('--fg-muted') "
-                           "if canvas or chart code genuinely needs the value.")
-                prop.unmapped.append(Unmapped(
-                    kind="color", value=", ".join(c.members),
-                    occurrences=len(items), where=where_of(items),
-                    reason=reason, recommendation=rec,
-                ))
+                # One entry per kind of holder: a `$` variable and a custom
+                # property in one cluster get different advice.
+                kinds: Dict[str, list] = {}
+                for item in items:
+                    holder = item["prop"] or ""
+                    kinds.setdefault(holder[:1] if holder[:1] in "$@" else
+                                     holder[:2] if holder.startswith("--") else
+                                     "prop" if holder else "js", []).append(item)
+                for group in kinds.values():
+                    reason, rec = held_colour(group[0]["prop"])
+                    prop.unmapped.append(Unmapped(
+                        kind="color", value=", ".join(c.members),
+                        occurrences=len(group), where=where_of(group),
+                        reason=reason, recommendation=rec,
+                    ))
                 continue
             role, why = role_for(rname, step, klass)
             if not role:
@@ -1730,7 +1742,8 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
                 prop_classes=[klass],
                 props=sorted({l["prop"] for l in items
                               if not l["prop"].startswith("tw:")}),
-                occurrences=len(items), confidence=confidence, note=note,
+                occurrences=len(items), delta_px=round(dist, 3),    # a colour's is ΔE
+                confidence=confidence, note=note,
             ))
             prop.provenance[role].append(
                 f"{', '.join(c.members)} x{len(items)} ({klass})")
@@ -2356,9 +2369,15 @@ def render_reconciliation(prop: Proposal, payload: dict, args) -> str:
         buf.append("|---|---|---:|---:|---|")
         for r in sorted(review, key=lambda r: -r.occurrences):
             # `delta_px` is the rule's own unit: a duration's is milliseconds.
-            unit = {"duration": "ms", "z-index": ""}.get(r.kind, "px")
+            if r.kind == "color":
+                delta = f"ΔE {r.delta_px:g}"
+            elif r.kind == "shadow":
+                delta = "—"                 # matched by structure, not by a distance
+            else:
+                unit = {"duration": "ms", "z-index": ""}.get(r.kind, "px")
+                delta = f"{r.delta_px:+g}{unit}"
             buf.append(f"| `{', '.join(r.match[:3])}` | `{r.token}` | "
-                       f"{r.delta_px:+g}{unit} | {r.occurrences} | "
+                       f"{delta} | {r.occurrences} | "
                        f"{r.note or r.kind} |")
         buf.append("")
 

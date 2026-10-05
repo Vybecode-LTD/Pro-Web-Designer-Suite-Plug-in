@@ -348,12 +348,26 @@ class MigrationPipeline(TempDirTest):
         self.assertIn("keep the declaration", recs["scrollbar-color"])
         self.assertNotIn("Delete it", recs["scrollbar-color"])
 
+    def test_one_colour_in_two_kinds_of_holder_gets_both_kinds_of_advice(self):
+        # CodeRabbit on #54: the cluster's first holder chose the advice for all.
+        self.write("src/a.scss", "$mix: #7a3cf0;\n.a { color: $mix; }\n.b { --mix: #7a3cf0; }\n")
+        _, report = self.cluster(self.extract(self.tmp / "src")[0])
+        self.assertIn("held in the preprocessor variable `$mix`", report)
+        self.assertIn("held in the custom property `--mix`", report)
+
     def test_the_review_table_names_its_units(self):
         # CodeRabbit on #54: a duration sat under "more than 2px".
         self.write("src/a.css", ".a { transition: opacity 250ms ease; }\n")
         _, report = self.cluster(self.extract(self.tmp / "src")[0])
         self.assertIn("## Replacements to review", report)
         self.assertNotIn("more than 2px\n", report)
+        # CodeRabbit on #54: a colour's row read "+0px"; its distance is a ΔE.
+        self.write("src/a.css", "".join(f".c{i} {{ color: {c}; }}\n" for i, c in enumerate(
+            ("#2f6df6", "#2f6df6", "#5a5a5a", "#8a6d3b", "#c0392b"))))
+        _, report = self.cluster(self.extract(self.tmp / "src")[0])
+        review = report.split("## Replacements to review", 1)[1]
+        row = next(l for l in review.splitlines() if l.startswith("| `#8a6d3b`"))
+        self.assertIn("| ΔE 0.043 |", row)
 
     def test_the_z_index_note_counts_the_rungs_above_base(self):
         rules = "\n".join(f".z{i} {{ z-index: {v}; }}" for i, v in
