@@ -297,7 +297,7 @@ The sheet's chrome lives in its own `matrix` cascade layer, declared after `util
 | `--viewport WxH`, `--dpr N` | pinned rendering geometry |
 | `--browser PATH` | chromium executable (default `$MATRIX_CHROMIUM`, else the first that starts of `/opt/pw-browsers/chromium`, Playwright's own Chromium, an installed Chrome or Edge — pin one for baselines shared across machines) |
 
-Exit `0` clean or updated · `1` regression, new cell or capture error · `2` bad arguments or no usable browser.
+Exit `0` clean or updated · `1` regression, new cell or capture error · `2` bad arguments, no usable browser, or a run that failed.
 
 **It never downloads a browser.** It launches with an explicit `executablePath` and fails with instructions if nothing is there. Install the module with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D -E playwright` to use the Chrome you have. CI pins the browser instead. It installs the Chromium that the locked Playwright was built for, which the script tries first (`references/visual-regression.md` §7).
 

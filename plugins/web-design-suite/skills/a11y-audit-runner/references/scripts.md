@@ -68,7 +68,7 @@ node scripts/a11y_runtime.mjs --file dist/index.html --tags wcag2a,wcag2aa,wcag2
 | `--skip CHECK` | `axe names taborder focus forced contrast keys reflow` (repeatable) |
 | `--max-stops` · `--max-cells` · `--focus-threshold` · `--viewport` · `--dpr` · `--axe` · `--browser` · `--json` · `--quiet` | |
 
-Exit `0` no errors and inside budget · `1` violations or breach · `2` bad arguments, no browser, no axe, page failed to load.
+Exit `0` no errors and inside budget · `1` violations or breach · `2` bad arguments, no browser, no axe, page failed to load, or the run failed: a crash is never a finding.
 
 **axe is injected from `node_modules`, never a CDN, and the browser is never downloaded.** A gate that depends on a third-party CDN goes red when that CDN does, and a team taught that red means "re-run it" is a team with no gate.
 

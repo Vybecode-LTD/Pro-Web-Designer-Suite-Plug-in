@@ -10,6 +10,17 @@
   passed. It now uses the matrix's freeze, which pauses them.
 - **a11y_runtime reads a JSONC budget or keymap**, with comments and trailing commas, as
   measure_vitals and perf_audit already did.
+- **A page with a strict Content-Security-Policy crashed the run** (GT-A5). Under
+  `default-src 'self'` the page refused the freeze stylesheet that a11y_runtime and
+  snapshot_matrix inject, and the error left as exit 1, which means violations. Every
+  context of the three browser scripts now bypasses the page's CSP, and a run that
+  fails exits 2: a crash is never a finding, a regression or a breach.
+- **Disabled controls were held to contrast** (GT-A14 (b)). SC 1.4.3 exempts the text of
+  an inactive component, and axe skips it; a11y_runtime reported `<button disabled>` as
+  `contrast-too-low`. It now skips a disabled control or fieldset and what it holds,
+  anything inside `aria-disabled="true"`, and the label of a disabled control. A control
+  that only looks disabled is still measured. With GT-A5, this finishes GT-C2: 3.1.0
+  did the colours, modals, iframes and inert content, and P9 the pausing.
 
 ### Changed
 
@@ -36,6 +47,13 @@
   compared (the old tool reports such a pair the same). CodeRabbit's added a fourth: an
   entry damaged alike in both builds read as the same error on both sides, so two
   damaged builds compared the same; an unreadable entry is now always a difference.
+- P10 part 1 (GT-A5, GT-A14 (b)): `test_browser_scripts` runs the three scripts against
+  a stub browser that records each context's options and then fails, and holds every
+  `newContext(` call in their source to `bypassCSP: true`; `test_browser_runtime` audits
+  a page and captures a sheet under `default-src 'self'`, and checks disabled controls
+  against a lookalike that is not. Against `v3.3.0`, all 5 fail. measure_vitals ran
+  under that CSP at 3.3.0 too, since it injects only an init script; its bypass is
+  preventive.
 
 ## 3.3.0 — 2026-10-04
 

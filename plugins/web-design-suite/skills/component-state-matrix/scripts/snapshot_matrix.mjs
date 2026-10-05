@@ -57,7 +57,8 @@
  * ----------
  *   0  every cell matched, or baselines were updated
  *   1  at least one regression, new cell, or capture error
- *   2  bad arguments, missing sheet, or no usable browser
+ *   2  bad arguments, missing sheet, no usable browser, or the run itself
+ *      failed: a crash is never a regression
  */
 
 import { createRequire } from 'node:module';
@@ -390,6 +391,9 @@ async function main() {
     colorScheme: 'light',   // the sheet sets data-theme itself; never inherit the OS
     locale: 'en-US',
     timezoneId: 'UTC',
+    // A strict Content-Security-Policy refuses the injected freeze
+    // stylesheet; the capture is of the sheet, not of its CSP (GT-A5).
+    bypassCSP: true,
   });
   await context.addInitScript(STUB_JS);
 
@@ -544,7 +548,8 @@ function CSS_escape(s) {
   return String(s).replace(/["\\]/g, '\\$&');
 }
 
+// 1 means a regression, so a run that failed exits 2 (GT-A5).
 main().catch((err) => {
-  process.stderr.write(`snapshot_matrix: ${err && err.stack ? err.stack : err}\n`);
-  process.exit(1);
+  process.stderr.write(`snapshot_matrix: the run failed: ${err && err.stack ? err.stack : err}\n`);
+  process.exit(2);
 });

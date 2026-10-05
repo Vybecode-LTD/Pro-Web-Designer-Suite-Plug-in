@@ -71,7 +71,8 @@
  * ----------
  *   0  every measured metric is inside its budget (or no budget was given)
  *   1  a budget was breached, or a run failed to produce a metric
- *   2  bad arguments, or no usable browser
+ *   2  bad arguments, no usable browser, or the run itself failed (the
+ *      page did not load, or a crash): a crash is never a breach
  */
 
 import { pathToFileURL } from 'node:url';
@@ -396,6 +397,9 @@ async function runOnce(browser, opts, url) {
     colorScheme: 'light',
     // Reduced motion OFF on purpose: the animations users see are the
     // animations whose cost we are measuring.
+    // A strict Content-Security-Policy would refuse what a run injects; the
+    // measurement is of the page, not of its CSP (GT-A5).
+    bypassCSP: true,
   });
   try {
     const page = await context.newPage();
@@ -752,7 +756,8 @@ async function main() {
   return 0;
 }
 
+// 1 means a budget was breached, so a run that failed exits 2 (GT-A5).
 main().then((code) => process.exit(code)).catch((err) => {
-  process.stderr.write(`measure_vitals: ${err && err.stack || err}\n`);
-  process.exit(1);
+  process.stderr.write(`measure_vitals: the run failed: ${err && err.stack || err}\n`);
+  process.exit(2);
 });

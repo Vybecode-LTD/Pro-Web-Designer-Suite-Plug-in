@@ -98,7 +98,8 @@
  * ----------
  *   0  no error-severity findings, and inside budget if one was given
  *   1  violations found, or a budget breach
- *   2  bad arguments, no usable browser, no axe-core, or the page failed to load
+ *   2  bad arguments, no usable browser, no axe-core, the page failed to load,
+ *      or the run itself failed: a crash is never a finding
  */
 
 import { createRequire } from 'node:module';
@@ -1167,6 +1168,16 @@ const CONTRAST_FN = () => {
     a: 1,
   });
 
+  // SC 1.4.3 exempts text that is part of an inactive component, and axe
+  // skips the same set: a disabled control or fieldset and everything in it,
+  // anything inside aria-disabled="true", and the label of a disabled control.
+  // A control that only looks disabled is measured (GT-A14).
+  const inactive = (el) => {
+    if (el.closest(':disabled, [aria-disabled="true"]')) return true;
+    const label = el.closest('label');
+    return !!(label && label.control && label.control.matches(':disabled'));
+  };
+
   const out = [];
   const seen = new Set();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -1179,6 +1190,7 @@ const CONTRAST_FN = () => {
     if (/^(script|style|noscript|title)$/i.test(el.tagName)) continue;
     if (!window.__a11y.visible(el)) continue;
     seen.add(el);
+    if (inactive(el)) continue;
 
     const cs = getComputedStyle(el);
     const fg = parse(cs.color);
@@ -1867,6 +1879,9 @@ async function main() {
       locale: 'en-US',
       timezoneId: 'UTC',
       reducedMotion: 'no-preference',
+      // A strict Content-Security-Policy refuses the stylesheet and scripts
+      // this run injects; the audit is of the page, not of its CSP (GT-A5).
+      bypassCSP: true,
     });
     await ctx.addInitScript(HELPERS);
     const page = await ctx.newPage();
@@ -1889,7 +1904,7 @@ async function main() {
 
   try {
     const { ctx, page } = await newPage('none');
-    const cmpCtx = await browser.newContext();
+    const cmpCtx = await browser.newContext({ bypassCSP: true });
     const cmpPage = await cmpCtx.newPage();
     await cmpPage.goto('about:blank');
 
@@ -2133,7 +2148,8 @@ async function main() {
   return (errors || breaches.length) ? 1 : 0;
 }
 
+// 1 means the page has violations, so a run that failed exits 2 (GT-A5).
 main().then((code) => process.exit(code)).catch((err) => {
-  process.stderr.write(`a11y_runtime: ${err && err.stack ? err.stack : err}\n`);
-  process.exit(1);
+  process.stderr.write(`a11y_runtime: the run failed: ${err && err.stack ? err.stack : err}\n`);
+  process.exit(2);
 });

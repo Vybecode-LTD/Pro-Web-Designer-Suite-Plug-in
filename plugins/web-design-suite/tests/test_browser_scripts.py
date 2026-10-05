@@ -12,6 +12,9 @@ Regressions covered:
   instead of the next browser being tried; an explicit one that would not start
   crashed instead of exiting 2 ("no usable browser").
 - axe's fix text was cut at exactly 300 characters, mid-word, straight into the URL.
+- GT-A5: no context bypassed the page's Content-Security-Policy, so a strict
+  one refused the injected freeze stylesheet, and the crash exited 1, the code
+  for violations.
 
 A stub `playwright` module stands in for the real one: its launch() prints the
 executable it was given and exits 42, or throws for the executables listed in
@@ -39,6 +42,25 @@ export const chromium = {
     }
     process.stdout.write('STUB-LAUNCH ' + JSON.stringify(exe) + '\\n');
     process.exit(42);
+  },
+};
+export default { chromium };
+"""
+
+# A browser that starts, prints the options of each context it is asked for,
+# and then fails the way an unexpected error inside the run does.
+STUB_CRASHING_CONTEXT = """\
+const crash = async () => { throw new Error('STUB-CRASH'); };
+export const chromium = {
+  executablePath() { return '/nonexistent/stub-chromium'; },
+  async launch() {
+    return {
+      async newContext(opts) {
+        process.stdout.write('STUB-CONTEXT ' + JSON.stringify(opts ?? {}) + '\\n');
+        return { addInitScript: crash, newPage: crash, async close() {} };
+      },
+      async close() {},
+    };
   },
 };
 export default { chromium };
@@ -170,6 +192,40 @@ class BrowserScriptResolution(TempDirTest):
                 proc = self.run_script(name, *extra, cwd=elsewhere,
                                        env_changes={"NODE_PATH": None, "npm_config_prefix": str(prefix)})
                 self.assertEqual(proc.returncode, 42, output(proc))
+
+    def test_every_context_bypasses_csp_and_a_crash_exits_2(self):
+        """GT-A5: a page served with `Content-Security-Policy: default-src
+        'self'` refused the injected freeze stylesheet, and the error left
+        through the last-resort handler as exit 1, which means violations.
+        Every context now bypasses the page's CSP, and a run that fails
+        exits 2: a crash is never a finding."""
+        self.write("proj/node_modules/playwright/index.mjs", STUB_CRASHING_CONTEXT)
+        self.write("proj/node_modules/axe-core/axe.min.js", "window.axe = {};")
+        for name in SCRIPTS:
+            with self.subTest(script=name):
+                proc = self.run_script(
+                    name, "--browser", self.fake_browser, cwd=self.tmp / "proj",
+                    env_changes={"NODE_PATH": str(self.tmp / "proj" / "node_modules")})
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn("STUB-CRASH", output(proc))
+                contexts = [json.loads(line.split(" ", 1)[1])
+                            for line in output(proc).splitlines() if line.startswith("STUB-CONTEXT ")]
+                self.assertTrue(contexts, output(proc))
+                self.assertEqual([], [c for c in contexts if c.get("bypassCSP") is not True])
+
+
+class ContextOptions(unittest.TestCase):
+    """GT-A5: the stub above sees only the contexts a script opens before it
+    fails, so every `newContext(` call in the source is held to it too."""
+
+    def test_every_new_context_bypasses_csp(self):
+        for name, (skill, script) in SCRIPTS.items():
+            text = (SKILLS / skill / "scripts" / script).read_text(encoding="utf-8")
+            calls = re.findall(r"\.newContext\((\{.*?\})?\)", text, re.S)
+            with self.subTest(script=name):
+                self.assertTrue(calls)
+                self.assertEqual([], [c or "(no options)" for c in calls
+                                      if not re.search(r"\bbypassCSP: true\b", c)])
 
 
 @unittest.skipUnless(NODE, "node is not installed")

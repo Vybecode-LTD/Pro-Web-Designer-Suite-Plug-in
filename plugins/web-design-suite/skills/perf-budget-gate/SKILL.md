@@ -232,7 +232,7 @@ node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --interact "button.buy" -
 | `--warm` | measure the second load instead of a cold one |
 | `--settle MS` · `--viewport WxH` · `--dpr N` · `--resources N` · `--json` · `--browser PATH` · `--quiet` | |
 
-Exit `0` inside budget · `1` breach or no LCP recorded · `2` bad arguments or no browser.
+Exit `0` inside budget · `1` breach or no LCP recorded · `2` bad arguments, no browser, or a run that failed.
 
 Four things it does that most runtime checks do not:
 
