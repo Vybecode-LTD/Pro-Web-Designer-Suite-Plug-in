@@ -360,7 +360,7 @@ class Manifests(unittest.TestCase):
             self.assertEqual(plugin[field], entry[field], field)
 
 
-SHIPPED =sorted({p.stem for p in SKILLS.glob("*/scripts/*") if p.suffix in {".py", ".mjs"}},
+SHIPPED = sorted({p.stem for p in SKILLS.glob("*/scripts/*") if p.suffix in {".py", ".mjs"}},
                  key=len, reverse=True)
 # A suite script however a doc spells its path: -m scripts.x, scripts/x.py,
 # "${CLAUDE_SKILL_DIR}/scripts/x.py", "$WDS/x.py", <skill>/scripts/x.mjs.
