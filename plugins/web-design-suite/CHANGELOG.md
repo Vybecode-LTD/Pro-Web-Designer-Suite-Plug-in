@@ -407,6 +407,21 @@
   prefixed the layout primitives (`.l-stack`, `.l-grid`, `.l-center`), and the
   starter's layout.css defines `.stack`, `.grid` and `.center`. The rule now keeps the
   starter's names.
+- **The README's commands work in PowerShell and cmd** (XC-A2, N8, XC-B5, XC-C9). The
+  install section had a placeholder, and gives the GitHub route now:
+  `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`. `WDS`, the
+  plugin's `skills` folder, has a form for bash, PowerShell and cmd, at the path Claude
+  Code installs to. Each command is one line whose only expansion is `"$WDS/…"`: no
+  assignment, no trailing comment.
+- **`python3` and `/tmp/`.** The accessibility and performance skills started their
+  local server with `python3`, which on many Windows machines is the Microsoft Store
+  placeholder, and so did `measure_vitals.mjs`'s note on `file://` URLs. The state
+  matrix wrote its narrowed preview to `/tmp/b.html`. They use `python` and
+  `matrix-button.html`.
+- **TypeScript is pinned beside typescript-eslint** (N7). The ESLint config composes
+  typescript-eslint, whose 8.71.0 accepts TypeScript below 6.1.0, and npm's latest
+  TypeScript is 7.0.2, so an unpinned install is a peer conflict. The config's install
+  line pins `typescript@~6.0`.
 
 ### Added
 
@@ -809,6 +824,19 @@
   copy with another description).
   CodeRabbit's added one: the comparison read a missing field and a `null` one alike
   (`test_an_absent_field_differs_from_a_null_one`, which fails on `e97785c`).
+- P8 part 2 (XC-A2, N8, XC-B5, XC-C9, N7): `test_docs.PasteableCommands` reads every
+  shell line of both READMEs for what bash, PowerShell 5.1 and cmd read differently
+  (continuations, comments, `&`, `;`, substitutions, assignments, any variable but
+  `"$WDS/…"`, `/tmp/`, `python3`, `~`, single quotes, globs), with broken lines as its
+  positive control. It holds the README's three `WDS` forms to plugin.json's version and
+  its install to plugin.json's repository, finds no `python3` or `/tmp/` in the skills'
+  shell fences or the browser scripts, and holds every typescript-eslint install to a
+  TypeScript 6.0 pin, as the repository's toolchain has. Against `v3.2.1`, 5 fail (24
+  subtests); the control and the inherited quick start pass on both.
+  CodeRabbit's review of #35 added two: the fence reader closed a fence on any ``` line
+  and did not read `~~~` fences (`test_fences_pair_as_commonmark_pairs_them`), and an
+  install continued over lines was never checked for its pin
+  (`test_an_install_split_over_lines_is_still_read`). Both fail on `3121d61`.
 
 ## 3.2.1 — 2026-09-25
 

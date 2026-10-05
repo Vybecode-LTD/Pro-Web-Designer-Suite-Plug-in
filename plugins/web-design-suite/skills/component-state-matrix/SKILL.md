@@ -104,7 +104,7 @@ One self-contained HTML file. No network requests, no build step, opens from `fi
 Narrow it while you iterate:
 
 ```bash
-python -m scripts.generate_matrix matrix.json --out /tmp/b.html \
+python -m scripts.generate_matrix matrix.json --out matrix-button.html \
   --only button --themes dark --densities compact,spacious
 ```
 

@@ -109,7 +109,7 @@ python -m scripts.perf_audit dist/ --src src/ --budget perf-budget.json
 One second, and you have a weight ledger, the largest assets with their intrinsic dimensions, and every static risk. Then, on a served build:
 
 ```bash
-python3 -m http.server 8080 --directory dist &
+python -m http.server 8080 --directory dist &
 node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --runs 5 --throttle slow4g
 ```
 

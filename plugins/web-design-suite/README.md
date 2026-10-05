@@ -77,13 +77,17 @@ compile target, and the one place the laws deliberately bend.
 
 ## Install
 
-**As a plugin** — everything at once. Add the folder (or the git URL) that holds
-`.claude-plugin/marketplace.json`, then install by its full id:
+**As a plugin** — everything at once. In Claude Code, add this repository as a
+marketplace, then install the plugin by its full id:
 
 ```
-/plugin marketplace add path/to/web-design-suite
+/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in
 /plugin install web-design-suite@web-design-suite
 ```
+
+The repository is public, so this works for anyone. To install from a release zip
+instead, unpack it and add the unpacked `web-design-suite` folder, the one that holds
+`.claude-plugin/marketplace.json`, in place of the repository's name.
 
 **As individual skills** — a skill folder can be installed on its own, but eight of
 them run web-design-studio's `audit_design.py` as their gate, so install
@@ -93,39 +97,61 @@ web-design-studio beside any of them. (No packaged `.skill` files ship yet.)
 
 ---
 
+## Running the scripts
+
 Every script is plain Python and needs **Python 3.9 or newer**; the three browser
 scripts need Node instead. The lint configs need a Node that stylelint 17 and
 ESLint 10 both support: 20.19 or newer on the 20 line, 22.13 or newer on the 22
 line, or 24 and later. Run the scripts
 **by path, from your project's root**, so `src/` means your `src/` and every output
-lands in your project, never inside the plugin. Below, `WDS` is the plugin's
-`skills` folder (for a local install, `~/.claude/local-marketplaces/web-design-suite/skills`).
+lands in your project, never inside the plugin.
+
+Below, `WDS` is the plugin's `skills` folder. Claude Code keeps each installed version
+in its own folder, `.claude/plugins/cache/web-design-suite/web-design-suite/<version>`, under your home
+folder. Set `WDS` once per terminal, in your shell's form (with the version you have):
+
+| Shell | Set it once | Then |
+|---|---|---|
+| bash, zsh, Git Bash | `WDS="$HOME/.claude/plugins/cache/web-design-suite/web-design-suite/3.2.1/skills"` | paste the commands as they are |
+| PowerShell | `$WDS = "$HOME/.claude/plugins/cache/web-design-suite/web-design-suite/3.2.1/skills"` | paste the commands as they are |
+| cmd | `set "WDS=%USERPROFILE%/.claude/plugins/cache/web-design-suite/web-design-suite/3.2.1/skills"` | write `%WDS%` where a command says `$WDS` |
+
+Each command below is one line, and `"$WDS/…"` is all the shell expands, which bash
+and PowerShell do the same way. (The skills' own docs write commands for bash, which
+is where Claude Code runs them: Git Bash, on Windows.)
 
 ## Quick start on a new project
 
+Tokens: derive the ramp from the brand and check its contrast, then print the
+starter's type scale.
+
 ```bash
-# 1. Tokens — derive the ramp from the brand, verify contrast
 python "$WDS/web-design-studio/scripts/generate_color_ramp.py" "#e8440a" --name accent --format css
-python "$WDS/web-design-studio/scripts/generate_type_scale.py" --preview    # the starter's type scale
+python "$WDS/web-design-studio/scripts/generate_type_scale.py" --preview
+```
 
-# 2. Build. Copy tokens.css / reset.css / base.css / layout.css.
+Build: copy `tokens.css`, `reset.css`, `base.css` and `layout.css` from the starter.
+Then gate it, with the design gate, the performance gate and the accessibility gate:
 
-# 3. Gate
-python "$WDS/web-design-studio/scripts/audit_design.py" src/ --strict    # the design gate
-python "$WDS/perf-budget-gate/scripts/perf_audit.py" dist/ --strict      # the performance gate
-python "$WDS/a11y-audit-runner/scripts/a11y_static.py" src/ --strict     # the accessibility gate
+```bash
+python "$WDS/web-design-studio/scripts/audit_design.py" src/ --strict
+python "$WDS/perf-budget-gate/scripts/perf_audit.py" dist/ --strict
+python "$WDS/a11y-audit-runner/scripts/a11y_static.py" src/ --strict
 ```
 
 ## Quick start on an inherited codebase
 
+Take a census of what is actually there, as a report and then as data. Cluster it into
+what it was trying to be. Run the codemod dry, then for real. Freeze the rest as a
+baseline.
+
 ```bash
-M="$WDS/design-token-migration/scripts"
-python "$M/extract_literals.py" ./src --format report                   # what is actually there
-python "$M/extract_literals.py" ./src --format json -o literals.json     # the same, as data
-python "$M/cluster_values.py" literals.json -o proposal/                 # what it was trying to be
-python "$M/apply_codemod.py" ./src -m proposal/mapping.json --kind spacing          # dry run
-python "$M/apply_codemod.py" ./src -m proposal/mapping.json --kind spacing --apply
-python "$WDS/web-design-studio/scripts/audit_design.py" ./src --write-baseline .design-baseline.json  # freeze the rest
+python "$WDS/design-token-migration/scripts/extract_literals.py" ./src --format report
+python "$WDS/design-token-migration/scripts/extract_literals.py" ./src --format json -o literals.json
+python "$WDS/design-token-migration/scripts/cluster_values.py" literals.json -o proposal/
+python "$WDS/design-token-migration/scripts/apply_codemod.py" ./src -m proposal/mapping.json --kind spacing
+python "$WDS/design-token-migration/scripts/apply_codemod.py" ./src -m proposal/mapping.json --kind spacing --apply
+python "$WDS/web-design-studio/scripts/audit_design.py" ./src --write-baseline .design-baseline.json
 ```
 
 ---

@@ -100,7 +100,7 @@ Never put the runtime layer in a pre-commit hook. A minute of browser time per c
 
 ```bash
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D -E playwright axe-core   # uses the Chrome you have
-python3 -m http.server 8080 --directory dist &
+python -m http.server 8080 --directory dist &
 node scripts/a11y_runtime.mjs --url http://127.0.0.1:8080/ --budget a11y-budget.json
 ```
 

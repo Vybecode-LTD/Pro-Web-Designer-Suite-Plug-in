@@ -5,7 +5,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | ID | Severity or size | Status | What is wrong or missing |
 |---|---|---|---|
 | XC-A1 | medium | fixed in 3.1.0 | "Quick start on an inherited codebase" fails as |
-| XC-A2 | low | W4 (3.3.0) | The README's install instructions use a placeholder. |
+| XC-A2 | low | fixed in 3.3.0: `test_docs.PasteableCommands` (PR #35) | The README's install instructions use a placeholder. |
 | XC-A3 | medium | fixed in 3.2.0 | "any single `.skill` file works standalone" and "each |
 | XC-A4 | low | fixed in 3.1.0 | Packaging: running a script the documented way (`python -m scripts.X`) writes bytecode into the plugin. |
 | XC-A5 | low | fixed in 3.3.0: `test_contract.ContractCopies` (PR #34) | `shared/token-contract.md` is referenced by nothing, and its role as the master copy is not stated. |
@@ -17,7 +17,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | XC-B2 | — | W9 (3.5.0) | No eval suite, so nothing shows the skills fire on the right prompts or beat the no-plugin baseline. |
 | XC-B3 | — | fixed in 3.3.0: `.github/workflows/ci.yml` runs the suite and the static checks on Windows, Linux and macOS, at Python 3.9 and 3.14, with Node (PR #17); the floor is declared since PR #4 | The tests are regression and guard tests only: no smoke test per documented command, no CI, no declared minimum Python. |
 | XC-B4 | — | fixed in 3.1.0 (CHANGELOG) and 3.2.1 (CLAUDE.md for contributors) | no CHANGELOG (the suite teaches semver and changelogs for design systems but keeps |
-| XC-B5 | — | W4 (3.3.0) | The docs are bash-first (backslash continuations, `&&`, `/tmp/`, `$(…)`, `python3`): fine through Git Bash, broken when pasted into cmd or PowerShell 5.1. |
+| XC-B5 | — | fixed in 3.3.0 for what a person pastes, the READMEs; the skills' docs stay bash, which Claude Code runs them in: `test_docs.PasteableCommands` (PR #35) | The docs are bash-first (backslash continuations, `&&`, `/tmp/`, `$(…)`, `python3`): fine through Git Bash, broken when pasted into cmd or PowerShell 5.1. |
 | XC-B6 | — | fixed in 3.2.0 | discoverability in a heavy environment: in this machine's sessions the 13 skills |
 | XC-C1 | L · high | W9 (3.5.0) | An eval suite (`evals/`): per-skill triggering cases and outcome graders, run with ablation, in CI with a cost ceiling. |
 | XC-C2 | M · high | W9 (3.5.0) | An opt-in design-gate hook: PostToolUse on Edit/Write runs `audit_design` on the changed file and returns the findings to Claude. |
@@ -27,7 +27,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | XC-C6 | M · medium | fixed in 3.3.0: `tooling/release/build.py` (`test_release_build`), `.github/workflows/ci.yml` and `release.yml` (PR #17). The evals join CI with P29 | Build and release: a build tool for the zip and the 13 `.skill` files, `claude plugin tag`, and a CI matrix of Windows/Linux/macOS × Python 3.9–3.14 with Node. |
 | XC-C7 | M · medium | fixed in 3.2.0 | token efficiency: SKILL.md files are 17–28 KB (≈4.4–6.9k tokens per |
 | XC-C8 | M · medium | W9 (3.5.0) | One project config file, `.design-suite.json`, read by every script, the hook and the commands. |
-| XC-C9 | S · low | W4 (3.3.0) | Cross-platform docs: PowerShell/cmd equivalents for the few shell-only recipes, or one `python -m scripts.gate` entry point. |
+| XC-C9 | S · low | fixed in 3.3.0: `WDS` in bash, PowerShell and cmd forms, one-line commands (`test_docs.PasteableCommands`, PR #35) | Cross-platform docs: PowerShell/cmd equivalents for the few shell-only recipes, or one `python -m scripts.gate` entry point. |
 | XC-C10 | S · high | fixed in 3.1.0 (the review's C6) | fixes XC-A8: write every documented command as |
 | SS-A1 | high | fixed in 3.1.0 | Law 7 (density) does nothing on a subtree, which is how every doc uses it. |
 | SS-A2 | high | fixed in 3.1.0 | Where: reset.css:110 (`color-scheme: light`); tokens.css:425-471 (the dark block never sets `color-scheme`); tokens.css:473-480 (the OS media query flips the scheme but no tokens). |

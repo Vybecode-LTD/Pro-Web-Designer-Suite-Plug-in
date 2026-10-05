@@ -36,7 +36,7 @@ import subprocess
 import sys
 import unittest
 
-from wds_support import NODE, OFF, PLUGIN, REPO, SKILLS, TempDirTest, env, output
+from wds_support import NODE, OFF, PLUGIN, REPO, SKILLS, TOOLING, TempDirTest, env, output
 
 GIT = shutil.which("git")
 GIT_ENV = {"GIT_AUTHOR_NAME": "wds-test", "GIT_AUTHOR_EMAIL": "wds-test@example.invalid",
@@ -393,6 +393,169 @@ class Manifests(unittest.TestCase):
         self.assertEqual(plugin["name"], entry["name"])
         for field in ("license", "homepage", "author"):
             self.assertEqual(plugin[field], entry[field], field)
+
+
+# What bash, PowerShell 5.1 and cmd do not read alike (XC-B5). A command a
+# person pastes from a README may use none of it; `"$WDS/…"` is the one
+# expansion, and the README gives cmd its `%WDS%` form. The exemption is
+# that prefix only: `cd "$WDS"` alone, or a literal `%` in an argument, is
+# refused. Widen it if a README ever needs one.
+NOT_PORTABLE = {
+    "a line continuation": re.compile(r"[\\`]\s*$"),
+    "a comment, which cmd runs as arguments": re.compile(r"(?:^|\s)#"),
+    "&&, || or &": re.compile(r"&"),
+    "|| or ;": re.compile(r"\|\||;"),
+    "a command substitution": re.compile(r"\$\(|`"),
+    "an assignment or export": re.compile(r"^(?:export\s+)?[A-Za-z_]\w*="),
+    "a variable other than \"$WDS/…\"": re.compile(r"\$|%"),
+    "a POSIX temp folder": re.compile(r"/tmp/"),
+    "python3, which Windows lacks": re.compile(r"\bpython3\b"),
+    "a home shorthand": re.compile(r"(?:^|\s)~"),
+    "a single-quoted argument, which cmd keeps quoted": re.compile(r"'"),
+    "a glob, which only bash expands": re.compile(r"\*"),
+}
+SHELL_LANGS = {"bash", "sh", "shell", "console", ""}
+FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+
+
+def shell_fences(text: str, langs=SHELL_LANGS) -> list[str]:
+    """The bodies of a markdown file's shell fences, paired as CommonMark
+    pairs them: a fence of backticks or tildes, indented up to three spaces,
+    closes on the same character, at least as many of it, and nothing but
+    whitespace after. An untagged fence counts by default: a README's are
+    commands."""
+    found, body, lang, opener = [], None, "", ""
+    for line in text.splitlines():
+        m = FENCE.match(line)
+        if body is None:
+            if m and not (m.group(1)[0] == "`" and "`" in m.group(2)):
+                opener, body, lang = m.group(1), [], (m.group(2).split() or [""])[0]
+        elif m and m.group(1)[0] == opener[0] and len(m.group(1)) >= len(opener) and not m.group(2).strip():
+            if lang in langs:
+                found.append("\n".join(body))
+            body = None
+        else:
+            body.append(line)
+    return found
+
+
+def pasted_lines(text: str):
+    """Every shell line of a README's fences; Claude Code's own `/plugin`
+    commands are not shell."""
+    for block in shell_fences(text):
+        for line in block.splitlines():
+            if line.strip() and not line.lstrip().startswith("/"):
+                yield line.strip()
+
+
+def typescript_eslint_installs(text: str) -> list[str]:
+    """Every npm install of typescript-eslint in a file, with continued lines
+    joined (in a comment, the next line's `*` too)."""
+    text = re.sub(r"[ \t]*\\\n[ \t*]*", " ", text)
+    return [line for line in text.splitlines()
+            if re.search(r"\bnpm (?:i|install|add)\b.*\btypescript-eslint\b", line)]
+
+
+def not_portable(line: str) -> list[str]:
+    bare = line.replace('"$WDS/', '"')
+    return [why for why, rx in NOT_PORTABLE.items() if rx.search(bare)]
+
+
+class PasteableCommands(unittest.TestCase):
+    """P8 (XC-A2, N8, XC-B5, XC-C9): the README's commands were bash: an
+    assignment, trailing comments and a placeholder install. Pasted into
+    PowerShell or cmd, they failed."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.README = (PLUGIN / "README.md").read_text(encoding="utf-8")
+        cls.VERSION = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))["version"]
+
+    def readmes(self):
+        yield "README.md", self.README
+        if repository_marketplace(PLUGIN, REPO):
+            yield "../../README.md", (REPO / "README.md").read_text(encoding="utf-8")
+
+    def test_the_check_sees_what_breaks(self):
+        for line in ('M="$WDS/scripts"', 'python "$M/x.py" src/   # dry run', "python3 x.py", "a \\",
+                     "a && b", "python x.py --out /tmp/b.html", "python x.py 'a b'", "python x.py src/*.css",
+                     "python x.py ~/src", "cmd %WDS%", "echo $(date)"):
+            with self.subTest(line=line):
+                self.assertTrue(not_portable(line))
+        self.assertEqual([], not_portable('python "$WDS/a/b.py" "#e8440a" --name accent -o proposal/'))
+
+    def test_fences_pair_as_commonmark_pairs_them(self):
+        """CodeRabbit on #35: any ``` line closed a fence, so a longer fence
+        holding one, or trailing text, desynchronised the rest of the file,
+        and ~~~ fences were not read."""
+        text = ("````md\n```bash\nan example\n```\n````\n"
+                "~~~bash\npython3 x.py\n~~~\n"
+                "  ```sh\nindented\n  ```\n"
+                "```bash\nkeep\n``` not a close\nstill\n```\n"
+                "```css\n.a {}\n```\n")
+        self.assertEqual(["python3 x.py", "indented", "keep\n``` not a close\nstill"], shell_fences(text))
+
+    def test_an_install_split_over_lines_is_still_read(self):
+        """CodeRabbit on #35: one line at a time, a continued install was never
+        checked for its pin."""
+        self.assertEqual(["npm i -D typescript-eslint typescript@~6.0"],
+                         typescript_eslint_installs("npm i -D \\\n  typescript-eslint typescript@~6.0\n"))
+        self.assertEqual([" *   npm i -D eslint typescript-eslint"],
+                         typescript_eslint_installs(" *   npm i -D eslint \\\n *     typescript-eslint\n"))
+
+    def test_every_command_a_readme_shows_pastes_into_bash_powershell_and_cmd(self):
+        for name, text in self.readmes():
+            lines = list(pasted_lines(text))
+            self.assertTrue(lines, name)
+            for line in lines:
+                with self.subTest(readme=name, line=line):
+                    self.assertEqual([], not_portable(line))
+
+    def test_the_readme_sets_wds_in_each_shell(self):
+        path = f".claude/plugins/cache/web-design-suite/web-design-suite/{self.VERSION}/skills"
+        for form in (f'`WDS="$HOME/{path}"`', f'`$WDS = "$HOME/{path}"`', f'`set "WDS=%USERPROFILE%/{path}"`'):
+            with self.subTest(form=form):
+                self.assertIn(form, self.README)
+        self.assertIn("write `%WDS%` where a command says `$WDS`", self.README)
+
+    def test_the_readme_installs_from_the_public_repository(self):
+        repository = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))["repository"]
+        prefix = "https://github.com/"
+        self.assertTrue(repository.startswith(prefix), repository)
+        install = self.README.split("## Install", 1)[1].split("\n## ", 1)[0]
+        self.assertIn(f"/plugin marketplace add {repository[len(prefix):]}\n"
+                      "/plugin install web-design-suite@web-design-suite", install)
+        self.assertNotIn("path/to/", install)
+
+    def test_no_doc_runs_python3_or_writes_to_tmp(self):
+        """python3 is the Microsoft Store placeholder on many Windows machines,
+        and /tmp is not a Windows folder. Fences tagged as shell are read;
+        an untagged fence in the skills' docs is sample output, which may
+        name any path."""
+        for path in sorted(SKILLS.rglob("*")):
+            if path.suffix not in {".md", ".mjs"}:
+                continue
+            text = path.read_text(encoding="utf-8")
+            blocks = shell_fences(text, SHELL_LANGS - {""}) if path.suffix == ".md" else [text]
+            for block in blocks:
+                with self.subTest(file=path.relative_to(SKILLS).as_posix()):
+                    self.assertNotRegex(block, r"\bpython3\b")
+                    self.assertNotRegex(block, r"(?:^|\s)/tmp/")
+
+    def test_typescript_is_pinned_wherever_typescript_eslint_is_installed(self):
+        """P8 (N7): typescript-eslint 8.71 accepts TypeScript below 6.1, and
+        npm's latest is 7 (evidence.json)."""
+        installs = []
+        for path in [PLUGIN / "README.md", *SKILLS.rglob("*.md"), *SKILLS.rglob("*.mjs")]:
+            for line in typescript_eslint_installs(path.read_text(encoding="utf-8")):
+                installs.append(line)
+                with self.subTest(file=path.name, line=line.strip()):
+                    self.assertRegex(line, r"\btypescript@~?6\.0\b")
+        self.assertTrue(installs)
+        if TOOLING and (TOOLING / "main" / "package.json").is_file():
+            manifest = json.loads((TOOLING / "main" / "package.json").read_text(encoding="utf-8"))
+            pinned = manifest.get("devDependencies", {}).get("typescript", "")
+            self.assertTrue(pinned.startswith("6.0."), f"tooling/main pins typescript {pinned or 'nowhere'}")
 
 
 SHIPPED = sorted({p.stem for p in SKILLS.glob("*/scripts/*") if p.suffix in {".py", ".mjs"}},
