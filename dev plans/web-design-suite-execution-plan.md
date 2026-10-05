@@ -83,7 +83,7 @@ PRs #12 to #15 were merged on 2026-10-02. P0 fixes what their reviews found.
 | PR | What | Items | Main files | Size |
 |---|---|---|---|---|
 | P9, #38 | One copy of the runtime helpers, vendored into each gate, with a test that the copies match; and the release build compares archives by content (N34) | GT-C13, N34 | `a11y_runtime.mjs`, `measure_vitals.mjs`, `generate_matrix.py` and their helpers | S-M |
-| P10 part 1, #39 | a11y_runtime: `bypassCSP` on every context of the three browser scripts, a crash exits 2, and disabled controls are exempt from contrast; the rest of C2 was done in 3.1.0 and P9 | GT-A5, GT-A14, GT-C2 | `a11y_runtime.mjs`, `snapshot_matrix.mjs`, `measure_vitals.mjs` | M |
+| P10 part 1, #39 | a11y_runtime: `bypassCSP` where a browser script injects (not in measure_vitals), a crash exits 2, Chrome's one-stop wrap is not a trap, and disabled controls are exempt from contrast; the rest of C2 was done in 3.1.0 and P9 | GT-A5, GT-A14, GT-C2 | `a11y_runtime.mjs`, `snapshot_matrix.mjs`, `measure_vitals.mjs` | M |
 | P10 | a11y_runtime: the focus, forced-colors and density probe, run in the studio's build flow | SB-B3 | `a11y_runtime.mjs`, web-design-studio's Phase 5 | M |
 | P11 | a11y_static's success criteria, the axe tag advice, and the gate docs' corrections | GT-A8, GT-A16, GT-A18, GT-C5 | `a11y_static.py`, a11y and perf references | M |
 | P12 | The snapshot matrix: focus mirroring, custom states, the differs-from-default gate, its model and its baseline lifecycle | GT-A12, GT-A13, GT-C3, GT-B7, GT-B8 | `generate_matrix.py`, `snapshot_matrix` | L |

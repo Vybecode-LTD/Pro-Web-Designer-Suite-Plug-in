@@ -397,9 +397,9 @@ async function runOnce(browser, opts, url) {
     colorScheme: 'light',
     // Reduced motion OFF on purpose: the animations users see are the
     // animations whose cost we are measuring.
-    // A strict Content-Security-Policy would refuse what a run injects; the
-    // measurement is of the page, not of its CSP (GT-A5).
-    bypassCSP: true,
+    // No bypassCSP, unlike the other two scripts: the collector is an init
+    // script, which CSP does not govern, and a bypass would load what the
+    // page's CSP blocks, so the numbers would describe a page no user gets.
   });
   try {
     const page = await context.newPage();
