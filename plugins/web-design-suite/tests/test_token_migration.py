@@ -335,10 +335,25 @@ class MigrationPipeline(TempDirTest):
     def test_a_held_colour_is_deleted_not_re_pointed(self):
         # LC-A23: framework-migrations.md says delete a `$brand` variable at the
         # call sites; the report told the reader to re-point it.
-        self.write("src/a.scss", "$brand: #2f6df6;\n.a { color: $brand; }\n")
+        # Codex and CodeRabbit on #54: only a preprocessor variable is deleted; a
+        # custom property points at a role, and a plain property keeps its line.
+        self.write("src/a.scss", "$brand: #2f6df6;\n.a { color: $brand; }\n"
+                                 ".b { --brand-x: #e8440a; }\n"
+                                 ".c { scrollbar-color: #1f9d55 transparent; }\n")
         _, report = self.cluster(self.extract(self.tmp / "src")[0])
-        self.assertNotIn("Point it at the role", report)
-        self.assertIn("delete", report)
+        recs = {h: report.split(f"`{h}`", 1)[1].split("**`", 1)[0]
+                for h in ("$brand", "--brand-x", "scrollbar-color")}
+        self.assertIn("Delete it", recs["$brand"])
+        self.assertIn("Point it at the role", recs["--brand-x"])
+        self.assertIn("keep the declaration", recs["scrollbar-color"])
+        self.assertNotIn("Delete it", recs["scrollbar-color"])
+
+    def test_the_review_table_names_its_units(self):
+        # CodeRabbit on #54: a duration sat under "more than 2px".
+        self.write("src/a.css", ".a { transition: opacity 250ms ease; }\n")
+        _, report = self.cluster(self.extract(self.tmp / "src")[0])
+        self.assertIn("## Replacements to review", report)
+        self.assertNotIn("more than 2px\n", report)
 
     def test_the_z_index_note_counts_the_rungs_above_base(self):
         rules = "\n".join(f".z{i} {{ z-index: {v}; }}" for i, v in
@@ -596,6 +611,44 @@ class ProposedTokensContrast(starter.StarterRoleContrast):
     @classmethod
     def tokens_text(cls) -> str:
         return proposed_tokens_css()
+
+
+class LifecycleDocClaims(unittest.TestCase):
+    """LC-A17, LC-A23 (CodeRabbit on #54): the lifecycle docs' corrected claims,
+    held to what they describe."""
+
+    def test_a_breaking_announcement_names_a_major_and_commits_once(self):
+        text = (SKILLS / "design-system-versioning" / "references" / "rollout.md").read_text(
+            encoding="utf-8")
+        found = re.findall(r"\*\*Design system (\d+)\.(\d+)\.(\d+)\.\*\* One breaking change"
+                           r".*?`UPGRADE-([\d.]+)\.md`", text)
+        self.assertTrue(found)
+        for major, minor, patch, guide in found:
+            self.assertEqual((minor, patch, guide), ("0", "0", f"{major}.0.0"))
+        procedure = text.split("## 3.", 1)[1].split("## 4.", 1)[0]
+        self.assertNotIn("git commit -am", procedure)
+        self.assertEqual(procedure.count("git commit"), 1)
+
+    def test_the_algorithm_count_matches_its_table(self):
+        text = (SKILLS / "design-token-migration" / "SKILL.md").read_text(encoding="utf-8")
+        m = re.search(r"(\w+) separate algorithms[^\n]*\n\n(\|.*?)\n\n", text, re.S)
+        rows = m.group(2).splitlines()[2:]
+        self.assertEqual({"four": 4, "five": 5, "six": 6}[m.group(1).lower()], len(rows))
+
+    def test_the_plan_template_names_each_token_at_its_size(self):
+        tokens = (SKILLS / "web-design-studio" / "assets" / "starter" / "styles"
+                  / "tokens.css").read_text(encoding="utf-8")
+        size = {n: int(px) for n, px in
+                re.findall(r"--(space-[\w-]+):\s*[^;]+;\s*/\*\s*(\d+)px", tokens)}
+        for name, step in re.findall(r"--((?:pad|gap)-[\w-]+):\s*calc\(var\(--(space-[\w-]+)\)",
+                                     tokens):
+            size[name] = size[step]
+        plan = (SKILLS / "design-token-migration" / "assets" / "MIGRATION_PLAN.md").read_text(
+            encoding="utf-8")
+        pairs = re.findall(r"(\d+)px --((?:pad|gap|space)-[\w-]+)", plan)
+        self.assertTrue(pairs)
+        for px, name in pairs:
+            self.assertEqual(size.get(name), int(px), name)
 
 
 if __name__ == "__main__":

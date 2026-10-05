@@ -348,7 +348,7 @@ git revert --no-commit migration-base..HEAD && git commit -m "revert token migra
 | Symptom | Action |
 |---|---|
 | One component looks wrong | Fix forward. It is one token, and you know which batch |
-| One *page* looks wrong | Revert that batch, re-run with `--skip-review`, re-apply. Something in the "moves more than 2px" table was wrong |
+| One *page* looks wrong | Revert that batch, re-run with `--skip-review`, re-apply. Something in the report's "Replacements to review" table was wrong |
 | Anything is functionally broken (clipping, overflow, unclickable) | Revert immediately, investigate after. Almost always a z-index or a Law 2 batch |
 | Contrast regression reported | Revert the color batch. Do not fix forward: the ramp mapping is wrong and it is wrong everywhere |
 

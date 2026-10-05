@@ -136,7 +136,7 @@ Why this is worth arguing for:
 - The result exists only after compilation, so **nobody can check its contrast**. A ramp is one table you audit once.
 - The same `darken($brand, 8%)` typed in four files is four values that drift the moment one of them becomes `9%`.
 
-Mapping rule: match the computed color to its nearest ramp step by ΔE. The script cannot do it for you: it sees `darken($brand, 8%)`, not the colour it compiles to, so the reconciliation report lists each call and where it is, and the matching is yours (compile it, then take the nearest step). A `darken(…, 8%)` almost always lands one step down; `darken(…, 15%)` lands two. When it lands between steps, take the step — the ramp is perceptually even and the hand-computed value was not.
+Mapping rule: match the computed color to its nearest ramp step by ΔE. The script cannot do it for you: it sees `darken($brand, 8%)`, not the colour it compiles to, so the reconciliation report lists each distinct call with up to three places it occurs, and the matching is yours (compile it, then take the nearest step). A `darken(…, 8%)` almost always lands one step down; `darken(…, 15%)` lands two. When it lands between steps, take the step — the ramp is perceptually even and the hand-computed value was not.
 
 ### `@mixin` → tokens, or nothing
 

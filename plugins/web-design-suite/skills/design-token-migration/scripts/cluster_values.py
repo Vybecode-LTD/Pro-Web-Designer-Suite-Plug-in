@@ -1669,9 +1669,8 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
         for klass, items in sorted(by_class.items()):
             if klass in ("other", "var"):
                 holder = items[0]["prop"]
-                if holder:
-                    reason = (f"held in `{holder}` — a preprocessor variable or "
-                              f"an unclassified property")
+                if holder and holder.startswith(("$", "@")):
+                    reason = f"held in the preprocessor variable `{holder}`"
                     rec = (f"Delete it, and use the role at each call site "
                            f"(`var(--fg-default)`, or whichever role that site "
                            f"means). Re-pointed, `{holder}: var(--fg-default)` "
@@ -1679,6 +1678,18 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
                            f"(framework-migrations.md). Keep a variable only "
                            f"for a value the browser cannot hold, such as a "
                            f"breakpoint inside `@media`.")
+                elif holder and holder.startswith("--"):
+                    reason = f"held in the custom property `{holder}`"
+                    rec = (f"Point it at the role instead: `{holder}: "
+                           f"var(--fg-default)` (pick the right role). A "
+                           f"component's own property defaulting to a role is "
+                           f"a Tier-3 socket; holding a literal, it is a tier "
+                           f"missing.")
+                elif holder:
+                    reason = f"in `{holder}`, a property with no colour role"
+                    rec = (f"Replace the colour inside `{holder}` with the role "
+                           f"it means at that call site (`var(--fg-default)`, "
+                           f"`var(--border-default)`, …); keep the declaration.")
                 else:
                     reason = "a color constant in JavaScript"
                     rec = ("A color in JS is a color dark mode cannot re-point. "
@@ -2333,10 +2344,12 @@ def render_reconciliation(prop: Proposal, payload: dict, args) -> str:
             buf.append("")
 
     if review:
-        buf.append("## Replacements that move a value more than 2px")
+        buf.append("## Replacements to review")
         buf.append("")
-        buf.append("Two pixels is roughly where a change stops being invisible "
-                   "and starts being a diff someone notices in a screenshot. "
+        buf.append("A length that moves more than 2px is roughly where a change "
+                   "stops being invisible and starts being a diff someone "
+                   "notices in a screenshot; a duration is here because its "
+                   "role needs confirming. Each delta is in its value's unit. "
                    "Apply these in their own commit, with before/after shots.")
         buf.append("")
         buf.append("| Original | → Token | Δ | Occurrences | Why |")

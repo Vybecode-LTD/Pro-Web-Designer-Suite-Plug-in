@@ -196,9 +196,12 @@
   in X+1.0.0, but `--since 2.1.0 --removal 2.2.0` was accepted; only a patch-apart window
   was refused. A removal that is not a later major is refused now, unless `--force`.
 - **The reconciliation report's smaller errors** (LC-A23). A duration's delta printed as
-  "-30px"; it is in milliseconds. A colour held in a `$`-variable was to be re-pointed
-  (`$brand: var(--fg-default)`), where framework-migrations.md says to delete such
-  variables at their call sites; the report says so now.
+  "-30px"; it is in milliseconds, under a heading that no longer says "more than 2px". A
+  colour held in a `$`-variable was to be re-pointed (`$brand: var(--fg-default)`), where
+  framework-migrations.md says to delete such variables at their call sites. The report
+  says so now for a `$` or `@` variable; a custom property is pointed at a role (a Tier-3
+  socket), and a colour in a property with no role, such as `scrollbar-color`, is
+  replaced in place.
 - **The lifecycle docs' smaller errors** (LC-A23, LC-B8). deprecation.md said `tsc`
   surfaces `@deprecated`; it does not, and the gate is `@typescript-eslint/no-deprecated`.
   framework-migrations.md said the script reports a `darken()` call's distance to the
@@ -240,7 +243,13 @@
   advice for a held colour; `test_figma_sync.DeterministicOutput` runs the drift check on a
   generated `tokens.css` and on a hand edit. Against `v3.3.0`, 3 fail. Two are controls: a
   removal in a later major was always taken, and the drift check already worked; it had no
-  test behind the claim. The docs-only fixes have no test.
+  test behind the claim. Codex and CodeRabbit on #54 found two more, failing on its head:
+  the delete advice reached plain properties (`scrollbar-color`), and durations sat under
+  "more than 2px" (`test_the_review_table_names_its_units`).
+  `test_token_migration.LifecycleDocClaims` holds the doc fixes: a breaking announcement
+  names a major and its guide, and the upgrade commits once; the algorithm count matches
+  its table; and MIGRATION_PLAN's tokens are the sizes it gives them. Against `v3.3.0`, all
+  3 fail.
 - The test-file exemption: `test_audit_design.TestFilesByThePathBelowTheRoot` audits one JSX
   colour under `neutral/` and under `fixtures/test/`, and a `.test.jsx` and a `__mocks__` file as
   the control. Against `v3.3.0`, 1 fails; the control passes there only because this test's
