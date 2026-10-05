@@ -195,6 +195,23 @@ class MigrationPipeline(TempDirTest):
         self.assertIn(f"+.panel > .bleed {{ margin-inline: {cancel}; }}", diff)
         self.assertIn(f".media {{ margin-block-start: {cancel}; }}", diff)
 
+    def test_a_cancel_keeps_to_its_axis_and_reads_a_grouped_selector(self):
+        # Codex on #49: `-8px` inline is not the 8px block padding's cancel, and a
+        # padding declared for `.a, .panel` is `.panel`'s padding.
+        self.write("src/a.css", ".card { padding: 8px 16px; }\n.card__media { margin-inline: -8px; }\n"
+                                ".a, .panel { padding: 16px; }\n.panel > .bleed { margin-inline: -16px; }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+
+        def token(klass, value):
+            return next(r["token"] for r in mapping["rules"]
+                        if klass in r.get("prop_classes", []) and value in r["match"])
+
+        diff = self.codemod(self.tmp / "src")
+        media = next(l for l in diff.splitlines() if l.startswith("+.card__media"))
+        self.assertNotIn(f"var({token('pad-block', '8px')})", media)
+        self.assertIn(f"+.panel > .bleed {{ margin-inline: calc(var({token('pad-all', '16px')}) * -1); }}",
+                      diff)
+
     def test_a_negative_margin_with_nothing_to_cancel_keeps_its_own_token(self):
         # Control: no padding in the parent rule, so it is a spacing value of its own.
         self.write("src/a.css", ".row { gap: 16px; }\n.row__item { margin-block-start: -16px; }\n"
