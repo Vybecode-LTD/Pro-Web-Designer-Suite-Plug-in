@@ -354,6 +354,12 @@ class MigrationPipeline(TempDirTest):
         _, report = self.cluster(self.extract(self.tmp / "src")[0])
         self.assertIn("held in the preprocessor variable `$mix`", report)
         self.assertIn("held in the custom property `--mix`", report)
+        # CodeRabbit on #54, again: two plain properties named only the first.
+        self.write("src/a.scss", ".c { scrollbar-color: #1f9d55 transparent; }\n"
+                                 ".d { background-image: linear-gradient(#1f9d55, transparent); }\n")
+        _, report = self.cluster(self.extract(self.tmp / "src")[0])
+        self.assertIn("in `scrollbar-color`, a property with no colour role", report)
+        self.assertIn("in `background-image`, a property with no colour role", report)
 
     def test_the_review_table_names_its_units(self):
         # CodeRabbit on #54: a duration sat under "more than 2px".

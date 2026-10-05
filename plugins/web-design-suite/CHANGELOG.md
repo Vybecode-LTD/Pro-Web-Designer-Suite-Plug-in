@@ -220,7 +220,8 @@
   framework-migrations.md says to delete such variables at their call sites. The report
   says so now for a `$` or `@` variable; a custom property is pointed at a role (a Tier-3
   socket), and a colour in a property with no role, such as `scrollbar-color`, is
-  replaced in place. One colour in two kinds of holder gets an entry for each.
+  replaced in place. One colour in two holders gets an entry for each, by kind of holder
+  and, for plain properties, by property.
 - **The lifecycle docs' smaller errors** (LC-A23, LC-B8). deprecation.md said `tsc`
   surfaces `@deprecated`; it does not, and the gate is `@typescript-eslint/no-deprecated`.
   framework-migrations.md said the script reports a `darken()` call's distance to the
@@ -272,7 +273,8 @@
   "more than 2px" (`test_the_review_table_names_its_units`). Its next review found two
   more, failing on `79bd76b`: a colour's review row read "+0px", and one colour held by a
   `$` variable and a custom property got the first holder's advice for both
-  (`test_one_colour_in_two_kinds_of_holder_gets_both_kinds_of_advice`).
+  (`test_one_colour_in_two_kinds_of_holder_gets_both_kinds_of_advice`); and on `090ded4`,
+  two plain properties holding one colour were named as the first.
   `test_token_migration.LifecycleDocClaims` holds the doc fixes: a breaking announcement
   names a major and its guide, and the upgrade commits once; the algorithm count matches
   its table; MIGRATION_PLAN's tokens are the sizes it gives them; and deprecation.md names

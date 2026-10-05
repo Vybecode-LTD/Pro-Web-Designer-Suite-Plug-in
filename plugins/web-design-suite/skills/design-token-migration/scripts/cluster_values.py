@@ -1703,9 +1703,9 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
                 kinds: Dict[str, list] = {}
                 for item in items:
                     holder = item["prop"] or ""
-                    kinds.setdefault(holder[:1] if holder[:1] in "$@" else
+                    kinds.setdefault(holder[:1] if holder[:1] in ("$", "@") else
                                      holder[:2] if holder.startswith("--") else
-                                     "prop" if holder else "js", []).append(item)
+                                     holder or "js", []).append(item)
                 for group in kinds.values():
                     reason, rec = held_colour(group[0]["prop"])
                     prop.unmapped.append(Unmapped(
