@@ -15,14 +15,18 @@ Regressions covered:
   OFF_RAMP_COLOR errors.
 - LC-A4: every generated tokens.css/json carried the current time, so the
   documented CI drift check failed on an unchanged export.
+- LC-C3 (3.4.0): the two scripts' readers were copies that had drifted apart.
+- LC-A22 (3.4.0): the `--reverse` body carried a `_comment` key, never named a
+  collection's first mode, and offered primitives in the pickers.
 """
 from __future__ import annotations
 
+import ast
 import json
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from wds_support import TempDirTest, output, run_py
+from wds_support import SKILLS, TempDirTest, load_script, output, run_py
 
 DTCG_2025 = {
     "neutral": {"$type": "color",
@@ -242,6 +246,129 @@ class StatusInks(TempDirTest):
     def test_an_on_status_ink_is_measured_on_its_fill(self):
         self.assertEqual(self.contrast_failures("#d92f35"), [])      # 4.76:1 on the fill
         self.assertEqual(len(self.contrast_failures("#ff9999")), 1)  # 2.07:1 on the fill
+
+
+PLUGIN_EXPORT = {"collections": [{"name": "semantic", "modes": [
+    {"name": "Light", "variables": [{"name": "bg/surface", "type": "COLOR", "value": "#ffffff"}]},
+    {"name": "Dark", "variables": [{"name": "bg/surface", "type": "COLOR", "value": "#111111"}]}]}]}
+PLUGIN_FLAT = {"collections": [{"name": "semantic", "defaultModeId": "1:0",
+                                "modes": [{"modeId": "1:0", "name": "Light"},
+                                          {"modeId": "1:1", "name": "Dark"}],
+                                "variables": [{"name": "bg/surface", "type": "COLOR", "valuesByMode": {
+                                    "1:0": "#ffffff", "1:1": "#111111"}}]}]}
+RECORDS_EXPORT = [
+    {"name": "bg/surface", "type": "COLOR", "value": "#ffffff", "collection": "semantic", "mode": "Light"},
+    {"name": "bg/surface", "type": "COLOR", "value": "#111111", "collection": "semantic", "mode": "Dark"},
+    {"name": "space/4", "type": "FLOAT", "value": 16}]
+REST_ORPHAN = {"meta": {"variableCollections": {}, "variables": {"VariableID:9:9": {
+    "id": "VariableID:9:9", "name": "space/4", "variableCollectionId": "VariableCollectionId:9:1",
+    "resolvedType": "FLOAT", "valuesByMode": {"9:0": 16}}}}}
+
+
+class FigmaCommon(TempDirTest):
+    """LC-C3: the two scripts said they share their readers and did not. Copied
+    apart, they drifted: the audit split a records export's modes into one
+    variable each, which figma_to_tokens had stopped doing."""
+
+    def read(self, module, data):
+        doc = module.load_document(self.write("export.json", json.dumps(data)), None, "tokens")
+        return (doc.shape,
+                {n: (c.modes, c.default_mode) for n, c in sorted(doc.collections.items())},
+                sorted((v.name, v.collection, v.resolved_type, json.dumps(v.values, sort_keys=True))
+                       for v in doc.variables))
+
+    def test_both_scripts_read_every_shape_the_same_way(self):
+        to_tokens = load_script("figma-variables-sync", "figma_to_tokens")
+        audit = load_script("figma-variables-sync", "figma_audit")
+        for shape, data in (("rest", REST_COMPOSED), ("rest", REST_ORPHAN), ("plugin", PLUGIN_EXPORT),
+                            ("plugin", PLUGIN_FLAT),
+                            ("records", RECORDS_EXPORT), ("dtcg", DTCG_2025)):
+            with self.subTest(shape=shape):
+                read = self.read(to_tokens, data)
+                self.assertEqual(read[0], shape)
+                self.assertEqual(self.read(audit, data), read)
+
+    def test_a_flat_plugin_export_reads_its_values_by_mode_name(self):
+        # CodeRabbit on #53: valuesByMode is keyed by mode id, the modes by name.
+        read = self.read(load_script("figma-variables-sync", "figma_common"), PLUGIN_FLAT)
+        self.assertEqual(read[1], {"semantic": (["Light", "Dark"], "Light")})
+        self.assertEqual(json.loads(read[2][0][3]), {"Dark": "#111111", "Light": "#ffffff"})
+
+    def test_neither_script_defines_what_figma_common_does(self):
+        scripts = SKILLS / "figma-variables-sync" / "scripts"
+
+        def defined(path):
+            names = set()
+            for node in ast.parse(path.read_text(encoding="utf-8")).body:
+                if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                    names.add(node.name)
+                elif isinstance(node, ast.Assign):
+                    names |= {t.id for t in node.targets if isinstance(t, ast.Name)}
+            return names
+
+        common = defined(scripts / "figma_common.py")
+        self.assertTrue({"load_document", "as_color", "FDoc"} <= common, common)
+        for script in ("figma_to_tokens.py", "figma_audit.py"):
+            with self.subTest(script=script):
+                self.assertEqual(defined(scripts / script) & common, set())
+
+
+class ReverseBody(TempDirTest):
+    """LC-A22: the body `--reverse` writes is the one Figma's REST API takes."""
+
+    def body(self):
+        forward = run_py("figma-variables-sync", "figma_to_tokens",
+                         self.write("export.tokens.json", json.dumps(DTCG_2025)),
+                         "--format", "json", cwd=self.tmp)
+        tokens = self.write("tokens.json", forward.stdout.decode("utf-8"))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", tokens, "--reverse", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return json.loads(proc.stdout)
+
+    def test_a_duration_crosses_as_milliseconds(self):
+        # CodeRabbit on #53: `--dur-base: 220ms` was dropped, having no px value.
+        body = self.body()
+        dur = next((v for v in body["variables"] if v["codeSyntax"]["WEB"] == "var(--dur-base)"),
+                   None)
+        self.assertIsNotNone(dur, body["variables"])
+        self.assertIn(220, [m["value"] for m in body["variableModeValues"]
+                            if m["variableId"] == dur["id"]])
+
+    def test_the_body_has_only_the_four_arrays(self):
+        self.assertEqual(set(self.body()), {"variableCollections", "variableModes", "variables",
+                                            "variableModeValues"})
+
+    def test_each_collections_first_mode_is_named_by_an_update(self):
+        body = self.body()
+        modes = {m["id"]: m for m in body["variableModes"]}
+        for collection in body["variableCollections"]:
+            with self.subTest(collection=collection["name"]):
+                first = modes.get(collection["initialModeId"])
+                self.assertIsNotNone(first, body["variableModes"])
+                self.assertEqual((first["action"], first["variableCollectionId"]),
+                                 ("UPDATE", collection["id"]))
+                self.assertTrue(first["name"])
+
+    def test_the_first_mode_takes_a_name_no_theme_has(self):
+        # A dark `:root` has a `light` theme; Codex on #53: and a `default` one.
+        for themes, first in ((["light"], "Default"), (["light", "default"], "Base")):
+            with self.subTest(themes=themes):
+                tokens = self.write("tokens.json", json.dumps({
+                    "semantic": {"bg-surface": {"value": "#111111"}},
+                    "themes": {t: {"bg-surface": {"value": "#ffffff"}} for t in themes}}))
+                proc = run_py("figma-variables-sync", "figma_to_tokens", tokens, "--reverse",
+                              cwd=self.tmp)
+                modes = json.loads(proc.stdout)["variableModes"]
+                self.assertEqual(modes[0]["name"], first, output(proc))
+                self.assertEqual(len({m["name"].lower() for m in modes}), len(themes) + 1, modes)
+                self.assertEqual(len({m["id"] for m in modes}), len(themes) + 1, modes)
+
+    def test_primitives_are_offered_in_no_picker(self):
+        body = self.body()
+        tier = {c["id"]: c["name"] for c in body["variableCollections"]}
+        scopes = {v["name"]: (tier[v["variableCollectionId"]], v["scopes"]) for v in body["variables"]}
+        self.assertEqual(scopes["neutral/500"], ("primitive", []))
+        self.assertEqual(scopes["bg/surface"], ("semantic", ["FRAME_FILL", "SHAPE_FILL"]))
 
 
 if __name__ == "__main__":

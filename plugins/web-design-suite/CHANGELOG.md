@@ -186,6 +186,24 @@
   predicts the font-guard skip, which a colour rename never meets.
 - **A re-point listed every density and condition** when its default value moved, a side
   effect of P14's equality check, which needs them only when the default does not move.
+- **figma_audit split a records export's modes** (LC-C3). A flat export lists one row per
+  variable and mode. figma_to_tokens merged the rows into one variable with a value per
+  mode; the audit's copy of the reader made each row a variable of its own, in a
+  collection whose default mode, `Value`, no variable had. Both scripts now read through
+  one module (Changed, below), so the audit merges them too. And a flat plugin export,
+  whose `valuesByMode` is keyed by mode id while its modes are listed by name, kept the
+  ids: in both scripts, a `Dark` mode came out as a theme named `1:1`. Both are read
+  as the mode's name now.
+- **`--reverse` wrote a body Figma would not take as written** (LC-A22). It carried a
+  `_comment` key, though the body's own comment said Figma rejects unknown top-level keys,
+  and SKILL.md never said to strip it. It never named a collection's first mode, which
+  Figma creates under its own name; Figma's REST example names it with an `UPDATE` on the
+  temporary id, which `--reverse` now sends (`Value`, or `Light` unless a theme has that
+  name, then `Default` or `Base`, so two modes never share a name or a temporary id).
+  And primitives were scoped to the pickers (`ALL_FILLS`, `GAP`), inviting a designer to
+  bind Tier 1, the Law 6 failure: they get `scopes: []` now. Every duration was dropped
+  too, `--dur-base: 220ms` having no pixel value, with exit 1: a duration crosses as
+  milliseconds now, 220.
 - **The model announcement shipped a breaking change as a minor** (LC-A17). rollout.md's
   example read "Design system 2.1.0. One breaking change: `--bg-accent` moved", a re-point
   released as a minor, the failure the skill exists to prevent. It is 3.0.0 now, with
@@ -234,6 +252,11 @@
   against its CRC), size, date and mode. A build
   is byte-identical to another only with the same zlib: Windows' Python 3.14 uses
   zlib-ng, the CI's zlib, so 3.3.0's release matched no local build's checksums.
+- **One reader for both Figma scripts** (LC-C3). figma_to_tokens and figma_audit each
+  carried a copy of the same reader (the shape detector, the four parsers, the value and
+  colour helpers and the document model), and the docs said they shared it. It is
+  `scripts/figma_common.py` now, beside `dtcg_values.py`, taking the better of the two
+  copies where they had drifted; each script lost about 400 lines.
 
 ### Tests
 
@@ -250,6 +273,18 @@
   names a major and its guide, and the upgrade commits once; the algorithm count matches
   its table; and MIGRATION_PLAN's tokens are the sizes it gives them. Against `v3.3.0`, all
   3 fail.
+- P16 (LC-C3, LC-A22): `test_figma_sync.FigmaCommon` reads a REST export (one with a
+  variable whose collection is missing), a plugin export, a two-mode records export and a
+  DTCG file through both scripts and holds them to one result, and checks that neither
+  script defines a name `figma_common.py` does, so the copies cannot come back.
+  `test_figma_sync.ReverseBody` holds the `--reverse` body to the four arrays, an `UPDATE`
+  naming each collection's first mode, distinct mode names beside a `light` theme, and no
+  scopes on primitives. Against `v3.3.0`, all 6 fail. The reviews of #53 found two more,
+  failing on its head (`559cce2`): a flat plugin export's values by mode id
+  (`test_a_flat_plugin_export_reads_its_values_by_mode_name`), and a `default` theme
+  beside a `light` one, which took the first mode's name and id
+  (`test_the_first_mode_takes_a_name_no_theme_has`). Its next review found the dropped
+  duration, failing on `v3.3.0` and on `260df86` (`test_a_duration_crosses_as_milliseconds`).
 - The test-file exemption: `test_audit_design.TestFilesByThePathBelowTheRoot` audits one JSX
   colour under `neutral/` and under `fixtures/test/`, and a `.test.jsx` and a `__mocks__` file as
   the control. Against `v3.3.0`, 1 fails; the control passes there only because this test's
