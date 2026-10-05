@@ -239,7 +239,10 @@ Theme is inside every cell in every pass — it is the cheapest axis (it adds no
                                             // for components needing a parent
     "variants": ["default","primary"],      // "default" emits no data-variant
     "sizes":    ["default","sm"],           // "default" emits no data-size
-    "states":   ["default","hover","…"],    // subset of the seven
+    "states":   ["default","hover","selected","selected+hover"],
+                                            // the seven, custom ones, a+b
+    "custom_states": { "selected": {"attrs": {"aria-selected":"true"}} },
+                                            // detect defaults to the attribute
     "content":  { "default": "Save", "long-string": "…" },
                                             // fixture name -> HTML
     "stage_style": { "--msheet-well": "var(--pad-card)" },
@@ -257,7 +260,8 @@ Notes:
 
 - **`{attrs}` is mandatory** in a template. `{content}` is not a substitute for it — a template may omit `{content}` (a void element like `<input>` has none) but never `{attrs}`: without it, state, variant and size cannot be applied and every cell renders identically — the generator refuses.
 - **`stage_style` keys must all start with `--`.** Law 4 permits inline style only when every key is a custom property; the generator enforces it and tells you why.
-- **`disabled` is applied intelligently**: a real `disabled` attribute on form controls (detected from the template, overridable with `form_control`), `aria-disabled="true"` otherwise. Never both on a `<div>`, which is invalid.
+- **`disabled` is applied intelligently**: a real `disabled` attribute on form controls (detected from the template, overridable with `form_control`), `aria-disabled="true"` otherwise. Never both on a `<div>`, which is invalid. **`error`** likewise: `aria-invalid="true"` only on a form control, `data-state="error"` everywhere.
+- **The focus-visible cell carries `focus-visible focus focus-within`**, so a ring written with `:focus` or `:focus-within` renders there too.
 
 ---
 

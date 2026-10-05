@@ -162,7 +162,7 @@ The ring is the `outline`, and that is not a style choice. Windows High Contrast
 
 ### 1.8 Precedence — which state wins when two are true
 
-States overlap constantly: a disabled button is also hovered, an invalid input is also focused. Decide the precedence once, encode it in guards, and the sheet will show you whether you got it right — the state pass renders each state in isolation, so any cell that looks like a *different* row's cell is a precedence bug.
+States overlap constantly: a disabled button is also hovered, an invalid input is also focused. Decide the precedence once, encode it in guards, and the sheet will show you whether you got it right — the state pass renders each state in isolation, so any cell that looks like a *different* row's cell is a precedence bug. To render two at once, list them joined with `+` in `states` (`"selected+hover"`): the cell carries both states' attributes, and it is covered when each state has a rule.
 
 | Both true | Winner | Why |
 |---|---|---|
@@ -337,7 +337,7 @@ The order to do them in is **manifest first**. Declare the state before you writ
 
 ### The checklist for a new state
 
-1. Add it to `states` in `matrix.json`.
+1. Add it to `states` in `matrix.json`. One of the seven is known already; any other (selected, readonly, current, open) is declared once in the component's `custom_states`, by the attributes that put a cell in it: `"custom_states": {"selected": {"attrs": {"aria-selected": "true"}}}`. Its rule is found by the attribute as written (`aria-selected="true"`), or by the strings you list in `detect`.
 2. Generate; confirm the cell renders and is flagged `no rule`.
 3. Pick the expression: a real ARIA attribute if one exists (`aria-expanded`, `aria-current`, `aria-selected`, `aria-invalid`, `:disabled`), else `data-state`. Never an `is-*` class.
 4. Write the rule as a **socket re-point**, not new structure. If the state needs a property the component does not already declare, add the socket to the root rule first.

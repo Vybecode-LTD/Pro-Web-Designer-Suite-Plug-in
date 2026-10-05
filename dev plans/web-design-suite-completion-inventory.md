@@ -159,8 +159,8 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-A9 | medium | fixed in 3.2.0 | the docs recommend "Not Evaluated" as a legitimate ACR entry. |
 | GT-A10 | medium | fixed in 3.2.0 | the docs promise runtime behaviour that the code does not have. |
 | GT-A11 | medium | fixed in 3.2.0 | the docs say to put the device and network "in a comment" in `perf-budget.json`, and the examples are JSONC. |
-| GT-A12 | medium | W5 (3.4.0) | rules written with `:focus` or `:focus-within` are mirrored to `[data-force-state~="focus"]`. |
-| GT-A13 | medium | W5 (3.4.0) | only the seven fixed states are allowed. |
+| GT-A12 | medium | fixed in 3.4.0: `test_content_and_a11y.MatrixStates` (PR #42) | rules written with `:focus` or `:focus-within` are mirrored to `[data-force-state~="focus"]`. |
+| GT-A13 | medium | fixed in 3.4.0: `test_content_and_a11y.MatrixStates` (PR #42) | only the seven fixed states are allowed. |
 | GT-A14 | medium | fixed in 3.4.0: (a) `test_browser_runtime.test_a_spinner_is_not_a_focus_ring` (PR #38); (b) `test_browser_runtime.test_disabled_controls_are_exempt_from_contrast` (PR #39) | two measurements give false results (fixture `$W\e11\probes.html`). |
 | GT-A15 | medium | fixed in 3.2.0 | none of the CI recipes (a11y SKILL.md:285-311; ci-integration.md:53-110; visual-regression.md:191-237) runs as written in every case. |
 | GT-A16 | low-medium | fixed in 3.4.0: `test_numbers.ByteBudgets` (PR #41) | two rows of the "same method" table cannot be reproduced with that method (TTFB = 4·RTT + 200 ms, minus 300 + 150 ms). |
@@ -178,7 +178,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-B9 | — | W11 (3.6.0+) | Chromium only. |
 | GT-C1 | M · P0 | fixed in 3.1.0 and 3.2.0 (browser tests) | A test suite that uses a real browser, skipped when none is available. |
 | GT-C2 | S–M · P0 | fixed in 3.4.0: colours, modals, iframes and inert content in 3.1.0 (GT-A1, GT-A2), pausing in PR #38 (GT-A14 (a)), `bypassCSP` and the disabled-control exemption in PR #39 (GT-A5, GT-A14 (b)) | Fix colour parsing, modals, iframes, inert content, `bypassCSP`, animation pausing and the disabled-control exemption. |
-| GT-C3 | M · P0 | partly done; the rest in W5 (3.4.0) | Matrix: the within-run "differs from default" gate, a tuned tolerance, focus mirroring, custom states, `data-state="error"` on non-form templates. |
+| GT-C3 | M · P0 | fixed in 3.4.0: the differs-from-default gate and the tolerance in 3.1.0, focus mirroring, custom states and the error attributes in PR #42 | Matrix: the within-run "differs from default" gate, a tuned tolerance, focus mirroring, custom states, `data-state="error"` on non-form templates. |
 | GT-C4 | S · P0 | fixed in 3.1.0, with GT-A4 | One shipped hook with opt-in stages in place of the inline snippets. |
 | GT-C5 | S · P0 | fixed in 3.4.0: A7, A9, A10 and A19 in 3.2.0, A8 and A16 in PR #41 | A correction pass on the docs (A7–A10, A16, A19). |
 | GT-C6 | S · P1 | fixed in 3.1.0 (the review's C6) | Write SKILL.md commands with `${CLAUDE_SKILL_DIR}` and pre-approve them with `allowed-tools`. |

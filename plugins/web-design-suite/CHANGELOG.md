@@ -12,6 +12,12 @@
   studio's Phase 5 runs it on the built page, and review-checklist 8.2 and 8.9 say what
   it measures and what is still by eye.
 
+- **Custom states and combinations in the matrix** (GT-A13). A component declares a state
+  of its own (selected, readonly, current, open) in `custom_states`, by the attributes
+  that put a cell in it, and joins two with `+` (`"selected+hover"`). Only the seven
+  were allowed, so state-coverage.md's own procedure for adding a state, its
+  per-archetype rows and its "selected + hover" row could not be rendered.
+
 ### Fixed
 
 - **A loading spinner counted as a focus ring** (GT-A14 (a)). a11y_runtime shortened
@@ -60,6 +66,15 @@
   method and the Slow 4G profile, and budgets.md no longer says the 800 ms TTFB matches
   web.dev's 0.8 s "not by coincidence": web.dev calls that threshold a rough guide. With
   GT-A8, this finishes GT-C5's correction pass.
+
+- **A `:focus` ring never rendered in the matrix** (GT-A12). Rules written with `:focus`
+  or `:focus-within` were mirrored to their own `data-force-state` token, but the
+  focus-visible cell carried `focus-visible` alone, so the ring never showed, the
+  coverage line called the state covered, and a11y_runtime reported a ring users do see
+  as missing. The cell now carries all three tokens.
+- **The matrix's error state stamped `aria-invalid` on buttons and spans** (GT-A13).
+  ARIA 1.2 deprecated it as a global attribute; a form control gets it, and everything
+  gets `data-state="error"`. With GT-A12 and GT-A13, this finishes GT-C3.
 
 ### Changed
 
@@ -110,6 +125,9 @@
   runs `tabindex` beside `image-alt`; `test_content_and_a11y.StaticBestPractice` and
   `test_numbers.ByteBudgets` recompute the rest. Against `v3.3.0`, all 6 fail. The
   web.dev quote is registered in `evidence.json`.
+- P12 part 1 (GT-A12, GT-A13): `test_content_and_a11y.MatrixStates` generates a sheet
+  with a `:focus` ring, a custom state and a combination, an undeclared state, and the
+  error state on a span and an input. Against `v3.3.0`, all 4 fail.
 
 ## 3.3.0 — 2026-10-04
 
