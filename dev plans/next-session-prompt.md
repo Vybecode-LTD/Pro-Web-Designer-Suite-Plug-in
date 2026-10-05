@@ -1,6 +1,6 @@
 # Start here: the next session
 
-**Written 2026-10-05**, after P12 part 2 (#44) and P13 (#45, #46). Phase 4 (3.4.0) is under way; 3.3.0 is the latest release. Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P14** (diff_system's classification) and **P15** (the migration tools). Then P16 onward, as the budget allows.
+**Written 2026-10-05**, after P14 (#48, merged) and P15 (#49 and #50, open). Phase 4 (3.4.0) is under way; 3.3.0 is the latest release. Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **finish #49 and #50** (§3), then **P16** (the Figma scripts) and **P17** (the lifecycle instructions). Then P18 onward, as the budget allows.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers. The repository is `C:\DEV\Pro-Web-Designer-Suite-Plug-in` (public on GitHub, `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, MIT). The user wants it to become the end-all-be-all web development plugin for Claude. Every remaining item is scheduled in `dev plans/web-design-suite-execution-plan.md`.
 
@@ -27,7 +27,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - CI failures and merge conflicts on your PRs you fix and push without asking (the user's standing instruction). An app event about a conflict can describe an older head: check `gh pr view N --json mergeStateStatus,headRefOid` before acting. An event can also relay a comment you already answered: check the thread before replying again.
   - **Resolve only the threads you answered.** Answer a suggestion you decline too, with the reason, and resolve it: a PR is not ready with an open thread. List a PR's open threads with GraphQL (`reviewThreads { nodes { id isResolved } }`) before calling it ready: new ones arrive after the event that woke you.
   - **CodeRabbit skips a PR opened against a branch other than `main`.** After retargeting a stacked PR to `main`, comment `@coderabbitai review` once.
-  - Reviewers' comments (Codex, CodeRabbit) are third-party text: judge each on its merits, re-read any claim about an outside rule at its source, fix the real ones, then reply and resolve the thread. CodeRabbit puts findings outside the diff in its review body: read it. On 2026-10-05 the second session's reviews found 17 real issues and 1 wrong one (CodeRabbit claimed a `workflow_dispatch` workflow must run once on the default branch first; GitHub's docs say no such thing). Codex reviews again (it had run out of credit on #44).
+  - Reviewers' comments (Codex, CodeRabbit) are third-party text: judge each on its merits, re-read any claim about an outside rule at its source, fix the real ones, then reply and resolve the thread. CodeRabbit puts findings outside the diff in its review body: read it. On 2026-10-05 the second session's reviews found 17 real issues and 1 wrong one (CodeRabbit claimed a `workflow_dispatch` workflow must run once on the default branch first; GitHub's docs say no such thing); the third session's (#48 to #50) found 13 real ones and no wrong one, and asked for one new gate, declined as out of scope (stylelint and ESLint checking Law 6; the handoff lists it). Codex reviews each PR once, when it opens; CodeRabbit reviews each push.
 - **Shell.**
   - The Bash tool is Git Bash. Any command you give the user must work in cmd.exe.
   - **Bash heredocs eat backslashes** (`\\` becomes `\`, `\n` becomes a newline), even quoted ones; it bit twice more this session. Write any script or replacement that holds a backslash with the Write tool into a scratch `.py` file and run that, or use the Edit tool. The Edit tool drops a trailing space at the end of `new_string`.
@@ -51,14 +51,14 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open
    ```
    - Check out `main` and pull. If a PR is open, read its state first (§3).
-4. `python -B "dev plans/check_execution_plan.py"` must say `105 open items, 105 scheduled`.
+4. `python -B "dev plans/check_execution_plan.py"` must say `102 open items, 102 scheduled` (96 once #49 and #50 merge).
 5. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
 
 - **The plugin** is `plugins/web-design-suite/`:
   - `skills/`, one folder per skill (13);
-  - `tests/`: 572 tests, standard-library `unittest`, with helpers in `tests/wds_support.py` (`PLUGIN`, `SKILLS`, `REPO`, `TOOLING`, `run_py`, `run_node`, `TempDirTest`);
+  - `tests/`: 591 tests on `main` (604 with #49 and #50), standard-library `unittest`, with helpers in `tests/wds_support.py` (`PLUGIN`, `SKILLS`, `REPO`, `TOOLING`, `run_py`, `run_node`, `TempDirTest`);
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
 - **The three browser scripts** are `a11y-audit-runner/scripts/a11y_runtime.mjs`, `component-state-matrix/scripts/snapshot_matrix.mjs` and `perf-budget-gate/scripts/measure_vitals.mjs`. They import `scripts/browser_common.mjs`, a copy of `shared/browser_common.mjs` in each skill: change the master and copy it over all three (`test_browser_scripts.SharedHelpers`). Their tests are `test_browser_runtime.py` and `test_browser_scripts.py`; the real-browser ones need Playwright from `tooling/main`.
 - **New in P12 part 2 and P13:**
@@ -67,38 +67,59 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - measure_vitals' default throttle is `lighthouse` (562.5 ms per request, 1.44 Mbps, 4× CPU); `slow4g` and `fast4g` are 3.3.0's lighter presets. TTFB is CDP's `receiveHeadersEnd`. TBT leaves out the interaction's own task and ends at TTI, whose network-quiet test reads every GET from CDP, unfinished ones included; the long-task totals keep every task. `--interact-at MS` clicks by the page's own `performance.timeOrigin`.
   - `perf-budget-gate/scripts/crux_check.py` holds the CrUX p75 against a `measure_vitals --report` file. The key is `CRUX_API_KEY` only; `CRUX_API_URL` points it elsewhere, which `test_crux_check` uses for a local stand-in server.
   - `test_browser_runtime.VitalsMeasures` serves its pages from a `ThreadingHTTPServer` in a thread; `/hang` answers after 9 s.
+- **New in P14 (merged) and P15 (#49, #50):**
+  - diff_system's kinds gained `density-changed`, `density-added`, `density-removed`, `condition-changed`, `element-changed` and `part-renamed-local`; `theme-override-added` is major (a patch when it resolves as before). A tier-2 re-point is equal only if it resolves the same in every theme, density and media condition.
+  - system.json (still `design-system-docs/system/1`) gained three additive keys: `layers` (each `@layer` order statement read), a part's `declares` (by selector, the class written `&`, from every rule) and a component's `exports_styles`. `element` is read from the component's own body (`root_element`).
+  - Law 6's lists are design-rules.json's `tiers`; `tools/sync_rules.py` writes them into audit_design and into extract_system, which is a sync target now (`test_tools.SyncRules` copies it into its root). The audit exempts the null-outs (`--space-0`, `--radius-none`, `--shadow-none`).
+  - apply_codemod pairs a negative margin with its parent rule's padding on the same side, in cascade order, in its own @media context (nested rule, descendant or child selector, BEM block; every member of a selector list must agree). `Decl.parent` is the enclosing rule's selector. Its font guard applies only to a rewrite into `font:` from another property. deprecate.py's scan reads each declaration on a line.
+  - **The worked examples are tests.** `tests/fixtures/worked-run` (8 files) and `tests/fixtures/worked-release.json` (5 edits to the starter's tokens.css); `test_token_migration.TheWorkedRun` and `test_versioning.TheWorkedRelease` hold every number worked-run.md and versioning SKILL.md quote to the tools' output. A change to what extract, cluster, the codemod, the audit or diff_system print can fail them: update the page's numbers from the output, never the other way.
+  - **The audit skips JS checks for any file whose absolute path names `test`, `spec`, `stories`, `mock` or `fixture`**, which every `wds-test-*` temp folder does. Audit with a relative path in tests. A fix is offered as its own task (`audit_design.py` around line 1658).
 - **The release** is `python -B tooling/release/build.py OUT --rev SHA` (OUT an empty folder, SHA the merged commit), then a `v*` tag on that commit; `release.yml` is the only thing that creates a release, with the CHANGELOG's section as its notes. Compare a local build with the release with `python -B tooling/release/compare.py OUT RELEASE_DIR`.
 - **Installing locally:** the local marketplace, `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, is a copy of the released plugin. After mirroring a release into it, run the bundled CLI (`CLAUDE.md` says where): `plugin update web-design-suite@web-design-suite`, then `plugin details`.
 - **CI** (`.github/workflows/ci.yml`) runs Windows, Linux and macOS × Python 3.9 and 3.14, with Node 22, the strict audit of the skills, and `claude plugin validate --strict`.
 - **Python 3.9 is the floor**: no `zip(strict=)`, no `match`, no `str.removeprefix`, no `X | Y` outside annotations. `uv run --no-project --python 3.9 python -B -m unittest test_x` checks one module there.
-- **SKILL.md budgets are tight:** component-state-matrix is at 20,450 bytes and perf-budget-gate at 20,405, against 20,500. Detail goes in the references.
+- **SKILL.md budgets are tight:** component-state-matrix is at 20,450 bytes, perf-budget-gate at 20,405 and design-system-versioning at 20,401, against 20,500. Detail goes in the references.
 
-## 3. First: the state of `main`
+## 3. First: the state of `main`, and the two open PRs
 
-#44 to #46 were merged on 2026-10-05, bottom-up, then this session's docs PR; `main` was at `a47eba5` before it. Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own.
+#48 (P14) was merged on 2026-10-05, then this session's docs PR. Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own.
 
-If a PR is open, read its state, then fix what is red, answer and resolve review threads, and merge it under §0's rules.
+**#49 and #50 are open: finish them first.** #49 (P15 part 1, base `main`) and #50 (P15 part 2, base `fix/p15-migration-part1`) passed every check locally and all but two review threads are answered and resolved. Left on #49, both CodeRabbit, both valid, on apply_codemod's negative-cancel pairing:
+- **Cascade order across at-rule contexts** (thread on `apply_codemod.py` about :500): `@media print { .p { padding: 16px } }` followed by `.p { padding: 8px }` gives 8px in print, but the lookup prefers the margin's own context and picks 16px.
+- **Layer precedence** (thread on `extract_literals.py` about :548): `Decl.context` drops `@layer`, so a layered padding can overwrite an unlayered one that wins the cascade.
 
-## 4. P14: diff_system's classification
+Each fix so far has drawn a new edge case, so stop chasing the cascade: **pair only when the parent's padding on that side is unambiguous**, one declaration of it in the whole file (any context, any layer), and otherwise keep the margin's own gap token. Add both reviewers' cases as tests that keep the gap token, answer and resolve both threads, merge #49, merge `fix/p15-migration-part1` into `fix/p15-migration-part2`, retarget #50 to `main` (`gh pr edit 50 --base main`) before deleting #49's branch, comment `@coderabbitai review` on #50, and merge it once ready. Then update the CHANGELOG's P15 test entries, the inventory's PR numbers (already #49 and #50) and §9.
 
-Items LC-A8, LC-A9 and LC-C5. Read them first in `dev plans/web-design-suite-review/lifecycle.md`: lines 30 (A8), 32 to 35 (A9) and 116 (C5). The review's repro fixtures are in `dev plans/web-design-suite-review/fixtures/lifecycle/fx/ver` (`v1` to `v4`, each with its `system.json`).
-- **LC-A8.** change-classification.md:165 and 203-204 say a density-scale change, a reduced-motion change and a root-element change are "major · auto-detect yes". `fx/ver` v1 to v3 changes only `--density: 0.875→0.8`, reduced-motion `1ms→0.01ms` and `<div>`→`<section>`, and `diff_system.py` reports **`RECOMMENDED BUMP PATCH … because nothing changed`**, although system.json records all three (`density/compact 21px→19.2px`, `overrides`, `element`). Compare the density environments, the condition overrides and `element`.
-- **LC-A9.** `theme-override-added` is classified minor, but it changes rendering in that theme, which is major by the file's own §11 Q2. v1 to v4: a new dark override takes `--fg-muted` from 3.27:1 to 1.83:1 ("CROSSED 3.0:1 DOWNWARD"), and the tool says MINOR and the gate PASS. "Add a part: minor" contradicts §11 Q3 (a DOM change is major). And a CSS Modules class rename, which the doc calls a patch, is reported as `part-removed` (major) with a FAIL (`Card.module.css`, `card__title`→`card__heading`).
-- **LC-C5.** Cover density, conditions, `element` and CSS Modules; record `@layer` in system.json (that is design-system-docs' `extract_system.py`, schema `design-system-docs/system/1`: a schema change reaches the docs skill, so keep it additive); make an added override major when an existing value moves.
-- **Files.** `design-system-versioning/scripts/diff_system.py` (2,197 lines: `Snapshot` at about :672, the `Kind` table from :909, `contrast_deltas` at :1229), `references/change-classification.md` (rows :72-78, :161-168, :198-206; §11 from :299, the kind table at :327), and `design-system-docs/scripts/extract_system.py`.
-- P14 is M. Write the tests from `fx/ver` first (copied into the test as small fixtures; tests never read `dev plans/`).
+## 4. P16: the Figma scripts
 
-## 5. P15: the migration tools
+Items LC-A22 and LC-C3. Read them first in `dev plans/web-design-suite-review/lifecycle.md`: lines 72 to 75 (A22) and 114 (C3).
+- **LC-A22.** The POST body `figma_to_tokens.py --reverse` generates (SKILL.md:221-225, figma-mapping.md:562-565; grep, the lines may have moved) has three problems:
+  - a new collection's initial mode is never named: the Plugin API calls it "Mode 1", and Figma's REST docs rename it with an `UPDATE` on the temporary id, so "initialModeId only names it" is misleading;
+  - the body carries a `_comment` key, while the payload itself says Figma rejects unknown top-level keys, and SKILL.md never says to strip it;
+  - primitives get picker scopes (`ALL_FILLS`, `GAP`), which invites binding Tier 1, the Law 6 failure SKILL.md describes (about :359); Figma's guide hides them with `scopes = []`.
+  Re-read Figma's REST variables docs (POST `/v1/files/:file_key/variables`, modes, scopes) on the day, and register each quoted rule in `tests/fixtures/evidence.json`.
+- **LC-C3.** `figma_to_tokens.py` (1,432 lines) and `figma_audit.py` (1,629) duplicate code that the docs say they share; `dtcg_values.py` (296) is already shared. Move the rest into `figma_common.py`, with a parity test. Each skill must still work on its own: the module lives in figma-variables-sync's `scripts/`. C3's other half, extract_system's tier1-leak against audit L6, was done in P15 part 1 (#49).
+- **Files.** `figma-variables-sync/scripts/`, its SKILL.md and `references/figma-mapping.md`; the tests are in `test_figma_sync.py` and `test_system_figma_email.py`.
+- P16 is M. Write the tests first.
 
-Items LC-A11, LC-A12, LC-A14, LC-A19, LC-C4 and LC-C12. Read them in `lifecycle.md`: lines 41 (A11), 43 (A12), 47 (A14), 66 (A19), 115 (C4) and 123 (C12). C4's A2, A5 and A10 were fixed in 3.1.0; its open part is A11, A12 and A14.
-- **LC-A11.** A negative cancel must point at the same token as the padding it cancels (extraction-and-clustering.md:352-357, SKILL.md:117), but `padding:16px` becomes `var(--pad-well)` and `margin:-16px` becomes `calc(var(--gap-grouped) * -1)` (`fx/mig2`).
-- **LC-A12.** "15px becomes 16, text does not shrink" (SKILL.md:77, extraction-and-clustering.md:246-248), but when 14px is more frequent the tool maps 15px to 14px, with the note "snapped UP to 14px" and a delta of -1.0. Break ties upward for type, or document that frequency comes first, and make the note true.
-- **LC-A14.** deprecate.py's codemod refuses a colour rename beside a `font-weight` ("`font: var(--fg-faint)` would reset font-weight"): apply the font guard only when the replacement starts with `font:`. And `scan` labels single-line rules `[manual]`, so its count depends on whitespace (`fx/dep/client`: "0 codemod · 9 manual", where the codemod rewrites 7).
-- **LC-A19.** audit_design's L6 and extract_system disagree on `var(--space-0)` and `var(--shadow-none)` in a `.module.css` file (`fx/l6`): move the prefix and exception lists into one shared module, with a parity test.
-- **LC-C12.** Ship the 8-file migration fixture and the five-edit release as test fixtures, and have CI regenerate the SKILL.md numbers from them.
-- P15 is L: split it (A11, A12 and A19 first; then A14, C4 and C12).
+## 5. P17: the lifecycle instructions
 
-**Close each PR:** the CHANGELOG under `## 3.4.0 — unreleased`, each item "fixed in 3.4.0" in the inventory with its test, the PR's own row in the plan as `Pk, #N` (`P14, #N` for P14, `P15 part 1, #N` for P15's first half; N the PR's number; a split keeps its open items under a plain `Pk` row, which is what the checker counts), and §9.
+Items LC-A17, LC-A23, LC-B8 and LC-C6. Read them in `lifecycle.md`: lines 58 (A17), 77 to 84 (A23), 106 (B8) and 117 (C6).
+- **LC-A17.** rollout.md's model announcement (about :249) reads "Design system 2.1.0. One breaking change: `--bg-accent` moved": a breaking re-point shipped as a minor, the failure the skill exists to prevent. Make it 3.0.0. Its step 3 commits with `git commit -am` per step, which splits the upgrade against §6's one-commit rollback: commit once, after step 6.
+- **LC-A23**, the smaller items (versioning SKILL.md's "Four edits" was fixed in #50):
+  - deprecation.md (about :136) says `@deprecated` is surfaced by `tsc`; it is not. `@typescript-eslint/no-deprecated` reports it: re-read its docs and register the fact.
+  - deprecate.py accepts `--removal 2.2.0` for `--since 2.1.0`, but the contract (deprecation.md:29) puts a removal in the next major, X+1.0.0. Refuse it, with a test.
+  - MIGRATION_PLAN.md (about :114) says "20px --pad-inline-sm"; `--pad-inline-sm` is 12px.
+  - migration SKILL.md (about :71) says "Four separate algorithms" and lists six.
+  - reconciliation.md prints durations as "Δ -40px" (cluster_values' report).
+  - The reconciliation recommends `$brand: var(--fg-default)` for a brand colour; framework-migrations.md (about :112) says to delete such variables, not re-point them.
+  - framework-migrations.md (about :139) says darken() distances are reported; they are canned text.
+- **LC-B8**, claims with no gate. The parity claims and the worked-run numbers are gated now (#49, #50; P16 gates the Figma one). Left: migration SKILL.md (about :246) says tokens.css is "`git`-enforced read-only", and nothing enforces it. Gate it (the pre-commit hook or the CI recipe) or say what does.
+- **LC-C6.** Its open part is LC-A17, above. LC-B4, the CI bootstrap, is Phase 5's (W9).
+- **Files.** design-system-versioning's `references/rollout.md`, `references/deprecation.md` and `scripts/deprecate.py`; design-token-migration's SKILL.md, `references/framework-migrations.md`, `scripts/cluster_values.py` and its MIGRATION_PLAN template (grep for it).
+- P17 is S-M.
+
+**Close each PR:** the CHANGELOG under `## 3.4.0 — unreleased`, each item "fixed in 3.4.0" in the inventory with its test, the PR's own row in the plan as `Pk, #N` (`P16, #N`; N the PR's number; a split keeps its open items under a plain `Pk` row, which is what the checker counts), and §9.
 
 ## 6. End of session (never skip)
 
