@@ -357,6 +357,40 @@ class MatrixStates(TempDirTest):
         self.assertEqual(proc.returncode, 2, output(proc))
         self.assertIn("data-state", output(proc))
 
+    def test_a_quoted_bracket_before_attrs_keeps_the_tag(self):
+        """CodeRabbit on #42: `[^<>]*` stopped at a `<` inside a quoted value,
+        so an input with one was not read as a form control."""
+        template = '<input class="chip" data-hint="1<2" {attrs}>'
+        self.assertTrue(all('aria-invalid="true"' in a for a in self.state_cells(template, "input", "error")))
+        self.assertTrue(all(re.search(r"(?:^|\s)disabled(?:\s|$)", a)
+                            for a in self.state_cells(template, "input", "disabled") if "aria-disabled" in a))
+
+    def test_a_conflict_is_judged_on_the_element_that_renders_it(self):
+        """CodeRabbit on #42: error + a state setting aria-invalid="false"
+        conflicts on an input, where error sets aria-invalid, and not on a span."""
+        custom = {"valid": {"attrs": {"aria-invalid": "false"}}}
+        for template, refused in (('<input class="chip" {attrs}>', True),
+                                  ('<span class="chip" {attrs}>{content}</span>', False)):
+            with self.subTest(refused=refused):
+                proc, _ = self.generate(".chip {}\n", template, ["default", "error+valid"], custom)
+                self.assertEqual(proc.returncode, 2 if refused else 0, output(proc))
+
+    def test_form_control_true_keeps_aria_invalid_off_a_div(self):
+        """CodeRabbit on #42: `form_control: true` bypassed error's form tags."""
+        self.write("chip.css", '.chip {}\n.chip[data-state="error"] { color: #b00; }\n')
+        self.write("matrix.json", json.dumps({"$schema": "component-state-matrix/1",
+                                              "themes": ["light"], "densities": ["comfortable"],
+                                              "components": [{"name": "chip", "css": "chip.css",
+                                                              "template": '<div class="chip" {attrs}>x</div>',
+                                                              "states": ["default", "error", "disabled"],
+                                                              "form_control": True}]}))
+        proc = run_py("component-state-matrix", "generate_matrix", "matrix.json", "--out", "sheet.html",
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        cells = self.cells((self.tmp / "sheet.html").read_text(encoding="utf-8"), "div")
+        self.assertFalse([a for a in cells if "aria-invalid" in a])
+        self.assertTrue([a for a in cells if re.search(r"(?:^|\s)disabled(?:\s|$)", a)])
+
     def test_the_coverage_table_has_a_column_per_state(self):
         """Codex on #42: the grid had seven state tracks, so a custom state's
         column wrapped onto a row of its own."""

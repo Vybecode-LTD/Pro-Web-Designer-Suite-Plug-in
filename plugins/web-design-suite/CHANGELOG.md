@@ -143,7 +143,10 @@
   error state on a span and an input. Against `v3.3.0`, all 4 fail. Codex's review of #42
   added three, each failing on its first head: a wrapper and a button keep `aria-invalid`
   and `disabled` off where they do not belong, `loading+error` (both set `data-state`) is
-  refused, and the coverage grid has a column per state.
+  refused, and the coverage grid has a column per state. CodeRabbit's added three, failing on
+  the head before them: a quoted `<` before `{attrs}`, a conflict judged on the element
+  that renders it (`error+valid` on an input, not a span), and `form_control: true`
+  keeping `aria-invalid` off a `<div>`.
 
 ## 3.3.0 — 2026-10-04
 

@@ -136,7 +136,8 @@ FORM_TAGS = ("button", "input", "select", "textarea", "fieldset", "optgroup", "o
 # The element that carries {attrs} is the one a state's attributes land on, so
 # it alone decides whether they are a form control's: a <div {attrs}> wrapping
 # an <input> is not one (Codex on #42).
-ATTRS_TAG_RE = re.compile(r"<\s*([a-zA-Z][\w-]*)\b[^<>]*\{attrs\}")
+# A quoted value may hold < or > (CodeRabbit on #42).
+ATTRS_TAG_RE = re.compile(r"""<\s*([a-zA-Z][\w-]*)\b(?:[^<>"']|"[^"]*"|'[^']*')*?\{attrs\}""")
 
 DEFAULT_THEMES = ["light", "dark"]
 DEFAULT_DENSITIES = ["compact", "comfortable", "spacious"]
@@ -503,19 +504,7 @@ class Component:
             )
         self.state_detect = raw.get("state_detect", {})
         self.state_attrs = raw.get("state_attrs", {})
-        for st in (s for s in self.states if "+" in s):
-            seen: Dict[str, Tuple[str, str]] = {}
-            for part in st.split("+"):
-                attrs = {**(self.model[part].get("attrs") or {}), **self.state_attrs.get(part, {})}
-                for k, v in attrs.items():
-                    if k != "data-force-state" and k in seen and seen[k][1] != v:
-                        raise ManifestError(
-                            f"{where} ('{self.name}') combines '{st}', but '{seen[k][0]}' and "
-                            f"'{part}' both set `{k}` ({seen[k][1]!r} and {v!r}), so one would "
-                            f"silently replace the other while coverage counted both. Declare "
-                            f"the combined state in `custom_states` with the attributes it "
-                            f"really has (Codex on #42).")
-                    seen.setdefault(k, (part, v))
+        self.where = where
         self.stage_style = raw.get("stage_style", {}) or {}
         bad_keys = [k for k in self.stage_style if not k.startswith("--")]
         if bad_keys:
@@ -577,22 +566,32 @@ class Component:
         return out
 
     def state_attrs_for(self, state: str, is_form: Optional[str]) -> Dict[str, str]:
-        """The attributes of one state or a `+` combination. Forced pseudo-states
-        are joined (`hover focus-visible …`); any other attribute is the last
-        state's."""
+        """The attributes of one state or a `+` combination, on the element that
+        carries {attrs}. Forced pseudo-states are joined (`hover focus-visible
+        …`). Two states of a combination that set one attribute to two values
+        are refused, as rendered on this element: one would silently replace
+        the other while coverage counted both (Codex and CodeRabbit on #42)."""
         merged: Dict[str, str] = {}
+        owner: Dict[str, str] = {}
         forced: List[str] = []
         for part in state.split("+"):
             spec = self.model[part]
             attrs = dict(spec.get("attrs") or {})
-            if is_form and (is_form == "*" or is_form in spec.get("form_tags", FORM_TAGS)):
+            tags = spec.get("form_tags")
+            if is_form and (tags is None or is_form in tags):
                 attrs.update(spec.get("form_attrs") or {})
             attrs.update(self.state_attrs.get(part, {}))
             for k, v in attrs.items():
                 if k == "data-force-state":
                     forced += [t for t in v.split() if t not in forced]
-                else:
-                    merged[k] = v
+                    continue
+                if k in merged and merged[k] != v:
+                    raise ManifestError(
+                        f"{self.where} ('{self.name}') combines '{state}', but '{owner[k]}' "
+                        f"and '{part}' both set `{k}` ({merged[k]!r} and {v!r}) on this "
+                        f"element. Declare the combined state in `custom_states` with the "
+                        f"attributes it really has.")
+                merged[k], owner[k] = v, part
         if forced:
             merged["data-force-state"] = " ".join(forced)
         return merged
@@ -620,12 +619,14 @@ class Component:
         return tpl
 
     def is_form_control(self, tpl: str) -> Optional[str]:
-        """The form control's tag when the element carrying {attrs} is one
-        ("*" when the manifest says so with `form_control`), else None."""
-        if self.form_control is not None:
-            return "*" if self.form_control else None
+        """The tag of the element carrying {attrs} when it is a form control, or
+        when the manifest says so with `form_control: true`; else None. A
+        state's own `form_tags` still apply, so `form_control` never puts
+        aria-invalid on a <div> (CodeRabbit on #42)."""
         m = ATTRS_TAG_RE.search(tpl)
         tag = m.group(1).lower() if m else ""
+        if self.form_control is not None:
+            return (tag or "*") if self.form_control else None
         return tag if tag in FORM_TAGS else None
 
 
