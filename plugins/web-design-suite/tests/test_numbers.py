@@ -442,6 +442,17 @@ class ByteBudgets(unittest.TestCase):
                 self.assertAlmostEqual(self.kb(critical), want, delta=want * 0.05)
                 self.assertAlmostEqual(self.kb(total), want * 2.4, delta=want * 2.4 * 0.05)
 
+    def test_the_3g_paragraph_is_the_method(self):
+        """CodeRabbit on #41: the 3G paragraph gave all 1,800 ms of TTFB to the
+        four round trips (1,600 ms); 200 ms of it is server time."""
+        text = self.DOC.read_text(encoding="utf-8")
+        para = re.search(r"^On 3G, .*$", text, re.M).group(0)
+        ttfb, rtt, server, rest, kbps = 1800, 400, 200, 2500 - 1800 - 300 - 150, 400
+        self.assertEqual(ttfb, 4 * rtt + server)
+        for figure in (f"{ttfb:,} ms", f"four {rtt} ms round trips", f"{server} ms of server time",
+                       f"{rest} ms at {kbps} Kbps", f"{rest * kbps / 8 / 1000:g} KB"):
+            self.assertIn(figure, para)
+
     def test_skill_md_quotes_the_table(self):
         text = (SKILLS / "perf-budget-gate" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("250 KB on Slow 4G and 1.9 MB on Fast 4G", text)
