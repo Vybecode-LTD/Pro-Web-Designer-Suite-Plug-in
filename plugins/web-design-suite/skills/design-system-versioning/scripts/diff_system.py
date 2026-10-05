@@ -1455,7 +1455,7 @@ def diff_tokens(old: Snapshot, new: Snapshot, out: List[Change],
             else:
                 # Equal means equal everywhere: 24px at the default density
                 # and 21px against 24px at compact is a re-point (§11 Q2).
-                elsewhere = moves_elsewhere(old, new, name)
+                elsewhere = [] if base_moved else moves_elsewhere(old, new, name)
                 same = not base_moved and not elsewhere
                 detail = f"{told.get('raw')}  ->  {tnew.get('raw')}"
                 if elsewhere:

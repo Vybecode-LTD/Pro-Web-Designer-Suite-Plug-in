@@ -123,7 +123,7 @@ Step 5 of that list is the acceptance test. A design-system upgrade that type-ch
 
 ## A worked release
 
-Four edits to the canonical `tokens.css`, which is roughly what a real release looks like: one rename, one ramp nudge, one re-point, one addition, one comment.
+Five edits to the starter's `tokens.css` (`tests/fixtures/worked-release.json`, rerun by a test), roughly what a real release looks like: one rename, one ramp nudge, one re-point, one addition, one comment.
 
 ```
 RECOMMENDED BUMP   MAJOR   1.4.2 -> 2.0.0
@@ -131,7 +131,7 @@ because            tier-2 role renamed: --fg-subtle
 changes            3 major · 1 minor · 1 patch
 
   [tier1-value-changed]  --accent-600
-      value        #c64600  ->  #d45003
+      value        #c64600  ->  #d24e00
       blast·roles        2  --bg-accent, --border-focus
       blast·transitive   2  --elevation-focus, --shadow-focus
 
@@ -142,17 +142,17 @@ changes            3 major · 1 minor · 1 patch
       value        #c64600  ->  #e75b12
       detail       var(--accent-600)  ->  var(--accent-500)
 
-CONTRAST — 7 pair(s) moved
+CONTRAST — 10 pair(s) moved
   light  --fg-on-accent on --bg-accent    4.92:1   3.56:1  CROSSED 4.5:1 DOWNWARD
          caused by --accent-600, --bg-accent
-  light  --border-focus on --bg-surface   4.92:1   4.26:1  moved, no threshold crossed
+  light  --border-focus on --bg-surface   4.92:1   4.35:1  moved, no threshold crossed
 ```
 
 Four things to notice, because they are the reason the tool exists:
 
 - **The one-line ramp nudge is four roles deep.** `--accent-600` → `--border-focus` → `--shadow-focus` → `--elevation-focus`, plus `--bg-accent` in parallel. Nobody edited the last three; they are reported under their cause rather than as three more decisions.
 - **The re-point is the accessibility regression**, and it is the change that looks most harmless in a diff. 4.92:1 → 3.56:1 is the scenario at the top of this file, caught before it shipped.
-- **The focus ring moved too.** `--border-focus` against `--bg-surface` went 4.92 → 4.26. It is not text, so no linter has an opinion, and SC 1.4.11 still asks 3:1 of it.
+- **The focus ring moved too.** `--border-focus` against `--bg-surface` went 4.92 → 4.35. It is not text, so no linter has an opinion, and SC 1.4.11 still asks 3:1 of it.
 - **Only the rename fails the gate.** The value change and the re-point are equally breaking and there is no deprecation record that could help them — a changelog entry and a visual diff are their remedy.
 
 Record the deprecation, ship the shim, and the same rename classifies as **minor**: `--fg-faint` added, `--fg-subtle` re-pointed to it with an identical resolved value in both themes. That is one command's difference between a release every client must schedule and one nobody has to think about.

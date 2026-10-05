@@ -281,10 +281,6 @@ def locate(lines: Sequence[str], entry: Dict[str, Any],
 #                            layer, not a consumer's call site.
 #   border: 1px solid var(--old)   a shorthand. The rule would have to enumerate
 #                            every surrounding text.
-#   a rule that also sets font-weight/line-height   the engine's font-shorthand
-#                            guard skips declaration-scope rewrites there. It
-#                            reports the skip and exits 1, so nothing is lost
-#                            silently — but somebody edits those by hand.
 # `scan` finds every one of those and labels it `manual`, which is the honest
 # answer to "is the codemod enough".
 # ===========================================================================
@@ -445,61 +441,6 @@ SCAN_EXT = CSS_EXT | TS_EXT | {".html", ".vue", ".svelte", ".astro", ".md",
                                ".mdx", ".json"}
 CUSTOM_PROP_DECL = re.compile(r"^\s*--[\w-]+\s*:")
 
-#: apply_codemod refuses a declaration-scope rewrite inside a rule that already
-#: decides a font, because its declaration scope exists for `font:` shorthands
-#: and dropping one in would reset the siblings. The guard is not scoped to font
-#: rules, so it catches a `color:` rewrite in the same block — which is a real
-#: skip a consumer needs to know about BEFORE they run the codemod, not from a
-#: message about font shorthands they never asked for.
-FONT_SIBLINGS = {"font", "font-weight", "font-family", "font-style",
-                 "font-variant", "font-stretch", "line-height"}
-
-
-def css_block_props(text: str) -> List[Tuple[int, int, set]]:
-    """[(first line, last line, properties declared)] for each rule block."""
-    clean = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"),
-                   text, flags=re.S)
-    blocks: List[Tuple[int, int, set]] = []
-    stack: List[Tuple[int, set]] = []
-    line = 1
-    buf: List[str] = []
-    for ch in clean:
-        if ch == "\n":
-            line += 1
-            buf = []
-            continue
-        if ch == "{":
-            stack.append((line, set()))
-            buf = []
-            continue
-        if ch == "}":
-            if stack:
-                start, props = stack.pop()
-                blocks.append((start, line, props))
-            buf = []
-            continue
-        if ch == ";":
-            raw = "".join(buf)
-            m = re.match(r"\s*([-\w]+)\s*:", raw)
-            if m and stack:
-                stack[-1][1].add(m.group(1))
-            buf = []
-            continue
-        buf.append(ch)
-    while stack:
-        start, props = stack.pop()
-        blocks.append((start, line, props))
-    return blocks
-
-
-def block_for(blocks: Sequence[Tuple[int, int, set]], line: int) -> set:
-    best: Optional[Tuple[int, int, set]] = None
-    for start, end, props in blocks:
-        if start <= line <= end and (best is None or start >= best[0]):
-            best = (start, end, props)
-    return best[2] if best else set()
-
-
 @dataclass
 class Hit:
     consumer: str
@@ -549,22 +490,25 @@ def scan_one(root: Path, entry: Dict[str, Any]) -> List[Hit]:
             continue
         if name not in text:
             continue
-        blocks = (css_block_props(text) if path.suffix.lower() in CSS_EXT
-                  else [])
+        is_css = path.suffix.lower() in CSS_EXT
         for i, raw in enumerate(text.splitlines(), 1):
             if not needle.search(raw):
                 continue
-            if decl is not None and decl.match(raw):
-                continue                # the declaration itself, not a use
-            verdict, why = classify_hit(raw, path, name, props,
-                                        block_for(blocks, i))
-            hits.append(Hit(consumer, str(path), i, raw.strip()[:110],
-                            verdict, why))
+            # Each declaration on the line, so `.meta { color: var(--x); }`
+            # reads as the declaration it is, however the rule is wrapped.
+            pieces = [p for p in re.split(r"[{};]", raw) if needle.search(p)] \
+                if is_css else [raw]
+            for piece in pieces:
+                if decl is not None and decl.match(piece):
+                    continue            # the declaration itself, not a use
+                verdict, why = classify_hit(piece, path, name, props)
+                hits.append(Hit(consumer, str(path), i, raw.strip()[:110],
+                                verdict, why))
     return hits
 
 
-def classify_hit(raw: str, path: Path, name: str, props: Sequence[str],
-                 siblings: Optional[set] = None) -> Tuple[str, str]:
+def classify_hit(raw: str, path: Path, name: str,
+                 props: Sequence[str]) -> Tuple[str, str]:
     if path.suffix.lower() not in CSS_EXT:
         return ("codemod" if not name.startswith("--") else "manual",
                 "" if not name.startswith("--") else
@@ -583,11 +527,6 @@ def classify_hit(raw: str, path: Path, name: str, props: Sequence[str],
     if value.strip() != f"var({name})":
         return ("manual", "the token is part of a longer value (a shorthand); "
                           "the rule matches the whole declaration value")
-    clash = (siblings or set()) & (FONT_SIBLINGS - {prop})
-    if clash:
-        return ("manual", f"the same rule declares {', '.join(sorted(clash))} — "
-                          f"apply_codemod refuses a declaration-scope rewrite "
-                          f"there and will report the skip; edit this one by hand")
     return ("codemod", "")
 
 

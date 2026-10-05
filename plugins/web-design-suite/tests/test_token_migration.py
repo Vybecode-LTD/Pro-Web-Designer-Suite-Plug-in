@@ -44,11 +44,12 @@ import pathlib
 import re
 import shutil
 import subprocess
+import sys
 import time
 import unittest
 
 import test_starter_css as starter
-from wds_support import TempDirTest, env, output, run_py, temp_dir
+from wds_support import SKILLS, TempDirTest, env, output, run_py, temp_dir
 
 GIT = shutil.which("git")
 CSS = ".card { margin: 13px; }\n"
@@ -221,6 +222,67 @@ class MigrationPipeline(TempDirTest):
         _, report = self.cluster(self.extract(self.tmp / "src")[0])
         self.assertNotIn("an 7-rung", report)
         self.assertIn("--z-base", report)
+
+
+class TheWorkedRun(TempDirTest):
+    """LC-C12: references/worked-run.md is the 8-file fixture in
+    tests/fixtures/worked-run, run the way the page runs it. Every number the page
+    quotes (the census, the clustering, the replacements, the audit before and
+    after, the remaining errors) must be what the tools print for it today."""
+
+    KINDS = "color spacing type radius stroke duration shadow z-index tracking".split()
+
+    def test_the_page_quotes_what_the_tools_print(self):
+        import collections
+        shutil.copytree(pathlib.Path(__file__).resolve().parent / "fixtures" / "worked-run" / "src",
+                        self.tmp / "src")
+        def census():
+            # A relative path, as the page runs it: the audit leaves files under a
+            # folder named like a test (this one's `wds-test-…`) to the test tools.
+            proc = subprocess.run([sys.executable, "-B", str(SKILLS / "web-design-studio" / "scripts"
+                                                            / "audit_design.py"), "src", "--json"],
+                                  cwd=self.tmp, capture_output=True, env=env())
+            found = json.loads(proc.stdout)
+            errors = [f for f in found if f["severity"] == "error"]
+            return ({"errors": len(errors), "warnings": len(found) - len(errors),
+                     **collections.Counter(f["law"] for f in errors)},
+                    collections.Counter(f"{f['law']} {f['rule']}" for f in errors))
+
+        before, _ = census()
+        printed = output(run_py("design-token-migration", "extract_literals", "./src", cwd=self.tmp))
+        run_py("design-token-migration", "extract_literals", "./src", "--format", "json",
+               "-o", "literals.json", cwd=self.tmp)
+        printed += output(run_py("design-token-migration", "cluster_values", "literals.json",
+                                 "-o", "./proposal", cwd=self.tmp))
+        shutil.copyfile(self.tmp / "proposal" / "tokens.css", self.tmp / "src" / "styles" / "tokens.css")
+        made = {}
+        for kind in self.KINDS:
+            out = output(run_py("design-token-migration", "apply_codemod", "./src", "-m",
+                                "proposal/mapping.json", "--kind", kind, "--apply", cwd=self.tmp))
+            m = re.search(r"(\d+) replacement\(s\) in", out)
+            if m and int(m.group(1)):
+                made[kind] = int(m.group(1))
+        after, remaining = census()
+
+        page = (SKILLS / "design-token-migration" / "references" / "worked-run.md").read_text(encoding="utf-8")
+        flat = " ".join(printed.split())
+        for line in re.findall(r"^#   (.+)$", page, re.M):
+            with self.subTest(line=line):
+                m = re.match(r"(\d+) replacements: (.+)$", line)
+                if m:
+                    quoted = {k: int(n) for k, n in re.findall(r"([\w-]+) (\d+)", m.group(2))}
+                    self.assertEqual((int(m.group(1)), quoted), (sum(made.values()), made))
+                else:
+                    self.assertIn(" ".join(line.split()), flat)
+        rows = re.findall(r"^\| (Audit errors|Audit warnings|L\d)[^|]*\| (\d+) \| \**(\d+)\** \|$", page, re.M)
+        self.assertEqual(len(rows), 7, rows)
+        for label, was, now in rows:
+            key = {"Audit errors": "errors", "Audit warnings": "warnings"}.get(label, label)
+            with self.subTest(row=label):
+                self.assertEqual((int(was), int(now)), (before.get(key, 0), after.get(key, 0)))
+        listed = {f: int(n) for n, f in re.findall(r"^\| (\d+) \| `(L\d [\w-]+)` \|", page, re.M)}
+        self.assertEqual(listed, dict(remaining))
+        self.assertIn(f"The {after['errors']} remaining errors", page)
 
 
 class VendorScopeAndScale(TempDirTest):

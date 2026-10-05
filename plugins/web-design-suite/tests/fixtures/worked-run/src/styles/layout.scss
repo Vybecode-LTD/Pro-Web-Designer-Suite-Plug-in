@@ -1,0 +1,26 @@
+$gutter: 24px;
+
+.page {
+  display: grid;
+  gap: 32px;
+  padding: 40px $gutter;
+
+  .sidebar {
+    padding: 20px;
+    background: #f5f5f5;
+    border-right: 1px solid #e5e5e5;
+  }
+
+  .main > * + * {
+    margin-top: 16px;
+  }
+}
+
+.overlay {
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 900;
+}
+
+@media (min-width: 768px) {
+  .page { gap: 48px; padding: 64px $gutter; }
+}

@@ -1,0 +1,20 @@
+/* The spring campaign page. Built in a week, never revisited. */
+.promo-hero {
+  padding: 74px 34px;
+  background: linear-gradient(135deg, #2f6df6, #7a3cf0);
+  color: #fff;
+}
+
+.promo-hero h1 { font-size: 47px; margin-bottom: 22px; font-weight: 700; }
+.promo-hero p { font-size: 19px; max-width: 560px; }
+
+.promo-cta {
+  padding: 13px;
+  border-radius: 24px;
+  background: #ff6b35;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(255, 107, 53, 0.4);
+}
+
+.promo-grid { display: grid; gap: 22px; margin-top: 40px; }
+.promo-note { font-size: 11px; color: #888; }

@@ -19,9 +19,13 @@ entry stylesheet with the layer order, and one CSS Modules card with its props.
 from __future__ import annotations
 
 import json
+import pathlib
+import re
 import unittest
 
-from wds_support import TempDirTest, output, run_py
+from wds_support import SKILLS, TempDirTest, output, run_py
+
+FIXTURES = pathlib.Path(__file__).resolve().parent / "fixtures"
 
 TOKENS = """\
 @layer tokens {
@@ -286,6 +290,104 @@ class DiffSystemClassifiesWhatSystemJsonRecords(TempDirTest):
         notes = [n for n in res["notes"] if "layer order was not compared" in n]
         self.assertTrue(notes, res["notes"])
         self.assertIn("extract_system", notes[0])
+
+
+CLIENT = [".meta { color: var(--fg-subtle); }",
+          ".meta-strong { color: var(--fg-subtle); font-weight: 600; }",
+          ".rule { border-color: var(--fg-subtle); }",
+          ".icon { fill: var(--fg-subtle); stroke: var(--fg-subtle); }",
+          ".divider { border-bottom: 1px solid var(--fg-subtle); }",
+          ".card { --card-meta-fg: var(--fg-subtle); }"]
+
+
+def multi_line(rule: str) -> str:
+    sel, _, body = rule.partition("{")
+    decls = [d.strip() for d in body.rstrip("} ").split(";") if d.strip()]
+    return sel.rstrip() + " {\n" + "".join(f"  {d};\n" for d in decls) + "}"
+
+
+class DeprecateRewritesAndCountsAColourRename(TempDirTest):
+    """LC-A14, the review's `fx/dep/client`: a colour rename beside a
+    font-weight, and the scan's labels on one-line rules."""
+
+    def setUp(self):
+        super().setUp()
+        self.ledger = self.tmp / "deprecations.json"
+        proc = run_py("design-system-versioning", "deprecate", "--ledger", self.ledger, "add",
+                      "--name=--fg-subtle", "--kind", "token", "--since", "1.5.0",
+                      "--removal", "2.0.0", "--replacement=--fg-faint", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        proc = run_py("design-system-versioning", "deprecate", "--ledger", self.ledger,
+                      "mapping", "-o", self.tmp / "mapping.json", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+
+    def codemod(self, folder: str) -> str:
+        proc = run_py("design-token-migration", "apply_codemod", "-m", self.tmp / "mapping.json",
+                      self.tmp / folder, cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return proc.stdout.decode("utf-8")
+
+    def scan(self, folder: str) -> dict:
+        proc = run_py("design-system-versioning", "deprecate", "--ledger", self.ledger, "scan",
+                      self.tmp / folder, "--format", "json", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        hits = [h for per in json.loads(proc.stdout)["results"]["--fg-subtle"].values()
+                for h in per]
+        return {v: sum(1 for h in hits if h["verdict"] == v) for v in ("codemod", "manual")}
+
+    def test_a_colour_rename_beside_a_font_weight_is_rewritten(self):
+        self.write("client/src/app.css", "\n".join(CLIENT) + "\n")
+        out = self.codemod("client")
+        self.assertIn("+.meta-strong { color: var(--fg-faint); font-weight: 600; }", out)
+        self.assertNotIn("would reset", out)
+
+    def test_the_scan_labels_a_one_line_rule_as_the_codemod_treats_it(self):
+        self.write("one/src/app.css", "\n".join(CLIENT) + "\n")
+        self.write("many/src/app.css", "\n".join(multi_line(r) for r in CLIENT) + "\n")
+        one, many = self.scan("one"), self.scan("many")
+        self.assertEqual(one, many)
+        rewritten = re.search(r"(\d+) replacement\(s\)", self.codemod("one"))
+        self.assertEqual(one["codemod"], int(rewritten.group(1)), one)
+        self.assertEqual(one["manual"], 2, one)     # the shorthand and the socket default
+
+
+def collapsed(text: str) -> str:
+    return " ".join(text.split())
+
+
+class TheWorkedRelease(TempDirTest):
+    """LC-C12: versioning SKILL.md's worked release is the five edits in
+    tests/fixtures/worked-release.json, applied to the starter's tokens.css. Its
+    quoted report, and every before → after ratio its notes quote, must be what
+    diff_system prints for them today."""
+
+    def test_the_skill_quotes_what_the_diff_prints(self):
+        fx = json.loads((FIXTURES / "worked-release.json").read_text(encoding="utf-8"))
+        old = (SKILLS / "web-design-studio" / "assets" / "starter" / "styles" / "tokens.css").read_text(encoding="utf-8")
+        new = old
+        for edit in fx["edits"]:
+            count = new.count(edit["old"])
+            self.assertTrue(count == 1 or (edit.get("all") and count), edit)
+            new = new.replace(edit["old"], edit["new"])
+        a, b = self.write("a/tokens.css", old), self.write("b/tokens.css", new)
+        proc = run_py("design-system-versioning", "diff_system", a, b,
+                      "--from-version", fx["from_version"], cwd=self.tmp)
+        report = collapsed(proc.stdout.decode("utf-8"))
+        self.assertIn("RECOMMENDED BUMP", report, output(proc))
+        # A re-point that moved by default lists no theme, density or condition.
+        self.assertIn("detail var(--accent-600) -> var(--accent-500) consumer", report)
+
+        skill = (SKILLS / "design-system-versioning" / "SKILL.md").read_text(encoding="utf-8")
+        section = skill.split("## A worked release", 1)[1].split("\n---", 1)[0]
+        block = section.split("```", 2)[1]
+        for line in filter(str.strip, block.splitlines()):
+            with self.subTest(line=line.strip()):
+                self.assertIn(collapsed(line), report)
+        pairs = re.findall(r"(\d\.\d\d)(?::1)? → (\d\.\d\d)", section.split("```", 2)[2])
+        self.assertTrue(pairs)
+        for before, after in pairs:
+            with self.subTest(ratio=f"{before} → {after}"):
+                self.assertIn(f"{before}:1 {after}:1", report)
 
 
 if __name__ == "__main__":

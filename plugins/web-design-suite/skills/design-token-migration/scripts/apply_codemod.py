@@ -492,8 +492,12 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
         # ---- whole-declaration rewrites (font-size -> a --type-* role) -----
         drule = mapping.decl_rule(prop, value_eff.strip())
         if drule:
+            # Only a rewrite INTO the `font` shorthand resets the longhands
+            # beside it. A colour rename (`color: var(--fg-faint)`, from
+            # deprecate.py) keeps its property and resets nothing.
             siblings = block_props.get(d.block_start, set()) - {prop}
-            clash = siblings & FONT_SIBLINGS
+            into_font = drule["replacement"].startswith("font:") and prop != "font"
+            clash = siblings & FONT_SIBLINGS if into_font else set()
             if clash:
                 skips.append(Skip(
                     source_name, line_of(d.decl_offset),
