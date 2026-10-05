@@ -46,7 +46,7 @@ That combinatorial render is, in practice, the fastest way to find:
 | Blind to | anything not written down | anything that renders correctly by accident |
 | Answers | "is this code legal?" | "does this system actually work?" |
 
-The distinction that matters: **a state that was never written produces no violation.** There is no line for the linter to object to. `.button:focus-visible` missing from a stylesheet is textually indistinguishable from a stylesheet that simply does not need it. A linter cannot tell those apart. A proof sheet showing the focus row identical to the default row can, instantly, without you knowing what you were looking for.
+The distinction that matters: **a state that was never written produces no violation.** A missing `.button:focus-visible` reads exactly like a stylesheet that needs none; a focus row identical to the default row does not.
 
 Run both. They fail for different reasons and both failures are actionable.
 
@@ -58,7 +58,7 @@ Run both. They fail for different reasons and both failures are actionable.
 
 Write a `matrix.json` by hand, one entry per component. **Do not generate it from the CSS.**
 
-That sounds like busywork and is the opposite. If the manifest is inferred from the stylesheet, it can only ever contain what you already implemented — so every state renders, nothing is ever missing, and the sheet proves that your code matches your code. **What you *meant* to support is the thing under test.** The manifest is the specification; the CSS is the implementation; the sheet is the comparison. Inferring one from the other collapses all three into one and the whole exercise becomes a tautology.
+A manifest inferred from the stylesheet can only contain what you already implemented, so the sheet would prove that your code matches your code. **What you *meant* to support is the thing under test**: the manifest is the specification, the CSS the implementation, the sheet the comparison.
 
 So: list all seven states even for the component that only implements four. The generator will flag the three with no matching rule, and you will decide whether each is a gap or a deliberate omission. That decision is the point.
 
@@ -132,9 +132,11 @@ Per-state detail, including what each state must *not* do, is in `references/sta
 node scripts/snapshot_matrix.mjs build/proof-sheet.html \
   --baselines tests/visual/baselines --update-baselines
 
-# every run after that
+# every run after that; then the same cells under forced colours
 node scripts/snapshot_matrix.mjs build/proof-sheet.html \
   --baselines tests/visual/baselines --out build/matrix-report
+node scripts/snapshot_matrix.mjs build/proof-sheet.html \
+  --baselines tests/visual/baselines --out build/matrix-report --forced-colors
 ```
 
 One PNG per cell, compared perceptually, HTML report written, exit 1 on regression.
@@ -145,6 +147,7 @@ Four things decide whether this survives contact with a team:
 - **A meaningful threshold is small.** `--threshold 0.002` — two pixels in a thousand. Tune it once on a clean tree until three consecutive runs pass with margin, then never touch it to make a failure go away.
 - **Accept intentional diffs in the same commit as their cause.** A baseline update alone is unreviewable; alongside the CSS change it reads as "this changed, so these 14 images changed".
 - **Keep the baseline from becoming noise.** New cells fail by default (an unreviewed cell is not a passing cell). Orphan baselines are reported and pruned with `--update-baselines --prune`.
+- **Record baselines where the gate runs.** Windows and macOS fonts never match a Linux runner's: record them in CI and, past about 2,000, keep them in Git LFS (`references/visual-regression.md` §7 and §6).
 
 Determinism, the anti-flake checklist, threshold theory, baseline storage tradeoffs and the no-Playwright fallback are all in `references/visual-regression.md`.
 
@@ -179,8 +182,6 @@ You cannot hover 200 cells at once, so the generator reads each component's own 
 Identical specificity (0,3,0 both ways), same layer, later in document order — so it wins on order, not on a fight. Pseudo-classes inside `:not(...)` are left alone, because those are guards, not states. At-rule context is preserved, so a hover rule behind `@media (hover: hover)` stays behind it — and will therefore render only when the harness reports a fine pointer. Headless Chromium does; a mobile emulation context does not. If a hover row looks empty, check for that media query before you conclude the state is missing.
 
 ### The token rebind
-
-This one is subtle and it is the reason a naive proof sheet silently lies.
 
 A custom property's `var()` references are substituted **on the element where the property is declared**, not where it is used. So:
 
@@ -243,8 +244,8 @@ Theme is inside every cell in every pass — it is the cheapest axis (it adds no
                                             // the seven, custom ones, a+b
     "custom_states": { "selected": {"attrs": {"aria-selected":"true"}} },
                                             // detect defaults to the attribute
-    "content":  { "default": "Save", "long-string": "…" },
-                                            // fixture name -> HTML
+    "content":  { "default": "Save", "ar": {"html": "حفظ", "dir": "rtl", "lang": "ar"} },
+                                            // fixture -> HTML, or {html, dir, lang}
     "stage_style": { "--msheet-well": "var(--pad-card)" },
                                             // inline style, custom props ONLY
     "state_attrs": { "loading": {"data-busy":"1"} },
@@ -297,6 +298,7 @@ The sheet's chrome lives in its own `matrix` cascade layer, declared after `util
 | `--threshold N` | max fraction of differing pixels per cell (default `0.002`) |
 | `--pixel-threshold N` | perceptual tolerance per pixel, 0..1 (default `0.03`: the suite's 4% hover overlay is a distance of ~0.038) |
 | `--allow-new` | a cell with no baseline is not a failure |
+| `--forced-colors` | every cell under forced colours, with baselines and report in `forced-colors/` folders; a focus ring that vanishes fails |
 | `--only SUBSTR` | only cells whose id contains SUBSTR; repeatable |
 | `--viewport WxH`, `--dpr N` | pinned rendering geometry |
 | `--browser PATH` | chromium executable (default `$MATRIX_CHROMIUM`, else the first that starts of `/opt/pw-browsers/chromium`, Playwright's own Chromium, an installed Chrome or Edge — pin one for baselines shared across machines) |
@@ -305,7 +307,7 @@ Exit `0` clean or updated · `1` regression, new cell or capture error · `2` ba
 
 **It never downloads a browser.** It launches with an explicit `executablePath` and fails with instructions if nothing is there. Install the module with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D -E playwright` to use the Chrome you have. CI pins the browser instead. It installs the Chromium that the locked Playwright was built for, which the script tries first (`references/visual-regression.md` §7).
 
-Comparison runs on a canvas **inside the browser** — no `pixelmatch`, no `pngjs`, no `sharp`, nothing to compile. The metric is YIQ colour distance (luma weighted far above chroma, because that is how eyes work) with a 3×3 neighbourhood escape so sub-pixel antialiasing costs nothing.
+Comparison runs on a canvas **inside the browser**: no `pixelmatch`, `pngjs` or `sharp` to compile. The metric is YIQ colour distance (luma weighted far above chroma) with a 3×3 neighbourhood escape for sub-pixel antialiasing.
 
 ---
 

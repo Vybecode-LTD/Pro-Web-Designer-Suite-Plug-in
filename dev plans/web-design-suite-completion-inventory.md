@@ -173,8 +173,8 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-B4 | — | W11 (3.6.0+) | Multiple URLs and viewports. |
 | GT-B5 | — | W11 (3.6.0+) | The field-data loop. |
 | GT-B6 | — | W11 (3.6.0+) | Checks the coverage table lists as automatable but that don't exist. |
-| GT-B7 | — | W11 (3.6.0+) | The matrix model. |
-| GT-B8 | — | W11 (3.6.0+) | The baseline lifecycle. |
+| GT-B7 | — | fixed in 3.4.0: custom states and combinations in PR #42; a fixture's `dir` and `lang`, the `--forced-colors` pass, and what interaction states need, in PR #44 (`test_content_and_a11y.MatrixModel`, `test_browser_runtime.MatrixSeesStateChanges`) | The matrix model. |
+| GT-B8 | — | fixed in 3.4.0: the `workflow_dispatch` recording job and Git LFS past the line, in visual-regression.md §6 and §7; the generator says when a sheet nears it (`test_content_and_a11y.MatrixModel`, PR #44) | The baseline lifecycle. |
 | GT-B9 | — | W11 (3.6.0+) | Chromium only. |
 | GT-C1 | M · P0 | fixed in 3.1.0 and 3.2.0 (browser tests) | A test suite that uses a real browser, skipped when none is available. |
 | GT-C2 | S–M · P0 | fixed in 3.4.0: colours, modals, iframes and inert content in 3.1.0 (GT-A1, GT-A2), pausing in PR #38 (GT-A14 (a)), `bypassCSP` and the disabled-control exemption in PR #39 (GT-A5, GT-A14 (b)) | Fix colour parsing, modals, iframes, inert content, `bypassCSP`, animation pausing and the disabled-control exemption. |

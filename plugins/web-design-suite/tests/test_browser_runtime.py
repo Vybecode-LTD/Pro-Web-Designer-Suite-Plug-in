@@ -309,6 +309,52 @@ class MatrixSeesStateChanges(TempDirTest):
         proc = self.snapshot(sheet, "--update-baselines")
         self.assertEqual(proc.returncode, 0, output(proc))
 
+    FOCUS = """<!doctype html><html lang=en><head><title>focus</title><style>
+      body{{margin:0;background:#fff;font:16px/1.4 system-ui}}
+      .cell{{display:inline-block;padding:16px}}
+      .button{{display:inline-block;padding:8px 16px;background:#fff;color:#222;
+              border:1px solid #ccc;border-radius:6px}}
+      [data-force-state~="hover"] .button{{box-shadow:0 2px 4px #0004}}
+      [data-force-state~="focus-visible"] .button{{{ring}}}
+    </style></head><body>
+      <div class=cell data-cell-id="{d}"><span class=button>Save</span></div>
+      <div class=cell data-cell-id="{h}" data-force-state="hover"><span class=button>Save</span></div>
+      <div class=cell data-cell-id="{f}" data-force-state="focus-visible"><span class=button>Save</span></div>
+    </body></html>"""
+
+    def focus_sheet(self, ring):
+        return self.write("focus.html", self.FOCUS.format(
+            ring=ring, d=self.ID.format("default"), h=self.ID.format("hover"),
+            f=self.ID.format("focus-visible")))
+
+    def test_a_box_shadow_focus_ring_fails_under_forced_colours(self):
+        """GT-B7: forced colours drop box-shadow, so that ring vanishes; a
+        hover drawn with box-shadow may vanish there, and is not held to it."""
+        sheet = self.focus_sheet("box-shadow:0 0 0 3px #1a5fb4")
+        proc = self.snapshot(sheet, "--allow-new")
+        self.assertEqual(proc.returncode, 0, output(proc))
+        proc = self.snapshot(sheet, "--allow-new", "--forced-colors")
+        self.assertEqual(proc.returncode, 1, output(proc))
+        self.assertIn("st_focus-visible", output(proc))
+        self.assertIn("does not survive", output(proc))
+        self.assertNotIn("fail   " + self.ID.format("hover"), output(proc))
+        proc = self.snapshot(self.focus_sheet("outline:2px solid #1a5fb4;outline-offset:2px"),
+                             "--allow-new", "--forced-colors")
+        self.assertEqual(proc.returncode, 0, output(proc))
+
+    def test_the_forced_colours_pass_keeps_its_own_baselines(self):
+        sheet = self.focus_sheet("outline:2px solid #1a5fb4")
+        for args in (("--update-baselines",), ("--update-baselines", "--forced-colors"),
+                     (), ("--forced-colors",)):
+            with self.subTest(args=args):
+                proc = self.snapshot(sheet, *args)
+                self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertEqual(len(list((self.tmp / "base").glob("*.png"))), 3)
+        self.assertEqual(len(list((self.tmp / "base" / "forced-colors").glob("*.png"))), 3)
+        self.assertTrue((self.tmp / "report" / "forced-colors" / "index.html").is_file())
+        self.assertIn("forced colours", (self.tmp / "report" / "forced-colors" / "index.html")
+                      .read_text(encoding="utf-8"))
+
     def test_a_subtle_fill_change_against_the_baseline_is_caught(self):
         proc = self.snapshot(self.sheet(hover="0.04"), "--update-baselines")
         self.assertEqual(proc.returncode, 0, output(proc))

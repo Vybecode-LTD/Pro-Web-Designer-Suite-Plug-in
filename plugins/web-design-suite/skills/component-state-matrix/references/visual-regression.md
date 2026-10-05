@@ -140,9 +140,11 @@ Most diffs are intentional. The workflow has to make accepting them cheap, or pe
 5. For each failure, answer ONE question: did I mean to do this?
       yes -> continue
       no  -> fix the CSS, go to 2
-6. Accept:                        node snapshot_matrix.mjs ... --update-baselines
+6. Accept, where the gate runs:   gh workflow run baselines.yml --ref <your branch>   (§7)
 7. Commit the CSS change and the baseline change IN THE SAME COMMIT.
 ```
+
+Step 6 records the baselines in CI's own runner. Recorded on a Windows or macOS machine against a Linux gate, every text cell differs by its fonts, and the first CI run fails everywhere. `--update-baselines` on your own machine is right only when it is the gate's OS and image.
 
 Step 7 is the one that matters. A baseline update in its own commit is unreviewable — the reviewer sees a wall of binary changes with no cause. In the same commit, the diff reads: *"padding changed here, and these 14 images changed as a result."* That is a review a person can do.
 
@@ -180,9 +182,20 @@ There is no free option. Pick deliberately.
 
 1. **Keep cells small.** A 300×200 PNG of a button is ~4 KB. A full-page screenshot is 400 KB. This is the strongest argument for component-level shots after reviewability.
 2. **Prune orphans every time.** `--update-baselines --prune` on the release commit.
-3. **Watch the number.** Past roughly 2,000 baselines or 50 MB, move to object storage or Git LFS. Below that the review benefit wins easily.
+3. **Watch the number.** Past roughly 2,000 baselines or 50 MB, move to Git LFS (below) or object storage. Below that the review benefit wins easily.
 
-The pruned profile is what keeps you under that line: 108 cells per component instead of 1,260.
+The pruned profile is what keeps you under that line for longer: 108 cells per component instead of 1,260, for the button in `state-coverage.md` §3. That still passes 2,000 at about 19 components, or 10 with the forced-colors pass, which doubles the set. `generate_matrix.py` prints the count once a sheet passes 1,000 cells.
+
+### Git LFS, by default past the line
+
+A design system headed for 19 components (10 with the forced-colors pass) starts its baselines in LFS rather than moving them later: a move leaves every PNG already committed in the history.
+
+```bash
+git lfs install
+git lfs track "tests/visual/baselines/**"     # writes .gitattributes: commit it with the first baselines
+```
+
+The repository then holds a small pointer per image, and the images live in LFS storage. What that costs on GitHub, from its own documentation: GitHub Free includes 10 GiB of LFS storage and 10 GiB of bandwidth a month, and a workflow that checks out LFS files spends the owner's bandwidth. Past the bandwidth, LFS is disabled for the account until the next month. So cache the objects in CI (§7) rather than downloading the set on every run. GitHub also recommends that a repository stay under 1 GB, and strongly under 5 GB.
 
 ---
 
@@ -239,6 +252,16 @@ jobs:
             --out build/matrix-report \
             --threshold 0.002
 
+      # The same cells under forced colours: a focus ring drawn with
+      # box-shadow vanishes there, and fails.
+      - name: visual regression, forced colours
+        if: ${{ !cancelled() }}
+        run: |
+          node scripts/snapshot_matrix.mjs build/proof-sheet.html \
+            --baselines tests/visual/baselines \
+            --out build/matrix-report \
+            --forced-colors
+
       - if: always()
         uses: actions/upload-artifact@v6
         with:
@@ -255,6 +278,77 @@ Notes on that file, in order of how often they bite:
 - **Two gates, not one job each.** They share the checkout and the deps, and a reviewer wants both results on one line.
 
 For non-GitHub CI the shape is identical: install, audit, generate, snapshot, upload the report directory.
+
+### Recording the baselines where the gate runs
+
+Baselines recorded on a Windows or macOS machine differ from a Linux runner's in every text cell, by their fonts. Record them in the gate's own runner instead, with a job you start by hand:
+
+```yaml
+# .github/workflows/baselines.yml
+name: baselines
+on: workflow_dispatch            # gh workflow run baselines.yml --ref <branch>
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  record:
+    runs-on: ubuntu-latest       # the gate's runner: its fonts, its browser
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.12' }
+      - run: npm ci
+      - uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+
+      - name: record
+        run: |
+          python -m scripts.generate_matrix matrix.json --out build/proof-sheet.html
+          node scripts/snapshot_matrix.mjs build/proof-sheet.html \
+            --baselines build/baselines --out build/matrix-report --update-baselines
+          node scripts/snapshot_matrix.mjs build/proof-sheet.html \
+            --baselines build/baselines --out build/matrix-report --update-baselines \
+            --forced-colors
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: baselines
+          path: build/baselines
+```
+
+GitHub starts a `workflow_dispatch` run only for a workflow file that is on the default branch, so merge `baselines.yml` first, in a PR of its own; until then, only a machine with the gate's OS and image can record the baselines. Then, on your machine, for any branch:
+
+```bash
+gh workflow run baselines.yml --ref "$(git branch --show-current)"
+gh run list --workflow baselines.yml --limit 1     # the run's id, once it has finished
+rm -rf tests/visual/baselines                      # the artifact is the whole set
+gh run download <id> --name baselines --dir tests/visual/baselines
+git add tests/visual/baselines                     # after you have looked at them
+```
+
+- **It uploads; it does not commit.** A commit pushed with the workflow's `GITHUB_TOKEN` starts no ordinary workflow run, so the gate would never run on it, and the baselines you commit should be the ones you looked at.
+- **It records into an empty folder**, so the artifact is the complete set, and replacing the folder with it prunes the orphans.
+- **A state cell with no style fails while recording too**, and nothing is uploaded: a baseline must never enshrine it.
+
+With the baselines in LFS (§6), the gate checks out pointers and fills them from a cache, so each run downloads only the images that changed:
+
+```yaml
+      - uses: actions/checkout@v5                # pointers only
+      - run: git lfs ls-files --long | cut -d ' ' -f1 | sort > .lfs-ids
+      - uses: actions/cache@v5
+        with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-ids') }}
+          restore-keys: lfs-
+      - run: git lfs pull
+```
 
 ---
 

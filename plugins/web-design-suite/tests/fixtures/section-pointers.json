@@ -434,6 +434,12 @@
  {
   "from": "component-state-matrix/SKILL.md",
   "to": "component-state-matrix/references/visual-regression.md",
+  "section": "6",
+  "heading": "Storing baselines"
+ },
+ {
+  "from": "component-state-matrix/SKILL.md",
+  "to": "component-state-matrix/references/visual-regression.md",
   "section": "7",
   "heading": "CI wiring"
  },
@@ -448,6 +454,18 @@
   "to": "web-design-studio/references/style-architecture.md",
   "section": "8",
   "heading": "State belongs in data attributes"
+ },
+ {
+  "from": "component-state-matrix/references/visual-regression.md",
+  "to": "component-state-matrix/references/state-coverage.md",
+  "section": "3",
+  "heading": "Combinatorics, and the pruning rule"
+ },
+ {
+  "from": "component-state-matrix/scripts/generate_matrix.py",
+  "to": "component-state-matrix/references/visual-regression.md",
+  "section": "6",
+  "heading": "Storing baselines"
  },
  {
   "from": "content-model-to-ui/SKILL.md",

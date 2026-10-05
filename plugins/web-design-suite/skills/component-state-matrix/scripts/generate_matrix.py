@@ -124,6 +124,12 @@ STATE_MODEL: Dict[str, Dict[str, Any]] = {
 
 SEVEN_STATES = list(STATE_MODEL)
 STATE_NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
+LANG_RE = re.compile(r"^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$")
+
+# Past this many cells, the baselines belong in Git LFS (visual-regression.md
+# §6): PNGs do not delta-compress, so every re-recording adds its full size to
+# the history. The pruned sheet passes it at about 19 components (GT-B8).
+LFS_CELLS = 2000
 
 # Longest-first so `:focus-visible` is matched before `:focus`.
 FORCEABLE_PSEUDO = ("focus-visible", "focus-within", "focus", "hover", "active",
@@ -522,7 +528,11 @@ class Component:
                 f"{where} ('{self.name}') `content` must be a string or a non-empty "
                 f"object mapping fixture name -> HTML."
             )
-        self.content: Dict[str, str] = {str(k): str(v) for k, v in content.items()}
+        self.content: Dict[str, str] = {}
+        self.fixture_attrs: Dict[str, Dict[str, str]] = {}
+        for k, v in content.items():
+            self.content[str(k)], self.fixture_attrs[str(k)] = self.read_fixture(
+                v, f"{where}.content.{k}")
         self.form_control = raw.get("form_control")
 
         self.css_text = ""
@@ -530,6 +540,31 @@ class Component:
             self.css_text += read_text(p) + "\n"
         self.coverage = detect_states(self.css_text, self.states, self.state_detect,
                                       self.model)
+
+    @staticmethod
+    def read_fixture(raw: Any, where: str) -> Tuple[str, Dict[str, str]]:
+        """A fixture is its HTML, or {"html": ..., "dir": "rtl", "lang": "ar"}:
+        the direction and language go on the cell's stage, so logical
+        properties and `:dir(rtl)` rules mirror the whole component (GT-B7)."""
+        if not isinstance(raw, dict):
+            return str(raw), {}
+        unknown = sorted(set(raw) - {"html", "dir", "lang"})
+        if unknown or not isinstance(raw.get("html"), str):
+            raise ManifestError(
+                f"{where}: an object fixture is {{\"html\": \"...\", \"dir\": \"rtl\", "
+                f"\"lang\": \"ar\"}}, with `html` required"
+                + (f"; unknown key(s) {unknown}" if unknown else "") + ".")
+        attrs: Dict[str, str] = {}
+        if "dir" in raw:
+            if raw["dir"] not in ("ltr", "rtl", "auto"):
+                raise ManifestError(f"{where}: `dir` is ltr, rtl or auto, not {raw['dir']!r}.")
+            attrs["dir"] = raw["dir"]
+        if "lang" in raw:
+            if not isinstance(raw["lang"], str) or not LANG_RE.match(raw["lang"]):
+                raise ManifestError(f"{where}: `lang` is a language tag (ar, he, fa-IR), "
+                                    f"not {raw['lang']!r}.")
+            attrs["lang"] = raw["lang"]
+        return raw["html"], attrs
 
     @staticmethod
     def read_custom_states(raw: Any, where: str) -> Dict[str, Dict[str, Any]]:
@@ -911,6 +946,7 @@ def render_cell(comp: Component, cell: Cell, tpl: str, is_form: Optional[str]) -
 
     style = ";".join(f"{k}:{v}" for k, v in comp.stage_style.items())
     style_attr = f' style="{esc(style)}"' if style else ""
+    style_attr += "".join(f' {k}="{esc(v)}"' for k, v in comp.fixture_attrs[cell.fixture].items())
     missing = not comp.coverage.get(cell.state, True)
     flag = ('<span class="msheet__flag" title="No rule for this state in the '
             'component\'s own stylesheet.">no rule</span>') if missing else ""
@@ -1607,6 +1643,10 @@ def main(argv: Optional[List[str]] = None) -> int:
               f"{total} cells, profile {args.profile}.")
         print(f"  themes:    {', '.join(themes)}")
         print(f"  densities: {', '.join(densities)}")
+        if total > LFS_CELLS // 2:
+            print(f"  baselines: {total:,} cells, {2 * total:,} with the forced-colors pass. "
+                  f"Past {LFS_CELLS:,}, keep them in Git LFS "
+                  f"(references/visual-regression.md §6).")
         if args.emit_css:
             print(f"  chrome css: {args.emit_css} "
                   f"(run audit_design.py on it — the sheet obeys the laws too)")
