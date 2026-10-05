@@ -792,9 +792,17 @@ def emit_reverse(data: Any, collection_split: bool = True) -> Tuple[str, List[Pr
     def default_mode_for(tier: str) -> str:
         if tier == "primitive" or not theme_names:
             return "Value"
-        # A `light` theme means `:root` was another one: two modes of one name
-        # in a collection is a body Figma refuses.
-        return "Default" if "light" in (t.lower() for t in theme_names) else "Light"
+        # `:root` takes a name no theme has (a `light` theme means `:root` was
+        # another one): two modes of one name, or one temporary id, in a
+        # collection is a body Figma refuses.
+        taken = {re.sub(r"[^a-z0-9]+", "_", t.lower()) for t in theme_names}
+        for name in ("Light", "Default", "Base"):
+            if name.lower() not in taken:
+                return name
+        n = 1
+        while f"root_{n}" in taken:
+            n += 1
+        return f"Root {n}"
 
     def to_figma_value(token: str, entry: dict,
                        vtype: str) -> Tuple[Any, Optional[str]]:

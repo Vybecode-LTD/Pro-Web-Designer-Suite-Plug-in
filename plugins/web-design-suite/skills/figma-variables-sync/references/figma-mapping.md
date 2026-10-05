@@ -573,9 +573,9 @@ within it. `--reverse` uses `tmp_collection_*`, `tmp_mode_*`, `tmp_var_*`.
 under a name Figma picks; `initialModeId` only gives it an id you can refer to.
 To name it, Figma's own example sends a `VariableModeChange` with
 `"action": "UPDATE"` for that id. A `CREATE` for the same id asks Figma to make it
-twice. `--reverse` renames each initial mode (`Value` for primitives; `Light`, or
-`Default` when a `light` theme exists, for a themed tier) and `CREATE`s only the
-extra modes.
+twice. `--reverse` renames each initial mode (`Value` for primitives; for a themed
+tier `Light`, or `Default` or `Base` when a theme already has that name) and
+`CREATE`s only the extra modes.
 
 The body holds those four arrays and nothing else: no comment key, so the file
 is POSTed as `--reverse` wrote it.

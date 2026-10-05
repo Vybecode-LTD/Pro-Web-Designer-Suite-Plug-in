@@ -231,6 +231,11 @@ class StatusInks(TempDirTest):
 PLUGIN_EXPORT = {"collections": [{"name": "semantic", "modes": [
     {"name": "Light", "variables": [{"name": "bg/surface", "type": "COLOR", "value": "#ffffff"}]},
     {"name": "Dark", "variables": [{"name": "bg/surface", "type": "COLOR", "value": "#111111"}]}]}]}
+PLUGIN_FLAT = {"collections": [{"name": "semantic", "defaultModeId": "1:0",
+                                "modes": [{"modeId": "1:0", "name": "Light"},
+                                          {"modeId": "1:1", "name": "Dark"}],
+                                "variables": [{"name": "bg/surface", "type": "COLOR", "valuesByMode": {
+                                    "1:0": "#ffffff", "1:1": "#111111"}}]}]}
 RECORDS_EXPORT = [
     {"name": "bg/surface", "type": "COLOR", "value": "#ffffff", "collection": "semantic", "mode": "Light"},
     {"name": "bg/surface", "type": "COLOR", "value": "#111111", "collection": "semantic", "mode": "Dark"},
@@ -256,11 +261,18 @@ class FigmaCommon(TempDirTest):
         to_tokens = load_script("figma-variables-sync", "figma_to_tokens")
         audit = load_script("figma-variables-sync", "figma_audit")
         for shape, data in (("rest", REST_COMPOSED), ("rest", REST_ORPHAN), ("plugin", PLUGIN_EXPORT),
+                            ("plugin", PLUGIN_FLAT),
                             ("records", RECORDS_EXPORT), ("dtcg", DTCG_2025)):
             with self.subTest(shape=shape):
                 read = self.read(to_tokens, data)
                 self.assertEqual(read[0], shape)
                 self.assertEqual(self.read(audit, data), read)
+
+    def test_a_flat_plugin_export_reads_its_values_by_mode_name(self):
+        # CodeRabbit on #53: valuesByMode is keyed by mode id, the modes by name.
+        read = self.read(load_script("figma-variables-sync", "figma_common"), PLUGIN_FLAT)
+        self.assertEqual(read[1], {"semantic": (["Light", "Dark"], "Light")})
+        self.assertEqual(json.loads(read[2][0][3]), {"Dark": "#111111", "Light": "#ffffff"})
 
     def test_neither_script_defines_what_figma_common_does(self):
         scripts = SKILLS / "figma-variables-sync" / "scripts"
@@ -308,13 +320,19 @@ class ReverseBody(TempDirTest):
                                  ("UPDATE", collection["id"]))
                 self.assertTrue(first["name"])
 
-    def test_a_dark_root_with_a_light_theme_gets_two_mode_names(self):
-        tokens = self.write("tokens.json", json.dumps({
-            "semantic": {"bg-surface": {"value": "#111111"}},
-            "themes": {"light": {"bg-surface": {"value": "#ffffff"}}}}))
-        proc = run_py("figma-variables-sync", "figma_to_tokens", tokens, "--reverse", cwd=self.tmp)
-        names = [m["name"] for m in json.loads(proc.stdout)["variableModes"]]
-        self.assertEqual(sorted(names), ["Default", "Light"], output(proc))
+    def test_the_first_mode_takes_a_name_no_theme_has(self):
+        # A dark `:root` has a `light` theme; Codex on #53: and a `default` one.
+        for themes, first in ((["light"], "Default"), (["light", "default"], "Base")):
+            with self.subTest(themes=themes):
+                tokens = self.write("tokens.json", json.dumps({
+                    "semantic": {"bg-surface": {"value": "#111111"}},
+                    "themes": {t: {"bg-surface": {"value": "#ffffff"}} for t in themes}}))
+                proc = run_py("figma-variables-sync", "figma_to_tokens", tokens, "--reverse",
+                              cwd=self.tmp)
+                modes = json.loads(proc.stdout)["variableModes"]
+                self.assertEqual(modes[0]["name"], first, output(proc))
+                self.assertEqual(len({m["name"].lower() for m in modes}), len(themes) + 1, modes)
+                self.assertEqual(len({m["id"] for m in modes}), len(themes) + 1, modes)
 
     def test_primitives_are_offered_in_no_picker(self):
         body = self.body()

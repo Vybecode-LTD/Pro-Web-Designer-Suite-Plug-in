@@ -387,6 +387,10 @@ def parse_plugin(data: dict) -> FDoc:
         raw_modes = col.get("modes") or []
         mode_labels: List[str] = []
         merged: Dict[str, FVar] = {}
+        # A flat variable's valuesByMode is keyed by mode id; the collection
+        # lists modes by name. Read both as the name.
+        name_of = {str(m["modeId"]): str(m.get("name") or m["modeId"])
+                   for m in raw_modes if isinstance(m, dict) and m.get("modeId")}
 
         def _ingest(entry: dict, mode: str) -> None:
             if not isinstance(entry, dict) or "name" not in entry:
@@ -408,9 +412,10 @@ def parse_plugin(data: dict) -> FDoc:
             vbm = entry.get("valuesByMode")
             if isinstance(vbm, dict):
                 for mk, mv in vbm.items():
-                    fv.values[str(mk)] = mv
-                    if str(mk) not in mode_labels:
-                        mode_labels.append(str(mk))
+                    label = name_of.get(str(mk), str(mk))
+                    fv.values[label] = mv
+                    if label not in mode_labels:
+                        mode_labels.append(label)
             elif "value" in entry or "$value" in entry:
                 fv.values[mode] = entry.get("value", entry.get("$value"))
 
@@ -437,6 +442,7 @@ def parse_plugin(data: dict) -> FDoc:
         if not mode_labels:
             mode_labels = ["Value"]
         default = col.get("defaultMode") or col.get("defaultModeId") or mode_labels[0]
+        default = name_of.get(str(default), default)
         if default not in mode_labels:
             default = mode_labels[0]
         doc.collections[cname] = FCollection(cname, mode_labels, default)

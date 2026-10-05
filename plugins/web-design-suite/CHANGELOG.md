@@ -157,13 +157,16 @@
   variable and mode. figma_to_tokens merged the rows into one variable with a value per
   mode; the audit's copy of the reader made each row a variable of its own, in a
   collection whose default mode, `Value`, no variable had. Both scripts now read through
-  one module (Changed, below), so the audit merges them too.
+  one module (Changed, below), so the audit merges them too. And a flat plugin export,
+  whose `valuesByMode` is keyed by mode id while its modes are listed by name, kept the
+  ids: in both scripts, a `Dark` mode came out as a theme named `1:1`. Both are read
+  as the mode's name now.
 - **`--reverse` wrote a body Figma would not take as written** (LC-A22). It carried a
   `_comment` key, though the body's own comment said Figma rejects unknown top-level keys,
   and SKILL.md never said to strip it. It never named a collection's first mode, which
   Figma creates under its own name; Figma's REST example names it with an `UPDATE` on the
-  temporary id, which `--reverse` now sends (`Value`, `Light`, or `Default` beside a `light`
-  theme, so two modes never share a name). And primitives were scoped to the pickers
+  temporary id, which `--reverse` now sends (`Value`, or `Light` unless a theme has that
+  name, then `Default` or `Base`, so two modes never share a name or a temporary id). And primitives were scoped to the pickers
   (`ALL_FILLS`, `GAP`), inviting a designer to bind Tier 1, the Law 6 failure: they get
   `scopes: []` now.
 
@@ -197,7 +200,11 @@
   script defines a name `figma_common.py` does, so the copies cannot come back.
   `test_figma_sync.ReverseBody` holds the `--reverse` body to the four arrays, an `UPDATE`
   naming each collection's first mode, distinct mode names beside a `light` theme, and no
-  scopes on primitives. Against `v3.3.0`, all 6 fail.
+  scopes on primitives. Against `v3.3.0`, all 6 fail. The reviews of #53 found two more,
+  failing on its head (`559cce2`): a flat plugin export's values by mode id
+  (`test_a_flat_plugin_export_reads_its_values_by_mode_name`), and a `default` theme
+  beside a `light` one, which took the first mode's name and id
+  (`test_the_first_mode_takes_a_name_no_theme_has`).
 - The test-file exemption: `test_audit_design.TestFilesByThePathBelowTheRoot` audits one JSX
   colour under `neutral/` and under `fixtures/test/`, and a `.test.jsx` and a `__mocks__` file as
   the control. Against `v3.3.0`, 1 fails; the control passes there only because this test's
