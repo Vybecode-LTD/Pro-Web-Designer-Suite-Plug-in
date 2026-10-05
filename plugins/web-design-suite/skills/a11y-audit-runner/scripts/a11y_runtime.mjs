@@ -441,8 +441,23 @@ const HELPERS = () => {
   // Not in the accessibility tree at all: inert, aria-hidden, or behind a modal.
   const hiddenFromAT = (el) => !!inertOrHidden(el) || behindModal(el);
 
+  // Whether the page cancelled the last Tab. Chrome wraps Tab from the last
+  // stop to the first inside the page, so on a page with one stop a wrap and
+  // a trap look alike; a trap built on the key cancels it.
+  // The event is kept and read once its dispatch is over, after every
+  // listener the page has, wherever it was added.
+  let lastTab = null;
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') lastTab = e;
+  }, true);
+  const takeTabCancelled = () => {
+    const v = !!(lastTab && lastTab.defaultPrevented);
+    lastTab = null;
+    return v;
+  };
+
   window.__a11y = { FOCUSABLE, cssPath, visible, expectedTabbables, describeActive,
-                    hiddenFromAT, openModal };
+                    hiddenFromAT, openModal, takeTabCancelled };
 };
 
 // ---------------------------------------------------------------------------
@@ -721,7 +736,8 @@ async function tabSequence(page, { steps, shift }) {
   for (let i = 0; i < steps; i++) {
     await page.keyboard.press(shift ? 'Shift+Tab' : 'Tab');
     // eslint-disable-next-line no-await-in-loop
-    const stop = await page.evaluate(() => window.__a11y.describeActive());
+    const stop = await page.evaluate(() => ({ ...window.__a11y.describeActive(),
+                                              cancelled: window.__a11y.takeTabCancelled() }));
     seq.push(stop);
     if (stop.sel === '(document)' && seq.length > 2 &&
         seq[seq.length - 2].sel === '(document)') break;   // left the page
@@ -763,10 +779,13 @@ function analyseTabOrder(forward, reverse, expected, opts) {
     }
   }
   // Focus that does not move at all. An <iframe> reported as the stop is a
-  // cross-origin frame this script cannot look into, not a trap.
+  // cross-origin frame this script cannot look into, not a trap. On a page
+  // with one stop, Chrome's wrap lands on the same element, so there it is a
+  // trap only if the page cancelled the key.
+  const wraps = expected.length === 1;
   for (let i = 1; i < forward.length; i++) {
     if (forward[i].sel === forward[i - 1].sel && forward[i].sel !== '(document)' &&
-        forward[i].tag !== 'iframe') {
+        forward[i].tag !== 'iframe' && (!wraps || forward[i].cancelled)) {
       out.push(finding(
         'taborder', 'focus-stuck', '2.1.2', 'error',
         `Tab did not move focus away from ${forward[i].sel}.`,
@@ -1226,9 +1245,17 @@ const CONTRAST_FN = () => {
   // SC 1.4.3 exempts text that is part of an inactive component, and axe
   // skips the same set: a disabled control or fieldset and everything in it,
   // anything inside aria-disabled="true", and the label of a disabled control.
-  // A control that only looks disabled is measured (GT-A14).
+  // The first legend of a disabled fieldset is not disabled (HTML), so what
+  // it holds is measured, and so is a control that only looks disabled
+  // (GT-A14).
   const inactive = (el) => {
-    if (el.closest(':disabled, [aria-disabled="true"]')) return true;
+    if (el.closest('[aria-disabled="true"]')) return true;
+    for (let n = el; n; n = n.parentElement) {
+      if (!n.matches(':disabled')) continue;
+      if (n.tagName !== 'FIELDSET') return true;
+      const legend = n.querySelector(':scope > legend');
+      if (!legend || !legend.contains(el)) return true;
+    }
     const label = el.closest('label');
     return !!(label && label.control && label.control.matches(':disabled'));
   };

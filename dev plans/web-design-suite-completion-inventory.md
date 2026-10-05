@@ -152,7 +152,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-A2 | high | fixed in 3.1.0 | the runtime reports false Level-A errors on two page shapes that are everyday. |
 | GT-A3 | high | fixed in 3.1.0 | the visual gate is blind to the regressions the matrix exists to catch. |
 | GT-A4 | high | fixed in 3.1.0 | the pre-commit snippet ("one hook, three checks", which shows two) has four faults. |
-| GT-A5 | medium | fixed in 3.4.0: `test_browser_scripts.BrowserScriptResolution.test_every_context_bypasses_csp_and_a_crash_exits_2`, `ContextOptions`, `test_browser_runtime.test_a_page_with_a_strict_csp_is_audited` and `test_a_sheet_with_a_strict_csp_is_captured` (PR #39) | no `bypassCSP`. |
+| GT-A5 | medium | fixed in 3.4.0: `test_browser_scripts.BrowserScriptResolution.test_contexts_bypass_csp_where_they_inject_and_a_crash_exits_2`, `ContextOptions`, `test_browser_runtime.VitalsUnderCsp`, `test_browser_runtime.test_a_page_with_a_strict_csp_is_audited`, `test_a_sheet_with_a_strict_csp_is_captured` and `test_a_page_with_one_tab_stop_is_not_a_trap` (PR #39) | no `bypassCSP`. |
 | GT-A6 | medium | W5 (3.4.0) | the throttle presets are not Lighthouse's, and TTFB is never throttled. |
 | GT-A7 | medium | fixed in 3.2.0 | the coverage sources are misstated. |
 | GT-A8 | medium | W5 (3.4.0) | the axe tag advice is wrong in both directions. |
