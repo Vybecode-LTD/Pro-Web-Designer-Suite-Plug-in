@@ -1613,7 +1613,7 @@ def match_braces(text: str, start: int) -> int:
     return n
 
 
-def audit_js(path: Path, text: str) -> list[Finding]:
+def audit_js(path: Path, text: str, root: Path | None = None) -> list[Finding]:
     # Lint and build configs quote example code as data. Auditing them
     # audits the examples, which is noise, not signal.
     if CONFIG_FILE_PAT.search(str(path).replace(os.sep, '/')):
@@ -1656,7 +1656,7 @@ def audit_js(path: Path, text: str) -> list[Finding]:
     for m in re.finditer(r"""["'`](#[0-9a-fA-F]{3,8})["'`]""", clean):
         ln = line_of(m.start())
         ctx = lines[ln - 1] if 0 < ln <= len(lines) else ""
-        if re.search(r"\b(test|spec|stories|mock|fixture)\b", str(path), re.I):
+        if test_like(path, root):
             continue
         if "#" in ctx and re.search(r"(href|id|anchor|hash|sha|commit)", ctx, re.I):
             continue
@@ -2110,17 +2110,44 @@ def file_kind(path: Path) -> str | None:
 
 
 def iter_files(paths: list[str]) -> Iterator[Path]:
+    for fp, _root in iter_files_with_roots(paths):
+        yield fp
+
+
+def iter_files_with_roots(paths: list[str]) -> Iterator[tuple[Path, Path | None]]:
+    """Each file, with the folder it was found under (None when named)."""
     for raw in paths:
         p = Path(raw)
         if p.is_file():
-            yield p                               # named explicitly: always reported
+            yield p, None                         # named explicitly: always reported
         elif p.is_dir():
             for root, dirs, files in os.walk(p):
                 dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
                 for f in sorted(files):
                     fp = Path(root) / f
                     if file_kind(fp):
-                        yield fp
+                        yield fp, p
+
+
+# `__mocks__`, `tests/`, `fixtures/` and `Badge.test.jsx`: an underscore or a
+# dot ends the word, a letter or digit in any script does not (`latest.js` and
+# `testé/` are not tests), and a plural is the same word.
+TEST_LIKE = re.compile(r"(?<![^\W_])(tests?|specs?|stories|mocks?|fixtures?)(?![^\W_])", re.I)
+
+
+def test_like(path: Path, root: Path | None = None) -> bool:
+    """A test, story, mock or fixture file, which the test tools judge, not
+    this audit. Read from the path below the folder being audited (or the path
+    as given, for a file named by a relative path): the folders a project sits
+    in, a checkout under `test/` or a temporary `wds-test-*`, say nothing about it."""
+    if root is not None:
+        try:
+            rel = path.relative_to(root).as_posix()
+        except ValueError:
+            rel = path.name
+    else:
+        rel = path.name if path.is_absolute() else path.as_posix()
+    return bool(TEST_LIKE.search(rel))
 
 
 def is_html_email(text: str) -> bool:
@@ -2145,7 +2172,7 @@ def audit_run(paths: list[str]) -> tuple[list[Finding], int, list[tuple[Path, st
     audited = 0
     skipped: list[tuple[Path, str]] = []
     css_sources: list[tuple[Path, str]] = []
-    for fp in iter_files(paths):
+    for fp, root in iter_files_with_roots(paths):
         kind = file_kind(fp)
         if kind is None:
             skipped.append((fp, SKIP_NOT_AUDITABLE))
@@ -2171,7 +2198,7 @@ def audit_run(paths: list[str]) -> tuple[list[Finding], int, list[tuple[Path, st
             elif kind == "template":
                 out.extend(audit_template(fp, text))
             else:
-                out.extend(audit_js(fp, text))
+                out.extend(audit_js(fp, text, root))
         except Exception as exc:  # a crashed rule must never block a commit
             out.append(Finding(str(fp), 1, "--", "internal-error", "warning",
                                f"audit_design could not fully parse this file: {exc}",

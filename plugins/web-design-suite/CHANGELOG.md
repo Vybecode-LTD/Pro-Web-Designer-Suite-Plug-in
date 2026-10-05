@@ -130,6 +130,11 @@
   from the element that carries `{attrs}`, not the whole template, so a `<div>` wrapping
   an `<input>` no longer gets `disabled` or `aria-invalid`. With GT-A12 and GT-A13, this
   finishes GT-C3.
+- **The audit dropped its JS colour check for a whole project in a folder named `test`.**
+  It leaves test, story, mock and fixture files to the test tools, but matched the words
+  anywhere in the absolute path, so a project inside a folder named `test` or `fixtures`, or a
+  temporary `wds-test-*` folder, lost `js-raw-color` for every file. It reads the path below
+  the folder being audited now, and plurals and `__mocks__` count, which they never did.
 - **diff_system missed density, media-condition and root-element changes** (LC-A8).
   change-classification.md calls all three major and detected, and system.json records
   them, but the diff compared none: a release that changed only `--density` at compact,
@@ -168,6 +173,10 @@
 
 ### Tests
 
+- The test-file exemption: `test_audit_design.TestFilesByThePathBelowTheRoot` audits one JSX
+  colour under `neutral/` and under `fixtures/test/`, and a `.test.jsx` and a `__mocks__` file as
+  the control. Against `v3.3.0`, 1 fails; the control passes there only because this test's
+  own `wds-test-*` folder exempted everything.
 - P9 (GT-C13, GT-A14 (a), N34): `test_browser_scripts.SharedHelpers` holds the three
   copies to the master, keeps the moved helpers out of the scripts, and holds both
   freezes to pausing; `test_browser_runtime.test_a_spinner_is_not_a_focus_ring` runs
