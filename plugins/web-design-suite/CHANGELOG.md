@@ -75,8 +75,11 @@
   coverage line called the state covered, and a11y_runtime reported a ring users do see
   as missing. The cell now carries all three tokens.
 - **The matrix's error state stamped `aria-invalid` on buttons and spans** (GT-A13).
-  ARIA 1.2 deprecated it as a global attribute; a form control gets it, and everything
-  gets `data-state="error"`. With GT-A12 and GT-A13, this finishes GT-C3.
+  ARIA 1.2 deprecated it as a global attribute; an input, select or textarea gets it, and
+  everything gets `data-state="error"`. Whether the cell is a form control is now read
+  from the element that carries `{attrs}`, not the whole template, so a `<div>` wrapping
+  an `<input>` no longer gets `disabled` or `aria-invalid`. With GT-A12 and GT-A13, this
+  finishes GT-C3.
 
 ### Changed
 
@@ -133,7 +136,10 @@
   web.dev quote is registered in `evidence.json`.
 - P12 part 1 (GT-A12, GT-A13): `test_content_and_a11y.MatrixStates` generates a sheet
   with a `:focus` ring, a custom state and a combination, an undeclared state, and the
-  error state on a span and an input. Against `v3.3.0`, all 4 fail.
+  error state on a span and an input. Against `v3.3.0`, all 4 fail. Codex's review of #42
+  added three, each failing on its first head: a wrapper and a button keep `aria-invalid`
+  and `disabled` off where they do not belong, `loading+error` (both set `data-state`) is
+  refused, and the coverage grid has a column per state.
 
 ## 3.3.0 — 2026-10-04
 

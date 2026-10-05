@@ -288,6 +288,15 @@ class MatrixStates(TempDirTest):
     def cells(sheet, tag):
         return re.findall(rf'<{tag} class="chip"([^>]*)>', sheet)
 
+    def state_cells(self, template, tag, state):
+        css = '.chip {}\n.chip[data-state="error"] { color: #b00; }\n.chip:disabled { opacity: .5; }\n'
+        proc, sheet = self.generate(css, template, ["default", state])
+        self.assertEqual(proc.returncode, 0, output(proc))
+        marker = 'data-state="error"' if state == "error" else "disabled"
+        cells = [a for a in self.cells(sheet, tag) if marker in a]
+        self.assertTrue(cells, sheet[-400:])
+        return cells
+
     def test_a_focus_ring_renders_in_the_focus_visible_cell(self):
         proc, sheet = self.generate(".chip { color: #222; }\n.chip:focus { outline: 2px solid #222; }\n",
                                     '<span class="chip" tabindex="0" {attrs}>{content}</span>',
@@ -320,15 +329,43 @@ class MatrixStates(TempDirTest):
         self.assertIn("custom_states", output(proc))
 
     def test_the_error_state_puts_aria_invalid_on_form_controls_only(self):
-        css = '.chip {}\n.chip[data-state="error"] { color: #b00; }\n'
+        """A button takes no aria-invalid, and a wrapper around an input is not
+        the input: the element carrying {attrs} decides (Codex on #42)."""
         for template, tag, invalid in (('<span class="chip" {attrs}>{content}</span>', "span", False),
-                                       ('<input class="chip" {attrs}>', "input", True)):
+                                       ('<input class="chip" {attrs}>', "input", True),
+                                       ('<button class="chip" {attrs}>{content}</button>', "button", False),
+                                       ('<div class="chip" {attrs}><input></div>', "div", False)):
             with self.subTest(tag=tag):
-                proc, sheet = self.generate(css, template, ["default", "error"])
-                self.assertEqual(proc.returncode, 0, output(proc))
-                errors = [a for a in self.cells(sheet, tag) if 'data-state="error"' in a]
-                self.assertTrue(errors)
+                errors = self.state_cells(template, tag, "error")
                 self.assertEqual([invalid] * len(errors), ['aria-invalid="true"' in a for a in errors])
+
+    def test_a_wrapper_around_a_form_control_is_not_disabled_by_attribute(self):
+        """Codex on #42: a <div {attrs}> holding an <input> got a `disabled`
+        attribute, which a div cannot have."""
+        for template, tag, real in (('<div class="chip" {attrs}><input></div>', "div", False),
+                                    ('<button class="chip" {attrs}>{content}</button>', "button", True)):
+            with self.subTest(tag=tag):
+                cells = [a for a in self.state_cells(template, tag, "disabled") if "aria-disabled" in a]
+                self.assertTrue(cells)
+                self.assertEqual([real] * len(cells), [bool(re.search(r"(?:^|\s)disabled(?:\s|$)", a)) for a in cells])
+
+    def test_a_combination_whose_states_set_one_attribute_twice_is_refused(self):
+        """Codex on #42: loading+error kept only data-state="error", while the
+        coverage line counted both rules."""
+        proc, _ = self.generate(".chip {}\n", '<span class="chip" {attrs}>{content}</span>',
+                                ["default", "loading+error"])
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("data-state", output(proc))
+
+    def test_the_coverage_table_has_a_column_per_state(self):
+        """Codex on #42: the grid had seven state tracks, so a custom state's
+        column wrapped onto a row of its own."""
+        proc, sheet = self.generate(".chip {}\n", '<span class="chip" {attrs}>{content}</span>',
+                                    ["default", "selected"],
+                                    {"selected": {"attrs": {"aria-selected": "true"}}})
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn('class="msheet__table" role="table" style="--msheet-states: 8"', sheet)
+        self.assertIn("repeat(var(--msheet-states, 7), 1fr)", sheet)
 
 
 SAAS_DDL = """\

@@ -260,7 +260,7 @@ Notes:
 
 - **`{attrs}` is mandatory** in a template. `{content}` is not a substitute for it — a template may omit `{content}` (a void element like `<input>` has none) but never `{attrs}`: without it, state, variant and size cannot be applied and every cell renders identically — the generator refuses.
 - **`stage_style` keys must all start with `--`.** Law 4 permits inline style only when every key is a custom property; the generator enforces it and tells you why.
-- **`disabled` is applied intelligently**: a real `disabled` attribute on form controls (detected from the template, overridable with `form_control`), `aria-disabled="true"` otherwise. Never both on a `<div>`, which is invalid. **`error`** likewise: `aria-invalid="true"` only on a form control, `data-state="error"` everywhere.
+- **`disabled` is applied intelligently**: a real `disabled` attribute when the element carrying `{attrs}` is a form control (overridable with `form_control`), `aria-disabled="true"` otherwise. Never both on a `<div>`, which is invalid. **`error`** likewise: `aria-invalid="true"` only on an input, select or textarea, `data-state="error"` everywhere. A combination whose states set one attribute to two values is refused.
 - **The focus-visible cell carries `focus-visible focus focus-within`**, so a ring written with `:focus` or `:focus-within` renders there too.
 
 ---

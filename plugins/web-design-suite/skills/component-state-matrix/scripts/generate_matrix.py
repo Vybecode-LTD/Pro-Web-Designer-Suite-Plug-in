@@ -115,6 +115,7 @@ STATE_MODEL: Dict[str, Dict[str, Any]] = {
         # global attribute, so a button or a card gets data-state alone (GT-A13).
         "attrs": {"data-state": "error"},
         "form_attrs": {"aria-invalid": "true"},
+        "form_tags": ["input", "select", "textarea"],
         "force": None,
         "detect": ["[aria-invalid", 'data-state="error"', "[data-invalid"],
         "blurb": "invalid or failed; colour alone never carries this",
@@ -131,7 +132,11 @@ PSEUDO_RE = re.compile(
     r"(?<!:):(" + "|".join(FORCEABLE_PSEUDO) + r")\b"
 )
 
-FORM_TAG_RE = re.compile(r"<\s*(button|input|select|textarea|fieldset|optgroup|option)\b", re.I)
+FORM_TAGS = ("button", "input", "select", "textarea", "fieldset", "optgroup", "option")
+# The element that carries {attrs} is the one a state's attributes land on, so
+# it alone decides whether they are a form control's: a <div {attrs}> wrapping
+# an <input> is not one (Codex on #42).
+ATTRS_TAG_RE = re.compile(r"<\s*([a-zA-Z][\w-]*)\b[^<>]*\{attrs\}")
 
 DEFAULT_THEMES = ["light", "dark"]
 DEFAULT_DENSITIES = ["compact", "comfortable", "spacious"]
@@ -498,6 +503,19 @@ class Component:
             )
         self.state_detect = raw.get("state_detect", {})
         self.state_attrs = raw.get("state_attrs", {})
+        for st in (s for s in self.states if "+" in s):
+            seen: Dict[str, Tuple[str, str]] = {}
+            for part in st.split("+"):
+                attrs = {**(self.model[part].get("attrs") or {}), **self.state_attrs.get(part, {})}
+                for k, v in attrs.items():
+                    if k != "data-force-state" and k in seen and seen[k][1] != v:
+                        raise ManifestError(
+                            f"{where} ('{self.name}') combines '{st}', but '{seen[k][0]}' and "
+                            f"'{part}' both set `{k}` ({seen[k][1]!r} and {v!r}), so one would "
+                            f"silently replace the other while coverage counted both. Declare "
+                            f"the combined state in `custom_states` with the attributes it "
+                            f"really has (Codex on #42).")
+                    seen.setdefault(k, (part, v))
         self.stage_style = raw.get("stage_style", {}) or {}
         bad_keys = [k for k in self.stage_style if not k.startswith("--")]
         if bad_keys:
@@ -558,7 +576,7 @@ class Component:
                          "blurb": str(spec.get("blurb", "a state this component declares"))}
         return out
 
-    def state_attrs_for(self, state: str, is_form: bool) -> Dict[str, str]:
+    def state_attrs_for(self, state: str, is_form: Optional[str]) -> Dict[str, str]:
         """The attributes of one state or a `+` combination. Forced pseudo-states
         are joined (`hover focus-visible …`); any other attribute is the last
         state's."""
@@ -567,7 +585,7 @@ class Component:
         for part in state.split("+"):
             spec = self.model[part]
             attrs = dict(spec.get("attrs") or {})
-            if is_form:
+            if is_form and (is_form == "*" or is_form in spec.get("form_tags", FORM_TAGS)):
                 attrs.update(spec.get("form_attrs") or {})
             attrs.update(self.state_attrs.get(part, {}))
             for k, v in attrs.items():
@@ -601,10 +619,14 @@ class Component:
             )
         return tpl
 
-    def is_form_control(self, tpl: str) -> bool:
+    def is_form_control(self, tpl: str) -> Optional[str]:
+        """The form control's tag when the element carrying {attrs} is one
+        ("*" when the manifest says so with `form_control`), else None."""
         if self.form_control is not None:
-            return bool(self.form_control)
-        return bool(FORM_TAG_RE.search(tpl))
+            return "*" if self.form_control else None
+        m = ATTRS_TAG_RE.search(tpl)
+        tag = m.group(1).lower() if m else ""
+        return tag if tag in FORM_TAGS else None
 
 
 class Manifest:
@@ -863,7 +885,7 @@ def esc(s: Any) -> str:
     return html.escape(str(s), quote=True)
 
 
-def attrs_for(comp: Component, cell: Cell, is_form: bool) -> str:
+def attrs_for(comp: Component, cell: Cell, is_form: Optional[str]) -> str:
     pairs: List[Tuple[str, str]] = []
     if cell.variant != "default":
         pairs.append(("data-variant", cell.variant))
@@ -879,7 +901,7 @@ def attrs_for(comp: Component, cell: Cell, is_form: bool) -> str:
     return " ".join(out)
 
 
-def render_cell(comp: Component, cell: Cell, tpl: str, is_form: bool) -> str:
+def render_cell(comp: Component, cell: Cell, tpl: str, is_form: Optional[str]) -> str:
     body = tpl.replace("{attrs}", attrs_for(comp, cell, is_form))
     body = body.replace("{content}", comp.content[cell.fixture])
     body = body.replace("{cell_id}", cell.cell_id)
@@ -919,7 +941,7 @@ class _IdSet(set):
 
 
 def render_grid(comp: Component, grid: Grid, themes: List[str], tpl: str,
-                is_form: bool, seen_ids: set) -> str:
+                is_form: Optional[str], seen_ids: set) -> str:
     out: List[str] = []
     out.append(f'<section class="msheet__pass" data-pass="{esc(grid.key)}">')
     out.append(f'<h3 class="msheet__pass-title">{esc(grid.title)}</h3>')
@@ -971,8 +993,9 @@ def render_coverage(components: List[Component]) -> str:
            'stylesheet. A gap here is a prompt, not a verdict &mdash; a focus '
            'ring can legitimately come from a global <code>:where(:focus-visible)</code> '
            'rule in <code>base.css</code>. Look at the cell and decide.</p>',
-           '<div class="msheet__table" role="table">']
+           '<div class="msheet__table" role="table" style="--msheet-states: COLUMNS">']
     columns = every_state(components)
+    out[-1] = out[-1].replace("COLUMNS", str(len(columns)))
     header = ["component"] + columns
     out.append('<div class="msheet__trow msheet__trow--head" role="row">')
     for h in header:
@@ -1255,7 +1278,7 @@ CHROME_CSS = r"""
 
   .msheet__trow {
     display: grid;
-    grid-template-columns: max-content repeat(7, 1fr);
+    grid-template-columns: max-content repeat(var(--msheet-states, 7), 1fr);
     gap: var(--stroke-hairline);
     background: var(--msheet-rule);
   }
