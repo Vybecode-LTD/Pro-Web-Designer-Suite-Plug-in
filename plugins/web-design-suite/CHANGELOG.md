@@ -202,6 +202,11 @@
   target or below 0. Against `v3.3.0`, all 5 fail. They pass in Playwright's Chromium and
   in an installed Chrome; a click timed from Node's clock missed the task in Chrome, whose
   cold start delays the request, so `--interact-at` counts from the page's time origin.
+  Codex's review of #45 found two, each failing on its head: a request still in flight
+  has no Resource Timing entry, so three hanging fetches looked like a quiet network and
+  TTI came early (`test_requests_in_flight_keep_the_network_busy`; the requests now come
+  from CDP); and the long-task totals dropped the click's task with TBT (they keep it).
+  CodeRabbit's made the `--interact` control assert that the click happened.
 
 ## 3.3.0 — 2026-10-04
 
