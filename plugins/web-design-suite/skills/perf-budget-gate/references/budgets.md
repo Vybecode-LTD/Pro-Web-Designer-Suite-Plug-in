@@ -55,7 +55,7 @@ Promise: LCP ≤ 2500 ms, mid-tier Android, Slow 4G
   × 200 KB/s                                  =    250 KB
 ```
 
-**250 KB is the whole critical path** — everything that must arrive before the largest element can paint. Note what the arithmetic just told you for free: the 800 ms TTFB subtotal is exactly web.dev's "good" TTFB threshold. That is not a coincidence; the thresholds were derived the same way.
+**250 KB is the whole critical path** — everything that must arrive before the largest element can paint. The 800 ms TTFB subtotal happens to match web.dev's "good" TTFB, 0.8 seconds or less, but that threshold was not derived this way: web.dev calls it "a rough guide". On a faster network this method gives a smaller TTFB, and on a slower one a larger.
 
 Allocate the 250 KB:
 
@@ -77,13 +77,17 @@ total page weight = critical path × 2.4 ≈ 600 KB
 
 ### The same method, four other promises
 
+Each row is the calculation above with its own network: TTFB is four round trips plus 200 ms of server time, the CPU and slow-start costs stay at 300 and 150 ms, and the total is the critical path × 2.4.
+
 | Promise | Critical path | Total |
 |---|---|---|
-| LCP ≤ 2.5s, Slow 4G, mid-tier Android | 250 KB | 600 KB |
-| LCP ≤ 2.5s, Fast 4G (9 Mbps, 40 ms RTT) | 1.5 MB | 3 MB |
-| LCP ≤ 2.5s, 3G (400 Kbps, 400 ms RTT) | 40 KB | 100 KB |
-| LCP ≤ 4.0s (the "poor" line), Slow 4G | 550 KB | 1.3 MB |
-| LCP ≤ 2.5s, desktop cable (5 Mbps, 28 ms RTT) | 1.2 MB | 2.9 MB |
+| LCP ≤ 2.5s, Slow 4G (1.6 Mbps, 150 ms RTT), mid-tier Android | 250 KB | 600 KB |
+| LCP ≤ 2.5s, Fast 4G (9 Mbps, 40 ms RTT) | 1.9 MB | 4.6 MB |
+| LCP ≤ 2.5s, 3G (400 Kbps, 400 ms RTT) | 12.5 KB | 30 KB |
+| LCP ≤ 4.0s (the "poor" line), Slow 4G (1.6 Mbps, 150 ms RTT) | 550 KB | 1.3 MB |
+| LCP ≤ 2.5s, desktop cable (5 Mbps, 28 ms RTT) | 1.1 MB | 2.6 MB |
+
+On 3G, TTFB takes 1,800 ms of the 2,500 (four 400 ms round trips and 200 ms of server time), and after the 450 ms of CPU and slow start, 250 ms at 400 Kbps leaves 12.5 KB for the critical path: half the HTML document's share in the allocation above. A page can still make it, a server-rendered one whose largest element is text with its critical CSS inline, but none built to the 250 KB allocation will. Build that light page, or promise 4 s.
 
 The spread is what makes the point. **A byte budget with no device and network attached is not a budget, it is a preference.** Write the profile into the budget file as a comment and into the README, because the first question anyone asks about a number they dislike is "says who".
 

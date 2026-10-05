@@ -155,7 +155,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-A5 | medium | fixed in 3.4.0: `test_browser_scripts.BrowserScriptResolution.test_contexts_bypass_csp_where_they_inject_and_a_crash_exits_2`, `ContextOptions`, `test_browser_runtime.VitalsUnderCsp`, `test_browser_runtime.test_a_page_with_a_strict_csp_is_audited`, `test_a_sheet_with_a_strict_csp_is_captured` and `test_a_page_with_one_tab_stop_is_not_a_trap` (PR #39) | no `bypassCSP`. |
 | GT-A6 | medium | W5 (3.4.0) | the throttle presets are not Lighthouse's, and TTFB is never throttled. |
 | GT-A7 | medium | fixed in 3.2.0 | the coverage sources are misstated. |
-| GT-A8 | medium | W5 (3.4.0) | the axe tag advice is wrong in both directions. |
+| GT-A8 | medium | fixed in 3.4.0: `test_facts.AxeTagAdvice`, `test_browser_runtime.test_a_best_practice_rule_is_a_warning` (PR #41) | the axe tag advice is wrong in both directions. |
 | GT-A9 | medium | fixed in 3.2.0 | the docs recommend "Not Evaluated" as a legitimate ACR entry. |
 | GT-A10 | medium | fixed in 3.2.0 | the docs promise runtime behaviour that the code does not have. |
 | GT-A11 | medium | fixed in 3.2.0 | the docs say to put the device and network "in a comment" in `perf-budget.json`, and the examples are JSONC. |
@@ -163,9 +163,9 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-A13 | medium | W5 (3.4.0) | only the seven fixed states are allowed. |
 | GT-A14 | medium | fixed in 3.4.0: (a) `test_browser_runtime.test_a_spinner_is_not_a_focus_ring` (PR #38); (b) `test_browser_runtime.test_disabled_controls_are_exempt_from_contrast` (PR #39) | two measurements give false results (fixture `$W\e11\probes.html`). |
 | GT-A15 | medium | fixed in 3.2.0 | none of the CI recipes (a11y SKILL.md:285-311; ci-integration.md:53-110; visual-regression.md:191-237) runs as written in every case. |
-| GT-A16 | low-medium | W5 (3.4.0) | two rows of the "same method" table cannot be reproduced with that method (TTFB = 4·RTT + 200 ms, minus 300 + 150 ms). |
+| GT-A16 | low-medium | fixed in 3.4.0: `test_numbers.ByteBudgets` (PR #41) | two rows of the "same method" table cannot be reproduced with that method (TTFB = 4·RTT + 200 ms, minus 300 + 150 ms). |
 | GT-A17 | low-medium | W5 (3.4.0) | `--interact` adds the interaction's own handler to TBT. |
-| GT-A18 | low-medium | W5 (3.4.0) | `multiple-h1`, `heading-skip` and `no-main-landmark` are hard errors attributed to SCs 1.3.1, 2.4.6 and 2.4.1. |
+| GT-A18 | low-medium | fixed in 3.4.0: `test_content_and_a11y.StaticBestPractice` (PR #41) | `multiple-h1`, `heading-skip` and `no-main-landmark` are hard errors attributed to SCs 1.3.1, 2.4.6 and 2.4.1. |
 | GT-A19 | low | fixed in 3.2.0 | smaller errors in the docs. |
 | GT-B1 | — | W11 (3.6.0+) | SPA and dynamic states. |
 | GT-B2 | — | W11 (3.6.0+) | Authenticated pages. |
@@ -180,7 +180,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-C2 | S–M · P0 | fixed in 3.4.0: colours, modals, iframes and inert content in 3.1.0 (GT-A1, GT-A2), pausing in PR #38 (GT-A14 (a)), `bypassCSP` and the disabled-control exemption in PR #39 (GT-A5, GT-A14 (b)) | Fix colour parsing, modals, iframes, inert content, `bypassCSP`, animation pausing and the disabled-control exemption. |
 | GT-C3 | M · P0 | partly done; the rest in W5 (3.4.0) | Matrix: the within-run "differs from default" gate, a tuned tolerance, focus mirroring, custom states, `data-state="error"` on non-form templates. |
 | GT-C4 | S · P0 | fixed in 3.1.0, with GT-A4 | One shipped hook with opt-in stages in place of the inline snippets. |
-| GT-C5 | S · P0 | partly done; the rest in W5 (3.4.0) | A correction pass on the docs (A7–A10, A16, A19). |
+| GT-C5 | S · P0 | fixed in 3.4.0: A7, A9, A10 and A19 in 3.2.0, A8 and A16 in PR #41 | A correction pass on the docs (A7–A10, A16, A19). |
 | GT-C6 | S · P1 | fixed in 3.1.0 (the review's C6) | Write SKILL.md commands with `${CLAUDE_SKILL_DIR}` and pre-approve them with `allowed-tools`. |
 | GT-C7 | S · P1 | fixed in 3.2.0, item 13 | SKILL.md size: 5k tokens or less. |
 | GT-C8 | S · P1 | fixed in 3.2.0, item 13 | Descriptions with a standalone first sentence and a "not for" line. |

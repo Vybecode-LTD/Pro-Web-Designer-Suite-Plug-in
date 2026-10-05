@@ -284,6 +284,17 @@
       "docs": [
         "web-design-studio/assets/configs/eslint.design.config.mjs"
       ]
+    },
+    {
+      "figure": "0.8 seconds",
+      "claim": "web.dev's good TTFB, which it calls a rough guide",
+      "source": "web.dev, Time to First Byte (TTFB)",
+      "url": "https://web.dev/articles/ttfb",
+      "checked": "2026-10-05",
+      "quote": "As a rough guide, most sites should strive to have a TTFB of 0.8 seconds or less.",
+      "docs": [
+        "perf-budget-gate/references/budgets.md"
+      ]
     }
   ],
   "not_statistics": [

@@ -52,9 +52,10 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import subprocess
 import unittest
 
-from wds_support import NODE, SKILLS, TempDirTest, output, run_node, tool_modules
+from wds_support import NODE, SKILLS, TempDirTest, env, output, run_node, tool_modules
 
 A11Y = SKILLS / "a11y-audit-runner"
 RUNTIME = A11Y / "scripts" / "a11y_runtime.mjs"
@@ -670,6 +671,47 @@ class FrameworkAndPackagingFacts(unittest.TestCase):
     def test_no_skill_is_said_to_work_standalone(self):
         readme = read(SKILLS.parent / "README.md")
         self.assertNotRegex(readme, r"`\.skill` file works standalone")
+
+
+class AxeTagAdvice(unittest.TestCase):
+    """GT-A8: the docs recommended `--tags wcag2a,wcag2aa,wcag22aa`, which drops
+    every WCAG 2.1 rule. Every tag list the a11y docs give that names a WCAG
+    2.0 tag names 2.1's too, and the rules the docs say 2.1 holds carry those
+    tags in the pinned axe-core."""
+
+    def test_no_tag_list_drops_wcag_2_1(self):
+        for path in sorted(A11Y.rglob("*")):
+            if path.suffix not in (".md", ".mjs", ".py"):
+                continue
+            for tags in re.findall(r"--tags (\S+)", path.read_text(encoding="utf-8")):
+                tags = set(tags.strip("`,.").split(","))
+                if "wcag2a" in tags:
+                    with self.subTest(file=path.name, tags=sorted(tags)):
+                        self.assertLessEqual({"wcag21a", "wcag21aa"}, tags)
+
+    @unittest.skipUnless(NODE and tool_modules("WDS_NODE_MODULES", "axe-core", node_path=True),
+                         "needs node and axe-core")
+    def test_the_rules_the_docs_name_carry_the_wcag_2_1_tags(self):
+        doc = (A11Y / "references" / "automation-coverage.md").read_text(encoding="utf-8")
+        named = {"autocomplete-valid": "wcag21aa", "avoid-inline-spacing": "wcag21aa",
+                 "label-content-name-mismatch": "wcag21a", "css-orientation-lock": "wcag21aa"}
+        for rule in named:
+            self.assertIn(f"`{rule}`", doc)
+        modules = tool_modules("WDS_NODE_MODULES", "axe-core", node_path=True)
+        proc = run_node_script(
+            "const axe = require('axe-core'); process.stdout.write(JSON.stringify("
+            "Object.fromEntries(axe.getRules().map((r) => [r.ruleId, r.tags]))));", modules)
+        tags = json.loads(proc.stdout)
+        for rule, tag in named.items():
+            with self.subTest(rule=rule):
+                self.assertIn(tag, tags[rule])
+        self.assertIn("experimental", tags["label-content-name-mismatch"])
+        self.assertIn("experimental", tags["css-orientation-lock"])
+
+
+def run_node_script(js, node_path):
+    return subprocess.run([NODE, "-e", js], capture_output=True, check=True,
+                          env=env(NODE_PATH=node_path))
 
 
 if __name__ == "__main__":

@@ -612,5 +612,24 @@ class A11yStaticScaleAndScope(TempDirTest):
         self.assertNotIn("card.sass", report)
 
 
+class StaticBestPractice(TempDirTest):
+    """GT-A18: a11y_static made `multiple-h1`, `heading-skip` and
+    `no-main-landmark` errors under success criteria, where axe tags the same
+    checks best-practice only. They are warnings now, labelled best practice,
+    and a page with nothing else wrong passes."""
+
+    def test_the_outline_and_landmark_checks_are_best_practice_warnings(self):
+        page = self.write("page.html", '<!doctype html><html lang="en"><title>t</title><body>'
+                                       "<h1>One</h1><h3>Skipped</h3><h1>Two</h1></body></html>\n")
+        proc = run_py("a11y-audit-runner", "a11y_static", page, "--json", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        found = {f["rule"]: (f["severity"], f["sc"]) for f in json.loads(proc.stdout)["findings"]}
+        for rule in ("multiple-h1", "heading-skip", "no-main-landmark"):
+            with self.subTest(rule=rule):
+                self.assertEqual(("warning", "best practice"), found.get(rule))
+        proc = run_py("a11y-audit-runner", "a11y_static", page, "--strict", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 1, output(proc))          # --strict still fails on them
+
+
 if __name__ == "__main__":
     unittest.main()
