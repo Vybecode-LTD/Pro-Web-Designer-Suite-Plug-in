@@ -836,6 +836,8 @@ def emit_reverse(data: Any, collection_split: bool = True) -> Tuple[str, List[Pr
             px = entry.get("px")
             if px is None:
                 px = as_px(raw)
+            if px is None:          # a duration, `220ms` or `0.22s`: Figma holds 220
+                px = as_ms(raw)
             if px is None:
                 return None, f"`--{token}` is typed FLOAT but `{raw}` has no numeric value."
             return (round(px, 4) if px % 1 else int(px)), None

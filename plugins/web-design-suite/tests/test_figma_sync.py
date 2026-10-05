@@ -305,6 +305,15 @@ class ReverseBody(TempDirTest):
         self.assertIn(proc.returncode, (0, 1), output(proc))
         return json.loads(proc.stdout)
 
+    def test_a_duration_crosses_as_milliseconds(self):
+        # CodeRabbit on #53: `--dur-base: 220ms` was dropped, having no px value.
+        body = self.body()
+        dur = next((v for v in body["variables"] if v["codeSyntax"]["WEB"] == "var(--dur-base)"),
+                   None)
+        self.assertIsNotNone(dur, body["variables"])
+        self.assertIn(220, [m["value"] for m in body["variableModeValues"]
+                            if m["variableId"] == dur["id"]])
+
     def test_the_body_has_only_the_four_arrays(self):
         self.assertEqual(set(self.body()), {"variableCollections", "variableModes", "variables",
                                             "variableModeValues"})

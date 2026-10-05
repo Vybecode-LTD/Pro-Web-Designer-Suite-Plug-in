@@ -188,7 +188,9 @@
   temporary id, which `--reverse` now sends (`Value`, or `Light` unless a theme has that
   name, then `Default` or `Base`, so two modes never share a name or a temporary id).
   And primitives were scoped to the pickers (`ALL_FILLS`, `GAP`), inviting a designer to
-  bind Tier 1, the Law 6 failure: they get `scopes: []` now.
+  bind Tier 1, the Law 6 failure: they get `scopes: []` now. Every duration was dropped
+  too, `--dur-base: 220ms` having no pixel value, with exit 1: a duration crosses as
+  milliseconds now, 220.
 
 ### Changed
 
@@ -224,7 +226,8 @@
   failing on its head (`559cce2`): a flat plugin export's values by mode id
   (`test_a_flat_plugin_export_reads_its_values_by_mode_name`), and a `default` theme
   beside a `light` one, which took the first mode's name and id
-  (`test_the_first_mode_takes_a_name_no_theme_has`).
+  (`test_the_first_mode_takes_a_name_no_theme_has`). Its next review found the dropped
+  duration, failing on `v3.3.0` and on `260df86` (`test_a_duration_crosses_as_milliseconds`).
 - The test-file exemption: `test_audit_design.TestFilesByThePathBelowTheRoot` audits one JSX
   colour under `neutral/` and under `fixtures/test/`, and a `.test.jsx` and a `__mocks__` file as
   the control. Against `v3.3.0`, 1 fails; the control passes there only because this test's
