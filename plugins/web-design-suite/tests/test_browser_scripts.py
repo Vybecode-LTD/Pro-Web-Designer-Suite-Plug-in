@@ -301,7 +301,7 @@ class VitalsTiming(unittest.TestCase):
         script = (found.group(0) + "console.log(JSON.stringify(" + json.dumps(cases)
                   + ".map(([s, t]) => networkTtfb(s, t))));")
         proc = subprocess.run([NODE, "--input-type=module", "-e", script],
-                              capture_output=True, timeout=60)
+                              capture_output=True, timeout=60, env=env())
         self.assertEqual(proc.returncode, 0, output(proc))
         self.assertEqual(json.loads(proc.stdout), [540, None, None, None])
 
