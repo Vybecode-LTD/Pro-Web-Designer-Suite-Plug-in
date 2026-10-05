@@ -321,7 +321,11 @@
   was read in print though a later base padding wins there, and a layered padding
   replaced an unlayered one that wins the cascade. Rather than model the cascade, the
   pairing now reads only a padding set in one block of the file; set in two, the margin
-  keeps its gap token (`test_a_padding_set_in_two_blocks_is_not_cancelled`).
+  keeps its gap token (`test_a_padding_set_in_two_blocks_is_not_cancelled`). The next
+  found one more, failing on that fix (`1f141b5`): `!important` was read as a slot of the
+  padding, in the extractor and the pairing alike, so `padding: 16px !important` was
+  block padding only, and a later plain declaration beat it. It is one value now, and an
+  `!important` one wins its block (`test_an_important_padding_is_one_value_and_wins_its_block`).
 
 ## 3.3.0 — 2026-10-04
 

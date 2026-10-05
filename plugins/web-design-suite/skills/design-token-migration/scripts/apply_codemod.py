@@ -447,8 +447,9 @@ def selector_list(selector: str) -> List[str]:
     return [selector_key(s) for s in out if s.strip()]
 
 
-# {selector: {side: [(block, at-rule context, the value's keys, its rule or None)]}}
-Pads = Dict[str, Dict[str, List[Tuple[int, tuple, set, Optional[dict]]]]]
+# {selector: {side: [(block, at-rule context, !important, the value's keys,
+#                     its rule or None)]}}
+Pads = Dict[str, Dict[str, List[Tuple[int, tuple, bool, set, Optional[dict]]]]]
 
 
 def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Pads:
@@ -459,6 +460,10 @@ def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Pads:
         if not d.prop.startswith("padding"):
             continue
         value = text[d.value_offset:d.value_offset + len(d.value)]
+        # `!important` is not a slot: `padding: 16px !important` is one side value.
+        important = "!important" in value.lower()
+        if important:
+            value = value[:value.lower().index("!important")]
         slots = split_slots(mask_strings_and_urls(value))
         for i, (slot, klass) in enumerate(zip(slots, slot_classes(d.prop, slots))):
             real = value[slot.start:slot.end]
@@ -466,7 +471,7 @@ def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Pads:
             for member in selector_list(d.selector):
                 for side in box_sides(d.prop, len(slots), i):
                     out.setdefault(member, {}).setdefault(side, []).append(
-                        (d.block_start, d.context, set(canon_slot(real)), rule))
+                        (d.block_start, d.context, important, set(canon_slot(real)), rule))
     return out
 
 
@@ -496,13 +501,14 @@ def cancelled_padding(d, slot: str, sides: Sequence[str], pads: Pads) -> Optiona
 
     def padding(parent: str, side: str):
         # Only a padding set in one block of the whole file is certain: the last
-        # declaration there wins. Set in two blocks, which wins depends on the
-        # @media that applies, the @layer, or the order, so keep the gap token.
-        # A padding inside another media query never applies here.
+        # `!important` declaration there wins, or else the last one. Set in two
+        # blocks, which wins depends on the @media that applies, the @layer, or
+        # the order, so keep the gap token. A padding inside another media
+        # query never applies here.
         found = pads.get(parent, {}).get(side, [])
-        if not found or len({block for block, _, _, _ in found}) > 1:
+        if not found or len({entry[0] for entry in found}) > 1:
             return None
-        _, context, keys, rule = found[-1]
+        _, context, _, keys, rule = ([e for e in found if e[2]] or found)[-1]
         return (keys, rule) if d.context[:len(context)] == context else None
 
     def in_parent(parent: str) -> Optional[dict]:
