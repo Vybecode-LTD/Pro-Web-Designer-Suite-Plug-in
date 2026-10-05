@@ -700,7 +700,7 @@ Four rules. They are boring and they are the entire mechanism.
 1. **One block name per file, and the filename is the block name.** `card.css` may define selectors starting `.card` and nothing else. Violations are a one-line grep.
 2. **Block names are globally unique and never generic.** `.card`, not `.item`, `.wrapper`, `.container`, `.content`, `.inner`, `.box`. Generic names are how two features collide.
 3. **Utilities have one name each, the starter's.** `.visually-hidden`, as `assets/starter/styles/utilities.css` ships it. A block name is never generic (rule 2), so a utility cannot collide with one.
-4. **Layout primitives carry a prefix too.** `.l-stack`, `.l-grid`, `.l-center`. Layout is a different kind of thing from a component and the markup should say so.
+4. **Layout primitives keep the starter's names.** `.stack`, `.grid`, `.center` and the rest of `assets/starter/styles/layout.css`, in the `layout` layer. Layout is a different kind of thing from a component: a component's block name never takes a primitive's (rule 2), so `class="stack"` in the markup always means the same thing.
 
 ---
 
@@ -888,7 +888,7 @@ The minimum useful set is three plugins.
 @custom-media --lg (min-width: 64rem);   /* mirrors --bp-lg */
 
 /* usage */
-@media (--md) { .l-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (--md) { .gallery { grid-template-columns: repeat(2, 1fr); } }
 ```
 
 The literals are duplicated between `tokens.css` and `media.css`; that duplication is unavoidable today and is an explicit audit item (§15). Without the plugin, breakpoint literals scatter across every component file instead, which is strictly worse.

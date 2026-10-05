@@ -36,7 +36,7 @@ import subprocess
 import sys
 import unittest
 
-from wds_support import NODE, OFF, PLUGIN, SKILLS, TempDirTest, env, output
+from wds_support import NODE, OFF, PLUGIN, REPO, SKILLS, TempDirTest, env, output
 
 GIT = shutil.which("git")
 GIT_ENV = {"GIT_AUTHOR_NAME": "wds-test", "GIT_AUTHOR_EMAIL": "wds-test@example.invalid",
@@ -311,6 +311,88 @@ class SkillFrontmatter(unittest.TestCase):
                     self.assertNotIn(" #", description)
                     self.assertNotIn(description[:1], "[]{}>|*&!%@`,?")
                 self.assertLessEqual(len(description), 1024)
+
+
+ABSENT = object()
+
+
+def manifest_differences(ours: dict, theirs: dict) -> list[str]:
+    """The fields two marketplace manifests disagree on, apart from where each
+    finds the plugin (`source` is relative to its own manifest). A field one
+    of them lacks differs from a `null` in the other."""
+    def differ(x: dict, y: dict, key: str) -> bool:
+        return x.get(key, ABSENT) != y.get(key, ABSENT)
+
+    found = [k for k in sorted(set(ours) | set(theirs)) if k != "plugins" and differ(ours, theirs, k)]
+    a, b = ours.get("plugins", ABSENT), theirs.get("plugins", ABSENT)
+    if not (isinstance(a, list) and isinstance(b, list) and len(a) == len(b)):
+        return [*found, "plugins"] if a != b else found
+    for i, (x, y) in enumerate(zip(a, b)):
+        found += [f"plugins[{i}].{k}" for k in sorted(set(x) | set(y)) if k != "source" and differ(x, y, k)]
+    return found
+
+
+def repository_marketplace(plugin, repo):
+    """The repository's marketplace when `plugin` is this repository's own
+    plugin folder. None for a copy elsewhere, such as an older release under
+    WDS_PLUGIN_ROOT, whose metadata may differ legitimately."""
+    market = repo / ".claude-plugin" / "marketplace.json" if repo else None
+    if not (market and market.is_file()):
+        return None
+    return market if (repo / "plugins" / "web-design-suite").resolve() == plugin.resolve() else None
+
+
+class Manifests(unittest.TestCase):
+    """P8 (N9): the repository's marketplace and the plugin's own describe the
+    same plugin. Nothing compared them, and the root copy is the one GitHub
+    users add."""
+
+    PLUGIN_MARKET = PLUGIN / ".claude-plugin" / "marketplace.json"
+    REPO_MARKET = repository_marketplace(PLUGIN, REPO)
+
+    def load(self, path):
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def test_a_copy_elsewhere_is_not_held_to_this_repository(self):
+        """Codex on #34: with WDS_PLUGIN_ROOT on another release, that copy's
+        manifest was compared with this checkout's."""
+        if not (REPO and (REPO / ".claude-plugin" / "marketplace.json").is_file()):
+            self.skipTest("the tests are not inside the repository")
+        self.assertEqual(REPO / ".claude-plugin" / "marketplace.json",
+                         repository_marketplace(REPO / "plugins" / "web-design-suite", REPO))
+        self.assertIsNone(repository_marketplace(REPO / "plugins" / "web-design-suite" / "skills", REPO))
+        self.assertIsNone(repository_marketplace(PLUGIN, None))
+
+    def test_the_comparison_sees_a_difference(self):
+        ours = self.load(self.PLUGIN_MARKET)
+        theirs = json.loads(json.dumps(ours))
+        theirs["plugins"][0]["keywords"] = theirs["plugins"][0]["keywords"][1:]
+        theirs["plugins"][0]["source"] = "./elsewhere"
+        theirs["description"] = "drifted"
+        self.assertEqual(["description", "plugins[0].keywords"], manifest_differences(ours, theirs))
+
+    def test_an_absent_field_differs_from_a_null_one(self):
+        """CodeRabbit on #34: dict.get read both as None."""
+        self.assertEqual(["homepage"], manifest_differences({"homepage": None, "plugins": []}, {"plugins": []}))
+        self.assertEqual(["plugins[0].tags"], manifest_differences({"plugins": [{"tags": None}]}, {"plugins": [{}]}))
+        self.assertEqual(["plugins"], manifest_differences({"plugins": None}, {}))
+        self.assertEqual([], manifest_differences({"plugins": None}, {"plugins": None}))
+        self.assertEqual([], manifest_differences({"plugins": [{"source": "./"}]}, {"plugins": [{"source": "./x"}]}))
+
+    def test_the_repositorys_marketplace_matches_the_plugins(self):
+        if not (self.REPO_MARKET and self.REPO_MARKET.is_file()):
+            self.skipTest("the plugin under test is not this repository's own")
+        ours, theirs = self.load(self.PLUGIN_MARKET), self.load(self.REPO_MARKET)
+        self.assertEqual([], manifest_differences(ours, theirs))
+        self.assertEqual(["./"], [p["source"] for p in ours["plugins"]])
+        self.assertEqual(["./plugins/web-design-suite"], [p["source"] for p in theirs["plugins"]])
+
+    def test_the_marketplace_entry_names_the_plugin(self):
+        plugin = self.load(PLUGIN / ".claude-plugin" / "plugin.json")
+        entry = self.load(self.PLUGIN_MARKET)["plugins"][0]
+        self.assertEqual(plugin["name"], entry["name"])
+        for field in ("license", "homepage", "author"):
+            self.assertEqual(plugin[field], entry[field], field)
 
 
 SHIPPED = sorted({p.stem for p in SKILLS.glob("*/scripts/*") if p.suffix in {".py", ".mjs"}},

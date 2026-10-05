@@ -14,7 +14,7 @@
       "docs": [
         "a11y-audit-runner/SKILL.md",
         "a11y-audit-runner/references/automation-coverage.md",
-        "web-design-studio/references/accessibility.md"
+        "web-design-studio/references/accessibility-testing.md"
       ]
     },
     {
@@ -32,7 +32,7 @@
         "a11y-audit-runner/SKILL.md",
         "a11y-audit-runner/references/automation-coverage.md",
         "a11y-audit-runner/scripts/a11y_runtime.mjs",
-        "web-design-studio/references/accessibility.md"
+        "web-design-studio/references/accessibility-testing.md"
       ]
     },
     {
@@ -72,7 +72,7 @@
         "a11y-audit-runner/SKILL.md",
         "a11y-audit-runner/references/automation-coverage.md",
         "a11y-audit-runner/scripts/a11y_runtime.mjs",
-        "web-design-studio/references/accessibility.md"
+        "web-design-studio/references/accessibility-testing.md"
       ]
     },
     {

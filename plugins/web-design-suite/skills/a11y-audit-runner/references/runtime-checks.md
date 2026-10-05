@@ -202,7 +202,7 @@ Emulation is close and not identical: real Windows High Contrast also supplies t
 
 ### What predictably breaks in a token system
 
-The symptom table is in `accessibility.md` §10 and is not repeated here. What matters for a *runner* is which of those symptoms are measurable and which are only surveyable:
+The symptom table is in `accessibility-testing.md` §3 and is not repeated here. What matters for a *runner* is which of those symptoms are measurable and which are only surveyable:
 
 | Symptom | How the runner sees it |
 |---|---|

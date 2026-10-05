@@ -8,7 +8,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | XC-A2 | low | W4 (3.3.0) | The README's install instructions use a placeholder. |
 | XC-A3 | medium | fixed in 3.2.0 | "any single `.skill` file works standalone" and "each |
 | XC-A4 | low | fixed in 3.1.0 | Packaging: running a script the documented way (`python -m scripts.X`) writes bytecode into the plugin. |
-| XC-A5 | low | W4 (3.3.0) | `shared/token-contract.md` is referenced by nothing, and its role as the master copy is not stated. |
+| XC-A5 | low | fixed in 3.3.0: `test_contract.ContractCopies` (PR #34) | `shared/token-contract.md` is referenced by nothing, and its role as the master copy is not stated. |
 | XC-A6 | medium | fixed in 3.1.0 | a11y_static is quadratic on large inputs. |
 | XC-A7 | medium | fixed in 3.1.0 | super-linear on long lines, which is what minified CSS looks like: 96 KB on one line 1.5 s, |
 | XC-A8 | medium | fixed in 3.1.0 | the invocation contract is ambiguous. |
