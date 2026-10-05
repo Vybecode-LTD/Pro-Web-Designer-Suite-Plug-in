@@ -267,6 +267,11 @@
   under reduced motion was a patch, a root that became a fragment went unreported, and a
   local rename that also changed a value was paired as a pure rename. system.json's parts
   now record their declarations (`declares`) so the pairing can compare values.
+  CodeRabbit's found three more, each failing on its head: `declares` came from a part's
+  first rule only; a component whose file exports its styles object had its keys paired
+  as local (`exports_styles` now records it); and `element` was the first JSX root after
+  the props interface, so a helper above the component lent it its `<span>`. The root is
+  read from the component's own body now.
 
 ## 3.3.0 — 2026-10-04
 

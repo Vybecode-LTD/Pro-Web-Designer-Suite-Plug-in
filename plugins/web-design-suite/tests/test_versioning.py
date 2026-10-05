@@ -60,14 +60,18 @@ CARD_CSS = """\
     background: var(--card-bg);
   }
   .TITLE { font-weight: WEIGHT; color: var(--fg-default); }
+  .card > .TITLE { margin-block-end: MARGIN; }
   .card:hover { --card-bg: var(--bg-canvas); }
 }
 """
 
 CARD_TSX = """\
-export interface CardProps {
+IMPORTSexport interface CardProps {
   /** Heading text */
   title?: string;
+}
+function Label() {
+  return <span>label</span>;
 }
 /** A surface. */
 export function Card({ title }: CardProps) {
@@ -77,7 +81,7 @@ export function Card({ title }: CardProps) {
 
 V1 = {"pad_card": "calc(var(--space-6) * var(--density))", "dark_extra": "",
       "densities": {"compact": "0.875"}, "reduced": "1ms", "element": "div",
-      "title": "card__title", "weight": "600", "module": True, "motion": "var(--dur-base)",
+      "title": "card__title", "weight": "600", "margin": "0", "exports": False, "module": True, "motion": "var(--dur-base)",
       "layers": "reset, tokens, base, components, utilities"}
 
 
@@ -99,10 +103,13 @@ class DiffSystemClassifiesWhatSystemJsonRecords(TempDirTest):
                        f"@layer {v['layers']};\n@import url(\"tokens.css\");\n")
         css_name = "Card.module.css" if v["module"] else "card.css"
         self.write(f"{name}/src/components/{css_name}",
-                   CARD_CSS.replace("TITLE", v["title"]).replace("WEIGHT", v["weight"]))
+                   CARD_CSS.replace("TITLE", v["title"]).replace("WEIGHT", v["weight"])
+                   .replace("MARGIN", v["margin"]))
         el = v["element"]
         render = f'<{el} className="card">{{title}}</{el}>' if el else "<>{title}</>"
-        self.write(f"{name}/src/components/Card.tsx", CARD_TSX.replace("RENDER", render))
+        self.write(f"{name}/src/components/Card.tsx", CARD_TSX.replace("RENDER", render).replace(
+            "IMPORTS", 'import styles from "./Card.module.css";\nexport { styles };\n'
+            if v["exports"] else ""))
         out = root / "system.json"
         proc = run_py("design-system-docs", "extract_system", "styles", "src",
                       "--root", str(root), "--out", str(out), cwd=root)
@@ -250,6 +257,20 @@ class DiffSystemClassifiesWhatSystemJsonRecords(TempDirTest):
         # Codex on #48: the same properties are not the same rule.
         res = self.diff(self.snapshot("v1"),
                         self.snapshot("v2", title="card__heading", weight="700"))
+        kinds = self.kinds(res)
+        self.assertNotIn("part-renamed-local", kinds, res["changes"])
+        self.assertEqual(kinds["part-removed"]["severity"], "major")
+
+    def test_a_local_rename_restyled_in_a_second_rule_is_not_a_patch(self):
+        # CodeRabbit on #48: every rule that styles the part, not only the first.
+        res = self.diff(self.snapshot("v1"),
+                        self.snapshot("v2", title="card__heading", margin="4px"))
+        self.assertNotIn("part-renamed-local", self.kinds(res), res["changes"])
+
+    def test_a_rename_in_a_module_whose_styles_are_exported_is_major(self):
+        # CodeRabbit on #48: an exported styles object makes the key the API.
+        res = self.diff(self.snapshot("v1", exports=True),
+                        self.snapshot("v2", exports=True, title="card__heading"))
         kinds = self.kinds(res)
         self.assertNotIn("part-renamed-local", kinds, res["changes"])
         self.assertEqual(kinds["part-removed"]["severity"], "major")
