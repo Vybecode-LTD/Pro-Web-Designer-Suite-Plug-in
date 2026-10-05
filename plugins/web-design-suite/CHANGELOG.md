@@ -206,7 +206,10 @@
   has no Resource Timing entry, so three hanging fetches looked like a quiet network and
   TTI came early (`test_requests_in_flight_keep_the_network_busy`; the requests now come
   from CDP); and the long-task totals dropped the click's task with TBT (they keep it).
-  CodeRabbit's made the `--interact` control assert that the click happened.
+  CodeRabbit's made the `--interact` control assert that the click happened, gave the TTI
+  test a 9-second settle, and found CDP's unset `receiveHeadersEnd` (-1) added to TTFB:
+  `test_browser_scripts.VitalsTiming` runs `networkTtfb()` on its own, and fails with the
+  guard deleted.
 
 ## 3.3.0 — 2026-10-04
 
