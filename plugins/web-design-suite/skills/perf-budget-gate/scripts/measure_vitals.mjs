@@ -537,7 +537,9 @@ async function runOnce(browser, opts, url) {
     cdp.on('Network.loadingFailed', landed);
     cdp.on('Network.responseReceived', (e) => {
       const timing = e.response && e.response.timing;
-      if (doc && e.requestId === doc.id && doc.ttfb == null && timing && timing.requestTime > 0) {
+      // CDP marks an unset field -1; then Navigation Timing stands in.
+      if (doc && e.requestId === doc.id && doc.ttfb == null && timing &&
+          timing.requestTime > 0 && timing.receiveHeadersEnd >= 0) {
         doc.ttfb = (timing.requestTime - doc.start) * 1000 + timing.receiveHeadersEnd;
       }
     });

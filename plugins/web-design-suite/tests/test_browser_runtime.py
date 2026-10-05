@@ -332,12 +332,14 @@ class VitalsMeasures(TempDirTest):
         self.assertGreaterEqual(out["longTasks"]["blockingTotal"], 150)
 
     def test_tbt_stops_at_tti(self):
-        """A long task after five quiet seconds is after TTI; one before is not."""
+        """A long task after five quiet seconds is after TTI; one before is not.
+        A 9-second settle leaves a slow runner room for the quiet window
+        (CodeRabbit on #45)."""
         late = "<script>setTimeout(() => { " + self.BUSY.format(ms=250) + " }, {at});</script>"
-        out = self.vitals(late.replace("{at}", "6000"), "--throttle", "off", "--settle", "7000")
+        out = self.vitals(late.replace("{at}", "6000"), "--throttle", "off", "--settle", "9000")
         self.assertLess(out["stats"]["tbt"]["median"], 50)
         self.assertIsNotNone(out["stats"]["tti"])
-        out = self.vitals(late.replace("{at}", "1000"), "--throttle", "off", "--settle", "7000")
+        out = self.vitals(late.replace("{at}", "1000"), "--throttle", "off", "--settle", "9000")
         self.assertGreaterEqual(out["stats"]["tbt"]["median"], 150)
 
     def test_requests_in_flight_keep_the_network_busy(self):
