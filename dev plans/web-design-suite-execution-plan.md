@@ -209,7 +209,7 @@ Update this table in each PR.
 
 | Phase | PRs done | Items closed | Release |
 |---|---|---|---|
-| 3 | #12 to #36 (2026-10-02 to 04): P0 #16, P1 #17, P2 #18 and #19, P3 part 1 #20, and the skill descriptions #21; P3 part 2 #23, P4 #24, P5 #26; P6 part 1 #28 and part 2 #29; P7 part 1 #31 and part 2 #32; P8 part 1 #34 and part 2 #35 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30, SB-A15, N31, SB-A11, SB-A25, SB-C10, N3, N32, SB-C9, SS-B5, SS-A9, SS-B6, SS-B7, SS-C5, SB-B4, SS-B2, SS-C9, SS-A17, SS-A18, N4, XC-A5, N9, N10, N33, XC-A2, XC-B5, XC-C9, N7, N8; DL-B2 in part | 3.3.0, `v3.3.0` (R1, #36) |
+| 3 | #12 to #36 (2026-10-02 to 04): P0 #16, P1 #17, P2 #18 and #19, P3 part 1 #20, and the skill descriptions #21; P3 part 2 #23, P4 #24, P5 #26; P6 part 1 #28 and part 2 #29; P7 part 1 #31 and part 2 #32; P8 part 1 #34 and part 2 #35 | DL-A7, DL-B8, DL-C2, DL-B1, SB-A8, SB-A23, N16 to N29, XC-C6, XC-B3, N5, N2, SB-C2, N1, N30, SB-A15, N31, SB-A11, SB-A25, SB-C10, N3, N32, SB-C9, SS-B5, SS-A9, SS-B6, SS-B7, SS-C5, SB-B4, SS-B2, SS-C9, SS-A17, SS-A18, N4, XC-A5, N9, N10, N33, XC-A2, XC-B5, XC-C9, N7, N8; DL-B2 in part | 3.3.0 pending: #36 bumps the version; `v3.3.0` is tagged on its merge, and `release.yml` publishes it |
 | 4 | — | — | — |
 | 5 | — | — | — |
 | 6 | — | — | — |
