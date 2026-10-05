@@ -286,6 +286,26 @@ class MigrationPipeline(TempDirTest):
                 line = next(l for l in lines if l.startswith(f"+.{name}__x"))
                 self.assertIn(f"margin-inline: calc(var({all16}) * -1)", line)
 
+    def test_a_logical_side_pairs_only_when_both_directions_agree(self):
+        # CodeRabbit on #49: `padding-inline-start` is the left padding only left
+        # to right; in a right-to-left page `.r__x`'s left padding is 8px.
+        self.write("src/a.css", ".r { padding-inline-start: 16px; padding-inline-end: 8px; }\n"
+                                ".r__x { margin-left: -16px; }\n"
+                                ".s { padding-inline-start: 16px; padding-inline-end: 16px; }\n"
+                                ".s__x { margin-inline-start: -16px; }\n"
+                                ".t { padding: 16px; }\n.t__x { margin-inline-start: -16px; }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+
+        def token(klass):
+            return next(r["token"] for r in mapping["rules"]
+                        if klass in r.get("prop_classes", []) and "16px" in r["match"])
+
+        lines = {l.split(" {")[0][1:]: l for l in self.codemod(self.tmp / "src").splitlines()
+                 if l.startswith("+.")}
+        self.assertIn(f"calc(var({token('gap')}) * -1)", lines[".r__x"])
+        self.assertIn(f"calc(var({token('pad-inline')}) * -1)", lines[".s__x"])
+        self.assertIn(f"calc(var({token('pad-all')}) * -1)", lines[".t__x"])
+
     def test_a_negative_margin_with_nothing_to_cancel_keeps_its_own_token(self):
         # Control: no padding in the parent rule, so it is a spacing value of its own.
         self.write("src/a.css", ".row { gap: 16px; }\n.row__item { margin-block-start: -16px; }\n"

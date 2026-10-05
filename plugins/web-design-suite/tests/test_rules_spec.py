@@ -94,7 +94,7 @@ def spec_examples() -> list[Example]:
 
     margins = SPEC["margins_in_components"]
     for verdict in ("allowed", "refused"):
-        for section in ("nesting", "zero", "system_colors"):
+        for section in ("nesting", "zero", "system_colors", "tiers"):
             for css in SPEC[section].get(verdict, []):
                 add(section, verdict, css, rule(css))
         for css in SPEC["layers"][verdict]:

@@ -409,11 +409,21 @@ def selector_key(selector: str) -> str:
     return " ".join(selector.split())
 
 
+# The inline sides stay logical: which of left and right `inline-start` is
+# depends on `direction`, which a stylesheet rarely says (horizontal writing
+# assumed for block).
 LONGHAND_SIDES = {
     "top": ("top",), "right": ("right",), "bottom": ("bottom",), "left": ("left",),
-    "block": ("top", "bottom"), "inline": ("left", "right"),
+    "block": ("top", "bottom"), "inline": ("inline-start", "inline-end"),
     "block-start": ("top",), "block-end": ("bottom",),
-    "inline-start": ("left",), "inline-end": ("right",),      # left to right
+    "inline-start": ("inline-start",), "inline-end": ("inline-end",),
+}
+# The sides that can set one side, left to right and right to left.
+BY_DIRECTION = {
+    "left": (("left", "inline-start"), ("left", "inline-end")),
+    "right": (("right", "inline-end"), ("right", "inline-start")),
+    "inline-start": (("inline-start", "left"), ("inline-start", "right")),
+    "inline-end": (("inline-end", "right"), ("inline-end", "left")),
 }
 SHORTHAND_SIDES = {
     1: [("top", "right", "bottom", "left")],
@@ -447,9 +457,9 @@ def selector_list(selector: str) -> List[str]:
     return [selector_key(s) for s in out if s.strip()]
 
 
-# {selector: {side: [(block, at-rule context, !important, the value's keys,
-#                     its rule or None)]}}
-Pads = Dict[str, Dict[str, List[Tuple[int, tuple, bool, set, Optional[dict]]]]]
+# {selector: {side: [(block, at-rule context, !important, source offset,
+#                     the value's keys, its rule or None)]}}
+Pads = Dict[str, Dict[str, List[Tuple[int, tuple, bool, int, set, Optional[dict]]]]]
 
 
 def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Pads:
@@ -471,7 +481,8 @@ def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Pads:
             for member in selector_list(d.selector):
                 for side in box_sides(d.prop, len(slots), i):
                     out.setdefault(member, {}).setdefault(side, []).append(
-                        (d.block_start, d.context, important, set(canon_slot(real)), rule))
+                        (d.block_start, d.context, important, d.decl_offset,
+                         set(canon_slot(real)), rule))
     return out
 
 
@@ -505,11 +516,21 @@ def cancelled_padding(d, slot: str, sides: Sequence[str], pads: Pads) -> Optiona
         # blocks, which wins depends on the @media that applies, the @layer, or
         # the order, so keep the gap token. A padding inside another media
         # query never applies here.
-        found = pads.get(parent, {}).get(side, [])
-        if not found or len({entry[0] for entry in found}) > 1:
-            return None
-        _, context, _, keys, rule = ([e for e in found if e[2]] or found)[-1]
-        return (keys, rule) if d.context[:len(context)] == context else None
+        # An inline side is read both ways, left to right and right to left,
+        # and must come out the same: `padding-inline-start` is the left
+        # padding only when the direction is.
+        sides = pads.get(parent, {})
+        got = []
+        for names in BY_DIRECTION.get(side, ((side,),)):
+            found = sorted((e for n in names for e in sides.get(n, [])), key=lambda e: e[3])
+            if not found or len({entry[0] for entry in found}) > 1:
+                return None
+            _, context, _, _, keys, rule = ([e for e in found if e[2]] or found)[-1]
+            if d.context[:len(context)] != context:
+                return None
+            got.append((keys, rule))
+        same = all(k == got[0][0] and r is got[0][1] for k, r in got)
+        return got[0] if same else None
 
     def in_parent(parent: str) -> Optional[dict]:
         found = [padding(parent, side) for side in sides]
