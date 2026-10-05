@@ -251,6 +251,25 @@ class MigrationPipeline(TempDirTest):
         self.assertNotIn(f"var({all16})", p_x)
         self.assertIn(f".q__x {{ margin-inline: calc(var({all16}) * -1); }}", q_x)
 
+    def test_a_padding_set_in_two_blocks_is_not_cancelled(self):
+        # CodeRabbit on #49: a later `.p` padding wins over a print one in print,
+        # and an unlayered padding wins over a later layered one. Which padding
+        # applies is not certain, so the margin keeps its own gap token.
+        self.write("src/a.css", "@media print { .p { padding: 16px; } }\n.p { padding: 8px; }\n"
+                                "@media print { .p__x { margin-inline: -16px; } }\n"
+                                ".l { padding: 8px; }\n@layer components { .l { padding: 16px; } }\n"
+                                ".l__x { margin-inline: -16px; }\n"
+                                ".n { padding: 16px; @media print { padding: 8px; } }\n"
+                                ".n__x { margin-inline: -16px; }\n")
+        mapping, _ = self.cluster(self.extract(self.tmp / "src")[0])
+        gap = next(r["token"] for r in mapping["rules"]
+                   if r["kind"] == "spacing" and "gap" in r.get("prop_classes", []))
+        lines = self.codemod(self.tmp / "src").splitlines()
+        for name in ("p", "l", "n"):
+            with self.subTest(rule=name):
+                line = next(l for l in lines if f".{name}__x {{" in l and l.startswith("+"))
+                self.assertIn(f"margin-inline: calc(var({gap}) * -1)", line)
+
     def test_a_negative_margin_with_nothing_to_cancel_keeps_its_own_token(self):
         # Control: no padding in the parent rule, so it is a spacing value of its own.
         self.write("src/a.css", ".row { gap: 16px; }\n.row__item { margin-block-start: -16px; }\n"
@@ -292,8 +311,7 @@ class TheWorkedRun(TempDirTest):
         shutil.copytree(pathlib.Path(__file__).resolve().parent / "fixtures" / "worked-run" / "src",
                         self.tmp / "src")
         def census():
-            # A relative path, as the page runs it: the audit leaves files under a
-            # folder named like a test (this one's `wds-test-…`) to the test tools.
+            # A relative path, as the page runs it.
             proc = subprocess.run([sys.executable, "-B", str(SKILLS / "web-design-studio" / "scripts"
                                                             / "audit_design.py"), "src", "--json"],
                                   cwd=self.tmp, capture_output=True, env=env())

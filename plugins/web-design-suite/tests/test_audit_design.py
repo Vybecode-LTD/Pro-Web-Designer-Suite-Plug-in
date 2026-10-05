@@ -863,5 +863,34 @@ class TheAuditInCi(TempDirTest):
                          [(f["rule"], f["line"]) for f in json.loads(proc.stdout)])
 
 
+class TestFilesByThePathBelowTheRoot(TempDirTest):
+    """The audit leaves test, story, mock and fixture files to the test tools,
+    judged by the path: the absolute one, so a project inside any folder named
+    `test` or `fixtures`, or this test's own `wds-test-*` folder, lost its JS
+    colour checks entirely."""
+
+    JSX = 'export const tone = "#a15c00";\n'
+
+    def colours(self, folder: str) -> int:
+        audit = load_script("web-design-studio", "audit_design")
+        found = audit.audit([str(self.tmp / folder)])
+        return sum(1 for f in found if f.rule == "js-raw-color")
+
+    def test_the_folders_above_the_root_say_nothing(self):
+        for folder in ("neutral", "fixtures/test"):
+            with self.subTest(folder=folder):
+                self.write(f"{folder}/src/Badge.jsx", self.JSX)
+                self.assertEqual(1, self.colours(f"{folder}/src"))
+        # Codex on #52: a letter in any script continues the word.
+        self.write("intl/src/testé/Badge.jsx", self.JSX)
+        self.assertEqual(1, self.colours("intl/src"))
+
+    def test_a_test_file_below_the_root_is_still_left_alone(self):
+        # Control: the exemption itself stays.
+        self.write("app/src/Badge.test.jsx", self.JSX)
+        self.write("app/src/__mocks__/Badge.jsx", self.JSX)
+        self.assertEqual(0, self.colours("app/src"))
+
+
 if __name__ == "__main__":
     unittest.main()

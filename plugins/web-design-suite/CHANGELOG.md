@@ -130,6 +130,11 @@
   from the element that carries `{attrs}`, not the whole template, so a `<div>` wrapping
   an `<input>` no longer gets `disabled` or `aria-invalid`. With GT-A12 and GT-A13, this
   finishes GT-C3.
+- **The audit dropped its JS colour check for a whole project in a folder named `test`.**
+  It leaves test, story, mock and fixture files to the test tools, but matched the words
+  anywhere in the absolute path, so a project inside a folder named `test` or `fixtures`, or a
+  temporary `wds-test-*` folder, lost `js-raw-color` for every file. It reads the path below
+  the folder being audited now, and plurals and `__mocks__` count, which they never did.
 - **diff_system missed density, media-condition and root-element changes** (LC-A8).
   change-classification.md calls all three major and detected, and system.json records
   them, but the diff compared none: a release that changed only `--density` at compact,
@@ -154,8 +159,10 @@
   margin clusters to a gap: the bleed breaks the day the padding changes. apply_codemod
   pairs each negative margin with the padding of its parent rule (the rule it is nested
   in, the left side of a descendant or child selector, or a BEM element's block) and
-  reads that padding's token. extraction-and-clustering.md's example named `--pad-card`,
-  24px, for the 16px padding.
+  reads that padding's token, when that padding is set in one block of the file; set in
+  two (another `@media`, an `@layer`, the rule written twice), which one applies is not
+  certain, and the margin keeps its gap token. extraction-and-clustering.md's example
+  named `--pad-card`, 24px, for the 16px padding.
 - **A type tie snapped down when the smaller size was commoner** (LC-A12). The docs promise
   "15px becomes 16, text does not shrink", but frequency settled the tie first, so with
   14px commoner 15px became `--type-ui`, with a note saying "snapped UP to 14px" and a
@@ -207,6 +214,10 @@
 
 ### Tests
 
+- The test-file exemption: `test_audit_design.TestFilesByThePathBelowTheRoot` audits one JSX
+  colour under `neutral/` and under `fixtures/test/`, and a `.test.jsx` and a `__mocks__` file as
+  the control. Against `v3.3.0`, 1 fails; the control passes there only because this test's
+  own `wds-test-*` folder exempted everything.
 - P9 (GT-C13, GT-A14 (a), N34): `test_browser_scripts.SharedHelpers` holds the three
   copies to the master, keeps the moved helpers out of the scripts, and holds both
   freezes to pausing; `test_browser_runtime.test_a_spinner_is_not_a_focus_ring` runs
@@ -327,14 +338,17 @@
   member of either list.
   Its next review found one more: a padding inside one `@media` decided a margin's cancel
   in another. Each declaration records its at-rule context, and a margin reads its own.
+  The review after that found two more, failing on its head (`edf441f`): a print padding
+  was read in print though a later base padding wins there, and a layered padding
+  replaced an unlayered one that wins the cascade. Rather than model the cascade, the
+  pairing now reads only a padding set in one block of the file; set in two, the margin
+  keeps its gap token (`test_a_padding_set_in_two_blocks_is_not_cancelled`).
 - P15 part 2 (LC-A14, LC-C4, LC-C12): `test_versioning.DeprecateRewritesAndCountsAColourRename`
   runs the review's `fx/dep/client` rules through deprecate.py's mapping, the codemod and
   the scan, one rule per line and the same rules on several lines;
   `test_token_migration.TheWorkedRun` reruns worked-run.md against its fixture and
   `test_versioning.TheWorkedRelease` reruns the worked release, each holding every number
-  the page quotes to the output. Against `v3.3.0`, all 4 fail. TheWorkedRun audits with a
-  relative path: the audit skips JS checks for any file whose path, absolute included,
-  names a test folder, and the test's temporary folder does.
+  the page quotes to the output. Against `v3.3.0`, all 4 fail.
   Codex's review of #50 found one more, failing on its head: a declaration-scope rewrite
   replaced through `!important` and dropped it, which the font guard had hidden beside a
   `font-weight`. The rewrite ends where the value does now.
