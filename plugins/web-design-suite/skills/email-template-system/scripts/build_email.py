@@ -97,9 +97,13 @@ TEXT_BLOCK_TAGS = {
 # Comments worth keeping in a sent email. Everything else is bytes the reader
 # never sees, counted against Gmail's clipping threshold. Conditional comments are
 # load-bearing markup; ESP directives are how merge logic is expressed in several
-# platforms; authoring notes are not.
+# platforms; authoring notes are not. A directive is matched by its own syntax:
+# a Handlebars block ({{# {{/ {{^ {{else), a Liquid or Jinja tag ({%), a
+# Mailchimp merge tag (*|IF:X|*), ERB (<%). A note that only mentions a {{ }}
+# merge tag is a note, and went out in every receipt (DL-A20).
 COMMENT_KEEP_RE = re.compile(
-    r"\[if\b|<!\[endif\]|mc:|\*\||\{\{|\{%|<%|\bhtmlmin:", re.I
+    r"\[if\b|<!\[endif\]|\bmc:|\*\|[^|\s]+\|\*|\{\{\s*(?:[#/^]|else\b)|\{%|<%|\bhtmlmin:",
+    re.I,
 )
 
 
@@ -776,14 +780,40 @@ def style_blocks(rules: list[Rule]) -> list[str]:
 # MSO scaffolding
 # ---------------------------------------------------------------------------
 
+# The Word engine cannot resolve -apple-system or a web font at the head of
+# a stack and lands on its default serif, so Outlook alone gets a font it has
+# (references/email-architecture.md §2, DL-A11).
+MSO_FONT_STYLE = (
+    '<style type="text/css">\n'
+    "table, td, div, p, a, h1, h2, h3, li, blockquote "
+    "{ font-family: Arial, Helvetica, sans-serif !important; }\n"
+    "</style>"
+)
+
 MSO_HEAD_BLOCK = (
     "<!--[if mso]>\n"
     "<noscript><xml><o:OfficeDocumentSettings>\n"
     "<o:AllowPNG/>\n"
     "<o:PixelsPerInch>96</o:PixelsPerInch>\n"
     "</o:OfficeDocumentSettings></xml></noscript>\n"
+    + MSO_FONT_STYLE + "\n"
     "<![endif]-->"
 )
+
+
+BROAD_FONT_SELECTORS = {"*", "body", "table", "td"}
+
+
+def sets_broad_font(comment: str) -> bool:
+    """Whether a conditional comment's <style> gives the whole email a font:
+    a font-family rule on *, body, table or td. A component's own override,
+    `.price { font-family: Arial }`, is not the scaffold (Codex on #57)."""
+    for css in re.findall(r"<style\b[^>]*>(.*?)</style\s*>", comment, re.S | re.I):
+        for rule in parse_stylesheet(css):
+            if (any(d.prop == "font-family" for d in rule.declarations)
+                    and BROAD_FONT_SELECTORS & {s.strip().lower() for s in rule.selectors}):
+                return True
+    return False
 
 
 def inject_mso(root: Node) -> list[str]:
@@ -801,15 +831,25 @@ def inject_mso(root: Node) -> list[str]:
     head = root.find("head")
     if head is None:
         return notes
-    already = any(
-        node.kind == "comment" and "PixelsPerInch" in node.data for node in head.walk()
-    )
-    if already:
+    mso = [node for node in head.walk()
+           if node.kind == "comment" and re.match(r"\s*\[if\s+mso", node.data, re.I)]
+    has_dpi = any("PixelsPerInch" in node.data for node in mso)
+    has_font = any(sets_broad_font(node.data) for node in mso)
+    if has_dpi and has_font:
         return notes
-    comment = Node("comment", data=MSO_HEAD_BLOCK[4:-3])
+    if has_dpi:
+        block = "<!--[if mso]>\n" + MSO_FONT_STYLE + "\n<![endif]-->"
+    elif has_font:
+        block = MSO_HEAD_BLOCK.replace(MSO_FONT_STYLE + "\n", "")
+    else:
+        block = MSO_HEAD_BLOCK
+    comment = Node("comment", data=block[4:-3])
     comment.parent = head
     head.children.append(comment)
-    notes.append("added <o:PixelsPerInch>96</o:PixelsPerInch> (120-DPI defuse)")
+    if not has_dpi:
+        notes.append("added <o:PixelsPerInch>96</o:PixelsPerInch> (120-DPI defuse)")
+    if not has_font:
+        notes.append("added the [if mso] font rule (Arial for the Word engine)")
     return notes
 
 

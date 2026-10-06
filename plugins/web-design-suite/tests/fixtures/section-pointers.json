@@ -1201,6 +1201,12 @@
  },
  {
   "from": "email-template-system/scripts/build_email.py",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "2",
+  "heading": "The head, and the MSO scaffolding"
+ },
+ {
+  "from": "email-template-system/scripts/build_email.py",
   "to": "email-template-system/references/email-client-matrix.md",
   "section": "7",
   "heading": "Size limits and clipping"

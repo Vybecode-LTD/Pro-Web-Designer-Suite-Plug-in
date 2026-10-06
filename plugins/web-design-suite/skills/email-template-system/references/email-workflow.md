@@ -90,7 +90,7 @@ And as a CI gate — `lint_email.py` exits non-zero on any error, which is the w
 2. Parses the `<style>` blocks and splits rules into inlinable and retained.
 3. Inlines with the real cascade: specificity, then source order, with `!important` and the existing `style` attribute in their correct positions.
 4. Rewrites the survivors into one `<style>` block.
-5. Injects the `v:`/`o:` namespaces and the `<o:PixelsPerInch>96</o:PixelsPerInch>` block.
+5. Injects the `v:`/`o:` namespaces and the `[if mso]` block: `<o:PixelsPerInch>96</o:PixelsPerInch>` and the font rule that gives the Word engine Arial.
 6. Drops authoring comments — keeping conditional comments and ESP directives.
 7. Generates the plain-text alternative from the DOM.
 8. Reports bytes against the clipping threshold.

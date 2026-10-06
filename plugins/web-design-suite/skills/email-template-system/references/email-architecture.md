@@ -98,7 +98,7 @@ Every line earns its place. Nothing here is cargo. `build_email.py` adds the nam
   <o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch>
 </o:OfficeDocumentSettings></xml></noscript>
 <style type="text/css">
-  table, td, div, p, a, h1, h2, h3 { font-family: Arial, Helvetica, sans-serif !important; }
+  table, td, div, p, a, h1, h2, h3, li, blockquote { font-family: Arial, Helvetica, sans-serif !important; }
 </style>
 <![endif]-->
 </head>
