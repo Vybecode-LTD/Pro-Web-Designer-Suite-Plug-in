@@ -244,21 +244,21 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-A11 | medium | fixed in 3.4.0: the build adds the `[if mso]` font rule and the lint asks for it (PR #57; `test_email.OutlookFontRule`) | the Outlook font rule is never added. |
 | DL-A12 | medium | fixed in 3.4.0: the receipt's container is `width:100%` (PR #57; `test_email.ContainersAreFluid`) | the receipt isn't fluid. |
 | DL-A13 | medium | fixed in 3.4.0: a dropped token fails the build with its `use`, and `lint_email --source` (PR #58; `test_email.DroppedTokensFailTheBuild`, `LintTheSource`) | nothing enforces "Law 1 holds at build time". |
-| DL-A14 | low | W7 (3.4.0) | the inliner isn't "the real cascade" when shorthand and longhand mix. |
+| DL-A14 | low | fixed in 3.4.0: the inliner moves a later winner to the end (PR #59; `test_email.InlinerWritesTheCascadesOrder`) | the inliner isn't "the real cascade" when shorthand and longhand mix. |
 | DL-A15 | low | fixed in 3.2.0 | cells contradict the cited caniemail raw data |
 | DL-A16 | low | fixed in 3.2.0 | Gmail's 16 KB rule is mis-described. |
 | DL-A17 | low | fixed in 3.2.0 | dated or wrong facts. |
 | DL-A18 | low | fixed in 3.2.0 | ten section pointers point at the wrong section |
 | DL-A19 | low | fixed in 3.1.0, as XC-A4 and XC-A8 | Invocation and Windows portability (instances of XC-A4 and XC-A8). |
 | DL-A20 | low | fixed in 3.4.0: only real ESP syntax keeps a comment (PR #57; `test_email.AuthoringCommentsAreDropped`) | authoring notes ship in the email. |
-| DL-A21 | low | W7 (3.4.0) | Consistency: "same 18 steps" and the email tokens' weight note are wrong. |
+| DL-A21 | low | fixed in 3.4.0: the Law 3 row, the weight and size notes, the newsletter's gaps, the announcement's headings, the edge token (PR #59; `test_email.EmailDocClaims`) | Consistency: "same 18 steps" and the email tokens' weight note are wrong. |
 | DL-B1 | high | fixed in 3.3.0: the reference's §9 (`test_docs.SupabaseGuidance.test_the_access_boundary_is_stated`) and the generated `lib/supabase.ts` (`test_policies`) | no data-access boundary. |
 | DL-B2 | high | partly done (3.3.0: per-table policies, column grants and a smoke test, `test_policies`); a server-side schema (pydantic or zod) mirroring the constraints is left | authorization and server validation belong to nobody. |
 | DL-B3 | medium | W13 (3.6.0+) | stacks the description implies but doesn't serve. |
 | DL-B4 | medium | W13 (3.6.0+) | email frameworks. |
 | DL-B5 | medium | W13 (3.6.0+) | email translation and RTL. |
 | DL-B6 | medium | fixed in 3.4.0: the dark pass and the MSO font check (PR #57), the `nostyle` check and `--source` (PR #58); generated-form ARIA (A9) is its own item | Checks the docs promise but nothing runs: email dark-mode contrast, the MSO font block, the no-`<style>` layout, source literals, generated-form ARIA. |
-| DL-B7 | low | W7 (3.4.0) | deliverability is dated. |
+| DL-B7 | low | fixed in 3.4.0: Google's and Microsoft's bulk-sender rules, re-read 2026-10-06, figures in `evidence.json` (PR #59; `test_email.EmailDocClaims`) | deliverability is dated. |
 | DL-B8 | low | fixed in 3.3.0: `test_schema_sources.TheWorkedExampleIsTheFixture`, `GeneratedTypesAgreeOnStructure` | unverifiable claims. |
 | DL-C1 | M | fixed: 3.1.0 classified the sensitive columns (DL-A1, DL-A2); 3.3.0 parses RLS and policies and prints the SECURITY block (`test_content_and_a11y.SchemaSecurityPass`) | A security pass in `introspect_schema`: classify sensitive columns, parse RLS and policies, print a SECURITY block first. |
 | DL-C2 | M | done in 3.3.0: `test_schema_sources` | A sturdier schema parser, tested on real `db pull` and `gen types` files. |

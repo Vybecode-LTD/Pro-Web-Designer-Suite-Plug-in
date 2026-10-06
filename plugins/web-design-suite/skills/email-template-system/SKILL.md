@@ -38,9 +38,9 @@ This reframing is the whole skill. Without it, "email is different" becomes a li
 
 | Law | In email | What replaces it |
 |---|---|---|
-| **1. Tokens or nothing** | **Holds — at build time.** Source templates use `var(--token)`; the compiler resolves them. A literal hex in a source template is the same violation it has always been. | `assets/email-tokens.json` + `build_email.py` |
+| **1. Tokens or nothing** | **Holds — at build time.** Source templates use `var(--token)`; the compiler resolves them. A literal hex in a source template is the same violation it has always been. | `assets/email-tokens.json`, `build_email.py`, `lint_email.py --source` |
 | **2. Parents own the gaps** | **Bends.** There is no `gap`, and child `margin` is unreliable in the Word engine and absent on `div`s in Samsung Mail. | The parent `<table>` owns the gap: `padding` on the content `<td>` for space *inside* a band, a **spacer `<tr>`** for space *between* bands. A content element still never sets its own outer spacing. |
-| **3. The scale is closed** | **Holds.** Same 18 steps, resolved to px. | — |
+| **3. The scale is closed** | **Narrows.** 13 of the 18 spacing steps, in px; type has email's own steps. | — |
 | **4. One home** | **Inverted — on purpose, by a tool.** Everything ends up inlined, which is the maximum dispersal the web law exists to prevent. | The rule becomes: **no human hand-writes an inline style.** The *source* still has exactly one home per component, and a reviewer still predicts its appearance from one rule. The compiler does the dispersal, deterministically, and `lint_email.py` proves the result. |
 | **5. Layers, not specificity** | **Gone.** There is nothing to layer. | **Source order is the only layer order.** Utilities are declared last or they lose silently at equal specificity. `!important` becomes *correct* in the media query, because that block must beat the inline styles the compiler wrote — the thing layers existed to avoid is the thing email requires. |
 | **6. Semantic before primitive** | **Holds.** Templates read roles (`--fg-muted`), never ramp steps. | — |
@@ -113,7 +113,7 @@ Worth seeing once, because it is what makes the exception credible rather than a
     Ten-year repair promise</h2></td>
 ```
 
-Note what survived and what did not. The media query stays, because it cannot be resolved to a static element set — and the class stays on the element so the query still has something to match. Everything else became an attribute. No human typed `#080706`, and nobody will: change `--neutral-950` once and every template that reads `--fg-strong` moves with it.
+Note what survived and what did not. The media query stays, since no static element set resolves it, and so does the class it matches. Everything else became an attribute. No human typed `#080706`, and nobody will: change `--neutral-950` once and every template that reads `--fg-strong` moves with it.
 
 ---
 
@@ -176,7 +176,7 @@ Ranked by how often they are the actual cause. Full detail in `references/email-
 
 **3. GANGA.** The Gmail app signed in with a non-Google account does **not apply embedded `<style>` at all**, and blocks images by default. Same app, same icon, materially poorer renderer. Anything that lives only in the `<style>` block is absent for those readers — which is why the layout must be correct without it, and why fluid-hybrid beats media queries as the default.
 
-**4. Gmail's two size ceilings.** 102,400 bytes of HTML and it clips, hiding everything past the cut — the footer, the unsubscribe link, the tracking pixel — behind "View entire message." Separately, 16,384 bytes of `<style>` content, counted across every `<style>` element. Each element that crosses the ceiling is removed **whole**, along with every element after it, so one block over the ceiling loses all of its CSS. Past the ceiling the build splits the retained CSS into several blocks in authoring order, so only the tail is lost: put what matters most first. Both ceilings are reported on every build.
+**4. Gmail's two size ceilings.** 102,400 bytes of HTML and it clips, hiding everything past the cut — the footer, the unsubscribe link, the tracking pixel — behind "View entire message." Separately, 16,384 bytes of `<style>` content, counted across every `<style>` element. Each element that crosses the ceiling is removed **whole**, along with every element after it, so one block over the ceiling loses all of its CSS. Past it the build splits the retained CSS into blocks in authoring order, so only the tail is lost: put what matters first. The build reports both.
 
 **5. Dark mode, which you do not control.** Three behaviours: respect (Apple Mail, and the Outlook apps other than classic Windows for the media query), partial colour inversion (most Outlook, Gmail Android), full forced inversion (Gmail iOS, classic Outlook). You cannot opt out of forced inversion anywhere. Design light, avoid pure `#000`/`#fff` because inversion algorithms key on the extremes, add the `prefers-color-scheme` block because Apple Mail, Outlook for Mac, Outlook.com, the Outlook mobile apps and Samsung Email 6.1 honour it, then stop.
 

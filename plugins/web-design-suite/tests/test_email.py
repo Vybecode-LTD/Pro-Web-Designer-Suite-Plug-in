@@ -14,6 +14,10 @@
   fallback compiled to the fallback. `lint_email --source` and the build's
   dropped-token error now hold Law 1.
 - DL-B6, DL-C3: a no-<style> width check, and render_email.mjs.
+- DL-A14: the inliner kept a longhand's first position when a shorthand won
+  after it, so the client applied the longhand again.
+- DL-A21, DL-B7: the email docs' smaller inconsistencies, and deliverability
+  rules that stopped at Gmail and Yahoo.
 """
 from __future__ import annotations
 
@@ -369,3 +373,84 @@ class RenderEmail(EmailTest):
         self.assertEqual(code, 1)
         self.assertEqual([m for m, r in sorted(modes.items()) if not r["fits"]], ["nostyle"])
         self.assertGreaterEqual(modes["nostyle"]["scrollWidth"], 600)
+
+
+class InlinerWritesTheCascadesOrder(EmailTest):
+    """DL-A14: `td{padding:0}` + `.pad{padding-left:24px}` + `style="padding:8px"`
+    came out as `padding:8px;padding-left:24px`: a left of 24px, where the
+    cascade says 8px."""
+
+    @staticmethod
+    def left(style):
+        value = None
+        for decl in style.split(";"):
+            prop, _, v = decl.partition(":")
+            if prop.strip() == "padding":
+                vals = v.split()
+                value = vals[{1: 0, 2: 1, 3: 1, 4: 3}[len(vals)]]
+            elif prop.strip() == "padding-left":
+                value = v.strip()
+        return value
+
+    def test_a_later_shorthand_follows_the_longhand_it_beats(self):
+        source = self.page("pad.html", '<table role="presentation"><tr><td class="pad" '
+                                       'style="padding:8px">x</td></tr></table>',
+                           "<style>td { padding: 0; } .pad { padding-left: 24px; }</style>\n")
+        html = self.build(source)[0].read_text(encoding="utf-8")
+        style = re.search(r'<td class="pad" style="([^"]*)"', html).group(1)
+        self.assertEqual(self.left(style), "8px", style)
+
+
+class EmailDocClaims(EmailTest):
+    """DL-A21, DL-B7: claims the email docs and token file make, held to the
+    files they describe."""
+
+    TOKENS = json.loads((EMAIL / "assets" / "email-tokens.json").read_bytes())
+
+    def text(self, rel):
+        return (EMAIL / rel).read_text(encoding="utf-8")
+
+    def test_the_scale_row_counts_the_steps_email_keeps(self):
+        steps = re.compile(r"--space-(?:px|\d+(?:-\d+)?)$")
+        kept = [n for n in self.TOKENS["tokens"] if steps.match(n)]
+        dropped = [n for n in self.TOKENS["dropped"] if steps.match(n)]
+        skill = self.text("SKILL.md")
+        self.assertNotIn("Same 18 steps", skill)
+        self.assertIn("%d of the %d spacing steps" % (len(kept), len(kept) + len(dropped)), skill)
+
+    def test_the_weights_name_the_fonts_that_lead_the_stack(self):
+        notes = " ".join(self.TOKENS["tokens"][n].get("note", "") for n in
+                         ("--weight-medium", "--weight-semibold", "--type-h2-weight"))
+        self.assertNotIn("websafe stacks have no", notes)
+        self.assertIn("SF", notes)
+        self.assertIn("Segoe UI", notes)
+
+    def test_the_heading_sizes_say_why_they_differ_from_the_web(self):
+        for name in ("--type-h1-size", "--type-h2-size"):
+            self.assertIn("own heading scale", self.TOKENS["tokens"][name].get("note", ""), name)
+
+    def test_the_edge_reads_the_border_role(self):
+        self.assertEqual(self.TOKENS["tokens"]["--email-edge"]["value"], "1px solid var(--border-subtle)")
+        html = self.build(EMAIL / "assets" / "templates" / "transactional-receipt.html")[0]
+        self.assertIn("border-top:1px solid #e7e5e2", html.read_text(encoding="utf-8"))
+
+    def test_no_paragraph_spacing_needs_a_last_child_workaround(self):
+        news = self.text("assets/templates/newsletter.html")
+        self.assertNotIn("padding-bottom:0", news.replace(" ", ""))
+        prose = re.search(r"\.prose \{(.*?)\}", news, re.S).group(1)
+        self.assertNotIn("padding-bottom", prose)
+
+    def test_headings_are_headings_in_order(self):
+        for template in TEMPLATES:
+            with self.subTest(template=template.name):
+                html = template.read_text(encoding="utf-8")
+                self.assertNotRegex(html, r'<p class="h[1-6]')
+                levels = [int(n) for n in re.findall(r"<h([1-6])\b", html)]
+                self.assertEqual(levels[0], 1)
+                self.assertTrue(all(b - a <= 1 for a, b in zip(levels, levels[1:])), levels)
+
+    def test_deliverability_names_google_and_microsoft_rules(self):
+        workflow = self.text("references/email-workflow.md")
+        for needle in ("List-Unsubscribe=One-Click", "RFC 8058", "48 hours", "0.30%",
+                       "5 May 2025", "550; 5.7.515", "p=none"):
+            self.assertIn(needle, workflow)

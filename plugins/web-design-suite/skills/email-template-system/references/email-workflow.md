@@ -184,7 +184,9 @@ Authentication (SPF, DKIM, DMARC), list hygiene and sending reputation matter fa
 
 **4. The plain-text part.** Its absence is a mild spam signal on its own, and a bad one — auto-generated, tag-stripped mush — is worse. See §7.
 
-**One-click unsubscribe.** Bulk senders to Gmail and Yahoo are expected to support `List-Unsubscribe` and `List-Unsubscribe-Post` headers. Those are ESP configuration, not HTML, but your body link must still exist and must still work: a reader who cannot find unsubscribe presses "report spam", which costs far more than the unsubscribe would have.
+**The mailbox providers' rules for bulk senders.** Since February 2024, Google holds anyone sending 5,000 or more messages a day to Gmail accounts to SPF and DKIM, DMARC on the sending domain, one-click unsubscribe (both headers: `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, RFC 8058), unsubscribe requests fulfilled within 48 hours, and a spam rate in Postmaster Tools below 0.10%, never reaching 0.30% ([Google's sender guidelines](https://support.google.com/a/answer/81126), [its FAQ](https://support.google.com/a/answer/14229414)). Since 5 May 2025, Microsoft's Outlook.com (outlook.com, hotmail.com and live.com addresses) holds domains sending more than 5,000 emails a day to an SPF pass, a DKIM pass, and DMARC at `p=none` or stricter, aligned with SPF or DKIM. Its announcement, as updated on 29 April 2025, rejects a failing message with `550; 5.7.515 Access denied, sending domain [SendingDomain] does not meet the required authentication level.`; the same post still says such mail goes to Junk first, so treat a failure as a rejection ([Microsoft's announcement](https://techcommunity.microsoft.com/blog/microsoftdefenderforoffice365blog/strengthening-email-ecosystem-outlook’s-new-requirements-for-high‐volume-senders/4399730)).
+
+The headers and DNS records are ESP and domain configuration, not HTML, but your body link must still exist and must still work: a reader who cannot find unsubscribe presses "report spam", which costs far more than the unsubscribe would have.
 
 ---
 
