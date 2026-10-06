@@ -229,6 +229,11 @@
   `--pad-inline-sm`", which is 12px; migration SKILL.md said "four" algorithms and listed
   six; and figma-variables-sync called `tokens.css` "`git`-enforced read-only", where the
   CI drift check is what refuses a hand edit.
+- **`--interact-at` times the click on the page's clock.** It waited until
+  `Date.now()` reached `performance.timeOrigin` plus MS, comparing Node's wall clock with
+  the browser's. It now maps the page's `performance.now()` onto Node's monotonic clock
+  as NTP does, from the narrowest of three round trips, so a stalled request or reply
+  costs at most half that trip (Codex and CodeRabbit on #56), and `clickedAt` is page time.
 
 ### Changed
 
@@ -262,6 +267,15 @@
 
 ### Tests
 
+- The hydration-click flake: `test_browser_runtime.VitalsMeasures.test_interact_at_clicks_while_the_page_hydrates`
+  found no interaction entry on Windows CI twice (#49's first run, #54's merge to `main`),
+  and failed with a `TypeError`. Its page started the 3-second task 1.5 s after its script
+  parsed, while the click is due 2.5 s after navigation starts, so a late parse put the
+  click before the task. The task is now due at 1.5 s on the page's clock, and a missing
+  entry fails with the run's numbers. It never failed locally (5 runs before the fix, 4
+  after), so there is no fail-before count; the test change is a control.
+  `test_browser_scripts.VitalsTiming.test_the_page_clock_survives_a_stalled_request_or_reply`
+  runs the clock mapping on fake clocks with stalls; it fails on the PR's first head.
 - P17 (LC-A17, LC-A23, LC-B8, LC-C6): `test_versioning.DeprecateKeepsRemovalsInAMajor`
   refuses `--removal` 2.2.0, 2.1.1 and 3.1.0 for `--since 2.1.0` and takes 3.0.0 and 4.0.0;
   `test_token_migration.MigrationPipeline` checks the report's millisecond delta and its

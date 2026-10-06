@@ -305,6 +305,33 @@ class VitalsTiming(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, output(proc))
         self.assertEqual(json.loads(proc.stdout), [540, None, None, None])
 
+    def test_the_page_clock_survives_a_stalled_request_or_reply(self):
+        """Codex and CodeRabbit on #56: anchoring the page's time when the
+        reply landed counted a stalled reply as page time not yet passed, and
+        --interact-at clicked that much late. pageClockOffset() is run on a
+        fake pair of clocks 1000 ms apart, with the stalls given."""
+        source = (SKILLS / "perf-budget-gate" / "scripts" / "measure_vitals.mjs").read_text(
+            encoding="utf-8")
+        found = re.search(r"^async function pageClockOffset\(.*?^}\n", source, re.S | re.M)
+        self.assertIsNotNone(found, "measure_vitals.mjs has no pageClockOffset()")
+        cases = [[[0, 300], [200, 0], [5, 5]],      # the narrowest sample is exact
+                 [[0, 300]], [[300, 0]]]           # one stall: off by half the round trip
+        script = found.group(0) + """
+const run = async (stalls) => {
+  let t = 50, i = 0;
+  const read = async () => { const [before, after] = stalls[i++]; t += before;
+                             const page = t + 1000; t += after; return page; };
+  return pageClockOffset(read, () => t, stalls.length);
+};
+const cases = %s;
+const out = [];
+for (const c of cases) out.push(await run(c));
+console.log(JSON.stringify(out));""" % json.dumps(cases)
+        proc = subprocess.run([NODE, "--input-type=module", "-e", script],
+                              capture_output=True, timeout=60, env=env())
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertEqual(json.loads(proc.stdout), [1000, 850, 1150])
+
 
 class AxeFixText(unittest.TestCase):
 
