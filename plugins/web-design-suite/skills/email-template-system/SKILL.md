@@ -113,7 +113,7 @@ Worth seeing once, because it is what makes the exception credible rather than a
     Ten-year repair promise</h2></td>
 ```
 
-Note what survived and what did not. The media query stays, since no static element set resolves it, and so does the class it matches. Everything else became an attribute. No human typed `#080706`, and nobody will: change `--neutral-950` once and every template that reads `--fg-strong` moves with it.
+Note what survived and what did not. The media query stays, since its condition is evaluated at runtime, and so does the class it matches. Everything else became an attribute. No human typed `#080706`, and nobody will: change `--neutral-950` once and every template that reads `--fg-strong` moves with it.
 
 ---
 
