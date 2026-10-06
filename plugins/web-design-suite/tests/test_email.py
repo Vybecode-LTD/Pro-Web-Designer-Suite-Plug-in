@@ -123,6 +123,25 @@ class LintHasADarkPass(EmailTest):
         self.assertEqual([f["check"] for f in findings if f["check"] in ("contrast", "dark")
                           and f["severity"] == "error"], ["contrast"])
 
+    def test_an_inherited_colour_on_a_background_the_dark_rules_change(self):
+        """Codex on #57: the text sets no colour, its cell does."""
+        body = ('<div style="background-color:#ffffff;color:#9b3400;">'
+                '<p class="child">Back in stock</p></div>')
+        found = self.dark_findings(".child { background-color: #171512 !important; } ", body)
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("#9b3400 on #171512 is 2.50:1", found[0]["message"])
+
+    def test_a_later_style_block_wins_a_tie(self):
+        """Codex on #57: each block's rule order started at 0, so the first
+        block's second rule beat the second block's first."""
+        head = ("<style>@media (prefers-color-scheme: dark) { .wrap { background-color: "
+                "#171512 !important; } .x { color: #9b3400 !important; } }</style>\n"
+                "<style>@media (prefers-color-scheme: dark) { .x { color: #ffa582 !important; } "
+                "}</style>\n")
+        body = '<div class="wrap" style="background-color:#ffffff;"><p class="x">Hi</p></div>'
+        findings = self.lint(self.page("two.html", body, head))
+        self.assertEqual([f for f in findings if f["check"] == "dark"], [])
+
     def test_no_dark_block_no_dark_findings(self):
         page = self.page("light.html", self.BUTTON)
         self.assertEqual([f for f in self.lint(page) if f["check"] == "dark"], [])
@@ -159,6 +178,28 @@ class OutlookFontRule(EmailTest):
         self.assertEqual(len(head_warnings("-apple-system, Arial, sans-serif", "a.html")), 1)
         self.assertEqual(head_warnings("Arial, Helvetica, sans-serif", "b.html"), [])
         self.assertEqual(head_warnings("'Segoe UI', Arial, sans-serif", "c.html"), [])
+
+    def test_only_a_broad_rule_in_the_head_counts(self):
+        """Codex on #57: a VML button's font in the body, or a component's
+        override in the head, is not the scaffold."""
+        stack = '<p style="font-family:-apple-system, Arial;color:#222222;">Hi</p>'
+        vml = '<!--[if mso]><center style="font-family:Arial,sans-serif;">Buy</center><![endif]-->'
+        narrow = "<!--[if mso]><style>.price { font-family: Arial; }</style><![endif]-->\n"
+        broad = "<!--[if mso]><style>table, td { font-family: Arial; }</style><![endif]-->\n"
+        for name, body, head, warns in (("vml.html", stack + vml, "", 1),
+                                        ("narrow.html", stack, narrow, 1),
+                                        ("broad.html", stack, broad, 0)):
+            with self.subTest(case=name):
+                found = [f for f in self.lint(self.page(name, body, head))
+                         if "MSO font rule" in f["message"]]
+                self.assertEqual(len(found), warns, found)
+
+    def test_a_component_override_does_not_stop_the_scaffold(self):
+        narrow = "<!--[if mso]><style>.price { font-family: Arial; }</style><![endif]-->\n"
+        out, log = self.build(self.page("narrow.html", "<p>Hi</p>", narrow))
+        self.assertIn("table, td, div, p, a, h1, h2, h3, li, blockquote",
+                      out.read_text(encoding="utf-8"))
+        self.assertIn("font rule", log)
 
 
 class ContainersAreFluid(EmailTest):

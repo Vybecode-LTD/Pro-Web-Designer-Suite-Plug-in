@@ -65,12 +65,12 @@ sys.dont_write_bytecode = True
 try:                                              # python -m scripts.lint_email
     from .build_email import (VAR_RE, TokenError, compile_selector, default_tokens_path,
                               dropped_message, load_dropped, load_tokens, parse_declarations,
-                              parse_stylesheet)
+                              parse_stylesheet, sets_broad_font)
 except ImportError:                               # python scripts/lint_email.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from build_email import (VAR_RE, TokenError, compile_selector,  # type: ignore[no-redef]
                              default_tokens_path, dropped_message, load_dropped, load_tokens,
-                             parse_declarations, parse_stylesheet)
+                             parse_declarations, parse_stylesheet, sets_broad_font)
 
 GMAIL_CLIP_BYTES = 102_400
 GMAIL_STYLE_BYTES = 16_384
@@ -584,9 +584,12 @@ class Linter:
         # DL-A11: the Word engine cannot resolve a first family Windows lacks
         # (-apple-system, a web font) and lands on its default serif, unless
         # an [if mso] block sets a font it has.
-        mso_font = any(
+        # Only a broad rule in the head counts: a VML button's <center
+        # style="font-family:Arial"> in the body is no scaffold (Codex on #57).
+        head = next((n for n in self.root.elements() if n.tag == "head"), None)
+        mso_font = head is not None and any(
             n.kind == "comment" and re.match(r"\s*\[if\s+mso", n.data, re.I)
-            and "font-family" in n.data for n in self.root.walk()
+            and sets_broad_font(n.data) for n in head.walk()
         )
         if not mso_font:
             stacks = [declarations(n.get("style") or "").get("font-family", "")
@@ -781,19 +784,23 @@ class Linter:
         return size, bold, 3.0 if large else 4.5
 
     def dark_rules(self) -> list:
-        """(compiled selector, rule) for each retained rule under
-        `prefers-color-scheme: dark` whose selector the compiler can match."""
+        """(compiled selector, rule, source order) for each retained rule
+        under `prefers-color-scheme: dark` whose selector the compiler can
+        match. The order runs on across <style> blocks: each block's parse
+        starts at 0, and a later block's rule wins a tie (Codex on #57)."""
         found = []
+        order = 0
         for node in self.root.elements():
             if node.tag != "style":
                 continue
             for rule in parse_stylesheet(node.text_content()):
+                order += 1
                 if not rule.at_rule or not DARK_RE.search(rule.at_rule):
                     continue
                 for selector in rule.selectors:
                     compiled = compile_selector(selector)
                     if compiled is not None:
-                        found.append((compiled, rule))
+                        found.append((compiled, rule, order))
         return found
 
     def check_dark(self):
@@ -810,10 +817,10 @@ class Linter:
             if id(node) not in cache:
                 bucket = [((3 if d.important else 1, 9, 9, 9, 10**9), d.prop, d.value)
                           for d in parse_declarations(node.get("style") or "")]
-                for compiled, rule in rules:
+                for compiled, rule, order in rules:
                     if compiled.matches(node):
                         for d in rule.declarations:
-                            rank = (2 if d.important else 0,) + compiled.specificity + (rule.order,)
+                            rank = (2 if d.important else 0,) + compiled.specificity + (order,)
                             bucket.append((rank, d.prop, d.value))
                 bucket.sort(key=lambda item: item[0])
                 final: dict[str, str] = {}
@@ -838,17 +845,37 @@ class Linter:
                     return color, raw
             return None, ""
 
+        def colour(node, own):
+            """The colour this element's text is drawn in, inherited when
+            it sets none, with `own` giving each element's declarations."""
+            for current in [node, *node.ancestors()]:
+                if current.kind != "element" or current.tag == "#document":
+                    continue
+                raw = own(current).get("color") or current.get("color")
+                if raw and parse_color(raw):
+                    return raw
+            return None
+
+        def inline(node):
+            return declarations(node.get("style") or "")
+
+        # Each element that holds text of its own is measured, with the colour
+        # it inherits: a dark rule may change only its background (Codex on #57).
         for node in self.root.elements():
-            if node.tag in ("#document", "style", "head", "title"):
+            if node.tag in ("#document", "style", "head", "title", "script"):
                 continue
-            color = dark(node).get("color") or node.get("color")
+            if not any(c.kind == "text" and c.data.strip() for c in node.children):
+                continue
+            if any(is_preheader(n) for n in [node, *node.ancestors()] if n.kind == "element"):
+                continue
+            color = colour(node, dark)
             fg = parse_color(color) if color else None
-            if fg is None or not " ".join(node.text_content().split()):
+            if fg is None:
                 continue
             bg, source = dark_background(node)
             if bg is None:
                 continue
-            light = declarations(node.get("style") or "").get("color") or node.get("color")
+            light = colour(node, inline)
             if (parse_color(light) if light else None, self.resolve_background(node)[0]) == (fg, bg):
                 continue
             size, bold, required = self.text_size(node, declarations(node.get("style") or ""))

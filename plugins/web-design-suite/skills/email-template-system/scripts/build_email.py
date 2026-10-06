@@ -828,6 +828,21 @@ MSO_HEAD_BLOCK = (
 )
 
 
+BROAD_FONT_SELECTORS = {"*", "body", "table", "td"}
+
+
+def sets_broad_font(comment: str) -> bool:
+    """Whether a conditional comment's <style> gives the whole email a font:
+    a font-family rule on *, body, table or td. A component's own override,
+    `.price { font-family: Arial }`, is not the scaffold (Codex on #57)."""
+    for css in re.findall(r"<style\b[^>]*>(.*?)</style\s*>", comment, re.S | re.I):
+        for rule in parse_stylesheet(css):
+            if (any(d.prop == "font-family" for d in rule.declarations)
+                    and BROAD_FONT_SELECTORS & {s.strip().lower() for s in rule.selectors}):
+                return True
+    return False
+
+
 def inject_mso(root: Node) -> list[str]:
     notes: list[str] = []
     html = root.find("html")
@@ -846,7 +861,7 @@ def inject_mso(root: Node) -> list[str]:
     mso = [node for node in head.walk()
            if node.kind == "comment" and re.match(r"\s*\[if\s+mso", node.data, re.I)]
     has_dpi = any("PixelsPerInch" in node.data for node in mso)
-    has_font = any("font-family" in node.data for node in mso)
+    has_font = any(sets_broad_font(node.data) for node in mso)
     if has_dpi and has_font:
         return notes
     if has_dpi:
