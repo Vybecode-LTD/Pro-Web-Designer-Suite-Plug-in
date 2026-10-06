@@ -63,12 +63,13 @@ sys.dont_write_bytecode = True
 # The compiler's CSS parser and selector matcher, so the dark pass reaches the
 # elements the build's own cascade would (DL-B6).
 try:                                              # python -m scripts.lint_email
-    from .build_email import (VAR_RE, TokenError, compile_selector, default_tokens_path,
+    from .build_email import (VAR_RE, Declaration, TokenError, compile_selector, default_tokens_path,
                               dropped_message, load_dropped, load_tokens, parse_declarations,
                               parse_stylesheet, sets_broad_font)
 except ImportError:                               # python scripts/lint_email.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from build_email import (VAR_RE, TokenError, compile_selector,  # type: ignore[no-redef]
+    from build_email import (VAR_RE, Declaration, TokenError,  # type: ignore[no-redef]
+                             compile_selector,
                              default_tokens_path, dropped_message, load_dropped, load_tokens,
                              parse_declarations, parse_stylesheet, sets_broad_font)
 
@@ -78,7 +79,11 @@ EMAIL_MIN_FONT_PX = 13
 # The phone width the no-<style> check holds inline widths to (DL-A12).
 PHONE_PX = 375
 COLOR_LITERAL_RE = re.compile(r"#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(")
-LENGTH_LITERAL_RE = re.compile(r"(?<![\w.#-])(\d*\.?\d+)(px|em|rem)\b")
+# A sign belongs to the literal (`-24px`), a digit inside a name does not.
+LENGTH_LITERAL_RE = re.compile(r"(?<![\w.#])(-?\d*\.?\d+)(px|em|rem)\b")
+# The attributes that carry a colour, on an element or in a VML shape.
+COLOUR_ATTRS = ("bgcolor", "color", "background", "fillcolor", "strokecolor")
+COMMENT_ATTR_RE = re.compile(r"\b(%s|style)\s*=\s*\"([^\"]*)\"" % "|".join(COLOUR_ATTRS), re.I)
 DARK_RE = re.compile(r"prefers-color-scheme\s*:\s*dark", re.I)
 
 VOID_TAGS = {
@@ -965,8 +970,10 @@ class Linter:
             if width is None or width <= PHONE_PX:
                 continue
             cap = decls.get("max-width", "")
-            if cap.endswith("%") or (px(cap) is not None and px(cap) <= PHONE_PX):
-                continue
+            share = re.fullmatch(r"\s*(\d*\.?\d+)\s*%\s*", cap)
+            if (share and float(share.group(1)) <= 100) or (px(cap) is not None
+                                                             and px(cap) <= PHONE_PX):
+                continue          # a cap of 200% fits nothing (Codex on #58)
             self.add("error", "nostyle",
                      "<%s> is %gpx wide with no <style>, on a %dpx phone"
                      % (node.tag, width, PHONE_PX), node.line,
@@ -976,19 +983,36 @@ class Linter:
                      "in the [if mso] ghost table (references/email-architecture.md)")
 
     def source_declarations(self):
-        """(line, where, prop, value) for every declaration a source template
-        writes: inline styles, and the rules of each <style> block."""
-        for node in self.root.elements():
+        """(line, where, prop, value, lengths) for every value a source template
+        writes: inline styles, the rules of each <style> block, the colour
+        attributes, and those and the styles inside a conditional comment's VML
+        (Codex on #58). `lengths` is False where only colours and tokens are
+        held: VML sizes its own shapes."""
+        for node in self.root.walk():
+            if node.kind == "comment":
+                for m in COMMENT_ATTR_RE.finditer(node.data):
+                    name = m.group(1).lower()
+                    decls = (parse_declarations(m.group(2)) if name == "style"
+                             else [Declaration(name, m.group(2), False)])
+                    for d in decls:
+                        yield node.line, "a conditional comment", d.prop, d.value, False
+                continue
+            if node.kind != "element":
+                continue
             if node.tag == "style":
                 for rule in parse_stylesheet(node.text_content()):
                     where = "`%s`" % ", ".join(rule.selectors) if rule.selectors else "an at-rule"
                     for d in rule.declarations:
-                        yield node.line, where, d.prop, d.value
-            elif node.get("style") and not is_preheader(node):
+                        yield node.line, where, d.prop, d.value, True
+                continue
+            for name in COLOUR_ATTRS:
+                if node.get(name):
+                    yield node.line, "<%s>" % node.tag, name, node.get(name), False
+            if node.get("style") and not is_preheader(node):
                 for d in parse_declarations(node.get("style")):
                     if node.tag == "img" and d.prop in ("width", "height"):
                         continue          # an image's own size, mirrored from its attributes
-                    yield node.line, "<%s>" % node.tag, d.prop, d.value
+                    yield node.line, "<%s>" % node.tag, d.prop, d.value, True
 
     def check_source(self):
         """DL-A13, DL-C5: Law 1 on the source, before the build turns every
@@ -997,7 +1021,7 @@ class Linter:
         by_value: dict[str, list[str]] = {}
         for name, value in tokens.items():
             by_value.setdefault(value.strip().lower(), []).append(name)
-        for line, where, prop, value in self.source_declarations():
+        for line, where, prop, value, lengths in self.source_declarations():
             for m in VAR_RE.finditer(value):
                 name, fallback = m.group(1), m.group(2)
                 if name in self.dropped and name not in tokens:
@@ -1019,13 +1043,15 @@ class Linter:
                              line, "in %s %s" % (where, prop),
                              "drop it: it only waits to hide a renamed token")
             bare = VAR_RE.sub("", value)
-            if COLOR_LITERAL_RE.search(bare):
+            named = [w for w in re.findall(r"[A-Za-z]+", bare)
+                     if NAMED_COLORS.get(w.lower()) and prop != "font-family"]
+            if COLOR_LITERAL_RE.search(bare) or named:
                 self.add("error", "source", "a hand-written colour, %s: %s" % (prop, bare.strip()),
                          line, "in %s. Law 1: the token file is the source of truth." % where,
                          "use a role token")
             literals = ["%s%s" % (n, unit) for n, unit in LENGTH_LITERAL_RE.findall(bare)
-                        if float(n) != 0]
-            if prop == "font-weight" and re.fullmatch(r"\s*\d+\s*", bare):
+                        if float(n) != 0] if lengths else []
+            if lengths and prop == "font-weight" and re.fullmatch(r"\s*\d+\s*", bare):
                 literals.append(bare.strip())
             for literal in literals:
                 family = token_family(prop)
