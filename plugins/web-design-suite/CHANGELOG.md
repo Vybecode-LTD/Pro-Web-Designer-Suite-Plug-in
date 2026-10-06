@@ -299,7 +299,8 @@
   February 2024, among others: SPF, DKIM, DMARC, an aligned From domain, reverse DNS, TLS,
   and on promotional mail the RFC 8058 header pair with unsubscribes fulfilled within
   48 hours, a spam rate below 0.10% and never 0.30%) and Microsoft's for Outlook.com (since
-  5 May 2025, for domains sending more than 5,000 a day: SPF and DKIM passing, DMARC at
+  5 May 2025, for senders of 5,000 or more a day from one `5322.From` domain, as its 5.7.515 help
+  page puts it: SPF and DKIM passing, DMARC at
   `p=none` or stricter and aligned, and the `550; 5.7.515` rejection), each re-read at its
   source on 2026-10-06; the percentages and the 48 hours are in `evidence.json`.
 
@@ -368,6 +369,9 @@
   and a negative literal unmatched.
   CodeRabbit's added two: a token file that is not a JSON object crashed with a traceback,
   and `render_email.mjs` ran the email's scripts; it renders with JavaScript off.
+  `render_email.mjs` retries a full-page screenshot Chromium's headless shell refused
+  ("Unable to capture screenshot", once on #60's Linux CI). `RenderEmailRetries` holds it
+  with a stub browser that refuses the first capture; it fails on #60's earlier head.
 - P19 (DL-A14, DL-A21, DL-B7): `test_email.InlinerWritesTheCascadesOrder` and
   `EmailDocClaims` (the Law 3 count read from the token file, the weight and size notes,
   the edge built from the border role, no `:last-child` workaround, headings in order in

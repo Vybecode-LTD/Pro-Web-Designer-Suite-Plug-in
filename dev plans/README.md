@@ -10,7 +10,7 @@ Every release is also a tagged commit, from `v3.0.0` on. So `git diff v3.1.0 v3.
 |---|---|
 | **`web-design-suite-execution-plan.md`** | **The schedule for everything left** (2026-10-02). Every open item and N-item in one of 44 PRs, P0–P43, over phases 3 to 6 and four releases. It also has the decisions the user made on 2026-10-02, the efficiency rules, the lean protocol per PR, and phase 7, an eval-driven method for going past the review. |
 | `check_execution_plan.py` | Fails if an open item is missing from the execution plan's schedule or placed twice. Run it after changing the plan or the inventory. |
-| `next-session-prompt.md` | **The prompt to start the next session from.** Orientation, then the next PRs in detail: P18 (the email templates and lint) and P19 (the email build and its facts). Rewrite it at the end of every session. |
+| `next-session-prompt.md` | **The prompt to start the next session from.** Orientation, then the next PRs in detail: P20 (the scaffold's answers, accessible forms and a server schema) and P21 (the deck, honest by construction). Rewrite it at the end of every session. |
 | `next-session-opening-prompt.md` | The message to paste into the next session to start it. Rewrite it with `next-session-prompt.md`. |
 | `web-design-suite-completion-plan.md` | **What each item needs.** Phases 3 to 6 (3.3.0 onward) in fourteen workstreams, W1–W14. It covers every open review item and what phase 2 and 3.2.1 found. It also has the rules of the work, the decisions only the user can make, and the release procedure. |
 | `web-design-suite-completion-inventory.md` | All 265 review items, each with its status: fixed in a release, or planned in a workstream. It replaces the review's ✔ marks; update a row when its item is fixed. |

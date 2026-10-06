@@ -114,7 +114,18 @@ async function main() {
         await page.setContent(mode.strip ? stripStyles(html) : html, { waitUntil: 'load' });
         const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
         const png = path.join(opts.out, `${stem}-${mode.name}.png`);
-        await page.screenshot({ path: png, fullPage: true });
+        // Chromium's headless shell sometimes refuses a full-page capture
+        // ("Unable to capture screenshot"), and the next attempt succeeds:
+        // try three times before calling the run failed (#60's Linux CI).
+        for (let attempt = 1; ; attempt++) {
+          try {
+            await page.screenshot({ path: png, fullPage: true });
+            break;
+          } catch (err) {
+            if (attempt >= 3 || !/Unable to capture screenshot/.test(String(err.message))) throw err;
+            await page.waitForTimeout(200);
+          }
+        }
         results.push({ mode: mode.name, png, width: opts.width, scrollWidth,
                        fits: scrollWidth <= opts.width });
       } finally {

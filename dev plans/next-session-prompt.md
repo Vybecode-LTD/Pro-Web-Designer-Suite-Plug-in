@@ -1,6 +1,6 @@
 # Start here: the next session
 
-**Written 2026-10-05**, at the end of the fourth Phase 4 session: P15 (#49, #50), P16 (#53) and P17 (#54) were merged. Phase 4 (3.4.0) is under way; 3.3.0 is the latest release. Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P18** (the email templates and lint, §4) and **P19** (the email build and its facts, §5). Then P20 onward, as the budget allows.
+**Written 2026-10-06**, at the end of the fifth Phase 4 session: the hydration flake fix (#56), P18 (#57, #58) and P19 (#59) were merged. Phase 4 (3.4.0) is under way; 3.3.0 is the latest release. Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P20** (the scaffold's answers, accessible forms and a server schema, §4) and **P21** (the deck, honest by construction, §5). Then P22 onward, as the budget allows.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers. The repository is `C:\DEV\Pro-Web-Designer-Suite-Plug-in` (public on GitHub, `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, MIT). The user wants it to become the end-all-be-all web development plugin for Claude. Every remaining item is scheduled in `dev plans/web-design-suite-execution-plan.md`.
 
@@ -10,7 +10,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 - **Budget.** A session may run up to **750 thousand tokens, with no compacting** (the user, 2026-10-02). About 90 thousand of it is spent before the first message.
   - Report usage after each PR, and warn early. Stop and write the handoff (§6) well before the cap; the end-of-session docs take about 40 thousand.
-  - The `total_tokens left` counter resets when the app delivers a `<ci-monitor-event>` (not on a background task's notification). Keep a running total yourself: the used figure is 15,000,000 minus the counter, plus what was used before the last reset. It reset twice last session.
+  - The `total_tokens left` counter resets when the app delivers a `<ci-monitor-event>` (not on a background task's notification). Keep a running total yourself: the used figure is 15,000,000 minus the counter, plus what was used before the last reset. It reset about ten times last session, at each app event.
   - Long thinking costs as much as long output. Decide, then act.
   - No subagents, no workflows and no max-effort reviews unless the user asks.
   - Read files by section (`grep -n`, `sed -n`, Read with offset and limit), never whole review files, and never a whole test file you only need a class of.
@@ -51,13 +51,13 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-4. `python -B "dev plans/check_execution_plan.py"` must say `90 open items, 90 scheduled`.
+4. `python -B "dev plans/check_execution_plan.py"` must say `79 open items, 79 scheduled`.
 5. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
 
-- **The plugin** is `plugins/web-design-suite/`: `skills/` (13), `tests/` (about 620 tests, standard-library `unittest`, helpers in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `run_py`, `run_node`, `load_script`, `TempDirTest`), and `tools/` (`check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`).
-- **The browser scripts** (`a11y_runtime.mjs`, `snapshot_matrix.mjs`, `measure_vitals.mjs`) import `scripts/browser_common.mjs`, a copy of `shared/browser_common.mjs` in each skill: change the master and copy it over all three. P18's `render_email.py` should find the browser the same way (DL-C3).
+- **The plugin** is `plugins/web-design-suite/`: `skills/` (13), `tests/` (672 tests, standard-library `unittest`, helpers in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `run_py`, `run_node`, `load_script`, `TempDirTest`), and `tools/` (`check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`).
+- **The browser scripts** (`a11y_runtime.mjs`, `snapshot_matrix.mjs`, `measure_vitals.mjs`) import `scripts/browser_common.mjs`, a copy of `shared/browser_common.mjs` in each skill, and `render_email.mjs` (email-template-system) uses it too: change the master and copy it over all four.
 - **New in P15 (#49, #50):**
   - apply_codemod pairs a negative margin with its parent rule's padding (nested rule, descendant or child selector, BEM block) only when that side is set in **one block** of the file: the last `!important` declaration there wins, or else the last one. An inline side is read both ways (`BY_DIRECTION`: left to right and right to left) and pairs only when the two agree. `!important` is not a slot, in the extractor (`slot_prop`) or the pairing.
   - Law 6's lists are design-rules.json's `tiers`, synced into the audit and extract_system; `test_rules_spec` runs the `tiers` examples through the audit.
@@ -68,30 +68,27 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 - **The release** is `python -B tooling/release/build.py OUT --rev SHA`, then a `v*` tag on that commit; `release.yml` is the only thing that creates a release.
 - **CI** runs Windows, Linux and macOS × Python 3.9 and 3.14, with Node 22. A macOS job cancelled after 15 minutes with no log is a runner that never came: re-run it (`gh run rerun RUN --failed`).
 - **Python 3.9 is the floor**: no `zip(strict=)`, no `match`, no `str.removeprefix`, no `X | Y` outside annotations.
-- **SKILL.md budgets are tight:** component-state-matrix is at 20,450 bytes, perf-budget-gate at 20,405 and design-system-versioning at 20,401, against 20,500. Detail goes in the references.
+- **SKILL.md budgets are tight:** email-template-system is at 20,456 bytes, component-state-matrix at 20,450, perf-budget-gate at 20,405 and design-system-versioning at 20,401, against 20,500. Detail goes in the references.
+- **New in #56:** `--interact-at` maps the page's clock with `pageClockOffset()` (the narrowest of three round trips); the hydration test fails with the run's numbers if it recurs.
+- **New in P18 and P19 (#57 to #59):** `test_email` holds the email skill. `lint_email` has `dark` (the retained dark rules through build_email's matcher, one source order across `<style>` blocks, inherited colours), `nostyle` (an inline width over 375px) and `--source` (Law 1 on a source template: dropped, unknown and fallback `var()`s, hand-written colours in CSS, colour attributes and VML, length and weight literals with the same-family Tier-2 role). `build_email` refuses a dropped token by name, notes each fallback, adds the broad `[if mso]` font rule (`sets_broad_font`), and writes the cascade's order. `render_email.mjs` renders light, dark and no-`<style>` with JavaScript off. A new script with a shebang must be executable in git (`git update-index --chmod=+x`); `test_file_modes` caught one only in CI.
 
 ## 3. First: the state of `main`
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings: the flake there, if it recurs, gets fixed before new work.
 
-## 4. P18: the email templates and lint
+## 4. P20: the scaffold reads its answers, wires its forms, and emits a server schema
 
-Items DL-A10, DL-A11, DL-A12, DL-A20, DL-B6, DL-C3, DL-C5, in `dev plans/web-design-suite-review/delivery.md`: lines 48 to 56 (A10 to A12), 72 (A20), 82 (B6), 90 (C3) and 92 (C5). **DL-A13 (line 57) moved here from P19** in #55: its fix is DL-C5's `lint_email --source`, the same file.
-- **DL-A10.** Dark mode breaks the call to action: the dark block's `a { color: var(--email-dark-link) !important }` beats the button's inline `color:#ffffff` (2.56:1), and the announcement's eyebrow is 2.50:1 on the dark surface. Add `.button{color:var(--fg-on-accent)!important}` to each dark block, give the announcement's CTA `class="button"`, re-point `.label`.
-- **DL-A11.** The `[if mso]` block never carries the Outlook font rule the docs promise, so classic Outlook falls back to its serif. Inject the `font-family:Arial,Helvetica,sans-serif!important` `<style>` in `MSO_HEAD_BLOCK` (build_email.py, about :747) and lint for it.
-- **DL-A12.** The receipt's container is `width:600px` inline, so without `<style>` (Gmail's app with a non-Google account) it is 600px wide at 375px: `width:100%`, as the other templates.
-- **DL-A20.** A comment holding `{{` is kept as an ESP directive, so the receipt's authoring notes ship; match real ESP syntax only (`{{#`, `{%`, `*|…|*`).
-- **DL-B6, DL-C3.** The checks the docs promise: `lint_email` gets a dark pass (build_email's selector matcher on the retained `prefers-color-scheme` rules, contrast re-run) and a no-`<style>` width check; a new `render_email.py` renders light, dark and no-style at 375px with the browser scripts' discovery.
-- **DL-C5 (and DL-A13).** `lint_email --source`: literals, `var()` fallbacks, and a `var(<dropped token>, …)` as an error that prints `dropped[name].use`.
-- **Files.** `email-template-system/assets/` (the three templates), `scripts/build_email.py`, `scripts/lint_email.py`, a new `scripts/render_email.py`, the email references. Tests are in the email test module (grep `lint_email` in `tests/`). P18 is L: split it in two PRs (the templates and the build, then the lint passes and the renderer) if it runs long.
+Items DL-A8, DL-A9, DL-B2, in `dev plans/web-design-suite-review/delivery.md`: lines 39 (A8), 42 (A9) and 78 (B2).
+- **DL-A8.** `scaffold_ui.py` ignores interview answers: with `money = {"currency":"JPY","storage":"decimal"}` the output still has `currency: 'USD'` and `formatMoney(row.budget_cents / 100)`, the hard-coded `/100` field-mapping §7 calls silently wrong (JPY 1, KWD 1000). `cardinality`, `label_column` and `default_sort` are never read (only 8 answer kinds, about :165-200). Thread currency and scale into the cells, read the other answers, or mark which are advisory.
+- **DL-A9.** Generated forms lack the a11y wiring screen-patterns.md promises: ids go to a `data-describedby` on a wrapper div (assistive tech ignores it), `RadioGroup`'s `labelledBy` names a label with no id, every field error and the summary carry `role="alert"` (N+1 live regions), and nothing focuses the summary. Put `aria-describedby` and `aria-invalid` on the control, use `<fieldset><legend>` or id the label, drop `role="alert"` from inline errors, focus the summary.
+- **DL-B2, what is left of it.** The per-table policies, column grants and RLS smoke test shipped in 3.3.0 (`test_policies`; the inventory says "partly done"): do not redo them. Left: a server-side schema, zod or pydantic, that mirrors the constraints the scaffold already reads.
+- **Files.** `content-model-to-ui/scripts/scaffold_ui.py`, its references (field-mapping.md, screen-patterns.md, supabase-integration.md). Tests: grep `scaffold_ui` in `tests/`. P20 is M-L: split it (A8 and A9, then B2) if it runs long.
 
-## 5. P19: the email build and its facts
+## 5. P21: the deck, honest by construction
 
-Items DL-A14, DL-A21, DL-B7, delivery.md lines 61, 73 and 83.
-- **DL-A14.** The inliner keeps a longhand's first position when a shorthand follows it, so `td{padding:0}` + `.pad{padding-left:24px}` + `style="padding:8px"` gives `padding:8px;padding-left:24px` (the cascade says 8px). `final.pop(prop, None)` before re-inserting (build_email.py, about :694).
-- **DL-A21.** Consistency: SKILL.md's "Same 18 steps" (email keeps 13 and adds off-scale type), the `shorthand-font-removed` reasons, "no 500/600 weight" (wrong for SF and Segoe UI), newsletter's per-paragraph `padding-bottom` then `0` (the `:last-child` workaround SKILL.md rules out), `<p class="h3">` headings invisible to screen readers, and a duplicated `#e7e5e2`.
-- **DL-B7.** Deliverability is dated: add Microsoft's consumer-mail rules (since 5 May 2025: SPF, DKIM, DMARC, and the rejection code: the review wrote `550 5.7.15`, Codex on #55 says Microsoft's announcement gives `550; 5.7.515 Access denied`; take the one the announcement prints) and Google's RFC 8058 header pair, 48-hour unsubscribe handling and 0.3% spam ceiling. Re-read both at the source on the day; the 0.3% and the dates are figures for `evidence.json`.
-- P19 is M.
+Items PS-C1, PS-A5, PS-A6, PS-A7, PS-A10, PS-A12, PS-A13, PS-A19, PS-B7, in `dev plans/web-design-suite-review/persuasion.md`: lines 73 (C1), 17 (A5), 19 (A6), 21 (A7), 27 (A10), 31 (A12), 33 (A13), 45 (A19) and 67 (B7). Read each line before you plan.
+- **PS-A5:** `--a11y` rejects the suite's own accessibility JSON. **PS-A6:** the printed deck sends every presenter note to the client; add `--handout`. **PS-A7:** a reversed decision is presented as current. **PS-A10:** the "Say this" lines break the skill's rule on numbers. **PS-A12:** the landing markup breaks its own full-bleed rule. **PS-A13:** flaw timing and deck structures contradict the method. **PS-A19:** the meeting record overstates its legal effect. **PS-B7:** pressing N while screen-sharing shows the notes; add a presenter window (BroadcastChannel). **PS-C1:** wording chosen from the data, manual-test evidence as an input.
+- **Files.** `client-presentation-builder/scripts/build_presentation.py`, its references and assets, landing-page-conversion's markup for A12. P21 is L: split it in two (the data and print: A5, A6, A7, A10; then the presenter window and the docs: A12, A13, A19, B7, and PS-C1, which includes the presenter window, so it closes with the second part).
 
 **Close each PR:** the CHANGELOG under `## 3.4.0 — unreleased`, each item "fixed in 3.4.0" in the inventory with its test, the PR's own row in the plan as `Pk, #N`, and §9.
 

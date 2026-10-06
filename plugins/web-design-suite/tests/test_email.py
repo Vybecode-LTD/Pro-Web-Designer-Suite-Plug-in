@@ -380,6 +380,56 @@ class NoStyleWidth(EmailTest):
 
 MODULES = tool_modules("WDS_NODE_MODULES", "playwright", node_path=True)
 
+# A browser whose full-page capture fails the first time on each page, as
+# Chromium's headless shell did on #60's Linux CI, then writes a stub PNG.
+STUB_FLAKY_SCREENSHOT = """\
+import fs from 'node:fs';
+export const chromium = {
+  executablePath() { return '/nonexistent/stub-chromium'; },
+  async launch() {
+    return {
+      async newContext() {
+        let refused = false;
+        return {
+          async newPage() {
+            return {
+              async route() {}, async setContent() {}, async evaluate() { return 375; },
+              async waitForTimeout() {},
+              async screenshot(opts) {
+                if (!refused) {
+                  refused = true;
+                  throw new Error('Protocol error (Page.captureScreenshot): Unable to capture screenshot');
+                }
+                fs.writeFileSync(opts.path, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+              },
+            };
+          },
+          async close() {},
+        };
+      },
+      async close() {},
+    };
+  },
+};
+export default { chromium };
+"""
+
+
+@unittest.skipUnless(NODE, "node is not installed")
+class RenderEmailRetries(EmailTest):
+    """CodeRabbit on #60: a refused capture once failed the whole run."""
+
+    def test_a_refused_screenshot_is_tried_again(self):
+        self.write("stub/node_modules/playwright/index.mjs", STUB_FLAKY_SCREENSHOT)
+        browser = self.write("fake-browser.exe", "not really a browser")
+        page = self.page("r.html", "<p>Hi</p>")
+        proc = run_node("email-template-system", "render_email.mjs", page, "--out",
+                        self.tmp / "renders", "--browser", browser, cwd=self.tmp,
+                        env_changes={"NODE_PATH": str(self.tmp / "stub" / "node_modules"),
+                                     "EMAIL_CHROMIUM": None})
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertEqual(len(list((self.tmp / "renders").glob("*.png"))), 3)
+
 
 @unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
 class RenderEmail(EmailTest):
@@ -501,5 +551,5 @@ class EmailDocClaims(EmailTest):
         for needle in ("List-Unsubscribe=One-Click", "RFC 8058", "48 hours", "0.30%",
                        "5 May 2025", "550; 5.7.515", "p=none", "not transactional",
                        "reverse DNS", "TLS", "RFC 5322", "in summary",
-                       "Google recommends rather than requires"):
+                       "Google recommends rather than requires", "5,000 or more emails a day", "same `5322.From` domain"):
             self.assertIn(needle, workflow)
