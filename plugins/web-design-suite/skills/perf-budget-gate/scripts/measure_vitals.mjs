@@ -465,7 +465,10 @@ const HARVEST = ({ topN, ttfb: networkTtfb, requests: networkRequests }) => {
 // click goes through the browser's input pipeline at MS after navigation
 // starts, so it queues behind whatever task holds the main thread then, as a
 // user's does. MS counts from the page's own time origin: a cold browser can
-// take half a second to send the request. Returns when it clicked, or null.
+// take half a second to send the request. The wait is read off the page's
+// clock (performance.now), not Date.now() against performance.timeOrigin:
+// those are two processes' wall clocks, which a busy CI machine can skew
+// apart. Returns when it clicked, on the page's clock, or null.
 // The document's TTFB in ms from CDP: from the request's first timestamp
 // (seconds) to the end of its headers, or null when CDP left the timing
 // unset (it marks an unset field -1), so Navigation Timing stands in.
@@ -477,14 +480,18 @@ function networkTtfb(start, timing) {
 
 async function clickDuringLoad(page, opts) {
   try {
-    const origin = await page.evaluate(() => performance.timeOrigin);
     const target = page.locator(opts.interact).first();
     await target.waitFor({ state: 'visible', timeout: opts.interactAt + 10000 });
     const box = await target.boundingBox();
     if (!box) throw new Error('the target has no layout box');
-    const wait = origin + opts.interactAt - Date.now();
+    // The page's time, paired with Node's monotonic clock when the answer
+    // lands: the reply leaves as soon as it is read, the request may queue.
+    const pageNow = await page.evaluate(() => performance.now());
+    const anchor = performance.now();
+    const onPage = () => pageNow + performance.now() - anchor;
+    const wait = opts.interactAt - onPage();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    const at = Math.round(Date.now() - origin);
+    const at = Math.round(onPage());
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     return at;
   } catch (err) {
