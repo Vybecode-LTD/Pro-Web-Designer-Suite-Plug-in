@@ -10,13 +10,18 @@
   stripped it overflowed a phone.
 - DL-A20: any comment holding `{{` was kept as an ESP directive, so the
   receipt's authoring notes went out in every build.
+- DL-A13, DL-C5: nothing read a source template, and a dropped token with a
+  fallback compiled to the fallback. `lint_email --source` and the build's
+  dropped-token error now hold Law 1.
+- DL-B6, DL-C3: a no-<style> width check, and render_email.mjs.
 """
 from __future__ import annotations
 
 import json
 import re
+import unittest
 
-from wds_support import SKILLS, TempDirTest, output, run_py
+from wds_support import NODE, SKILLS, TempDirTest, output, run_node, run_py, tool_modules
 
 EMAIL = SKILLS / "email-template-system"
 TEMPLATES = sorted((EMAIL / "assets" / "templates").glob("*.html"))
@@ -230,3 +235,184 @@ class AuthoringCommentsAreDropped(EmailTest):
         for directive in kept:
             self.assertIn(directive, html)
         self.assertNotIn("note: write the name", html)
+
+
+class DroppedTokensFailTheBuild(EmailTest):
+    """DL-A13: `var(--elevation-card, #000)` compiled to #000000 and exited 0,
+    and without the fallback the error was generic, not the "use
+    --email-edge" SKILL.md promises."""
+
+    def build_failing(self, css):
+        source = self.page("drop.html", '<p class="c">Hi</p>', "<style>.c { %s }</style>\n" % css)
+        proc = run_py("email-template-system", "build_email", source, "-o", self.tmp / "o.html",
+                      cwd=self.tmp)
+        return proc.returncode, output(proc)
+
+    def test_a_dropped_token_fails_with_what_to_use(self):
+        for css in ("border: var(--elevation-card);", "border: var(--elevation-card, #000);"):
+            with self.subTest(css=css):
+                code, out = self.build_failing(css)
+                self.assertEqual(code, 2, out)
+                self.assertIn("--elevation-card is not in email", out)
+                self.assertIn("use --email-edge", out)
+
+    def test_a_token_file_that_is_not_an_object_exits_2(self):
+        """CodeRabbit on #58: `[{"tokens": …}]` raised AttributeError, a traceback."""
+        bad = self.write("bad-tokens.json", '[{"tokens": {}}]')
+        source = self.page("t.html", "<p>Hi</p>")
+        for module, args in (("build_email", ("-o", self.tmp / "o.html")), ("lint_email", ("--source",))):
+            with self.subTest(module=module):
+                proc = run_py("email-template-system", module, source, *args, "--tokens", bad,
+                              cwd=self.tmp)
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn("is not a JSON object", output(proc))
+                self.assertNotIn("Traceback", output(proc))
+
+    def test_a_fallback_that_stood_in_is_noted(self):
+        source = self.page("fb.html", '<p class="c">Hi</p>',
+                           "<style>.c { padding-top: var(--not-a-token, 7px); }</style>\n")
+        out, log = self.build(source)
+        self.assertIn("var(--not-a-token) is not a token: its fallback 7px was used", log)
+
+
+class LintTheSource(EmailTest):
+    """DL-A13, DL-C5: `lint_email --source`, Law 1 before the build."""
+
+    def source_findings(self, css="", inline=""):
+        page = self.page("src.html", '<p class="c" style="%s">Hi</p>' % inline,
+                         "<style>.c { %s }</style>\n" % css)
+        proc = run_py("email-template-system", "lint_email", page, "--source", "--format", "json",
+                      cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        findings = json.loads(proc.stdout.decode("utf-8"))["files"][str(page)]["findings"]
+        return [(f["severity"], f["message"], f["detail"]) for f in findings]
+
+    def test_a_dropped_token_is_an_error_that_names_its_replacement(self):
+        found = self.source_findings("border: var(--elevation-card, #000);")
+        self.assertIn("error", [f[0] for f in found])
+        self.assertTrue(any("use --email-edge" in f[1] for f in found), found)
+
+    def test_unknown_tokens_and_fallbacks(self):
+        self.assertEqual(self.source_findings("color: var(--no-such-role);")[0][:2],
+                         ("error", "var(--no-such-role) is not a token"))
+        self.assertEqual(self.source_findings("padding-top: var(--no-such-gap, 7px);")[0][0],
+                         "warning")
+        self.assertIn("the fallback never applies",
+                      self.source_findings("padding-top: var(--gutter-page, 24px);")[0][1])
+
+    def test_a_hand_written_colour_is_an_error(self):
+        for css, inline in (("color: #ff00aa;", ""), ("", "background-color:rgb(1,2,3)")):
+            with self.subTest(css=css, inline=inline):
+                found = self.source_findings(css, inline)
+                self.assertEqual([f[0] for f in found], ["error"], found)
+                self.assertIn("a hand-written colour", found[0][1])
+
+    def test_a_literal_names_the_role_that_holds_it_or_says_it_is_off_the_scale(self):
+        found = self.source_findings("padding-left: 24px; font-size: 26px;")
+        messages = {f[1]: f[2] for f in found}
+        self.assertIn("--gutter-page", messages["padding-left: 24px is a literal"])
+        self.assertIn("font-size: 26px is off the scale", messages)
+        self.assertNotIn("--type-body-line", " ".join(messages.values()),
+                         "a line height does not hold a font size")
+
+    def test_named_colours_attributes_and_vml_are_read(self):
+        """Codex on #58: `color:white`, a `bgcolor`, and a VML fillcolor in a
+        conditional comment all passed --source clean."""
+        self.assertIn("a hand-written colour", self.source_findings("color: white;")[0][1])
+        page = self.page("attr.html", '<table role="presentation" bgcolor="#ffffff"><tr><td>x'
+                                      '<!--[if mso]><v:roundrect fillcolor="#c64600" '
+                                      'style="width:212px"></v:roundrect><![endif]--></td></tr></table>')
+        proc = run_py("email-template-system", "lint_email", page, "--source", "--format", "json",
+                      cwd=self.tmp)
+        found = json.loads(proc.stdout.decode("utf-8"))["files"][str(page)]["findings"]
+        self.assertEqual(sorted(f["message"] for f in found),
+                         ["a hand-written colour, bgcolor: #ffffff",
+                          "a hand-written colour, fillcolor: #c64600"])
+
+    def test_a_negative_literal_is_a_literal(self):
+        found = self.source_findings("letter-spacing: -0.015em; margin-left: -24px;")
+        messages = [f[1] for f in found]
+        for literal in ("letter-spacing: -0.015em", "margin-left: -24px"):
+            self.assertTrue(any(m.startswith(literal) for m in messages), messages)
+
+    def test_the_templates_hold_law_1(self):
+        for template in TEMPLATES:
+            with self.subTest(template=template.name):
+                proc = run_py("email-template-system", "lint_email", template, "--source",
+                              "--format", "json", cwd=self.tmp)
+                self.assertEqual(proc.returncode, 0, output(proc))
+                findings = json.loads(proc.stdout.decode("utf-8"))["files"][str(template)]["findings"]
+                self.assertEqual([f for f in findings if f["severity"] == "error"], [])
+                self.assertEqual([f["message"] for f in findings if "is a literal" in f["message"]
+                                  and "line-height: 28px" not in f["message"]], [])
+
+
+class NoStyleWidth(EmailTest):
+    """DL-B6, DL-A12: with <style> stripped, an inline width over a phone's."""
+
+    def nostyle(self, body):
+        return [f["message"] for f in self.lint(self.page("w.html", body)) if f["check"] == "nostyle"]
+
+    def test_a_fixed_width_container_is_an_error(self):
+        self.assertEqual(len(self.nostyle(
+            '<table role="presentation" style="width:600px;max-width:600px"><tr><td>x</td></tr></table>')), 1)
+        self.assertEqual(len(self.nostyle(
+            '<table role="presentation" width="600"><tr><td>x</td></tr></table>')), 1)
+
+    def test_a_percentage_cap_over_the_screen_is_no_cap(self):
+        """Codex on #58: any `%` cap passed, 200% and a malformed one too."""
+        for cap in ("200%", "abc%"):
+            with self.subTest(cap=cap):
+                self.assertEqual(len(self.nostyle(
+                    '<table role="presentation" style="width:600px;max-width:%s"><tr><td>x'
+                    '</td></tr></table>' % cap)), 1)
+
+    def test_a_fluid_container_and_a_capped_image_fit(self):
+        self.assertEqual(self.nostyle(
+            '<table role="presentation" style="width:100%;max-width:600px"><tr><td>'
+            '<img src="https://example.com/a.png" alt="a" width="600" height="300" '
+            'style="width:100%;max-width:600px;height:auto"></td></tr></table>'), [])
+
+
+MODULES = tool_modules("WDS_NODE_MODULES", "playwright", node_path=True)
+
+
+@unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
+class RenderEmail(EmailTest):
+    """DL-C3: light, dark and no-<style> at a phone's width."""
+
+    def render(self, path):
+        proc = run_node("email-template-system", "render_email.mjs", path, "--out",
+                        self.tmp / "renders", "--json", cwd=self.tmp,
+                        env_changes={"NODE_PATH": MODULES}, timeout=300)
+        if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
+            self.skipTest(output(proc)[-200:])
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return proc.returncode, {r["mode"]: r for r in json.loads(proc.stdout)["results"]}
+
+    def test_the_receipt_fits_in_every_mode_and_dark_differs(self):
+        built = self.build(EMAIL / "assets" / "templates" / "transactional-receipt.html")[0]
+        code, modes = self.render(built)
+        self.assertEqual(code, 0, modes)
+        self.assertEqual(sorted(modes), ["dark", "light", "nostyle"])
+        pngs = {m: (self.tmp / "renders" / ("built-transactional-receipt-%s.png" % m)).read_bytes()
+                for m in modes}
+        self.assertTrue(all(png.startswith(b"\x89PNG") for png in pngs.values()))
+        self.assertNotEqual(pngs["light"], pngs["dark"], "the dark block changed nothing")
+
+    def test_the_email_s_scripts_do_not_run(self):
+        """CodeRabbit on #58: setContent ran an email's <script>; no client does."""
+        page = self.page("js.html", "<p>Hi</p><script>document.body.insertAdjacentHTML("
+                                    "'beforeend', '<div style=\"width:2000px\">x</div>')</script>")
+        code, modes = self.render(page)
+        self.assertEqual(code, 0, modes)
+
+    def test_a_fixed_width_email_overflows_only_without_style(self):
+        page = self.page("fixed.html",
+                         '<table role="presentation" class="c" style="width:600px"><tr><td>x</td>'
+                         '</tr></table>',
+                         "<style>@media (max-width: 600px) { .c { width: 100% !important; } }</style>\n")
+        code, modes = self.render(page)
+        self.assertEqual(code, 1)
+        self.assertEqual([m for m, r in sorted(modes.items()) if not r["fits"]], ["nostyle"])
+        self.assertGreaterEqual(modes["nostyle"]["scrollWidth"], 600)

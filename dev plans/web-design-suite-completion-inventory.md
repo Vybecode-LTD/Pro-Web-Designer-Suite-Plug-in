@@ -243,7 +243,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-A10 | medium | fixed in 3.4.0: a `.button` rule in each dark block, the eyebrow re-pointed, and `lint_email`'s `dark` check (PR #57; `test_email.TemplatesInDarkMode`, `LintHasADarkPass`) | dark mode breaks the call-to-action. |
 | DL-A11 | medium | fixed in 3.4.0: the build adds the `[if mso]` font rule and the lint asks for it (PR #57; `test_email.OutlookFontRule`) | the Outlook font rule is never added. |
 | DL-A12 | medium | fixed in 3.4.0: the receipt's container is `width:100%` (PR #57; `test_email.ContainersAreFluid`) | the receipt isn't fluid. |
-| DL-A13 | medium | W7 (3.4.0) | nothing enforces "Law 1 holds at build time". |
+| DL-A13 | medium | fixed in 3.4.0: a dropped token fails the build with its `use`, and `lint_email --source` (PR #58; `test_email.DroppedTokensFailTheBuild`, `LintTheSource`) | nothing enforces "Law 1 holds at build time". |
 | DL-A14 | low | W7 (3.4.0) | the inliner isn't "the real cascade" when shorthand and longhand mix. |
 | DL-A15 | low | fixed in 3.2.0 | cells contradict the cited caniemail raw data |
 | DL-A16 | low | fixed in 3.2.0 | Gmail's 16 KB rule is mis-described. |
@@ -257,14 +257,14 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-B3 | medium | W13 (3.6.0+) | stacks the description implies but doesn't serve. |
 | DL-B4 | medium | W13 (3.6.0+) | email frameworks. |
 | DL-B5 | medium | W13 (3.6.0+) | email translation and RTL. |
-| DL-B6 | medium | W7 (3.4.0); the dark pass and the MSO font check are in (PR #57) | Checks the docs promise but nothing runs: email dark-mode contrast, the MSO font block, the no-`<style>` layout, source literals, generated-form ARIA. |
+| DL-B6 | medium | fixed in 3.4.0: the dark pass and the MSO font check (PR #57), the `nostyle` check and `--source` (PR #58); generated-form ARIA (A9) is its own item | Checks the docs promise but nothing runs: email dark-mode contrast, the MSO font block, the no-`<style>` layout, source literals, generated-form ARIA. |
 | DL-B7 | low | W7 (3.4.0) | deliverability is dated. |
 | DL-B8 | low | fixed in 3.3.0: `test_schema_sources.TheWorkedExampleIsTheFixture`, `GeneratedTypesAgreeOnStructure` | unverifiable claims. |
 | DL-C1 | M | fixed: 3.1.0 classified the sensitive columns (DL-A1, DL-A2); 3.3.0 parses RLS and policies and prints the SECURITY block (`test_content_and_a11y.SchemaSecurityPass`) | A security pass in `introspect_schema`: classify sensitive columns, parse RLS and policies, print a SECURITY block first. |
 | DL-C2 | M | done in 3.3.0: `test_schema_sources` | A sturdier schema parser, tested on real `db pull` and `gen types` files. |
-| DL-C3 | M | W7 (3.4.0); A10 to A12 and the dark pass are in (PR #57) | Email: fix A10–A12, then add a dark pass and a no-`<style>` check to `lint_email`, and `render_email.py`. |
+| DL-C3 | M | fixed in 3.4.0: A10 to A12 and the dark pass (PR #57), the `nostyle` check and `render_email.mjs` (PR #58; `test_email.NoStyleWidth`, `RenderEmail`) | Email: fix A10–A12, then add a dark pass and a no-`<style>` check to `lint_email`, and `render_email.py`. |
 | DL-C4 | S | fixed in 3.3.0, with DL-A5 and DL-B1's reference | rewrite supabase-integration.md §2/§4/§6 |
-| DL-C5 | S | W7 (3.4.0) | `lint_email --source`: flag literals, `var()` fallbacks and dropped tokens. |
+| DL-C5 | S | fixed in 3.4.0: `lint_email --source`, and the build notes each fallback (PR #58; `test_email.LintTheSource`) | `lint_email --source`: flag literals, `var()` fallbacks and dropped tokens. |
 | DL-C6 | S | fixed in 3.2.0 | pointer and command hygiene; the detail file lists them. |
 | DL-C7 | M | W9 (3.5.0) | plugin features for these skills. |
 | DL-C8 | S | fixed in 3.2.0 | slimmer SKILL.md, sharper descriptions. |

@@ -1,13 +1,14 @@
 /**
- * browser_common.mjs — what the suite's three browser scripts share:
+ * browser_common.mjs — what the suite's browser scripts share:
  * resolving Playwright and a browser from disk, never from the network;
  * freezing animations before a measurement; and reading a JSON file a person
  * may have saved from PowerShell or Notepad.
  *
  * The master copy is shared/browser_common.mjs, at the plugin's root. The
- * scripts/ folders of a11y-audit-runner, component-state-matrix and
- * perf-budget-gate each hold a byte-identical copy, so each skill still runs
- * on its own: change the master, copy it over all three, and
+ * scripts/ folders of a11y-audit-runner, component-state-matrix,
+ * email-template-system and perf-budget-gate each hold a byte-identical copy,
+ * so each skill still runs on its own: change the master, copy it over all
+ * four, and
  * tests/test_browser_scripts.py fails until they match. (GT-C13: the copies
  * had drifted. a11y_runtime shortened animations without pausing them, so a
  * spinner beside a button with no focus ring counted as a ring.)
