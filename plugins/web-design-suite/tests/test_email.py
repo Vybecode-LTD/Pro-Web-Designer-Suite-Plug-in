@@ -307,6 +307,26 @@ class LintTheSource(EmailTest):
         self.assertNotIn("--type-body-line", " ".join(messages.values()),
                          "a line height does not hold a font size")
 
+    def test_named_colours_attributes_and_vml_are_read(self):
+        """Codex on #58: `color:white`, a `bgcolor`, and a VML fillcolor in a
+        conditional comment all passed --source clean."""
+        self.assertIn("a hand-written colour", self.source_findings("color: white;")[0][1])
+        page = self.page("attr.html", '<table role="presentation" bgcolor="#ffffff"><tr><td>x'
+                                      '<!--[if mso]><v:roundrect fillcolor="#c64600" '
+                                      'style="width:212px"></v:roundrect><![endif]--></td></tr></table>')
+        proc = run_py("email-template-system", "lint_email", page, "--source", "--format", "json",
+                      cwd=self.tmp)
+        found = json.loads(proc.stdout.decode("utf-8"))["files"][str(page)]["findings"]
+        self.assertEqual(sorted(f["message"] for f in found),
+                         ["a hand-written colour, bgcolor: #ffffff",
+                          "a hand-written colour, fillcolor: #c64600"])
+
+    def test_a_negative_literal_is_a_literal(self):
+        found = self.source_findings("letter-spacing: -0.015em; margin-left: -24px;")
+        messages = [f[1] for f in found]
+        for literal in ("letter-spacing: -0.015em", "margin-left: -24px"):
+            self.assertTrue(any(m.startswith(literal) for m in messages), messages)
+
     def test_the_templates_hold_law_1(self):
         for template in TEMPLATES:
             with self.subTest(template=template.name):
@@ -330,6 +350,14 @@ class NoStyleWidth(EmailTest):
             '<table role="presentation" style="width:600px;max-width:600px"><tr><td>x</td></tr></table>')), 1)
         self.assertEqual(len(self.nostyle(
             '<table role="presentation" width="600"><tr><td>x</td></tr></table>')), 1)
+
+    def test_a_percentage_cap_over_the_screen_is_no_cap(self):
+        """Codex on #58: any `%` cap passed, 200% and a malformed one too."""
+        for cap in ("200%", "abc%"):
+            with self.subTest(cap=cap):
+                self.assertEqual(len(self.nostyle(
+                    '<table role="presentation" style="width:600px;max-width:%s"><tr><td>x'
+                    '</td></tr></table>' % cap)), 1)
 
     def test_a_fluid_container_and_a_capped_image_fit(self):
         self.assertEqual(self.nostyle(

@@ -362,6 +362,9 @@
   a control (a fluid container and a capped image). `test_browser_scripts` holds
   `render_email.mjs` to the browser scripts' contract (resolution, exit codes, no CSP
   bypass) and the fourth `browser_common.mjs` copy to the master.
+  Codex's review of #58 added three, each failing on its head: a `max-width` over 100%
+  taken as a cap, a named colour, a `bgcolor` or a VML `fillcolor` passing `--source`,
+  and a negative literal unmatched.
 - P19 (DL-A14, DL-A21, DL-B7): `test_email.InlinerWritesTheCascadesOrder` and
   `EmailDocClaims` (the Law 3 count read from the token file, the weight and size notes,
   the edge built from the border role, no `:last-child` workaround, headings in order in
