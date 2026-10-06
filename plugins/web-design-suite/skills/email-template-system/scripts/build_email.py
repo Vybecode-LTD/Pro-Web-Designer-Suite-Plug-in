@@ -305,6 +305,8 @@ def load_tokens(path: Path) -> dict[str, str]:
         raise TokenError("token file not found: %s" % path)
     except json.JSONDecodeError as exc:
         raise TokenError("token file is not valid JSON (%s): %s" % (path, exc))
+    if not isinstance(data, dict):
+        raise TokenError("%s is not a JSON object" % path)
 
     raw = data.get("tokens")
     if not isinstance(raw, dict):
@@ -345,9 +347,10 @@ def load_tokens(path: Path) -> dict[str, str]:
 def load_dropped(path: Path) -> dict[str, dict]:
     """email-tokens.json's `dropped` map: name -> {"reason": …, "use": …}."""
     try:
-        dropped = json.loads(path.read_bytes()).get("dropped")
+        data = json.loads(path.read_bytes())
     except (OSError, ValueError):
         return {}
+    dropped = data.get("dropped") if isinstance(data, dict) else None
     return dropped if isinstance(dropped, dict) else {}
 
 

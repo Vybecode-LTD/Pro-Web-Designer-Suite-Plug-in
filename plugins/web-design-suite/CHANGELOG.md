@@ -345,6 +345,8 @@
   Codex's review of #58 added three, each failing on its head: a `max-width` over 100%
   taken as a cap, a named colour, a `bgcolor` or a VML `fillcolor` passing `--source`,
   and a negative literal unmatched.
+  CodeRabbit's added two: a token file that is not a JSON object crashed with a traceback,
+  and `render_email.mjs` ran the email's scripts; it renders with JavaScript off.
 - P17 (LC-A17, LC-A23, LC-B8, LC-C6): `test_versioning.DeprecateKeepsRemovalsInAMajor`
   refuses `--removal` 2.2.0, 2.1.1 and 3.1.0 for `--since 2.1.0` and takes 3.0.0 and 4.0.0;
   `test_token_migration.MigrationPipeline` checks the report's millisecond delta and its
