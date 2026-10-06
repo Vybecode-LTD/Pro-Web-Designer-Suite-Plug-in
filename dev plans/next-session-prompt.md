@@ -74,7 +74,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 ## 3. First: the state of `main`
 
-Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings: the flake there, if it recurs, gets fixed before new work.
+Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings, and schedule its two unscheduled follow-ups in the plan (run the checker) before new work.
 
 ## 4. P20: the scaffold reads its answers, wires its forms, and emits a server schema
 

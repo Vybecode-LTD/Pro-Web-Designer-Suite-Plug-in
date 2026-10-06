@@ -20,7 +20,8 @@
 1. **P20**, the scaffold (DL-A8, A9, B2): interview answers read, forms wired for accessibility, a server schema.
 2. **P21**, the deck honest by construction (PS-C1 and eight PS items). L: split it.
 3. Then P22, P23 and R2, the 3.4.0 release.
-4. **Not yet scheduled:** (a) a Law 6 check in stylelint and the ESLint config; (b) registering Gmail's 102,400 and 16,384 byte limits in `evidence.json`, with test_evidence's `FIGURE` taught byte counts (CodeRabbit on #59); (c) build_email inlines each `<style>` block separately, so a later block's rule loses a tie it should win (a task chip was offered for it). Schedule them and run the checker.
+4. **Done since:** build_email inlines every `<style>` block as one stylesheet (#61).
+5. **Not yet scheduled:** (a) a Law 6 check in stylelint and the ESLint config; (b) registering Gmail's 102,400 and 16,384 byte limits in `evidence.json`, with test_evidence's `FIGURE` taught byte counts (CodeRabbit on #59).
 
 ## Warnings
 

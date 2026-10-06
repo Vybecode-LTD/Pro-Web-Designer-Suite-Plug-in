@@ -285,6 +285,10 @@
   its key's first position, so `td{padding:0}`, `.pad{padding-left:24px}` and
   `style="padding:8px"` came out as `padding:8px;padding-left:24px`, a left of 24px where
   the cascade says 8px. A winner now moves to the end.
+- **The `<style>` blocks are one stylesheet.** build_email inlined each block on its own, so
+  the first block's results became the element's authored inline style: a later block's rule
+  lost the tie it wins, and a stylesheet rule beat an authored inline colour. Every block's
+  rules are now inlined in one pass, with one running source order.
 - **The email docs agree with the files** (DL-A21). SKILL.md's Law 3 row said "Same 18
   steps"; email keeps 13 of the 18 spacing steps and has its own heading scale, which the
   h1 and h2 sizes' notes now say. The weight notes said websafe stacks have no 500 or 600;
@@ -376,6 +380,8 @@
   `EmailDocClaims` (the Law 3 count read from the token file, the weight and size notes,
   the edge built from the border role, no `:last-child` workaround, headings in order in
   every template, the deliverability rules). Against `v3.3.0`, all 8 fail.
+- The `<style>` blocks as one stylesheet: `test_email.InlinerWritesTheCascadesOrder.test_the_style_blocks_are_one_stylesheet`
+  fails on `v3.3.0` and on `main` before the fix (`37a7128`).
 - P17 (LC-A17, LC-A23, LC-B8, LC-C6): `test_versioning.DeprecateKeepsRemovalsInAMajor`
   refuses `--removal` 2.2.0, 2.1.1 and 3.1.0 for `--since 2.1.0` and takes 3.0.0 and 4.0.0;
   `test_token_migration.MigrationPipeline` checks the report's millisecond delta and its
