@@ -271,7 +271,7 @@
   and failed with a `TypeError`. Its page started the 3-second task 1.5 s after its script
   parsed, while the click is due 2.5 s after navigation starts, so a late parse put the
   click before the task. The task is now due at 1.5 s on the page's clock, and a missing
-  entry fails with the run's numbers. It never failed locally (8 runs before the fix, 3
+  entry fails with the run's numbers. It never failed locally (5 runs before the fix, 4
   after), so there is no fail-before count; the test change is a control.
 - P17 (LC-A17, LC-A23, LC-B8, LC-C6): `test_versioning.DeprecateKeepsRemovalsInAMajor`
   refuses `--removal` 2.2.0, 2.1.1 and 3.1.0 for `--since 2.1.0` and takes 3.0.0 and 4.0.0;
