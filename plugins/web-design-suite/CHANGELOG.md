@@ -243,13 +243,14 @@
   colour.
 - **`lint_email` measures dark mode** (DL-B6, DL-C3). A new `dark` check applies the
   retained `prefers-color-scheme: dark` rules with build_email's own selector matcher and
-  cascade, as a client that honours them renders the email, and measures the contrast of
-  whatever they change. It found both of DL-A10's failures, at the review's figures.
+  cascade (one source order across `<style>` blocks), as a client that honours them renders
+  the email, and measures the text whose colour or background they change, inherited
+  colours included. It found both of DL-A10's failures, at the review's figures.
 - **The Outlook font rule is in the build** (DL-A11). email-architecture.md §2 said the
   compiler adds an `[if mso]` block that gives the Word engine Arial, without which a stack
   starting with `-apple-system` lands on its default serif; the block never had it. It
   does now, a hand-written PixelsPerInch block gets the font rule beside it, and the lint
-  warns when no `[if mso]` font rule exists and a stack starts with a family Windows
+  warns when no broad `[if mso]` font rule (on `*`, `body`, `table` or `td`) is in the head and a stack starts with a family Windows
   lacks.
 - **The receipt is fluid** (DL-A12). Its container was `width:600px` inline, so with
   `<style>` stripped (Gmail's app with a non-Google account) it was 600px wide on a 375px
@@ -309,6 +310,10 @@
   10 fail. Four are controls: the templates linted clean before (the lint had no dark
   pass), a class rule that wins back the label, a page with no dark block, and a pair the
   dark rules leave alone.
+  Codex's review of #57 added four, each failing on its head: text that inherits its colour
+  onto a background a dark rule changes, a later `<style>` block winning a tie, a VML
+  button's or a component's `[if mso]` font standing in for the scaffold in the lint, and
+  a component's override stopping the build from adding it.
 - P17 (LC-A17, LC-A23, LC-B8, LC-C6): `test_versioning.DeprecateKeepsRemovalsInAMajor`
   refuses `--removal` 2.2.0, 2.1.1 and 3.1.0 for `--since 2.1.0` and takes 3.0.0 and 4.0.0;
   `test_token_migration.MigrationPipeline` checks the report's millisecond delta and its
