@@ -370,7 +370,8 @@
   CodeRabbit's added two: a token file that is not a JSON object crashed with a traceback,
   and `render_email.mjs` ran the email's scripts; it renders with JavaScript off.
   `render_email.mjs` retries a full-page screenshot Chromium's headless shell refused
-  ("Unable to capture screenshot", once on #60's Linux CI): a flake, so no fail-before.
+  ("Unable to capture screenshot", once on #60's Linux CI). `RenderEmailRetries` holds it
+  with a stub browser that refuses the first capture; it fails on #60's earlier head.
 - P19 (DL-A14, DL-A21, DL-B7): `test_email.InlinerWritesTheCascadesOrder` and
   `EmailDocClaims` (the Law 3 count read from the token file, the weight and size notes,
   the edge built from the border role, no `:last-child` workaround, headings in order in
