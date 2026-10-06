@@ -16,7 +16,7 @@
 
 ## Next steps
 
-1. **P18**, the email templates and lint (DL-A10, A11, A12, A20, B6, C3, C5), with **DL-A13 moved in from P19**: its fix is `lint_email --source`, DL-C5's. L: split it if it runs long.
+1. **P18**, the email templates and lint (DL-A10, A11, A12, A20, B6, C3, C5), with **DL-A13, moved in from P19** in the plan (#55): its fix is `lint_email --source`, DL-C5's. L: split it if it runs long.
 2. **P19**, the email build and facts (DL-A14, A21, B7).
 3. Then P20 to P23, and R2, the 3.4.0 release.
 4. **Not yet scheduled:** a Law 6 check in stylelint and the ESLint config (only the audit reads Law 6 today). Schedule it in Phase 5 or 7 and run the checker.
