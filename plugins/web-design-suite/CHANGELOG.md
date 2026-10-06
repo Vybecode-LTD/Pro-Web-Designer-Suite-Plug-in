@@ -296,7 +296,8 @@
   the build sends the same `1px solid #e7e5e2`.
 - **Deliverability names today's rules** (DL-B7). email-workflow.md named only Gmail and
   Yahoo's unsubscribe headers. It now gives Google's bulk-sender requirements (since
-  February 2024: SPF, DKIM, DMARC, the RFC 8058 header pair, unsubscribes fulfilled within
+  February 2024, among others: SPF, DKIM, DMARC, an aligned From domain, reverse DNS, TLS,
+  and on promotional mail the RFC 8058 header pair with unsubscribes fulfilled within
   48 hours, a spam rate below 0.10% and never 0.30%) and Microsoft's for Outlook.com (since
   5 May 2025, for domains sending more than 5,000 a day: SPF and DKIM passing, DMARC at
   `p=none` or stricter and aligned, and the `550; 5.7.515` rejection), each re-read at its

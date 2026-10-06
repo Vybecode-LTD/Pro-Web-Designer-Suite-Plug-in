@@ -480,5 +480,6 @@ class EmailDocClaims(EmailTest):
     def test_deliverability_names_google_and_microsoft_rules(self):
         workflow = self.text("references/email-workflow.md")
         for needle in ("List-Unsubscribe=One-Click", "RFC 8058", "48 hours", "0.30%",
-                       "5 May 2025", "550; 5.7.515", "p=none"):
+                       "5 May 2025", "550; 5.7.515", "p=none", "not transactional",
+                       "reverse DNS", "TLS", "RFC 5322", "in summary"):
             self.assertIn(needle, workflow)
