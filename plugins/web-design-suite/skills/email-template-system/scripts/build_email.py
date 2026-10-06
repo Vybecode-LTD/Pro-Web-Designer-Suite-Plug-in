@@ -1167,18 +1167,27 @@ def build(
     inlined_elements = 0
     rule_count = 0
 
+    # Every block is one stylesheet, inlined in one pass with one running source
+    # order. Inlined a block at a time, an earlier block's results became the
+    # element's authored inline style, so a later block's rule lost a tie it
+    # should win, and stylesheet rules outranked authored inline styles.
+    rules: list[Rule] = []
     for style_node in style_nodes:
         css = "".join(c.data for c in style_node.children if c.kind == "text")
         keep_whole = (style_node.get("data-embed") or "").lower() in ("keep", "embed")
         if keep_whole or not inline:
             # Leave this block exactly as authored.
             continue
-        rules = parse_stylesheet(css)
-        rule_count += len(rules)
-        inlined_elements += inline_rules(root, rules, retained)
+        block = parse_stylesheet(css)
+        for rule in block:
+            rule.order += len(rules)
+        rules.extend(block)
         # Empty it; we rewrite the survivors into the first block below.
         style_node.children = []
         style_node.set("data-compiled", "1")
+    rule_count = len(rules)
+    if rules:
+        inlined_elements = inline_rules(root, rules, retained)
 
     if inline and style_nodes:
         blocks = style_blocks(retained)

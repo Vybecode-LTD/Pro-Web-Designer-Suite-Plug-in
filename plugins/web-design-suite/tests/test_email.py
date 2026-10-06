@@ -497,6 +497,16 @@ class InlinerWritesTheCascadesOrder(EmailTest):
         style = re.search(r'<td class="pad" style="([^"]*)"', html).group(1)
         self.assertEqual(self.left(style), "8px", style)
 
+    def test_the_style_blocks_are_one_stylesheet(self):
+        """Inlined a block at a time, the first block's result became the
+        element's authored style: the second block's `.x` lost the tie it
+        wins, and beat an authored inline colour it must not."""
+        head = "<style>.x { color: #111111; }</style>\n<style>.x { color: #222222; }</style>\n"
+        body = '<p class="x">Later wins</p><p class="x" style="color:#333333">Inline wins</p>'
+        html = self.build(self.page("blocks.html", body, head))[0].read_text(encoding="utf-8")
+        colours = re.findall(r'<p class="x" style="[^"]*color:(#[0-9a-f]{6})', html)
+        self.assertEqual(colours, ["#222222", "#333333"], html)
+
 
 class EmailDocClaims(EmailTest):
     """DL-A21, DL-B7: claims the email docs and token file make, held to the
