@@ -16,7 +16,7 @@ description: Build HTML email that survives Outlook, Gmail and dark mode, compil
 > The commands below are written `python -m scripts.<name>`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_email.py, lint_email.py).
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_email.py, lint_email.py, render_email.mjs).
 
 Every agency client eventually needs email, and email is the one place where **this suite's laws must be deliberately broken**. HTML email has no cascade layers, no custom properties you can rely on, no `gap`, no flexbox or grid in the client that matters most, and `<style>` blocks that several clients strip entirely.
 
@@ -63,6 +63,7 @@ mkdir -p emails
 cp "${CLAUDE_SKILL_DIR}/assets/templates/transactional-receipt.html" emails/my-email.html
 
 # 2. Edit the copy — tokens only, no literals, utilities declared last
+python -m scripts.lint_email emails/my-email.html --source
 
 # 3. Compile: resolve tokens, inline the CSS, keep the media queries,
 #    add the Outlook scaffolding, write the plain-text part, report bytes
@@ -76,7 +77,7 @@ python -m scripts.lint_email build/my-email.html
 cat build/my-email.txt
 ```
 
-Nothing else is installed. Both scripts are stdlib Python 3.
+Python scripts: stdlib. `render_email.mjs`: Node and Playwright.
 
 ---
 
@@ -145,7 +146,7 @@ python -m scripts.build_email "${CLAUDE_SKILL_DIR}/assets/templates/transactiona
     --out build/receipt.html --text build/receipt.txt
 ```
 
-Resolves tokens, inlines the CSS with real cascade ordering, keeps the media queries, adds the MSO scaffolding, writes the plain-text part, reports bytes against Gmail's clipping threshold.
+Resolves tokens, inlines with real cascade ordering, keeps media queries, adds the MSO scaffolding and plain-text part, and reports bytes against Gmail's clipping threshold.
 
 ### 4. Lint
 
@@ -153,11 +154,11 @@ Resolves tokens, inlines the CSS with real cascade ordering, keeps the media que
 python -m scripts.lint_email build/receipt.html --transactional
 ```
 
-Exits non-zero on anything that breaks in a named client. This is Law 9 for email.
+Exits non-zero on anything that breaks in a named client: Law 9 for email.
 
 ### 5. Test
 
-Free checks first — they catch most of it. `references/email-workflow.md` §4 lists them; §5 gives the five paid client combinations worth the budget, in priority order. The one people skip and should not: **the Gmail app signed in with a non-Google account**, where the `<style>` block does not apply at all.
+Free checks first: `node scripts/render_email.mjs build/x.html` shows light, dark and no-`<style>` at 375px. `references/email-workflow.md` §4 lists them; §5 gives the five paid client combinations worth the budget, in priority order. The one people skip and should not: **the Gmail app signed in with a non-Google account**, where the `<style>` block does not apply at all.
 
 ### 6. Hand off
 
@@ -242,11 +243,12 @@ Exit `0` compiled · `1` over the clipping threshold (or `--strict` with warning
 
 ### `scripts/lint_email.py` — the gate
 
-Checks unresolved `var()`, unsupported CSS per the matrix, layout tables missing `role="presentation"`, images without `alt` or explicit dimensions, missing `lang`/`<title>`/charset/preheader/MSO font rule, relative URLs, size against both Gmail thresholds, measured contrast against the nearest resolvable background, in light and with the retained dark rules applied, non-descriptive link text, a missing unsubscribe link, forms and scripts, and text below the 13px email floor.
+Checks unresolved `var()`, unsupported CSS per the matrix, layout tables missing `role="presentation"`, images without `alt` or explicit dimensions, missing `lang`/`<title>`/charset/preheader/MSO font rule, relative URLs, size against both Gmail thresholds, measured contrast against the nearest resolvable background, in light and with the retained dark rules applied, non-descriptive link text, a missing unsubscribe link, forms and scripts, text below the 13px email floor, and inline widths over a phone's.
 
 | Flag | Does |
 |---|---|
 | `--format report\|json` | human or machine readable |
+| `--source` | Law 1 on a source template |
 | `--transactional` | demote the unsubscribe check for receipts and password resets |
 | `--strict` | warnings fail too |
 | `--ignore a,b` | silence named checks |
@@ -255,7 +257,7 @@ Checks unresolved `var()`, unsupported CSS per the matrix, layout tables missing
 
 Exit `0` clean · `1` at least one error · `2` bad invocation.
 
-Every `error` traces to a row in `references/email-client-matrix.md`. Nothing is flagged on taste — if the linter objects, a named client drops the thing on the floor.
+Every `error` traces to a row in `references/email-client-matrix.md`, or with `--source` to Law 1.
 
 ---
 

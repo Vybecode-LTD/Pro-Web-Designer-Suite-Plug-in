@@ -259,6 +259,27 @@
   the build reported it dropped. A comment is kept for real ESP syntax only: a Handlebars
   block (`{{#`, `{{/`, `{{^`, `{{else`), a Liquid tag (`{%`), a Mailchimp merge tag
   (`*|IF:X|*`), ERB (`<%`), and conditional comments as before.
+- **A dropped token fails the build by name** (DL-A13). SKILL.md said `var(--elevation-card)`
+  fails and says to use `--email-edge`; the error was generic, and with a fallback,
+  `var(--elevation-card, #000)`, the build shipped `#000000` and exited 0. Any `var()` of a
+  token in `email-tokens.json`'s `dropped` map now stops the build with its reason and its
+  `use`, fallback or not, and every fallback that stood in for a missing token is noted.
+- **`lint_email --source`: Law 1 before the build** (DL-C5, DL-A13). Nothing read a source
+  template, where a literal can still be told from a token. `--source` reports a `var()` of
+  a dropped token (an error naming the token to use), of no token, or with a fallback; a
+  hand-written colour (an error); and each length or weight literal, with the Tier-2 role
+  of the same family that holds the value, or "off the scale". The templates' literals with
+  a role (the email widths, the h3 weight, the column gutter, the stack gap, the display's
+  phone step to the h1 size and line) are tokens now; what is left is the phone type and
+  gutter step-downs, the hairlines and the 264px column, which no role holds.
+- **`lint_email`'s `nostyle` check** (DL-B6). An inline width wider than a 375px phone, not
+  capped by a max-width that fits, is an error: it is all a client that strips `<style>`
+  has. It finds the v3.3.0 receipt's 600px container.
+- **`render_email.mjs`** (DL-C3). A built email at a phone's width in light, dark (the
+  retained dark block applied) and with every `<style>` removed, as full-page PNGs, with
+  the page width of each against the screen: exit 1 when one is wider. Nothing is fetched.
+  It finds its browser with the suite's `browser_common.mjs`, now copied into the email
+  skill too, and never downloads one.
 
 ### Changed
 
@@ -309,6 +330,13 @@
   10 fail. Four are controls: the templates linted clean before (the lint had no dark
   pass), a class rule that wins back the label, a page with no dark block, and a pair the
   dark rules leave alone.
+- P18 part 2 (DL-A13, DL-B6, DL-C3, DL-C5): `test_email.DroppedTokensFailTheBuild`,
+  `LintTheSource` (the templates hold Law 1 with no errors), `NoStyleWidth` and
+  `RenderEmail` (in a browser: the receipt fits in every mode and dark differs from light;
+  a fixed-width email overflows only without `<style>`). Against `v3.3.0`, 10 fail; one is
+  a control (a fluid container and a capped image). `test_browser_scripts` holds
+  `render_email.mjs` to the browser scripts' contract (resolution, exit codes, no CSP
+  bypass) and the fourth `browser_common.mjs` copy to the master.
 - P17 (LC-A17, LC-A23, LC-B8, LC-C6): `test_versioning.DeprecateKeepsRemovalsInAMajor`
   refuses `--removal` 2.2.0, 2.1.1 and 3.1.0 for `--since 2.1.0` and takes 3.0.0 and 4.0.0;
   `test_token_migration.MigrationPipeline` checks the report's millisecond delta and its

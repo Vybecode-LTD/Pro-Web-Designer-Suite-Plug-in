@@ -70,12 +70,14 @@ SCRIPTS = {
     "snapshot_matrix": ("component-state-matrix", "snapshot_matrix.mjs"),
     "measure_vitals": ("perf-budget-gate", "measure_vitals.mjs"),
     "a11y_runtime": ("a11y-audit-runner", "a11y_runtime.mjs"),
+    "render_email": ("email-template-system", "render_email.mjs"),
 }
 # Whether a script injects what a page's CSP governs (a stylesheet, axe), and
 # so bypasses that CSP.
-INJECTS = {"snapshot_matrix": True, "measure_vitals": False, "a11y_runtime": True}
+INJECTS = {"snapshot_matrix": True, "measure_vitals": False, "a11y_runtime": True,
+           "render_email": False}
 BROWSER_ENV = {"MATRIX_CHROMIUM": None, "PERF_CHROMIUM": None, "A11Y_CHROMIUM": None,
-               "STUB_FAIL_LAUNCH": None}
+               "EMAIL_CHROMIUM": None, "STUB_FAIL_LAUNCH": None}
 SANDBOX_BROWSER = "/opt/pw-browsers/chromium"
 
 
@@ -115,6 +117,8 @@ class BrowserScriptResolution(TempDirTest):
             return [self.page, "--baselines", self.tmp / "baselines", "--out", self.tmp / "report"]
         if name == "measure_vitals":
             return [self.page]
+        if name == "render_email":
+            return [self.page, "--out", self.tmp / "renders"]
         return ["--file", self.page]
 
     def run_script(self, name, *extra, cwd, env_changes):

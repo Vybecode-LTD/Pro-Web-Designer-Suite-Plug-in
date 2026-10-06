@@ -28,7 +28,7 @@ build/                     compiler output — gitignored, never hand-edited
 
 ### The rules
 
-1. **No literal hexes, sizes or spacing values.** Every value is `var(--token)`. `lint_email.py` catches survivors on the built file; code review catches them in the source, where they are still cheap to fix.
+1. **No literal hexes, sizes or spacing values.** Every value is `var(--token)`. `lint_email.py --source` catches them in the source, where they are still cheap to fix: a hand-written colour or a `var()` of a dropped token is an error that names the token to use, and a length or weight literal a warning that names the role holding the same value. On the built file it catches what survived.
 2. **Classes in a `<style>` block, one rule per component.** Law 4 survives here: a reviewer predicts a component's appearance from one rule.
 3. **Utilities last.** Email has no cascade layers, so **source order is the only layer order there is**. A single-class utility (`.muted`) beats a single-class component rule (`.line-item`) only if it is declared after it. Declared before, it loses silently at equal specificity — and because the compiler implements the real cascade, you get exactly what CSS says you asked for.
 4. **Inline `style` only for per-instance values** — the one padding that differs on this one row. Everything repeated belongs in a class.
@@ -135,11 +135,12 @@ Do all of this before you spend a cent on a rendering service. It catches most o
 
 | Check | How |
 |---|---|
-| Unresolved tokens, unsupported CSS, contrast, alt text, size, structure | `python -m scripts.lint_email build/*.html` |
+| Unresolved tokens, unsupported CSS, contrast in light and dark, inline widths without `<style>`, alt text, size, structure | `python -m scripts.lint_email build/*.html` |
+| Light, dark and no-`<style>` at 375px | `node scripts/render_email.mjs build/receipt.html` writes three PNGs and exits 1 when a mode is wider than the screen. Images are not fetched; their alt text stands in. |
 | The plain-text part | `python -m scripts.build_email src.html --text-only` and **read it** |
 | Images blocked | Open the built file in a browser with images disabled. The email must still make sense. |
 | Real inbox rendering, free tier | Send to your own Gmail, Outlook.com and iCloud accounts. Three of the nine environments, at no cost. |
-| **GANGA** | Add an Outlook.com or Yahoo account to the Gmail app on a phone. This is the single highest-value free test, because it is the environment nothing else simulates. |
+| **GANGA** | Add an Outlook.com or Yahoo account to the Gmail app on a phone. This is the single highest-value free test: `render_email.mjs` strips the `<style>`, but only the app shows the rest of what it does. |
 | Delivered byte size | Gmail → **Show original**. This is the number the clipping threshold applies to, after your ESP's rewrites. |
 | Dark mode | Toggle dark mode on the phone with the email open in Apple Mail, then in Gmail iOS. Two different behaviours, one minute. |
 | Every link | Click every one from a real send. Merge tags that look fine in the template resolve to `https://example.com/orders/` with nothing after it. |
@@ -147,7 +148,7 @@ Do all of this before you spend a cent on a rendering service. It catches most o
 
 ### The browser preview lies
 
-A built email in Chrome is a useful proofreading surface and nothing more. It has a cascade, `max-width`, web fonts and no sanitiser. It will never show you the Word engine, GANGA, or a clip.
+A built email in Chrome is a useful proofreading surface and nothing more. It has a cascade, `max-width`, web fonts and no sanitiser. It will never show you the Word engine or a clip, and GANGA only as far as `render_email.mjs`'s no-`<style>` mode goes.
 
 ---
 
@@ -281,7 +282,7 @@ Run it every time. It is short because the compiler and the linter already did t
 
 ---
 
-Related: `references/email-client-matrix.md` (what breaks where), `references/email-architecture.md` (how to build it), `scripts/build_email.py`, `scripts/lint_email.py`.
+Related: `references/email-client-matrix.md` (what breaks where), `references/email-architecture.md` (how to build it), `scripts/build_email.py`, `scripts/lint_email.py`, `scripts/render_email.mjs`.
 
 ---
 

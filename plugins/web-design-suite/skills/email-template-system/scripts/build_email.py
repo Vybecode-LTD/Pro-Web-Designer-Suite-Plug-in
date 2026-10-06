@@ -293,6 +293,10 @@ class TokenError(Exception):
     pass
 
 
+class DroppedTokenError(TokenError):
+    """A template references a token the email projection dropped."""
+
+
 def load_tokens(path: Path) -> dict[str, str]:
     """Flatten email-tokens.json into name -> literal, resolving token references."""
     try:
@@ -338,12 +342,33 @@ def load_tokens(path: Path) -> dict[str, str]:
     return flat
 
 
-def substitute_vars(text: str, tokens: dict[str, str]) -> tuple[str, set[str]]:
+def load_dropped(path: Path) -> dict[str, dict]:
+    """email-tokens.json's `dropped` map: name -> {"reason": …, "use": …}."""
+    try:
+        dropped = json.loads(path.read_bytes()).get("dropped")
+    except (OSError, ValueError):
+        return {}
+    return dropped if isinstance(dropped, dict) else {}
+
+
+def dropped_message(name: str, entry: dict) -> str:
+    """What a dropped token's reference says: why, and what to use instead."""
+    text = "%s is not in email" % name
+    if entry.get("reason"):
+        text += " (%s)" % str(entry["reason"]).rstrip(".")
+    if entry.get("use"):
+        text += "; use %s" % entry["use"]
+    return text
+
+
+def substitute_vars(text: str, tokens: dict[str, str],
+                    fallbacks: dict[str, str] | None = None) -> tuple[str, set[str]]:
     """Replace var(--x) / var(--x, fallback). Returns (text, names that had no value).
 
     A `var()` with a fallback and no token resolves to the fallback and is NOT
     reported missing — that is the documented escape hatch for a value the email
-    layer legitimately owns. A bare `var()` with no token is an error.
+    layer legitimately owns. A bare `var()` with no token is an error. Each name
+    a fallback stood in for goes into `fallbacks`, with the value used.
     """
     missing: set[str] = set()
 
@@ -353,6 +378,8 @@ def substitute_vars(text: str, tokens: dict[str, str]) -> tuple[str, set[str]]:
         if name in tokens:
             return tokens[name]
         if fallback is not None:
+            if fallbacks is not None:
+                fallbacks[name] = fallback.strip()
             return fallback.strip()
         missing.add(name)
         return match.group(0)
@@ -1025,14 +1052,28 @@ def minify_css(css: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def substitute_document(root: Node, tokens: dict[str, str]) -> set[str]:
+def var_names(root: Node) -> set[str]:
+    """Every name a var() references, wherever substitute_document looks."""
+    texts = []
+    for node in root.walk():
+        if node.kind == "comment":
+            texts.append(node.data)
+        elif node.kind == "element":
+            texts.extend(value for _name, value in node.attrs if value)
+            if node.tag == "style":
+                texts.extend(c.data for c in node.children if c.kind == "text")
+    return {m.group(1) for text in texts for m in VAR_RE.finditer(text)}
+
+
+def substitute_document(root: Node, tokens: dict[str, str],
+                        fallbacks: dict[str, str] | None = None) -> set[str]:
     """Resolve var() everywhere it can legally appear in an email source template."""
     missing: set[str] = set()
     attr_targets = ("style", "bgcolor", "background", "width", "height", "color", "align")
 
     for node in root.walk():
         if node.kind == "comment":
-            new, miss = substitute_vars(node.data, tokens)
+            new, miss = substitute_vars(node.data, tokens, fallbacks)
             node.data = new
             missing |= miss
         elif node.kind == "element":
@@ -1040,13 +1081,13 @@ def substitute_document(root: Node, tokens: dict[str, str]) -> set[str]:
                 if pair[1] is None:
                     continue
                 if pair[0] in attr_targets or "var(" in pair[1]:
-                    new, miss = substitute_vars(pair[1], tokens)
+                    new, miss = substitute_vars(pair[1], tokens, fallbacks)
                     pair[1] = new
                     missing |= miss
             if node.tag == "style":
                 for child in node.children:
                     if child.kind == "text":
-                        new, miss = substitute_vars(child.data, tokens)
+                        new, miss = substitute_vars(child.data, tokens, fallbacks)
                         child.data = new
                         missing |= miss
     return missing
@@ -1076,11 +1117,23 @@ def build(
     mso: bool = True,
     minify: bool = False,
     keep_comments: bool = False,
+    dropped: dict[str, dict] | None = None,
 ) -> tuple[str, dict]:
     root = parse_html(source)
     report: dict = {"notes": [], "warnings": []}
 
-    missing = substitute_document(root, tokens)
+    # A dropped token fails the build by name, with or without a fallback, and
+    # says what to use instead (DL-A13): the fallback would ship a literal the
+    # token file never chose.
+    gone = sorted(n for n in var_names(root) if n in (dropped or {}) and n not in tokens)
+    if gone:
+        raise DroppedTokenError("; ".join(dropped_message(n, dropped[n]) for n in gone))
+
+    fallbacks: dict[str, str] = {}
+    missing = substitute_document(root, tokens, fallbacks)
+    for name in sorted(fallbacks):
+        report["notes"].append(
+            "var(%s) is not a token: its fallback %s was used" % (name, fallbacks[name]))
     if missing:
         raise TokenError(
             "unresolved token(s) with no value and no fallback: %s"
@@ -1249,7 +1302,11 @@ def main(argv: list[str] | None = None) -> int:
             mso=not args.no_mso,
             minify=args.minify,
             keep_comments=args.keep_comments,
+            dropped=load_dropped(tokens_path),
         )
+    except DroppedTokenError as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 2
     except TokenError as exc:
         print("error: %s" % exc, file=sys.stderr)
         print("       every token an email template uses must exist in %s, or carry a"
