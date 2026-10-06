@@ -133,7 +133,7 @@ python -m scripts.deprecate --ledger node_modules/@your-org/design-system/deprec
        scan ./src --fail-on-usage
 ```
 
-Stylelint and ESLint have no native concept of a deprecated custom property, and writing a plugin for one is not worth an afternoon — the marker regex plus `scan` covers it, and `scan` also tells you which hits the codemod will and will not reach, which a lint rule never would. Where the design system ships TypeScript, `@deprecated` in the JSDoc is already surfaced by every editor and by `tsc` with no configuration at all; that is free and worth taking.
+Stylelint and ESLint have no native concept of a deprecated custom property, and writing a plugin for one is not worth an afternoon — the marker regex plus `scan` covers it, and `scan` also tells you which hits the codemod will and will not reach, which a lint rule never would. Where the design system ships TypeScript, `@deprecated` in the JSDoc is free and worth taking, but it is not a gate on its own: editors strike the name through, and `tsc` reports nothing ("TypeScript doesn't report type errors for deprecated code on its own", typescript-eslint's docs). The gate is typescript-eslint's `@typescript-eslint/no-deprecated` rule, in its `strict-type-checked` config; it needs type information.
 
 ---
 

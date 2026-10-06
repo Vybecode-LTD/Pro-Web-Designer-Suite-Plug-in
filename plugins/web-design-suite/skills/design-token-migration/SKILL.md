@@ -82,7 +82,7 @@ The intellectual core, and the reason this skill is not a `sed` script.
 python -m scripts.cluster_values literals.json -o ./proposal
 ```
 
-Four separate algorithms, because four kinds of value fail in four different ways:
+Six separate algorithms, because six kinds of value fail in six different ways:
 
 | Kind | Method | Why that method |
 |---|---|---|

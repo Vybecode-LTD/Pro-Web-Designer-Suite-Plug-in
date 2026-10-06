@@ -204,6 +204,31 @@
   bind Tier 1, the Law 6 failure: they get `scopes: []` now. Every duration was dropped
   too, `--dur-base: 220ms` having no pixel value, with exit 1: a duration crosses as
   milliseconds now, 220.
+- **The model announcement shipped a breaking change as a minor** (LC-A17). rollout.md's
+  example read "Design system 2.1.0. One breaking change: `--bg-accent` moved", a re-point
+  released as a minor, the failure the skill exists to prevent. It is 3.0.0 now, with
+  `UPGRADE-3.0.0.md`, and so is the upgrade procedure, whose step 3 committed the codemod
+  on its own (`git commit -am`) against §6's one-commit rollback: the upgrade is one
+  commit now, after step 6.
+- **deprecate.py took a removal outside a major** (LC-A23). deprecation.md puts a removal
+  in X+1.0.0, but `--since 2.1.0 --removal 2.2.0` was accepted; only a patch-apart window
+  was refused. A removal that is not a later major is refused now, unless `--force`.
+- **The reconciliation report's smaller errors** (LC-A23). A duration's delta printed as
+  "-30px"; it is in milliseconds, and a colour's row shows its ΔE, not "+0px", under a
+  heading that no longer says "more than 2px". A
+  colour held in a `$`-variable was to be re-pointed (`$brand: var(--fg-default)`), where
+  framework-migrations.md says to delete such variables at their call sites. The report
+  says so now for a `$` or `@` variable; a custom property is pointed at a role (a Tier-3
+  socket), and a colour in a property with no role, such as `scrollbar-color`, is
+  replaced in place. One colour in two holders gets an entry for each, by kind of holder
+  and, for plain properties, by property.
+- **The lifecycle docs' smaller errors** (LC-A23, LC-B8). deprecation.md said `tsc`
+  surfaces `@deprecated`; it does not, and the gate is `@typescript-eslint/no-deprecated`.
+  framework-migrations.md said the script reports a `darken()` call's distance to the
+  ramp; it cannot compile Sass, so it lists the calls. MIGRATION_PLAN.md offered "20px
+  `--pad-inline-sm`", which is 12px; migration SKILL.md said "four" algorithms and listed
+  six; and figma-variables-sync called `tokens.css` "`git`-enforced read-only", where the
+  CI drift check is what refuses a hand edit.
 
 ### Changed
 
@@ -237,6 +262,23 @@
 
 ### Tests
 
+- P17 (LC-A17, LC-A23, LC-B8, LC-C6): `test_versioning.DeprecateKeepsRemovalsInAMajor`
+  refuses `--removal` 2.2.0, 2.1.1 and 3.1.0 for `--since 2.1.0` and takes 3.0.0 and 4.0.0;
+  `test_token_migration.MigrationPipeline` checks the report's millisecond delta and its
+  advice for a held colour; `test_figma_sync.DeterministicOutput` runs the drift check on a
+  generated `tokens.css` and on a hand edit. Against `v3.3.0`, 3 fail. Two are controls: a
+  removal in a later major was always taken, and the drift check already worked; it had no
+  test behind the claim. Codex and CodeRabbit on #54 found two more, failing on its head:
+  the delete advice reached plain properties (`scrollbar-color`), and durations sat under
+  "more than 2px" (`test_the_review_table_names_its_units`). Its next review found two
+  more, failing on `79bd76b`: a colour's review row read "+0px", and one colour held by a
+  `$` variable and a custom property got the first holder's advice for both
+  (`test_one_colour_in_two_kinds_of_holder_gets_both_kinds_of_advice`); and on `090ded4`,
+  two plain properties holding one colour were named as the first.
+  `test_token_migration.LifecycleDocClaims` holds the doc fixes: a breaking announcement
+  names a major and its guide, and the upgrade commits once; the algorithm count matches
+  its table; MIGRATION_PLAN's tokens are the sizes it gives them; and deprecation.md names
+  the lint rule, not `tsc`, as the gate for `@deprecated`. Against `v3.3.0`, all 4 fail.
 - P16 (LC-C3, LC-A22): `test_figma_sync.FigmaCommon` reads a REST export (one with a
   variable whose collection is missing), a plugin export, a two-mode records export and a
   DTCG file through both scripts and holds them to one result, and checks that neither
