@@ -156,9 +156,13 @@
     .container { background-color: var(--email-dark-surface) !important; }
     .display, .h2, .h3, .lead, .body { color: var(--email-dark-fg) !important; }
     .muted, .legal, .caption { color: var(--email-dark-fg-muted) !important; }
+    .label { color: var(--email-dark-link) !important; }
     .footer { background-color: var(--email-dark-sunken) !important; }
     .divider { background-color: var(--email-dark-border) !important; }
     a { color: var(--email-dark-link) !important; }
+    /* A class beats `a`: without it the dark link colour lands on the
+       accent fill (DL-A10). */
+    .button { color: var(--fg-on-accent) !important; }
   }
 </style>
 </head>
@@ -233,7 +237,7 @@
         </v:roundrect>
         <![endif]-->
         <!--[if !mso]><!-- -->
-        <a href="https://example.com/ridgeline"
+        <a class="button" href="https://example.com/ridgeline"
            style="display:inline-block;padding:var(--email-button-pad);background-color:var(--bg-accent);color:var(--fg-on-accent);font-family:var(--font-sans);font-size:var(--type-ui-size);line-height:var(--type-ui-line);font-weight:var(--type-ui-weight);text-decoration:none;border-radius:var(--radius-md);mso-hide:all;">Shop the Ridgeline</a>
         <!--<![endif]-->
       </td>

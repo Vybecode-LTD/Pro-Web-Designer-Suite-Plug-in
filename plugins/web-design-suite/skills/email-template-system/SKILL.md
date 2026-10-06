@@ -230,7 +230,7 @@ Both are stdlib-only Python 3, no dependencies.
 | `--text FILE` | also write the plain-text alternative |
 | `--text-only` | emit only the plain-text part |
 | `--no-inline` | resolve tokens, leave the CSS in `<style>` |
-| `--no-mso` | skip the Outlook namespace / PixelsPerInch scaffolding |
+| `--no-mso` | skip the Outlook namespaces, PixelsPerInch and font rule |
 | `--minify` | collapse whitespace; conditional comments are protected |
 | `--keep-comments` | keep authoring comments |
 | `--width N` | wrap column for the text part (default 72) |
@@ -242,7 +242,7 @@ Exit `0` compiled · `1` over the clipping threshold (or `--strict` with warning
 
 ### `scripts/lint_email.py` — the gate
 
-Checks unresolved `var()`, unsupported CSS per the matrix, layout tables missing `role="presentation"`, images without `alt` or explicit dimensions, missing `lang`/`<title>`/charset/preheader, relative URLs, size against both Gmail thresholds, measured contrast against the nearest resolvable background, non-descriptive link text, a missing unsubscribe link, forms and scripts, and text below the 13px email floor.
+Checks unresolved `var()`, unsupported CSS per the matrix, layout tables missing `role="presentation"`, images without `alt` or explicit dimensions, missing `lang`/`<title>`/charset/preheader/MSO font rule, relative URLs, size against both Gmail thresholds, measured contrast against the nearest resolvable background, in light and with the retained dark rules applied, non-descriptive link text, a missing unsubscribe link, forms and scripts, and text below the 13px email floor.
 
 | Flag | Does |
 |---|---|

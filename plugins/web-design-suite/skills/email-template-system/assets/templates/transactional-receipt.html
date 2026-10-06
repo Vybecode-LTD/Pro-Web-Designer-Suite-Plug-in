@@ -35,8 +35,10 @@
 
   .wrap { width: 100%; background-color: var(--bg-canvas); }
 
+  /* 100% with a 600px cap, so a client that strips <style> still fits a
+     phone; Outlook gets its 600px from the [if mso] table (DL-A12). */
   .container {
-    width: var(--email-width);
+    width: 100%;
     max-width: var(--email-width);
     background-color: var(--bg-surface);
   }
@@ -133,7 +135,6 @@
 
   /* Retained — @media. This is the only breakpoint the email has. */
   @media only screen and (max-width: var(--email-bp-stack)) {
-    .container { width: 100% !important; }
     .pad { padding-left: 20px !important; padding-right: 20px !important; }
     .h1 { font-size: 26px !important; line-height: 32px !important; }
     .stack { display: block !important; width: 100% !important; }
@@ -149,6 +150,9 @@
     .muted, .legal, .label { color: var(--email-dark-fg-muted) !important; }
     .well, .footer { background-color: var(--email-dark-sunken) !important; }
     a { color: var(--email-dark-link) !important; }
+    /* A class beats `a`: without it the dark link colour lands on the
+       accent fill (DL-A10). */
+    .button { color: var(--fg-on-accent) !important; }
   }
 </style>
 </head>

@@ -14,12 +14,15 @@ WHAT IT CHECKS
   css         properties no client in the matrix supports (flex, grid, position, …)
   structure   layout tables without role="presentation"; forms, script, iframe, video
   images      missing alt, missing explicit width/height, missing dimensions in style
-  head        lang, <title>, charset, viewport, preheader, the MSO PixelsPerInch block
+  head        lang, <title>, charset, viewport, preheader, the MSO PixelsPerInch block,
+              and the MSO font rule when a stack starts with a font Windows lacks
   links       relative URLs, non-descriptive link text, a missing unsubscribe link
   size        total bytes against Gmail's 102,400-byte clipping threshold, and the
               16,384-byte ceiling on surviving <style> content
   contrast    every element that sets a colour, measured against its nearest
               resolvable background, at the WCAG 2.2 AA thresholds
+  dark        the same measure with the retained prefers-color-scheme: dark rules
+              applied, as a client that honours them renders the email
   type        text below the 13px email floor
 
 USAGE
@@ -45,9 +48,20 @@ import sys
 from html.parser import HTMLParser
 from pathlib import Path
 
+# Importing the compiler must not leave a __pycache__ in the plugin.
+sys.dont_write_bytecode = True
+# The compiler's CSS parser and selector matcher, so the dark pass reaches the
+# elements the build's own cascade would (DL-B6).
+try:                                              # python -m scripts.lint_email
+    from .build_email import compile_selector, parse_declarations, parse_stylesheet
+except ImportError:                               # python scripts/lint_email.py
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from build_email import compile_selector, parse_declarations, parse_stylesheet  # type: ignore[no-redef]
+
 GMAIL_CLIP_BYTES = 102_400
 GMAIL_STYLE_BYTES = 16_384
 EMAIL_MIN_FONT_PX = 13
+DARK_RE = re.compile(r"prefers-color-scheme\s*:\s*dark", re.I)
 
 VOID_TAGS = {
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link",
@@ -138,6 +152,10 @@ class Node:
 
     def get(self, name, default=None):
         return self.attrs.get(name, default)
+
+    @property
+    def classes(self) -> list[str]:
+        return (self.attrs.get("class") or "").split()
 
     def walk(self):
         yield self
@@ -255,6 +273,21 @@ def declarations(style: str) -> dict[str, str]:
         prop, _, value = piece.partition(":")
         out[prop.strip().lower()] = re.sub(r"!\s*important\s*$", "", value.strip(), flags=re.I).strip()
     return out
+
+
+# Families classic Outlook's Word engine finds on Windows, and the generics.
+# Windows maps Helvetica to Arial.
+WINDOWS_FAMILIES = {
+    "arial", "helvetica", "georgia", "times new roman", "times", "verdana", "tahoma",
+    "trebuchet ms", "courier new", "courier", "segoe ui", "calibri", "cambria",
+    "sans-serif", "serif", "monospace", "inherit",
+}
+
+
+def first_family(stack: str) -> str:
+    """The first family in a font-family value, unquoted and lower-cased."""
+    first = re.sub(r"!\s*important\s*$", "", stack, flags=re.I).split(",")[0]
+    return first.strip().strip("'\"").strip().lower()
 
 
 def px(value: str) -> float | None:
@@ -499,6 +532,30 @@ class Linter:
                      fix="build with build_email.py, or paste the mso conditional from "
                          "references/email-architecture.md §2")
 
+        # DL-A11: the Word engine cannot resolve a first family Windows lacks
+        # (-apple-system, a web font) and lands on its default serif, unless
+        # an [if mso] block sets a font it has.
+        mso_font = any(
+            n.kind == "comment" and re.match(r"\s*\[if\s+mso", n.data, re.I)
+            and "font-family" in n.data for n in self.root.walk()
+        )
+        if not mso_font:
+            stacks = [declarations(n.get("style") or "").get("font-family", "")
+                      for n in self.root.elements()]
+            stacks += [m.group(1) for n in self.root.elements() if n.tag == "style"
+                       for m in re.finditer(r"font-family\s*:\s*([^;}]+)", n.text_content())]
+            missing = sorted({first for first in (first_family(s) for s in stacks)
+                              if first and first not in WINDOWS_FAMILIES
+                              and not first.startswith("var(")})
+            if missing:
+                self.add("warning", "head", "no MSO font rule, and a stack starts with %s"
+                         % ", ".join(missing),
+                         detail="Classic Outlook's Word engine cannot resolve that family "
+                                "and lands on its own default serif "
+                                "(references/email-architecture.md §2).",
+                         fix="build with build_email.py, which adds the [if mso] font rule, "
+                             "or paste it from references/email-architecture.md §2")
+
         # Use the same test check_css() uses to exempt the preheader's hiding
         # declarations (is_preheader): that one also accepts opacity:0 without
         # max-height:0, and a node missed here but caught there produced a
@@ -644,13 +701,7 @@ class Linter:
             if bg is None:
                 continue
 
-            size = px(decls.get("font-size", "")) or self.inherited_font_size(node) or 16.0
-            weight_raw = decls.get("font-weight", "") or self.inherited_weight(node)
-            bold = weight_raw in ("bold", "bolder") or (
-                weight_raw.isdigit() and int(weight_raw) >= 700
-            )
-            large = size >= 24 or (bold and size >= 18.66)
-            required = 3.0 if large else 4.5
+            size, bold, required = self.text_size(node, decls)
             ratio = contrast_ratio(fg, bg)
 
             if ratio < required:
@@ -669,6 +720,102 @@ class Linter:
                          % (color, source_tag, ratio, required), node.line,
                          "Dark-mode colour inversion in Gmail iOS and Outlook can move "
                          "this either way. No headroom means no margin for that.")
+
+    def text_size(self, node, decls) -> tuple[float, bool, float]:
+        """The size, the boldness and the WCAG floor for this element's text."""
+        size = px(decls.get("font-size", "")) or self.inherited_font_size(node) or 16.0
+        weight_raw = decls.get("font-weight", "") or self.inherited_weight(node)
+        bold = weight_raw in ("bold", "bolder") or (
+            weight_raw.isdigit() and int(weight_raw) >= 700
+        )
+        large = size >= 24 or (bold and size >= 18.66)
+        return size, bold, 3.0 if large else 4.5
+
+    def dark_rules(self) -> list:
+        """(compiled selector, rule) for each retained rule under
+        `prefers-color-scheme: dark` whose selector the compiler can match."""
+        found = []
+        for node in self.root.elements():
+            if node.tag != "style":
+                continue
+            for rule in parse_stylesheet(node.text_content()):
+                if not rule.at_rule or not DARK_RE.search(rule.at_rule):
+                    continue
+                for selector in rule.selectors:
+                    compiled = compile_selector(selector)
+                    if compiled is not None:
+                        found.append((compiled, rule))
+        return found
+
+    def check_dark(self):
+        """DL-A10, DL-B6: apply the retained dark rules as a client that honours
+        prefers-color-scheme does, by the cascade build_email inlines with, and
+        measure the contrast again. Only what the dark rules change is measured:
+        the rest is the light pass's."""
+        rules = self.dark_rules()
+        if not rules:
+            return
+        cache: dict[int, dict[str, str]] = {}
+
+        def dark(node) -> dict[str, str]:
+            if id(node) not in cache:
+                bucket = [((3 if d.important else 1, 9, 9, 9, 10**9), d.prop, d.value)
+                          for d in parse_declarations(node.get("style") or "")]
+                for compiled, rule in rules:
+                    if compiled.matches(node):
+                        for d in rule.declarations:
+                            rank = (2 if d.important else 0,) + compiled.specificity + (rule.order,)
+                            bucket.append((rank, d.prop, d.value))
+                bucket.sort(key=lambda item: item[0])
+                final: dict[str, str] = {}
+                for _rank, prop, value in bucket:
+                    if prop == "background":
+                        prop, value = "background-color", (value.split() or [""])[0]
+                    final[prop] = value
+                cache[id(node)] = final
+            return cache[id(node)]
+
+        def dark_background(node):
+            for current in [node, *node.ancestors()]:
+                if current.kind != "element" or current.tag == "#document":
+                    continue
+                raw = dark(current).get("background-color")
+                color = parse_color(raw) if raw else None
+                if color:
+                    return color, raw
+                raw = current.get("bgcolor")
+                color = parse_color(raw) if raw else None
+                if color:
+                    return color, raw
+            return None, ""
+
+        for node in self.root.elements():
+            if node.tag in ("#document", "style", "head", "title"):
+                continue
+            color = dark(node).get("color") or node.get("color")
+            fg = parse_color(color) if color else None
+            if fg is None or not " ".join(node.text_content().split()):
+                continue
+            bg, source = dark_background(node)
+            if bg is None:
+                continue
+            light = declarations(node.get("style") or "").get("color") or node.get("color")
+            if (parse_color(light) if light else None, self.resolve_background(node)[0]) == (fg, bg):
+                continue
+            size, bold, required = self.text_size(node, declarations(node.get("style") or ""))
+            ratio = contrast_ratio(fg, bg)
+            if ratio < required:
+                self.add("error", "dark",
+                         "in dark mode, %s on %s is %.2f:1, needs %.1f:1"
+                         % (color, source, ratio, required),
+                         node.line,
+                         "%.0fpx%s <%s>%s. Clients that honour prefers-color-scheme apply "
+                         "the retained dark block (email-client-matrix.md), and an "
+                         "!important rule there beats the inline colour."
+                         % (size, " bold" if bold else "", node.tag,
+                            " class=\"%s\"" % node.get("class") if node.get("class") else ""),
+                         "re-point this element's colour in the dark block; a class rule "
+                         "beats an element rule such as `a`")
 
     def resolve_background(self, node) -> tuple[tuple[int, int, int] | None, str]:
         for current in [node, *node.ancestors()]:
@@ -735,6 +882,7 @@ class Linter:
         self.check_links()
         self.check_size()
         self.check_contrast()
+        self.check_dark()
         self.check_type()
         rank = {"error": 0, "warning": 1, "info": 2}
         self.findings.sort(key=lambda f: (rank[f.severity], f.check, f.line))

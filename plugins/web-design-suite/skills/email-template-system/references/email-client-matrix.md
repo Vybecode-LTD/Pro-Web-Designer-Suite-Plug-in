@@ -321,6 +321,8 @@ Sources disagree at the margins — particularly on Gmail web (some describe it 
 
 **The practical position:** design light, with a palette whose colours are still legible if lightness is flipped, using images that read on both. Add the `prefers-color-scheme` block because it is nearly free and Apple Mail, the Outlook apps other than classic Windows, and Samsung Email 6.1 honour it. Verify contrast in both directions. Then stop — further effort buys unpredictability, not control.
 
+**Re-point every colour the block reaches.** The dark block's rules are `!important`, so they beat the inline colours the build wrote. `a { color: var(--email-dark-link) !important }` turns a button's white label into the dark link colour on the accent fill, 2.56:1 in the shipped templates before 3.4.0; a `.button { color: var(--fg-on-accent) !important }` rule wins it back, since a class beats an element. And a colour set in light mode that the block never re-points, such as an accent eyebrow, stays light-mode dark on the dark surface. `lint_email.py`'s `dark` check applies the retained block as a client that honours it does and measures both.
+
 ---
 
 ## 9. What I could not verify

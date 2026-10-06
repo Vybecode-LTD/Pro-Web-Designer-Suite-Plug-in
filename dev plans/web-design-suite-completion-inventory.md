@@ -240,9 +240,9 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-A7 | medium | fixed in 3.3.0: `test_schema_sources` | Supabase's own schema outputs are silently misread. |
 | DL-A8 | medium | W7 (3.4.0) | interview answers are ignored. |
 | DL-A9 | medium | W7 (3.4.0) | generated forms lack promised a11y wiring |
-| DL-A10 | medium | W7 (3.4.0) | dark mode breaks the call-to-action. |
-| DL-A11 | medium | W7 (3.4.0) | the Outlook font rule is never added. |
-| DL-A12 | medium | W7 (3.4.0) | the receipt isn't fluid. |
+| DL-A10 | medium | fixed in 3.4.0: a `.button` rule in each dark block, the eyebrow re-pointed, and `lint_email`'s `dark` check (PR #57; `test_email.TemplatesInDarkMode`, `LintHasADarkPass`) | dark mode breaks the call-to-action. |
+| DL-A11 | medium | fixed in 3.4.0: the build adds the `[if mso]` font rule and the lint asks for it (PR #57; `test_email.OutlookFontRule`) | the Outlook font rule is never added. |
+| DL-A12 | medium | fixed in 3.4.0: the receipt's container is `width:100%` (PR #57; `test_email.ContainersAreFluid`) | the receipt isn't fluid. |
 | DL-A13 | medium | W7 (3.4.0) | nothing enforces "Law 1 holds at build time". |
 | DL-A14 | low | W7 (3.4.0) | the inliner isn't "the real cascade" when shorthand and longhand mix. |
 | DL-A15 | low | fixed in 3.2.0 | cells contradict the cited caniemail raw data |
@@ -250,19 +250,19 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-A17 | low | fixed in 3.2.0 | dated or wrong facts. |
 | DL-A18 | low | fixed in 3.2.0 | ten section pointers point at the wrong section |
 | DL-A19 | low | fixed in 3.1.0, as XC-A4 and XC-A8 | Invocation and Windows portability (instances of XC-A4 and XC-A8). |
-| DL-A20 | low | W7 (3.4.0) | authoring notes ship in the email. |
+| DL-A20 | low | fixed in 3.4.0: only real ESP syntax keeps a comment (PR #57; `test_email.AuthoringCommentsAreDropped`) | authoring notes ship in the email. |
 | DL-A21 | low | W7 (3.4.0) | Consistency: "same 18 steps" and the email tokens' weight note are wrong. |
 | DL-B1 | high | fixed in 3.3.0: the reference's §9 (`test_docs.SupabaseGuidance.test_the_access_boundary_is_stated`) and the generated `lib/supabase.ts` (`test_policies`) | no data-access boundary. |
 | DL-B2 | high | partly done (3.3.0: per-table policies, column grants and a smoke test, `test_policies`); a server-side schema (pydantic or zod) mirroring the constraints is left | authorization and server validation belong to nobody. |
 | DL-B3 | medium | W13 (3.6.0+) | stacks the description implies but doesn't serve. |
 | DL-B4 | medium | W13 (3.6.0+) | email frameworks. |
 | DL-B5 | medium | W13 (3.6.0+) | email translation and RTL. |
-| DL-B6 | medium | W7 (3.4.0) | Checks the docs promise but nothing runs: email dark-mode contrast, the MSO font block, the no-`<style>` layout, source literals, generated-form ARIA. |
+| DL-B6 | medium | W7 (3.4.0); the dark pass and the MSO font check are in (PR #57) | Checks the docs promise but nothing runs: email dark-mode contrast, the MSO font block, the no-`<style>` layout, source literals, generated-form ARIA. |
 | DL-B7 | low | W7 (3.4.0) | deliverability is dated. |
 | DL-B8 | low | fixed in 3.3.0: `test_schema_sources.TheWorkedExampleIsTheFixture`, `GeneratedTypesAgreeOnStructure` | unverifiable claims. |
 | DL-C1 | M | fixed: 3.1.0 classified the sensitive columns (DL-A1, DL-A2); 3.3.0 parses RLS and policies and prints the SECURITY block (`test_content_and_a11y.SchemaSecurityPass`) | A security pass in `introspect_schema`: classify sensitive columns, parse RLS and policies, print a SECURITY block first. |
 | DL-C2 | M | done in 3.3.0: `test_schema_sources` | A sturdier schema parser, tested on real `db pull` and `gen types` files. |
-| DL-C3 | M | W7 (3.4.0) | Email: fix A10–A12, then add a dark pass and a no-`<style>` check to `lint_email`, and `render_email.py`. |
+| DL-C3 | M | W7 (3.4.0); A10 to A12 and the dark pass are in (PR #57) | Email: fix A10–A12, then add a dark pass and a no-`<style>` check to `lint_email`, and `render_email.py`. |
 | DL-C4 | S | fixed in 3.3.0, with DL-A5 and DL-B1's reference | rewrite supabase-integration.md §2/§4/§6 |
 | DL-C5 | S | W7 (3.4.0) | `lint_email --source`: flag literals, `var()` fallbacks and dropped tokens. |
 | DL-C6 | S | fixed in 3.2.0 | pointer and command hygiene; the detail file lists them. |

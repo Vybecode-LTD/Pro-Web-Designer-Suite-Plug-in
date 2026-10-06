@@ -229,6 +229,31 @@
   `--pad-inline-sm`", which is 12px; migration SKILL.md said "four" algorithms and listed
   six; and figma-variables-sync called `tokens.css` "`git`-enforced read-only", where the
   CI drift check is what refuses a hand edit.
+- **Email dark mode no longer breaks the call to action** (DL-A10). The dark block's
+  `a { color: var(--email-dark-link) !important }` beat the button's inline white label:
+  #ffa582 on the #c64600 fill, 2.56:1, wherever `prefers-color-scheme` is honoured. Each
+  template's dark block now ends with `.button { color: var(--fg-on-accent) !important }`,
+  the announcement's call to action has `class="button"`, and its "Back in stock" eyebrow,
+  left at the light accent on the dark surface (2.50:1), is re-pointed to the dark link
+  colour.
+- **`lint_email` measures dark mode** (DL-B6, DL-C3). A new `dark` check applies the
+  retained `prefers-color-scheme: dark` rules with build_email's own selector matcher and
+  cascade, as a client that honours them renders the email, and measures the contrast of
+  whatever they change. It found both of DL-A10's failures, at the review's figures.
+- **The Outlook font rule is in the build** (DL-A11). email-architecture.md §2 said the
+  compiler adds an `[if mso]` block that gives the Word engine Arial, without which a stack
+  starting with `-apple-system` lands on its default serif; the block never had it. It
+  does now, a hand-written PixelsPerInch block gets the font rule beside it, and the lint
+  warns when no `[if mso]` font rule exists and a stack starts with a family Windows
+  lacks.
+- **The receipt is fluid** (DL-A12). Its container was `width:600px` inline, so with
+  `<style>` stripped (Gmail's app with a non-Google account) it was 600px wide on a 375px
+  phone. It is `width:100%` with the 600px cap, like the other two templates.
+- **Authoring notes stay out of the email** (DL-A20). The build kept any comment holding
+  `{{` as an ESP directive, so the receipt's header comment shipped in every build while
+  the build reported it dropped. A comment is kept for real ESP syntax only: a Handlebars
+  block (`{{#`, `{{/`, `{{^`, `{{else`), a Liquid tag (`{%`), a Mailchimp merge tag
+  (`*|IF:X|*`), ERB (`<%`), and conditional comments as before.
 
 ### Changed
 
@@ -262,6 +287,14 @@
 
 ### Tests
 
+- P18 part 1 (DL-A10, DL-A11, DL-A12, DL-A20): `test_email`, a new module.
+  `TemplatesInDarkMode` builds and lints each template and checks every filled link is a
+  `.button` the dark block re-points; `LintHasADarkPass` holds the `dark` check to the
+  review's 2.56:1 and 2.50:1 and leaves untouched pairs to `contrast`; `OutlookFontRule`,
+  `ContainersAreFluid` and `AuthoringCommentsAreDropped` hold the rest. Against `v3.3.0`,
+  10 fail. Four are controls: the templates linted clean before (the lint had no dark
+  pass), a class rule that wins back the label, a page with no dark block, and a pair the
+  dark rules leave alone.
 - P17 (LC-A17, LC-A23, LC-B8, LC-C6): `test_versioning.DeprecateKeepsRemovalsInAMajor`
   refuses `--removal` 2.2.0, 2.1.1 and 3.1.0 for `--since 2.1.0` and takes 3.0.0 and 4.0.0;
   `test_token_migration.MigrationPipeline` checks the report's millisecond delta and its

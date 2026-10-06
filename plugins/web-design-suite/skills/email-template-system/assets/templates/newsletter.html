@@ -134,6 +134,9 @@
     .footer { background-color: var(--email-dark-sunken) !important; }
     .divider { background-color: var(--email-dark-border) !important; }
     a { color: var(--email-dark-link) !important; }
+    /* A class beats `a`: without it the dark link colour lands on the
+       accent fill (DL-A10). */
+    .button { color: var(--fg-on-accent) !important; }
   }
 </style>
 </head>
