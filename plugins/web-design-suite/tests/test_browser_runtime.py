@@ -356,12 +356,16 @@ class VitalsMeasures(TempDirTest):
         """The click lands during a 3-second task: its wait is INP's, and the
         task stays in TBT, since it is the page's own work. The task starts
         1.5 s in, which leaves a slow runner time to find the button first
-        (at 0.5 s, Windows CI found it only after the task, and missed)."""
+        (at 0.5 s, Windows CI found it only after the task, and missed).
+        The task is due at 1.5 s on the page's clock, as the click is, not
+        1.5 s after the script parses: on a slow runner the two drifted
+        apart, the click came first, and INP was empty (#54's main run)."""
         page = ("<button>Buy</button><script>setTimeout(() => { " + self.BUSY.format(ms=3000)
-                + " }, 1500);</script>")
+                + " }, Math.max(0, 1500 - performance.now()));</script>")
         out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "button",
                           "--interact-at", "2500")
         self.assertLessEqual(out["perRun"][0]["clickedAt"], 2800, "the click came late")
+        self.assertIsNotNone(out["stats"]["inp"], "no interaction entry: %s" % out["perRun"])
         during = out["stats"]["inp"]["median"]
         self.assertGreaterEqual(during, 500)
         self.assertGreaterEqual(out["stats"]["tbt"]["median"], 1000)

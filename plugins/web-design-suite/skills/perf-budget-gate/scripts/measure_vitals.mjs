@@ -465,7 +465,10 @@ const HARVEST = ({ topN, ttfb: networkTtfb, requests: networkRequests }) => {
 // click goes through the browser's input pipeline at MS after navigation
 // starts, so it queues behind whatever task holds the main thread then, as a
 // user's does. MS counts from the page's own time origin: a cold browser can
-// take half a second to send the request. Returns when it clicked, or null.
+// take half a second to send the request. The wait is read off the page's
+// clock (performance.now), not Date.now() against performance.timeOrigin:
+// those are two processes' wall clocks, which a busy CI machine can skew
+// apart. Returns when it clicked, on the page's clock, or null.
 // The document's TTFB in ms from CDP: from the request's first timestamp
 // (seconds) to the end of its headers, or null when CDP left the timing
 // unset (it marks an unset field -1), so Navigation Timing stands in.
@@ -475,16 +478,34 @@ function networkTtfb(start, timing) {
   return (timing.requestTime - start) * 1000 + timing.receiveHeadersEnd;
 }
 
+// The page's clock against Node's monotonic one, paired as NTP pairs them:
+// a reading taken between `sent` and `back` is good to half that round trip,
+// whether the request queued or the reply stalled, so the narrowest of three
+// samples wins. Returns page time minus Node time.
+// test_browser_scripts.VitalsTiming runs this function on its own.
+async function pageClockOffset(readPage, now, samples = 3) {
+  let best = null;
+  for (let i = 0; i < samples; i++) {
+    const sent = now();
+    const pageNow = await readPage();
+    const back = now();
+    if (!best || back - sent < best.rtt) best = { rtt: back - sent, offset: pageNow - (sent + back) / 2 };
+  }
+  return best.offset;
+}
+
 async function clickDuringLoad(page, opts) {
   try {
-    const origin = await page.evaluate(() => performance.timeOrigin);
     const target = page.locator(opts.interact).first();
     await target.waitFor({ state: 'visible', timeout: opts.interactAt + 10000 });
     const box = await target.boundingBox();
     if (!box) throw new Error('the target has no layout box');
-    const wait = origin + opts.interactAt - Date.now();
+    const offset = await pageClockOffset(() => page.evaluate(() => performance.now()),
+                                         () => performance.now());
+    const onPage = () => performance.now() + offset;
+    const wait = opts.interactAt - onPage();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    const at = Math.round(Date.now() - origin);
+    const at = Math.round(onPage());
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     return at;
   } catch (err) {
