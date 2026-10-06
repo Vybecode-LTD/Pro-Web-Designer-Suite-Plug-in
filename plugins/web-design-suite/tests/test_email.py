@@ -501,5 +501,5 @@ class EmailDocClaims(EmailTest):
         for needle in ("List-Unsubscribe=One-Click", "RFC 8058", "48 hours", "0.30%",
                        "5 May 2025", "550; 5.7.515", "p=none", "not transactional",
                        "reverse DNS", "TLS", "RFC 5322", "in summary",
-                       "Google recommends rather than requires", "5,000 or more emails a day"):
+                       "Google recommends rather than requires", "5,000 or more emails a day", "same `5322.From` domain"):
             self.assertIn(needle, workflow)
