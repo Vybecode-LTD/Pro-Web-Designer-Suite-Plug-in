@@ -121,13 +121,13 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-A14 | medium | fixed in 3.4.0: `test_versioning.DeprecateRewritesAndCountsAColourRename` (PR #50) | deprecate.py emits a colour rename. |
 | LC-A15 | medium | fixed in 3.1.0, as SB-A12 | The doc says that after replacing the Tailwind theme, "an off-scale class does not exist and the build errors on it". |
 | LC-A16 | medium | fixed in 3.2.0 | Re-pointing --bs-primary does not reach .btn-primary, which sets --bs-btn-bg: #0d6efd literally ([bootstrap.css](https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.css)), or .bg-primary and .text-primary, wh |
-| LC-A17 | medium | W6 (3.4.0) | The model announcement reads "**Design system 2.1.0.** One breaking change: `--bg-accent` moved…". |
+| LC-A17 | medium | fixed in 3.4.0: docs only, rollout.md's example and procedure (PR #54) | The model announcement reads "**Design system 2.1.0.** One breaking change: `--bg-accent` moved…". |
 | LC-A18 | medium | fixed in 3.2.0 | The baseline is extracted from styles/ src/components/, but CI extracts from styles/ src/. |
 | LC-A19 | medium | fixed in 3.4.0: `test_rules_spec.TheTierListsAgree` (PR #49) | The doc says "tier1-leak … agree[s] by construction" with audit_design L6. |
 | LC-A20 | medium | fixed in 3.1.0, as XC-A8 | "Run them from this skill's root" combined with cwd-relative defaults writes project artifacts (literals.json, proposal/, the deprecation ledger) into the plugin install, which a plugin update replaces. |
 | LC-A21 | medium | fixed in 3.1.0, as XC-A1 | `extract_literals --format report` writes no literals.json, so `cluster_values literals.json` fails with "no such file", exit 2. |
 | LC-A22 | low | fixed in 3.4.0: `test_figma_sync.ReverseBody` (PR #53) | Three problems with the POST body `--reverse` generates. |
-| LC-A23 | low | W6 (3.4.0) | Smaller accuracy and consistency items. |
+| LC-A23 | low | fixed in 3.4.0: `test_versioning.DeprecateKeepsRemovalsInAMajor`, `test_token_migration.MigrationPipeline` (the report's ms delta and held-colour advice); the rest docs only (PR #54; versioning's "Four edits" in #50) | Smaller accuracy and consistency items. |
 | LC-B1 | — | W10 (3.6.0+) | no non-Enterprise route into Figma. |
 | LC-B2 | — | W10 (3.6.0+) | Style Dictionary, Tokens Studio and Terrazzo teams get nothing. |
 | LC-B3 | — | W9 (3.5.0) | no way to supply a project contract. |
@@ -135,13 +135,13 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-B5 | — | W12 (3.6.0+) | migration coverage. |
 | LC-B6 | — | W10 (3.6.0+) | Figma plan realities. |
 | LC-B7 | — | W12 (3.6.0+) | rollout gaps. |
-| LC-B8 | — | W6 (3.4.0) | claims with no gate. |
+| LC-B8 | — | fixed in 3.4.0: the parity and worked-run claims gated in #49, #50 and #53; `tokens.css`'s read-only claim names the CI drift check, held by `test_figma_sync.DeterministicOutput` (PR #54) | claims with no gate. |
 | LC-C1 | — | W9 (3.5.0) | Add `contract.json`, emitted by extract_system from the project's tokens.css and read through `--tokens` by figma_audit, figma_to_tokens, cluster_values, audit_design and diff_system. |
 | LC-C2 | — | W10 (3.6.0+) | Add a shared `dtcg.py` for 2025.10 read and write, Tokens Studio sets and themes, and `$deprecated` → ledger, plus a `--format dtcg` output. |
 | LC-C3 | — | fixed in 3.4.0: `test_figma_sync.FigmaCommon` (PR #53); the tier-list half, `test_rules_spec.TheTierListsAgree` (PR #49) | Move the two figma scripts' shared code into `figma_common.py`, and add a parity test for extract_system tier1-leak vs audit_design L6. |
 | LC-C4 | — | fixed in 3.4.0: A11, A12 and A14 with P15 (PR #49, #50), the rest in 3.1.0 | Add regression tests for LC-A5, A10, A11, A12, A14 and A2, then fix each one: focus-ring detection, the vendor rule, negative-cancel pairing, the type-tie note, the font guard scope, and composed opacity. |
 | LC-C5 | — | fixed in 3.4.0: `test_versioning.DiffSystemClassifiesWhatSystemJsonRecords` (PR #48) | diff_system: cover density, conditions, `element` and CSS Modules; record `@layer` in system.json; make an added override major when an existing value moves. |
-| LC-C6 | — | partly done; the rest in W6 (3.4.0) | Instruction fixes: the rebase recipe (LC-A6), a worktree-based before/after audit (LC-A13), the `${CLAUDE_SKILL_DIR}` invocation (LC-A20), one snapshot path with its inputs in config (LC-A18), the README (LC-A21), the ro |
+| LC-C6 | — | fixed in 3.4.0: its last open part, LC-A17 (PR #54); LC-B4 is W9's | Instruction fixes: the rebase recipe (LC-A6), a worktree-based before/after audit (LC-A13), the `${CLAUDE_SKILL_DIR}` invocation (LC-A20), one snapshot path with its inputs in config (LC-A18), the README (LC-A21), the ro |
 | LC-C7 | — | W10 (3.6.0+) | A Figma MCP route: a SKILL.md routing row that says "if `get_variable_defs` is available, read with it"; a `--reverse --format plugin-script` output for `use_figma` that renames "Mode 1", sets `scopes: []` on primitives  |
 | LC-C8 | — | W9 (3.5.0) | Hooks: block edits to files headed "GENERATED — DO NOT EDIT", and on a tokens.css edit run diff_system and return the bump and any contrast crossings. |
 | LC-C9 | — | W9 (3.5.0) | User-invocable workflow skills (`disable-model-invocation: true`): `/wds-migrate-census`, `/wds-release-check` (extract → diff → gate → changelog → guide), `/wds-figma-handoff`, `/wds-docs-check`, each with `allowed-tool |

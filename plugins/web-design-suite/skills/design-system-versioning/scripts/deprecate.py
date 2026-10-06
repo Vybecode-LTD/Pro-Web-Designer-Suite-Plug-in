@@ -178,10 +178,10 @@ def check_window(since: str, removal: str) -> Optional[str]:
         return (f"--removal {removal} is not after --since {since}. Removing in "
                 f"the release that announced it is not a deprecation, it is a "
                 f"removal with an apology attached.")
-    if b[0] == a[0] and b[1] == a[1]:
-        return (f"{since} -> {removal} is a patch apart. A consumer on a "
-                f"quarterly upgrade cadence will meet the removal and the "
-                f"announcement in the same diff. Give them a minor version.")
+    if b[0] == a[0] or b[1:] != (0, 0):
+        return (f"--removal {removal} is not a major release after {since}. A "
+                f"removal is breaking, so it ships in a major: {a[0] + 1}.0.0 or "
+                f"a later one (deprecation.md, the lifecycle table).")
     return None
 
 

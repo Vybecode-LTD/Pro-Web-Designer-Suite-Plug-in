@@ -269,7 +269,7 @@ being edited in the same week.
 | The argument | Values are *verified* in code and merely *drawn* in Figma. Contrast is measured, not eyeballed; `clamp()` and `calc()` only exist here; the audit gate and the type system are here. If the canonical value lives where it cannot be verified, verification is advisory | Designers make hundreds of small decisions a week and should not file a PR for each. The library is the deliverable and it ships to more than one codebase. A value that is canonical in one repo is not canonical for the other four |
 | Direction | `tokens.json` → `--reverse` → Figma | Figma → `figma_to_tokens.py` → `tokens.css` |
 | Who edits | Engineers, in a PR | Designers, in Figma |
-| The other side | Figma is generated and **read-only by convention** | `tokens.css` is generated and `git`-enforced read-only |
+| The other side | Figma is generated and **read-only by convention** | `tokens.css` is generated; the CI drift check below fails a hand edit |
 | Fails when | Designers edit the mirror anyway, because nobody told them it was a mirror | An unverifiable value ships — a contrast failure, an off-scale step — because nothing gates the design file |
 
 Whichever you pick, put it in `DESIGN_DECISIONS.md` in one sentence, name the
