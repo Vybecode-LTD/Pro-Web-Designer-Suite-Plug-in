@@ -260,6 +260,18 @@ class DroppedTokensFailTheBuild(EmailTest):
                 self.assertIn("--elevation-card is not in email", out)
                 self.assertIn("use --email-edge", out)
 
+    def test_a_token_file_that_is_not_an_object_exits_2(self):
+        """CodeRabbit on #58: `[{"tokens": …}]` raised AttributeError, a traceback."""
+        bad = self.write("bad-tokens.json", '[{"tokens": {}}]')
+        source = self.page("t.html", "<p>Hi</p>")
+        for module, args in (("build_email", ("-o", self.tmp / "o.html")), ("lint_email", ("--source",))):
+            with self.subTest(module=module):
+                proc = run_py("email-template-system", module, source, *args, "--tokens", bad,
+                              cwd=self.tmp)
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn("is not a JSON object", output(proc))
+                self.assertNotIn("Traceback", output(proc))
+
     def test_a_fallback_that_stood_in_is_noted(self):
         source = self.page("fb.html", '<p class="c">Hi</p>',
                            "<style>.c { padding-top: var(--not-a-token, 7px); }</style>\n")
@@ -391,6 +403,13 @@ class RenderEmail(EmailTest):
                 for m in modes}
         self.assertTrue(all(png.startswith(b"\x89PNG") for png in pngs.values()))
         self.assertNotEqual(pngs["light"], pngs["dark"], "the dark block changed nothing")
+
+    def test_the_email_s_scripts_do_not_run(self):
+        """CodeRabbit on #58: setContent ran an email's <script>; no client does."""
+        page = self.page("js.html", "<p>Hi</p><script>document.body.insertAdjacentHTML("
+                                    "'beforeend', '<div style=\"width:2000px\">x</div>')</script>")
+        code, modes = self.render(page)
+        self.assertEqual(code, 0, modes)
 
     def test_a_fixed_width_email_overflows_only_without_style(self):
         page = self.page("fixed.html",

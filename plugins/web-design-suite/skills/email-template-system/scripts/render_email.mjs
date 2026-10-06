@@ -99,9 +99,13 @@ async function main() {
   try {
     fs.mkdirSync(opts.out, { recursive: true });
     for (const mode of MODES) {
-      // No bypassCSP: nothing is injected, the email is the page.
+      // No bypassCSP: nothing is injected, the email is the page. No
+      // JavaScript either: no client runs an email's scripts, and one that ran
+      // here could open a WebSocket the http(s) route does not stop
+      // (CodeRabbit on #58).
       const context = await browser.newContext({
         viewport: { width: opts.width, height: 800 }, deviceScaleFactor: 1,
+        javaScriptEnabled: false,
         colorScheme: mode.colorScheme, locale: 'en-US', timezoneId: 'UTC',
       });
       try {

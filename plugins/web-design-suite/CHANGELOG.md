@@ -366,6 +366,8 @@
   Codex's review of #58 added three, each failing on its head: a `max-width` over 100%
   taken as a cap, a named colour, a `bgcolor` or a VML `fillcolor` passing `--source`,
   and a negative literal unmatched.
+  CodeRabbit's added two: a token file that is not a JSON object crashed with a traceback,
+  and `render_email.mjs` ran the email's scripts; it renders with JavaScript off.
 - P19 (DL-A14, DL-A21, DL-B7): `test_email.InlinerWritesTheCascadesOrder` and
   `EmailDocClaims` (the Law 3 count read from the token file, the weight and size notes,
   the edge built from the border role, no `:last-child` workaround, headings in order in
