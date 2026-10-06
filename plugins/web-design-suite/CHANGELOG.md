@@ -299,7 +299,7 @@
   February 2024, among others: SPF, DKIM, DMARC, an aligned From domain, reverse DNS, TLS,
   and on promotional mail the RFC 8058 header pair with unsubscribes fulfilled within
   48 hours, a spam rate below 0.10% and never 0.30%) and Microsoft's for Outlook.com (since
-  5 May 2025, for domains sending more than 5,000 a day: SPF and DKIM passing, DMARC at
+  5 May 2025, for senders of 5,000 or more a day, as its 5.7.515 help page puts it: SPF and DKIM passing, DMARC at
   `p=none` or stricter and aligned, and the `550; 5.7.515` rejection), each re-read at its
   source on 2026-10-06; the percentages and the 48 hours are in `evidence.json`.
 
