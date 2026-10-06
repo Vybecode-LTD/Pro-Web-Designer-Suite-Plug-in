@@ -231,8 +231,9 @@
   CI drift check is what refuses a hand edit.
 - **`--interact-at` times the click on the page's clock.** It waited until
   `Date.now()` reached `performance.timeOrigin` plus MS, comparing Node's wall clock with
-  the browser's; it now reads the page's `performance.now()` once the target is visible
-  and counts on from there with Node's monotonic clock, so `clickedAt` is page time too.
+  the browser's. It now maps the page's `performance.now()` onto Node's monotonic clock
+  as NTP does, from the narrowest of three round trips, so a stalled request or reply
+  costs at most half that trip (Codex and CodeRabbit on #56), and `clickedAt` is page time.
 
 ### Changed
 
@@ -273,6 +274,8 @@
   click before the task. The task is now due at 1.5 s on the page's clock, and a missing
   entry fails with the run's numbers. It never failed locally (5 runs before the fix, 4
   after), so there is no fail-before count; the test change is a control.
+  `test_browser_scripts.VitalsTiming.test_the_page_clock_survives_a_stalled_request_or_reply`
+  runs the clock mapping on fake clocks with stalls; it fails on the PR's first head.
 - P17 (LC-A17, LC-A23, LC-B8, LC-C6): `test_versioning.DeprecateKeepsRemovalsInAMajor`
   refuses `--removal` 2.2.0, 2.1.1 and 3.1.0 for `--since 2.1.0` and takes 3.0.0 and 4.0.0;
   `test_token_migration.MigrationPipeline` checks the report's millisecond delta and its

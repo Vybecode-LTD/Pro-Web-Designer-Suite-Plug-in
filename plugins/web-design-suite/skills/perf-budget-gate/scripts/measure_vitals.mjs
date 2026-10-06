@@ -478,17 +478,31 @@ function networkTtfb(start, timing) {
   return (timing.requestTime - start) * 1000 + timing.receiveHeadersEnd;
 }
 
+// The page's clock against Node's monotonic one, paired as NTP pairs them:
+// a reading taken between `sent` and `back` is good to half that round trip,
+// whether the request queued or the reply stalled, so the narrowest of three
+// samples wins. Returns page time minus Node time.
+// test_browser_scripts.VitalsTiming runs this function on its own.
+async function pageClockOffset(readPage, now, samples = 3) {
+  let best = null;
+  for (let i = 0; i < samples; i++) {
+    const sent = now();
+    const pageNow = await readPage();
+    const back = now();
+    if (!best || back - sent < best.rtt) best = { rtt: back - sent, offset: pageNow - (sent + back) / 2 };
+  }
+  return best.offset;
+}
+
 async function clickDuringLoad(page, opts) {
   try {
     const target = page.locator(opts.interact).first();
     await target.waitFor({ state: 'visible', timeout: opts.interactAt + 10000 });
     const box = await target.boundingBox();
     if (!box) throw new Error('the target has no layout box');
-    // The page's time, paired with Node's monotonic clock when the answer
-    // lands: the reply leaves as soon as it is read, the request may queue.
-    const pageNow = await page.evaluate(() => performance.now());
-    const anchor = performance.now();
-    const onPage = () => pageNow + performance.now() - anchor;
+    const offset = await pageClockOffset(() => page.evaluate(() => performance.now()),
+                                         () => performance.now());
+    const onPage = () => performance.now() + offset;
     const wait = opts.interactAt - onPage();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     const at = Math.round(onPage());
