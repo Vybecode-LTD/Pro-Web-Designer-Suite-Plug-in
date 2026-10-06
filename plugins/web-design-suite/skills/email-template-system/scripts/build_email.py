@@ -725,8 +725,12 @@ def inline_rules(root: Node, rules: list[Rule], retained: list[Rule]) -> int:
 
         bucket.sort(key=lambda item: item[0])
 
+        # A later winner moves to the end, so the written order is the cascade's:
+        # `padding:8px` over an earlier `padding-left:24px` must come after it,
+        # or the longhand wins again in the client (DL-A14).
         final: dict[str, tuple[str, bool]] = {}
         for _rank, prop, value, important in bucket:
+            final.pop(prop, None)
             final[prop] = (value, important)
 
         if not final:

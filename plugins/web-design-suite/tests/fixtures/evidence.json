@@ -331,6 +331,31 @@
       "docs": [
         "perf-budget-gate/references/budgets.md"
       ]
+    },
+    {
+      "figure": "0.30%",
+      "also": [
+        "0.10%"
+      ],
+      "claim": "the spam rate in Google's Postmaster Tools a sender should stay below, and the rate it should never reach",
+      "source": "Google Workspace Admin Help, Email sender guidelines",
+      "url": "https://support.google.com/a/answer/81126",
+      "checked": "2026-10-06",
+      "quote": "Keep spam rates reported in Postmaster Tools below 0.10% and avoid ever reaching a spam rate of 0.30% or higher.",
+      "docs": [
+        "email-template-system/references/email-workflow.md"
+      ]
+    },
+    {
+      "figure": "48 hours",
+      "claim": "how soon Google advises fulfilling an unsubscribe request",
+      "source": "Google Workspace Admin Help, Email sender guidelines FAQ",
+      "url": "https://support.google.com/a/answer/14229414",
+      "checked": "2026-10-06",
+      "quote": "we recommend that you fulfill unsubscribe requests within 48 hours, a reasonable timeline for removing recipients from a mailing list.",
+      "docs": [
+        "email-template-system/references/email-workflow.md"
+      ]
     }
   ],
   "not_statistics": [

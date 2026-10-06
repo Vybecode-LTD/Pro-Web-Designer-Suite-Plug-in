@@ -281,6 +281,27 @@
   the page width of each against the screen: exit 1 when one is wider. Nothing is fetched.
   It finds its browser with the suite's `browser_common.mjs`, now copied into the email
   skill too, and never downloads one.
+- **The inliner writes declarations in the cascade's order** (DL-A14). A later winner kept
+  its key's first position, so `td{padding:0}`, `.pad{padding-left:24px}` and
+  `style="padding:8px"` came out as `padding:8px;padding-left:24px`, a left of 24px where
+  the cascade says 8px. A winner now moves to the end.
+- **The email docs agree with the files** (DL-A21). SKILL.md's Law 3 row said "Same 18
+  steps"; email keeps 13 of the 18 spacing steps and has its own heading scale, which the
+  h1 and h2 sizes' notes now say. The weight notes said websafe stacks have no 500 or 600;
+  SF and Segoe UI lead the stack and have a semibold, and only Arial, classic Outlook's
+  font, lacks it. The newsletter set `padding-bottom` on every paragraph and `0` on the
+  last, the `:last-child` workaround SKILL.md rules out; its bands own the gaps now. The
+  announcement's colour names were `<p class="h3">`, invisible to a screen reader's heading
+  list; they are `<h2>`s. `--email-edge` restated `#e7e5e2`; it reads `--border-subtle`, and
+  the build sends the same `1px solid #e7e5e2`.
+- **Deliverability names today's rules** (DL-B7). email-workflow.md named only Gmail and
+  Yahoo's unsubscribe headers. It now gives Google's bulk-sender requirements (since
+  February 2024, among others: SPF, DKIM, DMARC, an aligned From domain, reverse DNS, TLS,
+  and on promotional mail the RFC 8058 header pair with unsubscribes fulfilled within
+  48 hours, a spam rate below 0.10% and never 0.30%) and Microsoft's for Outlook.com (since
+  5 May 2025, for domains sending more than 5,000 a day: SPF and DKIM passing, DMARC at
+  `p=none` or stricter and aligned, and the `550; 5.7.515` rejection), each re-read at its
+  source on 2026-10-06; the percentages and the 48 hours are in `evidence.json`.
 
 ### Changed
 
@@ -347,6 +368,10 @@
   and a negative literal unmatched.
   CodeRabbit's added two: a token file that is not a JSON object crashed with a traceback,
   and `render_email.mjs` ran the email's scripts; it renders with JavaScript off.
+- P19 (DL-A14, DL-A21, DL-B7): `test_email.InlinerWritesTheCascadesOrder` and
+  `EmailDocClaims` (the Law 3 count read from the token file, the weight and size notes,
+  the edge built from the border role, no `:last-child` workaround, headings in order in
+  every template, the deliverability rules). Against `v3.3.0`, all 8 fail.
 - P17 (LC-A17, LC-A23, LC-B8, LC-C6): `test_versioning.DeprecateKeepsRemovalsInAMajor`
   refuses `--removal` 2.2.0, 2.1.1 and 3.1.0 for `--since 2.1.0` and takes 3.0.0 and 4.0.0;
   `test_token_migration.MigrationPipeline` checks the report's millisecond delta and its
