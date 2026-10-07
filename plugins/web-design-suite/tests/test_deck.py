@@ -141,6 +141,13 @@ class TheSuitesOwnA11yJsonIsAnInput(Deck):
         bare = self.write("bare.json", json.dumps({"findings": []}))
         proc = self.build(decision_log("D1 — Tokens"), "--dry-run", "--a11y", bare)
         self.assertEqual(proc.returncode, 2, output(proc))
+        mixed = self.write("mixed.json", json.dumps([A11Y_CLEAN, STATIC_WARNING]))
+        proc = self.build(decision_log("D1 — Tokens"), "--dry-run", "--a11y", mixed)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("mixes shapes (axe and a11y_static) in one list", output(proc))
+        two_axe = self.write("two.json", json.dumps([A11Y_CLEAN, A11Y_CLEAN]))
+        self.assertIn("2</span></p><p class='metric__label'>page(s) scanned",
+                      self.html(decision_log("D1 — Tokens"), "--a11y", two_axe, name="two.html"))
         empty = self.write("empty.json", json.dumps({"tool": "a11y_static", "findings": []}))
         html = self.html(decision_log("D1 — Tokens"), "--a11y", empty)
         self.assertIn("passes an automated WCAG 2.2 AA check", html)
