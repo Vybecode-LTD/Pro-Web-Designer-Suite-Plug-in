@@ -677,14 +677,19 @@ const tier1Advice = (ref) => {
   return prefix ? TIER1_WITH_ROLE[prefix] : null;
 };
 
-/* Inside `@layer components { … }`, at any depth, as the audit reads it. */
+/* In the `components` layer or one of its sub-layers, as the audit reads it.
+ * The layer's full name decides: `@layer base.components` and
+ * `@layer base { @layer components { … } }` are both a layer inside base (CSS
+ * Cascade 5 reads a dotted name as nested), and `@layer components.card` is
+ * inside components (CodeRabbit on #73). */
 const inComponentsLayer = (node) => {
+  const path = [];
   for (let n = node.parent; n; n = n.parent) {
-    if (n.type === 'atrule' && n.name.toLowerCase() === 'layer' && n.params.includes('components')) {
-      return true;
+    if (n.type === 'atrule' && n.name.toLowerCase() === 'layer') {
+      path.unshift(...n.params.split('.').map((segment) => segment.trim()));
     }
   }
-  return false;
+  return path[0] === 'components';
 };
 
 const tierRule = (primary, secondary) => (root, result) => {
@@ -934,58 +939,12 @@ export default {
 
   overrides: [
     /* ---------------------------------------------------------------------
-     * 1. tokens.css — the ONE file where literals live (Law 1).
+     * 1. COMPONENT FILES — Law 2, at its strictest.
      *
-     * This is the definition of Law 1, not an exception to it: "literals
-     * live only in tokens.css". Every rule that bans a raw value is
-     * switched off here and nowhere else, which is what makes the file
-     * meaningful — there is exactly one place to look, and one file to
-     * review when a brand changes.
-     * ------------------------------------------------------------------ */
-    {
-      files: ['**/tokens.css', '**/*-tokens.css', '**/*.tokens.css', '**/tokens/*.css'],
-      rules: {
-        'declaration-property-value-allowed-list': null,
-        [hexRuleName]: null,
-        [colourFnRuleName]: null,
-        'color-named': null,
-        /* Tier 2 is defined here, from Tier 1. */
-        [tierRuleName]: null,
-        /* Tier-1 steps are `--space-0-5`, `--text-2xs`, `--radius-2xl`:
-         * digits inside segments, which the strict pattern rejects. */
-        'custom-property-pattern': '^[a-z0-9]+(-[a-z0-9]+)*$',
-        /* `no-duplicate-selectors` stays ON: a second `[data-theme="dark"]`
-         * block that quietly redefines a token is the bug it catches. The
-         * starter opens one `:root` block per tier (primitives, roles, …)
-         * and marks each repeat with a disable comment that says so. */
-      },
-    },
-
-    /* ---------------------------------------------------------------------
-     * 2. theme.css / tailwind bindings — the binding layer.
-     *
-     * A custom property here binds a token and decides nothing: it takes a
-     * token, a colour word or a CSS-wide keyword, and the literals documented
-     * in theme.css §0, a breakpoint in rem and an aspect ratio
-     * (BINDING_ALLOWLIST, from design-rules.json: bindings). A breakpoint has to be a literal,
-     * and never a var(), because media queries cannot read custom properties;
-     * a colour never has to be, so `design/color-no-hex` and
-     * `design/no-literal-colour-function` stay ON. Keyframe geometry, §0's
-     * third exception, is not a custom property, and the allowlist names
-     * only custom properties.
-     * ------------------------------------------------------------------ */
-    {
-      files: ['**/theme.css', '**/*-theme.css'],
-      rules: {
-        'declaration-property-value-allowed-list': BINDING_ALLOWLIST,
-        'custom-property-pattern': null, // `--text-h1--line-height` is Tailwind's syntax
-        'at-rule-disallowed-list': null,
-        [tierRuleName]: null, // a token file, as the audit reads it (design-rules.json: file_classes)
-      },
-    },
-
-    /* ---------------------------------------------------------------------
-     * 3. COMPONENT FILES — Law 2, at its strictest.
+     * First, because a later override wins: a token or theme file in a
+     * component folder (`src/components/tokens.css`) is a token file, as
+     * the audit reads it, so blocks 2 and 3 have the last word on the
+     * rules they set (Codex on #73).
      *
      * A component must not know what is next to it. It renders at its
      * natural size; the parent decides the spacing. That is the entire
@@ -1038,6 +997,57 @@ export default {
          * they still count. */
         'selector-max-universal': [0, { ignoreAfterCombinators: ['>', '+'] }],
         'selector-max-type': 0,
+      },
+    },
+
+    /* ---------------------------------------------------------------------
+     * 2. tokens.css — the ONE file where literals live (Law 1).
+     *
+     * This is the definition of Law 1, not an exception to it: "literals
+     * live only in tokens.css". Every rule that bans a raw value is
+     * switched off here and nowhere else, which is what makes the file
+     * meaningful — there is exactly one place to look, and one file to
+     * review when a brand changes.
+     * ------------------------------------------------------------------ */
+    {
+      files: ['**/tokens.css', '**/*-tokens.css', '**/*.tokens.css', '**/tokens/*.css'],
+      rules: {
+        'declaration-property-value-allowed-list': null,
+        [hexRuleName]: null,
+        [colourFnRuleName]: null,
+        'color-named': null,
+        /* Tier 2 is defined here, from Tier 1. */
+        [tierRuleName]: null,
+        /* Tier-1 steps are `--space-0-5`, `--text-2xs`, `--radius-2xl`:
+         * digits inside segments, which the strict pattern rejects. */
+        'custom-property-pattern': '^[a-z0-9]+(-[a-z0-9]+)*$',
+        /* `no-duplicate-selectors` stays ON: a second `[data-theme="dark"]`
+         * block that quietly redefines a token is the bug it catches. The
+         * starter opens one `:root` block per tier (primitives, roles, …)
+         * and marks each repeat with a disable comment that says so. */
+      },
+    },
+
+    /* ---------------------------------------------------------------------
+     * 3. theme.css / tailwind bindings — the binding layer.
+     *
+     * A custom property here binds a token and decides nothing: it takes a
+     * token, a colour word or a CSS-wide keyword, and the literals documented
+     * in theme.css §0, a breakpoint in rem and an aspect ratio
+     * (BINDING_ALLOWLIST, from design-rules.json: bindings). A breakpoint has to be a literal,
+     * and never a var(), because media queries cannot read custom properties;
+     * a colour never has to be, so `design/color-no-hex` and
+     * `design/no-literal-colour-function` stay ON. Keyframe geometry, §0's
+     * third exception, is not a custom property, and the allowlist names
+     * only custom properties.
+     * ------------------------------------------------------------------ */
+    {
+      files: ['**/theme.css', '**/*-theme.css'],
+      rules: {
+        'declaration-property-value-allowed-list': BINDING_ALLOWLIST,
+        'custom-property-pattern': null, // `--text-h1--line-height` is Tailwind's syntax
+        'at-rule-disallowed-list': null,
+        [tierRuleName]: null, // a token file, as the audit reads it (design-rules.json: file_classes)
       },
     },
 

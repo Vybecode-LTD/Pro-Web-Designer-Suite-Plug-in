@@ -336,9 +336,11 @@
 - **Law 6 is in stylelint and the ESLint config, not only the audit** (N35). A project
   that gated with the two configs let `var(--accent-600)` into a component. The spec's
   `tiers` lists now reach both through `tools/sync_rules.py`. stylelint's new
-  `design/tier1-primitive` refuses a `var()` naming a primitive that has a role in a
-  `components` layer, and anywhere in a component file, fallbacks and sockets included,
-  with the audit's advice; token files are exempt, as in the audit. ESLint's
+  `design/tier1-primitive` refuses a `var()` naming a primitive that has a role in the
+  `components` layer or a sub-layer of it, and anywhere in a component file, fallbacks
+  and sockets included, with the audit's advice; token and theme files are exempt, as in
+  the audit, in a component folder too. The layer is read by its full name in both
+  gates: the audit took `@layer base.components`, a layer inside `base`, for one. ESLint's
   `TIER1_SHORTHAND` is built from the same lists, so `p-(--space-section)` and
   `shadow-(--shadow-none)` pass and a type hint (`text-(length:--text-lg)`) no longer
   hides a primitive, and `style-prop-custom-properties-only` refuses an inline socket
