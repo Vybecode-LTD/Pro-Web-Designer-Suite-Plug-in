@@ -413,3 +413,33 @@ client room are disagreements you could have had in ten minutes beforehand. Send
 early. Ask: *"anything in here you would present differently?"* You will get the
 disagreements in private, where they cost nothing and where being persuaded is free — and you
 will walk into the room with one position instead of two.
+
+---
+
+## 10. The client who rejects the whole direction
+
+Not an objection to a decision: "this is not it", said about everything, usually in the first
+five minutes. The two mistakes are to defend decision by decision (each defence confirms the
+verdict) and to concede everything on the spot (you now have no direction and no brief).
+
+**Stop presenting.** The deck's remaining slides are answers to questions nobody is asking any
+more. Say so: *"Then the rest of this deck is the wrong meeting. Let's use the time to find out
+what changed."*
+
+**Find out whether the brief moved.** A whole-direction rejection is nearly always one of
+three things, and they need different responses:
+
+| What happened | How you can tell | What to do |
+|---|---|---|
+| The brief changed and nobody told you | Their objections name things the brief never asked for | Re-brief, in writing, before anything is redrawn. Scope and price move with it: `MEETING_RECORD.md` |
+| A decision-maker you never met has spoken | "We showed it to…" | §7. Get the actual words; offer the fifteen minutes; re-present to them |
+| It is the direction, honestly | They can say what they expected and it is inside the brief | Go back to the decision log: which constraint did you read wrongly? That is a rework you owe, and it is bounded by the log |
+
+**Do not redraw in the room.** "What if we…" sketched live is a third direction chosen under
+pressure. Take the constraints you have just learned, write them into the log as a reversed
+decision with its reason (the deck shows it as reversed, never as the current call), and
+come back with the options.
+
+**The record.** The same-day record (`assets/MEETING_RECORD.md`) matters more here than
+after any other meeting: the sentence to get confirmed is *what they expected instead*, in
+their words, because next round is judged against it.

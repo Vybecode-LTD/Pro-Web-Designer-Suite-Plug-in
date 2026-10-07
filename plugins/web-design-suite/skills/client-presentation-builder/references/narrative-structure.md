@@ -118,9 +118,13 @@ that out by asking each of them one question beforehand.
 
 ## 3. Deck structures for the five situations
 
-Each structure below is a sequence of slide *jobs*, not slide titles.
-`scripts/build_presentation.py` implements the client, team and creative-director orderings;
-these are what it is implementing and why.
+Each structure below is a sequence of slide *jobs*, not slide titles. What
+`scripts/build_presentation.py` builds of them: §3.1 is `--audience client`; §3.2 is the
+same deck with `Stage: iteration review` in the log's header, which opens on the "What
+changed since last time" slide (`## Since last time` and the reversals); §3.3 is
+`Stage: sign-off`, which brings the ask up to the second slide; §3.5 is `--audience team`.
+§3.4 is the client deck plus the reversed decisions shown as reversed; the rest of §3.4 is
+done by hand. In every order the known flaws come before the visual walkthrough (§8).
 
 ### 3.1 First concept presentation
 

@@ -849,15 +849,62 @@ def apply_reversals(log: DecisionLog) -> None:
                 + (f"; cost: {cost}" if cost and not PLACEHOLDER.fullmatch(cost) else "")
 
 
+def since_last_time(log: DecisionLog) -> list[dict[str, str]]:
+    """`## Since last time`: a table (You asked | What we did | If not, why
+    not), one row per request from the last review, including the ones not
+    done. narrative-structure.md §3.2: the row that says "we did not do this
+    one, and here is why" is the slide."""
+    text = re.sub(r"<!--.*?-->", "", log.sections.get("since last time", ""), flags=re.S)
+    lines = [ln for ln in text.splitlines() if ln.strip().startswith("|")]
+    if not lines:
+        return []
+    header = [h.strip().lower() for h in _md_table(["| x |", lines[0]])[0]]
+
+    def col(row: list[str], *names: str) -> str:
+        for name in names:
+            for i, h in enumerate(header):
+                if name in h and i < len(row):
+                    return row[i].strip()
+        return ""
+
+    out = []
+    for row in _md_table(lines):
+        asked = col(row, "asked", "request")
+        if not asked or PLACEHOLDER.fullmatch(asked.strip("`")):
+            continue
+        out.append({"asked": asked, "did": col(row, "did", "changed", "done"),
+                    "why": col(row, "why", "not")})
+    return out
+
+
 def _changed(inp: Inputs, audience: str) -> Slide | None:
-    """What was decided before and is no longer: shown as reversed, with the
-    replacement, never argued with its old rationale (PS-A7)."""
+    """What was asked last time and what became of it, and what was decided
+    before and is no longer: shown as reversed, with the replacement, never
+    argued with its old rationale (PS-A7, PS-B7)."""
     reversed_ = [d for d in inp.log.decisions if d.is_reversed]
-    if not reversed_:
+    asked = since_last_time(inp.log)
+    if not reversed_ and not asked:
         return None
     s = Slide("changed", "What changed since last time")
-    s.kicker = ("Decisions we reversed, and why" if audience == "client"
-                else "Reversed decisions")
+    s.kicker = ("What you asked for, and what we reversed" if audience == "client"
+                else "Requests and reversals")
+    if asked:
+        rows = []
+        for a in asked:
+            did = a["did"] and not re.fullmatch(r"(?i)(no|not changed|not done|—|-)", a["did"])
+            rows.append([quoted(a["asked"]),
+                         quoted(a["did"]) if did else "<em>not changed</em>",
+                         quoted(a["why"]) if a["why"] else ("" if did else "<em>no reason recorded</em>")])
+            if not did and not a["why"]:
+                s.gaps.append(f"\"{a['asked']}\" was not done and no reason is recorded: "
+                              f"say the constraint that stopped it and what was done "
+                              f"instead, or it is heard as \"they ignored me\".")
+        s.blocks.append(blk_table(["You asked", "What we did", "If not, why not"], rows))
+    if not reversed_:
+        s.notes.append("Read their list back verbatim, then what became of each item. "
+                       "The row that was not done is the slide: name the constraint "
+                       "and what was done instead.")
+        return s
     rows = []
     for d in reversed_:
         rows.append([f"<strong>{esc(d.ident)}</strong>", quoted(d.title),
@@ -871,6 +918,8 @@ def _changed(inp: Inputs, audience: str) -> Slide | None:
     s.blocks.append(blk_lede(
         "A reversed decision is shown as reversed. Its old reasoning is not "
         "re-argued here; the row says what replaced it and what that cost."))
+    if asked:
+        s.notes.append("Their list first, read back verbatim; the reversals after.")
     s.notes.append("Say what changed and who asked for it before anyone has to "
                    "ask. A reversal presented as the current call is the one "
                    "thing in this deck that a client will remember being told "
@@ -1522,13 +1571,27 @@ def _plan_for(inp: Inputs, audience: str, max_decisions: int,
                   if inp.a11y else None)
 
     plan: list[Slide] = []
+    stage = (inp.log.meta.get("stage") or "").strip().lower()
+    iteration = any(w in stage for w in ("iteration", "review", "round"))
+    sign_off = any(w in stage for w in ("sign-off", "signoff", "sign off", "final"))
     if audience == "client":
-        # Risk and outcome first; the system evidence is the reassurance that
-        # follows the work, not the reason to care about it.
-        plan = [cover, brief, index, changed, *decision_slides, *comparisons]
+        # Risk and outcome first, and the weak parts before the visual
+        # walkthrough: a flaw you name is a judgement call, the same flaw
+        # found while the screens are up is an oversight (SKILL.md's rule,
+        # narrative-structure.md §8). The system evidence is the reassurance
+        # that follows the work, not the reason to care about it.
+        plan = [cover, brief, index, changed, *decision_slides, flaws, *comparisons]
         plan += [screens]
         plan += [perf_slide, a11y_slide, sys_slide]
-        plan += [opens, flaws, ask, _appendix(inp), _provenance_slide(inp)]
+        plan += [opens, ask, _appendix(inp), _provenance_slide(inp)]
+        if iteration and changed:
+            # §3.2: the room has seen it before; what changed comes first.
+            plan.remove(changed)
+            plan.insert(1, changed)
+        if sign_off and index:
+            # §3.3: what is being signed off is the second thing on screen.
+            plan.remove(ask)
+            plan.insert(plan.index(index) + 1, ask)
     elif audience == "team":
         # A developer's first question is "how is this put together", and
         # their second is "what breaks if I touch it".
@@ -1987,6 +2050,13 @@ DECK_CSS = """@layer layout {
 
   .deck[data-notes="on"] .gap { display: flex; flex-direction: column; }
 
+  .bar__badge {
+    font: var(--type-label);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--fg-accent);
+  }
+
   /* -- .bar — the chrome --------------------------------------------- */
   .bar {
     --bar-bg: var(--bg-surface);
@@ -2200,12 +2270,22 @@ DECK_JS = """(function () {
   var nextBtn = document.querySelector("[data-deck-next]");
   var notesBtn = document.querySelector("[data-deck-notes]");
   var fsBtn = document.querySelector("[data-deck-fullscreen]");
+  var presentBtn = document.querySelector("[data-deck-presenter]");
+  var badge = document.querySelector("[data-deck-presenter-badge]");
   var total = slides.length;
   var index = 0;
 
+  // The presenter window: the same file opened with `-presenter` on its
+  // hash. It shows the notes and the gaps; the audience window never has
+  // to. The two windows keep in step over a BroadcastChannel, so pressing
+  // N on a shared screen is never needed.
+  var presenter = /-presenter$/.test(window.location.hash || "");
+  var channel = null;
+  try { channel = new BroadcastChannel("deck:" + document.title); } catch (e) {}
+
   function clamp(i) { return Math.max(0, Math.min(total - 1, i)); }
 
-  function show(i, updateHash, moveFocus) {
+  function show(i, updateHash, moveFocus, fromPeer) {
     index = clamp(i);
     for (var n = 0; n < total; n++) {
       var on = n === index;
@@ -2223,10 +2303,20 @@ DECK_JS = """(function () {
         (slides[index].getAttribute("data-title") || "");
     }
     if (updateHash !== false) {
-      try { history.replaceState(null, "", "#s" + (index + 1)); } catch (e) {}
+      try {
+        history.replaceState(null, "", "#s" + (index + 1) + (presenter ? "-presenter" : ""));
+      } catch (e) {}
     }
     if (moveFocus !== false) { slides[index].focus({ preventScroll: true }); }
     slides[index].scrollTop = 0;
+    if (channel && fromPeer !== true) {
+      try { channel.postMessage({ index: index }); } catch (e) {}
+    }
+  }
+
+  function openPresenter() {
+    var url = window.location.href.replace(/#.*$/, "") + "#s" + (index + 1) + "-presenter";
+    window.open(url, "deck-presenter");
   }
 
   function next() { if (index < total - 1) { show(index + 1); } }
@@ -2255,7 +2345,7 @@ DECK_JS = """(function () {
   }
 
   function fromHash() {
-    var m = /^#s(\\d+)$/.exec(window.location.hash || "");
+    var m = /^#s(\\d+)(-presenter)?$/.exec(window.location.hash || "");
     return m ? parseInt(m[1], 10) - 1 : 0;
   }
 
@@ -2277,6 +2367,8 @@ DECK_JS = """(function () {
       event.preventDefault(); show(total - 1);
     } else if (key === "n" || key === "N") {
       event.preventDefault(); toggleNotes();
+    } else if (key === "p" || key === "P") {
+      event.preventDefault(); openPresenter();
     } else if (key === "f" || key === "F") {
       event.preventDefault(); toggleFullscreen();
     } else if (key === "?" || key === "h" || key === "H") {
@@ -2290,6 +2382,20 @@ DECK_JS = """(function () {
   if (nextBtn) { nextBtn.addEventListener("click", next); }
   if (notesBtn) { notesBtn.addEventListener("click", function () { toggleNotes(); }); }
   if (fsBtn) { fsBtn.addEventListener("click", toggleFullscreen); }
+  if (presentBtn) { presentBtn.addEventListener("click", openPresenter); }
+  if (presenter) {
+    deck.dataset.presenter = "on";
+    if (badge) { badge.hidden = false; }
+    toggleNotes(true);
+  }
+  if (channel) {
+    channel.onmessage = function (event) {
+      var data = event && event.data;
+      if (data && typeof data.index === "number" && data.index !== index) {
+        show(data.index, true, false, true);
+      }
+    };
+  }
   var helpClose = document.querySelector("[data-deck-help-close]");
   if (helpClose) {
     helpClose.addEventListener("click", function () { toggleHelp(false); });
@@ -2349,7 +2455,9 @@ def render_html(plan: list[Slide], inp: Inputs, audience: str,
         ("→ / ↓ / space / Page Down", "next slide"),
         ("← / ↑ / backspace / Page Up", "previous slide"),
         ("Home / End", "first / last slide"),
-        ("N", "presenter notes and gap markers"),
+        ("N", "presenter notes and gap markers, in this window"),
+        ("P", "a presenter window: notes and gaps there, this window stays "
+              "clean to share; the two move in step"),
         ("F", "fullscreen"),
         ("? or H", "this panel"),
         ("Ctrl/Cmd + P", "print to PDF, one slide per page"),
@@ -2389,8 +2497,10 @@ def render_html(plan: list[Slide], inp: Inputs, audience: str,
     </div>
     <div class="progress"><div class="progress__fill"></div></div>
     <div class="bar__group">
+      <span class="bar__badge" data-deck-presenter-badge hidden>Presenter</span>
       <button class="bar__btn" type="button" data-deck-notes
         aria-pressed="false">Notes</button>
+      <button class="bar__btn" type="button" data-deck-presenter>Present</button>
       <button class="bar__btn" type="button" data-deck-fullscreen>Full</button>
     </div>
   </nav>

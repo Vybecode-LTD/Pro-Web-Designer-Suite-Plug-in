@@ -100,7 +100,11 @@ Send within four hours. The body of the email is three lines and a link:
 Two things make this work and both are about tone. **Ask to be corrected** —
 it is a summary offered for confirmation, not a record being asserted. And
 **give the silence a deadline** — "shout by Thursday, otherwise we build from
-this" is the sentence that turns a document into an agreement.
+this" is the sentence that makes the record hard to dispute later. That is all
+it does: it is a contemporaneous record, not an agreement and not legal advice.
+Silence is not acceptance, and a change to price, scope or dates goes through
+whatever change control the contract has, with this record as the evidence of
+what was said.
 
 Then update `DECISION_LOG.md` the same day, so the next deck is assembled from
 what is true rather than from what was true before this meeting.

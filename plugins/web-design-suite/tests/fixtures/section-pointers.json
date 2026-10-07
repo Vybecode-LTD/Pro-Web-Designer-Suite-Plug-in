@@ -384,6 +384,12 @@
   "heading": "Presenting alongside more senior designers"
  },
  {
+  "from": "client-presentation-builder/assets/DECISION_LOG.md",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "3.2",
+  "heading": "Iteration review"
+ },
+ {
   "from": "client-presentation-builder/references/evidence.md",
   "to": "a11y-audit-runner/references/automation-coverage.md",
   "section": "3",
@@ -418,6 +424,18 @@
   "to": "client-presentation-builder/assets/MEETING_RECORD.md",
   "section": "3",
   "heading": "Still open"
+ },
+ {
+  "from": "client-presentation-builder/scripts/build_presentation.py",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "3.2",
+  "heading": "Iteration review"
+ },
+ {
+  "from": "client-presentation-builder/scripts/build_presentation.py",
+  "to": "client-presentation-builder/references/narrative-structure.md",
+  "section": "8",
+  "heading": "The parts you are not happy with"
  },
  {
   "from": "component-state-matrix/SKILL.md",

@@ -4,6 +4,16 @@
 
 ### Added
 
+- **A presenter window, and the iteration review in the log** (PS-B7, PS-A13, closing
+  PS-C1). `P` opens the same deck in a presenter window (`#s3-presenter`) that shows the
+  notes and the gaps, kept in step with the shared window over a `BroadcastChannel`; the
+  handout has none of it. `## Since last time` in the log (You asked | What we did | If not,
+  why not) is read back on the "What changed since last time" slide, with the reversals; a
+  request not done with no reason is a gap. `Stage: iteration review` in the log's header
+  opens the deck on that slide and `Stage: sign-off` brings the ask up to the second slide;
+  narrative-structure.md §3 says which of its five structures the script builds and how.
+  objection-handling.md §10 is the playbook for a client who rejects the whole direction.
+
 - **The handout, and the suite's own accessibility JSON as the deck's input** (PS-A6,
   PS-A5, part of PS-C1). `--handout FILE` writes the deck the client keeps: the same
   slides in document flow, one per printed page, with no presenter notes, gap markers,
@@ -75,6 +85,19 @@
 
 ### Fixed
 
+- **The flaws come before the visuals** (PS-A13). The client order put "What we are not
+  happy with yet" seventh of ten, after the screens and the evidence, against the rule the
+  slide's own note states; it now follows the decisions and precedes the comparisons and
+  screens in every order.
+- **The meeting record claims no legal effect** (PS-A19). "The sentence that turns a
+  document into an agreement" is now "makes the record hard to dispute later": a
+  contemporaneous record, not an agreement and not legal advice; silence is not acceptance,
+  and price, scope and date changes go through the contract's change control.
+- **The landing page's painted bands bleed** (PS-A12). Five of the worked example's six
+  painted sections sat in the content column without `.bleed-full` and a nested
+  `.page-grid`, so each would have rendered as a content-width tinted box with the copy
+  flush against the tint; every painted band now has the pair, and the example's notes say
+  why.
 - **Print never sends the notes by accident** (PS-A6). The print stylesheet showed every
   presenter note whatever the toggle; now notes print only while they are showing
   (`data-notes="on"`), and the client's copy is `--handout`.

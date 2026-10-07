@@ -227,28 +227,32 @@ Layout primitives from `web-design-studio`'s `layout.css`, section shells from `
   </section>
 
   <!-- 2. DEMO — the strongest proof, placed second -->
-  <section id="demo" class="band section section--surface" aria-labelledby="demo-title">
-    <header class="section__header section__header--center">
-      <h2 id="demo-title" class="section__title">Run it on your own material</h2>
-      <p class="section__deck">
-        Drop in a mix and a reference. You will see the curve before you download
-        anything — nothing is uploaded, it runs locally.
-      </p>
-    </header>
-    <div class="frame frame--rounded">
-      <iframe src="/demo/embed" title="Interactive reference-matching demo" loading="lazy"></iframe>
+  <section id="demo" class="band bleed-full section section--surface" aria-labelledby="demo-title">
+    <div class="page-grid">
+      <header class="section__header section__header--center">
+        <h2 id="demo-title" class="section__title">Run it on your own material</h2>
+        <p class="section__deck">
+          Drop in a mix and a reference. You will see the curve before you download
+          anything — nothing is uploaded, it runs locally.
+        </p>
+      </header>
+      <div class="frame frame--rounded">
+        <iframe src="/demo/embed" title="Interactive reference-matching demo" loading="lazy"></iframe>
+      </div>
     </div>
   </section>
 
   <!-- 3. PROOF STRIP — a strip, not a section: band--tight -->
-  <section class="band band--tight section section--sunken" aria-label="Studios using Referent">
-    <p class="logo-strip__kicker">Used on records by</p>
-    <ul class="grid grid--fill grid--min-xs" role="list">
-      <li class="frame frame--3-2 frame--contain">
-        <img src="/img/logo-blue-room.svg" width="160" height="40" alt="Blue Room" loading="lazy">
-      </li>
-      <!-- five more -->
-    </ul>
+  <section class="band bleed-full band--tight section section--sunken" aria-label="Studios using Referent">
+    <div class="page-grid">
+      <p class="logo-strip__kicker">Used on records by</p>
+      <ul class="grid grid--fill grid--min-xs" role="list">
+        <li class="frame frame--3-2 frame--contain">
+          <img src="/img/logo-blue-room.svg" width="160" height="40" alt="Blue Room" loading="lazy">
+        </li>
+        <!-- five more -->
+      </ul>
+    </div>
   </section>
 
   <!-- 4. VALUE PROPS — three, because the hierarchy has three supports -->
@@ -270,25 +274,27 @@ Layout primitives from `web-design-studio`'s `layout.css`, section shells from `
   </section>
 
   <!-- 6. FEATURE DEEP-DIVE — two rows, alternating media side -->
-  <section class="band section section--surface" aria-labelledby="deep-title">
-    <header class="section__header">
-      <h2 id="deep-title" class="section__title">The graph is the product</h2>
-    </header>
-    <div class="subsections">
-      <div class="split split--1-2 split--center">
-        <div class="stack stack--tight">
-          <h3 class="section__title">Drag any band</h3>
-          <p>
-            The correction curve is not a summary of what happened — it is the control
-            surface. Drag any of the 32 bands and the EQ updates live.
-          </p>
+  <section class="band bleed-full section section--surface" aria-labelledby="deep-title">
+    <div class="page-grid">
+      <header class="section__header">
+        <h2 id="deep-title" class="section__title">The graph is the product</h2>
+      </header>
+      <div class="subsections">
+        <div class="split split--1-2 split--center">
+          <div class="stack stack--tight">
+            <h3 class="section__title">Drag any band</h3>
+            <p>
+              The correction curve is not a summary of what happened — it is the control
+              surface. Drag any of the 32 bands and the EQ updates live.
+            </p>
+          </div>
+          <figure class="frame frame--3-2 frame--rounded">
+            <img src="/img/bands.avif" width="1200" height="800" alt="Dragging a band"
+                 loading="lazy" decoding="async">
+          </figure>
         </div>
-        <figure class="frame frame--3-2 frame--rounded">
-          <img src="/img/bands.avif" width="1200" height="800" alt="Dragging a band"
-               loading="lazy" decoding="async">
-        </figure>
+        <!-- second row, split--2-1 to alternate the media side -->
       </div>
-      <!-- second row, split--2-1 to alternate the media side -->
     </div>
   </section>
 
@@ -323,32 +329,36 @@ Layout primitives from `web-design-studio`'s `layout.css`, section shells from `
   </section>
 
   <!-- 10. FAQ — real <details>, works before hydration, findable by ctrl-F -->
-  <section class="band section section--sunken" aria-labelledby="faq-title">
-    <header class="section__header">
-      <h2 id="faq-title" class="section__title">The questions we actually get</h2>
-    </header>
-    <div class="faq">
-      <details class="faq__item" open>
-        <summary class="faq__question">
-          Is this a subscription?
-          <span class="faq__marker" aria-hidden="true">&#9662;</span>
-        </summary>
-        <div class="faq__answer">
-          No. One payment, and the version you bought keeps working. Updates within the
-          major version are free; a future 2.0 would be a paid upgrade at a discount
-          for existing owners.
-        </div>
-      </details>
-      <!-- five more -->
+  <section class="band bleed-full section section--sunken" aria-labelledby="faq-title">
+    <div class="page-grid">
+      <header class="section__header">
+        <h2 id="faq-title" class="section__title">The questions we actually get</h2>
+      </header>
+      <div class="faq">
+        <details class="faq__item" open>
+          <summary class="faq__question">
+            Is this a subscription?
+            <span class="faq__marker" aria-hidden="true">&#9662;</span>
+          </summary>
+          <div class="faq__answer">
+            No. One payment, and the version you bought keeps working. Updates within the
+            major version are free; a future 2.0 would be a paid upgrade at a discount
+            for existing owners.
+          </div>
+        </details>
+        <!-- five more -->
+      </div>
     </div>
   </section>
 
   <!-- 11. FINAL CTA — the one inverse band on the page -->
-  <section class="band band--loose section section--inverse" aria-labelledby="cta-title">
-    <div class="cta-block">
-      <h2 id="cta-title" class="cta-block__claim">Stop A/B-ing. Start comparing.</h2>
-      <a class="cta" href="/download">Download the 14-day demo</a>
-      <p class="cta-block__note">Full version, no feature limits. 180 MB. No card, no account.</p>
+  <section class="band bleed-full band--loose section section--inverse" aria-labelledby="cta-title">
+    <div class="page-grid">
+      <div class="cta-block">
+        <h2 id="cta-title" class="cta-block__claim">Stop A/B-ing. Start comparing.</h2>
+        <a class="cta" href="/download">Download the 14-day demo</a>
+        <p class="cta-block__note">Full version, no feature limits. 180 MB. No card, no account.</p>
+      </div>
     </div>
   </section>
 
@@ -359,7 +369,7 @@ Layout primitives from `web-design-studio`'s `layout.css`, section shells from `
 
 - **Not one bespoke layout rule.** Every arrangement is `page-grid`, `cover`, `split`, `switcher`, `grid`, `frame`, `cluster`, `stack` or `subsections`. The section shells add surface and type, never arrangement.
 - **Every band is a `.band`**, including the transparent ones, so the page is in exactly one rhythm mode and a seam is always `2 × --space-subsection`.
-- **Full-bleed is a nested `.page-grid`**, not a negative margin — which is why the hero's background runs edge to edge without producing horizontal scroll when a scrollbar appears.
+- **Full-bleed is a nested `.page-grid`**, not a negative margin — which is why the hero's background runs edge to edge without producing horizontal scroll when a scrollbar appears. Every painted band (surface, sunken, inverse) is built the same way: `.bleed-full` on the section, a `.page-grid` inside it, so the tint runs edge to edge and the copy stays in the content column. A painted section without the pair renders as a content-width tinted box with the copy flush against its edge.
 - **The hero image is not lazy-loaded** and carries `fetchpriority="high"`; it is the LCP element. Everything below it is `loading="lazy"`. Getting this backwards is the most common accidental performance regression on a marketing page.
 - **Every `.frame` reserves its aspect ratio**, and every `<img>` carries `width` and `height`. That is the CLS fix, and on a landing page CLS usually manifests as a reader tapping a button that has just moved.
 - **The FAQ is real `<details>`**, so it works before hydration and the browser's own find-in-page reaches the answers.

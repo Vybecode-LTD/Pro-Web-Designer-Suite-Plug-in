@@ -120,7 +120,7 @@ reconstruction and it will sound like one.
 | `DECISION_LOG.md` | `assets/DECISION_LOG.md`, kept as you worked | Every decision in the five-part shape |
 | `audit.json` | `audit_design.py --json` (web-design-studio) | "Every value comes from one file" |
 | `perf.json` | `perf_audit.py --json` (perf-budget-gate) | Weight against a budget agreed up front |
-| `a11y.json` | `a11y_runtime.mjs --json` or `a11y_static.py --json` (a11y-audit-runner), or axe-core results | The accessibility claim you can actually make: "passes" only when it records no violations, "keyboard-tested by hand" only when the decision log has a `## Tested by hand` section, or `--manual FILE` a record, saying what was tested |
+| `a11y.json` | `a11y_runtime.mjs --json`, `a11y_static.py --json` or axe results | The accessibility claim you can actually make: "passes" only when it records no violations, "keyboard-tested by hand" only when the decision log has a `## Tested by hand` section, or `--manual FILE`, saying what was tested |
 | `defence.md` | `critique_report.py --format defence` (design-critique-gate) | The decisions needing an out-loud justification, the taste calls, the flaws you are carrying |
 | `shots/` | Screenshots at the width the decision was made at | The work |
 
@@ -167,7 +167,9 @@ Two rules that apply to all of them:
   number that decided everything, or the question the meeting has to answer (§4).
 - **Raise the parts you are not happy with yourself, early, with a plan** (`references/narrative-structure.md` §8). A flaw you
   name is a judgement call; the same flaw found by a reviewer is an oversight, and from that
-  moment every other decision is re-read as a possible accident.
+  moment every other decision is re-read as a possible accident. The flaws slide comes before
+  the screens; `Stage: iteration review` or `Stage: sign-off` in the log's header reorder it
+  (`references/narrative-structure.md` §3).
 
 ### 4. Generate the deck
 
@@ -244,8 +246,7 @@ python -m scripts.audit_design build-css/ --strict          # the deck audits cl
 | `--audit` `--perf` `--a11y` | The suite's JSON, translated into plain language with the numbers cited |
 | `--defence FILE` | The critique gate's defence sheet: taste calls become open questions, known flaws become the "what we are not happy with" slide, and a blocking item stops the build with exit 1 |
 | `--screenshots DIR` | Inlined as data URIs so the deck is one file. `home--before.png` + `home--after.png` pair into a comparison automatically |
-| `--handout FILE` | The deck the client keeps: the same slides in document flow, one per printed page, with no presenter notes, gaps, appendix or provenance in the file |
-| `--manual FILE` | The manual test record (keyboard, screen reader) when it is kept outside the log's `## Tested by hand` |
+| `--handout FILE` | The client's copy: one slide per printed page, no notes, gaps, appendix or provenance in the file |
 | `--dry-run` | Prints the slide plan, the decision ranking and every gap. Writes nothing |
 | `--notes FILE` | Speaker notes as markdown, ending in a pre-flight checklist of the gaps |
 | `--emit-css DIR` | Writes the deck's own CSS out so the gate can be run on it |
@@ -255,7 +256,8 @@ python -m scripts.audit_design build-css/ --strict          # the deck audits cl
 Exit `0` fine · `1` the defence sheet says do not present yet · `2` bad invocation.
 
 **The deck is a self-contained HTML file.** Arrow keys, space and Page Up/Down navigate;
-`Home`/`End` jump; `N` toggles presenter notes and the gap markers; `F` is fullscreen; `?`
+`Home`/`End` jump; `N` toggles presenter notes and the gap markers; `P` opens a presenter window
+with them, in step; `F` is fullscreen; `?`
 shows the keyboard map; `Ctrl/Cmd+P` prints one slide per page, with the notes only while they are showing.
 The PDF someone will ask for by email an hour after the meeting is `--handout`: the
 same slides with no notes, gaps, appendix or provenance in the file at all.
