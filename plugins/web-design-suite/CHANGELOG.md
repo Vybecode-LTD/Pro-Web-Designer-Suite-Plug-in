@@ -123,8 +123,7 @@
   landing-page-conversion declined deceptive patterns. objection-handling.md §5 now has
   the one rule, and evidence.md and the landing SKILL point to it: a lawful choice that
   only costs them is noted and built; an accessibility failure is held (the compliant
-  version is built, and the other ships only on the written decision of whoever signs the
-  site off); anything deceptive or unlawful is declined with the honest version offered;
+  version is built, the failing one is not, and the risk goes in writing); anything deceptive or unlawful is declined with the honest version offered;
   a question of law goes to their lawyer.
 - **The persuasion references' law and figures, re-read at the source on 2026-10-07**
   (PS-A9, PS-A14, PS-A15). conversion-audit.md §11: DSA Art. 25 binds only online

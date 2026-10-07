@@ -57,6 +57,11 @@ class OneRuleForARiskyRequest(unittest.TestCase):
         for outcome in ("build it", "Hold the line", "Decline it", "their lawyer"):
             with self.subTest(outcome=outcome):
                 self.assertIn(outcome, rule)
+        # Codex on #70: the rule let the failing version ship on a written
+        # sign-off, which the landing SKILL's "held, not built" contradicted.
+        held = next(line for line in rule.splitlines() if line.startswith("| It breaks accessibility"))
+        self.assertIn("not the failing one", held)
+        self.assertNotIn("signs the site off", read(DECK / "references" / "evidence.md"))
         for doc in (DECK / "references" / "evidence.md", LANDING / "SKILL.md"):
             with self.subTest(doc=doc.name):
                 self.assertIn("objection-handling.md §5", read(doc))

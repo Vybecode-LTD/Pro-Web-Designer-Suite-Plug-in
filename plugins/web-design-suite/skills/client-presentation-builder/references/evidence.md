@@ -281,8 +281,8 @@ client who is told what it costs and chooses.
 that only costs them, you note and build. An accessibility failure (a contrast failure, a
 broken tap target), you hold: build the version that meets their goal and the standard, and
 put the risk of the other in writing. "I've built the button at the nearest shade that
-meets the accessibility standard. The exact one you asked for is below it, so if you ever
-get an accessibility complaint that is where it will land; if you want it anyway, I need
-that from whoever signs the site off, in writing." Anything deceptive or unlawful, you
+meets the accessibility standard. The exact one you asked for is below it, which is why I
+haven't built it: if it is ever changed to that, an accessibility complaint will land
+there." Anything deceptive or unlawful, you
 decline and offer the honest version, and a question of law goes to their lawyer. Your job
 is to make sure the decision was informed, not to win it.

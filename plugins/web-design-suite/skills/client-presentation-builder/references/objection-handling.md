@@ -273,7 +273,7 @@ today I agree with. This one I want to push back on, and it is the only one."*
 | The request | What you do |
 |---|---|
 | Lawful, and it only costs them: a weaker headline, a crowded hero, a conversion risk | Say the cost once, write it down, and build it. It is their site |
-| It breaks accessibility: contrast below AA, a tap target under `--tap-min`, a keyboard trap, motion with no reduced version | Hold the line. Build the version that meets their goal and the standard, and put the risk of the other in writing. The failing version ships only on the written decision of whoever signs the site off |
+| It breaks accessibility: contrast below AA, a tap target under `--tap-min`, a keyboard trap, motion with no reduced version | Hold the line. Build the version that meets their goal and the standard, and not the failing one. Put the risk of the other in writing, so that if anyone changes it later the record shows it was not yours |
 | It deceives, or the law forbids it: a countdown that resets, a pre-ticked upsell, an invented review, hidden renewal terms | Decline it in one sentence and offer the honest version (landing-page-conversion's table of declined patterns) |
 | "Is this allowed?" | Name the rule you know, and send the question to their lawyer. Never sign off on legality |
 
