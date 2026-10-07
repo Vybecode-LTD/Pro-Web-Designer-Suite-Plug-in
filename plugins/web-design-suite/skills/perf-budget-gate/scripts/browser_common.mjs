@@ -1,14 +1,14 @@
 /**
  * browser_common.mjs — what the suite's browser scripts share:
  * resolving Playwright and a browser from disk, never from the network;
- * freezing animations before a measurement; and reading a JSON file a person
- * may have saved from PowerShell or Notepad.
+ * freezing animations before a measurement; reading a JSON file a person
+ * may have saved from PowerShell or Notepad; and WCAG's contrast ratio.
  *
  * The master copy is shared/browser_common.mjs, at the plugin's root. The
  * scripts/ folders of a11y-audit-runner, component-state-matrix,
- * email-template-system and perf-budget-gate each hold a byte-identical copy,
- * so each skill still runs on its own: change the master, copy it over all
- * four, and
+ * design-critique-gate, email-template-system and perf-budget-gate each hold
+ * a byte-identical copy, so each skill still runs on its own: change the
+ * master, copy it over all five, and
  * tests/test_browser_scripts.py fails until they match. (GT-C13: the copies
  * had drifted. a11y_runtime shortened animations without pausing them, so a
  * spinner beside a button with no focus ring counted as a ring.)
@@ -163,4 +163,20 @@ export function readJsonFile(file) {
   }
   flush();
   return JSON.parse(out);
+}
+
+// WCAG 2.x: the relative luminance of an sRGB triple (0 to 255 each), and
+// the contrast ratio of two, from 1 to 21. Not rounded: a caller that shows
+// a ratio rounds it down, so a pair shown at a floor meets it.
+function srgbToLin(c) {
+  const s = c / 255;
+  return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+export function luminance([r, g, b]) {
+  return 0.2126 * srgbToLin(r) + 0.7152 * srgbToLin(g) + 0.0722 * srgbToLin(b);
+}
+export function contrastRatio(a, b) {
+  const la = luminance(a), lb = luminance(b);
+  const hi = Math.max(la, lb), lo = Math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
 }

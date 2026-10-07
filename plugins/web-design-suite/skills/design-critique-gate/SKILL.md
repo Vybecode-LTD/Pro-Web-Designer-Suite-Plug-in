@@ -16,7 +16,7 @@ description: Adversarial design review before a client sees the work, with ranke
 > The commands below are written `python -m scripts.<name>`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (critique_report.py).
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (critique_report.py, critique_snapshots.mjs).
 > From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
 
 The expensive failure is not a bug. It is standing in front of a senior designer or a
@@ -114,6 +114,8 @@ blindness" exist.
 - **The squint test.** Squint until type is unreadable. What remains are the value blocks.
   The primary action should be one of the two strongest. If the blocks are all the same
   weight, there is no hierarchy and layer 3 is already answered.
+- **With no second person in the room.** `scripts/critique_snapshots.mjs` renders the
+  stand-ins (below). Say a stand-in as one: "390.png at 390px", never "tested on a phone".
 - **The 10-foot test.** Stand back. Composition survives; detail does not. Anything that
   falls apart at distance has a structure problem wearing a craft costume.
 - **Failure signature.** The page reads as a *category* ("a SaaS landing page") before it
@@ -268,13 +270,14 @@ python -m scripts.critique_report findings.json --summary
 | Naming what you can see but not diagnose | `references/failure-catalog.md` — symptom → mechanism → confirm → system fix |
 | Critiquing your own work before a meeting | `assets/self-review-protocol.md` — the timed 20-minute routine |
 | Writing the critique up | `assets/CRITIQUE_TEMPLATE.md`, then `scripts/critique_report.py` |
+| The checks a person runs, with no person | `scripts/critique_snapshots.mjs`, then the template's "Checks a person runs" |
 | Checking a token or role name | `references/token-contract.md` |
 | Mechanical conformance | `web-design-studio/references/review-checklist.md` + `scripts/audit_design.py` |
 | A layout that feels off and you cannot say why | `web-design-studio/references/spacing-system.md` §13, then §7 for optical |
 
 ---
 
-## The script
+## The scripts
 
 `scripts/critique_report.py` — stdlib only, Python 3.
 
@@ -294,9 +297,23 @@ output in as conformance findings, collapsed by rule, deduplicated against anyth
 already wrote up by hand — a whole rule only when your finding claims it (the rule id in
 `covers`, or in backticks), and otherwise site by site, so a group of eleven violations is
 not silently deleted because you mentioned one of them, or used the word "important".
-A rule raised with `--audit-blocking` is never folded, and every merge is reported on
-stderr. The defence sheet carries every open major and minor finding — confirmed ones
-first, suspicions labelled as suspicions — and drops the ones marked `fixed`.
+A rule raised with `--audit-blocking` is never folded, and every merge is reported in
+the output and on stderr. The defence sheet carries every open major and minor finding — confirmed ones
+first, suspicions labelled as suspicions — and drops the ones marked `fixed` unless they
+set `defend`.
+
+`scripts/critique_snapshots.mjs` — Node and Playwright, the browser found as the suite's
+other browser scripts find it, never downloaded. It renders what stands in for the checks
+a person runs: the page at 390 and 1440px, the 1440 capture blurred 8px, in greyscale,
+mirrored and at 25%, dark and reduced-motion captures, and `contrast.md`, each text colour
+on its background from computed styles against its AA floor. Nothing is injected into
+the page. Nothing stands in for a night's sleep, and a capture is not a phone in a hand:
+the template records each check as run, run with a proxy, or "not run — needs a human".
+
+```bash
+node scripts/critique_snapshots.mjs http://localhost:3000/pricing --out shots
+node scripts/critique_snapshots.mjs build/index.html --json   # exit 1: a pair below its floor
+```
 
 ---
 

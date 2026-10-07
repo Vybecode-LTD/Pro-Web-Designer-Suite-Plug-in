@@ -215,7 +215,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-B2 | — | W14 (3.6.0+) | Consumer law beyond the EU/US basics. |
 | PS-B3 | — | W14 (3.6.0+) | Price experiments. |
 | PS-B4 | — | W14 (3.6.0+) | Page types and audiences. |
-| PS-B5 | — | W8 (3.4.0) | Checks Claude can't honestly run. |
+| PS-B5 | — | fixed in 3.4.0: the template's "Checks a person runs", each run, run with a proxy, or "not run — needs a human" (PR #71; `test_critique_snapshots.TheTemplateHasAThirdState`) | Checks Claude can't honestly run. |
 | PS-B6 | — | W14 (3.6.0+) | No claims layer, and siblings don't route to each other. |
 | PS-B7 | — | fixed in 3.4.0: `test_deck.ThePresenterWindow`, `SinceLastTimeAndTheStage`, `TheDocsKeepTheirOwnRules` (PR #66) | Presenting in practice. |
 | PS-B8 | — | W14 (3.6.0+) | Consent for tracking. |
@@ -223,7 +223,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-C2 | — | W8 (3.4.0) | Fix critique_report: a `covers` field for merges, merge notes in every format, a `status` field. |
 | PS-C3 | — | fixed in 3.1.0, with PS-A4 | Close the HTML blind spot with web-design-studio: audit `<style>` and `style=""`; fail when zero files were audited. |
 | PS-C4 | — | W9 (3.5.0) | Add an adversarial critic subagent, `agents/design-critic.md`, that returns `findings.json` from a fresh context. |
-| PS-C5 | — | W14 (3.6.0+) | Add `critique_snapshots.mjs`: PNGs at 390 and 1440px plus blur, greyscale, mirror, 25%, dark and reduced-motion variants. |
+| PS-C5 | — | fixed in 3.4.0: `critique_snapshots.mjs` (PR #71; `test_critique_snapshots.CritiqueSnapshots`, `test_browser_scripts`) | Add `critique_snapshots.mjs`: PNGs at 390 and 1440px plus blur, greyscale, mirror, 25%, dark and reduced-motion variants. |
 | PS-C6 | — | W14 (3.6.0+) | Add `lint_claims.py`: load-time countdowns, fake scarcity, pre-checked opt-ins, unsourced percentages and the like. |
 | PS-C7 | — | W9 (3.5.0) | Add an eval suite in `evals/`, scored against a no-plugin baseline. |
 | PS-C8 | — | fixed in 3.2.0 | Put landing-page-conversion on a token diet. |

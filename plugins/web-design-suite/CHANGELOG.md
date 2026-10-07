@@ -4,6 +4,19 @@
 
 ### Added
 
+- **`critique_snapshots.mjs`: the checks a person runs, as files to look at** (PS-C5,
+  PS-B5). design-critique-gate's five-second test, squint, flip, greyscale and phone pass
+  had no tool behind them, and CRITIQUE_TEMPLATE.md offered only yes or no, so a check
+  nobody ran was ticked or read as failed. The script renders the page at 390 and 1440px,
+  the 1440 capture blurred 8px, in greyscale, mirrored and at 25%, dark and
+  reduced-motion captures, and `contrast.md`: each text colour on the background its
+  ancestors paint, from computed styles, against its AA floor (3:1 for large text), with
+  text over an image or gradient listed as not measured. Nothing is injected into the
+  page, so its CSP stands. A 390 capture wider than 390px is named (no `width=device-width`
+  viewport). Exit 1 when a pair is below its floor. The template's new "Checks a person
+  runs" table records each as run, run with a proxy (which file), or "not run — needs a
+  human", and nothing stands in for leaving it overnight. WCAG's contrast ratio moved into
+  `browser_common.mjs`, so a11y_runtime and the new script share one copy.
 - **The server's schema, from the same constraints the form reads** (DL-B2, its last
   part). `scaffold_ui.py` writes `server/<table>.schema.ts` (zod, `.strict()`) and
   `server/<table>_schema.py` (pydantic 2, `extra='forbid'`) for each entity: the draft's
