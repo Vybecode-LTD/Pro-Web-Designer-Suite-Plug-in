@@ -12,14 +12,14 @@
   - **#57, P18 part 1: the templates and a dark lint pass.** Each dark block re-points `.button`; the announcement's eyebrow is re-pointed; `lint_email`'s `dark` check applies the retained dark rules with build_email's matcher (one source order across `<style>` blocks, inherited colours included). The build adds the `[if mso]` Arial rule (only a broad rule, on `*`, `body`, `table` or `td`, counts: `sets_broad_font`), and the lint asks for it. The receipt is fluid; only real ESP syntax keeps a comment. Closes DL-A10, A11, A12, A20.
   - **#58, P18 part 2: Law 1 and the renderer.** A dropped token fails the build with its `use`; `lint_email --source` reports dropped, unknown and fallback `var()`s, hand-written colours (hex, functions, named, in `bgcolor` and VML `fillcolor` too) and length or weight literals with the same-family Tier-2 role that holds them. `nostyle` flags an inline width over a 375px phone. `render_email.mjs` (Node, so it shares `browser_common.mjs`, now in four skills) renders light, dark and no-`<style>` PNGs with JavaScript off. Closes DL-A13, B6, C3, C5.
   - **#59, P19: the build and the facts.** The inliner writes the cascade's order; the docs agree with the token file (13 of 18 spacing steps, the weight and size notes, the newsletter's gaps, headings that are headings, `--email-edge` from `--border-subtle`); deliverability gives Google's and Microsoft's bulk-sender rules, re-read 2026-10-06 (`0.30%`, `0.10%` and 48 hours in `evidence.json`). Closes DL-A14, A21, B7.
-- **The reviews found 15 real issues** (Codex 11, CodeRabbit 4, Codex and CodeRabbit both on one), each fixed with a test failing on the head it reviewed. Declined, with reasons on the threads: resolving the plain cascade in the lint for unbuilt files (the build's job), a deterministic clock offset in the hydration test, registering `5,000` and the dates (the register's distinctive-figure test collides with other docs), Microsoft's threshold as "5,000 or more" (the announcement says "more than"), and registering Gmail's byte limits here (pre-existing; a follow-up below).
-- **The plan:** 79 open items, all scheduled (`check_execution_plan.py`). Tests: 672.
+- **The reviews found 15 real issues** (Codex 11, CodeRabbit 4, Codex and CodeRabbit both on one), each fixed with a test failing on the head it reviewed. Declined, with reasons on the threads: resolving the plain cascade in the lint for unbuilt files (the build's job), a deterministic clock offset in the hydration test, registering `5,000` and the dates (the register's distinctive-figure test collides with other docs), and registering Gmail's byte limits here (pre-existing; a follow-up below).
+- **The plan:** 81 open items, all scheduled (N35 and N36 added 2026-10-07) (`check_execution_plan.py`). Tests: 672.
 
 ## Next steps
 
 1. **P20**, the scaffold (DL-A8, A9, B2): interview answers read, forms wired for accessibility, a server schema.
 2. **P21**, the deck honest by construction (PS-C1 and eight PS items). L: split it.
-3. Then P22, P23 and R2, the 3.4.0 release.
+3. Then P22, P23, P44 and P45 (below), and R2, the 3.4.0 release.
 4. **Done since:** build_email inlines every `<style>` block as one stylesheet (#61).
 5. **Scheduled since (2026-10-07):** both before R2: (a) a Law 6 check in stylelint and the ESLint config, P45 (N35); (b) registering Gmail's 102,400 and 16,384 byte limits in `evidence.json`, with test_evidence's `FIGURE` taught byte counts (CodeRabbit on #59), P44 (N36).
 

@@ -39,7 +39,7 @@ The plugin is done when all of these hold:
 | D5 | **The eval cost cap** (decision 4). | **$15 per full run** (the user, 2026-10-02). A run that would pass it stops first. Routing cases are cheap and run on every release; outcome cases run before each release and when a skill changes. | P29, P30 |
 | D6 | **Phase 6's release number.** | 4.0.0, because of D4. | R4 |
 | D7 | **Stacked PRs, merged in batches.** | Yes: up to three stacked PRs, merged in order, as #12 to #14. It saves a review round per PR. | all |
-| D8 | **Phase 7.** | Approve the method in §7 now; approve each new skill when its evidence is in. | P44+ |
+| D8 | **Phase 7.** | Approve the method in §7 now; approve each new skill when its evidence is in. | P46+ |
 
 ## 3. Why this order: the efficiency rules
 

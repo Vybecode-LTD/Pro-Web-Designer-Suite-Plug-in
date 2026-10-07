@@ -51,7 +51,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-4. `python -B "dev plans/check_execution_plan.py"` must say `79 open items, 79 scheduled`.
+4. `python -B "dev plans/check_execution_plan.py"` must say `81 open items, 81 scheduled`.
 5. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
