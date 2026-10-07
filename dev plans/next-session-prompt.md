@@ -51,12 +51,12 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-4. `python -B "dev plans/check_execution_plan.py"` must say `68 open items, 68 scheduled`.
+4. `python -B "dev plans/check_execution_plan.py"` must say `55 open items, 55 scheduled`.
 5. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
 
-- **The plugin** is `plugins/web-design-suite/`: `skills/` (13), `tests/` (724 tests, standard-library `unittest`, helpers in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `run_py`, `run_node`, `load_script`, `TempDirTest`), and `tools/` (`check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`).
+- **The plugin** is `plugins/web-design-suite/`: `skills/` (13), `tests/` (755 tests, standard-library `unittest`, helpers in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `run_py`, `run_node`, `load_script`, `TempDirTest`), and `tools/` (`check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`).
 - **The browser scripts** (`a11y_runtime.mjs`, `snapshot_matrix.mjs`, `measure_vitals.mjs`) import `scripts/browser_common.mjs`, a copy of `shared/browser_common.mjs` in each skill, and `render_email.mjs` (email-template-system) and `critique_snapshots.mjs` (design-critique-gate) use it too: change the master and copy it over all five.
 - **New in P15 (#49, #50):**
   - apply_codemod pairs a negative margin with its parent rule's padding (nested rule, descendant or child selector, BEM block) only when that side is set in **one block** of the file: the last `!important` declaration there wins, or else the last one. An inline side is read both ways (`BY_DIRECTION`: left to right and right to left) and pairs only when the two agree. `!important` is not a slot, in the extractor (`slot_prop`) or the pairing.
@@ -90,13 +90,13 @@ Item N35, in `dev plans/web-design-suite-completion-plan.md` line 137. Read it b
 - **The exemptions travel too.** The primitives with no Tier-2 equivalent are read directly and are correct (`--weight-*`, `--radius-*`, `--stroke-*`, `--z-*`, `--bp-*`, `--font-*`, `--measure-*`, `--width-*`, `--tap-min`: the token contract's line 95), and motion longhands may read `--dur-*` and `--ease-*` (`test_audit_design`: `test_weight_primitives_may_be_read_directly`, `test_motion_longhands_may_read_the_primitives`). Read how the audit applies `tiers` (`audit_design.py`, `tier1-leak` and `tier1-motion`) before you write either gate's rule.
 - **The gates.** stylelint: probably `declaration-property-value-disallowed-list` or the config's own plugin rule, scoped to component files as the audit scopes Law 6; ESLint: inline styles and Tailwind classes that name a primitive (`TIER1_SHORTHAND` already refuses `p-(--space-6)`: check what it covers). Read both configs' structure first.
 - **Tests.** Every `tiers` example runs through each gate: `tests/test_rules_spec.py` and `tests/test_real_tools.py` (the real stylelint and ESLint, from `tooling/main`). The fail-before table runs against `v3.3.0`.
-- **Files.** `design-rules.json`, `tools/sync_rules.py`, `stylelint.config.mjs`, `eslint.design.config.mjs`, `test_rules_spec.py`, `test_real_tools.py`, the CHANGELOG, the inventory's N35 row. M.
+- **Files.** `design-rules.json`, `tools/sync_rules.py`, `stylelint.config.mjs`, `eslint.design.config.mjs`, `test_rules_spec.py`, `test_real_tools.py`, the CHANGELOG, and N35's paragraph in `web-design-suite-completion-plan.md` (marked *Done for 3.4.0 (P45, #N).*, as N36's is; N35 has no inventory row). M.
 
 ## 5. R2: release 3.4.0
 
 As R1 was (#36), after P45 merges:
 - `plugins/web-design-suite/.claude-plugin/plugin.json` to 3.4.0 (the marketplace entries carry no version); the README's three `WDS` paths name 3.4.0 (`test_docs.PasteableCommands`); the CHANGELOG's heading `## 3.4.0 — <date>` with a short summary above its sections (`release.yml` uses the section as the release notes); the plan's R2 row and §9; the inventory's "W8 (3.4.0)" items are all fixed by then (`check_execution_plan.py`).
-- After the merge: `python -B tooling/release/build.py <empty folder outside OneDrive> --rev <merge sha>` (a local build never matches the release's checksums; `tooling/release/compare.py` compares by content), then tag the merge commit `v3.4.0` and push the tag. `release.yml` creates the release; nothing else does. Check the release page lists the zip, the 13 `.skill` files and `SHA256SUMS`.
+- After the merge: `python -B tooling/release/build.py OUT_DIR --rev FULL_MERGE_SHA`, OUT_DIR an empty folder outside OneDrive, (a local build never matches the release's checksums; `tooling/release/compare.py` compares by content), then tag the merge commit `v3.4.0` and push the tag. `release.yml` creates the release; nothing else does. Check the release page lists the zip, the 13 `.skill` files and `SHA256SUMS`.
 - Then install it: copy `plugins/web-design-suite` over the local marketplace (`C:\Users\vybec\.claude\local-marketplaces\web-design-suite`) and run `claude plugin update` with the desktop app's bundled CLI (CLAUDE.md, Commands). Tell the user to restart Claude Code.
 
 **Close each PR:** the CHANGELOG under `## 3.4.0 — unreleased`, each item "fixed in 3.4.0" in the inventory with its test, the PR's own row in the plan as `Pk, #N`, and §9.
