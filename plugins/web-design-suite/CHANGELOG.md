@@ -95,7 +95,7 @@
 
 ### Fixed
 
-- **Gmail's limits are registered figures** (N36, CodeRabbit on #59). The email docs quoted a 102,400-byte clipping threshold and a 16,384-byte `<style>` ceiling that no entry in `evidence.json` backed, and `test_evidence` did not recognise a byte count as a figure. Re-read 2026-10-07: Google publishes no clipping figure; the ESPs document 102 KB (Mailmodo, DailyStory), and the byte-exact 102,400 is from measurement, which the docs now say; the `<style>` ceiling is email-bugs #90's 16,384 bytes. Both are registered for every email doc that quotes them, and `FIGURE` reads byte counts (`102,400 bytes`, `16,384-byte`, `16 kB`).
+- **Gmail's limits are registered figures** (N36, CodeRabbit on #59). The email docs quoted a 102,400-byte clipping threshold and a 16,384-byte `<style>` ceiling that no entry in `evidence.json` backed, and `test_evidence` did not recognise a byte count as a figure. Re-read 2026-10-07: Google publishes no clipping figure; the ESPs document 102 KB (Mailmodo, DailyStory), and the byte-exact 102,400 is from measurement, which the docs now say; the `<style>` ceiling is email-bugs #90's 16,384 bytes. Both are registered for every email doc that quotes them, and `FIGURE` reads byte counts (`102,400 bytes`, `16,384-byte`, `16 kB`, `102kb`).
 - **The scaffold reads every interview answer** (DL-A8). `.money` set the currency and
   the storage unit and nothing read them: every cell was `formatMoney(x / 100)` in a
   hard-coded USD, wrong by the currency's own scale for JPY (1) and KWD (1000), and

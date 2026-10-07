@@ -37,7 +37,7 @@ FIGURE = re.compile(
     r"|\d[\d,]*(?:\.\d+)?\s?%"                                      # a percentage
     r"|\d[\d,]*(?:\.\d+)?\+?\s(?:participants|respondents|pages|sites|audits|issues|users|"
     r"fixations|home pages|form fields|categories|tools|errors|people|studies)"
-    r"|\d[\d,]*(?:\.\d+)?\s?(?:bytes|KiB|KB|kB|MB)\b"                 # a byte count: 102,400 bytes
+    r"|\d[\d,]*(?:\.\d+)?\s?(?:bytes|KiB|KB|kB|kb|MB)\b"                 # a byte count: 102,400 bytes
     r"|\d[\d,]*-byte\b)")                                               # 16,384-byte
 
 
@@ -83,7 +83,8 @@ class EvidenceRegister(unittest.TestCase):
         for text, figure in (("clips at 102,400 bytes of HTML", "102,400 bytes"),
                              ("the 16,384-byte ceiling", "16,384-byte"),
                              ("limits <style> to 16 kB", "16 kB"),
-                             ("adds 54 KB of HTML", "54 KB")):
+                             ("adds 54 KB of HTML", "54 KB"),
+                             ("more than 102kb, then Gmail", "102kb")):
             self.assertEqual(FIGURE.findall(text), [figure], text)
         self.assertEqual(FIGURE.findall("a 48px-tall button, 100 × 1024, 4.5:1"), [])
         registered = {v for e in REGISTER["entries"] for v in values(e)}
