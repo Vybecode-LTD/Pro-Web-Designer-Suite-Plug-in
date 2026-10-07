@@ -105,9 +105,10 @@ seconds, the principle underneath, and the fix at the system level.
 
 **Spot it.** Scroll to any row or list and measure two adjacent gaps that should mean the
 same thing. Or: `rg -I -o '(gap|padding|margin)[^;:]*:\s*[^;]+;' src/components | sort | uniq -c | sort -rn`
-(`-I`: searching more than one file, rg puts the file's path on every line, and every count
-comes out 1)
-— anything with a count of 1 is suspect.
+— anything with a count of 1 is used once in all the components, and suspect. (`-I`
+drops the file name rg puts on each line when it searches several files; with the name kept, a
+value would be counted per file, and one used once in each of ten files would look like
+ten one-offs.)
 
 **Principle.** Spacing is the only channel that encodes *relationship*. Two values for one
 relationship makes the channel noisy, and the reader stops trusting proximity as a cue —
