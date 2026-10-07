@@ -331,6 +331,17 @@ SHADOW_PROPS = {"box-shadow", "text-shadow"}
 # Softer: sometimes you genuinely need one half of a motion pair.
 TIER1_MOTION = {"dur-", "ease-"}
 
+
+def tier1_advice(ref: str) -> str | None:
+    """The role to use instead of `ref` when it is a Tier-1 primitive that has
+    one (Law 6), else None. stylelint's design/tier1-primitive and the ESLint
+    config's TIER1_SHORTHAND and inline-style check read the same lists."""
+    if ref in TIER2_EXCEPTIONS or ref in TIER1_NULLS:
+        return None         # a role, or zero, which is zero
+    bare = ref[2:]
+    return next((advice for pfx, advice in TIER1_WITH_ROLE.items() if bare.startswith(pfx)), None)
+
+
 # Specificity over the spec's cap is built to win a fight that layers already
 # settled; stylelint's selector-max-specificity reads the same cap (N32).
 SPECIFICITY_CAP = tuple(int(n) for n in MAX_SPECIFICITY.split(","))
@@ -371,9 +382,9 @@ TW_LITERAL = re.compile(
 TW_OPACITY = re.compile(
     r"(?<![-\w])(?:bg|text|border|ring|fill|stroke|outline|shadow|decoration|from|via|to"
     r"|placeholder|accent|caret|divide)-[a-z][\w-]*/\d+(?!\w)")
-TW_TIER1_VAR = re.compile(
-    r"\(--(?:space-(?!section|subsection|block|fluid)|neutral-|accent-|success-|warning-"
-    r"|danger-|info-|text-|leading-|shadow-)[\w-]*\)")
+# v4's `(--name)` shorthand, with or without a type hint (`text-(length:--x)`);
+# tier1_advice decides whether the name is a primitive that has a role.
+TW_VAR_SHORTHAND = re.compile(r"\((?:[a-z-]+:)?(--[\w-]+)\)")
 JSX_STYLE = re.compile(r"\bstyle\s*=\s*\{\{")
 CLASS_ATTR = re.compile(r"""(?:className|class)\s*=\s*(?:\{?\s*)?["'`]([^"'`]*)["'`]""")
 # Arbitrary VARIANTS select a state and carry no value; an image URL and a
@@ -1484,25 +1495,21 @@ def audit_css(path: Path, text: str) -> list[Finding]:
         # ---- L6 Tier-1 leakage ------------------------------------------------
         if component_file or in_layer(d.at_rules, "components"):
             for ref in VAR_REF.findall(value):
-                if ref in TIER2_EXCEPTIONS or ref in TIER1_NULLS:
-                    continue        # a role, or zero, which is zero
-                bare = ref[2:]
-                for pfx, advice in TIER1_WITH_ROLE.items():
-                    if bare.startswith(pfx):
-                        # Declaring a Tier-3 socket FROM a Tier-2 role is the
-                        # sanctioned pattern; reading a Tier-1 primitive is not.
-                        add(line, "L6", "tier1-leak", "error",
-                            f"Component code reads the Tier-1 primitive `{ref}`.",
-                            f"Right value, wrong tier — use {advice}. The day "
-                            f"'more air in cards' lands, you want to change one "
-                            f"role, not grep for {ref} across the repo.")
-                        break
+                advice = tier1_advice(ref)
+                if advice:
+                    # Declaring a Tier-3 socket FROM a Tier-2 role is the
+                    # sanctioned pattern; reading a Tier-1 primitive is not.
+                    add(line, "L6", "tier1-leak", "error",
+                        f"Component code reads the Tier-1 primitive `{ref}`.",
+                        f"Right value, wrong tier — use {advice}. The day "
+                        f"'more air in cards' lands, you want to change one "
+                        f"role, not grep for {ref} across the repo.")
                 else:
                     # Only a shorthand can take a --motion-* pair. A longhand
                     # (animation-duration, transition-timing-function) must read
                     # the primitive — view-transition pseudo-elements and
                     # scroll-driven animations need exactly that.
-                    if any(bare.startswith(p) for p in TIER1_MOTION) and prop in MOTION_SHORTHANDS:
+                    if any(ref[2:].startswith(p) for p in TIER1_MOTION) and prop in MOTION_SHORTHANDS:
                         add(line, "L6", "tier1-motion", "warning",
                             f"Component code reads `{ref}` directly.",
                             "Prefer a --motion-* pair so duration and easing "
@@ -1695,6 +1702,15 @@ def _audit_jsx_styles(clean: str, line_of, add) -> None:
                     "a number and do the arithmetic in CSS with calc(), or point the "
                     "property at a token: var(--gap-related).",
                     snippet=f"{pair.group(2)}: {pair.group(4)}")
+            # Law 6 through the same exception: a socket filled from a primitive.
+            for ref in VAR_REF.findall(pair.group(4)):
+                advice = tier1_advice(ref)
+                if advice:
+                    add(line_of(m.start()), "L6", "tier1-leak", "error",
+                        f"Inline `style` passes `{pair.group(2)}: '{pair.group(4)}'`, "
+                        f"which reads the Tier-1 primitive `{ref}`.",
+                        f"Right value, wrong tier — use {advice}.",
+                        snippet=f"{pair.group(2)}: {pair.group(4)}")
         if offenders:
             add(line_of(m.start()), "L4", "inline-style", "error",
                 f"Inline `style` sets visual propert{'y' if len(offenders) == 1 else 'ies'}: "
@@ -1810,7 +1826,9 @@ def _audit_class_lists(clean: str, line_of, add) -> None:
                 "A /NN modifier compiles to color-mix() with a number nobody "
                 "chose. Translucency has roles (bg-hover, bg-active, the scrim "
                 "role) that dark mode and the contrast checks can reach.")
-        for m in TW_TIER1_VAR.finditer(cls):
+        for m in TW_VAR_SHORTHAND.finditer(cls):
+            if tier1_advice(m.group(1)) is None:
+                continue
             add(line_of(at), "L6", "tier1-leak", "error",
                 f"`{m.group(0)}` reads a Tier-1 primitive.",
                 "Use the role: p-card rather than p-(--space-6), bg-surface "

@@ -968,8 +968,10 @@ grep -rnE '^\s*[a-z-]*(margin|padding|gap|inset|top|right|bottom|left|width|heig
 grep -rnE ':\s*(#[0-9a-fA-F]{3,8}|rgba?\(|hsla?\()' $S --include='*.css' \
   | grep -v 'tokens.css'
 
-# 3. Tier-1 reached from a component (Law 6).
-grep -rnE 'var\(--(space|text|neutral|accent|leading|tracking|shadow|dur|ease)-' \
+# 3. Tier-1 reached from a component (Law 6): the prefixes with a role
+#    (design-rules.json: tiers). --space-section, --space-block and the other
+#    page-rhythm roles, and the null-outs, are not leaks; stylelint knows them.
+grep -rnE 'var\(--(space|neutral|accent|success|warning|danger|info|text|leading|shadow)-' \
   $S/components $S/layout.css $S/utilities.css
 
 # 4. Child outer margins (Law 2). `margin-*: auto` is exempt; see card.css.
@@ -994,7 +996,7 @@ grep -rnE '@media[^{]*\([^)]*[0-9]+(px|rem)' $S --include='*.css' \
 #    is the cheap proxy; a stylelint rule is the real one.
 ```
 
-Pair the greps with **stylelint** for the checks a regex cannot make honestly: run the shipped `assets/configs/stylelint.config.mjs`, not a copy of its rules. It holds the nesting depth, ids, `!important`, type selectors in component files, the custom-property pattern, and the specificity cap (0,3,1) and three compound selectors, which `design-rules.json` sets for the audit too.
+Pair the greps with **stylelint** for the checks a regex cannot make honestly: run the shipped `assets/configs/stylelint.config.mjs`, not a copy of its rules. It holds the nesting depth, ids, `!important`, type selectors in component files, the custom-property pattern, the specificity cap (0,3,1) and three compound selectors, and Law 6 in component files and the `components` layer (`design/tier1-primitive`), which `design-rules.json` sets for the audit too.
 
 And the two checks only a human can make, in review:
 

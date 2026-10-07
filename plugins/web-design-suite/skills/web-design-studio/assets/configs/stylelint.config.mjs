@@ -207,6 +207,23 @@ const BINDING_ALLOWLIST = {
   '/^--animate-/': [MOTION_LIST],
   '/^--(?!breakpoint-|aspect-|animate-)/': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
 };
+const TIER1_WITH_ROLE = {
+  'space-': 'a proximity/inset role (--gap-related, --pad-card, --space-section)',
+  'neutral-': 'a color role (--bg-surface, --fg-muted, --border-default)',
+  'accent-': 'a color role (--bg-accent, --fg-accent, --border-accent)',
+  'success-': 'a color role (--bg-success, --fg-success)',
+  'warning-': 'a color role (--bg-warning, --fg-warning)',
+  'danger-': 'a color role (--bg-danger, --fg-danger)',
+  'info-': 'a color role',
+  'text-': 'a type role (--type-body, --type-h2, --type-ui)',
+  'leading-': 'a type role (--type-*), which carries leading in its shorthand',
+  'shadow-': 'an elevation role (--elevation-card, --elevation-modal)',
+};
+const TIER2_EXCEPTIONS = [
+  '--space-section', '--space-subsection', '--space-block', '--space-fluid-sm', '--space-fluid-md',
+  '--space-fluid-lg', '--space-fluid-xl',
+];
+const TIER1_NULLS = ['--space-0', '--radius-none', '--shadow-none'];
 // END design-rules
 
 /* =========================================================================
@@ -627,6 +644,80 @@ marginRule.meta = { url: 'assets/rules/design-rules.json' };
 
 const marginPlugin = createPlugin(marginRuleName, marginRule);
 
+/* -------------------------------------------------------------------------
+ * design/tier1-primitive: LAW 6, in a `components` layer, and in the whole
+ * of a component file (Part 5)
+ * -------------------------------------------------------------------------
+ * A component reads roles. `padding: var(--space-4)` is the right value at
+ * the wrong tier: the day "more air in cards" lands, one role should change,
+ * not a grep for --space-4 across the repo. Every var() in the value counts,
+ * a fallback's and a socket's too (`--card-gap: var(--space-4)`): a Tier-3
+ * socket is declared FROM a role. The prefixes with a role and their advice
+ * are TIER1_WITH_ROLE. Not leaks: the page-rhythm roles that live under
+ * --space- (TIER2_EXCEPTIONS) and the null-outs (TIER1_NULLS). A primitive
+ * with no role (--radius-*, --weight-*, --z-*, --font-*) is read directly,
+ * and so is a motion longhand's --dur-* or --ease-*. The audit reads the same
+ * lists in the same places (design-rules.json: tiers).
+ *
+ * The rule cannot see the file's path, so the component-file override turns
+ * on `componentFile` and the base config reads only a `components` layer.
+ * ------------------------------------------------------------------------- */
+const tierRuleName = 'design/tier1-primitive';
+const tierMessages = utils.ruleMessages(tierRuleName, {
+  rejected: (ref, advice) =>
+    `Law 6 (semantic before primitive): component code reads the Tier-1 primitive ${ref}. ` +
+    `Right value, wrong tier: use ${advice}.`,
+});
+const VAR_NAME = /var\(\s*(--[\w-]+)/g;
+
+/* The advice for a primitive that has a role, or null for anything else. */
+const tier1Advice = (ref) => {
+  if (TIER2_EXCEPTIONS.includes(ref) || TIER1_NULLS.includes(ref)) return null;
+  const prefix = Object.keys(TIER1_WITH_ROLE).find((p) => ref.slice(2).startsWith(p));
+  return prefix ? TIER1_WITH_ROLE[prefix] : null;
+};
+
+/* Inside `@layer components { … }`, at any depth, as the audit reads it. */
+const inComponentsLayer = (node) => {
+  for (let n = node.parent; n; n = n.parent) {
+    if (n.type === 'atrule' && n.name.toLowerCase() === 'layer' && n.params.includes('components')) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const tierRule = (primary, secondary) => (root, result) => {
+  const valid = utils.validateOptions(
+    result,
+    tierRuleName,
+    { actual: primary, possible: [true] },
+    { actual: secondary, possible: { componentFile: [true, false] }, optional: true },
+  );
+  if (!valid) return;
+  const componentFile = Boolean(secondary && secondary.componentFile);
+  root.walkDecls((decl) => {
+    if (!componentFile && !inComponentsLayer(decl)) return;
+    for (const [, ref] of decl.value.matchAll(VAR_NAME)) {
+      const advice = tier1Advice(ref);
+      if (!advice) continue;
+      utils.report({
+        message: tierMessages.rejected(ref, advice),
+        node: decl,
+        result,
+        ruleName: tierRuleName,
+        word: ref,
+      });
+    }
+  });
+};
+
+tierRule.ruleName = tierRuleName;
+tierRule.messages = tierMessages;
+tierRule.meta = { url: 'assets/rules/design-rules.json' };
+
+const tierPlugin = createPlugin(tierRuleName, tierRule);
+
 /* =========================================================================
  * PART 3 — THE VALUE ALLOWLISTS (LAW 1, LAW 3, LAW 6)
  * =========================================================================
@@ -671,12 +762,17 @@ const marginPlugin = createPlugin(marginRuleName, marginRule);
 
 export default {
   extends: ['stylelint-config-standard'],
-  plugins: [designPlugin, systemColorPlugin, hexPlugin, colourFnPlugin, marginPlugin],
+  plugins: [designPlugin, systemColorPlugin, hexPlugin, colourFnPlugin, marginPlugin, tierPlugin],
 
   rules: {
     /* ---- LAW 5: layers, not specificity ------------------------------ */
 
     [layerRuleName]: true,
+
+    /* ---- LAW 6: a `components` layer reads roles (Part 5 adds the
+     *      whole of a component file) --------------------------------- */
+
+    [tierRuleName]: true,
 
     /* ---- LAW 1: a system colour belongs to forced-colors mode -------- */
 
@@ -853,6 +949,8 @@ export default {
         [hexRuleName]: null,
         [colourFnRuleName]: null,
         'color-named': null,
+        /* Tier 2 is defined here, from Tier 1. */
+        [tierRuleName]: null,
         /* Tier-1 steps are `--space-0-5`, `--text-2xs`, `--radius-2xl`:
          * digits inside segments, which the strict pattern rejects. */
         'custom-property-pattern': '^[a-z0-9]+(-[a-z0-9]+)*$',
@@ -882,6 +980,7 @@ export default {
         'declaration-property-value-allowed-list': BINDING_ALLOWLIST,
         'custom-property-pattern': null, // `--text-h1--line-height` is Tailwind's syntax
         'at-rule-disallowed-list': null,
+        [tierRuleName]: null, // a token file, as the audit reads it (design-rules.json: file_classes)
       },
     },
 
@@ -928,6 +1027,8 @@ export default {
       ],
       rules: {
         [marginRuleName]: true,
+        /* Law 6 in the whole file, not only in its `components` layer. */
+        [tierRuleName]: [true, { componentFile: true }],
         /* A component styling anything but itself and its own parts is
          * reaching outside its box. `> *`, `+ *` and descendant element
          * selectors are how one component quietly starts owning another's

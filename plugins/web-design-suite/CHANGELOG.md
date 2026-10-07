@@ -333,6 +333,19 @@
   null-outs, and extract_system flagged `--weight-*`, which the audit allows. The lists
   are now the rule spec's `tiers` section (prefixes with a role, the role exceptions, the
   null-outs), written into both by `tools/sync_rules.py`; the audit exempts the null-outs.
+- **Law 6 is in stylelint and the ESLint config, not only the audit** (N35). A project
+  that gated with the two configs let `var(--accent-600)` into a component. The spec's
+  `tiers` lists now reach both through `tools/sync_rules.py`. stylelint's new
+  `design/tier1-primitive` refuses a `var()` naming a primitive that has a role in a
+  `components` layer, and anywhere in a component file, fallbacks and sockets included,
+  with the audit's advice; token files are exempt, as in the audit. ESLint's
+  `TIER1_SHORTHAND` is built from the same lists, so `p-(--space-section)` and
+  `shadow-(--shadow-none)` pass and a type hint (`text-(length:--text-lg)`) no longer
+  hides a primitive, and `style-prop-custom-properties-only` refuses an inline socket
+  filled from one (`'--gap': 'var(--space-4)'`), which the audit now refuses too. The
+  audit's Tailwind check reads the spec's lists instead of its own pattern. Primitives
+  with no role, and a motion longhand's `--dur-*` or `--ease-*`, stay allowed in all
+  three.
 - **A colour rename beside a `font-weight` was refused** (LC-A14). apply_codemod's font
   guard, which stops a `font-size` rewrite into the `font` shorthand from resetting the
   weight beside it, refused every declaration-scope rewrite in such a rule: deprecate.py's
