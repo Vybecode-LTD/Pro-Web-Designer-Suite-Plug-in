@@ -91,14 +91,16 @@ class EvidenceRegister(unittest.TestCase):
         self.assertIn(norm("102 KB"), registered)
         self.assertIn(norm("16,384 bytes"), registered)
         for doc in ("email-template-system/SKILL.md",
-                    "email-template-system/references/email-client-matrix.md"):
+                    "email-template-system/references/email-client-matrix.md",
+                    "email-template-system/references/email-architecture.md",
+                    "email-template-system/references/email-workflow.md"):
             self.assertIn(norm("16,384-byte"), registered_for(doc))
             self.assertIn(norm("102 KB"), registered_for(doc))
             # The docs call the threshold what the sources call it, 102 KB,
             # and say the byte-exact figure is measured.
             text = (SKILLS / doc).read_text(encoding="utf-8")
             self.assertIn("102 KB", text, doc)
-            self.assertRegex(text, r"measured[:,]? ?(?:at )?102,400 bytes|\(102,400 bytes, measured\)", doc)
+            self.assertRegex(text, r"measured[:,]? ?(?:at )?102,400 bytes|102,400 bytes is the measured value|\(102,400 bytes, measured\)", doc)
         # The scripts enforce what the register records: the <style> ceiling
         # is the registered figure, and the clipping constant is the measured
         # 102,400 the docs name beside the ESPs' 102 KB.
