@@ -12,7 +12,8 @@
   - **One reader.** `shared/project_config.py` reads the config, and a byte-identical
     copy sits beside the scripts that use it, so a skill installed alone has one.
   - **`contract.json`.** `extract_system.py --contract FILE` writes the token system's
-    default values by tier: ramps, scales, breakpoints and roles.
+    default values by tier: ramps, scales, breakpoints, constants and roles. A token
+    declared only in a theme or under a condition has no default and is left out.
   - **The scripts that read them.** `figma_audit.py --tokens` takes a `contract.json` as
     well as a `tokens.css`. With no flag, it and `extract_system.py` read the token files
     the config lists.
