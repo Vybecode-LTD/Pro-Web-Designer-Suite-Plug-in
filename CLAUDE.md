@@ -14,11 +14,11 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-10-07)
 
-- **Version:** 3.3.0 is the latest release (`v3.3.0`, `88a4886`, published by `release.yml`). Phase 4 (3.4.0) is under way: P9 to P21 and P44 are merged (#38 to #67; P18 as #57 and #58, P20 as #64, P21 as #65 and #66, P44 as #67), with the hydration flake fix (#56) and the email cascade fix (#61). No PR is open.
+- **Version:** 3.3.0 is the latest release (`v3.3.0`, `88a4886`, published by `release.yml`). Phase 4 (3.4.0) is under way: P9 to P23 and P44 are merged (#38 to #71; P22 as #69 and #71, P23 as #70), with the hydration flake fix (#56) and the email cascade fix (#61). No PR is open.
 - **Installed:** 3.3.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** 724. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P22 (the critique: merges with `covers`, notes and `status`, the counts, and `critique_snapshots.mjs`), then P23 (the persuasion references and facts), P45 and R2. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 68 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Tests:** 755. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P45 (Law 6 in stylelint and the ESLint config), then R2, the 3.4.0 release. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 55 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
