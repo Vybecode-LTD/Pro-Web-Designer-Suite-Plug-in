@@ -193,12 +193,12 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-A2 | high | fixed in 3.1.0 | The defence sheet presents suspicions as known flaws and drops confirmed defects. |
 | PS-A3 | high | fixed in 3.1.0 | The audit merge silently deletes whole rule groups. |
 | PS-A4 | high | fixed in 3.1.0 | The design gate passes HTML without auditing it. |
-| PS-A5 | medium | W8 (3.4.0) | `--a11y` rejects the suite's own accessibility JSON. |
-| PS-A6 | medium | W8 (3.4.0) | The printed deck sends every presenter note to the client. |
-| PS-A7 | medium | W8 (3.4.0) | A reversed decision is presented as current. |
+| PS-A5 | medium | fixed in 3.4.0: `test_deck.TheSuitesOwnA11yJsonIsAnInput` (PR #65) | `--a11y` rejects the suite's own accessibility JSON. |
+| PS-A6 | medium | fixed in 3.4.0: `test_deck.NotesNeverReachTheClient` (PR #65) | The printed deck sends every presenter note to the client. |
+| PS-A7 | medium | fixed in 3.4.0: `test_deck.AReversedDecisionIsShownAsReversed` (PR #65) | A reversed decision is presented as current. |
 | PS-A8 | medium | W8 (3.4.0) | The skills give opposite instructions for a risky client request. |
 | PS-A9 | medium | W8 (3.4.0) | Two legal statements are wrong. |
-| PS-A10 | medium | W8 (3.4.0) | The "Say this" lines break the skill's own rule on numbers. |
+| PS-A10 | medium | fixed in 3.4.0: `test_deck.TheSayThisLinesCarryOnlyWhatTheInputsGive` (PR #65) | The "Say this" lines break the skill's own rule on numbers. |
 | PS-A11 | medium | fixed in 3.2.0 | The ethics section falls outside what survives compaction. |
 | PS-A12 | low-medium | W8 (3.4.0) | The markup breaks the skill's own full-bleed rule. |
 | PS-A13 | low-medium | W8 (3.4.0) | Flaw timing and deck structures contradict the method. |

@@ -14,6 +14,21 @@
   CHECK that states it makes it a mirror. The per-table policies, grants and smoke test
   shipped in 3.3.0; this closes the item. field-mapping.md §9, scripts.md and
   supabase-integration.md §9 say where each runs.
+- **The handout, and the suite's own accessibility JSON as the deck's input** (PS-A6,
+  PS-A5, part of PS-C1). `--handout FILE` writes the deck the client keeps: the same
+  slides in document flow, one per printed page, with no presenter notes, gap markers,
+  appendix, provenance or script anywhere in the file. `--a11y` reads
+  `a11y_runtime.mjs --json` and `a11y_static.py --json` (`{tool, findings}`: a finding is
+  a violation when it names a success criterion or is an error; a best-practice warning
+  and an `incomplete` axe result are the tool's, not claims; the static audit counts its
+  files as pages) as well as axe results, and a file with neither key is refused naming
+  all three. `--manual FILE` takes the manual test record from outside the log's
+  `## Tested by hand`. SKILL.md's input table names the commands that produce `a11y.json`.
+- **Reversed decisions are shown as reversed** (PS-A7). A decision with
+  `Status: reversed`, a `**Reversed to:**` line, or a row in `## Reversals` never ranks
+  as current: it goes on a "What changed since last time" slide (was, now, who asked,
+  what it cost), before the headline decisions, and a reversal with no replacement is a
+  gap. The appendix still lists it with its status.
 
 - **The focus ring is measured at every density** (SB-B3). On a page, a11y_runtime
   measures the ring again at each `data-density` value the page's own stylesheets name,
@@ -95,6 +110,18 @@
   `summaryRef`). Field exports `describedBy(id, help, error)` for a caller with help
   text. Both stacks pass the audit and the static a11y check, and the real compiler
   parses every generated file (`test_scaffold`).
+- **Print never sends the notes by accident** (PS-A6). The print stylesheet showed every
+  presenter note whatever the toggle; now notes print only while they are showing
+  (`data-notes="on"`), and the client's copy is `--handout`.
+- **The "Say this" lines carry only what the inputs give** (PS-A10). evidence.md turned
+  a byte budget into "under two seconds on 4G" (a time only `measure_vitals.mjs` can
+  give), called the dark theme "eleven lines" (the block is 31 declarations), quoted
+  `--fg-muted` at 4.6:1 (that is `--fg-subtle` on `--bg-sunken`) and gave the coverage
+  of automated tools with no source. The lines now carry placeholders filled from the
+  measured files, the "faster" line keeps the bytes and leaves the seconds to the
+  vitals median, and the coverage is cited as a range from the register: 41% of 143
+  planted barriers for the best single tool (GDS, 2017) and 57% of issues by volume
+  (Deque, 2021), on the slide and in §3.
 - **TTFB never saw the emulated latency, and no preset was Lighthouse's** (GT-A6). CDP
   adds its latency once per request, and Navigation Timing's `responseStart` comes before
   it: `--throttle slow4g` reported a TTFB of 5 ms, which also skewed the LCP sub-parts.

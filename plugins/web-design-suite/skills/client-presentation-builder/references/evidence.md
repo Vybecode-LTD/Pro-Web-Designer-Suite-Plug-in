@@ -66,12 +66,12 @@ only the receipt.
 | `audit_design.py` with a baseline | The debt is frozen and cannot grow | "There is old code we have not converted. It is written down, it cannot get worse, and we pay it down per area" |
 | A **component state matrix** | Every state of every component has been designed, not defaulted | "Here is every state of every component — loading, empty, error, disabled. Nothing on this site is undesigned, including the parts users only see on a bad day" |
 | The **seven states** on a component | Someone thought about the failure cases | "This is what the form looks like when the network drops. Most sites find that out from a customer" |
-| `perf_audit.py` within budget | The page weight is inside a number agreed before the build | "It loads in under two seconds on a mid-range phone on 4G, and the build fails if someone makes it heavier" |
+| `perf_audit.py` within budget | The page weight is inside a number agreed before the build | "It weighs `<total>` against a budget of `<budget>` agreed before the build, and the build fails if someone makes it heavier" — the figures from `perf.json`; a byte count is never a load time, which only `measure_vitals.mjs` can give |
 | A **performance budget file** | The number was derived, not wished for | "The budget is two and a half seconds on a mid-range Android on slow 4G. Everything else is arithmetic from that" |
 | `measure_vitals.mjs` output | Real browser timings across runs | "Measured in a real browser, five runs, median reported — not a single lucky load" |
 | An **axe-core / a11y report** | An automated WCAG pass, plus whatever you tested by hand | §3 — this one has to be worded carefully |
-| **Measured contrast** | The colour decisions are not preferences | "Every text colour was measured, not judged. The muted grey clears the legibility floor at 4.6 to 1" |
-| **Dark theme as a token re-point** | The system layer is real, not decorative | "Dark mode is eleven lines in one file, because no component knows what colour it is" |
+| **Measured contrast** | The colour decisions are not preferences | "Every text colour was measured, not judged. The muted grey clears the legibility floor at `<ratio>` to 1" — the ratio from `check_roles.py`, for the pair you name |
+| **Dark theme as a token re-point** | The system layer is real, not decorative | "Dark mode is `<N>` re-pointed tokens in one file, because no component knows what colour it is" — count the dark block in `tokens.css` before you say the number |
 | `DESIGN_DECISIONS.md` | The reasoning survives the team | "When you hire a developer in a year, the reasons are in the repo. They will not 'fix' something that was deliberate" |
 | **Generated documentation** | The docs cannot drift from the code | "The documentation is generated from the code, so it cannot go stale — the usual failure with a style guide" |
 | The **critique gate's defence sheet** | You have already run the hostile review | (Never shown to a client. It is the prep, not the deliverable) |
@@ -137,7 +137,7 @@ The one place in the deck where overclaiming can be disproved by a single user, 
 the wrong wording can create a legal exposure for your client that they did not know they
 were accepting.
 
-**Automated tools fully decide 7 of the 55 WCAG 2.2 A and AA success criteria, and part of 31 more** (`a11y-audit-runner/references/automation-coverage.md` §3). They cannot judge
+**Automated tools fully decide 7 of the 55 WCAG 2.2 A and AA success criteria, and part of 31 more** (`a11y-audit-runner/references/automation-coverage.md` §3). Measured, the coverage is a range, and the deck cites it as one: in the UK government's 2017 test the best single tool found 41% of 143 planted barriers, and Deque's 2021 study puts automation at 57% of issues by volume. "Roughly a third" is not a figure either study gives. They cannot judge
 whether alt text is *accurate*, whether a heading order matches the *meaning*, whether a
 custom control is operable in a real screen reader, or whether an error message is
 *comprehensible*. A green axe run means "no machine-detectable failures", which is a real
@@ -168,7 +168,7 @@ That closes with honesty and an upsell, and the honesty is what makes the upsell
 |---|---|
 | "The site loads in 1.2 seconds" | "In our tests on a mid-range phone on 4G, the main content appears in about 1.2 seconds" |
 | "It scores 100 on Lighthouse" | "It is inside every budget we set. The score is a lab number on one machine; the number that matters is what your actual visitors experience, and we will watch that after launch" |
-| "It's 40% faster" | "The old homepage was 3.4 MB, this one is 412 KB — about eight times lighter, which on a phone on 4G is the difference between a four-second wait and under two" |
+| "It's 40% faster" | "The old homepage was 3.4 MB, this one is 412 KB — about eight times lighter. What that means in seconds is `measure_vitals.mjs`'s median on a mid-range phone, which we quote; arithmetic from bytes is not a timing" |
 | "It's optimised" | "There is a check in the build that fails if a page goes over its weight budget, so it stays fast after we leave" |
 
 **The durable claim is the gate, not the number.** Any agency can ship one fast page. The
