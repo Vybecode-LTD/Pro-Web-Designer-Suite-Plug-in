@@ -14,6 +14,8 @@
       "docs": [
         "a11y-audit-runner/SKILL.md",
         "a11y-audit-runner/references/automation-coverage.md",
+        "client-presentation-builder/references/evidence.md",
+        "client-presentation-builder/scripts/build_presentation.py",
         "web-design-studio/references/accessibility-testing.md"
       ]
     },
@@ -32,6 +34,8 @@
         "a11y-audit-runner/SKILL.md",
         "a11y-audit-runner/references/automation-coverage.md",
         "a11y-audit-runner/scripts/a11y_runtime.mjs",
+        "client-presentation-builder/references/evidence.md",
+        "client-presentation-builder/scripts/build_presentation.py",
         "web-design-studio/references/accessibility-testing.md"
       ]
     },
@@ -72,6 +76,8 @@
         "a11y-audit-runner/SKILL.md",
         "a11y-audit-runner/references/automation-coverage.md",
         "a11y-audit-runner/scripts/a11y_runtime.mjs",
+        "client-presentation-builder/references/evidence.md",
+        "client-presentation-builder/scripts/build_presentation.py",
         "web-design-studio/references/accessibility-testing.md"
       ]
     },

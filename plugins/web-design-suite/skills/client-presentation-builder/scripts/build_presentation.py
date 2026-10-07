@@ -112,6 +112,8 @@ FIELD_ALIASES = {
     "status": "status", "audience": "audience", "audiences": "audience",
     "tags": "tags", "tag": "tags", "owner": "owner", "date": "date",
     "reversible": "reversible",
+    "reversed to": "reversal", "reversed by": "reversal", "replaced by": "reversal",
+    "superseded by": "reversal",
 }
 
 META_ALIASES = {
@@ -136,11 +138,18 @@ class Decision:
     tags: list[str] = field(default_factory=list)
     owner: str = ""
     reversible: str = ""
+    reversal: str = ""          # `Reversed to:` on the block, or the Reversals row
     line: int = 0
 
     @property
     def is_open(self) -> bool:
         return self.status.strip().lower() in OPEN_STATUSES
+
+    @property
+    def is_reversed(self) -> bool:
+        """Overturned: by its status, or by a row in `## Reversals`. A
+        reversed decision is never argued as current."""
+        return self.status.strip().lower() == "reversed"
 
     @property
     def is_coin_flip(self) -> bool:
@@ -458,12 +467,40 @@ def load_a11y(path: Path) -> A11yFacts:
     for run in runs:
         if not isinstance(run, dict):
             continue
-        pages += 1
         vs = run.get("violations")
-        if vs is None:
+        if vs is None and isinstance(run.get("findings"), list):
+            # The suite's own shape: `a11y_runtime.mjs --json` (one target,
+            # findings with a check, a rule, a success criterion, a severity
+            # and the nodes) and `a11y_static.py --json` (findings per
+            # file). A finding is a violation when it names a WCAG success
+            # criterion or is an error; a best-practice warning and an
+            # `incomplete` axe result are reported by the tool, not claimed
+            # here as failures.
+            vs = []
+            files: set[str] = set()
+            for f in run["findings"]:
+                if not isinstance(f, dict):
+                    continue
+                rule = str(f.get("rule") or "unnamed")
+                if "incomplete" in rule:
+                    continue
+                if f.get("severity") != "error" and not f.get("sc"):
+                    continue
+                if f.get("file"):
+                    files.add(str(f["file"]))
+                found = f.get("nodes")
+                vs.append({"id": rule,
+                           "impact": f.get("impact") or f.get("severity") or "unspecified",
+                           "nodes": found if isinstance(found, list) and found else [1]})
+            pages += max(len(files), 1)
+        elif vs is None:
             raise BuildError(
-                f"{path} has no `violations` key. Supply an axe-core result "
-                f"object, a list of them, or any JSON with the same shape.")
+                f"{path} has no `violations` and no `findings` key. Supply an "
+                f"axe-core result object or a list of them, "
+                f"`a11y_runtime.mjs --json` output, or `a11y_static.py --json` "
+                f"output.")
+        else:
+            pages += 1
         for v in vs:
             violations += 1
             impact = (v.get("impact") or "unspecified").lower()
@@ -755,7 +792,72 @@ def rank_decisions(decisions: list[Decision], audience: str) -> list[Decision]:
             s += 8 * len(d.options)
         return (-s, d.line)
 
-    return sorted([d for d in decisions if not d.is_open], key=score)
+    return sorted([d for d in decisions if not d.is_open and not d.is_reversed],
+                  key=score)
+
+
+def apply_reversals(log: DecisionLog) -> None:
+    """`## Reversals` is a table (Date | Decision | Reversed to | Who asked |
+    What it cost). A decision named there is reversed whatever its block's
+    status says, and the row's "Reversed to" is its replacement."""
+    text = re.sub(r"<!--.*?-->", "", log.sections.get("reversals", ""), flags=re.S)
+    lines = [ln for ln in text.splitlines() if ln.strip().startswith("|")]
+    if not lines:
+        return
+    # _md_table drops the header row; the header names the columns here.
+    header = [h.strip().lower() for h in _md_table(["| x |", lines[0]])[0]]
+    rows = [[], *_md_table(lines)]
+    by_id = {d.ident.lower(): d for d in log.decisions}
+
+    def col(row: list[str], *names: str) -> str:
+        for name in names:
+            if name in header and header.index(name) < len(row):
+                return row[header.index(name)].strip().strip("`")
+        return ""
+
+    for row in rows[1:]:
+        ident = col(row, "decision")
+        if not ident or PLACEHOLDER.fullmatch(ident):
+            continue                    # the template's own example row
+        d = by_id.get(ident.lower())
+        if d is None:
+            continue
+        d.status = "reversed"
+        to = col(row, "reversed to", "replaced by", "now")
+        if to and not PLACEHOLDER.fullmatch(to):
+            who = col(row, "who asked", "who")
+            cost = col(row, "what it cost", "cost")
+            d.reversal = to + (f" (asked by {who})" if who and not PLACEHOLDER.fullmatch(who) else "") \
+                + (f"; cost: {cost}" if cost and not PLACEHOLDER.fullmatch(cost) else "")
+
+
+def _changed(inp: Inputs, audience: str) -> Slide | None:
+    """What was decided before and is no longer: shown as reversed, with the
+    replacement, never argued with its old rationale (PS-A7)."""
+    reversed_ = [d for d in inp.log.decisions if d.is_reversed]
+    if not reversed_:
+        return None
+    s = Slide("changed", "What changed since last time")
+    s.kicker = ("Decisions we reversed, and why" if audience == "client"
+                else "Reversed decisions")
+    rows = []
+    for d in reversed_:
+        rows.append([f"<strong>{esc(d.ident)}</strong>", quoted(d.title),
+                     quoted(d.choice or "—"),
+                     quoted(d.reversal) if d.reversal else "<em>not recorded</em>"])
+        if not d.reversal:
+            s.gaps.append(f"{d.ident} is reversed but nothing says what replaced it: "
+                          f"add a row to `## Reversals` (Reversed to, who asked, "
+                          f"what it cost) or a `**Reversed to:**` line on the block.")
+    s.blocks.append(blk_table(["", "Decision", "Was", "Now"], rows))
+    s.blocks.append(blk_lede(
+        "A reversed decision is shown as reversed. Its old reasoning is not "
+        "re-argued here; the row says what replaced it and what that cost."))
+    s.notes.append("Say what changed and who asked for it before anyone has to "
+                   "ask. A reversal presented as the current call is the one "
+                   "thing in this deck that a client will remember being told "
+                   "differently.")
+    return s
 
 
 def decision_block(d: Decision, audience: str) -> tuple[str, list[str]]:
@@ -943,12 +1045,16 @@ def slide_perf(perf: PerfFacts, prov: Provenance, audience: str) -> Slide:
     return s
 
 
-def manual_testing(log: DecisionLog) -> str:
-    """What the decision log records as tested by hand (`## Tested by hand`).
-    The deck claims manual testing only from here — never by default."""
+def manual_testing(log: DecisionLog, record: str = "") -> str:
+    """What is recorded as tested by hand: the log's `## Tested by hand`, or
+    the file `--manual` names (a test record kept outside the log). The deck
+    claims manual testing only from one of these — never by default."""
+    sources = [record]
     for key in ("tested by hand", "manual testing", "tested manually", "manual checks"):
+        sources.append(log.sections.get(key, ""))
+    for text in sources:
         # The template's own guidance is an HTML comment; it records nothing.
-        text = re.sub(r"<!--.*?-->", "", log.sections.get(key, ""), flags=re.S).strip()
+        text = re.sub(r"<!--.*?-->", "", text or "", flags=re.S).strip()
         if text:
             return text
     return ""
@@ -982,9 +1088,11 @@ def slide_a11y(a11y: A11yFacts, prov: Provenance, audience: str,
     # Every sentence below is chosen from the data. "Passes" only when the
     # automated result has no violations; "keyboard-tested" only when the
     # decision log records it (## Tested by hand).
-    limits = ("Automated tools find only part of the problems — they cannot "
-              "judge whether alt text is <em>accurate</em> or whether an "
-              "interaction makes sense to a screen reader user.")
+    limits = ("Automated tools find only part of the problems: in the UK "
+              "government's test the best single tool found 41% of 143 planted "
+              "barriers, and Deque's study puts automation at 57% of issues by "
+              "volume. No tool can judge whether alt text is <em>accurate</em> "
+              "or whether an interaction makes sense to a screen reader user.")
     if a11y.violations:
         claim = (f"The honest claim today: the automated WCAG 2.2 AA check still "
                  f"finds {cited(c_v)} issue(s) on {cited(c_n)} element(s), and "
@@ -1047,6 +1155,7 @@ class Inputs:
     a11y: A11yFacts | None = None
     defence: DefenceFacts | None = None
     shots: list[Shot] = field(default_factory=list)
+    manual: str = ""            # the manual test record, from --manual
     pairs: list[tuple[Shot, Shot]] = field(default_factory=list)
 
 
@@ -1069,12 +1178,18 @@ AUDIENCE_LEDE = {
 
 
 def _open_decisions(log: DecisionLog) -> list[Decision]:
-    return [d for d in log.decisions if d.is_open]
+    return [d for d in log.decisions if d.is_open and not d.is_reversed]
 
 
-def build_plan(inp: Inputs, audience: str, max_decisions: int) -> list[Slide]:
+def build_plan(inp: Inputs, audience: str, max_decisions: int,
+               handout: bool = False) -> list[Slide]:
     prov = Provenance()
+    apply_reversals(inp.log)
     plan = _plan_for(inp, audience, max_decisions, prov)
+    if handout:
+        # The handout is what the client keeps: no appendix ("never
+        # presented"), no provenance script, and render_html drops the notes.
+        plan = [s for s in plan if s.kind not in ("appendix", "provenance")]
     for s in plan:
         if s.kind == "provenance":
             # Script content is raw text, not markup: HTML-escaping it would
@@ -1376,6 +1491,7 @@ def _plan_for(inp: Inputs, audience: str, max_decisions: int,
     brief = _brief(inp, audience, headline)
     index = _decision_index(headline, audience) if headline else None
     opens = _open_questions(inp, audience)
+    changed = _changed(inp, audience)
     flaws = _flaws(inp, audience)
     comparisons = _comparison(inp)
     screens = _screens(inp, audience)
@@ -1383,21 +1499,22 @@ def _plan_for(inp: Inputs, audience: str, max_decisions: int,
 
     sys_slide = slide_system(inp.audit, prov, audience) if inp.audit else None
     perf_slide = slide_perf(inp.perf, prov, audience) if inp.perf else None
-    a11y_slide = (slide_a11y(inp.a11y, prov, audience, manual_testing(inp.log))
+    a11y_slide = (slide_a11y(inp.a11y, prov, audience,
+                             manual_testing(inp.log, inp.manual))
                   if inp.a11y else None)
 
     plan: list[Slide] = []
     if audience == "client":
         # Risk and outcome first; the system evidence is the reassurance that
         # follows the work, not the reason to care about it.
-        plan = [cover, brief, index, *decision_slides, *comparisons]
+        plan = [cover, brief, index, changed, *decision_slides, *comparisons]
         plan += [screens]
         plan += [perf_slide, a11y_slide, sys_slide]
         plan += [opens, flaws, ask, _appendix(inp), _provenance_slide(inp)]
     elif audience == "team":
         # A developer's first question is "how is this put together", and
         # their second is "what breaks if I touch it".
-        plan = [cover, sys_slide, brief, index, *decision_slides]
+        plan = [cover, sys_slide, brief, index, changed, *decision_slides]
         plan += [perf_slide, a11y_slide]
         plan += [opens, flaws, screens, *comparisons, ask,
                  _provenance_slide(inp)]
@@ -1405,7 +1522,7 @@ def _plan_for(inp: Inputs, audience: str, max_decisions: int,
         # A creative director is buying judgement: premise, then the hardest
         # calls with their alternatives, then the weaknesses before anyone
         # finds them.
-        plan = [cover, brief, index, *decision_slides, flaws, opens]
+        plan = [cover, brief, index, changed, *decision_slides, flaws, opens]
         plan += [*comparisons, screens, sys_slide, perf_slide, a11y_slide]
         plan += [ask, _provenance_slide(inp)]
 
@@ -1541,6 +1658,7 @@ DECK_CSS = """@layer layout {
   }
 
   .slide[data-kind="appendix"],
+  .slide[data-kind="changed"],
   .slide[data-kind="provenance"] {
     --slide-bg: var(--bg-sunken);
     --slide-elevation: var(--elevation-flat);
@@ -2015,7 +2133,11 @@ DECK_CSS = """@layer layout {
     .bar,
     .help { display: none; }
 
-    .notes {
+    /* Notes print only when they are showing on screen: a PDF made with
+       Ctrl+P from a deck with notes off carries none of them. */
+    .notes { display: none; }
+
+    .deck[data-notes="on"] .notes {
       display: flex;
       background-color: var(--bg-sunken);
       break-inside: avoid;
@@ -2024,6 +2146,27 @@ DECK_CSS = """@layer layout {
     .gap { display: none; }
 
     .shot__img { break-inside: avoid; }
+  }
+
+  /* -- the handout: every slide in flow, nothing presenter-only ------- */
+  .deck[data-handout="on"] {
+    display: block;
+    block-size: auto;
+    background-color: var(--bg-surface);
+  }
+
+  .deck[data-handout="on"] .deck__stage {
+    display: block;
+    overflow: visible;
+    padding: var(--pad-page);
+  }
+
+  .deck[data-handout="on"] .slide {
+    display: flex;
+    position: static;
+    margin-block-end: var(--gap-separate);
+    break-after: page;
+    break-inside: avoid;
   }
 }
 """
@@ -2143,10 +2286,16 @@ DECK_JS = """(function () {
 """
 
 
-def render_slide(slide: Slide, number: int, total: int, meta: dict[str, str]) -> str:
+def render_slide(slide: Slide, number: int, total: int, meta: dict[str, str],
+                 handout: bool = False) -> str:
     head = [f"<p class='slide__kicker'>{esc(slide.kicker)}</p>"] if slide.kicker else []
     head.append(f"<h2 class='slide__title'>{inline(slide.title)}</h2>")
     notes_html = ""
+    if handout:
+        # No notes and no gap markers in the markup at all: a handout is
+        # read, printed and forwarded, and a hidden element is one
+        # "show hidden" away from the client.
+        slide = Slide(slide.kind, slide.title, slide.kicker, list(slide.blocks))
     if slide.notes:
         items = "".join(f"<p class='body'>{inline(n)}</p>" for n in slide.notes)
         notes_html = (f"<div class='notes'><p class='notes__title'>"
@@ -2158,10 +2307,11 @@ def render_slide(slide: Slide, number: int, total: int, meta: dict[str, str]) ->
                     f"you present</p><ul class='list'>{items}</ul></div>")
     foot = (f"<div class='slide__foot'><span>{esc(meta.get('project', ''))}</span>"
             f"<span>{number} / {total}</span></div>")
+    state = ("" if handout else
+             "data-state='offscreen' aria-hidden='true' tabindex='-1' ")
     return (
         f"<section class='slide' data-kind='{esc(slide.kind)}' "
-        f"data-state='offscreen' data-title=\"{esc(slide.title)}\" "
-        f"aria-hidden='true' tabindex='-1' "
+        f"{state}data-title=\"{esc(slide.title)}\" "
         f"aria-label=\"Slide {number} of {total}: {esc(slide.title)}\">"
         f"<header class='slide__head'>{''.join(head)}</header>"
         f"<div class='slide__body'>{''.join(slide.blocks)}</div>"
@@ -2169,12 +2319,14 @@ def render_slide(slide: Slide, number: int, total: int, meta: dict[str, str]) ->
 
 
 def render_html(plan: list[Slide], inp: Inputs, audience: str,
-                tokens_css: str) -> str:
+                tokens_css: str, handout: bool = False) -> str:
     meta = inp.log.meta
     title = meta.get("project") or meta.get("title") or "Design review"
     total = len(plan)
-    slides = "".join(render_slide(s, i + 1, total, meta)
+    slides = "".join(render_slide(s, i + 1, total, meta, handout)
                      for i, s in enumerate(plan))
+    if handout:
+        return render_handout(slides, title, audience, tokens_css)
     help_rows = [
         ("→ / ↓ / space / Page Down", "next slide"),
         ("← / ↑ / backspace / Page Up", "previous slide"),
@@ -2237,6 +2389,39 @@ def render_html(plan: list[Slide], inp: Inputs, audience: str,
 <script>
 {DECK_JS}
 </script>
+</body>
+</html>
+"""
+
+
+def render_handout(slides: str, title: str, audience: str, tokens_css: str) -> str:
+    """The deck the client keeps: the same slides in document flow, printable
+    as one page each, with no presenter notes, no gap markers, no chrome and
+    no script. Nothing presenter-only is in the file (PS-A6)."""
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="client-presentation-builder/build_presentation.py">
+<meta name="deck-audience" content="{esc(audience)}">
+<meta name="deck-handout" content="yes">
+<title>{esc(title)}</title>
+<style data-deck-css="tokens">
+@layer reset, tokens, base, layout, components, utilities, overrides;
+{tokens_css}
+</style>
+<style data-deck-css="deck-components">
+{DECK_CSS}
+</style>
+</head>
+<body>
+<div class="deck" data-handout="on" data-notes="off" data-help="closed"
+     data-audience="{esc(audience)}">
+  <main class="deck__stage">
+    {slides}
+  </main>
+</div>
 </body>
 </html>
 """
@@ -2366,7 +2551,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--perf", metavar="FILE",
                     help="`perf_audit.py --json` output")
     ap.add_argument("--a11y", metavar="FILE",
-                    help="axe-core style accessibility results JSON")
+                    help="accessibility results: `a11y_runtime.mjs --json`, "
+                         "`a11y_static.py --json`, or axe-core results")
+    ap.add_argument("--manual", metavar="FILE",
+                    help="the manual test record (keyboard, screen reader), "
+                         "when it is kept outside the decision log's "
+                         "`## Tested by hand`")
     ap.add_argument("--defence", metavar="FILE",
                     help="`critique_report.py --format defence` markdown")
     ap.add_argument("--screenshots", metavar="DIR",
@@ -2376,6 +2566,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="deck output path (default: deck.html)")
     ap.add_argument("--notes", metavar="FILE",
                     help="also write speaker notes as markdown")
+    ap.add_argument("--handout", metavar="FILE",
+                    help="also write the handout: the same slides with no "
+                         "presenter notes, gap markers, appendix or "
+                         "provenance, for printing and sending")
     ap.add_argument("--emit-css", metavar="DIR",
                     help="write the deck's CSS out so `audit_design.py "
                          "--strict DIR` can prove it is on the system")
@@ -2429,6 +2623,11 @@ def main(argv: list[str] | None = None) -> int:
             inp.defence = load_defence(Path(args.defence))
         if args.screenshots:
             inp.shots, inp.pairs = load_screenshots(Path(args.screenshots))
+        if args.manual:
+            manual_path = Path(args.manual)
+            if not manual_path.exists():
+                raise BuildError(f"{manual_path} does not exist (--manual).")
+            inp.manual = manual_path.read_text(encoding="utf-8")
 
         tokens_css, tokens_from = find_tokens(args.tokens)
     except BuildError as exc:
@@ -2457,6 +2656,15 @@ def main(argv: list[str] | None = None) -> int:
             notes_path.write_text(render_notes(plan, inp, args.audience),
                                   encoding="utf-8")
             written.append(args.notes)
+        if args.handout:
+            handout_path = Path(args.handout)
+            handout_path.parent.mkdir(parents=True, exist_ok=True)
+            handout_plan = build_plan(inp, args.audience, args.max_decisions,
+                                      handout=True)
+            handout_path.write_text(
+                render_html(handout_plan, inp, args.audience, tokens_css,
+                            handout=True), encoding="utf-8")
+            written.append(args.handout)
         if args.emit_css:
             for p in emit_css(Path(args.emit_css), tokens_css):
                 written.append(str(p))

@@ -55,7 +55,8 @@ specific ask gets a vague answer, and a vague answer is a second meeting.>`
 > | `Choice` | **yes** | What you actually did, in one sentence, no hedging |
 > | `Consequence` | **yes** | What it costs. Naming the cost yourself is what makes the rest believable |
 > | `Evidence` | if it exists | A file, a number, a quote, a session recording. **No evidence is fine — inventing one is not** |
-> | `Status` | default `decided` | `decided` · `coin-flip` · `open` · `reversed` |
+> | `Status` | default `decided` | `decided` · `coin-flip` · `open` · `reversed`. A reversed decision (by status, or by a row in `## Reversals`) is never argued as current: it goes on the "What changed since last time" slide, as reversed |
+> | `Reversed to` | if reversed | What replaced it, when the `## Reversals` row does not say |
 > | `Audience` | optional | `client` · `team` · `creative-director` · `all`. Drives which 3–5 lead the deck |
 > | `Tags` | optional | `conversion, forms, tokens, perf, type, colour…` — used for ranking |
 > | `Say` | optional | The exact sentence you will use out loud. Write it once, here |

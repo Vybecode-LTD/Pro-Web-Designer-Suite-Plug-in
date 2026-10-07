@@ -1,0 +1,238 @@
+"""client-presentation-builder, the deck honest by construction (P21, part 1):
+
+- PS-A5: `--a11y` accepted only axe's `{violations}`; the suite's own
+  `a11y_runtime.mjs --json` and `a11y_static.py --json` emit `{tool, findings}`
+  and were refused with "has no `violations` key".
+- PS-A6: print mode showed every presenter note whatever the toggle, and the
+  printed deck carried the appendix ("never presented") and the provenance
+  slide; there was no handout build.
+- PS-A7: a `reversed` decision ranked like a current one and became a headline
+  slide argued with its old rationale.
+- PS-A10: evidence.md's "Say this" lines gave a load time from a byte count, a
+  dark-mode line count and a contrast ratio that were not the token file's,
+  and the coverage of automated tools with no source.
+- PS-C1, in part: the manual test record is an input (`--manual`), and the
+  coverage range is cited from the register.
+"""
+from __future__ import annotations
+
+import json
+import re
+import unittest
+
+from test_presentation import A11Y_CLEAN, A11Y_WITH_VIOLATIONS, decision_log
+from wds_support import SKILLS, TempDirTest, output, run_py
+
+RUNTIME = {"tool": "a11y_runtime", "target": "http://localhost/", "findings": [
+    {"check": "axe", "rule": "color-contrast", "sc": "1.4.3", "severity": "error",
+     "message": "x", "fix": "y", "nodes": ["#a", "#b"]},
+    {"check": "axe", "rule": "region", "sc": "", "severity": "warning",
+     "message": "best practice", "fix": ""},
+    {"check": "axe", "rule": "incomplete:color-contrast", "sc": "1.4.3",
+     "severity": "warning", "message": "", "fix": ""},
+    {"check": "keys", "rule": "no-accessible-name", "sc": "4.1.2", "severity": "error",
+     "message": "", "fix": ""}]}
+STATIC_WARNING = {"tool": "a11y_static", "errors": 0, "warnings": 1, "findings": [
+    {"file": "a.html", "line": 3, "category": "structure", "rule": "heading-order",
+     "sc": "", "severity": "warning", "message": "", "fix": ""}]}
+STATIC_ERROR = {"tool": "a11y_static", "errors": 1, "warnings": 0, "findings": [
+    {"file": "a.html", "line": 3, "category": "forms", "rule": "control-no-label",
+     "sc": "1.3.1", "severity": "error", "message": "", "fix": ""},
+    {"file": "b.html", "line": 9, "category": "forms", "rule": "control-no-label",
+     "sc": "1.3.1", "severity": "error", "message": "", "fix": ""}]}
+
+REVERSED_LOG = """\
+# Smoke deck
+
+## Decisions
+
+### D1 — Tokens
+**Constraint:** Many developers touch the CSS.
+**Choice:** A closed token system.
+
+### D2 — Carousel on the homepage
+**Status:** reversed
+**Constraint:** The client asked for motion.
+**Choice:** A five-slide hero carousel.
+
+### D3 — Single-column form
+**Constraint:** Two thirds of bookings start on a phone.
+**Choice:** One column at every width.
+"""
+REVERSALS = """
+## Reversals
+
+| Date | Decision | Reversed to | Who asked | What it cost |
+|---|---|---|---|---|
+| `<date>` | `<D4>` | `<what replaced it>` | `<name>` | `<hours / scope / a compromise>` |
+| 2026-10-01 | D2 | A static hero with one message | the client | two days |
+"""
+
+
+class Deck(TempDirTest):
+
+    def build(self, log_text, *args):
+        log = self.write("DECISION_LOG.md", log_text)
+        return run_py("client-presentation-builder", "build_presentation", log, *args, cwd=self.tmp)
+
+    def html(self, log_text, *args, name="deck.html"):
+        out = self.tmp / name
+        proc = self.build(log_text, "-o", out, *args)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        return re.sub(r"\s+", " ", out.read_text(encoding="utf-8"))
+
+    def outline(self, log_text, *args):
+        proc = self.build(log_text, "--dry-run", *args)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        return proc.stdout.decode("utf-8")
+
+
+class TheSuitesOwnA11yJsonIsAnInput(Deck):
+    """PS-A5."""
+
+    def test_the_runtime_audits_findings_are_violations_when_they_name_a_criterion(self):
+        a11y = self.write("a11y.json", json.dumps(RUNTIME))
+        text = self.outline(decision_log("D1 — Tokens"), "--audience", "client", "--a11y", a11y)
+        # color-contrast (2 nodes) and no-accessible-name (1): the best-practice
+        # warning and the `incomplete` result are the tool's, not claims.
+        self.assertIn("not clean (2 violation(s) on 3 element(s))", text)
+        html = self.html(decision_log("D1 — Tokens"), "--a11y", a11y)
+        self.assertNotIn("passes an automated WCAG 2.2 AA check", html)
+        self.assertIn("color-contrast", html)
+
+    def test_the_static_audits_findings_count_per_file(self):
+        warning = self.write("w.json", json.dumps(STATIC_WARNING))
+        html = self.html(decision_log("D1 — Tokens"), "--a11y", warning)
+        self.assertIn("passes an automated WCAG 2.2 AA check", html)
+        error = self.write("e.json", json.dumps(STATIC_ERROR))
+        text = self.outline(decision_log("D1 — Tokens"), "--a11y", error)
+        self.assertIn("not clean (2 violation(s) on 2 element(s))", text)
+        html = self.html(decision_log("D1 — Tokens"), "--a11y", error, name="e.html")
+        self.assertIn("#count(results)\" data-value=\"2\">2</span></p>"
+                      "<p class='metric__label'>page(s) scanned", html)
+
+    def test_axe_results_still_read_and_anything_else_names_both_shapes(self):
+        axe = self.write("axe.json", json.dumps(A11Y_WITH_VIOLATIONS))
+        text = self.outline(decision_log("D1 — Tokens"), "--a11y", axe)
+        self.assertIn("not clean (2 violation(s) on 3 element(s))", text)
+        other = self.write("other.json", json.dumps({"summary": {}}))
+        proc = self.build(decision_log("D1 — Tokens"), "--dry-run", "--a11y", other)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("has no `violations` and no `findings` key", output(proc))
+        self.assertIn("a11y_runtime.mjs --json", output(proc))
+
+    def test_the_manual_record_is_an_input(self):
+        a11y = self.write("a11y.json", json.dumps(A11Y_CLEAN))
+        record = self.write("tested.md", "Keyboard: every page, Tab and Shift+Tab, 2026-10-01.\n")
+        html = self.html(decision_log("D1 — Tokens"), "--a11y", a11y, "--manual", record)
+        self.assertIn("keyboard-tested by hand", html)
+        empty = self.write("empty.md", "<!-- what was tested, by whom -->\n")
+        html = self.html(decision_log("D1 — Tokens"), "--a11y", a11y, "--manual", empty, name="n.html")
+        self.assertNotIn("keyboard-tested by hand", html)
+        proc = self.build(decision_log("D1 — Tokens"), "--dry-run", "--manual", "missing.md")
+        self.assertEqual(proc.returncode, 2, output(proc))
+
+
+class AReversedDecisionIsShownAsReversed(Deck):
+    """PS-A7."""
+
+    def test_a_reversed_decision_is_not_a_headline_and_the_slide_says_what_replaced_it(self):
+        text = self.outline(REVERSED_LOG + REVERSALS)
+        self.assertNotRegex(text, r"decision\s+Carousel on the homepage")
+        self.assertRegex(text, r"changed\s+What changed since last time")
+        self.assertNotIn("D2 is reversed but nothing says what replaced it", text)
+        html = self.html(REVERSED_LOG + REVERSALS)
+        self.assertIn("A static hero with one message (asked by the client); cost: two days", html)
+        self.assertLess(html.index("What changed since last time"), html.index("data-kind='decision'"))
+
+    def test_a_reversal_row_alone_reverses_and_a_bare_status_is_a_gap(self):
+        row_only = REVERSED_LOG.replace("**Status:** reversed\n", "") + REVERSALS
+        text = self.outline(row_only)
+        self.assertNotRegex(text, r"decision\s+Carousel on the homepage")
+        self.assertRegex(text, r"changed\s+What changed")
+        text = self.outline(REVERSED_LOG)
+        self.assertRegex(text, r"changed\s+What changed")
+        self.assertIn("D2 is reversed but nothing says what replaced it", text)
+        plain = self.outline(decision_log("D1 — Tokens"))
+        self.assertNotIn("What changed", plain)
+
+    def test_a_reversed_to_line_on_the_block_counts(self):
+        log = REVERSED_LOG.replace("**Choice:** A five-slide hero carousel.\n",
+                                   "**Choice:** A five-slide hero carousel.\n"
+                                   "**Reversed to:** A static hero.\n")
+        text = self.outline(log)
+        self.assertNotIn("nothing says what replaced it", text)
+        self.assertNotRegex(text, r"decision\s+Carousel on the homepage")
+        self.assertRegex(text, r"changed\s+What changed")
+        html = self.html(log)
+        self.assertIn("A static hero", html)
+        self.assertIn("What changed since last time", html)
+
+
+class NotesNeverReachTheClient(Deck):
+    """PS-A6."""
+
+    def test_print_shows_notes_only_while_they_are_showing(self):
+        html = self.html(decision_log("D1 — Tokens"))
+        print_block = re.search(r"@media print \{(.*?)\n  \}", html.replace(" ", " "), re.S)
+        css = html[html.index("@media print"):]
+        self.assertIn(".notes { display: none; }", css)
+        self.assertIn('.deck[data-notes="on"] .notes { display: flex;', css)
+        self.assertNotRegex(css[:css.index('.deck[data-notes="on"] .notes')],
+                            r"(?<![\]\w])\.notes \{ display: flex")
+        _ = print_block
+
+    def test_the_handout_carries_nothing_presenter_only(self):
+        a11y = self.write("a11y.json", json.dumps(A11Y_WITH_VIOLATIONS))
+        out = self.tmp / "deck.html"
+        handout = self.tmp / "out" / "handout.html"
+        proc = self.build(REVERSED_LOG + REVERSALS, "-o", out, "--handout", handout, "--a11y", a11y)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        deck = out.read_text(encoding="utf-8")
+        kept = handout.read_text(encoding="utf-8")
+        for presenter_only in ("Presenter notes", "Gaps — fix before you present",
+                               "Every decision, for the record", "Where every number came from",
+                               "deck-provenance", "<script", "aria-hidden", "data-deck-notes",
+                               "Fix before presenting"):
+            self.assertIn(presenter_only, deck)
+            self.assertNotIn(presenter_only, kept, presenter_only)
+        self.assertIn('data-handout="on"', kept)
+        self.assertIn('<meta name="deck-handout" content="yes">', kept)
+        for slide in ("What changed since last time", "Accessibility, stated honestly",
+                      "Single-column form", "A static hero with one message"):
+            self.assertIn(slide, kept)
+        self.assertIn("data-kind='decision'", kept)
+
+    def test_the_handouts_css_is_the_decks_and_passes_the_gate(self):
+        handout = self.tmp / "handout.html"
+        proc = self.build(decision_log("D1 — Tokens"), "-o", self.tmp / "d.html", "--handout", handout,
+                          "--emit-css", self.tmp / "css")
+        self.assertEqual(proc.returncode, 0, output(proc))
+        proc = run_py("web-design-studio", "audit_design", self.tmp / "css", "--strict", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn('.deck[data-handout="on"]', handout.read_text(encoding="utf-8"))
+
+
+class TheSayThisLinesCarryOnlyWhatTheInputsGive(Deck):
+    """PS-A10."""
+
+    def test_no_figure_the_inputs_cannot_give(self):
+        text = (SKILLS / "client-presentation-builder" / "references" / "evidence.md").read_text(encoding="utf-8")
+        for invented in ("under two seconds", "eleven lines", "4.6 to 1", "four-second wait",
+                         "roughly a third of"):
+            self.assertNotIn(invented, text, invented)
+        for placeholder in ("`<total>`", "`<ratio>` to 1", "`<N>` re-pointed tokens", "measure_vitals.mjs"):
+            self.assertIn(placeholder, text, placeholder)
+        self.assertIn("41% of 143 planted barriers", text)
+        self.assertIn("57% of issues by volume", text)
+
+    def test_the_deck_cites_the_coverage_range(self):
+        a11y = self.write("a11y.json", json.dumps(A11Y_CLEAN))
+        html = self.html(decision_log("D1 — Tokens"), "--a11y", a11y)
+        self.assertIn("the best single tool found 41% of 143 planted barriers", html)
+        self.assertIn("Deque's study puts automation at 57% of issues by volume", html)
+        self.assertNotIn("roughly a third", html)
+
+
+if __name__ == "__main__":
+    unittest.main()
