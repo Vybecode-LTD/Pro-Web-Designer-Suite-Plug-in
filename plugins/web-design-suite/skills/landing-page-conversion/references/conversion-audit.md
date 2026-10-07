@@ -43,7 +43,7 @@ Show the first screen for five seconds. Take it away. Ask:
 3. What would happen if you clicked the main button?
 4. What do you remember?
 
-Run it with **five people who do not know the product**. NN/g's argument for five participants holds here: in a qualitative study, five people surface the large majority of the findings, and the sixth onward mostly repeats. Five people who match the audience is far better than five colleagues; colleagues cannot un-know what the product is.
+Run it with **five people who do not know the product**, and read it for a gross failure, not a measurement. NN/g's five-user rule, that five people find about 85% of the problems when each finds about 31%, is for iterative qualitative testing ([NN/g](https://www.nngroup.com/articles/why-you-only-need-to-test-with-5-users/)). Five answers to "what does this company sell?" catch a hero that fails outright (none or one of the five can say) and nothing finer. Comparing two headlines makes the answers a measure, and for a quantitative study NN/g recommends 20 users ([NN/g](https://www.nngroup.com/articles/quantitative-studies-how-many-users/)): about that many per variant. Five people who match the audience is far better than five colleagues; colleagues cannot un-know what the product is.
 
 **Reading the results.**
 
@@ -240,7 +240,7 @@ At 2,000 sessions a month, that test takes **thirteen months**. By then the traf
 
 | Method | What it is good for | Cost |
 |---|---|---|
-| **Usability testing with five people** | Finding the problems that stop people completing. Qualitative, and five is genuinely enough to surface most issues (NN/g) | An afternoon |
+| **Usability testing with five people** | Finding the problems that stop people completing. Qualitative and iterative: five a round surface most issues (NN/g). Not for choosing between two versions, which needs about 20 users per variant | An afternoon a round |
 | **Five-second tests** | Whether the message lands at all | An hour |
 | **Sequential qualitative review** | Ship the better-argued version, watch the qualitative signals — support tickets, replies, the questions people ask in the demo call | Free |
 | **Session recordings and form analytics** | Where people stall, which field kills the form | Cheap |
@@ -283,7 +283,7 @@ Related: `references/page-architecture.md` (the ladder the scroll review is meas
 
 ## 11. Dark patterns, as the law names them
 
-These have names because regulators gave them names. In the **EU**, dark patterns fall under the Unfair Commercial Practices Directive — misleading actions and omissions (Arts. 6–7), aggressive practices (Arts. 8–9), and the Annex I blacklist, which includes falsely stating a product is available for a very limited time. The **Digital Services Act Art. 25** additionally prohibits online platforms from designing interfaces that deceive or manipulate users, and a proposed Digital Fairness Act would tighten this further. In the **US**, the FTC has brought dark-pattern and negative-option cases under the FTC Act and ROSCA, which requires clear disclosure of material terms, express informed consent, and a simple cancellation mechanism. (Be precise about this one: the FTC's 2024 "click-to-cancel" Negative Option Rule was **vacated** by the Eighth Circuit in July 2025, and the FTC restarted rulemaking in early 2026 — so the specific rule is not in force, but ROSCA and Section 5 enforcement are, and several US states have their own automatic-renewal statutes. "The rule got struck down" is not a defence.)
+These have names because regulators gave them names. *As of 2026-10-07:* in the **EU**, dark patterns fall under the Unfair Commercial Practices Directive — misleading actions and omissions (Arts. 6–7), aggressive practices (Arts. 8–9), and the Annex I blacklist, which includes falsely stating a product is available for a very limited time. The **Digital Services Act Art. 25** binds only providers of online platforms, and its paragraph 2 says the prohibition "shall not apply to practices covered by Directive 2005/29/EC or Regulation (EU) 2016/679" ([Art. 25](https://eur-lex.europa.eu/eli/reg/2022/2065/oj/eng)): for an ordinary company's site it adds nothing to the UCPD. A **Digital Fairness Act** is announced, not proposed: the European Parliament's legislative train lists it as "Announced", with an indicative Q4 2026 ([EP](https://www.europarl.europa.eu/legislative-train/theme-protecting-our-democracy-upholding-our-values/file-digital-fairness-act)). In the **US**, the FTC has brought dark-pattern and negative-option cases under the FTC Act and ROSCA, which requires clear disclosure of material terms, express informed consent, and a simple cancellation mechanism. (Be precise about this one: the FTC's 2024 "click-to-cancel" Negative Option Rule was **vacated** by the Eighth Circuit in July 2025, and the FTC restarted rulemaking in early 2026 — so the specific rule is not in force, but ROSCA and Section 5 enforcement are, and several US states have their own automatic-renewal statutes. "The rule got struck down" is not a defence.)
 
 ---
 

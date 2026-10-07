@@ -233,7 +233,7 @@ opponent. Restate it at full strength, at its most reasonable, and then answer t
 |---|---|
 | **Agree with the goal, disagree with the mechanism** | "You're right that people need to see the services immediately. Where I'd push back is on the list — I think it does that job worse than the summary line does" |
 | **Never disagree with the feeling, only with the cause** | You cannot tell someone they do not feel something. You can absolutely offer a different reason for the feeling |
-| **Put the risk in their hands, once** | "I'd recommend against it, here's the specific risk, but it's your site and I'll build it either way" |
+| **Put the risk in their hands, once** | For a lawful choice that only costs them: "I'd recommend against it, here's the specific risk, but it's your site and I'll build it." An accessibility failure or anything deceptive is not this row: §5 |
 | **Disagree on one thing at a time** | Two simultaneous disagreements read as resistance; one reads as expertise |
 | **Never disagree with a room** | If three people agree with each other and not with you, you have lost this meeting. Take it away: "let me sit with that and come back with two options" |
 | **Write it down afterwards** | Anything you recommended against and built anyway goes in `MEETING_RECORD.md` §2, neutrally. Not to be right later — so the reason is recoverable when it comes up |
@@ -258,7 +258,7 @@ not.
 
 | Concede immediately | Hold the line |
 |---|---|
-| Anything parameterised — colour, photo, wording, order of two blocks | Anything that breaks accessibility |
+| Anything parameterised — colour, photo, wording, order of two blocks | Anything that breaks accessibility, or deceives |
 | Anything where you have no real argument (say so: "no strong view, happy either way") | Anything that breaks the thing the page exists to do |
 | Anything that costs under an hour and has no downstream effect | Anything that creates a maintenance burden the client will inherit unknowingly |
 | Anything about their business you cannot know | Anything you would be embarrassed to have your name on |
@@ -267,6 +267,15 @@ not.
 ("well, if that's what you want…") gets you the change *and* the resentment. And when you
 are holding the line, say which one you are doing, out loud: *"Most of what you have said
 today I agree with. This one I want to push back on, and it is the only one."*
+
+**A risky request has one rule**, the same in evidence.md §7.3 and in landing-page-conversion:
+
+| The request | What you do |
+|---|---|
+| Lawful, and it only costs them: a weaker headline, a crowded hero, a conversion risk | Say the cost once, write it down, and build it. It is their site |
+| It breaks accessibility: contrast below AA, a tap target under `--tap-min`, a keyboard trap, motion with no reduced version | Hold the line. Build the version that meets their goal and the standard, and put the risk of the other in writing. The failing version ships only on the written decision of whoever signs the site off |
+| It deceives, or the law forbids it: a countdown that resets, a pre-ticked upsell, an invented review, hidden renewal terms | Decline it in one sentence and offer the honest version (landing-page-conversion's table of declined patterns) |
+| "Is this allowed?" | Name the rule you know, and send the question to their lawyer. Never sign off on legality |
 
 ---
 

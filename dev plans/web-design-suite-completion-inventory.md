@@ -196,21 +196,21 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-A5 | medium | fixed in 3.4.0: `test_deck.TheSuitesOwnA11yJsonIsAnInput` (PR #65) | `--a11y` rejects the suite's own accessibility JSON. |
 | PS-A6 | medium | fixed in 3.4.0: `test_deck.NotesNeverReachTheClient` (PR #65) | The printed deck sends every presenter note to the client. |
 | PS-A7 | medium | fixed in 3.4.0: `test_deck.AReversedDecisionIsShownAsReversed` (PR #65) | A reversed decision is presented as current. |
-| PS-A8 | medium | W8 (3.4.0) | The skills give opposite instructions for a risky client request. |
-| PS-A9 | medium | W8 (3.4.0) | Two legal statements are wrong. |
+| PS-A8 | medium | fixed in 3.4.0: one rule, in objection-handling.md §5 (PR #70; `test_persuasion_docs`.OneRuleForARiskyRequest) | The skills give opposite instructions for a risky client request. |
+| PS-A9 | medium | fixed in 3.4.0: re-read 2026-10-07 (PR #70; `test_persuasion_docs`.TheLegalStatements) | Two legal statements are wrong. |
 | PS-A10 | medium | fixed in 3.4.0: `test_deck.TheSayThisLinesCarryOnlyWhatTheInputsGive` (PR #65) | The "Say this" lines break the skill's own rule on numbers. |
 | PS-A11 | medium | fixed in 3.2.0 | The ethics section falls outside what survives compaction. |
 | PS-A12 | low-medium | fixed in 3.4.0: `test_deck.TheDocsKeepTheirOwnRules.test_every_painted_band_in_the_worked_example_bleeds_and_nests_a_page_grid` (PR #66) | The markup breaks the skill's own full-bleed rule. |
 | PS-A13 | low-medium | fixed in 3.4.0: `test_deck.SinceLastTimeAndTheStage` (PR #66) | Flaw timing and deck structures contradict the method. |
-| PS-A14 | low-medium | W8 (3.4.0) | The NN/g five-user rule is misapplied to five-second tests. |
-| PS-A15 | low | W8 (3.4.0) | The colour-blindness figure is about half the standard one. |
-| PS-A16 | low-medium | W8 (3.4.0) | Three pieces of reference advice fail on their own terms. |
+| PS-A14 | low-medium | fixed in 3.4.0: NN/g's figures registered (PR #70; `test_persuasion_docs`.FiveSecondsIsNotAMeasure, `test_evidence`) | The NN/g five-user rule is misapplied to five-second tests. |
+| PS-A15 | low | fixed in 3.4.0: the NEI's 1 in 12 men, registered (PR #70; `test_persuasion_docs`.ColourVisionDeficiency, `test_evidence`) | The colour-blindness figure is about half the standard one. |
+| PS-A16 | low-medium | fixed in 3.4.0 (PR #70; `test_persuasion_docs`.TheAdviceHoldsOnItsOwnTerms) | Three pieces of reference advice fail on their own terms. |
 | PS-A17 | low | W8 (3.4.0) | The rule to stop at the first blocking finding is too broad. |
-| PS-A18 | low | W8 (3.4.0) | The media accessibility advice is incomplete. |
+| PS-A18 | low | fixed in 3.4.0 (PR #70; `test_persuasion_docs`.TheMediaAdvice) | The media accessibility advice is incomplete. |
 | PS-A19 | low-medium | fixed in 3.4.0: `test_deck.TheDocsKeepTheirOwnRules.test_the_meeting_record_claims_no_legal_effect` (PR #66) | The meeting record overstates its legal effect. |
 | PS-A20 | low | W8 (3.4.0) | Counts and structure in design-critique-gate are wrong. |
 | PS-A21 | low | W8 (3.4.0) | Smaller mismatches between docs and behaviour. |
-| PS-A22 | low | W8 (3.4.0) | The header says "SEVEN SECTION SHELLS" but lists eight (:7-13). |
+| PS-A22 | low | fixed in 3.4.0 (PR #70; `test_persuasion_docs`.PageSectionsSaysWhatItDoes) | The header says "SEVEN SECTION SHELLS" but lists eight (:7-13). |
 | PS-B1 | — | W14 (3.6.0+) | Accessibility of persuasive patterns. |
 | PS-B2 | — | W14 (3.6.0+) | Consumer law beyond the EU/US basics. |
 | PS-B3 | — | W14 (3.6.0+) | Price experiments. |

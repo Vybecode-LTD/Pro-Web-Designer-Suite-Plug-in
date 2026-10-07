@@ -396,6 +396,12 @@
   "heading": "The coverage table"
  },
  {
+  "from": "client-presentation-builder/references/evidence.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "5",
+  "heading": "Conceding well"
+ },
+ {
   "from": "client-presentation-builder/references/narrative-structure.md",
   "to": "client-presentation-builder/references/evidence.md",
   "section": "2",
@@ -424,6 +430,12 @@
   "to": "client-presentation-builder/assets/MEETING_RECORD.md",
   "section": "3",
   "heading": "Still open"
+ },
+ {
+  "from": "client-presentation-builder/references/objection-handling.md",
+  "to": "client-presentation-builder/references/evidence.md",
+  "section": "7.3",
+  "heading": "If it breaks the system, explain the mechanism, not the principle"
  },
  {
   "from": "client-presentation-builder/scripts/build_presentation.py",
@@ -1342,6 +1354,12 @@
   "to": "web-design-studio/references/spacing-system.md",
   "section": "2",
   "heading": "The closed scale"
+ },
+ {
+  "from": "landing-page-conversion/SKILL.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "5",
+  "heading": "Conceding well"
  },
  {
   "from": "landing-page-conversion/SKILL.md",
