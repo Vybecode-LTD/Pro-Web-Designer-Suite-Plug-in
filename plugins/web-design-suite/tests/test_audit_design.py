@@ -668,12 +668,13 @@ class ThePromisedChecks(TempDirTest):
                     self.assertNotIn(phrase, text)
 
     def test_the_stated_checklist_count_is_the_checklists(self):
-        """SB-A25 (6): three docs said 92 checks; review-checklist.md has 91."""
+        """SB-A25 (6): three docs said 92 checks; review-checklist.md has 91.
+        PS-A20: two more said 92, one across a line break and one in a reference."""
         checklist = (SKILLS / "web-design-studio" / "references" / "review-checklist.md").read_text(encoding="utf-8")
         rows = len(re.findall(r"^\| \d+\.\d+ \|", checklist, re.M))
-        stated = [(doc.relative_to(SKILLS).as_posix(), int(n)) for doc in sorted(SKILLS.glob("*/SKILL.md"))
-                  for n in re.findall(r"(\d+) checks", doc.read_text(encoding="utf-8"))]
-        self.assertEqual(3, len(stated))
+        stated = [(doc.relative_to(SKILLS).as_posix(), int(n)) for doc in sorted(SKILLS.rglob("*.md"))
+                  for n in re.findall(r"(\d+)\s+(?:mechanical\s+)?checks", doc.read_text(encoding="utf-8"))]
+        self.assertEqual(5, len(stated))
         for doc, count in stated:
             with self.subTest(doc=doc):
                 self.assertEqual(rows, count)

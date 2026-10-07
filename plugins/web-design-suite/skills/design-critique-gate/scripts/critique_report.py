@@ -84,7 +84,13 @@ Severity rubric:
     minor     it cheapens — reads as almost-professional
     taste     it merely differs from preference (always labelled as taste)
 
-Exit status: 0, or 1 when anything at or above ``--fail-on`` survives.
+A finding marked ``"status": "fixed"`` stays in the critique, labelled fixed,
+but leaves "Fix these three first", --summary, --fail-on and the defence
+sheet's "do not present" list; ``defend: true`` keeps it on the sheet's known
+flaws, labelled fixed.
+
+Exit status: 0; 1 when an open finding at or above ``--fail-on`` survives;
+2 on bad input or an ``--out`` that cannot be written.
 """
 
 from __future__ import annotations
@@ -550,12 +556,19 @@ def _meta_line(c: Critique) -> str:
 
 def _tally(findings: list[Finding]) -> str:
     counts = {s: sum(1 for f in findings if f.severity == s) for s in SEVERITIES}
-    return " · ".join(f"{counts[s]} {s}" for s in SEVERITIES)
+    fixed = sum(1 for f in findings if f.status == "fixed")
+    return (" · ".join(f"{counts[s]} {s}" for s in SEVERITIES)
+            + (f", {fixed} of them marked fixed" if fixed else ""))
+
+
+def _merge_notes(notes: list[str]) -> list[str]:
+    return ["", "## Merge notes", "", *(f"- {n}" for n in notes)] if notes else []
 
 
 def render_critique(c: Critique, findings: list[Finding], notes: list[str]) -> str:
     ranked = sorted(findings, key=lambda f: f.rank)
     defects = [f for f in ranked if f.severity != "taste"]
+    open_defects = [f for f in defects if f.status != "fixed"]
     tastes = [f for f in ranked if f.severity == "taste"]
 
     out: list[str] = []
@@ -577,8 +590,10 @@ def render_critique(c: Critique, findings: list[Finding], notes: list[str]) -> s
     out.append("")
     out.append("## Fix these three first")
     out.append("")
-    top = defects[:3]
-    if not top:
+    top = open_defects[:3]
+    if not top and defects:
+        out.append("Every defect is marked fixed. Re-check each against the page before you present.")
+    elif not top:
         out.append("Nothing at defect severity. Everything below is taste — label it as such when you present it.")
     for i, f in enumerate(top, 1):
         out.append(f"{i}. **{f.title}** — {_first_sentence(f.mechanism) or 'see below'} "
@@ -600,6 +615,7 @@ def render_critique(c: Critique, findings: list[Finding], notes: list[str]) -> s
         out.append(f"#### {i}. {f.title}")
         out.append("")
         out.append(f"`{_badge(f)}` · confidence: {f.confidence}"
+                   + (" · **fixed**" if f.status == "fixed" else "")
                    + (f" · {f.count} occurrences" if f.count > 1 else "")
                    + (" · also flagged by the auditor" if f.also_by_hand else ""))
         out.append("")
@@ -640,22 +656,19 @@ def render_critique(c: Critique, findings: list[Finding], notes: list[str]) -> s
         out.append("")
         out.append(", ".join(clean) + ".")
 
-    if notes:
-        out.append("")
-        out.append("## Merge notes")
-        out.append("")
-        for n in notes:
-            out.append(f"- {n}")
-
+    out += _merge_notes(notes)
     out.append("")
     return "\n".join(out)
 
 
 def render_triage(c: Critique, findings: list[Finding], notes: list[str]) -> str:
-    ranked = sorted(findings, key=lambda f: f.rank)
+    # Open work first, in rank order; a fixed finding is listed last, as fixed.
+    ranked = sorted(findings, key=lambda f: (f.status == "fixed", f.rank))
     out = [f"# Triage — {c.subject}", ""]
     for f in ranked:
         tag = "TASTE" if f.severity == "taste" else f.severity.upper()
+        if f.status == "fixed":
+            tag += ", FIXED"
         fix = _first_sentence(f.fix) or _first_sentence(f.mechanism) or "no fix recorded"
         bits = [f"[{tag}]", f"[{f.layer}]", f.title, "—", fix]
         suffix = [f.confidence]
@@ -666,6 +679,7 @@ def render_triage(c: Critique, findings: list[Finding], notes: list[str]) -> str
         out.append(f"- {' '.join(bits)} ({', '.join(suffix)})  <!-- {f.slug} -->")
     if not ranked:
         out.append("- (no findings)")
+    out += _merge_notes(notes)
     out.append("")
     return "\n".join(out)
 
@@ -712,9 +726,11 @@ def render_defence(c: Critique, findings: list[Finding], notes: list[str]) -> st
         out.append("*None recorded.*")
 
     # Every open defect you are presenting with — confirmed ones above all.
-    # Blocking ones are not "carried": they have their own section below.
-    carried = [f for f in ranked
-               if f.severity in ("major", "minor") and (f.status != "fixed" or f.defend)]
+    # Open blocking ones are not "carried": they have their own section below.
+    # A fixed one is carried only when `defend` asks, and is said as fixed.
+    carried = [f for f in ranked if f.severity != "taste" and (
+        (f.status == "fixed" and f.defend)
+        or (f.status != "fixed" and f.severity != "blocking"))]
     out += ["", "## Known flaws you are carrying in", ""]
     if carried:
         out.append(
@@ -726,12 +742,17 @@ def render_defence(c: Critique, findings: list[Finding], notes: list[str]) -> st
         out.append("|---|---|---|")
         for f in carried:
             say = _first_sentence(f.fix) or _first_sentence(f.mechanism) or "Known; fix is scoped."
-            sev = f.severity if f.confidence == "confirmed" else f"{f.severity} ({f.confidence})"
+            if f.status == "fixed":
+                sev = f"{f.severity}, fixed"
+            elif f.confidence == "confirmed":
+                sev = f.severity
+            else:
+                sev = f"{f.severity} ({f.confidence})"
             out.append(f"| {_cell(f.title)} | {sev} | {_cell(say)} |")
     else:
         out.append("*Nothing open. Every finding is fixed, blocking (below) or taste.*")
 
-    blocking = [f for f in ranked if f.severity == "blocking"]
+    blocking = [f for f in ranked if f.severity == "blocking" and f.status != "fixed"]
     out += ["", "## Do not present until these are fixed", ""]
     if blocking:
         for f in blocking:
@@ -739,6 +760,7 @@ def render_defence(c: Critique, findings: list[Finding], notes: list[str]) -> st
     else:
         out.append("*Clear.*")
 
+    out += _merge_notes(notes)
     out.append("")
     return "\n".join(out)
 
