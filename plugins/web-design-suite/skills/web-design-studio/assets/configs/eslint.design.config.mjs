@@ -136,12 +136,6 @@ const LITERAL_UTILITY =
 const OPACITY_MODIFIER =
   /(?<![-\w])(?:bg|text|border|ring|fill|stroke|outline|shadow|decoration|from|via|to|placeholder|accent|caret|divide)-[a-z][\w-]*\/\d+(?![\w])/;
 
-/* LAW 6 — v4's `(--var)` shorthand naming a Tier-1 primitive:
- * `p-(--space-6)`, `bg-(--neutral-800)`. The same tier skip as a stock
- * palette class, spelled so the palette rule cannot see it. */
-const TIER1_SHORTHAND =
-  /\(--(?:space-(?!section|subsection|block|fluid)|neutral-|accent-|success-|warning-|danger-|info-|text-|leading-|shadow-)[\w-]*\)/;
-
 /* LAW 2 — any outer margin utility except `auto`. `mx-auto` and `m-auto`
  * survive because centring is a container positioning ITSELF, not a child
  * pushing its siblings around.
@@ -181,7 +175,9 @@ const SPACE_BETWEEN = /(?<![-\w])(?:space-[xy]-|divide-[xy]?(?:-|\b))/;
  * else.
  *
  * The colour functions come from assets/rules/design-rules.json
- * (values.colour_functions), as the audit's do. */
+ * (values.colour_functions), as the audit's do, and so do the literal units
+ * (inline_styles) and Law 6's tier lists (tiers), which TIER1_SHORTHAND
+ * below is built from. */
 // BEGIN design-rules: written by tools/sync_rules.py from assets/rules/design-rules.json; edit the spec, then rerun it
 const COLOUR_FUNCTIONS = [
   'rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color', 'color-mix',
@@ -190,11 +186,49 @@ const COLOUR_FUNCTIONS = [
 const LITERAL_UNITS = [
   'px', 'rem', 'em', 'ch', 'ex', 'vw', 'vh', 'vmin', 'vmax', '%', 'deg', 's', 'ms',
 ];
+const TIER1_WITH_ROLE = {
+  'space-': 'a proximity/inset role (--gap-related, --pad-card, --space-section)',
+  'neutral-': 'a color role (--bg-surface, --fg-muted, --border-default)',
+  'accent-': 'a color role (--bg-accent, --fg-accent, --border-accent)',
+  'success-': 'a color role (--bg-success, --fg-success)',
+  'warning-': 'a color role (--bg-warning, --fg-warning)',
+  'danger-': 'a color role (--bg-danger, --fg-danger)',
+  'info-': 'a color role',
+  'text-': 'a type role (--type-body, --type-h2, --type-ui)',
+  'leading-': 'a type role (--type-*), which carries leading in its shorthand',
+  'shadow-': 'an elevation role (--elevation-card, --elevation-modal)',
+};
+const TIER2_EXCEPTIONS = [
+  '--space-section', '--space-subsection', '--space-block', '--space-fluid-sm', '--space-fluid-md',
+  '--space-fluid-lg', '--space-fluid-xl',
+];
+const TIER1_NULLS = ['--space-0', '--radius-none', '--shadow-none'];
 // END design-rules
 const RAW_COLOR = new RegExp(
   /(?:^|[\s(:,'"`[])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z])/.source +
     String.raw`|\b(?:${COLOUR_FUNCTIONS.join('|')})\s*\(`,
 );
+
+/* LAW 6 — v4's `(--name)` shorthand naming a Tier-1 primitive that has a
+ * role: `p-(--space-6)`, `bg-(--neutral-800)`, and with a type hint,
+ * `text-(length:--text-lg)`. The same tier skip as a stock palette class,
+ * spelled so the palette rule cannot see it. The prefixes, the page-rhythm
+ * roles under --space- and the null-outs are the spec's (design-rules.json:
+ * tiers), so `p-(--space-section)` and `shadow-(--shadow-none)` pass, as they
+ * do in the audit and stylelint. */
+const TIER1_SHORTHAND = new RegExp(
+  String.raw`\((?:[a-z-]+:)?--(?!(?:${[...TIER2_EXCEPTIONS, ...TIER1_NULLS].map((n) => n.slice(2)).join('|')})\))` +
+    String.raw`(?:${Object.keys(TIER1_WITH_ROLE).join('|')})[\w-]*\)`,
+);
+
+/* The advice for a primitive that has a role, or null for anything else:
+ * what `style-prop-custom-properties-only` gives an inline value (Part 3). */
+const VAR_NAME = /var\(\s*(--[\w-]+)/g;
+const tier1Advice = (ref) => {
+  if (TIER2_EXCEPTIONS.includes(ref) || TIER1_NULLS.includes(ref)) return null;
+  const prefix = Object.keys(TIER1_WITH_ROLE).find((p) => ref.slice(2).startsWith(p));
+  return prefix ? TIER1_WITH_ROLE[prefix] : null;
+};
 
 /* =========================================================================
  * PART 2 — SELECTOR SCOPES
@@ -272,7 +306,9 @@ const forbidInClasses = (pattern, message) =>
  *  (`style={{ '--gap': '12px' }}`), because that is Law 1 sneaking in
  *  through Law 4's one exception. A number, an identifier, a member
  *  expression or a call is fine — those are the runtime values this
- *  exception exists for. */
+ *  exception exists for. So is a role: `{ '--gap': 'var(--gap-related)' }`.
+ *  A Tier-1 primitive that has a role is not (`'var(--space-4)'`): that is
+ *  Law 6 skipping a tier through the same exception. */
 const stylePropCustomPropertiesOnly = {
   meta: {
     type: 'problem',
@@ -294,6 +330,8 @@ const stylePropCustomPropertiesOnly = {
         'Law 4 (one home per component\'s styles): `{{ name }}` is a CSS property set inline, where no theme, density mode, media query or audit can reach it. The only permitted `style` keys are CSS custom properties (`--name`), used to pass a runtime value into the stylesheet.',
       literalValue:
         'Law 1 (tokens or nothing): `{{ name }}: {{ value }}` hardcodes a design value inside the one place inline styles are allowed. Pass a runtime NUMBER and do the arithmetic in CSS with calc(), or point the property at a token: `var(--gap-related)`.',
+      tier1Value:
+        'Law 6 (semantic before primitive): `{{ name }}: {{ value }}` reads the Tier-1 primitive `{{ ref }}`. Right value, wrong tier: use {{ advice }}.',
     },
   },
   create(context) {
@@ -393,6 +431,18 @@ const stylePropCustomPropertiesOnly = {
               messageId: 'literalValue',
               data: { name, value: v.value },
             });
+          }
+          if (v && v.type === 'Literal' && typeof v.value === 'string') {
+            for (const [, ref] of v.value.matchAll(VAR_NAME)) {
+              const advice = tier1Advice(ref);
+              if (advice) {
+                context.report({
+                  node: v,
+                  messageId: 'tier1Value',
+                  data: { name, value: v.value, ref, advice },
+                });
+              }
+            }
           }
         }
     }

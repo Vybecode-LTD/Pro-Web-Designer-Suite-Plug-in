@@ -403,6 +403,7 @@ def in_layer(layer: str, css: str) -> str:
 
 ALLOWED_LIST = "declaration-property-value-allowed-list"
 MARGIN_RULE = "design/component-margins"
+TIER_RULE = "design/tier1-primitive"
 
 # Fixtures for the stylelint config: a file of the project and, for a refusal,
 # the rule that must report it.
@@ -436,6 +437,10 @@ REFUSED_CSS = {
     "src/components/Ring.css": (
         in_layer("components", ".btn:focus-visible { outline: none; "
                                "box-shadow: 0 0 0 var(--stroke-focus) var(--border-focus); }"), ALLOWED_LIST),
+    # P45: Law 6 reads a `components` layer in any file, and the whole of a
+    # component file, layered or not, as the audit does.
+    "src/styles/page.css": (in_layer("components", ".card { padding: var(--space-4); }"), TIER_RULE),
+    "src/components/Unlayered.css": (".card { gap: var(--space-2); }\n", TIER_RULE),
     # A second dark block that silently redefines a token.
     "src/styles/brand-tokens.css": (':root { --x: var(--space-4); }\n[data-theme="dark"] { --y: var(--x); }\n'
                                     '[data-theme="dark"] { --y: var(--x); }\n', "no-duplicate-selectors"),
@@ -456,6 +461,12 @@ ALLOWED_CSS = {
     "src/styles/layout/Socket.css": in_layer(
         "layout", ".center { --center-box: calc(var(--center-max) + var(--center-gutter) * 2); "
                   "max-inline-size: var(--center-box); }"),
+    # P45: a token file defines Tier 2 from Tier 1; the audit skips it too, and
+    # in a component folder too: there the token or theme override has the last
+    # word (Codex on #73).
+    "src/styles/brand/tokens.css": in_layer("tokens", ":root { --pad-card: var(--space-4); }"),
+    "src/components/tokens.css": in_layer("tokens", ":root { --pad-card: var(--space-4); }"),
+    "packages/ui/theme.css": "@theme inline {\n  --spacing-card: var(--space-4);\n}\n",
     **{f"src/components/ForcedColours{n}.css": in_layer("components", css)
        for n, css in enumerate(SPEC["system_colors"]["allowed"])},
     **{f"src/entries/allowed{n}/index.css": css + "\n" for n, css in enumerate(SPEC["layers"]["allowed"])},

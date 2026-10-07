@@ -87,7 +87,11 @@ def spec_examples() -> list[Example]:
                 else f"src/styles/{stem}-theme.css" if section == "bindings"
                 else f"src/styles/{folder}/{stem}.{ext}" if folder
                 else f"src/components/{stem}.{ext}")
-        examples.append(Example(section, verdict, source, name, text, tuple(SPEC[section.split(".")[0]]["gates"])))
+        # stylelint reads stylesheets and ESLint reads JSX: a section both
+        # enforce (tiers) gives each its own examples.
+        gates = tuple(g for g in SPEC[section.split(".")[0]]["gates"]
+                      if not (g == "stylelint" and ext != "css") and not (g == "eslint" and ext == "css"))
+        examples.append(Example(section, verdict, source, name, text, gates))
 
     def rule(css: str) -> str:
         return in_layer("components", css)
@@ -127,6 +131,10 @@ def spec_examples() -> list[Example]:
             add("bindings", verdict, declaration, f"@theme inline {{\n  {declaration};\n}}\n")
         for jsx in SPEC["inline_styles"][verdict]:
             add("inline_styles", verdict, jsx, jsx_component(jsx), ext="tsx")
+        for jsx in SPEC["tiers"][f"{verdict}_jsx"]:          # P45: Law 6 in a class or a style
+            add("tiers", verdict, jsx, jsx_component(jsx), ext="tsx")
+        for css in SPEC["tiers"]["stylesheets"][verdict]:    # outside a component file
+            add("tiers", verdict, css, css + "\n", folder="pages")
     return examples
 
 

@@ -277,7 +277,9 @@ class AuditPrecision(TempDirTest):
 
     def test_the_eslint_config_bans_the_same_classes(self):
         """SB-A5: the design ESLint config has matching patterns (checked here as
-        regexes, so the test needs no node_modules)."""
+        regexes, so the test needs no node_modules). TIER1_SHORTHAND is built
+        from the spec's `tiers` since P45, and its examples (`allowed_jsx`,
+        `refused_jsx`) run through the real ESLint in test_real_tools."""
         import re
         config = (SKILLS / "web-design-studio" / "assets" / "configs" /
                   "eslint.design.config.mjs").read_text(encoding="utf-8")
@@ -289,8 +291,7 @@ class AuditPrecision(TempDirTest):
 
         cases = {"LITERAL_UTILITY": ("duration-300", "z-50", "-z-10", "border-2", "ring-2",
                                      "outline-offset-2"),
-                 "OPACITY_MODIFIER": ("bg-accent/37", "text-fg/80"),
-                 "TIER1_SHORTHAND": ("p-(--space-6)", "bg-(--neutral-800)")}
+                 "OPACITY_MODIFIER": ("bg-accent/37", "text-fg/80")}
         for name, bad in cases.items():
             rx = pattern(name)
             for cls in bad:

@@ -57,9 +57,9 @@ TARGETS = {
     "skills/web-design-studio/assets/configs/stylelint.config.mjs":
         ("js", ("LAYER_ORDER", "MAX_NESTING", "MAX_SPECIFICITY", "MAX_COMPOUNDS", "SYSTEM_COLOR_NAMES",
                 "SYSTEM_COLOR_PROPERTY", "KEYWORDS", "COLOUR_FUNCTIONS", "COLOUR_WORDS", "SHAPES", "VALUE_ALLOWLIST",
-                "MARGIN_ALLOWLIST", "BINDING_ALLOWLIST")),
+                "MARGIN_ALLOWLIST", "BINDING_ALLOWLIST", "TIER1_WITH_ROLE", "TIER2_EXCEPTIONS", "TIER1_NULLS")),
     "skills/web-design-studio/assets/configs/eslint.design.config.mjs":
-        ("js", ("COLOUR_FUNCTIONS", "LITERAL_UNITS")),
+        ("js", ("COLOUR_FUNCTIONS", "LITERAL_UNITS", "TIER1_WITH_ROLE", "TIER2_EXCEPTIONS", "TIER1_NULLS")),
     # Not a gate: its tier1-leak gap is audit_design's L6 (LC-A19).
     "skills/design-system-docs/scripts/extract_system.py":
         ("py", ("TIER1_WITH_ROLE", "TIER2_EXCEPTIONS", "TIER1_NULLS")),
@@ -236,8 +236,9 @@ def py_constant(name: str, spec: dict, before: tuple[str, ...]) -> str:
 
 def js_constant(name: str, spec: dict, before: tuple[str, ...]) -> str:
     """The JavaScript forms of the value rules: a shape, the colour words, the
-    system-colour properties, or an allowlist for
-    declaration-property-value-allowed-list."""
+    system-colour properties, an allowlist for
+    declaration-property-value-allowed-list, or the tier prefixes with their
+    advice, as {prefix: advice}."""
     values = spec["values"]
     shapes = values["shapes"]
     if name in shapes:
@@ -261,6 +262,9 @@ def js_constant(name: str, spec: dict, before: tuple[str, ...]) -> str:
             for prop in group["properties"]:
                 property_pattern(prop, name)
         return js_allowlist(name, [("", spec["bindings"]["allow"])], shapes, before)
+    if name == "TIER1_WITH_ROLE":
+        rows = [f"  {js_string(k)}: {js_string(v)}," for k, v in spec["tiers"]["with_role"].items()]
+        return "\n".join([f"const {name} = {{", *rows, "};"])
     raise SpecError(f"{name} has no JavaScript form")
 
 
