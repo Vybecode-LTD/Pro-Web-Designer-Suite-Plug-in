@@ -1,6 +1,6 @@
 # The opening prompt for the next session
 
-Written 2026-10-06, at the end of the fifth Phase 4 session (the flake fix, P18 and P19). Paste the block below into a new session.
+Written 2026-10-06, updated 2026-10-07, at the end of the fifth Phase 4 session (the flake fix, P18, P19, the email cascade fix and P44 and P45 scheduled: #56 to #62). Paste the block below into a new session.
 
 ```
 You're continuing work on web-design-suite, a Claude Code plugin, in C:\DEV\Pro-Web-Designer-Suite-Plug-in. Budget: this session may run up to 750 thousand tokens, with no compacting. Report usage after each PR, warn early, and write the handoff before the cap.
