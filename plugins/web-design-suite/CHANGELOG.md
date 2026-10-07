@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.5.0 — unreleased
+
+### Added
+
+- **The project contract, part 1** (XC-C8, LC-C1, LC-B3). A project can now name its
+  token files, component globs, stack, budgets and baselines once, in a
+  `.design-suite.json` at its root, instead of flag by flag. A script finds it by walking
+  up from the working directory to the repository root, a flag beats it, and an unknown
+  key or a wrong shape stops the run with the key named.
+  - **One reader.** `shared/project_config.py` reads the config, and a byte-identical
+    copy sits beside the scripts that use it, so a skill installed alone has one.
+  - **`contract.json`.** `extract_system.py --contract FILE` writes the token system's
+    default values by tier: ramps, scales, breakpoints and roles.
+  - **The scripts that read them.** `figma_audit.py --tokens` takes a `contract.json` as
+    well as a `tokens.css`. With no flag, it and `extract_system.py` read the token files
+    the config lists.
+  - Part 2 brings the config to the other scripts, the budgets and baselines among them.
+
 ## 3.4.0 — 2026-10-07
 
 Phase 4 of the plan: the runtime gates, the lifecycle tools, email and persuasion do

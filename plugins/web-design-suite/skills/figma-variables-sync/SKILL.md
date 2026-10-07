@@ -337,6 +337,9 @@ with like.
 **project's** ramps — every `--<name>-<step>` in that file holding a literal
 colour — instead of the studio's. A client's brand ramp is the point of the
 migration that produced it; without `--tokens` it reads as eleven off-ramp errors.
+`--tokens` also takes a `contract.json` (design-system-docs' `extract_system.py
+--contract`), and with no flag the audit reads the token files the project's
+`.design-suite.json` lists.
 
 Every argument of `figma_audit.py` and `figma_to_tokens.py` is in `references/scripts.md`.
 
