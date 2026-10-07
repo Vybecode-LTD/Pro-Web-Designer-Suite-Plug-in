@@ -14,11 +14,11 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-10-07)
 
-- **Version:** 3.3.0 is the latest release (`v3.3.0`, `88a4886`, published by `release.yml`). Phase 4 (3.4.0) is under way: P9 to P23 and P44 are merged (#38 to #71; P22 as #69 and #71, P23 as #70), with the hydration flake fix (#56) and the email cascade fix (#61). No PR is open.
-- **Installed:** 3.3.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
+- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is next. No PR is open.
+- **Installed:** 3.4.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
 - **Tests:** 755. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P45 (Law 6 in stylelint and the ESLint config), then R2, the 3.4.0 release. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 55 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P24 (the project contract), then P25 (the hooks). `dev plans/web-design-suite-review/claude-code-capabilities.md` §5 is a partial 2026-10-07 re-check of the plugin features (the hooks, mods and evals pages are still to be re-read). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 54 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
@@ -44,7 +44,7 @@ CI (`.github/workflows/ci.yml`) runs the whole suite on Windows, Linux and macOS
 
 The Python floor runs with `uv run --no-project --python 3.9 python -B -m unittest discover -s tests`, which works in cmd as well.
 
-For `claude plugin validate --strict`, `update` and `details`, use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\<build>\claude.exe` (2.1.286's build folder is `635c1867224a`). The one on PATH is older.
+For `claude plugin validate --strict`, `update` and `details`, use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\<build>\claude.exe` (2.1.288's build folder is `36aa8c97bf86`). The one on PATH is older.
 
 ## Gotchas
 
@@ -65,7 +65,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 - **One set of rules.** A gate change goes into `skills/web-design-studio/assets/rules/design-rules.json` first. Then the audit, the stylelint config and the ESLint config follow, each with a real-tool test in `tests/test_real_tools.py`. Data the spec writes into a gate's `BEGIN design-rules` block (the layer order, the nesting depth, the system colours, the value shapes and allowlists, the colour functions, the literal units) changes by rerunning `tools/sync_rules.py`, never by hand. Every example in the spec runs through each gate its section names (`test_rules_spec`, `test_real_tools`).
 - **Facts.** A figure from outside the plugin is re-read at its source and registered, with its quote, in `tests/fixtures/evidence.json`.
 - **Size limits.** A SKILL.md stays at or under 20,500 bytes and a reference under 60.5 KB (`tests/test_skill_budget.py`).
-- **Git.** One branch per phase, conventional commits and a PR. Read the staged diff before each commit. Claude merges, once CI is green, every review thread is resolved and the PR is clean, with a merge commit; a stack merges bottom-up, retargeting the next PR to `main` before the merged branch is deleted (never `gh pr merge --delete-branch` on a branch another PR targets). Tag a release after its merge.
+- **Git.** One branch per PR (a phase has several), conventional commits. Read the staged diff before each commit. Claude merges, once CI is green, every review thread is resolved and the PR is clean, with a merge commit; a stack merges bottom-up, retargeting the next PR to `main` before the merged branch is deleted (never `gh pr merge --delete-branch` on a branch another PR targets). Tag a release after its merge.
 - **Docs.** Plans and reports go in `dev plans/`. Update the docs in the same PR as the code, and keep this file lean.
 
 ## Map
