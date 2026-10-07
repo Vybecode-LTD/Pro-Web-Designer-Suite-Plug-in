@@ -98,6 +98,16 @@ class EvidenceRegister(unittest.TestCase):
             text = (SKILLS / doc).read_text(encoding="utf-8")
             self.assertIn("102 KB", text, doc)
             self.assertRegex(text, r"measured[:,]? ?(?:at )?102,400 bytes|\(102,400 bytes, measured\)", doc)
+        # The scripts enforce what the register records: the <style> ceiling
+        # is the registered figure, and the clipping constant is the measured
+        # 102,400 the docs name beside the ESPs' 102 KB.
+        style_entry = next(e for e in REGISTER["entries"] if e["figure"] == "16,384 bytes")
+        style_bytes = int(re.sub(r"\D", "", style_entry["figure"]))
+        for script in ("build_email", "lint_email"):
+            source = (SKILLS / "email-template-system" / "scripts" / f"{script}.py").read_text(encoding="utf-8")
+            constants = dict(re.findall(r"^(GMAIL_\w+_BYTES) = ([\d_]+)", source, re.M))
+            self.assertEqual(int(constants["GMAIL_STYLE_BYTES"].replace("_", "")), style_bytes, script)
+            self.assertEqual(int(constants["GMAIL_CLIP_BYTES"].replace("_", "")), 102_400, script)
 
     def test_every_attributed_figure_is_registered(self):
         seen = 0
