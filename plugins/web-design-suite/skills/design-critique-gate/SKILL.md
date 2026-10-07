@@ -29,7 +29,7 @@ goes looking in the order a real critic's eye moves.
 
 Two things it is not:
 
-- **It is not the checklist.** `web-design-studio/references/review-checklist.md` is 92
+- **It is not the checklist.** `web-design-studio/references/review-checklist.md` is 91
   mechanical checks and `web-design-studio/scripts/audit_design.py` is the machine gate.
   Those verify
   **conformance** — that the work obeys the system. This skill judges **quality and
@@ -71,8 +71,9 @@ Full method, including the diagnostic moves for converting a suspicion into a me
 Critique in the order attention actually moves. **A finding at layer 1 makes every finding
 below it moot** — there is no point spacing-correcting a page that answers the wrong
 question, and no point in color work under a hierarchy that sends the eye to the wrong
-object. Work down. Stop and report when a layer produces a blocking finding, because
-fixing it changes everything beneath.
+object. Work down. A blocking finding in layers 1 to 3 stops the run: report it, because
+fixing it changes everything beneath. From layer 4 on, report a blocker and keep going:
+a contrast failure does not make the keyboard checks moot.
 
 | # | Layer | The question | Time |
 |---|---|---|---|
@@ -84,7 +85,7 @@ fixing it changes everything beneath.
 | 6 | **Color and contrast** | Measured, never judged | 3 min |
 | 7 | **States and edges** | Seven states, plus empty / loading / error / long / RTL | 4 min |
 | 8 | **Interaction and motion** | Affordance, feedback, keyboard, reduced motion | 3 min |
-| 9 | **Conformance** | The auditor and the 91 checks | 2 min |
+| 9 | **Conformance** | The auditor, then review-checklist.md's 91 checks | 2 min + 30 min |
 | 10 | **Presentation readiness** | Can you defend every non-obvious decision out loud? | 3 min |
 
 ### 1 — Premise

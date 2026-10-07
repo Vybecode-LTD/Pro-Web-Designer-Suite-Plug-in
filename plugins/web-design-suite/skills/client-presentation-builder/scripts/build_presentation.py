@@ -57,8 +57,8 @@ AUDIENCES
     creative-director  premise first, hardest decisions first, alternatives
                        shown, weaknesses raised early
 
-Exit codes: 0 fine · 1 the defence sheet says do not present yet · 2 bad
-invocation or unreadable input.
+Exit codes: 0 fine · 1 the defence sheet says do not present yet (nothing
+is written, and --dry-run exits 1 too) · 2 bad invocation or unreadable input.
 """
 
 from __future__ import annotations
@@ -575,7 +575,10 @@ def _md_table(block: list[str]) -> list[list[str]]:
         m = _MD_ROW.match(line.strip())
         if not m:
             continue
-        cells = [c.strip() for c in m.group(1).split("|")]
+        # critique_report writes a pipe inside a cell as `\|`: split on the
+        # others only, then unescape.
+        cells = [c.strip().replace("\\|", "|")
+                 for c in re.split(r"(?<!\\)\|", m.group(1))]
         if all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c):
             continue
         rows.append(cells)
@@ -2718,6 +2721,22 @@ def find_tokens(explicit: str | None) -> tuple[str, str]:
 # CLI
 # ---------------------------------------------------------------------------
 
+# The deck inlines its screenshots, so it is mailed as one file; past this
+# size an email gateway is likely to refuse it.
+EMAIL_SIZE_WARNING = 10_000_000
+
+
+def refuse_blockers(blockers: list[str]) -> int:
+    """A blocking item on the defence sheet stops the build: no deck, exit 1."""
+    print("\nDo not present yet. The defence sheet lists blocking items, so no "
+          "deck was written:", file=sys.stderr)
+    for b in blockers:
+        print(f"  - {b}", file=sys.stderr)
+    print("Fix them, rerun critique_report --format defence, then rebuild.",
+          file=sys.stderr)
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="python -m scripts.build_presentation",
@@ -2818,10 +2837,13 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     plan = build_plan(inp, args.audience, args.max_decisions)
+    blockers = inp.defence.blockers if inp.defence else []
 
     if args.dry_run:
         sys.stdout.write(render_outline(plan, inp, args.audience))
-        return 0
+        return refuse_blockers(blockers) if blockers else 0
+    if blockers:
+        return refuse_blockers(blockers)
 
     out_path = Path(args.out)
     html_text = render_html(plan, inp, args.audience, tokens_css)
@@ -2863,7 +2885,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  wrote:  {', '.join(written)}")
     if inp.pairs:
         print(f"  paired: {len(inp.pairs)} before/after comparison(s)")
-    if size > 12_000_000:
+    if size > EMAIL_SIZE_WARNING:
         print(f"\n  The deck is {human_bytes(size)}. Screenshots are inlined so "
               f"the file works with no network and survives being emailed — but "
               f"past about 10 MB it will not survive an email gateway. Export "
@@ -2873,12 +2895,6 @@ def main(argv: list[str] | None = None) -> int:
               f"deck to see them in place:")
         for i, g in gaps:
             print(f"  slide {i:>2}  {g}")
-    if inp.defence and inp.defence.blockers:
-        print("\nDo not present yet. The defence sheet lists blocking items:",
-              file=sys.stderr)
-        for b in inp.defence.blockers:
-            print(f"  - {b}", file=sys.stderr)
-        return 1
     return 0
 
 
