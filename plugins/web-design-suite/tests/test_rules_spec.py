@@ -133,6 +133,8 @@ def spec_examples() -> list[Example]:
             add("inline_styles", verdict, jsx, jsx_component(jsx), ext="tsx")
         for jsx in SPEC["tiers"][f"{verdict}_jsx"]:          # P45: Law 6 in a class or a style
             add("tiers", verdict, jsx, jsx_component(jsx), ext="tsx")
+        for css in SPEC["tiers"]["stylesheets"][verdict]:    # outside a component file
+            add("tiers", verdict, css, css + "\n", folder="pages")
     return examples
 
 

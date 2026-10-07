@@ -461,8 +461,12 @@ ALLOWED_CSS = {
     "src/styles/layout/Socket.css": in_layer(
         "layout", ".center { --center-box: calc(var(--center-max) + var(--center-gutter) * 2); "
                   "max-inline-size: var(--center-box); }"),
-    # P45: a token file defines Tier 2 from Tier 1; the audit skips it too.
+    # P45: a token file defines Tier 2 from Tier 1; the audit skips it too, and
+    # in a component folder too: there the token or theme override has the last
+    # word (Codex on #73).
     "src/styles/brand/tokens.css": in_layer("tokens", ":root { --pad-card: var(--space-4); }"),
+    "src/components/tokens.css": in_layer("tokens", ":root { --pad-card: var(--space-4); }"),
+    "packages/ui/theme.css": "@theme inline {\n  --spacing-card: var(--space-4);\n}\n",
     **{f"src/components/ForcedColours{n}.css": in_layer("components", css)
        for n, css in enumerate(SPEC["system_colors"]["allowed"])},
     **{f"src/entries/allowed{n}/index.css": css + "\n" for n, css in enumerate(SPEC["layers"]["allowed"])},

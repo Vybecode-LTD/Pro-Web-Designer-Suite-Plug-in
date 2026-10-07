@@ -707,8 +707,26 @@ def is_component_file(path: Path) -> bool:
     return bool(COMPONENT_FILE_PAT.search(str(path).replace(os.sep, "/").lower()))
 
 
+LAYER_BLOCK = re.compile(r"@layer(?![\w-])\s*([^{]*)", re.I)
+
+
+def layer_path(at_rules: Iterable[str]) -> list[str]:
+    """The full name of the cascade layer a rule sits in, by segment:
+    `@layer base.components` and `@layer base { @layer components {…} }` are
+    both ["base", "components"], a layer inside base, as CSS Cascade 5 reads a
+    dotted name. An anonymous layer is an empty segment."""
+    path: list[str] = []
+    for a in at_rules:
+        m = LAYER_BLOCK.match(a)
+        if m:
+            path.extend(seg.strip() for seg in m.group(1).split("."))
+    return path
+
+
 def in_layer(at_rules: Iterable[str], name: str) -> bool:
-    return any(a.startswith("@layer") and name in a for a in at_rules)
+    """In layer `name` or one of its sub-layers, never in a layer of that name
+    inside another (`base.components` is not in components: CodeRabbit on #73)."""
+    return layer_path(at_rules)[:1] == [name]
 
 
 VAR_MARK = " var() "

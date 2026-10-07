@@ -45,7 +45,7 @@
   },
   "tiers": {
     "gates": ["audit", "stylelint", "eslint"],
-    "rule":"Law 6: component code reads roles. Reading a Tier-1 primitive that has a role (with_role, by prefix, with the advice the gates give) skips a tier. Not leaks: the page-rhythm roles that live under --space- (tier2_exceptions), and the null-outs, which assert no value (nulls). A primitive with no role (--radius-*, --weight-*, --z-*, --font-*, ...) is read directly, and so is a motion longhand's --dur-* or --ease-*; a motion shorthand that splits a --motion-* pair draws a warning from the audit alone. The audit and stylelint (design/tier1-primitive) read every var() in a component file or a `components` layer (allowed, refused); the audit and ESLint read a Tailwind class's (--name) shorthand, with or without a type hint, and an inline custom property's string value, in any JSX file (allowed_jsx, refused_jsx). design-system-docs' extract_system.py reads the same three lists for its tier1-leak gap, so the two agree.",
+    "rule":"Law 6: component code reads roles. Reading a Tier-1 primitive that has a role (with_role, by prefix, with the advice the gates give) skips a tier. Not leaks: the page-rhythm roles that live under --space- (tier2_exceptions), and the null-outs, which assert no value (nulls). A primitive with no role (--radius-*, --weight-*, --z-*, --font-*, ...) is read directly, and so is a motion longhand's --dur-* or --ease-*; a motion shorthand that splits a --motion-* pair draws a warning from the audit alone. The audit and stylelint (design/tier1-primitive) read every var() in a component file or a `components` layer and its sub-layers (allowed, refused; stylesheets); the audit and ESLint read a Tailwind class's (--name) shorthand, with or without a type hint, and an inline custom property's string value, in any JSX file (allowed_jsx, refused_jsx). design-system-docs' extract_system.py reads the same three lists for its tier1-leak gap, so the two agree.",
     "with_role": {
       "space-": "a proximity/inset role (--gap-related, --pad-card, --space-section)",
       "neutral-": "a color role (--bg-surface, --fg-muted, --border-default)",
@@ -72,6 +72,12 @@
                 ".card { gap: var(--space-0-5); }",
                 ".card { --card-gap: var(--space-4); gap: var(--card-gap); }",
                 ".card { line-height: var(--leading-tight); }"],
+    "stylesheets": {
+      "about": "Whole stylesheets outside a component file, where the layer decides: the components layer and its sub-layers, by the layer's full name. A dotted name is a nested layer, so base.components is a layer inside base.",
+      "allowed": ["@layer base.components { .card { padding: var(--space-4); } }"],
+      "refused": ["@layer components { .card { padding: var(--space-4); } }",
+                  "@layer components.card { .card { padding: var(--space-4); } }"]
+    },
     "allowed_jsx": ["<div className=\"p-(--pad-card) gap-(--space-section)\" />",
                     "<div className=\"shadow-(--shadow-none)\" />",
                     "<div style={{ '--card-gap': 'var(--gap-related)' }} />"],
