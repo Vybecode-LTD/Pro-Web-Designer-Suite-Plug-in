@@ -38,4 +38,6 @@ Turn a model plus answers into components.
 
 Exit `0` written · `1` the model is unusable, or `--strict` met a blocking security finding · `2` bad invocation.
 
+It writes, per entity, `features/<table>/` (types, fields, list, detail, form, states), `db/policies/<table>.policies.todo.sql` with its `.test.sql`, and `server/<table>.schema.ts` and `server/<table>_schema.py`, the draft's constraints for the server (field-mapping.md §9); plus `ui/`, `lib/format.ts` and `lib/supabase.ts` once.
+
 **On the Tailwind stack.** Layout, spacing, colour and type become utility classes from the suite's theme — with no arbitrary values, because if a utility does not exist then neither does the token. Variant and state tables cannot be expressed that way, so they live in one emitted `styles/scaffold.css` under `@layer components`. That boundary is real and is stated rather than hidden: a utility system is excellent at layout and has nothing to say about a component's state machine.

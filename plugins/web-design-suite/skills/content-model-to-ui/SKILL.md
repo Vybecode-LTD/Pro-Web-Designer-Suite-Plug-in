@@ -85,7 +85,7 @@ python -m scripts.introspect_schema schema.sql --answers-template answers.json
 - **Which columns are read-only in practice?** The database permits far more than the product should.
 - **What does the empty state say, and what is the one action it offers?**
 
-Plus, per column where it applies: the currency and whether the stored value is minor units; whether a `timestamptz` renders in the viewer's zone or the record's; which jsonb keys are real; which Storage bucket and whether it is public; how many rows a referenced parent will hold; which parent column labels a picker.
+Plus, per column where it applies: the currency and whether the stored value is minor units; whether a `timestamptz` renders in the viewer's zone or the record's; which jsonb keys are real; which Storage bucket and whether it is public; how many rows a referenced parent will hold; which parent column labels a picker. Every one of these reaches the output: the currency and its own minor-unit scale in the cells and the server schema, the zone in `formatInstant`, a machine-only jsonb column off the form, the row count choosing select, combobox or picker, the label column named where the join goes, and the default sort as a constant the query applies. Two are advisory, since the fix is in the schema or the bucket, not the UI: `.naive_timestamp` and `.storage`.
 
 Skip this step and the scaffold still runs — every answer falls back to the machine's own proposal. It will be defensible and it will be wrong in about a quarter of places, and you will find them one at a time in review instead of all at once in a text editor.
 
@@ -102,7 +102,7 @@ python -m scripts.scaffold_ui model.json --out src --answers answers.json --dry-
 python -m scripts.scaffold_ui model.json --out src --answers answers.json
 ```
 
-One folder per entity: a list view, a detail view, a form, and the empty / filtered-empty / loading / error / forbidden / stale states as real components. A shared `ui/` kit underneath — Button, Field, the control primitives, Badge, Skeleton, StateBlock — each in the five-part component shape with Tier-3 sockets defaulting to Tier-2 roles.
+One folder per entity: a list view, a detail view, a form, and the empty / filtered-empty / loading / error / forbidden / stale states as real components; in `server/`, the form's draft as a zod schema and a pydantic model, from the same constraints the form reads (`references/field-mapping.md` §9). A shared `ui/` kit underneath — Button, Field, the control primitives, Badge, Skeleton, StateBlock — each in the five-part component shape with Tier-3 sockets defaulting to Tier-2 roles.
 
 React 19 conventions throughout: `ref` is an ordinary prop, no `forwardRef`. Components take their rows as props and know nothing about fetching, because cache keys, realtime and optimistic writes are product decisions and a scaffold has no business guessing at them.
 
@@ -247,7 +247,7 @@ Stated plainly, because a generator that overstates its reach is worse than one 
 
 - Any copy at all. Every string that a user reads and that is not a column label is a `TODO(copy)`
 - Information architecture — which screens a person needs to get their job done, and in what order
-- Navigation, roles, or who can do what. It proposes row-level security for each table in `db/policies/`, with a smoke test, guessed from the keys: a human corrects it before it ships (`references/supabase-integration.md` §9)
+- Navigation, roles, or who can do what. It proposes row-level security for each table in `db/policies/`, with a smoke test, guessed from the keys, and a server schema of each draft in `server/`: a human corrects both before they ship (`references/supabase-integration.md` §9)
 - The data layer: fetching, caching, realtime, optimistic writes, error taxonomy
 - Whether the schema is any good. A float money column, a naive `timestamp`, a `status text` with no constraint — it flags all three and fixes none of them, because they are schema bugs and fixing them in the UI is how they become permanent
 

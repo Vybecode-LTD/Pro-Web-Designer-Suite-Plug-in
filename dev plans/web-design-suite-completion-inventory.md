@@ -238,8 +238,8 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-A5 | medium | fixed in 3.3.0: `test_docs.SupabaseGuidance.test_the_access_boundary_is_stated` | unsafe or stale guidance. |
 | DL-A6 | medium | fixed in 3.3.0: `test_content_and_a11y.SchemaSecurityPass` | the tool cannot see RLS. |
 | DL-A7 | medium | fixed in 3.3.0: `test_schema_sources` | Supabase's own schema outputs are silently misread. |
-| DL-A8 | medium | W7 (3.4.0) | interview answers are ignored. |
-| DL-A9 | medium | W7 (3.4.0) | generated forms lack promised a11y wiring |
+| DL-A8 | medium | fixed in 3.4.0: `test_scaffold.TheAnswersReachTheOutput` (PR #64) | interview answers are ignored. |
+| DL-A9 | medium | fixed in 3.4.0: `test_scaffold.TheFormsAreWired` (PR #64) | generated forms lack promised a11y wiring |
 | DL-A10 | medium | fixed in 3.4.0: a `.button` rule in each dark block, the eyebrow re-pointed, and `lint_email`'s `dark` check (PR #57; `test_email.TemplatesInDarkMode`, `LintHasADarkPass`) | dark mode breaks the call-to-action. |
 | DL-A11 | medium | fixed in 3.4.0: the build adds the `[if mso]` font rule and the lint asks for it (PR #57; `test_email.OutlookFontRule`) | the Outlook font rule is never added. |
 | DL-A12 | medium | fixed in 3.4.0: the receipt's container is `width:100%` (PR #57; `test_email.ContainersAreFluid`) | the receipt isn't fluid. |
@@ -253,7 +253,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-A20 | low | fixed in 3.4.0: only real ESP syntax keeps a comment (PR #57; `test_email.AuthoringCommentsAreDropped`) | authoring notes ship in the email. |
 | DL-A21 | low | fixed in 3.4.0: the Law 3 row, the weight and size notes, the newsletter's gaps, the announcement's headings, the edge token (PR #59; `test_email.EmailDocClaims`) | Consistency: "same 18 steps" and the email tokens' weight note are wrong. |
 | DL-B1 | high | fixed in 3.3.0: the reference's §9 (`test_docs.SupabaseGuidance.test_the_access_boundary_is_stated`) and the generated `lib/supabase.ts` (`test_policies`) | no data-access boundary. |
-| DL-B2 | high | partly done (3.3.0: per-table policies, column grants and a smoke test, `test_policies`); a server-side schema (pydantic or zod) mirroring the constraints is left | authorization and server validation belong to nobody. |
+| DL-B2 | high | fixed: 3.3.0 the per-table policies, column grants and a smoke test (`test_policies`); 3.4.0 the server schema, zod and pydantic, `test_scaffold.TheServerSchemaMirrorsTheConstraints` (PR #64) | authorization and server validation belong to nobody. |
 | DL-B3 | medium | W13 (3.6.0+) | stacks the description implies but doesn't serve. |
 | DL-B4 | medium | W13 (3.6.0+) | email frameworks. |
 | DL-B5 | medium | W13 (3.6.0+) | email translation and RTL. |
