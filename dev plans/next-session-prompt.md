@@ -235,7 +235,7 @@ Read them by `grep -n`.
 - Command hooks (`hooks/hooks.json`, §2 of the capabilities reference) are the known route:
   - Use exec form, with `"command": "python"` and the script path in `args`. On Windows, exec form needs a real `.exe`.
   - Exit 2 on PostToolUse shows stderr to Claude.
-  - `hookSpecificOutput.additionalContext` reaches Claude as a reminder. It is capped at 10,000 characters, and `<system-reminder>` tags in it are escaped (2.1.290).
+  - `hookSpecificOutput.additionalContext` reaches Claude as a reminder. It is capped at 10,000 characters, and `<system-reminder>` tags in it are escaped (2.1.292).
 
 **Opt-in:**
 - The gate does nothing unless the project's `.design-suite.json` (P24) turns it on.
