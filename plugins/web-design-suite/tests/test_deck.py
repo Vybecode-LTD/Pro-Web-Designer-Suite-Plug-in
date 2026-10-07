@@ -260,7 +260,7 @@ class ThePresenterWindow(Deck):
 
     def test_the_deck_opens_a_presenter_window_kept_in_step(self):
         html = self.html(decision_log("D1 — Tokens"))
-        for piece in ('new BroadcastChannel("deck:" + document.title)', "-presenter",
+        for piece in ('new BroadcastChannel("deck:" + window.location.pathname + ":" + document.title)', "-presenter",
                       "data-deck-presenter-badge", 'key === "p" || key === "P"', "openPresenter()",
                       "show(data.index, true, false, true)", ">P<", "a presenter window"):
             self.assertIn(piece, html, piece)
@@ -295,7 +295,23 @@ class SinceLastTimeAndTheStage(Deck):
         iteration = self.outline(log.replace("# Test deck\n", "# Test deck\n\n**Stage:** iteration review\n") + SINCE)
         self.assertRegex(iteration, r"\n  1\. cover[\s\S]*\n  2\. changed[\s\S]*\n  3\. brief")
         sign_off = self.outline(log.replace("# Test deck\n", "# Test deck\n\n**Stage:** sign-off\n"))
-        self.assertRegex(sign_off, r"\n  3\. decision-index[\s\S]*\n  4\. ask[\s\S]*\n  5\. decision ")
+        # Review of #66 (Codex): the ask is the second slide, straight after
+        # the cover, whether or not there is a decision index.
+        self.assertRegex(sign_off, r"\n  1\. cover[\s\S]*\n  2\. ask[\s\S]*\n  3\. brief")
+        no_index = self.outline("# Test deck\n\n**Stage:** sign-off\n\n## Decisions\n\n### D1 — Tokens\n"
+                                "**Status:** open\n**Constraint:** Many developers touch the CSS.\n"
+                                "**Choice:** A closed token system.\n")
+        self.assertRegex(no_index, r"\n  1\. cover[\s\S]*\n  2\. ask")
+
+    def test_the_summary_table_agrees_with_the_order_and_the_channel_is_per_file(self):
+        """Review of #66 (Codex): SKILL.md's audience table still said client
+        weaknesses appear "Late, after the evidence", and two decks of one
+        project on one origin shared a BroadcastChannel."""
+        skill = (SKILLS / "client-presentation-builder" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertNotIn("Late, after the evidence", skill)
+        self.assertIn("| **Weaknesses appear** | After decisions, before visuals |", skill)
+        html = self.html(decision_log("D1 — Tokens"))
+        self.assertIn('new BroadcastChannel("deck:" + window.location.pathname + ":" + document.title)', html)
 
     def test_the_flaws_come_before_the_screens_and_the_evidence(self):
         from test_presentation import FINDINGS

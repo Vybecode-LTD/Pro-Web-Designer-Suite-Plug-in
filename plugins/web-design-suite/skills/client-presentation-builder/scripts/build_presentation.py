@@ -1588,10 +1588,11 @@ def _plan_for(inp: Inputs, audience: str, max_decisions: int,
             # §3.2: the room has seen it before; what changed comes first.
             plan.remove(changed)
             plan.insert(1, changed)
-        if sign_off and index:
-            # §3.3: what is being signed off is the second thing on screen.
+        if sign_off:
+            # §3.3: what is being signed off is the second thing on screen,
+            # straight after the cover.
             plan.remove(ask)
-            plan.insert(plan.index(index) + 1, ask)
+            plan.insert(1, ask)
     elif audience == "team":
         # A developer's first question is "how is this put together", and
         # their second is "what breaks if I touch it".
@@ -2281,7 +2282,11 @@ DECK_JS = """(function () {
   // N on a shared screen is never needed.
   var presenter = /-presenter$/.test(window.location.hash || "");
   var channel = null;
-  try { channel = new BroadcastChannel("deck:" + document.title); } catch (e) {}
+  // Named by the file, not the title: two decks of one project open on
+  // the same origin must not move each other.
+  try {
+    channel = new BroadcastChannel("deck:" + window.location.pathname + ":" + document.title);
+  } catch (e) {}
 
   function clamp(i) { return Math.max(0, Math.min(total - 1, i)); }
 

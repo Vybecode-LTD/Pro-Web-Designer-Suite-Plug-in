@@ -276,7 +276,7 @@ Not the title. The ordering, the slide set, and which field of each decision lea
 | **Decisions shown** | Top 5 by relevance | **All of them** | Top 5, **hardest first** |
 | **Each decision leads with** | The problem → what we did → what it costs | The decision → what you inherit | The constraint → the options rejected |
 | **Rejected options** | Compact, "we also considered" | Listed | **Emphasised** — the demonstration of judgement |
-| **Weaknesses appear** | Late, after the evidence | As tickets with owners | **Early**, before the visuals |
+| **Weaknesses appear** | After decisions, before visuals | As tickets with owners | **Early**, before the visuals |
 | **Closes on** | The ask, and sign-off | Where to start | What critique is wanted |
 
 ---
