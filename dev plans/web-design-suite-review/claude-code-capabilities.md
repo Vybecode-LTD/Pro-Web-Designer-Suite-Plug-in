@@ -106,3 +106,20 @@ Components live at the plugin root; only `plugin.json` goes inside `.claude-plug
 - **Names carry the signal.** Names always survive, so make them self-explanatory, and front-load a first sentence that works on its own.
 - **Routing that ignores the budget.** Two options don't depend on the listing at all. One is a plugin `UserPromptSubmit` hook that matches keywords (WCAG, axe, Figma variables, etc.) and returns `additionalContext` naming the right skill. The other is a plugin agent that preloads skills through `skills:`.
 - **Evals for this plugin.** Give each case a skill-specific `input_match`, so mis-routing between sibling skills shows up. Evals that run the validator scripts need `--allow-tools "Bash(...)"`, and therefore WSL2 on this machine; trigger-only suites using `Read, Glob, Grep, Skill` run natively.
+
+## 5. Re-checked on 2026-10-07 (before P24)
+
+Re-read against the Claude Code changelog (latest listed: 2.1.293; installed here: 2.1.288) and the plugin manifest reference; the hooks, skills and evals pages were not re-read. Nothing in the changelog contradicts sections 1 to 4. These are the changes since 2026-09-23 that bear on Phase 5:
+
+- **Mods (2.1.287).** "Added Claude Mods: plugins may now modify deeper behavior" ([changelog](https://code.claude.com/docs/en/changelog)). A mod is a plugin hooks module of JavaScript function hooks, such as `tool.check`, `tool.call`, `prompt.submit`, `turn.complete`, `agent.spawn` and UI surfaces. It is tested with `claude plugin test`, and `plugin.json`'s new `types` field names its `.d.ts` ([plugins-reference#fields](https://code.claude.com/docs/en/plugins-reference#fields), [mods reference](https://code.claude.com/docs/en/plugins/mods/reference#files)). The `hooks/hooks.json` command hooks of §2 are unchanged.
+  - **P25 should weigh a mod against command hooks.** A `tool.call` or `tool.check` hook could run the gate on Edit and Write, and a `prompt.submit` hook could do the routing. Read the mods reference first, and check whether mods run on Windows and in `claude -p`, which the evals use. *(inference)*
+- **Hook output.** `<system-reminder>` tags in a hook's output are escaped before they reach Claude. Long hook text is clipped and logged instead of refused or dropped (2.1.288, 2.1.290).
+- **Skills.** A `/skill` name typed mid-message is now announced to Claude as a skill, including a `disable-model-invocation` one (2.1.287). An agent's, a skill's or a plugin file's `name` longer than 256 characters is ignored (2.1.290).
+- **`bin/` (P28).** The standard layout now says that "claude.ai and Cowork don't install a plugin that has this directory" ([plugins-reference#standard-layout](https://code.claude.com/docs/en/plugins-reference#standard-layout)). A top-level `bin/` would therefore cost the plugin those installs. P28 should put its commands elsewhere, or decide that the trade is worth it.
+- **Manifest.**
+  - `claude plugin validate` checks MCP entries from 2.1.281: an undeclared `${user_config.KEY}` is an error, and so is a remote `url` that is not absolute.
+  - It accepts `icon`, `documentationUrl`, `supportUrl`, `privacyPolicyUrl` and `termsOfServiceUrl` without a warning from 2.1.281; earlier versions fail `--strict` on them.
+  - LSP configs take `requestTimeout` (2.1.288). Before 2.1.288, `${user_config.*}` and `${CLAUDE_PLUGIN_ROOT}` were passed unsubstituted in `initializationOptions` and `settings`.
+  - `experimental.evals` is listed with `themes` and `monitors`, and the top-level `themes` and `monitors` keys load with a warning.
+- **Moved anchors.** `plugins-reference#file-locations-reference` is now `#standard-layout`, and what each component does at runtime moved to [plugins/components](https://code.claude.com/docs/en/plugins/components). Links in §2 that use the old anchors land on the page top.
+- **`claude plugin eval`.** It no longer refuses a Bash-granting run on a Mac with Docker Desktop (2.1.288). Nothing else in §1 changed.

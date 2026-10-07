@@ -14,11 +14,11 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-10-07)
 
-- **Version:** 3.3.0 is the latest release (`v3.3.0`, `88a4886`, published by `release.yml`). Phase 4 (3.4.0) is under way: P9 to P23 and P44 are merged (#38 to #71; P22 as #69 and #71, P23 as #70), with the hydration flake fix (#56) and the email cascade fix (#61). No PR is open.
-- **Installed:** 3.3.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
+- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is next. No PR is open.
+- **Installed:** 3.4.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
 - **Tests:** 755. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P45 (Law 6 in stylelint and the ESLint config), then R2, the 3.4.0 release. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 55 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P24 (the project contract), then P25 (the hooks). `dev plans/web-design-suite-review/claude-code-capabilities.md` §5 is the 2026-10-07 re-check of the plugin features. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 54 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
@@ -44,7 +44,7 @@ CI (`.github/workflows/ci.yml`) runs the whole suite on Windows, Linux and macOS
 
 The Python floor runs with `uv run --no-project --python 3.9 python -B -m unittest discover -s tests`, which works in cmd as well.
 
-For `claude plugin validate --strict`, `update` and `details`, use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\<build>\claude.exe` (2.1.286's build folder is `635c1867224a`). The one on PATH is older.
+For `claude plugin validate --strict`, `update` and `details`, use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\<build>\claude.exe` (2.1.288's build folder is `36aa8c97bf86`). The one on PATH is older.
 
 ## Gotchas
 
