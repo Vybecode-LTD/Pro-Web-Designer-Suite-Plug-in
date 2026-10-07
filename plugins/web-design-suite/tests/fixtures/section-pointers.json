@@ -493,6 +493,12 @@
  },
  {
   "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/field-mapping.md",
+  "section": "9",
+  "heading": "Validation"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
   "to": "content-model-to-ui/references/screen-patterns.md",
   "section": "12",
   "heading": "The states generators skip"
@@ -568,6 +574,18 @@
   "to": "content-model-to-ui/references/supabase-integration.md",
   "section": "8",
   "heading": "Search"
+ },
+ {
+  "from": "content-model-to-ui/references/scripts.md",
+  "to": "content-model-to-ui/references/field-mapping.md",
+  "section": "9",
+  "heading": "Validation"
+ },
+ {
+  "from": "content-model-to-ui/references/supabase-integration.md",
+  "to": "content-model-to-ui/references/field-mapping.md",
+  "section": "9",
+  "heading": "Validation"
  },
  {
   "from": "content-model-to-ui/references/supabase-integration.md",

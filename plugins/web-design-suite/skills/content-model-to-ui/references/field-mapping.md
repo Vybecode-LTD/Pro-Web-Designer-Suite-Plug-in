@@ -252,7 +252,7 @@ These are different problems and the same component cannot do both.
 
 **The currency is a column, not a constant.** `Intl.NumberFormat(locale, { currency: 'USD' })` hardcoded in a formatter is 40 files of work the day the product sells in euros. If there is a `currency` column, thread it through. If there is not, ask whether there should be.
 
-**Minor-unit scale is not always 100.** JPY is 1, KWD and BHD are 1000. `Intl.NumberFormat().resolvedOptions().maximumFractionDigits` gives the right exponent per currency; a hardcoded `/ 100` is correct for most of the world and silently wrong for the rest.
+**Minor-unit scale is not always 100.** JPY is 1, KWD and BHD are 1000. `Intl.NumberFormat().resolvedOptions().maximumFractionDigits` gives the right exponent per currency; a hardcoded `/ 100` is correct for most of the world and silently wrong for the rest. The scaffold's `formatMinorUnits(minor, currency)` divides by `minorUnitScale(currency)`, and the currency in every cell is the `.money` answer's; unanswered, the cell carries `'USD'` with a `TODO(answers)` naming the question, so the assumption is visible rather than silent.
 
 ---
 
@@ -312,6 +312,8 @@ This is the rule that keeps forms honest. Invent a client rule and one of two th
 | Enum type | the option set | By construction |
 
 `introspect_schema.py` marks each rule `mirror: true` or `mirror: false`. The `false` ones — email format, URL scheme, slug pattern, "money is non-negative" — are conveniences the database does not enforce, and each is an argument for adding the constraint. A reviewer should read that list and decide, per rule, whether to tighten the schema or accept the divergence knowingly.
+
+**The server gets the same rules.** The form's check is a courtesy; the control runs where the browser cannot edit it. `scaffold_ui.py` writes `server/<table>.schema.ts` (zod, `.strict()`) and `server/<table>_schema.py` (pydantic 2, `extra='forbid'`) for each entity: the draft's columns only, with the same `required`, lengths, bounds, patterns and option sets the form reads, a uuid as a uuid, a `timestamptz` as a datetime with its offset, and minor units as an integer. A rule with no constraint behind it is marked `invented` in both files, so the reviewer's list above is the same list on the server. Delete the language the project does not use.
 
 **Two constraints the client cannot mirror at all:**
 

@@ -4,6 +4,16 @@
 
 ### Added
 
+- **The server's schema, from the same constraints the form reads** (DL-B2, its last
+  part). `scaffold_ui.py` writes `server/<table>.schema.ts` (zod, `.strict()`) and
+  `server/<table>_schema.py` (pydantic 2, `extra='forbid'`) for each entity: the draft's
+  columns only, with the `required`, lengths, bounds, patterns and option sets the form
+  mirrors, a uuid as a uuid, a `timestamptz` as a datetime with its offset, minor units
+  as an integer, and a reserved column name aliased. A rule no constraint states (the
+  mapper's email format, "money is non-negative") is marked `invented` in both files; a
+  CHECK that states it makes it a mirror. The per-table policies, grants and smoke test
+  shipped in 3.3.0; this closes the item. field-mapping.md §9, scripts.md and
+  supabase-integration.md §9 say where each runs.
 - **The handout, and the suite's own accessibility JSON as the deck's input** (PS-A6,
   PS-A5, part of PS-C1). `--handout FILE` writes the deck the client keeps: the same
   slides in document flow, one per printed page, with no presenter notes, gap markers,
@@ -75,6 +85,31 @@
 
 ### Fixed
 
+- **The scaffold reads every interview answer** (DL-A8). `.money` set the currency and
+  the storage unit and nothing read them: every cell was `formatMoney(x / 100)` in a
+  hard-coded USD, wrong by the currency's own scale for JPY (1) and KWD (1000), and
+  `.cardinality`, `.label_column`, `.default_sort`, `.options`, `.zone` and `.shape`
+  were asked and ignored. Now `formatMinorUnits(minor, currency)` divides by
+  `minorUnitScale(currency)` from `Intl`, a decimal amount goes through
+  `formatMoney(amount, currency)`, and an unanswered currency is `'USD'` with a
+  `TODO(answers)` naming the question. The row count picks select, combobox or picker;
+  the label column is named where the join goes and in the select's `TODO(options)`;
+  the `.options` answer is the closed set (and the list's badge); `fixed-utc` passes
+  `'UTC'` to `formatInstant` and `record` leaves a `TODO(zone)`; a machine-only jsonb
+  column leaves the form and the Draft; the default sort is a constant with the
+  `.order()` call the query applies. SKILL.md names the two answers that stay advisory.
+- **The forms carry the wiring screen-patterns.md promises** (DL-A9). The help and error
+  ids went to a `data-describedby` on a wrapper, which assistive tech ignores; the radio
+  group's `aria-labelledby` named a label with no id; every field error and the summary
+  were `role="alert"`, so a failed submit was announced once per field and once more;
+  and nothing focused the summary. The control now carries `aria-describedby` (the id
+  Field gives the error) and `aria-invalid`, a radio group is `<Field group>`: a
+  `<fieldset>` whose `<legend>` has the id the group names, and RadioGroup takes
+  `describedBy` and `invalid`; an inline error is plain text; the summary is the one live
+  region and takes focus after the render that shows the errors (`focusSummary`,
+  `summaryRef`). Field exports `describedBy(id, help, error)` for a caller with help
+  text. Both stacks pass the audit and the static a11y check, and the real compiler
+  parses every generated file (`test_scaffold`).
 - **Print never sends the notes by accident** (PS-A6). The print stylesheet showed every
   presenter note whatever the toggle; now notes print only while they are showing
   (`data-notes="on"`), and the client's copy is `--handout`.
