@@ -64,6 +64,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import keyword
 import re
 import sys
 from pathlib import Path
@@ -195,7 +196,10 @@ class Answers:
     def in_form(self, table: dict[str, Any], col: dict[str, Any]) -> bool:
         """On the form when the model places it there — or when it carries
         authority and a human released it by removing it from the
-        `authority_columns` answer (after protecting it in the database)."""
+        `authority_columns` answer (after protecting it in the database).
+        A jsonb column the `.shape` answer calls machine-only is off it."""
+        if self.machine_only(table, col):
+            return False
         if col["ui"].get("placement", {}).get("form"):
             return True
         if col["ui"].get("authority") and not col["ui"].get("never_display"):
@@ -226,6 +230,77 @@ class Answers:
         table's own fact: in a mixed schema it is "no" for every table."""
         stated = table.get("rls") if table else None
         return bool(self.get("app.rls_enabled", True) if stated is None else stated)
+
+    # Per-column answers. Each is read where the output depends on it; the
+    # ones the scaffold cannot act on (`.naive_timestamp`, `.storage`'s
+    # bucket) are advisory, and SKILL.md says so.
+
+    def column(self, table: dict[str, Any], col: dict[str, Any], key: str,
+               fallback: Any = None) -> Any:
+        return self.get(f"{table['name']}.{col['name']}.{key}", fallback)
+
+    def money(self, table: dict[str, Any], col: dict[str, Any]) -> dict[str, Any]:
+        """The currency and the storage unit of a money column. Without the
+        answer the storage is the model's guess and the currency is unknown,
+        which the output marks rather than silently writing USD."""
+        proposed = dict(col["ui"].get("money") or {})
+        got = self.column(table, col, "money")
+        answered = isinstance(got, dict)
+        if answered:
+            proposed.update({k: v for k, v in got.items() if v is not None})
+        storage = str(proposed.get("storage", "unknown"))
+        if storage.startswith("minor"):
+            storage = "minor-units"
+        elif storage != "decimal":
+            storage = "unknown"
+        currency = proposed.get("currency") if answered else None
+        return {"currency": str(currency).upper() if currency else None,
+                "storage": storage, "answered": answered}
+
+    def options(self, table: dict[str, Any], col: dict[str, Any]) -> list[str]:
+        """The closed set: the schema's enum or CHECK, else the `.options`
+        answer for a column that only reads as one."""
+        if col["ui"].get("options"):
+            return [str(o) for o in col["ui"]["options"]]
+        got = self.column(table, col, "options", [])
+        return [str(o) for o in got] if isinstance(got, list) else []
+
+    def cardinality(self, table: dict[str, Any], col: dict[str, Any]) -> str | None:
+        got = self.column(table, col, "cardinality")
+        return got if got in ("under-20", "under-5000", "unbounded") else None
+
+    def label_column(self, table: dict[str, Any], col: dict[str, Any]) -> str | None:
+        got = self.column(table, col, "label_column")
+        return str(got) if isinstance(got, str) and got else None
+
+    def zone(self, table: dict[str, Any], col: dict[str, Any]) -> str:
+        got = self.column(table, col, "zone", "viewer")
+        return got if got in ("viewer", "record", "fixed-utc") else "viewer"
+
+    def machine_only(self, table: dict[str, Any], col: dict[str, Any]) -> bool:
+        """A jsonb column whose `.shape` answer says users do not edit it
+        leaves the form and the Draft."""
+        got = self.column(table, col, "shape")
+        return isinstance(got, dict) and got.get("user_editable") is False \
+            and col["ui"].get("control") == "json-editor"
+
+    def default_sort(self, table: dict[str, Any]) -> dict[str, str]:
+        proposed = table["screens"].get("default_sort") or {}
+        got = self.get(f"{table['name']}.default_sort")
+        column = proposed.get("column", "")
+        direction = proposed.get("direction", "asc")
+        if isinstance(got, dict):
+            column = str(got.get("column", column))
+            direction = str(got.get("direction", direction))
+        elif isinstance(got, str) and got.strip():
+            parts = got.split()
+            column = parts[0]
+            if len(parts) > 1:
+                direction = parts[1]
+        direction = direction.lower()
+        if direction not in ("asc", "desc"):
+            direction = "asc"
+        return {"column": column, "direction": direction}
 
 
 # ---------------------------------------------------------------------------
@@ -429,18 +504,34 @@ export type FieldProps = {
   /** Set only AFTER first blur, or the form scolds people as they type. */
   error?: string | null;
   disabled?: boolean;
+  /**
+   * A group of controls (radios, a date range): the label becomes a
+   * `<legend>` with the id `${id}-label`, which the group's
+   * `aria-labelledby` names, since a `<label htmlFor>` can name only one
+   * control.
+   */
+  group?: boolean;
   children: React.ReactNode;
   className?: string;
 };
+
+/** The ids a control puts in its `aria-describedby`: help first, then the
+ *  error, so a screen reader hears the guidance before the complaint. */
+export function describedBy(id: string, help?: string, error?: string | null): string | undefined {
+  const ids = [help ? `${id}-help` : null, error ? `${id}-error` : null].filter(Boolean);
+  return ids.length > 0 ? ids.join(' ') : undefined;
+}
 
 /**
  * The label / control / help / error quartet, wired so the accessible name
  * and the visible name cannot drift apart.
  *
- * `aria-describedby` points at the help text and at the error, in that order,
- * so a screen reader hears the guidance before the complaint. The control
- * itself is handed `aria-invalid` by the caller; this component only owns the
- * surrounding structure.
+ * This component owns the structure and the ids: the help is `${id}-help`,
+ * the error `${id}-error`. The CONTROL carries `aria-describedby` (from
+ * `describedBy`) and `aria-invalid`, because assistive tech reads them on
+ * the control and ignores them on a wrapper. The error is not a live region:
+ * the form's summary announces a failed submit once and takes focus, and a
+ * live region per field would announce every field a second time.
  */
 export function Field({
   id,
@@ -449,30 +540,38 @@ export function Field({
   help,
   error,
   disabled = false,
+  group = false,
   children,
   className,
 }: FieldProps) {
   const helpId = help ? `${id}-help` : undefined;
   const errorId = error ? `${id}-error` : undefined;
+  const Root = group ? 'fieldset' : 'div';
+  const marker = required ? (
+    <span className={styles.required} aria-hidden="true">
+      *
+    </span>
+  ) : null;
 
   return (
-    <div
+    <Root
       className={cn(styles.root, 'stack', 'stack--tight', className)}
       data-state={error ? 'error' : undefined}
       data-disabled={disabled || undefined}
     >
-      <label className={styles.label} htmlFor={id}>
-        {label}
-        {required ? (
-          <span className={styles.required} aria-hidden="true">
-            *
-          </span>
-        ) : null}
-      </label>
+      {group ? (
+        <legend className={cn(styles.label, styles.groupLabel)} id={`${id}-label`}>
+          {label}
+          {marker}
+        </legend>
+      ) : (
+        <label className={styles.label} htmlFor={id}>
+          {label}
+          {marker}
+        </label>
+      )}
 
-      <div className={styles.control} data-describedby={[helpId, errorId].filter(Boolean).join(' ') || undefined}>
-        {children}
-      </div>
+      <div className={styles.control}>{children}</div>
 
       {help ? (
         <p className={styles.help} id={helpId}>
@@ -481,11 +580,11 @@ export function Field({
       ) : null}
 
       {error ? (
-        <p className={styles.error} id={errorId} role="alert">
+        <p className={styles.error} id={errorId}>
           {error}
         </p>
       ) : null}
-    </div>
+    </Root>
   );
 }
 """
@@ -500,9 +599,24 @@ FIELD_CSS = """\
     --field-measure:     var(--measure-narrow);
 
     max-inline-size: var(--field-measure);
+    /* A grouped field is a <fieldset>: drop the browser's box so it lays
+       out like the plain one. */
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
   }
 
   .root[data-disabled] { --field-label-fg: var(--fg-disabled); }
+
+  /* A <legend> is drawn in the fieldset's border by the browser, outside the
+     stack's flow. A floated legend gives that up and becomes an ordinary
+     flex item, so it takes the gap like a label does. */
+  .groupLabel {
+    float: left;
+    inline-size: 100%;
+    padding: 0;
+  }
 
   .label {
     font: var(--type-label);
@@ -700,7 +814,11 @@ export type RadioGroupProps = {
   options: readonly string[];
   disabled?: boolean;
   onValueChange?: (next: string) => void;
+  /** The id of the group's name: a `<legend>`, from `<Field group>`. */
   labelledBy?: string;
+  /** The ids of the help and the error, as `describedBy` builds them. */
+  describedBy?: string;
+  invalid?: boolean;
 };
 
 export function RadioGroup({
@@ -710,9 +828,17 @@ export function RadioGroup({
   disabled,
   onValueChange,
   labelledBy,
+  describedBy,
+  invalid,
 }: RadioGroupProps) {
   return (
-    <div className={styles.options} role="radiogroup" aria-labelledby={labelledBy}>
+    <div
+      className={styles.options}
+      role="radiogroup"
+      aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
+      aria-invalid={invalid || undefined}
+    >
       {options.map((option) => (
         <label className={styles.option} key={option}>
           <input
@@ -1098,7 +1224,7 @@ CARD_GRID_CSS = """\
 INDEX_TS_KIT = """\
 export { Button } from './Button/Button';
 export type { ButtonProps } from './Button/Button';
-export { Field } from './Field/Field';
+export { Field, describedBy } from './Field/Field';
 export type { FieldProps } from './Field/Field';
 export {
   TextInput,
@@ -1199,8 +1325,23 @@ def field_spec(col: dict[str, Any], table: dict[str, Any], model: dict[str, Any]
     for r in ui.get("validation", []):
         if r["rule"] in ("maxLength", "minLength", "min", "max", "pattern"):
             spec[r["rule"]] = r["value"]
-    if ui.get("options"):
-        spec["options"] = list(ui["options"])
+    options = ans.options(table, col)
+    if options:
+        spec["options"] = options
+    if col.get("foreign_key"):
+        # The `.cardinality` answer is the one input that decides between a
+        # select, a combobox and a picker; the schema can never contain it.
+        chosen = ans.cardinality(table, col)
+        if chosen:
+            spec["control"] = {"under-20": "select", "under-5000": "combobox",
+                               "unbounded": "record-picker"}[chosen]
+        label = ans.label_column(table, col)
+        if label:
+            spec["labelColumn"] = label
+    if ui.get("control") == "currency-input":
+        money = ans.money(table, col)
+        spec["money"] = {"currency": money["currency"],
+                         "storage": money["storage"]}
     if col["name"] in ans.readonly(table):
         spec["control"] = "readonly-text"
         spec["readOnly"] = True
@@ -1246,6 +1387,11 @@ def emit_fields(table: dict[str, Any], model: dict[str, Any],
         "  max?: number;",
         "  pattern?: string;",
         "  help?: string;",
+        "  /** A money column: the `.money` answer. `currency` is null until it",
+        "   *  is answered; `storage` says what the integer or decimal means. */",
+        "  money?: { currency: string | null; storage: 'minor-units' | 'decimal' | 'unknown' };",
+        "  /** A reference: the parent column a picker shows (`.label_column`). */",
+        "  labelColumn?: string;",
         "  /** Present when the mapper was not certain. Read it, then delete it. */",
         "  review?: string;",
         "};",
@@ -1256,7 +1402,7 @@ def emit_fields(table: dict[str, Any], model: dict[str, Any],
         entries = []
         for key in ("name", "label", "control", "required", "readOnly",
                     "options", "maxLength", "minLength", "min", "max",
-                    "pattern", "review"):
+                    "pattern", "money", "labelColumn", "review"):
             if key not in s:
                 continue
             entries.append(f"    {key}: {json.dumps(s[key])},")
@@ -1274,19 +1420,32 @@ def emit_fields(table: dict[str, Any], model: dict[str, Any],
     out.append(" *  people stop scanning and start reading. */")
     out.append(f"export const {camel(name)}ListColumns = "
                f"{json.dumps(list_cols)} as const;")
+    out.append("")
+    sort = ans.default_sort(table)
+    out.append("/** The designed order (the `.default_sort` answer). The list takes")
+    out.append(" *  its rows as props, so the query that fetches them applies this:")
+    out.append(f" *  `.order('{sort['column']}', {{ ascending: "
+               f"{'true' if sort['direction'] == 'asc' else 'false'} }})`. */")
+    out.append(f"export const {camel(name)}DefaultSort = "
+               f"{json.dumps(sort)} as const;")
     return "\n".join(out) + "\n"
 
 
-def cell_render(col: dict[str, Any], row: str = "row") -> dict[str, Any]:
+def cell_render(col: dict[str, Any], row: str = "row",
+                table: dict[str, Any] | None = None,
+                ans: Answers | None = None) -> dict[str, Any]:
     """How one column renders in a list cell or a detail value.
 
     Returns the JSX, whether it is an element or an expression (they are
     wrapped differently), the modifier class, and which formatter it needs so
-    the emitter can import exactly those and no more.
+    the emitter can import exactly those and no more. The money, zone and
+    label answers are read here, since this is where they change the output.
     """
     ui = col["ui"]
     ctrl = ui["control"]
     nullable = col.get("nullable", True)
+    ans = ans or Answers(None)
+    table = table or {"name": "", "screens": {}}
     acc = (f"{row}.{col['name']}"
            if re.fullmatch(r"[A-Za-z_$][\w$]*", col["name"])
            else f"{row}[{json.dumps(col['name'])}]")
@@ -1296,24 +1455,40 @@ def cell_render(col: dict[str, Any], row: str = "row") -> dict[str, Any]:
         return {"jsx": jsx, "element": element, "class": cls, "helper": helper}
 
     if ctrl == "currency-input":
-        minor = (ui.get("money") or {}).get("storage", "").startswith("minor")
-        if minor:
-            # `null / 100` is a type error, not a zero. The guard is not
-            # defensive noise; it is the difference between compiling and not.
-            amount = (f"{acc} === null ? null : {acc} / 100" if nullable
-                      else f"{acc} / 100")
-        else:
-            amount = acc
-        return out(f"formatMoney({amount})", cls="numeric", helper="formatMoney")
+        money = ans.money(table, col)
+        qid = f"{table['name']}.{col['name']}.money"
+        currency = (json.dumps(money["currency"]) if money["currency"]
+                    else f"'USD' /* TODO(answers): the currency, from `{qid}` */")
+        if money["storage"] == "minor-units":
+            # The scale is the currency's (JPY 1, KWD 1000), never a
+            # hard-coded 100: formatMinorUnits divides by the right one. A
+            # null stays null rather than becoming a type error.
+            return out(f"formatMinorUnits({acc}, {currency})", cls="numeric",
+                       helper="formatMinorUnits")
+        amount = acc
+        if money["storage"] == "unknown":
+            amount = (f"{acc} /* TODO(money): minor units or a decimal? "
+                      f"answer `{qid}` */")
+        return out(f"formatMoney({amount}, {currency})", cls="numeric",
+                   helper="formatMoney")
     if ctrl in ("number-input", "stepper", "percent-input"):
         return out(acc, cls="numeric")
     if ctrl in ("switch", "checkbox"):
         return out(f"{acc} ? 'Yes' : 'No'")
-    if ctrl in ("select", "radio-group") and ui.get("options"):
+    if ctrl in ("select", "radio-group") and ans.options(table, col):
         return out(f"<Badge tone={{toneFor({acc})}}>{{{acc}}}</Badge>",
                    element=True, helper="toneFor")
     if ctrl in ("readonly-timestamp", "datetime-picker", "time-picker"):
-        return out(f"formatInstant({acc})", cls="muted", helper="formatInstant")
+        zone = ""
+        if (ui.get("temporal") or {}).get("granularity") == "instant":
+            answered = ans.zone(table, col)
+            if answered == "fixed-utc":
+                zone = ", 'UTC'"
+            elif answered == "record":
+                zone = (f", undefined /* TODO(zone): this record's own zone "
+                        f"column, per `{table['name']}.{col['name']}.zone` */")
+        return out(f"formatInstant({acc}{zone})", cls="muted",
+                   helper="formatInstant")
     if ctrl == "date-picker":
         return out(f"formatDate({acc})", cls="muted", helper="formatDate")
     if ctrl == "image-upload":
@@ -1324,8 +1499,14 @@ def cell_render(col: dict[str, Any], row: str = "row") -> dict[str, Any]:
                    f"thumbnail once the bucket is known'", cls="muted")
     if col.get("foreign_key"):
         # The id is a placeholder for the parent's label, which needs a join
-        # the scaffold has no data layer to perform.
-        return out(f"{acc}", cls="truncate")
+        # the scaffold has no data layer to perform. The `.label_column`
+        # answer names the column that join selects.
+        label = ans.label_column(table, col)
+        parent = col["foreign_key"].get("table", "")
+        note = (f" /* TODO(join): show `{parent}.{label}` */" if label
+                else f" /* TODO(join): show the {parent} label; answer "
+                     f"`{table['name']}.{col['name']}.label_column` */")
+        return out(f"{acc}{note}", cls="truncate")
     if ctrl in ("textarea", "rich-text", "json-editor"):
         return out(f"String({acc} ?? '')", cls="truncate")
     if ctrl == "tag-input":
@@ -1342,27 +1523,48 @@ FORMAT_TS = """\
 /**
  * Display formatting. Deliberately tiny and deliberately explicit.
  *
- * MONEY. Integer minor units go in, a formatted string comes out, and no
- * float is ever constructed from a currency value along the way. The currency
- * is a parameter because it is a per-column answer from the interview, not a
- * global constant — the day this app sells in two currencies, a hardcoded USD
- * is 40 files of work.
+ * MONEY. The currency is a parameter because it is a per-column answer from
+ * the interview, not a global constant — the day this app sells in two
+ * currencies, a hardcoded USD is 40 files of work. Integer minor units go
+ * through `formatMinorUnits`, which divides by the currency's own scale
+ * (100 for USD and EUR, 1 for JPY, 1000 for KWD) — `Intl` knows the
+ * exponent, and a hard-coded `/ 100` is silently wrong for the rest of the
+ * world. A decimal amount goes through `formatMoney` as it is.
  *
  * INSTANTS. `timestamptz` is a point in time; rendering it needs a zone, and
  * the browser's own zone is only the right answer when the interview said
  * `viewer`. Where it said `record`, pass that record's zone in.
  */
 
-const MONEY = new Intl.NumberFormat(undefined, {
-  style: 'currency',
-  // TODO(answers): replace with the currency from the `.money` interview
-  // answer, or thread it through as a parameter if this app is multi-currency.
-  currency: 'USD',
-});
+const MONEY_FORMATS = new Map<string, Intl.NumberFormat>();
 
-export function formatMoney(amount: number | null): string {
-  if (amount === null) return '—';
-  return MONEY.format(amount);
+function moneyFormat(currency: string): Intl.NumberFormat {
+  let format = MONEY_FORMATS.get(currency);
+  if (!format) {
+    format = new Intl.NumberFormat(undefined, { style: 'currency', currency });
+    MONEY_FORMATS.set(currency, format);
+  }
+  return format;
+}
+
+/** 10 to the currency's minor-unit exponent: 100 for USD, 1 for JPY, 1000 for KWD. */
+export function minorUnitScale(currency: string): number {
+  const digits = moneyFormat(currency).resolvedOptions().maximumFractionDigits ?? 2;
+  return 10 ** digits;
+}
+
+/** A decimal amount (`numeric(p,2)`), already in major units. */
+export function formatMoney(amount: number | string | null, currency: string): string {
+  if (amount === null || amount === '') return '—';
+  const value = typeof amount === 'string' ? Number(amount) : amount;
+  if (!Number.isFinite(value)) return String(amount);
+  return moneyFormat(currency).format(value);
+}
+
+/** An integer in minor units (`price_cents`), divided by the currency's scale. */
+export function formatMinorUnits(minor: number | null, currency: string): string {
+  if (minor === null) return '—';
+  return moneyFormat(currency).format(minor / minorUnitScale(currency));
 }
 
 const INSTANT = new Intl.DateTimeFormat(undefined, {
@@ -1435,7 +1637,7 @@ def emit_list(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str
     cols = [c for c in table["columns"] if c["name"] in listed]
     if not cols:
         cols = table["columns"][:1]
-    cells = {c["name"]: cell_render(c) for c in cols}
+    cells = {c["name"]: cell_render(c, "row", table, ans) for c in cols}
 
     needs_badge = any(cells[c["name"]]["jsx"].startswith("<Badge") for c in cols)
     href = f"'/{name}/' + String(row.{pk})"
@@ -1626,7 +1828,7 @@ def emit_detail(table: dict[str, Any], model: dict[str, Any],
             continue
         if c["name"] == title:
             continue
-        cell = cell_render(c, "record")
+        cell = cell_render(c, "record", table, ans)
         cells.append(cell)
         rows.append(
             f"          <div className={{styles.pair}}>\n"
@@ -1769,13 +1971,20 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
     name = spec["name"]
     key = prop_key(name)
     acc = f"values.{name}" if key == name else f"values[{json.dumps(name)}]"
+    # The control itself carries the error's id and the invalid flag:
+    # assistive tech reads `aria-describedby` and `aria-invalid` on the
+    # control, not on a wrapper. The id is the one Field.tsx gives the error.
     common = (f'id={{fieldId(\'{name}\')}}\n{indent}  name="{name}"\n'
               f'{indent}  disabled={{disabled}}\n'
               f'{indent}  aria-invalid={{Boolean(errors.{name}) || undefined}}\n'
+              f"{indent}  aria-describedby={{errors.{name} ? fieldId('{name}') + '-error' : undefined}}\n"
               f'{indent}  required={{{str(spec.get("required", False)).lower()}}}')
     if ctrl in STUB_REASON:
+        reason = STUB_REASON[ctrl]
+        if spec.get("labelColumn"):
+            reason += f"; it shows `{spec['labelColumn']}`"
         return (f'{indent}<ControlStub control="{ctrl}" '
-                f'reason="{STUB_REASON[ctrl]}" />')
+                f'reason="{reason}" />')
     if ctrl in ("textarea", "rich-text"):
         return (f"{indent}<TextArea\n{indent}  {common}\n"
                 f"{indent}  value={{String({acc} ?? '')}}\n"
@@ -1789,6 +1998,11 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
             for o in opts)
         blank = (f"{indent}    <option value=\"\">Choose one</option>\n"
                  if not spec.get("required") and not multi else "")
+        if not opts and spec.get("labelColumn"):
+            # A reference with under 20 parents: the rows come from the
+            # parent table, and the option shows the answered label column.
+            options = (f"{indent}    {{/* TODO(options): one <option> per "
+                       f"parent row, showing `{spec['labelColumn']}` */}}")
         return (f"{indent}<Select{multi}\n{indent}  {common}\n"
                 f"{indent}  value={{String({acc} ?? '')}}\n"
                 f"{indent}  onChange={{(e) => onChange('{name}', e.target.value)}}\n"
@@ -1800,6 +2014,8 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
                 f"{indent}  options={{{opts}}}\n"
                 f"{indent}  disabled={{disabled}}\n"
                 f"{indent}  labelledBy={{fieldId('{name}') + '-label'}}\n"
+                f"{indent}  describedBy={{errors.{name} ? fieldId('{name}') + '-error' : undefined}}\n"
+                f"{indent}  invalid={{Boolean(errors.{name})}}\n"
                 f"{indent}  onValueChange={{(next) => onChange('{name}', next)}}\n"
                 f"{indent}/>")
     if ctrl in ("switch", "checkbox"):
@@ -1817,9 +2033,21 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
             extra += f"\n{indent}  max={{{spec['max']}}}"
         note = ""
         if ctrl == "currency-input":
-            note = (f"\n{indent}  // TODO(money): this is stored in minor units. "
-                    f"Divide on read,\n{indent}  // multiply on write, and keep "
-                    f"the float out of the middle.")
+            money = spec.get("money") or {}
+            cur = money.get("currency") or "the currency"
+            if money.get("storage") == "minor-units":
+                note = (f"\n{indent}  // TODO(money): stored in minor units of {cur}. "
+                        f"Divide by\n{indent}  // minorUnitScale({json.dumps(cur) if money.get('currency') else 'currency'}) "
+                        f"on read, multiply on write, and keep the\n{indent}  // float out of the middle.")
+            elif money.get("storage") == "decimal":
+                extra += f'\n{indent}  step="any"'
+                note = (f"\n{indent}  // TODO(money): a decimal amount in {cur}; "
+                        f"the database rounds to its\n{indent}  // scale. Parse "
+                        f"permissively, format on blur, never while typing.")
+            else:
+                note = (f"\n{indent}  // TODO(money): minor units or a decimal? "
+                        f"Answer the `.money` question;\n{indent}  // the two "
+                        f"differ by the currency's scale on every read and write.")
         return (f"{indent}<NumberInput\n{indent}  {common}{extra}{note}\n"
                 f"{indent}  value={{{acc} ?? ''}}\n"
                 f"{indent}  onChange={{(e) => onChange('{name}', e.target.valueAsNumber)}}\n"
@@ -1898,12 +2126,13 @@ def emit_form(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str
           label="$label"
           required={$required}
           error={errors.$name ?? null}
-          disabled={disabled}
+          disabled={disabled}$group
         >
 $control
         </Field>""").safe_substitute(
                 name=f, label=s["label"],
                 required=str(s.get("required", False)).lower(),
+                group="\n          group" if s["control"] == "radio-group" else "",
                 control=control_jsx(s), review=review))
         sections.append(
             f"      <fieldset className={{styles.group}} disabled={{disabled}}>\n"
@@ -1912,6 +2141,7 @@ $control
             + "\n".join(body) + "\n      </fieldset>")
 
     return Template("""\
+import { useEffect, useRef } from 'react';
 import { $kit } from '../../ui';
 import type { ${Entity}Draft } from './$camel.types';
 import styles from './${Entity}Form.module.css';
@@ -1964,6 +2194,19 @@ export function ${Entity}Form({
   onCancel,
 }: ${Entity}FormProps) {
   const invalid = Object.entries(errors).filter(([, message]) => Boolean(message));
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const focusSummary = useRef(false);
+
+  // After a submit that failed validation, move focus to the summary. The
+  // caller sets `errors` (now, or once its validation returns), so the move
+  // waits for the render that shows them; fixing a field afterwards does not
+  // move focus again.
+  useEffect(() => {
+    if (focusSummary.current && invalid.length > 0) {
+      focusSummary.current = false;
+      summaryRef.current?.focus();
+    }
+  }, [invalid.length]);
 
   return (
     <form
@@ -1971,11 +2214,12 @@ export function ${Entity}Form({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
+        focusSummary.current = true;
         onSubmit();
       }}
     >
       {invalid.length > 0 ? (
-        <div className={styles.summary} role="alert" tabIndex={-1}>
+        <div className={styles.summary} role="alert" tabIndex={-1} ref={summaryRef}>
           <p className={styles.summaryTitle}>
             {invalid.length === 1 ? 'One field needs attention' : String(invalid.length) + ' fields need attention'}
           </p>
@@ -2300,6 +2544,7 @@ TW_UTILITIES = {
     "body":         "text-body max-w-narrow",
     "label":        "text-label text-default",
     "legend":       "px-inline-xs text-h4 text-strong",
+    "groupLabel":   "float-left w-full p-0",
     "required":     "text-danger-fg",
     "help":         "text-label text-muted",
     "error":        "text-label text-danger-fg",
@@ -2527,7 +2772,7 @@ TW_ROOT_UTILITIES = {
     "Skeleton": "block rounded-inner bg-sunken",
     "StateBlock": "flex flex-col gap-related items-center p-card-lg rounded-panel "
                   "bg-surface text-muted text-center border border-line-subtle",
-    "Field":   "block max-w-narrow",
+    "Field":   "block max-w-narrow min-w-0 m-0 p-0 border-none",
     "List":    "w-full border-collapse text-ui text-default",
 }
 
@@ -2887,6 +3132,220 @@ def emit_policy_test(table: dict[str, Any], model: dict[str, Any], ans: Answers)
     return text.replace("do $$ begin", f"do {tag} begin").replace("end $$;", f"end {tag};")
 
 
+# ---------------------------------------------------------------------------
+# The server schema: the same constraints the form mirrors, for the side that
+# is a control rather than a courtesy
+# ---------------------------------------------------------------------------
+
+INTEGER_TYPES = ("integer", "smallint", "bigint")
+NUMBER_TYPES = INTEGER_TYPES + ("numeric", "real", "double precision", "money")
+
+
+def schema_fields(table: dict[str, Any], model: dict[str, Any],
+                  ans: Answers) -> list[dict[str, Any]]:
+    """One entry per writable column: what the Draft type submits, with the
+    rules the database holds. A rule invented by the mapper (`mirror: false`)
+    is kept and marked, so a reviewer can add the constraint or drop the
+    rule, but never find the two silently disagreeing."""
+    writable = ans.writable(table)
+    cols = {c["name"]: c for c in table["columns"]}
+    out = []
+    for name in writable:
+        col = cols[name]
+        spec = field_spec(col, table, model, ans)
+        rules = col["ui"].get("validation", [])
+        # A rule is invented only when no constraint states it: a CHECK and
+        # the mapper's "money is non-negative" both say `min`, and the CHECK
+        # makes it a mirror.
+        mirrored = {r["rule"] for r in rules if r.get("mirror") is not False}
+        invented = sorted({r["rule"] for r in rules
+                           if r.get("mirror") is False} - mirrored)
+        fmt = next((r["value"] for r in rules if r["rule"] == "format"), None)
+        entry = {
+            "name": name,
+            "type": col["type"],
+            "nullable": bool(col.get("nullable", True)),
+            "required": bool(spec.get("required")),
+            "array": bool(col.get("is_array")),
+            "enum": model["enums"].get(col["enum"], []) if col.get("enum") else [],
+            "options": spec.get("options") or [],
+            "integer": col["type"] in INTEGER_TYPES
+                       or (spec.get("money") or {}).get("storage") == "minor-units",
+            "format": fmt,
+            "temporal": (col["ui"].get("temporal") or {}).get("granularity"),
+            "invented": invented,
+        }
+        for key in ("maxLength", "minLength", "min", "max", "pattern"):
+            if key in spec:
+                entry[key] = spec[key]
+        out.append(entry)
+    return out
+
+
+def emit_schema_zod(table: dict[str, Any], model: dict[str, Any],
+                    ans: Answers) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    fields = schema_fields(table, model, ans)
+    lines = [
+        "/**",
+        f" * The server's schema for a {singular(name.replace('_', ' '))} draft.",
+        " *",
+        " * The form's validation is a courtesy; this is the control. Every rule",
+        " * here mirrors a database constraint, the same ones the form reads from",
+        " * the model, so the two cannot drift apart. A rule marked `invented`",
+        " * came from the mapper, not the schema: add the constraint or drop the",
+        " * rule. Run it in whatever answers the browser: an Edge Function, a",
+        " * route handler, a server action.",
+        " */",
+        "import { z } from 'zod';",
+        "",
+        f"export const {camel(singular(name))}DraftSchema = z.object({{",
+    ]
+    for f in fields:
+        values = f["enum"] or f["options"]
+        if values:
+            expr = f"z.enum({json.dumps(values)})"
+        elif f["type"] in NUMBER_TYPES:
+            expr = "z.number()"
+            if f["integer"]:
+                expr += ".int()"
+            if "min" in f:
+                expr += f".min({f['min']})"
+            if "max" in f:
+                expr += f".max({f['max']})"
+        elif f["type"] == "boolean":
+            expr = "z.boolean()"
+        elif f["type"] in ("jsonb", "json"):
+            expr = "z.unknown()"
+        elif f["temporal"] == "instant":
+            expr = "z.string().datetime({ offset: true })"
+        elif f["temporal"] == "date":
+            expr = "z.string().date()"
+        elif f["temporal"] == "time":
+            expr = "z.string().time()"
+        elif f["type"] == "uuid":
+            expr = "z.string().uuid()"
+        else:
+            expr = "z.string()"
+            if f["format"] == "email":
+                expr += ".email()"
+            elif f["format"] == "uri":
+                expr += ".url()"
+            if "minLength" in f:
+                expr += f".min({f['minLength']})"
+            elif f["required"]:
+                expr += ".trim().min(1)"
+            if "maxLength" in f:
+                expr += f".max({f['maxLength']})"
+            if "pattern" in f:
+                expr += f".regex(new RegExp({json.dumps(f['pattern'])}))"
+        if f["array"]:
+            expr = f"z.array({expr})"
+        if f["nullable"]:
+            expr += ".nullable()"
+        if not f["required"]:
+            expr += ".optional()"
+        note = (f" // invented: {', '.join(f['invented'])}"
+                if f["invented"] else "")
+        lines.append(f"  {prop_key(f['name'])}: {expr},{note}")
+    lines += [
+        "}).strict();",
+        "",
+        f"export type {Entity}DraftInput = z.infer<typeof "
+        f"{camel(singular(name))}DraftSchema>;",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def emit_schema_pydantic(table: dict[str, Any], model: dict[str, Any],
+                         ans: Answers) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    fields = schema_fields(table, model, ans)
+    uses_literal = any(f["enum"] or f["options"] for f in fields)
+    uses_decimal = any(f["type"] in NUMBER_TYPES and not f["integer"] for f in fields)
+    uses_any = any(f["type"] in ("jsonb", "json") for f in fields)
+    temporal = sorted({{"instant": "datetime", "date": "date", "time": "time"}[f["temporal"]]
+                       for f in fields if f["temporal"]})
+    typing = ["Optional"] + (["Literal"] if uses_literal else []) + (["Any"] if uses_any else [])
+    lines = [
+        f'"""The server\'s schema for a {singular(name.replace("_", " "))} draft.',
+        "",
+        "The form's validation is a courtesy; this is the control. Every rule here",
+        "mirrors a database constraint, the same ones the form reads from the model,",
+        "so the two cannot drift apart. A rule marked `invented` came from the mapper,",
+        "not the schema: add the constraint or drop the rule. Pydantic 2.",
+        '"""',
+        "",
+        "from __future__ import annotations",
+        "",
+    ]
+    if temporal:
+        lines.append(f"from datetime import {', '.join(temporal)}")
+    if uses_decimal:
+        lines.append("from decimal import Decimal")
+    lines += [f"from typing import {', '.join(sorted(typing))}"]
+    if any(f["type"] == "uuid" for f in fields):
+        lines.append("from uuid import UUID")
+    lines += ["", "from pydantic import BaseModel, ConfigDict, Field", "", "",
+              f"class {Entity}Draft(BaseModel):",
+              "    model_config = ConfigDict(extra='forbid')", ""]
+    for f in fields:
+        values = f["enum"] or f["options"]
+        args: list[str] = []
+        if values:
+            typ = "Literal[" + ", ".join(repr(v) for v in values) + "]"
+        elif f["type"] in NUMBER_TYPES:
+            typ = "int" if f["integer"] else "Decimal"
+            if "min" in f:
+                args.append(f"ge={f['min']}")
+            if "max" in f:
+                args.append(f"le={f['max']}")
+        elif f["type"] == "boolean":
+            typ = "bool"
+        elif f["type"] in ("jsonb", "json"):
+            typ = "Any"
+        elif f["temporal"]:
+            typ = {"instant": "datetime", "date": "date", "time": "time"}[f["temporal"]]
+        elif f["type"] == "uuid":
+            typ = "UUID"
+        else:
+            typ = "str"
+            if f["format"] == "email":
+                # pydantic's EmailStr needs the email-validator package;
+                # the same pattern the form shows, until that is installed.
+                args.append("pattern=r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'")
+            elif f["format"] == "uri":
+                args.append("pattern=r'^https?://'")
+            if "minLength" in f:
+                args.append(f"min_length={f['minLength']}")
+            elif f["required"]:
+                args.append("min_length=1")
+            if "maxLength" in f:
+                args.append(f"max_length={f['maxLength']}")
+            if "pattern" in f:
+                args.append(f"pattern={f['pattern']!r}")
+        if f["array"]:
+            typ = f"list[{typ}]"
+        if f["nullable"] or not f["required"]:
+            # Nullable, or omittable (the column has a default): None either way.
+            typ = f"Optional[{typ}]"
+        default = "..." if f["required"] else "None"
+        attr = f["name"]
+        if not attr.isidentifier() or keyword.iskeyword(attr):
+            # `class`, `from`, `order-id`: the attribute is renamed and the
+            # alias keeps the column's own name on the wire.
+            attr = re.sub(r"\W", "_", attr) + "_"
+            args.append(f"alias={f['name']!r}")
+        note = (f"  # invented: {', '.join(f['invented'])}"
+                if f["invented"] else "")
+        lines.append(f"    {attr}: {typ} = Field({', '.join([default] + args)}){note}")
+    if not fields:
+        lines.append("    pass")
+    return "\n".join(lines) + "\n"
+
+
 def build_files(model: dict[str, Any], ans: Answers, stack: str,
                 entities: set[str] | None) -> dict[str, str]:
     files: dict[str, str] = {}
@@ -2939,6 +3398,10 @@ def build_files(model: dict[str, Any], ans: Answers, stack: str,
             if css:
                 files[f"{base}/{comp}.module.css"] = sheet
         files[f"{base}/index.ts"] = emit_index(table, ans)
+        # The server's copy of the constraints, in both languages a Supabase
+        # server is written in; delete the one the project does not use.
+        files[f"server/{name}.schema.ts"] = emit_schema_zod(table, model, ans)
+        files[f"server/{name}_schema.py"] = emit_schema_pydantic(table, model, ans)
 
     # The database side. A join table needs its policies too: the
     # many-to-many control reads and writes it.

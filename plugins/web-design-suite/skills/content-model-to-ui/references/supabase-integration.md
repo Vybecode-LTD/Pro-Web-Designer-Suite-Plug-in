@@ -417,6 +417,8 @@ The publishable key is not a secret and gives no protection. With it, anyone can
 
 ### FastAPI has two authorities, and must choose per request
 
+Whichever authority a write runs under, it validates the body first with the generated `server/<table>_schema.py` (pydantic) or `server/<table>.schema.ts` (zod): the same constraints the form shows, enforced where the browser cannot edit them (field-mapping.md §9). RLS decides *whose* row; the schema decides *what* a row may hold.
+
 **As the user (the default).** Forward the caller's access token. The publishable key goes on the `apikey` header and the user's token on `Authorization`, so PostgREST runs the query as that user and every policy applies:
 
 ```python

@@ -301,7 +301,7 @@ Eleven decisions, each of which a generator gets wrong by default.
 
 **The error summary comes first in the DOM and takes focus on failed submit.** On a long form the invalid field is usually off-screen, and a user who presses Save and sees nothing happen concludes the button is broken. Each summary entry links to its field.
 
-**Errors sit below their field**, in `--fg-danger`, referenced by `aria-describedby`, with `aria-invalid` on the control. Help text is referenced first so the guidance is heard before the complaint.
+**Errors sit below their field**, in `--fg-danger`, referenced by `aria-describedby`, with `aria-invalid` on the control. Help text is referenced first so the guidance is heard before the complaint. Both attributes go on the control itself: assistive tech ignores them on a wrapper. The error is not a live region; the summary is the one live region, and a `role="alert"` per field would announce each failure a second time. A radio group is a `<fieldset>` whose `<legend>` carries the id its `aria-labelledby` names, because a `<label for>` can name only one control.
 
 **Error copy says what to do.** "Enter an email address, like name@example.com" beats "Invalid email". The user already knows it is invalid; that is why the message is there.
 
