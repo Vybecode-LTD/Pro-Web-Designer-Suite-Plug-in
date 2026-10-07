@@ -195,7 +195,8 @@ obligation. A third grey requires a third *meaning*, not a third hex.
 **Mechanism.** Danger, warning and success are a signalling channel that works because it is reserved;
 spending red on emphasis costs the product its ability to say "something is wrong" anywhere, not just here.
 **Confirm.** For every intent color: does it report state or decorate? Then — is any state carried by color
-alone? About 4% of male users cannot read your red/green.
+alone? About 1 in 12 men have a color vision deficiency ([NEI](https://www.nei.nih.gov/learn-about-eye-health/eye-conditions-and-diseases/color-blindness)), and the most
+common kind makes red and green hard to tell apart.
 **Fix.** Intent roles reserved by documented rule, and every state using one also carries an icon, a label
 or a shape.
 

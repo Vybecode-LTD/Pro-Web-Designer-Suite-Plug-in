@@ -398,6 +398,42 @@
         "email-template-system/references/email-client-matrix.md",
         "email-template-system/references/email-workflow.md"
       ]
+    },
+    {
+      "figure": "85%",
+      "also": [
+        "31%"
+      ],
+      "claim": "the share of usability problems five users find in a qualitative study, when each user finds 31% (NN/g's five-user rule)",
+      "source": "Nielsen Norman Group, Why You Only Need to Test with 5 Users (2000)",
+      "url": "https://www.nngroup.com/articles/why-you-only-need-to-test-with-5-users/",
+      "checked": "2026-10-07",
+      "quote": "The typical value of L is 31%, averaged across a large number of projects we studied. ... After the first study with five participants has found 85% of the usability problems, you will want to fix these problems in a redesign.",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "20 users",
+      "claim": "how many users NN/g recommends for a quantitative usability study",
+      "source": "Nielsen Norman Group, Quantitative Studies: How Many Users to Test? (2006)",
+      "url": "https://www.nngroup.com/articles/quantitative-studies-how-many-users/",
+      "checked": "2026-10-07",
+      "quote": "I usually recommend testing with 20 users when collecting quantitative usability metrics.",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "1 in 12 men",
+      "claim": "how many men have a color vision deficiency",
+      "source": "National Eye Institute, Color Blindness",
+      "url": "https://www.nei.nih.gov/learn-about-eye-health/eye-conditions-and-diseases/color-blindness",
+      "checked": "2026-10-07",
+      "quote": "About 1 in 12 men have color vision deficiency",
+      "docs": [
+        "design-critique-gate/references/failure-catalog.md"
+      ]
     }
   ],
   "not_statistics": [

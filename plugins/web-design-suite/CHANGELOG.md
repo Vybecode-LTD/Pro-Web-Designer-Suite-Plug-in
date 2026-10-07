@@ -132,6 +132,42 @@
   L6-3, L8-2, L8-3) and says "Eleven further failures" for its eleven rows. It and
   SKILL.md said 92 checklist rows where review-checklist.md has 91, and the conformance
   layer is timed "2 min + 30 min", with the protocol's half-hour for the checklist.
+- **One rule for a risky client request** (PS-A8). evidence.md §7.3 said to build a
+  contrast failure the client asked for ("It is their site"), objection-handling.md §4
+  said "I'll build it either way" while §5 held the line on accessibility, and
+  landing-page-conversion declined deceptive patterns. objection-handling.md §5 now has
+  the one rule, and evidence.md and the landing SKILL point to it: a lawful choice that
+  only costs them is noted and built; an accessibility failure is held (the compliant
+  version is built, the failing one is not, and the risk goes in writing); anything deceptive or unlawful is declined with the honest version offered;
+  a question of law goes to their lawyer.
+- **The persuasion references' law and figures, re-read at the source on 2026-10-07**
+  (PS-A9, PS-A14, PS-A15). conversion-audit.md §11: DSA Art. 25 binds only online
+  platforms and, by its paragraph 2, does not apply to practices the UCPD or the GDPR
+  cover, so it adds nothing to the UCPD for a company's own site; the Digital Fairness
+  Act is announced, not proposed (the Parliament's tracker: "Announced", indicative Q4
+  2026); the paragraph is dated. §2: a five-second test with five people catches a gross
+  failure and measures nothing; NN/g's five-user rule (85% of problems when each user
+  finds 31%) is for iterative qualitative testing, and NN/g recommends 20 users for a
+  quantitative study, so comparing two headlines needs about that many per variant.
+  failure-catalog.md: about 1 in 12 men have a colour vision deficiency (NEI), not "4%".
+  All three figures are in `evidence.json`, and test_evidence reads "1 in 12 men" as a
+  figure and the NEI as a source.
+- **Advice that failed on its own terms** (PS-A16, PS-A18). critique-method.md §3.5's
+  focus-ring fix, `box-shadow: var(--shadow-focus)`, failed the suite's own audit (a
+  tier-1 leak); it is now the contract's outline in `--border-focus` with
+  `box-shadow: var(--elevation-focus)` beside it, and the test runs it through
+  `audit_design --strict`. §3.1's `rg … | sort | uniq -c` counted every value once (rg
+  prefixes each line with the file when it searches several); it takes `-I`. Type roles
+  do not carry tracking (each is a `font` shorthand): critique-method §3.4 and
+  copy-patterns.md say base.css binds it to the headings and `.text-display`.
+  page-architecture.md's media advice: captions (1.2.2, A) and audio description (1.2.5,
+  AA) for video, since a transcript meets 1.2.3 at A but not 1.2.5 at AA, and a text
+  alternative for an audio-only demo (1.2.1, A).
+- **page-sections.css says what it does** (PS-A22). "Seven" shells for a list of eight;
+  the avatar-to-name gap is `--gap-fused` in the code, as its comment and
+  page-architecture.md say; the `.feature-card--media` comment describes the media
+  variant; the CTA note's raw `opacity: 0.85` is gone (smaller, not fainter); the avatar is
+  sized through a `--testimonial-avatar` socket, not as a tap target.
 - **Gmail's limits are registered figures** (N36, CodeRabbit on #59). The email docs quoted a 102,400-byte clipping threshold and a 16,384-byte `<style>` ceiling that no entry in `evidence.json` backed, and `test_evidence` did not recognise a byte count as a figure. Re-read 2026-10-07: Google publishes no clipping figure; the ESPs document 102 KB (Mailmodo, DailyStory), and the byte-exact 102,400 is from measurement, which the docs now say; the `<style>` ceiling is email-bugs #90's 16,384 bytes. Both are registered for every email doc that quotes them, and `FIGURE` reads byte counts (`102,400 bytes`, `16,384-byte`, `16 kB`, `102kb`).
 - **The scaffold reads every interview answer** (DL-A8). `.money` set the currency and
   the storage unit and nothing read them: every cell was `formatMoney(x / 100)` in a

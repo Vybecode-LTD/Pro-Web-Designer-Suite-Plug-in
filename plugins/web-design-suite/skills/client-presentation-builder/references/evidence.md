@@ -277,9 +277,12 @@ principle, which is arguable. And it leaves the decision with them — which is 
 belongs, because it is their site, and a client who is told "no" remembers it longer than a
 client who is told what it costs and chooses.
 
-**When it is genuinely dangerous** — a contrast failure, a broken tap target, something that
-creates a legal exposure — say so once, plainly, name the risk rather than the rule, and put
-it in writing afterwards. "I've built it as you asked. Noting for the record that the
-contrast on that button is below the accessibility standard, so if you ever get an
-accessibility complaint that is where it will land." Then build it. It is their site. Your
-job is to make sure the decision was informed, not to win it.
+**When it is genuinely dangerous**, objection-handling.md §5 has the rule. A lawful choice
+that only costs them, you note and build. An accessibility failure (a contrast failure, a
+broken tap target), you hold: build the version that meets their goal and the standard, and
+put the risk of the other in writing. "I've built the button at the nearest shade that
+meets the accessibility standard. The exact one you asked for is below it, which is why I
+haven't built it: if it is ever changed to that, an accessibility complaint will land
+there." Anything deceptive or unlawful, you
+decline and offer the honest version, and a question of law goes to their lawyer. Your job
+is to make sure the decision was informed, not to win it.
