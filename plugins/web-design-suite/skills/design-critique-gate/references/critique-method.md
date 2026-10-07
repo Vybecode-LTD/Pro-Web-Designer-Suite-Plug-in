@@ -104,8 +104,11 @@ seconds, the principle underneath, and the fix at the system level.
 ### 3.1 Inconsistent gaps at one hierarchy level
 
 **Spot it.** Scroll to any row or list and measure two adjacent gaps that should mean the
-same thing. Or: `rg -o '(gap|padding|margin)[^;:]*:\s*[^;]+;' src/components | sort | uniq -c | sort -rn`
-— anything with a count of 1 is suspect.
+same thing. Or: `rg -I -o '(gap|padding|margin)[^;:]*:\s*[^;]+;' src/components | sort | uniq -c | sort -rn`
+— anything with a count of 1 is used once in all the components, and suspect. (`-I`
+drops the file name rg puts on each line when it searches several files; with the name kept, a
+value would be counted per file, and one used once in each of ten files would look like
+ten one-offs.)
 
 **Principle.** Spacing is the only channel that encodes *relationship*. Two values for one
 relationship makes the channel noisy, and the reader stops trusting proximity as a cue —
@@ -154,8 +157,9 @@ perfectly on-scale and still tells the reader that a caption outranks the body i
 annotates. Rank is a claim; the scale does not check your claims.
 
 **System fix.** Components read composite `--type-*` roles, never raw `--text-*` steps.
-Roles carry size, leading, tracking and weight together, which is what makes the claim
-reviewable in one place.
+Roles carry size, leading and weight together (each is a `font` shorthand), which is what
+makes the claim reviewable in one place. Tracking is not in the shorthand: base.css binds it
+to the heading levels and `.text-display`, and a component never restates it.
 
 ### 3.5 A focus ring that only works on one surface
 
@@ -167,10 +171,11 @@ against *whatever is behind it*, which changes per surface. A ring that disappea
 primary CTA is worse than no ring, because it is the control most likely to be reached by
 keyboard.
 
-**System fix.** The two-part ring from the token contract: an inner halo in the *surface*
-color plus an outer ring in `--border-focus`, so it separates from any background —
-`box-shadow: var(--shadow-focus)` paired with `outline: var(--stroke-focus) solid transparent`
-so it survives forced-colors mode, which discards box-shadow entirely.
+**System fix.** The ring from the token contract: `outline: var(--stroke-focus) solid var(--border-focus)`
+with `outline-offset: var(--stroke-focus)`, which forced-colors mode repaints rather than
+discards, plus `box-shadow: var(--elevation-focus)` where the ring must also separate from the
+surface behind it: beside the outline, never in place of it, because forced-colors mode
+drops box-shadow entirely. A raw `--shadow-*` here fails the audit's tier rule (§3.7).
 
 ### 3.6 An accent used decoratively, and therefore devalued
 

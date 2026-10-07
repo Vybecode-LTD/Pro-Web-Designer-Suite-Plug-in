@@ -26,14 +26,15 @@ REGISTER = json.loads((pathlib.Path(__file__).resolve().parent / "fixtures" / "e
 
 # A sentence attributes a figure when it names a source, links out, or says
 # where the number came from.
-CUE = re.compile(r"WebAIM|Deque|\bGDS\b|Government Digital|Baymard|NN/g|Nielsen Norman|"
+CUE = re.compile(r"WebAIM|\bNEI\b|National Eye Institute|Deque|\bGDS\b|Government Digital|Baymard|NN/g|Nielsen Norman|"
                  r"HTTP Archive|Web Almanac|CrUX|Chrome UX|caniemail|Litmus|Email on Acid|"
                  r"Akamai|Portent|Deloitte|Forrester|Gartner|McKinsey|Statista|Unbounce|HubSpot|"
                  r"\bCXL\b|Google|Microsoft|Apple|Cloudflare|\bstudy\b|\bstudies\b|\bsurvey\b|"
                  r"\breport(?:ed|s)?\b|\bresearch\b|\banalys[ie]s\b|\]\(https?://")
 FIGURE = re.compile(
     r"(?<![\w.#(/-])("
-    r"\d[\d,]*(?:\.\d+)?\s?[–-]\s?\d[\d,]*(?:\.\d+)?\s?%"          # a range: 37–41%
+    r"\d[\d,]* in \d[\d,]*\s(?:men|women|people|adults|users)"  # a share: 1 in 12 men
+    r"|\d[\d,]*(?:\.\d+)?\s?[–-]\s?\d[\d,]*(?:\.\d+)?\s?%"          # a range: 37–41%
     r"|\d[\d,]*(?:\.\d+)?\s?%"                                      # a percentage
     r"|\d[\d,]*(?:\.\d+)?\+?\s(?:participants|respondents|pages|sites|audits|issues|users|"
     r"fixations|home pages|form fields|categories|tools|errors|people|studies)"

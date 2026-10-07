@@ -124,7 +124,7 @@ Eight formulas. Each is a *starting shape*, not a template to fill blindly; the 
 
 ### Length and setting
 
-Two lines at `--type-display` is the practical ceiling; three wraps into a paragraph and stops being a headline. Set the H1 to `--measure-narrow`, never `--measure-prose` — a display-size line at 68ch forces the eye to travel too far to find the line return, and the headline stops reading as one unit. `--type-display` already carries `--leading-tight` and `--tracking-tighter`; do not add tracking on top of it.
+Two lines at `--type-display` is the practical ceiling; three wraps into a paragraph and stops being a headline. Set the H1 to `--measure-narrow`, never `--measure-prose` — a display-size line at 68ch forces the eye to travel too far to find the line return, and the headline stops reading as one unit. `--type-display` sets the size, weight and `--leading-tight`; its tracking, `--tracking-tighter`, comes from base.css, on the `h1` and on `.text-display`. Set the headline through one of those and add no tracking of your own.
 
 ---
 

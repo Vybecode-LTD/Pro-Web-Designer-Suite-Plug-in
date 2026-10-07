@@ -4,7 +4,7 @@
 
    The section-level companion to web-design-studio's `layout.css`. That file
    owns the PRIMITIVES (stack, cluster, split, switcher, grid, cover, frame,
-   center, reel). This file owns the seven SECTION SHELLS a converting page is
+   center, reel). This file owns the eight SECTION SHELLS a converting page is
    assembled from, expressed entirely in those primitives:
 
      1. Section band + heading block     5. Pricing table
@@ -201,9 +201,9 @@
     color: var(--fg-link);
   }
 
-  /* Bordered variant for a card that must sit on --bg-surface without
-     disappearing into it. Concentric corners: the inner radius equals the
-     outer minus the inset, floored so it never goes negative. */
+  /* Media variant: the figure runs edge to edge across the top, its top
+     corners following the card's and its bottom corners square against
+     the content, which keeps the card's inset. */
   .feature-card--media { padding: 0; }
   .feature-card--media > .feature-card__figure {
     border-start-start-radius: var(--feature-card-radius);
@@ -234,6 +234,10 @@
   .testimonial {
     --testimonial-inset: var(--pad-card);
     --testimonial-gap: var(--gap-separate);
+    /* No role sizes an avatar. It borrows --tap-min's 2.75rem, about the
+       height of the name and role beside it; it is not a tap target, and
+       this socket is where a project re-points it. */
+    --testimonial-avatar: var(--tap-min);
 
     display: grid;
     gap: var(--testimonial-gap);
@@ -254,11 +258,11 @@
   .testimonial__attribution {
     display: flex;
     align-items: center;
-    gap: var(--gap-tight);
+    gap: var(--gap-fused);
   }
   .testimonial__avatar {
-    inline-size: var(--tap-min);
-    block-size: var(--tap-min);
+    inline-size: var(--testimonial-avatar);
+    block-size: var(--testimonial-avatar);
     border-radius: var(--radius-full);
     object-fit: cover;
     flex: none;
@@ -460,7 +464,9 @@
     margin-inline: auto;         /* alignment, not spacing */
   }
   .cta-block__claim { font: var(--type-h2); }
-  .cta-block__note  { font: var(--type-ui); opacity: 0.85; }
+  /* Smaller, not fainter: on an inverse band there is no muted role, and an
+     opacity is a colour nobody measured. */
+  .cta-block__note  { font: var(--type-ui); }
 
   /* The button shell. Focus styling is deliberately absent — it is defined
      once in base.css for every focusable element on the page. */
