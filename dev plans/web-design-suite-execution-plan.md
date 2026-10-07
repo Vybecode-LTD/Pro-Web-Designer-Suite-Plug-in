@@ -114,7 +114,7 @@ Re-read `web-design-suite-review/claude-code-capabilities.md` against the curren
 
 | PR | What | Items | Main files | Size |
 |---|---|---|---|---|
-| P24 | The project contract: `.design-suite.json`, read by every script, the hook and the commands, and a `contract.json` generated from the project's tokens | XC-C8, LC-C1, LC-B3 | a shared config reader, every script's argument parsing | M |
+| P24 | The project contract: `.design-suite.json`, read by every script, the hook and the commands, and a `contract.json` generated from the project's tokens | XC-C8, LC-C1, LC-B3 | a shared config reader, every script's argument parsing | L, two parts |
 | P25 | Hooks: the opt-in design gate on Edit and Write, a block on edits to generated files, `diff_system` after a tokens edit, and a `UserPromptSubmit` router that names the right skill when the listing has dropped the descriptions | XC-C2, LC-C8, SS-C6 | `hooks/hooks.json`, `hooks/*.py` | M |
 | P26 | Workflow commands and CI bootstrap: gate, install-gate (which writes the CI template for all three gates in a pinned Playwright container, with a baseline-update job), new-system, critique, migrate, release-check, figma-sync, and the audit-to-deck chain | XC-C3, LC-C9, PS-C11, LC-B4, GT-C12 | `skills/<command>/SKILL.md` with `disable-model-invocation: true`, templates | M-L |
 | P27 | Subagents: design-critic, gate-runner, supabase-security-reviewer, codemod-batch-reviewer. GT-C9 and DL-C7 close here, and their other parts land with their kind: GT-C9's hook in P25; DL-C7's email-template hook in P25, its schema-to-screens and email-build commands in P26, and its delivery evals in P30 | XC-C4, PS-C4, GT-C9, DL-C7 | `agents/*.md` | M |

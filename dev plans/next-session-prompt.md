@@ -192,7 +192,9 @@ Before the schema, re-run that grep: the list above is from 2026-10-07.
 2. **`contract.json`'s schema.** `extract_system.py` writes it from the project's tokens.css: ramps, scales, roles and breakpoints, with a schema version. Every script whose `--tokens` takes a tokens.css (figma_audit, extract_system, build_presentation, and the ones P24 adds) accepts either that or a `contract.json`. The email scripts' `--tokens` does not.
 3. **One reader.** A Python module that finds and validates the config. It has a master in `shared/` and a copy in each skill that needs it, with a test that the copies match, as `browser_common.mjs` has.
 
-**The split (L, two parts):**
+**Who reads the config.** P24 builds the reader, and the scripts read it through their argument parsing. The hooks (P25) and the commands (P26) read it through the same reader when they are built, so their own PRs own those integrations; P24 states that hand-off in the reader's docstring and its reference section.
+
+**The split (L, two parts; the plan's row says the same):**
 - **Part 1:** the reader and both schemas. `extract_system` writes `contract.json`. `figma_audit` and `cluster_values` read `--tokens` either way, and `cluster_values` drops `STATUS_RAMPS` for the project's ramps when one is given.
 - **Part 2:**
   - `audit_design`: the component globs, and token files from the config.
@@ -258,5 +260,5 @@ Read them by `grep -n`.
 2. Update `CLAUDE.md`'s Current State, the execution plan's §9, the inventory, and `dev plans/README.md`'s line for this file.
 3. **Rewrite this file** and `next-session-opening-prompt.md` for the session after yours, with the next PRs in the same detail as §4 and §5 here.
 4. Run `python -B "dev plans/check_execution_plan.py"`.
-5. Commit the docs in a PR of their own, and merge it once its CI is green.
+5. Commit the docs in a PR of their own. Merge it when it is ready, as §0 defines ready: CI green on its head, every thread resolved, CodeRabbit finished, GitHub clean.
 6. Tell the user what merged, what is open, the token use, and what they need to do. Give them the opening prompt for the next session.
