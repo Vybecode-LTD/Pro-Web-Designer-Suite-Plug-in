@@ -29,5 +29,5 @@
 - **Stacked PRs:** CodeRabbit skips a PR whose base is not `main`; after retargeting, comment `@coderabbitai review`. A merge commit made with `--no-edit` lacks the attribution line: amend it.
 - **`fail_before.py` swaps the plugin, not the tests:** a doc assertion reads the doc through `SKILLS` (which honours `WDS_PLUGIN_ROOT`), never through `__file__`, or it is a control by construction.
 - **Bash heredocs eat backslashes**, which also breaks a `\n` inside a Python string in a heredoc script: write such scripts with the Write tool.
-- **GitHub had a partial outage on 2026-10-07** (pushes refused with 500 for about ten minutes): a background `until git push` loop rides it out.
+- **GitHub had a partial outage on 2026-10-07** (pushes refused with 500 for about ten minutes): retry `git push` every minute until it lands; nothing on this side needs fixing.
 - **Still open from earlier:** `--warning-700`, `--danger-100` and `--info-100` fall outside Display P3; `check_roles.py` measures a colour outside sRGB with its channels clipped; the hydration test fails with the run's numbers if it recurs; the worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`); a local build never matches the release's checksums (compare with `tooling/release/compare.py`); don't grep `tooling/`; the repository is public.

@@ -447,7 +447,7 @@ For the Word engine specifically, use the VML `v:rect`/`v:fill` pattern from `em
 
 | Item | Budget |
 |---|---|
-| Total HTML (after ESP processing) | **under 90 KB** — see the 102 KB (measured at 102,400 bytes) clipping threshold in `email-client-matrix.md` §7 |
+| Total HTML (after ESP processing) | **under 90 KB** — see the ESP-documented 102 KB clipping threshold; 102,400 bytes is the measured value, `email-client-matrix.md` §7 |
 | Retained `<style>` block | under 2 KB (Gmail drops past 16,384 bytes) |
 | Any single image | under 200 KB |
 | All images combined | under 1 MB |
