@@ -56,7 +56,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 ## 2. Useful facts
 
-- **The plugin** is `plugins/web-design-suite/`: `skills/` (13), `tests/` (672 tests, standard-library `unittest`, helpers in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `run_py`, `run_node`, `load_script`, `TempDirTest`), and `tools/` (`check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`).
+- **The plugin** is `plugins/web-design-suite/`: `skills/` (13), `tests/` (674 tests, standard-library `unittest`, helpers in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `run_py`, `run_node`, `load_script`, `TempDirTest`), and `tools/` (`check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`).
 - **The browser scripts** (`a11y_runtime.mjs`, `snapshot_matrix.mjs`, `measure_vitals.mjs`) import `scripts/browser_common.mjs`, a copy of `shared/browser_common.mjs` in each skill, and `render_email.mjs` (email-template-system) uses it too: change the master and copy it over all four.
 - **New in P15 (#49, #50):**
   - apply_codemod pairs a negative margin with its parent rule's padding (nested rule, descendant or child selector, BEM block) only when that side is set in **one block** of the file: the last `!important` declaration there wins, or else the last one. An inline side is read both ways (`BY_DIRECTION`: left to right and right to left) and pairs only when the two agree. `!important` is not a slot, in the extractor (`slot_prop`) or the pairing.
