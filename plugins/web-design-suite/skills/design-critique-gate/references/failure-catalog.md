@@ -3,7 +3,8 @@
 The ways professional-looking work fails, by run-order layer. Four lines each: **Seen as** (the symptom a
 reviewer experiences), **Mechanism** (what physically causes it), **Confirm** (prove it in under a minute),
 **Fix** (the change that stops the class, not the instance). IDs are stable — cite them: `"ref":
-"failure-catalog L4-1"`.
+"failure-catalog L4-1"`. A number missing from a layer (L4-2, L5-2, L6-3, L8-2, L8-3) is retired,
+never reused.
 
 ## The ten that make work read as "almost professional"
 
@@ -147,6 +148,8 @@ separation values is the finding.
 **Fix.** Three rhythm roles — `--space-section`, `--space-subsection`, `--space-block` — and nothing between
 them.
 
+## Layer 5 — Craft
+
 ### L5-1 · A type scale with one orphan size
 **Seen as.** Nearly harmonious type with one element that sits oddly.
 **Mechanism.** Every size belongs to a ratio except one — 19px among 14/16/32, usually introduced to fix a
@@ -164,6 +167,8 @@ parts* even when everything else matches.
 values — more than four is the finding.
 **Fix.** Bind radius to component *size class*, not to the component: small controls one step, cards the
 next, overlays the next. Nested elements compute their radius from the parent — see critique-method §3.3.
+
+## Layer 6 — Color and contrast
 
 ### L6-1 · Contrast assumed rather than measured
 **Seen as.** Nothing, on the reviewer's monitor; everything, on a laptop at 40% brightness.
@@ -369,7 +374,7 @@ are asking for.
 
 ## Catalogued in `critique-method.md` §3
 
-Nine further failures get the same treatment — spot it in seconds, the principle, the system fix — in
+Eleven further failures get the same treatment — spot it in seconds, the principle, the system fix — in
 `references/critique-method.md` §3, because they are also the things a senior reviewer notices first.
 They are listed here so this file remains the index.
 
@@ -390,5 +395,5 @@ They are listed here so this file remains the index.
 ---
 
 Related: `SKILL.md` (run order), `references/critique-method.md` (stance, severity, delivery),
-`web-design-studio/references/review-checklist.md` (the 92 mechanical checks),
+`web-design-studio/references/review-checklist.md` (the 91 mechanical checks),
 `web-design-studio/references/spacing-system.md` §7 and §13.

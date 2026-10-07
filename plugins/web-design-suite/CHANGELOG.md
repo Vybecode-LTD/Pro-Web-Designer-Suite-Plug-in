@@ -95,6 +95,28 @@
 
 ### Fixed
 
+- **The critique says what is fixed, and every format says what it merged** (PS-C2).
+  `status: fixed` (3.1.0) reached `--summary`, `--fail-on` and the defence sheet's known
+  flaws, but a fixed finding still led "Fix these three first", sat unmarked in triage,
+  and a fixed blocker stayed under the defence sheet's "Do not present", so the deck
+  refused to build for a defect already fixed. A fixed finding is now labelled fixed in
+  the critique and counted in its tally, listed last in triage as `FIXED`, and gone from
+  "Do not present"; with `defend: true` the sheet carries it as "major, fixed". Triage and
+  the defence sheet print the merge notes the critique already printed (stderr still has
+  them), and the docstring gives exit 2 for bad input.
+- **A blocking item stops the deck, as SKILL.md says** (PS-A21). The deck was written
+  anyway (exit 1) and `--dry-run` exited 0. Now nothing is written, both exit 1, and
+  stderr names the blockers. A pipe in a flaw's title, which critique_report writes as
+  `\|`, split the deck's flaws table into the wrong columns; `_md_table` reads the
+  escape. The size warning fired above 12,000,000 bytes but said "about 10 MB"; it fires
+  above 10,000,000 (`EMAIL_SIZE_WARNING`).
+- **The critique gate's docs match its files** (PS-A17, PS-A20). Only a blocking finding
+  in layers 1 to 3 stops the run; from layer 4 on, a blocker is reported and the review
+  goes on, because a contrast failure does not make the keyboard checks moot.
+  failure-catalog.md has its Layer 5 and 6 headings, names its retired ids (L4-2, L5-2,
+  L6-3, L8-2, L8-3) and says "Eleven further failures" for its eleven rows. It and
+  SKILL.md said 92 checklist rows where review-checklist.md has 91, and the conformance
+  layer is timed "2 min + 30 min", with the protocol's half-hour for the checklist.
 - **One rule for a risky client request** (PS-A8). evidence.md §7.3 said to build a
   contrast failure the client asked for ("It is their site"), objection-handling.md §4
   said "I'll build it either way" while §5 held the line on accessibility, and
@@ -132,7 +154,6 @@
   page-architecture.md say; the `.feature-card--media` comment describes the media
   variant; the CTA note's raw `opacity: 0.85` is gone (smaller, not fainter); the avatar is
   sized through a `--testimonial-avatar` socket, not as a tap target.
-
 - **Gmail's limits are registered figures** (N36, CodeRabbit on #59). The email docs quoted a 102,400-byte clipping threshold and a 16,384-byte `<style>` ceiling that no entry in `evidence.json` backed, and `test_evidence` did not recognise a byte count as a figure. Re-read 2026-10-07: Google publishes no clipping figure; the ESPs document 102 KB (Mailmodo, DailyStory), and the byte-exact 102,400 is from measurement, which the docs now say; the `<style>` ceiling is email-bugs #90's 16,384 bytes. Both are registered for every email doc that quotes them, and `FIGURE` reads byte counts (`102,400 bytes`, `16,384-byte`, `16 kB`, `102kb`).
 - **The scaffold reads every interview answer** (DL-A8). `.money` set the currency and
   the storage unit and nothing read them: every cell was `formatMoney(x / 100)` in a

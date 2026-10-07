@@ -25,6 +25,14 @@ Regressions covered:
 - PS-A3: a hand finding that merely contained an audit rule's name as an
   ordinary word ("the most important plan"; the rule is `important`) silently
   folded that rule's whole machine group, defeating --audit-blocking too.
+
+3.4.0:
+- PS-C2: a fixed finding led "Fix these three first", sat unmarked in triage
+  and stayed under "Do not present"; triage and the defence sheet dropped the
+  merge notes.
+- PS-A21: a blocker still wrote the deck and `--dry-run` exited 0; an escaped
+  pipe split the flaws table; the size warning fired at 12 MB, saying 10.
+- PS-A17, PS-A20: the critique gate's stop rule, headings, ids and counts.
 """
 from __future__ import annotations
 
@@ -32,7 +40,7 @@ import json
 import re
 import unittest
 
-from wds_support import TempDirTest, output, run_py
+from wds_support import SKILLS, TempDirTest, output, run_py
 
 OUTSIDE_CLAUDE_CODE = {"PYTHONIOENCODING": None, "PYTHONUTF8": None}
 
@@ -207,8 +215,168 @@ class CritiqueDefenceAndMerge(TempDirTest):
                 hand = [dict({"layer": "conformance", "severity": "major",
                               "title": "Specificity fights in the legacy sheets"}, **claim)]
                 proc = self.run_report(hand, "--audit", audit, "--format", "triage")
-                self.assertNotIn("important × 3", proc.stdout.decode("utf-8"))
-                self.assertIn("folded", output(proc))                  # said, on stderr
+                self.assertNotIn("[conformance] important × 3", proc.stdout.decode("utf-8"))
+                self.assertIn("folded", proc.stderr.decode("utf-8"))   # said, on stderr
+
+    def test_every_format_prints_the_merge_notes(self):
+        # PS-C2: triage and the defence sheet dropped them; only stderr had them.
+        audit = self.write("audit.json", json.dumps(AUDIT_IMPORTANT))
+        hand = [{"layer": "conformance", "severity": "major", "covers": ["important"],
+                 "title": "Specificity fights in the legacy sheets"}]
+        for fmt in ("critique", "triage", "defence"):
+            with self.subTest(format=fmt):
+                text = self.run_report(hand, "--audit", audit, "--format", fmt).stdout.decode("utf-8")
+                notes = text.split("## Merge notes", 1)[-1]
+                self.assertIn("important × 3 — folded whole", notes)
+
+    def test_a_fixed_finding_is_reported_as_fixed_not_as_work(self):
+        # PS-C2: `status: fixed` left a fixed finding in "Fix these three
+        # first", unmarked in triage, and under "do not present", which
+        # stopped the deck for a blocker already fixed.
+        findings = [
+            {"layer": "premise", "severity": "blocking", "status": "fixed",
+             "title": "The hero answers the wrong question", "mechanism": "Rewritten."},
+            {"layer": "hierarchy", "severity": "major", "status": "fixed", "defend": True,
+             "title": "Two primary actions", "fix": "Demoted the second."},
+            {"layer": "craft", "severity": "minor", "title": "An orphan type size", "fix": "Token it."},
+        ]
+        critique = self.run_report(findings).stdout.decode("utf-8")
+        top = critique.split("## Fix these three first", 1)[1].split("## ", 1)[0]
+        self.assertIn("An orphan type size", top)
+        self.assertNotIn("The hero answers the wrong question", top)
+        self.assertNotIn("Two primary actions", top)
+        self.assertIn("2 of them marked fixed", critique)
+
+        triage = self.run_report(findings, "--format", "triage").stdout.decode("utf-8")
+        lines = [line for line in triage.splitlines() if line.startswith("- [")]
+        self.assertTrue(lines[0].startswith("- [MINOR]"), lines)
+        self.assertTrue(lines[1].startswith("- [BLOCKING, FIXED]"), lines)
+
+        defence = self.run_report(findings, "--format", "defence").stdout.decode("utf-8")
+        blockers = defence.split("## Do not present until these are fixed", 1)[1].split("## ", 1)[0]
+        self.assertIn("*Clear.*", blockers)
+        flaws = defence.split("## Known flaws you are carrying in", 1)[1].split("## ", 1)[0]
+        self.assertIn("| Two primary actions | major, fixed |", flaws)
+        self.assertNotIn("The hero answers the wrong question", flaws)
+
+    def test_fixed_taste_and_an_all_fixed_summary_are_said_as_fixed(self):
+        # CodeRabbit on #69: a fixed taste finding was not labelled fixed.
+        # Codex on #69: --summary with only fixed defects said "Taste
+        # findings only".
+        taste = [{"layer": "craft", "severity": "taste", "status": "fixed",
+                  "title": "Rounder corners on the cards"}]
+        critique = self.run_report(taste).stdout.decode("utf-8")
+        self.assertIn("- **Rounder corners on the cards** (craft, fixed)", critique)
+        fixed = [{"layer": "color", "severity": "major", "status": "fixed",
+                  "title": "Muted text fails contrast"}]
+        summary = self.run_report(fixed, "--summary").stdout.decode("utf-8")
+        self.assertNotIn("Taste findings only", summary)
+        self.assertIn("every one is marked fixed", summary)
+
+    def test_bad_input_exits_2_as_the_docstring_says(self):
+        path = self.write("findings.json", json.dumps([{"layer": "nowhere", "severity": "major"}]))
+        proc = run_py("design-critique-gate", "critique_report", path, cwd=self.tmp)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        doc = (SKILLS / "design-critique-gate" / "scripts" / "critique_report.py").read_text(encoding="utf-8")
+        self.assertIn("2 on bad input", doc)
+
+
+class DeckFromTheDefenceSheet(TempDirTest):
+    """PS-A21: the deck as it reads critique_report's defence sheet."""
+
+    def defence(self, findings):
+        path = self.write("findings.json", json.dumps({"subject": "Pricing", "findings": findings}))
+        out = self.tmp / "defence.md"
+        proc = run_py("design-critique-gate", "critique_report", path, "--format", "defence",
+                      "-o", out, cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        return out
+
+    def build(self, *args):
+        log = self.write("DECISION_LOG.md", decision_log("D1 — Tokens"))
+        return run_py("client-presentation-builder", "build_presentation", log, *args, cwd=self.tmp)
+
+    def test_a_blocking_item_stops_the_build_and_the_dry_run(self):
+        defence = self.defence([{"layer": "color", "severity": "blocking", "confidence": "confirmed",
+                                 "title": "Body text fails contrast", "mechanism": "Measured 2.1:1."}])
+        deck = self.tmp / "deck.html"
+        proc = self.build("--defence", defence, "-o", deck)
+        self.assertEqual(proc.returncode, 1, output(proc))
+        self.assertFalse(deck.exists(), "a blocking item stops the build, as SKILL.md says")
+        self.assertIn("Body text fails contrast", output(proc))
+        proc = self.build("--defence", defence, "--dry-run")
+        self.assertEqual(proc.returncode, 1, output(proc))
+
+    def test_a_pipe_in_a_flaw_stays_in_its_cell(self):
+        defence = self.defence([{"layer": "structure", "severity": "minor", "confidence": "confirmed",
+                                 "title": "Pricing | FAQ seam has no rhythm",
+                                 "fix": "Add the section gap."}])
+        deck = self.tmp / "deck.html"
+        proc = self.build("--defence", defence, "-o", deck)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        html = deck.read_text(encoding="utf-8")
+        self.assertIn("Pricing | FAQ seam has no rhythm", html)
+        self.assertNotIn("Pricing \\", html)
+
+    def test_the_size_warning_fires_at_the_size_it_names(self):
+        shots = self.tmp / "shots"
+        shots.mkdir()
+        (shots / "home.png").write_bytes(b"\0" * 7_600_000)      # about 10.1 MB as base64
+        deck = self.tmp / "deck.html"
+        proc = self.build("--screenshots", shots, "-o", deck)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        size = deck.stat().st_size
+        self.assertTrue(10_000_000 < size < 12_000_000, size)
+        self.assertIn("past about 10 MB", output(proc))
+
+
+class CritiqueDocs(unittest.TestCase):
+    """PS-A17 and PS-A20: the critique gate's docs say what its files hold."""
+
+    GATE = SKILLS / "design-critique-gate"
+
+    def read(self, rel):
+        return (self.GATE / rel).read_text(encoding="utf-8")
+
+    def test_only_the_first_three_layers_stop_the_run(self):
+        text = " ".join(self.read("SKILL.md").split())
+        self.assertNotIn("Stop and report when a layer produces a blocking finding", text)
+        self.assertIn("A blocking finding in layers 1 to 3 stops the run", text)
+
+    def test_every_catalogued_failure_sits_under_its_own_layer(self):
+        text = self.read("references/failure-catalog.md")
+        self.assertEqual([str(n) for n in range(1, 11)],
+                         re.findall(r"^## Layer (\d+) —", text, re.M))
+        layer = None
+        for m in re.finditer(r"^## Layer (\d+) —|^### (L(\d+)-\d+) ·", text, re.M):
+            if m.group(1):
+                layer = m.group(1)
+                continue
+            with self.subTest(id=m.group(2)):
+                self.assertEqual(layer, m.group(3))
+
+    def test_the_catalog_names_its_gaps_and_counts_its_index(self):
+        text = self.read("references/failure-catalog.md")
+        intro = text.split("## The ten", 1)[0]
+        ids = {(int(a), int(b)) for a, b in re.findall(r"^### L(\d+)-(\d+) ·", text, re.M)}
+        for layer in range(1, 11):
+            numbers = [n for a, n in ids if a == layer]
+            for n in range(1, max(numbers) + 1):
+                if (layer, n) not in ids:
+                    with self.subTest(id=f"L{layer}-{n}"):
+                        self.assertIn(f"L{layer}-{n}", intro)
+        words = {"nine": 9, "ten": 10, "eleven": 11, "twelve": 12}
+        index = text.split("## Catalogued in", 1)[1]
+        stated = re.search(r"(\w+) further failures", index).group(1).lower()
+        rows = re.findall(r"^\| .+ \| critique-method §3\.\d+ \|$", index, re.M)
+        self.assertEqual(len(rows), words[stated])
+
+    def test_the_conformance_layer_is_timed_for_the_checklist(self):
+        row = next(line for line in self.read("SKILL.md").splitlines()
+                   if line.startswith("| 9 | **Conformance**"))
+        protocol = self.read("assets/self-review-protocol.md")
+        checklist_time = re.search(r"^\| (\+\d+ min) \| Full `review-checklist\.md`", protocol, re.M).group(1)
+        self.assertIn(checklist_time.lstrip("+"), row)
 
 
 if __name__ == "__main__":
