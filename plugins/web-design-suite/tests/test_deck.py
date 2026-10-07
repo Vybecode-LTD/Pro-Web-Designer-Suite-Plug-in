@@ -130,6 +130,23 @@ class TheSuitesOwnA11yJsonIsAnInput(Deck):
         self.assertIn("has no `violations` and no `findings` key", output(proc))
         self.assertIn("a11y_runtime.mjs --json", output(proc))
 
+    def test_a_findings_list_from_an_unknown_tool_is_refused_and_the_label_follows_the_shape(self):
+        """Review of #65 (CodeRabbit): `{"findings": []}` from any tool read as
+        a clean automated WCAG result, and the violations metric still said
+        "across the pages scanned" for the static shape."""
+        other = self.write("other.json", json.dumps({"tool": "lighthouse", "findings": []}))
+        proc = self.build(decision_log("D1 — Tokens"), "--dry-run", "--a11y", other)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("its `tool` is 'lighthouse', not a11y_runtime or a11y_static", output(proc))
+        bare = self.write("bare.json", json.dumps({"findings": []}))
+        proc = self.build(decision_log("D1 — Tokens"), "--dry-run", "--a11y", bare)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        empty = self.write("empty.json", json.dumps({"tool": "a11y_static", "findings": []}))
+        html = self.html(decision_log("D1 — Tokens"), "--a11y", empty)
+        self.assertIn("passes an automated WCAG 2.2 AA check", html)
+        self.assertIn("across the file(s) with findings", html)
+        self.assertNotIn("across the pages scanned", html)
+
     def test_the_manual_record_is_an_input(self):
         a11y = self.write("a11y.json", json.dumps(A11Y_CLEAN))
         record = self.write("tested.md", "Keyboard: every page, Tab and Shift+Tab, 2026-10-01.\n")
@@ -166,9 +183,12 @@ class AReversedDecisionIsShownAsReversed(Deck):
         self.assertNotIn("What changed", plain)
 
     def test_a_reversed_to_line_on_the_block_counts(self):
+        """Review of #65 (CodeRabbit): the line alone, with no status, must
+        reverse the decision too."""
         log = REVERSED_LOG.replace("**Choice:** A five-slide hero carousel.\n",
                                    "**Choice:** A five-slide hero carousel.\n"
-                                   "**Reversed to:** A static hero.\n")
+                                   "**Reversed to:** A static hero.\n").replace("**Status:** reversed\n", "")
+        self.assertNotIn("Status", log)
         text = self.outline(log)
         self.assertNotIn("nothing says what replaced it", text)
         self.assertNotRegex(text, r"decision\s+Carousel on the homepage")

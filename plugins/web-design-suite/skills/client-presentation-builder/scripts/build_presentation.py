@@ -149,7 +149,9 @@ class Decision:
     def is_reversed(self) -> bool:
         """Overturned: by its status, or by a row in `## Reversals`. A
         reversed decision is never argued as current."""
-        return self.status.strip().lower() == "reversed"
+        return (self.status.strip().lower() == "reversed"
+                or bool(self.reversal.strip()
+                        and not PLACEHOLDER.fullmatch(self.reversal.strip())))
 
     @property
     def is_coin_flip(self) -> bool:
@@ -474,6 +476,15 @@ def load_a11y(path: Path) -> A11yFacts:
         if not isinstance(run, dict):
             continue
         vs = run.get("violations")
+        if vs is None and isinstance(run.get("findings"), list) \
+                and run.get("tool") not in ("a11y_runtime", "a11y_static"):
+            # A `findings` list from an unknown tool is not an automated
+            # WCAG result the deck may claim a pass from.
+            raise BuildError(
+                f"{path} has a `findings` list but its `tool` is "
+                f"{run.get('tool')!r}, not a11y_runtime or a11y_static. Supply "
+                f"`a11y_runtime.mjs --json` or `a11y_static.py --json` output, "
+                f"or axe-core results (`violations`).")
         if vs is None and isinstance(run.get("findings"), list):
             # The suite's own shape: `a11y_runtime.mjs --json` (one target,
             # findings with a check, a rule, a success criterion, a severity
@@ -1085,7 +1096,7 @@ def slide_a11y(a11y: A11yFacts, prov: Provenance, audience: str,
     c_n = prov.add(a11y.nodes, a11y.source, "sum(len(violations[].nodes))")
     c_p = prov.add(a11y.pages, a11y.source, a11y.scope_path)
     metrics = [
-        (cited(c_v), "automated violations", inline("across the pages scanned")),
+        (cited(c_v), "automated violations", inline(f"across the {a11y.scope}")),
         (cited(c_n), "elements affected", inline("each one a real node")),
         (cited(c_p), a11y.scope, inline("automated pass")),
     ]
