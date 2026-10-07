@@ -36,7 +36,9 @@ FIGURE = re.compile(
     r"\d[\d,]*(?:\.\d+)?\s?[–-]\s?\d[\d,]*(?:\.\d+)?\s?%"          # a range: 37–41%
     r"|\d[\d,]*(?:\.\d+)?\s?%"                                      # a percentage
     r"|\d[\d,]*(?:\.\d+)?\+?\s(?:participants|respondents|pages|sites|audits|issues|users|"
-    r"fixations|home pages|form fields|categories|tools|errors|people|studies))")
+    r"fixations|home pages|form fields|categories|tools|errors|people|studies)"
+    r"|\d[\d,]*(?:\.\d+)?\s?(?:bytes|KiB|KB|kB|MB)\b"                 # a byte count: 102,400 bytes
+    r"|\d[\d,]*-byte\b)")                                               # 16,384-byte
 
 
 def norm(value: str) -> str:
@@ -73,6 +75,29 @@ def registered_for(doc: str) -> set[str]:
 
 
 class EvidenceRegister(unittest.TestCase):
+
+    def test_byte_counts_are_figures_and_gmails_limits_are_registered(self):
+        """N36 (CodeRabbit on #59): the email docs quoted Gmail's 102,400-byte
+        clipping threshold and its 16,384-byte <style> ceiling, FIGURE did not
+        recognise a byte count, and neither figure was in the register."""
+        for text, figure in (("clips at 102,400 bytes of HTML", "102,400 bytes"),
+                             ("the 16,384-byte ceiling", "16,384-byte"),
+                             ("limits <style> to 16 kB", "16 kB"),
+                             ("adds 54 KB of HTML", "54 KB")):
+            self.assertEqual(FIGURE.findall(text), [figure], text)
+        self.assertEqual(FIGURE.findall("a 48px-tall button, 100 × 1024, 4.5:1"), [])
+        registered = {v for e in REGISTER["entries"] for v in values(e)}
+        self.assertIn(norm("102 KB"), registered)
+        self.assertIn(norm("16,384 bytes"), registered)
+        for doc in ("email-template-system/SKILL.md",
+                    "email-template-system/references/email-client-matrix.md"):
+            self.assertIn(norm("16,384-byte"), registered_for(doc))
+            self.assertIn(norm("102 KB"), registered_for(doc))
+            # The docs call the threshold what the sources call it, 102 KB,
+            # and say the byte-exact figure is measured.
+            text = (SKILLS / doc).read_text(encoding="utf-8")
+            self.assertIn("102 KB", text, doc)
+            self.assertRegex(text, r"measured[:,]? ?(?:at )?102,400 bytes|\(102,400 bytes, measured\)", doc)
 
     def test_every_attributed_figure_is_registered(self):
         seen = 0

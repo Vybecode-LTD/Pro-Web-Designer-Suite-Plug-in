@@ -297,7 +297,7 @@ Related: `references/email-client-matrix.md` (what breaks where), `references/em
 | "The button lost its rounded corners" | `border-radius` in the Word engine. | VML `roundrect`, `email-architecture.md` §6 |
 | "There's a gap under every image" | Images are not `display:block`; the baseline descender space is showing. | `display:block`, always |
 | "The two columns didn't stack on my phone" | A media query that got stripped — likely GANGA. | fluid-hybrid, `email-architecture.md` §7 |
-| "Gmail cut my email off" | 102,400 bytes. | `--minify`, drop base64 images, measure via Show original |
+| "Gmail cut my email off" | 102 KB (102,400 bytes, measured). | `--minify`, drop base64 images, measure via Show original |
 | "My media queries just vanished" | The 16,384-byte `<style>` ceiling: Gmail removes every `<style>` element that crosses it, and every one after. | inline more; only queries and pseudo-classes need to stay |
 | "It's unreadable in dark mode" | Forced or partial inversion. | `email-client-matrix.md` §8 — and be honest about what cannot be fixed |
 | "Can we use our brand font?" | No, not as the design. | build on the websafe stack, layer `@font-face` as decoration |
