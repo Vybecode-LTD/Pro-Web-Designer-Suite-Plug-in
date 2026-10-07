@@ -51,7 +51,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-4. `python -B "dev plans/check_execution_plan.py"` must say `79 open items, 79 scheduled`.
+4. `python -B "dev plans/check_execution_plan.py"` must say `81 open items, 81 scheduled`.
 5. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
@@ -74,7 +74,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 ## 3. First: the state of `main`
 
-Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings, and schedule its two unscheduled follow-ups in the plan (run the checker) before new work.
+Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings. Its two follow-ups are scheduled, as P44 and P45 before R2.
 
 ## 4. P20: the scaffold reads its answers, wires its forms, and emits a server schema
 
