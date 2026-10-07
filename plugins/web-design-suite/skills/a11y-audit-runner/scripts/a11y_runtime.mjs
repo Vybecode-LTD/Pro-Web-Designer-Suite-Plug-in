@@ -114,7 +114,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { FREEZE_ANIMATIONS_CSS, launchBrowser, loadPlaywright, nodeModulesAbove, npmGlobalRoot, readJsonFile } from './browser_common.mjs';
+import { FREEZE_ANIMATIONS_CSS, contrastRatio, launchBrowser, loadPlaywright, nodeModulesAbove, npmGlobalRoot, readJsonFile } from './browser_common.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TAGS = 'wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice';
@@ -461,23 +461,6 @@ const HELPERS = () => {
   window.__a11y = { FOCUSABLE, cssPath, visible, expectedTabbables, describeActive,
                     hiddenFromAT, openModal, takeTabCancelled };
 };
-
-// ---------------------------------------------------------------------------
-// Colour maths (WCAG 2.x relative luminance), shared by contrast and focus
-// ---------------------------------------------------------------------------
-
-function srgbToLin(c) {
-  const s = c / 255;
-  return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-}
-function luminance([r, g, b]) {
-  return 0.2126 * srgbToLin(r) + 0.7152 * srgbToLin(g) + 0.0722 * srgbToLin(b);
-}
-function contrastRatio(a, b) {
-  const la = luminance(a), lb = luminance(b);
-  const hi = Math.max(la, lb), lo = Math.min(la, lb);
-  return (hi + 0.05) / (lo + 0.05);
-}
 
 // ---------------------------------------------------------------------------
 // axe
