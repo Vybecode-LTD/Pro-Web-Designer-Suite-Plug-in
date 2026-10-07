@@ -113,9 +113,9 @@ folder. Set `WDS` once per terminal, in your shell's form (with the version you 
 
 | Shell | Set it once | Then |
 |---|---|---|
-| bash, zsh, Git Bash | `WDS="$HOME/.claude/plugins/cache/web-design-suite/web-design-suite/3.3.0/skills"` | paste the commands as they are |
-| PowerShell | `$WDS = "$HOME/.claude/plugins/cache/web-design-suite/web-design-suite/3.3.0/skills"` | paste the commands as they are |
-| cmd | `set "WDS=%USERPROFILE%/.claude/plugins/cache/web-design-suite/web-design-suite/3.3.0/skills"` | write `%WDS%` where a command says `$WDS` |
+| bash, zsh, Git Bash | `WDS="$HOME/.claude/plugins/cache/web-design-suite/web-design-suite/3.4.0/skills"` | paste the commands as they are |
+| PowerShell | `$WDS = "$HOME/.claude/plugins/cache/web-design-suite/web-design-suite/3.4.0/skills"` | paste the commands as they are |
+| cmd | `set "WDS=%USERPROFILE%/.claude/plugins/cache/web-design-suite/web-design-suite/3.4.0/skills"` | write `%WDS%` where a command says `$WDS` |
 
 Each command below is one line, and `"$WDS/…"` is all the shell expands, which bash
 and PowerShell do the same way. (The skills' own docs write commands for bash, which

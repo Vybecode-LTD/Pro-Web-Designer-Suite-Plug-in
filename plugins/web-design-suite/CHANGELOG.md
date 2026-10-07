@@ -1,6 +1,20 @@
 # Changelog
 
-## 3.4.0 — unreleased
+## 3.4.0 — 2026-10-07
+
+Phase 4 of the plan: the runtime gates, the lifecycle tools, email and persuasion do
+what their docs say. The browser gates share one copy of their helpers. a11y_runtime
+survives a strict CSP and probes focus, forced colours and density; the snapshot matrix
+renders RTL, forced colours and interaction states, with a baseline lifecycle;
+measure_vitals throttles as Lighthouse does, and `crux_check.py` brings field data.
+diff_system classifies density, themes, conditions and layers, the Figma scripts share
+one reader, and the email build and lint hold dark mode, Outlook and Law 1, with
+`render_email.mjs` to look at the result. The scaffold reads every interview answer and
+writes a server schema that mirrors the form; the deck is honest by construction, with a
+presenter window; the critique labels fixed findings, and `critique_snapshots.mjs` runs
+the checks a person runs. Law 6 reaches stylelint and ESLint. Every fix has a regression
+test that fails on 3.3.0, or on the head a review found it on
+(`python -B -m unittest discover -s tests`: 755 tests).
 
 ### Added
 
