@@ -270,5 +270,134 @@ class TheSayThisLinesCarryOnlyWhatTheInputsGive(Deck):
         self.assertNotIn("roughly a third", html)
 
 
+SINCE = """
+## Since last time
+
+| You asked | What we did | If not, why not |
+|---|---|---|
+| `<their words>` | `<the change, with its decision id>` | `<the constraint, and what was done instead>` |
+| A bigger logo | Doubled the mark in the header (D4) | |
+| A carousel on the homepage | | It halves the LCP budget; the static hero carries the three messages instead |
+| Blue buttons | | |
+| A bigger map | Not implemented | |
+| Fewer form fields | `<the change, with its decision id>` | `<the constraint, and what was done instead>` |
+"""
+
+
+class ThePresenterWindow(Deck):
+    """PS-B7: pressing N on a shared screen showed the client the notes."""
+
+    def test_the_deck_opens_a_presenter_window_kept_in_step(self):
+        html = self.html(decision_log("D1 — Tokens"))
+        for piece in ("new BroadcastChannel(deckId)", 'var deckId = "deck:" + window.location.pathname + ":" + document.title;',
+                      "-presenter", "tell(peer)", 'target.postMessage({ deck: deckId, index: index }, "*")',
+                      'window.addEventListener("message"', "peer = opened;", "toggleNotes(false);",
+                      "Number.isInteger(data.index)", "if (peer && event.source === peer && data && data.deck === deckId)",
+                      "data-deck-presenter-badge", 'key === "p" || key === "P"', "openPresenter()",
+                      "show(data.index, true, false, true)", ">P<", "a presenter window"):
+            self.assertIn(piece, html, piece)
+        handout = self.tmp / "handout.html"
+        proc = self.build(decision_log("D1 — Tokens"), "-o", self.tmp / "d.html", "--handout", handout)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertNotIn("peer = event.source", html)
+        kept = handout.read_text(encoding="utf-8")
+        for piece in ("BroadcastChannel", "data-deck-presenter", "Presenter"):
+            self.assertNotIn(piece, kept, piece)
+
+
+class SinceLastTimeAndTheStage(Deck):
+    """PS-B7 (§3.2) and PS-A13: the log could not say what was asked last time
+    or what was not changed; the client order put the flaws after the screens
+    and the evidence; the five structures were a promise with three orders."""
+
+    def test_the_requests_from_last_time_are_a_slide_and_a_silent_no_is_a_gap(self):
+        text = self.outline(decision_log("D1 — Tokens") + SINCE)
+        self.assertRegex(text, r"changed\s+What changed since last time")
+        self.assertIn('"Blue buttons" was not done and no reason is recorded', text)
+        # Review of #66 (CodeRabbit): a negative outcome ("Not implemented")
+        # and a row whose other cells are still the template's examples.
+        self.assertIn('"A bigger map" was not done and no reason is recorded', text)
+        self.assertIn('"Fewer form fields" was not done and no reason is recorded', text)
+        self.assertNotIn('"A carousel on the homepage" was not done', text)
+        html = self.html(decision_log("D1 — Tokens") + SINCE)
+        self.assertIn("Doubled the mark in the header (D4)", html)
+        self.assertIn("It halves the LCP budget", html)
+        self.assertEqual(html.count("<em>not changed</em>"), 4)
+        self.assertNotIn("Not implemented", html)
+        self.assertNotIn("the constraint, and what was done instead", html)
+        self.assertNotIn("the change, with its decision id", html)   # the template row is skipped
+
+    def test_an_iteration_review_opens_on_what_changed_and_a_sign_off_on_the_ask(self):
+        log = decision_log("D1 — Tokens", "D2 — Grid")
+        plain = self.outline(log + SINCE)
+        self.assertRegex(plain, r"\n  1\. cover[\s\S]*\n  2\. brief[\s\S]*\n  4\. changed")
+        iteration = self.outline(log.replace("# Test deck\n", "# Test deck\n\n**Stage:** iteration review\n") + SINCE)
+        self.assertRegex(iteration, r"\n  1\. cover[\s\S]*\n  2\. changed[\s\S]*\n  3\. brief")
+        sign_off = self.outline(log.replace("# Test deck\n", "# Test deck\n\n**Stage:** sign-off\n"))
+        # Review of #66 (Codex): the ask is the second slide, straight after
+        # the cover, whether or not there is a decision index.
+        self.assertRegex(sign_off, r"\n  1\. cover[\s\S]*\n  2\. ask[\s\S]*\n  3\. brief")
+        narrative = (SKILLS / "client-presentation-builder" / "references" / "narrative-structure.md").read_text(encoding="utf-8")
+        self.assertIn("so the table's job 6 is the second slide and the rest of its order is\nby hand", narrative)
+        no_index = self.outline("# Test deck\n\n**Stage:** sign-off\n\n## Decisions\n\n### D1 — Tokens\n"
+                                "**Status:** open\n**Constraint:** Many developers touch the CSS.\n"
+                                "**Choice:** A closed token system.\n")
+        self.assertRegex(no_index, r"\n  1\. cover[\s\S]*\n  2\. ask")
+
+    def test_the_summary_table_agrees_with_the_order_and_the_channel_is_per_file(self):
+        """Review of #66 (Codex): SKILL.md's audience table still said client
+        weaknesses appear "Late, after the evidence", and two decks of one
+        project on one origin shared a BroadcastChannel."""
+        skill = (SKILLS / "client-presentation-builder" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertNotIn("Late, after the evidence", skill)
+        self.assertIn("| **Weaknesses appear** | After decisions, before visuals |", skill)
+        html = self.html(decision_log("D1 — Tokens"))
+        self.assertIn('var deckId = "deck:" + window.location.pathname + ":" + document.title;', html)
+
+    def test_the_flaws_come_before_the_screens_and_the_evidence(self):
+        from test_presentation import FINDINGS
+        path = self.write("findings.json", json.dumps({"subject": "Pricing", "findings": FINDINGS}))
+        proc = run_py("design-critique-gate", "critique_report", path, "--format", "defence", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        defence = self.write("defence.md", proc.stdout.decode("utf-8"))
+        a11y = self.write("a11y.json", json.dumps(A11Y_CLEAN))
+        text = self.outline(decision_log("D1 — Tokens"), "--defence", defence, "--a11y", a11y)
+        self.assertIn("flaws", text)
+        self.assertLess(text.index(". flaws "), text.index(". evidence-a11y "))
+        self.assertLess(text.index(". decision "), text.index(". flaws "))
+
+
+class TheDocsKeepTheirOwnRules(unittest.TestCase):
+    """PS-A12, PS-A13, PS-A19, PS-B7: the prose and the markup."""
+
+    def test_the_meeting_record_claims_no_legal_effect(self):
+        text = (SKILLS / "client-presentation-builder" / "assets" / "MEETING_RECORD.md").read_text(encoding="utf-8")
+        self.assertNotIn("turns a document into an agreement", text)
+        self.assertIn("not an agreement and not legal advice", text)
+        self.assertIn("Silence is not acceptance", text)
+
+    def test_the_log_and_the_playbooks_cover_the_iteration_and_the_rejection(self):
+        log = (SKILLS / "client-presentation-builder" / "assets" / "DECISION_LOG.md").read_text(encoding="utf-8")
+        self.assertIn("## Since last time", log)
+        self.assertIn("| You asked | What we did | If not, why not |", log)
+        objections = (SKILLS / "client-presentation-builder" / "references" / "objection-handling.md").read_text(encoding="utf-8")
+        self.assertIn("## 10. The client who rejects the whole direction", objections)
+        self.assertIn("Do not redraw in the room", objections)
+        narrative = (SKILLS / "client-presentation-builder" / "references" / "narrative-structure.md").read_text(encoding="utf-8")
+        self.assertIn("§3.2 is the\nsame deck with `Stage: iteration review`", narrative)
+        self.assertIn("`objection-handling.md` §7 |", narrative)
+        self.assertNotIn("`objection-handling.md` §8 |", narrative)
+
+    def test_every_painted_band_in_the_worked_example_bleeds_and_nests_a_page_grid(self):
+        text = (SKILLS / "landing-page-conversion" / "references" / "worked-example.md").read_text(encoding="utf-8")
+        painted = re.findall(r"^  <section [^\n]*section--(?:surface|sunken|inverse)[^\n]*\n([^\n]*)", text, re.M)
+        self.assertEqual(len(painted), 5)
+        for opening in re.findall(r"^  <section [^\n]*section--(?:surface|sunken|inverse)[^\n]*$", text, re.M):
+            self.assertIn("bleed-full", opening, opening)
+        for following in painted:
+            self.assertEqual(following.strip(), '<div class="page-grid">', following)
+        self.assertEqual(text.count("</div>\n  </section>"), 6, "the hero and the five bands")
+
+
 if __name__ == "__main__":
     unittest.main()

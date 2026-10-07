@@ -125,6 +125,18 @@ is questioned properly.
 
 ---
 
+## Since last time
+
+<!-- An iteration review (Stage: iteration review, in the header) opens with
+this: their list from the last round, read back verbatim, and what became of
+each item. The row that was not done is the slide (narrative-structure.md
+§3.2): say the constraint that stopped it and what was done instead, or it is
+heard as "they ignored me". Delete the example row. -->
+
+| You asked | What we did | If not, why not |
+|---|---|---|
+| `<their words>` | `<the change, with its decision id>` | `<the constraint, and what was done instead>` |
+
 ## Tested by hand
 
 <!-- What was checked manually, by whom, when: "Keyboard: every page, Tab and

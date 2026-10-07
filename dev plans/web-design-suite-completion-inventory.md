@@ -200,14 +200,14 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-A9 | medium | W8 (3.4.0) | Two legal statements are wrong. |
 | PS-A10 | medium | fixed in 3.4.0: `test_deck.TheSayThisLinesCarryOnlyWhatTheInputsGive` (PR #65) | The "Say this" lines break the skill's own rule on numbers. |
 | PS-A11 | medium | fixed in 3.2.0 | The ethics section falls outside what survives compaction. |
-| PS-A12 | low-medium | W8 (3.4.0) | The markup breaks the skill's own full-bleed rule. |
-| PS-A13 | low-medium | W8 (3.4.0) | Flaw timing and deck structures contradict the method. |
+| PS-A12 | low-medium | fixed in 3.4.0: `test_deck.TheDocsKeepTheirOwnRules.test_every_painted_band_in_the_worked_example_bleeds_and_nests_a_page_grid` (PR #66) | The markup breaks the skill's own full-bleed rule. |
+| PS-A13 | low-medium | fixed in 3.4.0: `test_deck.SinceLastTimeAndTheStage` (PR #66) | Flaw timing and deck structures contradict the method. |
 | PS-A14 | low-medium | W8 (3.4.0) | The NN/g five-user rule is misapplied to five-second tests. |
 | PS-A15 | low | W8 (3.4.0) | The colour-blindness figure is about half the standard one. |
 | PS-A16 | low-medium | W8 (3.4.0) | Three pieces of reference advice fail on their own terms. |
 | PS-A17 | low | W8 (3.4.0) | The rule to stop at the first blocking finding is too broad. |
 | PS-A18 | low | W8 (3.4.0) | The media accessibility advice is incomplete. |
-| PS-A19 | low-medium | W8 (3.4.0) | The meeting record overstates its legal effect. |
+| PS-A19 | low-medium | fixed in 3.4.0: `test_deck.TheDocsKeepTheirOwnRules.test_the_meeting_record_claims_no_legal_effect` (PR #66) | The meeting record overstates its legal effect. |
 | PS-A20 | low | W8 (3.4.0) | Counts and structure in design-critique-gate are wrong. |
 | PS-A21 | low | W8 (3.4.0) | Smaller mismatches between docs and behaviour. |
 | PS-A22 | low | W8 (3.4.0) | The header says "SEVEN SECTION SHELLS" but lists eight (:7-13). |
@@ -217,9 +217,9 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-B4 | — | W14 (3.6.0+) | Page types and audiences. |
 | PS-B5 | — | W8 (3.4.0) | Checks Claude can't honestly run. |
 | PS-B6 | — | W14 (3.6.0+) | No claims layer, and siblings don't route to each other. |
-| PS-B7 | — | W8 (3.4.0) | Presenting in practice. |
+| PS-B7 | — | fixed in 3.4.0: `test_deck.ThePresenterWindow`, `SinceLastTimeAndTheStage`, `TheDocsKeepTheirOwnRules` (PR #66) | Presenting in practice. |
 | PS-B8 | — | W14 (3.6.0+) | Consent for tracking. |
-| PS-C1 | — | W8 (3.4.0) | Make the deck honest by construction: wording from the data, manual-test evidence as input, `--handout`, a presenter window. |
+| PS-C1 | — | fixed in 3.4.0: `test_deck` (PRs #65 and #66) | Make the deck honest by construction: wording from the data, manual-test evidence as input, `--handout`, a presenter window. |
 | PS-C2 | — | W8 (3.4.0) | Fix critique_report: a `covers` field for merges, merge notes in every format, a `status` field. |
 | PS-C3 | — | fixed in 3.1.0, with PS-A4 | Close the HTML blind spot with web-design-studio: audit `<style>` and `style=""`; fail when zero files were audited. |
 | PS-C4 | — | W9 (3.5.0) | Add an adversarial critic subagent, `agents/design-critic.md`, that returns `findings.json` from a fresh context. |
