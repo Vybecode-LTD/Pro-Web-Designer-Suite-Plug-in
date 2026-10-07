@@ -472,10 +472,20 @@ def load_a11y(path: Path) -> A11yFacts:
     rules: dict[str, int] = {}
     pages = 0
     scope, scope_path = "page(s) scanned", "count(results)"
+    shape_seen: str | None = None
     for run in runs:
         if not isinstance(run, dict):
             continue
         vs = run.get("violations")
+        # One file, one shape: a list that mixes axe results with the suite's
+        # reports would add pages to files under one label.
+        shape = ("axe" if vs is not None else str(run.get("tool") or "findings"))
+        if shape_seen is not None and shape != shape_seen:
+            raise BuildError(
+                f"{path} mixes shapes ({shape_seen} and {shape}) in one list. "
+                f"One file holds one tool's results; pass the other separately "
+                f"or merge them into one report.")
+        shape_seen = shape
         if vs is None and isinstance(run.get("findings"), list) \
                 and run.get("tool") not in ("a11y_runtime", "a11y_static"):
             # A `findings` list from an unknown tool is not an automated
