@@ -1093,10 +1093,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         ramps: Dict[str, Dict[str, Tuple[float, float, float]]] = {}
         for source in sources:
             try:
-                ramps.update(load_project_ramps(source))
+                loaded = load_project_ramps(source)
             except (OSError, ConfigError) as exc:
                 print(f"could not read {source}: {exc}", file=sys.stderr)
                 return 2
+            # Step by step: two files may each hold part of one ramp, and a
+            # later file's step wins (Codex on #76).
+            for name, steps in loaded.items():
+                ramps.setdefault(name, {}).update(steps)
         origin = ", ".join(str(s) for s in sources) + (f" (from {config_path})" if config_path else "")
         if ramps:
             use_ramps(ramps)

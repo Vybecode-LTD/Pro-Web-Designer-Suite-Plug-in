@@ -1929,13 +1929,19 @@ def contract_of(data: Dict[str, Any]) -> Dict[str, Any]:
     tier (shared/project_config.py describes the shape). A Tier-1 colour named
     `--<ramp>-<step>` with a numeric step is a ramp step; `--bp-*` is a
     breakpoint; any other Tier-1 value sits in the scale its first name segment
-    names; every Tier-2 token is a role, as written."""
+    names, or `constants` when the name has one segment (`--density`); every
+    Tier-2 token is a role, as written. A token with no default value, declared
+    only in a theme or under a condition, is left out (Codex on #76)."""
+    no_default = {g["token"] for g in data["gaps"] if g["kind"] == "theme-only-token"}
     ramps: Dict[str, Dict[str, str]] = {}
     scales: Dict[str, Dict[str, str]] = {}
     roles: Dict[str, str] = {}
     breakpoints: Dict[str, str] = {}
+    constants: Dict[str, str] = {}
     for t in data["tokens"]:
         name, raw = t["name"], t["raw"]
+        if name in no_default:
+            continue
         if t["tier"] == 2:
             roles[name] = raw
         elif name.startswith("--bp-"):
@@ -1947,9 +1953,12 @@ def contract_of(data: Dict[str, Any]) -> Dict[str, Any]:
             head, _, step = name[2:].partition("-")
             if step:
                 scales.setdefault(head, {})[step] = raw
+            else:
+                constants[name] = raw
     ramps = {r: dict(sorted(steps.items(), key=lambda kv: int(kv[0]))) for r, steps in ramps.items()}
     return {"schema": CONTRACT_SCHEMA, "sources": list(data["sources"]["tokens"]),
-            "ramps": ramps, "scales": scales, "roles": roles, "breakpoints": breakpoints}
+            "ramps": ramps, "scales": scales, "roles": roles, "breakpoints": breakpoints,
+            "constants": constants}
 
 
 def human_report(data: Dict[str, Any]) -> str:

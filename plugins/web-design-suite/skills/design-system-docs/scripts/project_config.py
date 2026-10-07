@@ -40,13 +40,16 @@ default. The hooks (P25) and the commands (P26) read it through this module.
       "ramps": {"accent": {"500": "oklch(62% 0.19 45)"}},
       "scales": {"space": {"4": "1rem"}, "radius": {"md": "0.5rem"}},
       "roles": {"--bg-surface": "var(--neutral-0)"},
-      "breakpoints": {"md": "48rem"}
+      "breakpoints": {"md": "48rem"},
+      "constants": {"--density": "1"}
     }
 
 `ramps` are the Tier-1 colours named `--<ramp>-<step>` with a numeric step;
 `scales` the other Tier-1 values, by their first name segment; `breakpoints`
-the `--bp-*` values; `roles` every Tier-2 token as written. Theme and density
-overrides stay in extract_system's system.json.
+the `--bp-*` values; `constants` a Tier-1 value whose name has one segment
+(`--density`); `roles` every Tier-2 token as written. Only a token with a
+default value is in it: one declared only in a theme or under a condition is
+not. Theme and density overrides stay in extract_system's system.json.
 """
 from __future__ import annotations
 
@@ -62,7 +65,7 @@ KEYS = ("schema", "tokens", "emailTokens", "components", "stack", "budgets", "ba
 STACKS = ("vanilla-css", "css-modules", "tailwind-v3", "tailwind-v4")
 BUDGETS = ("perf", "a11y")
 BASELINES = ("audit", "a11y", "perf", "docs", "snapshots")
-CONTRACT_SECTIONS = ("ramps", "scales", "roles", "breakpoints")
+CONTRACT_SECTIONS = ("ramps", "scales", "roles", "breakpoints", "constants")
 
 
 class ConfigError(ValueError):
@@ -103,7 +106,7 @@ def find_config(start: Optional[Union[str, Path]] = None) -> Optional[Path]:
 
 def _read_json(path: Path) -> Any:
     try:
-        return json.loads(Path(path).read_text(encoding="utf-8-sig"))
+        return json.loads(Path(path).read_bytes())    # json finds the encoding, a BOM included
     except OSError as exc:
         raise ConfigError(f"{path}: {exc.strerror or exc}") from exc
     except ValueError as exc:

@@ -114,6 +114,20 @@ class ExtractSystemWritesTheContract(TempDirTest):
         self.pc = load_script("design-system-docs", "project_config")
         self.pc.read_contract(self.tmp / "contract.json")                  # its own reader accepts it
 
+    def test_only_default_values_and_every_tier1_name(self):
+        """Codex on #76: a token declared only in a theme was written as a
+        default, and a one-segment Tier-1 name (`--density`) was dropped."""
+        self.write("src/styles/tokens.css", TOKENS.replace("  }\n}\n", (
+            "    --density: 1;\n  }\n  [data-theme=\"dark\"] {\n    --accent-990: #000000;\n"
+            "    --glow-strong: 0 0 1rem var(--accent-500);\n  }\n}\n")))
+        proc = run_py("design-system-docs", "extract_system", "--tokens", "src/styles/tokens.css",
+                      "--out", "system.json", "--contract", "contract.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        contract = json.loads((self.tmp / "contract.json").read_bytes())
+        self.assertEqual(STEPS, list(contract["ramps"]["accent"]))       # no dark-only 990
+        self.assertNotIn("--glow-strong", contract["roles"])
+        self.assertEqual({"--density": "1"}, contract["constants"])
+
     def test_without_tokens_it_reads_the_projects_config(self):
         self.write(".git/HEAD", "x\n")
         self.write("src/styles/tokens.css", TOKENS)
@@ -154,6 +168,14 @@ class FigmaAuditReadsTheContract(TempDirTest):
     def test_tokens_takes_a_contract(self):
         self.assertEqual(11, len(self.off_ramp()))                         # the studio's ramps
         self.assertEqual([], self.off_ramp("--tokens", "contract.json"))
+
+    def test_two_token_files_merge_one_ramp(self):
+        """Codex on #76: a second file's part of a ramp replaced the first's."""
+        pairs = list(zip(STEPS, PROJECT_ACCENT))
+        for name, part in (("a.css", pairs[:5]), ("b.css", pairs[5:])):
+            self.write(name, ":root {\n" + "".join(f"  --accent-{s}: {h};\n" for s, h in part) + "}\n")
+        self.write(".design-suite.json", '{"schema": 1, "tokens": ["a.css", "b.css"]}')
+        self.assertEqual([], self.off_ramp())
 
     def test_the_config_names_the_tokens_and_a_flag_beats_it(self):
         self.write(".design-suite.json", '{"schema": 1, "tokens": "contract.json"}')
