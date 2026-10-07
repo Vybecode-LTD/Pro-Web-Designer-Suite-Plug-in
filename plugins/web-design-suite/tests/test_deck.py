@@ -31,10 +31,14 @@ RUNTIME = {"tool": "a11y_runtime", "target": "http://localhost/", "findings": [
     {"check": "axe", "rule": "incomplete:color-contrast", "sc": "1.4.3",
      "severity": "warning", "message": "", "fix": ""},
     {"check": "keys", "rule": "no-accessible-name", "sc": "4.1.2", "severity": "error",
+     "message": "", "fix": ""},
+    {"check": "static", "rule": "heading-skip", "sc": "best practice", "severity": "warning",
      "message": "", "fix": ""}]}
 STATIC_WARNING = {"tool": "a11y_static", "errors": 0, "warnings": 1, "findings": [
-    {"file": "a.html", "line": 3, "category": "structure", "rule": "heading-order",
-     "sc": "", "severity": "warning", "message": "", "fix": ""}]}
+    {"file": "a.html", "line": 3, "category": "S", "rule": "no-main-landmark",
+     "sc": "best practice", "severity": "warning", "message": "", "fix": ""},
+    {"file": "a.html", "line": 9, "category": "S", "rule": "heading-skip",
+     "sc": "best practice", "severity": "warning", "message": "", "fix": ""}]}
 STATIC_ERROR = {"tool": "a11y_static", "errors": 1, "warnings": 0, "findings": [
     {"file": "a.html", "line": 3, "category": "forms", "rule": "control-no-label",
      "sc": "1.3.1", "severity": "error", "message": "", "fix": ""},
@@ -99,6 +103,8 @@ class TheSuitesOwnA11yJsonIsAnInput(Deck):
         html = self.html(decision_log("D1 — Tokens"), "--a11y", a11y)
         self.assertNotIn("passes an automated WCAG 2.2 AA check", html)
         self.assertIn("color-contrast", html)
+        self.assertNotIn("heading-skip", html)
+        self.assertIn("<p class='metric__label'>target(s) scanned", html)
 
     def test_the_static_audits_findings_count_per_file(self):
         warning = self.write("w.json", json.dumps(STATIC_WARNING))
@@ -108,8 +114,11 @@ class TheSuitesOwnA11yJsonIsAnInput(Deck):
         text = self.outline(decision_log("D1 — Tokens"), "--a11y", error)
         self.assertIn("not clean (2 violation(s) on 2 element(s))", text)
         html = self.html(decision_log("D1 — Tokens"), "--a11y", error, name="e.html")
-        self.assertIn("#count(results)\" data-value=\"2\">2</span></p>"
-                      "<p class='metric__label'>page(s) scanned", html)
+        self.assertIn("#count(distinct findings[].file)\" data-value=\"2\">2</span></p>"
+                      "<p class='metric__label'>file(s) with findings", html)
+        self.assertNotIn("page(s) scanned", html)
+        warn = self.html(decision_log("D1 — Tokens"), "--a11y", warning, name="w.html")
+        self.assertIn("data-value=\"0\">0</span></p><p class='metric__label'>file(s) with findings", warn)
 
     def test_axe_results_still_read_and_anything_else_names_both_shapes(self):
         axe = self.write("axe.json", json.dumps(A11Y_WITH_VIOLATIONS))

@@ -452,6 +452,11 @@ class A11yFacts:
     top_rules: list[tuple[str, int]]
     passes: int | None
     contrast: int = 0          # elements failing axe's color-contrast rule
+    # What `pages` counts, by shape: axe results are pages, the runtime audit
+    # has one target, and the static audit records only the files that had
+    # findings, never how many it read.
+    scope: str = "page(s) scanned"
+    scope_path: str = "count(results)"
 
 
 def load_a11y(path: Path) -> A11yFacts:
@@ -464,6 +469,7 @@ def load_a11y(path: Path) -> A11yFacts:
     by_impact: dict[str, int] = {}
     rules: dict[str, int] = {}
     pages = 0
+    scope, scope_path = "page(s) scanned", "count(results)"
     for run in runs:
         if not isinstance(run, dict):
             continue
@@ -473,18 +479,22 @@ def load_a11y(path: Path) -> A11yFacts:
             # findings with a check, a rule, a success criterion, a severity
             # and the nodes) and `a11y_static.py --json` (findings per
             # file). A finding is a violation when it names a WCAG success
-            # criterion or is an error; a best-practice warning and an
+            # criterion or is an error; a best-practice finding (its `sc` is
+            # the sentinel "best practice", never a criterion) and an
             # `incomplete` axe result are reported by the tool, not claimed
             # here as failures.
             vs = []
             files: set[str] = set()
+            static = run.get("tool") == "a11y_static" or any(
+                isinstance(f, dict) and f.get("file") for f in run["findings"])
             for f in run["findings"]:
                 if not isinstance(f, dict):
                     continue
                 rule = str(f.get("rule") or "unnamed")
-                if "incomplete" in rule:
+                sc = str(f.get("sc") or "").strip().lower()
+                if "incomplete" in rule or sc == "best practice":
                     continue
-                if f.get("severity") != "error" and not f.get("sc"):
+                if f.get("severity") != "error" and not sc:
                     continue
                 if f.get("file"):
                     files.add(str(f["file"]))
@@ -492,7 +502,14 @@ def load_a11y(path: Path) -> A11yFacts:
                 vs.append({"id": rule,
                            "impact": f.get("impact") or f.get("severity") or "unspecified",
                            "nodes": found if isinstance(found, list) and found else [1]})
-            pages += max(len(files), 1)
+            if static:
+                # The static audit never says how many files it read, only
+                # which ones had findings: that is what the number is called.
+                pages += len(files)
+                scope, scope_path = "file(s) with findings", "count(distinct findings[].file)"
+            else:
+                pages += 1
+                scope, scope_path = "target(s) scanned", "count(runs)"
         elif vs is None:
             raise BuildError(
                 f"{path} has no `violations` and no `findings` key. Supply an "
@@ -515,7 +532,8 @@ def load_a11y(path: Path) -> A11yFacts:
     top = sorted(rules.items(), key=lambda kv: (-kv[1], kv[0]))[:4]
     return A11yFacts(str(path), pages, violations, nodes, by_impact, top,
                      passes if saw_passes else None,
-                     contrast=rules.get("color-contrast", 0))
+                     contrast=rules.get("color-contrast", 0),
+                     scope=scope, scope_path=scope_path)
 
 
 @dataclass
@@ -1065,11 +1083,11 @@ def slide_a11y(a11y: A11yFacts, prov: Provenance, audience: str,
     s = Slide("evidence-a11y", "Accessibility, stated honestly")
     c_v = prov.add(a11y.violations, a11y.source, "count(violations)")
     c_n = prov.add(a11y.nodes, a11y.source, "sum(len(violations[].nodes))")
-    c_p = prov.add(a11y.pages, a11y.source, "count(results)")
+    c_p = prov.add(a11y.pages, a11y.source, a11y.scope_path)
     metrics = [
         (cited(c_v), "automated violations", inline("across the pages scanned")),
         (cited(c_n), "elements affected", inline("each one a real node")),
-        (cited(c_p), "page(s) scanned", inline("automated pass")),
+        (cited(c_p), a11y.scope, inline("automated pass")),
     ]
     s.blocks.append(blk_metrics(metrics))
     serious = sum(v for k, v in a11y.by_impact.items()
@@ -1127,8 +1145,8 @@ def slide_a11y(a11y: A11yFacts, prov: Provenance, audience: str,
             body = (f"{cited(c_c)} element(s) still fail the automated contrast "
                     f"check; they are listed below, and they are defects, not taste.")
         else:
-            body = (f"The automated pass found no contrast failure on the "
-                    f"{cited(c_p)} page(s) scanned, which is why the colour "
+            body = (f"The automated pass found no contrast failure "
+                    f"({cited(c_p)} {a11y.scope}), which is why the colour "
                     f"decisions in this deck are not arguments about taste.")
         s.blocks.append(blk_callout("note", "Contrast is measured, never judged",
                                     f"<p class='body'>{body}</p>"))
