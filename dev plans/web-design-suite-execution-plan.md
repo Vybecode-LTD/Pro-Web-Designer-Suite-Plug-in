@@ -110,7 +110,7 @@ PRs #12 to #15 were merged on 2026-10-02. P0 fixes what their reviews found.
 
 ### Phase 5 · 3.5.0: a full Claude Code plugin
 
-Re-read `web-design-suite-review/claude-code-capabilities.md` against the current Claude Code docs before P24: the plugin features change often. Done on 2026-10-07, in its §5: mods (2.1.287) are a new kind of hook for P25 to weigh, and `bin/` keeps a plugin out of claude.ai and Cowork installs (P28).
+Re-read `web-design-suite-review/claude-code-capabilities.md` against the current Claude Code docs before P24: the plugin features change often. Partly done on 2026-10-07, in its §5, against the changelog and the manifest reference only: mods (2.1.287) are a new kind of hook for P25 to weigh, and `bin/` keeps a plugin out of claude.ai and Cowork installs (P28). Still to re-read: the hooks page and the mods reference before P25, and the plugin-evals page before P29.
 
 | PR | What | Items | Main files | Size |
 |---|---|---|---|---|

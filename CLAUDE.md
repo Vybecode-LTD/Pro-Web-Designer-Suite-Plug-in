@@ -17,7 +17,7 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is next. No PR is open.
 - **Installed:** 3.4.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
 - **Tests:** 755. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P24 (the project contract), then P25 (the hooks). `dev plans/web-design-suite-review/claude-code-capabilities.md` §5 is the 2026-10-07 re-check of the plugin features. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P24 (the project contract), then P25 (the hooks). `dev plans/web-design-suite-review/claude-code-capabilities.md` §5 is a partial 2026-10-07 re-check of the plugin features (the hooks, mods and evals pages are still to be re-read). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
 - **Open:** 54 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands

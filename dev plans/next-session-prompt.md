@@ -89,7 +89,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`.
 2. Read the execution plan's §2 and §6, and its Phase 5 table in §4.
-3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2 and §5 (§5 is the 2026-10-07 re-check). Read §1 (evals) only when you reach P29.
+3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2 and §5. §5 is a **partial** re-check, done on 2026-10-07 against the changelog and the manifest reference only. Re-read the current hooks page (`code.claude.com/docs/en/hooks`) and the mods reference before P25, and the plugin-evals page before P29, and update §2, §1 and §5 with what changed. Read §1 (evals) only when you reach P29.
 4. Check the state, with the Bash tool:
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
@@ -162,11 +162,26 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 Read those three paragraphs, and the completion plan's W9 point 2 (line 372), before you plan.
 
-**The gap.** A project cannot tell the scripts where its tokens, components, budgets and baselines are, except flag by flag, and only some scripts take one:
-- `--tokens` exists only in `figma_audit.py` (line 1049; its `RAMPS` at line 132 has been updated from a tokens.css since 3.1.0, LC-A3) and `extract_system.py` (line 1962, `action="append"`).
-- `cluster_values.py` hard-codes `STATUS_RAMPS` (line 750).
-- `audit_design.py`, `diff_system.py` and `figma_to_tokens.py` take no project tokens at all.
-- The audit's component globs are the spec's `file_classes`, which a project cannot extend.
+**The gap.** A project cannot tell the scripts where its tokens, components, budgets and baselines are, except flag by flag. The flags that exist today (grep `add_argument("--` and `case '--` in `skills/*/scripts`; Codex on #75), classified:
+- **A project's tokens.css:**
+  - `figma_audit.py --tokens` (line 1049). Its `RAMPS` (line 132) has been updated from the tokens.css since 3.1.0 (LC-A3).
+  - `extract_system.py --tokens` (line 1962, `action="append"`).
+  - `build_presentation.py --tokens` (line 2778): "tokens.css to build the deck on (default: the bundled copy)".
+- **A different file of the same name.** `build_email.py --tokens` (line 1295) and `lint_email.py --tokens` (line 1164) take `email-tokens.json`, the email build's own token file, not a tokens.css. Keep them apart in the config (an `emailTokens` key, say), and don't route `contract.json` to them.
+- **No project tokens at all:** `cluster_values.py` hard-codes `STATUS_RAMPS` (line 750), and `audit_design.py`, `diff_system.py` and `figma_to_tokens.py` take no project tokens.
+- **Budgets:**
+  - `perf_audit.py --budget` (line 1643, default `perf-budget.json`)
+  - `measure_vitals.mjs --budget` (line 161)
+  - `a11y_runtime.mjs --budget` (line 179)
+- **Baselines:**
+  - `audit_design.py --baseline`/`--write-baseline` (line 2383)
+  - `a11y_static.py --baseline`/`--write-baseline` (line 1665, default `.a11y-baseline.json`)
+  - `perf_audit.py --baseline`/`--write-baseline` (line 1658, default `.perf-baseline.json`)
+  - `build_docs.py --baseline` (line 1376)
+  - `snapshot_matrix.mjs --baselines`/`--update-baselines` (line 123)
+- **Component globs:** the audit's are the spec's `file_classes`, which a project cannot extend.
+
+Before the schema, re-run that grep: the list above is from 2026-10-07.
 
 **The decisions to make** (they are the plan's; ask the user only if a real choice remains):
 1. **`.design-suite.json`'s schema.** It holds token files, component globs, the stack, budgets and baselines, plus a schema version.
@@ -174,7 +189,7 @@ Read those three paragraphs, and the completion plan's W9 point 2 (line 372), be
    - **Precedence:** a flag beats the config, which beats the default.
    - **Component globs:** a project's globs add to the spec's `file_classes`; whether they can also replace them is the open question.
    - **Unknown keys** are an error, with the key named.
-2. **`contract.json`'s schema.** `extract_system.py` writes it from the project's tokens.css: ramps, scales, roles and breakpoints, with a schema version. Every script that takes `--tokens` accepts either a tokens.css or a `contract.json`.
+2. **`contract.json`'s schema.** `extract_system.py` writes it from the project's tokens.css: ramps, scales, roles and breakpoints, with a schema version. Every script whose `--tokens` takes a tokens.css (figma_audit, extract_system, build_presentation, and the ones P24 adds) accepts either that or a `contract.json`. The email scripts' `--tokens` does not.
 3. **One reader.** A Python module that finds and validates the config. It has a master in `shared/` and a copy in each skill that needs it, with a test that the copies match, as `browser_common.mjs` has.
 
 **The split (L, two parts):**
@@ -182,7 +197,9 @@ Read those three paragraphs, and the completion plan's W9 point 2 (line 372), be
 - **Part 2:**
   - `audit_design`: the component globs, and token files from the config.
   - `diff_system` and `figma_to_tokens`.
-  - The budgets and baselines: perf-budget-gate's `perf_audit.py` and `crux_check.py`, component-state-matrix's baselines, and a11y_runtime's budget.
+  - `build_presentation.py`'s tokens.css.
+  - Every budget and baseline consumer listed under the gap: `perf_audit.py`, `measure_vitals.mjs` and `a11y_runtime.mjs` (budgets); `audit_design.py`, `a11y_static.py`, `perf_audit.py`, `build_docs.py` and `snapshot_matrix.mjs` (baselines). `crux_check.py` takes none today; give it the budget only if its reference says it should. A consumer left out is named in the PR with the reason.
+  - The email scripts' `email-tokens.json`, under its own key.
   - The docs: each skill's scripts reference, and a section in web-design-studio's references on the project contract.
 
 **Tests:**
@@ -211,7 +228,9 @@ Read them by `grep -n`.
 - `diff_system` after a tokens edit.
 - A `UserPromptSubmit` router that names the right skill when the listing has dropped the descriptions (`claude-code-capabilities.md`, "Implications").
 
-**First: weigh mods against command hooks.** Claude Mods (2.1.287) are plugin hooks modules of JavaScript function hooks (`tool.call`, `tool.check`, `prompt.submit`), tested with `claude plugin test`.
+**First: re-read the hooks page and the mods reference** (§1 step 3). The capabilities reference's §2 dates from 2026-09-23, and its §5 did not re-read either page.
+
+**Then: weigh mods against command hooks.** Claude Mods (2.1.287) are plugin hooks modules of JavaScript function hooks (`tool.call`, `tool.check`, `prompt.submit`), tested with `claude plugin test`.
 - Read the mods reference (capabilities §5 has the link), and check two things before choosing: that mods run on Windows, and that they run in `claude -p`, which the evals (P29) use.
 - Command hooks (`hooks/hooks.json`, §2 of the capabilities reference) are the known route:
   - Use exec form, with `"command": "python"` and the script path in `args`. On Windows, exec form needs a real `.exe`.

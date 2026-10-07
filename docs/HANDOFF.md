@@ -21,7 +21,7 @@
   - CodeRabbit: `@layer base.components` was read as the components layer.
 
   #74 had no findings.
-- **Phase 5's first step:** `claude-code-capabilities.md` §5 holds the 2026-10-07 re-check against the changelog (2.1.293) and the manifest reference:
+- **Phase 5's first step, in part:** `claude-code-capabilities.md` §5 holds the 2026-10-07 re-check against the changelog (2.1.293) and the manifest reference. The hooks page and the mods reference are still to be re-read before P25, and the evals page before P29. What it found:
   - Mods (2.1.287) are a new kind of plugin hook, and P25 should weigh them.
   - `bin/` keeps a plugin out of claude.ai and Cowork installs, which bears on P28.
   - Several anchors moved.
