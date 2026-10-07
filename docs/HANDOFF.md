@@ -43,7 +43,7 @@
 - **`browser_common.mjs` has five copies.** Change `shared/` and copy it over all five. A Python reader for `.design-suite.json` would follow the same pattern.
 - **The token counter resets at each app event.** It reset about six times this session; keep a running total. This session used about 420 thousand tokens: two PRs, one review round, the release, the re-check and these docs.
 - **Codex reviewed only the head each PR opened with** (`accb8d6` on #73), not the fix pushed after it.
-- **Bash heredocs eat backslashes.** Three times this session, a `\\n` in a Python heredoc became a newline, and once a Windows path broke the script. Write such scripts with the Write tool.
+- **Bash heredocs eat backslashes.** Twice this session, a `\\n` in a Python heredoc became a newline, and once a Windows path broke the script. Write such scripts with the Write tool.
 - **Still open from earlier:**
   - `--warning-700`, `--danger-100` and `--info-100` fall outside Display P3.
   - `check_roles.py` measures a colour outside sRGB with its channels clipped.
