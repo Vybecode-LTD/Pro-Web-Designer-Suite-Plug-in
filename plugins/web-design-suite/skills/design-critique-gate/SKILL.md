@@ -85,7 +85,7 @@ a contrast failure does not make the keyboard checks moot.
 | 6 | **Color and contrast** | Measured, never judged | 3 min |
 | 7 | **States and edges** | Seven states, plus empty / loading / error / long / RTL | 4 min |
 | 8 | **Interaction and motion** | Affordance, feedback, keyboard, reduced motion | 3 min |
-| 9 | **Conformance** | The auditor, then the 91 checks | 2 min + 30 min |
+| 9 | **Conformance** | The auditor, then review-checklist.md's 91 checks | 2 min + 30 min |
 | 10 | **Presentation readiness** | Can you defend every non-obvious decision out loud? | 3 min |
 
 ### 1 — Premise

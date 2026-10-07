@@ -259,6 +259,20 @@ class CritiqueDefenceAndMerge(TempDirTest):
         self.assertIn("| Two primary actions | major, fixed |", flaws)
         self.assertNotIn("The hero answers the wrong question", flaws)
 
+    def test_fixed_taste_and_an_all_fixed_summary_are_said_as_fixed(self):
+        # CodeRabbit on #69: a fixed taste finding was not labelled fixed.
+        # Codex on #69: --summary with only fixed defects said "Taste
+        # findings only".
+        taste = [{"layer": "craft", "severity": "taste", "status": "fixed",
+                  "title": "Rounder corners on the cards"}]
+        critique = self.run_report(taste).stdout.decode("utf-8")
+        self.assertIn("- **Rounder corners on the cards** (craft, fixed)", critique)
+        fixed = [{"layer": "color", "severity": "major", "status": "fixed",
+                  "title": "Muted text fails contrast"}]
+        summary = self.run_report(fixed, "--summary").stdout.decode("utf-8")
+        self.assertNotIn("Taste findings only", summary)
+        self.assertIn("every one is marked fixed", summary)
+
     def test_bad_input_exits_2_as_the_docstring_says(self):
         path = self.write("findings.json", json.dumps([{"layer": "nowhere", "severity": "major"}]))
         proc = run_py("design-critique-gate", "critique_report", path, cwd=self.tmp)

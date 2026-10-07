@@ -643,7 +643,8 @@ def render_critique(c: Critique, findings: list[Finding], notes: list[str]) -> s
         )
         out.append("")
         for f in tastes:
-            line = f"- **{f.title}** ({LAYER_LABEL[f.layer].lower()})"
+            line = f"- **{f.title}** ({LAYER_LABEL[f.layer].lower()}"
+            line += ", fixed)" if f.status == "fixed" else ")"
             if f.mechanism:
                 line += f" — {f.mechanism}"
             out.append(line)
@@ -771,6 +772,9 @@ def render_summary(c: Critique, findings: list[Finding]) -> str:
     if not defects:
         if not findings:
             return "No findings recorded. That is a result you have to earn — re-run the method.\n"
+        if any(f.severity != "taste" for f in findings):
+            return ("No open defects: every one is marked fixed. Re-check each against "
+                    "the page before you present.\n")
         return "No defects. Taste findings only — present as is, labelled as taste.\n"
     out = []
     for i, f in enumerate(defects[:3], 1):
