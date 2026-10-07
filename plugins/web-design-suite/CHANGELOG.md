@@ -10,8 +10,10 @@
   nobody ran was ticked or read as failed. The script renders the page at 390 and 1440px,
   the 1440 capture blurred 8px, in greyscale, mirrored and at 25%, dark and
   reduced-motion captures, and `contrast.md`: each text colour on the background its
-  ancestors paint, from computed styles, against its AA floor (3:1 for large text), with
-  text over an image or gradient listed as not measured. Nothing is injected into the
+  ancestors paint, from computed styles, against its AA floor (3:1 for large text), at
+  both widths, light and dark; a form control's value or placeholder counts as text, and
+  an ancestor's opacity is composited as the browser does. Text over an image or gradient
+  is listed as not measured. Nothing is injected into the
   page, so its CSP stands. A 390 capture wider than 390px is named (no `width=device-width`
   viewport). Exit 1 when a pair is below its floor. The template's new "Checks a person
   runs" table records each as run, run with a proxy (which file), or "not run — needs a

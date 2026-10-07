@@ -61,8 +61,13 @@ class CritiqueSnapshots(unittest.TestCase):
         cls.tmp = class_temp_dir(cls, "wds-snap-")
         cls.runs = {}
         pages = {
-            "muted": page('<p class="muted">Muted small print</p>',
-                          style=".muted { color: #9a9a9a; } "
+            "muted": page('<p class="muted">Muted small print</p>'
+                          '<p class="faded">Faded print</p>'
+                          '<input class="email" placeholder="Your email">'
+                          '<p class="narrow">Only on a phone</p>',
+                          style=".muted { color: #9a9a9a; } .faded { opacity: 0.4; } "
+                                ".email::placeholder { color: #bbbbbb; } .narrow { display: none; } "
+                                "@media (max-width: 600px) { .narrow { display: block; color: #aaaaaa; } } "
                                 "@media (prefers-color-scheme: dark) { .muted { color: #444; } }"),
             "clean": page(viewport=False),
         }
@@ -104,21 +109,41 @@ class CritiqueSnapshots(unittest.TestCase):
     def test_the_contrast_table_measures_each_pair_against_its_floor(self):
         code, report = self.run_of("muted")
         self.assertEqual(1, code, "a pair below its floor exits 1")
-        rows = {(r["scheme"], r["text"], r["background"]): r for r in report["contrast"]}
-        muted = rows[("light", "#9a9a9a", "#ffffff")]
+        rows = {(r["view"], r["text"], r["background"]): r for r in report["contrast"]}
+        muted = rows[("1440 light", "#9a9a9a", "#ffffff")]
         self.assertEqual((2.81, 4.5, False), (muted["ratio"], muted["floor"], muted["passes"]))
         self.assertIn("p.muted", muted["where"])
-        heading = rows[("light", "#767676", "#ffffff")]
+        heading = rows[("1440 light", "#767676", "#ffffff")]
         self.assertEqual((3, True), (heading["floor"], heading["passes"]))     # 32px is large text
-        self.assertFalse(rows[("dark", "#444444", "#111111")]["passes"])
-        band = [r for r in report["contrast"] if r["scheme"] == "light" and r["text"] == "#ffffff"
+        self.assertFalse(rows[("1440 dark", "#444444", "#111111")]["passes"])
+        band = [r for r in report["contrast"] if r["view"] == "1440 light" and r["text"] == "#ffffff"
                 and r["background"] not in (None, "an image or gradient")]
         self.assertEqual(1, len(band), report["contrast"])
         self.assertRegex(band[0]["background"], r"^#4[cd]4[cd]4[cd]$")          # 70% black on white
-        self.assertIn(("light", None, "an image or gradient"), rows)
+        self.assertIn(("1440 light", None, "an image or gradient"), rows)
         table = (self.tmp / "muted" / "contrast.md").read_text(encoding="utf-8")
-        self.assertIn("| light | `#9a9a9a` | `#ffffff` | 2.81:1 | 4.5:1 | **below** |", table)
+        self.assertIn("| 1440 light | `#9a9a9a` | `#ffffff` | 2.81:1 | 4.5:1 | **below** |", table)
         self.assertIn("not measured: run a11y_runtime.mjs", table)
+
+    def test_phone_only_text_form_text_and_faded_text_are_measured(self):
+        """Codex on #71: only the 1440 layout was sampled, only text nodes,
+        and an ancestor's opacity was ignored, so each of these passed unseen."""
+        code, report = self.run_of("muted")
+
+        def rows(name):
+            return [r for r in report["contrast"] if name in r["where"]]
+
+        faded = rows("p.faded")
+        self.assertEqual({"390 light", "390 dark", "1440 light", "1440 dark"}, {r["view"] for r in faded})
+        self.assertTrue(all(r["passes"] is False for r in faded), faded)     # #1a1a1a at 0.4 on white
+        light = next(r for r in faded if r["view"] == "1440 light")
+        self.assertRegex(light["text"], r"^#a[234]a[234]a[234]$")
+        placeholder = rows("input.email::placeholder")
+        self.assertTrue(placeholder and all(r["passes"] is False for r in placeholder
+                                            if r["view"].endswith("light")), placeholder)
+        narrow = rows("p.narrow")
+        self.assertEqual({"390 light", "390 dark"}, {r["view"] for r in narrow})
+        self.assertFalse(next(r for r in narrow if r["view"] == "390 light")["passes"])
 
     def test_a_clean_page_exits_0_and_a_missing_viewport_is_named(self):
         code, report = self.run_of("clean")
