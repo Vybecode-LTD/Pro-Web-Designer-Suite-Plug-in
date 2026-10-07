@@ -888,14 +888,22 @@ def since_last_time(log: DecisionLog) -> list[dict[str, str]]:
                     return row[i].strip()
         return ""
 
+    def cell(value: str) -> str:
+        # The template's example cells (`<the change…>`) record nothing.
+        return "" if PLACEHOLDER.fullmatch(value.strip().strip("`")) else value.strip()
+
     out = []
     for row in _md_table(lines):
-        asked = col(row, "asked", "request")
-        if not asked or PLACEHOLDER.fullmatch(asked.strip("`")):
+        asked = cell(col(row, "asked", "request"))
+        if not asked:
             continue
-        out.append({"asked": asked, "did": col(row, "did", "changed", "done"),
-                    "why": col(row, "why", "not")})
+        out.append({"asked": asked, "did": cell(col(row, "did", "changed", "done")),
+                    "why": cell(col(row, "why", "not"))})
     return out
+
+
+NOT_DONE = re.compile(r"(?i)^\s*(?:no|none|not?\b.*|we did not\b.*|declined\b.*|deferred\b.*|"
+                      r"dropped\b.*|rejected\b.*|unchanged|—|-|–)\s*\.?\s*$")
 
 
 def _changed(inp: Inputs, audience: str) -> Slide | None:
@@ -912,7 +920,7 @@ def _changed(inp: Inputs, audience: str) -> Slide | None:
     if asked:
         rows = []
         for a in asked:
-            did = a["did"] and not re.fullmatch(r"(?i)(no|not changed|not done|—|-)", a["did"])
+            did = bool(a["did"]) and not NOT_DONE.match(a["did"])
             rows.append([quoted(a["asked"]),
                          quoted(a["did"]) if did else "<em>not changed</em>",
                          quoted(a["why"]) if a["why"] else ("" if did else "<em>no reason recorded</em>")])
@@ -2303,11 +2311,21 @@ DECK_JS = """(function () {
   // N on a shared screen is never needed.
   var presenter = /-presenter$/.test(window.location.hash || "");
   var channel = null;
+  // The other window, when this one opened it (or was opened by it): the
+  // link that keeps two file:// windows in step, where a BroadcastChannel
+  // may not reach (Chrome gives each local file its own origin).
+  var peer = presenter ? window.opener : null;
+  var deckId = "deck:" + window.location.pathname + ":" + document.title;
   // Named by the file, not the title: two decks of one project open on
   // the same origin must not move each other.
   try {
-    channel = new BroadcastChannel("deck:" + window.location.pathname + ":" + document.title);
+    channel = new BroadcastChannel(deckId);
   } catch (e) {}
+
+  function tell(target) {
+    if (!target || target.closed) { return; }
+    try { target.postMessage({ deck: deckId, index: index }, "*"); } catch (e) {}
+  }
 
   function clamp(i) { return Math.max(0, Math.min(total - 1, i)); }
 
@@ -2335,14 +2353,21 @@ DECK_JS = """(function () {
     }
     if (moveFocus !== false) { slides[index].focus({ preventScroll: true }); }
     slides[index].scrollTop = 0;
-    if (channel && fromPeer !== true) {
-      try { channel.postMessage({ index: index }); } catch (e) {}
+    if (fromPeer !== true) {
+      if (channel) { try { channel.postMessage({ index: index }); } catch (e) {} }
+      tell(peer);
     }
   }
 
   function openPresenter() {
     var url = window.location.href.replace(/#.*$/, "") + "#s" + (index + 1) + "-presenter";
-    window.open(url, "deck-presenter");
+    var opened = window.open(url, "deck-presenter");
+    if (opened) {
+      peer = opened;
+      // The notes belong in the presenter window now: this one is the
+      // one on the shared screen.
+      toggleNotes(false);
+    }
   }
 
   function next() { if (index < total - 1) { show(index + 1); } }
@@ -2414,14 +2439,19 @@ DECK_JS = """(function () {
     if (badge) { badge.hidden = false; }
     toggleNotes(true);
   }
-  if (channel) {
-    channel.onmessage = function (event) {
-      var data = event && event.data;
-      if (data && typeof data.index === "number" && data.index !== index) {
-        show(data.index, true, false, true);
-      }
-    };
+  function follow(data) {
+    if (data && typeof data.index === "number" && data.index !== index) {
+      show(data.index, true, false, true);
+    }
   }
+  if (channel) { channel.onmessage = function (event) { follow(event && event.data); }; }
+  window.addEventListener("message", function (event) {
+    var data = event && event.data;
+    if (data && data.deck === deckId) {
+      if (!peer && event.source) { peer = event.source; }
+      follow(data);
+    }
+  });
   var helpClose = document.querySelector("[data-deck-help-close]");
   if (helpClose) {
     helpClose.addEventListener("click", function () { toggleHelp(false); });

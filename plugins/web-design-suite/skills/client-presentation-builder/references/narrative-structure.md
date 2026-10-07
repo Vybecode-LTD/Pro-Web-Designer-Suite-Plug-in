@@ -122,7 +122,9 @@ Each structure below is a sequence of slide *jobs*, not slide titles. What
 `scripts/build_presentation.py` builds of them: §3.1 is `--audience client`; §3.2 is the
 same deck with `Stage: iteration review` in the log's header, which opens on the "What
 changed since last time" slide (`## Since last time` and the reversals); §3.3 is
-`Stage: sign-off`, which brings the ask up to the second slide; §3.5 is `--audience team`.
+`Stage: sign-off`, which opens on the ask (§4's opening for a sign-off: the question the
+meeting has to answer), so the table's job 6 is the second slide and the rest of its order is
+by hand; §3.5 is `--audience team`.
 §3.4 is the client deck plus the reversed decisions shown as reversed; the rest of §3.4 is
 done by hand. In every order the known flaws come before the visual walkthrough (§8).
 

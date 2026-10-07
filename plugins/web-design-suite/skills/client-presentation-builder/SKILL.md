@@ -167,8 +167,8 @@ Two rules that apply to all of them:
   number that decided everything, or the question the meeting has to answer (§4).
 - **Raise the parts you are not happy with yourself, early, with a plan** (`references/narrative-structure.md` §8). A flaw you
   name is a judgement call; the same flaw found by a reviewer is an oversight, and from that
-  moment every other decision is re-read as a possible accident. The flaws slide comes before
-  the screens; `Stage: iteration review` or `Stage: sign-off` in the log's header reorder it
+  moment every other decision is re-read as a possible accident. Flaws come before the
+  screens; `Stage: iteration review` or `Stage: sign-off` in the header reorder it
   (`references/narrative-structure.md` §3).
 
 ### 4. Generate the deck
@@ -246,7 +246,7 @@ python -m scripts.audit_design build-css/ --strict          # the deck audits cl
 | `--audit` `--perf` `--a11y` | The suite's JSON, translated into plain language with the numbers cited |
 | `--defence FILE` | The critique gate's defence sheet: taste calls become open questions, known flaws become the "what we are not happy with" slide, and a blocking item stops the build with exit 1 |
 | `--screenshots DIR` | Inlined as data URIs so the deck is one file. `home--before.png` + `home--after.png` pair into a comparison automatically |
-| `--handout FILE` | The client's copy: one slide per printed page, no notes, gaps, appendix or provenance in the file |
+| `--handout FILE` | The client's copy: one slide per page, no notes, gaps, appendix or provenance |
 | `--dry-run` | Prints the slide plan, the decision ranking and every gap. Writes nothing |
 | `--notes FILE` | Speaker notes as markdown, ending in a pre-flight checklist of the gaps |
 | `--emit-css DIR` | Writes the deck's own CSS out so the gate can be run on it |
@@ -257,7 +257,7 @@ Exit `0` fine · `1` the defence sheet says do not present yet · `2` bad invoca
 
 **The deck is a self-contained HTML file.** Arrow keys, space and Page Up/Down navigate;
 `Home`/`End` jump; `N` toggles presenter notes and the gap markers; `P` opens a presenter window
-with them, in step; `F` is fullscreen; `?`
+with them, in step (a local file syncs via `P`'s link); `F` is fullscreen; `?`
 shows the keyboard map; `Ctrl/Cmd+P` prints one slide per page, with the notes only while they are showing.
 The PDF someone will ask for by email an hour after the meeting is `--handout`: the
 same slides with no notes, gaps, appendix or provenance in the file at all.

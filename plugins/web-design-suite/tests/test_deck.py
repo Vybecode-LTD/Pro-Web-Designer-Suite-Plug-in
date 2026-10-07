@@ -279,6 +279,8 @@ SINCE = """
 | A bigger logo | Doubled the mark in the header (D4) | |
 | A carousel on the homepage | | It halves the LCP budget; the static hero carries the three messages instead |
 | Blue buttons | | |
+| A bigger map | Not implemented | |
+| Fewer form fields | `<the change, with its decision id>` | `<the constraint, and what was done instead>` |
 """
 
 
@@ -287,7 +289,9 @@ class ThePresenterWindow(Deck):
 
     def test_the_deck_opens_a_presenter_window_kept_in_step(self):
         html = self.html(decision_log("D1 — Tokens"))
-        for piece in ('new BroadcastChannel("deck:" + window.location.pathname + ":" + document.title)', "-presenter",
+        for piece in ("new BroadcastChannel(deckId)", 'var deckId = "deck:" + window.location.pathname + ":" + document.title;',
+                      "-presenter", "tell(peer)", 'target.postMessage({ deck: deckId, index: index }, "*")',
+                      'window.addEventListener("message"', "peer = opened;", "toggleNotes(false);",
                       "data-deck-presenter-badge", 'key === "p" || key === "P"', "openPresenter()",
                       "show(data.index, true, false, true)", ">P<", "a presenter window"):
             self.assertIn(piece, html, piece)
@@ -308,11 +312,17 @@ class SinceLastTimeAndTheStage(Deck):
         text = self.outline(decision_log("D1 — Tokens") + SINCE)
         self.assertRegex(text, r"changed\s+What changed since last time")
         self.assertIn('"Blue buttons" was not done and no reason is recorded', text)
+        # Review of #66 (CodeRabbit): a negative outcome ("Not implemented")
+        # and a row whose other cells are still the template's examples.
+        self.assertIn('"A bigger map" was not done and no reason is recorded', text)
+        self.assertIn('"Fewer form fields" was not done and no reason is recorded', text)
         self.assertNotIn('"A carousel on the homepage" was not done', text)
         html = self.html(decision_log("D1 — Tokens") + SINCE)
         self.assertIn("Doubled the mark in the header (D4)", html)
         self.assertIn("It halves the LCP budget", html)
-        self.assertEqual(html.count("<em>not changed</em>"), 2)
+        self.assertEqual(html.count("<em>not changed</em>"), 4)
+        self.assertNotIn("Not implemented", html)
+        self.assertNotIn("the constraint, and what was done instead", html)
         self.assertNotIn("the change, with its decision id", html)   # the template row is skipped
 
     def test_an_iteration_review_opens_on_what_changed_and_a_sign_off_on_the_ask(self):
@@ -325,6 +335,8 @@ class SinceLastTimeAndTheStage(Deck):
         # Review of #66 (Codex): the ask is the second slide, straight after
         # the cover, whether or not there is a decision index.
         self.assertRegex(sign_off, r"\n  1\. cover[\s\S]*\n  2\. ask[\s\S]*\n  3\. brief")
+        narrative = (SKILLS / "client-presentation-builder" / "references" / "narrative-structure.md").read_text(encoding="utf-8")
+        self.assertIn("so the table's job 6 is the second slide and the rest of its order is\nby hand", narrative)
         no_index = self.outline("# Test deck\n\n**Stage:** sign-off\n\n## Decisions\n\n### D1 — Tokens\n"
                                 "**Status:** open\n**Constraint:** Many developers touch the CSS.\n"
                                 "**Choice:** A closed token system.\n")
@@ -338,7 +350,7 @@ class SinceLastTimeAndTheStage(Deck):
         self.assertNotIn("Late, after the evidence", skill)
         self.assertIn("| **Weaknesses appear** | After decisions, before visuals |", skill)
         html = self.html(decision_log("D1 — Tokens"))
-        self.assertIn('new BroadcastChannel("deck:" + window.location.pathname + ":" + document.title)', html)
+        self.assertIn('var deckId = "deck:" + window.location.pathname + ":" + document.title;', html)
 
     def test_the_flaws_come_before_the_screens_and_the_evidence(self):
         from test_presentation import FINDINGS
