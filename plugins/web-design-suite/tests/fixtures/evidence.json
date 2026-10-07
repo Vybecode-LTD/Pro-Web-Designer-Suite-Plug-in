@@ -362,6 +362,42 @@
       "docs": [
         "email-template-system/references/email-workflow.md"
       ]
+    },
+    {
+      "figure": "102 KB",
+      "also": [
+        "102kb"
+      ],
+      "claim": "the size of an email's HTML part past which Gmail clips it behind \"View entire message\", as the ESPs document it; Google publishes no figure, and the byte-exact 102,400 is from measurement, which the docs say",
+      "source": "Mailmodo, Why are my emails getting clipped in Gmail? (last updated 2025-11-04); DailyStory, HTML email clipping limits across different mailbox providers (updated 2026-03-17) says the same",
+      "url": "https://support.mailmodo.com/articles/339967-why-are-my-emails-getting-clipped-in-gmail",
+      "checked": "2026-10-07",
+      "quote": "If your HTML email is more than 102kb, then Gmail will clip your email.",
+      "docs": [
+        "email-template-system/SKILL.md",
+        "email-template-system/references/email-architecture.md",
+        "email-template-system/references/email-client-matrix.md",
+        "email-template-system/references/email-workflow.md"
+      ]
+    },
+    {
+      "figure": "16,384 bytes",
+      "also": [
+        "16384 bytes",
+        "16,384-byte",
+        "16 kB"
+      ],
+      "claim": "the ceiling on <style> content in Gmail, raised from 8,192 bytes; every element that crosses it is removed with every one after it",
+      "source": "hteumeuleu/email-bugs, issue #90 \"Gmail limits <style> to 16 kB\" (opened 2021-03-02)",
+      "url": "https://github.com/hteumeuleu/email-bugs/issues/90",
+      "checked": "2026-10-07",
+      "quote": "Gmail supports up to 8192 bytes of styles. (And this has been recently updated to 16384 bytes according to Eric Lepetit on the Emailgeeks Slack.)",
+      "docs": [
+        "email-template-system/SKILL.md",
+        "email-template-system/references/email-architecture.md",
+        "email-template-system/references/email-client-matrix.md",
+        "email-template-system/references/email-workflow.md"
+      ]
     }
   ],
   "not_statistics": [
@@ -379,6 +415,26 @@
       "doc": "landing-page-conversion/references/conversion-audit.md",
       "figure": "27%",
       "why": "an example of a claimed lift, quoted as one that does not replicate"
+    },
+    {
+      "doc": "email-template-system/references/email-client-matrix.md",
+      "figure": "102,400 bytes",
+      "why": "the measured cut, qualified in the sentence as measurement; the registered figure is the ESPs' 102 KB"
+    },
+    {
+      "doc": "email-template-system/references/email-client-matrix.md",
+      "figure": "100 KiB",
+      "why": "a unit conversion of 102,400 bytes"
+    },
+    {
+      "doc": "email-template-system/references/email-client-matrix.md",
+      "figure": "102.4 kB",
+      "why": "a unit conversion of 102,400 bytes"
+    },
+    {
+      "doc": "email-template-system/references/email-client-matrix.md",
+      "figure": "100 KB",
+      "why": "a unit conversion of 102,400 bytes"
     }
   ]
 }

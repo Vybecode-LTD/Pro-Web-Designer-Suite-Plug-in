@@ -258,9 +258,9 @@ Two Apple-specific behaviours to handle:
 
 Two independent ceilings. Cross either and content silently disappears.
 
-### Gmail clipping — 102,400 bytes
+### Gmail clipping — 102 KB, measured at 102,400 bytes
 
-**The number is 102,400 bytes**, which is 100 KiB, which is ~102.4 kB. The "is it 100 or 102?" argument is entirely a units confusion: tools that report "100 KB" are reporting 100 × 1024, and macOS reports the same file as "approximately 102 KB" because it divides by 1000. There is one threshold.
+**The number is 102,400 bytes**, which is 100 KiB, which is ~102.4 kB. The "is it 100 or 102?" argument is entirely a units confusion: tools that report "100 KB" are reporting 100 × 1024, and macOS reports the same file as "approximately 102 KB" because it divides by 1000. There is one threshold. Google does not publish it: the ESPs' documentation says 102 KB (Mailmodo and DailyStory, re-read 2026-10-07), and the byte-exact figure comes from measurement (Alice Li's testing, linked at the end of this file), so the build reports bytes against 102,400 and the docs call the threshold 102 KB.
 
 Three things people get wrong about it:
 
