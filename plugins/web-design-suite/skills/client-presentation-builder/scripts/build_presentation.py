@@ -2440,17 +2440,16 @@ DECK_JS = """(function () {
     toggleNotes(true);
   }
   function follow(data) {
-    if (data && typeof data.index === "number" && data.index !== index) {
+    if (data && Number.isInteger(data.index) && data.index !== index) {
       show(data.index, true, false, true);
     }
   }
   if (channel) { channel.onmessage = function (event) { follow(event && event.data); }; }
   window.addEventListener("message", function (event) {
+    // Only the linked window is followed, never a window that merely knows
+    // the deck's name.
     var data = event && event.data;
-    if (data && data.deck === deckId) {
-      if (!peer && event.source) { peer = event.source; }
-      follow(data);
-    }
+    if (peer && event.source === peer && data && data.deck === deckId) { follow(data); }
   });
   var helpClose = document.querySelector("[data-deck-help-close]");
   if (helpClose) {

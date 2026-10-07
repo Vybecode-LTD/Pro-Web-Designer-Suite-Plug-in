@@ -292,12 +292,14 @@ class ThePresenterWindow(Deck):
         for piece in ("new BroadcastChannel(deckId)", 'var deckId = "deck:" + window.location.pathname + ":" + document.title;',
                       "-presenter", "tell(peer)", 'target.postMessage({ deck: deckId, index: index }, "*")',
                       'window.addEventListener("message"', "peer = opened;", "toggleNotes(false);",
+                      "Number.isInteger(data.index)", "if (peer && event.source === peer && data && data.deck === deckId)",
                       "data-deck-presenter-badge", 'key === "p" || key === "P"', "openPresenter()",
                       "show(data.index, true, false, true)", ">P<", "a presenter window"):
             self.assertIn(piece, html, piece)
         handout = self.tmp / "handout.html"
         proc = self.build(decision_log("D1 — Tokens"), "-o", self.tmp / "d.html", "--handout", handout)
         self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertNotIn("peer = event.source", html)
         kept = handout.read_text(encoding="utf-8")
         for piece in ("BroadcastChannel", "data-deck-presenter", "Presenter"):
             self.assertNotIn(piece, kept, piece)
