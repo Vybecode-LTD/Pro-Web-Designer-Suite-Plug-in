@@ -21,7 +21,7 @@
 2. **P21**, the deck honest by construction (PS-C1 and eight PS items). L: split it.
 3. Then P22, P23 and R2, the 3.4.0 release.
 4. **Done since:** build_email inlines every `<style>` block as one stylesheet (#61).
-5. **Not yet scheduled:** (a) a Law 6 check in stylelint and the ESLint config; (b) registering Gmail's 102,400 and 16,384 byte limits in `evidence.json`, with test_evidence's `FIGURE` taught byte counts (CodeRabbit on #59).
+5. **Scheduled since (2026-10-07):** both before R2: (a) a Law 6 check in stylelint and the ESLint config, P45 (N35); (b) registering Gmail's 102,400 and 16,384 byte limits in `evidence.json`, with test_evidence's `FIGURE` taught byte counts (CodeRabbit on #59), P44 (N36).
 
 ## Warnings
 

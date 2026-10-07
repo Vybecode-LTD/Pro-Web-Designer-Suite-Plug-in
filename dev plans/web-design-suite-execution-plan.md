@@ -102,6 +102,8 @@ PRs #12 to #15 were merged on 2026-10-02. P0 fixes what their reviews found.
 | P21 | The deck, honest by construction: wording from the data, a `--handout` print without presenter notes, a presenter window, reversed decisions shown as reversed, and the deck's own rules kept | PS-C1, PS-A5, PS-A6, PS-A7, PS-A10, PS-A12, PS-A13, PS-A19, PS-B7 | `client-presentation-builder/scripts/`, its references | L |
 | P22 | The critique: merges that carry `covers`, notes and `status`, the right counts, and snapshots that make the "needs a human" checks runnable | PS-C2, PS-A17, PS-A20, PS-A21, PS-B5, PS-C5 | `critique_report`, new `critique_snapshots.mjs` | M-L |
 | P23 | Persuasion references and facts: the risky-request rule, the two legal statements, the five-user rule, the colour-blindness figure, the media advice, the section shells | PS-A8, PS-A9, PS-A14, PS-A15, PS-A16, PS-A18, PS-A22 | landing and critique references, `page-sections`, `evidence.json` | M |
+| P44 | Gmail's byte limits registered as figures, with test_evidence taught byte counts | N36 | `tests/fixtures/evidence.json`, `tests/test_evidence.py`, the email references | S |
+| P45 | Law 6 in stylelint and the ESLint config, from the spec's `tiers`, as the audit already reads it | N35 | `design-rules.json`, `sync_rules.py`, both configs, `test_real_tools` | M |
 | R2 | Release 3.4.0 | — | — | M |
 
 ### Phase 5 · 3.5.0: a full Claude Code plugin
