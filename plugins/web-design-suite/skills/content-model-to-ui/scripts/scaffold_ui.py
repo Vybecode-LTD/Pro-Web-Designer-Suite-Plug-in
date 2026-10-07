@@ -1323,7 +1323,8 @@ def field_spec(col: dict[str, Any], table: dict[str, Any], model: dict[str, Any]
         "required": any(r["rule"] == "required" for r in ui.get("validation", [])),
     }
     for r in ui.get("validation", []):
-        if r["rule"] in ("maxLength", "minLength", "min", "max", "pattern"):
+        if r["rule"] in ("maxLength", "minLength", "min", "max",
+                         "exclusiveMin", "exclusiveMax", "pattern"):
             spec[r["rule"]] = r["value"]
     options = ans.options(table, col)
     if options:
@@ -1385,6 +1386,10 @@ def emit_fields(table: dict[str, Any], model: dict[str, Any],
         "  minLength?: number;",
         "  min?: number;",
         "  max?: number;",
+        "  /** `CHECK (col > n)` / `< n`: the bound itself is out. HTML's `min`",
+        "   *  is inclusive, so the control cannot say it; the schemas do. */",
+        "  exclusiveMin?: number;",
+        "  exclusiveMax?: number;",
         "  pattern?: string;",
         "  help?: string;",
         "  /** A money column: the `.money` answer. `currency` is null until it",
@@ -1402,7 +1407,8 @@ def emit_fields(table: dict[str, Any], model: dict[str, Any],
         entries = []
         for key in ("name", "label", "control", "required", "readOnly",
                     "options", "maxLength", "minLength", "min", "max",
-                    "pattern", "money", "labelColumn", "review"):
+                    "exclusiveMin", "exclusiveMax", "pattern", "money",
+                    "labelColumn", "review"):
             if key not in s:
                 continue
             entries.append(f"    {key}: {json.dumps(s[key])},")
@@ -1994,7 +2000,8 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
         multi = " multiple" if ctrl == "multi-select" else ""
         opts = spec.get("options") or []
         options = "\n".join(
-            f"{indent}    <option key=\"{o}\" value=\"{o}\">{o}</option>"
+            f"{indent}    <option key={{{json.dumps(o)}}} value={{{json.dumps(o)}}}>"
+            f"{{{json.dumps(o)}}}</option>"
             for o in opts)
         blank = (f"{indent}    <option value=\"\">Choose one</option>\n"
                  if not spec.get("required") and not multi else "")
@@ -2023,6 +2030,8 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
                 f"{indent}  label=\"{spec['label']}\"\n"
                 f"{indent}  checked={{Boolean({acc})}}\n"
                 f"{indent}  disabled={{disabled}}\n"
+                f"{indent}  aria-invalid={{Boolean(errors.{name}) || undefined}}\n"
+                f"{indent}  aria-describedby={{errors.{name} ? fieldId('{name}') + '-error' : undefined}}\n"
                 f"{indent}  onChange={{(e) => onChange('{name}', e.target.checked)}}\n"
                 f"{indent}/>")
     if ctrl in ("number-input", "stepper", "percent-input", "currency-input"):
@@ -2116,9 +2125,18 @@ def emit_form(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str
             review = (f"\n        {{/* review: {s['review']} */}}"
                       if s.get("review") else "")
             if s["control"] in ("switch", "checkbox"):
+                # A toggle is its own label; it gets the error below it, with
+                # the id the control's aria-describedby names.
                 body.append(
-                    f"{review}\n        <div className={{styles.field}}>\n"
-                    f"{control_jsx(s, '          ')}\n        </div>")
+                    f"{review}\n        <div className={{styles.field}} "
+                    f"data-state={{errors.{f} ? 'error' : undefined}}>\n"
+                    f"{control_jsx(s, '          ')}\n"
+                    f"          {{errors.{f} ? (\n"
+                    f"            <p className={{styles.fieldError}} id={{fieldId('{f}') + '-error'}}>\n"
+                    f"              {{errors.{f}}}\n"
+                    f"            </p>\n"
+                    f"          ) : null}}\n"
+                    f"        </div>")
                 continue
             body.append(Template("""$review
         <Field
@@ -2141,7 +2159,7 @@ $control
             + "\n".join(body) + "\n      </fieldset>")
 
     return Template("""\
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { $kit } from '../../ui';
 import type { ${Entity}Draft } from './$camel.types';
 import styles from './${Entity}Form.module.css';
@@ -2195,18 +2213,25 @@ export function ${Entity}Form({
 }: ${Entity}FormProps) {
   const invalid = Object.entries(errors).filter(([, message]) => Boolean(message));
   const summaryRef = useRef<HTMLDivElement>(null);
-  const focusSummary = useRef(false);
+  const [attempt, setAttempt] = useState(0);
+  const focusedFor = useRef(0);
 
-  // After a submit that failed validation, move focus to the summary. The
-  // caller sets `errors` (now, or once its validation returns), so the move
-  // waits for the render that shows them; fixing a field afterwards does not
-  // move focus again.
+  // After a submit attempt that failed validation, move focus to the
+  // summary: once per attempt, whether or not the error count changed. The
+  // caller sets `errors` in `onSubmit` (React renders them with the attempt)
+  // or, validating asynchronously, sets `submitting` while it runs; fixing a
+  // field afterwards does not move focus again.
   useEffect(() => {
-    if (focusSummary.current && invalid.length > 0) {
-      focusSummary.current = false;
+    if (attempt > focusedFor.current && invalid.length > 0) {
+      focusedFor.current = attempt;
       summaryRef.current?.focus();
     }
-  }, [invalid.length]);
+  }, [attempt, invalid.length]);
+  // A save that ran and came back clean consumes the attempt, so an error
+  // that appears later, from a blur, does not pull focus to the summary.
+  useEffect(() => {
+    if (!submitting && invalid.length === 0) focusedFor.current = attempt;
+  }, [submitting, attempt, invalid.length]);
 
   return (
     <form
@@ -2214,7 +2239,7 @@ export function ${Entity}Form({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
-        focusSummary.current = true;
+        setAttempt((n) => n + 1);
         onSubmit();
       }}
     >
@@ -2288,6 +2313,11 @@ FORM_CSS = """\
   }
 
   .field { display: block; }
+
+  .fieldError {
+    font: var(--type-label);
+    color: var(--fg-danger);
+  }
 
   .summary {
     --form-summary-inset:  var(--pad-well);
@@ -2566,6 +2596,7 @@ TW_UTILITIES = {
     # structure
     "control":      "block",
     "field":        "block",
+    "fieldError":   "text-label text-danger-fg",
     "action":       "flex gap-tight",
     "options":      "flex flex-col gap-tight",
     "option":       "flex items-center gap-tight min-h-tap text-body text-default",
@@ -3173,11 +3204,24 @@ def schema_fields(table: dict[str, Any], model: dict[str, Any],
                        or (spec.get("money") or {}).get("storage") == "minor-units",
             "format": fmt,
             "temporal": (col["ui"].get("temporal") or {}).get("granularity"),
+            # A `timestamp` without time zone cannot carry an offset; every
+            # other instant must, or a wall time is read in the server's zone.
+            "aware": (col["ui"].get("temporal") or {}).get("timezone") != "ambiguous",
             "invented": invented,
         }
-        for key in ("maxLength", "minLength", "min", "max", "pattern"):
+        for key in ("maxLength", "minLength", "min", "max", "exclusiveMin",
+                    "exclusiveMax", "pattern"):
             if key in spec:
                 entry[key] = spec[key]
+        # A strict bound that is at least as tight as an inclusive one makes
+        # the inclusive one redundant: `CHECK (discount > 0)` beside the
+        # mapper's "money is non-negative" is one rule, `gt=0`.
+        for loose, strict in (("min", "exclusiveMin"), ("max", "exclusiveMax")):
+            if loose in entry and strict in entry and (
+                    entry[strict] >= entry[loose] if loose == "min"
+                    else entry[strict] <= entry[loose]):
+                del entry[loose]
+                entry["invented"] = [r for r in entry["invented"] if r != loose]
         out.append(entry)
     return out
 
@@ -3214,6 +3258,10 @@ def emit_schema_zod(table: dict[str, Any], model: dict[str, Any],
                 expr += f".min({f['min']})"
             if "max" in f:
                 expr += f".max({f['max']})"
+            if "exclusiveMin" in f:
+                expr += f".gt({f['exclusiveMin']})"
+            if "exclusiveMax" in f:
+                expr += f".lt({f['exclusiveMax']})"
         elif f["type"] == "boolean":
             expr = "z.boolean()"
         elif f["type"] in ("jsonb", "json"):
@@ -3267,7 +3315,9 @@ def emit_schema_pydantic(table: dict[str, Any], model: dict[str, Any],
     uses_decimal = any(f["type"] in NUMBER_TYPES and not f["integer"] for f in fields)
     uses_any = any(f["type"] in ("jsonb", "json") for f in fields)
     temporal = sorted({{"instant": "datetime", "date": "date", "time": "time"}[f["temporal"]]
-                       for f in fields if f["temporal"]})
+                       for f in fields if f["temporal"]
+                       and not (f["temporal"] == "instant" and f["aware"])})
+    aware = any(f["temporal"] == "instant" and f["aware"] for f in fields)
     typing = ["Optional"] + (["Literal"] if uses_literal else []) + (["Any"] if uses_any else [])
     lines = [
         f'"""The server\'s schema for a {singular(name.replace("_", " "))} draft.',
@@ -3288,7 +3338,8 @@ def emit_schema_pydantic(table: dict[str, Any], model: dict[str, Any],
     lines += [f"from typing import {', '.join(sorted(typing))}"]
     if any(f["type"] == "uuid" for f in fields):
         lines.append("from uuid import UUID")
-    lines += ["", "from pydantic import BaseModel, ConfigDict, Field", "", "",
+    lines += ["", "from pydantic import " + ("AwareDatetime, " if aware else "")
+              + "BaseModel, ConfigDict, Field", "", "",
               f"class {Entity}Draft(BaseModel):",
               "    model_config = ConfigDict(extra='forbid')", ""]
     for f in fields:
@@ -3302,10 +3353,16 @@ def emit_schema_pydantic(table: dict[str, Any], model: dict[str, Any],
                 args.append(f"ge={f['min']}")
             if "max" in f:
                 args.append(f"le={f['max']}")
+            if "exclusiveMin" in f:
+                args.append(f"gt={f['exclusiveMin']}")
+            if "exclusiveMax" in f:
+                args.append(f"lt={f['exclusiveMax']}")
         elif f["type"] == "boolean":
             typ = "bool"
         elif f["type"] in ("jsonb", "json"):
             typ = "Any"
+        elif f["temporal"] == "instant" and f["aware"]:
+            typ = "AwareDatetime"
         elif f["temporal"]:
             typ = {"instant": "datetime", "date": "date", "time": "time"}[f["temporal"]]
         elif f["type"] == "uuid":
@@ -3328,9 +3385,12 @@ def emit_schema_pydantic(table: dict[str, Any], model: dict[str, Any],
                 args.append(f"pattern={f['pattern']!r}")
         if f["array"]:
             typ = f"list[{typ}]"
-        if f["nullable"] or not f["required"]:
-            # Nullable, or omittable (the column has a default): None either way.
+        if f["nullable"]:
             typ = f"Optional[{typ}]"
+        # An omittable NOT NULL column (it has a default) keeps its bare type
+        # with `None` as the default: pydantic does not validate a default, so
+        # omitting the field passes and an explicit null is refused, as the
+        # zod schema's `.optional()` without `.nullable()` refuses it.
         default = "..." if f["required"] else "None"
         attr = f["name"]
         if not attr.isidentifier() or keyword.iskeyword(attr):

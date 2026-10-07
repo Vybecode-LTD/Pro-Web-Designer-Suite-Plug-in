@@ -21,7 +21,7 @@ import subprocess
 import sys
 import unittest
 
-from wds_support import TempDirTest, class_temp_dir, env, load_script, output, run_py, tool_modules
+from wds_support import SKILLS, TempDirTest, class_temp_dir, env, load_script, output, run_py, tool_modules
 
 DDL = """\
 CREATE TYPE priority AS ENUM ('low', 'normal', 'high');
@@ -38,6 +38,8 @@ CREATE TABLE orders (
   priority priority NOT NULL DEFAULT 'normal',
   total_cents integer NOT NULL CHECK (total_cents >= 0),
   deposit numeric(10,2),
+  discount numeric(4,3) CHECK (discount > 0 AND discount < 1),
+  is_rush boolean NOT NULL DEFAULT false,
   notes text,
   metadata jsonb,
   placed_at timestamptz NOT NULL DEFAULT now(),
@@ -48,6 +50,7 @@ CREATE TABLE orders (
 ANSWERS = {
     "orders.total_cents.money": {"currency": "JPY", "storage": "minor-units"},
     "orders.deposit.money": {"currency": "EUR", "storage": "decimal"},
+    "orders.discount.money": {"currency": "EUR", "storage": "decimal"},
     "orders.supplier_id.cardinality": "under-20",
     "orders.supplier_id.label_column": "name",
     "orders.category.options": ["retail", "wholesale"],
@@ -166,8 +169,18 @@ class TheAnswersReachTheOutput(Answered):
 
     def test_the_options_answer_is_the_closed_set(self):
         form = self.orders(self.src, "OrderForm.tsx")
-        self.assertRegex(form, r'<option key="retail" value="retail">retail</option>\s*'
-                               r'<option key="wholesale" value="wholesale">wholesale</option>')
+        self.assertRegex(form, r'<option key=\{"retail"\} value=\{"retail"\}>\{"retail"\}</option>\s*'
+                               r'<option key=\{"wholesale"\} value=\{"wholesale"\}>\{"wholesale"\}</option>')
+
+    def test_an_option_with_a_quote_or_markup_is_still_one_expression(self):
+        """Review of #64 (Codex): an option went into a double-quoted attribute
+        and raw JSX text as it was."""
+        mod = load_script("content-model-to-ui", "scaffold_ui")
+        jsx = mod.control_jsx({"name": "size", "label": "Size", "control": "select",
+                               "required": True, "options": ['XL "tall"', "<S>"]})
+        self.assertIn('<option key={"XL \\"tall\\""} value={"XL \\"tall\\""}>{"XL \\"tall\\""}</option>', jsx)
+        self.assertIn('<option key={"<S>"} value={"<S>"}>{"<S>"}</option>', jsx)
+        self.assertNotIn('value="', jsx)
         self.assertIn("<Badge tone={toneFor(record.category)}>", self.orders(self.src, "OrderDetail.tsx"))
         self.assertNotIn("<Badge tone={toneFor(record.category)}>", self.orders(self.plain, "OrderDetail.tsx"))
 
@@ -234,8 +247,43 @@ class TheFormsAreWired(Answered):
         self.assertEqual(form.count('role="alert"'), 2, "the summary and the form-level error")
         self.assertIn('role="alert" tabIndex={-1} ref={summaryRef}', form)
         self.assertIn("summaryRef.current?.focus();", form)
-        self.assertIn("focusSummary.current = true;", form)
-        self.assertIn("import { useEffect, useRef } from 'react';", form)
+        self.assertIn("import { useEffect, useRef, useState } from 'react';", form)
+
+    def test_the_summary_focuses_once_per_attempt_whatever_the_count_does(self):
+        """Review of #64 (Codex, CodeRabbit): the effect watched only the error
+        count, so a second submit with the same number of errors, or with the
+        errors already showing, moved nothing; and a clean save left the flag
+        set for a later blur error to steal focus."""
+        form = self.orders(self.src, "OrderForm.tsx")
+        self.assertIn("const [attempt, setAttempt] = useState(0);", form)
+        self.assertIn("setAttempt((n) => n + 1);\n        onSubmit();", form)
+        self.assertIn("if (attempt > focusedFor.current && invalid.length > 0) {", form)
+        self.assertIn("}, [attempt, invalid.length]);", form)
+        self.assertIn("if (!submitting && invalid.length === 0) focusedFor.current = attempt;", form)
+        self.assertNotIn("focusSummary", form)
+
+    def test_a_boolean_control_carries_its_error_too(self):
+        """Review of #64 (Codex): the switch and checkbox branch skipped Field
+        and the common attributes, so a boolean field's error was neither
+        shown nor referenced."""
+        for src in (self.src, self.tw):
+            form = self.orders(src, "OrderForm.tsx")
+            self.assertRegex(form, r"<Toggle\s+id=\{fieldId\('is_rush'\)\}[\s\S]*?"
+                                   r"aria-invalid=\{Boolean\(errors\.is_rush\) \|\| undefined\}\s+"
+                                   r"aria-describedby=\{errors\.is_rush \? fieldId\('is_rush'\) \+ '-error' : undefined\}")
+            self.assertIn("id={fieldId('is_rush') + '-error'}", form)
+            self.assertIn("{errors.is_rush}", form)
+            self.assertIn("data-state={errors.is_rush ? 'error' : undefined}", form)
+        self.assertIn(".fieldError {", read(self.src / "features" / "orders" / "OrderForm.module.css"))
+        self.assertIn("text-danger-fg", self.orders(self.tw, "OrderForm.tsx"))
+
+    def test_the_reference_says_where_each_attribute_goes(self):
+        """Review of #64 (CodeRabbit): "assistive tech ignores them on a
+        wrapper" overstated it; aria-describedby describes its own element."""
+        text = read(SKILLS / "content-model-to-ui" / "references" / "screen-patterns.md")
+        self.assertNotIn("assistive tech ignores them on a wrapper", text)
+        self.assertIn("`aria-describedby` describes the element that carries it and does not reach its "
+                      "descendants", text)
 
     def test_both_stacks_pass_the_audit_and_the_static_a11y_check(self):
         proc = run_py("web-design-studio", "audit_design", "src", "tw", "plain", "--strict", cwd=self.tmp)
@@ -285,11 +333,36 @@ class TheServerSchemaMirrorsTheConstraints(Answered):
         self.assertIn("model_config = ConfigDict(extra='forbid')", py)
         self.assertIn("reference: str = Field(..., min_length=1, max_length=24)", py)
         self.assertIn("category: Literal['retail', 'wholesale'] = Field(...)", py)
-        self.assertIn("priority: Optional[Literal['low', 'normal', 'high']] = Field(None)", py)
+        self.assertIn("priority: Literal['low', 'normal', 'high'] = Field(None)", py)
         self.assertIn("total_cents: int = Field(..., ge=0)\n", py)
-        self.assertIn("placed_at: Optional[datetime] = Field(None)", py)
-        self.assertIn("from datetime import datetime", py)
+        self.assertIn("placed_at: AwareDatetime = Field(None)", py)
+        self.assertIn("ships_at: Optional[AwareDatetime] = Field(None)", py)
+        self.assertIn("from pydantic import AwareDatetime, BaseModel, ConfigDict, Field", py)
+        self.assertNotIn("from datetime import", py)
         self.assertIn("from uuid import UUID", py)
+
+    def test_an_omittable_not_null_column_refuses_null_and_an_instant_needs_its_offset(self):
+        """Review of #64 (Codex, CodeRabbit): a NOT NULL column with a default
+        became `Optional[...]`, so pydantic took an explicit null the database
+        refuses and the zod schema rejects; and a `timestamptz` was a plain
+        `datetime`, which takes a wall time with no offset."""
+        py = self.pydantic()
+        self.assertIn("priority: Literal['low', 'normal', 'high'] = Field(None)", py)
+        self.assertIn("is_rush: bool = Field(None)", py)
+        self.assertNotIn("Optional[Literal", py)
+        zod = self.zod()
+        self.assertIn("priority: z.enum([\"low\", \"normal\", \"high\"]).optional(),", zod)
+        self.assertIn("is_rush: z.boolean().optional(),", zod)
+
+    def test_an_exclusive_check_bound_is_a_strict_bound_in_both_schemas(self):
+        """Review of #64 (Codex): `CHECK (col > n)` became `exclusiveMin` in the
+        model and was dropped before either emitter ran."""
+        self.assertIn("discount: z.number().gt(0).lt(1).nullable().optional(),", self.zod())
+        self.assertIn("discount: Optional[Decimal] = Field(None, gt=0, lt=1)", self.pydantic())
+        fields = self.orders(self.src, "orders.fields.ts")
+        self.assertIn("exclusiveMin: 0,", fields)
+        self.assertIn("exclusiveMax: 1,", fields)
+        py = self.pydantic()
         self.assertIn("supplier_id: UUID = Field(...)", py)
         self.assertNotIn("metadata", py)
 
@@ -309,8 +382,7 @@ class TheServerSchemaMirrorsTheConstraints(Answered):
         ast.parse(py)
 
     def test_an_email_column_gets_the_format_both_sides(self):
-        answers = dict(ANSWERS)
-        src = scaffold(self.tmp, "mail", answers=answers)
+        src = self.src
         zod = read(src / "server" / "suppliers.schema.ts")
         self.assertIn("contact_email: z.string().email().nullable().optional(), // invented: format", zod)
         py = read(src / "server" / "suppliers_schema.py")
@@ -328,11 +400,19 @@ class TheServerSchemaMirrorsTheConstraints(Answered):
             "from orders_schema import OrderDraft\n"
             "SID = '0f6b3a52-4c0e-4e4e-9c1e-6a8d2b6f0a11'\n"
             "OrderDraft(supplier_id=SID, reference='A-1', category='retail', total_cents=0)\n"
+            "OrderDraft(supplier_id=SID, reference='A-1', category='retail', total_cents=0,\n"
+            "           placed_at='2026-10-07T10:00:00+02:00', discount='0.250')\n"
             "for bad in ({'reference': 'x' * 25, 'category': 'retail', 'total_cents': 1},\n"
             "            {'reference': 'A', 'category': 'retail', 'total_cents': -1},\n"
             "            {'reference': 'A', 'category': 'bulk', 'total_cents': 1},\n"
             "            {'reference': 'A', 'category': 'retail', 'total_cents': 1, 'supplier_id': 'x'},\n"
-            "            {'reference': 'A', 'category': 'retail', 'total_cents': 1, 'metadata': {}}):\n"
+            "            {'reference': 'A', 'category': 'retail', 'total_cents': 1, 'metadata': {}},\n"
+            "            {'reference': 'A', 'category': 'retail', 'total_cents': 1, 'placed_at': None},\n"
+            "            {'reference': 'A', 'category': 'retail', 'total_cents': 1, 'is_rush': None},\n"
+            "            {'reference': 'A', 'category': 'retail', 'total_cents': 1,\n"
+            "             'placed_at': '2026-10-07T10:00:00'},\n"
+            "            {'reference': 'A', 'category': 'retail', 'total_cents': 1, 'discount': 1},\n"
+            "            {'reference': 'A', 'category': 'retail', 'total_cents': 1, 'discount': 0}):\n"
             "    bad.setdefault('supplier_id', SID)\n"
             "    try:\n        OrderDraft(**bad)\n    except ValidationError:\n        pass\n"
             "    else:\n        raise SystemExit('accepted ' + repr(bad))\n"
