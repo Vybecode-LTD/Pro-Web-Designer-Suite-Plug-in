@@ -165,6 +165,13 @@ class TheGeneratedFileGuard(HookTest):
                 self.assertIn('src', out["permissionDecisionReason"])
                 self.assertIn('"DO NOT EDIT"', out["permissionDecisionReason"])
 
+    def test_the_window_is_800_characters_as_the_audit_counts_them(self):
+        """Codex on #82: the guard counted UTF-16 units, so 400 emoji pushed a
+        marker out of its window and left it in the audit's."""
+        self.config(generatedFiles=True)
+        self.write("src/emoji.css", "/* " + "\U0001F600" * 400 + " DO NOT EDIT */\n")
+        self.assertEqual("deny", self.decision("src/emoji.css")["permissionDecision"])
+
     def test_an_ordinary_or_new_file_passes(self):
         self.config(generatedFiles=True)
         self.write("src/card.css", "/* The card. */\n.card { }\n")

@@ -100,10 +100,11 @@ function guard(input) {
   const project = governing(file);
   if (!project?.config?.hooks.generatedFiles) return;
   const fd = fs.openSync(file, 'r');
-  const buf = Buffer.alloc(3200);
+  const buf = Buffer.alloc(3203);                 // 800 characters of up to 4 bytes, and a BOM
   const read = fs.readSync(fd, buf, 0, buf.length, 0);
   fs.closeSync(fd);
-  const head = buf.subarray(0, read).toString('utf8').replace(/^﻿/, '').slice(0, 800);
+  // 800 characters as Python counts them, code points, not UTF-16 units (Codex on #82)
+  const head = Array.from(buf.subarray(0, read).toString('utf8').replace(/^﻿/, '')).slice(0, 800).join('');
   const marker = GENERATED.find((m) => head.includes(m));
   if (!marker) return;
   const rel = path.relative(project.config.root, file) || file;
