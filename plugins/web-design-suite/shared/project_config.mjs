@@ -50,8 +50,37 @@ export function findConfig(start = process.cwd()) {
   }
 }
 
-// A JSON file as Python's json reads bytes: UTF-8, with or without a BOM, or
-// UTF-16 with one.
+// A JSON file's text in the encoding Python's json.detect_encoding() finds
+// in bytes: UTF-32 or UTF-16 by their byte-order marks, UTF-8 with or without
+// one, and UTF-16 or UTF-32 of either order without one, by where the zero
+// bytes fall (Codex on #81: a UTF-16BE file was refused here and read there).
+function jsonText(buf) {
+  const starts = (...bytes) => buf.length >= bytes.length && bytes.every((b, i) => buf[i] === b);
+  let enc = 'utf-8';
+  let skip = 0;
+  if (starts(0, 0, 0xFE, 0xFF) || starts(0xFF, 0xFE, 0, 0)) [enc, skip] = [buf[0] ? 'utf-32le' : 'utf-32be', 4];
+  else if (starts(0xFE, 0xFF) || starts(0xFF, 0xFE)) [enc, skip] = [buf[0] === 0xFF ? 'utf-16le' : 'utf-16be', 2];
+  else if (starts(0xEF, 0xBB, 0xBF)) skip = 3;
+  else if (buf.length >= 4 && !buf[0]) enc = buf[1] ? 'utf-16be' : 'utf-32be';
+  else if (buf.length >= 4 && !buf[1]) enc = buf[2] || buf[3] ? 'utf-16le' : 'utf-32le';
+  else if (buf.length === 2 && !buf[0]) enc = 'utf-16be';
+  else if (buf.length === 2 && !buf[1]) enc = 'utf-16le';
+  const body = buf.subarray(skip);
+  if (enc.startsWith('utf-32')) {
+    if (body.length % 4) throw new Error('truncated UTF-32');
+    let text = '';
+    for (let i = 0; i < body.length; i += 4) {
+      const code = enc === 'utf-32le' ? body.readUInt32LE(i) : body.readUInt32BE(i);
+      if (code > 0x10FFFF) throw new Error(`no character ${code} in UTF-32`);
+      text += String.fromCodePoint(code);
+    }
+    return text;
+  }
+  if (enc === 'utf-16be') return new TextDecoder('utf-16le', { fatal: true }).decode(Buffer.from(body).swap16());
+  return new TextDecoder(enc, { fatal: true, ignoreBOM: true }).decode(body);
+}
+
+// A JSON file as Python's json reads bytes (jsonText).
 function readJson(file, shown) {
   let buf;
   try {
@@ -59,9 +88,8 @@ function readJson(file, shown) {
   } catch (err) {
     throw new ConfigError(`${shown}: ${err.code === 'ENOENT' ? 'No such file or directory' : err.message}`);
   }
-  const utf16 = buf[0] === 0xFF && buf[1] === 0xFE;
   try {
-    return JSON.parse(buf.toString(utf16 ? 'utf16le' : 'utf8').replace(/^﻿/, ''));
+    return JSON.parse(jsonText(buf));
   } catch (err) {
     throw new ConfigError(`${shown}: not JSON (${err.message})`);
   }

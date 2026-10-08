@@ -600,11 +600,12 @@ TOKEN_FILES = {
     "bad-scale.json": json.dumps({"schema": CONTRACT, "scales": {"space": "1rem"}}),
     "bad-role.json": json.dumps({"schema": CONTRACT, "roles": {"--x": 3}}),
     "not-json.json": "{",
+    "utf16be.json": ("﻿" + json.dumps({"schema": CONTRACT, "ramps": {"brand": {"500": "#123456"}}})).encode("utf-16-be"),
 }
 TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.css"], ["contract.json"],
                ["contract.json", "a.css"], ["a.css", "contract.json"], ["bad-schema.json"], ["bad-ramps.json"],
                ["bad-step.json"], ["bad-scale.json"], ["bad-role.json"], ["not-json.json"], ["gone.css"],
-               ["gone.json"], ["a.css", "gone.css"], []]
+               ["gone.json"], ["a.css", "gone.css"], [], ["utf16be.json"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).
@@ -652,7 +653,11 @@ class TheNodeReaderAgrees(TempDirTest):
 
     def test_every_config_reads_the_same(self):
         files = [self.write(f"{name}/.design-suite.json", text) for name, text in CONFIGS.items()]
-        files.append(self.write("utf16/.design-suite.json", '{"schema": 1, "stack": "css-modules"}'.encode("utf-16")))
+        text = '{"schema": 1, "stack": "css-modules"}'          # Codex on #81: every encoding json.loads finds
+        encoded = {"utf16": text.encode("utf-16"), "utf16be": ("﻿" + text).encode("utf-16-be"),
+                   "utf16le-bare": text.encode("utf-16-le"), "utf32": text.encode("utf-32"),
+                   "utf32be-bare": text.encode("utf-32-be"), "utf8-broken": b'{"schema": 1, "stack": "\xff"}'}
+        files += [self.write(f"{name}/.design-suite.json", data) for name, data in encoded.items()]
 
         def same(result):
             if "error" in result:

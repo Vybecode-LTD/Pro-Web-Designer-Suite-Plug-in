@@ -72,7 +72,9 @@
     re-exports it, to `shared/project_config.mjs`. That file also ports `read_tokens()`.
     A copy sits beside each importer, and the two lint configs import it from
     `assets/configs/`, so copy it with them. A test holds both readers to the same
-    tokens, refusals and component globs.
+    tokens, refusals and component globs. Both readers now take a config or contract in
+    every encoding Python's `json` finds: UTF-8, UTF-16 and UTF-32, with or without a
+    byte-order mark.
   - **Globs in stylelint.** stylelint's overrides match with micromatch, whose `**` is
     not the config's, so each glob is translated. Run through stylelint's own matcher, the
     translation matches exactly the files `is_component()` does. micromatch compares a
