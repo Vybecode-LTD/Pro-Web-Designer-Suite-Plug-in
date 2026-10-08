@@ -60,6 +60,15 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 
 SCHEMA = "design-system-docs/system/1"
 
+# The project contract (P24): .design-suite.json and contract.json, read by the
+# suite's scripts through one module, shared/project_config.py, of which this
+# is a copy.
+try:                                              # python -m scripts.extract_system
+    from .project_config import CONTRACT_SCHEMA, ConfigError, is_contract, token_sources
+except ImportError:                               # python scripts/extract_system.py
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from project_config import CONTRACT_SCHEMA, ConfigError, is_contract, token_sources  # type: ignore[no-redef]
+
 # ===========================================================================
 # 1. COLOR MATH
 #
@@ -1912,6 +1921,46 @@ def classify_inputs(paths: Sequence[Path]) -> Tuple[List[Path], List[Path], List
     return tokens, css, props
 
 
+RAMP_STEP = re.compile(r"^--([a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)*)-(\d+)$")
+
+
+def contract_of(data: Dict[str, Any]) -> Dict[str, Any]:
+    """The project contract from system.json's tokens: the default values by
+    tier (shared/project_config.py describes the shape). A Tier-1 colour named
+    `--<ramp>-<step>` with a numeric step is a ramp step; `--bp-*` is a
+    breakpoint; any other Tier-1 value sits in the scale its first name segment
+    names, or `constants` when the name has one segment (`--density`); every
+    Tier-2 token is a role, as written. A token with no default value, declared
+    only in a theme or under a condition, is left out (Codex on #76)."""
+    no_default = {g["token"] for g in data["gaps"] if g["kind"] == "theme-only-token"}
+    ramps: Dict[str, Dict[str, str]] = {}
+    scales: Dict[str, Dict[str, str]] = {}
+    roles: Dict[str, str] = {}
+    breakpoints: Dict[str, str] = {}
+    constants: Dict[str, str] = {}
+    for t in data["tokens"]:
+        name, raw = t["name"], t["raw"]
+        if name in no_default:
+            continue
+        if t["tier"] == 2:
+            roles[name] = raw
+        elif name.startswith("--bp-"):
+            breakpoints[name[len("--bp-"):]] = raw
+        elif t["kind"] == "color" and RAMP_STEP.match(name):
+            m = RAMP_STEP.match(name)
+            ramps.setdefault(m.group(1), {})[m.group(2)] = raw
+        else:
+            head, _, step = name[2:].partition("-")
+            if step:
+                scales.setdefault(head, {})[step] = raw
+            else:
+                constants[name] = raw
+    ramps = {r: dict(sorted(steps.items(), key=lambda kv: int(kv[0]))) for r, steps in ramps.items()}
+    return {"schema": CONTRACT_SCHEMA, "sources": list(data["sources"]["tokens"]),
+            "ramps": ramps, "scales": scales, "roles": roles, "breakpoints": breakpoints,
+            "constants": constants}
+
+
 def human_report(data: Dict[str, Any]) -> str:
     s = data["stats"]
     out = [
@@ -1960,7 +2009,8 @@ def build_parser() -> argparse.ArgumentParser:
                          "theme.css is read as a token file; other CSS as component CSS; "
                          ".ts/.tsx/.jsx as prop sources.")
     ap.add_argument("--tokens", action="append", default=[], metavar="PATH",
-                    help="Token file (repeatable). Overrides auto-detection.")
+                    help="Token file (repeatable). Overrides auto-detection. Without "
+                         "one, the CSS token files a .design-suite.json lists.")
     ap.add_argument("--components", action="append", default=[], metavar="PATH",
                     help="Component stylesheet, directory or glob (repeatable).")
     ap.add_argument("--props", action="append", default=[], metavar="PATH",
@@ -1970,6 +2020,10 @@ def build_parser() -> argparse.ArgumentParser:
                          "and orphan-doc gaps.")
     ap.add_argument("--out", metavar="FILE", default="-",
                     help="Where to write system.json (default: stdout).")
+    ap.add_argument("--contract", metavar="FILE",
+                    help="Also write the project contract (contract.json) to FILE: the "
+                         "token system's default values by tier, which figma_audit's "
+                         "--tokens and a .design-suite.json's \"tokens\" read.")
     ap.add_argument("--root", metavar="DIR", default=".",
                     help="Paths in the output are relative to this (default: cwd).")
     ap.add_argument("--root-font-size", type=float, default=16.0, metavar="PX",
@@ -2034,6 +2088,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     token_files, css_files, prop_files = dedupe(token_files), dedupe(css_files), dedupe(prop_files)
     if not token_files:
+        # A flag beats the config: the project's own token files only when
+        # neither --tokens nor a path named one (P24).
+        try:
+            listed, config_path = token_sources(None)
+        except ConfigError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        token_files = [p for p in listed if not is_contract(p)]
+        if token_files:
+            print(f"tokens from {config_path}: {', '.join(str(p) for p in token_files)}",
+                  file=sys.stderr)
+    if not token_files:
         ap.error("no token file found. Pass one with --tokens, or include a directory "
                  "containing tokens.css. Without the token layer there is no tier to "
                  "report and no value to resolve.")
@@ -2064,6 +2130,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"wrote {outp} — {data['stats']['tokens']} tokens, "
               f"{data['stats']['components']} components, {data['stats']['gaps']} gaps",
               file=sys.stderr)
+    if args.contract:
+        contract = contract_of(data)
+        cpath = Path(args.contract)
+        cpath.parent.mkdir(parents=True, exist_ok=True)
+        cpath.write_bytes((json.dumps(contract, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+        print(f"wrote {cpath} — {sum(len(s) for s in contract['ramps'].values())} ramp steps, "
+              f"{len(contract['roles'])} roles", file=sys.stderr)
     if args.report:
         print(human_report(data), file=sys.stderr)
     if args.strict and any(g["severity"] == "error" for g in data["gaps"]):

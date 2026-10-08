@@ -56,9 +56,11 @@ sys.dont_write_bytecode = True
 # and attach_styles.
 try:                                              # python -m scripts.figma_audit
     from .figma_common import *                   # type: ignore[import-not-found]  # noqa: F403
+    from .project_config import ConfigError, is_contract, read_contract, token_sources
 except ImportError:                               # python scripts/figma_audit.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from figma_common import *                    # type: ignore[no-redef]  # noqa: F403
+    from project_config import ConfigError, is_contract, read_contract, token_sources  # type: ignore[no-redef]
 
 # ===========================================================================
 # THE CONTRACT. These tables are the closed scales from token-contract.md and
@@ -830,10 +832,16 @@ def load_project_ramps(path: Path) -> Dict[str, Dict[str, Tuple[float, float, fl
     """Colour ramps declared in a project's tokens.css: every `--<name>-<step>`
     whose value is a literal colour. A client's brand ramp is the point — the
     migration seeds the accent from the brand on purpose — so checking a file
-    against the studio's own orange called every brand colour "off ramp"."""
-    text = re.sub(r"/\*.*?\*/", " ", path.read_text(encoding="utf-8-sig"), flags=re.S)
+    against the studio's own orange called every brand colour "off ramp".
+    A contract.json (extract_system --contract) gives its `ramps` (P24)."""
+    if is_contract(path):
+        steps = [(name, step, value) for name, ramp in read_contract(path)["ramps"].items()
+                 for step, value in ramp.items()]
+    else:
+        text = re.sub(r"/\*.*?\*/", " ", path.read_text(encoding="utf-8-sig"), flags=re.S)
+        steps = _RAMP_DECL.findall(text)
     ramps: Dict[str, Dict[str, Tuple[float, float, float]]] = {}
-    for name, step, value in _RAMP_DECL.findall(text):
+    for name, step, value in steps:
         rgba = as_color(value.strip())
         if rgba is None or rgba[3] < 0.999:
             continue                         # a var() re-point, or not a colour
@@ -1047,8 +1055,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--deadline", default="end of day tomorrow",
                    help="the timed default's cutoff, printed in --format markdown")
     p.add_argument("--tokens", metavar="TOKENS_CSS",
-                   help="the project's tokens.css: its colour ramps (any --<name>-<step> "
-                        "holding a literal colour) replace the studio's ramps of the same name")
+                   help="the project's tokens.css, or its contract.json (extract_system "
+                        "--contract): its colour ramps (any --<name>-<step> holding a literal "
+                        "colour) replace the studio's ramps of the same name. Without it, the "
+                        "token files a .design-suite.json lists")
     p.add_argument("--no-color", action="store_true")
     return p
 
@@ -1073,17 +1083,30 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               "--shape to force one.", file=sys.stderr)
         return 2
 
-    if args.tokens:
-        try:
-            ramps = load_project_ramps(Path(args.tokens))
-        except OSError as exc:
-            print(f"could not read {args.tokens}: {exc}", file=sys.stderr)
-            return 2
+    # A flag beats the config: the project's token files only without --tokens (P24).
+    try:
+        sources, config_path = token_sources(args.tokens)
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if sources:
+        ramps: Dict[str, Dict[str, Tuple[float, float, float]]] = {}
+        for source in sources:
+            try:
+                loaded = load_project_ramps(source)
+            except (OSError, ConfigError) as exc:
+                print(f"could not read {source}: {exc}", file=sys.stderr)
+                return 2
+            # Step by step: two files may each hold part of one ramp, and a
+            # later file's step wins (Codex on #76).
+            for name, steps in loaded.items():
+                ramps.setdefault(name, {}).update(steps)
+        origin = ", ".join(str(s) for s in sources) + (f" (from {config_path})" if config_path else "")
         if ramps:
             use_ramps(ramps)
-            doc.notes.append(f"colour ramps from {args.tokens}: {', '.join(sorted(ramps))}")
+            doc.notes.append(f"colour ramps from {origin}: {', '.join(sorted(ramps))}")
         else:
-            print(f"{args.tokens} declares no colour ramps (--<name>-<step>: <colour>); "
+            print(f"{origin} declares no colour ramps (--<name>-<step>: <colour>); "
                   "auditing against the studio's ramps.", file=sys.stderr)
 
     auditor = Auditor(doc, tap_min=args.tap_min)
