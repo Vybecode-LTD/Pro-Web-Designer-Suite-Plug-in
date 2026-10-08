@@ -66,4 +66,26 @@ Each takes `--tokens FILE` (repeatable), a `tokens.css` or a `contract.json`, an
 | design-system-versioning | `diff_system.py` | Takes a `contract.json` as either snapshot. Without a `new` snapshot, the candidate is the project's token files. Against a contract, the other side is cut down to what a contract holds, default values and tiers, so a theme or a note it leaves out is not a change |
 | design-token-migration | `cluster_values.py` | Its steps of the contract's six ramps (`neutral`, `accent` and the four status ramps) replace the derived ones, step by step, and `tokens.css` writes its values. A step it lacks is built as before, from its own accent step nearest 500. `--accent` beats its accent ramp. A ramp the contract does not name has no roles to land on, and the reconciliation report says so |
 
-**Not yet read (3.5.0 is in progress).** The reader checks every key now. The budgets, the baselines other than the audit's, `emailTokens` and `stack` are wired into their scripts next, with a Node reader for the browser scripts. The stylelint and ESLint configs still class files by the rule spec's globs alone.
+## 4. Who reads the other keys
+
+A flag beats each of these, and each falls back to the script's own default.
+
+| Key | Read by |
+|---|---|
+| `components` | web-design-studio's `audit_design.py` |
+| `stack` | content-model-to-ui's `scaffold_ui.py`: `tailwind-v3` and `tailwind-v4` scaffold Tailwind; `css-modules` and `vanilla-css` scaffold CSS Modules, the nearer of its two |
+| `emailTokens` | email-template-system's `build_email.py` and `lint_email.py --source`. They never read `tokens`: the email build has its own projection of the system |
+| `tokens` (CSS only) | client-presentation-builder's `build_presentation.py`, which builds the deck on the project's `tokens.css` files, in order. A contract cannot style a deck |
+| `budgets.perf` | perf-budget-gate's `perf_audit.py` and `measure_vitals.mjs` |
+| `budgets.a11y` | a11y-audit-runner's `a11y_runtime.mjs` |
+| `baselines.audit` | web-design-studio's `audit_design.py` |
+| `baselines.a11y` | a11y-audit-runner's `a11y_static.py` |
+| `baselines.perf` | perf-budget-gate's `perf_audit.py` |
+| `baselines.docs` | design-system-docs' `build_docs.py --check`. A baseline the config names but that is missing is an error, as a named `--baseline` is |
+| `baselines.snapshots` | component-state-matrix's `snapshot_matrix.mjs` |
+
+**The browser scripts** read the config through `projectConfig()` in their `browser_common.mjs`, a copy of the plugin's `shared/browser_common.mjs`. It finds and checks the file by the same rules as `project_config.py`, with the same messages, and a test runs both readers on the same files.
+
+**Vendored alone.** A project that copied `audit_design.py` or `a11y_static.py` into its own `scripts/` before 3.5.0, as the hook recipe said, has no `project_config.py` beside it. Each then runs as it did; the audit says that the config is not read, and refuses `--tokens`. Copy `project_config.py` across to turn the config on.
+
+**Not read by** the stylelint and ESLint configs, which class files by the rule spec's globs alone, and by `crux_check.py`, which compares field data with a lab report and has no budget of its own.

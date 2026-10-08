@@ -53,6 +53,7 @@
  *                      4x CPU, what Lighthouse applies for 150ms RTT at
  *                      1.6Mbps; slow4g and fast4g are lighter, see THROTTLE)
  *   --budget FILE      perf-budget.json; compares defaults.lab
+ *                      (default: the project's .design-suite.json budgets.perf)
  *   --page-type NAME   select a per-page-type budget from `pages`
  *   --interact SEL     click this selector after load and measure INP
  *   --interact-at MS   click it MS after navigation starts instead, while
@@ -89,7 +90,7 @@ import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { launchBrowser, loadPlaywright, readJsonFile } from './browser_common.mjs';
+import { launchBrowser, loadPlaywright, projectConfig, readJsonFile } from './browser_common.mjs';
 
 // Lighthouse's mobile profile is 150 ms RTT, 1.6 Mbps down, 750 Kbps up and
 // 4x CPU. CDP adds its latency to each request once, where a round trip is
@@ -792,6 +793,10 @@ async function main() {
   }
 
   // Read the budget before measuring: a typo found after N runs costs them all.
+  // A flag beats the project's .design-suite.json (P24).
+  if (opts.budget === null) {
+    try { opts.budget = projectConfig()?.budgets.perf ?? null; } catch (err) { die(err.message); }
+  }
   const lab = loadLabBudget(opts.budget, opts.pageType);
 
   const { chromium } = await loadPlaywright(die, 'node measure_vitals.mjs ...');

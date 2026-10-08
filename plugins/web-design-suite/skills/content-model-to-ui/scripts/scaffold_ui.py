@@ -71,6 +71,15 @@ from pathlib import Path
 from string import Template
 from typing import Any
 
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin. project_config.py is a copy of the plugin's shared/ master (P24).
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.scaffold_ui
+    from .project_config import ConfigError, project_config
+except ImportError:                               # python scripts/scaffold_ui.py, or loaded by path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from project_config import ConfigError, project_config  # type: ignore[no-redef]
+
 MODEL_SCHEMA = "content-model-to-ui/model/1"
 
 # Controls the scaffold renders for real. Anything else becomes a marked stub
@@ -3494,8 +3503,10 @@ def main(argv: list[str] | None = None) -> int:
                          "question falls back to the machine's own proposal")
     ap.add_argument("--entity", action="append", metavar="TABLE",
                     help="only this entity (repeatable or comma-separated)")
-    ap.add_argument("--stack", choices=("css-modules", "tailwind"),
-                    default="css-modules")
+    ap.add_argument("--stack", choices=("css-modules", "tailwind"), default=None,
+                    help="default: the project's .design-suite.json stack (tailwind-v3 and "
+                         "tailwind-v4 scaffold Tailwind; css-modules scaffolds CSS Modules), "
+                         "else css-modules")
     ap.add_argument("--dry-run", action="store_true",
                     help="print the tree and sizes, write nothing")
     ap.add_argument("--force", action="store_true",
@@ -3504,6 +3515,16 @@ def main(argv: list[str] | None = None) -> int:
                     help="write nothing and exit 1 when the schema has a blocking "
                          "security finding (for CI)")
     args = ap.parse_args(argv)
+    # A flag beats the project's .design-suite.json, which beats the default (P24).
+    # The scaffold writes CSS Modules or Tailwind; a vanilla-css project gets
+    # CSS Modules, the nearer of the two.
+    if args.stack is None:
+        try:
+            config = project_config()
+        except ConfigError as exc:
+            print(f"scaffold_ui: {exc}", file=sys.stderr)
+            return 2
+        args.stack = "tailwind" if config and (config.stack or "").startswith("tailwind") else "css-modules"
 
     mp = Path(args.model)
     if not mp.exists():

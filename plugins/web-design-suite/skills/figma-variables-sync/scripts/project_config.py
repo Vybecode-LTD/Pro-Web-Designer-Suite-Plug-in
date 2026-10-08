@@ -67,6 +67,7 @@ ramp step or a breakpoint.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -170,14 +171,15 @@ def load_config(path: Union[str, Path]) -> ProjectConfig:
     unknown = sorted(set(data) - set(KEYS))
     if unknown:
         raise ConfigError(f"{path}: unknown key {unknown[0]!r}; the keys are {', '.join(KEYS)}")
-    if data.get("schema") != CONFIG_SCHEMA:
+    schema = data.get("schema")
+    if isinstance(schema, bool) or schema != CONFIG_SCHEMA:   # `true == 1` in Python, not in JSON
         raise ConfigError(f'{path}: "schema" must be {CONFIG_SCHEMA}')
     base = path.parent
 
     def one_path(key: str, value: Any) -> Path:
         if not isinstance(value, str) or not value.strip():
             raise ConfigError(f'{path}: "{key}" must be a path, as a string')
-        return base / value
+        return Path(os.path.normpath(base / value))         # `../shared/tokens.css` too
 
     def path_list(key: str) -> List[Path]:
         value = data.get(key, [])
@@ -217,6 +219,13 @@ def project_config(start: Optional[Union[str, Path]] = None) -> Optional[Project
     """The config that governs `start`, read and checked, or None."""
     found = find_config(start)
     return load_config(found) if found else None
+
+
+def config_path(config: Optional[ProjectConfig], section: str, key: str) -> Optional[str]:
+    """The config's `budgets.perf`, `baselines.a11y`… as a string, or None,
+    for a script's `flag or config_path(...) or default`."""
+    value = getattr(config, section).get(key) if config is not None else None
+    return str(value) if value is not None else None
 
 
 def token_sources(flag: Union[None, str, Sequence[str]],

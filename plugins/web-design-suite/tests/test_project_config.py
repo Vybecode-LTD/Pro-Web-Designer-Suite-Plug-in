@@ -23,7 +23,7 @@ import sys
 import unittest
 
 from test_figma_sync import PROJECT_ACCENT, STEPS
-from wds_support import PLUGIN, SKILLS, TempDirTest, env, load_script, output, run_py
+from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, load_script, output, run_node, run_py
 
 MASTER = PLUGIN / "shared" / "project_config.py"
 TOKENS = ("@layer tokens {\n  :root {\n" + "".join(f"    --accent-{s}: {h};\n" for s, h in zip(STEPS, PROJECT_ACCENT))
@@ -37,8 +37,10 @@ class TheCopiesAreTheMaster(unittest.TestCase):
     def test_every_reader_has_the_master_copy_beside_it(self):
         readers = sorted({p.parent for p in SKILLS.glob("*/scripts/*.py")
                           if re.search(r"^\s*from \.?project_config import", p.read_text(encoding="utf-8"), re.M)})
-        self.assertEqual(["design-system-docs", "design-system-versioning", "design-token-migration",
-                          "figma-variables-sync", "web-design-studio"], [r.parent.name for r in readers])
+        self.assertEqual(["a11y-audit-runner", "client-presentation-builder", "content-model-to-ui",
+                          "design-system-docs", "design-system-versioning", "design-token-migration",
+                          "email-template-system", "figma-variables-sync", "perf-budget-gate",
+                          "web-design-studio"], [r.parent.name for r in readers])
         copies = sorted(p.parent for p in SKILLS.glob("*/scripts/project_config.py"))
         self.assertEqual(readers, copies)
         master = MASTER.read_bytes()
@@ -453,3 +455,190 @@ class ClusterValuesLandsOnTheProjectsRamps(TempDirTest):
         self.assertNotIn(" 150", self.accent(pinned, 600))
         other, _ = self.propose("--tokens", "src/app.css")                    # so does --tokens
         self.assertEqual(self.accent(derived, 600), self.accent(other, 600))
+
+
+# Part 3: the budgets, the other baselines, emailTokens, stack and the deck's
+# tokens, and the Node reader the browser scripts share.
+
+READER_JS = """
+import { findConfig, loadConfig } from %s;
+const [mode, ...files] = process.argv.slice(1);
+const out = files.map((file) => {
+  try { return { ok: mode === 'find' ? findConfig(file) : loadConfig(file) }; }
+  catch (err) { return { error: err.message }; }
+});
+console.log(JSON.stringify(out));
+"""
+
+CONFIGS = {
+    "full": json.dumps({"schema": 1, "tokens": ["src/tokens.css", "../shared/contract.json"],
+                        "emailTokens": "emails/email-tokens.json", "components": "src/widgets/**/*.css",
+                        "stack": "tailwind-v4", "budgets": {"perf": "perf.json", "a11y": "a11y.json"},
+                        "baselines": {"audit": "b/audit.json", "snapshots": "snaps/"}}),
+    "nulls": '{"schema": 1, "emailTokens": null, "stack": null}',
+    "bom": "﻿" + '{"schema": 1, "tokens": "t.css"}',
+    "unknown": '{"schema": 1, "token": "x.css", "budget": {}}',
+    "no-schema": '{"tokens": "x.css"}',
+    "schema-true": '{"schema": true}',
+    "schema-text": '{"schema": "1"}',
+    "stack": '{"schema": 1, "stack": "bootstrap"}',
+    "budget-key": '{"schema": 1, "budgets": {"lcp": "x.json"}}',
+    "baselines-null": '{"schema": 1, "baselines": null}',
+    "baseline-empty": '{"schema": 1, "baselines": {"audit": " "}}',
+    "tokens-number": '{"schema": 1, "tokens": [3]}',
+    "tokens-null": '{"schema": 1, "tokens": null}',
+    "components-empty": '{"schema": 1, "components": [""]}',
+    "components-before-tokens": '{"schema": 1, "tokens": [3], "components": 7}',
+    "array": "[1]",
+    "trailing-comma": '{"schema": 1,}',
+    "comment": '{"schema": 1 /* a comment */}',
+}
+
+
+@unittest.skipUnless(NODE, "node is not installed")
+class TheNodeReaderAgrees(TempDirTest):
+    """XC-C8: the browser scripts read .design-suite.json through
+    browser_common.mjs's projectConfig(), which must accept, refuse and
+    resolve exactly what shared/project_config.py does."""
+
+    def setUp(self):
+        super().setUp()
+        self.pc = load_script("design-system-docs", "project_config")
+
+    def node(self, mode, files):
+        script = READER_JS % json.dumps((PLUGIN / "shared" / "browser_common.mjs").as_uri())
+        proc = subprocess.run([NODE, "--input-type=module", "-e", script, mode, *map(str, files)],
+                              cwd=self.tmp, env=env(), capture_output=True, timeout=60)
+        self.assertEqual(0, proc.returncode, output(proc))
+        return json.loads(proc.stdout)
+
+    def python(self, file):
+        try:
+            c = self.pc.load_config(file)
+        except self.pc.ConfigError as exc:
+            return {"error": str(exc)}
+        return {"ok": {"path": str(c.path), "root": str(c.root), "tokens": [str(p) for p in c.tokens],
+                       "emailTokens": str(c.email_tokens) if c.email_tokens else None,
+                       "components": c.components, "stack": c.stack,
+                       "budgets": {k: str(v) for k, v in c.budgets.items()},
+                       "baselines": {k: str(v) for k, v in c.baselines.items()}}}
+
+    def test_every_config_reads_the_same(self):
+        files = [self.write(f"{name}/.design-suite.json", text) for name, text in CONFIGS.items()]
+        files.append(self.write("utf16/.design-suite.json", '{"schema": 1, "stack": "css-modules"}'.encode("utf-16")))
+
+        def same(result):
+            if "error" in result:
+                return {"error": re.sub(r"not JSON \(.*\)$", "not JSON", result["error"])}
+            return result
+
+        for file, from_node in zip(files, self.node("load", files)):
+            with self.subTest(config=file.parent.name):
+                self.assertEqual(same(self.python(file)), same(from_node))
+        self.assertIn("ok", self.python(files[0]))                           # the cases cover both
+        self.assertIn("error", self.python(files[3]))
+
+    def test_the_walk_up_is_the_same(self):
+        self.write(".design-suite.json", '{"schema": 1}')
+        self.write("repo/.git/HEAD", "x\n")
+        deep = self.tmp / "repo" / "src" / "app"
+        deep.mkdir(parents=True)
+        self.assertEqual([{"ok": None}], self.node("find", [deep]))         # not the one above the repository
+        own = self.write("repo/.design-suite.json", '{"schema": 1}')
+        self.assertEqual(own.resolve(), self.pc.find_config(deep))
+        self.assertEqual([{"ok": str(own.resolve())}], self.node("find", [deep]))
+
+
+class TheConfigsFilesReachTheirScripts(TempDirTest):
+    """XC-C8: each script that takes a budget, a baseline, the email tokens,
+    the stack or the deck's tokens reads it from the config, and a flag beats
+    it. A file the config names but that is missing or broken is named in the
+    script's own message, which is how these tests see that it was read."""
+
+    def setUp(self):
+        super().setUp()
+        self.write(".git/HEAD", "x\n")
+        self.write("page.html", "<!doctype html><html lang=en><title>t</title><main>hi</main></html>\n")
+
+    def config(self, **keys):
+        self.write(".design-suite.json", json.dumps({"schema": 1, **keys}))
+
+    def test_perf_audit_budget_and_baseline(self):
+        self.config(budgets={"perf": "ci/perf-budget.json"}, baselines={"perf": "ci/perf-baseline.json"})
+        self.write("ci/perf-baseline.json", "{not json")
+        proc = run_py("perf-budget-gate", "perf_audit", "page.html", cwd=self.tmp)
+        self.assertIn("perf-budget.json not found", output(proc))
+        self.assertRegex(output(proc), r"could not read baseline .*perf-baseline\.json")
+        proc = run_py("perf-budget-gate", "perf_audit", "page.html", "--budget", "mine.json",
+                      "--baseline", "mine-baseline.json", cwd=self.tmp)
+        self.assertIn("mine.json not found", output(proc))
+        self.assertNotIn("could not read baseline", output(proc))
+
+    def test_a11y_static_baseline(self):
+        self.config(baselines={"a11y": "ci/a11y-baseline.json"})
+        self.write("ci/a11y-baseline.json", "{not json")
+        proc = run_py("a11y-audit-runner", "a11y_static", "page.html", cwd=self.tmp)
+        self.assertRegex(output(proc), r"could not read baseline .*a11y-baseline\.json")
+        proc = run_py("a11y-audit-runner", "a11y_static", "page.html", "--baseline", "none.json", cwd=self.tmp)
+        self.assertNotIn("could not read baseline", output(proc))
+
+    def test_build_docs_check_baseline(self):
+        self.write("tokens.css", TOKENS)
+        proc = run_py("design-system-docs", "extract_system", "--tokens", "tokens.css", "--out", "system.json",
+                      cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.config(baselines={"docs": "docs/committed.json"})
+        proc = run_py("design-system-docs", "build_docs", "system.json", "--out", "site", "--check", cwd=self.tmp)
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("committed.json does not exist", output(proc))
+
+    def test_the_email_scripts_read_email_tokens_not_tokens(self):
+        bundled = SKILLS / "email-template-system" / "assets" / "email-tokens.json"
+        template = SKILLS / "email-template-system" / "assets" / "templates" / "newsletter.html"
+        self.config(tokens="site-tokens.css", emailTokens="emails/missing-tokens.json")
+        for module, args in (("build_email", [template, "-o", "out.html"]), ("lint_email", ["--source", template])):
+            with self.subTest(script=module):
+                proc = run_py("email-template-system", module, *args, cwd=self.tmp)
+                self.assertEqual(2, proc.returncode, output(proc))
+                self.assertIn("missing-tokens.json", output(proc))
+                self.assertNotIn("site-tokens.css", output(proc))
+                proc = run_py("email-template-system", module, *args, "--tokens", bundled, cwd=self.tmp)
+                self.assertNotIn("missing-tokens.json", output(proc))
+
+    def test_the_deck_takes_the_configs_css(self):
+        from test_deck import REVERSED_LOG
+        self.write("DECISION_LOG.md", REVERSED_LOG)
+        self.write("brand/tokens.css", (SKILLS / "client-presentation-builder" / "assets" / "deck-tokens.css").read_bytes())
+        self.config(tokens=["brand/tokens.css", "brand/contract.json"])
+        proc = run_py("client-presentation-builder", "build_presentation", "DECISION_LOG.md", cwd=self.tmp)
+        self.assertRegex(output(proc), r"tokens: \S*brand.tokens\.css\s")   # the CSS, not the contract
+
+    def test_scaffold_ui_stack(self):
+        self.write("schema.sql", "CREATE TABLE posts (\n    id uuid PRIMARY KEY,\n    title text NOT NULL\n);\n")
+        proc = run_py("content-model-to-ui", "introspect_schema", "schema.sql", "-o", "model.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.config(stack="tailwind-v4")
+        proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "src", "--dry-run", cwd=self.tmp)
+        self.assertIn("[tailwind]", output(proc))
+        proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "src", "--dry-run",
+                      "--stack", "css-modules", cwd=self.tmp)
+        self.assertIn("[css-modules]", output(proc))
+
+    @unittest.skipUnless(NODE, "node is not installed")
+    def test_the_browser_scripts(self):
+        self.config(budgets={"perf": "ci/perf.json", "a11y": "ci/a11y.json"})
+        no_path = {"NODE_PATH": None}
+        proc = run_node("perf-budget-gate", "measure_vitals.mjs", "page.html", cwd=self.tmp, env_changes=no_path)
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertRegex(output(proc), r"no such budget file: .*perf\.json")
+        proc = run_node("perf-budget-gate", "measure_vitals.mjs", "page.html", "--budget", "mine.json",
+                        cwd=self.tmp, env_changes=no_path)
+        self.assertIn("no such budget file: mine.json", output(proc))
+        proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", "page.html", "--axe", "page.html",
+                        cwd=self.tmp, env_changes=no_path)
+        self.assertRegex(output(proc), r"no such budget file: .*a11y\.json")
+        self.write(".design-suite.json", '{"schema": 1, "baseline": {}}')
+        proc = run_node("component-state-matrix", "snapshot_matrix.mjs", "page.html", cwd=self.tmp,
+                        env_changes=no_path)
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("unknown key 'baseline'", output(proc))

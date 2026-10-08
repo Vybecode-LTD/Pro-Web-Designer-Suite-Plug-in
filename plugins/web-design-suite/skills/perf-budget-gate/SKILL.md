@@ -188,9 +188,9 @@ python -m scripts.perf_audit dist/ --write-baseline .perf-baseline.json
 | Flag | Does |
 |---|---|
 | `--src DIR` | scan for markup/CSS/JS problems but **do not** count toward byte budgets (repeatable) |
-| `--budget FILE` | default `perf-budget.json`; built-in defaults if missing |
+| `--budget FILE` | default: `.design-suite.json`'s `budgets.perf`, else `perf-budget.json`; built-ins if missing |
 | `--page-type NAME` | glob-matched against the `pages` map, deep-merged onto `defaults` |
-| `--baseline FILE` | ignore recorded findings, compare byte totals (default `.perf-baseline.json`) |
+| `--baseline FILE` | ignore recorded findings, compare byte totals (default: its `baselines.perf`, else `.perf-baseline.json`) |
 | `--write-baseline FILE` | record findings **and** totals |
 | `--category B\|L\|C\|T\|W` | narrow the report (repeatable) |
 | `--json` `--strict` `--quiet` `--no-color` `--no-ledger` `--include-maps` | |
@@ -226,7 +226,7 @@ node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --interact "button.buy" -
 |---|---|
 | `--runs N` | iterations; the median is reported (default 5) |
 | `--throttle NAME` | `lighthouse` (default: Lighthouse's own throttling) · `slow4g`, `fast4g` (lighter) · `cpu4` · `off`, via CDP |
-| `--budget FILE` | compares the median against `defaults.lab`; non-zero exit on breach |
+| `--budget FILE` | compares the median against `defaults.lab`; non-zero exit on breach; default `budgets.perf` |
 | `--page-type NAME` | per-page-type `lab` override |
 | `--interact SEL` | click it after load and measure **real INP** |
 | `--interact-at MS` | click it MS after navigation starts instead, while the page hydrates |

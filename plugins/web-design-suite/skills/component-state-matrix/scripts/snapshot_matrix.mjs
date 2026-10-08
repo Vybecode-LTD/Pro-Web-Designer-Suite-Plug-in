@@ -38,7 +38,8 @@
  *
  * Options
  * -------
- *   --baselines DIR        where baseline PNGs live       (default ./matrix-baselines)
+ *   --baselines DIR        where baseline PNGs live       (default: the project's
+ *                          .design-suite.json baselines.snapshots, else ./matrix-baselines)
  *   --out DIR              report + current + diff output (default ./matrix-report)
  *   --update-baselines     accept everything as the new truth
  *   --prune                with --update-baselines, delete baselines with no cell
@@ -76,7 +77,7 @@ import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { FREEZE_ANIMATIONS_CSS, launchBrowser, loadPlaywright } from './browser_common.mjs';
+import { FREEZE_ANIMATIONS_CSS, launchBrowser, loadPlaywright, projectConfig } from './browser_common.mjs';
 
 // ---------------------------------------------------------------------------
 // Arguments
@@ -90,7 +91,7 @@ function die(msg, code = 2) {
 function parseArgs(argv) {
   const opts = {
     sheet: null,
-    baselines: 'matrix-baselines',
+    baselines: null,
     out: 'matrix-report',
     update: false,
     prune: false,
@@ -151,6 +152,11 @@ function parseArgs(argv) {
   if (!Number.isFinite(opts.pixelThreshold) || opts.pixelThreshold < 0 || opts.pixelThreshold > 1)
     die('--pixel-threshold must be between 0 and 1');
   if (!fs.existsSync(opts.sheet)) die(`no such proof sheet: ${opts.sheet}`);
+  // A flag beats the project's .design-suite.json, which beats the default (P24).
+  if (opts.baselines === null) {
+    try { opts.baselines = projectConfig()?.baselines.snapshots ?? 'matrix-baselines'; }
+    catch (err) { die(err.message); }
+  }
   // Own baselines and report, so the two passes never see each other's
   // files as orphans or overwrite each other's report (GT-B7).
   if (opts.forcedColors) {

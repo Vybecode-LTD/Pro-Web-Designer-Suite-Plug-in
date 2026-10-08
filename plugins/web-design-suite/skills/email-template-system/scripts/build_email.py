@@ -73,6 +73,15 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Iterable
 
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin. project_config.py is a copy of the plugin's shared/ master (P24).
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.build_email
+    from .project_config import ConfigError, config_path, project_config
+except ImportError:                               # python scripts/build_email.py, or loaded by path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from project_config import ConfigError, config_path, project_config  # type: ignore[no-redef]
+
 GMAIL_CLIP_BYTES = 102_400  # 100 KiB. Verified figure — see the matrix reference.
 GMAIL_STYLE_BYTES = 16_384  # Gmail's ceiling on all <style> content, counted together.
 
@@ -1292,7 +1301,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("source", help="source template (.html) authored against tokens")
     parser.add_argument("--out", "-o", help="write compiled HTML here (default: stdout)")
-    parser.add_argument("--tokens", help="email-tokens.json (default: assets/email-tokens.json)")
+    parser.add_argument("--tokens", help="email-tokens.json (default: the project's "
+                                         ".design-suite.json emailTokens, else "
+                                         "assets/email-tokens.json)")
     parser.add_argument("--text", help="also write the plain-text alternative here")
     parser.add_argument("--text-only", action="store_true",
                         help="emit only the plain-text alternative (to stdout unless --out)")
@@ -1318,7 +1329,15 @@ def main(argv: list[str] | None = None) -> int:
         print("error: cannot read %s: %s" % (source_path, exc), file=sys.stderr)
         return 2
 
-    tokens_path = Path(args.tokens) if args.tokens else default_tokens_path()
+    # A flag beats the project's .design-suite.json, which beats the default
+    # (P24). The email build reads emailTokens, never the site's tokens.
+    try:
+        config = None if args.tokens else project_config()
+    except ConfigError as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 2
+    tokens_path = (Path(args.tokens) if args.tokens else
+                   config.email_tokens if config and config.email_tokens else default_tokens_path())
     try:
         tokens = load_tokens(tokens_path)
     except TokenError as exc:

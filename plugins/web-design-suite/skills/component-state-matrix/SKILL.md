@@ -44,7 +44,7 @@ That combinatorial render is, in practice, the fastest way to find:
 | Reads | source text | rendered pixels |
 | Finds | a value that is wrong | a value that is **absent** |
 | Blind to | anything not written down | anything that renders correctly by accident |
-| Answers | "is this code legal?" | "does this system actually work?" |
+| Answers | "is this code legal?" | "does this system work?" |
 
 The distinction that matters: **a state that was never written produces no violation.** A missing `.button:focus-visible` reads exactly like a stylesheet that needs none; a focus row identical to the default row does not.
 
@@ -291,7 +291,7 @@ The sheet's chrome lives in its own `matrix` cascade layer, declared after `util
 
 | Flag | Does |
 |---|---|
-| `--baselines DIR` | where baseline PNGs live (default `./matrix-baselines`) |
+| `--baselines DIR` | where baseline PNGs live (default: `.design-suite.json`'s `baselines.snapshots`, else `./matrix-baselines`) |
 | `--out DIR` | report, current shots and diffs (default `./matrix-report`) |
 | `--update-baselines` | accept everything as the new truth |
 | `--prune` | with the above, delete baselines with no cell |

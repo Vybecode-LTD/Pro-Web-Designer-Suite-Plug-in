@@ -79,6 +79,20 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Iterator
 
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin. project_config.py is a copy of the plugin's shared/ master (P24). A
+# project that vendored a11y_static.py alone, as the hook recipe did before
+# 3.5.0, has no copy: the audit then runs as it did.
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.a11y_static
+    from .project_config import ConfigError, config_path, project_config
+except ImportError:                               # python scripts/a11y_static.py, or loaded by path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from project_config import ConfigError, config_path, project_config  # type: ignore[no-redef]
+    except ImportError:
+        project_config = None                     # type: ignore[assignment]
+
 # ---------------------------------------------------------------------------
 # File selection
 # ---------------------------------------------------------------------------
@@ -1662,9 +1676,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--quiet", action="store_true",
                     help="suppress the fix guidance")
     ap.add_argument("--no-color", action="store_true")
-    ap.add_argument("--baseline", metavar="FILE", default=".a11y-baseline.json",
-                    help="ignore findings recorded in this file "
-                         "(default: .a11y-baseline.json)")
+    ap.add_argument("--baseline", metavar="FILE", default=None,
+                    help="ignore findings recorded in this file (default: the project's "
+                         ".design-suite.json baselines.a11y, else .a11y-baseline.json)")
     ap.add_argument("--write-baseline", metavar="FILE",
                     help="record current findings so only NEW ones fail")
     ap.add_argument("--category", action="append", metavar="S|N|K|R|F",
@@ -1708,8 +1722,16 @@ def main(argv: list[str] | None = None) -> int:
               "user feels first: F (labels), K (focus), N (names).")
         return 0
 
+    # A flag beats the project's .design-suite.json, which beats the default (P24).
+    config = None
+    if project_config is not None:
+        try:
+            config = project_config()
+        except ConfigError as exc:
+            print(f"a11y_static: {exc}", file=sys.stderr)
+            return 2
     baseline: set = set()
-    bp = Path(args.baseline)
+    bp = Path(args.baseline or config_path(config, "baselines", "a11y") or ".a11y-baseline.json")
     if bp.exists():
         try:
             baseline = set(json.loads(bp.read_bytes()))

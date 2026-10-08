@@ -68,6 +68,7 @@
  *                         warnings and never fail the run
  *   --keymap FILE         expected keyboard behaviour per pattern
  *   --budget FILE         a11y-budget.json; non-zero exit on breach
+ *                         (default: the project's .design-suite.json budgets.a11y)
  *   --only SUBSTR         with --matrix, only cells containing SUBSTR (repeatable);
  *                         it does not pick checks, so a page refuses it
  *   --densities LIST      on a page, the data-density values to measure focus
@@ -114,7 +115,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { FREEZE_ANIMATIONS_CSS, contrastRatio, launchBrowser, loadPlaywright, nodeModulesAbove, npmGlobalRoot, readJsonFile } from './browser_common.mjs';
+import { FREEZE_ANIMATIONS_CSS, contrastRatio, launchBrowser, loadPlaywright, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile } from './browser_common.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TAGS = 'wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice';
@@ -1938,6 +1939,10 @@ async function main() {
     if (!fs.existsSync(opts.keymap)) die(`no such keymap file: ${opts.keymap}`);
     try { keymap = readJsonFile(opts.keymap); }
     catch (err) { die(`cannot parse ${opts.keymap}: ${err.message}`); }
+  }
+  // A flag beats the project's .design-suite.json (P24).
+  if (opts.budget === null) {
+    try { opts.budget = projectConfig()?.budgets.a11y ?? null; } catch (err) { die(err.message); }
   }
   const budget = loadBudget(opts.budget);
 

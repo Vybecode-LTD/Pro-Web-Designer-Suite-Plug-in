@@ -78,6 +78,15 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Iterable, Iterator
 
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin. project_config.py is a copy of the plugin's shared/ master (P24).
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.perf_audit
+    from .project_config import ConfigError, config_path, project_config
+except ImportError:                               # python scripts/perf_audit.py, or loaded by path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from project_config import ConfigError, config_path, project_config  # type: ignore[no-redef]
+
 # ---------------------------------------------------------------------------
 # Configuration — the vocabulary this skill enforces.
 # ---------------------------------------------------------------------------
@@ -1640,9 +1649,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--src", action="append", default=[], metavar="DIR",
                     help="source to scan for markup/CSS/JS problems but NOT "
                          "count toward byte budgets (repeatable)")
-    ap.add_argument("--budget", metavar="FILE", default="perf-budget.json",
-                    help="budget file (default: perf-budget.json; built-in "
-                         "defaults are used if it is missing)")
+    ap.add_argument("--budget", metavar="FILE", default=None,
+                    help="budget file (default: the project's .design-suite.json "
+                         "budgets.perf, else perf-budget.json; built-in defaults "
+                         "are used if it is missing)")
     ap.add_argument("--page-type", metavar="NAME",
                     help="select a per-page-type budget from the `pages` map")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
@@ -1655,9 +1665,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="suppress the weight table")
     ap.add_argument("--include-maps", action="store_true",
                     help="count sourcemaps and other non-shipped files")
-    ap.add_argument("--baseline", metavar="FILE", default=".perf-baseline.json",
+    ap.add_argument("--baseline", metavar="FILE", default=None,
                     help="ignore findings recorded here and compare byte totals "
-                         "against it (default: .perf-baseline.json)")
+                         "against it (default: the project's .design-suite.json "
+                         "baselines.perf, else .perf-baseline.json)")
     ap.add_argument("--write-baseline", metavar="FILE",
                     help="record current findings and byte totals so only NEW "
                          "violations and real growth fail")
@@ -1670,6 +1681,15 @@ def main(argv: list[str] | None = None) -> int:
     if missing:
         print(f"perf_audit: no such path: {', '.join(missing)}", file=sys.stderr)
         return 2
+
+    # A flag beats the project's .design-suite.json, which beats the default (P24).
+    try:
+        config = project_config()
+    except ConfigError as exc:
+        print(f"perf_audit: {exc}", file=sys.stderr)
+        return 2
+    args.budget = args.budget or config_path(config, "budgets", "perf") or "perf-budget.json"
+    args.baseline = args.baseline or config_path(config, "baselines", "perf") or ".perf-baseline.json"
 
     try:
         budget, provenance = load_budget(args.budget)

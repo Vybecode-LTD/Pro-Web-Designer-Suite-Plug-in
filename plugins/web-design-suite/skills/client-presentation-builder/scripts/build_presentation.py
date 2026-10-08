@@ -75,6 +75,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin. project_config.py is a copy of the plugin's shared/ master (P24).
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.build_presentation
+    from .project_config import ConfigError, is_contract, project_config
+except ImportError:                               # python scripts/build_presentation.py, or loaded by path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from project_config import ConfigError, is_contract, project_config  # type: ignore[no-redef]
+
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 
 AUDIENCES = ("client", "team", "creative-director")
@@ -2698,14 +2707,25 @@ def emit_css(directory: Path, tokens_css: str) -> list[Path]:
     return [tokens_path, deck_path]
 
 
-def find_tokens(explicit: str | None) -> tuple[str, str]:
-    """Return (css, provenance). The client's own tokens beat the bundled copy."""
+def find_tokens(explicit: str | None, configured: list[Path] | None = None) -> tuple[str, str]:
+    """Return (css, provenance). The client's own tokens beat the bundled copy:
+    --tokens, else the CSS token files the project's .design-suite.json lists,
+    in order (a contract.json cannot style a deck, so it is passed over)."""
     candidates: list[Path] = []
     if explicit:
         p = Path(explicit)
         if not p.exists():
             raise BuildError(f"--tokens {p} does not exist")
         candidates.append(p)
+    elif configured:
+        css = [p for p in configured if not is_contract(p)]
+        missing = [str(p) for p in css if not p.is_file()]
+        if missing:
+            raise BuildError(f"the project's .design-suite.json lists {', '.join(missing)}, "
+                             "which does not exist")
+        if css:
+            return ("\n".join(p.read_text(encoding="utf-8") for p in css),
+                    ", ".join(str(p) for p in css))
     candidates.append(SKILL_ROOT / "assets" / "deck-tokens.css")
     candidates.append(SKILL_ROOT.parent / "web-design-studio" / "assets" /
                       "starter" / "styles" / "tokens.css")
@@ -2776,7 +2796,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="write the deck's CSS out so `audit_design.py "
                          "--strict DIR` can prove it is on the system")
     ap.add_argument("--tokens", metavar="FILE",
-                    help="tokens.css to build the deck on (default: the "
+                    help="tokens.css to build the deck on (default: the CSS token "
+                         "files the project's .design-suite.json lists, else the "
                          "bundled copy; pass the client's for their brand)")
     ap.add_argument("--max-decisions", type=int, default=5, metavar="N",
                     help="headline decisions for client/creative-director "
@@ -2831,7 +2852,12 @@ def main(argv: list[str] | None = None) -> int:
                 raise BuildError(f"{manual_path} does not exist (--manual).")
             inp.manual = manual_path.read_text(encoding="utf-8")
 
-        tokens_css, tokens_from = find_tokens(args.tokens)
+        # A flag beats the project's .design-suite.json (P24).
+        config = None if args.tokens else project_config()
+        tokens_css, tokens_from = find_tokens(args.tokens, config.tokens if config else None)
+    except ConfigError as exc:
+        print(f"build_presentation: {exc}", file=sys.stderr)
+        return 2
     except BuildError as exc:
         print(f"build_presentation: {exc}", file=sys.stderr)
         return 2
