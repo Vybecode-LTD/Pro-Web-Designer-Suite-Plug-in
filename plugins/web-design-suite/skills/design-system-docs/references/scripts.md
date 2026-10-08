@@ -38,7 +38,7 @@ Exit `0` extracted · `1` `--strict` with errors · `2` bad invocation, or a `.d
 | `--only NAME` | one component; repeatable or comma-separated |
 | `--no-examples` | skip the rendered instances and the forced-state stylesheet |
 | `--check` | drift mode: diff against the baseline, check every hand-written claim, exit non-zero |
-| `--baseline FILE` | the committed `system.json` to diff against (default `<out>/assets/system.json`). A named baseline that does not exist exits 2 |
+| `--baseline FILE` | the committed `system.json` to diff against (default: the project's `.design-suite.json` `baselines.docs`, else `<out>/assets/system.json`). A named baseline that does not exist exits 2 |
 | `--emit-css FILE` | the site's own chrome stylesheet, for `audit_design.py` |
 | `--emit-examples DIR` | every fenced code example as a real file, to be linted like source |
 

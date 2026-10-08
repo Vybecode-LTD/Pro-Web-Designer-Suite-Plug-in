@@ -42,8 +42,22 @@
   - **`cluster_values.py --tokens`.** A migration lands on the project's ramps: its steps
     of the contract's six ramps replace the derived ones, and a step it lacks is built
     from its own accent. `--accent` still beats it.
-  - Part 3 brings the budgets, the other baselines, `emailTokens` and `stack` to their
-    scripts, with a Node reader for the browser scripts.
+- **The project contract, part 3: every key has its readers** (XC-C8). A flag still beats
+  each, and each falls back to the script's own default.
+  - **Budgets:** `perf_audit.py` and `measure_vitals.mjs` read `budgets.perf`;
+    `a11y_runtime.mjs` reads `budgets.a11y`.
+  - **Baselines:** `a11y_static.py` reads `baselines.a11y`, `perf_audit.py`
+    `baselines.perf`, `build_docs.py --check` `baselines.docs`, and
+    `snapshot_matrix.mjs` `baselines.snapshots`.
+  - **The email build** (`build_email.py`, `lint_email.py --source`) reads `emailTokens`,
+    never the site's `tokens`. **The deck** builds on the config's CSS token files.
+    **`scaffold_ui.py`** takes its stack from `stack`.
+  - **A Node reader.** `browser_common.mjs` gains `projectConfig()`, which finds and
+    checks the file by the Python reader's rules, with the same messages; a test runs
+    both on the same files. Python now refuses `"schema": true` and normalises `..` in
+    a path, as Node does.
+  - **Vendored alone.** `a11y_static.py` copied into a project's `scripts/` without its
+    reader runs as it did, like `audit_design.py`.
 
 ## 3.4.0 — 2026-10-07
 

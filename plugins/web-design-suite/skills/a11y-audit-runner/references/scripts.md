@@ -23,6 +23,7 @@ python -m scripts.a11y_static src/ --category F --category K
 python -m scripts.a11y_static src/ --sc 1.3.5           # one criterion
 python -m scripts.a11y_static src/ --json
 python -m scripts.a11y_static src/ --write-baseline .a11y-baseline.json
+# The baseline it reads: --baseline, else .design-suite.json's baselines.a11y, else .a11y-baseline.json
 ```
 
 Escape hatches are comment pragmas in every syntax these files use, so each exception is visible in review. Everything after `--` is the reason, and a pragma with no reason should not survive review:
@@ -63,7 +64,7 @@ node scripts/a11y_runtime.mjs --file dist/index.html --tags wcag2a,wcag2aa,wcag2
 | `--url` · `--file` · `--matrix` | exactly one; they are three different jobs |
 | `--tags LIST` | axe tag set (default `wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice`). A best-practice rule names no success criterion, so its findings are warnings and never fail the run, whatever axe rates its impact |
 | `--keymap FILE` | expected keyboard behaviour per pattern |
-| `--budget FILE` | counter limits, as JSON `{"key": limit}`; non-zero exit on breach, and an unknown key exits 2. Keys (a best-practice violation counts in none of them; an incomplete result counts in `axe_incomplete`, whatever its tags): `axe_violations`, `axe_serious`, `axe_incomplete`, `unnamed_controls`, `duplicate_names`, `tab_traps`, `unreachable_controls`, `focus_invisible`, `focus_weak`, `forced_colors_lost`, `contrast_failures`, `reflow_failures`, `keymap_failures` |
+| `--budget FILE` | counter limits, as JSON `{"key": limit}`; non-zero exit on breach, and an unknown key exits 2. Keys (a best-practice violation counts in none of them; an incomplete result counts in `axe_incomplete`, whatever its tags): `axe_violations`, `axe_serious`, `axe_incomplete`, `unnamed_controls`, `duplicate_names`, `tab_traps`, `unreachable_controls`, `focus_invisible`, `focus_weak`, `forced_colors_lost`, `contrast_failures`, `reflow_failures`, `keymap_failures` Without it, the project's `.design-suite.json` `budgets.a11y` (web-design-studio's `references/project-contract.md`). |
 | `--only SUBSTR` | with `--matrix`, narrow to matching cells (repeatable). It does not pick checks, so a page refuses it: use `--skip` |
 | `--densities LIST` | on a page, the `data-density` values to measure focus at as well, in normal and forced colours (default `auto`: each one the page's own stylesheets name; `none` turns it off) |
 | `--skip CHECK` | `axe names taborder focus forced contrast keys reflow` (repeatable) |

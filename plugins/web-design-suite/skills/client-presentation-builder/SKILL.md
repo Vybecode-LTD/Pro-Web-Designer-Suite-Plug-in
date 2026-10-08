@@ -245,13 +245,13 @@ python -m scripts.audit_design build-css/ --strict          # the deck audits cl
 | `--audience client\|team\|creative-director` | Changes emphasis **and order**, per `narrative-structure.md` §§1, 3 |
 | `--audit` `--perf` `--a11y` | The suite's JSON, translated into plain language with the numbers cited |
 | `--defence FILE` | The critique gate's defence sheet: taste calls become open questions, known flaws become the "what we are not happy with" slide, and a blocking item stops the build with exit 1 |
-| `--screenshots DIR` | Inlined as data URIs so the deck is one file. `home--before.png` + `home--after.png` pair into a comparison automatically |
+| `--screenshots DIR` | Inlined as data URIs so the deck is one file. `home--before.png` + `home--after.png` pair into a comparison |
 | `--handout FILE` | The client's copy: one slide per page, no notes, gaps, appendix or provenance |
 | `--dry-run` | Prints the slide plan, the decision ranking and every gap. Writes nothing |
 | `--notes FILE` | Speaker notes as markdown, ending in a pre-flight checklist of the gaps |
 | `--emit-css DIR` | Writes the deck's own CSS out so the gate can be run on it |
-| `--tokens FILE` | Build the deck on the client's `tokens.css` so it is in their brand |
-| `--max-decisions N` | Headline decisions for client and creative-director (default 5; a team gets all of them) |
+| `--tokens FILE` | The client's `tokens.css`, for their brand; default: `.design-suite.json`'s CSS `tokens` |
+| `--max-decisions N` | Headline decisions for client and creative-director (default 5; a team gets all) |
 
 Exit `0` fine · `1` the defence sheet says do not present yet · `2` bad invocation.
 

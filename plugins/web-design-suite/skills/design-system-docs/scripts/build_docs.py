@@ -60,9 +60,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.build_docs
     from .extract_system import CssFile, SEVEN_STATES, strip_guards
+    from .project_config import ConfigError, config_path, project_config
 except ImportError:                               # python scripts/build_docs.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from extract_system import CssFile, SEVEN_STATES, strip_guards
+    from project_config import ConfigError, config_path, project_config  # type: ignore[no-redef]
 
 SCHEMA = "design-system-docs/system/1"
 
@@ -1374,8 +1376,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="Drift mode: diff against the last committed system.json, check every "
                          "hand-written claim, and exit non-zero on any difference.")
     ap.add_argument("--baseline", metavar="FILE",
-                    help="The committed system.json to diff against. "
-                         "Default: <out>/assets/system.json.")
+                    help="The committed system.json to diff against. Default: the "
+                         "project's .design-suite.json baselines.docs, else "
+                         "<out>/assets/system.json.")
     ap.add_argument("--emit-css", metavar="FILE",
                     help="Write the site's own chrome stylesheet for audit_design.py.")
     ap.add_argument("--emit-examples", metavar="DIR",
@@ -1414,15 +1417,28 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
 
     if args.check:
+        # A flag beats the project's .design-suite.json, which beats the default (P24).
+        # The message names where a missing baseline came from (CodeRabbit on #79).
+        from_flag = bool(args.baseline)
+        try:
+            args.baseline = args.baseline or config_path(project_config(), "baselines", "docs")
+        except ConfigError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
         baseline = Path(args.baseline) if args.baseline else (
             Path(args.out) / "assets" / "system.json" if args.out else None)
         if args.baseline and not baseline.is_file():
             # A named baseline that is not there is a wrong path, not a first
             # run: skipping the diff here made the gate pass while comparing
             # nothing.
-            print(f"error: --baseline {args.baseline} does not exist. Commit the baseline "
-                  "that extract_system.py wrote (docs/system.json in the documented "
-                  "workflow), or drop --baseline to check prose only.", file=sys.stderr)
+            if from_flag:
+                print(f"error: --baseline {args.baseline} does not exist. Commit the baseline "
+                      "that extract_system.py wrote (docs/system.json in the documented "
+                      "workflow), or drop --baseline to check prose only.", file=sys.stderr)
+            else:
+                print(f"error: the baseline {args.baseline} does not exist, and the project's "
+                      ".design-suite.json names it (baselines.docs). Commit the baseline that "
+                      "extract_system.py wrote, or correct baselines.docs.", file=sys.stderr)
             return 2
         problems: List[str] = []
         if baseline and baseline.is_file():

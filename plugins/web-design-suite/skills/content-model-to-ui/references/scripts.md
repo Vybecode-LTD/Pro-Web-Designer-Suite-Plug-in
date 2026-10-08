@@ -31,7 +31,7 @@ Turn a model plus answers into components.
 | `--out DIR` | output root (default `src`) |
 | `--answers FILE` | the interview, answered; without it every question falls back to the proposal |
 | `--entity TABLE` | one entity (repeatable or comma-separated) |
-| `--stack css-modules\|tailwind` | default `css-modules` |
+| `--stack css-modules\|tailwind` | default: the project's `.design-suite.json` `stack` (`tailwind-v3` and `tailwind-v4` scaffold Tailwind), else `css-modules` |
 | `--dry-run` | print the tree, the sizes and the TODO count; write nothing |
 | `--force` | overwrite files that already exist (the default is to skip them) |
 | `--strict` | write nothing and exit `1` when the schema has a blocking security finding (RLS off, a policy that lets anyone write). For CI; the default prints the findings and still writes |

@@ -72,6 +72,10 @@ except ImportError:                               # python scripts/lint_email.py
                              compile_selector,
                              default_tokens_path, dropped_message, load_dropped, load_tokens,
                              parse_declarations, parse_stylesheet, sets_broad_font)
+try:                                              # python -m scripts.lint_email
+    from .project_config import ConfigError, project_config
+except ImportError:                               # python scripts/lint_email.py
+    from project_config import ConfigError, project_config  # type: ignore[no-redef]
 
 GMAIL_CLIP_BYTES = 102_400
 GMAIL_STYLE_BYTES = 16_384
@@ -1161,8 +1165,9 @@ def main(argv=None) -> int:
     parser.add_argument("--source", action="store_true",
                         help="lint source templates for Law 1: literals, var() fallbacks, "
                              "dropped tokens")
-    parser.add_argument("--tokens", help="token file for --source "
-                                         "(default: assets/email-tokens.json)")
+    parser.add_argument("--tokens", help="token file for --source (default: the project's "
+                                         ".design-suite.json emailTokens, else "
+                                         "assets/email-tokens.json)")
     parser.add_argument("--format", choices=("report", "json"), default="report")
     parser.add_argument("-o", "--out", help="write output here instead of stdout")
     parser.add_argument("--transactional", action="store_true",
@@ -1179,7 +1184,14 @@ def main(argv=None) -> int:
     ignored = {name.strip() for name in args.ignore.split(",") if name.strip()}
     tokens = dropped = roles = None
     if args.source:
-        tokens_path = Path(args.tokens) if args.tokens else default_tokens_path()
+        # A flag beats the project's .design-suite.json, which beats the default (P24).
+        try:
+            config = None if args.tokens else project_config()
+        except ConfigError as exc:
+            print("error: %s" % exc, file=sys.stderr)
+            return 2
+        tokens_path = (Path(args.tokens) if args.tokens else
+                       config.email_tokens if config and config.email_tokens else default_tokens_path())
         try:
             tokens = load_tokens(tokens_path)
         except TokenError as exc:

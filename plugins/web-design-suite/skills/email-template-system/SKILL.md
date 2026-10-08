@@ -227,7 +227,7 @@ Both are stdlib-only Python 3, no dependencies.
 | Flag | Does |
 |---|---|
 | `--out FILE` | compiled HTML (default: stdout) |
-| `--tokens FILE` | token file (default `assets/email-tokens.json`) |
+| `--tokens FILE` | default: `.design-suite.json`'s `emailTokens`, else `assets/email-tokens.json` |
 | `--text FILE` | also write the plain-text alternative |
 | `--text-only` | emit only the plain-text part |
 | `--no-inline` | resolve tokens, leave the CSS in `<style>` |
@@ -274,7 +274,7 @@ The common requests, and the answer to each, are in `references/email-workflow.m
 | Building or restyling the system itself | `web-design-studio` |
 | An inherited codebase not yet on tokens | `design-token-migration` |
 | Design file and code have drifted apart | `figma-variables-sync` |
-| Every state × density × theme actually renders | `component-state-matrix` |
+| Every state × density × theme renders | `component-state-matrix` |
 | Copy, offer and persuasion on a landing page | `landing-page-conversion` |
 | **The design system has to reach an inbox** | **here** |
 | Adversarial review before a client sees it | `design-critique-gate` |
