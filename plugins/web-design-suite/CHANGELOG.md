@@ -75,7 +75,10 @@
     tokens, refusals and component globs.
   - **Globs in stylelint.** stylelint's overrides match with micromatch, whose `**` is
     not the config's, so each glob is translated. Run through stylelint's own matcher, the
-    translation matches exactly the files `is_component()` does.
+    translation matches exactly the files `is_component()` does. micromatch compares a
+    path as the tool spelt it, so each glob is written for every spelling of the
+    project's folder: resolved, through a link or a subst drive, and on Windows with
+    either case of drive letter.
   - **One fix.** A `tokens.css` ramp step must be ASCII digits, as a contract's is:
     `--brand-٥٠٠` was a ramp step to Python and a scale to Node.
 - **Hooks, part 1** (XC-C2, LC-C8 and SS-C6 in part, XC-C8's hook part). The plugin

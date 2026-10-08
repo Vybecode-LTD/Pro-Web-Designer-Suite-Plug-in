@@ -164,6 +164,35 @@ export function isComponent(config, file) {
 // stylelint turns every backslash into a slash.
 const literalGlob = (s) => s.replace(/[[\]{}()*?]/g, (c) => `[${c}]`);
 
+// micromatch compares a path as the tool spelt it, so a glob is written for
+// each spelling of the project's folder (CodeRabbit on #81): as resolved; as
+// reached through a link, a junction or a subst drive, by the working
+// directory or the shell's PWD; and on Windows with either case of drive
+// letter, since an editor sends `c:\`.
+function rootSpellings(root, start) {
+  const out = new Set([root]);
+  for (const logical of [start, process.env.PWD]) {
+    if (!logical) continue;
+    for (let a = path.resolve(logical); ; a = path.dirname(a)) {
+      if (realPath(a) === root) { out.add(a); break; }
+      if (path.dirname(a) === a) break;
+    }
+  }
+  return [...out];
+}
+
+const driveCases = (p) => (/^[A-Za-z]:/.test(p) ? [p[0].toUpperCase() + p.slice(1), p[0].toLowerCase() + p.slice(1)] : [p]);
+const asGlob = (p) => literalGlob(p.split(path.sep).join('/'));
+
+// A file's spellings: under each spelling of the folder that holds it.
+function fileSpellings(file, roots) {
+  const real = realPath(file);
+  const rel = path.relative(roots[0], real);
+  const under = rel && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
+  return [...new Set((under ? roots.map((r) => path.join(r, rel)) : [real]).flatMap(driveCases))];
+}
+
+// `root` is the config's folder, resolved, or the list rootSpellings() gives.
 export function overrideGlobs(root, pattern) {
   const merged = [];
   for (const t of globTokens(pattern)) {
@@ -173,7 +202,8 @@ export function overrideGlobs(root, pattern) {
     else if (t === '**/' && last === '**/') continue;
     else merged.push(t);
   }
-  let globs = [`${literalGlob(realPath(root).split(path.sep).join('/'))}/`];
+  const roots = Array.isArray(root) ? root : [realPath(root)];
+  let globs = [...new Set(roots.flatMap(driveCases))].map((r) => `${asGlob(r)}/`);
   merged.forEach((t, n) => {
     const atFolder = n === 0 || merged[n - 1] === '/';
     const alternatives = { '**/': atFolder ? ['**/'] : ['', '*/**/'], '**': ['*', '*/**/*'], '*': ['*'],
@@ -377,10 +407,11 @@ export function lintProject(start = process.cwd()) {
   const config = projectConfig(start);
   if (!config) return { config: null, tokenGlobs: [], componentGlobs: [], isComponent: () => false, rampSteps: [] };
   const ramps = readTokens(config.tokens).ramps;
+  const roots = rootSpellings(config.root, start);
   return {
     config,
-    tokenGlobs: config.tokens.map((file) => literalGlob(realPath(file).split(path.sep).join('/'))),
-    componentGlobs: config.components.flatMap((g) => overrideGlobs(config.root, g)),
+    tokenGlobs: config.tokens.flatMap((file) => fileSpellings(file, roots).map(asGlob)),
+    componentGlobs: config.components.flatMap((g) => overrideGlobs(roots, g)),
     isComponent: (file) => isComponent(config, file),
     rampSteps: Object.entries(ramps).flatMap(([ramp, steps]) => Object.keys(steps).map((s) => `--${ramp}-${s}`)),
   };

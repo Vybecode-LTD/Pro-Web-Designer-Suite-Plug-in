@@ -117,15 +117,20 @@ def temp_project(cls, prefix: str, modules: str) -> pathlib.Path:
     junction on Windows (it needs no privilege), a symlink elsewhere. The link
     is removed first, so cleaning up never reaches the folder it points at."""
     tmp = class_temp_dir(cls, prefix)
-    target, link = pathlib.Path(modules).resolve(), tmp / "node_modules"
+    cls.addClassCleanup(link_folder(pathlib.Path(modules).resolve(), tmp / "node_modules"))
+    return tmp
+
+
+def link_folder(target: pathlib.Path, link: pathlib.Path):
+    """Make `link` a link to the folder `target`: a directory junction on
+    Windows (it needs no privilege), a symlink elsewhere. Returns what removes
+    the link, never the folder it points at."""
     if os.name == "nt":
         import _winapi
         _winapi.CreateJunction(str(target), str(link))
-        cls.addClassCleanup(os.rmdir, link)        # the junction, not its target
-    else:
-        link.symlink_to(target, target_is_directory=True)
-        cls.addClassCleanup(link.unlink)
-    return tmp
+        return lambda: os.rmdir(link)            # the junction, not its target
+    link.symlink_to(target, target_is_directory=True)
+    return link.unlink
 
 
 def json_report(proc: subprocess.CompletedProcess) -> list | None:
@@ -625,7 +630,7 @@ class TheGatesReadTheProject(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.stylelint, cls.eslint, cls.audit = {}, {}, {}
+        cls.stylelint, cls.eslint, cls.audit, cls.projects = {}, {}, {}, {}
         a11y = entry_url(ESLINT_ROOTS, "eslint-plugin-jsx-a11y")
         design = (CONFIGS / "eslint.design.config.mjs").read_text(encoding="utf-8")
         tools = {"stylelint.config.mjs": (CONFIGS / "stylelint.config.mjs").read_text(encoding="utf-8"),
@@ -637,7 +642,7 @@ class TheGatesReadTheProject(unittest.TestCase):
                                        "{ ecmaFeatures: { jsx: true } } } },\n"
                                        "  ...design,\n];\n")}
         for kind, config in (("config", {".design-suite.json": PROJECT_CONFIG}), ("none", {})):
-            tmp = temp_project(cls, f"wds-project-{kind}-", STYLELINT_MODULES)
+            tmp = cls.projects[kind] = temp_project(cls, f"wds-project-{kind}-", STYLELINT_MODULES)
             write_files(tmp, {**tools, **config, **PROJECT_FILES})
             css = [n for n in PROJECT_FILES if n.endswith(".css")]
             jsx = [n for n in PROJECT_FILES if n.endswith(".jsx")]
@@ -664,6 +669,28 @@ class TheGatesReadTheProject(unittest.TestCase):
 
     def test_stylelint_reads_the_projects_config(self):
         self.assertEqual(PROJECT_STYLELINT, self.stylelint["config"])
+
+    def test_stylelint_reads_it_through_a_link(self):
+        """CodeRabbit on #81: stylelint matches an override against each path
+        as it was given, and the globs named only the resolved folder. So a
+        project reached through a junction, a symlink or a subst drive, or
+        linted from an editor that sends a lower-case drive letter, lost its
+        config. Here it is linted through a link, from the link, with the
+        drive letter in lower case on Windows."""
+        real = self.projects["config"]
+        link = class_temp_dir(type(self), "wds-link-") / "project"
+        self.addCleanup(link_folder(real, link))
+        files = [str(link / name) for name in PROJECT_STYLELINT]
+        if os.name == "nt":
+            files = [f[0].lower() + f[1:] for f in files]
+        proc = subprocess.run([NODE, str(pathlib.Path(STYLELINT_MODULES) / "stylelint" / "bin" / "stylelint.mjs"),
+                               *files, "--config", str(link / "stylelint.config.mjs"), "--formatter", "json"],
+                              cwd=link, capture_output=True, timeout=300, env=env(PWD=str(link)))
+        report = json_report(proc)
+        self.assertIsNotNone(report, output(proc))
+        self.assertEqual(PROJECT_STYLELINT,
+                         {os.path.relpath(os.path.realpath(r["source"]), os.path.realpath(real)).replace(os.sep, "/"):
+                          sorted({w["rule"] for w in r["warnings"]}) for r in report})
 
     def test_eslint_reads_the_projects_config(self):
         self.assertEqual(PROJECT_ESLINT, self.eslint["config"])
