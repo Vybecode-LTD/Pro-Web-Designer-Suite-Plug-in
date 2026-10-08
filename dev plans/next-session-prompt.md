@@ -185,7 +185,10 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
   - `figma_audit --tokens` takes a tokens.css or a contract, and with no flag reads the config's token files, merging ramps step by step.
   - `extract_system` reads the config's CSS token files when no flag or path names one, and writes the contract with `--contract`.
 
-**Part 2's scope** (re-run the flag grep first: `add_argument("--` and `case '--` in `skills/*/scripts`):
+**Part 2's scope.** Re-run the flag search first, with the Bash tool, as the prompt's other commands are:
+```bash
+cd /c/DEV/Pro-Web-Designer-Suite-Plug-in/plugins/web-design-suite && grep -nE "add_argument\(\"--|case '--" skills/*/scripts/*.py skills/*/scripts/*.mjs | grep -v browser_common
+```
 - **`cluster_values.py`.** It builds a new system from a legacy codebase, with `STATUS_RAMPS` hard-coded (line 750).
   - **Decide:** with a project's tokens (`--tokens`, or the config), does it snap literals onto the project's ramps and skip writing ramps, or only take the status ramps? Read its reference first; part 1 moved it here for this reason.
 - **`audit_design.py`:**
