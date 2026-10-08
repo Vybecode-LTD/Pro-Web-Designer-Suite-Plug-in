@@ -636,6 +636,11 @@ class TheConfigsFilesReachTheirScripts(TempDirTest):
         proc = run_py("design-system-docs", "build_docs", "system.json", "--out", "site", "--check", cwd=self.tmp)
         self.assertEqual(2, proc.returncode, output(proc))
         self.assertIn("committed.json does not exist", output(proc))
+        self.assertIn("correct baselines.docs", output(proc))                 # CodeRabbit on #79: not "--baseline"
+        self.assertNotIn("--baseline", output(proc))
+        proc = run_py("design-system-docs", "build_docs", "system.json", "--out", "site", "--check",
+                      "--baseline", "mine.json", cwd=self.tmp)
+        self.assertIn("--baseline mine.json does not exist", output(proc))     # a flag beats the config
 
     def test_the_email_scripts_read_email_tokens_not_tokens(self):
         bundled = SKILLS / "email-template-system" / "assets" / "email-tokens.json"

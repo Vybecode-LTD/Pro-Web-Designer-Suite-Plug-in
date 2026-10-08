@@ -1418,6 +1418,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.check:
         # A flag beats the project's .design-suite.json, which beats the default (P24).
+        # The message names where a missing baseline came from (CodeRabbit on #79).
+        from_flag = bool(args.baseline)
         try:
             args.baseline = args.baseline or config_path(project_config(), "baselines", "docs")
         except ConfigError as exc:
@@ -1429,9 +1431,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             # A named baseline that is not there is a wrong path, not a first
             # run: skipping the diff here made the gate pass while comparing
             # nothing.
-            print(f"error: --baseline {args.baseline} does not exist. Commit the baseline "
-                  "that extract_system.py wrote (docs/system.json in the documented "
-                  "workflow), or drop --baseline to check prose only.", file=sys.stderr)
+            if from_flag:
+                print(f"error: --baseline {args.baseline} does not exist. Commit the baseline "
+                      "that extract_system.py wrote (docs/system.json in the documented "
+                      "workflow), or drop --baseline to check prose only.", file=sys.stderr)
+            else:
+                print(f"error: the baseline {args.baseline} does not exist, and the project's "
+                      ".design-suite.json names it (baselines.docs). Commit the baseline that "
+                      "extract_system.py wrote, or correct baselines.docs.", file=sys.stderr)
             return 2
         problems: List[str] = []
         if baseline and baseline.is_file():

@@ -26,7 +26,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | XC-C5 | S · high | fixed in 3.2.0 | promote this review's harnesses to permanent tests: every documented |
 | XC-C6 | M · medium | fixed in 3.3.0: `tooling/release/build.py` (`test_release_build`), `.github/workflows/ci.yml` and `release.yml` (PR #17). The evals join CI with P29 | Build and release: a build tool for the zip and the 13 `.skill` files, `claude plugin tag`, and a CI matrix of Windows/Linux/macOS × Python 3.9–3.14 with Node. |
 | XC-C7 | M · medium | fixed in 3.2.0 | token efficiency: SKILL.md files are 17–28 KB (≈4.4–6.9k tokens per |
-| XC-C8 | M · medium | fixed in 3.5.0: `test_project_config` (`TheNodeReaderAgrees`, `TheConfigsFilesReachTheirScripts`, `AuditReadsTheProject`), PRs #76, #78 and #79 | One project config file, `.design-suite.json`, read by every script, the hook and the commands. |
+| XC-C8 | M · medium | W9 (3.5.0); every script reads it, in PRs #76, #78 and #79 (`test_project_config`: `TheNodeReaderAgrees`, `TheConfigsFilesReachTheirScripts`, `AuditReadsTheProject`); the hook reads it in P25 and the commands in P26, where it closes | One project config file, `.design-suite.json`, read by every script, the hook and the commands. |
 | XC-C9 | S · low | fixed in 3.3.0: `WDS` in bash, PowerShell and cmd forms, one-line commands (`test_docs.PasteableCommands`, PR #35) | Cross-platform docs: PowerShell/cmd equivalents for the few shell-only recipes, or one `python -m scripts.gate` entry point. |
 | XC-C10 | S · high | fixed in 3.1.0 (the review's C6) | fixes XC-A8: write every documented command as |
 | SS-A1 | high | fixed in 3.1.0 | Law 7 (density) does nothing on a subtree, which is how every doc uses it. |
