@@ -692,6 +692,24 @@ class TheGatesReadTheProject(unittest.TestCase):
                          {os.path.relpath(os.path.realpath(r["source"]), os.path.realpath(real)).replace(os.sep, "/"):
                           sorted({w["rule"] for w in r["warnings"]}) for r in report})
 
+    def test_a_token_file_named_through_a_link_is_a_token_file(self):
+        """CodeRabbit on #81: the token globs named only a token file's
+        resolved path, and stylelint lints it as the config spells it, so a
+        palette in a linked folder lost the token-file override."""
+        tmp = temp_project(type(self), "wds-linked-tokens-", STYLELINT_MODULES)
+        write_files(tmp, {"stylelint.config.mjs": (CONFIGS / "stylelint.config.mjs").read_text(encoding="utf-8"),
+                          "project_config.mjs": (CONFIGS / "project_config.mjs").read_text(encoding="utf-8"),
+                          ".design-suite.json": json.dumps({"schema": 1, "tokens": "src/brand/palette.css"}),
+                          "brand-real/palette.css": PROJECT_FILES["src/brand/palette.css"]})
+        (tmp / "src").mkdir()
+        self.addCleanup(link_folder(tmp / "brand-real", tmp / "src" / "brand"))
+        proc = subprocess.run([NODE, str(pathlib.Path(STYLELINT_MODULES) / "stylelint" / "bin" / "stylelint.mjs"),
+                               "src/brand/palette.css", "--config", "stylelint.config.mjs", "--formatter", "json"],
+                              cwd=tmp, capture_output=True, timeout=300, env=env())
+        report = json_report(proc)
+        self.assertIsNotNone(report, output(proc))
+        self.assertEqual([[]], [[w["rule"] for w in r["warnings"]] for r in report])
+
     def test_eslint_reads_the_projects_config(self):
         self.assertEqual(PROJECT_ESLINT, self.eslint["config"])
 
