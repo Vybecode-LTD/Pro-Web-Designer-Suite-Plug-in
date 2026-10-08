@@ -163,10 +163,12 @@ class TheReader(TempDirTest):
 
     def test_a_contracts_ramp_steps_are_numbers(self):
         """CodeRabbit on #78: a named step crashed every reader with a traceback."""
-        bad = {"schema": "web-design-suite/contract/1", "ramps": {"brand": {"primary": "#123456"}}}
-        with self.assertRaises(self.pc.ConfigError) as caught:
-            self.pc.read_tokens([self.write("bad.json", json.dumps(bad))])
-        self.assertIn('"ramps.brand.primary" must be a numeric step', str(caught.exception))
+        for step in ("primary", "5²"):                                  # `²` is a digit to isdigit()
+            with self.subTest(step=step):
+                bad = {"schema": "web-design-suite/contract/1", "ramps": {"brand": {step: "#123456"}}}
+                with self.assertRaises(self.pc.ConfigError) as caught:
+                    self.pc.read_tokens([self.write("bad.json", json.dumps(bad))])
+                self.assertIn(f'"ramps.brand.{step}" must be a numeric step', str(caught.exception))
 
     def test_a_missing_token_file_is_named(self):
         with self.assertRaises(self.pc.ConfigError) as caught:
