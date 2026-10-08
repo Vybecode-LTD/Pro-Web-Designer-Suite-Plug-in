@@ -75,6 +75,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin. project_config.py is a copy of the plugin's shared/ master (P24).
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.diff_system
+    from .project_config import CONTRACT_SCHEMA, ConfigError, is_contract, project_config, read_tokens
+except ImportError:                               # python scripts/diff_system.py, or loaded by path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from project_config import (CONTRACT_SCHEMA, ConfigError, is_contract,  # type: ignore[no-redef]
+                                project_config, read_tokens)
+
 SCHEMA = "design-system-versioning/diff@1"
 DOCS_SCHEMA = "design-system-docs/system/1"
 LEDGER_SCHEMA = "design-system-versioning/deprecations@1"
@@ -869,7 +879,56 @@ def _snapshot_from_css_vendored(paths: List[Path], label: str) -> Snapshot:
                 "resolved": {}, "file": first["file"], "line": first["line"],
             }
         snap.tokens[name]["overrides"].extend(entries)
+    return _resolve_snapshot(snap, base, themes)
 
+
+def _snapshot_from_contract(paths: List[Path], label: str) -> Snapshot:
+    """A project's contract.json (design-system-docs' `extract_system.py
+    --contract`, P24): its default values, with the tier it records for each.
+    It holds no themes, densities, components or layers."""
+    try:
+        tokens = read_tokens(paths)
+    except ConfigError as exc:
+        raise bail(f"diff_system: {exc}")
+    snap = Snapshot(label=label, path=str(paths[0]), source="contract.json",
+                    impl="project contract", layers_recorded=False)
+    base = tokens.values()
+    tiers = tokens.tiers()
+    for name, value in base.items():
+        snap.tokens[name] = {
+            "tier": tiers[name], "group": group_of(name), "kind": "other",
+            "raw": value, "note": "", "references": sorted(set(VAR_REF.findall(value))),
+            "referenced_by": [], "overrides": [], "resolved": {},
+            "file": "", "line": 0,
+        }
+    return _resolve_snapshot(snap, base, ["light"])
+
+
+def as_contract(snap: Snapshot) -> Snapshot:
+    """What a contract.json holds of `snap`: each default value with its
+    tier, resolved as a contract's are, and nothing else. A snapshot diffed
+    against a contract is cut down to this first, or every theme, condition,
+    note and file a contract leaves out reads as a change. A token declared
+    only in a theme or under a condition has no default and is left out."""
+    out = Snapshot(label=snap.label, path=snap.path, source=snap.source,
+                   impl=f"{snap.impl}, as a contract", layers_recorded=False)
+    base: Dict[str, str] = {}
+    for name, tok in snap.tokens.items():
+        first = (tok.get("overrides") or [{}])[0]
+        if first and (first.get("file"), first.get("line")) == (tok.get("file"), tok.get("line")):
+            continue                                    # its first declaration is an override
+        base[name] = str(tok.get("raw", ""))
+        out.tokens[name] = {
+            "tier": tok.get("tier", 0), "group": tok.get("group", group_of(name)), "kind": "other",
+            "raw": base[name], "note": "", "references": list(tok.get("references") or []),
+            "referenced_by": [], "overrides": [], "resolved": {}, "file": "", "line": 0,
+        }
+    return _resolve_snapshot(out, base, ["light"])
+
+
+def _resolve_snapshot(snap: Snapshot, base: Dict[str, str], themes: List[str]) -> Snapshot:
+    """Resolve every token in each theme and density, and record who reads
+    whom: the half of a snapshot that does not depend on its source."""
     envs: Dict[str, Dict[str, str]] = {"light": dict(base)}
     for theme in themes[1:]:
         env = dict(base)
@@ -935,7 +994,9 @@ def load_snapshot(raw: str, label: str, *, no_upstream: bool = False) -> Snapsho
             data = json.loads(p.read_bytes())
         except (OSError, json.JSONDecodeError) as exc:
             raise bail(f"diff_system: {p} is not readable JSON ({exc}).")
-        schema = str(data.get("schema", ""))
+        schema = str(data.get("schema", "")) if isinstance(data, dict) else ""
+        if schema == CONTRACT_SCHEMA:
+            return _snapshot_from_contract([p], label)
         if schema.split("/")[0] != "design-system-docs":
             raise bail(
                 f"diff_system: {p} is not a design-system-docs snapshot "
@@ -944,6 +1005,24 @@ def load_snapshot(raw: str, label: str, *, no_upstream: bool = False) -> Snapsho
         snap = _normalize_docs_json(data, label, str(p))
         return snap
     return _load_css([p], label, no_upstream)
+
+
+def project_snapshot(label: str, *, no_upstream: bool = False) -> Snapshot:
+    """The token files the project's `.design-suite.json` lists, found by
+    walking up from the working directory (P24): its tokens.css files, read
+    as one snapshot, or its contract.json when it lists no CSS."""
+    try:
+        config = project_config()
+    except ConfigError as exc:
+        raise bail(f"diff_system: {exc}")
+    if not (config and config.tokens):
+        raise bail("diff_system: name the candidate snapshot, or list the project's token files "
+                   "in its .design-suite.json (\"tokens\").")
+    missing = [str(p) for p in config.tokens if not p.is_file()]
+    if missing:
+        raise bail(f"diff_system: {config.path} lists {', '.join(missing)}, which does not exist.")
+    css = [p for p in config.tokens if not is_contract(p)]
+    return _load_css(css, label, no_upstream) if css else _snapshot_from_contract(list(config.tokens), label)
 
 
 def _load_css(paths: List[Path], label: str, no_upstream: bool) -> Snapshot:
@@ -2232,9 +2311,10 @@ def build_parser() -> argparse.ArgumentParser:
       --from-version 1.4.2 -o docs/UPGRADE.md
   python -m scripts.diff_system a.json b.json --deprecations deprecations.json
 """)
-    ap.add_argument("old", help="the published snapshot: system.json, tokens.css "
-                                "or a directory containing one")
-    ap.add_argument("new", help="the candidate snapshot, same forms")
+    ap.add_argument("old", help="the published snapshot: system.json, tokens.css, "
+                                "contract.json or a directory containing one")
+    ap.add_argument("new", nargs="?", help="the candidate snapshot, same forms (default: the "
+                                           "token files the project's .design-suite.json lists)")
     ap.add_argument("--format", choices=("report", "json", "changelog",
                                          "migration-guide"),
                     default="report", help="output shape (default: report)")
@@ -2304,14 +2384,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                   file=sys.stderr)
 
     old = load_snapshot(args.old, "old", no_upstream=args.no_upstream)
-    new = load_snapshot(args.new, "new", no_upstream=args.no_upstream)
+    new = (load_snapshot(args.new, "new", no_upstream=args.no_upstream) if args.new
+           else project_snapshot("new", no_upstream=args.no_upstream))
+    contract = "contract.json" in (old.source, new.source)
+    if contract:
+        old, new = as_contract(old), as_contract(new)
 
     changes: List[Change] = []
     inherited: List[str] = []
     rename, changed_values = diff_tokens(old, new, changes, inherited)
     diff_components(old, new, changes)
     notes: List[str] = []
-    layer_note = diff_layers(old, new, changes)
+    if contract:
+        notes.append("a contract.json holds default values and tiers only, so only those were "
+                     "compared: no themes, densities, conditions, notes, layers or components")
+    layer_note = None if contract else diff_layers(old, new, changes)
     if layer_note:
         notes.append(layer_note)
     if old.has_components != new.has_components:

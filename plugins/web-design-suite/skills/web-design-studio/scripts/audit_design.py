@@ -54,6 +54,18 @@ and the debt paid down deliberately, instead of the gate being turned off.
 Its keys are paths relative to the baseline file, so `src/`, `./src` and the
 absolute path all match, from any working directory.
 
+The project's own tokens (P24)
+------------------------------
+    python -m scripts.audit_design src/ --tokens src/design/system.css
+
+A project's `.design-suite.json` (found by walking up from the working
+directory to the repository root) names its token files, component globs and
+baseline once; `--tokens` and `--baseline` beat it. A token file it names is a
+token file wherever it sits, its `components` globs add to the component
+files, and the colour ramps its token files declare (`--brand-500`, from a
+tokens.css or a contract.json) are Tier-1 colours with a role, like the
+starter's (Law 6).
+
 Escape hatches (use sparingly, they are visible in review)
 ---------------------------------------------------------
     /* design-audit-ignore-next-line: L2 -- CMS flow container, see ADR-014 */
@@ -73,6 +85,20 @@ import sys
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Iterable, Iterator
+
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin. project_config.py is a copy of the plugin's shared/ master (P24). A
+# project that vendored audit_design.py alone, before 3.5.0, has no copy: the
+# audit then runs as it did, and only --tokens needs one.
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.audit_design
+    from .project_config import ConfigError, ProjectConfig, project_config, read_tokens
+except ImportError:                               # python scripts/audit_design.py, or loaded by path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from project_config import ConfigError, ProjectConfig, project_config, read_tokens  # type: ignore[no-redef]
+    except ImportError:
+        project_config = None                     # type: ignore[assignment]
 
 # ---------------------------------------------------------------------------
 # Configuration — the vocabulary this skill enforces.
@@ -332,12 +358,36 @@ SHADOW_PROPS = {"box-shadow", "text-shadow"}
 TIER1_MOTION = {"dur-", "ease-"}
 
 
+@dataclass
+class Project:
+    """What a project's `.design-suite.json` and token files add (P24): its
+    token files, wherever they sit, its component globs, and the ramp steps
+    its tokens declare, which are Tier-1 colours with a role."""
+    config: ProjectConfig | None = None
+    token_files: set[Path] = field(default_factory=set)
+    ramp_steps: set[str] = field(default_factory=set)
+
+
+PROJECT = Project()
+PROJECT_RAMP_ADVICE = "a color role (--bg-*, --fg-*, --border-*)"
+
+
+def use_project(config: ProjectConfig | None, sources: list[Path]) -> None:
+    """Audit against a project: `config` (or None) and its token files."""
+    tokens = read_tokens(sources)
+    PROJECT.config = config
+    PROJECT.token_files = {Path(p).resolve() for p in sources}
+    PROJECT.ramp_steps = {f"--{ramp}-{step}" for ramp, steps in tokens.ramps.items() for step in steps}
+
+
 def tier1_advice(ref: str) -> str | None:
     """The role to use instead of `ref` when it is a Tier-1 primitive that has
     one (Law 6), else None. stylelint's design/tier1-primitive and the ESLint
     config's TIER1_SHORTHAND and inline-style check read the same lists."""
     if ref in TIER2_EXCEPTIONS or ref in TIER1_NULLS:
         return None         # a role, or zero, which is zero
+    if ref in PROJECT.ramp_steps:
+        return PROJECT_RAMP_ADVICE
     bare = ref[2:]
     return next((advice for pfx, advice in TIER1_WITH_ROLE.items() if bare.startswith(pfx)), None)
 
@@ -690,7 +740,10 @@ def scan_css(text: str) -> Iterator[CssDecl | tuple]:
 # ---------------------------------------------------------------------------
 
 def is_token_file(path: Path) -> bool:
-    return bool(TOKEN_FILE_PAT.search(str(path).replace(os.sep, "/")))
+    """The spec's token files, and any the project's config or --tokens names."""
+    if TOKEN_FILE_PAT.search(str(path).replace(os.sep, "/")):
+        return True
+    return bool(PROJECT.token_files) and Path(path).resolve() in PROJECT.token_files
 
 
 # theme.css and *-theme.css: a token file whose custom properties bind the
@@ -703,8 +756,11 @@ def is_binding_file(path: Path) -> bool:
 
 
 def is_component_file(path: Path) -> bool:
-    """A component file is where Laws 2 and 6 bite hardest."""
-    return bool(COMPONENT_FILE_PAT.search(str(path).replace(os.sep, "/").lower()))
+    """A component file is where Laws 2 and 6 bite hardest: the spec's, and
+    any the project's `components` globs match."""
+    if COMPONENT_FILE_PAT.search(str(path).replace(os.sep, "/").lower()):
+        return True
+    return PROJECT.config is not None and PROJECT.config.is_component(path)
 
 
 LAYER_BLOCK = re.compile(r"@layer(?![\w-])\s*([^{]*)", re.I)
@@ -2381,8 +2437,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--quiet", action="store_true", help="suppress the fix guidance")
     ap.add_argument("--no-color", action="store_true")
     ap.add_argument("--baseline", metavar="FILE", default=None,
-                    help="ignore findings recorded in this file "
-                         "(default: .design-baseline.json, if it exists)")
+                    help="ignore findings recorded in this file (default: the project's "
+                         ".design-suite.json baselines.audit, else .design-baseline.json, if it exists)")
+    ap.add_argument("--tokens", action="append", default=[], metavar="FILE",
+                    help="the project's token file, a tokens.css or a contract.json (repeatable; "
+                         "default: the token files the project's .design-suite.json lists)")
     ap.add_argument("--write-baseline", metavar="FILE",
                     help="record current findings so only NEW ones fail")
     ap.add_argument("--law", action="append", metavar="Lx",
@@ -2414,6 +2473,26 @@ def main(argv: list[str] | None = None) -> int:
                   file=sys.stderr)
         paths += [name for name in listed if name not in gone]
 
+    # The project's config, found from the working directory; a flag beats it (P24).
+    config = None
+    if project_config is None:                    # vendored alone, before 3.5.0
+        if args.tokens:
+            print("audit_design: --tokens needs project_config.py beside audit_design.py "
+                  "(copy it from web-design-studio's scripts).", file=sys.stderr)
+            return 2
+        if Path(".design-suite.json").is_file():
+            print("audit_design: .design-suite.json is not read: copy project_config.py from "
+                  "web-design-studio's scripts beside audit_design.py.", file=sys.stderr)
+    else:
+        try:
+            config = project_config()
+            use_project(config, [Path(t) for t in args.tokens] or (list(config.tokens) if config else []))
+        except ConfigError as exc:
+            print(f"audit_design: {exc}", file=sys.stderr)
+            return 2
+    baseline_file = args.baseline or (str(config.baselines["audit"])
+                                      if config and "audit" in config.baselines else None)
+
     findings, audited, skipped = audit_run(paths)
 
     for why in (SKIP_NOT_AUDITABLE, SKIP_EMAIL, SKIP_INDENTED_SASS):
@@ -2443,7 +2522,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Keys are relative to the baseline file's folder, so the path spelling
     # and the working directory stop mattering.
-    bp = Path(args.write_baseline or args.baseline or ".design-baseline.json")
+    bp = Path(args.write_baseline or baseline_file or ".design-baseline.json")
     root = bp.resolve().parent
 
     if args.write_baseline:
@@ -2462,8 +2541,8 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, json.JSONDecodeError):
             print(f"audit_design: could not read baseline {bp}; auditing everything.",
                   file=sys.stderr)
-    elif args.baseline:
-        print(f"audit_design: baseline {args.baseline} not found; auditing everything.",
+    elif baseline_file:
+        print(f"audit_design: baseline {baseline_file} not found; auditing everything.",
               file=sys.stderr)
     if baseline:
         findings = [f for f in findings if f.key(root) not in baseline]

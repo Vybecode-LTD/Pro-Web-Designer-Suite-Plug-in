@@ -43,6 +43,10 @@ USAGE
   # Pin the accent instead of letting the codebase's most-used chroma win
   python -m scripts.cluster_values literals.json -o ./proposal --accent '#e8440a'
 
+  # Land on a project's own ramps: its tokens.css or contract.json (P24).
+  # Without the flag, the token files its .design-suite.json lists.
+  python -m scripts.cluster_values literals.json -o ./proposal --tokens brand/contract.json
+
   # Just the report, nothing written
   python -m scripts.cluster_values literals.json --dry-run
 
@@ -64,6 +68,15 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin. project_config.py is a copy of the plugin's shared/ master (P24).
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.cluster_values
+    from .project_config import ConfigError, ProjectTokens, read_tokens, token_sources
+except ImportError:                               # python scripts/cluster_values.py, or loaded by path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from project_config import ConfigError, ProjectTokens, read_tokens, token_sources  # type: ignore[no-redef]
 
 # ===========================================================================
 # COLOR MATH
@@ -759,6 +772,36 @@ STATUS_RAMPS = {
 }
 
 STATUS_HUE = {"success": 152.0, "warning": 85.0, "danger": 25.0, "info": 250.0}
+
+# The ramps the contract names; the role tables below are keyed by them.
+CONTRACT_RAMPS = ("neutral", "accent", *STATUS_RAMPS)
+OKLCH_TEXT = re.compile(r"oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)(?:deg)?\s*\)", re.I)
+
+
+def project_ramps(tokens: ProjectTokens, prop: Proposal) -> Dict[str, Dict[int, Tuple[float, float, float]]]:
+    """The project's own steps of the contract's ramps (P24: LC-C1), as OKLCH.
+    A ramp the contract does not name has no roles to land on, so it is
+    named in the notes and left out."""
+    out: Dict[str, Dict[int, Tuple[float, float, float]]] = {}
+    for name, steps in tokens.ramps.items():
+        if name not in CONTRACT_RAMPS:
+            prop.notes.append(f"The project's tokens declare a `{name}` ramp, which the contract "
+                              f"has no roles for; the migration does not land on it.")
+            continue
+        for step, value in steps.items():
+            m = OKLCH_TEXT.fullmatch(value.strip())
+            if m:
+                lch = (float(m.group(1)) / (100.0 if m.group(2) else 1.0), float(m.group(3)), float(m.group(4)))
+            else:
+                try:
+                    rgb, alpha = parse_any_color(value)
+                except ColorError:
+                    continue                 # a colour space this script does not read
+                if alpha < 0.999:
+                    continue
+                lch = oklab_to_oklch(*rgb_to_oklab(rgb))
+            out.setdefault(name, {})[int(step)] = lch
+    return out
 
 
 def nearest_ramp_step(lab: Tuple[float, float, float],
@@ -1605,7 +1648,9 @@ def held_colour(holder: str) -> Tuple[str, str]:
 
 
 def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
-                        accent_override: Optional[str]) -> Tuple[Ramp, Ramp, Dict[str, Ramp]]:
+                        accent_override: Optional[str],
+                        project: Optional[Dict[str, Dict[int, Tuple[float, float, float]]]] = None,
+                        ) -> Tuple[Ramp, Ramp, Dict[str, Ramp]]:
     freq: Dict[str, int] = defaultdict(int)
     for l in lits:
         freq[l["normalized"]] += 1
@@ -1627,6 +1672,13 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
     if accent_override:
         seed_rgb, _a = parse_any_color(accent_override)
         prop.accent_seed = accent_override
+    elif project and project.get("accent"):
+        # The project's steps replace the built ones below; seeding from its
+        # own step keeps any it does not declare on its hue.
+        anchor = min(project["accent"], key=lambda step: abs(step - 500))
+        seed_rgb = clamp_rgb(oklch_to_rgb(*project["accent"][anchor]))
+        prop.accent_seed = rgb_to_hex(seed_rgb)
+        prop.notes.append(f"Accent seeded from the project's --accent-{anchor} ({prop.accent_seed}).")
     elif chromatic:
         # Most-used chromatic color that is not obviously a status color.
         def status_distance(c: ColorCluster) -> float:
@@ -1672,6 +1724,18 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
     neutral = build_neutral_ramp(prop.neutral_hue)
     status = {name: Ramp(name, dict(steps)) for name, steps in STATUS_RAMPS.items()}
     ramps: Dict[str, Ramp] = {"neutral": neutral, "accent": accent, **status}
+    # The project's own steps replace the built ones, step by step: the
+    # literals land on its ramps, and tokens.css writes its values. --accent
+    # beats the project's accent, as a flag beats the config.
+    taken = []
+    for name, steps in (project or {}).items():
+        if name == "accent" and accent_override:
+            continue
+        ramps[name].steps.update(steps)
+        taken.append(f"{name} ({len(steps)} of {len(ramps[name].steps)} steps)")
+    if taken:
+        prop.notes.append(f"Ramps from the project's tokens: {', '.join(taken)}. A step they do not "
+                          f"declare is built as it would be without them.")
 
     canvas_rgb = neutral.rgb(50)
 
@@ -2472,6 +2536,11 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--accent", metavar="COLOR",
                     help="pin the accent seed instead of deriving it from the "
                          "codebase's most-used chromatic color")
+    ap.add_argument("--tokens", action="append", default=[], metavar="FILE",
+                    help="the project's token file, a tokens.css or a contract.json "
+                         "(repeatable): its steps of the contract's ramps replace the "
+                         "derived ones (default: the token files the project's "
+                         ".design-suite.json lists)")
     ap.add_argument("--dry-run", action="store_true",
                     help="print the reconciliation report and write nothing")
     return ap
@@ -2502,10 +2571,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     idx = literal_index(payload)
     prop = Proposal()
+    # A flag beats the config: the project's token files only without --tokens (P24).
+    try:
+        sources, _config = token_sources(args.tokens)
+        project = project_ramps(read_tokens(sources), prop) if sources else None
+    except ConfigError as exc:
+        print(f"cluster_values: {exc}", file=sys.stderr)
+        return 2
     route_inline_styles(idx, prop)
 
     neutral, accent, status = cluster_color_phase(
-        idx.get("color", []), args.color_tolerance, prop, args.accent)
+        idx.get("color", []), args.color_tolerance, prop, args.accent, project)
 
     cluster_spacing(idx.get("length", []), args.spacing_tolerance, prop)
     cluster_type(idx.get("font-size", []), args.type_tolerance, prop)

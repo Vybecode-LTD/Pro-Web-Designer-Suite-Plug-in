@@ -232,6 +232,7 @@ python -m scripts.cluster_values literals.json --dry-run     # report only
 | `--color-tolerance DE` | 0.025 | OKLab ΔE below which two colors are one decision (≈7 sRGB code values) |
 | `--duration-tolerance MS` | 60 | How far a duration may move |
 | `--accent COLOR` | derived | Pin the brand seed instead of deriving it from the most-used chromatic color |
+| `--tokens FILE` | the config's | The project's `tokens.css` or `contract.json`: its steps of the contract's six ramps replace the derived ones, so the literals land on its ramps. `--accent` beats its accent (web-design-studio's `references/project-contract.md`) |
 
 Tighten `--spacing-tolerance` to 2 on a codebase with real design intent behind its numbers; loosen it to 4 on one where everything was eyeballed. The tolerance you pick is the migration's single biggest risk dial, and the reconciliation report tells you what it bought you.
 

@@ -18,6 +18,32 @@
     well as a `tokens.css`. With no flag, it and `extract_system.py` read the token files
     the config lists.
   - Part 2 brings the config to the other scripts, the budgets and baselines among them.
+- **The project contract, part 2: the project's tokens everywhere** (LC-C1, LC-B3). Every
+  script that compared against the starter's token system now reads the project's: a
+  `tokens.css` or a `contract.json`, from `--tokens` or the config's token files.
+  - **One view of the tokens.** `read_tokens()` gives the scripts a project's token files
+    in the contract's sections. A `tokens.css` is read by its defaults, as extract_system
+    reads them; web-design-studio's new `references/project-contract.md` says how its
+    tiers can differ from a contract's, and what each script takes.
+  - **`audit_design.py`.** A token file the project names is a token file wherever it
+    sits, so `src/design/system.css` may hold literals. The ramps it declares
+    (`--brand-500`) are Tier-1 colours, so a component reading one is a Law 6 leak. The
+    config's `components` globs add to the component files, and `baselines.audit` is the
+    baseline without `--baseline`.
+  - **`figma_audit.py`.** A scale the project declares (spacing, radius, type, stroke, z,
+    duration, leading, tracking, weight, breakpoints) replaces the studio's, as its ramps
+    already did. The starter's own tokens change nothing.
+  - **`figma_to_tokens.py --tokens`.** The project's names join the vocabulary:
+    `color/brand/500` comes back as `--brand-500`, recognised and in its tier.
+  - **`diff_system.py`.** A `contract.json` is a snapshot, and without a `new` snapshot the
+    candidate is the project's token files. Against a contract, the other side is cut down
+    to default values and tiers, so a contract diffed against its own `tokens.css` has no
+    changes.
+  - **`cluster_values.py --tokens`.** A migration lands on the project's ramps: its steps
+    of the contract's six ramps replace the derived ones, and a step it lacks is built
+    from its own accent. `--accent` still beats it.
+  - Part 3 brings the budgets, the other baselines, `emailTokens` and `stack` to their
+    scripts, with a Node reader for the browser scripts.
 
 ## 3.4.0 — 2026-10-07
 
