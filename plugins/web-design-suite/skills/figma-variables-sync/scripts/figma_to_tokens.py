@@ -55,9 +55,11 @@ sys.dont_write_bytecode = True
 # as_alias, FVar, FCollection, FDoc, slugify and load_document.
 try:                                              # python -m scripts.figma_to_tokens
     from .figma_common import *                   # type: ignore[import-not-found]  # noqa: F403
+    from .project_config import ConfigError, ProjectTokens, read_tokens, token_sources
 except ImportError:                               # python scripts/figma_to_tokens.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from figma_common import *                    # type: ignore[no-redef]  # noqa: F403
+    from project_config import ConfigError, ProjectTokens, read_tokens, token_sources  # type: ignore[no-redef]
 
 # ===========================================================================
 # The contract's token names. This list is what makes the round trip lossless:
@@ -193,6 +195,29 @@ def canonical_oklch(hex_value: str) -> Optional[Tuple[float, float, float]]:
             for _oklch in _rows.values():
                 _CANONICAL[rgb_to_hex(*oklch_to_rgb(*_oklch))] = _oklch
     return _CANONICAL.get(hex_value)
+
+
+OKLCH_LITERAL = re.compile(r"oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)(?:deg)?\s*\)", re.I)
+
+
+def use_project_names(tokens: ProjectTokens) -> List[str]:
+    """The project's own token names join the vocabulary (P24: LC-B3), so a
+    variable named for one comes back as that token, recognised, in its tier;
+    the starter's names keep theirs. A ramp step its token file writes in
+    OKLCH comes back as that exact value. Returns the names added."""
+    added = []
+    for name, tier in tokens.tiers().items():
+        if name[2:] not in KNOWN:
+            KNOWN[name[2:]] = "primitive" if tier == 1 else "semantic"
+            added.append(name[2:])
+    for ramp, steps in tokens.ramps.items():
+        for step, value in steps.items():
+            m = OKLCH_LITERAL.fullmatch(value.strip())
+            if m:
+                L = float(m.group(1)) * (1.0 if m.group(2) else 100.0)
+                RAMP_OKLCH.setdefault(ramp, {})[step] = (L, float(m.group(3)), float(m.group(4)))
+    _CANONICAL.clear()
+    return added
 
 
 def format_oklch(r: float, g: float, b: float, a: float = 1.0) -> str:
@@ -961,6 +986,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--flat", action="store_true",
                    help="--reverse: one Figma collection instead of one per tier")
     p.add_argument("--quiet", action="store_true", help="do not print warnings")
+    p.add_argument("--tokens", action="append", default=[], metavar="FILE",
+                   help="the project's token file, a tokens.css or a contract.json (repeatable), "
+                        "whose names join the vocabulary; default: the token files the "
+                        "project's .design-suite.json lists")
     return p
 
 
@@ -994,6 +1023,17 @@ def report_problems(problems: Sequence[Problem], quiet: bool) -> None:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     path = Path(args.path)
+    # A flag beats the config: the project's token files only without --tokens (P24).
+    try:
+        sources, config_path = token_sources(args.tokens)
+        if sources:
+            added = use_project_names(read_tokens(sources))
+            origin = ", ".join(str(s) for s in sources) + (f" (from {config_path})" if config_path else "")
+            if not args.quiet:
+                print(f"token names from {origin}: {len(added)} beyond the starter's", file=sys.stderr)
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     try:
         if args.reverse:
             data = json.loads(path.read_bytes())

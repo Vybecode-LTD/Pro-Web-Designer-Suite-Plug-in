@@ -76,7 +76,8 @@ project/
 │
 ├── public/                    # Served verbatim at the origin root. Fonts, favicons, og.
 └── scripts/
-    └── audit_design.py        # Law 9's enforcement. Wired to npm + pre-commit.
+    ├── audit_design.py        # Law 9's enforcement. Wired to npm + pre-commit.
+    └── project_config.py      # Beside it: reads the project's .design-suite.json.
 ```
 
 ### 1.2 `styles/` — the cascade in file order

@@ -1,4 +1,4 @@
-"""The project contract (P24 part 1: XC-C8, LC-C1, LC-B3).
+"""The project contract (P24: XC-C8, LC-C1, LC-B3).
 
 A project could tell the scripts where its tokens were only flag by flag, and
 only figma_audit and extract_system took a flag. `.design-suite.json` names a
@@ -7,15 +7,23 @@ shared/project_config.py reads it for every script, with a copy in each skill
 that uses it. extract_system writes a `contract.json`, the token system's
 default values by tier, which figma_audit's `--tokens` reads as it reads a
 tokens.css.
+
+Part 2: every script that compares against the starter's token system reads
+the project's instead (read_tokens): audit_design (its token files, component
+globs, ramps and baseline), figma_audit's scales, figma_to_tokens' names,
+diff_system's snapshots and cluster_values' ramps. Each takes `--tokens`, or
+the config's token files without it.
 """
 from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 import unittest
 
 from test_figma_sync import PROJECT_ACCENT, STEPS
-from wds_support import PLUGIN, SKILLS, TempDirTest, load_script, output, run_py
+from wds_support import PLUGIN, SKILLS, TempDirTest, env, load_script, output, run_py
 
 MASTER = PLUGIN / "shared" / "project_config.py"
 TOKENS = ("@layer tokens {\n  :root {\n" + "".join(f"    --accent-{s}: {h};\n" for s, h in zip(STEPS, PROJECT_ACCENT))
@@ -29,7 +37,8 @@ class TheCopiesAreTheMaster(unittest.TestCase):
     def test_every_reader_has_the_master_copy_beside_it(self):
         readers = sorted({p.parent for p in SKILLS.glob("*/scripts/*.py")
                           if re.search(r"^\s*from \.?project_config import", p.read_text(encoding="utf-8"), re.M)})
-        self.assertEqual(["design-system-docs", "figma-variables-sync"], [r.parent.name for r in readers])
+        self.assertEqual(["design-system-docs", "design-system-versioning", "design-token-migration",
+                          "figma-variables-sync", "web-design-studio"], [r.parent.name for r in readers])
         copies = sorted(p.parent for p in SKILLS.glob("*/scripts/project_config.py"))
         self.assertEqual(readers, copies)
         master = MASTER.read_bytes()
@@ -94,6 +103,75 @@ class TheReader(TempDirTest):
         self.assertIn('"ramps.accent" must be an object of strings', str(caught.exception))
         with self.assertRaises(self.pc.ConfigError):
             self.pc.read_contract(self.write("system.json", json.dumps({"schema": "design-system-docs/system/1"})))
+
+    def test_component_globs_are_read_from_the_configs_folder(self):
+        config = self.pc.load_config(self.write("site/.design-suite.json",
+                                                '{"schema": 1, "components": ["src/widgets/**/*.css", "*.tsx"]}'))
+        site = self.tmp / "site"
+        for rel, expected in (("src/widgets/card.css", True), ("src/widgets/a/b/card.css", True),
+                              ("src/other/card.css", False), ("src/widgets/card.scss", False),
+                              ("Card.tsx", True), ("src/Card.tsx", False)):
+            with self.subTest(path=rel):
+                self.assertEqual(expected, config.is_component(site / rel))
+        self.assertFalse(config.is_component(self.tmp / "src" / "widgets" / "card.css"))   # outside the project
+
+    def test_a_tokens_css_is_read_by_its_defaults(self):
+        path = self.write("tokens.css", (
+            "@layer reset, tokens;\n@layer tokens {\n  :root, [data-theme] {\n"
+            "    --accent-600: oklch(56.5% 0.176 42);\n    --accent-50:  #fff7f0;\n"
+            "    --icon: url(\"data:image/svg+xml;utf8,<svg/>\");\n    --bp-md: 48rem;\n"
+            "    --bg-accent: var(--accent-600);\n    --density: 1;\n  }\n"
+            "  [data-theme=\"dark\"] { --accent-990: #000000; --bg-accent: var(--accent-50); }\n"
+            "  @media (prefers-reduced-motion: reduce) { :root { --dur-base: 1ms; } }\n}\n"
+            "/* :root { --commented-out: 1px; } */\n"))
+        tokens = self.pc.read_tokens([path])
+        self.assertEqual({"accent": {"50": "#fff7f0", "600": "oklch(56.5% 0.176 42)"}}, tokens.ramps)
+        self.assertEqual(["50", "600"], list(tokens.ramps["accent"]))                 # numeric order
+        self.assertEqual({"--bg-accent": "var(--accent-600)"}, tokens.roles)        # the default, not dark's
+        self.assertEqual({"md": "48rem"}, tokens.breakpoints)
+        self.assertEqual({"--icon": 'url("data:image/svg+xml;utf8,<svg/>")', "--density": "1"},
+                         tokens.constants)                                         # one declaration, `;` and all
+        self.assertNotIn("--dur-base", tokens.values())
+        self.assertNotIn("--commented-out", tokens.values())
+
+    def test_a_tokens_css_and_its_contract_agree(self):
+        """The starter's tokens.css, read here and through extract_system's
+        contract: the same names, ramps and breakpoints. The tiers differ only
+        where extract_system reads the name first, as the docstring says."""
+        starter = SKILLS / "web-design-studio" / "assets" / "starter" / "styles" / "tokens.css"
+        proc = run_py("design-system-docs", "extract_system", "--tokens", starter, "--out", "system.json",
+                      "--contract", "contract.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        css, contract = self.pc.read_tokens([starter]), self.pc.read_tokens([self.tmp / "contract.json"])
+        self.assertEqual(contract.values(), css.values())
+        self.assertEqual(contract.ramps, css.ramps)
+        self.assertEqual(contract.breakpoints, css.breakpoints)
+        differ = sorted(n for n, tier in contract.tiers().items() if css.tiers()[n] != tier)
+        self.assertEqual(["--bg-active", "--bg-hover", "--bg-scrim", "--shadow-focus", "--space-fluid-lg",
+                          "--space-fluid-md", "--space-fluid-sm", "--space-fluid-xl"], differ)
+
+    def test_a_later_file_moves_a_name(self):
+        """Codex on #78: a name a later file filed in another section stayed
+        in the earlier one, so a ramp step that became a role was still a ramp."""
+        a = self.write("a.css", ":root { --brand-500: #ff0000; --brand-600: #cc0000; }\n")
+        b = self.write("b.css", ":root { --brand-500: var(--accent-500); }\n")
+        tokens = self.pc.read_tokens([a, b])
+        self.assertEqual({"brand": {"600": "#cc0000"}}, tokens.ramps)
+        self.assertEqual({"--brand-500": "var(--accent-500)"}, tokens.roles)
+
+    def test_a_contracts_ramp_steps_are_numbers(self):
+        """CodeRabbit on #78: a named step crashed every reader with a traceback."""
+        for step in ("primary", "5²"):                                  # `²` is a digit to isdigit()
+            with self.subTest(step=step):
+                bad = {"schema": "web-design-suite/contract/1", "ramps": {"brand": {step: "#123456"}}}
+                with self.assertRaises(self.pc.ConfigError) as caught:
+                    self.pc.read_tokens([self.write("bad.json", json.dumps(bad))])
+                self.assertIn(f'"ramps.brand.{step}" must be a numeric step', str(caught.exception))
+
+    def test_a_missing_token_file_is_named(self):
+        with self.assertRaises(self.pc.ConfigError) as caught:
+            self.pc.read_tokens([self.tmp / "gone.css"])
+        self.assertIn("gone.css", str(caught.exception))
 
 
 class ExtractSystemWritesTheContract(TempDirTest):
@@ -176,9 +254,236 @@ class FigmaAuditReadsTheContract(TempDirTest):
             self.write(name, ":root {\n" + "".join(f"  --accent-{s}: {h};\n" for s, h in part) + "}\n")
         self.write(".design-suite.json", '{"schema": 1, "tokens": ["a.css", "b.css"]}')
         self.assertEqual([], self.off_ramp())
+        self.write(".design-suite.json", '{"schema": 1}')
+        self.assertEqual([], self.off_ramp("--tokens", "a.css", "--tokens", "b.css"))   # CodeRabbit on #78
 
     def test_the_config_names_the_tokens_and_a_flag_beats_it(self):
         self.write(".design-suite.json", '{"schema": 1, "tokens": "contract.json"}')
         self.assertEqual([], self.off_ramp())
         self.write("other.css", ":root { --accent-500: #ff0000; }\n")
         self.assertTrue(self.off_ramp("--tokens", "other.css"))           # the flag's ramp, not the config's
+
+
+FLOATS = [("spacing/on", 16), ("spacing/off", 18), ("radius/on", 8), ("radius/off", 10),
+          ("font-size/on", 16), ("font-size/off", 17), ("font-size/fluid", 72), ("breakpoint/on", 768),
+          ("breakpoint/off", 800), ("duration/on", 140), ("duration/off", 150), ("line-height/on", 1.6),
+          ("line-height/off", 1.5), ("font-weight/on", 600), ("font-weight/off", 650), ("z-index/on", 400),
+          ("z-index/off", 450), ("stroke/on", 2), ("stroke/off", 3)]
+
+
+class FigmaAuditReadsTheScales(TempDirTest):
+    """LC-C1, LC-B3: a project's scales and breakpoints, not only its ramps."""
+
+    def off_scale(self, *extra):
+        proc = run_py("figma-variables-sync", "figma_audit", "export.json", "--format", "json", *extra,
+                      cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return sorted(f["name"] for f in json.loads(proc.stdout)["findings"] if f["code"].startswith("OFF_SCALE"))
+
+    def setUp(self):
+        super().setUp()
+        self.write(".git/HEAD", "x\n")
+        self.write("export.json", json.dumps([{"name": n, "type": "FLOAT", "value": v} for n, v in FLOATS]))
+
+    def test_the_starters_own_tokens_change_nothing(self):
+        """The control: the starter's scales, read from its tokens.css, are the
+        studio's tables (and its --dur-loop)."""
+        starter = SKILLS / "web-design-studio" / "assets" / "starter" / "styles" / "tokens.css"
+        self.assertEqual(sorted(n for n, _ in FLOATS if n.endswith("/off")), self.off_scale())
+        self.assertEqual(self.off_scale(), self.off_scale("--tokens", starter))
+
+    def test_a_projects_scale_replaces_the_studios(self):
+        self.write("tokens.css", ":root {\n  --space-sm: 1.125rem;\n  --bp-tablet: 50rem;\n"
+                                 "  --dur-quick: 150ms;\n}\n")
+        self.write(".design-suite.json", '{"schema": 1, "tokens": "tokens.css"}')
+        off = self.off_scale()
+        for name in ("spacing/off", "breakpoint/off", "duration/off"):
+            self.assertNotIn(name, off)                                     # the project's steps
+        for name in ("spacing/on", "breakpoint/on", "duration/on", "radius/off"):
+            self.assertIn(name, off)                                        # not the studio's; radius untouched
+
+
+class AuditReadsTheProject(TempDirTest):
+    """LC-C1, XC-C8: audit_design's token files, component globs, ramps and
+    baseline from the project's config, and --tokens beating it."""
+
+    def setUp(self):
+        super().setUp()
+        self.write(".git/HEAD", "x\n")
+        self.write("src/design/system.css", "@layer tokens {\n  :root {\n    --brand-500: oklch(55% 0.2 260);\n"
+                                            "    --bg-brand: var(--brand-500);\n  }\n}\n")
+        self.write("src/components/card.css", "@layer components {\n  .card { color: var(--brand-500); "
+                                              "background: var(--bg-brand); }\n}\n")
+        self.write("src/widgets/panel.css", "@layer base {\n  .panel { padding: var(--space-4); }\n}\n")
+
+    def findings(self, *extra, code=1):
+        proc = run_py("web-design-studio", "audit_design", "src", "--json", *extra, cwd=self.tmp)
+        self.assertEqual(code, proc.returncode, output(proc))
+        return sorted((f["file"].replace("\\", "/").split("src/")[-1], f["rule"]) for f in json.loads(proc.stdout))
+
+    def config(self, **keys):
+        self.write(".design-suite.json", json.dumps({"schema": 1, **keys}))
+
+    def test_without_a_config_the_starters_rules_hold(self):
+        self.assertEqual([("design/system.css", "socket-literal")], self.findings())
+
+    def test_the_configs_tokens_and_components(self):
+        self.config(tokens="src/design/system.css", components="src/widgets/**/*.css")
+        self.assertEqual([("components/card.css", "tier1-leak"), ("widgets/panel.css", "tier1-leak")],
+                         self.findings())
+
+    def test_a_contract_names_the_ramps_too(self):
+        proc = run_py("design-system-docs", "extract_system", "--tokens", "src/design/system.css",
+                      "--out", "system.json", "--contract", "contract.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn(("components/card.css", "tier1-leak"), self.findings("--tokens", "contract.json"))
+
+    def test_a_flag_beats_the_configs_tokens(self):
+        self.config(tokens="src/design/system.css", components="src/widgets/**/*.css")
+        self.write("other.css", ":root { --other-500: #ff0000; }\n")
+        self.assertEqual([("design/system.css", "socket-literal"), ("widgets/panel.css", "tier1-leak")],
+                         self.findings("--tokens", "other.css"))           # the globs still hold
+
+    def test_the_configs_baseline(self):
+        self.config(baselines={"audit": "ci/audit-baseline.json"})
+        self.write("ci/.keep", "")
+        proc = run_py("web-design-studio", "audit_design", "src", "--write-baseline", "ci/audit-baseline.json",
+                      cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual([], self.findings(code=0))                         # read without --baseline
+        self.assertTrue(self.findings("--baseline", "elsewhere.json"))     # a flag beats it
+
+    def test_a_broken_config_stops_the_run(self):
+        self.config(tokens="src/design/missing.css")
+        proc = run_py("web-design-studio", "audit_design", "src", cwd=self.tmp)
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("missing.css", output(proc))
+
+    def test_a_copy_vendored_alone_still_audits(self):
+        """A project that copied audit_design.py into its scripts/ before 3.5.0
+        has no project_config.py: the audit runs as it did, and says so."""
+        self.config(tokens="src/design/system.css")
+        self.write("scripts/audit_design.py", (SKILLS / "web-design-studio" / "scripts" / "audit_design.py").read_bytes())
+        lone = [sys.executable, "-m", "scripts.audit_design", "src", "--json"]
+        proc = subprocess.run(lone, cwd=self.tmp, env=env(), capture_output=True, timeout=120)
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn(".design-suite.json is not read", output(proc))
+        self.assertIn("socket-literal", proc.stdout.decode("utf-8"))      # the config's token file is not one
+        proc = subprocess.run(lone + ["--tokens", "x.css"], cwd=self.tmp, env=env(), capture_output=True, timeout=120)
+        self.assertEqual(2, proc.returncode, output(proc))
+
+
+class FigmaToTokensReadsTheNames(TempDirTest):
+    """LC-B3: a project's own names come back recognised, in their tier."""
+
+    def setUp(self):
+        super().setUp()
+        self.write(".git/HEAD", "x\n")
+        self.write("export.json", json.dumps([{"name": "color/brand/500", "type": "COLOR", "value": "#1e5bd7"},
+                                              {"name": "bg/brand", "type": "COLOR", "value": "#1e5bd7"}]))
+        self.write("brand.css", ":root {\n  --brand-500: oklch(52.4% 0.19 262.1);\n  --bg-brand: var(--brand-500);\n}\n")
+
+    def convert(self, *extra):
+        proc = run_py("figma-variables-sync", "figma_to_tokens", "export.json", *extra, cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return proc.stdout.decode("utf-8"), output(proc)
+
+    def test_the_configs_tokens_and_a_flag_beating_them(self):
+        css, everything = self.convert()
+        self.assertIn("--color-brand-500:", css)
+        self.assertIn("`bg/brand` is not a name in the contract", everything)
+        self.write(".design-suite.json", '{"schema": 1, "tokens": "brand.css"}')
+        css, everything = self.convert()
+        self.assertIn("--brand-500:", css)
+        self.assertNotIn("--color-brand-500", css)
+        self.assertNotIn("is not a name in the contract", everything)
+        self.write("other.css", ":root { --other-1: 1px; }\n")
+        self.assertIn("--color-brand-500:", self.convert("--tokens", "other.css")[0])
+
+
+class DiffSystemReadsTheContract(TempDirTest):
+    """LC-C1: diff_system takes a contract.json, and the project's tokens as
+    the candidate when none is named."""
+
+    def setUp(self):
+        super().setUp()
+        self.write(".git/HEAD", "x\n")
+        self.write("src/styles/tokens.css", TOKENS)
+        proc = run_py("design-system-docs", "extract_system", "--tokens", "src/styles/tokens.css",
+                      "--out", "system.json", "--contract", "v1.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+
+    def changes(self, *args, code=0):
+        proc = run_py("design-system-versioning", "diff_system", *args, "--format", "json", "--gate", "none",
+                      cwd=self.tmp)
+        self.assertEqual(code, proc.returncode, output(proc))
+        return sorted((c["kind"], c["subject"]) for c in json.loads(proc.stdout)["changes"]) if code == 0 else output(proc)
+
+    def test_two_contracts(self):
+        v2 = json.loads((self.tmp / "v1.json").read_bytes())
+        v2["ramps"]["accent"]["600"] = "#123456"
+        v2["roles"]["--bg-brand"] = "var(--accent-500)"
+        self.write("v2.json", json.dumps(v2))
+        self.assertEqual([("tier1-value-changed", "--accent-600"), ("tier2-added", "--bg-brand")],
+                         self.changes("v1.json", "v2.json"))
+
+    def test_a_contract_against_its_own_tokens_css_has_no_changes(self):
+        self.assertEqual([], self.changes("v1.json", "src/styles/tokens.css"))
+
+    def test_a_config_that_mixes_css_and_a_contract(self):
+        """Codex on #78: with CSS in the list, its contracts were dropped, so a
+        role only a contract held read as removed."""
+        extra = {"schema": "web-design-suite/contract/1", "roles": {"--bg-extra": "var(--accent-500)"}}
+        self.write("extra.json", json.dumps(extra))
+        self.write(".design-suite.json", '{"schema": 1, "tokens": ["src/styles/tokens.css", "extra.json"]}')
+        self.assertEqual([("tier2-added", "--bg-extra")], self.changes("v1.json"))
+
+    def test_without_new_the_projects_tokens(self):
+        self.assertIn("name the candidate snapshot", self.changes("v1.json", code=2))
+        self.write(".design-suite.json", '{"schema": 1, "tokens": "src/styles/tokens.css"}')
+        self.assertEqual([], self.changes("v1.json"))
+        self.write("src/styles/tokens.css", TOKENS.replace("--space-4: 1rem", "--space-4: 1.25rem"))
+        self.assertEqual([("tier1-value-changed", "--space-4")], self.changes("v1.json"))
+
+
+class ClusterValuesLandsOnTheProjectsRamps(TempDirTest):
+    """LC-C1: a migration lands on the project's ramps, not ones it derives."""
+
+    def setUp(self):
+        super().setUp()
+        self.write(".git/HEAD", "x\n")
+        self.write("src/app.css", ".btn { background: #2f6df6; color: #ffffff; }\n.btn:hover { background: #2558c8; }\n")
+        self.write("brand.css", ":root {\n  --accent-500: oklch(60% 0.2 150);\n  --accent-600: oklch(52% 0.19 150);\n"
+                                "  --accent-450: oklch(64% 0.2 150);\n  --brand-500: #ff0000;\n}\n")
+        proc = run_py("design-token-migration", "extract_literals", "src", "--format", "json",
+                      "-o", "literals.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+
+    def propose(self, *extra):
+        proc = run_py("design-token-migration", "cluster_values", "literals.json", "-o", "out", *extra, cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        return (self.tmp / "out" / "tokens.css").read_bytes().decode("utf-8"), \
+            (self.tmp / "out" / "reconciliation.md").read_bytes().decode("utf-8")
+
+    def accent(self, css, step):
+        return re.search(rf"--accent-{step}:\s*([^;]+);", css).group(1)
+
+    def test_the_configs_ramps_and_a_flag_beating_them(self):
+        derived, _ = self.propose()
+        self.assertNotIn(" 150", self.accent(derived, 600))
+        self.write(".design-suite.json", '{"schema": 1, "tokens": "brand.css"}')
+        css, report = self.propose()
+        self.assertEqual("oklch(52% 0.190 150)", self.accent(css, 600))
+        self.assertRegex(self.accent(css, 900), r" 1[45]\d(\.\d)?\)$")       # a step it lacks, on its hue
+        self.assertIn("Ramps from the project's tokens: accent (2 of 11 steps)", report)
+        self.assertIn("`brand` ramp, which the contract has no roles for", report)
+        self.assertNotIn("--accent-450", css)                                 # CodeRabbit on #78: not a contract step
+        self.assertIn("steps the contract does not name (--accent-450)", report)
+        self.write("off.css", ":root {\n  --accent-450: oklch(64% 0.2 150);\n}\n")
+        _, report = self.propose("--tokens", "off.css")                      # nothing taken, so not said to be
+        self.assertNotIn("Ramps from the project's tokens", report)
+        self.assertIn("steps the contract does not name (--accent-450)", report)
+        pinned, _ = self.propose("--accent", "#e8440a")                       # --accent beats the config
+        self.assertNotIn(" 150", self.accent(pinned, 600))
+        other, _ = self.propose("--tokens", "src/app.css")                    # so does --tokens
+        self.assertEqual(self.accent(derived, 600), self.accent(other, 600))

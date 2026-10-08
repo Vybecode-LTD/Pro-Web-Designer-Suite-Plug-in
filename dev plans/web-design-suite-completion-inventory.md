@@ -26,7 +26,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | XC-C5 | S · high | fixed in 3.2.0 | promote this review's harnesses to permanent tests: every documented |
 | XC-C6 | M · medium | fixed in 3.3.0: `tooling/release/build.py` (`test_release_build`), `.github/workflows/ci.yml` and `release.yml` (PR #17). The evals join CI with P29 | Build and release: a build tool for the zip and the 13 `.skill` files, `claude plugin tag`, and a CI matrix of Windows/Linux/macOS × Python 3.9–3.14 with Node. |
 | XC-C7 | M · medium | fixed in 3.2.0 | token efficiency: SKILL.md files are 17–28 KB (≈4.4–6.9k tokens per |
-| XC-C8 | M · medium | W9 (3.5.0); part 1 in PR #76: `test_project_config` | One project config file, `.design-suite.json`, read by every script, the hook and the commands. |
+| XC-C8 | M · medium | W9 (3.5.0); part 1 in PR #76, part 2 in PR #78: `test_project_config` | One project config file, `.design-suite.json`, read by every script, the hook and the commands. |
 | XC-C9 | S · low | fixed in 3.3.0: `WDS` in bash, PowerShell and cmd forms, one-line commands (`test_docs.PasteableCommands`, PR #35) | Cross-platform docs: PowerShell/cmd equivalents for the few shell-only recipes, or one `python -m scripts.gate` entry point. |
 | XC-C10 | S · high | fixed in 3.1.0 (the review's C6) | fixes XC-A8: write every documented command as |
 | SS-A1 | high | fixed in 3.1.0 | Law 7 (density) does nothing on a subtree, which is how every doc uses it. |
@@ -130,13 +130,13 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-A23 | low | fixed in 3.4.0: `test_versioning.DeprecateKeepsRemovalsInAMajor`, `test_token_migration.MigrationPipeline` (the report's ms delta and held-colour advice); the rest docs only (PR #54; versioning's "Four edits" in #50) | Smaller accuracy and consistency items. |
 | LC-B1 | — | W10 (3.6.0+) | no non-Enterprise route into Figma. |
 | LC-B2 | — | W10 (3.6.0+) | Style Dictionary, Tokens Studio and Terrazzo teams get nothing. |
-| LC-B3 | — | W9 (3.5.0); part 1 in PR #76: `test_project_config` | no way to supply a project contract. |
+| LC-B3 | — | fixed in 3.5.0: `test_project_config` (`FigmaAuditReadsTheScales`, `FigmaToTokensReadsTheNames`, `AuditReadsTheProject`), PRs #76 and #78 | no way to supply a project contract. |
 | LC-B4 | — | W9 (3.5.0) | no CI bootstrap. |
 | LC-B5 | — | W12 (3.6.0+) | migration coverage. |
 | LC-B6 | — | W10 (3.6.0+) | Figma plan realities. |
 | LC-B7 | — | W12 (3.6.0+) | rollout gaps. |
 | LC-B8 | — | fixed in 3.4.0: the parity and worked-run claims gated in #49, #50 and #53; `tokens.css`'s read-only claim names the CI drift check, held by `test_figma_sync.DeterministicOutput` (PR #54) | claims with no gate. |
-| LC-C1 | — | W9 (3.5.0); part 1 in PR #76: `test_project_config` | Add `contract.json`, emitted by extract_system from the project's tokens.css and read through `--tokens` by figma_audit, figma_to_tokens, cluster_values, audit_design and diff_system. |
+| LC-C1 | — | fixed in 3.5.0: `test_project_config` (`FigmaAuditReadsTheContract`, `AuditReadsTheProject`, `DiffSystemReadsTheContract`, `ClusterValuesLandsOnTheProjectsRamps`, `FigmaToTokensReadsTheNames`), PRs #76 and #78; the studio's tables stay as the defaults for a project with no tokens | Add `contract.json`, emitted by extract_system from the project's tokens.css and read through `--tokens` by figma_audit, figma_to_tokens, cluster_values, audit_design and diff_system. |
 | LC-C2 | — | W10 (3.6.0+) | Add a shared `dtcg.py` for 2025.10 read and write, Tokens Studio sets and themes, and `$deprecated` → ledger, plus a `--format dtcg` output. |
 | LC-C3 | — | fixed in 3.4.0: `test_figma_sync.FigmaCommon` (PR #53); the tier-list half, `test_rules_spec.TheTierListsAgree` (PR #49) | Move the two figma scripts' shared code into `figma_common.py`, and add a parity test for extract_system tier1-leak vs audit_design L6. |
 | LC-C4 | — | fixed in 3.4.0: A11, A12 and A14 with P15 (PR #49, #50), the rest in 3.1.0 | Add regression tests for LC-A5, A10, A11, A12, A14 and A2, then fix each one: focus-ring detection, the vendor rule, negative-cancel pairing, the type-tie note, the font guard scope, and composed opacity. |

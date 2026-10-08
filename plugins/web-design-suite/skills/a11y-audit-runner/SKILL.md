@@ -89,6 +89,7 @@ cp <web-design-studio>/assets/configs/pre-commit-design-gate.sh .git/hooks/pre-c
 cp <web-design-studio>/assets/configs/pre-commit-design-gate.sh .git/hooks/commit-msg   # records bypasses
 mkdir -p scripts
 cp <web-design-studio>/scripts/audit_design.py scripts/        # Law 9
+cp <web-design-studio>/scripts/project_config.py scripts/      # its .design-suite.json reader
 cp <a11y-audit-runner>/scripts/a11y_static.py scripts/         # the accessibility floor
 ```
 

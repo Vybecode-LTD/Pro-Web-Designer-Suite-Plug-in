@@ -19,7 +19,7 @@ figma_audit.py <file> [--styles FILE] [--format report|json|markdown]
 | `--format markdown` | The document you send the designer |
 | `--fail-on` | Lowest severity that exits non-zero. Default `info` — any finding |
 | `--deadline` | The timed default's cutoff, printed into the markdown |
-| `--tokens` | The project's `tokens.css`, or the `contract.json` design-system-docs' `extract_system.py --contract` writes. Its colour ramps (every `--<name>-<step>` holding a literal colour) replace the studio's ramps of the same name. Without the flag, the token files the project's `.design-suite.json` lists, found by walking up from the working directory to the repository root; a broken config exits 2 and names the key |
+| `--tokens` | The project's `tokens.css`, or the `contract.json` design-system-docs' `extract_system.py --contract` writes (repeatable). Its colour ramps (every `--<name>-<step>` holding a literal colour) replace the studio's ramps of the same name, and a scale it declares (spacing, radius, type, stroke, z, duration, leading, tracking, weight, breakpoints) replaces the studio's: its steps, not both. Without the flag, the token files the project's `.design-suite.json` lists, found by walking up from the working directory to the repository root; a broken config exits 2 and names the key. web-design-studio's `references/project-contract.md` has the rules |
 
 Exit: `0` clean · `1` findings · `2` unreadable or empty input.
 
@@ -31,7 +31,7 @@ Exit: `0` clean · `1` findings · `2` unreadable or empty input.
 figma_to_tokens.py <file> [--format css|json|ts|all] [--out FILE] [--out-dir DIR]
                    [--reverse] [--flat] [--shape …] [--collection NAME]
                    [--color-format oklch|hex] [--unit rem|px] [--full-themes]
-                   [--quiet]
+                   [--tokens FILE] [--quiet]
 ```
 
 | Flag | Does |
@@ -41,6 +41,7 @@ figma_to_tokens.py <file> [--format css|json|ts|all] [--out FILE] [--out-dir DIR
 | `--flat` | With `--reverse`: one Figma collection instead of one per tier |
 | `--unit px` | Emit px instead of rem (hairlines and strokes stay px regardless) |
 | `--full-themes` | Restate every token in each theme block rather than only the re-points |
+| `--tokens` | The project's `tokens.css` or `contract.json` (repeatable): its names join the vocabulary, so `color/brand/500` comes back as `--brand-500`, recognised and in its tier, and a ramp step it writes in OKLCH comes back exact. Without the flag, the token files the project's `.design-suite.json` lists |
 
 Exit: `0` clean · `1` written with warnings (unmapped names, unresolved aliases,
 skipped composites — all on stderr) · `2` unreadable or empty input.

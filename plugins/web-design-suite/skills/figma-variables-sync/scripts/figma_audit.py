@@ -56,11 +56,11 @@ sys.dont_write_bytecode = True
 # and attach_styles.
 try:                                              # python -m scripts.figma_audit
     from .figma_common import *                   # type: ignore[import-not-found]  # noqa: F403
-    from .project_config import ConfigError, is_contract, read_contract, token_sources
+    from .project_config import ConfigError, ProjectTokens, read_tokens, token_sources
 except ImportError:                               # python scripts/figma_audit.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from figma_common import *                    # type: ignore[no-redef]  # noqa: F403
-    from project_config import ConfigError, is_contract, read_contract, token_sources  # type: ignore[no-redef]
+    from project_config import ConfigError, ProjectTokens, read_tokens, token_sources  # type: ignore[no-redef]
 
 # ===========================================================================
 # THE CONTRACT. These tables are the closed scales from token-contract.md and
@@ -499,8 +499,8 @@ class Auditor:
             self.add(
                 code="OFF_SCALE_DURATION", severity="warn", collection=var.collection,
                 mode=mode, name=var.name, summary=f"{fmt(ms)}ms is not one of the five durations",
-                detail=f"nearest is {fmt(best)}ms ({DUR_NAME[int(best)]}), {signed(delta)}ms away",
-                suggestion=f"use {DUR_NAME[int(best)]}",
+                detail=f"nearest is {fmt(best)}ms ({DUR_NAME[best]}), {signed(delta)}ms away",
+                suggestion=f"use {DUR_NAME[best]}",
             )
             return
 
@@ -565,8 +565,8 @@ class Auditor:
             self.add(
                 code="OFF_SCALE_WEIGHT", severity="warn", collection=var.collection,
                 mode=mode, name=var.name, summary=f"weight {fmt(px)} is not one of the four",
-                detail=f"nearest is {fmt(best)} ({WEIGHT_NAME[int(best)]}), {signed(delta)} away",
-                suggestion=f"use {WEIGHT_NAME[int(best)]}",
+                detail=f"nearest is {fmt(best)} ({WEIGHT_NAME[best]}), {signed(delta)} away",
+                suggestion=f"use {WEIGHT_NAME[best]}",
             )
             return
         if kind == "tap" and 0 < px < self.tap_min:
@@ -764,9 +764,9 @@ class Auditor:
                     code="TEXT_STYLE_OFF_SCALE", severity="error", collection="text styles",
                     mode="-", name=name,
                     summary=f"font-size {fmt(size)}px is not on the type scale",
-                    detail=f"nearest is {fmt(best)}px ({TYPE_NAME[int(best)]}), "
+                    detail=f"nearest is {fmt(best)}px ({TYPE_NAME[best]}), "
                            f"{signed(delta)}px away",
-                    suggestion=f"use {TYPE_NAME[int(best)]}",
+                    suggestion=f"use {TYPE_NAME[best]}",
                 )
             if isinstance(props, dict):
                 weight = props.get("fontWeight")
@@ -776,8 +776,8 @@ class Auditor:
                         code="TEXT_STYLE_OFF_SCALE", severity="warn", collection="text styles",
                         mode="-", name=name,
                         summary=f"weight {fmt(weight)} is not one of the four",
-                        detail=f"nearest is {fmt(best)} ({WEIGHT_NAME[int(best)]})",
-                        suggestion=f"use {WEIGHT_NAME[int(best)]}",
+                        detail=f"nearest is {fmt(best)} ({WEIGHT_NAME[best]})",
+                        suggestion=f"use {WEIGHT_NAME[best]}",
                     )
                 lh = props.get("lineHeightPx")
                 if isinstance(lh, (int, float)) and isinstance(size, (int, float)) and size:
@@ -825,30 +825,78 @@ def ramp_hex_index() -> Dict[str, str]:
     return _RAMP_HEX
 
 
-_RAMP_DECL = re.compile(r"--([a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)*)-(\d+)\s*:\s*([^;{}]+);", re.I)
-
-
-def load_project_ramps(path: Path) -> Dict[str, Dict[str, Tuple[float, float, float]]]:
-    """Colour ramps declared in a project's tokens.css: every `--<name>-<step>`
-    whose value is a literal colour. A client's brand ramp is the point — the
-    migration seeds the accent from the brand on purpose — so checking a file
-    against the studio's own orange called every brand colour "off ramp".
-    A contract.json (extract_system --contract) gives its `ramps` (P24)."""
-    if is_contract(path):
-        steps = [(name, step, value) for name, ramp in read_contract(path)["ramps"].items()
-                 for step, value in ramp.items()]
-    else:
-        text = re.sub(r"/\*.*?\*/", " ", path.read_text(encoding="utf-8-sig"), flags=re.S)
-        steps = _RAMP_DECL.findall(text)
+def load_project_ramps(tokens: ProjectTokens) -> Dict[str, Dict[str, Tuple[float, float, float]]]:
+    """The colour ramps a project's token files declare (project_config's
+    read_tokens): every Tier-1 `--<name>-<step>` whose default value is a
+    literal colour, from a tokens.css or a contract.json. A client's brand
+    ramp is the point — the migration seeds the accent from the brand on
+    purpose — so checking a file against the studio's own orange called every
+    brand colour "off ramp"."""
     ramps: Dict[str, Dict[str, Tuple[float, float, float]]] = {}
-    for name, step, value in steps:
-        rgba = as_color(value.strip())
-        if rgba is None or rgba[3] < 0.999:
-            continue                         # a var() re-point, or not a colour
-        L, a, b = rgb_to_oklab(*rgba[:3])
-        ramps.setdefault(name.lower(), {}).setdefault(
-            step, (L * 100.0, math.hypot(a, b), math.degrees(math.atan2(b, a)) % 360))
+    for name, steps in tokens.ramps.items():
+        for step, value in steps.items():
+            rgba = as_color(value)
+            if rgba is None or rgba[3] < 0.999:
+                continue                     # not a colour this script reads, or translucent
+            L, a, b = rgb_to_oklab(*rgba[:3])
+            ramps.setdefault(name.lower(), {})[step] = (
+                L * 100.0, math.hypot(a, b), math.degrees(math.atan2(b, a)) % 360)
     return ramps
+
+
+def _number(value: str) -> Optional[float]:
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _em(value: str) -> Optional[float]:
+    return _number(value[:-2]) if value.endswith("em") and not value.endswith("rem") else _number(value)
+
+
+def _px_or_clamp(value: str) -> List[float]:
+    """A length, or both ends of a `clamp()`: the starter's two fluid type
+    steps are on the type scale at their floor and their ceiling."""
+    m = re.fullmatch(r"clamp\(\s*([^,]+),[^,]+,\s*([^,]+)\)", value.strip())
+    ends = [as_px(m.group(1)), as_px(m.group(2))] if m else [as_px(value)]
+    return [px for px in ends if px is not None]
+
+
+# The closed scales a project's tokens may replace: the token name's first
+# segment, this module's two tables, and how a value is read.
+SCALES = (
+    ("space", "SPACING_PX", "SPACING_NAME", lambda v: [as_px(v)]),
+    ("radius", "RADIUS_PX", "RADIUS_NAME", lambda v: [as_px(v)]),
+    ("text", "TYPE_PX", "TYPE_NAME", _px_or_clamp),
+    ("stroke", "STROKE_PX", "STROKE_NAME", lambda v: [as_px(v)]),
+    ("z", "Z_STEPS", "Z_NAME", lambda v: [_number(v)]),
+    ("dur", "DUR_MS", "DUR_NAME", lambda v: [as_ms(v)]),
+    ("leading", "LEADING", "LEADING_NAME", lambda v: [_number(v)]),
+    ("tracking", "TRACKING_EM", "TRACKING_NAME", lambda v: [_em(v)]),
+    ("weight", "WEIGHTS", "WEIGHT_NAME", lambda v: [_number(v)]),
+    ("bp", "BP_PX", "BP_NAME", lambda v: [as_px(v)]),
+)
+
+
+def use_scales(tokens: ProjectTokens) -> List[str]:
+    """Make the project's scales the ones each check compares against (P24).
+    A scale the project declares, with a value this script can read,
+    replaces the studio's: its steps, not both, so the scale stays closed
+    (Law 3). Returns the scales replaced."""
+    declared = dict(tokens.scales, bp=tokens.breakpoints)
+    replaced = []
+    for head, values_name, names_name, read in SCALES:
+        steps: Dict[float, List[str]] = {}
+        for step, raw in declared.get(head, {}).items():
+            for value in read(raw):
+                if value is not None:
+                    steps.setdefault(value, []).append(f"--{head}-{step}")
+        if steps:
+            globals()[values_name] = tuple(sorted(steps))
+            globals()[names_name] = {value: " / ".join(names) for value, names in steps.items()}
+            replaced.append(head)
+    return replaced
 
 
 def use_ramps(ramps: Dict[str, Dict[str, Tuple[float, float, float]]]) -> None:
@@ -1054,11 +1102,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"minimum touch target in px (default: {TAP_MIN_PX:g})")
     p.add_argument("--deadline", default="end of day tomorrow",
                    help="the timed default's cutoff, printed in --format markdown")
-    p.add_argument("--tokens", metavar="TOKENS_CSS",
+    p.add_argument("--tokens", action="append", default=[], metavar="TOKENS_CSS",
                    help="the project's tokens.css, or its contract.json (extract_system "
-                        "--contract): its colour ramps (any --<name>-<step> holding a literal "
-                        "colour) replace the studio's ramps of the same name. Without it, the "
-                        "token files a .design-suite.json lists")
+                        "--contract), repeatable: its colour ramps (any --<name>-<step> holding "
+                        "a literal colour) and scales replace the studio's of the same name. "
+                        "Without it, the token files a .design-suite.json lists")
     p.add_argument("--no-color", action="store_true")
     return p
 
@@ -1090,24 +1138,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     if sources:
-        ramps: Dict[str, Dict[str, Tuple[float, float, float]]] = {}
-        for source in sources:
-            try:
-                loaded = load_project_ramps(source)
-            except (OSError, ConfigError) as exc:
-                print(f"could not read {source}: {exc}", file=sys.stderr)
-                return 2
+        origin = ", ".join(str(s) for s in sources) + (f" (from {config_path})" if config_path else "")
+        try:
             # Step by step: two files may each hold part of one ramp, and a
             # later file's step wins (Codex on #76).
-            for name, steps in loaded.items():
-                ramps.setdefault(name, {}).update(steps)
-        origin = ", ".join(str(s) for s in sources) + (f" (from {config_path})" if config_path else "")
+            tokens = read_tokens(sources)
+        except ConfigError as exc:
+            print(f"could not read the project's tokens: {exc}", file=sys.stderr)
+            return 2
+        ramps = load_project_ramps(tokens)
         if ramps:
             use_ramps(ramps)
             doc.notes.append(f"colour ramps from {origin}: {', '.join(sorted(ramps))}")
         else:
             print(f"{origin} declares no colour ramps (--<name>-<step>: <colour>); "
                   "auditing against the studio's ramps.", file=sys.stderr)
+        scales = use_scales(tokens)
+        if scales:
+            doc.notes.append(f"scales from {origin}: {', '.join(scales)}")
 
     auditor = Auditor(doc, tap_min=args.tap_min)
     findings = auditor.run()
