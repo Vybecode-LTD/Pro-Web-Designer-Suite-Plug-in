@@ -610,6 +610,17 @@ class TheConfigsFilesReachTheirScripts(TempDirTest):
         proc = run_py("a11y-audit-runner", "a11y_static", "page.html", "--baseline", "none.json", cwd=self.tmp)
         self.assertNotIn("could not read baseline", output(proc))
 
+    def test_a11y_static_vendored_alone(self):
+        """Codex on #79: the hook recipe copies a11y_static.py alone into a
+        project's scripts/, and without its reader every run raised NameError."""
+        self.config(baselines={"a11y": "ci/a11y-baseline.json"})
+        self.write("scripts/a11y_static.py", (SKILLS / "a11y-audit-runner" / "scripts" / "a11y_static.py").read_bytes())
+        proc = subprocess.run([sys.executable, "-m", "scripts.a11y_static", "page.html", "--json"], cwd=self.tmp,
+                              env=env(), capture_output=True, timeout=120)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        self.assertNotIn("Error", output(proc))
+        self.assertEqual("a11y_static", json.loads(proc.stdout)["tool"])
+
     def test_build_docs_check_baseline(self):
         self.write("tokens.css", TOKENS)
         proc = run_py("design-system-docs", "extract_system", "--tokens", "tokens.css", "--out", "system.json",

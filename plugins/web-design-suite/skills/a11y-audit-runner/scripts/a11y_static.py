@@ -1731,7 +1731,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"a11y_static: {exc}", file=sys.stderr)
             return 2
     baseline: set = set()
-    bp = Path(args.baseline or config_path(config, "baselines", "a11y") or ".a11y-baseline.json")
+    # config is None whenever the reader is missing, so config_path is defined here (Codex on #79).
+    bp = Path(args.baseline or (config_path(config, "baselines", "a11y") if config else None)
+              or ".a11y-baseline.json")
     if bp.exists():
         try:
             baseline = set(json.loads(bp.read_bytes()))
