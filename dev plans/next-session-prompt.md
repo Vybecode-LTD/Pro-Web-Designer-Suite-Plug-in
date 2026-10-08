@@ -57,7 +57,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
     - The app now keeps every PR you bound (`otherBoundPrs`), and sends events for each.
   - **Parallel work.** A review fix on a PR below a stack goes in a worktree in the scratchpad (`git worktree add PATH BRANCH`), so a `check.py` running in the main checkout is not disturbed.
     - Each worktree gets its own `check.py` run, with `WDS_NODE_MODULES` pointing at the main checkout's `tooling/main/node_modules`. Never run `npm ci` in a worktree.
-    - After a fix lands below, merge that branch into the stacked one. **Copy `shared/project_config.py` over every copy again afterwards**: git merges each copy separately, so the copies only the upper branch has keep the old reader (it happened twice on #79).
+    - After a fix lands below, merge that branch into the stacked one. **Copy both masters, `shared/project_config.py` and `shared/project_config.mjs`, over every copy again afterwards**: git merges each copy separately, so the copies only the upper branch has keep the old reader (it happened twice on #79).
     - The CHANGELOG, the plan and the inventory conflict every time: keep both sides, the earlier PR's first.
   - **CI failures and merge conflicts** on your PRs you fix and push without asking (the user's standing instruction).
     - An app event can describe an older head, or relay a comment you already answered. Check the current state before acting.
