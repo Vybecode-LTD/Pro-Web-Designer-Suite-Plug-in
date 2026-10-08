@@ -14,11 +14,11 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-10-08)
 
-- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is under way: P24 parts 1 to 3 are merged (#76, #78, #79). No PR is open.
+- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is under way: P24 is complete (#76, #78, #79, #81), and P25 part 1, the hooks, is merged (#82). No PR is open.
 - **Installed:** 3.4.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** 799. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P24 part 4 (N37: the project's config in stylelint and the ESLint config), then P25 (the hooks). `dev plans/web-design-suite-review/claude-code-capabilities.md` §5 is a partial 2026-10-07 re-check of the plugin features (the hooks, mods and evals pages are still to be re-read). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 53 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Tests:** 828. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P25 part 2 (the token diff after a token-file edit, LC-C8), then P26 (the workflow commands and the CI bootstrap). `dev plans/web-design-suite-review/claude-code-capabilities.md` §6 is the 2026-10-08 re-read of the hooks and mods pages (the skills and evals pages are still to be re-read). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 51 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
@@ -44,7 +44,7 @@ CI (`.github/workflows/ci.yml`) runs the whole suite on Windows, Linux and macOS
 
 The Python floor runs with `uv run --no-project --python 3.9 python -B -m unittest discover -s tests`, which works in cmd as well.
 
-For `claude plugin validate --strict`, `update` and `details`, use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\<build>\claude.exe` (2.1.288's build folder is `36aa8c97bf86`). The one on PATH is older.
+For `claude plugin validate --strict`, `update` and `details`, use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\<build>\claude.exe` (2.1.293's build folder is `83cb0bd7fed4`). The one on PATH is older.
 
 ## Gotchas
 
@@ -58,6 +58,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 - **Never write into OneDrive** or the folders redirected into it (Documents, Desktop, Pictures, Music, Videos). Downloads is safe.
 - **Commands you give the user** to run must work in cmd.exe. (The Commands block above is for the Bash tool.)
 - **Never run `npm ci` in a worktree whose `tooling/*/node_modules` is a junction**: it deletes the real toolchain through the link.
+- **The reader's copies.** `shared/project_config.py` has ten copies and `shared/project_config.mjs` seven (`hooks/` among them). After a merge from a branch below, copy both masters over every copy: git merges each copy on its own.
 
 ## Conventions
 
@@ -75,6 +76,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 plugins/web-design-suite/         the plugin (the only folder that ships)
   skills/<13 skills>/             SKILL.md, references/, scripts/, assets/
   shared/token-contract.md        the master copy of the contract (13 copies must match it)
+  hooks/                          hooks.json and design_hooks.mjs: the opt-in gate and guard, the router
   tests/                          the suite; fixtures/ holds the pointer and evidence registers
   tools/                          check_pointers.py, sync_snippets.py
   CHANGELOG.md, README.md, LICENSE

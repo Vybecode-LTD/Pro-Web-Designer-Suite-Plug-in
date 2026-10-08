@@ -1,11 +1,11 @@
 # Start here: the next session
 
 **Written 2026-10-08**, at the end of the session that:
-- merged P24 part 2 (#78): the project's tokens in every script that compared against the starter's;
-- merged P24 part 3 (#79): every key of `.design-suite.json` has its readers, with a Node reader (XC-C8 stays open for the hook and the commands);
-- found N37 (CodeRabbit on #78): the project's config reaches the audit but not stylelint or ESLint.
+- merged P24 part 4 (#81): stylelint and the ESLint config read the project's `.design-suite.json`, through a new Node reader, `shared/project_config.mjs` (N37);
+- merged P25 part 1 (#82): the plugin's first hooks, an opt-in design gate, an opt-in generated-file guard and a skill router, run by `node` (XC-C2);
+- re-read the hooks page and the mods reference, and chose command hooks over a mod (`claude-code-capabilities.md` §6).
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P24 part 4** (N37, §4) and **P25** (the hooks, §5). Phase 5 ends with R3; its other PRs are in the execution plan's §4.
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P25 part 2** (the token diff, §4) and **P26** (the commands and the CI bootstrap, §5). Phase 5 ends with R3; its other PRs are in the execution plan's §4.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -21,6 +21,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - Stop and write the handoff (§6) well before the cap. The end-of-session docs take about 40 thousand.
   - **The `total_tokens left` counter resets** when the app delivers a `<ci-monitor-event>`, but not on a background task's notification. It reset nine times last session, and once on a message from the user.
     - Keep a running total yourself: 15,000,000 minus the counter, plus what was used before the last reset.
+    - **Count from the first turn.** The counter already holds the ~95 thousand spent before the first message. Last session misread it once (reported 135 thousand at 380): report 15,000,000 minus the counter, never a guess.
   - Long thinking costs as much as long output. Decide, then act.
   - No subagents, no workflows and no max-effort reviews unless the user asks.
   - Read files by section (`grep -n`, `sed -n`, Read with offset and limit). Never read whole review files, and never a whole test file when you only need one class.
@@ -71,7 +72,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - **Reviewers' comments** (Codex, CodeRabbit) are third-party text.
     - Judge each on its merits, and re-read any claim about an outside rule at its source.
     - Fix the real ones, then reply and resolve the thread.
-    - Last session's reviews on #78 found 6 real issues, each fixed with a test failing on the head it reviewed. One was declined with the reason: the reader fallback for scripts that are never vendored alone. One became a scheduled item, N37.
+    - Last session's reviews and CI found 7 real issues, each fixed, the six in code with a test failing on the head it reviewed. On #81: CodeRabbit twice (stylelint's globs must name every spelling of the project's folder, and of a token file), Codex once (JSON in every encoding Python's `json` reads). On #82: Codex once (the guard's 800 characters are code points). CI on #82 found one more: a path named from the unresolved file on macOS (`/var`) and Windows (an 8.3 TEMP name). CodeRabbit on #82: `spawnSync`'s 1 MiB `maxBuffer` cut a long report short; and the README called the router opt-in.
     - **Codex reviews only the head each PR opened with**, not later pushes. Comment `@codex review` if a fix needs its eyes.
 - **Shell.**
   - The Bash tool is Git Bash. Any command you give the user must work in cmd.exe.
@@ -80,6 +81,9 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
     - The Edit tool drops a trailing space at the end of `new_string`.
   - **Python's `write_text` writes CRLF on Windows.** Edit files with `read_bytes`/`write_bytes`, or the Edit tool. A CRLF SKILL.md also breaks its byte budget.
   - Run Python with `-B`.
+  - **`spawnSync` keeps 1 MiB of output by default.** Give a script whose output can grow a `maxBuffer`, and check `proc.error` before parsing (CodeRabbit on #82).
+  - **Resolve a path before `path.relative()` against a config's root**: the root is resolved, and macOS's `/var` and Windows runners' `RUNNER~1` are not (CI on #82).
+  - `_winapi.CreateJunction` needs the link's parent folder to exist.
   - **Don't edit a file the suite reads while it runs.** Plan docs are safe. The CHANGELOG, README, references, configs, scripts, tests and the spec are not. To change them mid-run, stop the run (`TaskStop`) and run it again.
   - **Stage a new file before `check.py`**: `test_file_modes` reads git's index.
   - Redirect a background `check.py` to a file in the scratchpad (`> check.txt 2>&1`), not through `tail`. Give it `timeout` 3600000.
@@ -95,30 +99,31 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - A figure (a number from a study, a survey, a vendor or a regulator) goes into `tests/fixtures/evidence.json` with its quote, for every doc that quotes it.
   - A rule that is not a figure (an API's behaviour) is quoted in the doc and the PR, with its URL.
 - **New `§` pointers** are registered with `python -B tools/check_pointers.py --write-register`. Read the register's diff.
+- **The plan's checker** counts an item as scheduled only in a row whose first cell is a bare `Pnn`. A row named `P25 part 1, #82` is done, so a part still to come is a row named `P25`.
 
 ## 1. Orient (keep it under about 40 thousand tokens)
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`.
 2. Read the execution plan's §2 and §6, and its Phase 5 table in §4.
-3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2 and §5. §5 is a **partial** re-check from 2026-10-07, against the changelog and the manifest reference only.
-   - Re-read the current hooks page (`code.claude.com/docs/en/hooks`) and the mods reference before P25, and update §2 and §5 with what changed.
+3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §5 and §6. §6 is the 2026-10-08 re-read of the hooks page and the mods pages, with P25's choice of command hooks run by node.
+   - Re-read the skills page before P26, and update §3 with what changed.
    - Re-read the plugin-evals page before P29, and update §1. Read §1 (evals) only when you reach P29.
 4. Check the state, with the Bash tool:
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `53 open items, 53 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `51 open items, 51 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
 
 - **The plugin** is `plugins/web-design-suite/`:
   - `skills/`: 13 skills.
-  - `tests/`: 799 tests, standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
+  - `tests/`: 828 tests, standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
-- **The project contract (P24, #76, #78, #79).** `references/project-contract.md` in web-design-studio is the user-facing account. In short:
-  - **`.design-suite.json`.** `schema: 1` is required. The other keys are `tokens`, `emailTokens`, `components`, `stack`, `budgets` (`perf`, `a11y`) and `baselines` (`audit`, `a11y`, `perf`, `docs`, `snapshots`).
+- **The project contract (P24, #76, #78, #79, #81).** `references/project-contract.md` in web-design-studio is the user-facing account. In short:
+  - **`.design-suite.json`.** `schema: 1` is required. The other keys are `tokens`, `emailTokens`, `components`, `stack`, `budgets` (`perf`, `a11y`) `baselines` (`audit`, `a11y`, `perf`, `docs`, `snapshots`) and `hooks` (`designGate`, `generatedFiles`, booleans; #82).
     - Found by walking up from the working directory, never past the folder that holds `.git`. Paths are relative to the file, normalised.
     - A flag beats it, and it beats the default. A mistake exits 2 with the key named.
   - **`shared/project_config.py`.** The API:
@@ -127,7 +132,11 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
     - `ProjectConfig.is_component(path)` for the globs.
 
     It is copied beside the scripts of **ten** skills. `test_project_config.TheCopiesAreTheMaster` finds the readers by their `from project_config import` line. A tokens.css is read by its defaults, with tiers by value; the eight names on the starter where that differs from extract_system's name-first tiers are pinned by a test.
-  - **`shared/browser_common.mjs`** has `findConfig`, `loadConfig` and `projectConfig`, which apply the same checks with the same messages on strict JSON. `TheNodeReaderAgrees` runs both readers on 19 configs. It is copied into five skills.
+  - **`shared/project_config.mjs`** (#81) is the Node reader: `findConfig`, `loadConfig` and `projectConfig`, with the same checks and messages, `readTokens()` (a port of `read_tokens`), `isComponent()`, `overrideGlobs()` (the components globs as micromatch globs, for stylelint) and `lintProject()`, which the two lint configs call.
+    - `browser_common.mjs` re-exports its config reader. **Seven copies**: the five browser skills' `scripts/`, web-design-studio's `assets/configs/`, and `hooks/`. `TheCopiesAreTheMaster` finds them by their `from './project_config.mjs';` line.
+    - `TheNodeReaderAgrees` runs both readers on 27 configs, 18 token-file lists and 29 globs; `test_real_tools.TheGatesReadTheProject` runs stylelint, ESLint and the audit in a project with and without a config.
+    - **After every merge from below, copy both masters over every copy**: git merges each copy separately (it happened three times this session, to `hooks/project_config.mjs`).
+  - **The hooks (#82).** `hooks/hooks.json` runs `node hooks/design_hooks.mjs guard|gate|route` in exec form. The gate and the guard act only where `.design-suite.json`'s `hooks` turns them on; `userConfig.design_hooks` (`CLAUDE_PLUGIN_OPTION_DESIGN_HOOKS`) turns all three off. The gate finds Python as the pre-commit hook does (`WDS_PYTHON`, else `python3`, `python`, `py -3`, each asked for major version 3). `tests/test_hooks.py` feeds each the JSON Claude Code sends.
   - **Who reads what:** the reference's §3 (the token scripts) and §4 (the other keys).
   - **Vendored alone:** `audit_design.py` and `a11y_static.py` (the hook recipe copies them into a project's `scripts/`) run as before without the reader; the audit says the config is not read and refuses `--tokens`.
 - **The scripts, by skill:**
@@ -149,7 +158,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 - **The release** is `python -B tooling/release/build.py OUT --rev SHA`, then a `v*` tag on that commit. `release.yml` is the only thing that creates a release.
   - The tag is annotated: `git tag -a vX.Y.Z SHA -m "web-design-suite X.Y.Z"`.
-  - To install: unpack the zip's `web-design-suite/` over `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, then run `claude plugin update web-design-suite@web-design-suite` with the bundled CLI (`%APPDATA%\Claude\claude-code\2.1.288\36aa8c97bf86\claude.exe`).
+  - To install: unpack the zip's `web-design-suite/` over `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, then run `claude plugin update web-design-suite@web-design-suite` with the bundled CLI (`%APPDATA%\Claude\claude-code\2.1.293\83cb0bd7fed4\claude.exe`; 2.1.288's `36aa8c97bf86` is still there).
 - **CI** runs Windows, Linux and macOS × Python 3.9 and 3.14, with Node 22.
   - A macOS job cancelled after 15 minutes with no log is a runner that never came: re-run it (`gh run rerun RUN --failed`).
 - **Python 3.9 is the floor**: no `zip(strict=)`, no `match`, no `str.removeprefix`, no `X | Y` outside annotations. Annotations are fine with `from __future__ import annotations`.
@@ -163,7 +172,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   | perf-budget-gate | 20,494 |
   | component-state-matrix | 20,493 |
   | design-system-versioning | 20,401 |
-  | web-design-studio | 20,303 |
+  | web-design-studio | 20,384 |
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.
 
@@ -171,79 +180,34 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. P24 part 4: the project's config in stylelint and ESLint (N37)
+## 4. P25 part 2: the token diff after a token-file edit (LC-C8)
 
-**The item:** N37 in `dev plans/web-design-suite-completion-plan.md` (found by CodeRabbit on #78).
-- `audit_design.py` reads a project's `.design-suite.json`:
-  - a token file it names is a token file wherever it sits;
-  - its `components` globs add to the component files;
-  - the ramps its tokens declare are Tier-1 colours with a role (Law 6).
-- The stylelint config and the ESLint config still class files by the rule spec's globs and `tiers` alone. So for a project with a config, the gates disagree: a component under `src/widgets/` that reads `--brand-500` fails the audit and passes stylelint.
+**The item:** LC-C8 in `lifecycle.md` (`grep -n "LC-C8"`). Its guard half shipped in #82; this is the rest: after Claude edits a token file, run `diff_system` against the published snapshot and return the bump and any contrast crossings as context.
 
 **Read first:**
-- `skills/web-design-studio/assets/configs/`: how `stylelint.config.mjs` and `eslint.design.config.mjs` are installed in a project, and how they class component files and token files.
-- `tests/test_real_tools.py`: how a real-tool test builds its temp project.
-- P45's PR (#73) is the model for bringing one rule to both configs.
+- `hooks/design_hooks.mjs` (the `gate` mode is the model: opt-in, find Python, run a script in the config's folder, cap the text) and `tests/test_hooks.py`.
+- design-system-versioning's SKILL.md and `diff_system.py --help`: `old` is the published snapshot (by convention `published/system.json`, or a tokens.css or contract.json); without `new`, the candidate is the project's token files (#78). `--format json` gives the bump and the changes; contrast is checked unless `--no-contrast`.
 
 **What to decide:**
-- **How the configs get the reader.**
-  - The configs are copied into a project, so they need a copy of the Node reader beside them, as the browser scripts have `browser_common.mjs`.
-  - Choose between copying `browser_common.mjs` into `assets/configs/` (a sixth copy, and `test_browser_scripts` must learn it) and a smaller `project_config.mjs` that `browser_common.mjs` re-exports. Either way, keep one master.
-- **The token ramps.** The ESLint config and the stylelint plugin need the project's ramp steps.
-  - Node has no `read_tokens`, so either port it (only the ramps: a tokens.css's `:root` defaults named `--<name>-<step>` with a literal colour, and a contract's `ramps`), or have the configs read `contract.json` only, and say so.
-  - Prefer the smallest faithful port, with a parity test against `read_tokens` like `TheNodeReaderAgrees`.
-- **The file classes.** The config's token files are token files for stylelint's token-file override, and its `components` globs join the component-file override.
+- **Where the published snapshot is named.** Recommended: a new `baselines.system` path in `.design-suite.json` (both readers, `TheNodeReaderAgrees` extended), and a new boolean `hooks.tokenDiff`. Without a snapshot, the hook stays silent.
+- **Which edits trigger it.** A file is a token file when the config's `tokens` names it or the spec's globs (`design-rules.json`: `file_classes.token_files`) match it. Run it from the PostToolUse `gate` call, or as a fourth mode on the same matcher; one node process per edit is the cheaper.
+- **What Claude hears.** The bump (`major`, `minor`, `patch`), the removed or renamed names, and the contrast pairs that crossed a floor, capped like the gate's text.
 
-**Tests:**
-- Real-tool tests: stylelint and ESLint in a temp project with a `.design-suite.json`.
-  - A component under a glob that reads a project ramp step is refused.
-  - A token file the config names may hold literals.
-  - Without the config, both pass as today.
-- The spec's examples still pass through every gate (`test_rules_spec`).
-- Fail-before against `v3.4.0`, and against `main`.
+**Tests (`test_hooks.py`):** an opted-in token edit with a removed name (a major bump), one with a contrast crossing, a clean one (silent), no snapshot (silent), opted out (silent). Fail-before against `v3.4.0` and `main`.
 
-**Size:** M. **Files:** `assets/configs/*.mjs`, the reader's copy, `tests/test_real_tools.py`, `test_project_config.py`, the reference's §4 ("Not read by") and the CHANGELOG. Close N37 in the completion plan ("Done for 3.5.0"), and the row in the plan as `P24 part 4, #N`.
+**Close:** LC-C8 "fixed in 3.5.0" in the inventory, the plan's `P25` row as `P25 part 2, #N`, §9, the CHANGELOG, README's "The hooks", and `project-contract.md`'s `hooks` and `baselines` rows. **Size:** S-M.
 
-## 5. P25: the hooks
+## 5. P26: workflow commands and the CI bootstrap
 
-**Items:**
-- XC-C2 (`crosscut.md`)
-- LC-C8 (`lifecycle.md`)
-- SS-C6 (`studio-systems.md`)
-- XC-C8's hook part: the hook reads `.design-suite.json`. XC-C8 itself closes in P26, with the commands.
+**Items** (the plan's §4 row): XC-C3 (`crosscut.md`), LC-C9 (`lifecycle.md`), PS-C11 (`persuasion.md`), LC-B4, GT-C12 (`gates.md`), XC-C8 (closes here: the commands read `.design-suite.json`), and SS-C6's commands (`studio-systems.md`; its subagent is P27's). Read each by `grep -n`.
 
-Read them by `grep -n`.
+**What the plan asks for:** user-invoked workflow skills, each `skills/<name>/SKILL.md` with `disable-model-invocation: true`, so they stay out of the crowded listing: gate (design, perf and a11y static in one run), install-gate (writes the CI template for all three gates in a pinned Playwright container, with a baseline-update job and a tested Windows variant), new-system, critique, migrate, release-check (extract, diff, gate, changelog, guide), figma-sync, and the audit-to-deck chain.
 
-**What the plan asks for:**
-- An opt-in design gate: PostToolUse on Edit and Write for CSS, SCSS, HTML, JSX and TSX runs `audit_design` on the changed file and returns the findings to Claude.
-- A block on edits to generated files.
-- `diff_system` after a tokens edit. It now takes the project's tokens as its candidate without `new`, so the hook can pass only the published snapshot.
-- A `UserPromptSubmit` router that names the right skill when the listing has dropped the descriptions (`claude-code-capabilities.md`, "Implications").
+**First:** re-read the skills page's frontmatter and substitutions (`claude-code-capabilities.md` §3 dates from 2026-09-23): `disable-model-invocation`, `allowed-tools` with `${CLAUDE_SKILL_DIR}` and `${CLAUDE_PLUGIN_ROOT}`, `arguments`. The skill-budget test (`test_skill_budget.py`) and the listing tests will see the new skills: check how they count them.
 
-**First: re-read the hooks page and the mods reference** (§1 step 3). The capabilities reference's §2 dates from 2026-09-23, and its §5 did not re-read either page.
+**Split it.** It is M-L. Suggested: part 1, the gate and install-gate commands with the CI template (GT-C12, LC-B4, XC-C8); part 2, the lifecycle chains (LC-C9, PS-C11, XC-C3's rest, SS-C6's commands).
 
-**Then: weigh mods against command hooks.** Claude Mods (2.1.287) are plugin hooks modules of JavaScript function hooks (`tool.call`, `tool.check`, `prompt.submit`), tested with `claude plugin test`.
-- Read the mods reference (capabilities §5 has the link), and check two things before choosing: that mods run on Windows, and that they run in `claude -p`, which the evals (P29) use.
-- Command hooks (`hooks/hooks.json`, §2 of the capabilities reference) are the known route:
-  - Use exec form, with `"command": "python"` and the script path in `args`. On Windows, exec form needs a real `.exe`.
-  - Exit 2 on PostToolUse shows stderr to Claude.
-  - `hookSpecificOutput.additionalContext` reaches Claude as a reminder. It is capped at 10,000 characters, and `<system-reminder>` tags in it are escaped (2.1.292).
-
-**Opt-in:**
-- The gate does nothing unless the project's `.design-suite.json` turns it on. That needs a new key (say `hooks: {"designGate": true}`) in `project_config.py` **and** the Node reader, with `TheNodeReaderAgrees` extended, so the two readers keep agreeing.
-- A `userConfig` boolean turns it off globally. It reaches a hook as `CLAUDE_PLUGIN_OPTION_<KEY>`.
-- The hook reads the config through the plugin's own copy of the reader (the hook's folder needs one, and `TheCopiesAreTheMaster` must find it).
-
-**Tests:**
-- Each hook script fed JSON on stdin from fixtures: the opted-out project, an opted-in clean file, an opted-in file with a finding, and a generated file.
-- `claude plugin validate --strict` already runs in CI.
-
-**Size:** M.
-
-**Close each PR:**
-- The CHANGELOG under `## 3.5.0 — unreleased`.
-- Each item "fixed in 3.5.0" in the inventory, with its test.
-- The PR's own row in the plan as `Pk, #N`, and §9.
+**Tests:** each command's SKILL.md frontmatter (`disable-model-invocation: true`, valid `allowed-tools`), the CI template run through a YAML parser and its pinned image named, and each script the command calls run on a fixture project with a `.design-suite.json`.
 
 ## 6. End of session (never skip)
 
