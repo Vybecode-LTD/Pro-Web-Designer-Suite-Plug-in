@@ -248,7 +248,7 @@ def read_contract(path: Union[str, Path]) -> Dict[str, Any]:
         nested = section in ("ramps", "scales")
         for name, entry in value.items():
             if section == "ramps" and isinstance(entry, dict):
-                step = next((s for s in entry if not s.isdigit()), None)
+                step = next((s for s in entry if not (s.isascii() and s.isdigit())), None)   # not `²`
                 if step is not None:
                     raise ConfigError(f'{path}: "ramps.{name}.{step}" must be a numeric step')
             values = entry.values() if nested and isinstance(entry, dict) else [entry]
