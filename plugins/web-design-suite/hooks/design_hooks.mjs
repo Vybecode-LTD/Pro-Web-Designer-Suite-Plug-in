@@ -145,8 +145,11 @@ function gate(input) {
   // resolved, as the config's root is: a link, /var on macOS or a short 8.3 name would
   // otherwise name the file from outside its project
   const real = fs.realpathSync.native(file);
+  // a report past spawnSync's 1 MiB default was cut short (CodeRabbit on #82)
   const proc = spawnSync(exe, [...args, '-B', AUDIT, real, '--json'],
-                         { cwd: project.config.root, encoding: 'utf8', timeout: 100000, windowsHide: true });
+                         { cwd: project.config.root, encoding: 'utf8', timeout: 100000, windowsHide: true,
+                           maxBuffer: 256 * 1024 * 1024 });
+  if (proc.error) return tell(`audit_design.py could not run: ${proc.error.message}`);
   let findings;
   try {
     findings = JSON.parse(proc.stdout);

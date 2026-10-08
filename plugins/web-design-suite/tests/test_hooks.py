@@ -127,6 +127,17 @@ class TheDesignGate(HookTest):
         text = self.run_hook("gate", event)["hookSpecificOutput"]["additionalContext"]
         self.assertIn("audit_design.py found 1 problem in src/components/card.css.", text)
 
+    def test_a_report_past_a_mebibyte_reaches_claude(self):
+        """CodeRabbit on #82: spawnSync keeps 1 MiB of output, so a long report
+        was cut short and told Claude the audit had stopped."""
+        self.config(designGate=True)
+        rules = "".join(f"  .c{n} {{ color: var(--neutral-700); }}\n" for n in range(6000))
+        self.write("src/components/many.css", "@layer components {\n" + rules + "}\n")
+        text = self.context("src/components/many.css")
+        self.assertIn("audit_design.py found 6000 problems in src/components/many.css", text)
+        self.assertIn("more: run audit_design.py on the file", text)
+        self.assertLessEqual(len(text), 10000)
+
     def test_a_clean_file_says_nothing(self):
         self.config(designGate=True)
         self.write("src/components/card.css", CLEAN)
