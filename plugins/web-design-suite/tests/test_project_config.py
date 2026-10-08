@@ -13,10 +13,16 @@ the project's instead (read_tokens): audit_design (its token files, component
 globs, ramps and baseline), figma_audit's scales, figma_to_tokens' names,
 diff_system's snapshots and cluster_values' ramps. Each takes `--tokens`, or
 the config's token files without it.
+
+Part 4 (N37): shared/project_config.mjs is the Node reader, held to this one
+on the config, the token files and the component globs; the stylelint and
+ESLint configs read the project through it (test_real_tools).
 """
 from __future__ import annotations
 
+import dataclasses
 import json
+import pathlib
 import re
 import subprocess
 import sys
@@ -26,6 +32,7 @@ from test_figma_sync import PROJECT_ACCENT, STEPS
 from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, load_script, output, run_node, run_py
 
 MASTER = PLUGIN / "shared" / "project_config.py"
+NODE_MASTER = PLUGIN / "shared" / "project_config.mjs"
 TOKENS = ("@layer tokens {\n  :root {\n" + "".join(f"    --accent-{s}: {h};\n" for s, h in zip(STEPS, PROJECT_ACCENT))
           + "    --space-4: 1rem;\n    --bp-md: 48rem;\n    --bg-accent: var(--accent-600);\n  }\n}\n")
 
@@ -47,6 +54,22 @@ class TheCopiesAreTheMaster(unittest.TestCase):
         self.assertEqual([], [str(c.relative_to(PLUGIN)) for c in copies
                               if (c / "project_config.py").read_bytes() != master],
                          "copy shared/project_config.py over these")
+
+    def test_every_node_reader_has_the_master_copy_beside_it(self):
+        """N37: the lint configs read the project through project_config.mjs,
+        and browser_common.mjs re-exports it, so each folder that imports it
+        holds a byte-identical copy of shared/project_config.mjs."""
+        importers = sorted({p.parent for p in SKILLS.glob("*/**/*.mjs")
+                            if "from './project_config.mjs';" in p.read_text(encoding="utf-8")})
+        self.assertEqual(["a11y-audit-runner/scripts", "component-state-matrix/scripts",
+                          "design-critique-gate/scripts", "email-template-system/scripts",
+                          "perf-budget-gate/scripts", "web-design-studio/assets/configs"],
+                         [p.relative_to(SKILLS).as_posix() for p in importers])
+        self.assertEqual(importers, sorted(p.parent for p in SKILLS.glob("*/**/project_config.mjs")))
+        master = NODE_MASTER.read_bytes()
+        self.assertEqual([], [p.relative_to(PLUGIN).as_posix() for p in importers
+                              if (p / "project_config.mjs").read_bytes() != master],
+                         "copy shared/project_config.mjs over these")
 
 
 class TheReader(TempDirTest):
@@ -174,6 +197,13 @@ class TheReader(TempDirTest):
         with self.assertRaises(self.pc.ConfigError) as caught:
             self.pc.read_tokens([self.tmp / "gone.css"])
         self.assertIn("gone.css", str(caught.exception))
+
+    def test_a_tokens_css_ramp_step_is_ascii_digits(self):
+        """N37: `\\d` took `٥٠٠` as a step, so a tokens.css could declare a ramp
+        step that a contract.json refuses and the Node reader never sees."""
+        tokens = self.pc.read_tokens([self.write("t.css", ":root { --brand-500: #fff; --brand-٥٠٠: #000; }\n")])
+        self.assertEqual({"brand": {"500": "#fff"}}, tokens.ramps)
+        self.assertEqual({"brand": {"٥٠٠": "#000"}}, tokens.scales)
 
 
 class ExtractSystemWritesTheContract(TempDirTest):
@@ -529,6 +559,70 @@ CONFIGS = {
 }
 
 
+TOKENS_JS = """
+import { readTokens, loadConfig, isComponent } from %s;
+const [mode, ...args] = process.argv.slice(1);
+let out;
+if (mode === 'tokens') {
+  out = JSON.parse(args[0]).map((files) => {
+    try { return { ok: readTokens(files) }; } catch (err) { return { error: err.message }; }
+  });
+} else {
+  const config = loadConfig(args[0]);
+  const { globs, files } = JSON.parse(args[1]);
+  out = globs.map((glob) => files.map((file) => isComponent({ ...config, components: [glob] }, file)));
+}
+console.log(JSON.stringify(out));
+"""
+
+CONTRACT = "web-design-suite/contract/1"
+TOKEN_FILES = {
+    "layers.css": (
+        "@layer reset, tokens;\n@layer tokens {\n  :root, [data-theme] {\n"
+        "    --accent-600: oklch(56.5% 0.176 42);\n    --accent-50:  #FFF7F0;\n"
+        "    --icon: url(\"data:image/svg+xml;utf8,<svg/>\");\n    --bp-md: 48rem;\n"
+        "    --bg-accent: var(--accent-600);\n    --density: 1;\n    --edge-: 2px;\n    ---odd: 1;\n"
+        "    --p3-500: color(display-p3 1 0 0);\n    --quote: 'a;b}';\n  }\n"
+        "  [data-theme=\"dark\"] { --accent-990: #000000; }\n  [data-density=compact] { --space-4: 0.75rem; }\n"
+        "  @media (prefers-reduced-motion: reduce) { :root { --dur-base: 1ms; } }\n"
+        "  html { --accent-600: #123456; }\n  :where(:root) { --space-4: 1rem; }\n  * { --star-1: #fff; }\n"
+        "  :rooted { --nope-1: #fff; }\n}\n/* :root { --commented-out: 1px; } */\n"),
+    "digits.css": ":root { --brand-500: #fff; --brand-٥٠٠: #000; }\n",
+    "a.css": ":root { --brand-500: #ff0000; --brand-600: #cc0000; }\n",
+    "b.css": ":root { --brand-500: var(--accent-500); --brand-700: #990000; }\n",
+    "contract.json": json.dumps({"schema": CONTRACT, "ramps": {"brand": {"500": "#123456", "50": "#fff"},
+                                                               "__proto__": {"1": "#000"}, "empty": {}},
+                                 "scales": {"space": {"4": "1rem"}}, "roles": {"--bg-brand": "var(--brand-500)"},
+                                 "breakpoints": {"md": "48rem"}, "constants": {"--density": "1"}}),
+    "bad-schema.json": '{"schema": "x"}',
+    "bad-ramps.json": json.dumps({"schema": CONTRACT, "ramps": []}),
+    "bad-step.json": json.dumps({"schema": CONTRACT, "ramps": {"brand": {"5²": "#fff"}}}),
+    "bad-scale.json": json.dumps({"schema": CONTRACT, "scales": {"space": "1rem"}}),
+    "bad-role.json": json.dumps({"schema": CONTRACT, "roles": {"--x": 3}}),
+    "not-json.json": "{",
+    "utf16be.json": ("﻿" + json.dumps({"schema": CONTRACT, "ramps": {"brand": {"500": "#123456"}}})).encode("utf-16-be"),
+}
+TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.css"], ["contract.json"],
+               ["contract.json", "a.css"], ["a.css", "contract.json"], ["bad-schema.json"], ["bad-ramps.json"],
+               ["bad-step.json"], ["bad-scale.json"], ["bad-role.json"], ["not-json.json"], ["gone.css"],
+               ["gone.json"], ["a.css", "gone.css"], [], ["utf16be.json"]]
+
+# The component globs, odd ones included, and the paths they are tried on
+# (test_real_tools tries the same through stylelint's own matcher).
+GLOBS = ["src/widgets/**", "src/widgets/**/*.css", "**/*.widget.css", "src/*/card.css", "src/w?dgets/*.css", "**",
+         "*.css", "src/**.css", "src/a**b/*.css", "src/**x", "src/***/x.css", "src/****/x.css", "src/x**/y.css",
+         "src/x**", "src/(legacy)/*.css", "src/[id]/*.css", "src/{a,b}/*.css", "src/a+b/*.css", "src/@scope/*.css",
+         "src/!x/*.css", "/src/widgets/*.css", "src\\widgets\\*.css", "src/Components/*.css", "src/**/**/*.css",
+         "src/**/*/**/x.css", ".hidden/**", "src/a?(b)/*.css", "src/*(x)/*.css", "src/a.b/*.css"]
+GLOB_PATHS = ["src/widgets/card.css", "src/widgets/deep/card.css", "src/widgets/card.tsx", "src/card.widget.css",
+              "card.widget.css", "src/other/card.css", "src/wodgets/a.css", "x.css", "src/x.css", "src/a/b/c.css",
+              "src/ab/c.css", "src/axb/c.css", "src/a/y/b/c.css", "src/qx", "src/a/b/x", "src/a/x.css",
+              "src/x/y.css", "src/xz/y.css", "src/x/z/y.css", "src/(legacy)/a.css", "src/l/a.css", "src/[id]/a.css",
+              "src/i/a.css", "src/{a,b}/a.css", "src/a/a.css", "src/a+b/a.css", "src/aab/a.css",
+              "src/@scope/a.css", "src/!x/a.css", "src/Components/a.css", "src/components/a.css",
+              ".hidden/a.css", "src/.hidden.css", "src/ax(b)/a.css", "src/q(x)/a.css", "src/a.b/c.css"]
+
+
 @unittest.skipUnless(NODE, "node is not installed")
 class TheNodeReaderAgrees(TempDirTest):
     """XC-C8: the browser scripts read .design-suite.json through
@@ -559,7 +653,11 @@ class TheNodeReaderAgrees(TempDirTest):
 
     def test_every_config_reads_the_same(self):
         files = [self.write(f"{name}/.design-suite.json", text) for name, text in CONFIGS.items()]
-        files.append(self.write("utf16/.design-suite.json", '{"schema": 1, "stack": "css-modules"}'.encode("utf-16")))
+        text = '{"schema": 1, "stack": "css-modules"}'          # Codex on #81: every encoding json.loads finds
+        encoded = {"utf16": text.encode("utf-16"), "utf16be": ("﻿" + text).encode("utf-16-be"),
+                   "utf16le-bare": text.encode("utf-16-le"), "utf32": text.encode("utf-32"),
+                   "utf32be-bare": text.encode("utf-32-be"), "utf8-broken": b'{"schema": 1, "stack": "\xff"}'}
+        files += [self.write(f"{name}/.design-suite.json", data) for name, data in encoded.items()]
 
         def same(result):
             if "error" in result:
@@ -581,6 +679,52 @@ class TheNodeReaderAgrees(TempDirTest):
         own = self.write("repo/.design-suite.json", '{"schema": 1}')
         self.assertEqual(own.resolve(), self.pc.find_config(deep))
         self.assertEqual([{"ok": str(own.resolve())}], self.node("find", [deep]))
+
+    def run_node(self, mode, *args):
+        script = TOKENS_JS % json.dumps(NODE_MASTER.as_uri())
+        proc = subprocess.run([NODE, "--input-type=module", "-e", script, mode, *args],
+                              cwd=self.tmp, env=env(), capture_output=True, timeout=60)
+        self.assertEqual(0, proc.returncode, output(proc))
+        return json.loads(proc.stdout)
+
+    def test_the_token_files_read_the_same(self):
+        """N37: the lint configs take a project's ramps from readTokens(), a
+        port of read_tokens(): the same sections, values, order of files and
+        refusals, on a tokens.css, a contract.json and both together."""
+        for name, text in TOKEN_FILES.items():
+            self.write(name, text)
+        cases = [[str(self.tmp / name) for name in case] for case in TOKEN_CASES]
+
+        def python(files):
+            try:
+                t = self.pc.read_tokens(files)
+            except self.pc.ConfigError as exc:
+                return {"error": re.sub(r"not JSON \(.*\)$", "not JSON", str(exc))}
+            return {"ok": {"ramps": t.ramps, "scales": t.scales, "roles": t.roles,
+                           "breakpoints": t.breakpoints, "constants": t.constants}}
+
+        for case, from_node in zip(cases, self.run_node("tokens", json.dumps(cases))):
+            if "error" in from_node:
+                from_node["error"] = re.sub(r"not JSON \(.*\)$", "not JSON", from_node["error"])
+            with self.subTest(files=[pathlib.Path(f).name for f in case]):
+                self.assertEqual(python(case), from_node)
+                if "ok" in from_node:                    # ramp steps in numeric order, as Python's
+                    self.assertEqual([list(s) for s in python(case)["ok"]["ramps"].values()],
+                                     [list(s) for s in from_node["ok"]["ramps"].values()])
+        self.assertIn("٥٠٠", python(cases[1])["ok"]["scales"]["brand"])           # not a ramp step
+
+    def test_the_component_globs_match_the_same(self):
+        """N37: ESLint asks isComponent() which JSX files are components, as
+        the audit asks is_component(): glob by glob, the same answer."""
+        config = self.pc.load_config(self.write("site/.design-suite.json", '{"schema": 1}'))
+        files = [str(self.tmp / "site" / rel) for rel in GLOB_PATHS] + [str(self.tmp / "src" / "widgets" / "a.css")]
+        from_node = self.run_node("globs", str(config.path), json.dumps({"globs": GLOBS, "files": files}))
+        for glob, answers in zip(GLOBS, from_node):
+            one = dataclasses.replace(config, components=[glob])
+            with self.subTest(glob=glob):
+                self.assertEqual([one.is_component(f) for f in files], answers)
+                self.assertFalse(answers[-1])                         # outside the project
+        self.assertEqual(len(GLOBS), sum(1 for answers in from_node if any(answers)))   # each matches something
 
 
 class TheConfigsFilesReachTheirScripts(TempDirTest):

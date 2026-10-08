@@ -58,6 +58,31 @@
     a path, as Node does.
   - **Vendored alone.** `a11y_static.py` copied into a project's `scripts/` without its
     reader runs as it did, like `audit_design.py`.
+- **The project contract, part 4: the lint configs read it too** (N37). The audit read a
+  project's `.design-suite.json` and stylelint and the ESLint config did not, so a
+  component under `src/widgets/` that read `--brand-500` failed one gate and passed two.
+  Both configs now read the config from the working directory, as the audit does.
+  - **stylelint:** a token file the config names is a token file, so its literals are
+    allowed, and the `components` globs join the component files.
+  - **ESLint:** a JSX or TSX file the globs match is a component file.
+  - **Both:** a step of a ramp the project declares is a Tier-1 colour with a role. Its
+    advice comes from the rule spec (`tiers.project_ramps`) through `sync_rules.py`, as
+    the audit's now does.
+  - **One Node reader.** The config reader moves from `browser_common.mjs`, which
+    re-exports it, to `shared/project_config.mjs`. That file also ports `read_tokens()`.
+    A copy sits beside each importer, and the two lint configs import it from
+    `assets/configs/`, so copy it with them. A test holds both readers to the same
+    tokens, refusals and component globs. Both readers now take a config or contract in
+    every encoding Python's `json` finds: UTF-8, UTF-16 and UTF-32, with or without a
+    byte-order mark.
+  - **Globs in stylelint.** stylelint's overrides match with micromatch, whose `**` is
+    not the config's, so each glob is translated. Run through stylelint's own matcher, the
+    translation matches exactly the files `is_component()` does. micromatch compares a
+    path as the tool spelt it, so each glob is written for every spelling of the
+    project's folder: resolved, through a link or a subst drive, and on Windows with
+    either case of drive letter.
+  - **One fix.** A `tokens.css` ramp step must be ASCII digits, as a contract's is:
+    `--brand-٥٠٠` was a ramp step to Python and a scale to Node.
 
 ## 3.4.0 — 2026-10-07
 

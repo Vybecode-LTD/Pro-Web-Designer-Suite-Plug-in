@@ -45,7 +45,7 @@
   },
   "tiers": {
     "gates": ["audit", "stylelint", "eslint"],
-    "rule":"Law 6: component code reads roles. Reading a Tier-1 primitive that has a role (with_role, by prefix, with the advice the gates give) skips a tier. Not leaks: the page-rhythm roles that live under --space- (tier2_exceptions), and the null-outs, which assert no value (nulls). A primitive with no role (--radius-*, --weight-*, --z-*, --font-*, ...) is read directly, and so is a motion longhand's --dur-* or --ease-*; a motion shorthand that splits a --motion-* pair draws a warning from the audit alone. The audit and stylelint (design/tier1-primitive) read every var() in a component file or a `components` layer and its sub-layers (allowed, refused; stylesheets); the audit and ESLint read a Tailwind class's (--name) shorthand, with or without a type hint, and an inline custom property's string value, in any JSX file (allowed_jsx, refused_jsx). design-system-docs' extract_system.py reads the same three lists for its tier1-leak gap, so the two agree.",
+    "rule":"Law 6: component code reads roles. Reading a Tier-1 primitive that has a role (with_role, by prefix, with the advice the gates give) skips a tier. Not leaks: the page-rhythm roles that live under --space- (tier2_exceptions), and the null-outs, which assert no value (nulls). A primitive with no role (--radius-*, --weight-*, --z-*, --font-*, ...) is read directly, and so is a motion longhand's --dur-* or --ease-*; a motion shorthand that splits a --motion-* pair draws a warning from the audit alone. The audit and stylelint (design/tier1-primitive) read every var() in a component file or a `components` layer and its sub-layers (allowed, refused; stylesheets); the audit and ESLint read a Tailwind class's (--name) shorthand, with or without a type hint, and an inline custom property's string value, in any JSX file (allowed_jsx, refused_jsx). design-system-docs' extract_system.py reads the same three lists for its tier1-leak gap, so the two agree. A project's own ramps have roles too: the steps its .design-suite.json's token files declare (--brand-500) draw project_ramps' advice in all three gates, which read the config from the working directory, as the audit does.",
     "with_role": {
       "space-": "a proximity/inset role (--gap-related, --pad-card, --space-section)",
       "neutral-": "a color role (--bg-surface, --fg-muted, --border-default)",
@@ -61,6 +61,7 @@
     "tier2_exceptions": ["--space-section", "--space-subsection", "--space-block",
                          "--space-fluid-sm", "--space-fluid-md", "--space-fluid-lg", "--space-fluid-xl"],
     "nulls": ["--space-0", "--radius-none", "--shadow-none"],
+    "project_ramps": "a color role (--bg-*, --fg-*, --border-*)",
     "allowed": [".card { --card-gap: var(--space-0); gap: var(--card-gap); }",
                 ".card { box-shadow: var(--shadow-none); }",
                 ".card { padding-block: var(--space-section); }",

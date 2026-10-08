@@ -18,7 +18,8 @@
 #   Configs are found where handoff-conventions.md puts them, at the repo
 #   root (stylelint.config.*, .stylelintrc*, eslint.config.*), then in
 #   assets/configs/; DESIGN_GATE_STYLELINT_CONFIG and
-#   DESIGN_GATE_ESLINT_CONFIG name them outright. A stage that cannot run —
+#   DESIGN_GATE_ESLINT_CONFIG name them outright. The shipped configs import
+#   project_config.mjs from their own folder, so copy it with them. A stage that cannot run —
 #   no config, no audit script, no Python — FAILS the commit, because a gate
 #   that skips quietly passes everything. DESIGN_GATE_ALLOW_SKIP=1 turns
 #   that into a warning, for a repo that has not adopted the stage yet.

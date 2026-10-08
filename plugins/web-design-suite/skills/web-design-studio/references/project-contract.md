@@ -60,6 +60,7 @@ Each takes `--tokens FILE` (repeatable), a `tokens.css` or a `contract.json`, an
 | Skill | Script | What the project's tokens change |
 |---|---|---|
 | web-design-studio | `audit_design.py` | A token file the project names is a token file wherever it sits (`src/design/system.css`), so its literals are allowed. The ramps it declares (`--brand-500`) are Tier-1 colours with a role, so a component reading one is a Law 6 leak, as `--accent-500` is. The config's `components` globs add to the component files, and `baselines.audit` is the baseline without `--baseline` |
+| web-design-studio | `stylelint.config.mjs`, `eslint.design.config.mjs` | What the audit takes, read from the working directory with no flag. For stylelint, a token file the project names is a token file, so its literals are allowed. A step of a ramp it declares has a role in both configs: stylelint refuses it in a component file or a `components` layer, and ESLint in an inline custom property and in a `(--name)` class |
 | figma-variables-sync | `figma_audit.py` | Its ramps replace the studio's ramps of the same name. A scale it declares (spacing, radius, type, stroke, z, duration, leading, tracking, weight, breakpoints) replaces the studio's: its steps, not both, so the scale stays closed. A fluid `clamp()` type step counts at both ends |
 | figma-variables-sync | `figma_to_tokens.py` | Its names join the vocabulary, so `color/brand/500` comes back as `--brand-500`, recognised, in its tier. The starter's names keep theirs. A ramp step it writes in OKLCH comes back as that exact value |
 | design-system-docs | `extract_system.py` | Reads the CSS token files, and writes `contract.json` with `--contract` |
@@ -72,7 +73,7 @@ A flag beats each of these, and each falls back to the script's own default.
 
 | Key | Read by |
 |---|---|
-| `components` | web-design-studio's `audit_design.py` |
+| `components` | web-design-studio's `audit_design.py`, and its stylelint and ESLint configs. For ESLint, a JSX or TSX file a glob matches is a component file |
 | `stack` | content-model-to-ui's `scaffold_ui.py`: `tailwind-v3` and `tailwind-v4` scaffold Tailwind; `css-modules` and `vanilla-css` scaffold CSS Modules, the nearer of its two |
 | `emailTokens` | email-template-system's `build_email.py` and `lint_email.py --source`. They never read `tokens`: the email build has its own projection of the system |
 | `tokens` (CSS only) | client-presentation-builder's `build_presentation.py`, which builds the deck on the project's `tokens.css` files, in order. A contract cannot style a deck |
@@ -84,8 +85,8 @@ A flag beats each of these, and each falls back to the script's own default.
 | `baselines.docs` | design-system-docs' `build_docs.py --check`. A baseline the config names but that is missing is an error, as a named `--baseline` is |
 | `baselines.snapshots` | component-state-matrix's `snapshot_matrix.mjs` |
 
-**The browser scripts** read the config through `projectConfig()` in their `browser_common.mjs`, a copy of the plugin's `shared/browser_common.mjs`. It finds and checks the file by the same rules as `project_config.py`, with the same messages, and a test runs both readers on the same files.
+**The Node reader.** `project_config.mjs`, a copy of the plugin's `shared/project_config.mjs`, finds and checks the config by the same rules as `project_config.py`, with the same messages, and reads the token files as `read_tokens()` does; a test runs both readers on the same files, and the component globs on the same paths. The browser scripts reach it through `projectConfig()`, which their `browser_common.mjs` re-exports. The two lint configs import it from their own folder, so a project copies `project_config.mjs` with them; stylelint matches its overrides with micromatch, so the config translates each `components` glob into micromatch globs that match the same files.
 
 **Vendored alone.** A project that copied `audit_design.py` or `a11y_static.py` into its own `scripts/` before 3.5.0, as the hook recipe said, has no `project_config.py` beside it. Each then runs as it did; the audit says that the config is not read, and refuses `--tokens`. Copy `project_config.py` across to turn the config on.
 
-**Not read by** `crux_check.py`, which compares field data with a lab report and has no budget of its own, nor yet by the stylelint and ESLint configs, which class files by the rule spec's globs and tiers alone. Until a later 3.5.0 change brings the config to them, they and the audit can disagree about a project's own token files, components and ramps.
+**Not read by** `crux_check.py`, which compares field data with a lab report and has no budget of its own.

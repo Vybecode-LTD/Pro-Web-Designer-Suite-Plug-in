@@ -29,6 +29,7 @@ outside them is the gate's own. A block holds the constants its gate uses
   <FAMILY>_VALUES                one family's properties and values (SIZING_VALUES)
   TIER1_WITH_ROLE                tiers.with_role: each Tier-1 prefix with a role, and its advice
   TIER2_EXCEPTIONS, TIER1_NULLS  tiers.tier2_exceptions, tiers.nulls
+  PROJECT_RAMP_ADVICE            tiers.project_ramps: the advice for a project's own ramp step
 (The markers avoid "@generated": the audit and the migration tool skip a
 file that says it in its first 800 characters.)
 Files are written as UTF-8 with LF line endings, byte for byte the same on
@@ -53,13 +54,15 @@ TARGETS = {
                 "SYSTEM_COLOR_NAMES", "SYSTEM_COLOR_PROPERTY", "KEYWORDS", "COLOUR_FUNCTIONS", "LITERAL_UNITS",
                 "GEOMETRY_PROPERTIES", "COLOUR_WORDS", "SHAPES", "SPACING_VALUES", "STROKE_VALUES", "MOTION_VALUES",
                 "SIZING_VALUES", "MARGIN_VALUES", "BINDING_VALUES", "TIER1_WITH_ROLE", "TIER2_EXCEPTIONS",
-                "TIER1_NULLS")),
+                "TIER1_NULLS", "PROJECT_RAMP_ADVICE")),
     "skills/web-design-studio/assets/configs/stylelint.config.mjs":
         ("js", ("LAYER_ORDER", "MAX_NESTING", "MAX_SPECIFICITY", "MAX_COMPOUNDS", "SYSTEM_COLOR_NAMES",
                 "SYSTEM_COLOR_PROPERTY", "KEYWORDS", "COLOUR_FUNCTIONS", "COLOUR_WORDS", "SHAPES", "VALUE_ALLOWLIST",
-                "MARGIN_ALLOWLIST", "BINDING_ALLOWLIST", "TIER1_WITH_ROLE", "TIER2_EXCEPTIONS", "TIER1_NULLS")),
+                "MARGIN_ALLOWLIST", "BINDING_ALLOWLIST", "TIER1_WITH_ROLE", "TIER2_EXCEPTIONS", "TIER1_NULLS",
+                "PROJECT_RAMP_ADVICE")),
     "skills/web-design-studio/assets/configs/eslint.design.config.mjs":
-        ("js", ("COLOUR_FUNCTIONS", "LITERAL_UNITS", "TIER1_WITH_ROLE", "TIER2_EXCEPTIONS", "TIER1_NULLS")),
+        ("js", ("COLOUR_FUNCTIONS", "LITERAL_UNITS", "TIER1_WITH_ROLE", "TIER2_EXCEPTIONS", "TIER1_NULLS",
+                "PROJECT_RAMP_ADVICE")),
     # Not a gate: its tier1-leak gap is audit_design's L6 (LC-A19).
     "skills/design-system-docs/scripts/extract_system.py":
         ("py", ("TIER1_WITH_ROLE", "TIER2_EXCEPTIONS", "TIER1_NULLS")),
@@ -132,7 +135,8 @@ def block(spec: dict, lang: str, names: tuple[str, ...]) -> str:
             "KEYWORDS": values["keywords"], "COLOUR_FUNCTIONS": values["colour_functions"],
             "LITERAL_UNITS": spec["inline_styles"]["literal_units"],
             "GEOMETRY_PROPERTIES": spec["geometry"]["properties"],
-            "TIER2_EXCEPTIONS": spec["tiers"]["tier2_exceptions"], "TIER1_NULLS": spec["tiers"]["nulls"]}
+            "TIER2_EXCEPTIONS": spec["tiers"]["tier2_exceptions"], "TIER1_NULLS": spec["tiers"]["nulls"],
+            "PROJECT_RAMP_ADVICE": spec["tiers"]["project_ramps"]}
     py = lang == "py"
     text = (lambda s: json.dumps(s)) if py else js_string
     names = tuple(n for name in names for n in (tuple(values["shapes"]) if name == "SHAPES" else (name,)))

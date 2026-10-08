@@ -249,6 +249,7 @@ TIER2_EXCEPTIONS = [
     "--space-fluid-md", "--space-fluid-lg", "--space-fluid-xl",
 ]
 TIER1_NULLS = ["--space-0", "--radius-none", "--shadow-none"]
+PROJECT_RAMP_ADVICE = "a color role (--bg-*, --fg-*, --border-*)"
 # END design-rules
 IMPORT_LAYER = re.compile(r"@import\b.*?\blayer\(\s*([\w.-]+)\s*\)", re.I | re.S)
 # Sass (design-rules.json: sass). A @mixin or @function body emits nothing
@@ -368,8 +369,7 @@ class Project:
     ramp_steps: set[str] = field(default_factory=set)
 
 
-PROJECT = Project()
-PROJECT_RAMP_ADVICE = "a color role (--bg-*, --fg-*, --border-*)"
+PROJECT = Project()      # its ramp steps draw PROJECT_RAMP_ADVICE (design-rules.json: tiers)
 
 
 def use_project(config: ProjectConfig | None, sources: list[Path]) -> None:

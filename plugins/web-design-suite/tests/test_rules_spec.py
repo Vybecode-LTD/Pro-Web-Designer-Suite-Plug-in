@@ -357,6 +357,7 @@ class TheTierListsAgree(TempDirTest):
                 self.assertEqual(tiers["with_role"], module.TIER1_WITH_ROLE)
                 self.assertEqual(tiers["tier2_exceptions"], list(module.TIER2_EXCEPTIONS))
                 self.assertEqual(tiers["nulls"], list(module.TIER1_NULLS))
+        self.assertEqual(tiers["project_ramps"], audit.PROJECT_RAMP_ADVICE)    # N37: from the spec, as the configs'
 
 
 class TheDocsFollowTheSpec(unittest.TestCase):
