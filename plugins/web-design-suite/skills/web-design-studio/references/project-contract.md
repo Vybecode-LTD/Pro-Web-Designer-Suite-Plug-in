@@ -63,7 +63,7 @@ Each takes `--tokens FILE` (repeatable), a `tokens.css` or a `contract.json`, an
 | figma-variables-sync | `figma_audit.py` | Its ramps replace the studio's ramps of the same name. A scale it declares (spacing, radius, type, stroke, z, duration, leading, tracking, weight, breakpoints) replaces the studio's: its steps, not both, so the scale stays closed. A fluid `clamp()` type step counts at both ends |
 | figma-variables-sync | `figma_to_tokens.py` | Its names join the vocabulary, so `color/brand/500` comes back as `--brand-500`, recognised, in its tier. The starter's names keep theirs. A ramp step it writes in OKLCH comes back as that exact value |
 | design-system-docs | `extract_system.py` | Reads the CSS token files, and writes `contract.json` with `--contract` |
-| design-system-versioning | `diff_system.py` | Takes a `contract.json` as either snapshot. Without a `new` snapshot, the candidate is the project's token files. Against a contract, the other side is cut down to what a contract holds, default values and tiers, so a theme or a note it leaves out is not a change |
+| design-system-versioning | `diff_system.py` | Takes a `contract.json` as either snapshot. Without a `new` snapshot, the candidate is the project's token files: its tokens.css files as one snapshot, or, when the list holds a contract, every file read as above, in order, as a contract. Against a contract, the other side is cut down to what a contract holds, default values and tiers, so a theme or a note it leaves out is not a change |
 | design-token-migration | `cluster_values.py` | Its steps of the contract's six ramps (`neutral`, `accent` and the four status ramps) replace the derived ones, step by step, and `tokens.css` writes its values. A step it lacks is built as before, from its own accent step nearest 500. `--accent` beats its accent ramp. A ramp the contract does not name has no roles to land on, and the reconciliation report says so |
 
 ## 4. Who reads the other keys
@@ -88,4 +88,4 @@ A flag beats each of these, and each falls back to the script's own default.
 
 **Vendored alone.** A project that copied `audit_design.py` or `a11y_static.py` into its own `scripts/` before 3.5.0, as the hook recipe said, has no `project_config.py` beside it. Each then runs as it did; the audit says that the config is not read, and refuses `--tokens`. Copy `project_config.py` across to turn the config on.
 
-**Not read by** the stylelint and ESLint configs, which class files by the rule spec's globs alone, and by `crux_check.py`, which compares field data with a lab report and has no budget of its own.
+**Not read by** `crux_check.py`, which compares field data with a lab report and has no budget of its own, nor yet by the stylelint and ESLint configs, which class files by the rule spec's globs and tiers alone. Until a later 3.5.0 change brings the config to them, they and the audit can disagree about a project's own token files, components and ramps.

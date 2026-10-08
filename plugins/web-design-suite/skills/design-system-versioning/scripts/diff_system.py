@@ -1009,8 +1009,11 @@ def load_snapshot(raw: str, label: str, *, no_upstream: bool = False) -> Snapsho
 
 def project_snapshot(label: str, *, no_upstream: bool = False) -> Snapshot:
     """The token files the project's `.design-suite.json` lists, found by
-    walking up from the working directory (P24): its tokens.css files, read
-    as one snapshot, or its contract.json when it lists no CSS."""
+    walking up from the working directory (P24). Its tokens.css files are
+    read as one snapshot. A list with a contract.json in it is read through
+    project_config's read_tokens, every file in order, as a contract: a
+    contract holds only default values, so that is all the files share
+    (Codex on #78)."""
     try:
         config = project_config()
     except ConfigError as exc:
@@ -1021,8 +1024,9 @@ def project_snapshot(label: str, *, no_upstream: bool = False) -> Snapshot:
     missing = [str(p) for p in config.tokens if not p.is_file()]
     if missing:
         raise bail(f"diff_system: {config.path} lists {', '.join(missing)}, which does not exist.")
-    css = [p for p in config.tokens if not is_contract(p)]
-    return _load_css(css, label, no_upstream) if css else _snapshot_from_contract(list(config.tokens), label)
+    if any(is_contract(p) for p in config.tokens):
+        return _snapshot_from_contract(list(config.tokens), label)
+    return _load_css(list(config.tokens), label, no_upstream)
 
 
 def _load_css(paths: List[Path], label: str, no_upstream: bool) -> Snapshot:
