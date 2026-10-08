@@ -12,13 +12,13 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is public (since 2026-09-28), and MIT-licensed like the plugin.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
-## Current state (2026-10-07)
+## Current state (2026-10-08)
 
-- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is under way: P24 part 1 is merged (#76). No PR is open.
+- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is under way: P24 parts 1 to 3 are merged (#76, #78, #79). No PR is open.
 - **Installed:** 3.4.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** 768. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P24 part 2 (the project contract in the other scripts), then P25 (the hooks). `dev plans/web-design-suite-review/claude-code-capabilities.md` §5 is a partial 2026-10-07 re-check of the plugin features (the hooks, mods and evals pages are still to be re-read). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 54 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Tests:** 799. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P24 part 4 (N37: the project's config in stylelint and the ESLint config), then P25 (the hooks). `dev plans/web-design-suite-review/claude-code-capabilities.md` §5 is a partial 2026-10-07 re-check of the plugin features (the hooks, mods and evals pages are still to be re-read). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 53 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
