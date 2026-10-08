@@ -31,6 +31,9 @@ A script finds the file by walking up from the working directory to the first
 `.design-suite.json`, and stops at the repository root (a folder holding
 `.git`). A flag beats the config, and the config beats the script's own
 default. The hooks (P25) and the commands (P26) read it through this module.
+shared/project_config.mjs is the same reader for Node, held to this one by
+tests/test_project_config.py: the browser scripts and the stylelint and
+ESLint configs read the project through it.
 
 `contract.json` holds a token system's default values, by tier:
 
@@ -268,7 +271,7 @@ def read_contract(path: Union[str, Path]) -> Dict[str, Any]:
     return data
 
 
-RAMP_STEP = re.compile(r"^--([a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)*)-(\d+)$")
+RAMP_STEP = re.compile(r"^--([a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)*)-([0-9]+)$")    # `\d` takes `٥`
 COLOUR_LITERAL = re.compile(r"^(?:#[0-9a-f]{3,8}|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\()", re.I)
 ROOT_SELECTOR = re.compile(r"^(?::root|html|:where\(:root\)|\*)(?![\w-])")
 THEME_OR_DENSITY = re.compile(r"\[data-(?:theme|density)\s*[~|^$*]?=")

@@ -7,9 +7,9 @@
  * The master copy is shared/browser_common.mjs, at the plugin's root. The
  * scripts/ folders of a11y-audit-runner, component-state-matrix,
  * design-critique-gate, email-template-system and perf-budget-gate each hold
- * a byte-identical copy, so each skill still runs on its own: change the
- * master, copy it over all five, and
- * tests/test_browser_scripts.py fails until they match. (GT-C13: the copies
+ * a byte-identical copy, with a copy of shared/project_config.mjs beside it,
+ * so each skill still runs on its own: change the master, copy it over all
+ * five, and tests/test_browser_scripts.py fails until they match. (GT-C13: the copies
  * had drifted. a11y_runtime shortened animations without pausing them, so a
  * spinner beside a button with no focus ring counted as a ring.)
  */
@@ -166,87 +166,10 @@ export function readJsonFile(file) {
 }
 
 // The project contract (P24): a project's .design-suite.json, found and
-// checked by the rules shared/project_config.py applies for the Python
-// scripts, with the same messages. tests/test_project_config.py runs both
-// readers on the same files. The JSON is strict, as Python's is: no comments.
-export const CONFIG_NAME = '.design-suite.json';
-const CONFIG_KEYS = ['schema', 'tokens', 'emailTokens', 'components', 'stack', 'budgets', 'baselines'];
-const STACKS = ['vanilla-css', 'css-modules', 'tailwind-v3', 'tailwind-v4'];
-const BUDGETS = ['perf', 'a11y'];
-const BASELINES = ['audit', 'a11y', 'perf', 'docs', 'snapshots'];
-
-export class ConfigError extends Error {}
-
-function realPath(p) {
-  try { return fs.realpathSync.native(p); } catch { return path.resolve(p); }
-}
-
-// The first .design-suite.json walking up from `start`, never past the
-// folder that holds .git, or null.
-export function findConfig(start = process.cwd()) {
-  let here = realPath(start);
-  if (fs.existsSync(here) && fs.statSync(here).isFile()) here = path.dirname(here);
-  for (;;) {
-    const candidate = path.join(here, CONFIG_NAME);
-    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
-    if (fs.existsSync(path.join(here, '.git'))) return null;
-    const up = path.dirname(here);
-    if (up === here) return null;
-    here = up;
-  }
-}
-
-export function loadConfig(file) {
-  const where = realPath(file);
-  let data;
-  try {
-    const buf = fs.readFileSync(where);
-    const utf16 = buf[0] === 0xFF && buf[1] === 0xFE;
-    data = JSON.parse(buf.toString(utf16 ? 'utf16le' : 'utf8').replace(/^﻿/, ''));
-  } catch (err) {
-    throw new ConfigError(err instanceof SyntaxError ? `${where}: not JSON (${err.message})`
-                                                     : `${where}: ${err.message}`);
-  }
-  const fail = (msg) => { throw new ConfigError(`${where}: ${msg}`); };
-  const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
-  const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
-  if (!isObject(data)) fail('the top level must be an object');
-  const unknown = Object.keys(data).filter((k) => !CONFIG_KEYS.includes(k)).sort();
-  if (unknown.length) fail(`unknown key '${unknown[0]}'; the keys are ${CONFIG_KEYS.join(', ')}`);
-  if (data.schema !== 1) fail('"schema" must be 1');
-  const base = path.dirname(where);
-  const onePath = (key, value) => {
-    if (typeof value !== 'string' || !value.trim()) fail(`"${key}" must be a path, as a string`);
-    return path.resolve(base, value);
-  };
-  let components = has(data, 'components') ? data.components : [];
-  if (typeof components === 'string') components = [components];
-  if (!Array.isArray(components) || !components.every((g) => typeof g === 'string' && g))
-    fail('"components" must be a glob or a list of globs');
-  const stack = has(data, 'stack') ? data.stack : null;
-  if (stack !== null && !STACKS.includes(stack)) fail(`"stack" must be one of ${STACKS.join(', ')}`);
-  let tokens = has(data, 'tokens') ? data.tokens : [];
-  if (typeof tokens === 'string') tokens = [tokens];
-  if (!Array.isArray(tokens)) fail('"tokens" must be a path or a list of paths');
-  tokens = tokens.map((v) => onePath('tokens', v));
-  const email = has(data, 'emailTokens') ? data.emailTokens : null;
-  const emailTokens = email === null ? null : onePath('emailTokens', email);
-  const pathMap = (key, names) => {
-    const value = has(data, key) ? data[key] : {};
-    if (!isObject(value)) fail(`"${key}" must be an object`);
-    const extra = Object.keys(value).filter((k) => !names.includes(k)).sort();
-    if (extra.length) fail(`unknown key '${extra[0]}' in "${key}"; the keys are ${names.join(', ')}`);
-    return Object.fromEntries(Object.entries(value).map(([name, v]) => [name, onePath(`${key}.${name}`, v)]));
-  };
-  return { path: where, root: base, tokens, emailTokens, components, stack,
-           budgets: pathMap('budgets', BUDGETS), baselines: pathMap('baselines', BASELINES) };
-}
-
-// The config that governs `start`, read and checked, or null.
-export function projectConfig(start = process.cwd()) {
-  const found = findConfig(start);
-  return found ? loadConfig(found) : null;
-}
+// checked by project_config.mjs, which sits beside this file as a copy of the
+// plugin's shared/project_config.mjs (tests/test_project_config.py holds the
+// copies and the Python reader to it).
+export { CONFIG_NAME, ConfigError, findConfig, loadConfig, projectConfig } from './project_config.mjs';
 
 // WCAG 2.x: the relative luminance of an sRGB triple (0 to 255 each), and
 // the contrast ratio of two, from 1 to 21. Not rounded: a caller that shows

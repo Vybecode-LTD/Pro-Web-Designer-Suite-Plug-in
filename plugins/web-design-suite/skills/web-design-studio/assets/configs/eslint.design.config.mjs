@@ -34,6 +34,19 @@
  *
  *     npm i -D typescript-eslint typescript@~6.0
  *
+ *   Copy project_config.mjs with this file: the config imports it from its
+ *   own folder (both are in the plugin's assets/configs/).
+ *
+ * THE PROJECT'S OWN CONFIG (N37)
+ * ------------------------------
+ * A project's .design-suite.json reaches this file as it reaches
+ * scripts/audit_design.py and the stylelint config, read from the working
+ * directory: its `components` globs join the component files (a JSX or TSX
+ * file they match is one), and the ramp steps its tokens declare
+ * (`--brand-500`) are Tier-1 colours with a role, in an inline custom
+ * property and in a `(--name)` class. Without a config nothing changes; a
+ * config with a mistake stops the run with the key named, as the audit does.
+ *
  * WHY LINT RULES AND NOT A STYLE GUIDE
  * ------------------------------------
  * Every law in this file is one a competent engineer already agrees with
@@ -54,6 +67,7 @@
  * ========================================================================= */
 
 import jsxA11y from 'eslint-plugin-jsx-a11y';
+import { lintProject } from './project_config.mjs';
 
 /* =========================================================================
  * PART 1 — PATTERNS
@@ -203,7 +217,12 @@ const TIER2_EXCEPTIONS = [
   '--space-fluid-lg', '--space-fluid-xl',
 ];
 const TIER1_NULLS = ['--space-0', '--radius-none', '--shadow-none'];
+const PROJECT_RAMP_ADVICE = 'a color role (--bg-*, --fg-*, --border-*)';
 // END design-rules
+
+/* The project's config, from the working directory (N37, in the header). */
+const PROJECT = lintProject();
+const PROJECT_RAMP_STEPS = new Set(PROJECT.rampSteps);
 const RAW_COLOR = new RegExp(
   /(?:^|[\s(:,'"`[])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z])/.source +
     String.raw`|\b(?:${COLOUR_FUNCTIONS.join('|')})\s*\(`,
@@ -226,9 +245,22 @@ const TIER1_SHORTHAND = new RegExp(
 const VAR_NAME = /var\(\s*(--[\w-]+)/g;
 const tier1Advice = (ref) => {
   if (TIER2_EXCEPTIONS.includes(ref) || TIER1_NULLS.includes(ref)) return null;
+  if (PROJECT_RAMP_STEPS.has(ref)) return PROJECT_RAMP_ADVICE;
   const prefix = Object.keys(TIER1_WITH_ROLE).find((p) => ref.slice(2).startsWith(p));
   return prefix ? TIER1_WITH_ROLE[prefix] : null;
 };
+
+/* LAW 6 again — the `(--name)` shorthand naming a step of one of the
+ * project's own ramps, `bg-(--brand-500)`, or null without one. A shorthand
+ * holds only `--[\w-]+`, as the audit reads it, so no other name can be in one;
+ * a step TIER1_SHORTHAND already refuses (`--accent-500`) is left to it, and
+ * a page-rhythm role or a null-out is not a leak. */
+const SHORTHAND_STEPS = PROJECT.rampSteps.filter(
+  (name) => /^--[\w-]+$/.test(name) && tier1Advice(name) && !TIER1_SHORTHAND.test(`(${name})`),
+);
+const PROJECT_SHORTHAND = SHORTHAND_STEPS.length
+  ? new RegExp(String.raw`\((?:[a-z-]+:)?(?:${SHORTHAND_STEPS.join('|')})\)`)
+  : null;
 
 /* =========================================================================
  * PART 2 — SELECTOR SCOPES
@@ -664,6 +696,14 @@ const CORE_RESTRICTED_SYNTAX = [
           'Use the role class (p-card, bg-surface), or the role variable: p-(--pad-card).'
       ),
 
+      ...(PROJECT_SHORTHAND
+        ? forbidInClasses(
+            PROJECT_SHORTHAND,
+            "Law 6 (semantic before primitive): this reads a step of one of the project's own ramps " +
+              `(.design-suite.json). Right value, wrong tier: use ${PROJECT_RAMP_ADVICE}.`
+          )
+        : []),
+
       ...forbidInClasses(
         SPACE_BETWEEN,
         'Law 2 (parents own the gaps): space-x-*, space-y-* and divide-* set a margin or border on every child but the first. ' +
@@ -776,6 +816,7 @@ const componentConfig = {
     '**/components/**/*.{jsx,tsx}',
     '**/ui/**/*.{jsx,tsx}',
     'packages/ui/**/*.{jsx,tsx}',
+    (file) => /\.[jt]sx$/.test(file) && PROJECT.isComponent(file),  // the project's `components` (N37)
   ],
   rules: {
     /* Note the spread of CORE_RESTRICTED_SYNTAX. Without it, this block

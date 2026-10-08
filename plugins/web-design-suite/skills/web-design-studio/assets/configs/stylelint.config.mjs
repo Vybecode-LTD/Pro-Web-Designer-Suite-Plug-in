@@ -23,6 +23,19 @@
  *   package.json
  *     "lint:css": "stylelint \"src/**\/*.css\" \"packages/**\/*.css\""
  *
+ *   Copy project_config.mjs with this file: the config imports it from its
+ *   own folder (both are in the plugin's assets/configs/).
+ *
+ * THE PROJECT'S OWN CONFIG (N37)
+ * ------------------------------
+ * A project's .design-suite.json reaches this file as it reaches
+ * scripts/audit_design.py, read from the working directory: the token files
+ * it names are token files wherever they sit (Part 5, block 2), its
+ * `components` globs join the component files (block 1), and the ramp steps
+ * its tokens declare (`--brand-500`) are Tier-1 colours with a role
+ * (design/tier1-primitive). Without a config nothing changes; a config with a
+ * mistake stops the run with the key named, as the audit does.
+ *
  * WHY AN ALLOWLIST AND NOT A DENYLIST
  * -----------------------------------
  * A denylist enumerates the mistakes you have already seen. An allowlist
@@ -38,6 +51,7 @@
  * ========================================================================= */
 
 import stylelint from 'stylelint';
+import { lintProject } from './project_config.mjs';
 
 /* =========================================================================
  * PART 1 — THE CANONICAL LAYER ORDER (LAW 5)
@@ -224,7 +238,12 @@ const TIER2_EXCEPTIONS = [
   '--space-fluid-lg', '--space-fluid-xl',
 ];
 const TIER1_NULLS = ['--space-0', '--radius-none', '--shadow-none'];
+const PROJECT_RAMP_ADVICE = 'a color role (--bg-*, --fg-*, --border-*)';
 // END design-rules
+
+/* The project's config, from the working directory (N37, above). */
+const PROJECT = lintProject();
+const PROJECT_RAMP_STEPS = new Set(PROJECT.rampSteps);
 
 /* =========================================================================
  * PART 2 — LOCAL PLUGIN: LAYER ORDER (LAW 5)
@@ -656,8 +675,9 @@ const marginPlugin = createPlugin(marginRuleName, marginRule);
  * are TIER1_WITH_ROLE. Not leaks: the page-rhythm roles that live under
  * --space- (TIER2_EXCEPTIONS) and the null-outs (TIER1_NULLS). A primitive
  * with no role (--radius-*, --weight-*, --z-*, --font-*) is read directly,
- * and so is a motion longhand's --dur-* or --ease-*. The audit reads the same
- * lists in the same places (design-rules.json: tiers).
+ * and so is a motion longhand's --dur-* or --ease-*. A step of one of the
+ * project's own ramps has a role too (PROJECT_RAMP_STEPS). The audit reads the
+ * same lists in the same places (design-rules.json: tiers).
  *
  * The rule cannot see the file's path, so the component-file override turns
  * on `componentFile` and the base config reads only a `components` layer.
@@ -673,6 +693,7 @@ const VAR_NAME = /var\(\s*(--[\w-]+)/g;
 /* The advice for a primitive that has a role, or null for anything else. */
 const tier1Advice = (ref) => {
   if (TIER2_EXCEPTIONS.includes(ref) || TIER1_NULLS.includes(ref)) return null;
+  if (PROJECT_RAMP_STEPS.has(ref)) return PROJECT_RAMP_ADVICE;
   const prefix = Object.keys(TIER1_WITH_ROLE).find((p) => ref.slice(2).startsWith(p));
   return prefix ? TIER1_WITH_ROLE[prefix] : null;
 };
@@ -983,6 +1004,7 @@ export default {
         '**/ui/**/*.css',
         '**/*.module.css',
         '**/components.css',
+        ...PROJECT.componentGlobs,  // the project's `components` (N37)
       ],
       rules: {
         [marginRuleName]: true,
@@ -1010,7 +1032,8 @@ export default {
      * review when a brand changes.
      * ------------------------------------------------------------------ */
     {
-      files: ['**/tokens.css', '**/*-tokens.css', '**/*.tokens.css', '**/tokens/*.css'],
+      files: ['**/tokens.css', '**/*-tokens.css', '**/*.tokens.css', '**/tokens/*.css',
+              ...PROJECT.tokenGlobs],  // the project's `tokens` (N37)
       rules: {
         'declaration-property-value-allowed-list': null,
         [hexRuleName]: null,

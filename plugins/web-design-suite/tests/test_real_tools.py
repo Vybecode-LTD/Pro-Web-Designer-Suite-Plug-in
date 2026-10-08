@@ -54,6 +54,7 @@ Regressions covered:
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import pathlib
@@ -62,8 +63,8 @@ import subprocess
 import unittest
 
 from test_rules_spec import hold_to_the_spec, spec_examples
-from wds_support import (NODE, SKILLS, TOOLING_MAIN, TOOLING_V3, class_temp_dir, env, output,
-                         tailwind_part5, tool_modules, tool_roots)
+from wds_support import (NODE, SKILLS, TOOLING_MAIN, TOOLING_V3, class_temp_dir, env, load_script, output,
+                         run_py, tailwind_part5, tool_modules, tool_roots)
 
 CONFIGS = SKILLS / "web-design-studio" / "assets" / "configs"
 ESLINT_ROOTS = tool_roots("WDS_ESLINT_MODULES", TOOLING_MAIN)
@@ -181,6 +182,7 @@ class DesignEslintConfig(unittest.TestCase):
         ts = entry_url(ESLINT_ROOTS, "typescript-eslint")
         files = {
             "eslint.design.config.mjs": config.replace("from 'eslint-plugin-jsx-a11y'", f"from '{a11y}'"),
+            "project_config.mjs": (CONFIGS / "project_config.mjs").read_text(encoding="utf-8"),
             "eslint.config.mjs": (f"import tseslint from '{ts}';\n"
                                   "import design from './eslint.design.config.mjs';\n"
                                   "export default [\n"
@@ -484,6 +486,7 @@ class StylelintConfig(unittest.TestCase):
         from test_doc_snippets import as_files, snippets
         tmp = temp_project(cls, "wds-stylelint-", STYLELINT_MODULES)
         files = {"stylelint.config.mjs": (CONFIGS / "stylelint.config.mjs").read_text(encoding="utf-8"),
+                 "project_config.mjs": (CONFIGS / "project_config.mjs").read_text(encoding="utf-8"),
                  **{name: path.read_text(encoding="utf-8") for name, path in CANONICAL_ENTRIES.items()
                     if path.is_file()},
                  **{f"src/styles/{css.name}": css.read_text(encoding="utf-8")
@@ -567,6 +570,140 @@ class StylelintConfig(unittest.TestCase):
                 self.assertEqual([], [f"{name.split('/', 3)[3]} {p}" for name in names
                                       for p in self.problems(name)])
         self.assertLess(fragments, len(self.snippet_files) // 10)
+
+
+# N37: a project's .design-suite.json, which the audit read and the lint
+# configs did not, so a component under `src/widgets/` reading `--brand-500`
+# failed the audit and passed stylelint.
+PROJECT_CONFIG = json.dumps({"schema": 1, "tokens": "src/brand/palette.css", "components": ["src/widgets/**"]})
+PROJECT_FILES = {
+    # A token file the config names: literals live here (Law 1).
+    "src/brand/palette.css": ("@layer tokens {\n  :root {\n    --brand-500: oklch(62% 0.19 45);\n"
+                              "    --brand-600: #b4400a;\n    --bg-brand: var(--brand-500);\n  }\n}\n"),
+    # A component by the config's glob, reading one of the project's ramp steps (Law 6). In
+    # the layout layer, so only the file's class makes it a component.
+    "src/widgets/card.css": "@layer layout {\n  .card {\n    color: var(--brand-500);\n  }\n}\n",
+    # A component by the glob that pushes its sibling and styles an element (Law 2).
+    "src/widgets/note.css": ("@layer layout {\n  .note {\n    margin-block-start: var(--gap-related);\n  }\n\n"
+                             "  .note p {\n    color: var(--fg-default);\n  }\n}\n"),
+    # Outside the globs, the components layer decides (Law 6).
+    "src/styles/app.css": "@layer components {\n  .app {\n    color: var(--brand-600);\n  }\n}\n",
+    "src/widgets/Card.jsx": 'export const Card = () => <div className="bg-(--brand-500)" />;\n',
+    "src/widgets/Badge.jsx": "export const Badge = () => <div style={{ '--badge-fg': 'var(--brand-600)' }} />;\n",
+    "src/widgets/Note.jsx": 'export const Note = () => <div className="mt-related" />;\n',
+    "src/pages/Home.jsx": 'export const Home = () => <div className="mt-related" />;\n',
+}
+PROJECT_STYLELINT = {"src/brand/palette.css": [], "src/widgets/card.css": ["design/tier1-primitive"],
+                     "src/widgets/note.css": ["design/component-margins", "selector-max-type"],
+                     "src/styles/app.css": ["design/tier1-primitive"]}
+PROJECT_ESLINT = {"src/widgets/Card.jsx": ["no-restricted-syntax"],
+                  "src/widgets/Badge.jsx": ["design-laws/style-prop-custom-properties-only"],
+                  "src/widgets/Note.jsx": ["no-restricted-syntax"], "src/pages/Home.jsx": []}
+LAW_OF = {"design/tier1-primitive": "L6", "design/component-margins": "L2", "selector-max-type": "L2",
+          "declaration-property-value-allowed-list": "L1", "design/color-no-hex": "L1",
+          "design/no-literal-colour-function": "L1"}
+OVERRIDE_JS = """
+import { overrideGlobs } from %s;
+import { compileOverrideMatchers } from %s;
+const [root, data] = process.argv.slice(1);
+const { globs, files } = JSON.parse(data);
+console.log(JSON.stringify(globs.map((glob) => {
+  const [override] = compileOverrideMatchers([{ files: overrideGlobs(root, glob), rules: {} }], root);
+  return files.map((file) => override.matches(file));
+})));
+"""
+
+
+@unittest.skipUnless(NODE and STYLELINT_MODULES and ESLINT_MODULES,
+                     "set WDS_STYLELINT_MODULES and WDS_ESLINT_MODULES to run the project's own config")
+class TheGatesReadTheProject(unittest.TestCase):
+    """N37: stylelint and the ESLint config read a project's .design-suite.json
+    as the audit does: its token files are token files, its `components` globs
+    join the component files, and its ramp steps are primitives with a role.
+    The same files in a project without the config are the control: they pass
+    as they did before."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.stylelint, cls.eslint, cls.audit = {}, {}, {}
+        a11y = entry_url(ESLINT_ROOTS, "eslint-plugin-jsx-a11y")
+        design = (CONFIGS / "eslint.design.config.mjs").read_text(encoding="utf-8")
+        tools = {"stylelint.config.mjs": (CONFIGS / "stylelint.config.mjs").read_text(encoding="utf-8"),
+                 "project_config.mjs": (CONFIGS / "project_config.mjs").read_text(encoding="utf-8"),
+                 "eslint.design.config.mjs": design.replace("from 'eslint-plugin-jsx-a11y'", f"from '{a11y}'"),
+                 "eslint.config.mjs": ("import design from './eslint.design.config.mjs';\n"
+                                       "export default [\n"
+                                       "  { files: ['**/*.jsx'], languageOptions: { parserOptions: "
+                                       "{ ecmaFeatures: { jsx: true } } } },\n"
+                                       "  ...design,\n];\n")}
+        for kind, config in (("config", {".design-suite.json": PROJECT_CONFIG}), ("none", {})):
+            tmp = temp_project(cls, f"wds-project-{kind}-", STYLELINT_MODULES)
+            write_files(tmp, {**tools, **config, **PROJECT_FILES})
+            css = [n for n in PROJECT_FILES if n.endswith(".css")]
+            jsx = [n for n in PROJECT_FILES if n.endswith(".jsx")]
+            proc = subprocess.run([NODE, str(pathlib.Path(STYLELINT_MODULES) / "stylelint" / "bin" / "stylelint.mjs"),
+                                   *css, "--config", "stylelint.config.mjs", "--formatter", "json"],
+                                  cwd=tmp, capture_output=True, timeout=300, env=env())
+            report = json_report(proc)
+            if proc.returncode not in (0, 2) or report is None:
+                raise AssertionError(output(proc))
+            cls.stylelint[kind] = {pathlib.Path(r["source"]).resolve().relative_to(tmp.resolve()).as_posix():
+                                   sorted({w["rule"] for w in r["warnings"]}) for r in report}
+            proc = subprocess.run([NODE, str(pathlib.Path(ESLINT_MODULES) / "eslint" / "bin" / "eslint.js"),
+                                   "-c", "eslint.config.mjs", "--format", "json", *jsx],
+                                  cwd=tmp, capture_output=True, timeout=300, env=env())
+            if proc.returncode not in (0, 1):
+                raise AssertionError(output(proc))
+            cls.eslint[kind] = {pathlib.Path(r["filePath"]).resolve().relative_to(tmp.resolve()).as_posix():
+                                sorted({str(m["ruleId"]) for m in r["messages"]}) for r in json.loads(proc.stdout)}
+            proc = run_py("web-design-studio", "audit_design", "src", "--json", cwd=tmp)
+            if proc.returncode not in (0, 1):
+                raise AssertionError(output(proc))
+            cls.audit[kind] = sorted({(f["file"].replace("\\", "/").split("src/")[-1], f["law"])
+                                      for f in json.loads(proc.stdout)})
+
+    def test_stylelint_reads_the_projects_config(self):
+        self.assertEqual(PROJECT_STYLELINT, self.stylelint["config"])
+
+    def test_eslint_reads_the_projects_config(self):
+        self.assertEqual(PROJECT_ESLINT, self.eslint["config"])
+
+    def test_the_audit_and_stylelint_agree_on_each_stylesheet(self):
+        """The reference: the audit finds each law broken in a stylesheet
+        exactly where stylelint does, with the config and without it."""
+        for kind in ("config", "none"):
+            with self.subTest(project=kind):
+                self.assertEqual(sorted({(n.split("src/")[-1], LAW_OF[rule])
+                                         for n, rules in self.stylelint[kind].items() for rule in rules}),
+                                 [(n, law) for n, law in self.audit[kind] if n.endswith(".css")])
+
+    def test_without_the_config_nothing_changes(self):
+        """The control: no ramp of the project's is a primitive, no folder of
+        its a component folder, and its palette is not a token file."""
+        self.assertEqual({"src/brand/palette.css": ["design/color-no-hex", "design/no-literal-colour-function"],
+                          "src/widgets/card.css": [], "src/widgets/note.css": [], "src/styles/app.css": []},
+                         self.stylelint["none"])
+        self.assertEqual({name: [] for name in PROJECT_ESLINT}, self.eslint["none"])
+
+    def test_the_override_globs_match_what_the_audit_does(self):
+        """stylelint's overrides take globs, and micromatch's `**` differs from
+        the config's, so each glob is translated (overrideGlobs). Run through
+        stylelint's own matcher, it matches exactly what is_component does."""
+        from test_project_config import GLOB_PATHS, GLOBS
+        tmp = class_temp_dir(type(self), "wds-globs-")
+        (tmp / ".design-suite.json").write_bytes(b'{"schema": 1}')
+        config = load_script("web-design-studio", "project_config").load_config(tmp / ".design-suite.json")
+        files = [str(config.root / rel) for rel in GLOB_PATHS] + [str(config.root.parent / "src" / "a.css")]
+        augment = (pathlib.Path(STYLELINT_MODULES) / "stylelint" / "lib" / "augmentConfig.mjs").as_uri()
+        script = OVERRIDE_JS % (json.dumps((CONFIGS / "project_config.mjs").as_uri()), json.dumps(augment))
+        proc = subprocess.run([NODE, "--input-type=module", "-e", script, str(config.root),
+                               json.dumps({"globs": GLOBS, "files": files})],
+                              capture_output=True, timeout=60, env=env())
+        self.assertEqual(0, proc.returncode, output(proc))
+        for glob, answers in zip(GLOBS, json.loads(proc.stdout)):
+            one = dataclasses.replace(config, components=[glob])
+            with self.subTest(glob=glob):
+                self.assertEqual([one.is_component(f) for f in files], answers)
 
 
 def documented_examples(block: str, rule: str) -> list[str]:

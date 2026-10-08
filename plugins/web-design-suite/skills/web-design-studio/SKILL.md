@@ -218,7 +218,7 @@ python -m scripts.generate_type_scale --preview      # the starter's scale (--pr
 | `base.css` | Element defaults, prose rhythm with heading asymmetry, all in `:where()` |
 | `layout.css` | Every layout primitive, each with Tier-3 sockets |
 
-`assets/configs/` holds the enforcement: `theme.css` (Tailwind v4 `@theme`), `tailwind.config.ts` (v3), the Tailwind entries `index.tailwind.css` (v4) and `index.tailwind-v3.css`, `eslint.design.config.mjs`, `stylelint.config.mjs`, `pre-commit-design-gate.sh`.
+`assets/configs/` holds the enforcement: `theme.css` (Tailwind v4 `@theme`), `tailwind.config.ts` (v3), the Tailwind entries `index.tailwind.css` (v4) and `index.tailwind-v3.css`, `eslint.design.config.mjs` and `stylelint.config.mjs` with `project_config.mjs`, which both import to read `.design-suite.json`, and `pre-commit-design-gate.sh`.
 
 ---
 
