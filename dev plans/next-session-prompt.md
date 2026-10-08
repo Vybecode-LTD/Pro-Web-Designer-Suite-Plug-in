@@ -1,8 +1,12 @@
 # Start here: the next session
 
-**Written 2026-10-07**, at the end of the session that merged P45 (#73) and released 3.4.0 (R2, #74), then this docs PR. **Phase 4 is complete; Phase 5 (3.5.0, a full Claude Code plugin) starts now.**
+**Written 2026-10-07**, at the end of the session that:
+- merged P45 (#73);
+- released 3.4.0 (R2, #74), which completes Phase 4;
+- merged its docs (#75);
+- opened Phase 5 with P24 part 1 (#76).
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P24** (the project contract, §4) and **P25** (the hooks, §5). Phase 5 ends with R3; its other PRs are in the execution plan's §4.
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P24 part 2** (the project contract in the other scripts, §4) and **P25** (the hooks, §5). Phase 5 ends with R3; its other PRs are in the execution plan's §4.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -102,7 +106,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 - **The plugin** is `plugins/web-design-suite/`:
   - `skills/`: 13 skills.
-  - `tests/`: 755 tests, standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `run_py`, `run_node`, `load_script`, `TempDirTest`.
+  - `tests/`: 768 tests, standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `run_py`, `run_node`, `load_script`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
 - **The scripts, by skill** (P24 touches their argument parsing):
 
@@ -130,6 +134,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - **stylelint's `design/tier1-primitive`** is on in the base config for the `components` layer, judged by the layer's full name. The component-file override, now override 1 of 4, turns on `componentFile`. The tokens and theme overrides (2 and 3) turn it off, and come later, so they win for a token or theme file in a component folder.
   - **ESLint.** `TIER1_SHORTHAND` is built from the synced lists. `style-prop-custom-properties-only` reports `tier1Value`.
   - **The audit.** `tier1_advice(ref)`, `layer_path(at_rules)`, `in_layer` (the first segment), and `TW_VAR_SHORTHAND`, which replaces `TW_TIER1_VAR`.
+- **New in P24 part 1 (#76):** `.design-suite.json` and `contract.json`, read through `shared/project_config.py` (§4 has the decisions). `extract_system.py --contract FILE`. `figma_audit --tokens` takes a contract. A new reader needs its own copy of the module beside it.
 - **The release** is `python -B tooling/release/build.py OUT --rev SHA`, then a `v*` tag on that commit. `release.yml` is the only thing that creates a release.
   - The tag is annotated: `git tag -a vX.Y.Z SHA -m "web-design-suite X.Y.Z"`.
   - To install: unpack the zip's `web-design-suite/` over `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, then run `claude plugin update web-design-suite@web-design-suite` with the bundled CLI. The bundled CLI is now `%APPDATA%\Claude\claude-code\2.1.288\36aa8c97bf86\claude.exe`.
@@ -153,67 +158,69 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. P24: the project contract
+## 4. P24 part 2: the project contract in the other scripts
 
-**Items:**
-- XC-C8 (`dev plans/web-design-suite-review/crosscut.md` line 128)
-- LC-C1 (`lifecycle.md` line 112)
-- LC-B3 (`lifecycle.md` line 95)
+**Items:** XC-C8, LC-C1 and LC-B3, which stay open until this part closes them. Part 1 is #76. Read #76's description and `shared/project_config.py`'s docstring before you plan; they are the schema.
 
-Read those three paragraphs, and the completion plan's W9 point 2 (line 372), before you plan.
+**What part 1 decided** (don't reopen these without a reason):
+- **`.design-suite.json`.**
+  - **Keys:** `schema: 1` (required), `tokens`, `emailTokens`, `components`, `stack` (`vanilla-css`, `css-modules`, `tailwind-v3` or `tailwind-v4`), `budgets` (`perf`, `a11y`) and `baselines` (`audit`, `a11y`, `perf`, `docs`, `snapshots`).
+  - **Paths** are relative to the file.
+  - **Finding it:** walk up from the working directory to the first one, never past the folder that holds `.git`.
+  - **Precedence:** a flag or an explicit path beats the config, which beats the default. CodeRabbit asked for the config to beat a path given on the command line; that was declined in #76, with the reason.
+  - **Mistakes:** an unknown key or a wrong shape raises `ConfigError` naming the key, and the script exits 2.
+- **`contract.json`** (`schema: "web-design-suite/contract/1"`) has five sections:
+  - `ramps`: in step order.
+  - `scales`: by first name segment.
+  - `breakpoints`.
+  - `constants`: one-segment Tier-1 names, `--density`.
+  - `roles`: Tier 2, as written.
 
-**The gap.** A project cannot tell the scripts where its tokens, components, budgets and baselines are, except flag by flag. The flags that exist today (grep `add_argument("--` and `case '--` in `skills/*/scripts`; Codex on #75), classified:
-- **A project's tokens.css:**
-  - `figma_audit.py --tokens` (line 1049). Its `RAMPS` (line 132) has been updated from the tokens.css since 3.1.0 (LC-A3).
-  - `extract_system.py --tokens` (line 1962, `action="append"`).
-  - `build_presentation.py --tokens` (line 2778): "tokens.css to build the deck on (default: the bundled copy)".
-- **A different file of the same name.** `build_email.py --tokens` (line 1295) and `lint_email.py --tokens` (line 1164) take `email-tokens.json`, the email build's own token file, not a tokens.css. Keep them apart in the config (an `emailTokens` key, say), and don't route `contract.json` to them.
-- **No project tokens at all:** `cluster_values.py` hard-codes `STATUS_RAMPS` (line 750), and `audit_design.py`, `diff_system.py` and `figma_to_tokens.py` take no project tokens.
-- **Budgets:**
-  - `perf_audit.py --budget` (line 1643, default `perf-budget.json`)
-  - `measure_vitals.mjs --budget` (line 161)
-  - `a11y_runtime.mjs --budget` (line 179)
-- **Baselines:**
-  - `audit_design.py --baseline`/`--write-baseline` (line 2383)
-  - `a11y_static.py --baseline`/`--write-baseline` (line 1665, default `.a11y-baseline.json`)
-  - `perf_audit.py --baseline`/`--write-baseline` (line 1658, default `.perf-baseline.json`)
-  - `build_docs.py --baseline` (line 1376)
-  - `snapshot_matrix.mjs --baselines`/`--update-baselines` (line 123)
-- **Component globs:** the audit's are the spec's `file_classes`, which a project cannot extend.
+  Only tokens with a default value are in it.
+- **The reader.**
+  - The API: `find_config`, `load_config`, `project_config`, `token_sources(flag, start)`, `is_contract` and `read_contract`.
+  - A byte-identical copy sits in `design-system-docs/scripts/` and `figma-variables-sync/scripts/`.
+  - `test_project_config.TheCopiesAreTheMaster` finds the readers by their `from project_config import` line, so a new reader needs a copy of its own.
+- **Wired so far:**
+  - `figma_audit --tokens` takes a tokens.css or a contract, and with no flag reads the config's token files, merging ramps step by step.
+  - `extract_system` reads the config's CSS token files when no flag or path names one, and writes the contract with `--contract`.
 
-Before the schema, re-run that grep: the list above is from 2026-10-07.
+**Part 2's scope.** Re-run the flag search first, with the Bash tool, as the prompt's other commands are:
+```bash
+cd /c/DEV/Pro-Web-Designer-Suite-Plug-in/plugins/web-design-suite && grep -nE "add_argument\(\"--|case '--" skills/*/scripts/*.py skills/*/scripts/*.mjs | grep -v browser_common
+```
+- **`cluster_values.py`.** It builds a new system from a legacy codebase, with `STATUS_RAMPS` hard-coded (line 750).
+  - **Decide:** with a project's tokens (`--tokens`, or the config), does it snap literals onto the project's ramps and skip writing ramps, or only take the status ramps? Read its reference first; part 1 moved it here for this reason.
+- **`audit_design.py`:**
+  - The config's `components` add to the spec's `file_classes` component globs.
+  - Its `--baseline` takes the config's `baselines.audit`.
+  - **The project's tokens (LC-C1 names the audit; Codex on #77).** A new `--tokens` takes a tokens.css or a contract.json, and with no flag the audit reads the config's `tokens`. At the least:
+    - The config's token files are token files to the audit, so their literals are allowed, even at a path the `file_classes` globs miss (`src/design/system.css`).
+    - The contract's names are the project's tokens, for every check that compares against the starter's names.
 
-**The decisions to make** (they are the plan's; ask the user only if a real choice remains):
-1. **`.design-suite.json`'s schema.** It holds token files, component globs, the stack, budgets and baselines, plus a schema version.
-   - **Where a script finds it:** walk up from the working directory to the first `.design-suite.json`, or the repository root.
-   - **Precedence:** a flag beats the config, which beats the default.
-   - **Component globs:** a project's globs add to the spec's `file_classes`; whether they can also replace them is the open question.
-   - **Unknown keys** are an error, with the key named.
-2. **`contract.json`'s schema.** `extract_system.py` writes it from the project's tokens.css: ramps, scales, roles and breakpoints, with a schema version. Every script whose `--tokens` takes a tokens.css (figma_audit, extract_system, build_presentation, and the ones P24 adds) accepts either that or a `contract.json`. The email scripts' `--tokens` does not.
-3. **One reader.** A Python module that finds and validates the config. It has a master in `shared/` and a copy in each skill that needs it, with a test that the copies match, as `browser_common.mjs` has.
-
-**Who reads the config.** P24 builds the reader, and the scripts read it through their argument parsing. The hooks (P25) and the commands (P26) read it through the same reader when they are built, so their own PRs own those integrations; P24 states that hand-off in the reader's docstring and its reference section.
-
-**The split (L, two parts; the plan's row says the same):**
-- **Part 1:** the reader and both schemas. `extract_system` writes `contract.json`. `figma_audit` and `cluster_values` read `--tokens` either way, and `cluster_values` drops `STATUS_RAMPS` for the project's ramps when one is given.
-- **Part 2:**
-  - `audit_design`: the component globs, and token files from the config.
-  - `diff_system` and `figma_to_tokens`.
-  - `build_presentation.py`'s tokens.css.
-  - Every budget and baseline consumer listed under the gap: `perf_audit.py`, `measure_vitals.mjs` and `a11y_runtime.mjs` (budgets); `audit_design.py`, `a11y_static.py`, `perf_audit.py`, `build_docs.py` and `snapshot_matrix.mjs` (baselines). `crux_check.py` takes none today; give it the budget only if its reference says it should. A consumer left out is named in the PR with the reason.
-  - The email scripts' `email-tokens.json`, under its own key.
-  - The docs: each skill's scripts reference, and a section in web-design-studio's references on the project contract.
+    Read LC-C1 and the audit's token-file and name checks before choosing the rest. Test the precedence (flag, then config, then default) as `FigmaAuditReadsTheContract` does. LC-C1 is not closed until the audit, `diff_system` and `figma_to_tokens` read the contract.
+- **`diff_system.py` and `figma_to_tokens.py`:** read the project's tokens where they take a tokens file.
+- **`build_presentation.py --tokens`** (line 2778): the config's tokens.css. A contract cannot style a deck, so take CSS only, as extract_system does.
+- **The email scripts:** `build_email.py` and `lint_email.py` read `emailTokens`, never `tokens`.
+- **Budgets:** `perf_audit.py --budget` (`budgets.perf`); `measure_vitals.mjs --budget` (`budgets.perf`); `a11y_runtime.mjs --budget` (`budgets.a11y`).
+- **Baselines:** `a11y_static.py` (`baselines.a11y`), `perf_audit.py` (`baselines.perf`), `build_docs.py` (`baselines.docs`), `snapshot_matrix.mjs --baselines` (`baselines.snapshots`).
+- **The Node scripts cannot import the Python reader.** Give `shared/browser_common.mjs`, which all five browser scripts already copy, a `projectConfig()` that finds and checks the same file with the same rules. Add a test that runs both readers on the same fixtures and compares the results.
+- **`crux_check.py`** takes no budget today; give it one only if its reference says it should. A consumer left out is named in the PR with the reason.
+- **Docs:** each skill's `references/scripts.md` row, and a section on the project contract in web-design-studio's references, which the scripts' rows point to.
 
 **Tests:**
-- A new `tests/test_project_config.py`: the walk-up, precedence, unknown keys, and the copies matching.
-- Each script's reading of the config, through `run_py` in a temp project.
+- Add each consumer's reading of the config to `tests/test_project_config.py`, through `run_py`/`run_node` in a temp project with a `.git` folder, so the walk-up stops there.
+- Cover a flag beating the config each time.
+- Run `test_powershell_json` locally: `check.py` does not pick it for a script change, and it forbids `json.loads(...read_text(...))`. Read JSON from `read_bytes()`.
 - The fail-before table against `v3.4.0`.
 
+**Size:** L. Split it again if it grows: Python consumers first, then the Node reader and its consumers.
+
 **Files:**
-- `shared/` plus the copies, `extract_system.py`, `figma_audit.py`, `cluster_values.py`, then part 2's scripts.
+- The scripts above, `shared/browser_common.mjs` and its five copies, and `shared/project_config.py` copied beside each new Python reader.
 - The CHANGELOG under `## 3.5.0 — unreleased`.
-- The inventory rows for XC-C8, LC-C1 and LC-B3 (each "fixed in 3.5.0" with its test, in the part that finishes it).
-- The plan's P24 row and §9.
+- The inventory rows for XC-C8, LC-C1 and LC-B3: each "fixed in 3.5.0" with its test, when this part closes it.
+- The plan: replace the `P24` row with `P24 part 2, #N`, and update §9.
 
 ## 5. P25: the hooks
 
