@@ -20,13 +20,13 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | XC-B5 | — | fixed in 3.3.0 for what a person pastes, the READMEs; the skills' docs stay bash, which Claude Code runs them in: `test_docs.PasteableCommands` (PR #35) | The docs are bash-first (backslash continuations, `&&`, `/tmp/`, `$(…)`, `python3`): fine through Git Bash, broken when pasted into cmd or PowerShell 5.1. |
 | XC-B6 | — | fixed in 3.2.0 | discoverability in a heavy environment: in this machine's sessions the 13 skills |
 | XC-C1 | L · high | W9 (3.5.0) | An eval suite (`evals/`): per-skill triggering cases and outcome graders, run with ablation, in CI with a cost ceiling. |
-| XC-C2 | M · high | W9 (3.5.0) | An opt-in design-gate hook: PostToolUse on Edit/Write runs `audit_design` on the changed file and returns the findings to Claude. |
+| XC-C2 | M · high | fixed in 3.5.0: `test_hooks` (`TheDesignGate`, `TheHooksFile`), PR #82 | An opt-in design-gate hook: PostToolUse on Edit/Write runs `audit_design` on the changed file and returns the findings to Claude. |
 | XC-C3 | M · high | W9 (3.5.0) | User-invocable workflows as skills with `disable-model-invocation: true`: /gate, /install-gate, /critique, /new-system and more. |
 | XC-C4 | M · medium | W9 (3.5.0) | Subagents (design-critic, a11y-auditor), so heavy references load in an isolated context. |
 | XC-C5 | S · high | fixed in 3.2.0 | promote this review's harnesses to permanent tests: every documented |
 | XC-C6 | M · medium | fixed in 3.3.0: `tooling/release/build.py` (`test_release_build`), `.github/workflows/ci.yml` and `release.yml` (PR #17). The evals join CI with P29 | Build and release: a build tool for the zip and the 13 `.skill` files, `claude plugin tag`, and a CI matrix of Windows/Linux/macOS × Python 3.9–3.14 with Node. |
 | XC-C7 | M · medium | fixed in 3.2.0 | token efficiency: SKILL.md files are 17–28 KB (≈4.4–6.9k tokens per |
-| XC-C8 | M · medium | W9 (3.5.0); every script reads it, in PRs #76, #78 and #79 (`test_project_config`: `TheNodeReaderAgrees`, `TheConfigsFilesReachTheirScripts`, `AuditReadsTheProject`), and the lint configs in #81 (`test_real_tools.TheGatesReadTheProject`); the hook reads it in P25 and the commands in P26, where it closes | One project config file, `.design-suite.json`, read by every script, the hook and the commands. |
+| XC-C8 | M · medium | W9 (3.5.0); every script reads it, in PRs #76, #78 and #79 (`test_project_config`: `TheNodeReaderAgrees`, `TheConfigsFilesReachTheirScripts`, `AuditReadsTheProject`), and the lint configs in #81 (`test_real_tools.TheGatesReadTheProject`); the hook reads it from #82 (`test_hooks.TheDesignGate`); the hook reads it in P25 and the commands in P26, where it closes | One project config file, `.design-suite.json`, read by every script, the hook and the commands. |
 | XC-C9 | S · low | fixed in 3.3.0: `WDS` in bash, PowerShell and cmd forms, one-line commands (`test_docs.PasteableCommands`, PR #35) | Cross-platform docs: PowerShell/cmd equivalents for the few shell-only recipes, or one `python -m scripts.gate` entry point. |
 | XC-C10 | S · high | fixed in 3.1.0 (the review's C6) | fixes XC-A8: write every documented command as |
 | SS-A1 | high | fixed in 3.1.0 | Law 7 (density) does nothing on a subtree, which is how every doc uses it. |
@@ -60,7 +60,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SS-C3 | — | fixed in 3.2.0 | Make the docs part of the test suite (S–M, P1). |
 | SS-C4 | — | fixed in 3.2.0 | One source for shared CSS (M, P1). |
 | SS-C5 | — | fixed in 3.3.0: `--preset studio`, the 11px refusal, `--fluid-space`, `--anchor-seed`, `--neutral-hue`, `--gamut p3` (`test_numbers.TypeScale`, `ColourRamps`) | Generator upgrades (M, P1). |
-| SS-C6 | — | W9 (3.5.0) | Use Claude Code plugin features (M, P1). |
+| SS-C6 | — | W9 (3.5.0); the hook in PR #82 (`test_hooks.TheDesignGate`), the commands in P26 and the subagent in P27 | Use Claude Code plugin features (M, P1). |
 | SS-C7 | — | W9 (3.5.0) | An eval suite of script-graded cases, run against a no-plugin baseline. |
 | SS-C8 | — | fixed in 3.2.0 | Size: 17.7 KB / 2,616 words ≈ 4.4k tokens. |
 | SS-C9 | — | fixed in 3.3.0: `test_contract.TheStarterKeepsItsWord` | Ship what the starter refers to (S, P1). |
@@ -143,7 +143,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-C5 | — | fixed in 3.4.0: `test_versioning.DiffSystemClassifiesWhatSystemJsonRecords` (PR #48) | diff_system: cover density, conditions, `element` and CSS Modules; record `@layer` in system.json; make an added override major when an existing value moves. |
 | LC-C6 | — | fixed in 3.4.0: its last open part, LC-A17 (PR #54); LC-B4 is W9's | Instruction fixes: the rebase recipe (LC-A6), a worktree-based before/after audit (LC-A13), the `${CLAUDE_SKILL_DIR}` invocation (LC-A20), one snapshot path with its inputs in config (LC-A18), the README (LC-A21), the ro |
 | LC-C7 | — | W10 (3.6.0+) | A Figma MCP route: a SKILL.md routing row that says "if `get_variable_defs` is available, read with it"; a `--reverse --format plugin-script` output for `use_figma` that renames "Mode 1", sets `scopes: []` on primitives  |
-| LC-C8 | — | W9 (3.5.0) | Hooks: block edits to files headed "GENERATED — DO NOT EDIT", and on a tokens.css edit run diff_system and return the bump and any contrast crossings. |
+| LC-C8 | — | W9 (3.5.0); the generated-file guard in PR #82 (`test_hooks.TheGeneratedFileGuard`), the token diff in P25 part 2 | Hooks: block edits to files headed "GENERATED — DO NOT EDIT", and on a tokens.css edit run diff_system and return the bump and any contrast crossings. |
 | LC-C9 | — | W9 (3.5.0) | User-invocable workflow skills (`disable-model-invocation: true`): `/wds-migrate-census`, `/wds-release-check` (extract → diff → gate → changelog → guide), `/wds-figma-handoff`, `/wds-docs-check`, each with `allowed-tool |
 | LC-C10 | — | W9 (3.5.0) | A `claude plugin eval` suite, with a `scaffold_script` for each fixture. |
 | LC-C11 | — | fixed in 3.2.0 | Descriptions and token budget. |

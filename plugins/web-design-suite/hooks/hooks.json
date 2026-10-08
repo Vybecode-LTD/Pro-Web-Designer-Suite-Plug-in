@@ -1,0 +1,28 @@
+{
+  "description": "web-design-suite: a design gate and a generated-file guard that a project turns on in its .design-suite.json, and a router that names the skill a prompt needs.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {"type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/design_hooks.mjs", "guard"], "timeout": 30}
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {"type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/design_hooks.mjs", "gate"], "timeout": 120}
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {"type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/design_hooks.mjs", "route"], "timeout": 10}
+        ]
+      }
+    ]
+  }
+}

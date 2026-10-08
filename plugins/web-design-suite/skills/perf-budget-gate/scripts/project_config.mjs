@@ -20,10 +20,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const CONFIG_NAME = '.design-suite.json';
-const CONFIG_KEYS = ['schema', 'tokens', 'emailTokens', 'components', 'stack', 'budgets', 'baselines'];
+const CONFIG_KEYS = ['schema', 'tokens', 'emailTokens', 'components', 'stack', 'budgets', 'baselines', 'hooks'];
 const STACKS = ['vanilla-css', 'css-modules', 'tailwind-v3', 'tailwind-v4'];
 const BUDGETS = ['perf', 'a11y'];
 const BASELINES = ['audit', 'a11y', 'perf', 'docs', 'snapshots'];
+const HOOKS = ['designGate', 'generatedFiles'];      // the plugin's hooks a project turns on (P25)
 
 export class ConfigError extends Error {}
 
@@ -130,8 +131,17 @@ export function loadConfig(file) {
     if (extra.length) fail(`unknown key '${extra[0]}' in "${key}"; the keys are ${names.join(', ')}`);
     return Object.fromEntries(Object.entries(value).map(([name, v]) => [name, onePath(`${key}.${name}`, v)]));
   };
+  const hookFlags = () => {
+    const value = has(data, 'hooks') ? data.hooks : {};
+    if (!isObject(value)) fail('"hooks" must be an object');
+    const extra = Object.keys(value).filter((k) => !HOOKS.includes(k)).sort();
+    if (extra.length) fail(`unknown key '${extra[0]}' in "hooks"; the keys are ${HOOKS.join(', ')}`);
+    const bad = Object.keys(value).find((k) => typeof value[k] !== 'boolean');
+    if (bad !== undefined) fail(`"hooks.${bad}" must be true or false`);
+    return { ...value };
+  };
   return { path: where, root: base, tokens, emailTokens, components, stack,
-           budgets: pathMap('budgets', BUDGETS), baselines: pathMap('baselines', BASELINES) };
+           budgets: pathMap('budgets', BUDGETS), baselines: pathMap('baselines', BASELINES), hooks: hookFlags() };
 }
 
 // The config that governs `start`, read and checked, or null.

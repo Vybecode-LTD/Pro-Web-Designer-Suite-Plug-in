@@ -83,6 +83,28 @@
     either case of drive letter.
   - **One fix.** A `tokens.css` ramp step must be ASCII digits, as a contract's is:
     `--brand-٥٠٠` was a ramp step to Python and a scale to Node.
+- **Hooks, part 1** (XC-C2, LC-C8 and SS-C6 in part, XC-C8's hook part). The plugin
+  now ships `hooks/hooks.json`. Each hook runs `hooks/design_hooks.mjs` under `node`, in
+  exec form, so Windows spawns it with no shell.
+  - **The design gate** (PostToolUse on Edit and Write). After each edit Claude makes to
+    a file the audit reads, `audit_design.py` runs on that file, in the config's folder,
+    so the project's own components and ramps count. Its findings reach Claude as
+    context, capped below Claude Code's 10,000 characters.
+  - **The generated-file guard** (PreToolUse on Edit and Write). An edit to a file
+    that says it is generated in its first 800 characters is refused, with the reason:
+    change its source and regenerate. The markers are the audit's.
+  - **The router** (UserPromptSubmit). A prompt that names one skill's work, such as
+    WCAG, Figma variables or an HTML email, hears that skill's name, up to two. A crowded
+    skill listing drops the descriptions, and then the names are all Claude sees.
+  - **Opt-in.** The gate and the guard act only in a project whose `.design-suite.json`
+    turns them on, with the new `hooks` key: `{"designGate": true, "generatedFiles":
+    true}`. Both readers check the key, with the same messages. The plugin's
+    `design_hooks` option (`userConfig`), set to false, turns all three hooks off.
+  - **Python, found.** The gate alone needs Python, and looks for it as the pre-commit
+    hook does: `WDS_PYTHON`, else `python3`, `python` or `py -3`. Each candidate must
+    report major version 3, so the Store placeholder on Windows is passed over. A hook
+    that cannot act tells Claude why, or stays silent. It never blocks a tool call
+    because of its own failure.
 
 ## 3.4.0 — 2026-10-07
 

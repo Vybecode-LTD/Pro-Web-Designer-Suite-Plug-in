@@ -17,14 +17,17 @@ one (test_project_config holds every copy to the master).
       "budgets": {"perf": "perf-budget.json", "a11y": "a11y-budget.json"},
       "baselines": {"audit": ".design-baseline.json", "a11y": ".a11y-baseline.json",
                     "perf": ".perf-baseline.json", "docs": "docs/baseline.json",
-                    "snapshots": "snapshots/"}
+                    "snapshots": "snapshots/"},
+      "hooks": {"designGate": true, "generatedFiles": true}
     }
 
 Only `schema` is required. `tokens` holds the project's token files: a
 tokens.css, or a contract.json. `emailTokens` is the email build's own
 email-tokens.json, a different file that only the email scripts read.
 `components` adds globs to the component files the rule spec names
-(design-rules.json: file_classes). Paths are relative to the file. An unknown
+(design-rules.json: file_classes). `hooks` turns on the plugin's hooks for
+this project: `designGate` audits each file Claude edits, and `generatedFiles`
+refuses an edit to a generated file. Paths are relative to the file. An unknown
 key, or a value of the wrong shape, is an error that names the key.
 
 A script finds the file by walking up from the working directory to the first
@@ -79,10 +82,11 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 CONFIG_NAME = ".design-suite.json"
 CONFIG_SCHEMA = 1
 CONTRACT_SCHEMA = "web-design-suite/contract/1"
-KEYS = ("schema", "tokens", "emailTokens", "components", "stack", "budgets", "baselines")
+KEYS = ("schema", "tokens", "emailTokens", "components", "stack", "budgets", "baselines", "hooks")
 STACKS = ("vanilla-css", "css-modules", "tailwind-v3", "tailwind-v4")
 BUDGETS = ("perf", "a11y")
 BASELINES = ("audit", "a11y", "perf", "docs", "snapshots")
+HOOKS = ("designGate", "generatedFiles")     # the plugin's hooks a project turns on (P25)
 CONTRACT_SECTIONS = ("ramps", "scales", "roles", "breakpoints", "constants")
 
 
@@ -100,6 +104,7 @@ class ProjectConfig:
     stack: Optional[str] = None
     budgets: Dict[str, Path] = field(default_factory=dict)
     baselines: Dict[str, Path] = field(default_factory=dict)
+    hooks: Dict[str, bool] = field(default_factory=dict)
 
     @property
     def root(self) -> Path:
@@ -202,6 +207,18 @@ def load_config(path: Union[str, Path]) -> ProjectConfig:
                               f'the keys are {", ".join(names)}')
         return {name: one_path(f"{key}.{name}", v) for name, v in value.items()}
 
+    def hook_flags() -> Dict[str, bool]:
+        value = data.get("hooks", {})
+        if not isinstance(value, dict):
+            raise ConfigError(f'{path}: "hooks" must be an object')
+        extra = sorted(set(value) - set(HOOKS))
+        if extra:
+            raise ConfigError(f'{path}: unknown key {extra[0]!r} in "hooks"; the keys are {", ".join(HOOKS)}')
+        bad = next((k for k, v in value.items() if not isinstance(v, bool)), None)
+        if bad is not None:
+            raise ConfigError(f'{path}: "hooks.{bad}" must be true or false')
+        return dict(value)
+
     components = data.get("components", [])
     if isinstance(components, str):
         components = [components]
@@ -215,7 +232,7 @@ def load_config(path: Union[str, Path]) -> ProjectConfig:
                          email_tokens=one_path("emailTokens", email) if email is not None else None,
                          components=list(components), stack=stack,
                          budgets=path_map("budgets", BUDGETS),
-                         baselines=path_map("baselines", BASELINES))
+                         baselines=path_map("baselines", BASELINES), hooks=hook_flags())
 
 
 def project_config(start: Optional[Union[str, Path]] = None) -> Optional[ProjectConfig]:
