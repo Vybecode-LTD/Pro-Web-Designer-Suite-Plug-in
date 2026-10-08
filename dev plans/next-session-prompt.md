@@ -199,13 +199,13 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 ## 5. P26: workflow commands and the CI bootstrap
 
-**Items** (the plan's §4 row): XC-C3 (`crosscut.md`), LC-C9 (`lifecycle.md`), PS-C11 (`persuasion.md`), LC-B4, GT-C12 (`gates.md`), XC-C8 (closes here: the commands read `.design-suite.json`), and SS-C6's commands (`studio-systems.md`; its subagent is P27's). Read each by `grep -n`.
+**Items** (the plan's §4 row): XC-C3 (`crosscut.md`), LC-C9 (`lifecycle.md`), PS-C11 (`persuasion.md`), LC-B4, GT-C12 (`gates.md`), XC-C8 (closes here: the commands read `.design-suite.json`), SS-C6's commands (`studio-systems.md`; its subagent is P27's), and DL-C7's two commands (`delivery.md`: schema-to-screens and email-build; DL-C7 itself closes in P27, as the plan's P27 row says). Read each by `grep -n`; this list is not the whole inventory, so check each item's paragraph for the commands it names.
 
-**What the plan asks for:** user-invoked workflow skills, each `skills/<name>/SKILL.md` with `disable-model-invocation: true`, so they stay out of the crowded listing: gate (design, perf and a11y static in one run), install-gate (writes the CI template for all three gates in a pinned Playwright container, with a baseline-update job and a tested Windows variant), new-system, critique, migrate, release-check (extract, diff, gate, changelog, guide), figma-sync, and the audit-to-deck chain.
+**What the plan asks for:** user-invoked workflow skills, each `skills/<name>/SKILL.md` with `disable-model-invocation: true`, so they stay out of the crowded listing: gate (design, perf and a11y static in one run), install-gate (writes the CI template for all three gates in a pinned Playwright container, with a baseline-update job and a tested Windows variant), new-system, critique, migrate, release-check (extract, diff, gate, changelog, guide), figma-sync, docs-check (LC-C9's `/wds-docs-check`), schema-to-screens and email-build (DL-C7), and the audit-to-deck chain.
 
 **First:** re-read the skills page's frontmatter and substitutions (`claude-code-capabilities.md` §3 dates from 2026-09-23): `disable-model-invocation`, `allowed-tools` with `${CLAUDE_SKILL_DIR}` and `${CLAUDE_PLUGIN_ROOT}`, `arguments`. The skill-budget test (`test_skill_budget.py`) and the listing tests will see the new skills: check how they count them.
 
-**Split it.** It is M-L. Suggested: part 1, the gate and install-gate commands with the CI template (GT-C12, LC-B4, XC-C8); part 2, the lifecycle chains (LC-C9, PS-C11, XC-C3's rest, SS-C6's commands).
+**Split it.** It is M-L. Suggested: part 1, the gate and install-gate commands with the CI template (GT-C12, LC-B4, XC-C8); part 2, the lifecycle chains (LC-C9, PS-C11, XC-C3's rest, SS-C6's commands, DL-C7's two).
 
 **Tests:** each command's SKILL.md frontmatter (`disable-model-invocation: true`, valid `allowed-tools`), the CI template run through a YAML parser and its pinned image named, and each script the command calls run on a fixture project with a `.design-suite.json`.
 
