@@ -107,7 +107,7 @@ function guard(input) {
   const head = Array.from(buf.subarray(0, read).toString('utf8').replace(/^﻿/, '')).slice(0, 800).join('');
   const marker = GENERATED.find((m) => head.includes(m));
   if (!marker) return;
-  const rel = path.relative(project.config.root, file) || file;
+  const rel = path.relative(project.config.root, fs.realpathSync.native(file)) || file;
   say('PreToolUse', {
     permissionDecision: 'deny',
     permissionDecisionReason:
@@ -142,7 +142,10 @@ function gate(input) {
   const python = findPython();
   if (!python) return tell('it needs Python 3 (WDS_PYTHON, python3, python or py -3), and found none.');
   const [exe, ...args] = python;
-  const proc = spawnSync(exe, [...args, '-B', AUDIT, file, '--json'],
+  // resolved, as the config's root is: a link, /var on macOS or a short 8.3 name would
+  // otherwise name the file from outside its project
+  const real = fs.realpathSync.native(file);
+  const proc = spawnSync(exe, [...args, '-B', AUDIT, real, '--json'],
                          { cwd: project.config.root, encoding: 'utf8', timeout: 100000, windowsHide: true });
   let findings;
   try {
@@ -151,7 +154,7 @@ function gate(input) {
     return tell(`audit_design.py stopped (exit ${proc.status}): ${(proc.stderr || '').trim().slice(0, 600)}`);
   }
   if (!Array.isArray(findings) || !findings.length) return;
-  const rel = path.relative(project.config.root, file).split(path.sep).join('/');
+  const rel = path.relative(project.config.root, real).split(path.sep).join('/');
   let text = `audit_design.py found ${findings.length} problem${findings.length === 1 ? '' : 's'} in ${rel}. ` +
     'Fix each before going on, or tell the user why it should stay:';
   let shown = 0;

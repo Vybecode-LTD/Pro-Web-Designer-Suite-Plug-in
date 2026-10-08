@@ -14,9 +14,13 @@ Each case here is the JSON Claude Code sends, from a fixture.
 from __future__ import annotations
 
 import json
+import os
+import pathlib
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 
 from wds_support import NODE, PLUGIN, TempDirTest, env, load_script, output
@@ -101,6 +105,27 @@ class TheDesignGate(HookTest):
         self.assertIn("audit_design.py found 1 problem in src/components/card.css", text)
         self.assertIn("L6 tier1-leak (error)", text)
         self.assertIn("--neutral-700", text)
+
+    def test_the_file_is_named_from_its_project_through_a_link(self):
+        """CI on #82: the config's folder is resolved and the edited path was
+        not, so through /var on macOS, a short 8.3 name on Windows or any link
+        the file was named from outside its project (`../../var/...`)."""
+        self.config(designGate=True)
+        self.write("src/components/card.css", LEAK)
+        outside = pathlib.Path(tempfile.mkdtemp(prefix="wds-hook-link-"))
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        link = outside / "project"
+        if os.name == "nt":
+            import _winapi
+            _winapi.CreateJunction(str(self.tmp), str(link))
+            self.addCleanup(os.rmdir, link)              # the junction, never the project
+        else:
+            link.symlink_to(self.tmp, target_is_directory=True)
+            self.addCleanup(link.unlink)
+        event = {**self.edit("src/components/card.css"), "cwd": str(link),
+                 "tool_input": {"file_path": str(link / "src" / "components" / "card.css")}}
+        text = self.run_hook("gate", event)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("audit_design.py found 1 problem in src/components/card.css.", text)
 
     def test_a_clean_file_says_nothing(self):
         self.config(designGate=True)
