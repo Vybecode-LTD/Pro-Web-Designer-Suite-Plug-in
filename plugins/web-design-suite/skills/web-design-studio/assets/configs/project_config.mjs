@@ -212,12 +212,17 @@ function rootSpellings(root, start) {
 const driveCases = (p) => (/^[A-Za-z]:/.test(p) ? [p[0].toUpperCase() + p.slice(1), p[0].toLowerCase() + p.slice(1)] : [p]);
 const asGlob = (p) => literalGlob(p.split(path.sep).join('/'));
 
-// A file's spellings: under each spelling of the folder that holds it.
+// A file's spellings: as the config names it and as resolved, a link inside
+// the project being one of each (CodeRabbit on #81), each under every
+// spelling of the project's folder.
 function fileSpellings(file, roots) {
-  const real = realPath(file);
-  const rel = path.relative(roots[0], real);
-  const under = rel && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
-  return [...new Set((under ? roots.map((r) => path.join(r, rel)) : [real]).flatMap(driveCases))];
+  const out = new Set();
+  for (const spelling of new Set([path.resolve(file), realPath(file)])) {
+    const rel = path.relative(roots[0], spelling);
+    const under = rel && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
+    for (const p of under ? roots.map((r) => path.join(r, rel)) : [spelling]) driveCases(p).forEach((c) => out.add(c));
+  }
+  return [...out];
 }
 
 // `root` is the config's folder, resolved, or the list rootSpellings() gives.
