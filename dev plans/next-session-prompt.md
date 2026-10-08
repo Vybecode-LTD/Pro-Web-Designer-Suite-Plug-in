@@ -194,6 +194,11 @@ cd /c/DEV/Pro-Web-Designer-Suite-Plug-in/plugins/web-design-suite && grep -nE "a
 - **`audit_design.py`:**
   - The config's `components` add to the spec's `file_classes` component globs.
   - Its `--baseline` takes the config's `baselines.audit`.
+  - **The project's tokens (LC-C1 names the audit; Codex on #77).** A new `--tokens` takes a tokens.css or a contract.json, and with no flag the audit reads the config's `tokens`. At the least:
+    - The config's token files are token files to the audit, so their literals are allowed, even at a path the `file_classes` globs miss (`src/design/system.css`).
+    - The contract's names are the project's tokens, for every check that compares against the starter's names.
+
+    Read LC-C1 and the audit's token-file and name checks before choosing the rest. Test the precedence (flag, then config, then default) as `FigmaAuditReadsTheContract` does. LC-C1 is not closed until the audit, `diff_system` and `figma_to_tokens` read the contract.
 - **`diff_system.py` and `figma_to_tokens.py`:** read the project's tokens where they take a tokens file.
 - **`build_presentation.py --tokens`** (line 2778): the config's tokens.css. A contract cannot style a deck, so take CSS only, as extract_system does.
 - **The email scripts:** `build_email.py` and `lint_email.py` read `emailTokens`, never `tokens`.
