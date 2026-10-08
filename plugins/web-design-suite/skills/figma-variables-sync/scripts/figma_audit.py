@@ -1102,11 +1102,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"minimum touch target in px (default: {TAP_MIN_PX:g})")
     p.add_argument("--deadline", default="end of day tomorrow",
                    help="the timed default's cutoff, printed in --format markdown")
-    p.add_argument("--tokens", metavar="TOKENS_CSS",
+    p.add_argument("--tokens", action="append", default=[], metavar="TOKENS_CSS",
                    help="the project's tokens.css, or its contract.json (extract_system "
-                        "--contract): its colour ramps (any --<name>-<step> holding a literal "
-                        "colour) replace the studio's ramps of the same name. Without it, the "
-                        "token files a .design-suite.json lists")
+                        "--contract), repeatable: its colour ramps (any --<name>-<step> holding "
+                        "a literal colour) and scales replace the studio's of the same name. "
+                        "Without it, the token files a .design-suite.json lists")
     p.add_argument("--no-color", action="store_true")
     return p
 

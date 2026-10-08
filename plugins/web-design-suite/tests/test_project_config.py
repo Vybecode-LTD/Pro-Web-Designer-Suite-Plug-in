@@ -150,6 +150,22 @@ class TheReader(TempDirTest):
         self.assertEqual(["--bg-active", "--bg-hover", "--bg-scrim", "--shadow-focus", "--space-fluid-lg",
                           "--space-fluid-md", "--space-fluid-sm", "--space-fluid-xl"], differ)
 
+    def test_a_later_file_moves_a_name(self):
+        """Codex on #78: a name a later file filed in another section stayed
+        in the earlier one, so a ramp step that became a role was still a ramp."""
+        a = self.write("a.css", ":root { --brand-500: #ff0000; --brand-600: #cc0000; }\n")
+        b = self.write("b.css", ":root { --brand-500: var(--accent-500); }\n")
+        tokens = self.pc.read_tokens([a, b])
+        self.assertEqual({"brand": {"600": "#cc0000"}}, tokens.ramps)
+        self.assertEqual({"--brand-500": "var(--accent-500)"}, tokens.roles)
+
+    def test_a_contracts_ramp_steps_are_numbers(self):
+        """CodeRabbit on #78: a named step crashed every reader with a traceback."""
+        bad = {"schema": "web-design-suite/contract/1", "ramps": {"brand": {"primary": "#123456"}}}
+        with self.assertRaises(self.pc.ConfigError) as caught:
+            self.pc.read_tokens([self.write("bad.json", json.dumps(bad))])
+        self.assertIn('"ramps.brand.primary" must be a numeric step', str(caught.exception))
+
     def test_a_missing_token_file_is_named(self):
         with self.assertRaises(self.pc.ConfigError) as caught:
             self.pc.read_tokens([self.tmp / "gone.css"])
@@ -236,6 +252,8 @@ class FigmaAuditReadsTheContract(TempDirTest):
             self.write(name, ":root {\n" + "".join(f"  --accent-{s}: {h};\n" for s, h in part) + "}\n")
         self.write(".design-suite.json", '{"schema": 1, "tokens": ["a.css", "b.css"]}')
         self.assertEqual([], self.off_ramp())
+        self.write(".design-suite.json", '{"schema": 1}')
+        self.assertEqual([], self.off_ramp("--tokens", "a.css", "--tokens", "b.css"))   # CodeRabbit on #78
 
     def test_the_config_names_the_tokens_and_a_flag_beats_it(self):
         self.write(".design-suite.json", '{"schema": 1, "tokens": "contract.json"}')
@@ -409,6 +427,14 @@ class DiffSystemReadsTheContract(TempDirTest):
 
     def test_a_contract_against_its_own_tokens_css_has_no_changes(self):
         self.assertEqual([], self.changes("v1.json", "src/styles/tokens.css"))
+
+    def test_a_config_that_mixes_css_and_a_contract(self):
+        """Codex on #78: with CSS in the list, its contracts were dropped, so a
+        role only a contract held read as removed."""
+        extra = {"schema": "web-design-suite/contract/1", "roles": {"--bg-extra": "var(--accent-500)"}}
+        self.write("extra.json", json.dumps(extra))
+        self.write(".design-suite.json", '{"schema": 1, "tokens": ["src/styles/tokens.css", "extra.json"]}')
+        self.assertEqual([("tier2-added", "--bg-extra")], self.changes("v1.json"))
 
     def test_without_new_the_projects_tokens(self):
         self.assertIn("name the candidate snapshot", self.changes("v1.json", code=2))
