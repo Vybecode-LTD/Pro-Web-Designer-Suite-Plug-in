@@ -454,7 +454,7 @@ class ClusterValuesLandsOnTheProjectsRamps(TempDirTest):
         self.write(".git/HEAD", "x\n")
         self.write("src/app.css", ".btn { background: #2f6df6; color: #ffffff; }\n.btn:hover { background: #2558c8; }\n")
         self.write("brand.css", ":root {\n  --accent-500: oklch(60% 0.2 150);\n  --accent-600: oklch(52% 0.19 150);\n"
-                                "  --brand-500: #ff0000;\n}\n")
+                                "  --accent-450: oklch(64% 0.2 150);\n  --brand-500: #ff0000;\n}\n")
         proc = run_py("design-token-migration", "extract_literals", "src", "--format", "json",
                       "-o", "literals.json", cwd=self.tmp)
         self.assertEqual(0, proc.returncode, output(proc))
@@ -477,6 +477,8 @@ class ClusterValuesLandsOnTheProjectsRamps(TempDirTest):
         self.assertRegex(self.accent(css, 900), r" 1[45]\d(\.\d)?\)$")       # a step it lacks, on its hue
         self.assertIn("Ramps from the project's tokens: accent (2 of 11 steps)", report)
         self.assertIn("`brand` ramp, which the contract has no roles for", report)
+        self.assertNotIn("--accent-450", css)                                 # CodeRabbit on #78: not a contract step
+        self.assertIn("steps the contract does not name (--accent-450)", report)
         pinned, _ = self.propose("--accent", "#e8440a")                       # --accent beats the config
         self.assertNotIn(" 150", self.accent(pinned, 600))
         other, _ = self.propose("--tokens", "src/app.css")                    # so does --tokens
