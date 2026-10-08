@@ -481,6 +481,10 @@ class ClusterValuesLandsOnTheProjectsRamps(TempDirTest):
         self.assertIn("`brand` ramp, which the contract has no roles for", report)
         self.assertNotIn("--accent-450", css)                                 # CodeRabbit on #78: not a contract step
         self.assertIn("steps the contract does not name (--accent-450)", report)
+        self.write("off.css", ":root {\n  --accent-450: oklch(64% 0.2 150);\n}\n")
+        _, report = self.propose("--tokens", "off.css")                      # nothing taken, so not said to be
+        self.assertNotIn("Ramps from the project's tokens", report)
+        self.assertIn("steps the contract does not name (--accent-450)", report)
         pinned, _ = self.propose("--accent", "#e8440a")                       # --accent beats the config
         self.assertNotIn(" 150", self.accent(pinned, 600))
         other, _ = self.propose("--tokens", "src/app.css")                    # so does --tokens

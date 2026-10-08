@@ -1740,7 +1740,8 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
                               f"({', '.join(f'--{name}-{s}' for s in extra)}); the migration does not "
                               f"land on them.")
         ramps[name].steps.update(known)
-        taken.append(f"{name} ({len(known)} of {len(ramps[name].steps)} steps)")
+        if known:
+            taken.append(f"{name} ({len(known)} of {len(ramps[name].steps)} steps)")
     if taken:
         prop.notes.append(f"Ramps from the project's tokens: {', '.join(taken)}. A step they do not "
                           f"declare is built as it would be without them.")
