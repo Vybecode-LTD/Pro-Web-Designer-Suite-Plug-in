@@ -1731,8 +1731,16 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
     for name, steps in (project or {}).items():
         if name == "accent" and accent_override:
             continue
-        ramps[name].steps.update(steps)
-        taken.append(f"{name} ({len(steps)} of {len(ramps[name].steps)} steps)")
+        # Only the contract's steps: the proposal never names a token outside
+        # it, so a project's --accent-450 is reported, not used (CodeRabbit on #78).
+        known = {step: value for step, value in steps.items() if step in ramps[name].steps}
+        extra = sorted(set(steps) - set(known))
+        if extra:
+            prop.notes.append(f"The project's `{name}` ramp has steps the contract does not name "
+                              f"({', '.join(f'--{name}-{s}' for s in extra)}); the migration does not "
+                              f"land on them.")
+        ramps[name].steps.update(known)
+        taken.append(f"{name} ({len(known)} of {len(ramps[name].steps)} steps)")
     if taken:
         prop.notes.append(f"Ramps from the project's tokens: {', '.join(taken)}. A step they do not "
                           f"declare is built as it would be without them.")
