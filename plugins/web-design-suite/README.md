@@ -96,6 +96,23 @@ their gate, so install web-design-studio beside any of them.
 
 **As a repo** — extract `skills/web-design-studio/assets/starter/styles/` into your project, wire the configs from `assets/configs/`, and point Claude Code at it.
 
+**The hooks** come with the plugin, and need `node` on the PATH. They act only where a
+project's `.design-suite.json` turns them on:
+
+```json
+{"schema": 1, "hooks": {"designGate": true, "generatedFiles": true}}
+```
+
+- **`designGate`:** after each edit Claude makes to a stylesheet, template or script,
+  `audit_design.py` runs on that file, and Claude hears what it found. It needs Python 3
+  (`WDS_PYTHON`, else `python3`, `python` or `py -3`).
+- **`generatedFiles`:** Claude may not edit a file that says it is generated
+  (`DO NOT EDIT`), and is told to change its source.
+- **The router:** a third hook names the skill a prompt needs, when a crowded skill
+  listing has dropped the descriptions.
+
+The plugin's `design_hooks` option, set to false in `/config`, turns all three off.
+
 ---
 
 ## Running the scripts

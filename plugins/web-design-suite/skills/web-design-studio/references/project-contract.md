@@ -16,7 +16,8 @@ At the project's root:
   "budgets": {"perf": "perf-budget.json", "a11y": "a11y-budget.json"},
   "baselines": {"audit": ".design-baseline.json", "a11y": ".a11y-baseline.json",
                 "perf": ".perf-baseline.json", "docs": "docs/baseline.json",
-                "snapshots": "snapshots/"}
+                "snapshots": "snapshots/"},
+  "hooks": {"designGate": true, "generatedFiles": true}
 }
 ```
 
@@ -29,6 +30,7 @@ At the project's root:
 | `stack` | `vanilla-css`, `css-modules`, `tailwind-v3` or `tailwind-v4` |
 | `budgets` | `perf` and `a11y`: the budget files |
 | `baselines` | `audit`, `a11y`, `perf`, `docs` and `snapshots`: where each gate keeps its baseline |
+| `hooks` | Turns the plugin's hooks on for this project, each `true` or `false`. `designGate`: after each edit Claude makes to a file the audit reads, `audit_design.py` runs on it, in the config's folder, and Claude hears what it found. `generatedFiles`: Claude may not edit a file that says it is generated (`DO NOT EDIT`, `@generated`) in its first 800 characters, and is told to change its source |
 
 - **Finding it.** A script walks up from the working directory to the first `.design-suite.json`, and never past the folder that holds `.git`: a config above the repository is not the repository's.
 - **Paths** are relative to the file, so the scripts agree from any working directory.

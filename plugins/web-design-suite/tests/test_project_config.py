@@ -59,13 +59,14 @@ class TheCopiesAreTheMaster(unittest.TestCase):
         """N37: the lint configs read the project through project_config.mjs,
         and browser_common.mjs re-exports it, so each folder that imports it
         holds a byte-identical copy of shared/project_config.mjs."""
-        importers = sorted({p.parent for p in SKILLS.glob("*/**/*.mjs")
-                            if "from './project_config.mjs';" in p.read_text(encoding="utf-8")})
-        self.assertEqual(["a11y-audit-runner/scripts", "component-state-matrix/scripts",
-                          "design-critique-gate/scripts", "email-template-system/scripts",
-                          "perf-budget-gate/scripts", "web-design-studio/assets/configs"],
-                         [p.relative_to(SKILLS).as_posix() for p in importers])
-        self.assertEqual(importers, sorted(p.parent for p in SKILLS.glob("*/**/project_config.mjs")))
+        importers = sorted({p.parent for p in PLUGIN.glob("*/**/*.mjs") if p.parent.name != "shared"
+                            and "from './project_config.mjs';" in p.read_text(encoding="utf-8")})
+        self.assertEqual(["hooks", "skills/a11y-audit-runner/scripts", "skills/component-state-matrix/scripts",
+                          "skills/design-critique-gate/scripts", "skills/email-template-system/scripts",
+                          "skills/perf-budget-gate/scripts", "skills/web-design-studio/assets/configs"],
+                         [p.relative_to(PLUGIN).as_posix() for p in importers])
+        self.assertEqual(importers, sorted(p.parent for p in PLUGIN.glob("*/**/project_config.mjs")
+                                           if p.parent.name != "shared"))
         master = NODE_MASTER.read_bytes()
         self.assertEqual([], [p.relative_to(PLUGIN).as_posix() for p in importers
                               if (p / "project_config.mjs").read_bytes() != master],
@@ -538,7 +539,8 @@ CONFIGS = {
     "full": json.dumps({"schema": 1, "tokens": ["src/tokens.css", "../shared/contract.json"],
                         "emailTokens": "emails/email-tokens.json", "components": "src/widgets/**/*.css",
                         "stack": "tailwind-v4", "budgets": {"perf": "perf.json", "a11y": "a11y.json"},
-                        "baselines": {"audit": "b/audit.json", "snapshots": "snaps/"}}),
+                        "baselines": {"audit": "b/audit.json", "snapshots": "snaps/"},
+                        "hooks": {"designGate": True, "generatedFiles": False}}),
     "nulls": '{"schema": 1, "emailTokens": null, "stack": null}',
     "bom": "﻿" + '{"schema": 1, "tokens": "t.css"}',
     "unknown": '{"schema": 1, "token": "x.css", "budget": {}}',
@@ -556,6 +558,9 @@ CONFIGS = {
     "array": "[1]",
     "trailing-comma": '{"schema": 1,}',
     "comment": '{"schema": 1 /* a comment */}',
+    "hooks-key": '{"schema": 1, "hooks": {"designGate": true, "gate": true}}',
+    "hooks-value": '{"schema": 1, "hooks": {"designGate": "yes"}}',
+    "hooks-list": '{"schema": 1, "hooks": ["designGate"]}',
 }
 
 
@@ -648,7 +653,7 @@ class TheNodeReaderAgrees(TempDirTest):
                        "emailTokens": str(c.email_tokens) if c.email_tokens else None,
                        "components": c.components, "stack": c.stack,
                        "budgets": {k: str(v) for k, v in c.budgets.items()},
-                       "baselines": {k: str(v) for k, v in c.baselines.items()}}}
+                       "baselines": {k: str(v) for k, v in c.baselines.items()}, "hooks": c.hooks}}
 
     def test_every_config_reads_the_same(self):
         files = [self.write(f"{name}/.design-suite.json", text) for name, text in CONFIGS.items()]
