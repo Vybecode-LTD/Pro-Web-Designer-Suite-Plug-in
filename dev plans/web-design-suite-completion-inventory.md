@@ -21,12 +21,12 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | XC-B6 | — | fixed in 3.2.0 | discoverability in a heavy environment: in this machine's sessions the 13 skills |
 | XC-C1 | L · high | W9 (3.5.0) | An eval suite (`evals/`): per-skill triggering cases and outcome graders, run with ablation, in CI with a cost ceiling. |
 | XC-C2 | M · high | fixed in 3.5.0: `test_hooks` (`TheDesignGate`, `TheHooksFile`), PR #82 | An opt-in design-gate hook: PostToolUse on Edit/Write runs `audit_design` on the changed file and returns the findings to Claude. |
-| XC-C3 | M · high | W9 (3.5.0) | User-invocable workflows as skills with `disable-model-invocation: true`: /gate, /install-gate, /critique, /new-system and more. |
+| XC-C3 | M · high | W9 (3.5.0); /gate and /install-gate in PR #85 (`test_commands`), /critique and /new-system in P26 part 2 | User-invocable workflows as skills with `disable-model-invocation: true`: /gate, /install-gate, /critique, /new-system and more. |
 | XC-C4 | M · medium | W9 (3.5.0) | Subagents (design-critic, a11y-auditor), so heavy references load in an isolated context. |
 | XC-C5 | S · high | fixed in 3.2.0 | promote this review's harnesses to permanent tests: every documented |
 | XC-C6 | M · medium | fixed in 3.3.0: `tooling/release/build.py` (`test_release_build`), `.github/workflows/ci.yml` and `release.yml` (PR #17). The evals join CI with P29 | Build and release: a build tool for the zip and the 13 `.skill` files, `claude plugin tag`, and a CI matrix of Windows/Linux/macOS × Python 3.9–3.14 with Node. |
 | XC-C7 | M · medium | fixed in 3.2.0 | token efficiency: SKILL.md files are 17–28 KB (≈4.4–6.9k tokens per |
-| XC-C8 | M · medium | W9 (3.5.0); every script reads it, in PRs #76, #78 and #79 (`test_project_config`: `TheNodeReaderAgrees`, `TheConfigsFilesReachTheirScripts`, `AuditReadsTheProject`), and the lint configs in #81 (`test_real_tools.TheGatesReadTheProject`); the hook reads it from #82 (`test_hooks.TheDesignGate`); the hook reads it in P25 and the commands in P26, where it closes | One project config file, `.design-suite.json`, read by every script, the hook and the commands. |
+| XC-C8 | M · medium | fixed in 3.5.0: every script reads it, in PRs #76, #78 and #79 (`test_project_config`: `TheNodeReaderAgrees`, `TheConfigsFilesReachTheirScripts`, `AuditReadsTheProject`), and the lint configs in #81 (`test_real_tools.TheGatesReadTheProject`); the hook reads it from #82 (`test_hooks.TheDesignGate`); the token diff from #84 (`test_hooks.TheTokenDiff`); and the commands from #85 (`test_commands.TheGateCommand.test_the_projects_config_reaches_the_gates`, `TheInstallGate.test_the_baseline_job_runs_here`) | One project config file, `.design-suite.json`, read by every script, the hook and the commands. |
 | XC-C9 | S · low | fixed in 3.3.0: `WDS` in bash, PowerShell and cmd forms, one-line commands (`test_docs.PasteableCommands`, PR #35) | Cross-platform docs: PowerShell/cmd equivalents for the few shell-only recipes, or one `python -m scripts.gate` entry point. |
 | XC-C10 | S · high | fixed in 3.1.0 (the review's C6) | fixes XC-A8: write every documented command as |
 | SS-A1 | high | fixed in 3.1.0 | Law 7 (density) does nothing on a subtree, which is how every doc uses it. |
@@ -131,7 +131,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-B1 | — | W10 (3.6.0+) | no non-Enterprise route into Figma. |
 | LC-B2 | — | W10 (3.6.0+) | Style Dictionary, Tokens Studio and Terrazzo teams get nothing. |
 | LC-B3 | — | fixed in 3.5.0: `test_project_config` (`FigmaAuditReadsTheScales`, `FigmaToTokensReadsTheNames`, `AuditReadsTheProject`), PRs #76 and #78 | no way to supply a project contract. |
-| LC-B4 | — | W9 (3.5.0) | no CI bootstrap. |
+| LC-B4 | — | fixed in 3.5.0: /install-gate vendors the gates into `scripts/`, and the README's "In CI" runs the rest by path, PR #85 (`test_commands.TheInstallGate.test_the_vendored_gates_run_without_the_plugin`) | no CI bootstrap. |
 | LC-B5 | — | W12 (3.6.0+) | migration coverage. |
 | LC-B6 | — | W10 (3.6.0+) | Figma plan realities. |
 | LC-B7 | — | W12 (3.6.0+) | rollout gaps. |
@@ -187,7 +187,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-C9 | M · P1 | W9 (3.5.0) | Plugin components: a `gate-runner` agent, an opt-in PostToolUse hook running a11y_static, user-invoked gate skills. |
 | GT-C10 | M · P1 | W9 (3.5.0) | A `claude plugin eval` suite for the gates, run under WSL2. |
 | GT-C11 | M · P2 | fixed in 3.4.0: the `lighthouse` preset, TTFB from CDP and `--interact-at` in PR #45 (`test_browser_runtime.VitalsMeasures`), `crux_check.py` in PR #46 (`test_crux_check`) | A `lighthouse` throttle preset, TTFB from CDP, `--interact-at MS`, and `crux_check.py`. |
-| GT-C12 | M · P1 | W9 (3.5.0) | One CI template for all three gates in a pinned Playwright container, with a baseline-update job and a tested Windows variant. |
+| GT-C12 | M · P1 | fixed in 3.5.0: PR #85 (`test_commands.TheInstallGate`: the workflow, its Windows job and its baseline job run on a fixture) | One CI template for all three gates in a pinned Playwright container, with a baseline-update job and a tested Windows variant. |
 | GT-C13 | S · P2 | fixed in 3.4.0: `test_browser_scripts.SharedHelpers` (PR #38) | Vendor the shared runtime helpers into each skill as identical copies, with a test that they match. |
 | PS-A1 | high | fixed in 3.1.0 | The deck asserts claims that its own inputs contradict. |
 | PS-A2 | high | fixed in 3.1.0 | The defence sheet presents suspicions as known flaws and drops confirmed defects. |

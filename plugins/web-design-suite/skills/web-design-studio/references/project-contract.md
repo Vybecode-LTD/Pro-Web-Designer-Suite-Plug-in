@@ -92,4 +92,6 @@ A flag beats each of these, and each falls back to the script's own default.
 
 **Vendored alone.** A project that copied `audit_design.py` or `a11y_static.py` into its own `scripts/` before 3.5.0, as the hook recipe said, has no `project_config.py` beside it. Each then runs as it did; the audit says that the config is not read, and refuses `--tokens`. Copy `project_config.py` across to turn the config on.
 
+**The commands.** `/web-design-suite:gate` runs the audit, `a11y_static.py` and `perf_audit.py` from the project's root, so each reads the config as above. `/web-design-suite:install-gate` vendors them, with both readers, into the project's `scripts/`, and writes `baselines.audit`, `baselines.a11y` and `baselines.perf` into the CI workflow's baseline job.
+
 **Not read by** `crux_check.py`, which compares field data with a lab report and has no budget of its own.

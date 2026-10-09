@@ -9,6 +9,7 @@
   "homepage": "https://vybecod.ing",
   "repository": "https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in",
   "license": "MIT",
+  "skills": ["./workflow-commands/"],
   "userConfig": {
     "design_hooks": {
       "type": "boolean",

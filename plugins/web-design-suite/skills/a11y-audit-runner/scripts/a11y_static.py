@@ -1712,6 +1712,8 @@ def main(argv: list[str] | None = None) -> int:
                     if any(s in f.sc for s in args.sc)]
 
     if args.write_baseline:
+        # a folder the config names, as CI records it in a fresh checkout (P26)
+        Path(args.write_baseline).parent.mkdir(parents=True, exist_ok=True)
         Path(args.write_baseline).write_text(
             json.dumps(sorted({f.key() for f in findings}), indent=2) + "\n",
             encoding="utf-8")

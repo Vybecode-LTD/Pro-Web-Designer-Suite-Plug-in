@@ -116,6 +116,35 @@
   - **`diff_system.py`** without `old` compares against `baselines.system`, as it
     already took the config's token files without `new`.
   - The gate's hook now has 180 seconds, for the audit and the diff in one process.
+- **Workflow commands, part 1: `/gate` and `/install-gate`** (XC-C3 in part, GT-C12,
+  LC-B4, XC-C8). The plugin's first commands are skills only the user invokes
+  (`disable-model-invocation: true`), so they stay out of the skill listing. They live in
+  `workflow-commands/`, which `plugin.json`'s `skills` key adds to the scan, so the 13
+  skills and their `.skill` files are unchanged. Each pre-approves the one script it runs.
+  - **`/web-design-suite:gate`** runs `audit_design.py`, `a11y_static.py` and
+    `perf_audit.py` on the project, from its root, and gives one verdict per gate. The
+    performance gate is skipped, and says so, without a build.
+  - **`/web-design-suite:install-gate`** vendors the gate scripts into the project's
+    `scripts/`, where every CI recipe and the pre-commit hook expect them, with their
+    SHA-256 in `scripts/design-gates.json`. A clean checkout then runs them with no plugin
+    and no `PYTHONPATH`. It also writes `.github/workflows/design-gates.yml`:
+    - the three gates on Linux, in the Playwright image built for the project's own
+      `playwright` (`mcr.microsoft.com/playwright:vX.Y.Z-noble`), with Python installed,
+      the build served and waited for, and the browser gates' reports uploaded;
+    - the static gates on Windows, where the tests run the job's commands on a fixture;
+    - a job run by hand that records the baselines in CI and uploads them to commit.
+
+    It reads the baselines' paths from `.design-suite.json`, refuses a `playwright`
+    range, and never overwrites a file it did not write.
+  - **In CI**, the README says how to run another skill's script: by path, from the
+    plugin checked out at a release tag.
+
+### Fixed
+
+- **A baseline in a folder that does not exist yet** (GT-C12). `audit_design.py`,
+  `a11y_static.py` and `perf_audit.py` stopped with a traceback when `--write-baseline`
+  named a file in a missing folder, as a config's `ci/audit-baseline.json` is on a fresh
+  checkout. Each now creates the folder.
 
 ## 3.4.0 — 2026-10-07
 
