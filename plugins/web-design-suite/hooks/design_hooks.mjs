@@ -32,7 +32,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findConfig, loadConfig } from './project_config.mjs';
+import { findConfig, loadConfig, readJson } from './project_config.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const AUDIT = path.join(HERE, '..', 'skills', 'web-design-studio', 'scripts', 'audit_design.py');
@@ -103,10 +103,11 @@ function governing(dir) {
 }
 
 // Does the config at `found`, which does not pass its checks, still name `real`
-// among its `tokens`? Read as plain JSON, for the one message that says so.
+// among its `tokens`? Read as JSON in any encoding the reader takes, UTF-16 and
+// UTF-32 too (CodeRabbit on #84), for the one message that says so.
 function namesToken(found, real) {
   try {
-    const data = JSON.parse(fs.readFileSync(found, 'utf8').replace(/^﻿/, ''));
+    const data = readJson(found);
     const base = path.dirname(fs.realpathSync.native(found));
     return [data.tokens].flat().some((t) => typeof t === 'string' && t.trim() &&
       fs.existsSync(path.resolve(base, t)) && fs.realpathSync.native(path.resolve(base, t)) === real);
