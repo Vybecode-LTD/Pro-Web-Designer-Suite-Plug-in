@@ -148,6 +148,14 @@ The plugin's `design_hooks` option, set to false in `/config`, turns them all of
   stops on a blocking finding.
 - **`/web-design-suite:gate-a11y`**, **`gate-perf`** and **`gate-matrix`** run the
   browser halves of the gates on a served or built page.
+- **`/web-design-suite:critique`** has the design critic, a subagent that did not build
+  the work, critique it, and reports its findings.
+
+**The subagents** work in their own context and return only their findings; none edits
+a file. Claude hands work to them when it fits, or you can ask by name:
+`design-critic`, `gate-runner`, `a11y-auditor`, `design-auditor`,
+`supabase-security-reviewer` and `codemod-batch-reviewer` (each as
+`web-design-suite:<name>`).
 
 The reports go in `design-reports/`, which a project usually leaves out of git.
 

@@ -21,8 +21,8 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | XC-B6 | — | fixed in 3.2.0 | discoverability in a heavy environment: in this machine's sessions the 13 skills |
 | XC-C1 | L · high | W9 (3.5.0) | An eval suite (`evals/`): per-skill triggering cases and outcome graders, run with ablation, in CI with a cost ceiling. |
 | XC-C2 | M · high | fixed in 3.5.0: `test_hooks` (`TheDesignGate`, `TheHooksFile`), PR #82 | An opt-in design-gate hook: PostToolUse on Edit/Write runs `audit_design` on the changed file and returns the findings to Claude. |
-| XC-C3 | M · high | W9 (3.5.0); /gate and /install-gate in PR #85 (`test_commands`), /new-system in PR #87 (`test_commands.TheNewSystem`), /critique and the agents in P27 | User-invocable workflows as skills with `disable-model-invocation: true`: /gate, /install-gate, /critique, /new-system and more. |
-| XC-C4 | M · medium | W9 (3.5.0) | Subagents (design-critic, a11y-auditor), so heavy references load in an isolated context. |
+| XC-C3 | M · high | fixed in 3.5.0: /gate and /install-gate in PR #85 (`test_commands`), /new-system in PR #87 (`test_commands.TheNewSystem`), /critique in PR #89 (`test_commands.TheChains`, `test_agents`) | User-invocable workflows as skills with `disable-model-invocation: true`: /gate, /install-gate, /critique, /new-system and more. |
+| XC-C4 | M · medium | fixed in 3.5.0: PR #89, the design-critic and the a11y-auditor (`test_agents.TheAgentFiles`) | Subagents (design-critic, a11y-auditor), so heavy references load in an isolated context. |
 | XC-C5 | S · high | fixed in 3.2.0 | promote this review's harnesses to permanent tests: every documented |
 | XC-C6 | M · medium | fixed in 3.3.0: `tooling/release/build.py` (`test_release_build`), `.github/workflows/ci.yml` and `release.yml` (PR #17). The evals join CI with P29 | Build and release: a build tool for the zip and the 13 `.skill` files, `claude plugin tag`, and a CI matrix of Windows/Linux/macOS × Python 3.9–3.14 with Node. |
 | XC-C7 | M · medium | fixed in 3.2.0 | token efficiency: SKILL.md files are 17–28 KB (≈4.4–6.9k tokens per |
@@ -60,7 +60,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SS-C3 | — | fixed in 3.2.0 | Make the docs part of the test suite (S–M, P1). |
 | SS-C4 | — | fixed in 3.2.0 | One source for shared CSS (M, P1). |
 | SS-C5 | — | fixed in 3.3.0: `--preset studio`, the 11px refusal, `--fluid-space`, `--anchor-seed`, `--neutral-hue`, `--gamut p3` (`test_numbers.TypeScale`, `ColourRamps`) | Generator upgrades (M, P1). |
-| SS-C6 | — | W9 (3.5.0); the hook in PR #82 (`test_hooks.TheDesignGate`), the commands in PR #87 (`/new-system`, `/contrast`; `test_commands`), the subagent in P27 | Use Claude Code plugin features (M, P1). |
+| SS-C6 | — | fixed in 3.5.0: the hook in PR #82 (`test_hooks.TheDesignGate`), the commands in PR #87 (`/new-system`, `/contrast`; `test_commands`), the design-auditor in PR #89 (`test_agents`) | Use Claude Code plugin features (M, P1). |
 | SS-C7 | — | W9 (3.5.0) | An eval suite of script-graded cases, run against a no-plugin baseline. |
 | SS-C8 | — | fixed in 3.2.0 | Size: 17.7 KB / 2,616 words ≈ 4.4k tokens. |
 | SS-C9 | — | fixed in 3.3.0: `test_contract.TheStarterKeepsItsWord` | Ship what the starter refers to (S, P1). |
@@ -144,7 +144,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-C6 | — | fixed in 3.4.0: its last open part, LC-A17 (PR #54); LC-B4 is W9's | Instruction fixes: the rebase recipe (LC-A6), a worktree-based before/after audit (LC-A13), the `${CLAUDE_SKILL_DIR}` invocation (LC-A20), one snapshot path with its inputs in config (LC-A18), the README (LC-A21), the ro |
 | LC-C7 | — | W10 (3.6.0+) | A Figma MCP route: a SKILL.md routing row that says "if `get_variable_defs` is available, read with it"; a `--reverse --format plugin-script` output for `use_figma` that renames "Mode 1", sets `scopes: []` on primitives  |
 | LC-C8 | — | fixed in 3.5.0: the generated-file guard in PR #82 (`test_hooks.TheGeneratedFileGuard`), the token diff in PR #84 (`test_hooks.TheTokenDiff`, `test_project_config.DiffSystemReadsTheContract`) | Hooks: block edits to files headed "GENERATED — DO NOT EDIT", and on a tokens.css edit run diff_system and return the bump and any contrast crossings. |
-| LC-C9 | — | W9 (3.5.0); the commands in PR #87 (`test_commands.TheReleaseCheck`, `TheChains`), the agent in P27 | User-invocable workflow skills (`disable-model-invocation: true`): `/wds-migrate-census`, `/wds-release-check` (extract → diff → gate → changelog → guide), `/wds-figma-handoff`, `/wds-docs-check`, each with `allowed-tool |
+| LC-C9 | — | fixed in 3.5.0: the commands in PR #87 (`test_commands.TheReleaseCheck`, `TheChains`), the codemod-batch-reviewer in PR #89 (`test_agents`) | User-invocable workflow skills (`disable-model-invocation: true`): `/wds-migrate-census`, `/wds-release-check` (extract → diff → gate → changelog → guide), `/wds-figma-handoff`, `/wds-docs-check`, each with `allowed-tool |
 | LC-C10 | — | W9 (3.5.0) | A `claude plugin eval` suite, with a `scaffold_script` for each fixture. |
 | LC-C11 | — | fixed in 3.2.0 | Descriptions and token budget. |
 | LC-C12 | — | fixed in 3.4.0: `tests/fixtures/worked-run` and `worked-release.json`, held by `test_token_migration.TheWorkedRun` and `test_versioning.TheWorkedRelease` (PR #50) | Ship the 8-file migration fixture and the five-edit release as test fixtures, and have CI regenerate the SKILL.md numbers from them. |
@@ -184,7 +184,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-C6 | S · P1 | fixed in 3.1.0 (the review's C6) | Write SKILL.md commands with `${CLAUDE_SKILL_DIR}` and pre-approve them with `allowed-tools`. |
 | GT-C7 | S · P1 | fixed in 3.2.0, item 13 | SKILL.md size: 5k tokens or less. |
 | GT-C8 | S · P1 | fixed in 3.2.0, item 13 | Descriptions with a standalone first sentence and a "not for" line. |
-| GT-C9 | M · P1 | W9 (3.5.0): the gate commands in PR #88 (`test_commands.TheBrowserSteps`), the agent and the a11y_static hook in P27 (P25 closed without the hook) | Plugin components: a `gate-runner` agent, an opt-in PostToolUse hook running a11y_static, user-invoked gate skills. |
+| GT-C9 | M · P1 | W9 (3.5.0): the gate commands in PR #88 (`test_commands.TheBrowserSteps`), the gate-runner in PR #89 (`test_agents`), the a11y_static hook in P27 part 2 (P25 closed without the hook) | Plugin components: a `gate-runner` agent, an opt-in PostToolUse hook running a11y_static, user-invoked gate skills. |
 | GT-C10 | M · P1 | W9 (3.5.0) | A `claude plugin eval` suite for the gates, run under WSL2. |
 | GT-C11 | M · P2 | fixed in 3.4.0: the `lighthouse` preset, TTFB from CDP and `--interact-at` in PR #45 (`test_browser_runtime.VitalsMeasures`), `crux_check.py` in PR #46 (`test_crux_check`) | A `lighthouse` throttle preset, TTFB from CDP, `--interact-at MS`, and `crux_check.py`. |
 | GT-C12 | M · P1 | fixed in 3.5.0: PR #85 (`test_commands.TheInstallGate`: the workflow, its Windows job and its baseline job run on a fixture) | One CI template for all three gates in a pinned Playwright container, with a baseline-update job and a tested Windows variant. |
@@ -222,7 +222,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-C1 | — | fixed in 3.4.0: `test_deck` (PRs #65 and #66) | Make the deck honest by construction: wording from the data, manual-test evidence as input, `--handout`, a presenter window. |
 | PS-C2 | — | fixed in 3.4.0: `covers` and `status` in 3.1.0; fixed findings labelled in every format and merge notes in triage and defence (PR #69; `test_presentation.CritiqueDefenceAndMerge`) | Fix critique_report: a `covers` field for merges, merge notes in every format, a `status` field. |
 | PS-C3 | — | fixed in 3.1.0, with PS-A4 | Close the HTML blind spot with web-design-studio: audit `<style>` and `style=""`; fail when zero files were audited. |
-| PS-C4 | — | W9 (3.5.0) | Add an adversarial critic subagent, `agents/design-critic.md`, that returns `findings.json` from a fresh context. |
+| PS-C4 | — | fixed in 3.5.0: PR #89, `agents/design-critic.md` and `/critique` (`test_agents`, `test_commands.TheChains`) | Add an adversarial critic subagent, `agents/design-critic.md`, that returns `findings.json` from a fresh context. |
 | PS-C5 | — | fixed in 3.4.0: `critique_snapshots.mjs` (PR #71; `test_critique_snapshots.CritiqueSnapshots`, `test_browser_scripts`) | Add `critique_snapshots.mjs`: PNGs at 390 and 1440px plus blur, greyscale, mirror, 25%, dark and reduced-motion variants. |
 | PS-C6 | — | W14 (3.6.0+) | Add `lint_claims.py`: load-time countdowns, fake scarcity, pre-checked opt-ins, unsourced percentages and the like. |
 | PS-C7 | — | W9 (3.5.0) | Add an eval suite in `evals/`, scored against a no-plugin baseline. |
@@ -266,6 +266,6 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-C4 | S | fixed in 3.3.0, with DL-A5 and DL-B1's reference | rewrite supabase-integration.md §2/§4/§6 |
 | DL-C5 | S | fixed in 3.4.0: `lint_email --source`, and the build notes each fallback (PR #58; `test_email.LintTheSource`) | `lint_email --source`: flag literals, `var()` fallbacks and dropped tokens. |
 | DL-C6 | S | fixed in 3.2.0 | pointer and command hygiene; the detail file lists them. |
-| DL-C7 | M | W9 (3.5.0): the two commands in PR #88 (`test_commands.TheDeliveryChains`), the reviewer agent and the email-template hook in P27 (P25 closed without the hook), the evals in P30 | plugin features for these skills. |
+| DL-C7 | M | W9 (3.5.0): the two commands in PR #88 (`test_commands.TheDeliveryChains`), the supabase-security-reviewer in PR #89 (`test_agents`), the email-template hook in P27 part 2 (P25 closed without the hook), the evals in P30 | plugin features for these skills. |
 | DL-C8 | S | fixed in 3.2.0 | slimmer SKILL.md, sharper descriptions. |
 | DL-C9 | M | W13 (3.6.0+) | Keep the email client matrix honest: regenerate its cells from caniemail's data, with test dates. |

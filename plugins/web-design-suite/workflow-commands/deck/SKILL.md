@@ -18,7 +18,7 @@ python "${CLAUDE_SKILL_DIR}/scripts/deck.py" $ARGUMENTS
 
 Use `python3` where `python` is not Python 3 (macOS). It needs two inputs the user owns:
 - **the decision log**, client-presentation-builder's `DECISION_LOG.md`: the decisions the deck argues. Without one, start from that skill's `assets/DECISION_LOG.md` with the user, before running this;
-- **the critique's findings**, design-critique-gate's `findings.json` (`--findings`). Without one, run that skill's critique on the work first and save its findings, then run this.
+- **the critique's findings**, design-critique-gate's `findings.json` (`--findings`). Without one, run `/web-design-suite:critique` first: it writes `design-reports/critique/findings.json`.
 
 The runner, in order:
 1. **audit:** `audit_design.py --json` on the paths, or the project, and `perf_audit.py --json` on the build (`--dist`, else `dist/` or `build/`);
