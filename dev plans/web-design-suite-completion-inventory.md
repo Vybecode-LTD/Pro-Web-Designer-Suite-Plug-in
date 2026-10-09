@@ -21,7 +21,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | XC-B6 | — | fixed in 3.2.0 | discoverability in a heavy environment: in this machine's sessions the 13 skills |
 | XC-C1 | L · high | W9 (3.5.0) | An eval suite (`evals/`): per-skill triggering cases and outcome graders, run with ablation, in CI with a cost ceiling. |
 | XC-C2 | M · high | fixed in 3.5.0: `test_hooks` (`TheDesignGate`, `TheHooksFile`), PR #82 | An opt-in design-gate hook: PostToolUse on Edit/Write runs `audit_design` on the changed file and returns the findings to Claude. |
-| XC-C3 | M · high | W9 (3.5.0); /gate and /install-gate in PR #85 (`test_commands`), /critique and /new-system in P26 part 2 | User-invocable workflows as skills with `disable-model-invocation: true`: /gate, /install-gate, /critique, /new-system and more. |
+| XC-C3 | M · high | W9 (3.5.0); /gate and /install-gate in PR #85 (`test_commands`), /new-system in PR #87 (`test_commands.TheNewSystem`), /critique and the agents in P27 | User-invocable workflows as skills with `disable-model-invocation: true`: /gate, /install-gate, /critique, /new-system and more. |
 | XC-C4 | M · medium | W9 (3.5.0) | Subagents (design-critic, a11y-auditor), so heavy references load in an isolated context. |
 | XC-C5 | S · high | fixed in 3.2.0 | promote this review's harnesses to permanent tests: every documented |
 | XC-C6 | M · medium | fixed in 3.3.0: `tooling/release/build.py` (`test_release_build`), `.github/workflows/ci.yml` and `release.yml` (PR #17). The evals join CI with P29 | Build and release: a build tool for the zip and the 13 `.skill` files, `claude plugin tag`, and a CI matrix of Windows/Linux/macOS × Python 3.9–3.14 with Node. |
@@ -60,7 +60,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SS-C3 | — | fixed in 3.2.0 | Make the docs part of the test suite (S–M, P1). |
 | SS-C4 | — | fixed in 3.2.0 | One source for shared CSS (M, P1). |
 | SS-C5 | — | fixed in 3.3.0: `--preset studio`, the 11px refusal, `--fluid-space`, `--anchor-seed`, `--neutral-hue`, `--gamut p3` (`test_numbers.TypeScale`, `ColourRamps`) | Generator upgrades (M, P1). |
-| SS-C6 | — | W9 (3.5.0); the hook in PR #82 (`test_hooks.TheDesignGate`), the commands in P26 and the subagent in P27 | Use Claude Code plugin features (M, P1). |
+| SS-C6 | — | W9 (3.5.0); the hook in PR #82 (`test_hooks.TheDesignGate`), the commands in PR #87 (`/new-system`, `/contrast`; `test_commands`), the subagent in P27 | Use Claude Code plugin features (M, P1). |
 | SS-C7 | — | W9 (3.5.0) | An eval suite of script-graded cases, run against a no-plugin baseline. |
 | SS-C8 | — | fixed in 3.2.0 | Size: 17.7 KB / 2,616 words ≈ 4.4k tokens. |
 | SS-C9 | — | fixed in 3.3.0: `test_contract.TheStarterKeepsItsWord` | Ship what the starter refers to (S, P1). |
@@ -144,7 +144,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-C6 | — | fixed in 3.4.0: its last open part, LC-A17 (PR #54); LC-B4 is W9's | Instruction fixes: the rebase recipe (LC-A6), a worktree-based before/after audit (LC-A13), the `${CLAUDE_SKILL_DIR}` invocation (LC-A20), one snapshot path with its inputs in config (LC-A18), the README (LC-A21), the ro |
 | LC-C7 | — | W10 (3.6.0+) | A Figma MCP route: a SKILL.md routing row that says "if `get_variable_defs` is available, read with it"; a `--reverse --format plugin-script` output for `use_figma` that renames "Mode 1", sets `scopes: []` on primitives  |
 | LC-C8 | — | fixed in 3.5.0: the generated-file guard in PR #82 (`test_hooks.TheGeneratedFileGuard`), the token diff in PR #84 (`test_hooks.TheTokenDiff`, `test_project_config.DiffSystemReadsTheContract`) | Hooks: block edits to files headed "GENERATED — DO NOT EDIT", and on a tokens.css edit run diff_system and return the bump and any contrast crossings. |
-| LC-C9 | — | W9 (3.5.0) | User-invocable workflow skills (`disable-model-invocation: true`): `/wds-migrate-census`, `/wds-release-check` (extract → diff → gate → changelog → guide), `/wds-figma-handoff`, `/wds-docs-check`, each with `allowed-tool |
+| LC-C9 | — | W9 (3.5.0); the commands in PR #87 (`test_commands.TheReleaseCheck`, `TheChains`), the agent in P27 | User-invocable workflow skills (`disable-model-invocation: true`): `/wds-migrate-census`, `/wds-release-check` (extract → diff → gate → changelog → guide), `/wds-figma-handoff`, `/wds-docs-check`, each with `allowed-tool |
 | LC-C10 | — | W9 (3.5.0) | A `claude plugin eval` suite, with a `scaffold_script` for each fixture. |
 | LC-C11 | — | fixed in 3.2.0 | Descriptions and token budget. |
 | LC-C12 | — | fixed in 3.4.0: `tests/fixtures/worked-run` and `worked-release.json`, held by `test_token_migration.TheWorkedRun` and `test_versioning.TheWorkedRelease` (PR #50) | Ship the 8-file migration fixture and the five-edit release as test fixtures, and have CI regenerate the SKILL.md numbers from them. |

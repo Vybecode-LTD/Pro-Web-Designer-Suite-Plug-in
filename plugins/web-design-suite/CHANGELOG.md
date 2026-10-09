@@ -149,6 +149,33 @@
     skipped.
   - **In CI**, the README says how to run another skill's script: by path, from the
     plugin checked out at a release tag.
+- **Workflow commands, part 2: the systems and the lifecycle** (XC-C3, SS-C6 and LC-C9's
+  commands; their agents come with the subagents). Six more commands, each pre-approving
+  exactly the scripts it runs. Two have a runner, where a step decides the next; the
+  others are chains whose body runs the skills' own scripts through
+  `${CLAUDE_PLUGIN_ROOT}`. Each writes its reports under `design-reports/` and edits
+  nothing it was not asked to.
+  - **`/web-design-suite:new-system BRAND`** turns a brand colour into the starter's
+    system: the accent ramp with the brand exact at its nearest step, the neutral ramp on
+    its hue, the starter's type scale or one from `--ratio`, `--dual-ratio` and `--fluid`,
+    and the starter styles in `src/styles/`. Then `check_roles.py` checks every role pair
+    in each theme, and a failing pair is named. It never overwrites a file without
+    `--force`.
+  - **`/web-design-suite:contrast`** checks every role pair in the project's tokens, or
+    one foreground on one background. This is SS-C6's `/wds:contrast`; its `/wds:tokens`
+    is `/new-system`, and its `/wds:audit` is `/gate`.
+  - **`/web-design-suite:migrate`** takes a token migration's census: the literals, the
+    clusters and the proposed mapping, with the questions that need a designer. It
+    applies nothing.
+  - **`/web-design-suite:release-check`** extracts the system, diffs it against the
+    published snapshot (`baselines.system`), stops at the gate when a name vanished with
+    no deprecation record, and writes the changelog entry and, for a breaking change, the
+    migration guide.
+  - **`/web-design-suite:figma-sync EXPORT`** audits a Figma export against the token
+    system and stops on an error, with the designer's questions; on a clean audit it
+    generates the tokens and diffs them against the project's.
+  - **`/web-design-suite:docs-check`** extracts the system and checks the docs' snapshot
+    (`baselines.docs`) and every hand-written claim against it.
 
 ### Fixed
 
@@ -156,6 +183,9 @@
   `a11y_static.py` and `perf_audit.py` stopped with a traceback when `--write-baseline`
   named a file in a missing folder, as a config's `ci/audit-baseline.json` is on a fresh
   checkout. Each now creates the folder.
+- **`extract_literals.py -o` into a new folder** (P26). It stopped with "cannot write"
+  where `cluster_values.py`, `extract_system.py` and `diff_system.py` create the folder.
+  `/migrate` writes its census to `design-reports/migration/`.
 
 ## 3.4.0 — 2026-10-07
 
