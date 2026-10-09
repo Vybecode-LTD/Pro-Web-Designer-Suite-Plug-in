@@ -6,7 +6,7 @@ Every argument of `diff_system.py` and `deprecate.py`. `SKILL.md` has the workfl
 
 | Flag | Does |
 |---|---|
-| `old` `new` | two snapshots: `system.json`, `tokens.css`, a `contract.json`, or a directory containing one. Without `new`, the token files the project's `.design-suite.json` lists (web-design-studio's `references/project-contract.md`) |
+| `old` `new` | two snapshots: `system.json`, `tokens.css`, a `contract.json`, or a directory containing one. Without `old`, the published snapshot the project's `.design-suite.json` names (`baselines.system`); without `new`, the token files it lists (web-design-studio's `references/project-contract.md`) |
 | `--format report\|json\|changelog\|migration-guide` | output shape (default `report`) |
 | `-o FILE` | write there instead of stdout |
 | `--from-version X.Y.Z` | the version `old` shipped as; yields a real recommended version |

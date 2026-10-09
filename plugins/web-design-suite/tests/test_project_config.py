@@ -478,6 +478,18 @@ class DiffSystemReadsTheContract(TempDirTest):
         self.write("src/styles/tokens.css", TOKENS.replace("--space-4: 1rem", "--space-4: 1.25rem"))
         self.assertEqual([("tier1-value-changed", "--space-4")], self.changes("v1.json"))
 
+    def test_without_old_the_published_snapshot_the_config_names(self):
+        """P25: `baselines.system` names the published snapshot, for the token
+        diff hook and for a run that names neither snapshot."""
+        self.write(".design-suite.json", '{"schema": 1, "tokens": "src/styles/tokens.css"}')
+        self.assertIn('name it in the project\'s .design-suite.json ("baselines": {"system"', self.changes(code=2))
+        self.write(".design-suite.json", json.dumps({"schema": 1, "tokens": "src/styles/tokens.css",
+                                                     "baselines": {"system": "v1.json"}}))
+        self.assertEqual([], self.changes())
+        self.write("src/styles/tokens.css", TOKENS.replace("--space-4: 1rem", "--space-4: 1.25rem"))
+        self.assertEqual([("tier1-value-changed", "--space-4")], self.changes())
+        self.assertEqual([], self.changes("src/styles/tokens.css"))              # a named one beats it
+
 
 class ClusterValuesLandsOnTheProjectsRamps(TempDirTest):
     """LC-C1: a migration lands on the project's ramps, not ones it derives."""
@@ -539,8 +551,9 @@ CONFIGS = {
     "full": json.dumps({"schema": 1, "tokens": ["src/tokens.css", "../shared/contract.json"],
                         "emailTokens": "emails/email-tokens.json", "components": "src/widgets/**/*.css",
                         "stack": "tailwind-v4", "budgets": {"perf": "perf.json", "a11y": "a11y.json"},
-                        "baselines": {"audit": "b/audit.json", "snapshots": "snaps/"},
-                        "hooks": {"designGate": True, "generatedFiles": False}}),
+                        "baselines": {"audit": "b/audit.json", "snapshots": "snaps/",
+                                      "system": "published/system.json"},
+                        "hooks": {"designGate": True, "generatedFiles": False, "tokenDiff": True}}),
     "nulls": '{"schema": 1, "emailTokens": null, "stack": null}',
     "bom": "﻿" + '{"schema": 1, "tokens": "t.css"}',
     "unknown": '{"schema": 1, "token": "x.css", "budget": {}}',

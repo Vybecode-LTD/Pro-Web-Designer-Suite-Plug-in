@@ -105,6 +105,21 @@
     report major version 3, so the Store placeholder on Windows is passed over. A hook
     that cannot act tells Claude why, or stays silent. It never blocks a tool call
     because of its own failure.
+- **Hooks, part 2: the token diff** (LC-C8). After Claude edits one of the project's
+  token files, the gate's hook runs `diff_system.py` against the published snapshot, and
+  Claude hears the release the edit makes, each breaking change, and each contrast pair
+  that crossed a WCAG floor, while it can still undo it. An edit that is only additive,
+  or changes nothing, is silent.
+  - **Opt-in:** `"hooks": {"tokenDiff": true}`, with the project's `tokens` and the new
+    `baselines.system`, the published snapshot. Until that snapshot exists, the hook
+    stays silent. Both readers check the new keys. A token file outside the project
+    (`../shared/tokens.css`) is found through the session's project, and a config that
+    fails its checks is reported for a token file it names, a `contract.json` too.
+  - **`diff_system.py`** without `old` compares against `baselines.system`, as it
+    already took the config's token files without `new`. It now compares components only
+    when both snapshots carry them, as its note always said: a published `system.json`
+    against the token files read every component as removed, a major release.
+  - The gate's hook now has 180 seconds, for the audit and the diff in one process.
 
 ## 3.4.0 — 2026-10-07
 

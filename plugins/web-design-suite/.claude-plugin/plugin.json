@@ -13,7 +13,7 @@
     "design_hooks": {
       "type": "boolean",
       "title": "Design hooks",
-      "description": "The design gate, the generated-file guard and the skill router. Off stops all three. On, the gate and the guard still act only in a project whose .design-suite.json turns them on.",
+      "description": "The design gate, the token diff, the generated-file guard and the skill router. Off stops them all. On, the gate, the token diff and the guard still act only in a project whose .design-suite.json turns them on.",
       "default": true
     }
   },

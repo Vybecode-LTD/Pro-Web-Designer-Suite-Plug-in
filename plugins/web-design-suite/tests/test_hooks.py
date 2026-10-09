@@ -1,14 +1,16 @@
-"""The plugin's hooks (P25: XC-C2, LC-C8 in part, SS-C6, XC-C8's hook part).
+"""The plugin's hooks (P25: XC-C2, LC-C8, SS-C6, XC-C8's hook part).
 
 hooks/hooks.json runs hooks/design_hooks.mjs under node with the event's
 JSON on stdin, as Claude Code does:
 - `guard` (PreToolUse on Edit|Write) refuses an edit to a generated file;
 - `gate` (PostToolUse on Edit|Write) runs audit_design.py on the changed
-  file and returns its findings as additionalContext;
+  file and returns its findings as additionalContext, and after an edit to a
+  token file, diff_system.py against the published snapshot;
 - `route` (UserPromptSubmit) names the skill a prompt needs.
 
-The guard and the gate act only in a project whose .design-suite.json turns
-them on (`hooks`), and the plugin's `design_hooks` option turns all three off.
+The guard, the gate and the token diff act only in a project whose
+.design-suite.json turns them on (`hooks`), and the plugin's `design_hooks`
+option turns them all off.
 Each case here is the JSON Claude Code sends, from a fixture.
 """
 from __future__ import annotations
@@ -23,7 +25,7 @@ import sys
 import tempfile
 import unittest
 
-from wds_support import NODE, PLUGIN, TempDirTest, env, load_script, output
+from wds_support import NODE, PLUGIN, TempDirTest, env, load_script, output, run_py
 
 HOOKS = PLUGIN / "hooks"
 SCRIPT = HOOKS / "design_hooks.mjs"
@@ -181,6 +183,168 @@ class TheDesignGate(HookTest):
         self.config(designGate=True)
         self.assertIn("needs Python 3", self.context("src/components/card.css",
                                                      WDS_PYTHON=str(self.tmp / "no-python")))
+
+
+TOKENS = """\
+@layer tokens {
+  :root {
+    --neutral-0: oklch(100% 0 0);
+    --neutral-500: NEUTRAL;
+    --neutral-900: oklch(23% 0.005 75);
+    --bg-surface: var(--neutral-0);
+    --fg-default: var(--neutral-900);
+    --fg-muted: var(--neutral-500);SPACE
+  }
+}
+"""
+
+
+def tokens(neutral="oklch(53.5% 0.009 75)", space="\n    --space-4: 1rem;"):
+    return TOKENS.replace("NEUTRAL", neutral).replace("SPACE", space)
+
+
+class TheTokenDiff(HookTest):
+    """LC-C8: after an edit to a token file, Claude hears what the edit costs
+    a consumer, against the published snapshot, while it can still undo it."""
+
+    def setUp(self):
+        super().setUp()
+        self.write("published/tokens.css", tokens())
+
+    def config(self, snapshot="published/tokens.css", **hooks):
+        data = {"schema": 1, "tokens": "src/tokens.css", "hooks": hooks or {"tokenDiff": True}}
+        if snapshot:
+            data["baselines"] = {"system": snapshot}
+        self.write(".design-suite.json", json.dumps(data))
+
+    def context(self, rel="src/tokens.css", **changes):
+        out = self.run_hook("gate", self.edit(rel), **changes)
+        return out and out["hookSpecificOutput"]["additionalContext"]
+
+    def test_a_removed_name_is_a_major_release(self):
+        self.config()
+        self.write("src/tokens.css", tokens(space=""))
+        text = self.context()
+        self.assertIn("web-design-suite token diff: after this edit to src/tokens.css", text)
+        self.assertIn("(published/tokens.css) make a major release, tier-1 primitive removed: --space-4", text)
+        self.assertIn("\n- tier1-removed: --space-4, 16px → none", text)
+
+    def test_a_contrast_crossing_is_named(self):
+        self.config()
+        self.write("src/tokens.css", tokens(neutral="oklch(70% 0.009 75)"))
+        text = self.context()
+        self.assertIn("\n- tier1-value-changed: --neutral-500, #706d68 → #a29e98", text)
+        self.assertIn("\n- contrast, light theme: --fg-muted on --bg-surface, 5.17:1 → 2.67:1, "
+                      "below 4.5:1 (body text (SC 1.4.3)) and below 3:1 (large text (SC 1.4.3)), "
+                      "through --fg-muted, --neutral-500", text)
+
+    def test_an_unchanged_or_additive_edit_is_silent(self):
+        """Only a breaking change or a crossing is worth a turn: a minor
+        release breaks nothing, and the diff runs on every token edit."""
+        self.config()
+        self.write("src/tokens.css", tokens())
+        self.assertIsNone(self.context())
+        self.write("src/tokens.css", tokens(space="\n    --space-4: 1rem;\n    --space-5: 1.25rem;"))
+        self.assertIsNone(self.context())
+
+    def test_without_a_published_snapshot_nothing_runs(self):
+        """Before the first release there is nothing to compare against."""
+        self.write("src/tokens.css", tokens(space=""))
+        self.config(snapshot=None)
+        self.assertIsNone(self.context())
+        self.config(snapshot="published/system.json")                     # named, not yet written
+        self.assertIsNone(self.context())
+
+    def test_without_the_opt_in_nothing_runs(self):
+        self.write("src/tokens.css", tokens(space=""))
+        self.config(designGate=True)                                      # a gate, not the diff
+        self.assertIsNone(self.context())
+        self.config(tokenDiff=False)
+        self.assertIsNone(self.context())
+        self.config()
+        self.assertIsNone(self.context(CLAUDE_PLUGIN_OPTION_DESIGN_HOOKS="false"))
+
+    def test_only_the_projects_token_files(self):
+        self.config()
+        self.write("src/tokens.css", tokens(space=""))
+        self.write("src/theme.css", tokens(space=""))           # a token file by name, not the project's
+        self.assertIsNone(self.context("src/theme.css"))
+        self.config(designGate=True, tokenDiff=True)
+        self.write("src/components/card.css", LEAK)
+        text = self.context("src/components/card.css")
+        self.assertIn("audit_design.py found 1 problem", text)
+        self.assertNotIn("token diff", text)
+
+    def test_with_the_gate_on_the_diff_still_speaks(self):
+        self.config(designGate=True, tokenDiff=True)
+        self.write("src/tokens.css", tokens(space=""))
+        text = self.context()
+        self.assertIn("tier1-removed: --space-4", text)
+        self.assertNotIn("design gate", text)                   # a token file's literals are its job
+
+    def test_a_published_system_json_with_components(self):
+        """CodeRabbit on #84: the snapshot the docs publish, a system.json with
+        components, against the token files, which carry none, read every
+        component as removed: a major release on every token edit."""
+        self.write("src/tokens.css", tokens())
+        self.write("src/components/card.css", "@layer components {\n  .card {\n    --card-bg: var(--bg-surface);\n"
+                                              "    background: var(--card-bg);\n  }\n}\n")
+        proc = run_py("design-system-docs", "extract_system", "src", "--out", "published/system.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertTrue(json.loads((self.tmp / "published" / "system.json").read_bytes())["components"])
+        self.config(snapshot="published/system.json")
+        self.assertIsNone(self.context())
+        self.write("src/tokens.css", tokens(space=""))
+        text = self.context()
+        self.assertIn("tier1-removed: --space-4", text)
+        self.assertNotIn("component-removed", text)
+
+    def test_a_token_file_outside_the_project(self):
+        """Codex on #84: a config may name `../shared/tokens.css`. Walking up
+        from that file finds no config, so the session's project names it."""
+        self.write("app/published/tokens.css", tokens())
+        self.write("app/.design-suite.json", json.dumps({
+            "schema": 1, "tokens": "../shared/tokens.css", "baselines": {"system": "published/tokens.css"},
+            "hooks": {"tokenDiff": True}}))
+        self.write("shared/tokens.css", tokens(space=""))
+        event = {**self.edit("shared/tokens.css"), "cwd": str(self.tmp / "app")}
+        text = self.run_hook("gate", event)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("after this edit to ../shared/tokens.css", text)
+        self.assertIn("tier1-removed: --space-4", text)
+
+    def test_a_broken_config_is_said_for_a_contract_it_names(self):
+        """Codex on #84: a contract.json is no file the audit reads, so a
+        config that failed its checks went unsaid."""
+        self.write(".design-suite.json", json.dumps({"schema": 1, "tokens": "src/contract.json",
+                                                     "baselines": {"system": "published/tokens.css"},
+                                                     "hooks": {"tokenDiff": "yes"}}))
+        self.write("src/contract.json", '{"schema": "web-design-suite/contract/1"}')
+        self.write("src/other.json", "{}")
+        text = self.context("src/contract.json")
+        self.assertIn("web-design-suite token diff: .design-suite.json could not be read, so the token diff did "
+                      "not run", text)
+        self.assertIn('"hooks.tokenDiff" must be true or false', text)
+        self.assertIsNone(self.context("src/other.json"))               # a file it does not name
+
+    def test_a_broken_config_in_utf_16_or_32_is_said_too(self):
+        """CodeRabbit on #84: the readers take a config in UTF-16 and UTF-32
+        (Codex on #81), but the hook read a broken one as UTF-8 only, so the
+        token file it names went unsaid."""
+        self.write("src/contract.json", '{"schema": "web-design-suite/contract/1"}')
+        data = json.dumps({"schema": 1, "tokens": "src/contract.json", "hooks": {"tokenDiff": "yes"}})
+        for encoding in ("utf-16", "utf-32"):
+            with self.subTest(encoding=encoding):
+                self.write(".design-suite.json", data.encode(encoding))
+                self.assertIn('"hooks.tokenDiff" must be true or false', self.context("src/contract.json"))
+
+    def test_a_diff_that_cannot_run_is_said(self):
+        self.write(".design-suite.json", json.dumps({
+            "schema": 1, "tokens": ["src/tokens.css", "src/missing.css"],
+            "baselines": {"system": "published/tokens.css"}, "hooks": {"tokenDiff": True}}))
+        self.write("src/tokens.css", tokens())
+        text = self.context()
+        self.assertIn("web-design-suite token diff: diff_system.py stopped (exit 2)", text)
+        self.assertIn("missing.css", text)
 
 
 class TheGeneratedFileGuard(HookTest):
