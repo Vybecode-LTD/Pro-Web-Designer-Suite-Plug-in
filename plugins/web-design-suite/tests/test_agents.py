@@ -97,8 +97,10 @@ class TheAgentFiles(unittest.TestCase):
         self.assertIn("for the matrix, read the console's summary", text("gate-runner"))
         self.assertIn("critique_snapshots.mjs\" TARGET --out design-reports/critique/shots", text("design-critic"))
         self.assertIn("The one folder anything is written to is `design-reports/critique/`", text("design-critic"))
-        self.assertIn("without one, its `USING`, which Postgres then applies to the new row too",
-                      text("supabase-security-reviewer"))
+        reviewer = text("supabase-security-reviewer")
+        self.assertIn("for an `UPDATE` or `ALL` policy without one, its `USING`, which Postgres then applies to the "
+                      "new row too", reviewer)                                   # CodeRabbit on #89: ALL inserts too
+        self.assertIn("an `INSERT` policy cannot have `USING`, so it needs `WITH CHECK`", reviewer)
 
     def test_the_critique_command_hands_the_work_to_the_critic(self):
         body = (COMMANDS / "critique" / "SKILL.md").read_text(encoding="utf-8")
