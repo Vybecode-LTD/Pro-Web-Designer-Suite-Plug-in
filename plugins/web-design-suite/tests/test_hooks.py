@@ -25,7 +25,7 @@ import sys
 import tempfile
 import unittest
 
-from wds_support import NODE, PLUGIN, TempDirTest, env, load_script, output
+from wds_support import NODE, PLUGIN, TempDirTest, env, load_script, output, run_py
 
 HOOKS = PLUGIN / "hooks"
 SCRIPT = HOOKS / "design_hooks.mjs"
@@ -281,6 +281,50 @@ class TheTokenDiff(HookTest):
         text = self.context()
         self.assertIn("tier1-removed: --space-4", text)
         self.assertNotIn("design gate", text)                   # a token file's literals are its job
+
+    def test_a_published_system_json_with_components(self):
+        """CodeRabbit on #84: the snapshot the docs publish, a system.json with
+        components, against the token files, which carry none, read every
+        component as removed: a major release on every token edit."""
+        self.write("src/tokens.css", tokens())
+        self.write("src/components/card.css", "@layer components {\n  .card {\n    --card-bg: var(--bg-surface);\n"
+                                              "    background: var(--card-bg);\n  }\n}\n")
+        proc = run_py("design-system-docs", "extract_system", "src", "--out", "published/system.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertTrue(json.loads((self.tmp / "published" / "system.json").read_bytes())["components"])
+        self.config(snapshot="published/system.json")
+        self.assertIsNone(self.context())
+        self.write("src/tokens.css", tokens(space=""))
+        text = self.context()
+        self.assertIn("tier1-removed: --space-4", text)
+        self.assertNotIn("component-removed", text)
+
+    def test_a_token_file_outside_the_project(self):
+        """Codex on #84: a config may name `../shared/tokens.css`. Walking up
+        from that file finds no config, so the session's project names it."""
+        self.write("app/published/tokens.css", tokens())
+        self.write("app/.design-suite.json", json.dumps({
+            "schema": 1, "tokens": "../shared/tokens.css", "baselines": {"system": "published/tokens.css"},
+            "hooks": {"tokenDiff": True}}))
+        self.write("shared/tokens.css", tokens(space=""))
+        event = {**self.edit("shared/tokens.css"), "cwd": str(self.tmp / "app")}
+        text = self.run_hook("gate", event)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("after this edit to ../shared/tokens.css", text)
+        self.assertIn("tier1-removed: --space-4", text)
+
+    def test_a_broken_config_is_said_for_a_contract_it_names(self):
+        """Codex on #84: a contract.json is no file the audit reads, so a
+        config that failed its checks went unsaid."""
+        self.write(".design-suite.json", json.dumps({"schema": 1, "tokens": "src/contract.json",
+                                                     "baselines": {"system": "published/tokens.css"},
+                                                     "hooks": {"tokenDiff": "yes"}}))
+        self.write("src/contract.json", '{"schema": "web-design-suite/contract/1"}')
+        self.write("src/other.json", "{}")
+        text = self.context("src/contract.json")
+        self.assertIn("web-design-suite token diff: .design-suite.json could not be read, so the token diff did "
+                      "not run", text)
+        self.assertIn('"hooks.tokenDiff" must be true or false', text)
+        self.assertIsNone(self.context("src/other.json"))               # a file it does not name
 
     def test_a_diff_that_cannot_run_is_said(self):
         self.write(".design-suite.json", json.dumps({

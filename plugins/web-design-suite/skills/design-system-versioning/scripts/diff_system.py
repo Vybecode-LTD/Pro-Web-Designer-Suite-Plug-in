@@ -1709,7 +1709,10 @@ def _theme_override(tok: Dict[str, Any], theme: str) -> Optional[str]:
 
 
 def diff_components(old: Snapshot, new: Snapshot, out: List[Change]) -> None:
-    if not (old.has_components or new.has_components):
+    # Both, as main()'s note says: a tokens.css or a contract carries no
+    # inventory, so against a system.json every component read as removed
+    # (CodeRabbit on #84).
+    if not (old.has_components and new.has_components):
         return
     old_names, new_names = set(old.components), set(new.components)
     for name in sorted(old_names - new_names):
