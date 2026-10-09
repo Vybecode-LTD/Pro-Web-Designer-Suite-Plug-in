@@ -173,7 +173,8 @@
     migration guide.
   - **`/web-design-suite:figma-sync EXPORT`** audits a Figma export against the token
     system and stops on an error, with the designer's questions; on a clean audit it
-    generates the tokens and diffs them against the project's.
+    generates the tokens and diffs them against the project's. `figma_audit.py` gains
+    `--out FILE`, which writes the questions, creating the folder.
   - **`/web-design-suite:docs-check`** extracts the system and checks the docs' snapshot
     (`baselines.docs`) and every hand-written claim against it.
 - **Workflow commands, part 3: delivery, persuasion and the runtime gates** (PS-C11;
