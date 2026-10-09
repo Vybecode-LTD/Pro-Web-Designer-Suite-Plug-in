@@ -124,6 +124,13 @@ class TheGateCommand(CommandTest):
         self.assertEqual(0, proc.returncode, output(proc))
         self.assertTrue(self.verdict(proc)["performance"].startswith("skipped (no build output"))
 
+    def test_a_named_build_that_is_missing_could_not_run(self):
+        """CodeRabbit on #85: a --dist that does not exist was skipped, and
+        the run passed. Only a build found by looking may be skipped."""
+        proc = self.run_py(RUN_GATES, "--src", "src", "--dist", "nowhere")
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertEqual("could not run (exit 2)", self.verdict(proc)["performance"])
+
     def test_the_projects_config_reaches_the_gates(self):
         """XC-C8: the gates read .design-suite.json, so the project's ramps
         and components count, and a baseline it names holds."""
@@ -198,6 +205,11 @@ class TheInstallGate(CommandTest):
         for job in ("gates", "baselines"):
             self.assertEqual("mcr.microsoft.com/playwright:v1.62.1-noble", flow["jobs"][job]["container"])
         self.assertEqual("windows-latest", flow["jobs"]["windows"]["runs-on"])
+        checkouts = [s for job in flow["jobs"].values() for s in job["steps"]
+                     if s.get("uses", "").startswith("actions/checkout@")]
+        self.assertEqual(3, len(checkouts))
+        for step in checkouts:                    # CodeRabbit on #85: no token for npm's install scripts
+            self.assertIs(False, step["with"]["persist-credentials"])
         self.assertIn("update-baselines", flow["on"]["workflow_dispatch"]["inputs"])
         runs = "\n".join(step.get("run", "") for step in flow["jobs"]["gates"]["steps"])
         self.assertIn("npx wait-on http://127.0.0.1:8080", runs)
@@ -248,6 +260,37 @@ class TheInstallGate(CommandTest):
         (self.tmp / ".github" / "workflows" / "design-gates.yml").unlink()
         self.assertIn("a range", output(self.install(code=1)))
         self.assertFalse((self.tmp / ".github" / "workflows" / "design-gates.yml").exists())
+
+    def test_the_browser_gates_packages_are_named_when_missing(self):
+        """Codex on #85: with playwright pinned, nothing said axe-core, serve
+        and wait-on were missing, and a11y_runtime stops without axe-core."""
+        self.write("package.json", json.dumps({"devDependencies": {"playwright": "1.62.1"}}))
+        text = output(self.install())
+        self.assertIn("does not list them: axe-core, serve, wait-on", text)
+        self.assertIn("npm i -D -E axe-core serve wait-on", text)
+        self.write("package.json", json.dumps({"devDependencies": {
+            "playwright": "1.62.1", "axe-core": "4.11.0", "serve": "14.2.4", "wait-on": "8.0.3"}}))
+        self.assertNotIn("npm i -D -E", output(self.install()))
+
+    def test_a_stamp_it_did_not_write_is_in_the_way(self):
+        """Codex on #85: scripts/design-gates.json was written without the
+        check every other file gets."""
+        self.write("scripts/design-gates.json", '{"ours": true}\n')
+        self.assertIn("scripts/design-gates.json", output(self.install(code=1)))
+        self.assertEqual('{"ours": true}\n', (self.tmp / "scripts" / "design-gates.json").read_text())
+        self.install("--force")
+
+    def test_a_path_the_workflow_cannot_run_unquoted_is_refused(self):
+        """Codex on #85: the workflow runs each path unquoted, so `web source`
+        became two arguments."""
+        for args in (["--src", "web source"], ["--dist", "../out"], ["--dest", "/abs"], ["--build", "npm run b # x"]):
+            with self.subTest(args=args):
+                self.assertIn("must be", output(self.install(*args, code=2)))
+        for baseline in ("my baselines/a.json", "ci/a;rm -rf x.json", "ci/$(id).json"):     # CodeRabbit on #85
+            with self.subTest(baseline=baseline):
+                self.write(".design-suite.json", json.dumps({"schema": 1, "baselines": {"audit": baseline}}))
+                self.assertIn("baselines.audit", output(self.install(code=2)))
+        self.assertFalse((self.tmp / "scripts").exists())
 
     @unittest.skipUnless(TOOLING, "the repository's tooling/ is not beside the plugin")
     def test_the_default_image_is_the_playwright_the_suite_tests(self):

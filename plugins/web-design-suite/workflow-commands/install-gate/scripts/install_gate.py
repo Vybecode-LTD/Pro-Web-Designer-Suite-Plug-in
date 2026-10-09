@@ -53,6 +53,9 @@ VENDORED = {
     "perf-budget-gate": ["perf_audit.py", "measure_vitals.mjs"],
 }
 BASELINES = {"audit": ".design-baseline.json", "a11y": ".a11y-baseline.json", "perf": ".perf-baseline.json"}
+# What the browser gates import or run beside playwright: axe-core in a11y_runtime, serve and wait-on in the workflow.
+COMPANIONS = ("axe-core", "serve", "wait-on")
+SAFE_PATH = re.compile(r"(?!/)(?!.*(?:^|/)\.\.(?:/|$))[A-Za-z0-9._/-]+")
 
 sys.path.insert(0, str(PLUGIN / "shared"))
 from project_config import ConfigError, project_config  # noqa: E402
@@ -83,6 +86,15 @@ def pinned_playwright(root: Path) -> Optional[str]:
     return None
 
 
+def declared(root: Path) -> set:
+    """The packages package.json lists, in either group."""
+    try:
+        package = json.loads((root / "package.json").read_bytes())
+    except (OSError, ValueError):
+        return set()
+    return {name for group in ("devDependencies", "dependencies") for name in (package.get(group) or {})}
+
+
 def posix(path: Path, root: Path) -> str:
     try:
         return path.resolve().relative_to(root.resolve()).as_posix()
@@ -100,10 +112,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--force", action="store_true", help="overwrite files this command did not write")
     ap.add_argument("--dry-run", action="store_true", help="say what would be written, and write nothing")
     args = ap.parse_args(argv)
-    for name in ("dest", "src", "dist", "build"):
-        value = getattr(args, name)
-        if not value.strip() or "@" in value or "\n" in value:
-            ap.error(f"--{name} must be a plain path or command")
+    # The workflow runs each path unquoted, in bash and in PowerShell, so a path
+    # holds only what neither splits or reads specially (Codex on #85).
+    for name in ("dest", "src", "dist"):
+        if not SAFE_PATH.fullmatch(getattr(args, name)):
+            ap.error(f"--{name} must be a relative path of letters, digits, '.', '_', '-' and '/': the workflow "
+                     "runs it unquoted")
+    if not args.build.strip() or any(c in args.build for c in ("@", "\n", " #", ": ")):
+        ap.error("--build must be one command line, without '@', ' #' or ': '")
 
     root = Path.cwd()
     try:
@@ -134,6 +150,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # 2. the workflow
     baselines = {key: posix(config.baselines[key], root) if config and key in config.baselines else default
                  for key, default in BASELINES.items()}
+    unsafe = next((key for key, value in baselines.items() if not SAFE_PATH.fullmatch(value)), None)
+    if unsafe:
+        print(f"install_gate: baselines.{unsafe} in .design-suite.json is {baselines[unsafe]!r}. The workflow runs "
+              "it unquoted, so it must be a path inside the project of letters, digits, '.', '_', '-' and '/'.",
+              file=sys.stderr)
+        return 2
     text = TEMPLATE.read_text(encoding="utf-8")
     for key, value in {"VERSION": plugin_version(), "PLAYWRIGHT": playwright, "DEST": args.dest.strip("/"),
                        "SRC": args.src, "DIST": args.dist, "BUILD": args.build,
@@ -145,6 +167,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     writes: Dict[Path, bytes] = {dest / name: data for name, data in files.items()}
     writes[root / WORKFLOW] = workflow
     in_the_way: List[str] = []
+    # the stamp is this command's when it says so; another file there is the user's (Codex on #85)
+    if stamp_path.exists() and last.get("plugin") != "web-design-suite" and not args.force:
+        in_the_way.append(posix(stamp_path, root))
     for path, data in writes.items():
         if not path.exists() or path.read_bytes() == data:
             continue
@@ -168,9 +193,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"{verb} {posix(path, root)}")
     print(f"\nThe CI image is mcr.microsoft.com/playwright:v{playwright}-noble.")
     if not pin:
-        print(f"package.json pins no playwright, so the image is the one the suite tests with. The browser gates "
-              f"need it in the lockfile, with axe-core, serve and wait-on:\n"
-              f"  npm i -D -E playwright@{playwright} axe-core serve wait-on")
+        print("package.json pins no playwright, so the image is the one the suite tests with.")
+    # the browser gates stop without any of these, pinned playwright or not (Codex on #85)
+    listed = declared(root)
+    missing = ([] if pin else [f"playwright@{playwright}"]) + [p for p in COMPANIONS if p not in listed]
+    if missing:
+        print("The browser gates need these in package.json, and it does not list them: "
+              f"{', '.join(m.split('@')[0] for m in missing)}. Add them:\n  npm i -D -E {' '.join(missing)}")
     print("Commit both, then run the workflow by hand with update-baselines ticked to record the baselines in CI.")
     return 0
 

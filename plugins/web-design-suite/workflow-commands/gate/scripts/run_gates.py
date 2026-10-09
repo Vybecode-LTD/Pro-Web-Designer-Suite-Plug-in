@@ -37,13 +37,14 @@ BUILDS = ("dist", "build")
 
 def gates(paths: List[str], src: Optional[str], dist: Optional[str]) -> List[Tuple[str, Optional[List[str]], str]]:
     """Each gate's name, its command (None when it cannot run here) and why."""
+    # A --dist the user names runs even when it is missing, so perf_audit says
+    # so and the verdict is "could not run" (CodeRabbit on #85); only a build
+    # found by looking is skipped when there is none.
     build = dist or next((b for b in BUILDS if Path(b).is_dir()), None)
     perf: Optional[List[str]] = None
     note = ""
     if build is None:
         note = "no build output: build the site, then pass --dist DIR"
-    elif not Path(build).exists():
-        note = f"{build} does not exist"
     else:
         perf = [str(PERF), build, *(["--src", src] if src else [])]
     return [("design", [str(AUDIT), *paths, "--strict"], ""),

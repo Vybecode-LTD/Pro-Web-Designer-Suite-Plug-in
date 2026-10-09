@@ -19,6 +19,9 @@ on:
 permissions:
   contents: read
 
+# Every checkout leaves no token in .git/config: npm ci and the build run
+# third-party install scripts, and nothing here pushes.
+
 jobs:
   # Linux, in the Playwright image built for the project's own playwright
   # (@PLAYWRIGHT@, from package.json), so the browser is the one the lockfile
@@ -32,6 +35,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: python
         run: apt-get update && apt-get install -y --no-install-recommends python3
       - run: npm ci
@@ -68,6 +73,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -95,6 +102,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: python
         run: apt-get update && apt-get install -y --no-install-recommends python3
       - run: npm ci

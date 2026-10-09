@@ -31,4 +31,4 @@ What it writes:
 
 It takes the baselines' paths from `.design-suite.json`. It never overwrites a file it did not write, or one changed since it wrote it, unless `--force`: tell the user which files are in the way and let them decide. It refuses a `playwright` version range in `package.json`, since the image's browsers fit one version.
 
-Then tell the user what was written, and the next steps the command printed: the exact `npm i -D -E` line when `playwright` is missing, committing both, and the first baseline run. Running it again upgrades the scripts and the workflow to this plugin's version.
+It refuses a path with a space or a shell character, since the workflow runs each one unquoted. Then tell the user what was written, and the next steps the command printed: the exact `npm i -D -E` line for any package the browser gates need that `package.json` does not list (`playwright`, `axe-core`, `serve`, `wait-on`), committing both, and the first baseline run. Running it again upgrades the scripts and the workflow to this plugin's version.
