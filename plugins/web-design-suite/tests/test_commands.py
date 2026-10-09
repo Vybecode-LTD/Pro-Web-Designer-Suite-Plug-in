@@ -505,6 +505,20 @@ class TheNewSystem(ChainTest):
         self.assertEqual(0, self.new("#e8440a", "--force").returncode)
         self.assertNotEqual(before, tree(self.tmp / "src" / "styles"))
 
+    def test_the_notes_describe_this_system_not_the_starters(self):
+        """Codex on #87: the notes still named Ember, hue 75 and the
+        starter's ratio, and called the starter's ratios verified."""
+        proc = self.new("#2563eb", "--neutral-hue", "250", "--ratio", "1.125", "--dual-ratio", "1.25")
+        self.assertEqual(0, proc.returncode, output(proc))
+        tokens = (self.tmp / "src" / "styles" / "tokens.css").read_text(encoding="utf-8")
+        for stale in ("Ember", "--neutral-hue 75", "Verified ", "ratio 1.200", "Same 380 -> 1440"):
+            self.assertNotIn(stale, tokens)
+        for note in ('"#2563eb" --anchor-seed prints it', '"#2563eb" --neutral --neutral-hue 250 prints it',
+                     "--ratio 1.125 --dual-ratio 1.25 prints these steps", "The starter measured 4.60:1"):
+            self.assertIn(note, " ".join(tokens.split()))
+        body = split_front(COMMANDS / "new-system" / "SKILL.md")[1]      # CodeRabbit on #87
+        self.assertIn('Exit 2 after "wrote 7 files" means the files are there', " ".join(body.split()))
+
     def test_a_scale_replaces_the_starters_and_one_the_generator_refuses_writes_nothing(self):
         proc = self.new("#2563eb", "--ratio", "1.125", "--dual-ratio", "1.25", "--fluid", "380", "1440",
                         "--out", "styles")
@@ -611,6 +625,17 @@ class TheChains(ChainTest):
         self.assertEqual(0, proc.returncode, output(proc))
         self.assertRegex(output(proc), r"PASS\s+4\.5:1")
 
+    def test_figma_questions_it_cannot_write_are_not_a_finding(self):
+        """CodeRabbit on #87: an --out it could not write ended in a
+        traceback and exit 1, which reads as findings."""
+        self.command = "figma-sync"
+        _, questions, _, _ = self.steps()
+        self.write("export.json", json.dumps([{"name": "space/4", "type": "FLOAT", "value": 16}]))
+        (self.tmp / "design-reports" / "figma" / "handoff-questions.md").mkdir(parents=True)
+        proc = self.run_step(questions, {"EXPORT": ["export.json"]})
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("cannot write", output(proc))
+
     def test_critique_reports_the_critics_findings_as_they_are(self):
         """PS-C4 and XC-C3: the critic's block, saved as it is, is ranked
         and turned into tracker lines."""
@@ -706,6 +731,24 @@ class TheDeck(ChainTest):
         self.assertEqual(["audit.json", "deck.html", "defence.md", "notes.md", "perf.json"],
                          sorted(p.name for p in self.out.iterdir()))
         self.assertIn("Muted text fails", (self.out / "defence.md").read_text(encoding="utf-8"))
+
+    def test_the_defence_carries_what_the_audit_found(self):
+        """Codex on #88: the defence sheet was built without the audit, so a
+        conformance defect the critique merged could be missing from it."""
+        self.write("src/components/card.css", LEAK)
+        proc = self.deck(self.MAJOR)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("tier1-leak", (self.out / "defence.md").read_text(encoding="utf-8"))
+
+    def test_no_build_leaves_no_old_performance_report(self):
+        """Codex on #88: a perf.json from an earlier run with a build stayed
+        beside a deck that had no performance evidence."""
+        self.write("design-reports/deck/perf.json", '{"from": "an earlier run"}\n')
+        (self.tmp / "dist" / "index.html").unlink()
+        (self.tmp / "dist").rmdir()
+        proc = self.deck(self.MAJOR)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertFalse((self.out / "perf.json").exists())
 
     def test_a_blocking_finding_stops_it_with_no_deck(self):
         self.write("design-reports/deck/deck.html", "an earlier run's\n")

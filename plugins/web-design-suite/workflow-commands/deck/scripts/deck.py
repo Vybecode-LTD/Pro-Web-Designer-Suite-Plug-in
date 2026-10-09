@@ -69,7 +69,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                                   "(default: dist/ or build/, if one exists)")
     ap.add_argument("--out", default="design-reports/deck", metavar="DIR",
                     help="where the reports and the deck go (default: design-reports/deck)")
-    args = ap.parse_args(argv)
+    args = ap.parse_intermixed_args(argv)              # paths after --findings, on Python 3.9 too
 
     for path, what in ((args.log, "the decision log"), (args.findings, "the critique's findings")):
         if not Path(path).is_file():
@@ -77,7 +77,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 2
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    for stale in ("defence.md", "deck.html", "notes.md"):    # a stopped run leaves no old deck behind
+    for stale in ("audit.json", "perf.json", "defence.md", "deck.html", "notes.md"):   # no old run's evidence
         if (out / stale).is_file():
             (out / stale).unlink()
 
@@ -108,7 +108,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     step("defence")
     defence = out / "defence.md"
-    if call([str(CRITIQUE), args.findings, "--format", "defence", "-o", str(defence)]) != 0:
+    if call([str(CRITIQUE), args.findings, "--audit", str(audit), "--format", "defence",   # the same evidence
+             "-o", str(defence)]) != 0:                                                       # (Codex on #88)
         return 2
     print(f"the defence sheet -> {defence}")
 

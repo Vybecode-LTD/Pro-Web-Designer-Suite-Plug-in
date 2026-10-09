@@ -29,4 +29,4 @@ Then tell the user:
 - what nothing wrote: a `--out` other than `src/styles` belongs in `.design-suite.json` as `"tokens": "<out>/tokens.css"`, so the gates read it, and the "Verified" notes in `tokens.css` are the starter's, measured by `check_roles.py` now;
 - the next step: web-design-studio's Phase 1 sign-off on the token file, before any component.
 
-Exit 2 wrote nothing: report the reason (a file in the way, or a generator that refused a scale) and the flag that fixes it.
+Exit 2 before the files are written wrote nothing: report the reason (a file in the way, or a generator that refused a scale) and the flag that fixes it. Exit 2 after "wrote 7 files" means the files are there but `check_roles.py` could not run: report its error, and check the pairs with `/web-design-suite:contrast`.
