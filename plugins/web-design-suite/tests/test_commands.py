@@ -54,7 +54,7 @@ CLEAN = "@layer components {\n  .card {\n    color: var(--fg-default);\n  }\n}\n
 PAGE = ('<!doctype html>\n<html lang="en">\n<head><title>Home</title></head>\n'
         '<body><main><h1>Home</h1></main></body>\n</html>\n')
 needs_yaml = unittest.skipUnless(NODE and YAML_MODULES, "node and js-yaml (tooling/main) are not installed")
-NAMES = ["contrast", "deck", "docs-check", "email-build", "figma-sync", "gate", "gate-a11y", "gate-matrix",
+NAMES = ["contrast", "critique", "deck", "docs-check", "email-build", "figma-sync", "gate", "gate-a11y", "gate-matrix",
          "gate-perf", "install-gate", "migrate", "new-system", "release-check", "schema-to-screens"]
 PLACEHOLDERS = ("$ARGUMENTS", "PATHS", "TOKENS", "EXPORT", "FG", "BG", "BRAND", "OPTIONS", "SCHEMA", "TEMPLATE",
                 "NAME", "TARGET", "DIST", "URL", "MANIFEST")
@@ -635,6 +635,23 @@ class TheChains(ChainTest):
         proc = self.run_step(questions, {"EXPORT": ["export.json"]})
         self.assertEqual(2, proc.returncode, output(proc))
         self.assertIn("cannot write", output(proc))
+
+    def test_critique_reports_the_critics_findings_as_they_are(self):
+        """PS-C4 and XC-C3: the critic's block, saved as it is, is ranked
+        and turned into tracker lines."""
+        self.command = "critique"
+        findings = {"subject": "Pricing", "findings": [
+            {"layer": "color", "severity": "major", "confidence": "confirmed", "title": "Muted text fails",
+             "evidence": "Measured 3.2:1", "fix": "Re-point --fg-muted."}]}
+        self.write("design-reports/critique/findings.json", json.dumps(findings))
+        before = (self.tmp / "design-reports" / "critique" / "findings.json").read_bytes()
+        steps = self.steps()
+        self.assertEqual(2, len(steps))
+        for step in steps:
+            proc = self.run_step(step, {})
+            self.assertEqual(0, proc.returncode, output(proc))
+            self.assertIn("Muted text fails", output(proc))
+        self.assertEqual(before, (self.tmp / "design-reports" / "critique" / "findings.json").read_bytes())
 
     def test_migrate_takes_the_census_and_changes_nothing(self):
         self.command = "migrate"

@@ -194,6 +194,23 @@
     performance audit, then `measure_vitals.mjs` on the served build; the proof sheet,
     then `snapshot_matrix.mjs` against the baselines, which it records only when the
     user has looked at the sheet.
+- **Subagents, and `/critique`** (PS-C4, XC-C4, XC-C3, SS-C6 and LC-C9; GT-C9's and
+  DL-C7's agents). Six agents in `agents/`, each working in its own context and
+  returning only what the conversation needs. None has a tool that edits files.
+  - **`design-critic`** critiques with design-critique-gate preloaded and the project's
+    CLAUDE.md left out, so the builder's familiarity does not come with it, and returns
+    its findings as one JSON block. **`/web-design-suite:critique`** hands it the work,
+    and nothing about how it was made, saves the block unedited to
+    `design-reports/critique/findings.json`, and reports it; `/deck` takes that file.
+  - **`gate-runner`** runs the browser gates and returns only the verdicts, the failing
+    findings and the JSON paths. It never updates a baseline.
+  - **`a11y-auditor`** and **`design-auditor`** audit with a11y-audit-runner and
+    web-design-studio preloaded: by WCAG criterion with the manual checks left, and by
+    Law with the drift no script sees.
+  - **`supabase-security-reviewer`** reviews a scaffold's row-level security, write
+    policies, unprotectable columns and keys, after `/schema-to-screens`.
+  - **`codemod-batch-reviewer`** checks one codemod batch against the reconciliation and
+    the known traps, with a verdict per file.
 
 ### Fixed
 
