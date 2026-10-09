@@ -690,6 +690,24 @@ class TheDeck(ChainTest):
                          sorted(p.name for p in self.out.iterdir()))
         self.assertIn("Muted text fails", (self.out / "defence.md").read_text(encoding="utf-8"))
 
+    def test_the_defence_carries_what_the_audit_found(self):
+        """Codex on #88: the defence sheet was built without the audit, so a
+        conformance defect the critique merged could be missing from it."""
+        self.write("src/components/card.css", LEAK)
+        proc = self.deck(self.MAJOR)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("tier1-leak", (self.out / "defence.md").read_text(encoding="utf-8"))
+
+    def test_no_build_leaves_no_old_performance_report(self):
+        """Codex on #88: a perf.json from an earlier run with a build stayed
+        beside a deck that had no performance evidence."""
+        self.write("design-reports/deck/perf.json", '{"from": "an earlier run"}\n')
+        (self.tmp / "dist" / "index.html").unlink()
+        (self.tmp / "dist").rmdir()
+        proc = self.deck(self.MAJOR)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertFalse((self.out / "perf.json").exists())
+
     def test_a_blocking_finding_stops_it_with_no_deck(self):
         self.write("design-reports/deck/deck.html", "an earlier run's\n")
         proc = self.deck(self.MAJOR, self.BLOCKING)
