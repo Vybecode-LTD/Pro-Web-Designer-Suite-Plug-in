@@ -2526,6 +2526,8 @@ def main(argv: list[str] | None = None) -> int:
     root = bp.resolve().parent
 
     if args.write_baseline:
+        # a folder the config names, as CI records it in a fresh checkout (P26)
+        bp.parent.mkdir(parents=True, exist_ok=True)
         bp.write_text(
             json.dumps(sorted({f.key(root) for f in findings}), indent=2) + "\n",
             encoding="utf-8")

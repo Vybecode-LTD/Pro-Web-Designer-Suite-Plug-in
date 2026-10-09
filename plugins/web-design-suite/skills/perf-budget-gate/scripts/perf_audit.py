@@ -1712,6 +1712,8 @@ def main(argv: list[str] | None = None) -> int:
             "totals": {"bytes": ledger.byte_table(),
                        "requests": ledger.counts()},
         }
+        # a folder the config names, as CI records it in a fresh checkout (P26)
+        Path(args.write_baseline).parent.mkdir(parents=True, exist_ok=True)
         Path(args.write_baseline).write_text(
             json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         print(f"perf_audit: recorded {len(findings)} finding(s) and "

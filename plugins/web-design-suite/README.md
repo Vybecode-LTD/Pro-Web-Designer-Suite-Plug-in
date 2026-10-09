@@ -120,6 +120,23 @@ router runs in every project:
 
 The plugin's `design_hooks` option, set to false in `/config`, turns them all off.
 
+**The commands** are skills only you invoke, so they stay out of Claude's skill listing:
+
+- **`/web-design-suite:gate`** runs the design, accessibility and performance gates on
+  the project in one pass, with one verdict. Each reads the project's `.design-suite.json`.
+- **`/web-design-suite:install-gate`** vendors the gate scripts into the project's
+  `scripts/` and writes `.github/workflows/design-gates.yml`. The workflow runs the three
+  gates on Linux in the Playwright image built for the project's own `playwright`, and the
+  static gates on Windows. A job you run by hand records the baselines where the gates
+  run, for you to review and commit.
+
+**In CI**, `scripts/` is where every recipe in the skills expects the scripts
+(`python -m scripts.audit_design`), so after `/web-design-suite:install-gate` a clean
+checkout has them. For another skill's script in CI, such as `diff_system.py` or
+`build_docs.py`, check the plugin out at a release tag and run the script by path,
+`python <plugin>/skills/<skill>/scripts/<script>.py`. A script run by path finds the
+helpers beside it, so it needs no `PYTHONPATH`.
+
 ---
 
 ## Running the scripts

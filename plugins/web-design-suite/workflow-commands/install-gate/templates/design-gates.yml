@@ -1,0 +1,132 @@
+# The design, accessibility and performance gates, written by web-design-suite
+# @VERSION@'s /web-design-suite:install-gate. The scripts it runs are vendored
+# in @DEST@/ (listed in @DEST@/design-gates.json): run the command again to
+# upgrade both. Each script reads .design-suite.json, so the project's token
+# files, component globs, budgets and baselines hold here as they do locally.
+name: design gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      update-baselines:
+        description: Record each gate's baseline and upload them, to review and commit
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Every checkout leaves no token in .git/config: npm ci and the build run
+# third-party install scripts, and nothing here pushes.
+
+jobs:
+  # Linux, in the Playwright image built for the project's own playwright
+  # (@PLAYWRIGHT@, from package.json), so the browser is the one the lockfile
+  # expects. The image has Node and the browsers, but no Python.
+  gates:
+    if: ${{ !inputs.update-baselines }}
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v@PLAYWRIGHT@-noble
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: python
+        run: apt-get update && apt-get install -y --no-install-recommends python3
+      - run: npm ci
+      - name: build
+        run: |
+          @BUILD@
+      - name: design audit
+        run: python3 @DEST@/audit_design.py --strict
+      - name: accessibility, static
+        run: python3 @DEST@/a11y_static.py @SRC@ --strict
+      - name: performance, static
+        run: python3 @DEST@/perf_audit.py @DIST@ --src @SRC@
+      # The server starts, is waited for and is used in one step: a process
+      # backgrounded in an earlier step may not outlive it.
+      - name: serve, wait, audit and measure
+        run: |
+          npx serve @DIST@ -l 8080 &
+          npx wait-on http://127.0.0.1:8080 -t 30000
+          node @DEST@/a11y_runtime.mjs --url http://127.0.0.1:8080/ --report a11y-report.json || FAILED=1
+          node @DEST@/measure_vitals.mjs http://127.0.0.1:8080/ --runs 7 --throttle lighthouse \
+            --report perf-runtime.json || FAILED=1
+          exit ${FAILED:-0}
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: design-gate-reports
+          path: |
+            a11y-report.json
+            perf-runtime.json
+          if-no-files-found: ignore
+
+  # The static gates on Windows, which has no containers: the runner's own
+  # Python and Node.
+  windows:
+    if: ${{ !inputs.update-baselines }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: build
+        run: |
+          @BUILD@
+      - name: design audit
+        run: python @DEST@/audit_design.py --strict
+      - name: accessibility, static
+        run: python @DEST@/a11y_static.py @SRC@ --strict
+      - name: performance, static
+        run: python @DEST@/perf_audit.py @DIST@ --src @SRC@
+
+  # Run by hand with update-baselines ticked: each gate records what it finds
+  # now as the baseline, where the gates run, and uploads the files. Review
+  # them, then commit them.
+  baselines:
+    if: ${{ inputs.update-baselines }}
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v@PLAYWRIGHT@-noble
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: python
+        run: apt-get update && apt-get install -y --no-install-recommends python3
+      - run: npm ci
+      - name: build
+        run: |
+          @BUILD@
+      - name: record the baselines
+        run: |
+          python3 @DEST@/audit_design.py --write-baseline @AUDIT_BASELINE@
+          python3 @DEST@/a11y_static.py @SRC@ --write-baseline @A11Y_BASELINE@
+          python3 @DEST@/perf_audit.py @DIST@ --src @SRC@ --write-baseline @PERF_BASELINE@
+      # The default baselines are dot files, which upload-artifact leaves out unless
+      # told (its README: "hidden files are ignored by this action").
+      - uses: actions/upload-artifact@v6
+        with:
+          name: design-gate-baselines
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            @AUDIT_BASELINE@
+            @A11Y_BASELINE@
+            @PERF_BASELINE@
