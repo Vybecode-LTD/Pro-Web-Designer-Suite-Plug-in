@@ -55,7 +55,9 @@ VENDORED = {
 BASELINES = {"audit": ".design-baseline.json", "a11y": ".a11y-baseline.json", "perf": ".perf-baseline.json"}
 # What the browser gates import or run beside playwright: axe-core in a11y_runtime, serve and wait-on in the workflow.
 COMPANIONS = ("axe-core", "serve", "wait-on")
-SAFE_PATH = re.compile(r"(?!/)(?!.*(?:^|/)\.\.(?:/|$))[A-Za-z0-9._/-]+")
+# Relative, inside the project, and never an option: a leading `-` made
+# `python3 -scripts/audit_design.py` (Codex, CodeRabbit on #85).
+SAFE_PATH = re.compile(r"(?![/-])(?!.*(?:^|/)\.\.(?:/|$))[A-Za-z0-9._/-]+")
 
 sys.path.insert(0, str(PLUGIN / "shared"))
 from project_config import ConfigError, project_config  # noqa: E402
@@ -116,10 +118,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # holds only what neither splits or reads specially (Codex on #85).
     for name in ("dest", "src", "dist"):
         if not SAFE_PATH.fullmatch(getattr(args, name)):
-            ap.error(f"--{name} must be a relative path of letters, digits, '.', '_', '-' and '/': the workflow "
-                     "runs it unquoted")
-    if not args.build.strip() or any(c in args.build for c in ("@", "\n", " #", ": ")):
-        ap.error("--build must be one command line, without '@', ' #' or ': '")
+            ap.error(f"--{name} must be a relative path of letters, digits, '.', '_', '-' and '/', not starting "
+                     "with '-': the workflow runs it unquoted")
+    # the template holds it in a block scalar, so YAML reads `true` or `a: b` as the text it is (Codex on #85)
+    if not args.build.strip() or "@" in args.build or "\n" in args.build:
+        ap.error("--build must be one command line, without '@'")
 
     root = Path.cwd()
     try:
@@ -153,7 +156,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     unsafe = next((key for key, value in baselines.items() if not SAFE_PATH.fullmatch(value)), None)
     if unsafe:
         print(f"install_gate: baselines.{unsafe} in .design-suite.json is {baselines[unsafe]!r}. The workflow runs "
-              "it unquoted, so it must be a path inside the project of letters, digits, '.', '_', '-' and '/'.",
+              "it unquoted, so it must be a path inside the project of letters, digits, '.', '_', '-' and '/', not starting with '-'.",
               file=sys.stderr)
         return 2
     text = TEMPLATE.read_text(encoding="utf-8")

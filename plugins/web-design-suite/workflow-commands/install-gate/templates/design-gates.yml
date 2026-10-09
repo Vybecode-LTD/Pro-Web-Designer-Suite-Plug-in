@@ -40,7 +40,9 @@ jobs:
       - name: python
         run: apt-get update && apt-get install -y --no-install-recommends python3
       - run: npm ci
-      - run: @BUILD@
+      - name: build
+        run: |
+          @BUILD@
       - name: design audit
         run: python3 @DEST@/audit_design.py --strict
       - name: accessibility, static
@@ -82,7 +84,9 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: @BUILD@
+      - name: build
+        run: |
+          @BUILD@
       - name: design audit
         run: python @DEST@/audit_design.py --strict
       - name: accessibility, static
@@ -107,15 +111,21 @@ jobs:
       - name: python
         run: apt-get update && apt-get install -y --no-install-recommends python3
       - run: npm ci
-      - run: @BUILD@
+      - name: build
+        run: |
+          @BUILD@
       - name: record the baselines
         run: |
           python3 @DEST@/audit_design.py --write-baseline @AUDIT_BASELINE@
           python3 @DEST@/a11y_static.py @SRC@ --write-baseline @A11Y_BASELINE@
           python3 @DEST@/perf_audit.py @DIST@ --src @SRC@ --write-baseline @PERF_BASELINE@
+      # The default baselines are dot files, which upload-artifact leaves out unless
+      # told (its README: "hidden files are ignored by this action").
       - uses: actions/upload-artifact@v6
         with:
           name: design-gate-baselines
+          include-hidden-files: true
+          if-no-files-found: error
           path: |
             @AUDIT_BASELINE@
             @A11Y_BASELINE@

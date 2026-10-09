@@ -219,6 +219,29 @@ class TheInstallGate(CommandTest):
         self.assertIn("--write-baseline .design-baseline.json", recorded)
 
     @needs_yaml
+    def test_the_build_command_stays_a_string(self):
+        """Codex on #85: `run: true` is a YAML boolean, not the command
+        `true`. The build sits in a block scalar, so any command line reads as
+        itself."""
+        for build in ("true", "null", "npm run b # x", "make: all"):
+            with self.subTest(build=build):
+                self.install("--build", build, "--force")
+                runs = [s["run"] for job in load_yaml(self.workflow())["jobs"].values() for s in job["steps"]
+                        if s.get("name") == "build"]
+                self.assertEqual([build + "\n"] * 3, runs)
+
+    @needs_yaml
+    def test_the_baselines_upload_takes_dot_files(self):
+        """Codex on #85: upload-artifact leaves hidden files out unless told,
+        and the default baselines all start with a dot."""
+        self.install()
+        [upload] = [s for s in load_yaml(self.workflow())["jobs"]["baselines"]["steps"]
+                    if s.get("uses", "").startswith("actions/upload-artifact@")]
+        self.assertIs(True, upload["with"]["include-hidden-files"])
+        self.assertEqual("error", upload["with"]["if-no-files-found"])
+        self.assertIn(".design-baseline.json", upload["with"]["path"])
+
+    @needs_yaml
     def test_the_windows_job_runs_here(self):
         """GT-C12's Windows variant: its gate steps, run on the fixture as
         written, pass on a clean project and fail on a leak."""
@@ -283,10 +306,11 @@ class TheInstallGate(CommandTest):
     def test_a_path_the_workflow_cannot_run_unquoted_is_refused(self):
         """Codex on #85: the workflow runs each path unquoted, so `web source`
         became two arguments."""
-        for args in (["--src", "web source"], ["--dist", "../out"], ["--dest", "/abs"], ["--build", "npm run b # x"]):
+        for args in (["--src", "web source"], ["--dist", "../out"], ["--dest", "/abs"],
+                     ["--src=-assets"], ["--dest=-scripts"]):       # Codex, CodeRabbit on #85: an option, not a path
             with self.subTest(args=args):
                 self.assertIn("must be", output(self.install(*args, code=2)))
-        for baseline in ("my baselines/a.json", "ci/a;rm -rf x.json", "ci/$(id).json"):     # CodeRabbit on #85
+        for baseline in ("my baselines/a.json", "ci/a;rm -rf x.json", "ci/$(id).json", "-b.json"):
             with self.subTest(baseline=baseline):
                 self.write(".design-suite.json", json.dumps({"schema": 1, "baselines": {"audit": baseline}}))
                 self.assertIn("baselines.audit", output(self.install(code=2)))

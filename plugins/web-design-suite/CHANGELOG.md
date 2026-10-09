@@ -136,11 +136,13 @@
       `playwright` (`mcr.microsoft.com/playwright:vX.Y.Z-noble`), with Python installed,
       the build served and waited for, and the browser gates' reports uploaded;
     - the static gates on Windows, where the tests run the job's commands on a fixture;
-    - a job run by hand that records the baselines in CI and uploads them to commit.
+    - a job run by hand that records the baselines in CI and uploads them to commit,
+      dot files included (`include-hidden-files`). The build command sits in a block
+      scalar, so YAML reads any command line as itself.
 
     It reads the baselines' paths from `.design-suite.json`, refuses a `playwright`
     range, and never overwrites a file it did not write, its stamp included. It refuses
-    a path the workflow could not run unquoted (a space, `;`, `$()`), names any package
+    a path the workflow could not run unquoted (a space, `;`, `$()`, a leading `-`), names any package
     the browser gates need that `package.json` lacks (`axe-core`, `serve`, `wait-on`),
     and checks out with `persist-credentials: false`, since `npm ci` runs install
     scripts. A `--dist` named for `/gate` that does not exist is "could not run", not
