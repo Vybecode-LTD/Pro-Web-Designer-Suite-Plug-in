@@ -1171,8 +1171,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             text = render_report(doc, findings, auditor.checked, use_color)
         if args.out:                     # /figma-sync's handoff questions (P26)
             out = Path(args.out)
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_bytes((text + "\n").encode("utf-8"))
+            try:
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_bytes((text + "\n").encode("utf-8"))
+            except OSError as exc:       # not a finding: exit 2 (CodeRabbit on #87)
+                print(f"figma_audit: cannot write {out}: {exc}", file=sys.stderr)
+                return 2
             print(f"figma_audit: wrote {out}", file=sys.stderr)
         else:
             print(text)

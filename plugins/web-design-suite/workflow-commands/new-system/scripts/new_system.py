@@ -102,6 +102,32 @@ def substitute(css: str, values: Dict[str, str], what: str) -> str:
     return "\n".join(out)
 
 
+def renote(css: str, brand: str, accent: List[str], neutral: List[str], scale: List[str]) -> str:
+    """The starter's notes that describe its own values, rewritten for these
+    (Codex on #87): the ramps' commands, Ember, and the scale when it changed.
+    Its measured ratios stay as the starter's, labelled so."""
+    seed = f'"{brand}"'
+    notes = [
+        (r"/\* Neutral — .*?\*/", "/* Neutral, from /web-design-suite:new-system: generate_color_ramp.py\n       "
+                                  + " ".join([seed, "--neutral", *neutral]) + " prints it. */"),
+        (r"/\* Accent — .*?\*/", "/* Accent, from /web-design-suite:new-system: generate_color_ramp.py\n       "
+                                 + " ".join([seed, "--anchor-seed", *accent]) + " prints it. The L values\n"
+                                 "       are the studio's, tuned for contrast; check_roles.py measures the roles. */"),
+    ]
+    if scale:
+        notes += [(r"Modular scale, ratio 1\.200.*?the studio preset\.",
+                   "From /web-design-suite:new-system: generate_type_scale.py\n       "
+                   + " ".join(scale) + " prints these steps."),
+                  (r"/\* Same 380 -> 1440 viewport anchors.*?\*/",
+                   "/* The fluid steps come from the same command. Keep the fluid spacing's\n"
+                   "       anchors and these the same pair. */")]
+    for pattern, note in notes:
+        css, found = re.subn(pattern, lambda m: note, css, count=1, flags=re.S)
+        if not found:
+            raise Refused(f"the starter's tokens.css no longer has the note {pattern!r}")
+    return css.replace("Verified ", "The starter measured ")
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(prog="new_system.py",
                                  description="A brand colour to the starter's token system, with its "
@@ -129,7 +155,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                   + "\n  ".join(taken), file=sys.stderr)
             return 2
 
-    color = [*(["--gamut", args.gamut] if args.gamut else []), "--format", "css"]
+    gamut = ["--gamut", args.gamut] if args.gamut else []
+    accent_flags = [*(["--hue-shift", args.hue_shift] if args.hue_shift else []), *gamut]
+    neutral_flags = [*(["--neutral-hue", args.neutral_hue] if args.neutral_hue else []), *gamut]
     scale_flags = [*(["--ratio", args.ratio] if args.ratio else []),
                    *(["--dual-ratio", args.dual_ratio] if args.dual_ratio else []),
                    *(["--base", args.base] if args.base else []),
@@ -138,16 +166,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     tokens = (STARTER / "tokens.css").read_bytes().decode("utf-8")
     try:
         accent = generate("accent ramp", [str(RAMP), args.brand, "--name", "accent", "--anchor-seed",
-                                          *(["--hue-shift", args.hue_shift] if args.hue_shift else []),
-                                          *color], RAMP_NAME)
+                                          *accent_flags, "--format", "css"], RAMP_NAME)
         neutral = generate("neutral ramp", [str(RAMP), args.brand, "--neutral", "--name", "neutral",
-                                            *(["--neutral-hue", args.neutral_hue] if args.neutral_hue else []),
-                                            *color], RAMP_NAME)
+                                            *neutral_flags, "--format", "css"], RAMP_NAME)
         tokens = substitute(tokens, accent, "accent ramp")
         tokens = substitute(tokens, neutral, "neutral ramp")
         if scale_flags:
             tokens = substitute(tokens, generate("type scale", [str(TYPE), *scale_flags, "--format", "css"],
                                                  TEXT_NAME), "type scale")
+        tokens = renote(tokens, args.brand, accent_flags, neutral_flags, scale_flags)
     except Refused as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
