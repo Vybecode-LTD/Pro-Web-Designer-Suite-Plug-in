@@ -90,20 +90,35 @@ function target(input) {
   return typeof file === 'string' && file ? path.resolve(input.cwd || process.cwd(), file) : null;
 }
 
-// The config that governs `file`: { config }, { error }, or null without one.
-function governing(file) {
+// The config that governs the folder `dir`: { config }, { error, found }, or
+// null without one.
+function governing(dir) {
+  let found = null;
   try {
-    const found = findConfig(path.dirname(file));
+    found = findConfig(dir);
     return found ? { config: loadConfig(found) } : null;
   } catch (err) {
-    return { error: err.message };
+    return { error: err.message, found };
+  }
+}
+
+// Does the config at `found`, which does not pass its checks, still name `real`
+// among its `tokens`? Read as plain JSON, for the one message that says so.
+function namesToken(found, real) {
+  try {
+    const data = JSON.parse(fs.readFileSync(found, 'utf8').replace(/^﻿/, ''));
+    const base = path.dirname(fs.realpathSync.native(found));
+    return [data.tokens].flat().some((t) => typeof t === 'string' && t.trim() &&
+      fs.existsSync(path.resolve(base, t)) && fs.realpathSync.native(path.resolve(base, t)) === real);
+  } catch {
+    return false;
   }
 }
 
 function guard(input) {
   const file = target(input);
   if (!file || !fs.existsSync(file) || !fs.statSync(file).isFile()) return;
-  const project = governing(file);
+  const project = governing(path.dirname(file));
   if (!project?.config?.hooks.generatedFiles) return;
   const fd = fs.openSync(file, 'r');
   const buf = Buffer.alloc(3203);                 // 800 characters of up to 4 bytes, and a BOM
@@ -221,21 +236,28 @@ function gate(input) {
   const file = target(input);
   if (!file || !fs.existsSync(file) || !fs.statSync(file).isFile()) return;
   const audited = AUDITED.includes(path.extname(file).toLowerCase());
-  const project = governing(file);
-  if (!project) return;
-  const tell = (text) => say('PostToolUse', { additionalContext: text });
-  if (project.error) {
-    if (audited) tell(`web-design-suite design gate: .design-suite.json could not be read, so the gate did not ` +
-                      `run: ${project.error}`);
-    return;
-  }
-  const { config } = project;
   // resolved, as the config's root is: a link, /var on macOS or a short 8.3 name would
   // otherwise name the file from outside its project
   const real = fs.realpathSync.native(file);
-  const auditing = audited && config.hooks.designGate;
-  const diffing = config.hooks.tokenDiff && config.baselines.system && fs.existsSync(config.baselines.system) &&
-    isTokenFile(config, real);
+  const tell = (text) => say('PostToolUse', { additionalContext: text });
+  const own = governing(path.dirname(file));
+  // A token file may sit outside its project (`../shared/tokens.css`). Then the
+  // project the session runs in is the one that names it (Codex on #84).
+  const session = input.cwd ? governing(path.resolve(input.cwd)) : null;
+  for (const project of [own, session]) {
+    // said for a file that config would have read: one the audit reads, or a
+    // token file it names, a contract.json too (Codex on #84)
+    const gating = audited && project === own;
+    if (project?.error && (gating || namesToken(project.found, real))) {
+      return tell(`web-design-suite ${gating ? 'design gate' : 'token diff'}: .design-suite.json could not be ` +
+                  `read, so ${gating ? 'the gate' : 'the token diff'} did not run: ${project.error}`);
+    }
+  }
+  const config = own?.config;
+  const auditing = audited && config?.hooks.designGate;
+  const diffConfig = [own?.config, session?.config].find((c) => c?.hooks.tokenDiff && c.baselines.system &&
+    fs.existsSync(c.baselines.system) && isTokenFile(c, real));
+  const diffing = Boolean(diffConfig);
   if (!auditing && !diffing) return;
   const python = findPython();
   if (!python) {
@@ -243,7 +265,7 @@ function gate(input) {
                 'python3, python or py -3), and found none.');
   }
   // the token diff is short; the audit has what is left of the cap
-  const diffText = diffing ? tokenDiff(python, config, real, LIMIT / 3) : null;
+  const diffText = diffing ? tokenDiff(python, diffConfig, real, LIMIT / 3) : null;
   const auditText = auditing ? audit(python, config, real, LIMIT - (diffText ? diffText.length + 2 : 0)) : null;
   const parts = [auditText, diffText].filter(Boolean);
   if (parts.length) tell(parts.join('\n\n'));
