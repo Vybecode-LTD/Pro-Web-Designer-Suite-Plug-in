@@ -14,6 +14,12 @@ Part 2 (XC-C3, SS-C6, LC-C9): the systems and the lifecycle.
 - /contrast, /migrate, /figma-sync and /docs-check are chains: the body runs
   the skills' own scripts through ${CLAUDE_PLUGIN_ROOT}, and the tests run
   the body's commands, in order, on a fixture project.
+Part 3 (DL-C7, PS-C11, GT-C9): delivery, persuasion and the runtime gates.
+- /deck has a runner: audit, critique, defence and deck, stopping on a
+  blocking finding.
+- /schema-to-screens, /email-build, /gate-a11y, /gate-perf and /gate-matrix
+  are chains; their browser steps run in a real browser where the suite's
+  tooling has one.
 
 The SKILL.md frontmatter and the workflow go through js-yaml, a real YAML
 parser, from the suite's tooling (WDS_NODE_MODULES, as for the real-tool
@@ -22,14 +28,19 @@ variant is tested on each platform CI runs.
 """
 from __future__ import annotations
 
+import functools
 import hashlib
+import http.server
 import json
 import re
 import shlex
 import subprocess
 import sys
+import threading
 import unittest
+from pathlib import Path
 
+from test_browser_runtime import MODULES as BROWSER_MODULES, QuietHandler, only
 from wds_support import NODE, PLUGIN, TOOLING, TempDirTest, env, output, tool_modules
 
 COMMANDS = PLUGIN / "workflow-commands"
@@ -43,10 +54,13 @@ CLEAN = "@layer components {\n  .card {\n    color: var(--fg-default);\n  }\n}\n
 PAGE = ('<!doctype html>\n<html lang="en">\n<head><title>Home</title></head>\n'
         '<body><main><h1>Home</h1></main></body>\n</html>\n')
 needs_yaml = unittest.skipUnless(NODE and YAML_MODULES, "node and js-yaml (tooling/main) are not installed")
-NAMES = ["contrast", "docs-check", "figma-sync", "gate", "install-gate", "migrate", "new-system", "release-check"]
+NAMES = ["contrast", "deck", "docs-check", "email-build", "figma-sync", "gate", "gate-a11y", "gate-matrix",
+         "gate-perf", "install-gate", "migrate", "new-system", "release-check", "schema-to-screens"]
+PLACEHOLDERS = ("$ARGUMENTS", "PATHS", "TOKENS", "EXPORT", "FG", "BG", "SCHEMA", "TEMPLATE", "NAME", "TARGET",
+                "DIST", "URL", "MANIFEST")
 # Bash(python "${CLAUDE_SKILL_DIR}/scripts/x.py" *), or a skill's script by the
 # plugin's root, with any fixed arguments before the wildcard.
-RULE = re.compile(r'Bash\((python3?) ("\$\{(CLAUDE_SKILL_DIR|CLAUDE_PLUGIN_ROOT)\}/([\w./-]+)"(?: [^\s*()]+)*) \*\)')
+RULE = re.compile(r'Bash\((python3?|node) ("\$\{(CLAUDE_SKILL_DIR|CLAUDE_PLUGIN_ROOT)\}/([\w./-]+)"(?: [^\s*()]+)*) \*\)')
 STARTER = PLUGIN / "skills" / "web-design-studio" / "assets" / "starter" / "styles"
 SCRIPTS = {name: PLUGIN / "skills" / skill / "scripts" / f"{name}.py" for skill, name in (
     ("design-system-docs", "extract_system"), ("design-system-versioning", "diff_system"))}
@@ -68,7 +82,7 @@ def front(skill_md) -> tuple[dict, str]:
 def body_commands(body: str) -> list:
     """The commands in the body's bash blocks, in the order Claude runs them."""
     return [line.strip() for block in re.findall(r"```bash\n(.*?)```", body, re.S)
-            for line in block.splitlines() if re.match(r"\s*python3? ", line)]
+            for line in block.splitlines() if re.match(r"\s*(python3?|node) ", line)]
 
 
 def allows(prefix: str, command: str) -> bool:
@@ -109,8 +123,9 @@ class TheCommandFiles(unittest.TestCase):
                     self.assertRegex(found.group(4), r"^scripts/[\w.]+$" if own else r"^skills/[\w-]+/scripts/[\w.]+$")
                     self.assertTrue(((skill_md.parent if own else PLUGIN) / found.group(4)).is_file(), rule)
                     prefixes.append(f"{found.group(1)} {found.group(2)}")
-                python = sorted(p for p in prefixes if p.startswith("python "))
-                self.assertEqual(python, sorted("python " + p[8:] for p in prefixes if p.startswith("python3 ")))
+                python = sorted(p for p in prefixes if not p.startswith("python3 "))
+                self.assertEqual(sorted(p for p in python if p.startswith("python ")),
+                                 sorted("python " + p[8:] for p in prefixes if p.startswith("python3 ")))
                 run = body_commands(body)
                 self.assertTrue(run)
                 for command in run:                           # each one the body runs is allowed
@@ -399,21 +414,29 @@ class BaselinesInAMissingFolder(CommandTest):
 class ChainTest(CommandTest):
     """Runs a command's body as Claude does: each command in its bash blocks,
     in order, with the plugin's paths substituted and each placeholder
-    (`$ARGUMENTS`, PATHS, TOKENS, EXPORT, FG, BG) given the test's values."""
+    (PLACEHOLDERS) given the test's values: a word that is one becomes the
+    list, and one inside a path (`design-reports/email/NAME.html`) its value."""
     command = ""
 
     def steps(self) -> list:
         return body_commands(front(COMMANDS / self.command / "SKILL.md")[1])
 
-    def run_step(self, line: str, values: dict):
+    def run_step(self, line: str, values: dict, timeout: int = 300):
         argv = []
         for word in shlex.split(line):
             if word in values:
                 argv += [str(v) for v in values[word]]
                 continue
-            self.assertFalse(word in ("$ARGUMENTS", "PATHS", "TOKENS", "EXPORT", "FG", "BG"), f"no value for {word}")
+            for key, value in values.items():
+                if len(value) == 1:
+                    word = re.sub(rf"(?<![A-Za-z$]){re.escape(key)}(?![A-Za-z])", lambda m: str(value[0]), word)
+            self.assertFalse(re.search(r"(?<![A-Za-z$])(%s)(?![A-Za-z])" % "|".join(map(re.escape, PLACEHOLDERS)),
+                                       word), f"no value for {word}")
             argv.append(word.replace("${CLAUDE_PLUGIN_ROOT}", PLUGIN.as_posix())
                         .replace("${CLAUDE_SKILL_DIR}", (COMMANDS / self.command).as_posix()))
+        if argv[0] == "node":
+            return subprocess.run([NODE, *argv[1:]], cwd=self.tmp, capture_output=True, timeout=timeout,
+                                  env=env(NODE_PATH=BROWSER_MODULES))
         self.assertEqual("python", argv[0])
         return self.run_py(*argv[1:])
 
@@ -594,6 +617,163 @@ class TheChains(ChainTest):
         proc = self.run_step(check, {})
         self.assertEqual(1, proc.returncode, output(proc))
         self.assertIn("token removed    --fg-subtle", output(proc))
+
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+NO_RLS = ("create table public.notes (\n  id uuid primary key default gen_random_uuid(),\n  body text not null\n);\n"
+          "grant select, insert on public.notes to anon;\n")
+BUTTON = ("@layer components {\n  .button {\n    padding: var(--space-2) var(--space-4);\n"
+          "    color: var(--fg-default);\n    background: var(--bg-surface);\n  }\n}\n")
+
+
+class TheDeck(ChainTest):
+    """PS-C11: /deck, audit, critique, defence and deck, stopping on blockers."""
+    command = "deck"
+    MAJOR = {"layer": "color", "severity": "major", "confidence": "confirmed", "title": "Muted text fails",
+             "evidence": "Measured 3.2:1", "fix": "Re-point --fg-muted."}
+    BLOCKING = {"layer": "craft", "severity": "blocking", "confidence": "confirmed",
+                "title": "The checkout button is invisible", "evidence": "Seen at 375px", "fix": "Restore it."}
+
+    def setUp(self):
+        super().setUp()
+        self.starter()
+        self.write("DECISION_LOG.md", (PLUGIN / "skills" / "client-presentation-builder" / "assets"
+                                       / "DECISION_LOG.md").read_bytes().decode("utf-8"))
+        self.out = self.tmp / "design-reports" / "deck"
+
+    def deck(self, *findings):
+        self.write("findings.json", json.dumps({"subject": "Pricing", "findings": list(findings)}))
+        (step,) = self.steps()
+        return self.run_step(step, {"$ARGUMENTS": ["DECISION_LOG.md", "--findings", "findings.json", "src"]})
+
+    def test_the_deck_is_built_from_the_evidence(self):
+        proc = self.deck(self.MAJOR)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual(["audit.json", "deck.html", "defence.md", "notes.md", "perf.json"],
+                         sorted(p.name for p in self.out.iterdir()))
+        self.assertIn("Muted text fails", (self.out / "defence.md").read_text(encoding="utf-8"))
+
+    def test_a_blocking_finding_stops_it_with_no_deck(self):
+        self.write("design-reports/deck/deck.html", "an earlier run's\n")
+        proc = self.deck(self.MAJOR, self.BLOCKING)
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("stopped: a blocking finding", output(proc))
+        self.assertFalse((self.out / "deck.html").exists())               # none, not a stale one
+
+    def test_without_the_critique_it_cannot_run(self):
+        (step,) = self.steps()
+        proc = self.run_step(step, {"$ARGUMENTS": ["DECISION_LOG.md", "--findings", "missing.json"]})
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("the critique's findings, missing.json, does not exist", output(proc))
+
+
+class TheDeliveryChains(ChainTest):
+    """DL-C7: /schema-to-screens and /email-build's Python steps."""
+
+    def test_schema_to_screens_scaffolds_and_audits(self):
+        self.command = "schema-to-screens"
+        self.write("shop.sql", (FIXTURES / "supabase" / "shop.sql").read_bytes().decode("utf-8"))
+        steps = self.steps()
+        self.assertEqual(6, len(steps))
+        for step in steps:
+            proc = self.run_step(step, {"SCHEMA": ["shop.sql"]})
+            self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("design audit: clean", output(proc))
+        self.assertTrue(list((self.tmp / "src").rglob("*.tsx")))
+
+    def test_schema_to_screens_stops_on_a_blocking_security_finding(self):
+        self.command = "schema-to-screens"
+        self.write("notes.sql", NO_RLS)
+        introspect, _, answers, dry_run, scaffold, _ = self.steps()
+        for step in (introspect, answers):
+            self.assertEqual(0, self.run_step(step, {"SCHEMA": ["notes.sql"]}).returncode)
+        before = tree(self.tmp / "src")
+        for step in (dry_run, scaffold):
+            proc = self.run_step(step, {})
+            self.assertEqual(1, proc.returncode, output(proc))
+            self.assertIn("row-level security is off", output(proc))
+        self.assertEqual(before, tree(self.tmp / "src"))                  # nothing written
+
+    def test_email_build_lints_compiles_and_lints_again(self):
+        self.command = "email-build"
+        self.write("emails/receipt.html", (PLUGIN / "skills" / "email-template-system" / "assets" / "templates"
+                                           / "transactional-receipt.html").read_bytes().decode("utf-8"))
+        steps = self.steps()
+        self.assertEqual(4, len(steps))
+        for step in steps[:3]:
+            proc = self.run_step(step, {"TEMPLATE": ["emails/receipt.html"], "NAME": ["receipt"]})
+            self.assertEqual(0, proc.returncode, output(proc))
+        self.assertTrue((self.tmp / "design-reports" / "email" / "receipt.txt").is_file())
+
+
+@unittest.skipUnless(NODE and BROWSER_MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright and axe-core")
+class TheBrowserSteps(ChainTest):
+    """GT-C9 (c) and DL-C7: the commands' browser steps, in a real browser."""
+
+    def browser(self, proc):
+        if proc.returncode == 2 and re.search(rb"browser|chromium", proc.stderr, re.I):
+            self.skipTest("no usable browser: " + output(proc)[-200:])
+        return proc
+
+    def test_gate_a11y_passes_a_clean_page_and_names_a_missing_alt(self):
+        self.command = "gate-a11y"
+        (step,) = self.steps()
+        proc = self.browser(self.run_step(step, {"TARGET": ["--file", "dist/index.html", *only("axe")]}))
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertTrue((self.tmp / "design-reports" / "a11y" / "runtime.json").is_file())
+        self.write("dist/index.html", PAGE.replace("<h1>Home</h1>", '<h1>Home</h1><img src="x.png">'))
+        proc = self.browser(self.run_step(step, {"TARGET": ["--file", "dist/index.html", *only("axe")]}))
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("image-alt", output(proc))
+
+    def test_gate_perf_runs_both_layers(self):
+        self.command = "gate-perf"
+        static, vitals = self.steps()
+        self.assertEqual(0, self.run_step(static, {"DIST": ["dist"]}).returncode)
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0),
+                                                 functools.partial(QuietHandler, directory=str(self.tmp / "dist")))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        url = f"http://127.0.0.1:{server.server_address[1]}/index.html"
+        proc = self.browser(self.run_step(vitals, {"URL": [url, "--runs", "1"]}))
+        self.assertEqual(0, proc.returncode, output(proc))
+        report = json.loads((self.tmp / "design-reports" / "perf" / "vitals.json").read_bytes())
+        self.assertEqual(1, len(report["perRun"]))
+
+    def test_gate_matrix_records_then_matches_its_baselines(self):
+        self.command = "gate-matrix"
+        self.starter("tokens.css", "base.css")
+        self.write("src/components/button.css", BUTTON)
+        self.write("templates.html", '<template id="button"><button class="button" {attrs}>{content}</button>'
+                                     "</template>\n")
+        self.write("matrix.json", json.dumps({
+            "$schema": "component-state-matrix/1", "project": "Gate", "tokens": "src/styles/tokens.css",
+            "base": ["src/styles/base.css"], "templates": "templates.html", "themes": ["light"],
+            "densities": ["comfortable"],
+            "components": [{"name": "button", "css": "src/components/button.css", "variants": ["default"],
+                            "sizes": ["default"], "states": ["default"], "content": {"default": "Save"}}]}))
+        self.write(".design-suite.json", json.dumps({"schema": 1, "baselines": {"snapshots": "tests/visual"}}))
+        generate, diff = self.steps()
+        proc = self.run_step(generate, {"MANIFEST": ["matrix.json"]})
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        self.assertTrue((self.tmp / "design-reports" / "matrix" / "proof-sheet.html").is_file())
+        proc = self.browser(self.run_step(diff + " --update-baselines", {}))
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertTrue(list((self.tmp / "tests" / "visual").rglob("*.png")))
+        proc = self.browser(self.run_step(diff, {}))
+        self.assertEqual(0, proc.returncode, output(proc))
+
+    def test_email_build_renders_three_ways(self):
+        self.command = "email-build"
+        self.write("emails/receipt.html", (PLUGIN / "skills" / "email-template-system" / "assets" / "templates"
+                                           / "transactional-receipt.html").read_bytes().decode("utf-8"))
+        values = {"TEMPLATE": ["emails/receipt.html"], "NAME": ["receipt"]}
+        *python, render = self.steps()
+        self.assertEqual(0, self.run_step(python[1], values).returncode)
+        proc = self.browser(self.run_step(render, values))
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual(3, len(list((self.tmp / "design-reports" / "email" / "renders").glob("*.png"))))
 
 
 if __name__ == "__main__":

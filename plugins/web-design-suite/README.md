@@ -140,6 +140,13 @@ The plugin's `design_hooks` option, set to false in `/config`, turns them all of
 - **`/web-design-suite:figma-sync EXPORT`** audits a Figma export, then generates the
   tokens and shows what they would change.
 - **`/web-design-suite:docs-check`** checks that the docs still describe the code.
+- **`/web-design-suite:schema-to-screens SCHEMA`** turns a database schema into screens,
+  asking you what only you can answer, and stops on a blocking security finding.
+- **`/web-design-suite:email-build TEMPLATE`** lints, compiles and renders an HTML email.
+- **`/web-design-suite:deck`** builds the client deck from the audits and a critique, and
+  stops on a blocking finding.
+- **`/web-design-suite:gate-a11y`**, **`gate-perf`** and **`gate-matrix`** run the
+  browser halves of the gates on a served or built page.
 
 The reports go in `design-reports/`, which a project usually leaves out of git.
 

@@ -184,7 +184,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-C6 | S · P1 | fixed in 3.1.0 (the review's C6) | Write SKILL.md commands with `${CLAUDE_SKILL_DIR}` and pre-approve them with `allowed-tools`. |
 | GT-C7 | S · P1 | fixed in 3.2.0, item 13 | SKILL.md size: 5k tokens or less. |
 | GT-C8 | S · P1 | fixed in 3.2.0, item 13 | Descriptions with a standalone first sentence and a "not for" line. |
-| GT-C9 | M · P1 | W9 (3.5.0): the gate commands in P26, the agent and the a11y_static hook in P27 (P25 closed without the hook) | Plugin components: a `gate-runner` agent, an opt-in PostToolUse hook running a11y_static, user-invoked gate skills. |
+| GT-C9 | M · P1 | W9 (3.5.0): the gate commands in PR #88 (`test_commands.TheBrowserSteps`), the agent and the a11y_static hook in P27 (P25 closed without the hook) | Plugin components: a `gate-runner` agent, an opt-in PostToolUse hook running a11y_static, user-invoked gate skills. |
 | GT-C10 | M · P1 | W9 (3.5.0) | A `claude plugin eval` suite for the gates, run under WSL2. |
 | GT-C11 | M · P2 | fixed in 3.4.0: the `lighthouse` preset, TTFB from CDP and `--interact-at` in PR #45 (`test_browser_runtime.VitalsMeasures`), `crux_check.py` in PR #46 (`test_crux_check`) | A `lighthouse` throttle preset, TTFB from CDP, `--interact-at MS`, and `crux_check.py`. |
 | GT-C12 | M · P1 | fixed in 3.5.0: PR #85 (`test_commands.TheInstallGate`: the workflow, its Windows job and its baseline job run on a fixture) | One CI template for all three gates in a pinned Playwright container, with a baseline-update job and a tested Windows variant. |
@@ -229,7 +229,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-C8 | — | fixed in 3.2.0 | Put landing-page-conversion on a token diet. |
 | PS-C9 | — | fixed in 3.2.0 | Rewrite the descriptions. |
 | PS-C10 | — | fixed in 3.2.0 | Add an evidence register: each figure's value, URL, date verified and exact quote, with a test. |
-| PS-C11 | — | W9 (3.5.0) | Add a user-invocable chain skill: audit → critique → defence → deck, stopping on blockers. |
+| PS-C11 | — | fixed in 3.5.0: PR #88, `/deck` (`test_commands.TheDeck`: the deck from the evidence, and a blocking finding stops it with no deck) | Add a user-invocable chain skill: audit → critique → defence → deck, stopping on blockers. |
 | PS-C12 | — | W14 (3.6.0+) | Bridge MESSAGE_BRIEF to DECISION_LOG. |
 | DL-A1 | high | fixed in 3.1.0 | secret columns are shown and editable. |
 | DL-A2 | high | fixed in 3.1.0 | authorization columns are editable by default. |
@@ -266,6 +266,6 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-C4 | S | fixed in 3.3.0, with DL-A5 and DL-B1's reference | rewrite supabase-integration.md §2/§4/§6 |
 | DL-C5 | S | fixed in 3.4.0: `lint_email --source`, and the build notes each fallback (PR #58; `test_email.LintTheSource`) | `lint_email --source`: flag literals, `var()` fallbacks and dropped tokens. |
 | DL-C6 | S | fixed in 3.2.0 | pointer and command hygiene; the detail file lists them. |
-| DL-C7 | M | W9 (3.5.0): the two commands in P26, the reviewer agent and the email-template hook in P27 (P25 closed without the hook), the evals in P30 | plugin features for these skills. |
+| DL-C7 | M | W9 (3.5.0): the two commands in PR #88 (`test_commands.TheDeliveryChains`), the reviewer agent and the email-template hook in P27 (P25 closed without the hook), the evals in P30 | plugin features for these skills. |
 | DL-C8 | S | fixed in 3.2.0 | slimmer SKILL.md, sharper descriptions. |
 | DL-C9 | M | W13 (3.6.0+) | Keep the email client matrix honest: regenerate its cells from caniemail's data, with test dates. |

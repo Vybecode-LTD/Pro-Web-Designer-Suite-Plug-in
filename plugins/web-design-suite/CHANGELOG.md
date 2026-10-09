@@ -176,6 +176,23 @@
     generates the tokens and diffs them against the project's.
   - **`/web-design-suite:docs-check`** extracts the system and checks the docs' snapshot
     (`baselines.docs`) and every hand-written claim against it.
+- **Workflow commands, part 3: delivery, persuasion and the runtime gates** (PS-C11;
+  DL-C7's and GT-C9's commands, their agents and hooks to come). Six more:
+  - **`/web-design-suite:schema-to-screens SCHEMA`** introspects the schema, puts the
+    questions only a person can answer to the user, scaffolds the UI with `--strict` (a
+    blocking security finding, such as row-level security off, stops it with nothing
+    written), audits the result, and checks it against supabase-integration.md's
+    security sections.
+  - **`/web-design-suite:email-build TEMPLATE`** lints the source, compiles it with the
+    email tokens, lints the result and renders it light, dark and without styles.
+  - **`/web-design-suite:deck`** runs the audits, the critique report on the critique's
+    findings (stopping on a blocking one), the defence sheet and the deck, from the
+    decision log. It has a runner, since the audits' JSON feeds the next steps.
+  - **`/web-design-suite:gate-a11y`**, **`gate-perf`** and **`gate-matrix`** run the
+    browser halves of the gates by hand: `a11y_runtime.mjs` on a page or a file; the static
+    performance audit, then `measure_vitals.mjs` on the served build; the proof sheet,
+    then `snapshot_matrix.mjs` against the baselines, which it records only when the
+    user has looked at the sheet.
 
 ### Fixed
 
@@ -186,6 +203,8 @@
 - **`extract_literals.py -o` into a new folder** (P26). It stopped with "cannot write"
   where `cluster_values.py`, `extract_system.py` and `diff_system.py` create the folder.
   `/migrate` writes its census to `design-reports/migration/`.
+- **`introspect_schema.py -o` and `--answers-template` into a new folder** (P26). Both
+  ended in a traceback; `/schema-to-screens` writes them to `design-reports/screens/`.
 
 ## 3.4.0 — 2026-10-07
 
