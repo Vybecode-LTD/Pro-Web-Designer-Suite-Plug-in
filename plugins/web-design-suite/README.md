@@ -129,6 +129,20 @@ The plugin's `design_hooks` option, set to false in `/config`, turns them all of
   gates on Linux in the Playwright image built for the project's own `playwright`, and the
   static gates on Windows. A job you run by hand records the baselines where the gates
   run, for you to review and commit.
+- **`/web-design-suite:new-system BRAND`** starts a system from a brand colour: the
+  ramps, a type scale and the starter styles, with every role pair's contrast checked.
+- **`/web-design-suite:contrast`** checks the role pairs in the project's tokens, or one
+  foreground on one background.
+- **`/web-design-suite:migrate`** takes a token migration's census and proposes the
+  mapping. It changes nothing.
+- **`/web-design-suite:release-check`** extracts, diffs and gates the system against the
+  published snapshot, then writes the changelog entry and, for a breaking change, the
+  migration guide.
+- **`/web-design-suite:figma-sync EXPORT`** audits a Figma export, then generates the
+  tokens and shows what they would change.
+- **`/web-design-suite:docs-check`** checks that the docs still describe the code.
+
+The reports go in `design-reports/`, which a project usually leaves out of git.
 
 **In CI**, `scripts/` is where every recipe in the skills expects the scripts
 (`python -m scripts.audit_design`), so after `/web-design-suite:install-gate` a clean

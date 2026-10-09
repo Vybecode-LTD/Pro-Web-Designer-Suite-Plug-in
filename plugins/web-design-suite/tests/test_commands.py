@@ -8,6 +8,12 @@ keeps them out of the 13 skills and their .skill files.
 - /install-gate vendors the gate scripts into the project's scripts/ and
   writes the CI workflow: the gates in a pinned Playwright image, the static
   gates on Windows, and a job that records the baselines.
+Part 2 (XC-C3, SS-C6, LC-C9): the systems and the lifecycle.
+- /new-system and /release-check have runners: a brand colour to the starter
+  system with its role pairs checked; extract, diff, gate, changelog, guide.
+- /contrast, /migrate, /figma-sync and /docs-check are chains: the body runs
+  the skills' own scripts through ${CLAUDE_PLUGIN_ROOT}, and the tests run
+  the body's commands, in order, on a fixture project.
 
 The SKILL.md frontmatter and the workflow go through js-yaml, a real YAML
 parser, from the suite's tooling (WDS_NODE_MODULES, as for the real-tool
@@ -19,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shlex
 import subprocess
 import sys
 import unittest
@@ -36,6 +43,14 @@ CLEAN = "@layer components {\n  .card {\n    color: var(--fg-default);\n  }\n}\n
 PAGE = ('<!doctype html>\n<html lang="en">\n<head><title>Home</title></head>\n'
         '<body><main><h1>Home</h1></main></body>\n</html>\n')
 needs_yaml = unittest.skipUnless(NODE and YAML_MODULES, "node and js-yaml (tooling/main) are not installed")
+NAMES = ["contrast", "docs-check", "figma-sync", "gate", "install-gate", "migrate", "new-system", "release-check"]
+PLACEHOLDERS = ("$ARGUMENTS", "PATHS", "TOKENS", "EXPORT", "FG", "BG", "BRAND", "OPTIONS")
+# Bash(python "${CLAUDE_SKILL_DIR}/scripts/x.py" *), or a skill's script by the
+# plugin's root, with any fixed arguments before the wildcard.
+RULE = re.compile(r'Bash\((python3?) ("\$\{(CLAUDE_SKILL_DIR|CLAUDE_PLUGIN_ROOT)\}/([\w./-]+)"(?: [^\s*()]+)*) \*\)')
+STARTER = PLUGIN / "skills" / "web-design-studio" / "assets" / "starter" / "styles"
+SCRIPTS = {name: PLUGIN / "skills" / skill / "scripts" / f"{name}.py" for skill, name in (
+    ("design-system-docs", "extract_system"), ("design-system-versioning", "diff_system"))}
 
 
 def load_yaml(text: str):
@@ -45,23 +60,42 @@ def load_yaml(text: str):
     return json.loads(proc.stdout)
 
 
+def split_front(skill_md) -> tuple[str, str]:
+    """The frontmatter's text and the body, with no YAML parser needed."""
+    return tuple(skill_md.read_text(encoding="utf-8")[4:].split("\n---\n", 1))
+
+
 def front(skill_md) -> tuple[dict, str]:
-    text = skill_md.read_text(encoding="utf-8")
-    head, body = text[4:].split("\n---\n", 1)
+    head, body = split_front(skill_md)
     return load_yaml(head), body
+
+
+def body_commands(body: str) -> list:
+    """The commands in the body's bash blocks, in the order Claude runs them."""
+    return [line.strip() for block in re.findall(r"```bash\n(.*?)```", body, re.S)
+            for line in block.splitlines() if re.match(r"\s*python3? ", line)]
+
+
+def allows(prefix: str, command: str) -> bool:
+    """A `Bash(prefix *)` rule's match: the prefix, then a word boundary."""
+    return command == prefix or command.startswith(prefix + " ")
 
 
 class TheCommandFiles(unittest.TestCase):
     """XC-C3: each command is a skill only the user invokes, and it may run
-    exactly the script it names, with no permission prompt."""
+    exactly the scripts its body runs, with no permission prompt."""
 
     def test_the_manifest_adds_the_folder_to_the_skills(self):
         manifest = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_bytes())
         self.assertEqual(["./workflow-commands/"], manifest["skills"])
-        self.assertEqual(["gate", "install-gate"], sorted(p.parent.name for p in COMMANDS.glob("*/SKILL.md")))
+        self.assertEqual(NAMES, sorted(p.parent.name for p in COMMANDS.glob("*/SKILL.md")))
 
     @needs_yaml
     def test_each_command_is_user_invoked_and_runs_what_it_allows(self):
+        """Every command the body runs starts with a rule's prefix, every rule
+        is one the body runs, and each has its python3 twin for macOS. A rule
+        names a script that exists: the command's own, by ${CLAUDE_SKILL_DIR},
+        or a skill's, by ${CLAUDE_PLUGIN_ROOT}."""
         commands = sorted(COMMANDS.glob("*/SKILL.md"))
         self.assertTrue(commands)                          # no vacuous pass
         for skill_md in commands:
@@ -72,17 +106,22 @@ class TheCommandFiles(unittest.TestCase):
                 self.assertIs(True, fields["disable-model-invocation"])
                 rules = fields["allowed-tools"]
                 self.assertIsInstance(rules, list)
-                scripts = set()
+                prefixes = []
                 for rule in rules:
-                    found = re.fullmatch(r'Bash\((python3?) "\$\{CLAUDE_SKILL_DIR\}/(scripts/[\w.]+)" \*\)', rule)
+                    found = RULE.fullmatch(rule)
                     self.assertIsNotNone(found, rule)
-                    self.assertTrue((skill_md.parent / found.group(2)).is_file(), found.group(2))
-                    scripts.add(found.group(2))
-                commands = re.findall(r"^(python3? \S+)", body, re.M)
-                self.assertTrue(commands)
-                for command in commands:                      # each one the body runs is allowed
-                    self.assertIn(command, {f'{py} "${{CLAUDE_SKILL_DIR}}/{s}"' for py in ("python", "python3")
-                                            for s in scripts})
+                    own = found.group(3) == "CLAUDE_SKILL_DIR"
+                    self.assertRegex(found.group(4), r"^scripts/[\w.]+$" if own else r"^skills/[\w-]+/scripts/[\w.]+$")
+                    self.assertTrue(((skill_md.parent if own else PLUGIN) / found.group(4)).is_file(), rule)
+                    prefixes.append(f"{found.group(1)} {found.group(2)}")
+                python = sorted(p for p in prefixes if p.startswith("python "))
+                self.assertEqual(python, sorted("python " + p[8:] for p in prefixes if p.startswith("python3 ")))
+                run = body_commands(body)
+                self.assertTrue(run)
+                for command in run:                           # each one the body runs is allowed
+                    self.assertTrue(any(allows(p, command) for p in prefixes), command)
+                for prefix in python:                         # and nothing it never runs is
+                    self.assertTrue(any(allows(prefix, c) for c in run), f"allowed, never run: {prefix}")
 
 
 class CommandTest(TempDirTest):
@@ -360,6 +399,267 @@ class BaselinesInAMissingFolder(CommandTest):
                 proc = self.run_py(PLUGIN / "skills" / script, *args, "--write-baseline", f"ci/new/{name}.json")
                 self.assertEqual(0, proc.returncode, output(proc))
                 self.assertTrue((self.tmp / "ci" / "new" / f"{name}.json").is_file())
+
+
+class ChainTest(CommandTest):
+    """Runs a command's body as Claude does: each command in its bash blocks,
+    in order, with the plugin's paths substituted and each placeholder
+    (PLACEHOLDERS) replaced by the test's values as typed, then split as a
+    POSIX shell splits it: an unquoted `#` starts a comment (Codex on #87).
+    The body is read without a YAML parser, so these run without js-yaml."""
+    command = ""
+
+    def steps(self) -> list:
+        return body_commands(split_front(COMMANDS / self.command / "SKILL.md")[1])
+
+    def run_step(self, line: str, values: dict):
+        text = (line.replace("${CLAUDE_PLUGIN_ROOT}", PLUGIN.as_posix())
+                .replace("${CLAUDE_SKILL_DIR}", (COMMANDS / self.command).as_posix()))
+        for key, value in values.items():
+            text = re.sub(rf"(?<![A-Za-z$]){re.escape(key)}(?![A-Za-z])", lambda m: " ".join(map(str, value)), text)
+        left = re.search(r"(?<![A-Za-z$])(%s)(?![A-Za-z])" % "|".join(map(re.escape, PLACEHOLDERS)), text)
+        self.assertIsNone(left, f"no value for {left and left.group(1)} in {line}")
+        argv = shlex.split(text, comments=True)
+        self.assertEqual("python", argv[0])
+        return self.run_py(*argv[1:])
+
+    def starter(self, *names: str, rename: tuple = ()):
+        """The starter's styles in src/styles/, a token renamed if asked."""
+        for name in names or ("tokens.css",):
+            text = (STARTER / name).read_bytes().decode("utf-8")
+            if rename and name == "tokens.css":
+                text = text.replace(*rename)
+            self.write(f"src/styles/{name}", text)
+
+    def snapshot(self, to: str):
+        proc = self.run_py(SCRIPTS["extract_system"], "src", "--out", to)
+        self.assertEqual(0, proc.returncode, output(proc))
+
+
+def tree(root) -> dict:
+    return {p.relative_to(root).as_posix(): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
+
+
+class TheNewSystem(ChainTest):
+    """XC-C3 and SS-C6: /new-system, a brand colour to the starter's system."""
+    command = "new-system"
+
+    def new(self, brand, *options):
+        (step,) = self.steps()
+        return self.run_step(step, {"BRAND": [brand], "OPTIONS": options})
+
+    def test_the_brand_survives_the_shell(self):
+        """Codex on #87: `$ARGUMENTS` unquoted, `#2563eb` was a comment and
+        `oklch(…)` three words, so the runner had no brand."""
+        for brand in ("#2563eb", "oklch(54.6% 0.215 262.9)"):
+            with self.subTest(brand=brand):
+                proc = self.new(brand, "--out", f"styles-{len(brand)}")
+                self.assertEqual(0, proc.returncode, output(proc))
+                self.assertIn(f"the ramps from {brand}", output(proc))
+
+    def test_a_brand_colour_becomes_a_system_the_gates_pass(self):
+        proc = self.new("#2563eb")
+        self.assertEqual(0, proc.returncode, output(proc))
+        styles = self.tmp / "src" / "styles"
+        self.assertEqual(sorted(p.name for p in STARTER.glob("*.css")), sorted(p.name for p in styles.iterdir()))
+        tokens = (styles / "tokens.css").read_text(encoding="utf-8")
+        self.assertRegex(tokens, r"--accent-600: oklch\(54\.6% 0\.215 262\.9\);\s*/\* #2563eb \*/")   # exact
+        self.assertIn("--neutral-500: oklch(53.5% 0.009 262.9);", tokens)                            # its hue
+        self.assertEqual((STARTER / "layout.css").read_bytes(), (styles / "layout.css").read_bytes())
+        self.assertIn("100 of 100 pass", output(proc))
+        gate = self.run_py(RUN_GATES, "src")                 # design and accessibility on src, perf on dist
+        self.assertEqual(0, gate.returncode, output(gate))
+
+    def test_a_failing_role_pair_is_named_and_the_files_kept(self):
+        proc = self.new("#00ff00")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("FAIL  --fg-on-accent on --bg-accent (light)", output(proc))
+        self.assertTrue((self.tmp / "src" / "styles" / "tokens.css").is_file())
+
+    def test_it_never_overwrites_without_force(self):
+        self.assertEqual(0, self.new("#2563eb").returncode)
+        before = tree(self.tmp / "src" / "styles")
+        proc = self.new("#e8440a")
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("never overwrites", output(proc))
+        self.assertEqual(before, tree(self.tmp / "src" / "styles"))
+        self.assertEqual(0, self.new("#e8440a", "--force").returncode)
+        self.assertNotEqual(before, tree(self.tmp / "src" / "styles"))
+
+    def test_the_notes_describe_this_system_not_the_starters(self):
+        """Codex on #87: the notes still named Ember, hue 75 and the
+        starter's ratio, and called the starter's ratios verified."""
+        proc = self.new("#2563eb", "--neutral-hue", "250", "--ratio", "1.125", "--dual-ratio", "1.25")
+        self.assertEqual(0, proc.returncode, output(proc))
+        tokens = (self.tmp / "src" / "styles" / "tokens.css").read_text(encoding="utf-8")
+        for stale in ("Ember", "--neutral-hue 75", "Verified ", "ratio 1.200", "Same 380 -> 1440"):
+            self.assertNotIn(stale, tokens)
+        for note in ('"#2563eb" --anchor-seed prints it', '"#2563eb" --neutral --neutral-hue 250 prints it',
+                     "--ratio 1.125 --dual-ratio 1.25 prints these steps", "The starter measured 4.60:1"):
+            self.assertIn(note, " ".join(tokens.split()))
+        body = split_front(COMMANDS / "new-system" / "SKILL.md")[1]      # CodeRabbit on #87
+        self.assertIn('Exit 2 after "wrote 7 files" means the files are there', " ".join(body.split()))
+
+    def test_a_scale_replaces_the_starters_and_one_the_generator_refuses_writes_nothing(self):
+        proc = self.new("#2563eb", "--ratio", "1.125", "--dual-ratio", "1.25", "--fluid", "380", "1440",
+                        "--out", "styles")
+        self.assertEqual(0, proc.returncode, output(proc))
+        tokens = (self.tmp / "styles" / "tokens.css").read_text(encoding="utf-8")
+        self.assertIn("--text-6xl: clamp(3.8147rem,", tokens)
+        self.assertIn("--text-2xs:", tokens)
+        proc = self.new("#2563eb", "--ratio", "1.25", "--out", "other")
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("11px", output(proc))
+        self.assertFalse((self.tmp / "other").exists())
+
+
+class TheReleaseCheck(ChainTest):
+    """LC-C9: /release-check, extract, diff, gate, changelog, guide."""
+    command = "release-check"
+    LEDGER = {"schema": "design-system-versioning/deprecations@1", "deprecations": []}
+
+    def setUp(self):
+        super().setUp()
+        self.starter()
+        self.snapshot("published/system.json")
+        self.write(".design-suite.json", json.dumps({"schema": 1, "baselines": {"system": "published/system.json"}}))
+        self.out = self.tmp / "design-reports" / "release"
+
+    def check(self, *args):
+        (step,) = self.steps()
+        return self.run_step(step, {"$ARGUMENTS": ["--from-version", "1.2.0", *args]})
+
+    def test_an_unchanged_system_is_a_patch_with_its_changelog(self):
+        proc = self.check()
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertRegex(output(proc), r"version\s+1\.2\.0 -> 1\.2\.1")
+        self.assertTrue((self.out / "CHANGELOG.part.md").is_file())
+        self.assertFalse((self.out / "UPGRADE.md").exists())
+
+    def test_a_rename_without_a_ledger_is_advisory_and_gets_its_guide(self):
+        self.starter(rename=("--fg-subtle:", "--fg-faint:"))
+        proc = self.check()
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("advisory", output(proc))
+        self.assertRegex(output(proc), r"version\s+1\.2\.0 -> 2\.0\.0")
+        self.assertTrue((self.out / "UPGRADE.md").is_file())
+
+    def test_a_vanished_name_stops_the_release_at_the_gate(self):
+        self.starter(rename=("--fg-subtle:", "--fg-faint:"))
+        self.write("deprecations.json", json.dumps(self.LEDGER))
+        self.write("design-reports/release/CHANGELOG.part.md", "an earlier run's\n")
+        proc = self.check()
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("FAILED: --fg-subtle vanished", output(proc))
+        self.assertFalse((self.out / "CHANGELOG.part.md").exists())      # none, not a stale one
+
+    def test_an_out_that_holds_the_published_snapshot_is_refused(self):
+        """CodeRabbit on #87: extraction overwrote the snapshot it then
+        compared with, so the diff found nothing and the snapshot was lost."""
+        self.write(".design-suite.json", json.dumps({"schema": 1, "baselines": {"system": "rel/system.json"}}))
+        self.snapshot("rel/system.json")
+        before = (self.tmp / "rel" / "system.json").read_bytes()
+        proc = self.check("--out", "rel")
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("would overwrite the published snapshot", output(proc))
+        self.assertEqual(before, (self.tmp / "rel" / "system.json").read_bytes())
+
+    def test_a_report_it_could_not_write_stops_it(self):
+        """CodeRabbit on #87: the runner read diff.json whether or not the
+        diff wrote it: a traceback, or an earlier run's gate."""
+        (self.out / "diff.json").mkdir(parents=True)
+        proc = self.check()
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("could not write its report", output(proc))
+
+    def test_the_readme_says_the_guide_is_for_a_breaking_change(self):
+        """CodeRabbit on #87."""
+        readme = (PLUGIN / "README.md").read_text(encoding="utf-8")
+        self.assertIn("the changelog entry and, for a breaking change, the migration guide", " ".join(readme.split()))
+
+    def test_with_no_published_snapshot_it_cannot_run(self):
+        (self.tmp / ".design-suite.json").unlink()
+        proc = self.check()
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("baselines.system", output(proc))
+
+
+class TheChains(ChainTest):
+    """XC-C3, SS-C6 and LC-C9: the commands whose body is the chain, run in
+    order on a project whose .design-suite.json names its tokens."""
+
+    def setUp(self):
+        super().setUp()
+        self.starter()
+        self.write(".design-suite.json", json.dumps({"schema": 1, "tokens": "src/styles/tokens.css"}))
+
+    def test_contrast_checks_the_role_pairs_or_one_pair(self):
+        self.command = "contrast"
+        pair, roles = self.steps()
+        proc = self.run_step(roles, {"TOKENS": ["src/styles/tokens.css"]})
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.starter(rename=("--fg-muted:       var(--neutral-600)", "--fg-muted: var(--neutral-300)"))
+        proc = self.run_step(roles, {"TOKENS": ["src/styles/tokens.css"]})
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("FAIL  --fg-muted", output(proc))
+        proc = self.run_step(pair, {"FG": ["#767676"], "BG": ["#ffffff"]})
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertRegex(output(proc), r"PASS\s+4\.5:1")
+
+    def test_figma_questions_it_cannot_write_are_not_a_finding(self):
+        """CodeRabbit on #87: an --out it could not write ended in a
+        traceback and exit 1, which reads as findings."""
+        self.command = "figma-sync"
+        _, questions, _, _ = self.steps()
+        self.write("export.json", json.dumps([{"name": "space/4", "type": "FLOAT", "value": 16}]))
+        (self.tmp / "design-reports" / "figma" / "handoff-questions.md").mkdir(parents=True)
+        proc = self.run_step(questions, {"EXPORT": ["export.json"]})
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("cannot write", output(proc))
+
+    def test_migrate_takes_the_census_and_changes_nothing(self):
+        self.command = "migrate"
+        self.write("src/components/card.css", ".card {\n  padding: 13px;\n  color: #333;\n}\n"
+                                              ".b {\n  padding: 12px;\n  color: #343434;\n}\n")
+        before = tree(self.tmp / "src")
+        steps = self.steps()
+        self.assertEqual(3, len(steps))
+        for step in steps:
+            proc = self.run_step(step, {"PATHS": ["src"]})
+            self.assertEqual(0, proc.returncode, output(proc))
+        self.assertTrue((self.tmp / "design-reports" / "migration" / "proposal" / "reconciliation.md").is_file())
+        self.assertEqual(before, tree(self.tmp / "src"))
+
+    def test_figma_sync_stops_on_an_audit_error_and_generates_when_clean(self):
+        self.command = "figma-sync"
+        audit, questions, generate, compare = self.steps()
+        clean = [{"name": "space/4", "type": "FLOAT", "value": 16}, {"name": "radius/md", "type": "FLOAT", "value": 8}]
+        self.write("bad.json", json.dumps(clean + [{"name": "space/odd", "type": "FLOAT", "value": 13}]))
+        proc = self.run_step(audit, {"EXPORT": ["bad.json"]})
+        self.assertEqual(1, proc.returncode, output(proc))               # the sync stops here
+        self.assertEqual(1, self.run_step(questions, {"EXPORT": ["bad.json"]}).returncode)
+        handoff = self.tmp / "design-reports" / "figma" / "handoff-questions.md"     # Codex, CodeRabbit on #87
+        self.assertIn("space/odd", handoff.read_text(encoding="utf-8"))
+        self.write("export.json", json.dumps(clean))
+        for step, values in ((audit, {}), (generate, {}), (compare, {"TOKENS": ["src/styles/tokens.css"]})):
+            proc = self.run_step(step, {"EXPORT": ["export.json"], **values})
+            self.assertEqual(0, proc.returncode, output(proc))
+        self.assertTrue((self.tmp / "design-reports" / "figma" / "tokens" / "tokens.css").is_file())
+        self.assertIn("major", output(proc))                              # the starter's tokens it lacks
+
+    def test_docs_check_finds_the_drift(self):
+        self.command = "docs-check"
+        self.snapshot("docs/system.json")
+        self.write(".design-suite.json", json.dumps({"schema": 1, "baselines": {"docs": "docs/system.json"}}))
+        extract, check = self.steps()
+        for step in (extract, check):
+            proc = self.run_step(step, {"PATHS": ["src"]})
+            self.assertEqual(0, proc.returncode, output(proc))
+        self.starter(rename=("--fg-subtle:", "--fg-faint:"))
+        self.assertEqual(0, self.run_step(extract, {"PATHS": ["src"]}).returncode)
+        proc = self.run_step(check, {})
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("token removed    --fg-subtle", output(proc))
 
 
 if __name__ == "__main__":

@@ -1490,6 +1490,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.output:
         try:
+            Path(args.output).parent.mkdir(parents=True, exist_ok=True)   # as the other scripts' -o do
             Path(args.output).write_text(text, encoding="utf-8")
         except OSError as exc:
             print(f"extract_literals: cannot write {args.output}: {exc}",

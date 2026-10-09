@@ -36,6 +36,10 @@ Regressions covered:
 - N12: `//` was a comment in plain CSS, as in the audit (SB-A9), so after
   `url(https://…)` the census filed every literal under `background` and the
   codemod rewrote none of them.
+3.5.0:
+- P26: `extract_literals -o` into a folder that did not exist failed, where
+  cluster_values, extract_system and diff_system create it; /migrate writes
+  its census to design-reports/migration/.
 """
 from __future__ import annotations
 
@@ -675,6 +679,18 @@ class LifecycleDocClaims(unittest.TestCase):
         self.assertTrue(pairs)
         for px, name in pairs:
             self.assertEqual(size.get(name), int(px), name)
+
+
+class TheCensusMakesItsFolder(TempDirTest):
+    """P26: /migrate writes the census where nothing exists yet."""
+
+    def test_the_output_folder_is_created(self):
+        self.write("src/card.css", ".card {\n  padding: 13px;\n}\n")
+        proc = run_py("design-token-migration", "extract_literals", "src", "--format", "json",
+                      "-o", "design-reports/migration/literals.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        literals = json.loads((self.tmp / "design-reports" / "migration" / "literals.json").read_bytes())
+        self.assertTrue(literals["literals"])
 
 
 if __name__ == "__main__":
