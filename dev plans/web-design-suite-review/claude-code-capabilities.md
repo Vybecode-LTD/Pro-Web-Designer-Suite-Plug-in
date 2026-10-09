@@ -140,3 +140,25 @@ Re-read: the hooks page ([hooks](https://code.claude.com/docs/en/hooks)), the mo
 - **A command hook.** The gate, the guard and the router block, allow or add context with scripts the plugin already has, which is the case the comparison gives command hooks. They run on every version that loads plugin hooks, not only 2.1.287 or later, and the suite tests them as Claude Code runs them: JSON on stdin, JSON out.
 - **Run by node.** Exec form on Windows needs a real executable. Python has no name that works on every system: `python3` is the Store's placeholder on Windows, and macOS has no `python`. `node` has one name everywhere. The Node hook reads the config through `project_config.mjs` and calls Python only for the gate, in an opted-in project, after it has found a Python 3.
 - **A mod later.** A mod remains the way to draw: a findings pane, or a band above the prompt. The plugin can add one beside the command hooks, in the same `hooks/hooks.json`, once 2.1.287 is old enough to require.
+
+## 7. Re-checked on 2026-10-09 (before P26)
+
+Re-read: the skills page ([skills](https://code.claude.com/docs/en/skills)) and the manifest reference ([plugins-reference](https://code.claude.com/docs/en/plugins-reference)). §3's frontmatter and substitutions still hold. These are new or sharper:
+
+- **Who invokes.** `disable-model-invocation: true` is "Description not in context, full skill loads when invoked". It "Also prevents the skill from being preloaded into subagents", and, as of v2.1.196, "from running when a scheduled task fires with the skill as its prompt".
+- **Booleans** "accept `yes`, `no`, `on`, `off`, `1`, and `0` in any letter case". Before v2.1.218, only `true` and `false`.
+- **Substitution in `allowed-tools`.** "Claude Code substitutes `${CLAUDE_SKILL_DIR}` and `${CLAUDE_PROJECT_DIR}` in two places: the skill's markdown content, and Bash rules in the `allowed-tools` frontmatter. In a plugin skill, Claude Code substitutes `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_DATA}` in the same two places." `${CLAUDE_PROJECT_DIR}` needs v2.1.196. The page does not say whether `$ARGUMENTS` is substituted in a rule.
+- **`allowed-tools`** "Accepts a space- or comma-separated string, or a YAML list". The grant "clears when you send your next message".
+- **Injected commands** take `shell: powershell` "when the PowerShell tool is enabled". With `shell: bash` and no Git Bash, "the invocation fails before any command runs".
+- **The listing.** The budget "scales at 1% of the model's context window", and descriptions drop "starting with the skills you invoke least". `/doctor` estimates its cost, and `skillListingBudgetFraction` raises the budget. Low-priority entries can be set to `"name-only"` in `skillOverrides`; whether that reaches plugin skills was not re-read (§4 quotes that it does not).
+- **The manifest's `skills` key:** "Directories to scan for skills, each a directory of `<name>/SKILL.md` folders or one folder holding `SKILL.md` directly … Adds to the default `skills/` scan."
+- **`commands`** "Replaces the default `commands/` scan". The standard layout calls `commands/` "Flat Markdown command files. Prefer `skills/` for new plugins". `commands` also takes an object map of name to `source` or `content`.
+- **`claude plugin validate`** on a folder of skills alone wants a manifest (observed with 2.1.293: "No manifest found in directory"). Run it on the plugin. `--strict` passes with the new `skills` key.
+
+**P26's choice: `workflow-commands/`, added by the `skills` key.** *(decision, 2026-10-09)*
+- **Why not `skills/`:**
+  - Each folder in `skills/` becomes a `.skill` release file, and the per-skill tests count 13.
+  - A command runs other skills' scripts through `${CLAUDE_PLUGIN_ROOT}`, so as a standalone `.skill` it would not work.
+  - Its non-spec frontmatter is refused by claude.ai uploads (§3).
+- **Why not `commands/`:** it is the legacy flat-file folder, and its scan could pick up a command's subfolders too.
+- **`workflows/`** is the Workflow component's folder.

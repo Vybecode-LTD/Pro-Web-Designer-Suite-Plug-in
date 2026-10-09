@@ -12,13 +12,13 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is public (since 2026-09-28), and MIT-licensed like the plugin.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
-## Current state (2026-10-08)
+## Current state (2026-10-09)
 
-- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is under way: P24 is complete (#76, #78, #79, #81), and P25 part 1, the hooks, is merged (#82). No PR is open.
+- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is under way: P24 is complete (#76, #78, #79, #81), P25 is complete (#82, the hooks; #84, the token diff), and P26 part 1 is merged (#85: `/gate` and `/install-gate`, with the CI template). No PR is open.
 - **Installed:** 3.4.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** 828. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P25 part 2 (the token diff after a token-file edit, LC-C8), then P26 (the workflow commands and the CI bootstrap). `dev plans/web-design-suite-review/claude-code-capabilities.md` §6 is the 2026-10-08 re-read of the hooks and mods pages (the skills and evals pages are still to be re-read). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 51 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Tests:** 863. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P26 parts 2 and 3 (the other workflow commands), then P27 (the subagents, and the two hooks P25 left). `dev plans/web-design-suite-review/claude-code-capabilities.md` §6 and §7 are the re-reads of the hooks, mods and skills pages and the manifest reference (the sub-agents and evals pages are still to be re-read). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 47 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
@@ -76,7 +76,8 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 plugins/web-design-suite/         the plugin (the only folder that ships)
   skills/<13 skills>/             SKILL.md, references/, scripts/, assets/
   shared/token-contract.md        the master copy of the contract (13 copies must match it)
-  hooks/                          hooks.json and design_hooks.mjs: the opt-in gate and guard, the router
+  hooks/                          hooks.json and design_hooks.mjs: the opt-in gate, token diff and guard, the router
+  workflow-commands/              the commands only the user invokes (/gate, /install-gate), added by plugin.json's `skills`
   tests/                          the suite; fixtures/ holds the pointer and evidence registers
   tools/                          check_pointers.py, sync_snippets.py
   CHANGELOG.md, README.md, LICENSE
