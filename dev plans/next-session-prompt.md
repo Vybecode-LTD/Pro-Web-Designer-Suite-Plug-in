@@ -223,7 +223,7 @@ Read each by `grep -n`.
 - a chain that must stop on a blocker, stopping.
 
 **Close:**
-- the inventory rows: XC-C3, SS-C6 and LC-C9 close with part 3 if their agents are P27's (say "commands in #N, the agent in P27");
+- the inventory rows: XC-C3, SS-C6 and LC-C9 stay open after part 3, since their agents are P27's and P27's row lists them (write "the commands in #N, the agent in P27");
 - the plan's `P26` row renamed per part, §9, the CHANGELOG and README's "The commands".
 
 **Size:** M per part.
@@ -247,7 +247,7 @@ Read each by `grep -n`.
 - each `skills:` entry exists;
 - the two hooks, as `test_hooks` does the others.
 
-An agent's behaviour is P29 and P30's evals.
+**Close:** GT-C9, DL-C7 (but for its evals, P30's), PS-C4 and XC-C4, and XC-C3, SS-C6 and LC-C9 with their agents. An agent's behaviour is P29 and P30's evals.
 
 **Size:** M.
 
