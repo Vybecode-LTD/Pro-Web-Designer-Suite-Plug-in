@@ -16,8 +16,8 @@ At the project's root:
   "budgets": {"perf": "perf-budget.json", "a11y": "a11y-budget.json"},
   "baselines": {"audit": ".design-baseline.json", "a11y": ".a11y-baseline.json",
                 "perf": ".perf-baseline.json", "docs": "docs/baseline.json",
-                "snapshots": "snapshots/"},
-  "hooks": {"designGate": true, "generatedFiles": true}
+                "snapshots": "snapshots/", "system": "published/system.json"},
+  "hooks": {"designGate": true, "generatedFiles": true, "tokenDiff": true}
 }
 ```
 
@@ -29,8 +29,8 @@ At the project's root:
 | `components` | Globs that add to the component files the rule spec names. `*` and `?` stay within a folder, and `**/` is any number of folders, none included |
 | `stack` | `vanilla-css`, `css-modules`, `tailwind-v3` or `tailwind-v4` |
 | `budgets` | `perf` and `a11y`: the budget files |
-| `baselines` | `audit`, `a11y`, `perf`, `docs` and `snapshots`: where each gate keeps its baseline |
-| `hooks` | Turns the plugin's hooks on for this project, each `true` or `false`. `designGate`: after each edit Claude makes to a file the audit reads, `audit_design.py` runs on it, in the config's folder, and Claude hears what it found. `generatedFiles`: Claude may not edit a file that says it is generated (`DO NOT EDIT`, `@generated`) in its first 800 characters, and is told to change its source |
+| `baselines` | `audit`, `a11y`, `perf`, `docs` and `snapshots`: where each gate keeps its baseline. `system`: the published snapshot, the system as consumers have it, which `diff_system.py` compares against |
+| `hooks` | Turns the plugin's hooks on for this project, each `true` or `false`. `designGate`: after each edit Claude makes to a file the audit reads, `audit_design.py` runs on it, in the config's folder, and Claude hears what it found. `generatedFiles`: Claude may not edit a file that says it is generated (`DO NOT EDIT`, `@generated`) in its first 800 characters, and is told to change its source. `tokenDiff`: after each edit Claude makes to one of the config's `tokens`, `diff_system.py` compares them with `baselines.system`, and Claude hears the release that makes, each breaking change and each contrast pair that crossed a WCAG floor. An additive edit is silent, and so is the hook until the snapshot exists |
 
 - **Finding it.** A script walks up from the working directory to the first `.design-suite.json`, and never past the folder that holds `.git`: a config above the repository is not the repository's.
 - **Paths** are relative to the file, so the scripts agree from any working directory.
@@ -66,7 +66,7 @@ Each takes `--tokens FILE` (repeatable), a `tokens.css` or a `contract.json`, an
 | figma-variables-sync | `figma_audit.py` | Its ramps replace the studio's ramps of the same name. A scale it declares (spacing, radius, type, stroke, z, duration, leading, tracking, weight, breakpoints) replaces the studio's: its steps, not both, so the scale stays closed. A fluid `clamp()` type step counts at both ends |
 | figma-variables-sync | `figma_to_tokens.py` | Its names join the vocabulary, so `color/brand/500` comes back as `--brand-500`, recognised, in its tier. The starter's names keep theirs. A ramp step it writes in OKLCH comes back as that exact value |
 | design-system-docs | `extract_system.py` | Reads the CSS token files, and writes `contract.json` with `--contract` |
-| design-system-versioning | `diff_system.py` | Takes a `contract.json` as either snapshot. Without a `new` snapshot, the candidate is the project's token files: its tokens.css files as one snapshot, or, when the list holds a contract, every file read as above, in order, as a contract. Against a contract, the other side is cut down to what a contract holds, default values and tiers, so a theme or a note it leaves out is not a change |
+| design-system-versioning | `diff_system.py` | Takes a `contract.json` as either snapshot. Without an `old` snapshot, it is `baselines.system`. Without a `new` one, the candidate is the project's token files: its tokens.css files as one snapshot, or, when the list holds a contract, every file read as above, in order, as a contract. Against a contract, the other side is cut down to what a contract holds, default values and tiers, so a theme or a note it leaves out is not a change |
 | design-token-migration | `cluster_values.py` | Its steps of the contract's six ramps (`neutral`, `accent` and the four status ramps) replace the derived ones, step by step, and `tokens.css` writes its values. A step it lacks is built as before, from its own accent step nearest 500. `--accent` beats its accent ramp. A ramp the contract does not name has no roles to land on, and the reconciliation report says so |
 
 ## 4. Who reads the other keys
@@ -86,6 +86,7 @@ A flag beats each of these, and each falls back to the script's own default.
 | `baselines.perf` | perf-budget-gate's `perf_audit.py` |
 | `baselines.docs` | design-system-docs' `build_docs.py --check`. A baseline the config names but that is missing is an error, as a named `--baseline` is |
 | `baselines.snapshots` | component-state-matrix's `snapshot_matrix.mjs` |
+| `baselines.system` | design-system-versioning's `diff_system.py`, as `old` when none is named, and the `tokenDiff` hook |
 
 **The Node reader.** `project_config.mjs`, a copy of the plugin's `shared/project_config.mjs`, finds and checks the config by the same rules as `project_config.py`, with the same messages, and reads the token files as `read_tokens()` does; a test runs both readers on the same files, and the component globs on the same paths. The browser scripts reach it through `projectConfig()`, which their `browser_common.mjs` re-exports. The two lint configs import it from their own folder, so a project copies `project_config.mjs` with them; stylelint matches its overrides with micromatch, so the config translates each `components` glob into micromatch globs that match the same files.
 

@@ -1,5 +1,5 @@
 {
-  "description": "web-design-suite: a design gate and a generated-file guard that a project turns on in its .design-suite.json, and a router that names the skill a prompt needs.",
+  "description": "web-design-suite: a design gate, a token diff and a generated-file guard that a project turns on in its .design-suite.json, and a router that names the skill a prompt needs.",
   "hooks": {
     "PreToolUse": [
       {
@@ -13,7 +13,7 @@
       {
         "matcher": "Edit|Write",
         "hooks": [
-          {"type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/design_hooks.mjs", "gate"], "timeout": 120}
+          {"type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/design_hooks.mjs", "gate"], "timeout": 180}
         ]
       }
     ],

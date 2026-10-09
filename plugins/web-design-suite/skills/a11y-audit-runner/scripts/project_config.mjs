@@ -11,9 +11,10 @@
  * byte-identical copy sits beside each file that imports it: browser_common.mjs
  * in the scripts/ of a11y-audit-runner, component-state-matrix,
  * design-critique-gate, email-template-system and perf-budget-gate, which
- * re-exports the config reader, and the two lint configs in web-design-studio's
- * assets/configs/. Change the master, copy it over all six, and
- * tests/test_project_config.py fails until they match.
+ * re-exports the config reader; the two lint configs in web-design-studio's
+ * assets/configs/; and the plugin's hooks, hooks/design_hooks.mjs. Change the
+ * master, copy it over all seven, and tests/test_project_config.py fails until
+ * they match.
  */
 
 import fs from 'node:fs';
@@ -23,8 +24,8 @@ export const CONFIG_NAME = '.design-suite.json';
 const CONFIG_KEYS = ['schema', 'tokens', 'emailTokens', 'components', 'stack', 'budgets', 'baselines', 'hooks'];
 const STACKS = ['vanilla-css', 'css-modules', 'tailwind-v3', 'tailwind-v4'];
 const BUDGETS = ['perf', 'a11y'];
-const BASELINES = ['audit', 'a11y', 'perf', 'docs', 'snapshots'];
-const HOOKS = ['designGate', 'generatedFiles'];      // the plugin's hooks a project turns on (P25)
+const BASELINES = ['audit', 'a11y', 'perf', 'docs', 'snapshots', 'system'];
+const HOOKS = ['designGate', 'generatedFiles', 'tokenDiff'];      // the plugin's hooks a project turns on (P25)
 
 export class ConfigError extends Error {}
 

@@ -17,18 +17,21 @@ one (test_project_config holds every copy to the master).
       "budgets": {"perf": "perf-budget.json", "a11y": "a11y-budget.json"},
       "baselines": {"audit": ".design-baseline.json", "a11y": ".a11y-baseline.json",
                     "perf": ".perf-baseline.json", "docs": "docs/baseline.json",
-                    "snapshots": "snapshots/"},
-      "hooks": {"designGate": true, "generatedFiles": true}
+                    "snapshots": "snapshots/", "system": "published/system.json"},
+      "hooks": {"designGate": true, "generatedFiles": true, "tokenDiff": true}
     }
 
 Only `schema` is required. `tokens` holds the project's token files: a
 tokens.css, or a contract.json. `emailTokens` is the email build's own
 email-tokens.json, a different file that only the email scripts read.
 `components` adds globs to the component files the rule spec names
-(design-rules.json: file_classes). `hooks` turns on the plugin's hooks for
-this project: `designGate` audits each file Claude edits, and `generatedFiles`
-refuses an edit to a generated file. Paths are relative to the file. An unknown
-key, or a value of the wrong shape, is an error that names the key.
+(design-rules.json: file_classes). `baselines.system` is the published
+snapshot that diff_system.py compares against. `hooks` turns on the plugin's
+hooks for this project: `designGate` audits each file Claude edits,
+`generatedFiles` refuses an edit to a generated file, and `tokenDiff` diffs
+the token files against the published snapshot after each edit to one. Paths
+are relative to the file. An unknown key, or a value of the wrong shape, is an
+error that names the key.
 
 A script finds the file by walking up from the working directory to the first
 `.design-suite.json`, and stops at the repository root (a folder holding
@@ -85,8 +88,8 @@ CONTRACT_SCHEMA = "web-design-suite/contract/1"
 KEYS = ("schema", "tokens", "emailTokens", "components", "stack", "budgets", "baselines", "hooks")
 STACKS = ("vanilla-css", "css-modules", "tailwind-v3", "tailwind-v4")
 BUDGETS = ("perf", "a11y")
-BASELINES = ("audit", "a11y", "perf", "docs", "snapshots")
-HOOKS = ("designGate", "generatedFiles")     # the plugin's hooks a project turns on (P25)
+BASELINES = ("audit", "a11y", "perf", "docs", "snapshots", "system")
+HOOKS = ("designGate", "generatedFiles", "tokenDiff")     # the plugin's hooks a project turns on (P25)
 CONTRACT_SECTIONS = ("ramps", "scales", "roles", "breakpoints", "constants")
 
 

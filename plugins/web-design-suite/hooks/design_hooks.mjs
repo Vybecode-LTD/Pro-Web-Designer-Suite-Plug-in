@@ -7,20 +7,25 @@
  *          first 800 characters, as audit_design.py reads it, so Claude
  *          changes the source and regenerates instead (LC-C8).
  *   gate   PostToolUse on Edit|Write. Runs audit_design.py on the file Claude
- *          just changed and hands Claude what it found (XC-C2, SS-C6).
+ *          just changed and hands Claude what it found (XC-C2, SS-C6). After
+ *          an edit to one of the project's token files, it also runs
+ *          diff_system.py against the published snapshot and hands Claude the
+ *          breaking changes and the contrast pairs that crossed a WCAG floor
+ *          (LC-C8).
  *   route  UserPromptSubmit. When a prompt names a task one of the plugin's
  *          skills does, says which: a crowded skill listing drops the
  *          descriptions, and then the names are all Claude sees.
  *
  * guard and gate act only in a project whose .design-suite.json turns them on,
- * "hooks": {"generatedFiles": true, "designGate": true}, read through
- * project_config.mjs beside this file (a copy of the plugin's
- * shared/project_config.mjs). The plugin's `design_hooks` option, false, turns
- * all three off. They run under node because one name runs node on every
- * system; the gate alone needs Python, and looks for it as the pre-commit hook
- * does (WDS_PYTHON, else python3, python and py -3). A hook that cannot act
- * says so to Claude, or stays silent, and never blocks anything because of
- * its own failure.
+ * "hooks": {"generatedFiles": true, "designGate": true, "tokenDiff": true},
+ * read through project_config.mjs beside this file (a copy of the plugin's
+ * shared/project_config.mjs). The token diff also needs the config's `tokens`
+ * and `baselines.system`, and stays silent until that snapshot exists. The
+ * plugin's `design_hooks` option, false, turns all of them off. They run under
+ * node because one name runs node on every system; the gate alone needs
+ * Python, and looks for it as the pre-commit hook does (WDS_PYTHON, else
+ * python3, python and py -3). A hook that cannot act says so to Claude, or
+ * stays silent, and never blocks anything because of its own failure.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -31,6 +36,7 @@ import { findConfig, loadConfig } from './project_config.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const AUDIT = path.join(HERE, '..', 'skills', 'web-design-studio', 'scripts', 'audit_design.py');
+const DIFF = path.join(HERE, '..', 'skills', 'design-system-versioning', 'scripts', 'diff_system.py');
 // The files audit_design.py reads: its CSS_EXT, JS_EXT and TEMPLATE_EXT.
 const AUDITED = ['.css', '.scss', '.sass', '.less', '.pcss', '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs',
                  '.html', '.htm', '.vue', '.svelte', '.astro'];
@@ -131,44 +137,116 @@ function findPython() {
   }) ?? null;
 }
 
-function gate(input) {
-  const file = target(input);
-  if (!file || !AUDITED.includes(path.extname(file).toLowerCase()) || !fs.existsSync(file)) return;
-  const project = governing(file);
-  if (!project) return;
-  const tell = (text) => say('PostToolUse', { additionalContext: `web-design-suite design gate: ${text}` });
-  if (project.error) return tell(`.design-suite.json could not be read, so the gate did not run: ${project.error}`);
-  if (!project.config.hooks.designGate) return;
-  const python = findPython();
-  if (!python) return tell('it needs Python 3 (WDS_PYTHON, python3, python or py -3), and found none.');
-  const [exe, ...args] = python;
-  // resolved, as the config's root is: a link, /var on macOS or a short 8.3 name would
-  // otherwise name the file from outside its project
-  const real = fs.realpathSync.native(file);
+// Runs a plugin script under `python` in the config's folder, and returns its
+// JSON, or { failed } with what Claude should hear.
+function runScript(python, script, args, root, timeout) {
+  const [exe, ...pre] = python;
   // a report past spawnSync's 1 MiB default was cut short (CodeRabbit on #82)
-  const proc = spawnSync(exe, [...args, '-B', AUDIT, real, '--json'],
-                         { cwd: project.config.root, encoding: 'utf8', timeout: 100000, windowsHide: true,
-                           maxBuffer: 256 * 1024 * 1024 });
-  if (proc.error) return tell(`audit_design.py could not run: ${proc.error.message}`);
-  let findings;
+  const proc = spawnSync(exe, [...pre, '-B', script, ...args],
+                         { cwd: root, encoding: 'utf8', timeout, windowsHide: true, maxBuffer: 256 * 1024 * 1024 });
+  const name = path.basename(script);
+  if (proc.error) return { failed: `${name} could not run: ${proc.error.message}` };
   try {
-    findings = JSON.parse(proc.stdout);
+    return { json: JSON.parse(proc.stdout) };
   } catch {
-    return tell(`audit_design.py stopped (exit ${proc.status}): ${(proc.stderr || '').trim().slice(0, 600)}`);
+    return { failed: `${name} stopped (exit ${proc.status}): ${(proc.stderr || '').trim().slice(0, 600)}` };
   }
-  if (!Array.isArray(findings) || !findings.length) return;
-  const rel = path.relative(project.config.root, real).split(path.sep).join('/');
-  let text = `audit_design.py found ${findings.length} problem${findings.length === 1 ? '' : 's'} in ${rel}. ` +
-    'Fix each before going on, or tell the user why it should stay:';
+}
+
+// `lines` added to `text` while the whole stays within `limit`, and a last line
+// that counts what did not fit.
+function capped(text, lines, limit, rest) {
   let shown = 0;
-  for (const f of findings) {
-    const line = `\n- line ${f.line}, ${f.law} ${f.rule} (${f.severity}): ${f.message} Fix: ${f.fix}`;
-    if (text.length + line.length > LIMIT) break;
+  for (const line of lines) {
+    if (text.length + line.length > limit) break;
     text += line;
     shown += 1;
   }
-  if (shown < findings.length) text += `\n- and ${findings.length - shown} more: run audit_design.py on the file.`;
-  tell(text);
+  return shown < lines.length ? `${text}\n- and ${lines.length - shown} more: ${rest}` : text;
+}
+
+const posix = (root, file) => path.relative(root, file).split(path.sep).join('/') || file;
+
+function audit(python, config, real, limit) {
+  const head = 'web-design-suite design gate: ';
+  const run = runScript(python, AUDIT, [real, '--json'], config.root, 100000);
+  if (run.failed) return head + run.failed;
+  const findings = run.json;
+  if (!Array.isArray(findings) || !findings.length) return null;
+  const text = `${head}audit_design.py found ${findings.length} problem${findings.length === 1 ? '' : 's'} in ` +
+    `${posix(config.root, real)}. Fix each before going on, or tell the user why it should stay:`;
+  return capped(text, findings.map((f) => `\n- line ${f.line}, ${f.law} ${f.rule} (${f.severity}): ${f.message} Fix: ${f.fix}`),
+                limit, 'run audit_design.py on the file.');
+}
+
+// LC-C8: the project's token files against the published snapshot. A change
+// that is only minor or a patch, with no pair crossing a floor, is silent.
+function tokenDiff(python, config, real, limit) {
+  const head = 'web-design-suite token diff: ';
+  const snapshot = config.baselines.system;
+  const run = runScript(python, DIFF, [snapshot, '--format', 'json', '--gate', 'none'], config.root, 60000);
+  if (run.failed) return head + run.failed;
+  const { bump, counts, changes = [], contrast = [] } = run.json ?? {};
+  const breaking = changes.filter((c) => c.severity === 'major');
+  const crossed = contrast.filter((r) => r.crossings?.length);
+  if (!breaking.length && !crossed.length) return null;
+  const text = `${head}after this edit to ${posix(config.root, real)}, the token files against the published ` +
+    `snapshot (${posix(config.root, snapshot)}) make a ${bump.level} release, ${bump.reason}: ` +
+    `${counts.major} major, ${counts.minor} minor and ${counts.patch} patch changes. A breaking change needs a major ` +
+    'release and a deprecation first (design-system-versioning), and a pair below its floor fails WCAG: undo what ' +
+    'was not meant, or tell the user.';
+  const lines = [
+    ...breaking.map((c) => `\n- ${c.kind}: ${c.subject}${c.component ? ` (${c.component})` : ''}` +
+      `${c.theme ? `, ${c.theme} theme` : ''}${c.replacement ? `, now ${c.replacement}` : ''}` +
+      `${c.before || c.after ? `, ${c.before || 'none'} → ${c.after || 'none'}` : ''}`),
+    ...crossed.map((r) => `\n- contrast, ${r.theme} theme: ${r.fg} on ${r.bg}, ${r.before}:1 → ${r.after}:1, ` +
+      r.crossings.map((x) => `${x.direction} ${x.threshold}:1 (${x.label})`).join(' and ') +
+      (r.caused_by?.length ? `, through ${r.caused_by.join(', ')}` : '')),
+  ];
+  return capped(text, lines, limit, 'run diff_system.py for the whole report.');
+}
+
+// Is `real` one of the config's token files? Both resolved, as the config's are.
+function isTokenFile(config, real) {
+  return config.tokens.some((t) => {
+    try {
+      return fs.realpathSync.native(t) === real;
+    } catch {
+      return false;
+    }
+  });
+}
+
+function gate(input) {
+  const file = target(input);
+  if (!file || !fs.existsSync(file) || !fs.statSync(file).isFile()) return;
+  const audited = AUDITED.includes(path.extname(file).toLowerCase());
+  const project = governing(file);
+  if (!project) return;
+  const tell = (text) => say('PostToolUse', { additionalContext: text });
+  if (project.error) {
+    if (audited) tell(`web-design-suite design gate: .design-suite.json could not be read, so the gate did not ` +
+                      `run: ${project.error}`);
+    return;
+  }
+  const { config } = project;
+  // resolved, as the config's root is: a link, /var on macOS or a short 8.3 name would
+  // otherwise name the file from outside its project
+  const real = fs.realpathSync.native(file);
+  const auditing = audited && config.hooks.designGate;
+  const diffing = config.hooks.tokenDiff && config.baselines.system && fs.existsSync(config.baselines.system) &&
+    isTokenFile(config, real);
+  if (!auditing && !diffing) return;
+  const python = findPython();
+  if (!python) {
+    return tell(`web-design-suite ${auditing ? 'design gate' : 'token diff'}: it needs Python 3 (WDS_PYTHON, ` +
+                'python3, python or py -3), and found none.');
+  }
+  // the token diff is short; the audit has what is left of the cap
+  const diffText = diffing ? tokenDiff(python, config, real, LIMIT / 3) : null;
+  const auditText = auditing ? audit(python, config, real, LIMIT - (diffText ? diffText.length + 2 : 0)) : null;
+  const parts = [auditText, diffText].filter(Boolean);
+  if (parts.length) tell(parts.join('\n\n'));
 }
 
 function route(input) {

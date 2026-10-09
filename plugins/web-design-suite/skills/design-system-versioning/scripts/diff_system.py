@@ -1029,6 +1029,20 @@ def project_snapshot(label: str, *, no_upstream: bool = False) -> Snapshot:
     return _load_css(list(config.tokens), label, no_upstream)
 
 
+def published_snapshot(label: str, *, no_upstream: bool = False) -> Snapshot:
+    """The published snapshot the project's `.design-suite.json` names,
+    `baselines.system` (P25), found as project_snapshot finds the token files."""
+    try:
+        config = project_config()
+    except ConfigError as exc:
+        raise bail(f"diff_system: {exc}")
+    published = config.baselines.get("system") if config else None
+    if published is None:
+        raise bail("diff_system: name the published snapshot, or name it in the project's "
+                   ".design-suite.json (\"baselines\": {\"system\": \"published/system.json\"}).")
+    return load_snapshot(str(published), label, no_upstream=no_upstream)
+
+
 def _load_css(paths: List[Path], label: str, no_upstream: bool) -> Snapshot:
     extractor = None if no_upstream else _sibling(
         "design-system-docs", "scripts", "extract_system.py")
@@ -2315,8 +2329,10 @@ def build_parser() -> argparse.ArgumentParser:
       --from-version 1.4.2 -o docs/UPGRADE.md
   python -m scripts.diff_system a.json b.json --deprecations deprecations.json
 """)
-    ap.add_argument("old", help="the published snapshot: system.json, tokens.css, "
-                                "contract.json or a directory containing one")
+    ap.add_argument("old", nargs="?", help="the published snapshot: system.json, tokens.css, "
+                                           "contract.json or a directory containing one (default: "
+                                           "the one the project's .design-suite.json names, "
+                                           "baselines.system)")
     ap.add_argument("new", nargs="?", help="the candidate snapshot, same forms (default: the "
                                            "token files the project's .design-suite.json lists)")
     ap.add_argument("--format", choices=("report", "json", "changelog",
@@ -2387,7 +2403,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"warning: falling back to vendored colour math ({exc})",
                   file=sys.stderr)
 
-    old = load_snapshot(args.old, "old", no_upstream=args.no_upstream)
+    old = (load_snapshot(args.old, "old", no_upstream=args.no_upstream) if args.old
+           else published_snapshot("old", no_upstream=args.no_upstream))
     new = (load_snapshot(args.new, "new", no_upstream=args.no_upstream) if args.new
            else project_snapshot("new", no_upstream=args.no_upstream))
     contract = "contract.json" in (old.source, new.source)
