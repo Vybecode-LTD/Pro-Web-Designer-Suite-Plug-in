@@ -2888,6 +2888,7 @@ def main(argv: list[str] | None = None) -> int:
                                 "pg_schema": args.pg_schema})
 
     if args.answers_template:
+        Path(args.answers_template).parent.mkdir(parents=True, exist_ok=True)   # a new folder too (P26)
         Path(args.answers_template).write_text(
             json.dumps(answers_template(model), indent=2) + "\n", encoding="utf-8")
         print(f"introspect_schema: wrote {len(model.questions)} pre-filled "
@@ -2897,6 +2898,7 @@ def main(argv: list[str] | None = None) -> int:
     # writes the model AND shows you the proposal, which is the combination you
     # actually want the first time you run this on a schema.
     if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.out).write_text(json.dumps(doc, indent=2) + "\n",
                                   encoding="utf-8")
         st = doc["stats"]

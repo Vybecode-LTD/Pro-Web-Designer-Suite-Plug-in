@@ -13,6 +13,8 @@ Regressions covered:
   and `CHECK (x between 1 and 99)` gave no min or max.
 - DL-B8: the fixture the worked example and supabase-integration.md §1 quote
   was not shipped, so neither could be checked.
+- P26: `-o` and `--answers-template` into a folder that did not exist ended
+  in a traceback; /schema-to-screens writes both to design-reports/screens/.
 """
 from __future__ import annotations
 
@@ -377,3 +379,14 @@ class TheWorkedExampleIsTheFixture(SchemaSources):
         _, out = self.introspect("shop.sql", summary=True)
         printed = {" ".join(line.split()) for line in out.splitlines()}
         self.assertEqual([], [line for line in quoted if line not in printed])
+
+
+class TheModelMakesItsFolder(SchemaSources):
+    """P26: the model and the answers template land in a new folder."""
+
+    def test_both_outputs_create_their_folder(self):
+        proc = run_py("content-model-to-ui", "introspect_schema", FIXTURES / "shop.sql", "-o", "new/model.json",
+                      "--answers-template", "other/answers.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertTrue(json.loads((self.tmp / "new" / "model.json").read_bytes())["tables"])
+        self.assertTrue((self.tmp / "other" / "answers.json").is_file())
