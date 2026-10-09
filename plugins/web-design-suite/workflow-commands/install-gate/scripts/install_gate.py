@@ -147,8 +147,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         last = json.loads(stamp_path.read_bytes())
     except (OSError, ValueError):
-        last = {}
-    last = last if isinstance(last, dict) else {}
+        last = None
+    # This command's stamp, by its shape; any other file there is the user's,
+    # a stamp whose `files` is no map included (Codex on #85).
+    ours = (isinstance(last, dict) and last.get("plugin") == "web-design-suite"
+            and isinstance(last.get("files"), dict))
+    known: Dict[str, object] = last["files"] if ours else {}
+    known_workflow = last.get("workflow") if ours else None
 
     # 2. the workflow
     baselines = {key: posix(config.baselines[key], root) if config and key in config.baselines else default
@@ -170,15 +175,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     writes: Dict[Path, bytes] = {dest / name: data for name, data in files.items()}
     writes[root / WORKFLOW] = workflow
     in_the_way: List[str] = []
-    # the stamp is this command's when it says so; another file there is the user's (Codex on #85)
-    if stamp_path.exists() and last.get("plugin") != "web-design-suite" and not args.force:
-        in_the_way.append(posix(stamp_path, root))
-    for path, data in writes.items():
-        if not path.exists() or path.read_bytes() == data:
-            continue
-        mine = (last.get("files") or {}).get(path.name) if path.parent == dest else last.get("workflow")
-        if mine != sha(path.read_bytes()) and not args.force:
-            in_the_way.append(posix(path, root))
+    if not args.force:
+        if stamp_path.exists() and not ours:
+            in_the_way.append(posix(stamp_path, root))
+        for path, data in writes.items():
+            if not path.exists() or path.read_bytes() == data:
+                continue
+            mine = known.get(path.name) if path.parent == dest else known_workflow
+            if mine != sha(path.read_bytes()):
+                in_the_way.append(posix(path, root))
     if in_the_way:
         print("install_gate: nothing was written. These files are in the way: this command did not write them, "
               "or they changed since it did (pass --force to replace them):\n  " + "\n  ".join(in_the_way),

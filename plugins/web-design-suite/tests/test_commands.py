@@ -302,6 +302,12 @@ class TheInstallGate(CommandTest):
         self.assertIn("scripts/design-gates.json", output(self.install(code=1)))
         self.assertEqual('{"ours": true}\n', (self.tmp / "scripts" / "design-gates.json").read_text())
         self.install("--force")
+        # Codex on #85: a stamp naming the plugin with no map of files, and a
+        # changed script, stopped with a traceback, even under --force
+        self.write("scripts/design-gates.json", '{"plugin": "web-design-suite", "files": [1]}\n')
+        self.write("scripts/audit_design.py", "# edited\n")
+        self.assertIn("scripts/design-gates.json", output(self.install(code=1)))
+        self.install("--force")
 
     def test_a_path_the_workflow_cannot_run_unquoted_is_refused(self):
         """Codex on #85: the workflow runs each path unquoted, so `web source`
