@@ -62,7 +62,9 @@ class TheCommandFiles(unittest.TestCase):
 
     @needs_yaml
     def test_each_command_is_user_invoked_and_runs_what_it_allows(self):
-        for skill_md in sorted(COMMANDS.glob("*/SKILL.md")):
+        commands = sorted(COMMANDS.glob("*/SKILL.md"))
+        self.assertTrue(commands)                          # no vacuous pass
+        for skill_md in commands:
             with self.subTest(command=skill_md.parent.name):
                 fields, body = front(skill_md)
                 self.assertEqual(skill_md.parent.name, fields["name"])
