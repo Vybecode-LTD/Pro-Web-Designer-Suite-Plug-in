@@ -82,8 +82,9 @@ function jsonText(buf) {
   return new TextDecoder(enc, { fatal: true, ignoreBOM: true }).decode(body);
 }
 
-// A JSON file as Python's json reads bytes (jsonText).
-function readJson(file, shown) {
+// A JSON file as Python's json reads bytes (jsonText). The hooks read a config
+// that fails its checks through it too.
+export function readJson(file, shown = file) {
   let buf;
   try {
     buf = fs.readFileSync(file);

@@ -326,6 +326,17 @@ class TheTokenDiff(HookTest):
         self.assertIn('"hooks.tokenDiff" must be true or false', text)
         self.assertIsNone(self.context("src/other.json"))               # a file it does not name
 
+    def test_a_broken_config_in_utf_16_or_32_is_said_too(self):
+        """CodeRabbit on #84: the readers take a config in UTF-16 and UTF-32
+        (Codex on #81), but the hook read a broken one as UTF-8 only, so the
+        token file it names went unsaid."""
+        self.write("src/contract.json", '{"schema": "web-design-suite/contract/1"}')
+        data = json.dumps({"schema": 1, "tokens": "src/contract.json", "hooks": {"tokenDiff": "yes"}})
+        for encoding in ("utf-16", "utf-32"):
+            with self.subTest(encoding=encoding):
+                self.write(".design-suite.json", data.encode(encoding))
+                self.assertIn('"hooks.tokenDiff" must be true or false', self.context("src/contract.json"))
+
     def test_a_diff_that_cannot_run_is_said(self):
         self.write(".design-suite.json", json.dumps({
             "schema": 1, "tokens": ["src/tokens.css", "src/missing.css"],
