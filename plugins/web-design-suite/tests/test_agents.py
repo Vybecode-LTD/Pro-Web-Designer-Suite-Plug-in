@@ -87,6 +87,19 @@ class TheAgentFiles(unittest.TestCase):
                     named.append(path)
         self.assertGreater(len(named), 20)
 
+    def test_each_agent_says_what_its_scripts_write_and_check(self):
+        """Codex on #89: the matrix writes HTML, not JSON; the critic's
+        snapshots write files, so it names their folder; and an update policy
+        without WITH CHECK has its USING check the new row (Postgres)."""
+        def text(name):
+            return " ".join((AGENTS / f"{name}.md").read_text(encoding="utf-8").split())
+        self.assertIn("design-reports/matrix/report/index.html", text("gate-runner"))
+        self.assertIn("for the matrix, read the console's summary", text("gate-runner"))
+        self.assertIn("critique_snapshots.mjs\" TARGET --out design-reports/critique/shots", text("design-critic"))
+        self.assertIn("The one folder anything is written to is `design-reports/critique/`", text("design-critic"))
+        self.assertIn("without one, its `USING`, which Postgres then applies to the new row too",
+                      text("supabase-security-reviewer"))
+
     def test_the_critique_command_hands_the_work_to_the_critic(self):
         body = (COMMANDS / "critique" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("`web-design-suite:design-critic`", body)

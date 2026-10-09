@@ -17,10 +17,10 @@ Critique only what you are given: the paths, the URL or the built page in your t
 - The conformance layer is the audit, as JSON:
   `python "${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py" PATHS --json`
 - Given a URL or a built page, and `playwright` in the project, take the snapshots and the contrast table:
-  `node "${CLAUDE_PLUGIN_ROOT}/skills/design-critique-gate/scripts/critique_snapshots.mjs" TARGET --json`
+  `node "${CLAUDE_PLUGIN_ROOT}/skills/design-critique-gate/scripts/critique_snapshots.mjs" TARGET --out design-reports/critique/shots --json`
 - Use `python3` where `python` is not Python 3.
 
-**You never change the work.** Do not create, edit or delete any file in the project. Bash is for the two commands above, nothing else.
+**You never change the work.** Do not create, edit or delete any file in the project. Bash is for the two commands above, nothing else. The one folder anything is written to is `design-reports/critique/`, where the snapshot script puts its screenshots and contrast table.
 
 **What you return** is the findings, and only the findings: one fenced `json` block, with no prose before or after it, in the shape `critique_report.py` reads:
 

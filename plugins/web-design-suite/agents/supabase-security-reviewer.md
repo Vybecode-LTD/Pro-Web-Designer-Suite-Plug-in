@@ -15,7 +15,7 @@ You report; you never change the work. Do not create, edit or delete any file, a
 
 Check, and cite the file and line for each:
 - every table the screens read or write has row-level security on, with a policy for each command the screens use;
-- every insert and update policy has `WITH CHECK`, not only `USING`;
+- every insert policy has `WITH CHECK`, and every update policy checks the new row: its `WITH CHECK`, or, without one, its `USING`, which Postgres then applies to the new row too ("if no `WITH CHECK` expression is defined, then the `USING` expression will be used both to determine which rows are visible … and which new rows will be allowed to be added", postgresql.org/docs/current/sql-createpolicy.html). Report an update whose effective check does not pin the row to the caller, not one that merely omits `WITH CHECK`;
 - the columns RLS cannot protect (a role, an `is_admin`, an owner id, a price) are not editable in a form, and the server path that writes them checks the caller;
 - the browser holds the publishable key and nothing else: no service-role key, no secret, in client code or in a public env variable;
 - the proposed policies in the scaffold (`db/policies/`) and the server drafts (`server/`) match what the schema needs. They were guessed from the keys, so say where the guess is wrong;
