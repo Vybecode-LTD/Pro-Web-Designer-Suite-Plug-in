@@ -1,11 +1,12 @@
 # Start here: the next session
 
-**Written 2026-10-09**, at the end of the session that:
-- merged P25 part 2 (#84): the token diff, a hook that runs `diff_system` against the published snapshot (`baselines.system`) after an edit to a token file (LC-C8, closing P25);
-- merged P26 part 1 (#85): the first workflow commands, `/gate` and `/install-gate`, in `workflow-commands/`, with the CI template (GT-C12, LC-B4, XC-C8);
-- re-read the skills page and the manifest reference (`claude-code-capabilities.md` §7).
+**Written 2026-10-10**, at the end of the session that:
+- merged P26 part 2 (#87): `/new-system`, `/contrast`, `/migrate`, `/release-check`, `/figma-sync` and `/docs-check`;
+- merged P26 part 3 (#88): `/schema-to-screens`, `/email-build`, `/deck`, `/gate-a11y`, `/gate-perf` and `/gate-matrix` (PS-C11 closed);
+- merged P27 part 1 (#89): six subagents in `agents/` and `/critique` (XC-C3, XC-C4, PS-C4, SS-C6 and LC-C9 closed);
+- re-read the sub-agents page (`claude-code-capabilities.md` §8).
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P26 part 2** (the other workflow commands, §4) and **P27** (the subagents, §5). Phase 5 ends with R3; its other PRs are in the execution plan's §4.
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P27 part 2** (the two hooks P25 left, §4) and **P28** (an MCP server for the gates, `bin/`, an LSP spike, §5). Phase 5 ends with R3; its other PRs are in the execution plan's §4.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -76,6 +77,12 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Codex:** the companion packages; the stamp's ownership, twice (a foreign file, then a malformed one); unquoted paths; dot files left out of `upload-artifact`; the build as a YAML string; a leading hyphen.
       - **CodeRabbit:** the config's baseline paths; `persist-credentials: false`; a named missing `--dist`; the undocumented skip; the leading hyphen too.
       - **Lesson:** a template that substitutes into a workflow needs every value checked for the shell and for YAML, and Codex keeps finding the next case. Ask once more after a round of fixes, then merge when the fixes are small and tested.
+    - **2026-10-10's reviews found 16 real issues** on #87 (9), #88 (3) and #89 (4), each fixed with a test failing on the head it reviewed, and CI found one more:
+      - **A command's body is run through Bash.** An unquoted `#2563eb` is a comment and `oklch(…)` three words, so a colour placeholder is always quoted (`"BRAND"`, `"FG" "BG"`). `ChainTest` renders each command and splits it with `shlex.split(comments=True)`, as a shell would.
+      - **Every file a step promises must be written by a script**, not by Claude: `figma_audit.py` gained `--out`. A runner writes a report only when the step exited 0 or 1, removes the reports it writes before it starts, and refuses an `--out` that would overwrite its own input (`release_check.py`, `deck.py`).
+      - **Generated files must not keep the template's notes**: `new_system.py` rewrites the starter's notes about Ember, hue 75 and its ratio.
+      - **Python 3.9's argparse** refuses positionals after an option (`DECISION_LOG.md --findings F src`); use `parse_intermixed_args`. Run a new runner's tests under `uv run --no-project --python 3.9` before pushing.
+      - **An agent's text must match what its scripts do**: the matrix writes HTML, not JSON; the critic's snapshots write files, so it names their folder; a Postgres `UPDATE` or `ALL` policy with no `WITH CHECK` checks the new row with its `USING`, inserted rows included for `ALL`.
     - **Codex reviews only the head each PR opened with**, not later pushes. Comment `@codex review` if a fix needs its eyes.
 - **Shell.**
   - The Bash tool is Git Bash. Any command you give the user must work in cmd.exe.
@@ -111,20 +118,20 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`.
 2. Read the execution plan's §2 and §6, and its Phase 5 table in §4.
-3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3 and §7. §7 is the 2026-10-09 re-read of the skills page and the manifest reference, with P26's choice of `workflow-commands/`.
-   - Re-read the sub-agents page before P27, and update §2's agents bullet with what changed.
+3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
+   - Before P28, re-read the MCP page (https://code.claude.com/docs/en/mcp, plugin-provided servers) and the manifest reference's `bin/` and `lspServers`, and add a §9.
    - Re-read the plugin-evals page before P29, and update §1. Read §1 (evals) only when you reach P29.
 4. Check the state, with the Bash tool:
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `47 open items, 47 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `41 open items, 41 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
 
-- **The plugin** is `plugins/web-design-suite/`:
+- **The plugin** is `plugins/web-design-suite/` (about 904 tests):
   - `skills/`: 13 skills.
   - `tests/`: 863 tests, standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -150,7 +157,10 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - Each has `disable-model-invocation: true` and an `allowed-tools` list of `Bash(python "${CLAUDE_SKILL_DIR}/scripts/X" *)` and its `python3` form. Every command its body runs must be one it allows (`test_commands.TheCommandFiles`, which parses the frontmatter with js-yaml from `tooling/main`).
   - `/gate` (`run_gates.py`): `audit_design --strict`, `a11y_static --strict`, `perf_audit` on `--dist` or `dist/`/`build/`, one verdict.
   - `/install-gate` (`install_gate.py`): vendors ten files from three skills into the project's `scripts/`, with `scripts/design-gates.json` (SHA-256s, the version), and writes `.github/workflows/design-gates.yml` from `templates/design-gates.yml`. The jobs are `gates` (Linux, `mcr.microsoft.com/playwright:v<project's pin>-noble`, `apt-get install python3`), `windows` (the static gates) and `baselines` (`workflow_dispatch`, `update-baselines`). `TESTED_PLAYWRIGHT` must equal `tooling/main`'s playwright (a test holds it).
+  - **Fifteen commands now** (#85, #87, #88, #89): gate, install-gate; new-system, contrast, migrate, release-check, figma-sync, docs-check; schema-to-screens, email-build, deck, gate-a11y, gate-perf, gate-matrix; critique. `gate`, `install-gate`, `new-system`, `release-check` and `deck` have runners in their own `scripts/`; the other ten are chains whose body runs the skills' scripts by `${CLAUDE_PLUGIN_ROOT}/skills/<skill>/scripts/<script>`, browser steps through `node`. A command that writes reports puts them in its own folder under `design-reports/` (`release`, `migration`, `docs`, `figma`, `screens`, `email`, `deck`, `critique`, `a11y`, `perf`, `matrix`), never `build/` or `dist/`, which `/gate` reads as the build; `/gate`, `/contrast` and `/install-gate` write none.
+  - `TheCommandFiles` checks every command in a body's bash blocks starts with a rule's prefix, every rule is run, and each `python` rule has its `python3` twin. `ChainTest` runs a body's commands in order on a fixture with each placeholder (`PLACEHOLDERS`) given the test's values; `TheBrowserSteps` runs the browser steps with the tooling's Playwright.
   - **The commands have not run in a live session either**: before R3, invoke each from `claude --plugin-dir plugins/web-design-suite`.
+- **The subagents (#89)** are `agents/*.md`: `design-critic` (design-critique-gate preloaded, `omitClaudeMd: true`, returns one JSON block), `gate-runner`, `a11y-auditor`, `design-auditor`, `supabase-security-reviewer`, `codemod-batch-reviewer`. None has Edit or Write, but each has Bash for the skills' scripts, so "read-only" is an instruction, not a sandbox. `test_agents` holds their frontmatter to the fields a plugin agent honours, their preloaded skills, and every script they name. `/critique` delegates to the critic in its body (the skills page documents `context: fork`'s `agent` only for built-in and `.claude/agents/` agents). They have not run live either.
 - **The scripts, by skill:**
 
   | Skill | Scripts |
@@ -192,64 +202,37 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. P26 part 2: the other workflow commands
+## 4. P27 part 2: the two hooks P25 left
 
-**Items:**
-- XC-C3's rest (`crosscut.md`): `/new-system` (brand colour to ramp, type scale and starter styles). Its `/critique` needs the design-critic subagent, so it lands in P27.
-- SS-C6's commands (`studio-systems.md`): `/wds:tokens` (the generators and the role check) and `/wds:contrast`. `/wds:audit` is `/gate`, done.
-- LC-C9 (`lifecycle.md`): migrate-census, release-check (extract, diff, gate, changelog, guide), figma-handoff, docs-check. Its `codemod-batch-reviewer` agent is P27's.
-- PS-C11 (`persuasion.md`): the audit-to-deck chain (audit, critique, defence, deck), stopping on blockers.
-- DL-C7's two commands (`delivery.md`): schema-to-screens (introspect, questions, scaffold, audit, security checklist) and email-build (build, lint, render).
-- GT-C9 (c) (`gates.md` C9): `gate-a11y`, `gate-perf` and `gate-matrix`, the runtime gates by hand.
+**Items:** GT-C9 (b) (`gates.md` C9) and DL-C7's hook (`delivery.md`). Both close here (DL-C7's evals are P30's). Read each by `grep -n`.
 
-Read each by `grep -n`.
+**What:**
+- **GT-C9 (b):** in `hooks/design_hooks.mjs`'s `gate` mode (PostToolUse on Edit and Write), run `a11y-audit-runner/scripts/a11y_static.py` on the edited file when it is css, html, jsx or tsx, behind a new `hooks.a11yGate`. Its findings go into the same `additionalContext` as the audit's, under the 9,000-character `LIMIT` they share. Model it on `audit()` and `tokenDiff()`.
+- **DL-C7:** after an edit to an email template, build it and lint the result (`email-template-system/scripts/build_email.py`, then `lint_email.py`), errors as `additionalContext`, behind its own key. **Decide first how a template is recognised.** A proposal: `hooks.emailBuild` plus a new top-level `emails` glob list in `.design-suite.json` (default `emails/**/*.html`), matched with `ProjectConfig.is_component`'s glob code. Say which in the PR.
+- **Both readers.** `HOOKS` in `shared/project_config.py` and its counterpart in `shared/project_config.mjs` gain the keys (and `emails`, if chosen), with the same messages. **Copy both masters over every copy** (ten `.py`, seven `.mjs`; `TheCopiesAreTheMaster` finds them), and run `TheNodeReaderAgrees`.
+- `hooks.json` needs no change if the work happens inside the `gate` mode; mind its 180-second timeout with three scripts in one process.
+- `references/project-contract.md` §4 (the keys) and the README's hooks paragraph.
 
-**How, from part 1:**
-- One folder per command in `workflow-commands/`, `disable-model-invocation: true`.
-- A chain is a SKILL.md that runs the skills' own scripts by `${CLAUDE_PLUGIN_ROOT}/skills/<skill>/scripts/<script>`. Its `allowed-tools` pre-approves each command it runs: the skills page says `${CLAUDE_PLUGIN_ROOT}` is substituted in Bash rules there, as `${CLAUDE_SKILL_DIR}` is. Write a runner script only where a chain needs logic between steps, as `/gate` did for its verdict.
-- **Extend `TheCommandFiles`:**
-  - its rule regex accepts the `${CLAUDE_PLUGIN_ROOT}/skills/...` form, with the script checked against `PLUGIN`;
-  - the manifest test's command list grows.
+**Tests** (`tests/test_hooks.py`, feeding each hook the JSON Claude Code sends, as `TheDesignGate` does): a11y findings on an edited html file with the key on, silence with it off, the shared limit; an email template built and linted, an error reported, a non-template ignored; both readers refuse a non-boolean key.
 
-**Name the commands first.** LC-C9 says `/wds-release-check`, SS-C6 says `/wds:tokens`, and XC-C3 says `/new-system`; under the plugin they are all `/web-design-suite:<name>`. Pick short verbs (`new-system`, `contrast`, `migrate`, `release-check`, `figma-sync`, `docs-check`, `schema-to-screens`, `email-build`, `deck`, `gate-a11y`, `gate-perf`, `gate-matrix`) and say so in the PR.
+**Close:** GT-C9 and DL-C7 in the inventory (DL-C7's evals stay P30's, so write "the hook in #N; the evals in P30" and keep it scheduled in P30's row); the plan's `P27` row renamed `P27 part 2, #N`; §9; the CHANGELOG.
 
-**Split it.** About twelve commands:
-- part 2: the systems and the lifecycle (new-system, contrast, migrate, release-check, figma-sync, docs-check);
-- part 3: delivery, persuasion and the runtime gates (schema-to-screens, email-build, deck, gate-a11y, gate-perf, gate-matrix).
+**Size:** S-M.
 
-**Tests:**
-- each command's frontmatter (`TheCommandFiles` covers a new one automatically);
-- each chain's commands run in order on a fixture project with a `.design-suite.json`, as `TheGateCommand` does;
-- a chain that must stop on a blocker, stopping.
+## 5. P28: an MCP server for the gates, `bin/`, and an LSP spike
 
-**Close:**
-- the inventory rows: XC-C3, SS-C6 and LC-C9 stay open after part 3, since their agents are P27's and P27's row lists them (write "the commands in #N, the agent in P27");
-- the plan's `P26` row renamed per part, §9, the CHANGELOG and README's "The commands".
+**Item:** XC-B1 (`crosscut.md`). Read it first, then re-read the MCP page and the manifest reference's `bin/` and `lspServers` (§1 step 3).
 
-**Size:** M per part.
+**Ask the owner before building `bin/`:** the manifest reference says claude.ai and Cowork "don't install a plugin that has this directory" (`claude-code-capabilities.md` §2, §5). Shipping `bin/` trades those installs for bare commands on the Bash tool's PATH. Put the choice to the user with that cost, and do not ship `bin/` without a yes.
 
-## 5. P27: the subagents, and the two hooks P25 left
+**What, as the plan has it:**
+- **An MCP server** exposing the gates as tools (the audit, a11y_static, perf_audit, check_roles, diff_system), declared in `.mcp.json` with `${CLAUDE_PLUGIN_ROOT}`, standard library only (Python stdio JSON-RPC), each tool returning the script's JSON. Its tools are named `mcp__plugin_web-design-suite_<server>__<tool>`.
+- **`bin/`**, only with the owner's yes: thin launchers for the runners.
+- **An LSP spike** for live diagnostics from the audit (`.lsp.json`), shipped only if it works on Windows. The binary must be on PATH; the spike decides whether that is reasonable.
 
-**Re-read the sub-agents page first** (https://code.claude.com/docs/en/sub-agents), and update `claude-code-capabilities.md` §2's agents bullet. Its facts are from 2026-09-23. Plugin agents ignore `hooks`, `mcpServers` and `permissionMode`, and do not support `initialPrompt`.
+**Tests:** the server speaks JSON-RPC over stdio (initialize, tools/list, tools/call on a fixture); `claude plugin validate --strict` passes with `.mcp.json`.
 
-**Items:**
-- PS-C4 (`persuasion.md`): `agents/design-critic.md`, with `tools: Read, Grep, Glob, Bash`, `skills: [design-critique-gate]` and `omitClaudeMd: true`. It critiques in a fresh context and returns a `findings.json` the main thread does not edit. `/critique` (XC-C3) invokes it.
-- GT-C9 (a) (`gates.md` C9): `agents/gate-runner.md` (Bash, Read). It runs the runtime scripts and returns only the findings and the JSON path, so 5 to 10 thousand tokens of output stay out of the main context.
-- XC-C4 (`crosscut.md`): the a11y-auditor; SS-C6's read-only design-auditor.
-- DL-C7: `supabase-security-reviewer`, read-only, after scaffolding.
-- LC-C9: `codemod-batch-reviewer`, read-only, checking each batch against `reconciliation.md` and the known traps.
-- **The two hooks P25 did not ship** (the plan said "in P25", and P25 closed without them; the docs PR of 2026-10-09 moved them here):
-  - GT-C9 (b): an opt-in PostToolUse hook that runs `a11y_static.py` on the edited css/html/jsx/tsx file. It fits the `gate` mode beside the audit, behind a new `hooks.a11yGate`.
-  - DL-C7's email-template hook: build and lint on an email-template edit, as `additionalContext`.
-
-**Tests:**
-- each agent's frontmatter parses, through js-yaml, with only the fields plugin agents honour;
-- each `skills:` entry exists;
-- the two hooks, as `test_hooks` does the others.
-
-**Close:** GT-C9, DL-C7 (but for its evals, P30's), PS-C4 and XC-C4, and XC-C3, SS-C6 and LC-C9 with their agents. An agent's behaviour is P29 and P30's evals.
-
-**Size:** M.
+**Size:** M. Split the LSP spike into its own PR if it grows.
 
 ## 6. End of session (never skip)
 

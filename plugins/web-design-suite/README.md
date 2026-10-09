@@ -151,8 +151,10 @@ The plugin's `design_hooks` option, set to false in `/config`, turns them all of
 - **`/web-design-suite:critique`** has the design critic, a subagent that did not build
   the work, critique it, and reports its findings.
 
-**The subagents** work in their own context and return only their findings; none edits
-a file. Claude hands work to them when it fits, or you can ask by name:
+**The subagents** work in their own context and return only their findings. None has the
+Edit or Write tool, and each is told to leave the work unchanged, but each runs the
+skills' scripts through Bash, so they are not a sandbox. Claude hands work to them when
+it fits, or you can ask by name:
 `design-critic`, `gate-runner`, `a11y-auditor`, `design-auditor`,
 `supabase-security-reviewer` and `codemod-batch-reviewer` (each as
 `web-design-suite:<name>`).
