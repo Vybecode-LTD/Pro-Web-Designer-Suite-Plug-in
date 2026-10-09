@@ -52,8 +52,9 @@ def call(command: List[str]) -> int:
 def capture(command: List[str], to: Path) -> int:
     """A script's --json, kept in a file for the next step."""
     proc = subprocess.run([sys.executable, "-B", *command], capture_output=True)
-    to.write_bytes(proc.stdout)
     sys.stderr.write(proc.stderr.decode("utf-8", "replace"))
+    if proc.returncode in (0, 1):        # a run that failed leaves no partial report (CodeRabbit on #88)
+        to.write_bytes(proc.stdout)
     return proc.returncode
 
 
