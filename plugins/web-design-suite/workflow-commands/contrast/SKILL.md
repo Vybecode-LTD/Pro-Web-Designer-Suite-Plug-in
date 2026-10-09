@@ -14,10 +14,10 @@ allowed-tools:
 
 Measure contrast in the user's project, from its root. Use `python3` where `python` is not Python 3 (macOS).
 
-**Two colours** (`$ARGUMENTS` is a foreground and a background, hex or OKLCH): measure that pair.
+**Two colours** (`$ARGUMENTS` is a foreground FG and a background BG, hex or OKLCH): measure that pair. Keep each in double quotes: in Bash a `#` starts a comment, and `oklch(…)` holds spaces and parentheses.
 
 ```bash
-python "${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/generate_color_ramp.py" --check FG BG
+python "${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/generate_color_ramp.py" --check "FG" "BG"
 ```
 
 **Otherwise**, check every role pair the components put together, in light, dark and `.inverse`. TOKENS is the file the user named, else the first `.css` file in `.design-suite.json`'s `tokens`, else `src/styles/tokens.css`:

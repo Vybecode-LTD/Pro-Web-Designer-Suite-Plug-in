@@ -20,9 +20,9 @@ Run figma-variables-sync's handoff on the export the user names, from the projec
    ```bash
    python "${CLAUDE_PLUGIN_ROOT}/skills/figma-variables-sync/scripts/figma_audit.py" EXPORT --fail-on error
    ```
-   **Exit 1 stops the sync.** Write the designer's questions instead, and save the output as `design-reports/figma/handoff-questions.md`:
+   **Exit 1 stops the sync.** Write the designer's questions instead, to `design-reports/figma/handoff-questions.md`:
    ```bash
-   python "${CLAUDE_PLUGIN_ROOT}/skills/figma-variables-sync/scripts/figma_audit.py" EXPORT --format markdown
+   python "${CLAUDE_PLUGIN_ROOT}/skills/figma-variables-sync/scripts/figma_audit.py" EXPORT --format markdown --out design-reports/figma/handoff-questions.md
    ```
 2. **Generate**, once the audit has no error:
    ```bash

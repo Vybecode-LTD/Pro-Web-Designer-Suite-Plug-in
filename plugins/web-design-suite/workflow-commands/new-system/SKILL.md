@@ -13,10 +13,10 @@ allowed-tools:
 Turn the user's brand colour into web-design-studio's token system, in their project, from its root:
 
 ```bash
-python "${CLAUDE_SKILL_DIR}/scripts/new_system.py" $ARGUMENTS
+python "${CLAUDE_SKILL_DIR}/scripts/new_system.py" "BRAND" OPTIONS
 ```
 
-Use `python3` where `python` is not Python 3 (macOS). Without a brand colour, ask for one (hex or OKLCH) before running it. The runner:
+BRAND is the brand colour in `$ARGUMENTS`, and OPTIONS the rest of it. **Keep BRAND in double quotes**: in Bash a `#` starts a comment, so an unquoted `#2563eb` would vanish, and `oklch(64.5% 0.188 42)` holds spaces and parentheses. Without a brand colour, ask for one (hex or OKLCH) before running it. Use `python3` where `python` is not Python 3 (macOS). The runner:
 
 1. generates the accent ramp from the brand colour, which stays exact at its nearest step (`generate_color_ramp.py --anchor-seed`), and the neutral ramp on the brand's hue, or `--neutral-hue`;
 2. keeps the starter's type scale, or generates one from `--ratio`, `--dual-ratio`, `--base`, `--fluid` and `--snap-px`. The starter's roles read 3 steps below the base and 7 above, so a scale must keep them: `--ratio 1.125 --dual-ratio 1.25 --fluid 380 1440` widens the headings and keeps the small steps legible;

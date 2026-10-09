@@ -1108,6 +1108,7 @@ def build_parser() -> argparse.ArgumentParser:
                         "a literal colour) and scales replace the studio's of the same name. "
                         "Without it, the token files a .design-suite.json lists")
     p.add_argument("--no-color", action="store_true")
+    p.add_argument("-o", "--out", metavar="FILE", help="write the report to FILE instead of stdout")
     return p
 
 
@@ -1162,12 +1163,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         if args.format == "json":
-            print(render_json(doc, findings, auditor.checked))
+            text = render_json(doc, findings, auditor.checked)
         elif args.format == "markdown":
-            print(render_markdown(doc, findings, auditor.checked, args.deadline))
+            text = render_markdown(doc, findings, auditor.checked, args.deadline)
         else:
-            use_color = sys.stdout.isatty() and not args.no_color
-            print(render_report(doc, findings, auditor.checked, use_color))
+            use_color = sys.stdout.isatty() and not args.no_color and not args.out
+            text = render_report(doc, findings, auditor.checked, use_color)
+        if args.out:                     # /figma-sync's handoff questions (P26)
+            out = Path(args.out)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes((text + "\n").encode("utf-8"))
+            print(f"figma_audit: wrote {out}", file=sys.stderr)
+        else:
+            print(text)
     except BrokenPipeError:          # piped into `head`; not an audit failure
         try:
             sys.stdout.close()

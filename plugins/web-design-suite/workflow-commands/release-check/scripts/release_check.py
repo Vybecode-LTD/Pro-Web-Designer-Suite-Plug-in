@@ -88,9 +88,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               *(["--project", args.project] if args.project else [])]
     gate = ["--deprecations", ledger] if ledger else []
 
-    for stale in ("CHANGELOG.part.md", "UPGRADE.md"):   # a stopped run leaves no old report behind
-        if (out / stale).is_file():
-            (out / stale).unlink()
+    written = [out / name for name in ("system.json", "diff.json", "CHANGELOG.part.md", "UPGRADE.md")]
+    if Path(published).resolve() in [w.resolve() for w in written]:
+        print(f"error: --out {out} would overwrite the published snapshot, {published}. Choose another --out.",
+              file=sys.stderr)                         # CodeRabbit on #87
+        return 2
+    for stale in written[1:]:                          # a stopped run leaves no old report behind
+        if stale.is_file():
+            stale.unlink()
 
     step("extract")
     if call([str(EXTRACT), *paths, "--out", str(candidate)]) != 0:
@@ -103,7 +108,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("stopped: diff_system could not compare the snapshots")
         return 2
     report = out / "diff.json"
-    call([str(DIFF), published, str(candidate), *common, *gate, "--format", "json", "-o", str(report)])
+    if (call([str(DIFF), published, str(candidate), *common, *gate, "--format", "json", "-o", str(report)])
+            not in (0, 1) or not report.is_file()):
+        print("stopped: diff_system could not write its report")
+        return 2
     diff = json.loads(report.read_bytes())
 
     step("gate")

@@ -44,6 +44,7 @@ PAGE = ('<!doctype html>\n<html lang="en">\n<head><title>Home</title></head>\n'
         '<body><main><h1>Home</h1></main></body>\n</html>\n')
 needs_yaml = unittest.skipUnless(NODE and YAML_MODULES, "node and js-yaml (tooling/main) are not installed")
 NAMES = ["contrast", "docs-check", "figma-sync", "gate", "install-gate", "migrate", "new-system", "release-check"]
+PLACEHOLDERS = ("$ARGUMENTS", "PATHS", "TOKENS", "EXPORT", "FG", "BG", "BRAND", "OPTIONS")
 # Bash(python "${CLAUDE_SKILL_DIR}/scripts/x.py" *), or a skill's script by the
 # plugin's root, with any fixed arguments before the wildcard.
 RULE = re.compile(r'Bash\((python3?) ("\$\{(CLAUDE_SKILL_DIR|CLAUDE_PLUGIN_ROOT)\}/([\w./-]+)"(?: [^\s*()]+)*) \*\)')
@@ -59,9 +60,13 @@ def load_yaml(text: str):
     return json.loads(proc.stdout)
 
 
+def split_front(skill_md) -> tuple[str, str]:
+    """The frontmatter's text and the body, with no YAML parser needed."""
+    return tuple(skill_md.read_text(encoding="utf-8")[4:].split("\n---\n", 1))
+
+
 def front(skill_md) -> tuple[dict, str]:
-    text = skill_md.read_text(encoding="utf-8")
-    head, body = text[4:].split("\n---\n", 1)
+    head, body = split_front(skill_md)
     return load_yaml(head), body
 
 
@@ -399,21 +404,22 @@ class BaselinesInAMissingFolder(CommandTest):
 class ChainTest(CommandTest):
     """Runs a command's body as Claude does: each command in its bash blocks,
     in order, with the plugin's paths substituted and each placeholder
-    (`$ARGUMENTS`, PATHS, TOKENS, EXPORT, FG, BG) given the test's values."""
+    (PLACEHOLDERS) replaced by the test's values as typed, then split as a
+    POSIX shell splits it: an unquoted `#` starts a comment (Codex on #87).
+    The body is read without a YAML parser, so these run without js-yaml."""
     command = ""
 
     def steps(self) -> list:
-        return body_commands(front(COMMANDS / self.command / "SKILL.md")[1])
+        return body_commands(split_front(COMMANDS / self.command / "SKILL.md")[1])
 
     def run_step(self, line: str, values: dict):
-        argv = []
-        for word in shlex.split(line):
-            if word in values:
-                argv += [str(v) for v in values[word]]
-                continue
-            self.assertFalse(word in ("$ARGUMENTS", "PATHS", "TOKENS", "EXPORT", "FG", "BG"), f"no value for {word}")
-            argv.append(word.replace("${CLAUDE_PLUGIN_ROOT}", PLUGIN.as_posix())
-                        .replace("${CLAUDE_SKILL_DIR}", (COMMANDS / self.command).as_posix()))
+        text = (line.replace("${CLAUDE_PLUGIN_ROOT}", PLUGIN.as_posix())
+                .replace("${CLAUDE_SKILL_DIR}", (COMMANDS / self.command).as_posix()))
+        for key, value in values.items():
+            text = re.sub(rf"(?<![A-Za-z$]){re.escape(key)}(?![A-Za-z])", lambda m: " ".join(map(str, value)), text)
+        left = re.search(r"(?<![A-Za-z$])(%s)(?![A-Za-z])" % "|".join(map(re.escape, PLACEHOLDERS)), text)
+        self.assertIsNone(left, f"no value for {left and left.group(1)} in {line}")
+        argv = shlex.split(text, comments=True)
         self.assertEqual("python", argv[0])
         return self.run_py(*argv[1:])
 
@@ -438,9 +444,18 @@ class TheNewSystem(ChainTest):
     """XC-C3 and SS-C6: /new-system, a brand colour to the starter's system."""
     command = "new-system"
 
-    def new(self, *args):
+    def new(self, brand, *options):
         (step,) = self.steps()
-        return self.run_step(step, {"$ARGUMENTS": args})
+        return self.run_step(step, {"BRAND": [brand], "OPTIONS": options})
+
+    def test_the_brand_survives_the_shell(self):
+        """Codex on #87: `$ARGUMENTS` unquoted, `#2563eb` was a comment and
+        `oklch(…)` three words, so the runner had no brand."""
+        for brand in ("#2563eb", "oklch(54.6% 0.215 262.9)"):
+            with self.subTest(brand=brand):
+                proc = self.new(brand, "--out", f"styles-{len(brand)}")
+                self.assertEqual(0, proc.returncode, output(proc))
+                self.assertIn(f"the ramps from {brand}", output(proc))
 
     def test_a_brand_colour_becomes_a_system_the_gates_pass(self):
         proc = self.new("#2563eb")
@@ -524,6 +539,30 @@ class TheReleaseCheck(ChainTest):
         self.assertIn("FAILED: --fg-subtle vanished", output(proc))
         self.assertFalse((self.out / "CHANGELOG.part.md").exists())      # none, not a stale one
 
+    def test_an_out_that_holds_the_published_snapshot_is_refused(self):
+        """CodeRabbit on #87: extraction overwrote the snapshot it then
+        compared with, so the diff found nothing and the snapshot was lost."""
+        self.write(".design-suite.json", json.dumps({"schema": 1, "baselines": {"system": "rel/system.json"}}))
+        self.snapshot("rel/system.json")
+        before = (self.tmp / "rel" / "system.json").read_bytes()
+        proc = self.check("--out", "rel")
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("would overwrite the published snapshot", output(proc))
+        self.assertEqual(before, (self.tmp / "rel" / "system.json").read_bytes())
+
+    def test_a_report_it_could_not_write_stops_it(self):
+        """CodeRabbit on #87: the runner read diff.json whether or not the
+        diff wrote it: a traceback, or an earlier run's gate."""
+        (self.out / "diff.json").mkdir(parents=True)
+        proc = self.check()
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("could not write its report", output(proc))
+
+    def test_the_readme_says_the_guide_is_for_a_breaking_change(self):
+        """CodeRabbit on #87."""
+        readme = (PLUGIN / "README.md").read_text(encoding="utf-8")
+        self.assertIn("the changelog entry and, for a breaking change, the migration guide", " ".join(readme.split()))
+
     def test_with_no_published_snapshot_it_cannot_run(self):
         (self.tmp / ".design-suite.json").unlink()
         proc = self.check()
@@ -573,7 +612,9 @@ class TheChains(ChainTest):
         self.write("bad.json", json.dumps(clean + [{"name": "space/odd", "type": "FLOAT", "value": 13}]))
         proc = self.run_step(audit, {"EXPORT": ["bad.json"]})
         self.assertEqual(1, proc.returncode, output(proc))               # the sync stops here
-        self.assertIn("space/odd", output(self.run_step(questions, {"EXPORT": ["bad.json"]})))
+        self.assertEqual(1, self.run_step(questions, {"EXPORT": ["bad.json"]}).returncode)
+        handoff = self.tmp / "design-reports" / "figma" / "handoff-questions.md"     # Codex, CodeRabbit on #87
+        self.assertIn("space/odd", handoff.read_text(encoding="utf-8"))
         self.write("export.json", json.dumps(clean))
         for step, values in ((audit, {}), (generate, {}), (compare, {"TOKENS": ["src/styles/tokens.css"]})):
             proc = self.run_step(step, {"EXPORT": ["export.json"], **values})

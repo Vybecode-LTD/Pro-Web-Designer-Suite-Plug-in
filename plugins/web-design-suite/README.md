@@ -136,7 +136,8 @@ The plugin's `design_hooks` option, set to false in `/config`, turns them all of
 - **`/web-design-suite:migrate`** takes a token migration's census and proposes the
   mapping. It changes nothing.
 - **`/web-design-suite:release-check`** extracts, diffs and gates the system against the
-  published snapshot, then writes the changelog entry and the migration guide.
+  published snapshot, then writes the changelog entry and, for a breaking change, the
+  migration guide.
 - **`/web-design-suite:figma-sync EXPORT`** audits a Figma export, then generates the
   tokens and shows what they would change.
 - **`/web-design-suite:docs-check`** checks that the docs still describe the code.
