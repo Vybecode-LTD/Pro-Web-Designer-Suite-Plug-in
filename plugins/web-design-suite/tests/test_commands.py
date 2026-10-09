@@ -723,6 +723,16 @@ class TheDeck(ChainTest):
         self.assertEqual(0, proc.returncode, output(proc))
         self.assertIn("tier1-leak", (self.out / "defence.md").read_text(encoding="utf-8"))
 
+    def test_an_audit_that_could_not_run_leaves_no_report(self):
+        """CodeRabbit on #88: audit.json was written before the exit code
+        was read, so a failed audit left a partial report behind."""
+        self.write("findings.json", json.dumps({"subject": "Pricing", "findings": [self.MAJOR]}))
+        (step,) = self.steps()
+        proc = self.run_step(step, {"$ARGUMENTS": ["DECISION_LOG.md", "--findings", "findings.json", "nowhere"]})
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("the design audit could not run", output(proc))
+        self.assertFalse((self.out / "audit.json").exists())
+
     def test_no_build_leaves_no_old_performance_report(self):
         """Codex on #88: a perf.json from an earlier run with a build stayed
         beside a deck that had no performance evidence."""
