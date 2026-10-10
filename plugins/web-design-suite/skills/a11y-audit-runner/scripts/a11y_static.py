@@ -1553,7 +1553,9 @@ def audit_embedded_css(path: Path, text: str) -> list[Finding]:
 AUDITABLE_EXT = MARKUP_EXT | JSX_EXT | CSS_EXT
 
 
-def iter_files(paths: list[str]) -> Iterator[Path]:
+def iter_files(paths: list[str], leave=None, left: list[Path] | None = None) -> Iterator[Path]:
+    """The files to read: each one named, and those a folder holds. A file
+    `leave` claims is left out of a folder's, and listed in `left`."""
     for raw in paths:
         p = Path(raw)
         if p.is_file():
@@ -1565,6 +1567,10 @@ def iter_files(paths: list[str]) -> Iterator[Path]:
                 for f in sorted(files):
                     fp = Path(root) / f
                     if fp.suffix.lower() in AUDITABLE_EXT | {INDENTED_SASS_EXT}:
+                        if leave is not None and leave(fp):
+                            if left is not None:
+                                left.append(fp)
+                            continue
                         yield fp
 
 
@@ -1572,7 +1578,7 @@ def audit(paths: list[str]) -> list[Finding]:
     return audit_run(paths)[0]
 
 
-def audit_run(paths: list[str]) -> tuple[list[Finding], list[Path]]:
+def audit_run(paths: list[str], leave=None, left: list[Path] | None = None) -> tuple[list[Finding], list[Path]]:
     """(findings, files that are not markup, JSX or CSS: those named
     explicitly, and indented Sass wherever it is).
 
@@ -1580,7 +1586,7 @@ def audit_run(paths: list[str]) -> tuple[list[Finding], list[Path]]:
     and listed, not parsed as HTML and failed."""
     out: list[Finding] = []
     skipped: list[Path] = []
-    for fp in iter_files(paths):
+    for fp in iter_files(paths, leave, left):
         if fp.suffix.lower() not in AUDITABLE_EXT:
             skipped.append(fp)
             continue
@@ -1704,12 +1710,27 @@ def main(argv: list[str] | None = None) -> int:
         print(f"a11y_static: no such path: {', '.join(missing)}", file=sys.stderr)
         return 2
 
-    findings, skipped = audit_run(paths)
+    # A flag beats the project's .design-suite.json, which beats the default (P24).
+    config = None
+    if project_config is not None:
+        try:
+            config = project_config()
+        except ConfigError as exc:
+            print(f"a11y_static: {exc}", file=sys.stderr)
+            return 2
+
+    # An email template, one the config's `emails` names, is lint_email.py's:
+    # a page's rules (a <main> landmark, no outline reset on img) do not fit a
+    # letter, and the email lint checks its alt text, language and contrast
+    # (R3's live check). A template named on its own is still read.
+    left: list[Path] = []
+    findings, skipped = audit_run(paths, config.is_email if config else None, left)
     for group, why in (([p for p in skipped if p.suffix.lower() != INDENTED_SASS_EXT],
                         "that are not markup, JSX or CSS"),
                        ([p for p in skipped if p.suffix.lower() == INDENTED_SASS_EXT],
                         "of indented Sass, which it cannot read (check the compiled CSS, "
-                        "or use .scss)")):
+                        "or use .scss)"),
+                       (left, "that are email templates, which lint_email.py checks")):
         if group:
             names = ", ".join(str(p) for p in group[:5]) + (" …" if len(group) > 5 else "")
             print(f"a11y_static: skipped {len(group)} file(s) {why}: {names}", file=sys.stderr)
@@ -1734,14 +1755,6 @@ def main(argv: list[str] | None = None) -> int:
               "user feels first: F (labels), K (focus), N (names).")
         return 0
 
-    # A flag beats the project's .design-suite.json, which beats the default (P24).
-    config = None
-    if project_config is not None:
-        try:
-            config = project_config()
-        except ConfigError as exc:
-            print(f"a11y_static: {exc}", file=sys.stderr)
-            return 2
     baseline: set = set()
     # config is None whenever the reader is missing, so config_path is defined here (Codex on #79).
     bp = Path(args.baseline or (config_path(config, "baselines", "a11y") if config else None)
