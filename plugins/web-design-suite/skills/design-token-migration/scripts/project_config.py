@@ -13,23 +13,28 @@ one (test_project_config holds every copy to the master).
       "tokens": ["src/styles/tokens.css"],
       "emailTokens": "emails/email-tokens.json",
       "components": ["src/widgets/**/*.css"],
+      "emails": ["emails/**/*.html"],
       "stack": "tailwind-v4",
       "budgets": {"perf": "perf-budget.json", "a11y": "a11y-budget.json"},
       "baselines": {"audit": ".design-baseline.json", "a11y": ".a11y-baseline.json",
                     "perf": ".perf-baseline.json", "docs": "docs/baseline.json",
                     "snapshots": "snapshots/", "system": "published/system.json"},
-      "hooks": {"designGate": true, "generatedFiles": true, "tokenDiff": true}
+      "hooks": {"designGate": true, "generatedFiles": true, "tokenDiff": true,
+                "a11yGate": true, "emailBuild": true}
     }
 
 Only `schema` is required. `tokens` holds the project's token files: a
 tokens.css, or a contract.json. `emailTokens` is the email build's own
 email-tokens.json, a different file that only the email scripts read.
 `components` adds globs to the component files the rule spec names
-(design-rules.json: file_classes). `baselines.system` is the published
+(design-rules.json: file_classes). `emails` holds the globs of the email
+templates, `emails/**/*.html` when it is left out. `baselines.system` is the published
 snapshot that diff_system.py compares against. `hooks` turns on the plugin's
 hooks for this project: `designGate` audits each file Claude edits,
-`generatedFiles` refuses an edit to a generated file, and `tokenDiff` diffs
-the token files against the published snapshot after each edit to one. Paths
+`generatedFiles` refuses an edit to a generated file, `tokenDiff` diffs the
+token files against the published snapshot after each edit to one,
+`a11yGate` runs a11y_static.py on each file Claude edits, and `emailBuild`
+lints, builds and lints again each email template Claude edits. Paths
 are relative to the file. An unknown key, or a value of the wrong shape, is an
 error that names the key.
 
@@ -85,11 +90,13 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 CONFIG_NAME = ".design-suite.json"
 CONFIG_SCHEMA = 1
 CONTRACT_SCHEMA = "web-design-suite/contract/1"
-KEYS = ("schema", "tokens", "emailTokens", "components", "stack", "budgets", "baselines", "hooks")
+KEYS = ("schema", "tokens", "emailTokens", "components", "emails", "stack", "budgets", "baselines", "hooks")
 STACKS = ("vanilla-css", "css-modules", "tailwind-v3", "tailwind-v4")
 BUDGETS = ("perf", "a11y")
 BASELINES = ("audit", "a11y", "perf", "docs", "snapshots", "system")
-HOOKS = ("designGate", "generatedFiles", "tokenDiff")     # the plugin's hooks a project turns on (P25)
+HOOKS = ("designGate", "generatedFiles", "tokenDiff",       # the plugin's hooks a project turns on (P25,
+         "a11yGate", "emailBuild")                           # P27)
+EMAILS = ("emails/**/*.html",)                               # the email templates, unless `emails` names them
 CONTRACT_SECTIONS = ("ramps", "scales", "roles", "breakpoints", "constants")
 
 
@@ -104,6 +111,7 @@ class ProjectConfig:
     tokens: List[Path] = field(default_factory=list)
     email_tokens: Optional[Path] = None
     components: List[str] = field(default_factory=list)
+    emails: List[str] = field(default_factory=lambda: list(EMAILS))
     stack: Optional[str] = None
     budgets: Dict[str, Path] = field(default_factory=dict)
     baselines: Dict[str, Path] = field(default_factory=dict)
@@ -117,11 +125,19 @@ class ProjectConfig:
         """True when `path` matches one of `components`, read relative to the
         config's folder: `*` and `?` stay within a folder, and `**/` is any
         number of folders, none included."""
+        return self._matches(path, self.components)
+
+    def is_email(self, path: Union[str, Path]) -> bool:
+        """True when `path` is one of the email templates, by `emails`, as
+        is_component() reads its globs."""
+        return self._matches(path, self.emails)
+
+    def _matches(self, path: Union[str, Path], globs: Sequence[str]) -> bool:
         try:
             rel = Path(path).resolve().relative_to(self.root).as_posix()
         except ValueError:
             return False                    # outside the project
-        return any(glob_regex(g).match(rel) for g in self.components)
+        return any(glob_regex(g).match(rel) for g in globs)
 
 
 def glob_regex(pattern: str) -> "re.Pattern[str]":
@@ -222,18 +238,23 @@ def load_config(path: Union[str, Path]) -> ProjectConfig:
             raise ConfigError(f'{path}: "hooks.{bad}" must be true or false')
         return dict(value)
 
-    components = data.get("components", [])
-    if isinstance(components, str):
-        components = [components]
-    if not isinstance(components, list) or not all(isinstance(g, str) and g for g in components):
-        raise ConfigError(f'{path}: "components" must be a glob or a list of globs')
+    def glob_list(key: str, default: Sequence[str]) -> List[str]:
+        value = data.get(key, list(default))
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list) or not all(isinstance(g, str) and g for g in value):
+            raise ConfigError(f'{path}: "{key}" must be a glob or a list of globs')
+        return list(value)
+
+    components = glob_list("components", [])
+    emails = glob_list("emails", EMAILS)
     stack = data.get("stack")
     if stack is not None and stack not in STACKS:
         raise ConfigError(f'{path}: "stack" must be one of {", ".join(STACKS)}')
     email = data.get("emailTokens")
     return ProjectConfig(path=path, tokens=path_list("tokens"),
                          email_tokens=one_path("emailTokens", email) if email is not None else None,
-                         components=list(components), stack=stack,
+                         components=components, emails=emails, stack=stack,
                          budgets=path_map("budgets", BUDGETS),
                          baselines=path_map("baselines", BASELINES), hooks=hook_flags())
 
