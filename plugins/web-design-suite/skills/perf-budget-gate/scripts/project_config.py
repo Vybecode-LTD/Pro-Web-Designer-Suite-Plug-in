@@ -66,8 +66,10 @@ default value is in it: one declared only in a theme or under a condition is
 not. Theme and density overrides stay in extract_system's system.json.
 
 read_tokens() gives the scripts one view of a project's token files, in the
-contract's sections, whether a file is a contract.json or a tokens.css (P24
-part 2). A tokens.css is read the way extract_system reads a default: the
+contract's sections, whether a file is a contract.json, a tokens.css (P24
+part 2) or a DTCG 2025.10 document (P31, read through dtcg.py beside this
+file: `color.bg.surface` is `--color-bg-surface`, and its tiers come from the
+value, as a tokens.css's do). A tokens.css is read the way extract_system reads a default: the
 custom properties of a rule whose selector starts with `:root` (or `html`,
 `:where(:root)`, `*`), outside any at-rule but `@layer`, and with no theme or
 density selector that names a value. Its tiers come from the value alone: a
@@ -80,9 +82,11 @@ ramp step or a breakpoint.
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union
@@ -285,8 +289,9 @@ def token_sources(flag: Union[None, str, Sequence[str]],
 
 
 def is_contract(path: Union[str, Path]) -> bool:
-    """A token file named `*.json` is a contract.json; anything else is CSS."""
-    return Path(path).suffix.lower() == ".json"
+    """A token file named `*.json` or `*.tokens` is JSON: a contract.json or a
+    DTCG document (P31). Anything else is CSS."""
+    return Path(path).suffix.lower() in (".json", ".tokens")
 
 
 def read_contract(path: Union[str, Path]) -> Dict[str, Any]:
@@ -430,14 +435,69 @@ def _css_tokens(path: Path) -> ProjectTokens:
     return tokens
 
 
+def is_dtcg(data: Any) -> bool:
+    """A JSON token file that is not a contract.json and holds a token: an
+    object with `$value`, or a whole-token `$ref`, at any depth."""
+    if isinstance(data, dict) and "schema" in data:
+        return False
+
+    def holds(node: Any, depth: int) -> bool:
+        if not isinstance(node, dict) or depth > 64:
+            return False
+        if depth and ("$value" in node or isinstance(node.get("$ref"), str)):
+            return True
+        return any(holds(v, depth + 1) for k, v in node.items() if k not in ("$extensions", "$schema"))
+    return holds(data, 0)
+
+
+_DTCG: List[Any] = []
+
+
+def _dtcg(path: Path) -> Any:
+    """dtcg.py, loaded from this file's folder by its path, so neither the way
+    the script was started nor another module named dtcg can change it."""
+    if not _DTCG:
+        here = Path(__file__).resolve().parent / "dtcg.py"
+        if not here.is_file():
+            raise ConfigError(f"{path}: a DTCG token file needs dtcg.py beside project_config.py")
+        spec = importlib.util.spec_from_file_location("wds_dtcg", here)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module           # its dataclasses look themselves up there
+        spec.loader.exec_module(module)
+        _DTCG.append(module)
+    return _DTCG[0]
+
+
+def _dtcg_tokens(path: Path, data: Any) -> ProjectTokens:
+    """A DTCG 2025.10 file (P31), read through dtcg.py beside this file: each
+    token's CSS name (`color.bg.surface` is `--color-bg-surface`) and value,
+    a reference as `var(--name)`, filed by value as a tokens.css is (one that
+    reads another token is a role). A value
+    with no CSS form (a typography composite, a boolean) is not a custom
+    property, so it is left out."""
+    found, _problems = _dtcg(path).tokens(data)
+    tokens = ProjectTokens(sources=[Path(path)])
+    for token in found:
+        value = token.css()
+        if value is not None:
+            tokens.add(token.name, value, 2 if "var(" in value else 1)
+    return tokens
+
+
 def read_tokens(paths: Sequence[Union[str, Path]]) -> ProjectTokens:
-    """A project's token files, contract.json or tokens.css, read in order
-    into one ProjectTokens. A later file's value wins, step by step for a
+    """A project's token files, contract.json, DTCG or tokens.css, read in
+    order into one ProjectTokens. A later file's value wins, step by step for a
     ramp or a scale, so two files may each hold part of one ramp; a name a
     later file files in another section leaves the earlier one (Codex on #78)."""
     out = ProjectTokens(sources=[Path(p) for p in paths])
     for path in out.sources:
-        if is_contract(path):
+        data = _read_json(path) if is_contract(path) else None
+        if is_contract(path) and is_dtcg(data):
+            part = _dtcg_tokens(path, data)
+        elif is_contract(path):
+            if not (isinstance(data, dict) and "schema" in data):
+                raise ConfigError(f'{path}: neither a contract.json (no "schema") nor a DTCG '
+                                  f'token file (no "$value")')
             data = read_contract(path)
             part = ProjectTokens(ramps=data["ramps"], scales=data["scales"], roles=data["roles"],
                                  breakpoints=data["breakpoints"], constants=data["constants"])

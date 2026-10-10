@@ -604,6 +604,48 @@ console.log(JSON.stringify(out));
 """
 
 CONTRACT = "web-design-suite/contract/1"
+DTCG_EVERY_FORM = {
+    "brand": {"$type": "color",
+              "500": {"$value": {"colorSpace": "srgb", "components": [0.909804, 0.266667, 0.039216], "hex": "#e8440a"}},
+              "600": {"$value": {"colorSpace": "srgb-linear", "components": [0.5, 0.2, 0.01]}},
+              "700": {"$value": {"colorSpace": "hsl", "components": [-30, 80, 40]}},
+              "800": {"$value": {"colorSpace": "hwb", "components": [400, 10, 20]}},
+              "900": {"$value": {"colorSpace": "oklch", "components": [0.62, 0.19, "none"], "alpha": 0.5}},
+              "950": {"$value": {"colorSpace": "oklab", "components": ["0.5", -0.1, 0.1]}},
+              "960": {"$value": {"colorSpace": "lab", "components": [50, 40, 59.5]}},
+              "970": {"$value": {"colorSpace": "lch", "components": [50, 30, 270], "alpha": 0.0078125}},
+              "980": {"$value": {"colorSpace": "display-p3", "components": [1, 0, 0]}},
+              "990": {"$value": {"colorSpace": "display-p3", "components": [1, 0, 0], "hex": "#ff0000"}},
+              "991": {"$value": {"colorSpace": "rec2020", "components": [0.5, 0.5, 0.5], "alpha": 1}},
+              "992": {"$value": {"colorSpace": "srgb", "components": [0.5, 0.5, 0.5], "alpha": 0.25}},
+              "993": {"$value": {"colorSpace": "srgb", "components": "abc"}},
+              "$root": {"$value": {"colorSpace": "srgb", "components": [1, 0, 0]}}},
+    "bg": {"$type": "color", "brand": {"$value": "{brand.$root}"}, "pointer": {"$ref": "#/brand/$root"},
+           "mid": {"$value": "{brand.500}"}, "deep": {"$ref": "#/brand/600/$value"},
+           "bad": {"$ref": "#/brand/600/$value/components/0"}},
+    "space": {"$type": "dimension", "4": {"$value": {"value": 1, "unit": "rem"}},
+              "6": {"$value": {"value": 24, "unit": "px"}}, "big": {"$value": {"value": 1234567, "unit": "px"}},
+              "neg": {"$value": {"value": -0.0000001, "unit": "px"}}},
+    "dur": {"$type": "duration", "base": {"$value": {"value": 0.22, "unit": "s"}},
+            "fast": {"$value": {"value": 140, "unit": "ms"}}},
+    "density": {"$value": 1.5, "$type": "number"},
+    "weight": {"bold": {"$value": 700, "$type": "fontWeight"}},
+    "font": {"sans": {"$type": "fontFamily", "$value": ["Geist Sans", "system-ui", "sans-serif"]}},
+    "ease": {"out": {"$type": "cubicBezier", "$value": [0, 0, 0.58, 1]}},
+    "shadow": {"md": {"$type": "shadow", "$value": [
+        {"color": "{brand.500}", "offsetX": {"value": 0, "unit": "px"}, "offsetY": {"value": 2, "unit": "px"},
+         "blur": "{space.6}", "spread": {"value": 0, "unit": "px"}},
+        {"color": {"colorSpace": "srgb", "components": [0, 0, 0], "alpha": 0.1}, "offsetX": {"value": 0, "unit": "px"},
+         "offsetY": {"value": 6, "unit": "px"}, "blur": {"value": 12, "unit": "px"},
+         "spread": {"value": 0, "unit": "px"}, "inset": True}]}},
+    "border": {"focus": {"$type": "border", "$value": {"width": {"value": 2, "unit": "px"}, "style": "solid",
+                                                       "color": "{brand.$root}"}}},
+    "motion": {"hover": {"$type": "transition", "$value": {"duration": {"value": 140, "unit": "ms"},
+                                                           "timingFunction": [0, 0, 0.58, 1]}}},
+    "type": {"body": {"$type": "typography", "$value": {"fontFamily": "{font.sans}", "fontSize": "{space.4}"}}},
+    "flag": {"on": {"$type": "boolean", "$value": True}},
+    "legacy": {"$value": "16px", "$type": "dimension"},
+}
 TOKEN_FILES = {
     "layers.css": (
         "@layer reset, tokens;\n@layer tokens {\n  :root, [data-theme] {\n"
@@ -629,11 +671,20 @@ TOKEN_FILES = {
     "bad-role.json": json.dumps({"schema": CONTRACT, "roles": {"--x": 3}}),
     "not-json.json": "{",
     "utf16be.json": ("﻿" + json.dumps({"schema": CONTRACT, "ramps": {"brand": {"500": "#123456"}}})).encode("utf-16-be"),
+    # P31: DTCG 2025.10 documents, every value form dtcg.py writes as CSS.
+    "dtcg.tokens.json": json.dumps(DTCG_EVERY_FORM),
+    "extends.tokens": json.dumps({"base": {"$type": "color", "fg": {"$value": "#111111"}, "bg": {"$value": "#ffffff"}},
+                                  "print": {"$extends": "{base}", "fg": {"$value": "#000000"}},
+                                  "loop": {"$extends": "{loop}", "x": {"$value": "#010101", "$type": "color"}}}),
+    "legacy.json": json.dumps({"global": {"neutral": {"0": {"value": "#ffffff", "type": "color"}}}}),
+    "schema-and-tokens.json": json.dumps({"schema": "x", "a": {"$value": "#fff", "$type": "color"}}),
 }
 TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.css"], ["contract.json"],
                ["contract.json", "a.css"], ["a.css", "contract.json"], ["bad-schema.json"], ["bad-ramps.json"],
                ["bad-step.json"], ["bad-scale.json"], ["bad-role.json"], ["not-json.json"], ["gone.css"],
-               ["gone.json"], ["a.css", "gone.css"], [], ["utf16be.json"]]
+               ["gone.json"], ["a.css", "gone.css"], [], ["utf16be.json"],
+               ["dtcg.tokens.json"], ["extends.tokens"], ["a.css", "dtcg.tokens.json"], ["dtcg.tokens.json", "a.css"],
+               ["legacy.json"], ["schema-and-tokens.json"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).

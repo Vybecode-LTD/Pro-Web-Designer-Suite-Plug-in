@@ -79,11 +79,12 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.diff_system
-    from .project_config import CONTRACT_SCHEMA, ConfigError, is_contract, project_config, read_tokens
+    from .project_config import (CONTRACT_SCHEMA, ConfigError, is_contract, is_dtcg, project_config,
+                                 read_tokens)
 except ImportError:                               # python scripts/diff_system.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from project_config import (CONTRACT_SCHEMA, ConfigError, is_contract,  # type: ignore[no-redef]
-                                project_config, read_tokens)
+                                is_dtcg, project_config, read_tokens)
 
 SCHEMA = "design-system-versioning/diff@1"
 DOCS_SCHEMA = "design-system-docs/system/1"
@@ -882,16 +883,22 @@ def _snapshot_from_css_vendored(paths: List[Path], label: str) -> Snapshot:
     return _resolve_snapshot(snap, base, themes)
 
 
-def _snapshot_from_contract(paths: List[Path], label: str) -> Snapshot:
+# The snapshots that hold default values and tiers only, as the notes name them.
+DEFAULTS_ONLY = {"contract.json": "a contract.json", "DTCG": "a DTCG file"}
+
+
+def _snapshot_from_contract(paths: List[Path], label: str, source: str = "contract.json") -> Snapshot:
     """A project's contract.json (design-system-docs' `extract_system.py
-    --contract`, P24): its default values, with the tier it records for each.
-    It holds no themes, densities, components or layers."""
+    --contract`, P24), or a DTCG 2025.10 file (`source` "DTCG", P31): its
+    default values, with the tier each one's value gives. It holds no themes,
+    densities, components or layers."""
     try:
         tokens = read_tokens(paths)
     except ConfigError as exc:
         raise bail(f"diff_system: {exc}")
-    snap = Snapshot(label=label, path=str(paths[0]), source="contract.json",
-                    impl="project contract", layers_recorded=False)
+    snap = Snapshot(label=label, path=str(paths[0]), source=source,
+                    impl="project contract" if source == "contract.json" else "DTCG token file",
+                    layers_recorded=False)
     base = tokens.values()
     tiers = tokens.tiers()
     for name, value in base.items():
@@ -989,7 +996,7 @@ def load_snapshot(raw: str, label: str, *, no_upstream: bool = False) -> Snapsho
                 f"diff_system: {raw} contains neither system.json nor tokens.css.\n"
                 f"Point at one directly, or generate a snapshot with:\n"
                 f"  python -m scripts.extract_system {raw} --out system.json")
-    if p.suffix.lower() == ".json":
+    if is_contract(p):                                   # .json or .tokens
         try:
             data = json.loads(p.read_bytes())
         except (OSError, json.JSONDecodeError) as exc:
@@ -997,6 +1004,8 @@ def load_snapshot(raw: str, label: str, *, no_upstream: bool = False) -> Snapsho
         schema = str(data.get("schema", "")) if isinstance(data, dict) else ""
         if schema == CONTRACT_SCHEMA:
             return _snapshot_from_contract([p], label)
+        if is_dtcg(data):
+            return _snapshot_from_contract([p], label, "DTCG")
         if schema.split("/")[0] != "design-system-docs":
             raise bail(
                 f"diff_system: {p} is not a design-system-docs snapshot "
@@ -1005,6 +1014,13 @@ def load_snapshot(raw: str, label: str, *, no_upstream: bool = False) -> Snapsho
         snap = _normalize_docs_json(data, label, str(p))
         return snap
     return _load_css([p], label, no_upstream)
+
+
+def _is_dtcg_file(path: Path) -> bool:
+    try:
+        return is_dtcg(json.loads(path.read_bytes()))
+    except (OSError, ValueError):
+        return False                     # read_tokens reports it
 
 
 def project_snapshot(label: str, *, no_upstream: bool = False) -> Snapshot:
@@ -1025,7 +1041,8 @@ def project_snapshot(label: str, *, no_upstream: bool = False) -> Snapshot:
     if missing:
         raise bail(f"diff_system: {config.path} lists {', '.join(missing)}, which does not exist.")
     if any(is_contract(p) for p in config.tokens):
-        return _snapshot_from_contract(list(config.tokens), label)
+        dtcg_only = all(_is_dtcg_file(p) for p in config.tokens if is_contract(p))
+        return _snapshot_from_contract(list(config.tokens), label, "DTCG" if dtcg_only else "contract.json")
     return _load_css(list(config.tokens), label, no_upstream)
 
 
@@ -2410,7 +2427,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
            else published_snapshot("old", no_upstream=args.no_upstream))
     new = (load_snapshot(args.new, "new", no_upstream=args.no_upstream) if args.new
            else project_snapshot("new", no_upstream=args.no_upstream))
-    contract = "contract.json" in (old.source, new.source)
+    kinds = [DEFAULTS_ONLY[s] for s in dict.fromkeys((old.source, new.source)) if s in DEFAULTS_ONLY]
+    contract = bool(kinds)
     if contract:
         old, new = as_contract(old), as_contract(new)
 
@@ -2420,8 +2438,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     diff_components(old, new, changes)
     notes: List[str] = []
     if contract:
-        notes.append("a contract.json holds default values and tiers only, so only those were "
-                     "compared: no themes, densities, conditions, notes, layers or components")
+        notes.append(f"{' and '.join(kinds)} hold{'s' if len(kinds) == 1 else ''} default values and "
+                     "tiers only, so only those were compared: no themes, densities, conditions, notes, "
+                     "layers or components")
     layer_note = None if contract else diff_layers(old, new, changes)
     if layer_note:
         notes.append(layer_note)

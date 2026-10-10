@@ -271,9 +271,10 @@ export function overrideGlobs(root, pattern) {
 const CONTRACT_SCHEMA = 'web-design-suite/contract/1';
 const CONTRACT_SECTIONS = ['ramps', 'scales', 'roles', 'breakpoints', 'constants'];
 
-// A token file named `*.json` is a contract.json; anything else is CSS.
+// A token file named `*.json` or `*.tokens` is JSON: a contract.json or a
+// DTCG document (P31). Anything else is CSS.
 export function isContract(file) {
-  return path.extname(file).toLowerCase() === '.json';
+  return ['.json', '.tokens'].includes(path.extname(file).toLowerCase());
 }
 
 // Read and check a contract.json, as read_contract() does.
@@ -418,7 +419,332 @@ function cssTokens(file) {
   return tokens;
 }
 
-// A project's token files, contract.json or tokens.css, read in order into
+// --- DTCG 2025.10 token files (P31) -------------------------------------------
+// A port of what read_tokens() takes from dtcg.py: tokens(), the lossless
+// reading. Each token's CSS name is its path joined by `-`, a reference is
+// `var(--name)`, `$extends` groups merge, `$root` is the group's own token,
+// `$type` is inherited, and a value with no CSS form is left out. The numbers
+// are written as Python's f"{round(x, 6):g}" writes them, so both readers give
+// the same values (tests/test_project_config.py holds them to it).
+const DTCG_META = new Set(['$schema', '$description', '$extensions', '$type', '$deprecated', '$extends']);
+const UNSUPPORTED = Symbol('unsupported');
+const CSS_SPACES = new Set(['display-p3', 'a98-rgb', 'prophoto-rgb', 'rec2020', 'xyz-d65', 'xyz-d50']);
+// Python's float `%` (CPython's float_rem): fmod, moved to the divisor's sign.
+const pyMod = (a, b) => {
+  const mod = a % b;
+  if (mod) return (b < 0) !== (mod < 0) ? mod + b : mod;
+  return b < 0 ? -0 : 0;
+};
+const pyTruthy = (v) => !(v === undefined || v === null || v === false || v === 0 || v === ''
+  || (Array.isArray(v) && !v.length) || (isObject(v) && !Object.keys(v).length));
+
+// Python's float() for a JSON value: a number, a boolean or a numeric string.
+function pyFloat(x) {
+  if (typeof x === 'number') return x;
+  if (typeof x === 'boolean') return Number(x);
+  if (typeof x === 'string') {
+    const t = x.trim().toLowerCase().replace(/(?<=\d)_(?=\d)/g, '');
+    if (/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/.test(t)) return Number(t);
+    if (/^[+-]?(?:inf|infinity)$/.test(t)) return t.startsWith('-') ? -Infinity : Infinity;
+    if (/^[+-]?nan$/.test(t)) return NaN;
+  }
+  throw new TypeError('not a number');
+}
+
+// The digits of |x| to 100 places (exact for any double under 1e21).
+function roundHalfEven(x, places) {
+  if (!Number.isFinite(x) || Math.abs(x) >= 1e21) return x;
+  const [whole, frac] = Math.abs(x).toFixed(100).split('.');
+  const kept = whole + frac.slice(0, places);
+  const rest = frac.slice(places);
+  let digits = BigInt(kept);
+  const half = '5' + '0'.repeat(rest.length - 1);
+  if (rest > half || (rest === half && digits % 2n === 1n)) digits += 1n;
+  const text = digits.toString().padStart(places + 1, '0');
+  const value = Number(`${text.slice(0, text.length - places)}.${text.slice(text.length - places)}`);
+  return x < 0 || Object.is(x, -0) ? -value : value;
+}
+
+// Python's f"{x:g}": six significant digits, trailing zeros dropped.
+function formatG(x) {
+  if (Number.isNaN(x)) return 'nan';
+  if (!Number.isFinite(x)) return x > 0 ? 'inf' : '-inf';
+  if (x === 0) return Object.is(x, -0) ? '-0' : '0';
+  const [mantissa, exp] = x.toExponential(5).split('e');
+  const e = Number(exp);
+  const strip = (s) => (s.includes('.') ? s.replace(/0+$/, '').replace(/\.$/, '') : s);
+  if (e < -4 || e >= 6) return `${strip(mantissa)}e${e < 0 ? '-' : '+'}${String(Math.abs(e)).padStart(2, '0')}`;
+  return strip(x.toFixed(5 - e));
+}
+
+const fmt = (n) => formatG(roundHalfEven(pyFloat(n), 6));
+const pyRoundInt = (v) => {
+  const f = Math.floor(v);
+  const d = v - f;
+  return d > 0.5 ? f + 1 : d < 0.5 ? f : (f % 2 === 0 ? f : f + 1);
+};
+const componentOf = (x) => (x === null || x === undefined || (typeof x === 'string' && x.trim().toLowerCase() === 'none') ? 0 : pyFloat(x));
+const srgbEncode = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+
+function rgbCss(r, g, b, alpha) {
+  const [cr, cg, cb] = [r, g, b].map((c) => Math.min(1, Math.max(0, c)));
+  if (alpha >= 0.999) return `#${[cr, cg, cb].map((c) => pyRoundInt(c * 255).toString(16).padStart(2, '0')).join('')}`;
+  return `rgb(${fmt(cr * 255)} ${fmt(cg * 255)} ${fmt(cb * 255)} / ${fmt(alpha)})`;
+}
+
+// Python's colorsys.hls_to_rgb.
+function hlsToRgb(h, l, s) {
+  if (s === 0) return [l, l, l];
+  const m2 = l <= 0.5 ? l * (1 + s) : l + s - l * s;
+  const m1 = 2 * l - m2;
+  const v = (hue) => {
+    const x = pyMod(hue, 1);
+    if (x < 1 / 6) return m1 + (m2 - m1) * x * 6;
+    if (x < 0.5) return m2;
+    if (x < 2 / 3) return m1 + (m2 - m1) * (2 / 3 - x) * 6;
+    return m1;
+  };
+  return [v(h + 1 / 3), v(h), v(h - 1 / 3)];
+}
+
+function hwbRgb(h, w, b) {
+  const [ww, bb] = [w / 100, b / 100];
+  if (ww + bb >= 1) {
+    const grey = ww / (ww + bb);
+    return [grey, grey, grey];
+  }
+  return hlsToRgb(pyMod(h, 360) / 360, 0.5, 1).map((c) => c * (1 - ww - bb) + ww);
+}
+
+function colourToCss(v) {
+  const space = String(has(v, 'colorSpace') ? v.colorSpace : '').trim().toLowerCase();
+  let comps, alpha;
+  try {
+    const raw = v.components;                       // Python: `components or []`, iterated
+    if (pyTruthy(raw) && !Array.isArray(raw)) return null;
+    comps = (pyTruthy(raw) ? raw : []).map(componentOf);
+    alpha = v.alpha === undefined || v.alpha === null || v.alpha === 'none' ? 1 : pyFloat(v.alpha);
+  } catch {
+    return null;
+  }
+  if (comps.length === 3) {
+    if (space === 'srgb') return rgbCss(...comps, alpha);
+    if (space === 'srgb-linear') return rgbCss(...comps.map(srgbEncode), alpha);
+    if (space === 'hsl') return rgbCss(...hlsToRgb(pyMod(comps[0], 360) / 360, comps[2] / 100, comps[1] / 100), alpha);
+    if (space === 'hwb') return rgbCss(...hwbRgb(...comps), alpha);
+    if (space === 'oklch' || space === 'oklab') {
+      let [L, x, y] = comps;
+      if (space === 'oklab') [x, y] = [Math.hypot(x, y), pyMod(Math.atan2(y, x) * (180 / Math.PI), 360)];
+      return `oklch(${fmt(L * 100)}% ${fmt(x)} ${fmt(y)}${alpha >= 0.999 ? '' : ` / ${fmt(alpha)}`})`;
+    }
+  }
+  const hex = v.hex;
+  if (typeof hex === 'string' && hex.startsWith('#') && hex.length === 7) {
+    const parts = [1, 3, 5].map((i) => hex.slice(i, i + 2));
+    if (!parts.every((p) => /^\s*[+-]?[0-9a-f]+\s*$/i.test(p))) return null;
+    return rgbCss(...parts.map((p) => parseInt(p.trim(), 16) / 255), alpha);
+  }
+  if (comps.length === 3 && (CSS_SPACES.has(space) || space === 'lab' || space === 'lch')) {
+    const args = comps.map(fmt).join(' ') + (alpha >= 0.999 ? '' : ` / ${fmt(alpha)}`);
+    return space === 'lab' || space === 'lch' ? `${space}(${args})` : `color(${space} ${args})`;
+  }
+  return null;
+}
+
+const dtcgName = (parts) => `--${parts.join('-')}`;
+
+function refCss(v) {
+  const alias = typeof v === 'string' && v.trim().startsWith('{') ? pointerAlias(v) : null;
+  return alias ? `var(${dtcgName(alias.split('.'))})` : UNSUPPORTED;
+}
+
+function dimension(v, kind) {
+  if (typeof v === 'string') return refCss(v);
+  if (!(isObject(v) && has(v, 'value') && has(v, 'unit'))) return UNSUPPORTED;
+  let n;
+  try {
+    n = pyFloat(v.value);
+  } catch {
+    return UNSUPPORTED;
+  }
+  const unit = String(v.unit).trim().toLowerCase();
+  if (kind === 'duration' || unit === 'ms' || unit === 's') return unit === 's' ? `${fmt(n * 1000)}ms` : `${fmt(n)}ms`;
+  return `${fmt(n)}${unit}`;
+}
+
+function colourValue(v) {
+  if (isObject(v)) return colourToCss(v) || UNSUPPORTED;
+  if (typeof v === 'string' && !v.trim().startsWith('{')) return v;
+  return refCss(v);
+}
+
+function shadow(layers) {
+  const out = [];
+  for (const layer of layers) {
+    if (!isObject(layer)) return UNSUPPORTED;
+    const parts = ['offsetX', 'offsetY', 'blur', 'spread'].map((k) => dimension(layer[k], 'dimension'));
+    const colour = colourValue(layer.color);
+    if (parts.includes(UNSUPPORTED) || colour === UNSUPPORTED) return UNSUPPORTED;
+    out.push((layer.inset ? 'inset ' : '') + [...parts, colour].join(' '));
+  }
+  return out.join(', ');
+}
+
+function bezier(v) {
+  if (Array.isArray(v) && v.length === 4 && v.every((x) => ['number', 'boolean'].includes(typeof x))) return `cubic-bezier(${v.map(fmt).join(', ')})`;
+  return typeof v === 'string' && !v.startsWith('{') ? v : UNSUPPORTED;
+}
+
+function convertValue(value, kind) {
+  if (isObject(value) && has(value, '$ref')) {
+    const alias = pointerAlias(value.$ref);
+    return alias ? `{${alias}}` : UNSUPPORTED;
+  }
+  if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return value;
+  const k = String(kind || '').toLowerCase();
+  if (isObject(value)) {
+    if (has(value, 'colorSpace') || k === 'color') return colourValue(value);
+    if (['dimension', 'duration', ''].includes(k) && has(value, 'value') && has(value, 'unit')) return dimension(value, k);
+    if (k === 'shadow') return shadow([value]);
+    if (k === 'border') {
+      const parts = [dimension(value.width, 'dimension'), value.style, colourValue(value.color)];
+      return parts.includes(UNSUPPORTED) || typeof parts[1] !== 'string' ? UNSUPPORTED : parts.join(' ');
+    }
+    if (k === 'transition') {
+      const parts = [dimension(value.duration, 'duration'), bezier(value.timingFunction),
+        dimension(has(value, 'delay') ? value.delay : { value: 0, unit: 'ms' }, 'duration')];
+      return parts.includes(UNSUPPORTED) ? UNSUPPORTED : parts.join(' ');
+    }
+    return UNSUPPORTED;
+  }
+  if (Array.isArray(value)) {
+    if (k === 'cubicbezier') return bezier(value);
+    if (k === 'shadow') return shadow(value);
+    if ((k === 'fontfamily' || k === '') && value.length && value.every((x) => typeof x === 'string')) {
+      return value.map((x) => (x.includes(' ') ? `"${x}"` : x)).join(', ');
+    }
+  }
+  return UNSUPPORTED;
+}
+
+function pointerAlias(ref) {
+  if (typeof ref !== 'string') return null;
+  const s = ref.trim();
+  let parts;
+  if (s.startsWith('{') && s.endsWith('}')) parts = s.slice(1, -1).split('.');
+  else if (s.startsWith('#/')) {
+    parts = s.slice(2).split('/').map((p) => p.replaceAll('~1', '/').replaceAll('~0', '~'));
+    if (parts.length && parts[parts.length - 1] === '$value') parts = parts.slice(0, -1);
+  } else return null;
+  if (parts.length > 1 && parts[parts.length - 1] === '$root') parts = parts.slice(0, -1);
+  if (!parts.length || parts.some((p) => !p || p.startsWith('$'))) return null;
+  return parts.join('.');
+}
+
+function lookupGroup(root, ref) {
+  const alias = pointerAlias(ref);
+  if (alias === null) return null;
+  let node = root;
+  for (const part of alias.split('.')) {
+    if (!isObject(node) || !has(node, part)) return null;
+    node = node[part];
+  }
+  return node;
+}
+
+function overlay(base, own) {
+  for (const [key, value] of Object.entries(own)) {
+    if (isObject(value) && isObject(base[key]) && has(base, key) && !has(value, '$value') && !has(base[key], '$value')) {
+      overlay(base[key], value);
+    } else {
+      base[key] = structuredClone(value);
+    }
+  }
+}
+
+function resolveExtends(node, root, active) {
+  if (!isObject(node)) return;
+  if (has(node, '$extends')) {
+    const ref = node.$extends;
+    delete node.$extends;
+    const target = lookupGroup(root, ref);
+    if (!active.has(node) && isObject(target) && !has(target, '$value')) {
+      active.add(node);
+      resolveExtends(target, root, active);
+      active.delete(node);
+      const merged = structuredClone(target);
+      overlay(merged, node);
+      for (const key of Object.keys(node)) delete node[key];
+      Object.assign(node, merged);
+    }
+  }
+  for (const [key, child] of Object.entries(node)) {
+    if (isObject(child) && !DTCG_META.has(key)) resolveExtends(child, root, active);
+  }
+}
+
+// [[name, value as CSS or null]] in document order.
+function dtcgEntries(data) {
+  const doc = structuredClone(data);
+  resolveExtends(doc, doc, new Set());
+  const out = [];
+  const token = (node, path, kind) => {
+    const type = has(node, '$type') ? node.$type : kind;
+    let value;
+    if (!has(node, '$value')) {
+      const alias = pointerAlias(node.$ref);
+      if (alias === null) return;
+      value = `{${alias}}`;
+    } else {
+      value = convertValue(node.$value, type);
+      if (value === UNSUPPORTED) return;
+    }
+    const alias = typeof value === 'string' && value.startsWith('{') && value.endsWith('}') ? pointerAlias(value) : null;
+    let css;
+    if (alias) css = `var(${dtcgName(alias.split('.'))})`;
+    else if (typeof value === 'boolean' || value === null) css = null;
+    else if (typeof value === 'number') css = fmt(value);
+    else css = String(value).split(/\s+/).filter(Boolean).join(' ') || null;
+    out.push([dtcgName(path), css]);
+  };
+  const walk = (node, path, kind) => {
+    if (!isObject(node)) return;
+    if (has(node, '$value') || has(node, '$ref')) {
+      token(node, path, kind);
+      return;
+    }
+    const groupKind = has(node, '$type') ? node.$type : kind;
+    for (const [key, child] of Object.entries(node)) {
+      if (key === '$root') {
+        if (isObject(child)) token(child, path, groupKind);    // the group's own token: same path
+      } else if (!DTCG_META.has(key)) {
+        walk(child, [...path, key], groupKind);
+      }
+    }
+  };
+  walk(doc, [], null);
+  return out;
+}
+
+function isDtcg(data) {
+  if (isObject(data) && has(data, 'schema')) return false;
+  const holds = (node, depth) => {
+    if (!isObject(node) || depth > 64) return false;
+    if (depth && (has(node, '$value') || typeof node.$ref === 'string')) return true;
+    return Object.entries(node).some(([k, v]) => k !== '$extensions' && k !== '$schema' && holds(v, depth + 1));
+  };
+  return holds(data, 0);
+}
+
+function dtcgTokens(data) {
+  const tokens = new Tokens();
+  for (const [name, value] of dtcgEntries(data)) {
+    if (value !== null) tokens.add(name, value, value.includes('var(') ? 2 : 1);   // as cssTokens files them
+  }
+  return tokens;
+}
+
+// A project's token files, contract.json, DTCG or tokens.css, read in order into
 // one set of sections, as read_tokens() does: a later file's value wins, step
 // by step for a ramp or a scale, and a name a later file files in another
 // section leaves the earlier one.
@@ -426,7 +752,13 @@ export function readTokens(paths) {
   const out = new Tokens();
   for (const file of paths) {
     let part;
-    if (isContract(file)) {
+    const json = isContract(file) ? readJson(file) : null;
+    if (isContract(file) && isDtcg(json)) {
+      part = dtcgTokens(json);
+    } else if (isContract(file)) {
+      if (!(isObject(json) && has(json, 'schema'))) {
+        throw new ConfigError(`${file}: neither a contract.json (no "schema") nor a DTCG token file (no "$value")`);
+      }
       const data = readContract(file);
       part = new Tokens();
       for (const section of ['ramps', 'scales']) {

@@ -26,7 +26,7 @@ At the project's root:
 | Key | Holds |
 |---|---|
 | `schema` | `1`. The only key required |
-| `tokens` | The project's token files: a `tokens.css`, a `contract.json`, or a list. A later file's value wins, step by step for a ramp or a scale, so two files may each hold part of one ramp |
+| `tokens` | The project's token files: a `tokens.css`, a `contract.json`, a DTCG 2025.10 file (`*.json` or `*.tokens`), or a list. A later file's value wins, step by step for a ramp or a scale, so two files may each hold part of one ramp |
 | `emailTokens` | The email build's own `email-tokens.json`, a different file that only the email scripts read |
 | `components` | Globs that add to the component files the rule spec names. `*` and `?` stay within a folder, and `**/` is any number of folders, none included |
 | `emails` | Globs of the email templates, read as `components` is: `emails/**/*.html` when the key is left out, and none with `[]` |
@@ -58,9 +58,11 @@ Only a token with a default value is in it; one declared only in a theme or unde
 
 A script that takes a `tokens.css` instead reads it the same way: the custom properties of a rule whose selector starts with `:root` (or `html`, `:where(:root)`, `*`), outside any at-rule but `@layer`, and with no theme or density selector that names a value. It cannot see what extract_system sees, so it takes a token's tier from its value alone: a value that reads another token is a role, and a literal is Tier 1. extract_system reads the name first. On the starter's `tokens.css` the two disagree about eight names, none of them a ramp step or a breakpoint: seven roles with a literal value (`--bg-hover`, `--space-fluid-sm`) and `--shadow-focus`, which reads a token. A `contract.json` is the exact form; give the scripts one when a project's roles matter.
 
+A DTCG 2025.10 file (P31) is any `*.json` or `*.tokens` token file with no `"schema"` that holds a token (`$value`, or a whole-token `$ref`). Each token's name is its path joined by `-`, as Style Dictionary's `name/kebab` and Terrazzo's default write it (`color.bg.surface` is `--color-bg-surface`), a group's `$root` is the group's own name, and a reference is `var(--name)`. Its tiers come from the value, as a `tokens.css`'s do. A value with no CSS form (a typography composite, a boolean) is left out. The scripts read it through `dtcg.py`, a copy of the plugin's `shared/dtcg.py` beside each `project_config.py`, and the lint configs through `project_config.mjs`'s port, held to it by a test.
+
 ## 3. What each script takes from the project's tokens
 
-Each takes `--tokens FILE` (repeatable), a `tokens.css` or a `contract.json`, and without it the token files the config lists.
+Each takes `--tokens FILE` (repeatable), a `tokens.css`, a `contract.json` or a DTCG file, and without it the token files the config lists.
 
 | Skill | Script | What the project's tokens change |
 |---|---|---|
@@ -69,8 +71,8 @@ Each takes `--tokens FILE` (repeatable), a `tokens.css` or a `contract.json`, an
 | figma-variables-sync | `figma_audit.py` | Its ramps replace the studio's ramps of the same name. A scale it declares (spacing, radius, type, stroke, z, duration, leading, tracking, weight, breakpoints) replaces the studio's: its steps, not both, so the scale stays closed. A fluid `clamp()` type step counts at both ends |
 | figma-variables-sync | `figma_to_tokens.py` | Its names join the vocabulary, so `color/brand/500` comes back as `--brand-500`, recognised, in its tier. The starter's names keep theirs. A ramp step it writes in OKLCH comes back as that exact value |
 | design-system-docs | `extract_system.py` | Reads the CSS token files, and writes `contract.json` with `--contract` |
-| design-system-versioning | `diff_system.py` | Takes a `contract.json` as either snapshot. Without an `old` snapshot, it is `baselines.system`. Without a `new` one, the candidate is the project's token files: its tokens.css files as one snapshot, or, when the list holds a contract, every file read as above, in order, as a contract. Against a contract, the other side is cut down to what a contract holds, default values and tiers, so a theme or a note it leaves out is not a change |
-| design-token-migration | `cluster_values.py` | Its steps of the contract's six ramps (`neutral`, `accent` and the four status ramps) replace the derived ones, step by step, and `tokens.css` writes its values. A step it lacks is built as before, from its own accent step nearest 500. `--accent` beats its accent ramp. A ramp the contract does not name has no roles to land on, and the reconciliation report says so |
+| design-system-versioning | `diff_system.py` | Takes a `contract.json` or a DTCG file as either snapshot. Without an `old` snapshot, it is `baselines.system`. Without a `new` one, the candidate is the project's token files: its tokens.css files as one snapshot, or, when the list holds a contract, every file read as above, in order, as a contract. Against a contract, the other side is cut down to what a contract holds, default values and tiers, so a theme or a note it leaves out is not a change |
+| design-token-migration | `cluster_values.py` | Its steps of the contract's six ramps (`neutral`, `accent` and the four status ramps) replace the derived ones, step by step, and `tokens.css` writes its values. A step it lacks is built as before, from its own accent step nearest 500. `--accent` beats its accent ramp. A ramp the contract does not name has no roles to land on, and the reconciliation report says so. The proposal is written as `tokens.json` in DTCG 2025.10 too |
 
 ## 4. Who reads the other keys
 

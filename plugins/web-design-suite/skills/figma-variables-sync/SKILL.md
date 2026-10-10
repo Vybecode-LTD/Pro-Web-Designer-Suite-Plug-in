@@ -210,7 +210,14 @@ python scripts/figma_to_tokens.py design/figma-variables.json \
 # or one at a time
 python scripts/figma_to_tokens.py design/figma-variables.json --format css \
   --out src/styles/tokens.css
+
+# code -> a DTCG 2025.10 file, for Tokens Studio, Style Dictionary or Terrazzo
+python scripts/figma_to_tokens.py src/styles/tokens.css --format dtcg --out design/tokens.json
 ```
+
+`--format dtcg` writes the default mode, every token typed, colours as 2025.10
+objects and roles as references; a value DTCG has no type for (`clamp()`, `em`)
+is named and left out (`references/figma-mapping.md`, "Writing DTCG").
 
 What it does, and what it refuses to do:
 

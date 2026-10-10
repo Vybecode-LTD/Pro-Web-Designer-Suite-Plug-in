@@ -11,12 +11,15 @@ along with what to do about it — because the values that do not fit are where
 the design work is, and pretending they fit is how a migration ships a
 regression.
 
-It emits three files into the output directory:
+It emits four files into the output directory:
 
     tokens.css          the contract's exact token names, with the ramps
                         derived from THIS codebase's own colors, and a
                         provenance comment on every token saying which
                         literals it absorbed
+    tokens.json         the same default values as a DTCG 2025.10 file, for
+                        Style Dictionary, Terrazzo and Tokens Studio (P31);
+                        a value DTCG has no type for is left out and named
     mapping.json        every original literal -> its token, in the form
                         apply_codemod.py consumes
     reconciliation.md   every value that does not map, why, and the
@@ -73,9 +76,11 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.cluster_values
+    from . import dtcg                            # type: ignore[import-not-found]
     from .project_config import ConfigError, ProjectTokens, read_tokens, token_sources
 except ImportError:                               # python scripts/cluster_values.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import dtcg                                   # type: ignore[no-redef]
     from project_config import ConfigError, ProjectTokens, read_tokens, token_sources  # type: ignore[no-redef]
 
 # ===========================================================================
@@ -2679,6 +2684,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     }
 
     (out / "tokens.css").write_text(tokens_css, encoding="utf-8")
+    # The same proposal in DTCG 2025.10 (P31): tokens.css's default values,
+    # typed, with what DTCG cannot hold (clamp(), calc(), em) named.
+    doc, left_out = dtcg.document(read_tokens([out / "tokens.css"]).values().items(),
+                                  note="cluster_values.py's proposal: tokens.css's default values. "
+                                       "Its themes and densities are in tokens.css.")
+    (out / "tokens.json").write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     (out / "mapping.json").write_text(json.dumps(mapping, indent=2) + "\n",
                                       encoding="utf-8")
     (out / "reconciliation.md").write_text(report, encoding="utf-8")
@@ -2689,6 +2700,9 @@ def main(argv: Sequence[str] | None = None) -> int:
           f"occurrence(s); {review} need review; "
           f"{sum(u.occurrences for u in prop.unmapped)} need a design decision.")
     print(f"  {out / 'tokens.css'}")
+    print(f"  {out / 'tokens.json'}   DTCG 2025.10; {len(left_out)} value(s) it cannot type left out"
+          + (f": {', '.join(name for name, _ in left_out[:4])}" + (" ..." if len(left_out) > 4 else "")
+             if left_out else ""))
     print(f"  {out / 'mapping.json'}")
     print(f"  {out / 'reconciliation.md'}   <- read this one first")
     return 0
