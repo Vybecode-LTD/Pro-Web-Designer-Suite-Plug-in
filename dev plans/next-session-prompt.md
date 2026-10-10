@@ -136,7 +136,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 ## 1. Orient (keep it under about 40 thousand tokens)
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`.
-2. Read the execution plan's §2 and §6, and its Phase 5 table in §4.
+2. Read the execution plan's §2 and §6, and its Phase 6 table in §4 (P31 to P43 and R4: each item's scope and main files).
 3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
    - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions, and the owner's no to `bin/`.
    - §1 is the plugin-evals page, §10 P29's choices, and **§11 the sandboxing page and P30's choices**, with the first runs. Read §11 if you touch the evals.
