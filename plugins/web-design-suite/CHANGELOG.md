@@ -264,7 +264,8 @@
     in 3 runs, since the router heard "screen reader" only with a space. It hears the
     hyphen now, and the case passes 3 of 3.
   - **The first run:** 22 of 23 cases passed, then 23 of 23 after that fix, for about
-    $6 at list price, with Claude Code 2.1.293 and `claude-sonnet-5-5`.
+    $6 at list price, with Claude Code 2.1.293 and `claude-sonnet-5-5`; in CI on Linux, 23 of
+    23 for $4.11.
   - **In CI:** the repository's `evals.yml` runs the routing cases on a release tag or
     when started by hand, never on a pull request, with the CLI and both models pinned
     and a ceiling under the $15 a full run may cost.
