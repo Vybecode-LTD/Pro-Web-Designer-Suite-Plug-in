@@ -34,7 +34,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
     - waits for CodeRabbit's check to leave `pending`;
     - prints the checks, `mergeStateStatus`, the open-thread count and the reviews by commit.
 
-    It is in the last two sessions' scratchpads; copy it into yours.
+    It is in the last sessions' scratchpads; copy the newest (`0b8d7fc9-…`), whose `gh run watch` has `--interval 30`. **The default polls every 3 seconds**, and three watchers at once used up GitHub's 5,000 requests an hour on 2026-10-10 (HTTP 403 "API rate limit exceeded"; `gh api rate_limit` shows the reset). Run one watcher at a time, and stop a superseded one with `TaskStop`.
   - Never grep `tooling/`: its `node_modules` makes a search run for minutes. Reading one named file in it is fine.
 - **Where things go.**
   - Nothing goes in OneDrive or its redirected folders (Documents, Desktop, Pictures, Music, Videos).
