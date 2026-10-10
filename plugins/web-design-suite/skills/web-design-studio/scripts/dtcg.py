@@ -29,6 +29,10 @@ READING
                    written in its own CSS function (`lab(...)`, `color(display-p3
                    ...)`). project_config's read_tokens() reads a DTCG file so.
 
+  studio_document  a Tokens Studio export (its sets, `$themes`, `$metadata`,
+                   the legacy `{value, type}` keys and its math) as one 2025.10
+                   tree per theme; tokens() reads its default theme.
+
 WRITING
   document(values) a 2025.10 document from CSS custom properties: each name
                    split on `-` into groups (`--bg-surface` is `bg.surface`), a
@@ -371,6 +375,8 @@ def is_document(data: Any, depth: int = 0) -> bool:
     a whole-token `$ref`, at any depth."""
     if not isinstance(data, dict) or depth > 64:
         return False
+    if depth == 0 and is_studio(data):
+        return True
     if "$value" in data or isinstance(data.get("$ref"), str):
         return depth > 0
     return any(is_document(v, depth + 1) for k, v in data.items()
@@ -416,8 +422,13 @@ class Token:
 
 def tokens(data: Any) -> Tuple[List[Token], Problems]:
     """Every token of a 2025.10 document, flat and in document order, its
-    value lossless (see the module's docstring), with the problems."""
+    value lossless (see the module's docstring), with the problems. A Tokens
+    Studio export is read as its default theme: each theme group's first."""
+    studio: Problems = []
+    if is_studio(data):                          # its default theme's sets, merged
+        data, studio = studio_document(data)
     doc, problems = normalise(data, lossless=True)
+    problems = studio + problems
     out: List[Token] = []
 
     def walk(node: Any, path: List[str]) -> None:
@@ -435,6 +446,269 @@ def tokens(data: Any) -> Tuple[List[Token], Problems]:
 
     walk(doc, [])
     return out, problems
+
+
+# ---------------------------------------------------------------------------
+# Tokens Studio: sets, $themes and $metadata (P31 part 2)
+# ---------------------------------------------------------------------------
+# A Tokens Studio export keeps each token set under its name at the top level,
+# beside `$themes` (each theme's sets: "source" for references only, "enabled"
+# for its own tokens, "disabled") and `$metadata.tokenSetOrder`. Its references
+# name a token without its set (`{neutral.0}`), so the sets a theme uses merge
+# into one tree: its source sets, then its enabled ones, each in set order, a
+# later set's token winning, as sd-transforms' permutateThemes orders them. A legacy token is `{value, type, description}`; a value may be
+# math (`{space.base} * 6`); a bare number on a size is px.
+
+STUDIO_KEYS = ("$themes", "$metadata")
+# Tokens Studio's types, as the 2025.10 type each one is.
+STUDIO_TYPES = {"spacing": "dimension", "sizing": "dimension", "borderradius": "dimension",
+                "borderwidth": "dimension", "fontsizes": "dimension", "letterspacing": "dimension",
+                "paragraphspacing": "dimension", "paragraphindent": "dimension", "dimension": "dimension",
+                "fontfamilies": "fontFamily", "fontweights": "fontWeight", "lineheights": "number",
+                "opacity": "number", "number": "number", "boxshadow": "shadow", "color": "color",
+                "typography": "typography", "border": "border", "duration": "duration",
+                "cubicbezier": "cubicBezier"}
+MATH_REF = re.compile(r"\{([^{}]+)\}")
+MATH_TOKEN = re.compile(r"\s*(?:(\d+\.?\d*|\.\d+)(px|rem|em|%)?|([-+*/()]))", re.I)
+
+
+def is_studio(data: Any) -> bool:
+    return isinstance(data, dict) and (isinstance(data.get("$themes"), list)
+                                       or isinstance(data.get("$metadata"), dict))
+
+
+def studio_sets(data: dict) -> List[str]:
+    """The set names in `tokenSetOrder`, then any set it leaves out."""
+    meta = data.get("$metadata") if isinstance(data.get("$metadata"), dict) else {}
+    order = [n for n in (meta.get("tokenSetOrder") or []) if isinstance(n, str)]
+    names = [n for n in order if isinstance(data.get(n), dict)]
+    return names + [k for k, v in data.items()
+                    if isinstance(v, dict) and k not in STUDIO_KEYS and not k.startswith("$") and k not in names]
+
+
+@dataclass
+class Theme:
+    name: str
+    group: str
+    sets: List[str]                              # its "source" sets, then its "enabled" ones
+    enabled: List[str]
+
+
+def studio_themes(data: dict) -> List[Theme]:
+    order = studio_sets(data)
+    out = []
+    for entry in data.get("$themes") or []:
+        if not (isinstance(entry, dict) and isinstance(entry.get("name"), str)):
+            continue
+        chosen = entry.get("selectedTokenSets") if isinstance(entry.get("selectedTokenSets"), dict) else {}
+        out.append(Theme(entry["name"], str(entry.get("group") or ""),
+                         [s for s in order if chosen.get(s) == "source"]
+                         + [s for s in order if chosen.get(s) == "enabled"],
+                         [s for s in order if chosen.get(s) == "enabled"]))
+    return out
+
+
+def studio_default(data: dict) -> List[str]:
+    """The sets of each theme group's first theme, the source sets first, or
+    every set with no themes."""
+    themes = studio_themes(data)
+    if not themes:
+        return studio_sets(data)
+    first: Dict[str, Theme] = {}
+    for theme in themes:
+        first.setdefault(theme.group, theme)
+    enabled = {s for theme in first.values() for s in theme.enabled}
+    source = {s for theme in first.values() for s in theme.sets} - enabled
+    order = studio_sets(data)
+    return [s for s in order if s in source] + [s for s in order if s in enabled]
+
+
+def _studio_token(node: Any) -> bool:
+    return isinstance(node, dict) and ("$value" in node or (
+        "value" in node and ("type" in node or not isinstance(node["value"], dict))))
+
+
+def _studio_tree(node: Any, kind: Optional[str] = None) -> Any:
+    """A set as 2025.10 keys: `$value`, `$type` as the 2025.10 type,
+    `$description`, and a bare number on a size as px."""
+    if not isinstance(node, dict):
+        return node
+    if not _studio_token(node):
+        group_kind = node.get("$type", node.get("type", kind))
+        return {k: (_studio_tree(v, group_kind) if not k.startswith("$")
+                    else STUDIO_TYPES.get(str(v).lower(), v) if k == "$type" else v)
+                for k, v in node.items() if k not in ("type",)}
+    value = node["$value"] if "$value" in node else node["value"]
+    studio = str(node.get("$type", node.get("type", kind)) or "")
+    kind = STUDIO_TYPES.get(studio.lower(), studio or None)
+    if kind == "dimension" and (isinstance(value, (int, float)) and not isinstance(value, bool)
+                                or isinstance(value, str) and re.fullmatch(NUMBER, value.strip())):
+        value = f"{_fmt(float(value))}px"
+    out: Dict[str, Any] = {"$value": value}
+    if kind:
+        out["$type"] = kind
+    for key in ("description", "$description"):
+        if isinstance(node.get(key), str):
+            out["$description"] = node[key]
+    for key in ("$deprecated", "$extensions"):
+        if key in node:
+            out[key] = node[key]
+    return out
+
+
+def _merge(into: dict, tree: dict) -> None:
+    for key, value in tree.items():
+        if isinstance(value, dict) and isinstance(into.get(key), dict) \
+                and "$value" not in value and "$value" not in into[key]:
+            _merge(into[key], value)
+        else:
+            into[key] = copy.deepcopy(value)
+
+
+def _evaluate(text: str) -> Optional[Tuple[float, str]]:
+    """+ - * / and brackets over numbers that share one unit, or none."""
+    pos, parts = 0, []
+    while pos < len(text.rstrip()):
+        m = MATH_TOKEN.match(text, pos)
+        if not m:
+            return None
+        parts.append((float(m.group(1)), (m.group(2) or "").lower()) if m.group(1) else m.group(3))
+        pos = m.end()
+    units = {p[1] for p in parts if isinstance(p, tuple) and p[1]}
+    if len(units) > 1:
+        return None
+    at = [0]
+
+    def peek() -> Any:
+        return parts[at[0]] if at[0] < len(parts) else None
+
+    def factor() -> float:
+        token = peek()
+        at[0] += 1
+        if token == "-":
+            return -factor()
+        if token == "(":
+            value = expr()
+            if peek() != ")":
+                raise ValueError
+            at[0] += 1
+            return value
+        if isinstance(token, tuple):
+            return token[0]
+        raise ValueError
+
+    def term() -> float:
+        value = factor()
+        while peek() in ("*", "/"):
+            op = peek()
+            at[0] += 1
+            right = factor()
+            value = value * right if op == "*" else value / right
+        return value
+
+    def expr() -> float:
+        value = term()
+        while peek() in ("+", "-"):
+            op = peek()
+            at[0] += 1
+            right = term()
+            value = value + right if op == "+" else value - right
+        return value
+
+    try:
+        value = expr()
+    except (ValueError, ZeroDivisionError):
+        return None
+    if at[0] != len(parts) or not any(p in ("+", "-", "*", "/") for p in parts):
+        return None
+    return value, (units.pop() if units else "")
+
+
+def _is_math(text: str) -> bool:
+    """Math over references or numbers, not a whole reference or a CSS function."""
+    if (text.startswith("{") and text.endswith("}") and pointer_alias(text)) or re.search(r"[a-z]\(", text, re.I):
+        return False
+    return bool(MATH_REF.search(text) or re.search(r"\d\s*[*/+]|\s-\s", text))
+
+
+def _studio_math(doc: dict, problems: Problems) -> None:
+    """Each value that is math over references and numbers, worked out."""
+    def lookup(path: str, seen: Tuple[str, ...]) -> Any:
+        node: Any = doc
+        for part in path.split("."):
+            if not isinstance(node, dict) or part not in node:
+                return None
+            node = node[part]
+        if isinstance(node, dict) and "$value" not in node:
+            node = node.get("$root")
+        if not isinstance(node, dict) or path in seen:
+            return None
+        return solve(node.get("$value"), seen + (path,))
+
+    def solve(value: Any, seen: Tuple[str, ...]) -> Any:
+        if not isinstance(value, str):
+            return value
+        text = value.strip()
+        alias = pointer_alias(text) if text.startswith("{") and text.endswith("}") else None
+        if alias:
+            return lookup(alias, seen)
+        if not _is_math(text):
+            return value
+        replaced = MATH_REF.sub(lambda m: str(lookup(m.group(1), seen)), text)
+        result = _evaluate(replaced)
+        if result is None:
+            return value
+        return f"{_fmt(result[0])}{result[1]}" if result[1] else result[0]
+
+    def walk(node: Any, path: List[str]) -> bool:
+        """True: leave this token out."""
+        if not isinstance(node, dict):
+            return False
+        if "$value" in node:
+            value = node["$value"]
+            if isinstance(value, str) and _is_math(value.strip()):
+                solved = solve(value, (".".join(path),))
+                if solved == value:
+                    problems.append(("/".join(path), f"math this script cannot work out, left out "
+                                                     f"({_short(value)})"))
+                    return True
+                node["$value"] = solved
+            return False
+        for key in [k for k in node if not k.startswith("$")]:
+            if walk(node[key], path + [key]):
+                del node[key]
+        return False
+
+    walk(doc, [])
+
+
+def studio_document(data: dict, sets: Optional[Sequence[str]] = None) -> Tuple[dict, Problems]:
+    """The sets (default: the default theme's, studio_default) merged into one
+    2025.10 tree in set order, with its math worked out."""
+    problems: Problems = []
+    doc: Dict[str, Any] = {}
+    for name in (studio_default(data) if sets is None else sets):
+        if isinstance(data.get(name), dict):
+            _merge(doc, _studio_tree(data[name]))
+    _studio_math(doc, problems)
+    return doc, problems
+
+
+def studio_paths(data: dict, name: str) -> List[Tuple[str, ...]]:
+    """The tokens one set holds, as paths."""
+    out: List[Tuple[str, ...]] = []
+
+    def walk(node: Any, path: Tuple[str, ...]) -> None:
+        if _studio_token(node):
+            out.append(path)
+        elif isinstance(node, dict):
+            for key, child in node.items():
+                if key == "$root":
+                    walk(child, path)
+                elif not key.startswith("$") and key != "type":
+                    walk(child, path + (key,))
+    walk(data.get(name), ())
+    return out
 
 
 # ---------------------------------------------------------------------------

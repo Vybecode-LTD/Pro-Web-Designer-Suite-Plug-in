@@ -621,3 +621,20 @@ type for `clamp()`, `calc()`, `em`, `ch` or a `font` shorthand, so each such
 token, and every token that refers to one, is named on stderr and left out
 (exit 1). A DTCG file holds one mode: the default values are written, and each
 theme or density block is named as left out.
+
+**Tokens Studio.** A single-file Tokens Studio export keeps each token set under
+its name beside `$themes` and `$metadata.tokenSetOrder`, and its references name
+a token without its set (`{neutral.0}`). Both scripts read it as Tokens Studio
+does: the sets a theme uses merge, its `source` sets and then its `enabled` ones,
+each in set order, so a later set's token wins and a theme's own tokens beat
+the sets it only reads (as sd-transforms' `permutateThemes` orders them); each theme group is a collection whose modes are its
+themes, the first the default; and each set no theme enables is a collection of
+its own. A Light/Dark export is `:root` and `[data-theme="dark"]`, never
+`--light-bg-surface`. The legacy `{value, type, description}` keys and Tokens
+Studio's types (`spacing`, `fontWeights`, `boxShadow`...) read as 2025.10's, a
+bare number on a size is px, and math over references and numbers
+(`{space.base} * 6`, with `+ - * /` and brackets) is worked out. Math it cannot
+work out (two units, a reference that resolves to nothing) is named and left
+out, never written. `read_tokens()`, and so `.design-suite.json`'s `tokens`,
+reads such a file as its default theme: each group's first. A `number` or
+`fontWeight` token is written unitless, whatever its name.

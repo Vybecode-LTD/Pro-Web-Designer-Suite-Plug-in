@@ -283,6 +283,9 @@ class FVar:
     var_id: str = ""
     # DTCG `$deprecated`, the token's own or a group's: true, or the reason.
     deprecated: Union[bool, str] = False
+    # A DTCG source's own `$type` (`number`, `fontWeight`...), which says
+    # what a FLOAT is better than its name can.
+    dtcg_type: str = ""
 
     @property
     def slug(self) -> str:
@@ -517,7 +520,81 @@ def dtcg_type(declared: Optional[str], value: Any) -> str:
     return "STRING"
 
 
+def _dtcg_vars(data: dict) -> Tuple[Dict[str, dict], List[Tuple[str, str]]]:
+    """A 2025.10 tree as {"a/b": its normalised token}, in order."""
+    data, problems = dtcg.normalise(data)
+    reserved = dtcg.META_KEYS | {"$value"}
+    out: Dict[str, dict] = {}
+
+    def walk(node: Any, path: List[str]) -> None:
+        if _is_leaf_token(node):
+            out["/".join(path)] = node
+        elif isinstance(node, dict):
+            for k, v in node.items():
+                if k == "$root":
+                    walk(v, path)
+                elif k not in reserved:
+                    walk(v, path + [str(k)])
+    walk(data, [])
+    return out, problems
+
+
+def parse_studio(data: dict) -> FDoc:
+    """A Tokens Studio export (P31 part 2). Each theme group is a collection
+    whose modes are its themes, the first the default, holding the tokens of
+    the sets its themes enable; each set no theme enables is a collection of
+    its own, with one mode. References name tokens without their set, so a
+    Light/Dark export becomes `:root` and `[data-theme="dark"]`, never
+    `--light-bg-surface`."""
+    doc = FDoc(shape="tokens-studio")
+    themes = dtcg.studio_themes(data)
+    base, doc.unsupported = dtcg.studio_document(data)
+    base_vars, problems = _dtcg_vars(base)
+    doc.unsupported += problems
+    themed: Dict[str, str] = {}                  # token -> its group's collection
+
+    def add(name: str, node: dict, collection: str, values: Dict[str, Any]) -> None:
+        fv = FVar(name=name, collection=collection,
+                  resolved_type=dtcg_type(node.get("$type"), node.get("$value")), values=values,
+                  description=node.get("$description") or "", var_id=name,
+                  deprecated=node.get("$deprecated") or False, dtcg_type=str(node.get("$type") or ""))
+        doc.variables.append(fv)
+        doc.by_id.setdefault(name, fv)
+        doc.by_id.setdefault(name.replace("/", "."), fv)
+
+    groups: Dict[str, List[Any]] = {}
+    for theme in themes:
+        groups.setdefault(theme.group or "Themes", []).append(theme)
+    for group, members in groups.items():
+        doc.collections[group] = FCollection(group, [t.name for t in members], members[0].name)
+        per_theme = {}
+        for theme in members:
+            merged, extra = dtcg.studio_document(data, theme.sets)
+            per_theme[theme.name], more = _dtcg_vars(merged)
+            doc.unsupported += [p for p in extra + more if p not in doc.unsupported]
+        names = list(dict.fromkeys("/".join(path) for theme in members for s in theme.enabled
+                                   for path in dtcg.studio_paths(data, s)))
+        for name in names:
+            if name in themed:
+                continue
+            nodes = {t.name: per_theme[t.name][name] for t in members if name in per_theme[t.name]}
+            if nodes:
+                themed[name] = group
+                add(name, next(iter(nodes.values())), group, {m: n["$value"] for m, n in nodes.items()})
+    for set_name in dtcg.studio_sets(data):
+        doc.collections.setdefault(set_name, FCollection(set_name, ["Value"], "Value"))
+        for path in dtcg.studio_paths(data, set_name):
+            name = "/".join(path)
+            if name not in themed and name in base_vars and name not in doc.by_id:
+                add(name, base_vars[name], set_name, {"Value": base_vars[name]["$value"]})
+    for name in [c for c in doc.collections if not any(v.collection == c for v in doc.variables)]:
+        del doc.collections[name]
+    return doc
+
+
 def parse_dtcg(data: dict, collection: str) -> FDoc:
+    if dtcg.is_studio(data):
+        return parse_studio(data)
     doc = FDoc(shape="dtcg")
     doc.collections[collection] = FCollection(collection, ["Value"], "Value")
     # 2025.10 objects, $ref, $extends and group $type become the string forms
@@ -536,6 +613,7 @@ def parse_dtcg(data: dict, collection: str) -> FDoc:
                 description=node.get("$description") or node.get("description") or "",
                 var_id=name,
                 deprecated=node.get("$deprecated") or False,
+                dtcg_type=str(node.get("$type") or node.get("type") or ""),
             )
             doc.variables.append(fv)
             doc.by_id.setdefault(name, fv)

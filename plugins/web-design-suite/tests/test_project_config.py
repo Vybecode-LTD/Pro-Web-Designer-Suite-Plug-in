@@ -646,6 +646,44 @@ DTCG_EVERY_FORM = {
     "flag": {"on": {"$type": "boolean", "$value": True}},
     "legacy": {"$value": "16px", "$type": "dimension"},
 }
+STUDIO_LEGACY = {
+    "global": {"neutral": {"0": {"value": "#ffffff", "type": "color"}, "900": {"value": "#1f1d1b", "type": "color"}},
+               "space": {"base": {"value": "4", "type": "spacing"}, "6": {"value": "{space.base} * 6", "type": "spacing"},
+                         "half": {"value": "({space.base} + 2) / 4", "type": "spacing"},
+                         "neg": {"value": "-{space.base} - 1", "type": "spacing"},
+                         "mixed": {"value": "{space.base} + 1rem", "type": "spacing"},
+                         "zero": {"value": "{space.base} / 0", "type": "spacing"},
+                         "lost": {"value": "{space.nowhere} * 2", "type": "spacing"},
+                         "fluid": {"value": "calc(1rem + 2vw)", "type": "spacing"}},
+               "opacity": {"hover": {"value": "0.08 * 2", "type": "opacity"}},
+               "font": {"sans": {"value": "Inter, sans-serif", "type": "fontFamilies"},
+                        "bold": {"value": "700", "type": "fontWeights"}}},
+    "light": {"bg": {"surface": {"value": "{neutral.0}", "type": "color", "description": "the page"}}},
+    "dark": {"bg": {"surface": {"value": "{neutral.900}", "type": "color"}}},
+    "$themes": [{"id": "l", "name": "Light", "selectedTokenSets": {"global": "source", "light": "enabled"}},
+                {"id": "d", "name": "Dark", "selectedTokenSets": {"global": "source", "dark": "enabled"}}],
+    "$metadata": {"tokenSetOrder": ["global", "light", "dark"]},
+}
+STUDIO_GROUPS = {
+    "core": {"$type": "color", "blue": {"$value": "#2f6df6"}, "red": {"$value": "#e5484d"},
+             "size": {"$type": "sizing", "1": {"$value": 8}, "2": {"$value": "{size.1} * 2"}}},
+    "brand/a": {"accent": {"$type": "color", "$value": "{blue}"}},
+    "brand/b": {"accent": {"$type": "color", "$value": "{red}"}, "gone": {"$type": "color", "$value": "{core.red}"}},
+    "mode/light": {"bg": {"$type": "color", "$value": "#ffffff"}},
+    "mode/dark": {"bg": {"$type": "color", "$value": "#000000"}},
+    "spare": {"unused": {"$type": "color", "$value": "#123456"}},
+    "$themes": [{"name": "A", "group": "brand", "selectedTokenSets": {"core": "source", "brand/a": "enabled"}},
+                {"name": "B", "group": "brand", "selectedTokenSets": {"core": "source", "brand/b": "enabled"}},
+                {"name": "Light", "group": "mode", "selectedTokenSets": {"mode/light": "enabled", "spare": "disabled"}},
+                {"name": "Dark", "group": "mode", "selectedTokenSets": {"mode/dark": "enabled"}}],
+    "$metadata": {"tokenSetOrder": ["core", "mode/light", "mode/dark", "brand/a", "brand/b"]},
+}
+STUDIO_ORDER = {                                     # the source set comes later in the order
+    "light": {"bg": {"surface": {"value": "#ffffff", "type": "color"}}},
+    "base": {"bg": {"surface": {"value": "#eeeeee", "type": "color"}}, "neutral": {"0": {"value": "#fff", "type": "color"}}},
+    "$themes": [{"name": "Light", "selectedTokenSets": {"light": "enabled", "base": "source"}}],
+    "$metadata": {"tokenSetOrder": ["light", "base"]},
+}
 TOKEN_FILES = {
     "layers.css": (
         "@layer reset, tokens;\n@layer tokens {\n  :root, [data-theme] {\n"
@@ -678,13 +716,17 @@ TOKEN_FILES = {
                                   "loop": {"$extends": "{loop}", "x": {"$value": "#010101", "$type": "color"}}}),
     "legacy.json": json.dumps({"global": {"neutral": {"0": {"value": "#ffffff", "type": "color"}}}}),
     "schema-and-tokens.json": json.dumps({"schema": "x", "a": {"$value": "#fff", "$type": "color"}}),
+    # P31 part 2: Tokens Studio exports, legacy and 2025.10 keys, themes, groups and math.
+    "studio.json": json.dumps(STUDIO_LEGACY),
+    "studio-groups.json": json.dumps(STUDIO_GROUPS),
+    "studio-order.json": json.dumps(STUDIO_ORDER),
 }
 TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.css"], ["contract.json"],
                ["contract.json", "a.css"], ["a.css", "contract.json"], ["bad-schema.json"], ["bad-ramps.json"],
                ["bad-step.json"], ["bad-scale.json"], ["bad-role.json"], ["not-json.json"], ["gone.css"],
                ["gone.json"], ["a.css", "gone.css"], [], ["utf16be.json"],
                ["dtcg.tokens.json"], ["extends.tokens"], ["a.css", "dtcg.tokens.json"], ["dtcg.tokens.json", "a.css"],
-               ["legacy.json"], ["schema-and-tokens.json"]]
+               ["legacy.json"], ["schema-and-tokens.json"], ["studio.json"], ["studio-groups.json"], ["studio-order.json"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).

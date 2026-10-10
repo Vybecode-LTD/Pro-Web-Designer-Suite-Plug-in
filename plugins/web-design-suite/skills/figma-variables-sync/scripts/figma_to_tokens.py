@@ -404,7 +404,8 @@ class Converter:
 
         if var.resolved_type == "FLOAT":
             token = self.token_name(var)
-            if token.startswith(("z-", "grid-", "weight-", "density")):
+            unitless = var.dtcg_type.lower() in ("number", "fontweight")      # as a DTCG source says
+            if unitless or token.startswith(("z-", "grid-", "weight-", "density")):
                 px = as_px(raw)
                 return (f"{px:g}" if px is not None else str(raw), True)
             if token.startswith("leading-") or token.startswith("tracking-"):
