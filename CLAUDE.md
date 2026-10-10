@@ -12,13 +12,13 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is public (since 2026-09-28), and MIT-licensed like the plugin.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
-## Current state (2026-10-10, fourth session)
+## Current state (2026-10-10, fifth session)
 
 - **Version:** 3.5.0 is the latest release (`v3.5.0`, `44637c1`, published by `release.yml`), which completes Phase 5 (#76 to #99). It adds the project contract, the hooks, fifteen workflow commands, six subagents, the MCP server for the gates, and the eval suite (P29 routing, P30 outcome). R3's live check is `dev plans/web-design-suite-3.5.0-live-check.md`.
 - **Installed:** 3.5.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** about 980. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Tests:** about 1,030. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
 - **Evals:** 23 routing cases and 11 outcome cases. `evals.yml` runs both on a release tag or by hand (`tag=all`), under one $14 ceiling. The outcome cases grant Write, Edit and the gate MCP tools, never Bash. In `claude-code-capabilities.md`, §1 is the evals page, §10 P29's choices, and §11 the sandboxing page and P30's choices.
-- **Active work:** Phase 6 (4.0.0) in `dev plans/web-design-suite-execution-plan.md`, starting with P31 (DTCG tokens, the owner's choice). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Active work:** Phase 6 (4.0.0) in `dev plans/web-design-suite-execution-plan.md`. P31 parts 1 and 2 are merged (#101 `shared/dtcg.py`, DTCG 2025.10 read and write; #102 Tokens Studio); part 3 (the resolver module, `$deprecated` into the ledger, the Style Dictionary and Terrazzo name routes) is next. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
 - **Open:** 31 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
@@ -61,7 +61,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 - **Evals are real model calls** on the owner's account. From the plugin: `claude plugin eval . --tag routing --ablation none --trust-plugin --no-publish --model claude-sonnet-5-5 --output-dir <scratchpad>` with the bundled CLI (signed in, 2026-10-10), about $0.09 a routing run. Ask the owner before any run.
 - **Commands you give the user** to run must work in cmd.exe. (The Commands block above is for the Bash tool.)
 - **Never run `npm ci` in a worktree whose `tooling/*/node_modules` is a junction**: it deletes the real toolchain through the link.
-- **The reader's copies.** `shared/project_config.py` has ten copies and `shared/project_config.mjs` seven (`hooks/` among them). After a merge from a branch below, copy both masters over every copy: git merges each copy on its own.
+- **The reader's copies.** `shared/project_config.py` and `shared/dtcg.py` have ten copies each, `shared/project_config.mjs` seven (`hooks/` among them). After a merge from a branch below, copy the three masters over every copy: git merges each copy on its own.
 
 ## Conventions
 
@@ -79,6 +79,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 plugins/web-design-suite/         the plugin (the only folder that ships)
   skills/<13 skills>/             SKILL.md, references/, scripts/, assets/
   shared/token-contract.md        the master copy of the contract (13 copies must match it)
+  shared/dtcg.py                  DTCG 2025.10 and Tokens Studio, read and write (a copy beside each project_config.py)
   hooks/                          hooks.json and design_hooks.mjs: the opt-in gate, token diff and guard, the router
   workflow-commands/              the fifteen commands only the user invokes (/gate, /new-system, /deck...), added by plugin.json's `skills`
   agents/                         the six subagents (design-critic, gate-runner, the auditors and reviewers)

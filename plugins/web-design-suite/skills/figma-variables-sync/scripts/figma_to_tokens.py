@@ -404,7 +404,8 @@ class Converter:
 
         if var.resolved_type == "FLOAT":
             token = self.token_name(var)
-            if token.startswith(("z-", "grid-", "weight-", "density")):
+            unitless = var.dtcg_type.lower() in ("number", "fontweight")      # as a DTCG source says
+            if unitless or token.startswith(("z-", "grid-", "weight-", "density")):
                 px = as_px(raw)
                 return (f"{px:g}" if px is not None else str(raw), True)
             if token.startswith("leading-") or token.startswith("tracking-"):
@@ -525,7 +526,7 @@ class Converter:
         for var in self.doc.variables:
             col = self.doc.collections.get(var.collection)
             default = col.default_mode if col else next(iter(var.values), "Value")
-            if default not in var.values and var.values:
+            if default not in var.values and var.values and not var.partial:
                 default = next(iter(var.values))
             for mode, raw in var.values.items():
                 sel, _ = mode_selector(mode, mode == default)

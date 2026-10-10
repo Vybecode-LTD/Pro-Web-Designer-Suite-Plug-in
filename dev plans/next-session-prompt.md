@@ -1,12 +1,11 @@
 # Start here: the next session
 
-**Written 2026-10-10 (the fourth session that day)**, at the end of the session that:
-- merged P30 (#97): eleven outcome cases in six areas, graded in both arms, the gates run through the MCP server with no Bash, and `evals.yml` running routing then outcome under one ceiling;
-- merged N39 (#98): `a11y_static.py` and the a11y hook leave email templates to the email lint;
-- ran R3's live check (22 headless sessions, $3.01, and `/install-gate`'s template on GitHub), merged the release PR (#99) and **released 3.5.0**, which ends Phase 5;
-- asked the owner which Phase 6 workstream comes first: **P31, DTCG tokens**.
+**Written 2026-10-10 (the fifth session that day)**, at the end of the session that:
+- merged P31 part 1 (#101): `shared/dtcg.py`, DTCG 2025.10 read and write, copied beside every `project_config.py`; every token reader takes a DTCG file; `figma_to_tokens.py --format dtcg`; DTCG snapshots in `diff_system.py`; the migration proposal as `tokens.json`;
+- merged P31 part 2 (#102): Tokens Studio exports read as Tokens Studio reads them, `$themes` as modes, its math worked out;
+- fixed 18 real review findings across the two (§0).
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P31** (§4), then the rest of Phase 6 (§5).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P31 part 3** (§4), then the rest of Phase 6 (§5).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -58,7 +57,8 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
     - The app now keeps every PR you bound (`otherBoundPrs`), and sends events for each.
   - **Parallel work.** A review fix on a PR below a stack goes in a worktree in the scratchpad (`git worktree add PATH BRANCH`), so a `check.py` running in the main checkout is not disturbed.
     - Each worktree gets its own `check.py` run, with `WDS_NODE_MODULES` pointing at the main checkout's `tooling/main/node_modules`. Never run `npm ci` in a worktree.
-    - After a fix lands below, merge that branch into the stacked one. **Copy both masters, `shared/project_config.py` and `shared/project_config.mjs`, over every copy again afterwards**: git merges each copy separately, so the copies only the upper branch has keep the old reader (it happened twice on #79).
+    - **A worktree in the scratchpad hits the 260-character path limit:** create it with `git -c core.longpaths=true worktree add PATH BRANCH`, then `git config core.longpaths true` in it. Its `check.py` still errors on the long `evals/boundaries/` paths (16 errors last session), so run targeted tests there and the full `check.py` in the main checkout on a merge.
+    - After a fix lands below, merge that branch into the stacked one. **Copy the three masters, `shared/project_config.py`, `shared/project_config.mjs` and `shared/dtcg.py`, over every copy again afterwards**: git merges each copy separately, so the copies only the upper branch has keep the old reader (it happened twice on #79).
     - The CHANGELOG, the plan and the inventory conflict every time: keep both sides, the earlier PR's first.
   - **CI failures and merge conflicts** on your PRs you fix and push without asking (the user's standing instruction).
     - An app event can describe an older head, or relay a comment you already answered. Check the current state before acting.
@@ -96,6 +96,11 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Codex on #97:** a router pattern for "a patch release?" took any `token` as context, auth tokens included. A skill's context words must be its own domain's (design tokens, `tokens.css`, a CSS custom property).
       - **Codex on #98:** a check that stands aside for another must do so only when the other runs: with `emailBuild` off, an email template's edit went unchecked.
     - **CodeRabbit's free tier:** one review an hour, and it skips a PR of more than 100 files ("Review skipped: too many files"). Keep a PR under 100 files; a fixture copied into each case counts once per case.
+    - **The fifth 2026-10-10 session's reviews found 18 real issues** on #101 (Codex 7, CodeRabbit 7 and one carried to #102) and #102 (Codex 3), each fixed with a test failing on the head it reviewed. The lessons, for any reader of an outside format:
+      - **Read what the spec allows, not what our writer writes:** a key with a space (`Button background`) needs a CSS-safe name; `{group.$root}`, a property-level `$ref` (`#/x/$value/components/0`), non-ASCII names, and a legacy group named `type` are all valid.
+      - **Bound every recursion and every expansion:** a 300-deep document, a 200-link `$extends` chain and a fan-out (exponential) must be refused with a problem, not a traceback or a full memory. Check depth and size without recursing, after each merge.
+      - **Never drop silently:** every value left out is named; a `*/` in a description cannot end a CSS comment; a cycle (`$extends`, or `a -> {b} -> {a}`) is reported.
+      - **A partial mode map** (a token only the Dark theme sets) must not be promoted to `:root`.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
   - The Bash tool is Git Bash. Any command you give the user must work in cmd.exe.
@@ -140,10 +145,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
    - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions, and the owner's no to `bin/`.
    - §1 is the plugin-evals page, §10 P29's choices, and **§11 the sandboxing page and P30's choices**, with the first runs. Read §11 if you touch the evals.
-   - **Before P31, re-read at their sources**, and register every figure in `evidence.json`:
-     - the DTCG format, 2025.10 (designtokens.org): the colour object, aliases, `$deprecated`, groups and `$extends`;
-     - Tokens Studio's `$themes` and `$metadata` (its docs);
-     - Style Dictionary 5 and Terrazzo: their current versions on npm, and how each reads DTCG.
+   - **Before P31 part 3, re-read at their sources** the pages §4 lists, and register every figure in `evidence.json`.
 4. Check the state, with the Bash tool:
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
@@ -154,7 +156,8 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 ## 2. Useful facts
 
-- **The plugin** is `plugins/web-design-suite/` (about 980 tests):
+- **DTCG (#101, #102).** `shared/dtcg.py` is the master, copied beside every `project_config.py` (`test_dtcg.TheCopiesAreTheMaster`); `project_config.py` loads the copy beside it by path. `normalise()` (the Figma scripts' reading, string forms) and `tokens()` (lossless, CSS names) read 2025.10 and Tokens Studio (`studio_document`, `studio_themes`); `document()` writes 2025.10 from CSS custom properties. `project_config.mjs` ports the reading, numbers formatted as Python's `f"{round(x, 6):g}"`, and `TheNodeReaderAgrees` holds them equal on every value form. `figma_common.parse_studio` makes each Studio theme group a collection; `FVar` carries `deprecated`, `dtcg_type` and `partial`.
+- **The plugin** is `plugins/web-design-suite/` (about 1,030 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -246,31 +249,25 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. P31: DTCG tokens (the owner's first pick for Phase 6)
+## 4. P31 part 3: the resolver, the ledger and the name routes
 
-**Items:** LC-C2 and LC-B2. Read each inventory row, then its paragraph in `web-design-suite-review/lifecycle.md` (`grep -n "LC-C2\|LC-B2"`; LC-C2 is in the table at about line 113, LC-B2 at about line 90).
+**Items:** LC-C2 and LC-B2, which close with this part. Read each inventory row, then LC-B2's paragraph in `web-design-suite-review/lifecycle.md` (about line 90): its last three bullets are this part.
 
-**What it asks for:** a shared `dtcg.py` that reads and writes DTCG 2025.10, with:
-- Tokens Studio sets and `$themes`, read as modes;
-- `$deprecated`, fed into the deprecation ledger;
-- a `--format dtcg` output;
-- a way to map Style Dictionary's name transforms onto the contract's grammar, so the tier and Law 6 checks work on `--color-bg-surface`;
-- the migration proposal written as DTCG `tokens.json`.
+**What parts 1 and 2 left** (the CHANGELOG's `4.0.0 — unreleased` has the detail):
+- **Writing themes.** `figma_to_tokens.py --format dtcg` writes the default mode only and names each theme or density block as left out. Write the modes through the DTCG **resolver module** (2025.10, stable): a base `tokens.json`, one file per mode with its overrides, and a `*.resolver.json` with `sets`, `modifiers` (one per theme group, `contexts` per mode, `default`) and `resolutionOrder`. Terrazzo 2 reads it; Style Dictionary 5 does not yet ("does not have full support yet" for 2025.10). Decide: `--out-dir` writes the three, or `--format dtcg` with modes requires `--out-dir`.
+- **Reading a resolver.** `figma_common.load_document` and `read_tokens()` on a `*.resolver.json`: the sets and each modifier's default context, as the default theme; the modifiers as modes, as `parse_studio` does for Tokens Studio's groups. A token two groups set is now named as left out (Codex on #102); the resolver's permutations are the way to write both.
+- **`$deprecated` into the ledger.** `deprecate.py` (design-system-versioning) gains a way to import a DTCG file's `$deprecated` tokens as ledger entries (a subcommand, or `diff_system.py --deprecations` reading `$deprecated` from the new snapshot), so a removal the file already deprecates passes the gate. `dtcg.tokens()` keeps `deprecated` on each `Token`; `figma_common.FVar.deprecated` carries it on the Figma route.
+- **The Style Dictionary and Terrazzo name routes.** Their default names are the path joined by `-` (`color.bg.surface` is `--color-bg-surface`, `color.neutral.500` is `--color-neutral-500`), so the tier and Law 6 checks, which read the contract's grammar (`--bg-surface`, `--neutral-500`), do not see the roles. Give `.design-suite.json` a way to map a project's names onto the grammar (a prefix to strip per category, such as `color-`, or a rename table), read by `project_config.py` and `.mjs` and applied in the audit, the stylelint config and the ESLint config. **One set of rules:** the change goes into `design-rules.json` first, with `allowed` and `refused` examples, then the three gates, each with a real-tool test. If a gate cannot follow yet, record it as an item and schedule it (N37 is the model).
 
-Today a Tokens Studio export becomes `--light-bg-surface` and `--dark-bg-surface` in place of a `[data-theme]` block.
+**Re-read first, and register any figure in `evidence.json`:** the resolver module (https://www.designtokens.org/tr/2025.10/resolver/), Style Dictionary 5's name transforms and its DTCG page (https://styledictionary.com/info/dtcg/), Terrazzo's CSS plugin (`variableName`, `permutations`) and its resolver guide, and sd-transforms' `permutateThemes` source. npm on 2026-10-10: style-dictionary 5.6.1, @tokens-studio/sd-transforms 2.0.3, @terrazzo/cli 2.7.1.
 
-**Start from what exists:**
-- `figma-variables-sync/scripts/dtcg_values.py` already parses and writes DTCG values (the 2025.10 colour objects among them). `figma-mapping.md` describes 2025.10 at about line 597.
-- **Shared files live in `shared/`.** Like `project_config.py`, a `shared/dtcg.py` is copied beside each script that imports it. A test then holds every copy equal to the master (`test_project_config.TheCopiesAreTheMaster` is the model). Decide whether `dtcg_values.py` becomes the master or a reader of it, and say why in the PR.
-- The readers that should accept DTCG: `extract_system.py`, `diff_system.py`, `figma_to_tokens.py`, `cluster_values.py` and the shared reader's `read_tokens()`.
+**Tests:** a resolver round trip (a `tokens.css` with `[data-theme="dark"]` to DTCG with a resolver and back to the same CSS), a resolver read as modes, a `$deprecated` token reaching the ledger and the gate, and a Style Dictionary-named project whose roles the audit and both lint configs see. Run `fail_before.py` against `v3.5.0` and against `main`'s head.
 
-**Tests:** fixtures for a 2025.10 file, a Tokens Studio export with two themes, a `$deprecated` token and a Style Dictionary-named set. Each is round-tripped and diffed, with the fail-before table against `v3.5.0`.
+**Size:** M-L. Split it if it grows (the resolver first, then the ledger, then the name routes), keeping a row named `P31` for what is still to come.
 
-**Evals:** `evals/lifecycle/dtcg-export` already grades a DTCG export (`$type`, the colour objects, aliases). After P31, ask the owner before running it (one case, two arms, about $0.30).
+**Evals:** `evals/lifecycle/dtcg-export` grades a DTCG export. Ask the owner before running it (one case, two arms, about $0.30).
 
-**Size:** M-L. Split it if it grows: the reader and writer first, then Tokens Studio, then the Style Dictionary route, keeping a row named `P31` for the parts still to come.
-
-**Close:** LC-C2 and LC-B2 in the inventory; the plan's `P31` row renamed `P31, #N`; the CHANGELOG under a new `## 4.0.0 — unreleased` heading.
+**Close:** LC-C2 and LC-B2 in the inventory; the plan's `P31` row renamed `P31 part 3, #N`; the CHANGELOG under `## 4.0.0 — unreleased`.
 
 ## 5. Then the rest of Phase 6
 

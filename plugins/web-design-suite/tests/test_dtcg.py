@@ -244,6 +244,120 @@ class FigmaToTokensWritesDtcg(TempDirTest):
         self.assertEqual(2, refused.returncode)
 
 
+STUDIO_REVIEW = {                                  # the review's fx/figma/tokens-studio.json (LC-B2)
+    "global": {"neutral": {"0": {"value": "#ffffff", "type": "color"}, "900": {"value": "#1f1d1b", "type": "color"}},
+               "space": {"base": {"value": "4", "type": "spacing"}, "6": {"value": "{space.base} * 6", "type": "spacing"}}},
+    "light": {"bg": {"surface": {"value": "{neutral.0}", "type": "color"}}},
+    "dark": {"bg": {"surface": {"value": "{neutral.900}", "type": "color"}}},
+    "$themes": [{"id": "l", "name": "Light", "selectedTokenSets": {"global": "source", "light": "enabled"}},
+                {"id": "d", "name": "Dark", "selectedTokenSets": {"global": "source", "dark": "enabled"}}],
+    "$metadata": {"tokenSetOrder": ["global", "light", "dark"]},
+}
+
+
+class TokensStudio(TempDirTest):
+    """P31 part 2 (LC-B2): a Tokens Studio export's sets are merged, its
+    `$themes` are modes, and its math is worked out. It was read as plain
+    groups: `--light-bg-surface` and `--dark-bg-surface` in place of a
+    `[data-theme]` block, and `--space-6: {space.base} * 6;`."""
+
+    def css(self, data, *args):
+        src = self.write("studio.json", json.dumps(data))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--color-format", "hex", *args, cwd=self.tmp)
+        text = proc.stdout.decode("utf-8").replace("\r\n", "\n")
+        blocks = dict(re.findall(r"^  (:root|\[data-theme=\"[\w-]+\"\]) \{\n(.*?)^  \}", text, re.M | re.S))
+        return proc, text, blocks
+
+    def test_themes_are_modes_not_prefixes(self):
+        proc, text, blocks = self.css(STUDIO_REVIEW)
+        self.assertIn("--bg-surface: var(--neutral-0);", blocks[":root"])
+        self.assertIn("--bg-surface: var(--neutral-900);", blocks['[data-theme="dark"]'])
+        self.assertIn("--space-6: 1.5rem;", blocks[":root"])
+        for wrong in ("--light-", "--dark-", "--global-", "{space.base}"):
+            self.assertNotIn(wrong, text)
+
+    def test_each_theme_group_is_a_collection(self):
+        from test_project_config import STUDIO_GROUPS
+        _, text, blocks = self.css(STUDIO_GROUPS)
+        self.assertIn("--accent: var(--blue);", blocks[":root"])
+        self.assertIn("--accent: var(--red);", blocks['[data-theme="b"]'])
+        self.assertIn("--bg: #000000;", blocks['[data-theme="dark"]'])
+        self.assertIn("--size-2: 1rem;", blocks[":root"])
+        self.assertNotIn("--brand-", text)
+
+    def test_math_it_cannot_work_out_is_named_and_left_out(self):
+        from test_project_config import STUDIO_LEGACY
+        proc, text, blocks = self.css(STUDIO_LEGACY)
+        self.assertEqual(1, proc.returncode, output(proc))
+        for name in ("space/mixed", "space/zero", "space/lost"):
+            self.assertIn(f"`{name}` was left out: math this script cannot work out", output(proc))
+        for decl in ("--space-half: 0.09375rem;", "--space-neg: -0.3125rem;", "--font-bold: 700;",
+                     "--opacity-hover: 0.16;", "--space-fluid: calc(1rem + 2vw);", "--bg-surface: var(--neutral-0);"):
+            self.assertIn(decl, blocks[":root"])
+        self.assertNotIn("{space", text)
+
+    def test_a_themes_own_sets_beat_the_sets_it_only_reads(self):
+        """Source sets merge first, then enabled ones, as sd-transforms'
+        permutateThemes orders them, whatever `tokenSetOrder` says."""
+        from test_project_config import STUDIO_ORDER
+        _, _, blocks = self.css(STUDIO_ORDER)
+        self.assertIn("--bg-surface: #ffffff;", blocks[":root"])
+        pc = load_script("design-system-docs", "project_config")
+        tokens = pc.read_tokens([self.write("tokens/order.json", json.dumps(STUDIO_ORDER))])
+        self.assertEqual("#ffffff", tokens.constants.get("--bg-surface", tokens.scales.get("bg", {}).get("surface")))
+
+    def test_a_group_named_type_is_a_group(self):
+        """Codex on #102: `type` is legacy metadata only when it is a value."""
+        data = json.loads(json.dumps(STUDIO_REVIEW))
+        data["global"]["type"] = {"body": {"value": "16px", "type": "fontSizes"}}
+        data["global"]["font"] = {"type": {"value": "Inter", "type": "fontFamilies"}}
+        _, _, blocks = self.css(data)
+        self.assertIn("--type-body: 1rem;", blocks[":root"])
+        self.assertIn("--font-type: Inter;", blocks[":root"])
+        pc = load_script("design-system-docs", "project_config")
+        values = pc.read_tokens([self.write("tokens/t.json", json.dumps(data))]).values()
+        self.assertEqual("16px", values["--type-body"])
+
+    def test_a_token_only_a_later_theme_sets_stays_out_of_root(self):
+        """Codex on #102: a Dark-only token was written in `:root`."""
+        data = json.loads(json.dumps(STUDIO_REVIEW))
+        data["dark"]["bg"]["overlay"] = {"value": "#000000", "type": "color"}
+        _, _, blocks = self.css(data)
+        self.assertNotIn("--bg-overlay", blocks[":root"])
+        self.assertIn("--bg-overlay: #000000;", blocks['[data-theme="dark"]'])
+
+    def test_a_token_two_theme_groups_set_is_named(self):
+        """Codex on #102: the second group's values were dropped silently."""
+        from test_project_config import STUDIO_GROUPS
+        data = json.loads(json.dumps(STUDIO_GROUPS))
+        data["brand/b"]["bg"] = {"$type": "color", "$value": "#ff00ff"}
+        proc, _, _ = self.css(data)
+        self.assertIn("`bg` was left out: set by two theme groups", output(proc))
+
+    def test_math_is_remembered_and_composites_keep_their_references(self):
+        """CodeRabbit on #102: a 30-step fan-out of `{x} + {x} - {x}` ran 3^30 times,
+        and `2px solid {colors.red}` was taken for math and left out."""
+        from test_project_config import STUDIO_MATH
+        pc = load_script("design-system-docs", "project_config")
+        values = pc.read_tokens([self.write("tokens/m.json", json.dumps(STUDIO_MATH))]).values()
+        self.assertEqual("1px", values["--x30"])
+        self.assertEqual("2px solid var(--colors-red)", values["--edge"])
+        self.assertEqual("var(--x0) var(--x1)", values["--pair"])
+
+    def test_a_palette_each_theme_reads_is_a_mode(self):
+        """CodeRabbit on #102: the Dark palette, a source set only Dark reads,
+        was lost, and `{palette.bg}` meant the Light one in both modes."""
+        from test_project_config import STUDIO_PALETTES
+        _, _, blocks = self.css(STUDIO_PALETTES)
+        self.assertIn("--palette-bg: #ffffff;", blocks[":root"])
+        self.assertIn("--palette-bg: #000000;", blocks['[data-theme="dark"]'])
+        self.assertIn("--bg-surface: var(--palette-bg);", blocks[":root"])
+
+    def test_the_project_reads_its_default_theme(self):
+        pc = load_script("design-system-docs", "project_config")
+        tokens = pc.read_tokens([self.write("tokens/studio.json", json.dumps(STUDIO_REVIEW))])
+        self.assertEqual({"--bg-surface": "var(--neutral-0)"}, tokens.roles)
+        self.assertEqual({"base": "4px", "6": "24px"}, tokens.scales["space"])
 class TheEdgesOfTheFormat(TempDirTest):
     """The reviews of #101 (Codex, CodeRabbit): what a valid document may hold
     and the readers and the writer must not mishandle."""
@@ -303,6 +417,16 @@ class TheEdgesOfTheFormat(TempDirTest):
         doc, problems = self.dtcg.document([("--café", "#ffffff"), ("--alias", "var(--café)")])
         self.assertEqual([], problems)
         self.assertEqual("{café}", doc["alias"]["$value"])
+
+    def test_extends_that_expand_too_far_are_refused(self):
+        """CodeRabbit on #101: a shallow file whose `$extends` chain or fan-out
+        expands past the limits is refused, not a traceback or a full memory."""
+        from test_project_config import EXTENDS_CHAIN, EXTENDS_FAN, POINTER_FAN
+        for doc in (EXTENDS_CHAIN, EXTENDS_FAN, POINTER_FAN):           # POINTER_FAN: CodeRabbit on #102
+            with self.subTest(size=len(doc)):
+                _, problems = self.dtcg.normalise(doc)
+                self.assertIn("expand it past 64 levels or 100000 entries", problems[-1][1])
+                self.assertEqual({}, self.read(doc).values())
 
     def test_weight_keywords_and_unbounded_numbers(self):
         doc, problems = self.dtcg.document([("--weight-bold", "bold"), ("--weight-body", "normal"),

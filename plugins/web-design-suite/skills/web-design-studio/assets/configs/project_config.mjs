@@ -554,6 +554,20 @@ function colourToCss(v) {
 // A run of ASCII a custom property cannot hold unescaped is one `-`, as css_name() writes it.
 const dtcgName = (parts) => `--${parts.map((p) => String(p).replace(/[^A-Za-z0-9_\-\u0080-\u{10FFFF}]+/gu, '-')).join('-')}`;
 
+// More than 100,000 objects, arrays and values, as too_large() counts them.
+function tooLarge(data, limit = 100000) {
+  let count = 0;
+  const stack = [data];
+  while (stack.length) {
+    const node = stack.pop();
+    count += 1;
+    if (count > limit) return true;
+    if (isObject(node)) stack.push(...Object.values(node));
+    else if (Array.isArray(node)) stack.push(...node);
+  }
+  return false;
+}
+
 // Objects or arrays nested more than 64 deep, as dtcg.py's too_deep() finds them.
 function tooDeep(data, limit = 64) {
   const stack = [[data, 0]];
@@ -644,7 +658,7 @@ function pointerAlias(ref) {
   if (typeof ref !== 'string') return null;
   const s = ref.trim();
   let parts;
-  if (s.startsWith('{') && s.endsWith('}')) parts = s.slice(1, -1).split('.');
+  if (s.startsWith('{') && s.endsWith('}') && !/[{}]/.test(s.slice(1, -1))) parts = s.slice(1, -1).split('.');
   else if (s.startsWith('#/')) {
     parts = s.slice(2).split('/').map((p) => p.replaceAll('~1', '/').replaceAll('~0', '~'));
     if (parts.length && parts[parts.length - 1] === '$value') parts = parts.slice(0, -1);
@@ -689,11 +703,245 @@ function resolveExtends(node, root, active) {
       overlay(merged, node);
       for (const key of Object.keys(node)) delete node[key];
       Object.assign(node, merged);
+      if (tooDeep(node) || tooLarge(node)) throw new RangeError('expanded too far');
     }
   }
   for (const [key, child] of Object.entries(node)) {
     if (isObject(child) && !DTCG_META.has(key)) resolveExtends(child, root, active);
   }
+}
+
+// A Tokens Studio export (P31 part 2), as dtcg.py's studio_document() reads
+// it: the default theme's sets (each theme group's first, or every set) merged
+// in `tokenSetOrder`, the legacy `{value, type}` keys as 2025.10's, its types
+// as 2025.10's, a bare number on a size as px, and its math worked out.
+const STUDIO_TYPES = new Map(Object.entries({
+  spacing: 'dimension', sizing: 'dimension', borderradius: 'dimension', borderwidth: 'dimension',
+  fontsizes: 'dimension', letterspacing: 'dimension', paragraphspacing: 'dimension', paragraphindent: 'dimension',
+  dimension: 'dimension', fontfamilies: 'fontFamily', fontweights: 'fontWeight', lineheights: 'number',
+  opacity: 'number', number: 'number', boxshadow: 'shadow', color: 'color', typography: 'typography',
+  border: 'border', duration: 'duration', cubicbezier: 'cubicBezier',
+}));
+const STUDIO_NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/;
+const MATH_REF = /\{([^{}]+)\}/;
+// Python's str() for what a lookup returns.
+const pyStr = (v) => (v === null || v === undefined ? 'None' : typeof v === 'boolean' ? (v ? 'True' : 'False') : String(v));
+
+const isStudio = (data) => isObject(data) && (Array.isArray(data.$themes) || isObject(data.$metadata));
+
+function studioSets(data) {
+  const meta = isObject(data.$metadata) ? data.$metadata : {};
+  const order = (Array.isArray(meta.tokenSetOrder) ? meta.tokenSetOrder : []).filter((n) => typeof n === 'string');
+  const names = order.filter((n) => has(data, n) && isObject(data[n]));
+  return [...names, ...Object.entries(data)
+    .filter(([k, v]) => isObject(v) && !k.startsWith('$') && !names.includes(k)).map(([k]) => k)];
+}
+
+function studioThemes(data) {
+  const order = studioSets(data);
+  return (Array.isArray(data.$themes) ? data.$themes : [])
+    .filter((entry) => isObject(entry) && typeof entry.name === 'string')
+    .map((entry) => {
+      const chosen = isObject(entry.selectedTokenSets) ? entry.selectedTokenSets : {};
+      const state = (s) => (has(chosen, s) ? chosen[s] : undefined);
+      return { name: entry.name, group: pyTruthy(entry.group) ? pyStr(entry.group) : '',
+               sets: [...order.filter((s) => state(s) === 'source'), ...order.filter((s) => state(s) === 'enabled')],
+               enabled: order.filter((s) => state(s) === 'enabled') };
+    });
+}
+
+function studioDefault(data) {
+  const themes = studioThemes(data);
+  if (!themes.length) return studioSets(data);
+  const first = new Map();
+  for (const theme of themes) if (!first.has(theme.group)) first.set(theme.group, theme);
+  const enabled = new Set([...first.values()].flatMap((theme) => theme.enabled));
+  const source = new Set([...first.values()].flatMap((theme) => theme.sets).filter((s) => !enabled.has(s)));
+  const order = studioSets(data);
+  return [...order.filter((s) => source.has(s)), ...order.filter((s) => enabled.has(s))];
+}
+
+const studioToken = (node) => isObject(node) && (has(node, '$value')
+  || (has(node, 'value') && (has(node, 'type') || !isObject(node.value))));
+
+function studioTree(node, kind = null) {
+  if (!isObject(node)) return node;
+  if (!studioToken(node)) {
+    const legacy = has(node, 'type') && !isObject(node.type) && !Array.isArray(node.type);
+    const groupKind = has(node, '$type') ? node.$type : legacy ? node.type : kind;
+    const out = {};
+    for (const [k, v] of Object.entries(node)) {
+      if (k === 'type' && legacy) continue;     // a group or token named `type` stays (Codex on #102)
+      if (!k.startsWith('$')) out[k] = studioTree(v, groupKind);
+      else out[k] = k === '$type' && STUDIO_TYPES.has(pyStr(v).toLowerCase()) ? STUDIO_TYPES.get(pyStr(v).toLowerCase()) : v;
+    }
+    return out;
+  }
+  let value = has(node, '$value') ? node.$value : node.value;
+  const raw = has(node, '$type') ? node.$type : has(node, 'type') ? node.type : kind;
+  const studio = pyTruthy(raw) ? pyStr(raw) : '';
+  const type = STUDIO_TYPES.get(studio.toLowerCase()) ?? (studio || null);
+  if (type === 'dimension' && ((typeof value === 'number') || (typeof value === 'string' && STUDIO_NUMBER.test(value.trim())))) {
+    value = `${fmt(pyFloat(value))}px`;
+  }
+  const out = { $value: value };
+  if (type) out.$type = type;
+  for (const key of ['description', '$description']) if (typeof node[key] === 'string' && has(node, key)) out.$description = node[key];
+  for (const key of ['$deprecated', '$extensions']) if (has(node, key)) out[key] = node[key];
+  return out;
+}
+
+function mergeTree(into, tree) {
+  for (const [key, value] of Object.entries(tree)) {
+    if (isObject(value) && has(into, key) && isObject(into[key]) && !has(value, '$value') && !has(into[key], '$value')) {
+      mergeTree(into[key], value);
+    } else {
+      into[key] = structuredClone(value);
+    }
+  }
+}
+
+// + - * / and brackets over numbers that share one unit, as _evaluate().
+// Numbers (with a unit) and operators, or null, as _math_parts() reads them.
+function mathParts(text) {
+  const token = /\s*(?:(\d+\.?\d*|\.\d+)(px|rem|em|%)?|([-+*/()]))/iy;
+  const parts = [];
+  let pos = 0;
+  const end = text.replace(/\s+$/, '').length;
+  while (pos < end) {
+    token.lastIndex = pos;
+    const m = token.exec(text);
+    if (!m) return null;
+    parts.push(m[1] !== undefined ? [Number(m[1]), (m[2] || '').toLowerCase()] : m[3]);
+    pos = token.lastIndex;
+  }
+  return parts;
+}
+
+function evaluateMath(text) {
+  const parts = mathParts(text);
+  if (parts === null) return null;
+  const units = new Set(parts.filter((p) => Array.isArray(p) && p[1]).map((p) => p[1]));
+  if (units.size > 1) return null;
+  let at = 0;
+  const peek = () => (at < parts.length ? parts[at] : null);
+  const factor = () => {
+    const t = peek();
+    at += 1;
+    if (t === '-') return -factor();
+    if (t === '(') {
+      const v = expr();
+      if (peek() !== ')') throw new Error('bracket');
+      at += 1;
+      return v;
+    }
+    if (Array.isArray(t)) return t[0];
+    throw new Error('operand');
+  };
+  const term = () => {
+    let v = factor();
+    while (['*', '/'].includes(peek())) {
+      const op = peek();
+      at += 1;
+      const right = factor();
+      if (op === '/' && right === 0) throw new Error('zero');
+      v = op === '*' ? v * right : v / right;
+    }
+    return v;
+  };
+  const expr = () => {
+    let v = term();
+    while (['+', '-'].includes(peek())) {
+      const op = peek();
+      at += 1;
+      const right = term();
+      v = op === '+' ? v + right : v - right;
+    }
+    return v;
+  };
+  let value;
+  try {
+    value = expr();
+  } catch {
+    return null;
+  }
+  if (at !== parts.length || !parts.some((p) => ['+', '-', '*', '/'].includes(p))) return null;
+  return [value, units.size ? [...units][0] : ''];
+}
+
+const isMath = (text) => {
+  if ((text.startsWith('{') && text.endsWith('}') && pointerAlias(text)) || /[a-z]\(/i.test(text)) return false;
+  const parts = mathParts(text.replace(/\{([^{}]+)\}/g, '1'));
+  return parts !== null && parts.some((p) => ['+', '-', '*', '/'].includes(p));
+};
+
+// `{color.red}` inside a string, as `var(--color-red)`, as _var_of() writes it.
+const varOf = (m, ref) => {
+  const alias = pointerAlias(`{${ref}}`);
+  return alias ? `var(${dtcgName(alias.split('.'))})` : m;
+};
+
+function studioMath(doc) {
+  const memo = new Map();                       // as _studio_math(): remembered, and capped at 64
+  const lookup = (ref, seen) => {
+    if (memo.has(ref)) return memo.get(ref);
+    if (seen.length > 64) return null;
+    const found = lookupSolved(ref, seen);
+    memo.set(ref, found);
+    return found;
+  };
+  const lookupSolved = (ref, seen) => {
+    let node = doc;
+    for (const part of ref.split('.')) {
+      if (!isObject(node) || !has(node, part)) return null;
+      node = node[part];
+    }
+    if (isObject(node) && !has(node, '$value')) node = node.$root;
+    if (!isObject(node) || seen.includes(ref)) return null;
+    return solve(node.$value, [...seen, ref]);
+  };
+  const solve = (value, seen) => {
+    if (typeof value !== 'string') return value;
+    const text = value.trim();
+    const alias = text.startsWith('{') && text.endsWith('}') ? pointerAlias(text) : null;
+    if (alias) return lookup(alias, seen);
+    if (!isMath(text)) return value;
+    const result = evaluateMath(text.replace(/\{([^{}]+)\}/g, (_, ref) => pyStr(lookup(ref, seen))));
+    if (result === null) return value;
+    return result[1] ? `${fmt(result[0])}${result[1]}` : result[0];
+  };
+  const walk = (node, path) => {                  // true: leave this token out
+    if (!isObject(node)) return false;
+    if (has(node, '$value')) {
+      const v = node.$value;
+      if (typeof v === 'string' && !isMath(v.trim()) && MATH_REF.test(v) && !pointerAlias(v.trim())) {
+        node.$value = v.replace(/\{([^{}]+)\}/g, varOf);
+      } else if (typeof v === 'string' && isMath(v.trim())) {
+        let solved;
+        try {
+          solved = solve(v, [path.join('.')]);
+        } catch (err) {
+          if (!(err instanceof RangeError)) throw err;
+          solved = v;
+        }
+        if (solved === node.$value) return true;
+        node.$value = solved;
+      }
+      return false;
+    }
+    for (const key of Object.keys(node).filter((k) => !k.startsWith('$'))) {
+      if (walk(node[key], [...path, key])) delete node[key];
+    }
+    return false;
+  };
+  walk(doc, []);
+}
+
+function studioDocument(data) {
+  const doc = {};
+  for (const name of studioDefault(data)) if (has(data, name) && isObject(data[name])) mergeTree(doc, studioTree(data[name]));
+  studioMath(doc);
+  return doc;
 }
 
 // What a JSON Pointer addresses, or UNSUPPORTED, as _pointer() reads it.
@@ -714,7 +962,10 @@ function inlinePointers(node, root) {
     const target = seen.includes(ref) ? UNSUPPORTED : jsonPointer(root, ref);
     return target === UNSUPPORTED ? target : fix(structuredClone(target), [...seen, ref]);
   };
+  let budget = 100000;                          // a pointer fan-out stops, as in _inline_pointers()
   const fix = (value, seen) => {
+    budget -= 1;
+    if (budget < 0) throw new RangeError('expanded too far');
     if (isObject(value) && typeof value.$ref === 'string' && value.$ref.startsWith('#/')) {
       const alias = pointerAlias(value.$ref);
       if (alias) return `{${alias}}`;
@@ -743,9 +994,16 @@ function inlinePointers(node, root) {
 // [[name, value as CSS or null]] in document order.
 function dtcgEntries(data) {
   if (tooDeep(data)) return [];
-  const doc = structuredClone(data);
-  resolveExtends(doc, doc, new Set());
-  inlinePointers(doc, doc);
+  let doc;
+  try {                                           // as normalise(): a long chain or a fan-out
+    doc = structuredClone(isStudio(data) ? studioDocument(data) : data);
+    resolveExtends(doc, doc, new Set());
+    inlinePointers(doc, doc);
+    if (tooDeep(doc) || tooLarge(doc)) return [];
+  } catch (err) {
+    if (err instanceof RangeError) return [];
+    throw err;
+  }
   const out = [];
   const token = (node, path, kind) => {
     const type = has(node, '$type') ? node.$type : kind;
@@ -803,6 +1061,7 @@ function dtcgEntries(data) {
 
 function isDtcg(data) {
   if (isObject(data) && has(data, 'schema')) return false;
+  if (isStudio(data)) return true;               // a Tokens Studio export, legacy keys or not
   const holds = (node, depth) => {
     if (!isObject(node) || depth > 64) return false;
     if (depth && (has(node, '$value') || typeof node.$ref === 'string')) return true;

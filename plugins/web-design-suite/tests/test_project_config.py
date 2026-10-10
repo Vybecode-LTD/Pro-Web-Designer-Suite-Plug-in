@@ -646,6 +646,46 @@ DTCG_EVERY_FORM = {
     "flag": {"on": {"$type": "boolean", "$value": True}},
     "legacy": {"$value": "16px", "$type": "dimension"},
 }
+STUDIO_LEGACY = {
+    "global": {"neutral": {"0": {"value": "#ffffff", "type": "color"}, "900": {"value": "#1f1d1b", "type": "color"}},
+               "space": {"base": {"value": "4", "type": "spacing"}, "6": {"value": "{space.base} * 6", "type": "spacing"},
+                         "half": {"value": "({space.base} + 2) / 4", "type": "spacing"},
+                         "neg": {"value": "-{space.base} - 1", "type": "spacing"},
+                         "mixed": {"value": "{space.base} + 1rem", "type": "spacing"},
+                         "zero": {"value": "{space.base} / 0", "type": "spacing"},
+                         "lost": {"value": "{space.nowhere} * 2", "type": "spacing"},
+                         "fluid": {"value": "calc(1rem + 2vw)", "type": "spacing"}},
+               "opacity": {"hover": {"value": "0.08 * 2", "type": "opacity"}},
+               "type": {"body": {"value": "16px", "type": "fontSizes"}},
+               "font": {"type": {"value": "Inter", "type": "fontFamilies"},
+                        "sans": {"value": "Inter, sans-serif", "type": "fontFamilies"},
+                        "bold": {"value": "700", "type": "fontWeights"}}},
+    "light": {"bg": {"surface": {"value": "{neutral.0}", "type": "color", "description": "the page"}}},
+    "dark": {"bg": {"surface": {"value": "{neutral.900}", "type": "color"}}},
+    "$themes": [{"id": "l", "name": "Light", "selectedTokenSets": {"global": "source", "light": "enabled"}},
+                {"id": "d", "name": "Dark", "selectedTokenSets": {"global": "source", "dark": "enabled"}}],
+    "$metadata": {"tokenSetOrder": ["global", "light", "dark"]},
+}
+STUDIO_GROUPS = {
+    "core": {"$type": "color", "blue": {"$value": "#2f6df6"}, "red": {"$value": "#e5484d"},
+             "size": {"$type": "sizing", "1": {"$value": 8}, "2": {"$value": "{size.1} * 2"}}},
+    "brand/a": {"accent": {"$type": "color", "$value": "{blue}"}},
+    "brand/b": {"accent": {"$type": "color", "$value": "{red}"}, "gone": {"$type": "color", "$value": "{core.red}"}},
+    "mode/light": {"bg": {"$type": "color", "$value": "#ffffff"}},
+    "mode/dark": {"bg": {"$type": "color", "$value": "#000000"}},
+    "spare": {"unused": {"$type": "color", "$value": "#123456"}},
+    "$themes": [{"name": "A", "group": "brand", "selectedTokenSets": {"core": "source", "brand/a": "enabled"}},
+                {"name": "B", "group": "brand", "selectedTokenSets": {"core": "source", "brand/b": "enabled"}},
+                {"name": "Light", "group": "mode", "selectedTokenSets": {"mode/light": "enabled", "spare": "disabled"}},
+                {"name": "Dark", "group": "mode", "selectedTokenSets": {"mode/dark": "enabled"}}],
+    "$metadata": {"tokenSetOrder": ["core", "mode/light", "mode/dark", "brand/a", "brand/b"]},
+}
+STUDIO_ORDER = {                                     # the source set comes later in the order
+    "light": {"bg": {"surface": {"value": "#ffffff", "type": "color"}}},
+    "base": {"bg": {"surface": {"value": "#eeeeee", "type": "color"}}, "neutral": {"0": {"value": "#fff", "type": "color"}}},
+    "$themes": [{"name": "Light", "selectedTokenSets": {"light": "enabled", "base": "source"}}],
+    "$metadata": {"tokenSetOrder": ["light", "base"]},
+}
 DTCG_POINTERS = {                                     # Codex on #101: pointers into values, and cycles
     "base": {"$type": "color", "$value": {"colorSpace": "srgb", "components": [0.5, 0.25, 1]}},
     "chan": {"$type": "number", "$ref": "#/base/$value/components/0"},
@@ -655,6 +695,34 @@ DTCG_POINTERS = {                                     # Codex on #101: pointers 
     "lost": {"$type": "number", "$ref": "#/base/$value/components/9"},
     "a": {"$type": "color", "$value": "{b}"}, "b": {"$type": "color", "$value": "{a}"},
     "self": {"$type": "color", "$value": "{self}"}, "c": {"$type": "color", "$value": "{a}"},
+}
+# CodeRabbit on #101: shallow files that `$extends` expands past the limits.
+EXTENDS_CHAIN = {"x0": {"v": {"$type": "number", "$value": 1}},
+                 **{f"x{i}": {"c": {"$extends": f"{{x{i - 1}}}"}} for i in range(1, 200)}}
+EXTENDS_FAN = {"f0": {"v": {"$type": "number", "$value": 1}},
+               **{f"f{i}": {"a": {"$extends": f"{{f{i - 1}}}"}, "b": {"$extends": f"{{f{i - 1}}}"}}
+                  for i in range(1, 40)}}
+# CodeRabbit on #102: a math fan-out (each token adds the one before twice),
+# a property-level pointer fan-out, composites with references, and a palette
+# per theme read as a source set.
+STUDIO_MATH = {"core": {"x0": {"value": "1", "type": "spacing"},
+                        **{f"x{i}": {"value": f"{{x{i - 1}}} + {{x{i - 1}}} - {{x{i - 1}}}", "type": "spacing"}
+                           for i in range(1, 31)},
+                        "edge": {"value": "2px solid {colors.red}", "type": "border"},
+                        "pair": {"value": "{x0} {x1}", "type": "other"}},
+               "colors": {"red": {"value": "#ff0000", "type": "color"}},
+               "$metadata": {"tokenSetOrder": ["core", "colors"]}}
+POINTER_FAN = {"p0": {"$type": "number", "$value": {"x": 1}},
+               **{f"p{i}": {"$type": "number", "$value": {"x": {"a": {"$ref": f"#/p{i - 1}/$value/x"},
+                                                                "b": {"$ref": f"#/p{i - 1}/$value/x"}}}}
+                  for i in range(1, 40)}}
+STUDIO_PALETTES = {
+    "light-palette": {"palette": {"bg": {"value": "#ffffff", "type": "color"}}},
+    "dark-palette": {"palette": {"bg": {"value": "#000000", "type": "color"}}},
+    "semantic": {"bg": {"surface": {"value": "{palette.bg}", "type": "color"}}},
+    "$themes": [{"name": "Light", "selectedTokenSets": {"light-palette": "source", "semantic": "enabled"}},
+                {"name": "Dark", "selectedTokenSets": {"dark-palette": "source", "semantic": "enabled"}}],
+    "$metadata": {"tokenSetOrder": ["light-palette", "dark-palette", "semantic"]},
 }
 TOKEN_FILES = {
     "layers.css": (
@@ -688,7 +756,16 @@ TOKEN_FILES = {
                                   "loop": {"$extends": "{loop}", "x": {"$value": "#010101", "$type": "color"}}}),
     "legacy.json": json.dumps({"global": {"neutral": {"0": {"value": "#ffffff", "type": "color"}}}}),
     "schema-and-tokens.json": json.dumps({"schema": "x", "a": {"$value": "#fff", "$type": "color"}}),
+    # P31 part 2: Tokens Studio exports, legacy and 2025.10 keys, themes, groups and math.
+    "studio.json": json.dumps(STUDIO_LEGACY),
+    "studio-groups.json": json.dumps(STUDIO_GROUPS),
+    "studio-order.json": json.dumps(STUDIO_ORDER),
     "pointers.tokens.json": json.dumps(DTCG_POINTERS),
+    "chain.tokens.json": json.dumps(EXTENDS_CHAIN),
+    "studio-math.json": json.dumps(STUDIO_MATH),
+    "pointer-fan.tokens.json": json.dumps(POINTER_FAN),
+    "studio-palettes.json": json.dumps(STUDIO_PALETTES),
+    "fan.tokens.json": json.dumps(EXTENDS_FAN),
     "deep.tokens.json": json.dumps({"top": {"$type": "color", "$value": "#fff"}, "deep": json.loads(
         '{"g": ' * 70 + '{"$type": "color", "$value": "#000"}' + "}" * 70)}),
     "names.tokens.json": json.dumps({"Button background": {"$type": "color", "$value": "#ffffff"},
@@ -704,7 +781,9 @@ TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.
                ["bad-step.json"], ["bad-scale.json"], ["bad-role.json"], ["not-json.json"], ["gone.css"],
                ["gone.json"], ["a.css", "gone.css"], [], ["utf16be.json"],
                ["dtcg.tokens.json"], ["extends.tokens"], ["a.css", "dtcg.tokens.json"], ["dtcg.tokens.json", "a.css"],
-               ["legacy.json"], ["schema-and-tokens.json"], ["deep.tokens.json"], ["names.tokens.json"], ["pointers.tokens.json"]]
+               ["legacy.json"], ["schema-and-tokens.json"], ["studio.json"], ["studio-groups.json"], ["studio-order.json"],
+               ["deep.tokens.json"], ["names.tokens.json"], ["pointers.tokens.json"], ["chain.tokens.json"], ["fan.tokens.json"],
+               ["studio-math.json"], ["pointer-fan.tokens.json"], ["studio-palettes.json"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).

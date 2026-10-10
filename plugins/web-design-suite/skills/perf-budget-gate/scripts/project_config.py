@@ -440,6 +440,9 @@ def is_dtcg(data: Any) -> bool:
     object with `$value`, or a whole-token `$ref`, at any depth."""
     if isinstance(data, dict) and "schema" in data:
         return False
+    if isinstance(data, dict) and (isinstance(data.get("$themes"), list)
+                                   or isinstance(data.get("$metadata"), dict)):
+        return True                               # a Tokens Studio export, legacy keys or not
 
     def holds(node: Any, depth: int) -> bool:
         if not isinstance(node, dict) or depth > 64:

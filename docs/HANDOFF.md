@@ -1,43 +1,31 @@
 # Handoff
 
-**2026-10-10 (fourth session)**, after P30 (#97), N39 (#98), R3 (#99) and this docs PR. **3.5.0 is released**, which completes Phase 5 (a full Claude Code plugin). Phase 6 (4.0.0, broader coverage) is next, starting with P31 (the owner's choice).
+**2026-10-10 (fifth session)**, after P31 part 1 (#101), P31 part 2 (#102) and this docs PR. Phase 6 (4.0.0) is under way: the DTCG reader and writer and the Tokens Studio reading are in `main`; P31 part 3 is next.
 
-**The next session starts from `dev plans/next-session-prompt.md`**: orientation, then P31 (DTCG tokens) in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
+**The next session starts from `dev plans/next-session-prompt.md`**: orientation, then P31 part 3 in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
 ## State
 
 - **Merged this session**, each with CI green on its head, every thread resolved and GitHub clean:
-  - **#97 (P30): the outcome evals**, merged as `922cf5a`. There are eleven cases in six areas under `evals/<area>/`. Each grades what the run wrote in both arms, and the skill and the gates' verdicts with the plugin only. The gates run through the plugin's MCP server, so no case grants Bash and none needs WSL2 (the owner). `evals.yml` runs routing in one arm, then outcome in both, under one $14 ceiling (the owner's shared $15). One router fix. SS-C7, SB-C6, GT-C10, LC-C10, PS-C7 and DL-C7 close; SB-C6 has three of its four cases, with the mega menu left out for the budget.
-  - **#98 (N39)**, merged as `29b0504`. `a11y_static.py` read email templates as pages, so `/gate` failed on the plugin's own receipt template. A folder's templates are now the email lint's, and the hook stands aside only when the email build runs (Codex).
-  - **#99 (R3): release 3.5.0**, merged as `44637c1`. The version is bumped, the CHANGELOG dated, and the live check recorded (`dev plans/web-design-suite-3.5.0-live-check.md`).
-- **Evals:**
-  - **The local check of the outcome set** (the owner's Max plan, one run per arm): 11 of 11, mean Δ 0.22, $2.21.
-  - **The release dispatch** of `evals.yml` (`tag=all`) on `44637c1`: routing 23 of 23 ($4.18) and outcome 11 of 11 (mean Δ 0.15, $5.21), $9.39 in all, in 46 minutes (run 38075960885).
-- **The live check:** 22 headless sessions, $3.01. Every hook, all fifteen commands, the six agents and the five MCP tools ran; the one defect was N39. `/install-gate`'s CI template passed all three jobs on GitHub, in the private scratch repository `Vybecode-LTD/wds-gate-scratch`.
-- **The release:** `v3.5.0` (annotated, on `44637c1`) was pushed, and `release.yml` published it with the zip, the 13 `.skill` files and `SHA256SUMS`. The installed plugin was updated from the release zip, its checksum verified (3.4.0 to 3.5.0). The tag's own `evals.yml` run was cancelled at its start: it would have re-run the commit the dispatch had just passed, for about $9 more.
-- **The plan:** 31 open items, 31 scheduled. About 980 tests.
+  - **#101 (P31 part 1): `shared/dtcg.py`**, merged as `c0856da`. DTCG 2025.10 read and write in one module, copied beside every `project_config.py` (ten skills) and replacing `dtcg_values.py`. `read_tokens()` and the Node reader take a DTCG token file; `figma_to_tokens.py --format dtcg` writes one from a Figma export or a `tokens.css`; `diff_system.py` takes DTCG snapshots; the migration proposal is written as `tokens.json` too; `/install-gate` vendors `dtcg.py`. Two rounds of review found 14 real issues (Codex 7, CodeRabbit 7), each fixed with a test.
+  - **#102 (P31 part 2): Tokens Studio**, merged as `MERGE_102`. A Studio export's sets merge (source, then enabled, in set order), each theme group is a collection whose modes are its themes, the legacy keys, Studio's types and its math are read, and `read_tokens()` reads the default theme. A DTCG `number` or `fontWeight` is written unitless. Review: Codex 3, CodeRabbit 1 (carried from #101).
+- **The plan:** 31 open items, 31 scheduled. LC-C2 and LC-B2 close with P31 part 3. About 1,030 tests.
+- **No eval was run** this session (none was asked for).
 
 ## Next steps
 
-1. **P31:** `shared/dtcg.py` (DTCG 2025.10 read and write, Tokens Studio sets and themes, `$deprecated`, and the Style Dictionary and Terrazzo routes), building on `figma-variables-sync/scripts/dtcg_values.py`.
-2. Then the rest of Phase 6, in the plan's order unless the owner says otherwise.
+1. **P31 part 3:** themes written through the DTCG resolver module (`--format dtcg` with modes, and reading a `.resolver.json`), `$deprecated` into the deprecation ledger and the diff, and the Style Dictionary and Terrazzo name routes onto the contract's grammar (spec first, all three gates).
+2. Then the rest of Phase 6 in the plan's order, unless the owner says otherwise.
 
-## Open owner decision
+## Open owner decisions
 
-- **`evals.yml` on a tag.** A release now runs the suite twice: the dispatch before the tag, which holds the release back, and the tag's own run. Drop the tag trigger, or keep it and cancel it each time as this session did?
+- **`evals.yml` on a tag** (from the last session): a release runs the suite twice. Drop the tag trigger, or keep cancelling the tag's run?
+- **The `dtcg-export` eval** (`evals/lifecycle/dtcg-export`, about $0.30) can now be graded against a script route: run it when the owner says so.
 
 ## Warnings
 
+- **A worktree in the scratchpad hits Windows' 260-character path limit** (`evals/boundaries/...`): create it with `git -c core.longpaths=true worktree add`, and expect `check.py` there to error on those files; run the suite in the main checkout instead.
+- **A fail-before run can hang** when the old code has the bug being fixed (an exponential `$extends` fan-out did): give it a timeout and stop it with `TaskStop`.
 - **The scratch repository** `Vybecode-LTD/wds-gate-scratch` is private and the owner's to delete.
-- **CodeRabbit's free tier** allows one review an hour. It skipped #97 (107 files, over its 100-file limit) and was rate-limited on #99. Keep PRs under 100 files.
-- **Outcome evals vary run to run.** In five cases the plugin's arm did the work without loading the skill, so their skill graders are indicators only, in both arms (§11 of `claude-code-capabilities.md`).
-- **Open question:** `perf_audit.py` fails a starter project whose CSS is not bundled. The `@import` chain makes 8 requests, which is over the default budget, and `--src` reads the `@import` lines as errors. The CI template's test had to bundle.
-- **Headless sessions are refused reads of a skill's reference files** (the live check's `/schema-to-screens`). Interactive sessions ask.
-- **Flakes:** the hydration timing test on Windows 3.14, and `test_critique_snapshots` on Linux 3.9.
-- **Still open from earlier:**
-  - `--warning-700`, `--danger-100` and `--info-100` fall outside Display P3.
-  - `check_roles.py` clips a colour outside sRGB.
-  - The worked examples are tests.
-  - A local build never matches the release's checksums.
-  - Don't grep `tooling/`.
-  - The repository is public.
+- **CodeRabbit's free tier:** one review an hour; after a "Review limit reached", comment `@coderabbitai review` once it resets.
+- **Still open from earlier:** `perf_audit.py` and an unbundled `@import` chain; headless sessions refused a skill's reference files; the hydration and `test_critique_snapshots` flakes; three tokens outside Display P3; `check_roles.py` clips outside sRGB; the worked examples are tests; a local build never matches the release's checksums; don't grep `tooling/`; the repository is public.

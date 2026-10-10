@@ -26,6 +26,17 @@
   - **The migration proposal.** `cluster_values.py` writes `tokens.json` in DTCG beside
     `tokens.css`.
   - `/install-gate` vendors `dtcg.py` with the audit's `project_config.py`.
+- **Tokens Studio: part 2** (P31; LC-B2 in part). A Tokens Studio export is read as
+  Tokens Studio reads it: the sets a theme uses merged, its source sets and then its enabled
+  ones, each in `tokenSetOrder`, each theme
+  group a collection whose modes are its themes, and each set no theme enables a
+  collection of its own. A Light/Dark export becomes `:root` and `[data-theme="dark"]`,
+  where it was `--light-bg-surface` and `--dark-bg-surface`. The legacy `{value, type}`
+  keys and Studio's types read as 2025.10's, a bare number on a size is px, and math
+  (`{space.base} * 6`) is worked out, where it was written into the CSS; math it cannot
+  work out is named and left out. `read_tokens()` and the Node reader read such a file as
+  its default theme. A DTCG `number` or `fontWeight` token is written unitless, where an
+  opacity became `0.01rem`.
 
 ### Fixed
 
