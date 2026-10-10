@@ -5,3 +5,4 @@ __pycache__/
 Thumbs.db
 *.orig
 *.rej
+plugins/web-design-suite/evals/results/
