@@ -48,7 +48,7 @@ TESTED_PLAYWRIGHT = "1.63.0"
 
 # What each gate runs, and what those scripts import from their own folder.
 VENDORED = {
-    "web-design-studio": ["audit_design.py", "check_roles.py", "generate_color_ramp.py", "project_config.py"],
+    "web-design-studio": ["audit_design.py", "check_roles.py", "dtcg.py", "generate_color_ramp.py", "project_config.py"],
     "a11y-audit-runner": ["a11y_static.py", "a11y_runtime.mjs", "browser_common.mjs", "project_config.mjs"],
     "perf-budget-gate": ["perf_audit.py", "measure_vitals.mjs"],
 }

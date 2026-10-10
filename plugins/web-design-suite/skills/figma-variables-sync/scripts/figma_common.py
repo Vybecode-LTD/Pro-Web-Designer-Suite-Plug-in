@@ -6,7 +6,7 @@ file the same way by construction: the same variables, collections, modes and
 types. Copied apart, the two readers drifted (LC-C3): the audit split a records
 export's modes into one variable each, which figma_to_tokens had stopped doing.
 
-Dependency-free (Python 3.9+, stdlib only), like dtcg_values.py beside it.
+Dependency-free (Python 3.9+, stdlib only), like dtcg.py beside it.
 """
 
 from __future__ import annotations
@@ -17,16 +17,17 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.<script>
-    from . import dtcg_values                     # type: ignore[import-not-found]
+    from . import dtcg                            # type: ignore[import-not-found]
 except ImportError:                               # python scripts/<script>.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import dtcg_values                            # type: ignore[no-redef]
+    import dtcg                                   # type: ignore[no-redef]
 
 __all__ = [
+    "dtcg",
     "PX_PER_REM",
     "srgb_to_linear",
     "linear_to_srgb",
@@ -280,10 +281,20 @@ class FVar:
     code_syntax: Dict[str, str] = field(default_factory=dict)
     description: str = ""
     var_id: str = ""
+    # DTCG `$deprecated`, the token's own or a group's: true, or the reason.
+    deprecated: Union[bool, str] = False
 
     @property
     def slug(self) -> str:
         return slugify(self.name)
+
+    @property
+    def described(self) -> str:
+        """The description, with a note when the token is deprecated."""
+        if not self.deprecated:
+            return self.description
+        note = "deprecated" + (f": {self.deprecated}" if isinstance(self.deprecated, str) else "")
+        return " ".join(x for x in (self.description, f"({note})") if x)
 
 
 @dataclass
@@ -511,8 +522,8 @@ def parse_dtcg(data: dict, collection: str) -> FDoc:
     doc.collections[collection] = FCollection(collection, ["Value"], "Value")
     # 2025.10 objects, $ref, $extends and group $type become the string forms
     # the checks read; anything unreadable is kept as a finding.
-    data, doc.unsupported = dtcg_values.normalise(data)
-    reserved = dtcg_values.META_KEYS | {"$value"}
+    data, doc.unsupported = dtcg.normalise(data)
+    reserved = dtcg.META_KEYS | {"$value"}
 
     def walk(node: Any, path: List[str]) -> None:
         if _is_leaf_token(node):
@@ -524,6 +535,7 @@ def parse_dtcg(data: dict, collection: str) -> FDoc:
                 values={"Value": node.get("$value", node.get("value"))},
                 description=node.get("$description") or node.get("description") or "",
                 var_id=name,
+                deprecated=node.get("$deprecated") or False,
             )
             doc.variables.append(fv)
             doc.by_id.setdefault(name, fv)

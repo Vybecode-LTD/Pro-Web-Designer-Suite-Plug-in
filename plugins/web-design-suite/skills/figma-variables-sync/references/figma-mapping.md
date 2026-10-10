@@ -597,7 +597,28 @@ this document does not claim to know its current state. Both scripts read the
 DTCG format's first stable version, 2025.10: colour objects (`{colorSpace,
 components, alpha, hex}` — sRGB, sRGB-linear, HSL, OKLCH and OKLab, other spaces
 through their `hex` fallback), `{value, unit}` dimensions and durations,
-`{group.token}` and `$ref` references, `$extends`, `$root` and a group's `$type`.
+`{group.token}` and `$ref` references, `$extends`, `$root` (named
+`{group.$root}` in a reference) and a group's `$type` and `$deprecated`, which
+reach every token in the group that does not say otherwise.
 Shadow, border and transition composites are written as CSS; a typography
 composite, or a colour with no sRGB form, is reported by name and left out —
 never written as something CSS cannot read.
+
+**Writing DTCG.** `figma_to_tokens.py --format dtcg` writes a 2025.10 document
+from any export, or from a `tokens.css` (`figma_to_tokens.py
+src/styles/tokens.css --format dtcg --out design/tokens.json`), which is the
+route for a Figma plugin, Tokens Studio, Style Dictionary 5 or Terrazzo 2 that
+reads the format. Each contract name is split on `-` into groups (`--bg-surface`
+is `bg.surface`), a name that is also a group's prefix becomes the group's
+`$root`, `var(--x)` becomes a reference, and every token is typed: a colour is
+an object in its own space, with an sRGB `hex` fallback where one can be computed
+(none for `lab()`, `lch()` or a non-sRGB `color()`), a length is `{value,
+unit}` in px or rem: the format says "`$value.unit` may only be "px" or "rem""
+([the format's dimension section](https://www.designtokens.org/tr/2025.10/format/#dimension)),
+and names a group's own token `{group.$root}`, since "`{color.accent}` is an
+invalid token reference (refers to a group, not a token)" (its root tokens section). Read back, the
+same file gives the same names. DTCG has no
+type for `clamp()`, `calc()`, `em`, `ch` or a `font` shorthand, so each such
+token, and every token that refers to one, is named on stderr and left out
+(exit 1). A DTCG file holds one mode: the default values are written, and each
+theme or density block is named as left out.

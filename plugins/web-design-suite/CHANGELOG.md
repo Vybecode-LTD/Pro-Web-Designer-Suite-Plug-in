@@ -1,5 +1,39 @@
 # Changelog
 
+## 4.0.0 — unreleased
+
+### Added
+
+- **DTCG 2025.10, read and write: part 1** (P31; LC-C2, LC-B2 in part). One module,
+  `shared/dtcg.py`, reads and writes the Design Tokens format's first stable version,
+  copied beside every `project_config.py` and held to the master by a test. It replaces
+  figma-variables-sync's `dtcg_values.py`, whose reading it keeps.
+  - **A DTCG file is a token file.** `read_tokens()` reads a `*.json` or `*.tokens` file
+    with no `"schema"` that holds a token, so `.design-suite.json`'s `tokens`, every
+    `--tokens` flag, the audit and the lint configs take one. A token's name is its path
+    joined by `-` (`color.bg.surface` is `--color-bg-surface`), and its tier comes from
+    its value. `project_config.mjs` reads it the same way, held to the Python reader on
+    every value form.
+  - **Writing.** `figma_to_tokens.py --format dtcg` writes a 2025.10 document from any
+    Figma export or from a `tokens.css`: names split on `-` into groups, a name that is
+    also a group's prefix as its `$root`, `var()` as references, every token typed, and
+    colours as objects in their own space, with an sRGB `hex` fallback where one can be
+    computed (none for `lab()`, `lch()` or a `color()` space other than sRGB). A value DTCG has
+    no type for (`clamp()`, `calc()`, `em`, `ch`), a token that refers to one, and each
+    theme or density block are named and left out (exit 1).
+  - **`diff_system.py`** takes a DTCG file as either snapshot, compared as a contract is:
+    default values and tiers.
+  - **The migration proposal.** `cluster_values.py` writes `tokens.json` in DTCG beside
+    `tokens.css`.
+  - `/install-gate` vendors `dtcg.py` with the audit's `project_config.py`.
+
+### Fixed
+
+- **A reference to a group's own token** (`{brand.$root}`, `#/brand/$root`), the
+  spelling 2025.10 gives it, was left unresolved (P31).
+- **A group's `$deprecated`** did not reach its tokens; now each one that does not say
+  otherwise carries it, and the description notes it (P31).
+
 ## 3.5.0 — 2026-10-10
 
 ### Added

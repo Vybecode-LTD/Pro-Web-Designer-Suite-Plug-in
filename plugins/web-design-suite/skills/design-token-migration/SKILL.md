@@ -53,7 +53,7 @@ Work them in order. Each phase's output is the next phase's input, and each one 
 |---|---|---|---|
 | 1 Inventory | `literals.json`, a census | No | Nobody yet |
 | 2 Cluster | The decisions behind the values | No | The script proposes |
-| 3 Propose | `tokens.css`, `mapping.json`, `reconciliation.md` | No | **A human, on every row of the reconciliation** |
+| 3 Propose | `tokens.css`, `tokens.json`, `mapping.json`, `reconciliation.md` | No | **A human, on every row of the reconciliation** |
 | 4 Codemod | Reviewable diffs, in batches | Yes | Review per batch |
 | 5 Verify | Audit diff + visual regression | No | Whoever owns quality |
 | 6 Hold the line | Baseline + gate in CI | No | The team, forever |
@@ -100,6 +100,7 @@ The full method, including the ΔE threshold and its calibration, is in **`refer
 Same command; the outputs are the proposal:
 
 - **`tokens.css`** — the contract's exact token names, with the accent ramp seeded from *this codebase's* most-used chromatic color and the neutral hue read off *its own* grays. Every token carries a `was:` comment naming the literals it absorbed. That comment is the audit trail for the codemod and the answer to "why is this 16 and not 18" three months from now.
+- **`tokens.json`** — the same default values in DTCG 2025.10, for Tokens Studio, Style Dictionary or Terrazzo; what DTCG has no type for (`clamp()`, `em`) is named on the console and left out.
 - **`mapping.json`** — every original literal to its token, in the form the codemod consumes.
 - **`reconciliation.md`** — **the document you actually review.** Three tables: what is mechanically replaceable, what moves more than 2px and needs eyes on a screenshot, and every value with no home plus a recommendation.
 
