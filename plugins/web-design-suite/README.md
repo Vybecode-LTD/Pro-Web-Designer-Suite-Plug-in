@@ -167,6 +167,14 @@ it fits, or you can ask by name:
 `supabase-security-reviewer` and `codemod-batch-reviewer` (each as
 `web-design-suite:<name>`).
 
+**The gates as tools.** An MCP server, `gates`, starts with the plugin (it needs `node`,
+and Python 3 for the scripts). Its five tools run a gate in the project's folder and
+return the script's JSON, its exit code and a verdict: `audit_design`, `a11y_static`,
+`perf_audit`, `check_roles` and `diff_system`. Claude calls them by name
+(`mcp__plugin_web-design-suite_gates__audit_design`), and so can a permission rule or
+a skill's `allowed-tools`. A report too long for Claude's context keeps the head of its
+longest lists, nested ones too, and says how many it left out.
+
 The reports go in `design-reports/`, which a project usually leaves out of git.
 
 **In CI**, `scripts/` is where every recipe in the skills expects the scripts

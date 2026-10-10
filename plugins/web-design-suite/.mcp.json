@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "gates": {"command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/design_gates.mjs"]}
+  }
+}
