@@ -229,6 +229,12 @@
 
 ### Fixed
 
+- **a11y_static's and perf_audit's baselines across platforms** (N38). Both keyed a
+  finding by its path with the platform's separator, so a baseline recorded on Linux
+  CI suppressed nothing on Windows, and the reverse: the CI template `/install-gate`
+  writes records its baselines on Linux and runs the static gates on Windows too. Keys
+  now use `/` and drop `./`, as audit_design's do, and a baseline's keys are read the
+  same way, so one recorded before keeps matching.
 - **A baseline in a folder that does not exist yet** (GT-C12). `audit_design.py`,
   `a11y_static.py` and `perf_audit.py` stopped with a traceback when `--write-baseline`
   named a file in a missing folder, as a config's `ci/audit-baseline.json` is on a fresh
