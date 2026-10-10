@@ -293,7 +293,7 @@ A routing case cannot pass without the plugin, so `--ablation none` skips the no
 The outcome cases, one folder per area (`build`, `systems`, `gates`, `lifecycle`, `persuasion`, `delivery`), give Claude a task and grade what it wrote, with the plugin and without it, so the difference (Δ) is what the plugin adds. They write files, run the design audit and the contrast check through the plugin's MCP server, and copy their starting project in with a scaffold script from this folder:
 
 ```bash
-claude plugin eval . --tag outcome --runs 1 --scaffold --allow-real-servers --no-publish --allow-tools Write Edit "mcp__plugin_web-design-suite_gates__*"
+claude plugin eval . --tag outcome --runs 1 --scaffold --allow-real-servers --no-publish --allow-tools Write Edit mcp__plugin_web-design-suite_gates__audit_design mcp__plugin_web-design-suite_gates__check_roles
 ```
 
 They grant no shell either, since the MCP server runs outside the sandbox. A full run of both sets, three runs each, costs about $11 at list price.

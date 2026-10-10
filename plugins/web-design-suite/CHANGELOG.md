@@ -290,9 +290,8 @@
     the design audit and the contrast check through the plugin's MCP server, which
     runs outside the sandbox. So they run on native Windows, with no WSL2.
   - **Run them** from the plugin folder with `claude plugin eval . --tag outcome
-    --scaffold --allow-real-servers --allow-tools Write Edit
-    "mcp__plugin_web-design-suite_gates__*"`. Every run is a real model call on your
-    account.
+    --scaffold --allow-real-servers --allow-tools Write Edit` and the two gate tools
+    the cases use, as the README shows. Every run is a real model call on your account.
   - **The first run** (one run each way, Claude Code 2.1.293, `claude-sonnet-5-5`): 11
     of 11 passed for $2.21 at list price, with a mean Δ of 0.22. Without the plugin,
     Claude said a re-pointed `--bg-accent` could ship as a patch, built the restarting
@@ -309,8 +308,9 @@
   about a change to tokens.css named web-design-studio, not design-system-versioning:
   the versioning route heard only "semver", "breaking change" or "deprecate" in the
   same sentence as tokens, and a file name's dot ends a sentence. It now hears "a
-  patch, minor or major release or version" when tokens or a design system are named
-  anywhere in the prompt.
+  patch, minor or major release or version" when design tokens, a tokens.css or
+  tokens.json, a design system or a CSS custom property are named anywhere in the
+  prompt; an API's auth token is not enough.
 - **a11y_static's and perf_audit's baselines across platforms** (N38). Both keyed a
   finding by its path with the platform's separator, so a baseline recorded on Linux
   CI suppressed nothing on Windows, and the reverse: the CI template `/install-gate`
