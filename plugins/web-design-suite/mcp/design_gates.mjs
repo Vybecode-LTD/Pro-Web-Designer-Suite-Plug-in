@@ -12,8 +12,8 @@
  * Each runs the skill's script in the project's folder, where the scripts find
  * its .design-suite.json, and returns the script's JSON with its exit code and
  * a verdict: pass (0), fail (1), or an error the script could not get past.
- * A report too long for Claude's context keeps the head of its longest list
- * and says how much it left out.
+ * A report too long for Claude's context keeps the head of its longest lists
+ * and says how much each left out.
  *
  * MCP over stdio: JSON-RPC 2.0, one message per line, nothing else on stdout.
  * Node runs it because one name runs node on every system, as for the hooks
@@ -129,27 +129,47 @@ function run(exe, args, cwd) {
   });
 }
 
-// A payload whose JSON fits LIMIT: the longest list in the report keeps its head.
+// Every list in `value` reached through objects, with its path of keys: a
+// report's own list, `findings`, or one nested deeper, as perf_audit's
+// `ledger.assets` (Codex on #92).
+function listsIn(value, at = []) {
+  if (Array.isArray(value)) return [[at, value]];
+  if (value === null || typeof value !== 'object') return [];
+  return Object.entries(value).flatMap(([key, v]) => listsIn(v, [...at, key]));
+}
+
+const withList = (value, at, list) => (at.length ? { ...value, [at[0]]: withList(value[at[0]], at.slice(1), list) }
+  : list);
+const size = (value) => JSON.stringify(value).length;
+
+// A payload whose JSON fits LIMIT. The longest list keeps the head that fits,
+// and while the payload is still too long, so does the next longest.
 function fit(payload) {
-  if (JSON.stringify(payload).length <= LIMIT) return payload;
-  const { report } = payload;
-  const lists = Array.isArray(report) ? [[null, report]]
-    : Object.entries(report ?? {}).filter(([, v]) => Array.isArray(v));
-  if (!lists.length) return payload;
-  const [key, list] = lists.reduce((a, b) => (JSON.stringify(b[1]).length > JSON.stringify(a[1]).length ? b : a));
-  const cut = (n) => {
-    const head = list.slice(0, n);
-    return { ...payload, report: key === null ? head : { ...report, [key]: head },
-             truncated: { list: key ?? 'the report', shown: n, total: list.length,
-                          rest: `run ${path.basename(TOOLS[payload.tool].script)} for the whole report` } };
-  };
-  let lo = 0;
-  let hi = list.length;
-  while (lo < hi) {                         // the most items that fit
-    const mid = Math.ceil((lo + hi) / 2);
-    if (JSON.stringify(cut(mid)).length <= LIMIT) lo = mid; else hi = mid - 1;
+  if (size(payload) <= LIMIT) return payload;
+  const truncated = { lists: [], rest: `run ${path.basename(TOOLS[payload.tool].script)} for the whole report` };
+  let out = { ...payload, truncated };
+  for (;;) {
+    const left = listsIn(out.report).filter(([at]) => !truncated.lists.some((t) => t.at === at.join('.')));
+    if (!left.length || size(out) <= LIMIT) break;
+    const [at, list] = left.reduce((a, b) => (size(b[1]) > size(a[1]) ? b : a));
+    const entry = { at: at.join('.'), list: at.length ? at.join('.') : 'the report', shown: 0, total: list.length };
+    truncated.lists.push(entry);
+    const base = out;
+    const cut = (n) => {
+      entry.shown = n;
+      return { ...base, report: withList(base.report, at, list.slice(0, n)) };
+    };
+    let lo = 0;
+    let hi = list.length;
+    while (lo < hi) {                       // the most items that fit
+      const mid = Math.ceil((lo + hi) / 2);
+      if (size(cut(mid)) <= LIMIT) lo = mid; else hi = mid - 1;
+    }
+    out = cut(lo);
   }
-  return cut(lo);
+  for (const entry of truncated.lists) delete entry.at;
+  truncated.lists = truncated.lists.filter((t) => t.shown < t.total);
+  return out;
 }
 
 async function call(name, args) {

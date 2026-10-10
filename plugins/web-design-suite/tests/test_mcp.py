@@ -213,10 +213,27 @@ class TheGates(ServerTest):
         text = reply["result"]["content"][0]["text"]
         self.assertLessEqual(len(text), 60000)
         payload = json.loads(text)
-        self.assertEqual(6000, payload["truncated"]["total"])
-        self.assertEqual(len(payload["report"]), payload["truncated"]["shown"])
-        self.assertGreater(payload["truncated"]["shown"], 50)
+        [cut] = payload["truncated"]["lists"]
+        self.assertEqual(("the report", 6000, len(payload["report"])), (cut["list"], cut["total"], cut["shown"]))
+        self.assertGreater(cut["shown"], 50)
         self.assertIn("run audit_design.py", payload["truncated"]["rest"])
+
+    def test_a_long_nested_list_is_cut_too(self):
+        """Codex on #92: most of perf_audit's report is the nested
+        `ledger.assets`, which a cut of the top-level lists alone left whole,
+        past the limit."""
+        self.write("dist/index.html", PAGE.format("<p>Hello</p>"))
+        for n in range(1200):
+            self.write(f"dist/assets/chunk-{n:04d}-with-a-long-hashed-name.js", "x;")
+        reply = self.call("perf_audit", {"paths": ["dist"]})
+        text = reply["result"]["content"][0]["text"]
+        self.assertLessEqual(len(text), 60000)
+        payload = json.loads(text)
+        cuts = {c["list"]: c for c in payload["truncated"]["lists"]}
+        self.assertIn("ledger.assets", cuts)
+        self.assertEqual(1201, cuts["ledger.assets"]["total"])
+        self.assertEqual(len(payload["report"]["ledger"]["assets"]), cuts["ledger.assets"]["shown"])
+        self.assertIn("findings", payload["report"])
 
     def test_a_script_that_stops_or_no_python_is_said(self):
         reply = self.call("check_roles", {"tokens": "missing.css"})

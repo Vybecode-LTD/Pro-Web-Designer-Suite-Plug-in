@@ -237,7 +237,8 @@
   - **Safe arguments.** Each tool takes only its schema's arguments, checked; a path
     reaches the script after `--`, so a path never becomes an option.
   - **Sized for the context.** A report past 60,000 characters keeps the head of its
-    longest list, with `truncated` saying how many it left out: Claude Code warns past
+    longest lists, nested ones such as perf_audit's `ledger.assets` too, with
+    `truncated` saying how many each left out: Claude Code warns past
     10,000 tokens of tool output and stops at 25,000.
 
 ### Fixed
