@@ -606,7 +606,9 @@ def emit_css(conv: Converter, source: str) -> str:
                 out.append(f"    /* {label} */")
                 last_tier = tier
             css, ok = conv.css_value(var, mode, raw)
-            comment = f"  /* {var.described} */" if var.described else ""
+            # A `*/` in a description or a deprecation reason would end the
+            # comment and make the rest live CSS (CodeRabbit on #101).
+            comment = f"  /* {var.described.replace('*/', '* /')} */" if var.described else ""
             if not ok and css.startswith("/*"):
                 # Comment the whole declaration out rather than emit a property
                 # with a comment for a value, which is invalid CSS and would take
@@ -655,8 +657,11 @@ def emit_dtcg(conv: Converter, source: str) -> str:
     values, descriptions, deprecated = [], {}, {}
     for _tier, token, var, mode, raw in blocks.get(":root", []):
         css, ok = conv.css_value(var, mode, raw)
-        if not ok:
+        if not ok and css.lstrip().startswith("/*"):
             continue                     # already a problem: unresolved, or no CSS form
+        # Anything else (a keyword such as `transparent`, a reference to an
+        # unresolved token) goes to dtcg.document, which types it or names it
+        # as left out: nothing is dropped silently (CodeRabbit on #101).
         values.append((f"--{token}", css))
         descriptions[f"--{token}"] = var.description
         deprecated[f"--{token}"] = var.deprecated
@@ -1077,9 +1082,27 @@ def report_problems(problems: Sequence[Problem], quiet: bool) -> None:
             print(f"  - {r.message}", file=sys.stderr)
 
 
+def css_main(path: Path, args: argparse.Namespace) -> int:
+    """A tokens.css converts to --format dtcg only."""
+    if args.format != "dtcg" or args.reverse:
+        print(f"{path} is CSS: it converts to --format dtcg only.", file=sys.stderr)
+        return 2
+    problems: List[Problem] = []
+    try:
+        text = css_to_dtcg(path, problems)
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    write_out(text, args.out)
+    report_problems(problems, args.quiet)
+    return 1 if problems else 0
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     path = Path(args.path)
+    if path.suffix.lower() == ".css":    # reads none of the project's token names (CodeRabbit on #101)
+        return css_main(path, args)
     # A flag beats the config: the project's token files only without --tokens (P24).
     try:
         sources, config_path = token_sources(args.tokens)
@@ -1092,14 +1115,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     try:
-        if path.suffix.lower() == ".css":
-            if args.format != "dtcg" or args.reverse:
-                print(f"{path} is CSS: it converts to --format dtcg only.", file=sys.stderr)
-                return 2
-            css_problems: List[Problem] = []
-            write_out(css_to_dtcg(path, css_problems), args.out)
-            report_problems(css_problems, args.quiet)
-            return 1 if css_problems else 0
         if args.reverse:
             data = json.loads(path.read_bytes())
             text, problems = emit_reverse(data, collection_split=not args.flat)

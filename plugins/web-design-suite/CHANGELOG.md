@@ -17,7 +17,8 @@
   - **Writing.** `figma_to_tokens.py --format dtcg` writes a 2025.10 document from any
     Figma export or from a `tokens.css`: names split on `-` into groups, a name that is
     also a group's prefix as its `$root`, `var()` as references, every token typed, and
-    colours as objects in their own space with an sRGB `hex` fallback. A value DTCG has
+    colours as objects in their own space, with an sRGB `hex` fallback where one can be
+    computed (none for `lab()`, `lch()` or a `color()` space other than sRGB). A value DTCG has
     no type for (`clamp()`, `calc()`, `em`, `ch`), a token that refers to one, and each
     theme or density block are named and left out (exit 1).
   - **`diff_system.py`** takes a DTCG file as either snapshot, compared as a contract is:

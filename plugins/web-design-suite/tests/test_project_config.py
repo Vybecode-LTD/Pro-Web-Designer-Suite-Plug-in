@@ -720,13 +720,23 @@ TOKEN_FILES = {
     "studio.json": json.dumps(STUDIO_LEGACY),
     "studio-groups.json": json.dumps(STUDIO_GROUPS),
     "studio-order.json": json.dumps(STUDIO_ORDER),
+    "deep.tokens.json": json.dumps({"top": {"$type": "color", "$value": "#fff"}, "deep": json.loads(
+        '{"g": ' * 70 + '{"$type": "color", "$value": "#000"}' + "}" * 70)}),
+    "names.tokens.json": json.dumps({"Button background": {"$type": "color", "$value": "#ffffff"},
+                                     "A/B (x)": {"$type": "color", "$value": "{Button background}"},
+                                     "veil": {"$type": "color", "$value": {"colorSpace": "srgb", "components": [1, 0, 0],
+                                                                           "alpha": 0.9995}},
+                                     "loop": {"$extends": "{loop}", "x": {"$type": "color", "$value": "#010101"}},
+                                     "p": {"$extends": "{q}", "x": {"$type": "color", "$value": "#020202"}},
+                                     "q": {"$extends": "{p}", "y": {"$type": "color", "$value": "#030303"}}}),
 }
 TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.css"], ["contract.json"],
                ["contract.json", "a.css"], ["a.css", "contract.json"], ["bad-schema.json"], ["bad-ramps.json"],
                ["bad-step.json"], ["bad-scale.json"], ["bad-role.json"], ["not-json.json"], ["gone.css"],
                ["gone.json"], ["a.css", "gone.css"], [], ["utf16be.json"],
                ["dtcg.tokens.json"], ["extends.tokens"], ["a.css", "dtcg.tokens.json"], ["dtcg.tokens.json", "a.css"],
-               ["legacy.json"], ["schema-and-tokens.json"], ["studio.json"], ["studio-groups.json"], ["studio-order.json"]]
+               ["legacy.json"], ["schema-and-tokens.json"], ["studio.json"], ["studio-groups.json"], ["studio-order.json"],
+               ["deep.tokens.json"], ["names.tokens.json"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).
@@ -833,6 +843,11 @@ class TheNodeReaderAgrees(TempDirTest):
                     self.assertEqual([list(s) for s in python(case)["ok"]["ramps"].values()],
                                      [list(s) for s in from_node["ok"]["ramps"].values()])
         self.assertIn("٥٠٠", python(cases[1])["ok"]["scales"]["brand"])           # not a ramp step
+        dtcg_case = python(cases[TOKEN_CASES.index(["dtcg.tokens.json"])])["ok"]   # a DTCG file holds values (CodeRabbit)
+        self.assertEqual("var(--brand)", dtcg_case["roles"]["--bg-brand"])
+        self.assertEqual("lab(50 40 59.5)", dtcg_case["ramps"]["brand"]["960"])
+        deep = python(cases[TOKEN_CASES.index(["deep.tokens.json"])])["ok"]
+        self.assertEqual({}, deep["scales"])
 
     def test_the_component_globs_match_the_same(self):
         """N37: ESLint asks isComponent() which JSX files are components, as

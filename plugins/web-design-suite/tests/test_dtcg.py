@@ -194,6 +194,10 @@ class TheProjectReadsDtcg(TempDirTest):
                               cwd=self.tmp)
                 self.assertNotIn("not a contract.json", output(proc))
                 self.assertRegex(output(proc), r"token names from tokens[/\\]")
+        pc = load_script("design-system-docs", "project_config")             # what the intake holds (CodeRabbit)
+        tokens = pc.read_tokens([self.tmp / "tokens" / "design.tokens.json"])
+        self.assertEqual("var(--brand)", tokens.roles["--bg-brand"])
+        self.assertEqual("var(--brand-hover)", tokens.roles["--old-accent"])
         self.write(".design-suite.json", '{"schema": 1, "tokens": "tokens/design.tokens.json"}')
         self.write("src/card.css", ".card { color: var(--bg-brand); }\n")
         proc = run_py("web-design-studio", "audit_design", "src", "--json", cwd=self.tmp)
@@ -307,6 +311,76 @@ class TokensStudio(TempDirTest):
         tokens = pc.read_tokens([self.write("tokens/studio.json", json.dumps(STUDIO_REVIEW))])
         self.assertEqual({"--bg-surface": "var(--neutral-0)"}, tokens.roles)
         self.assertEqual({"base": "4px", "6": "24px"}, tokens.scales["space"])
+class TheEdgesOfTheFormat(TempDirTest):
+    """The reviews of #101 (Codex, CodeRabbit): what a valid document may hold
+    and the readers and the writer must not mishandle."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.dtcg = dtcg_module()
+
+    def read(self, data, name="t.tokens.json"):
+        pc = load_script("design-system-docs", "project_config")
+        return pc.read_tokens([self.write(name, json.dumps(data))])
+
+    def test_a_key_with_a_space_is_a_css_name(self):
+        tokens = self.read({"Button background": {"$type": "color", "$value": "#ffffff"},
+                            "Card (raised)": {"$type": "color", "$value": "{Button background}"}})
+        self.assertEqual({"--Card-raised-": "var(--Button-background)"}, tokens.roles)
+        self.assertEqual("#ffffff", tokens.values()["--Button-background"])
+
+    def test_alpha_just_below_one_is_kept(self):
+        tokens = self.read({"veil": {"$type": "color", "$value": {
+            "colorSpace": "srgb", "components": [1, 0, 0], "alpha": 0.9995}}})
+        self.assertEqual("rgb(255 0 0 / 0.9995)", tokens.constants["--veil"])
+
+    def test_an_extends_cycle_is_reported(self):
+        for doc in ({"a": {"$extends": "{a}", "x": {"$type": "color", "$value": "#000000"}}},
+                    {"a": {"$extends": "{b}", "x": {"$type": "color", "$value": "#000000"}},
+                     "b": {"$extends": "{a}", "y": {"$type": "color", "$value": "#ffffff"}}}):
+            with self.subTest(doc=list(doc)):
+                _, problems = self.dtcg.normalise(doc)
+                self.assertTrue(any("cycle" in why for _, why in problems), problems)
+
+    def test_a_document_nested_too_deep_is_refused_not_a_traceback(self):
+        deep = {"$type": "color", "$value": "#000000"}
+        for _ in range(300):
+            deep = {"g": deep}
+        doc = {"top": {"$type": "color", "$value": "#ffffff"}, "deep": deep}
+        _, problems = self.dtcg.normalise(doc)
+        self.assertIn("more than 64 levels", problems[0][1])
+        self.assertEqual({}, self.read(doc).values())
+
+    def test_weight_keywords_and_unbounded_numbers(self):
+        doc, problems = self.dtcg.document([("--weight-bold", "bold"), ("--weight-body", "normal"),
+                                            ("--huge", "1e999"), ("--gap", "1e999px")])
+        self.assertEqual({"$type": "fontWeight", "$value": "bold"}, doc["weight"]["bold"])
+        self.assertEqual("normal", doc["weight"]["body"]["$value"])
+        self.assertEqual({"--huge", "--gap"}, {name for name, _ in problems})
+        json.dumps(doc, allow_nan=False)                 # no Infinity in the file
+
+    def test_a_keyword_colour_is_written_not_dropped(self):
+        src = self.write("e.tokens.json", json.dumps({"veil": {"$type": "color", "$value": "transparent"},
+                                                      "ink": {"$type": "color", "$value": "#111111"}}))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--format", "dtcg", cwd=self.tmp)
+        doc = json.loads(proc.stdout)
+        self.assertEqual(0, doc["veil"]["$value"]["alpha"])
+
+    def test_a_deprecation_reason_cannot_end_a_comment(self):
+        src = self.write("e.tokens.json", json.dumps({"ink": {"$type": "color", "$value": "#111111",
+                                                              "$deprecated": "gone */ body { display: none }"}}))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--color-format", "hex", cwd=self.tmp)
+        css = proc.stdout.decode("utf-8")
+        self.assertIn("/* (deprecated: gone * / body { display: none }) */", css)
+        self.assertNotIn("*/ body", css)
+
+    def test_a_tokens_css_converts_whatever_the_project_lists(self):
+        self.write(".git/HEAD", "x\n")
+        self.write(".design-suite.json", '{"schema": 1, "tokens": "missing.json"}')
+        proc = run_py("figma-variables-sync", "figma_to_tokens", self.write("t.css", ":root { --ink: #111111; }\n"),
+                      "--format", "dtcg", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual("#111111", json.loads(proc.stdout)["ink"]["$value"]["hex"])
 
 
 class TheProposalIsDtcgToo(TempDirTest):
