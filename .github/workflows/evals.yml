@@ -4,7 +4,8 @@
 # request: the repository is public, and a fork's pull request must not spend
 # the key. The routing cases grant no shell, so the runner needs no OS sandbox.
 # The CLI and both models are pinned, so a new release or a model rollout is not
-# read as a change in the plugin.
+# read as a change in the plugin. The job holds the key, so its actions are pinned
+# to commits, and setup-node caches nothing.
 name: Evals
 
 on:
@@ -37,14 +38,15 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
         with:
           persist-credentials: false
 
       # The plugin's hooks run in every eval session, under node.
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1   # v7.1.0
         with:
           node-version: 22
+          package-manager-cache: false
 
       - name: Install the Claude Code CLI
         run: npm install --global @anthropic-ai/claude-code@2.1.293
@@ -96,7 +98,7 @@ jobs:
               print(f"| {case.get('name')} | {case.get('aggregates', {}).get('score')} |")
           EOF
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
         if: always()
         with:
           name: eval-results

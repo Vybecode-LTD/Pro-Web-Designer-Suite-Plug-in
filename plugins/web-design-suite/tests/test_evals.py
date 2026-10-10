@@ -241,7 +241,7 @@ class TheWorkflow(TempDirTest):
     def setUp(self):
         super().setUp()
         self.doc = node(LOAD_ALL, [WORKFLOW.read_text(encoding="utf-8")], YAML_MODULES)[0]
-        self.steps = {s.get("name", s.get("uses")): s for s in self.doc["jobs"]["evals"]["steps"]}
+        self.steps = {s.get("name", s.get("uses", "").split("@")[0]): s for s in self.doc["jobs"]["evals"]["steps"]}
 
     def run_step(self, name, cwd, **values):
         values.setdefault("RUNNER_TEMP", self.tmp.as_posix())
@@ -254,11 +254,21 @@ class TheWorkflow(TempDirTest):
         self.assertEqual({"workflow_dispatch", "push"}, set(self.doc["on"]))
         self.assertEqual({"tags": ["v*"]}, self.doc["on"]["push"])
         self.assertEqual({"contents": "read"}, self.doc["permissions"])
-        self.assertIs(False, self.steps["actions/checkout@v7"]["with"]["persist-credentials"])
+        self.assertIs(False, self.steps["actions/checkout"]["with"]["persist-credentials"])
+        self.assertIs(False, self.steps["actions/setup-node"]["with"]["package-manager-cache"])
         text = WORKFLOW.read_text(encoding="utf-8")
         self.assertEqual(1, text.count("${{ secrets."))
         for step in self.steps.values():                  # inputs reach a script through env only
             self.assertNotIn("${{", step.get("run", ""))
+
+    def test_every_action_is_pinned_to_a_commit(self):
+        """A moved tag would run new code in a job that holds the key
+        (CodeRabbit on #95)."""
+        actions = [s["uses"] for s in self.steps.values() if "uses" in s]
+        self.assertEqual(3, len(actions))
+        for uses in actions:
+            with self.subTest(uses=uses):
+                self.assertRegex(uses, r"^[\w.-]+/[\w.-]+@[0-9a-f]{40}$")
 
     def test_the_cli_is_pinned_past_the_git_check(self):
         pin = re.fullmatch(r"npm install --global @anthropic-ai/claude-code@(\d+)\.(\d+)\.(\d+)",
