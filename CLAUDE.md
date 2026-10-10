@@ -12,13 +12,14 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is public (since 2026-09-28), and MIT-licensed like the plugin.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
-## Current state (2026-10-10)
+## Current state (2026-10-10, fourth session)
 
-- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is under way: P24 and P25 are complete (#76 to #84), P26 is complete (#85, #87, #88: fifteen workflow commands), P27 is complete (#89: six subagents and `/critique`; #91: the a11y and email checks in the gate's hook), and P28 part 1 is merged (#92: the MCP server for the gates; the LSP spike not shipped), with N38 (#93: baseline keys across platforms). P28 part 2 closed without `bin/` (the owner) and P29 is merged (#95: the eval suite, 23 routing cases, and `evals.yml`). No PR is open.
-- **Installed:** 3.4.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** about 955. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P30 (the outcome evals, against a no-plugin baseline), then R3. `dev plans/web-design-suite-review/claude-code-capabilities.md` §1 is the evals page (re-read 2026-10-10), §6 to §9 the hooks, skills, manifest, sub-agents and MCP pages, and §10 P29's choices and its first run. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 37 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Version:** 3.5.0 is the latest release (`v3.5.0`, `44637c1`, published by `release.yml`), which completes Phase 5 (#76 to #99). It adds the project contract, the hooks, fifteen workflow commands, six subagents, the MCP server for the gates, and the eval suite (P29 routing, P30 outcome). R3's live check is `dev plans/web-design-suite-3.5.0-live-check.md`.
+- **Installed:** 3.5.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
+- **Tests:** about 980. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Evals:** 23 routing cases and 11 outcome cases. `evals.yml` runs both on a release tag or by hand (`tag=all`), under one $14 ceiling. The outcome cases grant Write, Edit and the gate MCP tools, never Bash. In `claude-code-capabilities.md`, §1 is the evals page, §10 P29's choices, and §11 the sandboxing page and P30's choices.
+- **Active work:** Phase 6 (4.0.0) in `dev plans/web-design-suite-execution-plan.md`, starting with P31 (DTCG tokens, the owner's choice). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 31 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
@@ -82,7 +83,7 @@ plugins/web-design-suite/         the plugin (the only folder that ships)
   workflow-commands/              the fifteen commands only the user invokes (/gate, /new-system, /deck...), added by plugin.json's `skills`
   agents/                         the six subagents (design-critic, gate-runner, the auditors and reviewers)
   mcp/, .mcp.json                 the MCP server: the gates as tools (node design_gates.mjs)
-  evals/                          claude plugin eval cases: routing/ (one per skill), boundaries/ (sibling pairs)
+  evals/                          claude plugin eval cases: routing/ (one per skill), boundaries/ (sibling pairs), and outcome cases in build/, systems/, gates/, lifecycle/, persuasion/, delivery/
   tests/                          the suite; fixtures/ holds the pointer and evidence registers
   tools/                          check_pointers.py, sync_snippets.py
   CHANGELOG.md, README.md, LICENSE
