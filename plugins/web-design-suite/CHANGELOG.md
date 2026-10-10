@@ -226,6 +226,20 @@
     `components` is. Left out, it is `emails/**/*.html`. `ProjectConfig.is_email()` and
     `isEmail()` answer for a file, and both readers check the new keys.
   - The scripts one edit starts share 160 seconds, inside the hook's 180.
+- **The gates as MCP tools** (XC-B1 in part). An MCP server, `gates`, in `.mcp.json`:
+  `node mcp/design_gates.mjs`, MCP over stdio, standard library only, with Python found
+  as the hooks find it.
+  - **Five tools:** `audit_design`, `a11y_static`, `perf_audit`, `check_roles` and
+    `diff_system`, named `mcp__plugin_web-design-suite_gates__<tool>`. Each runs the
+    skill's script in the project's folder (`CLAUDE_PROJECT_DIR`), so the project's
+    `.design-suite.json` counts, and returns its JSON with the exit code and a verdict:
+    `pass`, `fail`, or an error when the script could not run.
+  - **Safe arguments.** Each tool takes only its schema's arguments, checked; a path
+    reaches the script after `--`, so a path never becomes an option.
+  - **Sized for the context.** A report past 60,000 characters keeps the head of its
+    longest lists, nested ones such as perf_audit's `ledger.assets` too, with
+    `truncated` saying how many each left out: Claude Code warns past
+    10,000 tokens of tool output and stops at 25,000.
 
 ### Fixed
 
