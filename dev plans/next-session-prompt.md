@@ -3,7 +3,7 @@
 **Written 2026-10-10 (the fifth session that day)**, at the end of the session that:
 - merged P31 part 1 (#101): `shared/dtcg.py`, DTCG 2025.10 read and write, copied beside every `project_config.py`; every token reader takes a DTCG file; `figma_to_tokens.py --format dtcg`; DTCG snapshots in `diff_system.py`; the migration proposal as `tokens.json`;
 - merged P31 part 2 (#102): Tokens Studio exports read as Tokens Studio reads them, `$themes` as modes, its math worked out;
-- fixed 18 real review findings across the two (§0).
+- fixed 24 real review findings across the two (§0).
 
 Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P31 part 3** (§4), then the rest of Phase 6 (§5).
 
@@ -96,11 +96,13 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Codex on #97:** a router pattern for "a patch release?" took any `token` as context, auth tokens included. A skill's context words must be its own domain's (design tokens, `tokens.css`, a CSS custom property).
       - **Codex on #98:** a check that stands aside for another must do so only when the other runs: with `emailBuild` off, an email template's edit went unchecked.
     - **CodeRabbit's free tier:** one review an hour, and it skips a PR of more than 100 files ("Review skipped: too many files"). Keep a PR under 100 files; a fixture copied into each case counts once per case.
-    - **The fifth 2026-10-10 session's reviews found 18 real issues** on #101 (Codex 7, CodeRabbit 7 and one carried to #102) and #102 (Codex 3), each fixed with a test failing on the head it reviewed. The lessons, for any reader of an outside format:
+    - **The fifth 2026-10-10 session's reviews found 24 real issues** on #101 (Codex 7, CodeRabbit 8, one of them fixed in #102) and #102 (Codex 3, CodeRabbit 6), each fixed with a test failing on the head it reviewed. The lessons, for any reader of an outside format:
       - **Read what the spec allows, not what our writer writes:** a key with a space (`Button background`) needs a CSS-safe name; `{group.$root}`, a property-level `$ref` (`#/x/$value/components/0`), non-ASCII names, and a legacy group named `type` are all valid.
       - **Bound every recursion and every expansion:** a 300-deep document, a 200-link `$extends` chain and a fan-out (exponential) must be refused with a problem, not a traceback or a full memory. Check depth and size without recursing, after each merge.
       - **Never drop silently:** every value left out is named; a `*/` in a description cannot end a CSS comment; a cycle (`$extends`, or `a -> {b} -> {a}`) is reported.
-      - **A partial mode map** (a token only the Dark theme sets) must not be promoted to `:root`.
+      - **A partial mode map** (a token only the Dark theme sets) must not be promoted to `:root`, and a source set only some themes read (a palette per theme) is a mode.
+      - **A reference's body holds no brace:** `{x} + {x}` is math, not one reference. Remember each lookup, or a fan-out of `{x} + {x}` runs 2^N times.
+    - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
   - The Bash tool is Git Bash. Any command you give the user must work in cmd.exe.
@@ -157,7 +159,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 ## 2. Useful facts
 
 - **DTCG (#101, #102).** `shared/dtcg.py` is the master, copied beside every `project_config.py` (`test_dtcg.TheCopiesAreTheMaster`); `project_config.py` loads the copy beside it by path. `normalise()` (the Figma scripts' reading, string forms) and `tokens()` (lossless, CSS names) read 2025.10 and Tokens Studio (`studio_document`, `studio_themes`); `document()` writes 2025.10 from CSS custom properties. `project_config.mjs` ports the reading, numbers formatted as Python's `f"{round(x, 6):g}"`, and `TheNodeReaderAgrees` holds them equal on every value form. `figma_common.parse_studio` makes each Studio theme group a collection; `FVar` carries `deprecated`, `dtcg_type` and `partial`.
-- **The plugin** is `plugins/web-design-suite/` (about 1,030 tests):
+- **The plugin** is `plugins/web-design-suite/` (about 1,040 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
