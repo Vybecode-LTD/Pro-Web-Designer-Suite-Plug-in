@@ -291,10 +291,17 @@ class TheEmailBuild(HookTest):
     def test_a_missing_unsubscribe_link_is_an_error_in_the_build(self):
         self.config(emailBuild=True)
         self.write("emails/newsletter.html", self.letter.replace(UNSUBSCRIBE, ""))
-        text = self.context("emails/newsletter.html")
+        # a temporary root of its own, so anything this run leaves is seen,
+        # whatever its name (CodeRabbit on #91)
+        temp = self.tmp / "temp"
+        temp.mkdir()
+        roots = {"TEMP": str(temp), "TMP": str(temp), "TMPDIR": str(temp)}
+        text = self.context("emails/newsletter.html", **roots)
         self.assertIn("email build: emails/newsletter.html has 1 error and 6 warnings", text)
         self.assertIn("- the build, links: no unsubscribe link found", text)
-        self.assertEqual([], list(pathlib.Path(tempfile.gettempdir()).glob("wds-email-*/newsletter.html")))
+        self.assertEqual([], list(temp.iterdir()))                           # the build's folder removed
+        roots = {name: str(self.tmp / "no-temp") for name in roots}           # the control: the build is made there
+        self.assertIsNone(self.context("emails/newsletter.html", **roots))
 
     def test_an_unknown_token_stops_the_build(self):
         self.config(emailBuild=True)
