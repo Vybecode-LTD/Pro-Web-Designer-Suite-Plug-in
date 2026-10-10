@@ -14,11 +14,11 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-10-10)
 
-- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is under way: P24 and P25 are complete (#76 to #84), P26 is complete (#85, #87, #88: fifteen workflow commands), and P27 part 1 is merged (#89: six subagents and `/critique`). No PR is open.
+- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is under way: P24 and P25 are complete (#76 to #84), P26 is complete (#85, #87, #88: fifteen workflow commands), P27 is complete (#89: six subagents and `/critique`; #91: the a11y and email checks in the gate's hook), and P28 part 1 is merged (#92: the MCP server for the gates; the LSP spike not shipped), with N38 (#93: baseline keys across platforms). No PR is open.
 - **Installed:** 3.4.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** about 904. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P27 part 2 (the two hooks P25 left), then P28 (the MCP server for the gates, `bin/` only with the owner's yes, an LSP spike). `dev plans/web-design-suite-review/claude-code-capabilities.md` §6 to §8 are the re-reads of the hooks, skills, manifest and sub-agents pages (the MCP and evals pages are still to be re-read). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 41 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Tests:** about 940. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P28 part 2 (`bin/`, only with the owner's yes; otherwise XC-B1 closes in the docs), then P29 (the eval framework and the routing cases; it needs a signed-in CLI). `dev plans/web-design-suite-review/claude-code-capabilities.md` §6 to §9 are the re-reads of the hooks, skills, manifest, sub-agents and MCP pages (the evals page is still to be re-read, before P29). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 40 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
@@ -79,6 +79,7 @@ plugins/web-design-suite/         the plugin (the only folder that ships)
   hooks/                          hooks.json and design_hooks.mjs: the opt-in gate, token diff and guard, the router
   workflow-commands/              the fifteen commands only the user invokes (/gate, /new-system, /deck...), added by plugin.json's `skills`
   agents/                         the six subagents (design-critic, gate-runner, the auditors and reviewers)
+  mcp/, .mcp.json                 the MCP server: the gates as tools (node design_gates.mjs)
   tests/                          the suite; fixtures/ holds the pointer and evidence registers
   tools/                          check_pointers.py, sync_snippets.py
   CHANGELOG.md, README.md, LICENSE
