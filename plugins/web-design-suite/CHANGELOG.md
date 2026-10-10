@@ -211,6 +211,21 @@
     policies, unprotectable columns and keys, after `/schema-to-screens`.
   - **`codemod-batch-reviewer`** checks one codemod batch against the reconciliation and
     the known traps, with a verdict per file.
+- **Hooks, part 3: the a11y gate and the email build** (GT-C9, DL-C7). Two more checks
+  in the gate's hook, each behind its own key in `.design-suite.json`'s `hooks`.
+  - **`a11yGate`:** after each edit Claude makes to a file `a11y_static.py` reads
+    (markup, JSX, CSS, and templates such as `.php` and `.liquid`), it runs on that file
+    in the config's folder, with the project's a11y baseline, and Claude hears its
+    findings with the audit's. The two share the hook's 9,000 characters, each counting
+    what it left out.
+  - **`emailBuild`:** after each edit Claude makes to an email template, `lint_email.py`
+    checks the source, `build_email.py` builds it into a temporary folder, and
+    `lint_email.py` checks the build. Claude hears the errors; the warnings are counted,
+    for `/email-build` to show.
+  - **`emails`:** a new top-level key, the globs of the email templates, read as
+    `components` is. Left out, it is `emails/**/*.html`. `ProjectConfig.is_email()` and
+    `isEmail()` answer for a file, and both readers check the new keys.
+  - The scripts one edit starts share 160 seconds, inside the hook's 180.
 
 ### Fixed
 

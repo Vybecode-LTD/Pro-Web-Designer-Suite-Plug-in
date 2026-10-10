@@ -1,14 +1,16 @@
-"""The plugin's hooks (P25: XC-C2, LC-C8, SS-C6, XC-C8's hook part).
+"""The plugin's hooks (P25: XC-C2, LC-C8, SS-C6, XC-C8's hook part; P27: GT-C9, DL-C7).
 
 hooks/hooks.json runs hooks/design_hooks.mjs under node with the event's
 JSON on stdin, as Claude Code does:
 - `guard` (PreToolUse on Edit|Write) refuses an edit to a generated file;
-- `gate` (PostToolUse on Edit|Write) runs audit_design.py on the changed
-  file and returns its findings as additionalContext, and after an edit to a
-  token file, diff_system.py against the published snapshot;
+- `gate` (PostToolUse on Edit|Write) runs audit_design.py and a11y_static.py
+  on the changed file and returns their findings as additionalContext; after
+  an edit to a token file, diff_system.py against the published snapshot; and
+  after an edit to an email template, lint_email.py, build_email.py and
+  lint_email.py again;
 - `route` (UserPromptSubmit) names the skill a prompt needs.
 
-The guard, the gate and the token diff act only in a project whose
+The guard, the gates, the token diff and the email build act only in a project whose
 .design-suite.json turns them on (`hooks`), and the plugin's `design_hooks`
 option turns them all off.
 Each case here is the JSON Claude Code sends, from a fixture.
@@ -69,6 +71,12 @@ class TheHooksFile(unittest.TestCase):
             return re.findall(r"'([^']+)'", re.search(rf"const {name} = \[(.*?)\];", text, re.S).group(1))
         self.assertEqual(sorted(audit.CSS_EXT | audit.JS_EXT | audit.TEMPLATE_EXT), sorted(array("AUDITED")))
         self.assertEqual(list(audit.GENERATED_MARKERS), array("GENERATED"))
+
+    def test_the_a11y_gate_reads_what_a11y_static_reads(self):
+        a11y = load_script("a11y-audit-runner", "a11y_static")
+        text = SCRIPT.read_text(encoding="utf-8")
+        found = re.findall(r"'([^']+)'", re.search(r"const A11Y_READ = \[(.*?)\];", text, re.S).group(1))
+        self.assertEqual(sorted(a11y.AUDITABLE_EXT), sorted(found))
 
 
 @unittest.skipUnless(NODE, "node is not installed")
@@ -183,6 +191,151 @@ class TheDesignGate(HookTest):
         self.config(designGate=True)
         self.assertIn("needs Python 3", self.context("src/components/card.css",
                                                      WDS_PYTHON=str(self.tmp / "no-python")))
+
+
+PAGE = '<!doctype html>\n<html lang="en">\n<head><title>Home</title></head>\n<body>\n<main>\n{}\n</main>\n</body>\n</html>\n'
+
+
+class TheA11yGate(HookTest):
+    """GT-C9 (b): a11y_static's findings on the file Claude edited, behind
+    `hooks.a11yGate`, in the same additionalContext as the audit's."""
+
+    def context(self, rel, **changes):
+        out = self.run_hook("gate", self.edit(rel), **changes)
+        return out and out["hookSpecificOutput"]["additionalContext"]
+
+    def test_an_opted_in_project_hears_of_a_missing_alt(self):
+        self.config(a11yGate=True)
+        self.write("index.html", PAGE.format('<img src="hero.png">'))
+        text = self.context("index.html")
+        self.assertIn("a11y gate: a11y_static.py found 1 problem in index.html", text)
+        self.assertIn("line 6, img-no-alt, WCAG 1.1.1 (error)", text)
+        self.write("index.html", PAGE.format('<img src="hero.png" alt="The harbour at dawn">'))
+        self.assertIsNone(self.context("index.html"))                         # a clean file says nothing
+
+    def test_without_the_key_nothing_runs(self):
+        self.write("index.html", PAGE.format('<img src="hero.png">'))
+        self.assertIsNone(self.context("index.html"))                         # no config
+        self.config(designGate=True)
+        self.assertIsNone(self.context("index.html"))                         # the audit alone: a clean page for it
+        self.config(a11yGate=False)
+        self.assertIsNone(self.context("index.html"))
+        self.config(a11yGate=True)
+        self.assertIsNone(self.context("index.html", CLAUDE_PLUGIN_OPTION_DESIGN_HOOKS="false"))
+
+    def test_only_the_files_a11y_static_reads(self):
+        """A template the audit does not read (.php) is checked too, and a
+        Markdown file is not."""
+        self.config(a11yGate=True)
+        self.write("views/home.php", PAGE.format('<img src="hero.png">'))
+        self.assertIn("img-no-alt", self.context("views/home.php"))
+        self.write("notes.md", '<img src="hero.png">\n')
+        self.assertIsNone(self.context("notes.md"))
+
+    def test_the_projects_a11y_baseline_applies(self):
+        self.config(a11yGate=True)
+        self.write("index.html", PAGE.format('<img src="hero.png">'))
+        proc = run_py("a11y-audit-runner", "a11y_static", "index.html", "--write-baseline", ".a11y-baseline.json",
+                      cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIsNone(self.context("index.html"))
+
+    def test_the_audit_and_the_a11y_gate_share_the_cap(self):
+        """Claude Code caps additionalContext at 10,000 characters, so the two
+        reports share LIMIT, each counting what it left out."""
+        self.config(designGate=True, a11yGate=True)
+        rules = "".join(f".c{n}:focus {{ outline: none; color: var(--neutral-700); }}\n" for n in range(3000))
+        self.write("src/components/many.css", rules)      # a11y_static reads a rule at the top level
+        text = self.context("src/components/many.css")
+        self.assertRegex(text, r"audit_design.py found 300[01] problems")     # and the file is unlayered
+        self.assertIn("a11y_static.py found 3000 problems", text)
+        self.assertIn("more: run audit_design.py on the file", text)
+        self.assertIn("more: run a11y_static.py on the file", text)
+        self.assertLess(text.index("audit_design.py"), text.index("a11y_static.py"))
+        self.assertLessEqual(len(text), 10000)
+
+    def test_a_key_that_is_not_a_boolean_is_said(self):
+        self.write(".design-suite.json", '{"schema": 1, "hooks": {"a11yGate": "yes"}}')
+        self.write("index.html", PAGE.format('<img src="hero.png">'))
+        self.assertIn('"hooks.a11yGate" must be true or false', self.context("index.html"))
+        self.write("views/home.php", PAGE.format(""))                          # a file only a11y_static reads
+        self.assertIn('"hooks.a11yGate" must be true or false', self.context("views/home.php"))
+
+
+NEWSLETTER = (PLUGIN / "skills" / "email-template-system" / "assets" / "templates" / "newsletter.html")
+UNSUBSCRIBE = ' or <a href="https://example.com/unsubscribe?e={{email_hash}}">unsubscribe</a>'
+
+
+class TheEmailBuild(HookTest):
+    """DL-C7: after an edit to an email template, the source is linted, built
+    into a temporary folder and the build linted, behind `hooks.emailBuild`;
+    the errors reach Claude. A template is a file `emails` matches,
+    `emails/**/*.html` by default."""
+
+    def setUp(self):
+        super().setUp()
+        self.letter = NEWSLETTER.read_text(encoding="utf-8")
+        self.assertIn(UNSUBSCRIBE, self.letter)
+
+    def context(self, rel, **changes):
+        out = self.run_hook("gate", self.edit(rel), **changes)
+        return out and out["hookSpecificOutput"]["additionalContext"]
+
+    def test_the_starters_newsletter_is_silent(self):
+        """It has warnings (values off the email scale), which /email-build
+        shows; the hook names only errors."""
+        self.config(emailBuild=True)
+        self.write("emails/newsletter.html", self.letter)
+        self.assertIsNone(self.context("emails/newsletter.html"))
+
+    def test_a_missing_unsubscribe_link_is_an_error_in_the_build(self):
+        self.config(emailBuild=True)
+        self.write("emails/newsletter.html", self.letter.replace(UNSUBSCRIBE, ""))
+        # a temporary root of its own, so anything this run leaves is seen,
+        # whatever its name (CodeRabbit on #91)
+        temp = self.tmp / "temp"
+        temp.mkdir()
+        roots = {"TEMP": str(temp), "TMP": str(temp), "TMPDIR": str(temp)}
+        text = self.context("emails/newsletter.html", **roots)
+        self.assertIn("email build: emails/newsletter.html has 1 error and 6 warnings", text)
+        self.assertIn("- the build, links: no unsubscribe link found", text)
+        self.assertEqual([], list(temp.iterdir()))                           # the build's folder removed
+        roots = {name: str(self.tmp / "no-temp") for name in roots}           # the control: the build is made there
+        self.assertIsNone(self.context("emails/newsletter.html", **roots))
+
+    def test_an_unknown_token_stops_the_build(self):
+        self.config(emailBuild=True)
+        self.write("emails/newsletter.html", self.letter.replace('class="legal"', 'class="legal" style="color:var(--no-such-ink);"', 1))
+        text = self.context("emails/newsletter.html")
+        self.assertIn("- the build stopped (exit 2)", text)
+        self.assertIn("--no-such-ink", text)
+
+    def test_a_build_past_gmails_clip_is_an_error(self):
+        self.config(emailBuild=True)
+        filler = "<p>" + "Wharf Road news. " * 7000 + "</p>\n"
+        self.write("emails/newsletter.html", self.letter.replace("</body>", filler + "</body>", 1))
+        text = self.context("emails/newsletter.html")
+        self.assertIn("- the build, size: ", text)                            # the lint of the build says it
+        self.assertIn("exceeds Gmail's 102,400-byte clipping threshold", text)
+
+    def test_only_the_templates_emails_names(self):
+        broken = self.letter.replace(UNSUBSCRIBE, "")
+        self.config(emailBuild=True)
+        self.write("src/pages/newsletter.html", broken)
+        self.assertIsNone(self.context("src/pages/newsletter.html"))          # not under emails/
+        self.write(".design-suite.json", json.dumps({"schema": 1, "hooks": {"emailBuild": True},
+                                                     "emails": ["src/pages/*.html"]}))
+        self.assertIn("no unsubscribe link found", self.context("src/pages/newsletter.html"))
+        self.write("emails/newsletter.html", broken)
+        self.assertIsNone(self.context("emails/newsletter.html"))             # the default no longer applies
+
+    def test_without_the_key_nothing_runs(self):
+        self.write("emails/newsletter.html", self.letter.replace(UNSUBSCRIBE, ""))
+        self.assertIsNone(self.context("emails/newsletter.html"))             # no config
+        self.config(emailBuild=False, a11yGate=False)
+        self.assertIsNone(self.context("emails/newsletter.html"))
+        self.write(".design-suite.json", '{"schema": 1, "hooks": {"emailBuild": 1}}')
+        self.assertIn('"hooks.emailBuild" must be true or false', self.context("emails/newsletter.html"))
 
 
 TOKENS = """\

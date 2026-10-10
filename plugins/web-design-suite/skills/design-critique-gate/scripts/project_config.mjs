@@ -21,11 +21,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const CONFIG_NAME = '.design-suite.json';
-const CONFIG_KEYS = ['schema', 'tokens', 'emailTokens', 'components', 'stack', 'budgets', 'baselines', 'hooks'];
+const CONFIG_KEYS = ['schema', 'tokens', 'emailTokens', 'components', 'emails', 'stack', 'budgets', 'baselines',
+                     'hooks'];
 const STACKS = ['vanilla-css', 'css-modules', 'tailwind-v3', 'tailwind-v4'];
 const BUDGETS = ['perf', 'a11y'];
 const BASELINES = ['audit', 'a11y', 'perf', 'docs', 'snapshots', 'system'];
-const HOOKS = ['designGate', 'generatedFiles', 'tokenDiff'];      // the plugin's hooks a project turns on (P25)
+const HOOKS = ['designGate', 'generatedFiles', 'tokenDiff',       // the plugin's hooks a project turns on (P25,
+               'a11yGate', 'emailBuild'];                        // P27)
+const EMAILS = ['emails/**/*.html'];                             // the email templates, unless `emails` names them
 
 export class ConfigError extends Error {}
 
@@ -114,10 +117,15 @@ export function loadConfig(file) {
     if (typeof value !== 'string' || !value.trim()) fail(`"${key}" must be a path, as a string`);
     return path.resolve(base, value);
   };
-  let components = has(data, 'components') ? data.components : [];
-  if (typeof components === 'string') components = [components];
-  if (!Array.isArray(components) || !components.every((g) => typeof g === 'string' && g))
-    fail('"components" must be a glob or a list of globs');
+  const globList = (key, fallback) => {
+    let value = has(data, key) ? data[key] : [...fallback];
+    if (typeof value === 'string') value = [value];
+    if (!Array.isArray(value) || !value.every((g) => typeof g === 'string' && g))
+      fail(`"${key}" must be a glob or a list of globs`);
+    return value;
+  };
+  const components = globList('components', []);
+  const emails = globList('emails', EMAILS);
   const stack = has(data, 'stack') ? data.stack : null;
   if (stack !== null && !STACKS.includes(stack)) fail(`"stack" must be one of ${STACKS.join(', ')}`);
   let tokens = has(data, 'tokens') ? data.tokens : [];
@@ -142,7 +150,7 @@ export function loadConfig(file) {
     if (bad !== undefined) fail(`"hooks.${bad}" must be true or false`);
     return { ...value };
   };
-  return { path: where, root: base, tokens, emailTokens, components, stack,
+  return { path: where, root: base, tokens, emailTokens, components, emails, stack,
            budgets: pathMap('budgets', BUDGETS), baselines: pathMap('baselines', BASELINES), hooks: hookFlags() };
 }
 
@@ -175,14 +183,25 @@ export function globRegex(pattern) {
   return new RegExp(`^${globTokens(pattern).map((t) => parts[t] ?? escapeRegex(t)).join('')}$`);
 }
 
-// True when `file` matches one of the config's `components`, read relative to
-// its folder, as ProjectConfig.is_component() decides.
-export function isComponent(config, file) {
-  if (!config || !config.components.length) return false;
+// True when `file` matches one of `globs`, read relative to the config's folder.
+function matches(config, globs, file) {
+  if (!config || !globs.length) return false;
   const rel = path.relative(config.root, realPath(file));
   if (!rel || rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) return false;  // outside
   const posix = rel.split(path.sep).join('/');
-  return config.components.some((g) => globRegex(g).test(posix));
+  return globs.some((g) => globRegex(g).test(posix));
+}
+
+// True when `file` matches one of the config's `components`, read relative to
+// its folder, as ProjectConfig.is_component() decides.
+export function isComponent(config, file) {
+  return matches(config, config?.components ?? [], file);
+}
+
+// True when `file` is one of the config's email templates, by `emails`, as
+// ProjectConfig.is_email() decides.
+export function isEmail(config, file) {
+  return matches(config, config?.emails ?? [], file);
 }
 
 // stylelint matches an override's `files` with micromatch (dot: true), whose

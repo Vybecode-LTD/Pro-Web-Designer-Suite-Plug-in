@@ -96,23 +96,31 @@ their gate, so install web-design-studio beside any of them.
 
 **As a repo** — extract `skills/web-design-studio/assets/starter/styles/` into your project, wire the configs from `assets/configs/`, and point Claude Code at it.
 
-**The hooks** come with the plugin, and need `node` on the PATH. The gate, the token
-diff and the guard act only where a project's `.design-suite.json` turns them on; the
-router runs in every project:
+**The hooks** come with the plugin, and need `node` on the PATH. The gates, the token
+diff, the email build and the guard act only where a project's `.design-suite.json`
+turns them on; the router runs in every project:
 
 ```json
 {"schema": 1, "tokens": "src/styles/tokens.css",
  "baselines": {"system": "published/system.json"},
- "hooks": {"designGate": true, "tokenDiff": true, "generatedFiles": true}}
+ "hooks": {"designGate": true, "a11yGate": true, "tokenDiff": true, "emailBuild": true,
+           "generatedFiles": true}}
 ```
 
 - **`designGate`:** after each edit Claude makes to a stylesheet, template or script,
-  `audit_design.py` runs on that file, and Claude hears what it found. It and the token
-  diff need Python 3 (`WDS_PYTHON`, else `python3`, `python` or `py -3`).
+  `audit_design.py` runs on that file, and Claude hears what it found. It, the a11y gate,
+  the token diff and the email build need Python 3 (`WDS_PYTHON`, else `python3`,
+  `python` or `py -3`).
+- **`a11yGate`:** after each edit to markup, JSX or CSS, `a11y_static.py` runs on that
+  file, and Claude hears its findings with the audit's.
 - **`tokenDiff`:** after each edit to one of the project's `tokens`, `diff_system.py`
   compares them with the published snapshot, `baselines.system`. Claude hears the
   breaking changes and the contrast pairs that crossed a WCAG floor; an additive edit is
   silent, and so is the hook until the snapshot exists.
+- **`emailBuild`:** after each edit to an email template (the config's `emails` globs,
+  `emails/**/*.html` by default), `lint_email.py` checks the source, `build_email.py`
+  builds it into a temporary folder, and `lint_email.py` checks the build. Claude hears
+  the errors.
 - **`generatedFiles`:** Claude may not edit a file that says it is generated
   (`DO NOT EDIT`), and is told to change its source.
 - **The router:** another hook names the skill a prompt needs, when a crowded skill

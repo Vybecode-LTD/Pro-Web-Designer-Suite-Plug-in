@@ -550,10 +550,11 @@ console.log(JSON.stringify(out));
 CONFIGS = {
     "full": json.dumps({"schema": 1, "tokens": ["src/tokens.css", "../shared/contract.json"],
                         "emailTokens": "emails/email-tokens.json", "components": "src/widgets/**/*.css",
-                        "stack": "tailwind-v4", "budgets": {"perf": "perf.json", "a11y": "a11y.json"},
+                        "emails": "mail/**/*.html", "stack": "tailwind-v4", "budgets": {"perf": "perf.json", "a11y": "a11y.json"},
                         "baselines": {"audit": "b/audit.json", "snapshots": "snaps/",
                                       "system": "published/system.json"},
-                        "hooks": {"designGate": True, "generatedFiles": False, "tokenDiff": True}}),
+                        "hooks": {"designGate": True, "generatedFiles": False, "tokenDiff": True,
+                                  "a11yGate": True, "emailBuild": False}}),
     "nulls": '{"schema": 1, "emailTokens": null, "stack": null}',
     "bom": "﻿" + '{"schema": 1, "tokens": "t.css"}',
     "unknown": '{"schema": 1, "token": "x.css", "budget": {}}',
@@ -574,17 +575,26 @@ CONFIGS = {
     "hooks-key": '{"schema": 1, "hooks": {"designGate": true, "gate": true}}',
     "hooks-value": '{"schema": 1, "hooks": {"designGate": "yes"}}',
     "hooks-list": '{"schema": 1, "hooks": ["designGate"]}',
+    "emails-none": '{"schema": 1, "emails": []}',
+    "emails-empty": '{"schema": 1, "emails": [""]}',
+    "emails-object": '{"schema": 1, "emails": {"mail": "*.html"}}',
+    "emails-before-stack": '{"schema": 1, "emails": 3, "stack": "bootstrap"}',
+    "hooks-a11y": '{"schema": 1, "hooks": {"a11yGate": "yes"}}',
+    "hooks-email": '{"schema": 1, "hooks": {"emailBuild": 1}}',
 }
 
 
 TOKENS_JS = """
-import { readTokens, loadConfig, isComponent } from %s;
+import { readTokens, loadConfig, isComponent, isEmail } from %s;
 const [mode, ...args] = process.argv.slice(1);
 let out;
 if (mode === 'tokens') {
   out = JSON.parse(args[0]).map((files) => {
     try { return { ok: readTokens(files) }; } catch (err) { return { error: err.message }; }
   });
+} else if (mode === 'emails') {
+  const config = loadConfig(args[0]);
+  out = JSON.parse(args[1]).map((file) => isEmail(config, file));
 } else {
   const config = loadConfig(args[0]);
   const { globs, files } = JSON.parse(args[1]);
@@ -665,7 +675,7 @@ class TheNodeReaderAgrees(TempDirTest):
             return {"error": str(exc)}
         return {"ok": {"path": str(c.path), "root": str(c.root), "tokens": [str(p) for p in c.tokens],
                        "emailTokens": str(c.email_tokens) if c.email_tokens else None,
-                       "components": c.components, "stack": c.stack,
+                       "components": c.components, "emails": c.emails, "stack": c.stack,
                        "budgets": {k: str(v) for k, v in c.budgets.items()},
                        "baselines": {k: str(v) for k, v in c.baselines.items()}, "hooks": c.hooks}}
 
@@ -743,6 +753,21 @@ class TheNodeReaderAgrees(TempDirTest):
                 self.assertEqual([one.is_component(f) for f in files], answers)
                 self.assertFalse(answers[-1])                         # outside the project
         self.assertEqual(len(GLOBS), sum(1 for answers in from_node if any(answers)))   # each matches something
+
+    def test_the_email_templates_are_the_same(self):
+        """DL-C7: the hook asks isEmail() which file is an email template, by
+        `emails`, which is `emails/**/*.html` when the config leaves it out."""
+        rels = ["emails/welcome.html", "emails/2026/receipt.html", "emails/email-tokens.json",
+                "mail/welcome.html", "src/emails/welcome.html"]
+        for text, expected in (('{"schema": 1}', [True, True, False, False, False]),
+                               ('{"schema": 1, "emails": ["mail/*.html", "src/**/emails/*.html"]}',
+                                [False, False, False, True, True]),
+                               ('{"schema": 1, "emails": []}', [False] * 5)):
+            with self.subTest(config=text):
+                config = self.pc.load_config(self.write("site/.design-suite.json", text))
+                files = [str(self.tmp / "site" / rel) for rel in rels] + [str(self.tmp / "emails" / "a.html")]
+                self.assertEqual(expected + [False], [config.is_email(f) for f in files])   # the last is outside
+                self.assertEqual(expected + [False], self.run_node("emails", str(config.path), json.dumps(files)))
 
 
 class TheConfigsFilesReachTheirScripts(TempDirTest):

@@ -1,5 +1,5 @@
 {
-  "description": "web-design-suite: a design gate, a token diff and a generated-file guard that a project turns on in its .design-suite.json, and a router that names the skill a prompt needs.",
+  "description": "web-design-suite: a design gate, an a11y gate, a token diff, an email build and a generated-file guard that a project turns on in its .design-suite.json, and a router that names the skill a prompt needs.",
   "hooks": {
     "PreToolUse": [
       {

@@ -12,12 +12,14 @@ At the project's root:
   "tokens": ["src/styles/tokens.css"],
   "emailTokens": "emails/email-tokens.json",
   "components": ["src/widgets/**/*.css"],
+  "emails": ["emails/**/*.html"],
   "stack": "tailwind-v4",
   "budgets": {"perf": "perf-budget.json", "a11y": "a11y-budget.json"},
   "baselines": {"audit": ".design-baseline.json", "a11y": ".a11y-baseline.json",
                 "perf": ".perf-baseline.json", "docs": "docs/baseline.json",
                 "snapshots": "snapshots/", "system": "published/system.json"},
-  "hooks": {"designGate": true, "generatedFiles": true, "tokenDiff": true}
+  "hooks": {"designGate": true, "generatedFiles": true, "tokenDiff": true,
+            "a11yGate": true, "emailBuild": true}
 }
 ```
 
@@ -27,10 +29,11 @@ At the project's root:
 | `tokens` | The project's token files: a `tokens.css`, a `contract.json`, or a list. A later file's value wins, step by step for a ramp or a scale, so two files may each hold part of one ramp |
 | `emailTokens` | The email build's own `email-tokens.json`, a different file that only the email scripts read |
 | `components` | Globs that add to the component files the rule spec names. `*` and `?` stay within a folder, and `**/` is any number of folders, none included |
+| `emails` | Globs of the email templates, read as `components` is: `emails/**/*.html` when the key is left out, and none with `[]` |
 | `stack` | `vanilla-css`, `css-modules`, `tailwind-v3` or `tailwind-v4` |
 | `budgets` | `perf` and `a11y`: the budget files |
 | `baselines` | `audit`, `a11y`, `perf`, `docs` and `snapshots`: where each gate keeps its baseline. `system`: the published snapshot, the system as consumers have it, which `diff_system.py` compares against |
-| `hooks` | Turns the plugin's hooks on for this project, each `true` or `false`. `designGate`: after each edit Claude makes to a file the audit reads, `audit_design.py` runs on it, in the config's folder, and Claude hears what it found. `generatedFiles`: Claude may not edit a file that says it is generated (`DO NOT EDIT`, `@generated`) in its first 800 characters, and is told to change its source. `tokenDiff`: after each edit Claude makes to one of the config's `tokens`, `diff_system.py` compares them with `baselines.system`, and Claude hears the release that makes, each breaking change and each contrast pair that crossed a WCAG floor. An additive edit is silent, and so is the hook until the snapshot exists |
+| `hooks` | Turns the plugin's hooks on for this project, each `true` or `false`. `designGate`: after each edit Claude makes to a file the audit reads, `audit_design.py` runs on it, in the config's folder, and Claude hears what it found. `generatedFiles`: Claude may not edit a file that says it is generated (`DO NOT EDIT`, `@generated`) in its first 800 characters, and is told to change its source. `tokenDiff`: after each edit Claude makes to one of the config's `tokens`, `diff_system.py` compares them with `baselines.system`, and Claude hears the release that makes, each breaking change and each contrast pair that crossed a WCAG floor. An additive edit is silent, and so is the hook until the snapshot exists. `a11yGate`: after each edit Claude makes to a file `a11y_static.py` reads (markup, JSX and CSS, and templates such as `.php` and `.liquid`), it runs on that file in the config's folder, with `baselines.a11y`, and Claude hears its findings in the same message as the audit's. `emailBuild`: after each edit Claude makes to an email template (`emails`), `lint_email.py --source` runs on it, `build_email.py` builds it into a temporary folder, and `lint_email.py` runs on the build; Claude hears the errors, and the warnings are counted for `/email-build` to show. The hook lints as for marketing mail, so a receipt with no unsubscribe link is reported, and Claude says why it stays |
 
 - **Finding it.** A script walks up from the working directory to the first `.design-suite.json`, and never past the folder that holds `.git`: a config above the repository is not the repository's.
 - **Paths** are relative to the file, so the scripts agree from any working directory.
@@ -76,13 +79,14 @@ A flag beats each of these, and each falls back to the script's own default.
 | Key | Read by |
 |---|---|
 | `components` | web-design-studio's `audit_design.py`, and its stylelint and ESLint configs. For ESLint, a JSX or TSX file a glob matches is a component file |
+| `emails` | the `emailBuild` hook |
 | `stack` | content-model-to-ui's `scaffold_ui.py`: `tailwind-v3` and `tailwind-v4` scaffold Tailwind; `css-modules` and `vanilla-css` scaffold CSS Modules, the nearer of its two |
 | `emailTokens` | email-template-system's `build_email.py` and `lint_email.py --source`. They never read `tokens`: the email build has its own projection of the system |
 | `tokens` (CSS only) | client-presentation-builder's `build_presentation.py`, which builds the deck on the project's `tokens.css` files, in order. A contract cannot style a deck |
 | `budgets.perf` | perf-budget-gate's `perf_audit.py` and `measure_vitals.mjs` |
 | `budgets.a11y` | a11y-audit-runner's `a11y_runtime.mjs` |
 | `baselines.audit` | web-design-studio's `audit_design.py` |
-| `baselines.a11y` | a11y-audit-runner's `a11y_static.py` |
+| `baselines.a11y` | a11y-audit-runner's `a11y_static.py`, and the `a11yGate` hook through it |
 | `baselines.perf` | perf-budget-gate's `perf_audit.py` |
 | `baselines.docs` | design-system-docs' `build_docs.py --check`. A baseline the config names but that is missing is an error, as a named `--baseline` is |
 | `baselines.snapshots` | component-state-matrix's `snapshot_matrix.mjs` |
