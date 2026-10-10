@@ -8,8 +8,8 @@
 
 - **Merged this session**, each with CI green on its head, every thread resolved and GitHub clean:
   - **#101 (P31 part 1): `shared/dtcg.py`**, merged as `c0856da`. DTCG 2025.10 read and write in one module, copied beside every `project_config.py` (ten skills) and replacing `dtcg_values.py`. `read_tokens()` and the Node reader take a DTCG token file; `figma_to_tokens.py --format dtcg` writes one from a Figma export or a `tokens.css`; `diff_system.py` takes DTCG snapshots; the migration proposal is written as `tokens.json` too; `/install-gate` vendors `dtcg.py`. Two rounds of review found 14 real issues (Codex 7, CodeRabbit 7), each fixed with a test.
-  - **#102 (P31 part 2): Tokens Studio**, merged as `MERGE_102`. A Studio export's sets merge (source, then enabled, in set order), each theme group is a collection whose modes are its themes, the legacy keys, Studio's types and its math are read, and `read_tokens()` reads the default theme. A DTCG `number` or `fontWeight` is written unitless. Review: Codex 3, CodeRabbit 1 (carried from #101).
-- **The plan:** 31 open items, 31 scheduled. LC-C2 and LC-B2 close with P31 part 3. About 1,030 tests.
+  - **#102 (P31 part 2): Tokens Studio**, merged as `2cb299d`. A Studio export's sets merge (source, then enabled, in set order), each theme group is a collection whose modes are its themes, the legacy keys, Studio's types and its math are read, and `read_tokens()` reads the default theme. A DTCG `number` or `fontWeight` is written unitless. Review: Codex 3 and CodeRabbit 7 (one carried from #101), each fixed with a test; among them, `pointer_alias` read `{x} + {x}` as one reference, and a palette each theme reads was lost.
+- **The plan:** 31 open items, 31 scheduled. LC-C2 and LC-B2 close with P31 part 3. About 1,040 tests.
 - **No eval was run** this session (none was asked for).
 
 ## Next steps
@@ -25,6 +25,7 @@
 ## Warnings
 
 - **A worktree in the scratchpad hits Windows' 260-character path limit** (`evals/boundaries/...`): create it with `git -c core.longpaths=true worktree add`, and expect `check.py` there to error on those files; run the suite in the main checkout instead.
+- **Staged changes travel with `git checkout`.** The first draft of these docs, staged on the docs branch, rode into #102's last commit (`7d300c6`) and so into `main`; this PR corrects it. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
 - **A fail-before run can hang** when the old code has the bug being fixed (an exponential `$extends` fan-out did): give it a timeout and stop it with `TaskStop`.
 - **The scratch repository** `Vybecode-LTD/wds-gate-scratch` is private and the owner's to delete.
 - **CodeRabbit's free tier:** one review an hour; after a "Review limit reached", comment `@coderabbitai review` once it resets.
