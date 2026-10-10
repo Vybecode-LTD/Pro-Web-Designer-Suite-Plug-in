@@ -488,7 +488,7 @@ const srgbEncode = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) -
 
 function rgbCss(r, g, b, alpha) {
   const [cr, cg, cb] = [r, g, b].map((c) => Math.min(1, Math.max(0, c)));
-  if (alpha >= 0.999) return `#${[cr, cg, cb].map((c) => pyRoundInt(c * 255).toString(16).padStart(2, '0')).join('')}`;
+  if (alpha >= 1) return `#${[cr, cg, cb].map((c) => pyRoundInt(c * 255).toString(16).padStart(2, '0')).join('')}`;
   return `rgb(${fmt(cr * 255)} ${fmt(cg * 255)} ${fmt(cb * 255)} / ${fmt(alpha)})`;
 }
 
@@ -535,7 +535,7 @@ function colourToCss(v) {
     if (space === 'oklch' || space === 'oklab') {
       let [L, x, y] = comps;
       if (space === 'oklab') [x, y] = [Math.hypot(x, y), pyMod(Math.atan2(y, x) * (180 / Math.PI), 360)];
-      return `oklch(${fmt(L * 100)}% ${fmt(x)} ${fmt(y)}${alpha >= 0.999 ? '' : ` / ${fmt(alpha)}`})`;
+      return `oklch(${fmt(L * 100)}% ${fmt(x)} ${fmt(y)}${alpha >= 1 ? '' : ` / ${fmt(alpha)}`})`;
     }
   }
   const hex = v.hex;
@@ -545,13 +545,26 @@ function colourToCss(v) {
     return rgbCss(...parts.map((p) => parseInt(p.trim(), 16) / 255), alpha);
   }
   if (comps.length === 3 && (CSS_SPACES.has(space) || space === 'lab' || space === 'lch')) {
-    const args = comps.map(fmt).join(' ') + (alpha >= 0.999 ? '' : ` / ${fmt(alpha)}`);
+    const args = comps.map(fmt).join(' ') + (alpha >= 1 ? '' : ` / ${fmt(alpha)}`);
     return space === 'lab' || space === 'lch' ? `${space}(${args})` : `color(${space} ${args})`;
   }
   return null;
 }
 
-const dtcgName = (parts) => `--${parts.join('-')}`;
+// A run of ASCII a custom property cannot hold unescaped is one `-`, as css_name() writes it.
+const dtcgName = (parts) => `--${parts.map((p) => String(p).replace(/[^A-Za-z0-9_\-\u0080-\u{10FFFF}]+/gu, '-')).join('-')}`;
+
+// Objects or arrays nested more than 64 deep, as dtcg.py's too_deep() finds them.
+function tooDeep(data, limit = 64) {
+  const stack = [[data, 0]];
+  while (stack.length) {
+    const [node, depth] = stack.pop();
+    if (depth > limit) return true;
+    if (isObject(node)) for (const v of Object.values(node)) stack.push([v, depth + 1]);
+    else if (Array.isArray(node)) for (const v of node) stack.push([v, depth + 1]);
+  }
+  return false;
+}
 
 function refCss(v) {
   const alias = typeof v === 'string' && v.trim().startsWith('{') ? pointerAlias(v) : null;
@@ -668,7 +681,7 @@ function resolveExtends(node, root, active) {
     const ref = node.$extends;
     delete node.$extends;
     const target = lookupGroup(root, ref);
-    if (!active.has(node) && isObject(target) && !has(target, '$value')) {
+    if (isObject(target) && !has(target, '$value') && target !== node && !active.has(target)) {
       active.add(node);
       resolveExtends(target, root, active);
       active.delete(node);
@@ -685,6 +698,7 @@ function resolveExtends(node, root, active) {
 
 // [[name, value as CSS or null]] in document order.
 function dtcgEntries(data) {
+  if (tooDeep(data)) return [];
   const doc = structuredClone(data);
   resolveExtends(doc, doc, new Set());
   const out = [];

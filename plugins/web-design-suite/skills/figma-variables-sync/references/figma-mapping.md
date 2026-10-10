@@ -611,7 +611,8 @@ route for a Figma plugin, Tokens Studio, Style Dictionary 5 or Terrazzo 2 that
 reads the format. Each contract name is split on `-` into groups (`--bg-surface`
 is `bg.surface`), a name that is also a group's prefix becomes the group's
 `$root`, `var(--x)` becomes a reference, and every token is typed: a colour is
-an object in its own space with an sRGB `hex` fallback, a length is `{value,
+an object in its own space, with an sRGB `hex` fallback where one can be computed
+(none for `lab()`, `lch()` or a non-sRGB `color()`), a length is `{value,
 unit}` in px or rem: the format says "`$value.unit` may only be "px" or "rem""
 ([the format's dimension section](https://www.designtokens.org/tr/2025.10/format/#dimension)),
 and names a group's own token `{group.$root}`, since "`{color.accent}` is an

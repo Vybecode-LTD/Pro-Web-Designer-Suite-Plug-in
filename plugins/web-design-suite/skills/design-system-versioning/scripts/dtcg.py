@@ -74,7 +74,7 @@ def _rgb_css(r: float, g: float, b: float, alpha: float) -> str:
     """0..1 channels. Opaque becomes a hex (what Figma stores); translucent an
     rgb() with an alpha both scripts already parse."""
     r, g, b = (min(1.0, max(0.0, c)) for c in (r, g, b))
-    if alpha >= 0.999:
+    if alpha >= 1:
         return "#" + "".join(f"{round(c * 255):02x}" for c in (r, g, b))
     return f"rgb({_fmt(r * 255)} {_fmt(g * 255)} {_fmt(b * 255)} / {_fmt(alpha)})"
 
@@ -116,7 +116,7 @@ def colour_to_css(v: dict, lossless: bool = False) -> Optional[str]:
             L, x, y = comps
             if space == "oklab":                 # same colour, polar form
                 x, y = math.hypot(x, y), math.degrees(math.atan2(y, x)) % 360
-            suffix = "" if alpha >= 0.999 else f" / {_fmt(alpha)}"
+            suffix = "" if alpha >= 1 else f" / {_fmt(alpha)}"
             return f"oklch({_fmt(L * 100)}% {_fmt(x)} {_fmt(y)}{suffix})"
     hexv = v.get("hex")                          # the spec's sRGB fallback
     if isinstance(hexv, str) and hexv.startswith("#") and len(hexv) == 7:
@@ -126,7 +126,7 @@ def colour_to_css(v: dict, lossless: bool = False) -> Optional[str]:
             return None
         return _rgb_css(r, g, b, alpha)
     if lossless and len(comps) == 3 and space in CSS_SPACES | {"lab", "lch"}:
-        args = " ".join(_fmt(c) for c in comps) + ("" if alpha >= 0.999 else f" / {_fmt(alpha)}")
+        args = " ".join(_fmt(c) for c in comps) + ("" if alpha >= 1 else f" / {_fmt(alpha)}")
         return f"{space}({args})" if space in ("lab", "lch") else f"color({space} {args})"
     return None
 
@@ -269,10 +269,10 @@ def _resolve_extends(node: Any, root: dict, path: List[str],
         where = "/".join(path) or "(root)"
         ref = node.pop("$extends")
         target = _lookup(root, ref)
-        if id(node) in active:
-            problems.append((where, f"`$extends` cycle through {ref}"))
-        elif not isinstance(target, dict) or "$value" in target:
+        if not isinstance(target, dict) or "$value" in target:
             problems.append((where, f"`$extends` names {ref!r}, which is not a group here"))
+        elif target is node or id(target) in active:       # itself, or a group extending this one
+            problems.append((where, f"`$extends` cycle through {ref}"))
         else:
             active.add(id(node))
             _resolve_extends(target, root, path, problems, active)
@@ -356,9 +356,28 @@ def normalise(data: Any, lossless: bool = False) -> Tuple[Any, Problems]:
     problems: Problems = []
     if not isinstance(data, dict):
         return data, problems
+    if too_deep(data):                           # every step below recurses (CodeRabbit on #101)
+        return {}, [("(root)", f"nested more than {MAX_DEPTH} levels deep, so not read")]
     doc = copy.deepcopy(data)
     _resolve_extends(doc, doc, [], problems, set())
     return _walk(doc, [], None, None, problems, lossless), problems
+
+
+MAX_DEPTH = 64
+
+
+def too_deep(data: Any, limit: int = MAX_DEPTH) -> bool:
+    """Objects or arrays nested more than `limit` deep, found without recursing."""
+    stack = [(data, 0)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > limit:
+            return True
+        if isinstance(node, dict):
+            stack.extend((v, depth + 1) for v in node.values())
+        elif isinstance(node, list):
+            stack.extend((v, depth + 1) for v in node)
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -379,8 +398,13 @@ def is_document(data: Any, depth: int = 0) -> bool:
 
 def css_name(path: Sequence[str]) -> str:
     """A token's path as a CSS custom property: Style Dictionary's name/kebab
-    and Terrazzo's default (`color.bg.surface` -> `--color-bg-surface`)."""
-    return "--" + "-".join(path)
+    and Terrazzo's default (`color.bg.surface` -> `--color-bg-surface`). A run
+    of ASCII a name cannot hold unescaped (a space, `/`, `(`) is one `-`, so
+    `Button background` is `--Button-background` (Codex on #101)."""
+    return "--" + "-".join(NAME_UNSAFE.sub("-", str(p)) for p in path)
+
+
+NAME_UNSAFE = re.compile(r"[^A-Za-z0-9_\-\u0080-\U0010ffff]+")
 
 
 @dataclass
@@ -462,6 +486,8 @@ COLOR_FN_SPACES = {"srgb", "srgb-linear", "display-p3", "a98-rgb", "prophoto-rgb
 
 def _out(x: float) -> Union[int, float]:
     r = round(float(x), 6) + 0.0                 # + 0.0 turns -0.0 into 0.0
+    if not math.isfinite(r):                     # 1e999: JSON has no Infinity (CodeRabbit on #101)
+        raise ValueError(f"{x} is not a finite number")
     return int(r) if r == int(r) and abs(r) < 1e15 else r
 
 
@@ -654,6 +680,13 @@ def css_value(name: str, value: str) -> Tuple[Optional[str], Any]:
     """(the 2025.10 $type, the $value) for one custom property, or (None,
     UNSUPPORTED). A reference is ("$var", "--target"); a reference inside a
     composite is {"$var": "--target"}, which document() resolves."""
+    try:
+        return _css_value(name, value)
+    except (ValueError, OverflowError):          # a number no JSON can hold
+        return None, UNSUPPORTED
+
+
+def _css_value(name: str, value: str) -> Tuple[Optional[str], Any]:
     text = " ".join(str(value).split())
     low = text.lower()
     ref = _reference(text)
@@ -668,6 +701,8 @@ def css_value(name: str, value: str) -> Tuple[Optional[str], Any]:
     m = DURATION.fullmatch(low)
     if m:
         return "duration", {"value": _out(float(m.group(1))), "unit": m.group(2).lower()}
+    if "weight" in name.lower() and low in ("normal", "bold"):
+        return "fontWeight", low                 # 2025.10's names for 400 and 700 (Codex on #101)
     if PLAIN_NUMBER.fullmatch(low):
         n = _out(float(low))
         if "weight" in name.lower() and 1 <= n <= 1000:
