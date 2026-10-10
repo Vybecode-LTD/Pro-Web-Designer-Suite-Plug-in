@@ -1,12 +1,12 @@
 # Start here: the next session
 
-**Written 2026-10-10 (the second session that day)**, at the end of the session that:
-- merged P27 part 2 (#91): `hooks.a11yGate` and `hooks.emailBuild` in the gate's hook, and the `emails` key (GT-C9 closed);
-- merged P28 part 1 (#92): the MCP server for the gates, and the LSP spike's verdict, not shipped;
-- merged N38 (#93): a11y_static's and perf_audit's baseline keys, the same on every platform;
-- re-read the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/` (`claude-code-capabilities.md` §9).
+**Written 2026-10-10 (the third session that day)**, at the end of the session that:
+- closed P28 part 2 without `bin/` (the owner said no, 2026-10-10), which closes XC-B1;
+- merged P29 (#95): `evals/` with 23 routing cases (one per skill, and "must not fire" cases each way between five sibling pairs), `test_evals`, three router fixes the cases found, and `.github/workflows/evals.yml`;
+- ran the routing suite for real once (the owner's Max plan): 23 of 23 after one fix, $6.11 in all at list price; and dispatched `evals.yml` once on `main`, 23 of 23 for $4.11;
+- re-read the plugin-evals page (`claude-code-capabilities.md` §1, and §10 for P29's choices and the run).
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P28 part 2** (`bin/`, the owner's decision, §4) and **P29** (the eval framework and the routing cases, §5). Phase 5 ends with R3; its other PRs are in the execution plan's §4.
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P30** (the outcome evals, §4), then **R3** (3.5.0, §5). Phase 5 ends with R3.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -20,7 +20,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 - **Budget.** A session may run up to **750 thousand tokens, with no compacting** (the user, 2026-10-02). About 95 thousand of it is spent before the first message.
   - Report usage after each PR, and warn early.
   - Stop and write the handoff (§6) well before the cap. The end-of-session docs take about 40 thousand.
-  - **The `total_tokens left` counter resets** when the app delivers a `<ci-monitor-event>`, but not on a background task's notification. It reset about 15 times last session, on every review event, acknowledgements included.
+  - **The `total_tokens left` counter resets** when the app delivers a `<ci-monitor-event>`, and on some of the user's messages, but not on a background task's notification. It reset on every review event last session, acknowledgements included.
     - Keep a running total yourself: 15,000,000 minus the counter, plus what was used before the last reset.
     - **Count from the first turn.** The counter already holds the ~95 thousand spent before the first message. Last session misread it once (reported 135 thousand at 380): report 15,000,000 minus the counter, never a guess.
   - Long thinking costs as much as long output. Decide, then act.
@@ -89,8 +89,14 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Python 3.9's argparse** refuses positionals after an option (`DECISION_LOG.md --findings F src`); use `parse_intermixed_args`. Run a new runner's tests under `uv run --no-project --python 3.9` before pushing.
       - **An agent's text must match what its scripts do**: the matrix writes HTML, not JSON; the critic's snapshots write files, so it names their folder; a Postgres `UPDATE` or `ALL` policy with no `WITH CHECK` checks the new row with its `USING`, inserted rows included for `ALL`.
     - **Codex reviews only the head each PR opened with**, not later pushes. Comment `@codex review` if a fix needs its eyes.
+    - **The third 2026-10-10 session's reviews found 4 real issues** on #95, each fixed with a test failing on the head it reviewed:
+      - **Codex:** a router alternative with no context ("prop tables") sent a library README to design-system-docs: a skill's router pattern needs the skill's own context nearby. And a threshold below 1.0 let a two-grader boundary case pass with one bad run of three: a case's score is the mean of its runs.
+      - **CodeRabbit:** a job that holds a secret pins its actions to commit SHAs and sets setup-node's `package-manager-cache: false`.
+    - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
   - The Bash tool is Git Bash. Any command you give the user must work in cmd.exe.
+  - **The desktop app is an MSIX package**, so its `AppData\Roaming` is really `C:\Users\vybec\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming`. Claude's tools see the bundled CLI at `%APPDATA%\Claude\claude-code\2.1.293\83cb0bd7fed4\claude.exe`; the owner's terminal does not ("cannot find the file"). Give the owner the real path. The credentials are in `C:\Users\vybec\.claude`, which both see.
+  - **The terminal tool** (`run_in_terminal`) reported a long command as unfinished while it was in fact running `auth login`, and closing the tab cancelled the sign-in. Read the tab before closing it.
   - **Bash heredocs eat backslashes** (`\\` becomes `\`, `\n` becomes a newline), even quoted ones. It bit three times last session: a `\n` in a test became a real newline, and an edit script failed to match.
     - Write any script or test code that holds a backslash with the Write tool into a scratch `.py` file, and run that. Or use the Edit tool, which is safe.
     - The Edit tool drops a trailing space at the end of `new_string`: an `old_string` ending in a space turned `new = (` into `new =(` last session. Read the staged diff.
@@ -126,19 +132,20 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`.
 2. Read the execution plan's §2 and §6, and its Phase 5 table in §4.
 3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
-   - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions.
-   - **Before P29, re-read the plugin-evals page** (https://code.claude.com/docs/en/plugin-evals) and update §1, which dates from 2026-09-23 (2.1.280). Read §1 then.
+   - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions, and the owner's no to `bin/`.
+   - **§1 and §10 are P30's ground:** §1 is the plugin-evals page, re-read on 2026-10-10 (2.1.293), and §10 P29's choices and its first run. Read both.
+   - **Before P30, re-read** the sandboxing page (https://code.claude.com/docs/en/sandboxing) and the evals page's "Set up fixtures and mocks" (`curl -sSL https://code.claude.com/docs/en/plugin-evals.md`, then `grep -n "^#"` and read that section; §1 skipped it). Put what matters in a new §11.
 4. Check the state, with the Bash tool:
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `40 open items, 40 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `37 open items, 37 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
 
-- **The plugin** is `plugins/web-design-suite/` (about 940 tests):
+- **The plugin** is `plugins/web-design-suite/` (about 955 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -175,6 +182,11 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - `TOOLS` holds each tool's `script`, `properties` (its schema) and `args()`. Positionals follow `--` and option values join with `=`, so a path never becomes an option.
   - `fit()` keeps a result within 60,000 characters: the longest list reached through objects is cut to the head that fits, then the next, and `truncated.lists` names each.
   - `tests/test_mcp.py` speaks to it as Claude Code does. `claude plugin validate --strict` on `plugin.json` reads `.mcp.json` (on the plugin folder it validates the `marketplace.json` beside it instead); the test runs it when the desktop app's CLI exists, and CI has its own validate job.
+- **The evals (#95).** `evals/routing/<skill>/` (13) and `evals/boundaries/<skill>-not-<sibling>/` (10), each a `prompt.md` (frontmatter: `description`, `expected_outcome`, `tags: [routing]` or `[routing, boundary]`, `max_turns: 10`, `allowed_tools: [Skill]`) and `graders/fires.md`, plus `graders/not-<sibling>.md` (`min: 0`, `max: 0`). Every grader is `arm: both`.
+  - `tests/test_evals.py`: `TheCaseFiles` (the page's fields, js-yaml), `TheRoutingCases` (every skill, every pair each way, each `input_match` run in node), `TheRouterAgrees` (the router on every prompt), `TheWorkflow` (the job's steps run under bash with a stand-in `claude`). `PAIRS` holds the five pairs.
+  - The run: from `plugins/web-design-suite`, `claude.exe plugin eval . --tag routing --runs 3 -j 4 --ablation none --trust-plugin --no-publish --threshold 1.0 --max-cost-usd 14 --model claude-sonnet-5-5 --judge-model claude-haiku-5-5 --output-dir <scratchpad>`: 69 runs, about 330 seconds and $5.60. `--case NAME --runs 1` for one. `--keep-temp` keeps each run's folder under `%TEMP%\claude-eval-*`: read only its `out/trace.jsonl`, then delete it.
+  - `evals.yml`: `gh workflow run evals.yml --ref main -f tag=routing -f runs=3` (the owner's OK first: it bills `ANTHROPIC_API_KEY`). It runs one case at a time: 18 minutes and $4.11 for the first dispatch, 23 of 23. Its summary is on the run's page and `eval-results` is the artifact.
+  - The router runs in every eval session (the plugin's hooks load); the MCP server does not start under the default `--mocks record`.
 - **Baseline keys (#93, N38).** audit_design, a11y_static and perf_audit all write `/` in a key's path (`portable_key`), and read a baseline's keys the same way.
 - **The scripts, by skill:**
 
@@ -217,47 +229,55 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. P28 part 2: `bin/`, the owner's decision
+## 4. P30: the outcome evals, against a no-plugin baseline
 
-**Item:** XC-B1 (`crosscut.md`), the last of it. The agents, hooks, commands and MCP server are merged; the LSP spike is done and not shipped (`claude-code-capabilities.md` §9).
+**Items:** SS-C7 (the systems), SB-C6 (the build half), GT-C10 (the gates), LC-C10 (the lifecycle), PS-C7 (persuasion) and DL-C7 (delivery; its commands, agent and hook are merged, and only its evals are left). Read each inventory row, then its paragraph in `web-design-suite-review/<area>.md` by `grep -n`.
 
-**First, ask the owner** (it was asked last session and not answered): should the plugin ship a top-level `bin/`?
-- **What it gives:** bare commands on the Bash tool's PATH while the plugin is enabled, such as `wds-gate` for `/gate`'s runner. The MCP tools and the slash commands already reach the same scripts.
-- **What it costs:** "claude.ai and Cowork don't install a plugin that has this directory, including one you distribute through claude.ai organization settings" (the manifest reference's standard layout; §2, §5, §9).
-- **The recommendation given:** no.
+**First, the re-reads** in §1 step 3: the sandboxing page and the evals page's fixtures and mocks, into §11.
 
-**If no:** close XC-B1 with the session's docs: the inventory row "fixed in 3.5.0: the agents (#89), the hooks (#82, #84, #91), the commands (#85, #87 to #89), the MCP server (#92); `bin/` declined by the owner (DATE), the LSP spike not shipped (§9)", the plan's `P28` row renamed `P28 part 2, not built (owner, DATE)`, and §9. No code.
+**Ask the owner before any run.** The CLI is signed in (claude.ai, Max), and the repository has the `ANTHROPIC_API_KEY` secret. Two questions remain:
+- **Where the script-graded cases run.** Granting Bash needs an OS sandbox. Native Windows has none, so it needs WSL2; Linux needs bubblewrap and socat. Ask whether WSL2 is installed here. If not, those cases run only in CI (`ubuntu-latest` with `apt-get install bubblewrap socat`).
+- **The budget.** D5 is $15 per full run, and routing already takes about $5.60. Outcome cases run two arms for Δ, grant tools and take more turns. Estimate one case first (`--case NAME --runs 1`), then ask whether the outcome suite gets its own $15 or shares one with routing.
 
-**If yes (one PR, S):**
-- `bin/wds-gate`, `bin/wds-install-gate`, `bin/wds-new-system`, `bin/wds-release-check` and `bin/wds-deck`: POSIX `sh` scripts with a shebang (the Bash tool is Git Bash on Windows too) that find Python as the hooks do (`WDS_PYTHON`, else `python3`, `python`, `py -3`, each asked for major version 3) and `exec` the runner in `workflow-commands/<command>/scripts/` with `"$@"`.
-- `git update-index --chmod=+x` on each; `test_file_modes` reads git's index.
-- Tests: each launcher runs its runner with `--help` from a temp project, under `bash`, and fails with a clear message when no Python 3 is found.
-- The README says what `bin/` costs. Close XC-B1.
+**The design.** Check each point against the pages and a one-case run before building on it.
+- **The layout:** a folder per area under `evals/` (`systems/`, `build/`, `gates/`, `lifecycle/`, `persuasion/`, `delivery/`). Each case is tagged `outcome` and its area, so the job's default `routing` set stays cheap.
+- **Two graders a case, as the page advises:**
+  - **One on the result:** a `regex` over a file the run wrote (`target: {source: file, path: …}`), such as no raw colour literal in a component file. It is scored in both arms, so Δ measures the plugin.
+  - **One on the steps:** `tool_used` on the skill. It is left out of a two-arm score anyway; mark it `arm: with-only` to say so.
+- **Running a gate inside a run, two ways:**
+  - **(a) Bash:** `--allow-tools "Bash(python *)"` needs the sandbox, and the sandbox makes the home folder unreadable. A GitHub checkout is under `/home/runner/work`, so check first that a run can read `skills/*/scripts/`.
+  - **(b) The plugin's MCP server:** `--allow-real-servers` (or `--mocks off`) and `--allow-tools "mcp__plugin_web-design-suite_gates__*"`. It runs outside the sandbox, so it needs no Bash, on Windows too. Grade its verdict with a `regex` on `target: trace`, where quotes are escaped (`\"verdict\":\"pass\"`). It is `arm: with-only`, since the baseline has no server.
+- **Write and Edit** grants (`--allow-tools Write Edit`) need no sandbox.
+- **Fixtures:** a `case.yaml` beside the `prompt.md`, with either of two fields:
+  - `context.scaffold_script`, Bash that runs only with `--scaffold`, in 120 seconds, as the user. LC-C10 asks for one per fixture.
+  - `context.add_dirs`, read-only folders inside the case.
+- **Judges** (`llm`) only for short outputs, with concrete PASS and FAIL conditions, and `--judge-model claude-haiku-5-5` pinned.
+- **Cases to start from:**
+  - SB-C6's four: "Tailwind button with loading state", "vanilla card with stretched link", "mega menu", "add a vendor datepicker stylesheet".
+  - XC-C1's "build a pricing section", graded clean by `audit_design --strict`.
+  - One for each other area, taken from its item's paragraph.
 
-**Size:** S, or docs only.
+**CI.** Extend `evals.yml` only once the local run works: a second job, or the `tag` input. An outcome job needs `--allow-tools`, `--scaffold` and the sandbox's packages. Keep the threshold at 1.0 and the ceiling at the cap less one run (§10).
 
-## 5. P29: the eval framework and the routing cases
+**Tests, which cost nothing.** Extend `test_evals`:
+- every outcome case parses, carries its area's tag, and has a result grader and a steps grader;
+- every `{source: file}` path is one the prompt asks Claude to write;
+- every `scaffold_script` exists and passes `bash -n`.
 
-**Items:** XC-C1 and XC-B2 (`crosscut.md`; read each by `grep -n`). Read `claude-code-capabilities.md` §1 **after** re-reading the plugin-evals page (§1 step 3), and update §1 first.
+**Close:** the six items in the inventory; the plan's `P30` row renamed `P30, #N`; §11; the CHANGELOG.
 
-**Before any run, the owner must provide two things. Ask, and do not run evals until both are settled:**
-- **A signed-in CLI.** Every eval run is a real model call on the account. The desktop app's bundled CLI (`%APPDATA%\Claude\claude-code\2.1.293\83cb0bd7fed4\claude.exe`) answered `claude -p` with "Not logged in" last session.
-- **For a CI job, an API key as a repository secret.** The repository is public, so the job must not run on forks' PRs.
+**Size:** L. Split by area if it grows, keeping a row named `P30` for the parts still to come.
 
-D5's cap is **$15** per full run, set with `--max-cost-usd`. That flag is a ceiling checked before each run starts, and "runs that already started finish, so spend can pass the ceiling by those runs" (the evals page's command options; Codex on #94): set it below $15 by about one run's cost, estimated from a single-case run first. Routing cases are cheap and run on every release; outcome cases (P30) run before each release and when a skill changes.
+## 5. Then R3: 3.5.0 (M)
 
-**What, as the plan has it:**
-- `evals/` at the plugin root (or `experimental.evals` in `plugin.json`), the layout §1 describes: one directory per case, `prompt.md` plus `graders/*.md` (what `claude plugin eval init` writes), or `case.yaml` with `schema_version: "1.1"`.
-- **Routing cases** for each of the 13 skills: a prompt that should load it, graded with `type: tool_used`, `tool: Skill`, `input_match` on the skill's name (the pattern is in §1).
-- **"Must not fire" cases between sibling skills** (XC-B2): a prompt for one sibling, with a `tool_used` grader on the other set to `min: 0`, `max: 0` and `arm: both`. The page: "To assert a tool was never called, set both `min: 0` and `max: 0`" (`min` defaults to 1), and `arm: both` keeps a `tool_used: Skill` grader in the score of the default two-arm run, which otherwise leaves it out (Codex on #94). The pairs to start with: a11y-audit-runner and design-critique-gate, design-system-docs and design-system-versioning, design-token-migration and figma-variables-sync, web-design-studio and landing-page-conversion, component-state-matrix and a11y-audit-runner.
-- **The CI job**, only with the owner's yes and the secret: on `workflow_dispatch` and release tags, `claude plugin eval . --trust-plugin --json results.json --threshold 0.8 --model <pinned> --judge-model <pinned> --no-publish --max-cost-usd <$15 less one run>`, its results uploaded as an artifact.
-- **Windows:** check on the page whether a run that grants Bash needs WSL2 or Docker on Windows (the review said "script cases need WSL2"); routing cases need no Bash.
-
-**Tests** (they cost nothing): every case directory parses (its frontmatter or YAML, with js-yaml from `tooling/main`), names a skill that exists, and every skill has at least one routing case; every sibling pair has its "must not fire" case. Run the suite for real once, with the owner's CLI, and record the cost and the scores in the PR.
-
-**Close:** XC-C1 and XC-B2 in the inventory; the plan's `P29` row renamed `P29, #N`; §9; the CHANGELOG.
-
-**Size:** M-L. Split the CI job into its own PR if it waits on the secret.
+- **The live check** (the HANDOFF's warning). Run `claude --plugin-dir plugins/web-design-suite` on Windows and try each of these:
+  - each hook: the gate, the a11y and email checks, the token diff, the guard and the router;
+  - each of the fifteen commands;
+  - each of the six agents;
+  - one call to each MCP tool.
+- **The CI templates on GitHub.** Install `/install-gate`'s template in a scratch repository and push. `evals.yml` runs on the `v3.5.0` tag by itself.
+- **Then the release**, as §2 says: `tooling/release/build.py`, the annotated tag, and `release.yml` creating it.
+- Update the installed plugin from the release zip (§2).
 
 ## 6. End of session (never skip)
 

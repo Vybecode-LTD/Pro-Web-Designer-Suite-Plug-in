@@ -14,11 +14,11 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 
 ## Current state (2026-10-10)
 
-- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is under way: P24 and P25 are complete (#76 to #84), P26 is complete (#85, #87, #88: fifteen workflow commands), P27 is complete (#89: six subagents and `/critique`; #91: the a11y and email checks in the gate's hook), and P28 part 1 is merged (#92: the MCP server for the gates; the LSP spike not shipped), with N38 (#93: baseline keys across platforms). No PR is open.
+- **Version:** 3.4.0 is the latest release (`v3.4.0`, `5990347`, published by `release.yml`), which completes Phase 4 (#38 to #74; P45 as #73, R2 as #74). Phase 5 (3.5.0) is under way: P24 and P25 are complete (#76 to #84), P26 is complete (#85, #87, #88: fifteen workflow commands), P27 is complete (#89: six subagents and `/critique`; #91: the a11y and email checks in the gate's hook), and P28 part 1 is merged (#92: the MCP server for the gates; the LSP spike not shipped), with N38 (#93: baseline keys across platforms). P28 part 2 closed without `bin/` (the owner) and P29 is merged (#95: the eval suite, 23 routing cases, and `evals.yml`). No PR is open.
 - **Installed:** 3.4.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** about 940. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
-- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P28 part 2 (`bin/`, only with the owner's yes; otherwise XC-B1 closes in the docs), then P29 (the eval framework and the routing cases; it needs a signed-in CLI). `dev plans/web-design-suite-review/claude-code-capabilities.md` §6 to §9 are the re-reads of the hooks, skills, manifest, sub-agents and MCP pages (the evals page is still to be re-read, before P29). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 40 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Tests:** about 955. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Active work:** `dev plans/web-design-suite-execution-plan.md`. Next: P30 (the outcome evals, against a no-plugin baseline), then R3. `dev plans/web-design-suite-review/claude-code-capabilities.md` §1 is the evals page (re-read 2026-10-10), §6 to §9 the hooks, skills, manifest, sub-agents and MCP pages, and §10 P29's choices and its first run. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 37 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
@@ -56,6 +56,8 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 - **stylelint 17** writes its JSON report to stderr, clean or not; stdout stays empty.
 - **eslint-plugin-tailwindcss 3.18** needs an absolute config path, anchored at the project: ESLint 10 loads a config from whichever folder it lints.
 - **Never write into OneDrive** or the folders redirected into it (Documents, Desktop, Pictures, Music, Videos). Downloads is safe.
+- **The desktop app is an MSIX package.** Its bundled CLI is really in `C:\Users\vybec\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude-code\`; Claude's tools see it under `%APPDATA%`, the owner's terminal does not. Give the owner the real path.
+- **Evals are real model calls** on the owner's account. From the plugin: `claude plugin eval . --tag routing --ablation none --trust-plugin --no-publish --model claude-sonnet-5-5 --output-dir <scratchpad>` with the bundled CLI (signed in, 2026-10-10), about $0.09 a routing run. Ask the owner before any run.
 - **Commands you give the user** to run must work in cmd.exe. (The Commands block above is for the Bash tool.)
 - **Never run `npm ci` in a worktree whose `tooling/*/node_modules` is a junction**: it deletes the real toolchain through the link.
 - **The reader's copies.** `shared/project_config.py` has ten copies and `shared/project_config.mjs` seven (`hooks/` among them). After a merge from a branch below, copy both masters over every copy: git merges each copy on its own.
@@ -80,11 +82,12 @@ plugins/web-design-suite/         the plugin (the only folder that ships)
   workflow-commands/              the fifteen commands only the user invokes (/gate, /new-system, /deck...), added by plugin.json's `skills`
   agents/                         the six subagents (design-critic, gate-runner, the auditors and reviewers)
   mcp/, .mcp.json                 the MCP server: the gates as tools (node design_gates.mjs)
+  evals/                          claude plugin eval cases: routing/ (one per skill), boundaries/ (sibling pairs)
   tests/                          the suite; fixtures/ holds the pointer and evidence registers
   tools/                          check_pointers.py, sync_snippets.py
   CHANGELOG.md, README.md, LICENSE
 tooling/                          pinned tools for the tests (main/, tailwind-v3/); release/build.py
-.github/workflows/                ci.yml (the suite on three platforms), release.yml (a v* tag makes the release)
+.github/workflows/                ci.yml (the suite on three platforms), release.yml (a v* tag makes the release), evals.yml (the routing evals)
 dev plans/                        the review, the phase plans and reports, the completion plan and inventory
 docs/HANDOFF.md                   the current state and the next steps, one page
 ```
