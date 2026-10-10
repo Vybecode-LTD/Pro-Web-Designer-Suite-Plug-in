@@ -73,7 +73,7 @@ const ROUTES = [
    [/\b(?:semver|breaking changes?|deprecat\w*)\b[^.?!]*\b(?:tokens?|design system)\b/i]],
   ['design-system-docs', 'design-system documentation',
    [/\b(?:style ?guides?|storybook|design[- ]system(?:'s)? (?:docs|documentation|site))\b/i,
-    /\b(?:token references?|props? tables?)\b/i, /\b(?:docs|documentation)\b[^.?!]*\bdesign[- ]system\b/i]],
+    /\btoken references?\b/i, /\b(?:docs|documentation|props? tables?)\b[^.?!]*\bdesign[- ]system\b/i]],
   ['component-state-matrix', 'every state of a component', [/\b(?:state matrix|every state|visual regression)\b/i]],
   ['content-model-to-ui', 'screens from a data model',
    [/\b(?:CRUD|admin (?:screens?|panel|ui))\b/i, /\b(?:schema|supabase|prisma)\b[^.?!]*\b(?:forms?|screens?)\b/i]],

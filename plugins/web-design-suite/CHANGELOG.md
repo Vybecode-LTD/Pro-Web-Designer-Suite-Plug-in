@@ -258,7 +258,7 @@
     pointed a critique of a pricing page ("does this look professional") at
     landing-page-conversion alone, and a design system's documentation site at
     web-design-studio alone. It now hears "looks professional" for design-critique-gate,
-    and a token reference, prop tables, or docs for a design system for
+    and a token reference, or docs or prop tables for a design system, for
     design-system-docs. `test_evals` runs it on every case's prompt.
   - **In CI:** the repository's `evals.yml` runs the routing cases on a release tag or
     when started by hand, never on a pull request, with the CLI and both models pinned

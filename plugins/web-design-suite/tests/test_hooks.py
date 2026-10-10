@@ -568,6 +568,7 @@ class TheRouter(HookTest):
 
     def test_other_prompts_and_named_skills_hear_nothing(self):
         for prompt in ("Fix the login bug", "Rename the class in utils.ts",
+                       "Add prop tables to our React library's README",     # library docs (Codex on #95)
                        "Use /web-design-suite:a11y-audit-runner on the checkout"):
             with self.subTest(prompt=prompt):
                 self.assertEqual([], self.routed(prompt))
