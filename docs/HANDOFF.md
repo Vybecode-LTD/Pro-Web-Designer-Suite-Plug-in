@@ -1,35 +1,43 @@
 # Handoff
 
-**2026-10-10 (third session)**, after P29 (#95) and this docs PR. 3.4.0 is the latest release; Phase 5 (3.5.0, a full Claude Code plugin) is under way.
+**2026-10-10 (fourth session)**, after P30 (#97), N39 (#98), R3 (#99) and this docs PR. **3.5.0 is released**, which completes Phase 5 (a full Claude Code plugin). Phase 6 (4.0.0, broader coverage) is next, starting with P31 (the owner's choice).
 
-**The next session starts from `dev plans/next-session-prompt.md`**: orientation, then P30 (the outcome evals) in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
+**The next session starts from `dev plans/next-session-prompt.md`**: orientation, then P31 (DTCG tokens) in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
 ## State
 
-- **Merged this session:** #95 as `c84ec10`, with CI green on its head (`be94f1c`), every thread answered and resolved, CodeRabbit finished and GitHub clean.
-- **What it did:**
-  - **P28 part 2 is closed without `bin/`** (the owner, 2026-10-10). A plugin with `bin/` is not installed by claude.ai or Cowork, and the commands and MCP tools reach the runners already. XC-B1 closes.
-  - **P29: the eval suite.** `evals/` has 23 cases: a routing case per skill and a "must not fire" case each way between five sibling pairs. Every grader is `arm: both`, and every case lists `allowed_tools: [Skill]` alone, since the route is decided before any other tool runs ($0.09 a run against $0.21 with Read, Glob and Grep). `test_evals` checks the cases, runs each pattern in node, runs the router on every prompt and runs the CI job's steps under bash. XC-C1 and XC-B2 close.
-  - **The first real run** (the owner's Max plan, 2.1.293, `claude-sonnet-5-5`): 22 of 23 passed in 69 runs for $5.59, then 23 of 23 after a router fix. The whole session's eval spend was $6.11 on the plan and $4.11 on the API key, at list price.
-  - **The router, corrected three times** by the cases: "looks professional" for the critique, docs or prop tables beside a design system for the docs, and "screen-reader" with a hyphen.
-  - **`evals.yml`**, the CI job. It runs on `workflow_dispatch` and `v*` tags, never on a pull request, billed to the `ANTHROPIC_API_KEY` secret, which the owner added. It pins the CLI (2.1.293) and the models, and its actions to commit SHAs. The threshold is 1.0 and the ceiling $14. Its first dispatch on `main` (run 38055988575): 23 of 23 at 1.00, $4.11, 18 minutes.
-- **The reviews found 4 real issues**, each fixed with a test that failed on the head it reviewed:
-  - Codex, twice: prop tables routed for a library README, and the 0.8 threshold let a boundary case pass with one bad run.
-  - CodeRabbit: actions not pinned to commits, and setup-node's cache.
-- **The plan:** 37 open items, 37 scheduled (`check_execution_plan.py`). About 955 tests.
+- **Merged this session**, each with CI green on its head, every thread resolved and GitHub clean:
+  - **#97 (P30): the outcome evals**, merged as `922cf5a`. There are eleven cases in six areas under `evals/<area>/`. Each grades what the run wrote in both arms, and the skill and the gates' verdicts with the plugin only. The gates run through the plugin's MCP server, so no case grants Bash and none needs WSL2 (the owner). `evals.yml` runs routing in one arm, then outcome in both, under one $14 ceiling (the owner's shared $15). One router fix. SS-C7, SB-C6, GT-C10, LC-C10, PS-C7 and DL-C7 close; SB-C6 has three of its four cases, with the mega menu left out for the budget.
+  - **#98 (N39)**, merged as `29b0504`. `a11y_static.py` read email templates as pages, so `/gate` failed on the plugin's own receipt template. A folder's templates are now the email lint's, and the hook stands aside only when the email build runs (Codex).
+  - **#99 (R3): release 3.5.0**, merged as `44637c1`. The version is bumped, the CHANGELOG dated, and the live check recorded (`dev plans/web-design-suite-3.5.0-live-check.md`).
+- **Evals:**
+  - **The local check of the outcome set** (the owner's Max plan, one run per arm): 11 of 11, mean Δ 0.22, $2.21.
+  - **The release dispatch** of `evals.yml` (`tag=all`) on `44637c1`: routing 23 of 23 ($4.18) and outcome 11 of 11 (mean Δ 0.15, $5.21), $9.39 in all, in 46 minutes (run 38075960885).
+- **The live check:** 22 headless sessions, $3.01. Every hook, all fifteen commands, the six agents and the five MCP tools ran; the one defect was N39. `/install-gate`'s CI template passed all three jobs on GitHub, in the private scratch repository `Vybecode-LTD/wds-gate-scratch`.
+- **The release:** `v3.5.0` (annotated, on `44637c1`) was pushed, and `release.yml` published it with the zip, the 13 `.skill` files and `SHA256SUMS`. The installed plugin was updated from the release zip, its checksum verified (3.4.0 to 3.5.0). The tag's own `evals.yml` run was cancelled at its start: it would have re-run the commit the dispatch had just passed, for about $9 more.
+- **The plan:** 31 open items, 31 scheduled. About 980 tests.
 
 ## Next steps
 
-1. **P30: the outcome evals**, against a no-plugin baseline (SS-C7, SB-C6, GT-C10, LC-C10, PS-C7, DL-C7). Ask the owner before any run, the one-case estimate included: these grant tools, run two arms and may use judges.
-2. Then R3 (3.5.0): a live check of the new components, then a release PR (`plugin.json` to 3.5.0, since `release.yml` refuses a tag that differs). Dispatch `evals.yml` on its merge commit and wait for it to pass before the tag, since on a tag it runs beside `release.yml` and gates nothing.
+1. **P31:** `shared/dtcg.py` (DTCG 2025.10 read and write, Tokens Studio sets and themes, `$deprecated`, and the Style Dictionary and Terrazzo routes), building on `figma-variables-sync/scripts/dtcg_values.py`.
+2. Then the rest of Phase 6, in the plan's order unless the owner says otherwise.
+
+## Open owner decision
+
+- **`evals.yml` on a tag.** A release now runs the suite twice: the dispatch before the tag, which holds the release back, and the tag's own run. Drop the tag trigger, or keep it and cancel it each time as this session did?
 
 ## Warnings
 
-- **The desktop app's bundled CLI lives in a packaged folder.** The app is an MSIX package, so its `AppData\Roaming` is `C:\Users\vybec\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming`. Claude's tools see the usual path; the owner's own terminal does not. Give the owner the real path. The credentials are in `C:\Users\vybec\.claude`, which both share, and the CLI is signed in now (claude.ai, Max).
-- **Granting Bash to an eval needs an OS sandbox.** Native Windows has none (WSL2 is needed), and Linux needs bubblewrap and socat. The sandbox makes the home folder unreadable, and a GitHub checkout is under `/home/runner`, so check that a run can read the plugin's scripts before building on it. The plugin's MCP server runs outside the sandbox: with `--allow-real-servers` and a tool grant, it can run the gates with no Bash.
-- **Nothing new has run in a live session**: the hooks, the fifteen commands, the six agents and the MCP tools. Before R3, load the branch's plugin (`claude --plugin-dir plugins/web-design-suite`) and check each one. The evals ran the router hook 69 times without a problem.
-- **The CI templates have not run on GitHub**: `/install-gate`'s, nor `evals.yml` on a tag.
-- **Flakes:** the hydration timing test on Windows 3.14 (again on #95, passed on re-run), and `test_critique_snapshots` on Linux 3.9.
-- **Open question:** `perf_audit.py --src` reports the starter's `@import` lines as LCP errors, so a `/new-system` project fails `/gate --src`'s performance gate.
-- **The token counter** reset on review events and some user messages. This session used about 360 thousand.
-- **Still open from earlier:** `--warning-700`, `--danger-100` and `--info-100` fall outside Display P3; `check_roles.py` clips a colour outside sRGB; the worked examples are tests; a local build never matches the release's checksums; don't grep `tooling/`; the repository is public.
+- **The scratch repository** `Vybecode-LTD/wds-gate-scratch` is private and the owner's to delete.
+- **CodeRabbit's free tier** allows one review an hour. It skipped #97 (107 files, over its 100-file limit) and was rate-limited on #99. Keep PRs under 100 files.
+- **Outcome evals vary run to run.** In five cases the plugin's arm did the work without loading the skill, so their skill graders are indicators only, in both arms (§11 of `claude-code-capabilities.md`).
+- **Open question:** `perf_audit.py` fails a starter project whose CSS is not bundled. The `@import` chain makes 8 requests, which is over the default budget, and `--src` reads the `@import` lines as errors. The CI template's test had to bundle.
+- **Headless sessions are refused reads of a skill's reference files** (the live check's `/schema-to-screens`). Interactive sessions ask.
+- **Flakes:** the hydration timing test on Windows 3.14, and `test_critique_snapshots` on Linux 3.9.
+- **Still open from earlier:**
+  - `--warning-700`, `--danger-100` and `--info-100` fall outside Display P3.
+  - `check_roles.py` clips a colour outside sRGB.
+  - The worked examples are tests.
+  - A local build never matches the release's checksums.
+  - Don't grep `tooling/`.
+  - The repository is public.

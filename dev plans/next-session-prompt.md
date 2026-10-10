@@ -1,12 +1,12 @@
 # Start here: the next session
 
-**Written 2026-10-10 (the third session that day)**, at the end of the session that:
-- closed P28 part 2 without `bin/` (the owner said no, 2026-10-10), which closes XC-B1;
-- merged P29 (#95): `evals/` with 23 routing cases (one per skill, and "must not fire" cases each way between five sibling pairs), `test_evals`, three router fixes the cases found, and `.github/workflows/evals.yml`;
-- ran the routing suite for real once (the owner's Max plan): 23 of 23 after one fix, $6.11 in all at list price; and dispatched `evals.yml` once on `main`, 23 of 23 for $4.11;
-- re-read the plugin-evals page (`claude-code-capabilities.md` §1, and §10 for P29's choices and the run).
+**Written 2026-10-10 (the fourth session that day)**, at the end of the session that:
+- merged P30 (#97): eleven outcome cases in six areas, graded in both arms, the gates run through the MCP server with no Bash, and `evals.yml` running routing then outcome under one ceiling;
+- merged N39 (#98): `a11y_static.py` and the a11y hook leave email templates to the email lint;
+- ran R3's live check (22 headless sessions, $3.01, and `/install-gate`'s template on GitHub), merged the release PR (#99) and **released 3.5.0**, which ends Phase 5;
+- asked the owner which Phase 6 workstream comes first: **P31, DTCG tokens**.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P30** (the outcome evals, §4), then **R3** (3.5.0, §5). Phase 5 ends with R3.
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P31** (§4), then the rest of Phase 6 (§5).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -92,6 +92,10 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
     - **The third 2026-10-10 session's reviews found 4 real issues** on #95, each fixed with a test failing on the head it reviewed:
       - **Codex:** a router alternative with no context ("prop tables") sent a library README to design-system-docs: a skill's router pattern needs the skill's own context nearby. And a threshold below 1.0 let a two-grader boundary case pass with one bad run of three: a case's score is the mean of its runs.
       - **CodeRabbit:** a job that holds a secret pins its actions to commit SHAs and sets setup-node's `package-manager-cache: false`.
+    - **The fourth 2026-10-10 session's reviews found 2 real issues**, each fixed with a test failing on the head it reviewed:
+      - **Codex on #97:** a router pattern for "a patch release?" took any `token` as context, auth tokens included. A skill's context words must be its own domain's (design tokens, `tokens.css`, a CSS custom property).
+      - **Codex on #98:** a check that stands aside for another must do so only when the other runs: with `emailBuild` off, an email template's edit went unchecked.
+    - **CodeRabbit's free tier:** one review an hour, and it skips a PR of more than 100 files ("Review skipped: too many files"). Keep a PR under 100 files; a fixture copied into each case counts once per case.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
   - The Bash tool is Git Bash. Any command you give the user must work in cmd.exe.
@@ -109,13 +113,15 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - **Stage a new file before `check.py`**: `test_file_modes` reads git's index. A new script with a shebang needs `git update-index --chmod=+x`.
   - **A `*/` in a glob closes a JS block comment** (`emails/**/*.html` inside `/** … */` broke `design_hooks.mjs`). Write the glob out in words there.
   - **A test that rewrites recorded data must not lean on this platform's own form.** N38's first test swapped `/` in keys that Windows had recorded with `\`, so it passed before the fix on Windows. Build the platform's form explicitly, and run `fail_before.py` to see each test fail.
+  - **`test_docs.PasteableCommands` refuses a `*` in a README command**, quoted or not, since cmd and PowerShell must paste it too. Name the tools instead of a glob. Run `test_docs` after any README edit.
+  - **YAML frontmatter:** a value with `: ` in it (`GT-C10: a clean…`) is not valid YAML, and the eval CLI refuses the case. Quote it.
   - **`check.py` prints only the first failure's traceback.** When it reports more failures than it shows, run `python -B -m unittest discover -s tests > suite.txt 2>&1` in the background and grep `^FAIL:`.
   - **`test_harness` requires `env=`** on every subprocess a test starts (`env()` from `wds_support`).
   - **A test that loops over files must assert it found some**, or it passes vacuously on a plugin without them (`fail_before.py` shows it as a control).
   - Redirect a background `check.py` to a file in the scratchpad (`> check.txt 2>&1`), not through `tail`. Give it `timeout` 3600000.
   - Run a single test module from `tests/` (`cd tests && python -B -m unittest test_x`); `tests.test_x` from the plugin root does not import.
 - **Fail before, pass after.** Every fix gets a regression test, seen failing on the previous release's tag and passing now.
-  - Run `python -B tools/fail_before.py TEST_IDS` from `plugins/web-design-suite`. The default REV is the latest `v*` tag, **still `v3.4.0`**. For a PR that builds on unreleased work, also run it against `main`'s head, with the **full** SHA: that table shows what the PR itself fixed (#78 and #79 did both).
+  - Run `python -B tools/fail_before.py TEST_IDS` from `plugins/web-design-suite`. The default REV is the latest `v*` tag, **`v3.5.0`** from this session on. For a PR that builds on unreleased work, also run it against `main`'s head, with the **full** SHA: that table shows what the PR itself fixed (#78 and #79 did both).
   - A review fix runs against the head it fixes, with the **full** SHA. In the Bash tool that is `--rev $(git rev-parse SHORT)`; a short one is refused.
   - **`fail_before.py` swaps the plugin, not the tests**, so a fix to test code shows as a control: say so.
   - Run a new browser test several times, in Playwright's Chromium and in the installed Chrome, before you push it.
@@ -133,19 +139,22 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 2. Read the execution plan's §2 and §6, and its Phase 5 table in §4.
 3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
    - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions, and the owner's no to `bin/`.
-   - **§1 and §10 are P30's ground:** §1 is the plugin-evals page, re-read on 2026-10-10 (2.1.293), and §10 P29's choices and its first run. Read both.
-   - **Before P30, re-read** the sandboxing page (https://code.claude.com/docs/en/sandboxing) and the evals page's "Set up fixtures and mocks" (with the Bash tool, into the scratchpad: `curl -sSL -o evals.md https://code.claude.com/docs/en/plugin-evals.md && grep -n "^#" evals.md`, then read that section with `sed -n`; §1 skipped it). Put what matters in a new §11.
+   - §1 is the plugin-evals page, §10 P29's choices, and **§11 the sandboxing page and P30's choices**, with the first runs. Read §11 if you touch the evals.
+   - **Before P31, re-read at their sources**, and register every figure in `evidence.json`:
+     - the DTCG format, 2025.10 (designtokens.org): the colour object, aliases, `$deprecated`, groups and `$extends`;
+     - Tokens Studio's `$themes` and `$metadata` (its docs);
+     - Style Dictionary 5 and Terrazzo: their current versions on npm, and how each reads DTCG.
 4. Check the state, with the Bash tool:
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `37 open items, 37 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `31 open items, 31 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
 
-- **The plugin** is `plugins/web-design-suite/` (about 955 tests):
+- **The plugin** is `plugins/web-design-suite/` (about 980 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -187,6 +196,14 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - The run: from `plugins/web-design-suite`, `claude.exe plugin eval . --tag routing --runs 3 -j 4 --ablation none --trust-plugin --no-publish --threshold 1.0 --max-cost-usd 14 --model claude-sonnet-5-5 --judge-model claude-haiku-5-5 --output-dir <scratchpad>`: 69 runs, about 330 seconds and $5.60. `--case NAME --runs 1` for one. `--keep-temp` keeps each run's folder under `%TEMP%\claude-eval-*`: read only its `out/trace.jsonl`, then delete it.
   - `evals.yml`: `gh workflow run evals.yml --ref main -f tag=routing -f runs=3` (the owner's OK first: it bills `ANTHROPIC_API_KEY`). It runs one case at a time: 18 minutes and $4.11 for the first dispatch, 23 of 23. Its summary is on the run's page and `eval-results` is the artifact.
   - The router runs in every eval session (the plugin's hooks load); the MCP server does not start under the default `--mocks record`.
+- **The outcome evals (#97, P30).** `evals/<area>/<case>/` for `build`, `systems`, `gates`, `lifecycle`, `persuasion` and `delivery`, tagged `[outcome, <area>]`.
+  - **The files:** a case that needs a project has `case.yaml` (`context.scaffold_script: scaffold.sh`) and `scaffold.sh`, which copies the case's `files/` into the workspace.
+  - **The graders:** the result graders are `arm: both`; the skill and the gates' verdicts (a regex on the trace, `verdict\\*"\s*:\s*\\*"pass`) are `arm: with-only`.
+  - **The tests:** `test_evals.TheOutcomeCases` runs every pattern on `SAMPLES`; a new grader needs samples. It also runs every scaffold and audits every fixture.
+  - **The run:** `claude.exe plugin eval . --tag outcome --scaffold --allow-real-servers --ablation with-without -j 2 --trust-plugin --no-publish --model claude-sonnet-5-5 --judge-model claude-haiku-5-5 --allow-tools Write Edit "mcp__plugin_web-design-suite_gates__*"`, with `--allow-tools` last. One run per arm cost $2.21 and took 685 seconds of runs.
+  - **`evals.yml`:** `tag` is `routing`, `outcome` or `all` (a tag push runs `all`). Routing runs with `--ablation none`, then outcome `with-without`, with what routing left of $14.
+- **The live check (R3).** `dev plans/web-design-suite-3.5.0-live-check.md`. Headless sessions ran as `claude -p "<prompt>" --plugin-dir plugins/web-design-suite --setting-sources project,local --max-budget-usd 0.6 --output-format json --model claude-sonnet-5-5 --permission-mode acceptEdits --allowedTools "Bash(python *)" "Bash(node *)" "mcp__plugin_web-design-suite_gates__*"`, in a scratch copy of a project. The browser commands find Playwright through `NODE_PATH` (the tooling's `node_modules`).
+- **N39 (#98).** `a11y_static.py` leaves a folder's email templates (the config's `emails`) to `lint_email.py` and lists them on stderr; a template named on its own is still read. The gate hook's a11y check stands aside only when `emailBuild` runs.
 - **Baseline keys (#93, N38).** audit_design, a11y_static and perf_audit all write `/` in a key's path (`portable_key`), and read a baseline's keys the same way.
 - **The scripts, by skill:**
 
@@ -229,59 +246,51 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. P30: the outcome evals, against a no-plugin baseline
+## 4. P31: DTCG tokens (the owner's first pick for Phase 6)
 
-**Items:** SS-C7 (the systems), SB-C6 (the build half), GT-C10 (the gates), LC-C10 (the lifecycle), PS-C7 (persuasion) and DL-C7 (delivery; its commands, agent and hook are merged, and only its evals are left). Read each inventory row, then its paragraph in `web-design-suite-review/<area>.md` by `grep -n`.
+**Items:** LC-C2 and LC-B2. Read each inventory row, then its paragraph in `web-design-suite-review/lifecycle.md` (`grep -n "LC-C2\|LC-B2"`; LC-C2 is in the table at about line 113, LC-B2 at about line 90).
 
-**First, the re-reads** in §1 step 3: the sandboxing page and the evals page's fixtures and mocks, into §11.
+**What it asks for:** a shared `dtcg.py` that reads and writes DTCG 2025.10, with:
+- Tokens Studio sets and `$themes`, read as modes;
+- `$deprecated`, fed into the deprecation ledger;
+- a `--format dtcg` output;
+- a way to map Style Dictionary's name transforms onto the contract's grammar, so the tier and Law 6 checks work on `--color-bg-surface`;
+- the migration proposal written as DTCG `tokens.json`.
 
-**Ask the owner before any run, the one-case estimate included** (Codex on #96): every run is real model usage. The CLI is signed in (claude.ai, Max), and the repository has the `ANTHROPIC_API_KEY` secret. Two questions remain:
-- **Where the script-graded cases run.** Granting Bash needs an OS sandbox. Native Windows has none, so it needs WSL2; Linux needs bubblewrap and socat. Ask whether WSL2 is installed here. If not, those cases run only in CI (`ubuntu-latest` with `apt-get install bubblewrap socat`).
-- **The budget.** D5 is $15 per full run, and routing already takes about $5.60. Outcome cases run two arms for Δ, grant tools and take more turns. With the owner's OK, estimate one case first (`--case NAME --runs 1`, likely under $1). Then, with its cost in hand, ask whether the outcome suite gets its own $15 or shares one with routing.
+Today a Tokens Studio export becomes `--light-bg-surface` and `--dark-bg-surface` in place of a `[data-theme]` block.
 
-**The design.** Check each point against the pages and a one-case run before building on it.
-- **The layout:** a folder per area under `evals/` (`systems/`, `build/`, `gates/`, `lifecycle/`, `persuasion/`, `delivery/`). Each case is tagged `outcome` and its area, so the job's default `routing` set stays cheap.
-- **Two graders a case, as the page advises:**
-  - **One on the result:** a `regex` over a file the run wrote (`target: {source: file, path: …}`), such as no raw colour literal in a component file. It is scored in both arms, so Δ measures the plugin.
-  - **One on the steps:** `tool_used` on the skill. It is left out of a two-arm score anyway; mark it `arm: with-only` to say so.
-- **Running a gate inside a run, two ways:**
-  - **(a) Bash:** `--allow-tools "Bash(python *)"` needs the sandbox, and the sandbox makes the home folder unreadable. A GitHub checkout is under `/home/runner/work`, so check first that a run can read `skills/*/scripts/`.
-  - **(b) The plugin's MCP server:** `--allow-real-servers` (or `--mocks off`) and `--allow-tools "mcp__plugin_web-design-suite_gates__*"`. It runs outside the sandbox, so it needs no Bash, on Windows too. Grade its verdict with a `regex` on `target: trace`, where quotes are escaped (`\"verdict\":\"pass\"`). It is `arm: with-only`, since the baseline has no server.
-- **Write and Edit** grants (`--allow-tools Write Edit`) need no sandbox.
-- **Fixtures:** a `case.yaml` beside the `prompt.md`, with either of two fields:
-  - `context.scaffold_script`, Bash that runs only with `--scaffold`, in 120 seconds, as the user. LC-C10 asks for one per fixture.
-  - `context.add_dirs`, read-only folders inside the case.
-- **Judges** (`llm`) only for short outputs, with concrete PASS and FAIL conditions, and `--judge-model claude-haiku-5-5` pinned.
-- **Cases to start from:**
-  - SB-C6's four: "Tailwind button with loading state", "vanilla card with stretched link", "mega menu", "add a vendor datepicker stylesheet".
-  - XC-C1's "build a pricing section", graded clean by `audit_design --strict`.
-  - One for each other area, taken from its item's paragraph.
+**Start from what exists:**
+- `figma-variables-sync/scripts/dtcg_values.py` already parses and writes DTCG values (the 2025.10 colour objects among them). `figma-mapping.md` describes 2025.10 at about line 597.
+- **Shared files live in `shared/`.** Like `project_config.py`, a `shared/dtcg.py` is copied beside each script that imports it. A test then holds every copy equal to the master (`test_project_config.TheCopiesAreTheMaster` is the model). Decide whether `dtcg_values.py` becomes the master or a reader of it, and say why in the PR.
+- The readers that should accept DTCG: `extract_system.py`, `diff_system.py`, `figma_to_tokens.py`, `cluster_values.py` and the shared reader's `read_tokens()`.
 
-**CI.** Extend `evals.yml` only once the local run works: a second job, or the `tag` input. An outcome job needs `--allow-tools`, `--scaffold` and the sandbox's packages. Keep the threshold at 1.0 and the ceiling at the cap less one run (§10).
+**Tests:** fixtures for a 2025.10 file, a Tokens Studio export with two themes, a `$deprecated` token and a Style Dictionary-named set. Each is round-tripped and diffed, with the fail-before table against `v3.5.0`.
 
-**Tests, which cost nothing.** Extend `test_evals`:
-- every outcome case parses, carries its area's tag, and has a result grader and a steps grader;
-- every `{source: file}` path is one the prompt asks Claude to write;
-- every `scaffold_script` exists and passes `bash -n`.
+**Evals:** `evals/lifecycle/dtcg-export` already grades a DTCG export (`$type`, the colour objects, aliases). After P31, ask the owner before running it (one case, two arms, about $0.30).
 
-**Close:** the six items in the inventory; the plan's `P30` row renamed `P30, #N`; §11; the CHANGELOG.
+**Size:** M-L. Split it if it grows: the reader and writer first, then Tokens Studio, then the Style Dictionary route, keeping a row named `P31` for the parts still to come.
 
-**Size:** L. Split by area if it grows, keeping a row named `P30` for the parts still to come.
+**Close:** LC-C2 and LC-B2 in the inventory; the plan's `P31` row renamed `P31, #N`; the CHANGELOG under a new `## 4.0.0 — unreleased` heading.
 
-## 5. Then R3: 3.5.0 (M)
+## 5. Then the rest of Phase 6
 
-- **The live check** (the HANDOFF's warning). Run `claude --plugin-dir plugins/web-design-suite` on Windows and try each of these:
-  - each hook: the gate, the a11y and email checks, the token diff, the guard and the router;
-  - each of the fifteen commands;
-  - each of the six agents;
-  - one call to each MCP tool.
-- **The CI templates on GitHub.** Install `/install-gate`'s template in a scratch repository and push.
-- **A release PR**, as R2 was (#74):
-  - set `plugin.json`'s `version` to `3.5.0`, since `release.yml` refuses a tag that differs from it;
-  - date the CHANGELOG's `## 3.5.0` heading, whose section `release.yml` reads for the notes.
-- **The evals before the tag** (Codex on #96). On a tag, `evals.yml` runs beside `release.yml` and holds nothing back, so a failure would show only after 3.5.0 is public. Dispatch it on the release PR's merge commit, with the owner's OK since it bills the key. Wait for 23 of 23, and the outcome set if P30 puts it in CI, before tagging.
-- **Then the release**, as §2 says: `tooling/release/build.py`, the annotated tag, and `release.yml` creating it.
-- Update the installed plugin from the release zip (§2).
+**Ask the owner first** (the HANDOFF's open decision): `evals.yml` runs on a `v*` tag as well as by hand, so a release runs the suite twice. The pre-tag dispatch is the one that gates the release; the tag's own run re-tests the same commit for about $9. This session cancelled it. Drop the tag trigger, or keep cancelling it?
+
+
+The plan's order, unless the owner says otherwise:
+- P32: Figma on every plan;
+- P33: `light-dark()`;
+- P34: runtime coverage;
+- P35: the cheap automatable checks and other engines;
+- P36: Tailwind v4 and decision D4, the breaking change;
+- P37: SCSS, Next.js, Vue, Svelte and Astro;
+- P38: modern CSS;
+- P39: migration coverage;
+- P40: Prisma and Drizzle;
+- P41: email output and right-to-left;
+- P42 and P43: persuasion.
+
+R4 releases 4.0.0. Ask the owner before each eval run, and keep each PR under 100 files for CodeRabbit.
 
 ## 6. End of session (never skip)
 
@@ -291,3 +300,4 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 4. Run `python -B "dev plans/check_execution_plan.py"`.
 5. Commit the docs in a PR of their own. Merge it when it is ready, as §0 defines ready: CI green on its head, every thread resolved, CodeRabbit finished, GitHub clean.
 6. Tell the user what merged, what is open, the token use, and what they need to do. Give them the opening prompt for the next session.
+7. Remind the owner that `Vybecode-LTD/wds-gate-scratch` (R3's private CI test) is theirs to delete.

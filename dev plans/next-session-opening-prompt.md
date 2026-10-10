@@ -1,11 +1,11 @@
 # The opening prompt for the next session
 
-Written 2026-10-10, at the end of the third session that day, which closed P28 part 2 without `bin/` and merged P29 (#95). Paste the block below into a new session.
+Written 2026-10-10, at the end of the fourth session that day, which merged P30 (#97), N39 (#98) and R3 (#99), and released 3.5.0. Paste the block below into a new session.
 
 ```
 You're continuing work on web-design-suite, a Claude Code plugin, in C:\DEV\Pro-Web-Designer-Suite-Plug-in. Budget: this session may run up to 750 thousand tokens, with no compacting. Report usage after each PR (15,000,000 minus the counter, plus what was used before each reset), warn early, and write the handoff before the cap.
 1. Run: git fetch && git worktree list && gh pr list --state open. Then, in the worktree that holds main (this checkout unless the list says otherwise): git checkout main && git pull
 2. Read "dev plans/next-session-prompt.md" in full and follow it. Then read CLAUDE.md and docs/HANDOFF.md, as it says.
-3.4.0 is released. P29 is merged (#95: the eval suite, 23 routing cases passing, the evals.yml CI job), bin/ was declined, then the session's docs, and no PR is open. This session: P30, the outcome evals against a no-plugin baseline, re-reading the sandboxing page and the evals page's fixtures section first; then prepare R3 (3.5.0). The CLI is signed in and the API key secret exists, but every eval run costs real money: ask me before any run, the one-case estimate included; then, with its cost, ask about the budget and where the Bash-granting cases should run (WSL2 or CI only).
+3.5.0 is released (Phase 5 is done: P30's outcome evals, N39, and R3 with its live check). This session: Phase 6, starting with P31, the DTCG tokens (my choice), re-reading the DTCG 2025.10 format, Tokens Studio's themes and the Style Dictionary and Terrazzo docs first. Every eval run costs real money: ask me before any run, with its estimate. Keep each PR under 100 files, since CodeRabbit skips larger ones.
 You merge PRs yourself once they're ready (CI green, review threads resolved, clean), never in a way that breaks other pending work.
 ```
