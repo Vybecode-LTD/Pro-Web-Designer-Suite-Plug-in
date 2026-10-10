@@ -73,6 +73,7 @@ import argparse
 import bisect
 import json
 import os
+import posixpath
 import re
 import sys
 from dataclasses import dataclass, asdict
@@ -357,7 +358,16 @@ class Finding:
     def key(self) -> str:
         """Stable identity for baselining. Excludes the line number so that an
         unrelated edit above a violation does not resurrect it."""
-        return f"{self.file}|{self.rule}|{self.snippet.strip()[:120]}"
+        return portable_key(f"{self.file}|{self.rule}|{self.snippet.strip()[:120]}")
+
+
+def portable_key(key: str) -> str:
+    """A baseline key with `/` in its path and no `./`, so a baseline recorded
+    on Linux CI matches on Windows and the reverse, and `./src` matches `src`
+    (N38). Keys written before held the path as given, with the platform's
+    separator; they are read through this too, so they keep matching."""
+    path, sep, rest = key.partition("|")
+    return posixpath.normpath(path.replace("\\", "/")) + sep + rest
 
 
 # ---------------------------------------------------------------------------
@@ -1738,7 +1748,7 @@ def main(argv: list[str] | None = None) -> int:
               or ".a11y-baseline.json")
     if bp.exists():
         try:
-            baseline = set(json.loads(bp.read_bytes()))
+            baseline = {portable_key(k) for k in json.loads(bp.read_bytes()) if isinstance(k, str)}
         except (OSError, json.JSONDecodeError):
             print(f"a11y_static: could not read baseline {bp}; auditing "
                   f"everything.", file=sys.stderr)

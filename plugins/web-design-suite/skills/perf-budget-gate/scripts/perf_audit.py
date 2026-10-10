@@ -70,6 +70,7 @@ import fnmatch
 import gzip
 import json
 import os
+import posixpath
 import re
 import struct
 import sys
@@ -218,7 +219,16 @@ class Finding:
     def key(self) -> str:
         """Stable identity for baselining. Excludes the line number so that an
         unrelated edit above a violation does not resurrect it."""
-        return f"{self.file}|{self.rule}|{self.snippet.strip()[:120]}"
+        return portable_key(f"{self.file}|{self.rule}|{self.snippet.strip()[:120]}")
+
+
+def portable_key(key: str) -> str:
+    """A baseline key with `/` in its path and no `./`, so a baseline recorded
+    on Linux CI matches on Windows and the reverse, and `./src` matches `src`
+    (N38). Keys written before held the path as given, with the platform's
+    separator; they are read through this too, so they keep matching."""
+    path, sep, rest = key.partition("|")
+    return posixpath.normpath(path.replace("\\", "/")) + sep + rest
 
 
 @dataclass
@@ -1176,9 +1186,9 @@ def load_baseline(path: str) -> tuple[set[str], dict]:
         print(f"perf_audit: could not read baseline {p}; auditing everything.",
               file=sys.stderr)
         return set(), {}
-    if isinstance(data, list):           # audit_design's plain-list form
-        return set(data), {}
-    return set(data.get("findings") or []), (data.get("totals") or {})
+    keys = data if isinstance(data, list) else (data.get("findings") or [])   # a list: audit_design's form
+    found = {portable_key(k) for k in keys if isinstance(k, str)}
+    return found, ({} if isinstance(data, list) else (data.get("totals") or {}))
 
 
 def check_growth(ledger: Ledger, totals: dict, growth: dict) -> list[Finding]:
