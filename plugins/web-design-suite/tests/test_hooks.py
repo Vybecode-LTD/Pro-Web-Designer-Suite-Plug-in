@@ -235,13 +235,16 @@ class TheA11yGate(HookTest):
     def test_an_email_template_is_left_to_the_email_build(self):
         """R3's live check: the plugin's own receipt template drew a page's
         findings (no <main>, an outline reset on img). The email build checks
-        a template; the a11y gate still checks a page beside it."""
+        a template when it runs; the a11y gate still checks a page beside it,
+        and a template when the email build is off (Codex on #98)."""
         receipt = PLUGIN / "skills" / "email-template-system" / "assets" / "templates" / "transactional-receipt.html"
-        self.config(a11yGate=True)
+        self.config(a11yGate=True, emailBuild=True)
         self.write("emails/receipt.html", receipt.read_text(encoding="utf-8"))
-        self.assertIsNone(self.context("emails/receipt.html"))
+        self.assertNotIn("a11y gate", self.context("emails/receipt.html") or "")
         self.write("receipt.html", receipt.read_text(encoding="utf-8"))   # not a template by `emails`
         self.assertIn("a11y gate: a11y_static.py found", self.context("receipt.html"))
+        self.config(a11yGate=True)                                         # never left unchecked
+        self.assertIn("a11y gate: a11y_static.py found", self.context("emails/receipt.html"))
 
     def test_the_projects_a11y_baseline_applies(self):
         self.config(a11yGate=True)

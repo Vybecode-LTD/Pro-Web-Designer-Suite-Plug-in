@@ -351,11 +351,12 @@ function gate(input) {
   }
   const config = own?.config;
   const auditing = AUDITED.includes(ext) && config?.hooks.designGate;
-  // An email template is the email build's: a page's rules, a <main>
-  // landmark and no outline reset on img, do not fit a letter (R3's live check).
-  const email = config ? isEmail(config, real) : false;
-  const checking = A11Y_READ.includes(ext) && config?.hooks.a11yGate && !email;
-  const emailing = config?.hooks.emailBuild && email;
+  // An email template is the email build's when it runs: a page's rules, a
+  // <main> landmark and no outline reset on img, do not fit a letter (R3's
+  // live check). Without it the a11y gate still reads the template, so an
+  // edit is never left unchecked (Codex on #98).
+  const emailing = Boolean(config?.hooks.emailBuild && isEmail(config, real));
+  const checking = A11Y_READ.includes(ext) && config?.hooks.a11yGate && !emailing;
   const diffConfig = [own?.config, session?.config].find((c) => c?.hooks.tokenDiff && c.baselines.system &&
     fs.existsSync(c.baselines.system) && isTokenFile(c, real));
   const diffing = Boolean(diffConfig);
