@@ -286,6 +286,9 @@ class FVar:
     # A DTCG source's own `$type` (`number`, `fontWeight`...), which says
     # what a FLOAT is better than its name can.
     dtcg_type: str = ""
+    # No value in its collection's default mode (a Tokens Studio token only a
+    # later theme sets): never written in `:root` (Codex on #102).
+    partial: bool = False
 
     @property
     def slug(self) -> str:
@@ -553,7 +556,7 @@ def parse_studio(data: dict) -> FDoc:
     doc.unsupported += problems
     themed: Dict[str, str] = {}                  # token -> its group's collection
 
-    def add(name: str, node: dict, collection: str, values: Dict[str, Any]) -> None:
+    def add(name: str, node: dict, collection: str, values: Dict[str, Any]) -> FVar:
         fv = FVar(name=name, collection=collection,
                   resolved_type=dtcg_type(node.get("$type"), node.get("$value")), values=values,
                   description=node.get("$description") or "", var_id=name,
@@ -561,6 +564,7 @@ def parse_studio(data: dict) -> FDoc:
         doc.variables.append(fv)
         doc.by_id.setdefault(name, fv)
         doc.by_id.setdefault(name.replace("/", "."), fv)
+        return fv
 
     groups: Dict[str, List[Any]] = {}
     for theme in themes:
@@ -575,12 +579,15 @@ def parse_studio(data: dict) -> FDoc:
         names = list(dict.fromkeys("/".join(path) for theme in members for s in theme.enabled
                                    for path in dtcg.studio_paths(data, s)))
         for name in names:
-            if name in themed:
+            if name in themed:                   # one variable, one collection (Codex on #102)
+                doc.unsupported.append((name, f"set by two theme groups, {themed[name]} and {group}: "
+                                              f"{group}'s values"))
                 continue
             nodes = {t.name: per_theme[t.name][name] for t in members if name in per_theme[t.name]}
             if nodes:
                 themed[name] = group
-                add(name, next(iter(nodes.values())), group, {m: n["$value"] for m, n in nodes.items()})
+                fv = add(name, next(iter(nodes.values())), group, {m: n["$value"] for m, n in nodes.items()})
+                fv.partial = members[0].name not in nodes
     for set_name in dtcg.studio_sets(data):
         doc.collections.setdefault(set_name, FCollection(set_name, ["Value"], "Value"))
         for path in dtcg.studio_paths(data, set_name):

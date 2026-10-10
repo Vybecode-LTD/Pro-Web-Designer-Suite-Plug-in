@@ -554,6 +554,20 @@ function colourToCss(v) {
 // A run of ASCII a custom property cannot hold unescaped is one `-`, as css_name() writes it.
 const dtcgName = (parts) => `--${parts.map((p) => String(p).replace(/[^A-Za-z0-9_\-\u0080-\u{10FFFF}]+/gu, '-')).join('-')}`;
 
+// More than 100,000 objects, arrays and values, as too_large() counts them.
+function tooLarge(data, limit = 100000) {
+  let count = 0;
+  const stack = [data];
+  while (stack.length) {
+    const node = stack.pop();
+    count += 1;
+    if (count > limit) return true;
+    if (isObject(node)) stack.push(...Object.values(node));
+    else if (Array.isArray(node)) stack.push(...node);
+  }
+  return false;
+}
+
 // Objects or arrays nested more than 64 deep, as dtcg.py's too_deep() finds them.
 function tooDeep(data, limit = 64) {
   const stack = [[data, 0]];
@@ -689,6 +703,7 @@ function resolveExtends(node, root, active) {
       overlay(merged, node);
       for (const key of Object.keys(node)) delete node[key];
       Object.assign(node, merged);
+      if (tooDeep(node) || tooLarge(node)) throw new RangeError('expanded too far');
     }
   }
   for (const [key, child] of Object.entries(node)) {
@@ -752,10 +767,11 @@ const studioToken = (node) => isObject(node) && (has(node, '$value')
 function studioTree(node, kind = null) {
   if (!isObject(node)) return node;
   if (!studioToken(node)) {
-    const groupKind = has(node, '$type') ? node.$type : has(node, 'type') ? node.type : kind;
+    const legacy = has(node, 'type') && !isObject(node.type) && !Array.isArray(node.type);
+    const groupKind = has(node, '$type') ? node.$type : legacy ? node.type : kind;
     const out = {};
     for (const [k, v] of Object.entries(node)) {
-      if (k === 'type') continue;
+      if (k === 'type' && legacy) continue;     // a group or token named `type` stays (Codex on #102)
       if (!k.startsWith('$')) out[k] = studioTree(v, groupKind);
       else out[k] = k === '$type' && STUDIO_TYPES.has(pyStr(v).toLowerCase()) ? STUDIO_TYPES.get(pyStr(v).toLowerCase()) : v;
     }
@@ -945,8 +961,14 @@ function inlinePointers(node, root) {
 function dtcgEntries(data) {
   if (tooDeep(data)) return [];
   const doc = structuredClone(isStudio(data) ? studioDocument(data) : data);
-  resolveExtends(doc, doc, new Set());
-  inlinePointers(doc, doc);
+  try {                                           // as normalise(): a long chain or a fan-out
+    resolveExtends(doc, doc, new Set());
+    inlinePointers(doc, doc);
+    if (tooDeep(doc) || tooLarge(doc)) return [];
+  } catch (err) {
+    if (err instanceof RangeError) return [];
+    throw err;
+  }
   const out = [];
   const token = (node, path, kind) => {
     const type = has(node, '$type') ? node.$type : kind;

@@ -285,6 +285,8 @@ def _resolve_extends(node: Any, root: dict, path: List[str],
             _overlay(merged, node)
             node.clear()
             node.update(merged)
+            if too_deep(node) or too_large(node):    # stop a fan-out before it fills memory
+                raise RecursionError
     for key, child in list(node.items()):
         if isinstance(child, dict) and key not in META_KEYS:
             _resolve_extends(child, root, path + [key], problems, active)
@@ -363,8 +365,14 @@ def normalise(data: Any, lossless: bool = False) -> Tuple[Any, Problems]:
     if too_deep(data):                           # every step below recurses (CodeRabbit on #101)
         return {}, [("(root)", f"nested more than {MAX_DEPTH} levels deep, so not read")]
     doc = copy.deepcopy(data)
-    _resolve_extends(doc, doc, [], problems, set())
-    _inline_pointers(doc, doc)
+    try:                                         # each `$extends` or `$ref` copies a group in
+        _resolve_extends(doc, doc, [], problems, set())
+        _inline_pointers(doc, doc)
+        if too_deep(doc) or too_large(doc):
+            raise RecursionError
+    except RecursionError:                       # a long chain or a fan-out (CodeRabbit on #101)
+        return {}, [("(root)", f"`$extends` or `$ref` expand it past {MAX_DEPTH} levels or "
+                               f"{MAX_NODES} entries, so not read")]
     return _walk(doc, [], None, None, problems, lossless), problems
 
 
@@ -422,6 +430,22 @@ def _inline_pointers(node: Any, root: dict) -> None:
 
 
 MAX_DEPTH = 64
+MAX_NODES = 100_000
+
+
+def too_large(data: Any, limit: int = MAX_NODES) -> bool:
+    """More than `limit` objects, arrays and values, counted without recursing."""
+    count, stack = 0, [data]
+    while stack:
+        node = stack.pop()
+        count += 1
+        if count > limit:
+            return True
+        if isinstance(node, dict):
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+    return False
 
 
 def too_deep(data: Any, limit: int = MAX_DEPTH) -> bool:
@@ -624,10 +648,13 @@ def _studio_tree(node: Any, kind: Optional[str] = None) -> Any:
     if not isinstance(node, dict):
         return node
     if not _studio_token(node):
-        group_kind = node.get("$type", node.get("type", kind))
+        # A legacy group's `type` is metadata only when it is a value: a
+        # group or a token named `type` is a token (Codex on #102).
+        legacy = "type" in node and not isinstance(node["type"], (dict, list))
+        group_kind = node["$type"] if "$type" in node else node["type"] if legacy else kind
         return {k: (_studio_tree(v, group_kind) if not k.startswith("$")
                     else STUDIO_TYPES.get(str(v).lower(), v) if k == "$type" else v)
-                for k, v in node.items() if k not in ("type",)}
+                for k, v in node.items() if not (k == "type" and legacy)}
     value = node["$value"] if "$value" in node else node["value"]
     studio = str(node.get("$type", node.get("type", kind)) or "")
     kind = STUDIO_TYPES.get(studio.lower(), studio or None)
@@ -797,7 +824,7 @@ def studio_paths(data: dict, name: str) -> List[Tuple[str, ...]]:
             for key, child in node.items():
                 if key == "$root":
                     walk(child, path)
-                elif not key.startswith("$") and key != "type":
+                elif not key.startswith("$") and not (key == "type" and not isinstance(child, (dict, list))):
                     walk(child, path + (key,))
     walk(data.get(name), ())
     return out

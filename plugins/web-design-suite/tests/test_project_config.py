@@ -656,7 +656,9 @@ STUDIO_LEGACY = {
                          "lost": {"value": "{space.nowhere} * 2", "type": "spacing"},
                          "fluid": {"value": "calc(1rem + 2vw)", "type": "spacing"}},
                "opacity": {"hover": {"value": "0.08 * 2", "type": "opacity"}},
-               "font": {"sans": {"value": "Inter, sans-serif", "type": "fontFamilies"},
+               "type": {"body": {"value": "16px", "type": "fontSizes"}},
+               "font": {"type": {"value": "Inter", "type": "fontFamilies"},
+                        "sans": {"value": "Inter, sans-serif", "type": "fontFamilies"},
                         "bold": {"value": "700", "type": "fontWeights"}}},
     "light": {"bg": {"surface": {"value": "{neutral.0}", "type": "color", "description": "the page"}}},
     "dark": {"bg": {"surface": {"value": "{neutral.900}", "type": "color"}}},
@@ -694,6 +696,12 @@ DTCG_POINTERS = {                                     # Codex on #101: pointers 
     "a": {"$type": "color", "$value": "{b}"}, "b": {"$type": "color", "$value": "{a}"},
     "self": {"$type": "color", "$value": "{self}"}, "c": {"$type": "color", "$value": "{a}"},
 }
+# CodeRabbit on #101: shallow files that `$extends` expands past the limits.
+EXTENDS_CHAIN = {"x0": {"v": {"$type": "number", "$value": 1}},
+                 **{f"x{i}": {"c": {"$extends": f"{{x{i - 1}}}"}} for i in range(1, 200)}}
+EXTENDS_FAN = {"f0": {"v": {"$type": "number", "$value": 1}},
+               **{f"f{i}": {"a": {"$extends": f"{{f{i - 1}}}"}, "b": {"$extends": f"{{f{i - 1}}}"}}
+                  for i in range(1, 40)}}
 TOKEN_FILES = {
     "layers.css": (
         "@layer reset, tokens;\n@layer tokens {\n  :root, [data-theme] {\n"
@@ -731,6 +739,8 @@ TOKEN_FILES = {
     "studio-groups.json": json.dumps(STUDIO_GROUPS),
     "studio-order.json": json.dumps(STUDIO_ORDER),
     "pointers.tokens.json": json.dumps(DTCG_POINTERS),
+    "chain.tokens.json": json.dumps(EXTENDS_CHAIN),
+    "fan.tokens.json": json.dumps(EXTENDS_FAN),
     "deep.tokens.json": json.dumps({"top": {"$type": "color", "$value": "#fff"}, "deep": json.loads(
         '{"g": ' * 70 + '{"$type": "color", "$value": "#000"}' + "}" * 70)}),
     "names.tokens.json": json.dumps({"Button background": {"$type": "color", "$value": "#ffffff"},
@@ -747,7 +757,7 @@ TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.
                ["gone.json"], ["a.css", "gone.css"], [], ["utf16be.json"],
                ["dtcg.tokens.json"], ["extends.tokens"], ["a.css", "dtcg.tokens.json"], ["dtcg.tokens.json", "a.css"],
                ["legacy.json"], ["schema-and-tokens.json"], ["studio.json"], ["studio-groups.json"], ["studio-order.json"],
-               ["deep.tokens.json"], ["names.tokens.json"], ["pointers.tokens.json"]]
+               ["deep.tokens.json"], ["names.tokens.json"], ["pointers.tokens.json"], ["chain.tokens.json"], ["fan.tokens.json"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).

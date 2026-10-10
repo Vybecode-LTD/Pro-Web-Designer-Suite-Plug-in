@@ -306,6 +306,34 @@ class TokensStudio(TempDirTest):
         tokens = pc.read_tokens([self.write("tokens/order.json", json.dumps(STUDIO_ORDER))])
         self.assertEqual("#ffffff", tokens.constants.get("--bg-surface", tokens.scales.get("bg", {}).get("surface")))
 
+    def test_a_group_named_type_is_a_group(self):
+        """Codex on #102: `type` is legacy metadata only when it is a value."""
+        data = json.loads(json.dumps(STUDIO_REVIEW))
+        data["global"]["type"] = {"body": {"value": "16px", "type": "fontSizes"}}
+        data["global"]["font"] = {"type": {"value": "Inter", "type": "fontFamilies"}}
+        _, _, blocks = self.css(data)
+        self.assertIn("--type-body: 1rem;", blocks[":root"])
+        self.assertIn("--font-type: Inter;", blocks[":root"])
+        pc = load_script("design-system-docs", "project_config")
+        values = pc.read_tokens([self.write("tokens/t.json", json.dumps(data))]).values()
+        self.assertEqual("16px", values["--type-body"])
+
+    def test_a_token_only_a_later_theme_sets_stays_out_of_root(self):
+        """Codex on #102: a Dark-only token was written in `:root`."""
+        data = json.loads(json.dumps(STUDIO_REVIEW))
+        data["dark"]["bg"]["overlay"] = {"value": "#000000", "type": "color"}
+        _, _, blocks = self.css(data)
+        self.assertNotIn("--bg-overlay", blocks[":root"])
+        self.assertIn("--bg-overlay: #000000;", blocks['[data-theme="dark"]'])
+
+    def test_a_token_two_theme_groups_set_is_named(self):
+        """Codex on #102: the second group's values were dropped silently."""
+        from test_project_config import STUDIO_GROUPS
+        data = json.loads(json.dumps(STUDIO_GROUPS))
+        data["brand/b"]["bg"] = {"$type": "color", "$value": "#ff00ff"}
+        proc, _, _ = self.css(data)
+        self.assertIn("`bg` was left out: set by two theme groups", output(proc))
+
     def test_the_project_reads_its_default_theme(self):
         pc = load_script("design-system-docs", "project_config")
         tokens = pc.read_tokens([self.write("tokens/studio.json", json.dumps(STUDIO_REVIEW))])
@@ -370,6 +398,16 @@ class TheEdgesOfTheFormat(TempDirTest):
         doc, problems = self.dtcg.document([("--café", "#ffffff"), ("--alias", "var(--café)")])
         self.assertEqual([], problems)
         self.assertEqual("{café}", doc["alias"]["$value"])
+
+    def test_extends_that_expand_too_far_are_refused(self):
+        """CodeRabbit on #101: a shallow file whose `$extends` chain or fan-out
+        expands past the limits is refused, not a traceback or a full memory."""
+        from test_project_config import EXTENDS_CHAIN, EXTENDS_FAN
+        for doc in (EXTENDS_CHAIN, EXTENDS_FAN):
+            with self.subTest(size=len(doc)):
+                _, problems = self.dtcg.normalise(doc)
+                self.assertIn("expand it past 64 levels or 100000 entries", problems[-1][1])
+                self.assertEqual({}, self.read(doc).values())
 
     def test_weight_keywords_and_unbounded_numbers(self):
         doc, problems = self.dtcg.document([("--weight-bold", "bold"), ("--weight-body", "normal"),
