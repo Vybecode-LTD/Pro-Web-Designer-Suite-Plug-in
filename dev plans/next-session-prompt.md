@@ -134,7 +134,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
    - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions, and the owner's no to `bin/`.
    - **§1 and §10 are P30's ground:** §1 is the plugin-evals page, re-read on 2026-10-10 (2.1.293), and §10 P29's choices and its first run. Read both.
-   - **Before P30, re-read** the sandboxing page (https://code.claude.com/docs/en/sandboxing) and the evals page's "Set up fixtures and mocks" (`curl -sSL https://code.claude.com/docs/en/plugin-evals.md`, then `grep -n "^#"` and read that section; §1 skipped it). Put what matters in a new §11.
+   - **Before P30, re-read** the sandboxing page (https://code.claude.com/docs/en/sandboxing) and the evals page's "Set up fixtures and mocks" (with the Bash tool, into the scratchpad: `curl -sSL -o evals.md https://code.claude.com/docs/en/plugin-evals.md && grep -n "^#" evals.md`, then read that section with `sed -n`; §1 skipped it). Put what matters in a new §11.
 4. Check the state, with the Bash tool:
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
