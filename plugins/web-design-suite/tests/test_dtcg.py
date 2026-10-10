@@ -284,6 +284,26 @@ class TheEdgesOfTheFormat(TempDirTest):
         self.assertIn("more than 64 levels", problems[0][1])
         self.assertEqual({}, self.read(doc).values())
 
+    def test_a_property_level_pointer_is_its_value(self):
+        from test_project_config import DTCG_POINTERS
+        values = self.read(DTCG_POINTERS).values()
+        self.assertEqual("0.5", values["--chan"])                    # #/base/$value/components/0
+        self.assertEqual("#400000", values["--mix"])                 # a component that is a pointer
+        self.assertEqual("var(--base)", values["--shade"])           # a whole-token pointer inside a value
+
+    def test_an_alias_cycle_is_left_out(self):
+        from test_project_config import DTCG_POINTERS
+        tokens, problems = self.dtcg.tokens(DTCG_POINTERS)
+        names = {t.name for t in tokens}
+        self.assertFalse({"--a", "--b", "--self"} & names)
+        self.assertIn("--c", names)                                  # it reads into the cycle, but is not in it
+        self.assertEqual(3, sum("reference cycle" in why for _, why in problems))
+
+    def test_a_non_ascii_reference_is_written(self):
+        doc, problems = self.dtcg.document([("--café", "#ffffff"), ("--alias", "var(--café)")])
+        self.assertEqual([], problems)
+        self.assertEqual("{café}", doc["alias"]["$value"])
+
     def test_weight_keywords_and_unbounded_numbers(self):
         doc, problems = self.dtcg.document([("--weight-bold", "bold"), ("--weight-body", "normal"),
                                             ("--huge", "1e999"), ("--gap", "1e999px")])

@@ -696,11 +696,56 @@ function resolveExtends(node, root, active) {
   }
 }
 
+// What a JSON Pointer addresses, or UNSUPPORTED, as _pointer() reads it.
+function jsonPointer(root, ref) {
+  let node = root;
+  for (const raw of ref.slice(2).split('/')) {
+    const part = raw.replaceAll('~1', '/').replaceAll('~0', '~');
+    if (isObject(node) && has(node, part)) node = node[part];
+    else if (Array.isArray(node) && /^[0-9]+$/.test(part) && Number(part) < node.length) node = node[Number(part)];
+    else return UNSUPPORTED;
+  }
+  return node;
+}
+
+// A property-level `$ref` is the literal it points at, as _inline_pointers() does.
+function inlinePointers(node, root) {
+  const literal = (ref, seen) => {
+    const target = seen.includes(ref) ? UNSUPPORTED : jsonPointer(root, ref);
+    return target === UNSUPPORTED ? target : fix(structuredClone(target), [...seen, ref]);
+  };
+  const fix = (value, seen) => {
+    if (isObject(value) && typeof value.$ref === 'string' && value.$ref.startsWith('#/')) {
+      const alias = pointerAlias(value.$ref);
+      if (alias) return `{${alias}}`;
+      const found = literal(value.$ref, seen);
+      return found === UNSUPPORTED ? value : found;
+    }
+    if (isObject(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fix(v, seen)]));
+    if (Array.isArray(value)) return value.map((v) => fix(v, seen));
+    return value;
+  };
+  if (!isObject(node)) return;
+  const ref = node.$ref;
+  if (has(node, '$value')) {
+    node.$value = fix(node.$value, []);
+  } else if (typeof ref === 'string' && ref.startsWith('#/') && !pointerAlias(ref)) {
+    const found = literal(ref, []);
+    if (found !== UNSUPPORTED) {
+      node.$value = found;
+      delete node.$ref;
+    }
+  } else {
+    for (const [key, child] of Object.entries(node)) if (!DTCG_META.has(key)) inlinePointers(child, root);
+  }
+}
+
 // [[name, value as CSS or null]] in document order.
 function dtcgEntries(data) {
   if (tooDeep(data)) return [];
   const doc = structuredClone(data);
   resolveExtends(doc, doc, new Set());
+  inlinePointers(doc, doc);
   const out = [];
   const token = (node, path, kind) => {
     const type = has(node, '$type') ? node.$type : kind;
@@ -737,7 +782,23 @@ function dtcgEntries(data) {
     }
   };
   walk(doc, [], null);
-  return out;
+  // Each member of a reference cycle is left out, as tokens() leaves it out.
+  const graph = new Map();
+  for (const [name, css] of out) {
+    const m = /^var\((--.+)\)$/.exec(css ?? '');
+    if (m) graph.set(name, m[1]);
+  }
+  const cyclic = new Set();
+  for (const start of graph.keys()) {
+    const chain = [];
+    let cur = start;
+    while (graph.has(cur) && !chain.includes(cur)) {
+      chain.push(cur);
+      cur = graph.get(cur);
+    }
+    if (chain.includes(cur)) chain.slice(chain.indexOf(cur)).forEach((n) => cyclic.add(n));
+  }
+  return out.filter(([name]) => !cyclic.has(name));
 }
 
 function isDtcg(data) {
