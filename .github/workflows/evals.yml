@@ -52,8 +52,10 @@ jobs:
         run: npm install --global @anthropic-ai/claude-code@2.1.293
 
       # The inputs reach the shell through the environment, and are checked
-      # before any use. The ceiling is D5's $15 less one run, since a run that
-      # has started finishes past it (the evals page's command options).
+      # before any use. Each case asserts what must load and what must not, so
+      # one wrong run fails it: the threshold is 1.0 (Codex on #95). The ceiling
+      # is D5's $15 less one run, since a run that has started finishes past it
+      # (the evals page's command options).
       - name: Run the suite
         working-directory: plugins/web-design-suite
         env:
@@ -76,7 +78,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/evals"
           claude plugin eval . --tag "$TAG" --runs "$RUNS" --ablation none --trust-plugin \
             --json "$RUNNER_TEMP/evals/results.json" --output-dir "$RUNNER_TEMP/evals" \
-            --threshold 0.8 --model claude-sonnet-5-5 --judge-model claude-haiku-5-5 \
+            --threshold 1.0 --model claude-sonnet-5-5 --judge-model claude-haiku-5-5 \
             --no-publish --max-cost-usd 14
 
       - name: Summarise

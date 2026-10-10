@@ -288,6 +288,9 @@ class TheWorkflow(TempDirTest):
                               "--max-cost-usd", "--ablation", "--tag", "--runs"}, flags)
         value = {a: args[i + 1] for i, a in enumerate(args[:-1]) if a.startswith("--")}
         self.assertEqual(("routing", "3", "none"), (value["--tag"], value["--runs"], value["--ablation"]))
+        # A case's score is the mean of its runs, so below 1.0 a boundary case
+        # passes with its forbidden skill loaded in one run of three (Codex on #95).
+        self.assertEqual(1.0, float(value["--threshold"]))
         self.assertTrue(value["--json"].endswith(".json"))
         self.assertRegex(value["--model"], r"^claude-[a-z]+-\d")   # an ID, not an alias
         self.assertRegex(value["--judge-model"], r"^claude-[a-z]+-\d")
