@@ -684,6 +684,16 @@ STUDIO_ORDER = {                                     # the source set comes late
     "$themes": [{"name": "Light", "selectedTokenSets": {"light": "enabled", "base": "source"}}],
     "$metadata": {"tokenSetOrder": ["light", "base"]},
 }
+DTCG_POINTERS = {                                     # Codex on #101: pointers into values, and cycles
+    "base": {"$type": "color", "$value": {"colorSpace": "srgb", "components": [0.5, 0.25, 1]}},
+    "chan": {"$type": "number", "$ref": "#/base/$value/components/0"},
+    "mix": {"$type": "color", "$value": {"colorSpace": "srgb",
+                                         "components": [{"$ref": "#/base/$value/components/1"}, 0, 0]}},
+    "shade": {"$type": "color", "$value": {"$ref": "#/base"}},
+    "lost": {"$type": "number", "$ref": "#/base/$value/components/9"},
+    "a": {"$type": "color", "$value": "{b}"}, "b": {"$type": "color", "$value": "{a}"},
+    "self": {"$type": "color", "$value": "{self}"}, "c": {"$type": "color", "$value": "{a}"},
+}
 TOKEN_FILES = {
     "layers.css": (
         "@layer reset, tokens;\n@layer tokens {\n  :root, [data-theme] {\n"
@@ -720,6 +730,7 @@ TOKEN_FILES = {
     "studio.json": json.dumps(STUDIO_LEGACY),
     "studio-groups.json": json.dumps(STUDIO_GROUPS),
     "studio-order.json": json.dumps(STUDIO_ORDER),
+    "pointers.tokens.json": json.dumps(DTCG_POINTERS),
     "deep.tokens.json": json.dumps({"top": {"$type": "color", "$value": "#fff"}, "deep": json.loads(
         '{"g": ' * 70 + '{"$type": "color", "$value": "#000"}' + "}" * 70)}),
     "names.tokens.json": json.dumps({"Button background": {"$type": "color", "$value": "#ffffff"},
@@ -736,7 +747,7 @@ TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.
                ["gone.json"], ["a.css", "gone.css"], [], ["utf16be.json"],
                ["dtcg.tokens.json"], ["extends.tokens"], ["a.css", "dtcg.tokens.json"], ["dtcg.tokens.json", "a.css"],
                ["legacy.json"], ["schema-and-tokens.json"], ["studio.json"], ["studio-groups.json"], ["studio-order.json"],
-               ["deep.tokens.json"], ["names.tokens.json"]]
+               ["deep.tokens.json"], ["names.tokens.json"], ["pointers.tokens.json"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).

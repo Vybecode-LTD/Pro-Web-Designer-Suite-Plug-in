@@ -364,7 +364,61 @@ def normalise(data: Any, lossless: bool = False) -> Tuple[Any, Problems]:
         return {}, [("(root)", f"nested more than {MAX_DEPTH} levels deep, so not read")]
     doc = copy.deepcopy(data)
     _resolve_extends(doc, doc, [], problems, set())
+    _inline_pointers(doc, doc)
     return _walk(doc, [], None, None, problems, lossless), problems
+
+
+def _pointer(root: Any, ref: str) -> Any:
+    """What a JSON Pointer (`#/base/$value/components/0`) addresses, or UNSUPPORTED."""
+    node = root
+    for raw in ref[2:].split("/"):
+        part = raw.replace("~1", "/").replace("~0", "~")
+        if isinstance(node, dict) and part in node:
+            node = node[part]
+        elif isinstance(node, list) and part.isascii() and part.isdigit() and int(part) < len(node):
+            node = node[int(part)]
+        else:
+            return UNSUPPORTED
+    return node
+
+
+def _inline_pointers(node: Any, root: dict) -> None:
+    """A property-level `$ref` (into a value, `#/base/$value/components/0`) is
+    what it points at, a literal, so a token or a component may be one (Codex
+    on #101). A whole-token `$ref` inside a value becomes `{a.b}`; one that
+    is the whole token stays for _token(). A pointer to nothing, or a chain
+    that returns to itself, stays as it is, and is reported as unsupported."""
+    def literal(ref: str, seen: Tuple[str, ...]) -> Any:
+        target = UNSUPPORTED if ref in seen else _pointer(root, ref)
+        return target if target is UNSUPPORTED else fix(copy.deepcopy(target), seen + (ref,))
+
+    def fix(value: Any, seen: Tuple[str, ...]) -> Any:
+        if isinstance(value, dict) and isinstance(value.get("$ref"), str) and value["$ref"].startswith("#/"):
+            alias = pointer_alias(value["$ref"])
+            if alias:
+                return "{" + alias + "}"
+            found = literal(value["$ref"], seen)
+            return value if found is UNSUPPORTED else found
+        if isinstance(value, dict):
+            return {k: fix(v, seen) for k, v in value.items()}
+        if isinstance(value, list):
+            return [fix(v, seen) for v in value]
+        return value
+
+    if not isinstance(node, dict):
+        return
+    ref = node.get("$ref")
+    if "$value" in node:
+        node["$value"] = fix(node["$value"], ())
+    elif isinstance(ref, str) and ref.startswith("#/") and not pointer_alias(ref):
+        found = literal(ref, ())
+        if found is not UNSUPPORTED:
+            node["$value"] = found
+            del node["$ref"]
+    else:
+        for key, child in node.items():
+            if key not in META_KEYS:
+                _inline_pointers(child, root)
 
 
 MAX_DEPTH = 64
@@ -469,7 +523,19 @@ def tokens(data: Any) -> Tuple[List[Token], Problems]:
                 walk(child, path + [key])
 
     walk(doc, [])
-    return out, problems
+    # A cycle of references is invalid in DTCG and in CSS alike: each member
+    # is left out and named (Codex on #101). One that reads into it stays.
+    graph = {t.name: m.group(1) for t in out for m in [re.fullmatch(r"var\((--.+)\)", t.css() or "")] if m}
+    cyclic: set = set()
+    for start in graph:
+        chain, cur = [], start
+        while cur in graph and cur not in chain:
+            chain.append(cur)
+            cur = graph[cur]
+        if cur in chain:
+            cyclic.update(chain[chain.index(cur):])
+    problems += [("/".join(t.path), "is part of a reference cycle, left out") for t in out if t.name in cyclic]
+    return [t for t in out if t.name not in cyclic], problems
 
 
 # ---------------------------------------------------------------------------
@@ -742,7 +808,7 @@ def studio_paths(data: dict, name: str) -> List[Tuple[str, ...]]:
 # ---------------------------------------------------------------------------
 
 NUMBER = r"[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?"
-VAR_ONLY = re.compile(r"^var\(\s*(--[A-Za-z0-9_-]+)\s*\)$")
+VAR_ONLY = re.compile(r"^var\(\s*(--[A-Za-z0-9_\-\u0080-\U0010ffff]+)\s*\)$")   # `--café` too (Codex)
 DIMENSION = re.compile(rf"^({NUMBER})(px|rem)$", re.I)
 DURATION = re.compile(rf"^({NUMBER})(ms|s)$", re.I)
 PLAIN_NUMBER = re.compile(rf"^{NUMBER}$", re.I)
