@@ -259,7 +259,12 @@
     landing-page-conversion alone, and a design system's documentation site at
     web-design-studio alone. It now hears "looks professional" for design-critique-gate,
     and a token reference, or docs or prop tables for a design system, for
-    design-system-docs. `test_evals` runs it on every case's prompt.
+    design-system-docs. `test_evals` runs it on every case's prompt. The first full run
+    found a third: a review of a signup form for "screen-reader labels" loaded no skill
+    in 3 runs, since the router heard "screen reader" only with a space. It hears the
+    hyphen now, and the case passes 3 of 3.
+  - **The first run:** 22 of 23 cases passed, then 23 of 23 after that fix, for about
+    $6 at list price, with Claude Code 2.1.293 and `claude-sonnet-5-5`.
   - **In CI:** the repository's `evals.yml` runs the routing cases on a release tag or
     when started by hand, never on a pull request, with the CLI and both models pinned
     and a ceiling under the $15 a full run may cost.

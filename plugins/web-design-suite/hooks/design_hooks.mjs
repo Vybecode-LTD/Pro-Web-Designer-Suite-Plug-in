@@ -61,7 +61,7 @@ const OFF = /^(?:false|0|no|off)$/i;
 // named, in this order, so the specific ones come before the studio.
 const ROUTES = [
   ['a11y-audit-runner', 'accessibility audits',
-   [/\b(?:WCAG|axe-core|a11y|screen ?readers?)\b/i, /\baccessib\w* (?:audit|check|test|review)/i]],
+   [/\b(?:WCAG|axe-core|a11y|screen[- ]?readers?)\b/i, /\baccessib\w* (?:audit|check|test|review)/i]],
   ['figma-variables-sync', 'Figma variables and tokens', [/\bfigma\b[^.?!]*\b(?:variables?|tokens?|styles?)\b/i]],
   ['email-template-system', 'HTML email', [/\b(?:html e-?mails?|e-?mail templates?|newsletters?|MJML)\b/i]],
   ['perf-budget-gate', 'performance budgets', [/\b(?:core web vitals|lighthouse|performance budgets?|page ?speed)\b/i,

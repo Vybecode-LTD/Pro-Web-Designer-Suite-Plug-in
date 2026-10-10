@@ -118,7 +118,9 @@ class TheCaseFiles(unittest.TestCase):
                 self.assertLessEqual(set(fields), PROMPT_FIELDS)
                 self.assertTrue(1 <= fields.get("max_turns", 10) <= 200)
                 self.assertLessEqual(set(fields["allowed_tools"]), READ_ONLY)
-                self.assertIn("Skill", fields["allowed_tools"])
+                # The listing decides the route before any other tool, and Skill
+                # alone ran at $0.09 a run against $0.21 with Read, Glob and Grep.
+                self.assertEqual(["Skill"], fields["allowed_tools"])
                 self.assertIn("routing", fields["tags"])
                 self.assertTrue(body)
                 self.assertNotIn("web-design-suite", body)

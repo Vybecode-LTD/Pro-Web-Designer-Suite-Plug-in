@@ -551,6 +551,7 @@ class TheRouter(HookTest):
 
     def test_a_prompt_hears_the_skill_for_its_work(self):
         cases = {"Run an axe audit of the checkout against WCAG 2.2": ["a11y-audit-runner"],
+                 "Check the form's screen-reader labels": ["a11y-audit-runner"],      # the eval run on #95
                  "Sync our Figma variables into tokens.css": ["figma-variables-sync"],
                  "Critique this design system's docs site": ["design-system-docs", "design-critique-gate"],
                  "Generate the token reference and prop tables": ["design-system-docs"],
