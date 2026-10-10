@@ -551,8 +551,12 @@ class TheRouter(HookTest):
 
     def test_a_prompt_hears_the_skill_for_its_work(self):
         cases = {"Run an axe audit of the checkout against WCAG 2.2": ["a11y-audit-runner"],
+                 "Check the form's screen-reader labels": ["a11y-audit-runner"],      # the eval run on #95
                  "Sync our Figma variables into tokens.css": ["figma-variables-sync"],
                  "Critique this design system's docs site": ["design-system-docs", "design-critique-gate"],
+                 "Generate the token reference and prop tables": ["design-system-docs"],
+                 "We need a documentation site for our design system": ["design-system-docs", "web-design-studio"],
+                 "Does our pricing page look professional?": ["landing-page-conversion", "design-critique-gate"],
                  "Build the welcome HTML email": ["email-template-system"],
                  "Our LCP is 4s, set a performance budget": ["perf-budget-gate"],
                  "Replace the hardcoded colors with tokens": ["design-token-migration"],
@@ -565,6 +569,7 @@ class TheRouter(HookTest):
 
     def test_other_prompts_and_named_skills_hear_nothing(self):
         for prompt in ("Fix the login bug", "Rename the class in utils.ts",
+                       "Add prop tables to our React library's README",     # library docs (Codex on #95)
                        "Use /web-design-suite:a11y-audit-runner on the checkout"):
             with self.subTest(prompt=prompt):
                 self.assertEqual([], self.routed(prompt))

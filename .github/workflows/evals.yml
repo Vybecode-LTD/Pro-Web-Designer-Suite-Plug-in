@@ -1,0 +1,108 @@
+# The plugin's eval suite (P29): `claude plugin eval` on plugins/web-design-suite/evals/.
+# Every run is a real model call, billed to the ANTHROPIC_API_KEY secret, so the
+# job runs only when a maintainer starts it and on a release tag, never on a pull
+# request: the repository is public, and a fork's pull request must not spend
+# the key. The routing cases grant no shell, so the runner needs no OS sandbox.
+# The CLI and both models are pinned, so a new release or a model rollout is not
+# read as a change in the plugin. The job holds the key, so its actions are pinned
+# to commits, and setup-node caches nothing.
+name: Evals
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The cases to run, by tag"
+        required: true
+        default: routing
+      runs:
+        description: "Runs per case, 1 to 50"
+        required: true
+        default: "3"
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  evals:
+    name: claude plugin eval
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The plugin's hooks run in every eval session, under node.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1   # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Install the Claude Code CLI
+        run: npm install --global @anthropic-ai/claude-code@2.1.293
+
+      # The inputs reach the shell through the environment, and are checked
+      # before any use. Each case asserts what must load and what must not, so
+      # one wrong run fails it: the threshold is 1.0 (Codex on #95). The ceiling
+      # is D5's $15 less one run, since a run that has started finishes past it
+      # (the evals page's command options).
+      - name: Run the suite
+        working-directory: plugins/web-design-suite
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TAG: ${{ inputs.tag || 'routing' }}
+          RUNS: ${{ inputs.runs || '3' }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::The ANTHROPIC_API_KEY repository secret is not set."
+            exit 1
+          fi
+          case "$TAG" in
+            ''|*[!a-z0-9-]*|-*) echo "::error::The tag must be lowercase letters, digits and hyphens."; exit 1 ;;
+          esac
+          case "$RUNS" in
+            [1-9]|[1-4][0-9]|50) ;;
+            *) echo "::error::Runs must be a whole number from 1 to 50."; exit 1 ;;
+          esac
+          claude --version
+          mkdir -p "$RUNNER_TEMP/evals"
+          claude plugin eval . --tag "$TAG" --runs "$RUNS" --ablation none --trust-plugin \
+            --json "$RUNNER_TEMP/evals/results.json" --output-dir "$RUNNER_TEMP/evals" \
+            --threshold 1.0 --model claude-sonnet-5-5 --judge-model claude-haiku-5-5 \
+            --no-publish --max-cost-usd 14
+
+      - name: Summarise
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/evals/results.json" ] || exit 0
+          python3 - "$RUNNER_TEMP/evals/results.json" >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          import json, sys
+          result = json.load(open(sys.argv[1], encoding="utf-8"))
+          totals = result.get("aggregates", {})
+          print(f"**{totals.get('casesPassed')} of {totals.get('casesTotal')} cases passed**, "
+                f"score {totals.get('overallScore')}, about ${result.get('costUsd')}, "
+                f"Claude Code {result.get('claudeVersion')}"
+                + (f", partial: {result.get('partialReason')}" if result.get("partial") else ""))
+          print()
+          print("| Case | Score |")
+          print("|---|---|")
+          for case in result.get("cases", []):
+              print(f"| {case.get('name')} | {case.get('aggregates', {}).get('score')} |")
+          EOF
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
+        if: always()
+        with:
+          name: eval-results
+          path: ${{ runner.temp }}/evals/
+          if-no-files-found: ignore

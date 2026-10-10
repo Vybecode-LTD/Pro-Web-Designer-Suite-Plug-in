@@ -240,6 +240,35 @@
     longest lists, nested ones such as perf_audit's `ledger.assets` too, with
     `truncated` saying how many each left out: Claude Code warns past
     10,000 tokens of tool output and stops at 25,000.
+- **An eval suite, and the routing cases** (XC-C1, XC-B2). `evals/` holds cases for
+  `claude plugin eval` (Claude Code 2.1.269 or later), each a `prompt.md` with
+  `graders/*.md`, the layout `claude plugin eval init` writes.
+  - **Routing:** a case for each of the 13 skills, a request phrased as a user would type
+    it, which passes when Claude loads that skill (`tool_used` on `Skill`).
+  - **Boundaries:** five pairs of sibling skills, each way: a request for one that must
+    load it and never the other (`min: 0`, `max: 0`, `arm: both`). The pairs are the
+    accessibility audit and the critique, the docs and versioning, the migration and the
+    Figma sync, the studio and landing pages, and the state matrix and the accessibility
+    audit.
+  - **Run them** from the plugin folder with
+    `claude plugin eval . --tag routing --ablation none`. Every run is a real model call
+    on your account. A routing case cannot pass without the plugin, so the no-plugin arm
+    is skipped. The cases grant no shell, so they run on native Windows.
+  - **The router, corrected.** The prompt router runs in every eval session too. It
+    pointed a critique of a pricing page ("does this look professional") at
+    landing-page-conversion alone, and a design system's documentation site at
+    web-design-studio alone. It now hears "looks professional" for design-critique-gate,
+    and a token reference, or docs or prop tables for a design system, for
+    design-system-docs. `test_evals` runs it on every case's prompt. The first full run
+    found a third: a review of a signup form for "screen-reader labels" loaded no skill
+    in 3 runs, since the router heard "screen reader" only with a space. It hears the
+    hyphen now, and the case passes 3 of 3.
+  - **The first run:** 22 of 23 cases passed, then 23 of 23 after that fix, for about
+    $6 at list price, with Claude Code 2.1.293 and `claude-sonnet-5-5`.
+  - **In CI:** the repository's `evals.yml` runs the routing cases on a release tag or
+    when started by hand, never on a pull request, with the CLI and both models pinned
+    and a ceiling under the $15 a full run may cost.
+  - Outcome cases, scored against a no-plugin baseline, follow.
 
 ### Fixed
 

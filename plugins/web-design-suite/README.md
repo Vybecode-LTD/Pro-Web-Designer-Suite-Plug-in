@@ -280,6 +280,16 @@ Set `WDS_PLUGIN_ROOT` to run the same tests against another copy of the suite â€
 
 In the plugin's repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3` installs every one of those tools at pinned versions (a browser apart: see `tooling/README.md`), and the tests find them without any variable set (a toolchain installed for another operating system is ignored). Set a variable to `off` to switch its tests off.
 
+## Evals
+
+`evals/` holds cases for `claude plugin eval` (Claude Code 2.1.269 or later). For each skill there is a request phrased as a user would type it, which should load that skill. For five pairs of sibling skills there is a request for one that must never load the other. Every run is a real model call on your account. From the plugin root:
+
+```bash
+claude plugin eval . --tag routing --ablation none --runs 1 --no-publish
+```
+
+A routing case cannot pass without the plugin, so `--ablation none` skips the no-plugin arm and halves the cost. `--runs 1` is for iterating; the default is 3. The cases grant no shell, so they run on native Windows too, and the results go in `evals/results/`.
+
 What changed in each release is in `CHANGELOG.md`.
 
 ---
