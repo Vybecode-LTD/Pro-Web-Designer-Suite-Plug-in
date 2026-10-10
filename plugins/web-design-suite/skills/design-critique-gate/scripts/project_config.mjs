@@ -658,7 +658,7 @@ function pointerAlias(ref) {
   if (typeof ref !== 'string') return null;
   const s = ref.trim();
   let parts;
-  if (s.startsWith('{') && s.endsWith('}')) parts = s.slice(1, -1).split('.');
+  if (s.startsWith('{') && s.endsWith('}') && !/[{}]/.test(s.slice(1, -1))) parts = s.slice(1, -1).split('.');
   else if (s.startsWith('#/')) {
     parts = s.slice(2).split('/').map((p) => p.replaceAll('~1', '/').replaceAll('~0', '~'));
     if (parts.length && parts[parts.length - 1] === '$value') parts = parts.slice(0, -1);
@@ -802,7 +802,8 @@ function mergeTree(into, tree) {
 }
 
 // + - * / and brackets over numbers that share one unit, as _evaluate().
-function evaluateMath(text) {
+// Numbers (with a unit) and operators, or null, as _math_parts() reads them.
+function mathParts(text) {
   const token = /\s*(?:(\d+\.?\d*|\.\d+)(px|rem|em|%)?|([-+*/()]))/iy;
   const parts = [];
   let pos = 0;
@@ -814,6 +815,12 @@ function evaluateMath(text) {
     parts.push(m[1] !== undefined ? [Number(m[1]), (m[2] || '').toLowerCase()] : m[3]);
     pos = token.lastIndex;
   }
+  return parts;
+}
+
+function evaluateMath(text) {
+  const parts = mathParts(text);
+  if (parts === null) return null;
   const units = new Set(parts.filter((p) => Array.isArray(p) && p[1]).map((p) => p[1]));
   if (units.size > 1) return null;
   let at = 0;
@@ -864,11 +871,26 @@ function evaluateMath(text) {
 
 const isMath = (text) => {
   if ((text.startsWith('{') && text.endsWith('}') && pointerAlias(text)) || /[a-z]\(/i.test(text)) return false;
-  return MATH_REF.test(text) || /\d\s*[*/+]|\s-\s/.test(text);
+  const parts = mathParts(text.replace(/\{([^{}]+)\}/g, '1'));
+  return parts !== null && parts.some((p) => ['+', '-', '*', '/'].includes(p));
+};
+
+// `{color.red}` inside a string, as `var(--color-red)`, as _var_of() writes it.
+const varOf = (m, ref) => {
+  const alias = pointerAlias(`{${ref}}`);
+  return alias ? `var(${dtcgName(alias.split('.'))})` : m;
 };
 
 function studioMath(doc) {
+  const memo = new Map();                       // as _studio_math(): remembered, and capped at 64
   const lookup = (ref, seen) => {
+    if (memo.has(ref)) return memo.get(ref);
+    if (seen.length > 64) return null;
+    const found = lookupSolved(ref, seen);
+    memo.set(ref, found);
+    return found;
+  };
+  const lookupSolved = (ref, seen) => {
     let node = doc;
     for (const part of ref.split('.')) {
       if (!isObject(node) || !has(node, part)) return null;
@@ -891,8 +913,17 @@ function studioMath(doc) {
   const walk = (node, path) => {                  // true: leave this token out
     if (!isObject(node)) return false;
     if (has(node, '$value')) {
-      if (typeof node.$value === 'string' && isMath(node.$value.trim())) {
-        const solved = solve(node.$value, [path.join('.')]);
+      const v = node.$value;
+      if (typeof v === 'string' && !isMath(v.trim()) && MATH_REF.test(v) && !pointerAlias(v.trim())) {
+        node.$value = v.replace(/\{([^{}]+)\}/g, varOf);
+      } else if (typeof v === 'string' && isMath(v.trim())) {
+        let solved;
+        try {
+          solved = solve(v, [path.join('.')]);
+        } catch (err) {
+          if (!(err instanceof RangeError)) throw err;
+          solved = v;
+        }
         if (solved === node.$value) return true;
         node.$value = solved;
       }
@@ -931,7 +962,10 @@ function inlinePointers(node, root) {
     const target = seen.includes(ref) ? UNSUPPORTED : jsonPointer(root, ref);
     return target === UNSUPPORTED ? target : fix(structuredClone(target), [...seen, ref]);
   };
+  let budget = 100000;                          // a pointer fan-out stops, as in _inline_pointers()
   const fix = (value, seen) => {
+    budget -= 1;
+    if (budget < 0) throw new RangeError('expanded too far');
     if (isObject(value) && typeof value.$ref === 'string' && value.$ref.startsWith('#/')) {
       const alias = pointerAlias(value.$ref);
       if (alias) return `{${alias}}`;
@@ -960,8 +994,9 @@ function inlinePointers(node, root) {
 // [[name, value as CSS or null]] in document order.
 function dtcgEntries(data) {
   if (tooDeep(data)) return [];
-  const doc = structuredClone(isStudio(data) ? studioDocument(data) : data);
+  let doc;
   try {                                           // as normalise(): a long chain or a fan-out
+    doc = structuredClone(isStudio(data) ? studioDocument(data) : data);
     resolveExtends(doc, doc, new Set());
     inlinePointers(doc, doc);
     if (tooDeep(doc) || tooLarge(doc)) return [];

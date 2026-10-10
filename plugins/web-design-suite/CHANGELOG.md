@@ -27,7 +27,8 @@
     `tokens.css`.
   - `/install-gate` vendors `dtcg.py` with the audit's `project_config.py`.
 - **Tokens Studio: part 2** (P31; LC-B2 in part). A Tokens Studio export is read as
-  Tokens Studio reads it: the sets a theme uses merged in `tokenSetOrder`, each theme
+  Tokens Studio reads it: the sets a theme uses merged, its source sets and then its enabled
+  ones, each in `tokenSetOrder`, each theme
   group a collection whose modes are its themes, and each set no theme enables a
   collection of its own. A Light/Dark export becomes `:root` and `[data-theme="dark"]`,
   where it was `--light-bg-surface` and `--dark-bg-surface`. The legacy `{value, type}`

@@ -334,6 +334,25 @@ class TokensStudio(TempDirTest):
         proc, _, _ = self.css(data)
         self.assertIn("`bg` was left out: set by two theme groups", output(proc))
 
+    def test_math_is_remembered_and_composites_keep_their_references(self):
+        """CodeRabbit on #102: a 30-step fan-out of `{x} + {x} - {x}` ran 3^30 times,
+        and `2px solid {colors.red}` was taken for math and left out."""
+        from test_project_config import STUDIO_MATH
+        pc = load_script("design-system-docs", "project_config")
+        values = pc.read_tokens([self.write("tokens/m.json", json.dumps(STUDIO_MATH))]).values()
+        self.assertEqual("1px", values["--x30"])
+        self.assertEqual("2px solid var(--colors-red)", values["--edge"])
+        self.assertEqual("var(--x0) var(--x1)", values["--pair"])
+
+    def test_a_palette_each_theme_reads_is_a_mode(self):
+        """CodeRabbit on #102: the Dark palette, a source set only Dark reads,
+        was lost, and `{palette.bg}` meant the Light one in both modes."""
+        from test_project_config import STUDIO_PALETTES
+        _, _, blocks = self.css(STUDIO_PALETTES)
+        self.assertIn("--palette-bg: #ffffff;", blocks[":root"])
+        self.assertIn("--palette-bg: #000000;", blocks['[data-theme="dark"]'])
+        self.assertIn("--bg-surface: var(--palette-bg);", blocks[":root"])
+
     def test_the_project_reads_its_default_theme(self):
         pc = load_script("design-system-docs", "project_config")
         tokens = pc.read_tokens([self.write("tokens/studio.json", json.dumps(STUDIO_REVIEW))])
@@ -402,8 +421,8 @@ class TheEdgesOfTheFormat(TempDirTest):
     def test_extends_that_expand_too_far_are_refused(self):
         """CodeRabbit on #101: a shallow file whose `$extends` chain or fan-out
         expands past the limits is refused, not a traceback or a full memory."""
-        from test_project_config import EXTENDS_CHAIN, EXTENDS_FAN
-        for doc in (EXTENDS_CHAIN, EXTENDS_FAN):
+        from test_project_config import EXTENDS_CHAIN, EXTENDS_FAN, POINTER_FAN
+        for doc in (EXTENDS_CHAIN, EXTENDS_FAN, POINTER_FAN):           # POINTER_FAN: CodeRabbit on #102
             with self.subTest(size=len(doc)):
                 _, problems = self.dtcg.normalise(doc)
                 self.assertIn("expand it past 64 levels or 100000 entries", problems[-1][1])

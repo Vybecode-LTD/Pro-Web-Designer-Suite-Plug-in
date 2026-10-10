@@ -236,7 +236,7 @@ def pointer_alias(ref: Any) -> Optional[str]:
     if not isinstance(ref, str):
         return None
     s = ref.strip()
-    if s.startswith("{") and s.endswith("}"):
+    if s.startswith("{") and s.endswith("}") and "{" not in s[1:-1] and "}" not in s[1:-1]:
         parts = s[1:-1].split(".")
     elif s.startswith("#/"):
         parts = [p.replace("~1", "/").replace("~0", "~") for p in s[2:].split("/")]
@@ -400,7 +400,12 @@ def _inline_pointers(node: Any, root: dict) -> None:
         target = UNSUPPORTED if ref in seen else _pointer(root, ref)
         return target if target is UNSUPPORTED else fix(copy.deepcopy(target), seen + (ref,))
 
+    budget = [MAX_NODES]                         # a pointer fan-out stops here (CodeRabbit on #102)
+
     def fix(value: Any, seen: Tuple[str, ...]) -> Any:
+        budget[0] -= 1
+        if budget[0] < 0:
+            raise RecursionError
         if isinstance(value, dict) and isinstance(value.get("$ref"), str) and value["$ref"].startswith("#/"):
             alias = pointer_alias(value["$ref"])
             if alias:
@@ -682,8 +687,8 @@ def _merge(into: dict, tree: dict) -> None:
             into[key] = copy.deepcopy(value)
 
 
-def _evaluate(text: str) -> Optional[Tuple[float, str]]:
-    """+ - * / and brackets over numbers that share one unit, or none."""
+def _math_parts(text: str) -> Optional[List[Any]]:
+    """Numbers (with a unit) and operators, or None for anything else."""
     pos, parts = 0, []
     while pos < len(text.rstrip()):
         m = MATH_TOKEN.match(text, pos)
@@ -691,6 +696,14 @@ def _evaluate(text: str) -> Optional[Tuple[float, str]]:
             return None
         parts.append((float(m.group(1)), (m.group(2) or "").lower()) if m.group(1) else m.group(3))
         pos = m.end()
+    return parts
+
+
+def _evaluate(text: str) -> Optional[Tuple[float, str]]:
+    """+ - * / and brackets over numbers that share one unit, or none."""
+    parts = _math_parts(text)
+    if parts is None:
+        return None
     units = {p[1] for p in parts if isinstance(p, tuple) and p[1]}
     if len(units) > 1:
         return None
@@ -734,7 +747,7 @@ def _evaluate(text: str) -> Optional[Tuple[float, str]]:
 
     try:
         value = expr()
-    except (ValueError, ZeroDivisionError):
+    except (ValueError, ZeroDivisionError, RecursionError):   # `((((…` (CodeRabbit on #102)
         return None
     if at[0] != len(parts) or not any(p in ("+", "-", "*", "/") for p in parts):
         return None
@@ -742,15 +755,37 @@ def _evaluate(text: str) -> Optional[Tuple[float, str]]:
 
 
 def _is_math(text: str) -> bool:
-    """Math over references or numbers, not a whole reference or a CSS function."""
+    """Math over references or numbers: with each reference as a number, only
+    numbers, units, brackets and at least one operator. Not a whole reference,
+    a CSS function, or a composite such as `1px solid {color.red}`."""
     if (text.startswith("{") and text.endswith("}") and pointer_alias(text)) or re.search(r"[a-z]\(", text, re.I):
         return False
-    return bool(MATH_REF.search(text) or re.search(r"\d\s*[*/+]|\s-\s", text))
+    parts = _math_parts(MATH_REF.sub("1", text))
+    return parts is not None and any(p in ("+", "-", "*", "/") for p in parts)
+
+
+def _var_of(m: "re.Match[str]") -> str:
+    """`{color.red}` inside a string, as `var(--color-red)`."""
+    alias = pointer_alias("{" + m.group(1) + "}")
+    return f"var({css_name(alias.split('.'))})" if alias else m.group(0)
 
 
 def _studio_math(doc: dict, problems: Problems) -> None:
-    """Each value that is math over references and numbers, worked out."""
+    """Each value that is math over references and numbers, worked out; a
+    reference inside any other string is `var(--name)`. Each lookup is
+    remembered and a chain stops at MAX_DEPTH, so neither a fan-out nor a
+    long chain can run away (CodeRabbit on #102)."""
+    memo: Dict[str, Any] = {}
+
     def lookup(path: str, seen: Tuple[str, ...]) -> Any:
+        if path in memo:
+            return memo[path]
+        if len(seen) > MAX_DEPTH:
+            return None
+        memo[path] = found = _lookup_solved(path, seen)
+        return found
+
+    def _lookup_solved(path: str, seen: Tuple[str, ...]) -> Any:
         node: Any = doc
         for part in path.split("."):
             if not isinstance(node, dict) or part not in node:
@@ -783,8 +818,14 @@ def _studio_math(doc: dict, problems: Problems) -> None:
             return False
         if "$value" in node:
             value = node["$value"]
-            if isinstance(value, str) and _is_math(value.strip()):
-                solved = solve(value, (".".join(path),))
+            if isinstance(value, str) and not _is_math(value.strip()) and MATH_REF.search(value) \
+                    and not pointer_alias(value.strip()):
+                node["$value"] = MATH_REF.sub(_var_of, value)      # `1px solid {color.red}` (CodeRabbit on #102)
+            elif isinstance(value, str) and _is_math(value.strip()):
+                try:
+                    solved = solve(value, (".".join(path),))
+                except RecursionError:
+                    solved = value
                 if solved == value:
                     problems.append(("/".join(path), f"math this script cannot work out, left out "
                                                      f"({_short(value)})"))

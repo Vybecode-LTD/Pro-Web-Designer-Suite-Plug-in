@@ -576,7 +576,12 @@ def parse_studio(data: dict) -> FDoc:
             merged, extra = dtcg.studio_document(data, theme.sets)
             per_theme[theme.name], more = _dtcg_vars(merged)
             doc.unsupported += [p for p in extra + more if p not in doc.unsupported]
-        names = list(dict.fromkeys("/".join(path) for theme in members for s in theme.enabled
+        # A theme's own sets: those it enables, and a source set not every theme
+        # of the group reads (a Light palette and a Dark one), whose values
+        # differ by mode (CodeRabbit on #102).
+        shared = set.intersection(*(set(t.sets) for t in members))
+        names = list(dict.fromkeys("/".join(path) for theme in members
+                                   for s in theme.enabled + [x for x in theme.sets if x not in shared]
                                    for path in dtcg.studio_paths(data, s)))
         for name in names:
             if name in themed:                   # one variable, one collection (Codex on #102)

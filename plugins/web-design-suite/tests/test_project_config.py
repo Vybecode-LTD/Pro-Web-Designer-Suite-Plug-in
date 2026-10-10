@@ -702,6 +702,28 @@ EXTENDS_CHAIN = {"x0": {"v": {"$type": "number", "$value": 1}},
 EXTENDS_FAN = {"f0": {"v": {"$type": "number", "$value": 1}},
                **{f"f{i}": {"a": {"$extends": f"{{f{i - 1}}}"}, "b": {"$extends": f"{{f{i - 1}}}"}}
                   for i in range(1, 40)}}
+# CodeRabbit on #102: a math fan-out (each token adds the one before twice),
+# a property-level pointer fan-out, composites with references, and a palette
+# per theme read as a source set.
+STUDIO_MATH = {"core": {"x0": {"value": "1", "type": "spacing"},
+                        **{f"x{i}": {"value": f"{{x{i - 1}}} + {{x{i - 1}}} - {{x{i - 1}}}", "type": "spacing"}
+                           for i in range(1, 31)},
+                        "edge": {"value": "2px solid {colors.red}", "type": "border"},
+                        "pair": {"value": "{x0} {x1}", "type": "other"}},
+               "colors": {"red": {"value": "#ff0000", "type": "color"}},
+               "$metadata": {"tokenSetOrder": ["core", "colors"]}}
+POINTER_FAN = {"p0": {"$type": "number", "$value": {"x": 1}},
+               **{f"p{i}": {"$type": "number", "$value": {"x": {"a": {"$ref": f"#/p{i - 1}/$value/x"},
+                                                                "b": {"$ref": f"#/p{i - 1}/$value/x"}}}}
+                  for i in range(1, 40)}}
+STUDIO_PALETTES = {
+    "light-palette": {"palette": {"bg": {"value": "#ffffff", "type": "color"}}},
+    "dark-palette": {"palette": {"bg": {"value": "#000000", "type": "color"}}},
+    "semantic": {"bg": {"surface": {"value": "{palette.bg}", "type": "color"}}},
+    "$themes": [{"name": "Light", "selectedTokenSets": {"light-palette": "source", "semantic": "enabled"}},
+                {"name": "Dark", "selectedTokenSets": {"dark-palette": "source", "semantic": "enabled"}}],
+    "$metadata": {"tokenSetOrder": ["light-palette", "dark-palette", "semantic"]},
+}
 TOKEN_FILES = {
     "layers.css": (
         "@layer reset, tokens;\n@layer tokens {\n  :root, [data-theme] {\n"
@@ -740,6 +762,9 @@ TOKEN_FILES = {
     "studio-order.json": json.dumps(STUDIO_ORDER),
     "pointers.tokens.json": json.dumps(DTCG_POINTERS),
     "chain.tokens.json": json.dumps(EXTENDS_CHAIN),
+    "studio-math.json": json.dumps(STUDIO_MATH),
+    "pointer-fan.tokens.json": json.dumps(POINTER_FAN),
+    "studio-palettes.json": json.dumps(STUDIO_PALETTES),
     "fan.tokens.json": json.dumps(EXTENDS_FAN),
     "deep.tokens.json": json.dumps({"top": {"$type": "color", "$value": "#fff"}, "deep": json.loads(
         '{"g": ' * 70 + '{"$type": "color", "$value": "#000"}' + "}" * 70)}),
@@ -757,7 +782,8 @@ TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.
                ["gone.json"], ["a.css", "gone.css"], [], ["utf16be.json"],
                ["dtcg.tokens.json"], ["extends.tokens"], ["a.css", "dtcg.tokens.json"], ["dtcg.tokens.json", "a.css"],
                ["legacy.json"], ["schema-and-tokens.json"], ["studio.json"], ["studio-groups.json"], ["studio-order.json"],
-               ["deep.tokens.json"], ["names.tokens.json"], ["pointers.tokens.json"], ["chain.tokens.json"], ["fan.tokens.json"]]
+               ["deep.tokens.json"], ["names.tokens.json"], ["pointers.tokens.json"], ["chain.tokens.json"], ["fan.tokens.json"],
+               ["studio-math.json"], ["pointer-fan.tokens.json"], ["studio-palettes.json"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).
