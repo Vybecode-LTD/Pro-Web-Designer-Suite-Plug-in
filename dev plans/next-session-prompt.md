@@ -1,12 +1,12 @@
 # Start here: the next session
 
-**Written 2026-10-10**, at the end of the session that:
-- merged P26 part 2 (#87): `/new-system`, `/contrast`, `/migrate`, `/release-check`, `/figma-sync` and `/docs-check`;
-- merged P26 part 3 (#88): `/schema-to-screens`, `/email-build`, `/deck`, `/gate-a11y`, `/gate-perf` and `/gate-matrix` (PS-C11 closed);
-- merged P27 part 1 (#89): six subagents in `agents/` and `/critique` (XC-C3, XC-C4, PS-C4, SS-C6 and LC-C9 closed);
-- re-read the sub-agents page (`claude-code-capabilities.md` §8).
+**Written 2026-10-10 (the second session that day)**, at the end of the session that:
+- merged P27 part 2 (#91): `hooks.a11yGate` and `hooks.emailBuild` in the gate's hook, and the `emails` key (GT-C9 closed);
+- merged P28 part 1 (#92): the MCP server for the gates, and the LSP spike's verdict, not shipped;
+- merged N38 (#93): a11y_static's and perf_audit's baseline keys, the same on every platform;
+- re-read the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/` (`claude-code-capabilities.md` §9).
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P27 part 2** (the two hooks P25 left, §4) and **P28** (an MCP server for the gates, `bin/`, an LSP spike, §5). Phase 5 ends with R3; its other PRs are in the execution plan's §4.
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P28 part 2** (`bin/`, the owner's decision, §4) and **P29** (the eval framework and the routing cases, §5). Phase 5 ends with R3; its other PRs are in the execution plan's §4.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -77,6 +77,11 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Codex:** the companion packages; the stamp's ownership, twice (a foreign file, then a malformed one); unquoted paths; dot files left out of `upload-artifact`; the build as a YAML string; a leading hyphen.
       - **CodeRabbit:** the config's baseline paths; `persist-credentials: false`; a named missing `--dist`; the undocumented skip; the leading hyphen too.
       - **Lesson:** a template that substitutes into a workflow needs every value checked for the shell and for YAML, and Codex keeps finding the next case. Ask once more after a round of fixes, then merge when the fixes are small and tested.
+    - **The second 2026-10-10 session's reviews found 2 real issues**, each fixed with a test failing on the head it reviewed:
+      - **CodeRabbit on #91:** a test that scans the shared temp folder for one name can fail on a stale folder and pass on a renamed one. Give the code under test a root of its own (`TEMP`, `TMP`, `TMPDIR`), assert it is empty, and prove the code writes there with a missing root as the control.
+      - **Codex on #92:** a size cap that trims only top-level lists misses a nested one (perf_audit's `ledger.assets`). Cut the longest list at any depth, then the next.
+      - CodeRabbit asked to count DL-C7 as closed; declined (its evals are P30's), and it withdrew.
+    - **CodeRabbit's free tier runs out.** "Review limit reached … Next included review available in N minutes" posts as a comment and its check reports **pass** with no review. For new code, comment `@coderabbitai review` once the limit resets, then treat its finished check as usual.
     - **2026-10-10's reviews found 16 real issues** on #87 (9), #88 (3) and #89 (4), each fixed with a test failing on the head it reviewed, and CI found one more:
       - **A command's body is run through Bash.** An unquoted `#2563eb` is a comment and `oklch(…)` three words, so a colour placeholder is always quoted (`"BRAND"`, `"FG" "BG"`). `ChainTest` renders each command and splits it with `shlex.split(comments=True)`, as a shell would.
       - **Every file a step promises must be written by a script**, not by Claude: `figma_audit.py` gained `--out`. A runner writes a report only when the step exited 0 or 1, removes the reports it writes before it starts, and refuses an `--out` that would overwrite its own input (`release_check.py`, `deck.py`).
@@ -86,7 +91,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
     - **Codex reviews only the head each PR opened with**, not later pushes. Comment `@codex review` if a fix needs its eyes.
 - **Shell.**
   - The Bash tool is Git Bash. Any command you give the user must work in cmd.exe.
-  - **Bash heredocs eat backslashes** (`\\` becomes `\`, `\n` becomes a newline), even quoted ones. It bit again last session: a replacement holding `\n` silently did not match.
+  - **Bash heredocs eat backslashes** (`\\` becomes `\`, `\n` becomes a newline), even quoted ones. It bit three times last session: a `\n` in a test became a real newline, and an edit script failed to match.
     - Write any script or test code that holds a backslash with the Write tool into a scratch `.py` file, and run that. Or use the Edit tool, which is safe.
     - The Edit tool drops a trailing space at the end of `new_string`: an `old_string` ending in a space turned `new = (` into `new =(` last session. Read the staged diff.
   - **Python's `write_text` writes CRLF on Windows.** Edit files with `read_bytes`/`write_bytes`, or the Edit tool. A CRLF SKILL.md also breaks its byte budget.
@@ -96,6 +101,8 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - `_winapi.CreateJunction` needs the link's parent folder to exist.
   - **Don't edit a file the suite reads while it runs.** Plan docs are safe. The CHANGELOG, README, references, configs, scripts, tests and the spec are not. To change them mid-run, stop the run (`TaskStop`) and run it again.
   - **Stage a new file before `check.py`**: `test_file_modes` reads git's index. A new script with a shebang needs `git update-index --chmod=+x`.
+  - **A `*/` in a glob closes a JS block comment** (`emails/**/*.html` inside `/** … */` broke `design_hooks.mjs`). Write the glob out in words there.
+  - **A test that rewrites recorded data must not lean on this platform's own form.** N38's first test swapped `/` in keys that Windows had recorded with `\`, so it passed before the fix on Windows. Build the platform's form explicitly, and run `fail_before.py` to see each test fail.
   - **`check.py` prints only the first failure's traceback.** When it reports more failures than it shows, run `python -B -m unittest discover -s tests > suite.txt 2>&1` in the background and grep `^FAIL:`.
   - **`test_harness` requires `env=`** on every subprocess a test starts (`env()` from `wds_support`).
   - **A test that loops over files must assert it found some**, or it passes vacuously on a plugin without them (`fail_before.py` shows it as a control).
@@ -119,24 +126,25 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`.
 2. Read the execution plan's §2 and §6, and its Phase 5 table in §4.
 3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
-   - Before P28, re-read the MCP page (https://code.claude.com/docs/en/mcp, plugin-provided servers) and the manifest reference's `bin/` and `lspServers`, and add a §9.
-   - Re-read the plugin-evals page before P29, and update §1. Read §1 (evals) only when you reach P29.
+   - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions.
+   - **Before P29, re-read the plugin-evals page** (https://code.claude.com/docs/en/plugin-evals) and update §1, which dates from 2026-09-23 (2.1.280). Read §1 then.
 4. Check the state, with the Bash tool:
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `41 open items, 41 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `40 open items, 40 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
 
-- **The plugin** is `plugins/web-design-suite/` (about 904 tests):
+- **The plugin** is `plugins/web-design-suite/` (about 940 tests):
   - `skills/`: 13 skills.
-  - `tests/`: 863 tests, standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
+  - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
 - **The project contract (P24, #76, #78, #79, #81).** `references/project-contract.md` in web-design-studio is the user-facing account. In short:
-  - **`.design-suite.json`.** `schema: 1` is required. The other keys are `tokens`, `emailTokens`, `components`, `stack`, `budgets` (`perf`, `a11y`) `baselines` (`audit`, `a11y`, `perf`, `docs`, `snapshots`) and `hooks` (`designGate`, `generatedFiles`, booleans; #82).
+  - **`.design-suite.json`.** `schema: 1` is required. The other keys are `tokens`, `emailTokens`, `components`, `stack`, `budgets` (`perf`, `a11y`) `baselines` (`audit`, `a11y`, `perf`, `docs`, `snapshots`) and `hooks` (`designGate`, `generatedFiles`, `tokenDiff`, `a11yGate`, `emailBuild`, booleans; #82, #84, #91).
+    - `emails` (#91): the email templates' globs, read as `components` is; `emails/**/*.html` when left out, `[]` for none. `ProjectConfig.is_email()`, `isEmail()`.
     - Found by walking up from the working directory, never past the folder that holds `.git`. Paths are relative to the file, normalised.
     - A flag beats it, and it beats the default. A mistake exits 2 with the key named.
   - **`shared/project_config.py`.** The API:
@@ -151,6 +159,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
     - **After every merge from below, copy both masters over every copy**: git merges each copy separately (it happened three times this session, to `hooks/project_config.mjs`).
   - **The hooks (#82).** `hooks/hooks.json` runs `node hooks/design_hooks.mjs guard|gate|route` in exec form. The gate and the guard act only where `.design-suite.json`'s `hooks` turns them on; `userConfig.design_hooks` (`CLAUDE_PLUGIN_OPTION_DESIGN_HOOKS`) turns all three off. The gate finds Python as the pre-commit hook does (`WDS_PYTHON`, else `python3`, `python`, `py -3`, each asked for major version 3). `tests/test_hooks.py` feeds each the JSON Claude Code sends.
   - **The token diff (#84).** In the `gate` mode, after an edit to one of the config's `tokens` (resolved paths compared), with `hooks.tokenDiff` and an existing `baselines.system`, it runs `diff_system.py <snapshot> --format json --gate none` in the config's folder. Claude hears only majors and contrast crossings. A token file outside the project is found through the config at the hook's `cwd`. A broken config is reported for an audited file, or for a token file it names (read through the reader's exported `readJson`, any encoding). `diff_system.py` without `old` reads `baselines.system`, and compares components only when both snapshots carry them.
+  - **The a11y gate and the email build (#91).** In the `gate` mode too. `a11yGate`: `a11y_static.py <path relative to the config's folder> --json` there (its baseline keys hold the path so), on the files it reads (`A11Y_READ`, held to its `AUDITABLE_EXT`), its findings after the audit's under the shared `LIMIT`. `emailBuild`: on a file `isEmail()` matches, `lint_email.py --source`, `build_email.py --out` into `os.tmpdir()` (removed after), `lint_email.py` on the build; errors listed, warnings counted. The scripts one edit starts share `BUDGET`, 160 seconds, inside `hooks.json`'s 180. The email hook lints as for marketing mail: a receipt with no unsubscribe link is reported.
   - **Who reads what:** the reference's §3 (the token scripts) and §4 (the other keys).
   - **Vendored alone:** `audit_design.py` and `a11y_static.py` (the hook recipe copies them into a project's `scripts/`) run as before without the reader; the audit says the config is not read and refuses `--tokens`.
 - **The workflow commands (#85)** are skills in `workflow-commands/<name>/SKILL.md`, which `plugin.json`'s `"skills": ["./workflow-commands/"]` adds to the scan. They stay out of `skills/` so the 13 skills, their tests and their `.skill` release files are unchanged (the reasons are in `claude-code-capabilities.md` §7).
@@ -161,6 +170,12 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - `TheCommandFiles` checks every command in a body's bash blocks starts with a rule's prefix, every rule is run, and each `python` rule has its `python3` twin. `ChainTest` runs a body's commands in order on a fixture with each placeholder (`PLACEHOLDERS`) given the test's values; `TheBrowserSteps` runs the browser steps with the tooling's Playwright.
   - **The commands have not run in a live session either**: before R3, invoke each from `claude --plugin-dir plugins/web-design-suite`.
 - **The subagents (#89)** are `agents/*.md`: `design-critic` (design-critique-gate preloaded, `omitClaudeMd: true`, returns one JSON block), `gate-runner`, `a11y-auditor`, `design-auditor`, `supabase-security-reviewer`, `codemod-batch-reviewer`. None has Edit or Write, but each has Bash for the skills' scripts, so "read-only" is an instruction, not a sandbox. `test_agents` holds their frontmatter to the fields a plugin agent honours, their preloaded skills, and every script they name. `/critique` delegates to the critic in its body (the skills page documents `context: fork`'s `agent` only for built-in and `.claude/agents/` agents). They have not run live either.
+- **The MCP server (#92)** is `mcp/design_gates.mjs`, run by `.mcp.json` as `node ${CLAUDE_PLUGIN_ROOT}/mcp/design_gates.mjs`; Claude Code registers it as `plugin:web-design-suite:gates`. MCP over stdio, a JSON message per line, Node's standard library, Python found as the hooks find it (`WDS_PYTHON` first).
+  - Five tools: `audit_design`, `a11y_static`, `perf_audit`, `check_roles`, `diff_system`, each `mcp__plugin_web-design-suite_gates__<tool>`. A tool runs its script in `CLAUDE_PROJECT_DIR` and returns `{tool, exit, verdict, report}`; exit 2 or no JSON is an `isError` result.
+  - `TOOLS` holds each tool's `script`, `properties` (its schema) and `args()`. Positionals follow `--` and option values join with `=`, so a path never becomes an option.
+  - `fit()` keeps a result within 60,000 characters: the longest list reached through objects is cut to the head that fits, then the next, and `truncated.lists` names each.
+  - `tests/test_mcp.py` speaks to it as Claude Code does. `claude plugin validate --strict` on `plugin.json` reads `.mcp.json` (on the plugin folder it validates the `marketplace.json` beside it instead); the test runs it when the desktop app's CLI exists, and CI has its own validate job.
+- **Baseline keys (#93, N38).** audit_design, a11y_static and perf_audit all write `/` in a key's path (`portable_key`), and read a baseline's keys the same way.
 - **The scripts, by skill:**
 
   | Skill | Scripts |
@@ -202,37 +217,47 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. P27 part 2: the two hooks P25 left
+## 4. P28 part 2: `bin/`, the owner's decision
 
-**Items:** GT-C9 (b) (`gates.md` C9) and DL-C7's hook (`delivery.md`). Both close here (DL-C7's evals are P30's). Read each by `grep -n`.
+**Item:** XC-B1 (`crosscut.md`), the last of it. The agents, hooks, commands and MCP server are merged; the LSP spike is done and not shipped (`claude-code-capabilities.md` §9).
 
-**What:**
-- **GT-C9 (b):** in `hooks/design_hooks.mjs`'s `gate` mode (PostToolUse on Edit and Write), run `a11y-audit-runner/scripts/a11y_static.py` on the edited file when it is css, html, jsx or tsx, behind a new `hooks.a11yGate`. Its findings go into the same `additionalContext` as the audit's, under the 9,000-character `LIMIT` they share. Model it on `audit()` and `tokenDiff()`.
-- **DL-C7:** after an edit to an email template, build it and lint the result (`email-template-system/scripts/build_email.py`, then `lint_email.py`), errors as `additionalContext`, behind its own key. **Decide first how a template is recognised.** A proposal: `hooks.emailBuild` plus a new top-level `emails` glob list in `.design-suite.json` (default `emails/**/*.html`), matched with `ProjectConfig.is_component`'s glob code. Say which in the PR.
-- **Both readers.** `HOOKS` in `shared/project_config.py` and its counterpart in `shared/project_config.mjs` gain the keys (and `emails`, if chosen), with the same messages. **Copy both masters over every copy** (ten `.py`, seven `.mjs`; `TheCopiesAreTheMaster` finds them), and run `TheNodeReaderAgrees`.
-- `hooks.json` needs no change if the work happens inside the `gate` mode; mind its 180-second timeout with three scripts in one process.
-- `references/project-contract.md` §4 (the keys) and the README's hooks paragraph.
+**First, ask the owner** (it was asked last session and not answered): should the plugin ship a top-level `bin/`?
+- **What it gives:** bare commands on the Bash tool's PATH while the plugin is enabled, such as `wds-gate` for `/gate`'s runner. The MCP tools and the slash commands already reach the same scripts.
+- **What it costs:** "claude.ai and Cowork don't install a plugin that has this directory, including one you distribute through claude.ai organization settings" (the manifest reference's standard layout; §2, §5, §9).
+- **The recommendation given:** no.
 
-**Tests** (`tests/test_hooks.py`, feeding each hook the JSON Claude Code sends, as `TheDesignGate` does): a11y findings on an edited html file with the key on, silence with it off, the shared limit; an email template built and linted, an error reported, a non-template ignored; both readers refuse a non-boolean key.
+**If no:** close XC-B1 with the session's docs: the inventory row "fixed in 3.5.0: the agents (#89), the hooks (#82, #84, #91), the commands (#85, #87 to #89), the MCP server (#92); `bin/` declined by the owner (DATE), the LSP spike not shipped (§9)", the plan's `P28` row renamed `P28 part 2, not built (owner, DATE)`, and §9. No code.
 
-**Close:** GT-C9 and DL-C7 in the inventory (DL-C7's evals stay P30's, so write "the hook in #N; the evals in P30" and keep it scheduled in P30's row); the plan's `P27` row renamed `P27 part 2, #N`; §9; the CHANGELOG.
+**If yes (one PR, S):**
+- `bin/wds-gate`, `bin/wds-install-gate`, `bin/wds-new-system`, `bin/wds-release-check` and `bin/wds-deck`: POSIX `sh` scripts with a shebang (the Bash tool is Git Bash on Windows too) that find Python as the hooks do (`WDS_PYTHON`, else `python3`, `python`, `py -3`, each asked for major version 3) and `exec` the runner in `workflow-commands/<command>/scripts/` with `"$@"`.
+- `git update-index --chmod=+x` on each; `test_file_modes` reads git's index.
+- Tests: each launcher runs its runner with `--help` from a temp project, under `bash`, and fails with a clear message when no Python 3 is found.
+- The README says what `bin/` costs. Close XC-B1.
 
-**Size:** S-M.
+**Size:** S, or docs only.
 
-## 5. P28: an MCP server for the gates, `bin/`, and an LSP spike
+## 5. P29: the eval framework and the routing cases
 
-**Item:** XC-B1 (`crosscut.md`). Read it first, then re-read the MCP page and the manifest reference's `bin/` and `lspServers` (§1 step 3).
+**Items:** XC-C1 and XC-B2 (`crosscut.md`; read each by `grep -n`). Read `claude-code-capabilities.md` §1 **after** re-reading the plugin-evals page (§1 step 3), and update §1 first.
 
-**Ask the owner before building `bin/`:** the manifest reference says claude.ai and Cowork "don't install a plugin that has this directory" (`claude-code-capabilities.md` §2, §5). Shipping `bin/` trades those installs for bare commands on the Bash tool's PATH. Put the choice to the user with that cost, and do not ship `bin/` without a yes.
+**Before any run, the owner must provide two things. Ask, and do not run evals until both are settled:**
+- **A signed-in CLI.** Every eval run is a real model call on the account. The desktop app's bundled CLI (`%APPDATA%\Claude\claude-code\2.1.293\83cb0bd7fed4\claude.exe`) answered `claude -p` with "Not logged in" last session.
+- **For a CI job, an API key as a repository secret.** The repository is public, so the job must not run on forks' PRs.
+
+D5 caps a full run at **$15** (`--max-cost-usd`); a run that would pass it stops first. Routing cases are cheap and run on every release; outcome cases (P30) run before each release and when a skill changes.
 
 **What, as the plan has it:**
-- **An MCP server** exposing the gates as tools (the audit, a11y_static, perf_audit, check_roles, diff_system), declared in `.mcp.json` with `${CLAUDE_PLUGIN_ROOT}`, standard library only (Python stdio JSON-RPC), each tool returning the script's JSON. Its tools are named `mcp__plugin_web-design-suite_<server>__<tool>`.
-- **`bin/`**, only with the owner's yes: thin launchers for the runners.
-- **An LSP spike** for live diagnostics from the audit (`.lsp.json`), shipped only if it works on Windows. The binary must be on PATH; the spike decides whether that is reasonable.
+- `evals/` at the plugin root (or `experimental.evals` in `plugin.json`), the layout §1 describes: one directory per case, `prompt.md` plus `graders/*.md` (what `claude plugin eval init` writes), or `case.yaml` with `schema_version: "1.1"`.
+- **Routing cases** for each of the 13 skills: a prompt that should load it, graded with `type: tool_used`, `tool: Skill`, `input_match` on the skill's name (the pattern is in §1).
+- **"Must not fire" cases between sibling skills** (XC-B2): a prompt for one sibling, with a `tool_used` grader with `max: 0` on the other. The pairs to start with: a11y-audit-runner and design-critique-gate, design-system-docs and design-system-versioning, design-token-migration and figma-variables-sync, web-design-studio and landing-page-conversion, component-state-matrix and a11y-audit-runner.
+- **The CI job**, only with the owner's yes and the secret: on `workflow_dispatch` and release tags, `claude plugin eval . --trust-plugin --json results.json --threshold 0.8 --model <pinned> --judge-model <pinned> --no-publish --max-cost-usd 15`, its results uploaded as an artifact.
+- **Windows:** check on the page whether a run that grants Bash needs WSL2 or Docker on Windows (the review said "script cases need WSL2"); routing cases need no Bash.
 
-**Tests:** the server speaks JSON-RPC over stdio (initialize, tools/list, tools/call on a fixture); `claude plugin validate --strict` passes with `.mcp.json`.
+**Tests** (they cost nothing): every case directory parses (its frontmatter or YAML, with js-yaml from `tooling/main`), names a skill that exists, and every skill has at least one routing case; every sibling pair has its "must not fire" case. Run the suite for real once, with the owner's CLI, and record the cost and the scores in the PR.
 
-**Size:** M. Split the LSP spike into its own PR if it grows.
+**Close:** XC-C1 and XC-B2 in the inventory; the plan's `P29` row renamed `P29, #N`; §9; the CHANGELOG.
+
+**Size:** M-L. Split the CI job into its own PR if it waits on the secret.
 
 ## 6. End of session (never skip)
 

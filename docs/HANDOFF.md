@@ -1,43 +1,32 @@
 # Handoff
 
-**2026-10-10**, after P26 parts 2 and 3 (#87, #88), P27 part 1 (#89) and this docs PR. 3.4.0 is the latest release; Phase 5 (3.5.0, a full Claude Code plugin) is under way.
+**2026-10-10 (second session)**, after P27 part 2 (#91), P28 part 1 (#92), N38 (#93) and this docs PR. 3.4.0 is the latest release; Phase 5 (3.5.0, a full Claude Code plugin) is under way.
 
-**The next session starts from `dev plans/next-session-prompt.md`**: orientation, then P27 part 2 (the two hooks) and P28 (the MCP server, `bin/`, the LSP spike) in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
+**The next session starts from `dev plans/next-session-prompt.md`**: orientation, then P28 part 2 (`bin/`, only with the owner's yes) and P29 (the eval framework) in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
 ## State
 
-- **Merged this session:** #87, #88 and #89. Each had CI green on its head, every thread answered and resolved, CodeRabbit finished and GitHub clean. They were stacked and merged bottom-up, each retargeted to `main` before its base branch was deleted. This docs PR follows. No other PR is open.
+- **Merged this session:** #91, #92 and #93, each with CI green on its head, every thread answered and resolved, CodeRabbit finished and GitHub clean. #91 merged as `500e02d`, #92 as `f75dd51` and #93 as `ac482c5`. CodeRabbit's free tier ran out mid-session: it reviewed #91, and #92 when asked after the limit reset, but never #93, which merged on green CI, Codex's clean review and CodeRabbit's finished (rate-limited) check.
 - **What they did:**
-  - **#87, P26 part 2: the systems and the lifecycle.** `/new-system` (a brand colour to the starter system, role pairs checked), `/contrast`, `/migrate` (the census), `/release-check` (extract, diff, gate, changelog, guide), `/figma-sync` (audit, questions or tokens, diff) and `/docs-check`. `figma_audit.py` gained `--out`; `extract_literals.py -o` creates its folder.
-  - **#88, P26 part 3: delivery, persuasion and the runtime gates.** `/schema-to-screens` (stops on a blocking security finding), `/email-build`, `/deck` (stops on a blocking critique finding) and `/gate-a11y`, `/gate-perf`, `/gate-matrix`, whose browser steps run through `node`. `introspect_schema.py`'s outputs create their folder. PS-C11 closes.
-  - **#89, P27 part 1: the subagents.** `design-critic`, `gate-runner`, `a11y-auditor`, `design-auditor`, `supabase-security-reviewer` and `codemod-batch-reviewer` in `agents/`, none with Edit or Write (each has Bash for the skills' scripts and is told to leave the work unchanged, so they are not a sandbox), and `/critique`, which hands the work to the critic and saves its findings unedited. XC-C3, XC-C4, PS-C4, SS-C6 and LC-C9 close.
-- **The reviews found 16 real issues** (9 on #87, 3 on #88, 4 on #89), each fixed with a test failing on the head it reviewed, and CI found one more (Python 3.9's argparse). The lessons are in the next-session prompt's §0.
-- **The plan:** 41 open items, 41 scheduled (`check_execution_plan.py`). Tests: about 904. Fifteen workflow commands and six agents.
+  - **#91, P27 part 2: two more checks in the gate's hook.** `hooks.a11yGate` runs `a11y_static.py` on each file Claude edits that it reads, its findings beside the audit's under the shared cap. `hooks.emailBuild` lints an edited email template, builds it into a temporary folder and lints the build; Claude hears the errors. A new top-level `emails` key holds the templates' globs (`emails/**/*.html` by default), in both readers. GT-C9 closes; DL-C7's hook lands, and DL-C7 closes with its evals in P30.
+  - **#92, P28 part 1: the gates as MCP tools.** `.mcp.json` runs `node mcp/design_gates.mjs`: five tools (`audit_design`, `a11y_static`, `perf_audit`, `check_roles`, `diff_system`), each returning the script's JSON, its exit code and a verdict, arguments checked, a path never an option, a long report cut to 60,000 characters at any depth. Claude Code 2.1.293 connects to it on Windows (`claude mcp list`). **The LSP spike is not shipped:** each file extension gets one language server, so ours would pre-empt the user's TypeScript server (`claude-code-capabilities.md` §9).
+  - **#93, N38: baselines across platforms.** `a11y_static.py` and `perf_audit.py` keyed a baseline by the path with the platform's separator, so `/install-gate`'s Linux-recorded baselines failed its Windows job. Keys now use `/`, and old baselines keep matching.
+- **The reviews found 3 real issues:** CodeRabbit on #91 (the email test scanned the shared temp folder), Codex on #92 (nested lists escaped the size cap), and the session's own N38. One CodeRabbit suggestion was declined with a reason, and it withdrew it.
+- **The plan:** 40 open items, 40 scheduled (`check_execution_plan.py`). Tests: about 940. Fifteen workflow commands, six agents, one MCP server.
 
 ## Next steps
 
-1. **P27 part 2:** the two hooks P25 closed without: GT-C9's `a11y_static` on the edited file and DL-C7's email build and lint, each behind a new `hooks` key in both readers. Decide first how an email template is recognised.
-2. **P28:** an MCP server for the gates, then `bin/` (only with the owner's yes: it keeps the plugin out of claude.ai and Cowork installs) and an LSP spike.
-3. Then P29 and P30 (the evals), and R3 (3.5.0).
+1. **Ask the owner about `bin/`** (P28 part 2). Without a yes, close XC-B1 in the docs: the plugin then has agents, hooks, commands and an MCP server.
+2. **P29:** the eval framework and the routing cases. It needs a signed-in CLI: the desktop app's bundled one said "Not logged in" to `claude -p`.
+3. Then P30 (outcome evals) and R3 (3.5.0).
 
 ## Warnings
 
-- **Nothing new has run in a live session.** The installed plugin is 3.4.0. Before R3, load the branch's plugin (`claude --plugin-dir plugins/web-design-suite`) on Windows and check:
-  - the hooks: the gate on a real edit, the token diff, the guard's refusal, how often the router speaks;
-  - each of the fifteen commands, including that its `allowed-tools` spare the prompt, and that a quoted colour reaches the runner;
-  - each agent, and that `/critique` reaches `web-design-suite:design-critic` by that name.
-- **The CI template has not run on GitHub.** Before R3, install it in a scratch repository and push.
-- **Open question:** `perf_audit.py --src` reports the starter's own `index.css` `@import` lines as `css-import` LCP errors, so a project started with `/new-system` fails `/gate --src`'s performance gate. The starter means a bundler to inline them. Decide whether the perf gate should skip an entry stylesheet a bundler inlines, or the starter should stop using `@import`.
-- **Worth the owner's look:** the router runs in every project unless `design_hooks` is off; the gate, the token diff and the guard are opt-in.
+- **Nothing new has run in a live session**, apart from `claude mcp list` connecting to the MCP server. The installed plugin is 3.4.0. Before R3, load the branch's plugin (`claude --plugin-dir plugins/web-design-suite`) on Windows and check the hooks (the gate, a11y and email checks, the token diff, the guard, the router), each of the fifteen commands, each agent, and one call to each MCP tool.
+- **The CI template has not run on GitHub.** Before R3, install it in a scratch repository and push; N38 was found by reading it, not running it.
+- **A flake on `main`:** `test_critique_snapshots` failed once on Linux 3.9 with Chromium's "Unable to capture screenshot" (run 38005281749); the re-run passed. If it recurs, look at it.
+- **CodeRabbit's free tier runs out.** "Review limit reached" reports its check as passing without a review; ask again (`@coderabbitai review`) after the limit resets when the code is new.
+- **Open question:** `perf_audit.py --src` reports the starter's own `index.css` `@import` lines as `css-import` LCP errors, so a project started with `/new-system` fails `/gate --src`'s performance gate. Decide whether the perf gate should skip an entry stylesheet a bundler inlines, or the starter should stop using `@import`.
 - **A merge from below leaves copies behind.** Seven `project_config.mjs` copies and ten `project_config.py` copies: after every merge, copy both masters over them.
-- **`check.py` prints only the first failure.** When it reports more, run the suite directly and grep `^FAIL:`.
-- **The token counter** reset about 20 times this session, on every review event. This session used about 580 thousand.
-- **SKILL.md budgets:** client-presentation-builder, email-template-system and landing-page-conversion 20,497 bytes of 20,500; perf-budget-gate 20,494; component-state-matrix 20,493.
-- **Still open from earlier:**
-  - The hydration timing test flakes on Windows 3.14 runners (re-run it).
-  - `--warning-700`, `--danger-100` and `--info-100` fall outside Display P3.
-  - `check_roles.py` clips a colour outside sRGB.
-  - The worked examples are tests.
-  - A local build never matches the release's checksums.
-  - Don't grep `tooling/`.
-  - The repository is public.
+- **The token counter** reset on every review event again. This session used about 510 thousand.
+- **Still open from earlier:** the hydration timing test flakes on Windows 3.14 runners; `--warning-700`, `--danger-100` and `--info-100` fall outside Display P3; `check_roles.py` clips a colour outside sRGB; the worked examples are tests; a local build never matches the release's checksums; don't grep `tooling/`; the repository is public.
