@@ -13,7 +13,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | XC-A7 | medium | fixed in 3.1.0 | super-linear on long lines, which is what minified CSS looks like: 96 KB on one line 1.5 s, |
 | XC-A8 | medium | fixed in 3.1.0 | the invocation contract is ambiguous. |
 | XC-A9 | medium | fixed in 3.1.0 | Audit baseline keys stop matching when the same folder is spelled differently. |
-| XC-B1 | — | W9 (3.5.0) | The plugin ships only skills: no agents, hooks, commands or MCP/LSP servers, so Law 9 is never applied to Claude's own edits. |
+| XC-B1 | — | W9 (3.5.0): the agents in PR #89, the hooks in PRs #82, #84 and #91, the commands in PRs #85, #87 to #89, the MCP server in PR #92 (`test_mcp`), and the LSP spike there, not shipped (`claude-code-capabilities.md` §9); `bin/` in P28 part 2, with the owner's yes | The plugin ships only skills: no agents, hooks, commands or MCP/LSP servers, so Law 9 is never applied to Claude's own edits. |
 | XC-B2 | — | W9 (3.5.0) | No eval suite, so nothing shows the skills fire on the right prompts or beat the no-plugin baseline. |
 | XC-B3 | — | fixed in 3.3.0: `.github/workflows/ci.yml` runs the suite and the static checks on Windows, Linux and macOS, at Python 3.9 and 3.14, with Node (PR #17); the floor is declared since PR #4 | The tests are regression and guard tests only: no smoke test per documented command, no CI, no declared minimum Python. |
 | XC-B4 | — | fixed in 3.1.0 (CHANGELOG) and 3.2.1 (CLAUDE.md for contributors) | no CHANGELOG (the suite teaches semver and changelogs for design systems but keeps |
