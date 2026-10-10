@@ -61,7 +61,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SS-C4 | — | fixed in 3.2.0 | One source for shared CSS (M, P1). |
 | SS-C5 | — | fixed in 3.3.0: `--preset studio`, the 11px refusal, `--fluid-space`, `--anchor-seed`, `--neutral-hue`, `--gamut p3` (`test_numbers.TypeScale`, `ColourRamps`) | Generator upgrades (M, P1). |
 | SS-C6 | — | fixed in 3.5.0: the hook in PR #82 (`test_hooks.TheDesignGate`), the commands in PR #87 (`/new-system`, `/contrast`; `test_commands`), the design-auditor in PR #89 (`test_agents`) | Use Claude Code plugin features (M, P1). |
-| SS-C7 | — | W9 (3.5.0) | An eval suite of script-graded cases, run against a no-plugin baseline. |
+| SS-C7 | — | fixed in 3.5.0: `evals/systems/brand-tokens` (the #e8440a brand kept exactly, a dark theme, roles aliased to the palette, and check_roles passing) in PR #97 (`test_evals.TheOutcomeCases`) | An eval suite of script-graded cases, run against a no-plugin baseline. |
 | SS-C8 | — | fixed in 3.2.0 | Size: 17.7 KB / 2,616 words ≈ 4.4k tokens. |
 | SS-C9 | — | fixed in 3.3.0: `test_contract.TheStarterKeepsItsWord` | Ship what the starter refers to (S, P1). |
 | SB-A1 | high | fixed in 3.1.0 | The canonical Button shows no focus ring when reached by keyboard. |
@@ -100,7 +100,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-C3 | S-M · high | W12 (3.6.0+) | Ship a `tw_probe` script and a `/tw-probe` skill command. |
 | SB-C4 | S · high | W12 (3.6.0+) | Replace Part 5 with eslint-plugin-better-tailwindcss 4.7 (peers ESLint 7–10 and Tailwind 3.3/4.1). |
 | SB-C5 | S · high | fixed in 3.2.0 | Add doc-snippet CI: extract ```css/```tsx blocks, run audit + ESLint, and allow a `/* anti-example */` marker (extends XC-C5 and SS-C3). |
-| SB-C6 | M · medium | W9 (3.5.0) | Add build-half cases to the XC-C1 eval suite: "Tailwind button with loading state", "vanilla card with stretched link", "mega menu", "add a vendor datepicker stylesheet". |
+| SB-C6 | M · medium | fixed in 3.5.0: three of its four cases (`evals/build/`: the Tailwind button, the stretched-link card, the vendor stylesheet) and XC-C1's pricing section, graded on the files and the audit's verdict, in PR #97 (`test_evals.TheOutcomeCases`); the mega menu is left out so routing and outcome fit one $15 (the owner, 2026-10-10) | Add build-half cases to the XC-C1 eval suite: "Tailwind button with loading state", "vanilla card with stretched link", "mega menu", "add a vendor datepicker stylesheet". |
 | SB-C7 | S · medium | fixed in 3.2.0 | Harden the hook: filter by extension; fail instead of skipping when a config is missing unless `DESIGN_GATE_ALLOW_SKIP=1`; resolve configs at the repo root with fallbacks; pass `--no-warn-ignored`; use `git rev-parse --g |
 | SB-C8 | S · medium | fixed in 3.2.0 | Improve token efficiency (with XC-C7). |
 | SB-C9 | S · medium | fixed in 3.3.0: `starter/styles/index.css` (vanilla and CSS Modules), `configs/index.tailwind.css` and `configs/index.tailwind-v3.css`, each quoted by the references (`sync_snippets.py`) and linted by `StylelintConfig.test_the_canonical_entries_pass` | Keep one canonical `index.css` per stack (vanilla, modules, Tailwind v4, Tailwind v3) in a single file that every reference points to, with the vendor layer and the forced-colors focus rule built in. |
@@ -145,7 +145,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-C7 | — | W10 (3.6.0+) | A Figma MCP route: a SKILL.md routing row that says "if `get_variable_defs` is available, read with it"; a `--reverse --format plugin-script` output for `use_figma` that renames "Mode 1", sets `scopes: []` on primitives  |
 | LC-C8 | — | fixed in 3.5.0: the generated-file guard in PR #82 (`test_hooks.TheGeneratedFileGuard`), the token diff in PR #84 (`test_hooks.TheTokenDiff`, `test_project_config.DiffSystemReadsTheContract`) | Hooks: block edits to files headed "GENERATED — DO NOT EDIT", and on a tokens.css edit run diff_system and return the bump and any contrast crossings. |
 | LC-C9 | — | fixed in 3.5.0: the commands in PR #87 (`test_commands.TheReleaseCheck`, `TheChains`), the codemod-batch-reviewer in PR #89 (`test_agents`) | User-invocable workflow skills (`disable-model-invocation: true`): `/wds-migrate-census`, `/wds-release-check` (extract → diff → gate → changelog → guide), `/wds-figma-handoff`, `/wds-docs-check`, each with `allowed-tool |
-| LC-C10 | — | W9 (3.5.0) | A `claude plugin eval` suite, with a `scaffold_script` for each fixture. |
+| LC-C10 | — | fixed in 3.5.0: `evals/lifecycle/` (the DTCG 2025.10 export, from a scaffolded project; a re-pointed role is not a patch) in PR #97 (`test_evals.TheOutcomeCases`), and the router fix it found | A `claude plugin eval` suite, with a `scaffold_script` for each fixture. |
 | LC-C11 | — | fixed in 3.2.0 | Descriptions and token budget. |
 | LC-C12 | — | fixed in 3.4.0: `tests/fixtures/worked-run` and `worked-release.json`, held by `test_token_migration.TheWorkedRun` and `test_versioning.TheWorkedRelease` (PR #50) | Ship the 8-file migration fixture and the five-edit release as test fixtures, and have CI regenerate the SKILL.md numbers from them. |
 | GT-A1 | high | fixed in 3.1.0 | the runtime contrast check silently skips any colour that is not serialised as `rgb()`/`rgba()`. |
@@ -185,7 +185,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-C7 | S · P1 | fixed in 3.2.0, item 13 | SKILL.md size: 5k tokens or less. |
 | GT-C8 | S · P1 | fixed in 3.2.0, item 13 | Descriptions with a standalone first sentence and a "not for" line. |
 | GT-C9 | M · P1 | fixed in 3.5.0: the gate commands in PR #88 (`test_commands.TheBrowserSteps`), the gate-runner in PR #89 (`test_agents`), the a11y_static hook, `hooks.a11yGate`, in PR #91 (`test_hooks.TheA11yGate`) | Plugin components: a `gate-runner` agent, an opt-in PostToolUse hook running a11y_static, user-invoked gate skills. |
-| GT-C10 | M · P1 | W9 (3.5.0) | A `claude plugin eval` suite for the gates, run under WSL2. |
+| GT-C10 | M · P1 | fixed in 3.5.0: `evals/gates/axe-not-compliance`, and the audit's and check_roles' verdicts graded in the build and systems cases, through the plugin's MCP server rather than Bash, so no case needs WSL2 (the owner, 2026-10-10), in PR #97 (`test_evals.TheOutcomeCases`) | A `claude plugin eval` suite for the gates, run under WSL2. |
 | GT-C11 | M · P2 | fixed in 3.4.0: the `lighthouse` preset, TTFB from CDP and `--interact-at` in PR #45 (`test_browser_runtime.VitalsMeasures`), `crux_check.py` in PR #46 (`test_crux_check`) | A `lighthouse` throttle preset, TTFB from CDP, `--interact-at MS`, and `crux_check.py`. |
 | GT-C12 | M · P1 | fixed in 3.5.0: PR #85 (`test_commands.TheInstallGate`: the workflow, its Windows job and its baseline job run on a fixture) | One CI template for all three gates in a pinned Playwright container, with a baseline-update job and a tested Windows variant. |
 | GT-C13 | S · P2 | fixed in 3.4.0: `test_browser_scripts.SharedHelpers` (PR #38) | Vendor the shared runtime helpers into each skill as identical copies, with a test that they match. |
@@ -225,7 +225,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-C4 | — | fixed in 3.5.0: PR #89, `agents/design-critic.md` and `/critique` (`test_agents`, `test_commands.TheChains`) | Add an adversarial critic subagent, `agents/design-critic.md`, that returns `findings.json` from a fresh context. |
 | PS-C5 | — | fixed in 3.4.0: `critique_snapshots.mjs` (PR #71; `test_critique_snapshots.CritiqueSnapshots`, `test_browser_scripts`) | Add `critique_snapshots.mjs`: PNGs at 390 and 1440px plus blur, greyscale, mirror, 25%, dark and reduced-motion variants. |
 | PS-C6 | — | W14 (3.6.0+) | Add `lint_claims.py`: load-time countdowns, fake scarcity, pre-checked opt-ins, unsourced percentages and the like. |
-| PS-C7 | — | W9 (3.5.0) | Add an eval suite in `evals/`, scored against a no-plugin baseline. |
+| PS-C7 | — | fixed in 3.5.0: `evals/persuasion/no-fake-countdown`, scored against the no-plugin baseline, in PR #97 (`test_evals.TheOutcomeCases`) | Add an eval suite in `evals/`, scored against a no-plugin baseline. |
 | PS-C8 | — | fixed in 3.2.0 | Put landing-page-conversion on a token diet. |
 | PS-C9 | — | fixed in 3.2.0 | Rewrite the descriptions. |
 | PS-C10 | — | fixed in 3.2.0 | Add an evidence register: each figure's value, URL, date verified and exact quote, with a test. |
@@ -266,6 +266,6 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-C4 | S | fixed in 3.3.0, with DL-A5 and DL-B1's reference | rewrite supabase-integration.md §2/§4/§6 |
 | DL-C5 | S | fixed in 3.4.0: `lint_email --source`, and the build notes each fallback (PR #58; `test_email.LintTheSource`) | `lint_email --source`: flag literals, `var()` fallbacks and dropped tokens. |
 | DL-C6 | S | fixed in 3.2.0 | pointer and command hygiene; the detail file lists them. |
-| DL-C7 | M | W9 (3.5.0): the two commands in PR #88 (`test_commands.TheDeliveryChains`), the supabase-security-reviewer in PR #89 (`test_agents`), the hook in PR #91, `hooks.emailBuild` and `emails` (`test_hooks.TheEmailBuild`); the evals in P30 | plugin features for these skills. |
+| DL-C7 | M | fixed in 3.5.0: the two commands in PR #88 (`test_commands.TheDeliveryChains`), the supabase-security-reviewer in PR #89 (`test_agents`), the hook in PR #91, `hooks.emailBuild` and `emails` (`test_hooks.TheEmailBuild`); the evals, `evals/delivery/` (a profile form from a Supabase schema, a receipt email), in PR #97 (`test_evals.TheOutcomeCases`) | plugin features for these skills. |
 | DL-C8 | S | fixed in 3.2.0 | slimmer SKILL.md, sharper descriptions. |
 | DL-C9 | M | W13 (3.6.0+) | Keep the email client matrix honest: regenerate its cells from caniemail's data, with test dates. |

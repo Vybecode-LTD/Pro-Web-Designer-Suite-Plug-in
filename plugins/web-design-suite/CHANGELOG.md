@@ -269,10 +269,48 @@
   - **In CI:** the repository's `evals.yml` runs the routing cases on a release tag or
     when started by hand, never on a pull request, with the CLI and both models pinned
     and a ceiling under the $15 a full run may cost.
-  - Outcome cases, scored against a no-plugin baseline, follow.
+- **Outcome cases, scored against a no-plugin baseline** (SS-C7, SB-C6, GT-C10, LC-C10,
+  PS-C7, DL-C7). Eleven cases in `evals/<area>/`, each tagged `outcome` and its area:
+  - **build:** XC-C1's pricing section, a Tailwind button with a loading state, a card
+    whose title link covers the card, and a vendor datepicker's stylesheet;
+  - **systems:** colour tokens from the brand colour #e8440a, in two themes;
+  - **gates:** a clean axe run is not a WCAG 2.2 AA claim;
+  - **lifecycle:** a DTCG export of a project's tokens, and a re-pointed role token is
+    not a patch release;
+  - **persuasion:** a countdown that restarts for every visitor is refused;
+  - **delivery:** a profile form from a Supabase schema, and a receipt email for Outlook
+    and dark mode.
+
+  Each case grades what the run wrote, in both arms, so Δ measures the plugin: no raw
+  colour or Tier-1 token in a component, the vendor CSS in `layer(vendor)`, a visible
+  focus outline, colour objects in the DTCG file, and a judge for the answers. Its
+  other graders check, with the plugin only, that its skill fired and that the gate it
+  ran passed. A case that needs a project copies one in with a scaffold script.
+  - **No shell.** The cases grant `Write`, `Edit` and the plugin's gate tools, and run
+    the design audit and the contrast check through the plugin's MCP server, which
+    runs outside the sandbox. So they run on native Windows, with no WSL2.
+  - **Run them** from the plugin folder with `claude plugin eval . --tag outcome
+    --scaffold --allow-real-servers --allow-tools Write Edit
+    "mcp__plugin_web-design-suite_gates__*"`. Every run is a real model call on your
+    account.
+  - **The first run** (one run each way, Claude Code 2.1.293, `claude-sonnet-5-5`): 11
+    of 11 passed for $2.21 at list price, with a mean Δ of 0.22. Without the plugin,
+    Claude said a re-pointed `--bg-accent` could ship as a patch, built the restarting
+    countdown, used `var(--space-4)` in a component and literal `ring-2` and
+    `duration-150` classes. With it, the audit caught a Tier-1 leak and Claude fixed it
+    before finishing.
+  - **In CI:** `evals.yml` runs the routing cases, then the outcome cases in both arms,
+    under one ceiling: the outcome set gets what routing left of the $15 a full run may
+    cost. A release tag runs both.
 
 ### Fixed
 
+- **The router and a release question** (P30). "Can we ship this as a patch release?"
+  about a change to tokens.css named web-design-studio, not design-system-versioning:
+  the versioning route heard only "semver", "breaking change" or "deprecate" in the
+  same sentence as tokens, and a file name's dot ends a sentence. It now hears "a
+  patch, minor or major release or version" when tokens or a design system are named
+  anywhere in the prompt.
 - **a11y_static's and perf_audit's baselines across platforms** (N38). Both keyed a
   finding by its path with the platform's separator, so a baseline recorded on Linux
   CI suppressed nothing on Windows, and the reverse: the CI template `/install-gate`

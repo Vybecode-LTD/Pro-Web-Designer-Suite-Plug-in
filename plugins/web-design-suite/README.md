@@ -290,6 +290,14 @@ claude plugin eval . --tag routing --ablation none --runs 1 --no-publish
 
 A routing case cannot pass without the plugin, so `--ablation none` skips the no-plugin arm and halves the cost. `--runs 1` is for iterating; the default is 3. The cases grant no shell, so they run on native Windows too, and the results go in `evals/results/`.
 
+The outcome cases, one folder per area (`build`, `systems`, `gates`, `lifecycle`, `persuasion`, `delivery`), give Claude a task and grade what it wrote, with the plugin and without it, so the difference (Δ) is what the plugin adds. They write files, run the design audit and the contrast check through the plugin's MCP server, and copy their starting project in with a scaffold script from this folder:
+
+```bash
+claude plugin eval . --tag outcome --runs 1 --scaffold --allow-real-servers --no-publish --allow-tools Write Edit "mcp__plugin_web-design-suite_gates__*"
+```
+
+They grant no shell either, since the MCP server runs outside the sandbox. A full run of both sets, three runs each, costs about $11 at list price.
+
 What changed in each release is in `CHANGELOG.md`.
 
 ---

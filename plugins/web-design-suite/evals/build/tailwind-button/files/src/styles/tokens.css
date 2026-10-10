@@ -1,0 +1,84 @@
+@layer tokens {
+  :root {
+    --neutral-0: oklch(100% 0 0);
+    --neutral-50: oklch(98.2% 0.003 250);
+    --neutral-100: oklch(96% 0.004 250);
+    --neutral-300: oklch(86.5% 0.006 250);
+    --neutral-500: oklch(55.6% 0.01 250);
+    --neutral-700: oklch(37.1% 0.012 250);
+    --neutral-900: oklch(20.5% 0.015 250);
+    --neutral-950: oklch(14.5% 0.015 250);
+    --blue-100: oklch(93.2% 0.032 255);
+    --blue-400: oklch(70.7% 0.165 255);
+    --blue-600: oklch(54.6% 0.215 263);
+    --blue-700: oklch(48.8% 0.217 264);
+
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-12: 3rem;
+
+    --gap-tight: var(--space-1);
+    --gap-related: var(--space-2);
+    --gap-grouped: var(--space-4);
+    --gap-separate: var(--space-8);
+    --gap-distinct: var(--space-12);
+    --pad-inline-sm: var(--space-3);
+    --pad-block-sm: var(--space-2);
+    --pad-card: var(--space-6);
+
+    --radius-sm: 0.25rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 1rem;
+    --radius-full: 9999px;
+
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.125rem;
+    --text-2xl: 1.5rem;
+    --text-4xl: 2.25rem;
+    --leading-tight: 1.2;
+    --leading-normal: 1.5;
+    --font-sans: system-ui, sans-serif;
+    --shadow-md: 0 4px 12px oklch(0% 0 0 / 0.12);
+    --motion-hover: 150ms;
+    --focus-width: 2px;
+    --focus-offset: 2px;
+    --stroke: 1px;
+  }
+
+  :root, [data-theme="light"] {
+    --bg-canvas: var(--neutral-50);
+    --bg-surface: var(--neutral-0);
+    --bg-raised: var(--neutral-0);
+    --bg-accent: var(--blue-600);
+    --bg-accent-hover: var(--blue-700);
+    --fg-default: var(--neutral-900);
+    --fg-strong: var(--neutral-950);
+    --fg-muted: var(--neutral-700);
+    --fg-accent: var(--blue-700);
+    --fg-on-accent: var(--neutral-0);
+    --border-default: var(--neutral-300);
+    --border-accent: var(--blue-600);
+    --border-focus: var(--blue-600);
+  }
+
+  [data-theme="dark"] {
+    --bg-canvas: var(--neutral-950);
+    --bg-surface: var(--neutral-900);
+    --bg-raised: var(--neutral-700);
+    --bg-accent: var(--blue-400);
+    --bg-accent-hover: var(--blue-100);
+    --fg-default: var(--neutral-100);
+    --fg-strong: var(--neutral-0);
+    --fg-muted: var(--neutral-300);
+    --fg-accent: var(--blue-400);
+    --fg-on-accent: var(--neutral-950);
+    --border-default: var(--neutral-700);
+    --border-accent: var(--blue-400);
+    --border-focus: var(--blue-400);
+  }
+}

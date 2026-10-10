@@ -1,8 +1,10 @@
-# The plugin's eval suite (P29): `claude plugin eval` on plugins/web-design-suite/evals/.
+# The plugin's eval suite (P29, P30): `claude plugin eval` on plugins/web-design-suite/evals/.
 # Every run is a real model call, billed to the ANTHROPIC_API_KEY secret, so the
 # job runs only when a maintainer starts it and on a release tag, never on a pull
 # request: the repository is public, and a fork's pull request must not spend
-# the key. The routing cases grant no shell, so the runner needs no OS sandbox.
+# the key. No case grants a shell: the routing cases list only Skill, and the
+# outcome cases write files and run the gates through the plugin's MCP server,
+# which runs outside the sandbox, so the runner needs no OS sandbox.
 # The CLI and both models are pinned, so a new release or a model rollout is not
 # read as a change in the plugin. The job holds the key, so its actions are pinned
 # to commits, and setup-node caches nothing.
@@ -12,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "The cases to run, by tag"
+        description: "The cases to run: routing, outcome, or all (routing, then outcome)"
         required: true
         default: routing
       runs:
@@ -52,15 +54,22 @@ jobs:
         run: npm install --global @anthropic-ai/claude-code@2.1.293
 
       # The inputs reach the shell through the environment, and are checked
-      # before any use. Each case asserts what must load and what must not, so
-      # one wrong run fails it: the threshold is 1.0 (Codex on #95). The ceiling
-      # is D5's $15 less one run, since a run that has started finishes past it
-      # (the evals page's command options).
+      # before any use. Each case asserts what must happen and what must not,
+      # so one wrong run fails it: the threshold is 1.0 (Codex on #95). Routing
+      # and outcome share one ceiling, D5's $15 less one run, since a run that
+      # has started finishes past it (the evals page's command options): the
+      # outcome set gets what routing left (the owner, 2026-10-10). A release
+      # tag runs both. A routing case cannot pass without the plugin, so it
+      # runs one arm. An outcome case runs both, since Δ is what it measures;
+      # its skill and gate graders, which no run without the plugin can pass,
+      # are indicators there. The outcome cases write files, start the
+      # plugin's real MCP server for the gates, and run their scaffold
+      # scripts, which are this repository's own (claude-code-capabilities.md §11).
       - name: Run the suite
         working-directory: plugins/web-design-suite
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          TAG: ${{ inputs.tag || 'routing' }}
+          TAG: ${{ inputs.tag || 'all' }}
           RUNS: ${{ inputs.runs || '3' }}
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then
@@ -68,36 +77,67 @@ jobs:
             exit 1
           fi
           case "$TAG" in
-            ''|*[!a-z0-9-]*|-*) echo "::error::The tag must be lowercase letters, digits and hyphens."; exit 1 ;;
+            routing|outcome|all) ;;
+            *) echo "::error::The tag must be routing, outcome or all."; exit 1 ;;
           esac
           case "$RUNS" in
             [1-9]|[1-4][0-9]|50) ;;
             *) echo "::error::Runs must be a whole number from 1 to 50."; exit 1 ;;
           esac
           claude --version
-          mkdir -p "$RUNNER_TEMP/evals"
-          claude plugin eval . --tag "$TAG" --runs "$RUNS" --ablation none --trust-plugin \
-            --json "$RUNNER_TEMP/evals/results.json" --output-dir "$RUNNER_TEMP/evals" \
-            --threshold 1.0 --model claude-sonnet-5-5 --judge-model claude-haiku-5-5 \
-            --no-publish --max-cost-usd 14
-
+          out="$RUNNER_TEMP/evals"
+          mkdir -p "$out"
+          ceiling=14
+          status=0
+          suite() {
+            claude plugin eval . --tag "$1" --ablation "$2" --runs "$RUNS" --trust-plugin \
+              --json "$out/$1.json" --output-dir "$out/$1" \
+              --threshold 1.0 --model claude-sonnet-5-5 --judge-model claude-haiku-5-5 \
+              --no-publish --max-cost-usd "$ceiling" "${@:3}" || status=1
+          }
+          if [ "$TAG" != outcome ]; then
+            suite routing none
+            ceiling=$(python3 - "$out/routing.json" "$ceiling" <<'EOF'
+          import json, sys
+          try:
+              spent = float(json.load(open(sys.argv[1], encoding="utf-8")).get("costUsd") or 0)
+          except (OSError, ValueError):
+              spent = float(sys.argv[2])          # no result: count the whole ceiling as spent
+          print(f"{max(float(sys.argv[2]) - spent, 0):.2f}")
+          EOF
+            )
+          fi
+          if [ "$TAG" != routing ]; then
+            if python3 -c 'import sys; sys.exit(float(sys.argv[1]) < 1)' "$ceiling"; then
+              suite outcome with-without --scaffold --allow-real-servers \
+                --allow-tools Write Edit "mcp__plugin_web-design-suite_gates__*"
+            else
+              echo "::error::Routing left \$$ceiling of the ceiling, too little for the outcome cases."
+              status=1
+            fi
+          fi
+          exit "$status"
       - name: Summarise
         if: always()
         run: |
-          [ -f "$RUNNER_TEMP/evals/results.json" ] || exit 0
-          python3 - "$RUNNER_TEMP/evals/results.json" >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          import json, sys
-          result = json.load(open(sys.argv[1], encoding="utf-8"))
-          totals = result.get("aggregates", {})
-          print(f"**{totals.get('casesPassed')} of {totals.get('casesTotal')} cases passed**, "
-                f"score {totals.get('overallScore')}, about ${result.get('costUsd')}, "
-                f"Claude Code {result.get('claudeVersion')}"
-                + (f", partial: {result.get('partialReason')}" if result.get("partial") else ""))
-          print()
-          print("| Case | Score |")
-          print("|---|---|")
-          for case in result.get("cases", []):
-              print(f"| {case.get('name')} | {case.get('aggregates', {}).get('score')} |")
+          python3 - "$RUNNER_TEMP/evals" >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          import json, pathlib, sys
+          for tag in ("routing", "outcome"):
+              path = pathlib.Path(sys.argv[1], f"{tag}.json")
+              if not path.is_file():
+                  continue
+              result = json.loads(path.read_text(encoding="utf-8"))
+              totals = result.get("aggregates", {})
+              print(f"**{tag}: {totals.get('casesPassed')} of {totals.get('casesTotal')} cases passed**, "
+                    f"score {totals.get('overallScore')}, about ${result.get('costUsd')}, "
+                    f"Claude Code {result.get('claudeVersion')}"
+                    + (f", partial: {result.get('partialReason')}" if result.get("partial") else ""))
+              print()
+              print("| Case | Score |")
+              print("|---|---|")
+              for case in result.get("cases", []):
+                  print(f"| {case.get('name')} | {case.get('aggregates', {}).get('score')} |")
+              print()
           EOF
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2

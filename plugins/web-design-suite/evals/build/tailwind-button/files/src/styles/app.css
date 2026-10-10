@@ -1,0 +1,36 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@theme inline {
+  --color-*: initial;
+  --color-canvas: var(--bg-canvas);
+  --color-surface: var(--bg-surface);
+  --color-accent: var(--bg-accent);
+  --color-accent-hover: var(--bg-accent-hover);
+  --color-default: var(--fg-default);
+  --color-muted: var(--fg-muted);
+  --color-on-accent: var(--fg-on-accent);
+  --color-line: var(--border-default);
+  --color-focus: var(--border-focus);
+
+  --spacing-tight: var(--gap-tight);
+  --spacing-related: var(--gap-related);
+  --spacing-inline-sm: var(--pad-inline-sm);
+  --spacing-block-sm: var(--pad-block-sm);
+
+  --radius-control: var(--radius-md);
+  --text-ui: var(--text-sm);
+}
+
+@utility motion-hover {
+  transition-duration: var(--motion-hover);
+}
+
+@utility focus-ring {
+  outline: var(--focus-width) solid var(--color-focus);
+  outline-offset: var(--focus-offset);
+}
+
+@utility border-stroke {
+  border-width: var(--stroke);
+}
