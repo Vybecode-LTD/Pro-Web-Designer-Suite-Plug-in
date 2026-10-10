@@ -304,6 +304,14 @@
 
 ### Fixed
 
+- **Email templates are the email lint's** (N39). `/gate` failed a project on the
+  plugin's own receipt template: `a11y_static.py` read it as a page, and reported no
+  `<main>` landmark and the email reset's `outline: none` on `img`. The a11y hook said
+  the same after each edit to a template. A folder's email templates, the files the
+  config's `emails` names, are now left to `lint_email.py`, which checks their alt text,
+  language and contrast, and `a11y_static.py` lists them as skipped; a template named on
+  its own is still read. The hook leaves a template to the email build when that
+  runs, and checks it as before when it does not, so no edit goes unchecked.
 - **The router and a release question** (P30). "Can we ship this as a patch release?"
   about a change to tokens.css named web-design-studio, not design-system-versioning:
   the versioning route heard only "semver", "breaking change" or "deprecate" in the

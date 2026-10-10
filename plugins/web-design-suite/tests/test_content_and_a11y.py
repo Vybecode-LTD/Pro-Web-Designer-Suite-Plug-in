@@ -49,7 +49,7 @@ import re
 import time
 import unittest
 
-from wds_support import TempDirTest, output, run_py
+from wds_support import SKILLS, TempDirTest, output, run_py
 
 
 class NullableFromTopLevelNotNull(TempDirTest):
@@ -763,6 +763,49 @@ class SchemaSecurityPass(TempDirTest):
         self.assertEqual(proc.returncode, 0, output(proc))
         self.assertIn("Row-level security is on for this table", states("Profiles"))
         self.assertIn("RLS was reported as off", states("Projects"))
+
+
+class A11yStaticLeavesEmails(TempDirTest):
+    """R3's live check: /gate failed a project on the plugin's own receipt
+    template (no <main>, an outline reset on img), rules for a page, not a
+    letter. A folder's email templates, by the config's `emails`, are left to
+    lint_email.py; one named on its own is still read."""
+
+    RECEIPT = SKILLS / "email-template-system" / "assets" / "templates" / "transactional-receipt.html"
+    PAGE = ('<!doctype html><html lang="en"><head><title>Home</title></head>'
+            "<body><main><h1>Home</h1></main></body></html>\n")
+
+    def setUp(self):
+        super().setUp()
+        self.write("emails/receipt.html", self.RECEIPT.read_text(encoding="utf-8"))
+        self.write("index.html", self.PAGE)
+
+    def run_static(self, *args):
+        return run_py("a11y-audit-runner", "a11y_static", *args, "--json", cwd=self.tmp)
+
+    def test_a_projects_folder_leaves_its_templates_to_the_email_lint(self):
+        self.write(".design-suite.json", json.dumps({"schema": 1}))
+        proc = self.run_static(".")
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual([], json.loads(proc.stdout)["findings"])
+        self.assertIn("1 file(s) that are email templates, which lint_email.py checks", output(proc))
+
+    def test_the_configs_emails_say_which(self):
+        self.write(".design-suite.json", json.dumps({"schema": 1, "emails": ["mail/**/*.html"]}))
+        proc = self.run_static(".")                              # emails/ is a page folder here
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("outline-none-no-replacement", {f["rule"] for f in json.loads(proc.stdout)["findings"]})
+
+    def test_a_template_named_on_its_own_is_read(self):
+        self.write(".design-suite.json", json.dumps({"schema": 1}))
+        proc = self.run_static("emails/receipt.html")
+        self.assertEqual(1, proc.returncode, output(proc))      # the control: the receipt has findings
+        self.assertTrue(json.loads(proc.stdout)["findings"])
+
+    def test_without_a_config_nothing_is_left_out(self):
+        proc = self.run_static(".")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertNotIn("email templates", output(proc))
 
 
 class A11yStaticScaleAndScope(TempDirTest):

@@ -142,6 +142,8 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 
 **N38 · a11y_static's and perf_audit's baseline keys carry the platform's separator (found in P27 part 2).** *Done for 3.5.0 (#93): `test_baseline_keys`.* Both keyed a finding by the path as given, so a key read `src\pages\home.html|…` on Windows and `src/pages/home.html|…` on Linux. `/install-gate`'s CI template records the baselines on Linux and runs the static gates on Windows too, where every baselined finding came back and `--strict` failed; a baseline recorded on Windows failed Linux CI the same way, and so did the a11y hook. audit_design fixed this for its own keys in 3.1.x (`portable_key`). Both scripts now write keys with `/` and no `./`, and read a baseline's keys through the same normalisation, so baselines recorded before keep matching.
 
+**N39 · a11y_static read email templates as pages (found in R3's live check).** *Done for 3.5.0 (#98): `test_content_and_a11y.A11yStaticLeavesEmails`, `test_hooks.TheA11yGate`.* `/gate` failed a project on the plugin's own receipt template: a11y_static reported no `<main>` landmark and an outline reset on `img`, rules for a page, not a letter, and the a11y hook said the same after each edit to a template. A folder's email templates (the config's `emails`) are now left to lint_email.py, which checks their alt text, language and contrast; a template named on its own is still read, and the hook leaves templates to the email build when that runs (Codex on #98: with it off, a template would have gone unchecked).
+
 **N3 · The references' CSS against the stylelint config.** *Done for 3.3.0.* 56 of the 170 CSS snippet files failed it at 3.2.1. The failures by rule:
 - 27 `selector-max-type`;
 - 20 value allowlist;
