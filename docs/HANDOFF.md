@@ -20,8 +20,8 @@
 
 ## Next steps
 
-1. **P30: the outcome evals**, against a no-plugin baseline (SS-C7, SB-C6, GT-C10, LC-C10, PS-C7, DL-C7). Estimate one case first: these grant tools, run two arms and may use judges.
-2. Then R3 (3.5.0), after a live check of the new components.
+1. **P30: the outcome evals**, against a no-plugin baseline (SS-C7, SB-C6, GT-C10, LC-C10, PS-C7, DL-C7). Ask the owner before any run, the one-case estimate included: these grant tools, run two arms and may use judges.
+2. Then R3 (3.5.0): a live check of the new components, then a release PR (`plugin.json` to 3.5.0, since `release.yml` refuses a tag that differs). Dispatch `evals.yml` on its merge commit and wait for it to pass before the tag, since on a tag it runs beside `release.yml` and gates nothing.
 
 ## Warnings
 

@@ -235,9 +235,9 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 **First, the re-reads** in §1 step 3: the sandboxing page and the evals page's fixtures and mocks, into §11.
 
-**Ask the owner before any run.** The CLI is signed in (claude.ai, Max), and the repository has the `ANTHROPIC_API_KEY` secret. Two questions remain:
+**Ask the owner before any run, the one-case estimate included** (Codex on #96): every run is real model usage. The CLI is signed in (claude.ai, Max), and the repository has the `ANTHROPIC_API_KEY` secret. Two questions remain:
 - **Where the script-graded cases run.** Granting Bash needs an OS sandbox. Native Windows has none, so it needs WSL2; Linux needs bubblewrap and socat. Ask whether WSL2 is installed here. If not, those cases run only in CI (`ubuntu-latest` with `apt-get install bubblewrap socat`).
-- **The budget.** D5 is $15 per full run, and routing already takes about $5.60. Outcome cases run two arms for Δ, grant tools and take more turns. Estimate one case first (`--case NAME --runs 1`), then ask whether the outcome suite gets its own $15 or shares one with routing.
+- **The budget.** D5 is $15 per full run, and routing already takes about $5.60. Outcome cases run two arms for Δ, grant tools and take more turns. With the owner's OK, estimate one case first (`--case NAME --runs 1`, likely under $1). Then, with its cost in hand, ask whether the outcome suite gets its own $15 or shares one with routing.
 
 **The design.** Check each point against the pages and a one-case run before building on it.
 - **The layout:** a folder per area under `evals/` (`systems/`, `build/`, `gates/`, `lifecycle/`, `persuasion/`, `delivery/`). Each case is tagged `outcome` and its area, so the job's default `routing` set stays cheap.
@@ -275,7 +275,11 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
   - each of the fifteen commands;
   - each of the six agents;
   - one call to each MCP tool.
-- **The CI templates on GitHub.** Install `/install-gate`'s template in a scratch repository and push. `evals.yml` runs on the `v3.5.0` tag by itself.
+- **The CI templates on GitHub.** Install `/install-gate`'s template in a scratch repository and push.
+- **A release PR**, as R2 was (#74):
+  - set `plugin.json`'s `version` to `3.5.0`, since `release.yml` refuses a tag that differs from it;
+  - date the CHANGELOG's `## 3.5.0` heading, whose section `release.yml` reads for the notes.
+- **The evals before the tag** (Codex on #96). On a tag, `evals.yml` runs beside `release.yml` and holds nothing back, so a failure would show only after 3.5.0 is public. Dispatch it on the release PR's merge commit, with the owner's OK since it bills the key. Wait for 23 of 23, and the outcome set if P30 puts it in CI, before tagging.
 - **Then the release**, as §2 says: `tooling/release/build.py`, the annotated tag, and `release.yml` creating it.
 - Update the installed plugin from the release zip (§2).
 
