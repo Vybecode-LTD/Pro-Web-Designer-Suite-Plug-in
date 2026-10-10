@@ -235,6 +235,36 @@ class TheGates(ServerTest):
         self.assertEqual(len(payload["report"]["ledger"]["assets"]), cuts["ledger.assets"]["shown"])
         self.assertIn("findings", payload["report"])
 
+    def test_a_timeout_is_said_as_one(self):
+        """CodeRabbit on #92: a script stopped at the time limit read as
+        `stopped (exit null)`."""
+        self.write("tokens.css", STARTER.read_text(encoding="utf-8"))
+        reply = self.call("check_roles", {"tokens": "tokens.css"}, WDS_MCP_TIMEOUT_MS="1")
+        self.assertTrue(reply["result"]["isError"])
+        text = reply["result"]["content"][0]["text"]
+        self.assertIn("check_roles took longer than 0.001 seconds and was stopped", text)
+        self.assertIn("WDS_MCP_TIMEOUT_MS", text)
+
+    def test_a_report_with_nothing_left_to_cut_gives_way(self):
+        """CodeRabbit on #92: a report past the limit with every list cut, one
+        long text, was returned whole."""
+        script = (f"import {{ fit }} from {json.dumps(SERVER.as_uri())};\n"
+                  "const long = 'x'.repeat(100000);\n"
+                  "const cases = [{ note: long }, { findings: [1, 2, 3], note: long }];\n"
+                  "console.log(JSON.stringify(cases.map((report) => fit({ tool: 'check_roles', exit: 0, "
+                  "verdict: 'pass', report }))));\n")
+        proc = subprocess.run([NODE, "--input-type=module", "-e", script], env=env(), capture_output=True,
+                              timeout=60)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual(b"", proc.stderr)
+        for payload in json.loads(proc.stdout):
+            with self.subTest(keys=sorted(payload)):
+                self.assertIsNone(payload["report"])
+                self.assertIn("with every list cut", payload["truncated"]["omitted"])
+                self.assertIn("run check_roles.py", payload["truncated"]["rest"])
+                self.assertEqual(("check_roles", "pass"), (payload["tool"], payload["verdict"]))
+                self.assertLessEqual(len(json.dumps(payload)), 60000)
+
     def test_a_script_that_stops_or_no_python_is_said(self):
         reply = self.call("check_roles", {"tokens": "missing.css"})
         self.assertTrue(reply["result"]["isError"])

@@ -34,7 +34,9 @@ const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];   // the newest fi
 // Characters of JSON a result may hold, about 15,000 tokens: Claude Code warns
 // past 10,000 tokens of tool output and stops at 25,000 (MAX_MCP_OUTPUT_TOKENS).
 const LIMIT = 60000;
-const TIMEOUT = 600000;       // a whole site's audit, not a hung script
+// Ten minutes: a whole site's audit, not a hung script. WDS_MCP_TIMEOUT_MS
+// changes it, for a slow machine or a test.
+const timeout = () => Number(process.env.WDS_MCP_TIMEOUT_MS) || 600000;
 
 const paths = (what) => ({ type: 'array', items: { type: 'string' }, description: what });
 const flag = (what) => ({ type: 'boolean', description: what });
@@ -118,13 +120,15 @@ function run(exe, args, cwd) {
     const child = spawn(exe[0], [...exe.slice(1), ...args], { cwd, windowsHide: true });
     const out = [];
     const err = [];
-    const timer = setTimeout(() => child.kill(), TIMEOUT);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill(); }, timeout());
     child.stdout.on('data', (d) => out.push(d));
     child.stderr.on('data', (d) => err.push(d));
     child.on('error', (e) => { clearTimeout(timer); resolve({ error: e.message }); });
     child.on('close', (status) => {
       clearTimeout(timer);
-      resolve({ status, stdout: Buffer.concat(out).toString('utf8'), stderr: Buffer.concat(err).toString('utf8') });
+      resolve({ status, timedOut, stdout: Buffer.concat(out).toString('utf8'),
+                stderr: Buffer.concat(err).toString('utf8') });
     });
   });
 }
@@ -143,8 +147,10 @@ const withList = (value, at, list) => (at.length ? { ...value, [at[0]]: withList
 const size = (value) => JSON.stringify(value).length;
 
 // A payload whose JSON fits LIMIT. The longest list keeps the head that fits,
-// and while the payload is still too long, so does the next longest.
-function fit(payload) {
+// and while the payload is still too long, so does the next longest. A report
+// still too long with every list cut, one long text, gives way to a note
+// (CodeRabbit on #92).
+export function fit(payload) {
   if (size(payload) <= LIMIT) return payload;
   const truncated = { lists: [], rest: `run ${path.basename(TOOLS[payload.tool].script)} for the whole report` };
   let out = { ...payload, truncated };
@@ -169,6 +175,10 @@ function fit(payload) {
   }
   for (const entry of truncated.lists) delete entry.at;
   truncated.lists = truncated.lists.filter((t) => t.shown < t.total);
+  if (size(out) > LIMIT) {
+    return { ...payload, report: null,
+             truncated: { omitted: `the report is past ${LIMIT} characters with every list cut`, rest: truncated.rest } };
+  }
   return out;
 }
 
@@ -179,6 +189,10 @@ async function call(name, args) {
   if (!exe) return text(`${name}: the gates need Python 3 (WDS_PYTHON, python3, python or py -3), and none was found.`, true);
   const proc = await run([...exe, '-B', path.join(PLUGIN, tool.script)], tool.args(args), project());
   if (proc.error) return text(`${name} could not run: ${proc.error}`, true);
+  if (proc.timedOut) {
+    return text(`${name} took longer than ${timeout() / 1000} seconds and was stopped; run ` +
+                `${path.basename(tool.script)} itself, or set WDS_MCP_TIMEOUT_MS for a longer limit.`, true);
+  }
   let report;
   try {
     report = JSON.parse(proc.stdout);
@@ -274,5 +288,17 @@ async function handle(line) {
   }
 }
 
-const lines = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
-lines.on('line', (line) => { handle(line); });
+// The server starts when this file is run, by whatever path, link or letter
+// case names it; a test that imports fit() starts nothing.
+function isMain() {
+  try {
+    return fs.realpathSync.native(process.argv[1]) === fs.realpathSync.native(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isMain()) {
+  const lines = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+  lines.on('line', (line) => { handle(line); });
+}
