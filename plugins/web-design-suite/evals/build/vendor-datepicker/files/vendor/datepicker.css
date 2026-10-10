@@ -1,0 +1,5 @@
+.dp { font: 14px/1.4 sans-serif; color: #222; background: #fff; border: 1px solid #ccc; }
+.dp-header { display: flex; justify-content: space-between; padding: 8px; }
+.dp-day { padding: 6px; border-radius: 4px; cursor: pointer; }
+.dp-day:hover { background: #eee; }
+.dp-day.is-selected { background: #0a66c2; color: #fff; }

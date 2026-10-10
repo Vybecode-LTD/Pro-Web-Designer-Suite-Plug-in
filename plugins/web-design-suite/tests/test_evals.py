@@ -22,6 +22,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 
 from wds_support import NODE, PLUGIN, REPO, SKILLS, TempDirTest, env, output, tool_modules
@@ -110,18 +111,24 @@ class TheCaseFiles(unittest.TestCase):
     load; its prompt reads as a user would type it."""
 
     def test_the_suite_has_cases(self):
-        self.assertEqual(23, len(Suite.cases()))           # 13 routing cases, 10 boundary cases
+        tags = [fields["tags"][0] for fields, _, _ in Suite.cases().values()]
+        self.assertEqual(23, tags.count("routing"))        # 13 routing cases, 10 boundary cases
+        self.assertEqual(11, tags.count("outcome"))        # P30: six areas
+        self.assertEqual(len(tags), tags.count("routing") + tags.count("outcome"))
 
     def test_each_prompt_has_the_documented_fields(self):
         for case, (fields, body, graders) in Suite.cases().items():
             with self.subTest(case=case):
                 self.assertLessEqual(set(fields), PROMPT_FIELDS)
                 self.assertTrue(1 <= fields.get("max_turns", 10) <= 200)
+                self.assertTrue(1 <= fields.get("timeout_seconds", 300) <= 3600)
                 self.assertLessEqual(set(fields["allowed_tools"]), READ_ONLY)
-                # The listing decides the route before any other tool, and Skill
-                # alone ran at $0.09 a run against $0.21 with Read, Glob and Grep.
-                self.assertEqual(["Skill"], fields["allowed_tools"])
-                self.assertIn("routing", fields["tags"])
+                if fields["tags"][0] == "routing":
+                    # The listing decides the route before any other tool, and Skill
+                    # alone ran at $0.09 a run against $0.21 with Read, Glob and Grep.
+                    self.assertEqual(["Skill"], fields["allowed_tools"])
+                else:                                      # Write, Edit and the gates come from --allow-tools
+                    self.assertEqual(["Read", "Glob", "Grep", "Skill"], fields["allowed_tools"])
                 self.assertTrue(body)
                 self.assertNotIn("web-design-suite", body)
                 for name in SKILL_NAMES:                   # phrased as a user would, never naming the skill
@@ -150,6 +157,12 @@ class TheCaseFiles(unittest.TestCase):
 class TheRoutingCases(unittest.TestCase):
     """XC-C1: every skill has a case that should load it. XC-B2: every pair of
     siblings has a case each way that loads one and never the other."""
+
+    def test_the_routing_cases_carry_their_tag(self):
+        for case, (fields, _, _) in Suite.cases().items():
+            if case.startswith(("routing/", "boundaries/")):
+                with self.subTest(case=case):
+                    self.assertEqual("routing", fields["tags"][0])
 
     def test_every_skill_has_a_routing_case(self):
         routed = {}
@@ -226,10 +239,240 @@ class TheRouterAgrees(TempDirTest):
 
 BASH = shutil.which("bash")
 BASH = None if BASH and "system32" in BASH.lower() else BASH   # WSL's launcher is not a bash
+
+# P30: the outcome cases, a folder per area, each tagged [outcome, <area>].
+AREAS = ("build", "systems", "gates", "lifecycle", "persuasion", "delivery")
+TEST_FLAGGED = ("const checks = JSON.parse(require('fs').readFileSync(0, 'utf8'));"
+                "process.stdout.write(JSON.stringify(checks.map(([p, f, inputs]) =>"
+                " inputs.map((i) => new RegExp(p, f).test(i)))));")
+
+
+def mcp_result(tool, code, verdict):
+    """A gate's reply as the trace holds it: the MCP server's JSON, as the text
+    of a tool result, inside the trace's own JSON (seen in the first run, §11)."""
+    reply = json.dumps({"tool": tool, "exit": code, "verdict": verdict, "report": []}, separators=(",", ":"))
+    return json.dumps({"type": "tool_result", "content": [{"type": "text", "text": reply}]}, separators=(",", ":"))
+
+
+def tool_input(path, **more):
+    return json.dumps({"file_path": path, **more})
+
+
+# What each grader's pattern must match and must not, by grader name. A
+# not_contains grader fails on a match, so its first list is the faults.
+SAMPLES = {
+    "no-raw-colour": (["color: #333;", "border-color: #A0b1C2ff;", "background: rgb(0 0 0 / .5);",
+                       "fill: oklch(60% 0.1 250);", "color: HSL(10 50% 50%)"],
+                      ["color: var(--fg-default);", "background: color-mix(in oklch, var(--bg-accent), transparent);",
+                       "grid-template-columns: repeat(3, 1fr);"]),
+    "no-raw-spacing": (["  padding: 24px;", ".x{margin-top:1.5rem}", "gap: 0 1em;", "row-gap: 2px;"],
+                       ["padding: var(--pad-card);", "margin: 0 auto;", "@media (min-width: 48rem) {",
+                        "max-width: 60ch;", "border-radius: 8px;", "scroll-padding: 4px;"]),
+    "no-tier1": (["gap: var(--space-4);", "color: var( --neutral-700 );", "background: var(--blue-600);"],
+                 ["gap: var(--gap-related);", "padding: var(--pad-card);", "color: var(--fg-default);"]),
+    "layered": (["@layer components {\n  .card {}", "@layer components.pricing{"],
+                ["@layer reset, base;", ".card { color: var(--fg-default); }"]),
+    "audit-clean": ([mcp_result("audit_design", 0, "pass")],
+                    [mcp_result("audit_design", 1, "fail"), "a verdict: pass (0), fail (1)"]),
+    "contrast-pass": ([mcp_result("check_roles", 0, "pass")],
+                      [mcp_result("check_roles", 1, "fail"), mcp_result("audit_design", 0, "pass")]),
+    "one-link": (['<a href="/posts/1">'], ["<article>", "<abbr>"]),
+    "link-in-heading": (['<h2 class="card__title"><a href="/p">', '<h3>\n  <a href="#">'],
+                        ['<a href="/p"><h2>', "<h2>Title</h2>\n<a href=\"/p\">"]),
+    "stretched": ([".card__link::after { content: \"\"; position: absolute; inset: 0; }",
+                   ".x:after{position:absolute;top:0;left:0;right:0;bottom:0}"],
+                  [".card__link::after { content: \"\"; }\n.card { inset: 0; }"]),
+    "vendor-layer": (['@import url("../vendor/datepicker.css") layer(vendor);',
+                      "@import '../vendor/datepicker.css' layer(vendor);",
+                      "@import url(../vendor/datepicker.css) layer( vendor );"],
+                     ['@import url("../vendor/datepicker.css");',
+                      '@import url("../vendor/datepicker.css") layer(components);']),
+    "order-first": (["@layer reset, vendor, tokens, base, layout, components, utilities, overrides;\n\n"
+                     '@import url("tokens.css");\n@import url("../vendor/datepicker.css") layer(vendor);'],
+                    ['@import url("../vendor/datepicker.css") layer(vendor);\n'
+                     "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;",
+                     "@layer reset, tokens, base, layout, components, utilities, overrides, vendor;\n"
+                     '@import url("../vendor/datepicker.css") layer(vendor);']),
+    "vendor-not-edited": ([tool_input(str(pathlib.PureWindowsPath("/ws/vendor/datepicker.css")), old_string=".dp {"),
+                           tool_input("/ws/vendor/datepicker.css", old_string=".dp {")],
+                          [tool_input(str(pathlib.PureWindowsPath("/ws/styles/index.css")),
+                                      new_string='@import url("../vendor/datepicker.css") layer(vendor);')]),
+    "focus-visible": (['className="focus-visible:focus-ring"'], ['className="focus:ring"']),
+    "keeps-outline": (["focus:outline-none", "outline-none focus-visible:ring"], ["outline-hidden"]),
+    "announces-busy": (["aria-busy={loading}"], ["aria-disabled={disabled}"]),
+    "no-arbitrary": (["bg-[#2563eb]", "p-[13px]", "hover:bg-[var(--x)]"],
+                     ["bg-accent px-inline-sm", "aria-[busy=true]:cursor-wait", "data-[state=open]:block",
+                      "const first = items[0];"]),
+    "no-space-xy": (["space-x-2", "md:space-y-4"], ["gap-related", "aria-busy"]),
+    "no-literal-values": (["duration-150", "focus-visible:ring-2", "border-2", "z-50", "outline-offset-2"],
+                          ["motion-hover", "focus-visible:focus-ring", "border-stroke", "rounded-control",
+                           "text-ui"]),
+    "brand-kept": (["--orange-600: #E8440A;", "--orange-600: oklch(62.06% 0.2084 36.04);",
+                    "--brand: oklch(0.6206 0.2084 36.04);"],
+                   ["--orange-600: #e8440b;", "--orange-600: oklch(62% 0.15 36);"]),
+    "dark-theme": (['[data-theme="dark"] {', "@media (prefers-color-scheme: dark) {", "[data-theme=dark]"],
+                   ["[data-theme=\"light\"] {", "@media (prefers-reduced-motion: reduce)"]),
+    "roles-alias": (["--bg-surface: var(--neutral-0);", "--fg-default:var(--orange-900)"],
+                    ["--bg-surface: #fff;", "--orange-500: oklch(70% 0.18 36);"]),
+    "typed": (['"$type": "color"'], ['"$type": "dimension"']),
+    "colour-objects": (['"$value": {"colorSpace": "oklch", "components": [0.62, 0.21, 36]}'],
+                       ['"$value": "oklch(62% 0.21 36)"']),
+    "aliases": (['"$value": "{color.blue.600}"'], ['"$value": "#2563eb"']),
+    "no-python-repr": (["{'colorSpace': 'oklch'}"], ['{"colorSpace": "oklch"}']),
+    "outlook": (["<!--[if mso]>", "<!--[if gte mso 9]>"], ["<!-- note -->", "<!--[if !mso]><!-->"]),
+    "dark-mode": (["@media (prefers-color-scheme: dark) {", '<meta name="color-scheme" content="light dark">'],
+                  ["@media (max-width: 600px) {"]),
+    "presentation-tables": (['<table role="presentation" width="100%">'], ["<table width=\"100%\">"]),
+}
+SAMPLES["vendor-not-rewritten"] = SAMPLES["vendor-not-edited"]
+
+
+def outcome_cases() -> dict:
+    return {case: entry for case, entry in Suite.cases().items() if entry[0]["tags"][0] == "outcome"}
+
+
+def graded_files(grader) -> list:
+    """The workspace files a grader reads through {source: file, path: …}."""
+    return [where["path"] for where in (grader.get("target"), grader.get("focus"))
+            if isinstance(where, dict) and where.get("source") == "file"]
+
+
+@needs_yaml
+class TheOutcomeCases(unittest.TestCase):
+    """P30 (SS-C7, SB-C6, GT-C10, LC-C10, PS-C7, DL-C7): each case grades its
+    result in both arms, so Δ measures the plugin, and its steps in the
+    with-plugin arm alone; every pattern is run on what it must and must not
+    match; every scaffold runs."""
+
+    def test_every_area_has_cases_tagged_with_it(self):
+        cases = outcome_cases()
+        self.assertEqual(set(AREAS), {case.split("/")[0] for case in cases})
+        for case, (fields, _, _) in cases.items():
+            with self.subTest(case=case):
+                self.assertEqual(["outcome", case.split("/")[0]], fields["tags"])
+                self.assertEqual(2, case.count("/") + 1)
+
+    def test_each_case_grades_the_result_and_the_steps(self):
+        for case, (_, _, graders) in outcome_cases().items():
+            with self.subTest(case=case):
+                result = [n for n, g in graders.items() if g.get("arm") == "both"]
+                steps = [n for n, g in graders.items() if g.get("arm") == "with-only"]
+                self.assertTrue(result)                    # scored in both arms: Δ measures the plugin
+                self.assertEqual(set(graders), set(result) | set(steps))   # every grader says which
+                # The skill a case is about fired, in the with-plugin arm alone:
+                # it can never pass without the plugin.
+                fired = skill_graders(graders)
+                self.assertEqual(1, len(fired))
+                self.assertIn(list(fired)[0], SKILL_NAMES)
+                self.assertEqual("with-only", list(fired.values())[0]["arm"])
+
+    def test_each_file_a_grader_reads_is_one_the_prompt_names(self):
+        for case, (_, body, graders) in outcome_cases().items():
+            for name, grader in graders.items():
+                for path in graded_files(grader):
+                    with self.subTest(case=case, grader=name):
+                        self.assertIn(f"`{path}`", body)
+
+    def test_each_judge_has_a_pass_and_a_fail(self):
+        judges = [(case, name) for case, (_, _, graders) in outcome_cases().items()
+                  for name, grader in graders.items() if grader["type"] == "llm"]
+        self.assertTrue(judges)
+        for case, name in judges:
+            with self.subTest(case=case, grader=name):
+                rubric = split_front(EVALS / case / "graders" / f"{name}.md")[1]
+                self.assertRegex(rubric, r"(?m)^PASS if ")
+                self.assertRegex(rubric, r"(?m)^FAIL if ")
+
+    def test_each_pattern_matches_its_samples(self):
+        """The graders are JavaScript regexes, so node runs them, with their
+        flags, on what each must match and must not."""
+        checks, names = [], []
+        for case, (_, _, graders) in outcome_cases().items():
+            for name, grader in graders.items():
+                pattern = grader.get("pattern", grader.get("input_match"))
+                if pattern is None or (grader["type"] == "tool_used" and grader["tool"] == "Skill"):
+                    continue
+                self.assertIn(name, SAMPLES, f"{case}: {name} has no samples")
+                hits, misses = SAMPLES[name]
+                checks.append([pattern, grader.get("flags", ""), hits + misses])
+                names.append((case, name, len(hits)))
+        self.assertTrue(checks)
+        for (case, name, hits), verdicts in zip(names, node(TEST_FLAGGED, checks)):
+            with self.subTest(case=case, grader=name):
+                self.assertEqual([True] * hits + [False] * (len(verdicts) - hits), verdicts)
+
+    def test_the_case_yaml_names_only_the_scaffold(self):
+        for case in outcome_cases():
+            folder = EVALS / case
+            with self.subTest(case=case):
+                has_files = (folder / "files").is_dir()
+                self.assertEqual(has_files, (folder / "case.yaml").is_file())
+                if not has_files:
+                    continue
+                [fields] = node(LOAD_ALL, [(folder / "case.yaml").read_text(encoding="utf-8")], YAML_MODULES)
+                self.assertEqual({"schema_version": "1.1", "name": folder.name,
+                                  "context": {"scaffold_script": "scaffold.sh"}}, fields)
+
+    @unittest.skipUnless(BASH, "needs bash")
+    def test_each_scaffold_copies_its_project(self):
+        """A scaffold runs only with --scaffold, in the empty workspace, as the
+        user; each here copies its case's files/ there, as the first run showed
+        it does on Windows (§11)."""
+        scaffolds = sorted(EVALS.glob("*/*/scaffold.sh"))
+        self.assertTrue(scaffolds)
+        for script in scaffolds:
+            with self.subTest(case=script.parent.relative_to(EVALS).as_posix()):
+                syntax = subprocess.run([BASH, "-n", script.as_posix()], env=env(), capture_output=True, timeout=60)
+                self.assertEqual(0, syntax.returncode, output(syntax))
+                with tempfile.TemporaryDirectory() as workspace:
+                    proc = subprocess.run([BASH, script.as_posix()], cwd=workspace, env=env(),
+                                          capture_output=True, timeout=120)
+                    self.assertEqual(0, proc.returncode, output(proc))
+                    fixture = script.parent / "files"
+                    expected = sorted(p.relative_to(fixture).as_posix() for p in fixture.rglob("*") if p.is_file())
+                    copied = sorted(p.relative_to(workspace).as_posix()
+                                    for p in pathlib.Path(workspace).rglob("*") if p.is_file())
+                    self.assertTrue(expected)
+                    self.assertEqual(expected, copied)
+                    for name in expected:
+                        self.assertEqual((fixture / name).read_bytes(), (pathlib.Path(workspace) / name).read_bytes())
+
+    def test_each_project_starts_clean(self):
+        """A failing gate in a run is the run's own: every fixture's stylesheets
+        pass the audit, under the fixture's own .design-suite.json."""
+        projects = sorted(p.parent for p in EVALS.glob("*/*/files/.design-suite.json"))
+        self.assertTrue(projects)
+        audit = SKILLS / "web-design-studio" / "scripts" / "audit_design.py"
+        for project in projects:
+            styles = [p for p in ("styles", "src") if (project / p).is_dir()]
+            if not styles:
+                continue
+            with self.subTest(case=project.parent.relative_to(EVALS).as_posix()):
+                proc = subprocess.run([sys.executable, "-B", str(audit), "--strict", *styles], cwd=project,
+                                      env=env(), capture_output=True, timeout=120)
+                self.assertEqual(0, proc.returncode, output(proc))
+
+    def test_the_gate_graders_name_the_plugins_server(self):
+        """The verdict graders read the MCP server's replies, and the CI job
+        grants its tools by the server's name."""
+        servers = json.loads((PLUGIN / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]
+        self.assertIn("gates", servers)
 WORKFLOW = REPO / ".github" / "workflows" / "evals.yml" if REPO else None
 # Stand-ins the step's script calls by name: shell functions, so no PATH entry
-# (a drive letter's colon splits PATH in Git Bash).
-STAND_INS = ('claude() {{ [ "$1" = --version ] && return; printf "%s\\n" "$@" > "$RUNNER_TEMP/claude-args"; }}\n'
+# (a drive letter's colon splits PATH in Git Bash). The stand-in claude records
+# each call's arguments in claude-args-<n> and writes a result whose cost is
+# STAND_IN_COST to its --json path, unless STAND_IN_COST is "none".
+STAND_INS = ('claude() {{\n'
+             '  [ "$1" = --version ] && return\n'
+             '  calls=$((calls + 1)); printf "%s\\n" "$@" > "$RUNNER_TEMP/claude-args-$calls"\n'
+             '  local prev=""\n'
+             '  for a in "$@"; do\n'
+             '    if [ "$prev" = --json ] && [ "${{STAND_IN_COST:-4.5}}" != none ]; then\n'
+             '      printf \'{{"costUsd": %s}}\' "${{STAND_IN_COST:-4.5}}" > "$a"\n'
+             '    fi\n'
+             '    prev=$a\n'
+             '  done\n'
+             '}}\n'
              'python3() {{ "{python}" "$@"; }}\n')
 
 
@@ -278,50 +521,116 @@ class TheWorkflow(TempDirTest):
         self.assertIsNotNone(pin)
         self.assertGreaterEqual(tuple(map(int, pin.groups())), (2, 1, 283))   # git 2.31 is checked from 2.1.283
 
-    def test_the_suite_runs_with_its_pins_and_ceiling(self):
-        proc = self.run_step("Run the suite", PLUGIN, ANTHROPIC_API_KEY="k", TAG="routing", RUNS="3")
-        self.assertEqual(0, proc.returncode, output(proc))
-        args = (self.tmp / "claude-args").read_text(encoding="utf-8").split("\n")[:-1]
+    def calls(self):
+        """Each call the stand-in claude recorded: (its arguments, {option: the value after it})."""
+        found = []
+        for n in range(1, 10):
+            path = self.tmp / f"claude-args-{n}"
+            if not path.exists():
+                break
+            args = path.read_text(encoding="utf-8").split("\n")[:-1]
+            found.append((args, {a: args[i + 1] for i, a in enumerate(args[:-1]) if a.startswith("--")}))
+        return found
+
+    def clear_calls(self):
+        for stale in self.tmp.glob("claude-args-*"):
+            stale.unlink()
+
+    def assert_pinned(self, args, value, tag, ablation):
         self.assertEqual(["plugin", "eval", "."], args[:3])     # the target before --tag and --json
-        flags = {a for a in args if a.startswith("--")}
         self.assertLessEqual({"--trust-plugin", "--no-publish", "--json", "--model", "--judge-model",
-                              "--max-cost-usd", "--ablation", "--tag", "--runs"}, flags)
-        value = {a: args[i + 1] for i, a in enumerate(args[:-1]) if a.startswith("--")}
-        self.assertEqual(("routing", "3", "none"), (value["--tag"], value["--runs"], value["--ablation"]))
+                              "--max-cost-usd", "--ablation", "--tag", "--runs"}, set(args))
+        self.assertEqual((tag, "3", ablation), (value["--tag"], value["--runs"], value["--ablation"]))
         # A case's score is the mean of its runs, so below 1.0 a boundary case
         # passes with its forbidden skill loaded in one run of three (Codex on #95).
         self.assertEqual(1.0, float(value["--threshold"]))
-        self.assertTrue(value["--json"].endswith(".json"))
+        self.assertTrue(value["--json"].endswith(f"{tag}.json"))
         self.assertRegex(value["--model"], r"^claude-[a-z]+-\d")   # an ID, not an alias
         self.assertRegex(value["--judge-model"], r"^claude-[a-z]+-\d")
-        self.assertLessEqual(float(value["--max-cost-usd"]), 14)
+
+    def test_the_routing_set_grants_nothing(self):
+        proc = self.run_step("Run the suite", PLUGIN, ANTHROPIC_API_KEY="k", TAG="routing", RUNS="3")
+        self.assertEqual(0, proc.returncode, output(proc))
+        [(args, value)] = self.calls()
+        self.assert_pinned(args, value, "routing", "none")   # it cannot pass without the plugin
+        self.assertEqual(14, float(value["--max-cost-usd"]))
+        self.assertFalse({"--allow-tools", "--scaffold", "--allow-real-servers", "--mocks"} & set(args))
+
+    def test_the_outcome_set_grants_writes_and_the_gates_alone(self):
+        """No shell: Bash needs an OS sandbox the runner does not have, and
+        the gates run through the plugin's MCP server (§11)."""
+        proc = self.run_step("Run the suite", PLUGIN, ANTHROPIC_API_KEY="k", TAG="outcome", RUNS="3")
+        self.assertEqual(0, proc.returncode, output(proc))
+        [(args, value)] = self.calls()
+        self.assert_pinned(args, value, "outcome", "with-without")   # Δ is what it measures
+        self.assertEqual(14, float(value["--max-cost-usd"]))
+        self.assertLessEqual({"--scaffold", "--allow-real-servers"}, set(args))
+        self.assertEqual(["Write", "Edit", "mcp__plugin_web-design-suite_gates__*"],
+                         args[args.index("--allow-tools") + 1:])   # the last option: it takes the rest
+
+    def test_a_release_runs_both_under_one_ceiling(self):
+        """On a tag, routing runs first and the outcome set gets what it left:
+        one $15 for both (the owner, 2026-10-10)."""
+        self.assertEqual("${{ inputs.tag || 'all' }}", self.steps["Run the suite"]["env"]["TAG"])
+        proc = self.run_step("Run the suite", PLUGIN, ANTHROPIC_API_KEY="k", TAG="all", RUNS="3",
+                             STAND_IN_COST="4.25")
+        self.assertEqual(0, proc.returncode, output(proc))
+        (routing, first), (outcome, second) = self.calls()
+        self.assert_pinned(routing, first, "routing", "none")
+        self.assert_pinned(outcome, second, "outcome", "with-without")
+        self.assertEqual((14, 9.75), (float(first["--max-cost-usd"]), float(second["--max-cost-usd"])))
+
+    def test_the_outcome_set_waits_for_what_routing_spent(self):
+        for cost, message in (("none", "Routing left $0.00"), ("13.5", "Routing left $0.50")):
+            with self.subTest(cost=cost):
+                self.clear_calls()
+                proc = self.run_step("Run the suite", PLUGIN, ANTHROPIC_API_KEY="k", TAG="all", RUNS="3",
+                                     STAND_IN_COST=cost)
+                self.assertEqual(1, proc.returncode, output(proc))
+                self.assertIn(message, output(proc))
+                self.assertEqual(["routing"], [value["--tag"] for _, value in self.calls()])
 
     def test_the_inputs_are_checked_before_any_run(self):
         for changes, message in (({"ANTHROPIC_API_KEY": ""}, "secret is not set"),
                                  ({"TAG": "routing; rm -rf ~"}, "The tag must"),
                                  ({"TAG": "--case"}, "The tag must"),
+                                 ({"TAG": "boundary"}, "The tag must"),
                                  ({"RUNS": "0"}, "Runs must"), ({"RUNS": "51"}, "Runs must"),
                                  ({"RUNS": "3 --allow-tools Bash"}, "Runs must")):
             with self.subTest(changes=changes):
+                self.clear_calls()
                 values = {"ANTHROPIC_API_KEY": "k", "TAG": "routing", "RUNS": "3", **changes}
                 proc = self.run_step("Run the suite", PLUGIN, **values)
                 self.assertEqual(1, proc.returncode, output(proc))
                 self.assertIn(message, output(proc))
-                self.assertFalse((self.tmp / "claude-args").exists())
+                self.assertEqual([], self.calls())
 
-    def test_the_summary_reads_the_result(self):
+    def test_the_summary_reads_each_result(self):
         evals = self.tmp / "evals"
         evals.mkdir()
-        (evals / "results.json").write_text(json.dumps({
+        (evals / "routing.json").write_text(json.dumps({
             "aggregates": {"casesPassed": 22, "casesTotal": 23, "overallScore": 0.97}, "costUsd": 4.2,
             "claudeVersion": "2.1.293", "partial": False,
             "cases": [{"name": "web-design-studio", "aggregates": {"score": 1}}]}), encoding="utf-8")
+        (evals / "outcome.json").write_text(json.dumps({
+            "aggregates": {"casesPassed": 11, "casesTotal": 11, "overallScore": 1}, "costUsd": 6.1,
+            "claudeVersion": "2.1.293", "partial": True, "partialReason": "cost_ceiling",
+            "cases": [{"name": "pricing-section", "aggregates": {"score": 1}}]}), encoding="utf-8")
         summary = self.tmp / "summary.md"
         proc = self.run_step("Summarise", self.tmp, GITHUB_STEP_SUMMARY=summary.as_posix())
         self.assertEqual(0, proc.returncode, output(proc))
         text = summary.read_text(encoding="utf-8")
-        self.assertIn("**22 of 23 cases passed**, score 0.97, about $4.2, Claude Code 2.1.293", text)
+        self.assertIn("**routing: 22 of 23 cases passed**, score 0.97, about $4.2, Claude Code 2.1.293", text)
         self.assertIn("| web-design-studio | 1 |", text)
+        self.assertIn("**outcome: 11 of 11 cases passed**, score 1, about $6.1, Claude Code 2.1.293, "
+                      "partial: cost_ceiling", text)
+        self.assertLess(text.index("routing:"), text.index("outcome:"))
+
+    def test_the_summary_is_empty_without_a_result(self):
+        summary = self.tmp / "summary.md"
+        proc = self.run_step("Summarise", self.tmp, GITHUB_STEP_SUMMARY=summary.as_posix())
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual("", summary.read_text(encoding="utf-8") if summary.exists() else "")
 
 
 if __name__ == "__main__":

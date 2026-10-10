@@ -562,7 +562,11 @@ class TheRouter(HookTest):
                  "Replace the hardcoded colors with tokens": ["design-token-migration"],
                  "Make admin screens from the Supabase schema": ["content-model-to-ui"],
                  "Write a landing page with one CTA": ["landing-page-conversion"],
-                 "Set up a spacing scale and cascade layers": ["web-design-studio"]}
+                 "Set up a spacing scale and cascade layers": ["web-design-studio"],
+                 # P30's eval: the file name's dot ends the sentence before the question
+                 "We re-pointed --bg-accent in tokens.css. Can we ship it as a patch release?":
+                     ["design-system-versioning"],
+                 "Is a renamed design token a major version?": ["design-system-versioning", "web-design-studio"]}
         for prompt, skills in cases.items():
             with self.subTest(prompt=prompt):
                 self.assertEqual(skills, self.routed(prompt))
@@ -570,6 +574,9 @@ class TheRouter(HookTest):
     def test_other_prompts_and_named_skills_hear_nothing(self):
         for prompt in ("Fix the login bug", "Rename the class in utils.ts",
                        "Add prop tables to our React library's README",     # library docs (Codex on #95)
+                       "Can this login fix ship as a patch release?",       # a release with no tokens in it
+                       # an API's token is not a design token (Codex on #97)
+                       "We changed authentication token handling in the API. Can we ship this as a patch release?",
                        "Use /web-design-suite:a11y-audit-runner on the checkout"):
             with self.subTest(prompt=prompt):
                 self.assertEqual([], self.routed(prompt))

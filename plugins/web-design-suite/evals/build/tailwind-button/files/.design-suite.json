@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "tokens": ["src/styles/tokens.css"],
+  "components": ["src/components/**"],
+  "stack": "tailwind-v4"
+}

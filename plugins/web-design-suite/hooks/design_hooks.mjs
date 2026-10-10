@@ -70,7 +70,11 @@ const ROUTES = [
    [/\b(?:hard-?coded|magic) (?:values?|colou?rs?|numbers?|pixels?)\b/i, /\bmigrat\w*\b[^.?!]*\btokens?\b/i,
     /\bcodemods?\b/i]],
   ['design-system-versioning', 'versioning a design system',
-   [/\b(?:semver|breaking changes?|deprecat\w*)\b[^.?!]*\b(?:tokens?|design system)\b/i]],
+   [/\b(?:semver|breaking changes?|deprecat\w*)\b[^.?!]*\b(?:tokens?|design system)\b/i,
+    // "a patch release?" asked of a token change, anywhere in the prompt: a
+    // file name such as tokens.css ends the sentence the pattern above reads.
+    // Design tokens only: an API's auth token is not one (Codex on #97).
+    /^(?=[\s\S]*(?:\bdesign[- ]tokens?\b|\btokens\.(?:css|json)\b|\bdesign[- ]system\b|(?:^|[\s`(])--[a-z][\w-]*))[\s\S]*\b(?:patch|minor|major) (?:release|version)s?\b/i]],
   ['design-system-docs', 'design-system documentation',
    [/\b(?:style ?guides?|storybook|design[- ]system(?:'s)? (?:docs|documentation|site))\b/i,
     /\btoken references?\b/i, /\b(?:docs|documentation|props? tables?)\b[^.?!]*\bdesign[- ]system\b/i]],

@@ -1,0 +1,10 @@
+@layer base {
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    color: var(--fg-default);
+    background: var(--bg-canvas);
+  }
+}
