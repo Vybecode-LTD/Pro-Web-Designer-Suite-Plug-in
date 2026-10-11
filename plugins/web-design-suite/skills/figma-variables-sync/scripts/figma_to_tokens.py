@@ -1222,22 +1222,33 @@ for (const c of BODY.variableCollections) {
 }
 
 // The REST body's UPDATE names a collection's first mode, which Figma creates
-// as "Mode 1"; each CREATE is a theme. The plan caps the modes, and addMode
-// throws past the cap: Starter has only the first.
+// as "Mode 1"; each CREATE is a theme. The default values always go to the
+// default mode and a theme's never do, whatever the names say: a theme set
+// that changed leaves a mode named like the new default (Codex on #109). The
+// plan caps the modes, and addMode throws past the cap: Starter has only the
+// first.
 const modeOf = {};
 for (const m of BODY.variableModes) {
   const collection = collectionOf[m.variableCollectionId];
-  const have = collection.modes.find((x) => x.name === m.name);
-  if (have) {
-    modeOf[m.id] = have.modeId;
-    result.modes.found += 1;
-    continue;
-  }
+  const first = collection.defaultModeId;
   try {
     if (m.action === "UPDATE") {
-      collection.renameMode(collection.defaultModeId, m.name);
-      modeOf[m.id] = collection.defaultModeId;
-      result.modes.renamed += 1;
+      modeOf[m.id] = first;
+      const name = collection.modes.find((x) => x.modeId === first).name;
+      if (name === m.name) {
+        result.modes.found += 1;
+      } else if (collection.modes.some((x) => x.name === m.name)) {
+        fail(`mode "${m.name}" in "${collection.name}"`, `another mode has the name, so the default mode keeps "${name}" and holds the default values; remove or rename the other by hand`);
+      } else {
+        collection.renameMode(first, m.name);
+        result.modes.renamed += 1;
+      }
+      continue;
+    }
+    const have = collection.modes.find((x) => x.name === m.name && x.modeId !== first);
+    if (have) {
+      modeOf[m.id] = have.modeId;
+      result.modes.found += 1;
     } else {
       modeOf[m.id] = collection.addMode(m.name);
       result.modes.created += 1;
