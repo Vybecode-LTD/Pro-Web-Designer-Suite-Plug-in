@@ -22,13 +22,15 @@ import path from 'node:path';
 
 export const CONFIG_NAME = '.design-suite.json';
 const CONFIG_KEYS = ['schema', 'tokens', 'emailTokens', 'components', 'emails', 'stack', 'budgets', 'baselines',
-                     'hooks', 'names'];
+                     'hooks', 'names', 'figma'];
 const STACKS = ['vanilla-css', 'css-modules', 'tailwind-v3', 'tailwind-v4'];
 const BUDGETS = ['perf', 'a11y'];
 const BASELINES = ['audit', 'a11y', 'perf', 'docs', 'snapshots', 'system'];
 const HOOKS = ['designGate', 'generatedFiles', 'tokenDiff',       // the plugin's hooks a project turns on (P25,
                'a11yGate', 'emailBuild'];                        // P27)
 const NAMES = ['prefixes', 'rename'];                        // P31 part 5: a tool's names onto the grammar
+const FIGMA = ['plan'];                                      // P32: the Figma plan, whose modes are capped
+const FIGMA_PLANS = ['starter', 'professional', 'organization', 'enterprise'];
 const NAME_PREFIX = /^[A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*-$/;
 const CUSTOM_PROPERTY = /^--[A-Za-z0-9_-]+$/;
 const EMAILS = ['emails/**/*.html'];                             // the email templates, unless `emails` names them
@@ -168,11 +170,20 @@ export function loadConfig(file) {
       fail('"names.rename" must map a custom property to a custom property ("--gray-500": "--neutral-500")');
     return { prefixes: [...prefixes], rename: { ...rename } };
   };
+  const figmaPlan = () => {
+    const value = has(data, 'figma') ? data.figma : {};
+    if (!isObject(value)) fail('"figma" must be an object');
+    const extra = Object.keys(value).filter((k) => !FIGMA.includes(k)).sort();
+    if (extra.length) fail(`unknown key '${extra[0]}' in "figma"; the keys are ${FIGMA.join(', ')}`);
+    const plan = has(value, 'plan') ? value.plan : null;
+    if (plan !== null && !FIGMA_PLANS.includes(plan)) fail(`"figma.plan" must be one of ${FIGMA_PLANS.join(', ')}`);
+    return { plan };
+  };
   const budgets = pathMap('budgets', BUDGETS);
   const baselines = pathMap('baselines', BASELINES);
   const hooks = hookFlags();
   return { path: where, root: base, tokens, emailTokens, components, emails, stack, budgets, baselines, hooks,
-           names: nameRoute() };
+           names: nameRoute(), figma: figmaPlan() };
 }
 
 // `name` in the contract's grammar (P31 part 5), as grammar_name() reads it:

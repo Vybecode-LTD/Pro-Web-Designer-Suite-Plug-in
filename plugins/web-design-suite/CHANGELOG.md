@@ -86,12 +86,24 @@
   server: `get_variable_defs` reads a selection, audited as records, and `use_figma` runs
   the script. The facts are re-read at Figma's Plugin API, MCP and FAQ pages
   (`references/figma-mapping.md` §14).
+- **Each Figma plan's limits** (P32 part 2; LC-B6). A collection's modes are capped by the
+  plan: Starter keeps the first only, Professional allows 10 modes per collection and
+  Organization 20 modes per collection, and the REST API a maximum of 40 modes, each figure
+  re-read at Figma's pages and registered. `figma_audit.py --plan PLAN`, or
+  `.design-suite.json`'s new `figma.plan`, reports `MODE_LIMIT` (error) on a collection past
+  the cap, as a theme, a density and a brand in one collection soon are, and stops asking
+  Starter for a dark mode it cannot hold. `--reverse --format plugin-script --plan` reports
+  the same before the run, and a REST body past the endpoint's own cap is not
+  written (exit 2): Figma refuses the whole request. Both config
+  readers check the key alike. `figma-mapping.md` §14 adds the plans' table, branch keys
+  (`local` and the POST take one, `published` does not) and the MCP server's Starter
+  allowance.
 - **The top layer and the error state: modern CSS, part 1** (P38; SS-B4 in part).
   accessibility.md gave a modal dialog `z-index: var(--z-modal)`, as if the `--z-*` ladder
   reached the top layer. It does not: a toast at `--z-toast` sits under an open modal, and
   a z-index on a top-layer element orders nothing ("the last element in the top layer is
   rendered on top of everything else"). A new section says so and puts the message about
-  what a dialog did inside it, as a `popover="manual"`: a popover shown from elsewhere
+  what a dialog did inside it, as a `popover="manual"` with `role="status"`: a popover shown from elsewhere
   renders over the dialog too, but the modal has made it inert, so clicks pass through it
   and a screen reader does not reach it. The toast fades in from `@starting-style` and out
   with `transition-behavior: allow-discrete`, each feature's support stated. The field's

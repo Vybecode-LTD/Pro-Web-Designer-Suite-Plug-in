@@ -63,12 +63,13 @@ sys.dont_write_bytecode = True
 try:                                              # python -m scripts.figma_to_tokens
     from .figma_common import *                   # type: ignore[import-not-found]  # noqa: F403
     from .project_config import (ROOT_SELECTOR, THEME_OR_DENSITY, ConfigError, ProjectTokens,
-                                 _css_blocks, read_tokens, token_sources)
+                                 _css_blocks, project_config, read_tokens, token_sources)
 except ImportError:                               # python scripts/figma_to_tokens.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from figma_common import *                    # type: ignore[no-redef]  # noqa: F403
     from project_config import (ROOT_SELECTOR, THEME_OR_DENSITY,  # type: ignore[no-redef]
-                                ConfigError, ProjectTokens, _css_blocks, read_tokens, token_sources)
+                                ConfigError, ProjectTokens, _css_blocks, project_config, read_tokens,
+                                token_sources)
 
 # ===========================================================================
 # The contract's token names. This list is what makes the round trip lossless:
@@ -985,6 +986,8 @@ def read_tokens_json(data: Any) -> Tuple[Dict[str, dict], Dict[str, Dict[str, di
 
 def emit_reverse(data: Any, collection_split: bool = True) -> Tuple[str, List[Problem]]:
     body, problems = reverse_body(data, collection_split)
+    # The endpoint is Enterprise's, so its own cap applies whatever the plan.
+    problems += mode_limits(body, REST_MODES, f"the REST API allows {REST_MODES} per collection.")
     return json.dumps(body, indent=2) + "\n", problems
 
 
@@ -1322,10 +1325,27 @@ return result;
 """
 
 
-def emit_plugin_script(data: Any, source: str, collection_split: bool = True) -> Tuple[str, List[Problem]]:
+def mode_limits(body: dict, cap: int, why: str) -> List[Problem]:
+    """P32 (LC-B6): a collection with more modes than Figma will make."""
+    names = {c["id"]: c["name"] for c in body["variableCollections"]}
+    count: Dict[str, int] = {}
+    for mode in body["variableModes"]:
+        count[mode["variableCollectionId"]] = count.get(mode["variableCollectionId"], 0) + 1
+    return [Problem("mode-limit", names[cid],
+                    f"`{names[cid]}` needs {n} modes, and {why} Figma refuses each one past "
+                    f"the cap: give theme, density and brand a collection each, or keep the "
+                    f"extra themes in code.")
+            for cid, n in count.items() if n > cap]
+
+
+def emit_plugin_script(data: Any, source: str, collection_split: bool = True,
+                       plan: Optional[str] = None) -> Tuple[str, List[Problem]]:
     """`--reverse --format plugin-script` (P32): the REST body, applied
-    through the Plugin API, which needs no Enterprise plan."""
+    through the Plugin API, which needs no Enterprise plan. With the plan
+    known, a collection it cannot hold is reported here, before the run."""
     body, problems = reverse_body(data, collection_split)
+    if plan:
+        problems += mode_limits(body, PLAN_MODES[plan], plan_limit(plan))
     head, _, tail = PLUGIN_SCRIPT.partition("@BODY@")    # a description holding `@SOURCE@` stays as it is
     head = head.replace("@SOURCE@", " ".join(source.split()))
     return head + json.dumps(body, separators=(",", ":")) + tail, problems
@@ -1361,6 +1381,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="emit every token in each theme block, not only the re-points")
     p.add_argument("--flat", action="store_true",
                    help="--reverse: one Figma collection instead of one per tier")
+    p.add_argument("--plan", choices=tuple(PLAN_MODES),
+                   help="--reverse --format plugin-script: the Figma plan, whose modes per collection "
+                        "are capped; default: the .design-suite.json's figma.plan")
     p.add_argument("--quiet", action="store_true", help="do not print warnings")
     p.add_argument("--tokens", action="append", default=[], metavar="FILE",
                    help="the project's token file, a tokens.css or a contract.json (repeatable), "
@@ -1446,9 +1469,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.reverse:
             data = json.loads(path.read_bytes())
             if args.format == "plugin-script":
-                text, problems = emit_plugin_script(data, str(path), collection_split=not args.flat)
+                config = project_config() if args.plan is None else None
+                plan = args.plan or (config.figma_plan if config else None)
+                text, problems = emit_plugin_script(data, str(path), collection_split=not args.flat,
+                                                    plan=plan)
             else:
                 text, problems = emit_reverse(data, collection_split=not args.flat)
+                if any(p.kind == "mode-limit" for p in problems):
+                    # Figma refuses the whole POST, so a body past the cap is a
+                    # trap: write nothing (CodeRabbit on #111).
+                    report_problems(problems, args.quiet)
+                    print("No body written: Figma refuses a POST with a collection past its mode cap. "
+                          "Split the modes across collections, or use --format plugin-script.",
+                          file=sys.stderr)
+                    return 2
             write_out(text, args.out)
             report_problems(problems, args.quiet)
             return 1 if problems else 0
