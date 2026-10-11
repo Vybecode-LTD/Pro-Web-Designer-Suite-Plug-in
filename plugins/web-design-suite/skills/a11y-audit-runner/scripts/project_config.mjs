@@ -1114,10 +1114,14 @@ function resolverDocument(data, dir) {
       if (/^[a-z][a-z0-9+.-]*:\/\//i.test(name)) continue;    // a URL is not read
       if (/^([\\/]|[A-Za-z]:)/.test(name) || name.split(/[\\/]/).includes('..')) continue;   // outside(), CodeRabbit
       let tree;
-      try {
-        tree = readJson(path.resolve(dir, name));       // an absolute name stands, as in Python
+      try {                                      // its real path in the folder, as file_loader() (Codex)
+        const folder = fs.realpathSync(dir);
+        const target = fs.realpathSync(path.resolve(folder, name));
+        const rel = path.relative(folder, target);
+        if (!rel || rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) continue;
+        tree = readJson(target);
       } catch (err) {
-        if (err instanceof ConfigError) continue;
+        if (err instanceof ConfigError || err?.code) continue;     // missing, unreadable, not JSON
         throw err;
       }
       if (pointer) tree = jsonPointer(tree, `#${pointer}`);

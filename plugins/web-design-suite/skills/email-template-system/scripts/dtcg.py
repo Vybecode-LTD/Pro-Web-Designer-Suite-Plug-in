@@ -960,11 +960,21 @@ def resolver_modifiers(data: dict) -> List[Modifier]:
     return out
 
 
+class OutsideFolder(OSError):
+    """A source whose real path is not in the resolver's folder."""
+
+
 def file_loader(base: Optional[Union[str, Path]]) -> Loader:
     """Read a source file named relative to `base` (the resolver's folder):
-    JSON in UTF-8, UTF-16 or UTF-32, with or without a BOM."""
+    JSON in UTF-8, UTF-16 or UTF-32, with or without a BOM. A file whose real
+    path leaves the folder, through a symlink or a junction, is refused with
+    OutsideFolder (Codex on #105)."""
     def load(name: str) -> Any:
-        return json.loads((Path(base or ".") / name).read_bytes())
+        folder = Path(base or ".").resolve()
+        target = (folder / name).resolve()
+        if folder not in target.parents:
+            raise OutsideFolder(name)
+        return json.loads(target.read_bytes())
     return load
 
 
@@ -1025,6 +1035,10 @@ def _sources(sources: Any, data: dict, load: Loader, problems: Problems, where: 
             continue
         try:
             tree = load(name)
+        except OutsideFolder:
+            problems.append((at, f"`{name}` is outside the resolver's folder; only files in it or "
+                                 "below are read"))
+            continue
         except (OSError, ValueError, RecursionError) as exc:     # missing, unreadable, not JSON
             problems.append((at, f"`{name}` could not be read ({type(exc).__name__}), so not read"))
             continue
