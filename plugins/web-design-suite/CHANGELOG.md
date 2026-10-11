@@ -60,7 +60,9 @@
   gate, and the report says `deprecation  marked: $deprecated in OLD`. A ledger record
   for the same name wins. `deprecate.py import FILE --since X --removal Y` writes the marks
   into the ledger, so `status`, `scan` and `mapping` see them; the replacement is the
-  token the reason names (`"Please use {bg.brand} instead"` is `--bg-brand`).
+  token the reason names (`"Please use {bg.brand} instead"` is `--bg-brand`). A later
+  file that sets the token again without the mark, a `tokens.css` or a `contract.json`
+  among them, takes it off.
 - **Style Dictionary's and Terrazzo's names: part 5** (P31; LC-B2). Both tools join a
   token's path with `-`, so `color.neutral.500` is `--color-neutral-500` and a component
   reading it skipped a tier unseen: no gate knew the name. `.design-suite.json` takes

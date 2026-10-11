@@ -534,11 +534,14 @@ def read_deprecations(paths: Sequence[Union[str, Path]]) -> Dict[str, Union[bool
     """The tokens the DTCG files among `paths` mark `$deprecated` (P31 part
     4), by CSS name, with the reason when one is given, in the order
     read_tokens() reads them: a later file that sets a token again without
-    the mark takes it off. A contract.json or a tokens.css marks none."""
+    the mark takes it off. A contract.json or a tokens.css marks none, so
+    each token it sets loses its mark (CodeRabbit on #106)."""
     out: Dict[str, Union[bool, str]] = {}
     for path in map(Path, paths):
         data = _read_json(path) if is_contract(path) else None
         if not (is_contract(path) and is_dtcg(data)):
+            for name in read_tokens([path]).values():
+                out.pop(name, None)
             continue
         found, _problems = _dtcg(path).tokens(data, path.parent)
         for token in found:
