@@ -657,12 +657,19 @@ Re-read on 2026-10-11 at Figma's [plan comparison](https://help.figma.com/hc/en-
 [variables endpoints](https://developers.figma.com/docs/rest-api/variables-endpoints/) and the MCP
 server's [rate limits](https://developers.figma.com/docs/figma-mcp-server/rate-limits-access/).
 
-| Plan | Modes per collection | Branches | The MCP server |
+| Plan | Modes per collection | Branches | The MCP server, reading |
 |---|---|---|---|
 | Starter | The first only: modes are for "Education, Professional, Organization, and Enterprise plans" | No | "If you're on a Starter plan (20 tool calls per month), upgrade" |
-| Professional | "Up to 10 modes per collection" | No | A Dev or Full seat |
-| Organization | "Up to 20 modes per collection" | Yes | A Dev or Full seat |
-| Enterprise | "Unlimited modes with extended collections"; each collection holds a maximum of 40 modes through the REST API | Yes | A Dev or Full seat |
+| Professional | "Up to 10 modes per collection" | No | A Dev or Full seat daily; a View or Collab seat up to 20 tool calls per month |
+| Organization | "Up to 20 modes per collection" | Yes | The same |
+| Enterprise | "Unlimited modes with extended collections"; each collection holds a maximum of 40 modes through the REST API | Yes | The same, with the largest daily allowance |
+
+**Writing through the MCP server takes a Full seat** on any plan: "You need a Full seat to
+write to Figma files with agents", and "To modify an existing file, you also need edit
+permission for that file". A Dev seat reads only, "for read-only workflows such as pulling
+design context, variables, and screenshots" ([write to canvas](https://developers.figma.com/docs/figma-mcp-server/write-to-canvas/)),
+so `use_figma` running the plugin script needs a Full seat, and `get_variable_defs` a Dev
+seat or better. Write tools are exempt from the rate limits.
 
 - **A theme, a density and a brand multiply when they share a collection.** Light
   and Dark by Comfortable and Compact by three brands is 12 modes in one

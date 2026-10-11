@@ -478,6 +478,17 @@
       "docs": [
         "figma-variables-sync/references/figma-mapping.md"
       ]
+    },
+    {
+      "figure": "20 tool calls per month",
+      "claim": "the Figma MCP server's allowance for a View or Collab seat on a paid plan",
+      "source": "Figma, MCP server: Rate limits & access",
+      "url": "https://developers.figma.com/docs/figma-mcp-server/rate-limits-access/",
+      "checked": "2026-10-11",
+      "quote": "If you have a View or Collab seat on an Organization or Enterprise plan (20 tool calls per month), upgrade to a Full or Dev seat.",
+      "docs": [
+        "figma-variables-sync/references/figma-mapping.md"
+      ]
     }
   ],
   "not_statistics": [
