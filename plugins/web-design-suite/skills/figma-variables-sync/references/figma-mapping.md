@@ -652,6 +652,14 @@ first context is read) are named, never silent; a fan-out of sets is refused.
 `read_tokens()`, and so `.design-suite.json`'s `tokens`, reads a resolver as
 its default: each modifier's `default` context.
 
+**Style Dictionary's and Terrazzo's names.** Both join a token's path with `-`
+(Style Dictionary's `css` transform group uses `name/kebab`; Terrazzo's CSS
+plugin calls `makeCSSVar(token.id)` when `variableName` gives nothing), so a
+token at `color.bg.surface` becomes `--color-bg-surface`, where the contract
+says `--bg-surface`. Give `.design-suite.json` a `names` map, `"prefixes":
+["color-"]` or a `rename` table, and the gates read Law 6 through it
+(web-design-studio's `references/project-contract.md`).
+
 **Tokens Studio.** A single-file Tokens Studio export keeps each token set under
 its name beside `$themes` and `$metadata.tokenSetOrder`, and its references name
 a token without its set (`{neutral.0}`). Both scripts read it as Tokens Studio

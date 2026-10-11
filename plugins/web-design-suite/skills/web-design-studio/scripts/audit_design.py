@@ -377,18 +377,24 @@ def use_project(config: ProjectConfig | None, sources: list[Path]) -> None:
     tokens = read_tokens(sources)
     PROJECT.config = config
     PROJECT.token_files = {Path(p).resolve() for p in sources}
-    PROJECT.ramp_steps = {f"--{ramp}-{step}" for ramp, steps in tokens.ramps.items() for step in steps}
+    raw = {f"--{ramp}-{step}" for ramp, steps in tokens.ramps.items() for step in steps}
+    # The steps as the grammar reads them, through the project's `names`: a
+    # prefix comes off, and a renamed step is what it is renamed to, so no
+    # longer a step (CodeRabbit on #107).
+    rename = config.rename if config else {}
+    PROJECT.ramp_steps = {config.grammar_name(s) if config else s for s in raw if s not in rename}
 
 
 def tier1_advice(ref: str) -> str | None:
     """The role to use instead of `ref` when it is a Tier-1 primitive that has
     one (Law 6), else None. stylelint's design/tier1-primitive and the ESLint
     config's TIER1_SHORTHAND and inline-style check read the same lists."""
-    if ref in TIER2_EXCEPTIONS or ref in TIER1_NULLS:
+    name = PROJECT.config.grammar_name(ref) if PROJECT.config else ref    # its `names` (P31 part 5)
+    if name in TIER2_EXCEPTIONS or name in TIER1_NULLS:
         return None         # a role, or zero, which is zero
-    if ref in PROJECT.ramp_steps:
+    if name in PROJECT.ramp_steps:
         return PROJECT_RAMP_ADVICE
-    bare = ref[2:]
+    bare = name[2:]
     return next((advice for pfx, advice in TIER1_WITH_ROLE.items() if bare.startswith(pfx)), None)
 
 

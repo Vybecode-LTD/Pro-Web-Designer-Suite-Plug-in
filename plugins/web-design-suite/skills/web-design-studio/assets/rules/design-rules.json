@@ -85,7 +85,37 @@
     "refused_jsx": ["<div className=\"p-(--space-6)\" />",
                     "<div className=\"bg-(--neutral-800)\" />",
                     "<div className=\"text-(length:--text-lg)\" />",
-                    "<div style={{ '--card-gap': 'var(--space-4)' }} />"]
+                    "<div style={{ '--card-gap': 'var(--space-4)' }} />"],
+    "names": {
+      "about": "P31 part 5: a project whose tokens carry a tool's names maps them onto the grammar in its .design-suite.json's `names`, and all three gates read Law 6 through the map. Style Dictionary's css transform group (name/kebab) and Terrazzo's default join a token's path with `-`, so color.neutral.500 is --color-neutral-500 and color.bg.surface is --color-bg-surface. `prefixes` are taken off a name that starts with one (the first that fits), and `rename` maps one name to another, before the lists above are read: --color-neutral-500 is --neutral-500, a primitive with a role, and --color-bg-surface is --bg-surface, a role. Without `names`, a prefixed name matches no list, so the examples here pass in a project without the config.",
+      "config": {"prefixes": ["color-", "size-"], "rename": {"--gray-500": "--neutral-500"}},
+      "allowed": [".card { background: var(--color-bg-surface); }",
+                  ".card { padding-block: var(--size-space-section); }",
+                  ".card { box-shadow: var(--size-shadow-none); }",
+                  ".card { border-radius: var(--size-radius-md); }"],
+      "refused": [".card { color: var(--color-neutral-700); }",
+                  ".card { padding: var(--size-space-4); }",
+                  ".card { border-color: var(--gray-500); }"],
+      "allowed_jsx": ["<div className=\"bg-(--color-bg-surface) p-(--size-space-section)\" />"],
+      "refused_jsx": ["<div className=\"bg-(--color-neutral-800)\" />",
+                      "<div className=\"p-(--size-space-6)\" />",
+                      "<div className=\"border-(--gray-500)\" />",
+                      "<div style={{ '--card-gap': 'var(--size-space-4)' }} />"],
+      "overlaps": {
+        "about": "Codex on #107: the gates read a name as grammar_name() does. A rename comes first, then the first prefix that fits, so with color-neutral- before color-, --color-neutral-bg-surface is --bg-surface, a role. A step of the project's own ramps under a prefix (--color-brand-500, with --brand-500 in its tokens) is a primitive with a role. A name the map changes is judged by its mapped name alone, so --neutral-brand renamed to a role passes. CodeRabbit on #107: the project's ramp steps are read through the map as well, so a step renamed to a role (--sea-600) passes, and a step the tokens file spells with a prefix (--color-ocean-500, as Style Dictionary writes it) is still a primitive.",
+        "config": {"prefixes": ["color-neutral-", "color-"], "rename": {"--neutral-brand": "--bg-surface", "--sea-600": "--bg-brand"}},
+        "tokens": "@layer tokens {\n  :root {\n    --brand-500: #b4400a;\n    --sea-600: #0a5ab4;\n    --color-ocean-500: #0a7a5a;\n  }\n}\n",
+        "allowed": [".card { background: var(--color-neutral-bg-surface); }",
+                    ".card { border-color: var(--neutral-brand); }",
+                    ".card { background: var(--sea-600); }"],
+        "refused": [".card { color: var(--color-brand-500); }",
+                    ".card { color: var(--color-ocean-500); }"],
+        "allowed_jsx": ["<div className=\"bg-(--color-neutral-bg-surface) border-(--neutral-brand)\" />",
+                        "<div className=\"bg-(--sea-600)\" />"],
+        "refused_jsx": ["<div className=\"bg-(--color-brand-500)\" />",
+                        "<div className=\"bg-(--color-ocean-500)\" />"]
+      }
+    }
   },
   "margins_in_components": {
     "gates": ["audit", "stylelint"],

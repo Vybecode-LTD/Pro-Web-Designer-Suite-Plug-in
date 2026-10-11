@@ -222,7 +222,12 @@ const PROJECT_RAMP_ADVICE = 'a color role (--bg-*, --fg-*, --border-*)';
 
 /* The project's config, from the working directory (N37, in the header). */
 const PROJECT = lintProject();
-const PROJECT_RAMP_STEPS = new Set(PROJECT.rampSteps);
+// The steps as the grammar reads them, through the project's `names`: a prefix
+// comes off, and a renamed step is what it is renamed to, so no longer a step
+// (CodeRabbit on #107). The audit reads them alike.
+const PROJECT_RAMP_STEPS = new Set(
+  PROJECT.rampSteps.filter((n) => !Object.hasOwn(PROJECT.names.rename, n)).map((n) => PROJECT.grammarName(n)),
+);
 const RAW_COLOR = new RegExp(
   /(?:^|[\s(:,'"`[])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z])/.source +
     String.raw`|\b(?:${COLOUR_FUNCTIONS.join('|')})\s*\(`,
@@ -235,8 +240,16 @@ const RAW_COLOR = new RegExp(
  * roles under --space- and the null-outs are the spec's (design-rules.json:
  * tiers), so `p-(--space-section)` and `shadow-(--shadow-none)` pass, as they
  * do in the audit and stylelint. */
+/* A name the project's `names` maps (P31 part 5) is judged by its mapped name
+ * alone, in NAMED_SHORTHAND below, never by its own spelling here (Codex on
+ * #107): `(--neutral-brand)` renamed to a role passes. Prefixes and renamed
+ * names hold only letters, digits, `_` and `-` (project_config checks them). */
+const MAPPED = [
+  ...PROJECT.names.prefixes.map((p) => String.raw`(?!${p}[\w-])`),
+  ...Object.keys(PROJECT.names.rename).map((n) => String.raw`(?!${n.slice(2)}\))`),
+].join('');
 const TIER1_SHORTHAND = new RegExp(
-  String.raw`\((?:[a-z-]+:)?--(?!(?:${[...TIER2_EXCEPTIONS, ...TIER1_NULLS].map((n) => n.slice(2)).join('|')})\))` +
+  String.raw`\((?:[a-z-]+:)?--${MAPPED}(?!(?:${[...TIER2_EXCEPTIONS, ...TIER1_NULLS].map((n) => n.slice(2)).join('|')})\))` +
     String.raw`(?:${Object.keys(TIER1_WITH_ROLE).join('|')})[\w-]*\)`,
 );
 
@@ -244,9 +257,10 @@ const TIER1_SHORTHAND = new RegExp(
  * what `style-prop-custom-properties-only` gives an inline value (Part 3). */
 const VAR_NAME = /var\(\s*(--[\w-]+)/g;
 const tier1Advice = (ref) => {
-  if (TIER2_EXCEPTIONS.includes(ref) || TIER1_NULLS.includes(ref)) return null;
-  if (PROJECT_RAMP_STEPS.has(ref)) return PROJECT_RAMP_ADVICE;
-  const prefix = Object.keys(TIER1_WITH_ROLE).find((p) => ref.slice(2).startsWith(p));
+  const name = PROJECT.grammarName(ref);         // the project's `names` (P31 part 5)
+  if (TIER2_EXCEPTIONS.includes(name) || TIER1_NULLS.includes(name)) return null;
+  if (PROJECT_RAMP_STEPS.has(name)) return PROJECT_RAMP_ADVICE;
+  const prefix = Object.keys(TIER1_WITH_ROLE).find((p) => name.slice(2).startsWith(p));
   return prefix ? TIER1_WITH_ROLE[prefix] : null;
 };
 
@@ -256,11 +270,36 @@ const tier1Advice = (ref) => {
  * a step TIER1_SHORTHAND already refuses (`--accent-500`) is left to it, and
  * a page-rhythm role or a null-out is not a leak. */
 const SHORTHAND_STEPS = PROJECT.rampSteps.filter(
-  (name) => /^--[\w-]+$/.test(name) && tier1Advice(name) && !TIER1_SHORTHAND.test(`(${name})`),
-);
+  (name) => /^--[\w-]+$/.test(name) && PROJECT.grammarName(name) === name && tier1Advice(name) &&
+    !TIER1_SHORTHAND.test(`(${name})`),
+);                                     // a step the names change is NAMED_SHORTHAND's
 const PROJECT_SHORTHAND = SHORTHAND_STEPS.length
   ? new RegExp(String.raw`\((?:[a-z-]+:)?(?:${SHORTHAND_STEPS.join('|')})\)`)
   : null;
+
+/* LAW 6 under the project's `names` (P31 part 5): a shorthand whose name,
+ * mapped onto the grammar, is a primitive with a role. `(--color-neutral-800)`
+ * with the prefix `color-`, or a renamed `(--gray-500)`. A prefix holds only
+ * letters, digits, `_` and `-` (project_config checks it), so it is safe in
+ * the pattern; a page-rhythm role or a null-out under a prefix passes. */
+const NAMED_SHORTHAND = (() => {
+  const { prefixes, rename } = PROJECT.names;
+  const kept = [...TIER2_EXCEPTIONS, ...TIER1_NULLS].map((n) => n.slice(2)).join('|');
+  // What follows a prefix: a primitive with a role, or a step of the project's
+  // own ramps (Codex on #107), as tier1Advice() reads a mapped name.
+  const steps = [...PROJECT_RAMP_STEPS].filter((n) => /^--[\w-]+$/.test(n)).map((n) => n.slice(2));
+  const rest = String.raw`(?:(?:${Object.keys(TIER1_WITH_ROLE).join('|')})[\w-]*` +
+    (steps.length ? `|(?:${steps.join('|')}))` : ')');
+  // grammarName()'s order: a rename first, then the first prefix that fits.
+  const notRenamed = Object.keys(rename).map((n) => String.raw`(?!${n.slice(2)}\))`).join('');
+  const parts = prefixes.map((p, i) => {
+    const earlier = prefixes.slice(0, i).map((q) => String.raw`(?!${q}[\w-])`).join('');
+    return String.raw`--${notRenamed}${earlier}${p}(?!(?:${kept})\))${rest}`;
+  });
+  const renamed = Object.keys(rename).filter((n) => /^--[\w-]+$/.test(n) && tier1Advice(n));
+  if (renamed.length) parts.push(`(?:${renamed.join('|')})`);
+  return parts.length ? new RegExp(String.raw`\((?:[a-z-]+:)?(?:${parts.join('|')})\)`) : null;
+})();
 
 /* =========================================================================
  * PART 2 — SELECTOR SCOPES
@@ -695,6 +734,14 @@ const CORE_RESTRICTED_SYNTAX = [
         'Law 6 (semantic before primitive): (--space-6), (--neutral-800) and friends read a Tier-1 primitive. ' +
           'Use the role class (p-card, bg-surface), or the role variable: p-(--pad-card).'
       ),
+
+      ...(NAMED_SHORTHAND
+        ? forbidInClasses(
+            NAMED_SHORTHAND,
+            "Law 6 (semantic before primitive): under the project's names (.design-suite.json `names`), this " +
+              'reads a Tier-1 primitive that has a role. Use the role class, or the role variable.'
+          )
+        : []),
 
       ...(PROJECT_SHORTHAND
         ? forbidInClasses(
