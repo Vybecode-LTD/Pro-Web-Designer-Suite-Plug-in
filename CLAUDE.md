@@ -12,14 +12,14 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is public (since 2026-09-28), and MIT-licensed like the plugin.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
-## Current state (2026-10-10, fifth session)
+## Current state (2026-10-11)
 
 - **Version:** 3.5.0 is the latest release (`v3.5.0`, `44637c1`, published by `release.yml`), which completes Phase 5 (#76 to #99). It adds the project contract, the hooks, fifteen workflow commands, six subagents, the MCP server for the gates, and the eval suite (P29 routing, P30 outcome). R3's live check is `dev plans/web-design-suite-3.5.0-live-check.md`.
 - **Installed:** 3.5.0, from the release zip. The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** about 1,015. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Tests:** about 1,036. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
 - **Evals:** 23 routing cases and 11 outcome cases. `evals.yml` runs both on a release tag or by hand (`tag=all`), under one $14 ceiling. The outcome cases grant Write, Edit and the gate MCP tools, never Bash. In `claude-code-capabilities.md`, §1 is the evals page, §10 P29's choices, and §11 the sandboxing page and P30's choices.
-- **Active work:** Phase 6 in `dev plans/web-design-suite-execution-plan.md`, reordered by the owner on 2026-10-11: Phase 6a (P31, P32, P33, P38, P39, P40) ships as 3.6.0, then Phase 6b as 4.0.0. P31 parts 1 and 2 are merged (#101 `shared/dtcg.py`, DTCG 2025.10 read and write; #102 Tokens Studio); part 3 (the resolver module, `$deprecated` into the ledger, the Style Dictionary and Terrazzo name routes) is next. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 31 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Active work:** Phase 6 in `dev plans/web-design-suite-execution-plan.md`, reordered by the owner on 2026-10-11: Phase 6a (P31, P32, P33, P38, P39, P40) ships as 3.6.0, then Phase 6b as 4.0.0. P31 is merged in five parts (#101 `shared/dtcg.py`, DTCG 2025.10 read and write; #102 Tokens Studio; #105 the resolver module; #106 `$deprecated` into the release gate; #107 `.design-suite.json`'s `names`, Style Dictionary's and Terrazzo's names onto the grammar). P32 (Figma on every plan) is next. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 29 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 
@@ -62,6 +62,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 - **Commands you give the user** to run must work in cmd.exe. (The Commands block above is for the Bash tool.)
 - **Never run `npm ci` in a worktree whose `tooling/*/node_modules` is a junction**: it deletes the real toolchain through the link.
 - **The reader's copies.** `shared/project_config.py` and `shared/dtcg.py` have ten copies each, `shared/project_config.mjs` seven (`hooks/` among them). After a merge from a branch below, copy the three masters over every copy: git merges each copy on its own.
+- **A DTCG resolver** (`*.resolver.json`) reads its sources only from its own folder or below, by name and by real path, in both readers (#105).
 
 ## Conventions
 

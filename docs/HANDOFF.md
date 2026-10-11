@@ -1,32 +1,35 @@
 # Handoff
 
-**2026-10-10 (fifth session)**, after P31 part 1 (#101), P31 part 2 (#102) and this docs PR. Phase 6 is under way. **The owner reordered it on 2026-10-11:** the non-breaking half (P31, P32, P33, P38, P39, P40) ships first as **3.6.0**, then 4.0.0 with P36's breaking change. The DTCG reader and writer and the Tokens Studio reading are in `main`; P31 part 3 is next.
+**2026-10-11 (one session)**, after P31 parts 3 to 5 (#105, #106, #107) and this docs PR. **P31 is complete**: LC-C2 and LC-B2 are closed. Phase 6a continues with P32, toward the 3.6.0 release; the owner reordered Phase 6 on 2026-10-11 so the non-breaking half (P31, P32, P33, P38, P39, P40) ships first as 3.6.0, then 4.0.0.
 
-**The next session starts from `dev plans/next-session-prompt.md`**: orientation, then P31 part 3 in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
+**The next session starts from `dev plans/next-session-prompt.md`**: orientation, then P32 in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
 ## State
 
-- **Merged this session**, each with CI green on its head, every thread resolved and GitHub clean:
-  - **#101 (P31 part 1): `shared/dtcg.py`**, merged as `c0856da`. DTCG 2025.10 read and write in one module, copied beside every `project_config.py` (ten skills) and replacing `dtcg_values.py`. `read_tokens()` and the Node reader take a DTCG token file; `figma_to_tokens.py --format dtcg` writes one from a Figma export or a `tokens.css`; `diff_system.py` takes DTCG snapshots; the migration proposal is written as `tokens.json` too; `/install-gate` vendors `dtcg.py`. Two rounds of review found 14 real issues (Codex 7, CodeRabbit 7), each fixed with a test.
-  - **#102 (P31 part 2): Tokens Studio**, merged as `2cb299d`. A Studio export's sets merge (source, then enabled, in set order), each theme group is a collection whose modes are its themes, the legacy keys, Studio's types and its math are read, and `read_tokens()` reads the default theme. A DTCG `number` or `fontWeight` is written unitless. Review: Codex 3 and CodeRabbit 7 (one carried from #101), each fixed with a test; among them, `pointer_alias` read `{x} + {x}` as one reference, and a palette each theme reads was lost.
-- **The plan:** 31 open items, 31 scheduled. LC-C2 and LC-B2 close with P31 part 3. About 1,015 tests.
+- **Merged this session**, each with CI green on its head, every thread resolved, CodeRabbit finished and GitHub clean:
+  - **#105 (P31 part 3): the DTCG resolver module**, merged as `ed3667c`. `figma_to_tokens.py --format dtcg --out-dir DIR` writes `tokens.json`, each theme's or density's overrides and `tokens.resolver.json`, from a Figma export, a Tokens Studio export or a `tokens.css`. Both Figma scripts read a resolver as modes; `read_tokens()` and the Node reader read its default. Review found 8 real issues (Codex 4, CodeRabbit 4), each fixed with a test: a pointer to one source, a context's spaces and escaped quotes, sources outside the resolver's folder (by name and through a link), and odd shapes that raised.
+  - **#106 (P31 part 4): `$deprecated` into the release gate**, merged as `9fd1fec`. A token the old DTCG snapshot marks counts as recorded in `diff_system.py`; `deprecate.py import` writes the marks into the ledger. Closes LC-C2. CodeRabbit found 1 real issue: a later tokens.css or contract.json that set a token again did not take its mark off.
+  - **#107 (P31 part 5): Style Dictionary's and Terrazzo's names**, merged as `28c73da`. `.design-suite.json`'s `names` (`prefixes`, `rename`); the spec's `tiers.names` first, then the audit, stylelint and ESLint read Law 6 through it. Closes LC-B2. Codex found 3 real issues, all in ESLint's `(--name)` pattern, which did not follow the map's order, and CodeRabbit 1: the gates matched a renamed ramp step by its old name. The project's ramp steps are now read through the map too, and the spec's `tiers.names.overlaps` holds every case.
+- **At the end:** `main` is this docs PR's merge (#108), on top of #107's `28c73da`, with CI green on each code PR's head. No other PR is open, and the checkout at `C:\DEV\Pro-Web-Designer-Suite-Plug-in` is on `main` with no other worktree.
+- **The plan:** 29 open items, 29 scheduled. About 1,036 tests.
 - **No eval was run** this session (none was asked for).
 
 ## Next steps
 
-1. **P31 part 3:** themes written through the DTCG resolver module (`--format dtcg` with modes, and reading a `.resolver.json`), `$deprecated` into the deprecation ledger and the diff, and the Style Dictionary and Terrazzo name routes onto the contract's grammar (spec first, all three gates).
-2. Then P32, P33, P38, P39 and P40, and R3.6 releases 3.6.0. Phase 6b (4.0.0) follows.
+1. **P32: Figma on every plan** (LC-B1, LC-B6, LC-C7): a `--reverse --format plugin-script` route for `use_figma`, a routing row for the Figma MCP server's `get_variable_defs`, and each plan's mode limits in the audit.
+2. Then P33, P38, P39 and P40, and R3.6 releases 3.6.0. Phase 6b (4.0.0) follows.
 
 ## Open owner decisions
 
-- **`evals.yml` on a tag** (from the last session): a release runs the suite twice. Drop the tag trigger, or keep cancelling the tag's run?
-- **The `dtcg-export` eval** (`evals/lifecycle/dtcg-export`, about $0.30) can now be graded against a script route: run it when the owner says so.
+- **`evals.yml` on a tag** (asked again at this session's start, no answer yet): a release runs the suite twice. Drop the tag trigger, or keep cancelling the tag's run?
+- **The `dtcg-export` eval** (`evals/lifecycle/dtcg-export`, about $0.30) can be graded against the script route, now with themes: run it when the owner says so.
 
 ## Warnings
 
-- **A worktree in the scratchpad hits Windows' 260-character path limit** (`evals/boundaries/...`): create it with `git -c core.longpaths=true worktree add`, and expect `check.py` there to error on those files; run the suite in the main checkout instead.
-- **Staged changes travel with `git checkout`.** The first draft of these docs, staged on the docs branch, rode into #102's last commit (`7d300c6`) and so into `main`; this PR corrects it. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
-- **A fail-before run can hang** when the old code has the bug being fixed (an exponential `$extends` fan-out did): give it a timeout and stop it with `TaskStop`.
+- **The masters and their copies.** After every merge from a branch below, copy `shared/dtcg.py`, `shared/project_config.py` and `shared/project_config.mjs` over every copy (ten, ten and seven), then run `TheCopiesAreTheMaster`. Git merges each copy on its own.
+- **A worktree in the scratchpad hits Windows' 260-character path limit** (`evals/boundaries/...`): create it with `git -c core.longpaths=true worktree add`, run targeted tests there, and the full `check.py` in the main checkout. This session fixed #105's review findings in a worktree while `check.py` ran in the main one.
+- **Bash heredocs eat backslashes**, quoted or not, and a heredoc holding `'''` breaks the shell's parse. Write edit scripts with the Write tool; fix a backslash in one with the Edit tool.
+- **The token counter resets on every `<ci-monitor-event>`**, acknowledgements included. Keep a running total.
 - **The scratch repository** `Vybecode-LTD/wds-gate-scratch` is private and the owner's to delete.
-- **CodeRabbit's free tier:** one review an hour; after a "Review limit reached", comment `@coderabbitai review` once it resets.
+- **CodeRabbit's free tier:** one review an hour; it skips a stacked PR until it targets `main` (comment `@coderabbitai review` after retargeting).
 - **Still open from earlier:** `perf_audit.py` and an unbundled `@import` chain; headless sessions refused a skill's reference files; the hydration and `test_critique_snapshots` flakes; three tokens outside Display P3; `check_roles.py` clips outside sRGB; the worked examples are tests; a local build never matches the release's checksums; don't grep `tooling/`; the repository is public.

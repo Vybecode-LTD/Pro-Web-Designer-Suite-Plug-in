@@ -1,11 +1,12 @@
 # Start here: the next session
 
-**Written 2026-10-10 (the fifth session that day)**, at the end of the session that:
-- merged P31 part 1 (#101): `shared/dtcg.py`, DTCG 2025.10 read and write, copied beside every `project_config.py`; every token reader takes a DTCG file; `figma_to_tokens.py --format dtcg`; DTCG snapshots in `diff_system.py`; the migration proposal as `tokens.json`;
-- merged P31 part 2 (#102): Tokens Studio exports read as Tokens Studio reads them, `$themes` as modes, its math worked out;
-- fixed 24 real review findings across the two (§0).
+**Written 2026-10-11**, at the end of the session that:
+- merged P31 part 3 (#105): themes through the DTCG resolver module, written with `--format dtcg --out-dir` and read as modes;
+- merged P31 part 4 (#106): `$deprecated` reaches the release gate, and `deprecate.py import` writes it into the ledger;
+- merged P31 part 5 (#107): `.design-suite.json`'s `names` maps Style Dictionary's and Terrazzo's names onto the grammar for Law 6 in all three gates;
+- fixed 13 real review findings: 8 on #105, 1 on #106 and 4 on #107 (§0). **P31 is done: LC-C2 and LC-B2 are closed.**
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P31 part 3** (§4), then the rest of Phase 6 (§5).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P32** (§4), then the rest of Phase 6 (§5).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -47,7 +48,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - **You merge** (the user, 2026-10-03) once a PR is ready:
     - CI is green on its head.
     - Every review thread is answered and resolved.
-    - CodeRabbit's check has finished on the head.
+    - CodeRabbit's check has finished on the head. When the head only fixes CodeRabbit's own finding and its hourly review is spent, the check reads "Review rate limited"; its reply on the thread confirming the fix stands in for a review (#106 and #107, 2026-10-11).
     - GitHub reports it clean against its base.
   - **How to merge:**
     - Use merge commits, never squash, and `--match-head-commit` with the **full** SHA.
@@ -102,6 +103,13 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Never drop silently:** every value left out is named; a `*/` in a description cannot end a CSS comment; a cycle (`$extends`, or `a -> {b} -> {a}`) is reported.
       - **A partial mode map** (a token only the Dark theme sets) must not be promoted to `:root`, and a source set only some themes read (a palette per theme) is a mode.
       - **A reference's body holds no brace:** `{x} + {x}` is math, not one reference. Remember each lookup, or a fan-out of `{x} + {x}` runs 2^N times.
+    - **The 2026-10-11 session's reviews found 8 real issues on #105** (Codex 4 over two rounds, CodeRabbit 4), each fixed with a test failing on the head it reviewed; then 1 on #106 (CodeRabbit) and 4 on #107 (Codex 3, CodeRabbit 1). The lessons, for any reader that follows a reference:
+      - **Read the whole of what a spec allows to be referenced:** the resolver module allows a pointer anywhere but a modifier or `resolutionOrder` (`#/sets/base/sources/0`), not only `#/sets/<name>`.
+      - **A file reference is a path a stranger chose:** refuse an absolute name, a drive, a `..` step (either separator), and then compare real paths, since a symlink or a junction inside the folder can still point out. The hooks read a cloned repository's token files on their own.
+      - **A value a selector carries keeps its exact text:** spaces in `[data-theme="high contrast"]`, and CSS escapes (`\"`, `\22 `) both ways. Never slug a value the page matches against.
+      - **A pattern built to stand in for a function must follow its rules exactly** (Codex on #107, 3 findings): ESLint's `(--name)` regex tried every prefix where `grammarName()` takes the first that fits, missed project ramps under a prefix, and the raw-name check still fired on a name the map turns into a role. Put each such case in the spec's examples. And map both sides (CodeRabbit on #107): the project's ramp steps are read through the same `names` as the reference, so a step renamed to a role passes and a prefixed step in the tokens file is still a primitive. A reviewer's literal fix (compare the mapped name with the raw steps) would have broken the Style Dictionary case; check a suggested fix against every case before taking it.
+      - **A reader that follows another's order must follow all of it** (CodeRabbit on #106): `read_deprecations()` read files in `read_tokens()`'s order but skipped the CSS and contract files, so a later `tokens.css` that set a token again left the DTCG file's mark on it.
+      - **Guard every type a JSON key can hold before using it** (`default` a list, `sets` a list), and keep the Python and Node readers equal on each.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -147,19 +155,22 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
    - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions, and the owner's no to `bin/`.
    - §1 is the plugin-evals page, §10 P29's choices, and **§11 the sandboxing page and P30's choices**, with the first runs. Read §11 if you touch the evals.
-   - **Before P31 part 3, re-read at their sources** the pages §4 lists, and register every figure in `evidence.json`.
+   - **Before P32, re-read at their sources** the pages §4 lists, and register every figure in `evidence.json`.
 4. Check the state, with the Bash tool:
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `31 open items, 31 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `29 open items, 29 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
 
 - **DTCG (#101, #102).** `shared/dtcg.py` is the master, copied beside every `project_config.py` (`test_dtcg.TheCopiesAreTheMaster`); `project_config.py` loads the copy beside it by path. `normalise()` (the Figma scripts' reading, string forms) and `tokens()` (lossless, CSS names) read 2025.10 and Tokens Studio (`studio_document`, `studio_themes`); `document()` writes 2025.10 from CSS custom properties. `project_config.mjs` ports the reading, numbers formatted as Python's `f"{round(x, 6):g}"`, and `TheNodeReaderAgrees` holds them equal on every value form. `figma_common.parse_studio` makes each Studio theme group a collection; `FVar` carries `deprecated`, `dtcg_type` and `partial`.
-- **The plugin** is `plugins/web-design-suite/` (about 1,015 tests):
+- **The resolver (#105).** `dtcg.resolver_document(data, base, inputs, only)` merges a resolver's `resolutionOrder` for a choice of contexts (each modifier's string `default`, else its first, which is reported); `resolver_modifiers()`, `token_paths()`, `resolver()` (the writer), `outside()` and `file_loader()` (its real path must stay in the folder, else `OutsideFolder`). `figma_to_tokens.py --format dtcg --out-dir` writes `tokens.json`, `theme-<x>.json` or `density-<x>.json` (overrides only, `document(only=...)`) and `tokens.resolver.json`; `css_blocks()` and `figma_blocks()` feed `dtcg_files()`. `figma_common.parse_resolver()` makes each modifier a collection with `FCollection.kind`, and `mode_selector(mode, default, kind)` writes a theme or density context as the value itself (`css_escape`). Unreadable sources are `FDoc.unread` (`unread-source`, `UNREAD_SOURCE`). The Node port is `resolverDocument()` in `project_config.mjs`.
+- **The ledger (#106).** `project_config.read_deprecations(paths)` and `replacement_of(reason)`; `diff_system.marked_deprecations()` adds a record (`"marked"`) for each token the old DTCG snapshot marks; `deprecate.py import FILE… --since --removal`.
+- **The names (#107).** `.design-suite.json`'s `names`: `prefixes` (each ending in `-`) and `rename`. `ProjectConfig.grammar_name()`, `grammarName()` and `lintProject().grammarName`; the audit's `tier1_advice`, stylelint's and ESLint's `tier1Advice` read through it, and ESLint's `NAMED_SHORTHAND` covers `(--name)` classes. The spec's `tiers.names` holds the examples; `test_real_tools.TheGatesReadTheNames` runs them.
+- **The plugin** is `plugins/web-design-suite/` (about 1,036 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -251,36 +262,32 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. P31 part 3: the resolver, the ledger and the name routes
+## 4. P32: Figma on every plan
 
-**Items:** LC-C2 and LC-B2, which close with this part. Read each inventory row, then LC-B2's paragraph in `web-design-suite-review/lifecycle.md` (about line 90): its last three bullets are this part.
+**Items:** LC-B1, LC-B6 and LC-C7, which close with it. Read each inventory row, then their paragraphs in `web-design-suite-review/lifecycle.md` (LC-B1 at about line 89, LC-B6 at about 104, LC-C7 in the C table at about 118), and LC-A7, which LC-C7 fixes.
 
-**What parts 1 and 2 left** (the CHANGELOG's `3.6.0 — unreleased` has the detail):
-- **Writing themes.** `figma_to_tokens.py --format dtcg` writes the default mode only and names each theme or density block as left out. Write the modes through the DTCG **resolver module** (2025.10, stable): a base `tokens.json`, one file per mode with its overrides, and a `*.resolver.json` with `sets`, `modifiers` (one per theme group, `contexts` per mode, `default`) and `resolutionOrder`. Terrazzo 2 reads it; Style Dictionary 5 does not yet ("does not have full support yet" for 2025.10). Decide: `--out-dir` writes the three, or `--format dtcg` with modes requires `--out-dir`.
-- **Reading a resolver.** `figma_common.load_document` and `read_tokens()` on a `*.resolver.json`: the sets and each modifier's default context, as the default theme; the modifiers as modes, as `parse_studio` does for Tokens Studio's groups. A token two groups set is now named as left out (Codex on #102); the resolver's permutations are the way to write both.
-- **`$deprecated` into the ledger.** `deprecate.py` (design-system-versioning) gains a way to import a DTCG file's `$deprecated` tokens as ledger entries (a subcommand, or `diff_system.py --deprecations` reading `$deprecated` from the new snapshot), so a removal the file already deprecates passes the gate. `dtcg.tokens()` keeps `deprecated` on each `Token`; `figma_common.FVar.deprecated` carries it on the Figma route.
-- **The Style Dictionary and Terrazzo name routes.** Their default names are the path joined by `-` (`color.bg.surface` is `--color-bg-surface`, `color.neutral.500` is `--color-neutral-500`), so the tier and Law 6 checks, which read the contract's grammar (`--bg-surface`, `--neutral-500`), do not see the roles. Give `.design-suite.json` a way to map a project's names onto the grammar (a prefix to strip per category, such as `color-`, or a rename table), read by `project_config.py` and `.mjs` and applied in the audit, the stylelint config and the ESLint config. **One set of rules:** the change goes into `design-rules.json` first, with `allowed` and `refused` examples, then the three gates, each with a real-tool test. If a gate cannot follow yet, record it as an item and schedule it (N37 is the model).
+**What is there now.** `figma_to_tokens.py --reverse` builds a body for `POST /v1/files/:key/variables`, which needs an Enterprise plan. The reading side takes a REST export, a plugin export, DTCG (with Tokens Studio and, since #105, a resolver) and records.
 
-**Re-read first, and register any figure in `evidence.json`:** the resolver module (https://www.designtokens.org/tr/2025.10/resolver/), Style Dictionary 5's name transforms and its DTCG page (https://styledictionary.com/info/dtcg/), Terrazzo's CSS plugin (`variableName`, `permutations`) and its resolver guide, and sd-transforms' `permutateThemes` source. npm on 2026-10-10: style-dictionary 5.6.1, @tokens-studio/sd-transforms 2.0.3, @terrazzo/cli 2.7.1.
+**The work:**
+- **A route without Enterprise (LC-B1, LC-C7).** `--reverse --format plugin-script` writes a script for the Plugin API, which `use_figma` (the Figma MCP server) or a plugin runs. It renames "Mode 1" to the default mode's name, sets `scopes: []` on primitives (so they stay out of the pickers), and sets `codeSyntax.WEB` to `var(--name)`. A SKILL.md routing row: when the MCP tool `get_variable_defs` is available, read with it.
+- **Each plan's limits (LC-B6).** Modes per collection by plan. The review says Starter 1, Professional 10, Organization 20, Enterprise 40, from Figma's "What's new from Schema 2025" and the REST variables page. Re-read both, and register each figure in `evidence.json`. Then `figma_audit.py` reports a theme × density × brand set that exceeds the plan (a `--plan` flag, or `.design-suite.json`), and MISSING_DARK_MODE does not fire where a plan allows one mode. Also: branch file keys, and published styles versus local ones.
 
-**Tests:** a resolver round trip (a `tokens.css` with `[data-theme="dark"]` to DTCG with a resolver and back to the same CSS), a resolver read as modes, a `$deprecated` token reaching the ledger and the gate, and a Style Dictionary-named project whose roles the audit and both lint configs see. Run `fail_before.py` against `v3.5.0` and against `main`'s head.
+**Re-read first, and register every figure:** the Figma Plugin API's variables pages (`figma.variables.createVariable`, `setValueForMode`, `scopes`, `codeSyntax`), the Figma MCP server's tool list (`get_variable_defs`, `use_figma`), Schema 2025's notes, and the REST variables limits.
 
-**Size:** M-L. Split it if it grows (the resolver first, then the ledger, then the name routes), keeping a row named `P31` for what is still to come.
+**Tests:** the plugin script is valid JavaScript (run it under Node against a stub `figma` object that records each call); it renames Mode 1, scopes primitives out and writes `codeSyntax.WEB`; the mode-limit finding per plan; MISSING_DARK_MODE quiet on Starter. Run `fail_before.py` against `v3.5.0`.
 
-**Evals:** `evals/lifecycle/dtcg-export` grades a DTCG export. Ask the owner before running it (one case, two arms, about $0.30).
-
-**Close:** LC-C2 and LC-B2 in the inventory; the plan's `P31` row renamed `P31 part 3, #N`; the CHANGELOG under `## 3.6.0 — unreleased`.
+**Size:** M. **Close:** LC-B1, LC-B6 and LC-C7 in the inventory; the plan's `P32` row renamed `P32, #N`; the CHANGELOG under `## 3.6.0 — unreleased`.
 
 ## 5. Then the rest of Phase 6
 
-**Ask the owner first** (the HANDOFF's open decision): `evals.yml` runs on a `v*` tag as well as by hand, so a release runs the suite twice. The pre-tag dispatch is the one that gates the release; the tag's own run re-tests the same commit for about $9. This session cancelled it. Drop the tag trigger, or keep cancelling it?
+**Ask the owner first** (the HANDOFF's open decision, asked again on 2026-10-11 with no answer yet): `evals.yml` runs on a `v*` tag as well as by hand, so a release runs the suite twice. The pre-tag dispatch is the one that gates the release; the tag's own run re-tests the same commit for about $9. Drop the tag trigger, or keep cancelling it?
 
 
 **The owner reordered Phase 6 on 2026-10-11** (the plan's §4 and D6): the non-breaking half ships first as **3.6.0**, then 4.0.0.
 
 Phase 6a, 3.6.0, in this order unless the owner says otherwise:
-- P31 part 3 (§4);
-- P32: Figma on every plan;
+- P31: done (#101, #102, #105 to #107);
+- P32: Figma on every plan (§4);
 - P33: `light-dark()`;
 - P38: modern CSS;
 - P39: migration coverage;
