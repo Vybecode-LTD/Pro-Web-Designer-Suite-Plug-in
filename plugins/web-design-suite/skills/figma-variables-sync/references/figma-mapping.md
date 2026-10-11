@@ -682,7 +682,8 @@ seat or better. Write tools are exempt from the rate limits.
   cannot hold. Without a plan, neither changes.
 - **`--reverse --format plugin-script --plan PLAN`** reports the same before the
   run (`mode-limit`, exit 1); the script itself reports each mode Figma refuses.
-  The REST body is checked against the endpoint's own maximum of 40 modes.
+  The REST body is checked against the endpoint's own maximum of 40 modes, and past it
+  none is written (exit 2): Figma refuses the whole request.
 - **The Plugin API says only** that `addMode` "is limited by the current file's
   pricing tier". Older guides give Professional four modes; the plan comparison
   and Schema 2025's notes give 10, and those are what the audit uses.

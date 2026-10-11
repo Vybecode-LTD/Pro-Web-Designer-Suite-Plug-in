@@ -645,14 +645,17 @@ class PlanLimits(TempDirTest):
     def test_the_rest_body_keeps_to_the_endpoints_cap(self):
         tokens = {"semantic": {"bg-surface": {"value": "#ffffff"}},
                   "themes": {f"t{n}": {"bg-surface": {"value": "#000000"}} for n in range(40)}}
+        out = self.tmp / "payload.json"
         proc = run_py("figma-variables-sync", "figma_to_tokens", self.write("tokens.json", json.dumps(tokens)),
-                      "--reverse", cwd=self.tmp)
-        self.assertEqual(proc.returncode, 1, output(proc))
+                      "--reverse", "--out", out, cwd=self.tmp)
+        self.assertEqual(proc.returncode, 2, output(proc))
         self.assertIn("`semantic` needs 41 modes, and the REST API allows 40 per collection.", output(proc))
+        self.assertFalse(out.exists(), "a body Figma refuses whole is written")   # CodeRabbit on #111
         del tokens["themes"]["t0"]
         proc = run_py("figma-variables-sync", "figma_to_tokens", self.write("tokens.json", json.dumps(tokens)),
-                      "--reverse", cwd=self.tmp)
+                      "--reverse", "--out", out, cwd=self.tmp)
         self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertEqual(len(json.loads(out.read_bytes())["variableModes"]), 40)
 
     def test_the_plans_are_the_configs(self):
         common = load_script("figma-variables-sync", "figma_common")

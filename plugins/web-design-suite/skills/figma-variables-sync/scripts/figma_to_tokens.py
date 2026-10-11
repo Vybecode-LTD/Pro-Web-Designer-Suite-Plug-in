@@ -1475,6 +1475,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                                     plan=plan)
             else:
                 text, problems = emit_reverse(data, collection_split=not args.flat)
+                if any(p.kind == "mode-limit" for p in problems):
+                    # Figma refuses the whole POST, so a body past the cap is a
+                    # trap: write nothing (CodeRabbit on #111).
+                    report_problems(problems, args.quiet)
+                    print("No body written: Figma refuses a POST with a collection past its mode cap. "
+                          "Split the modes across collections, or use --format plugin-script.",
+                          file=sys.stderr)
+                    return 2
             write_out(text, args.out)
             report_problems(problems, args.quiet)
             return 1 if problems else 0
