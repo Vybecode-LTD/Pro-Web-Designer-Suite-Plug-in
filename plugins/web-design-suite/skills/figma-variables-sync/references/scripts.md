@@ -28,7 +28,7 @@ Exit: `0` clean · `1` findings · `2` unreadable or empty input.
 ## 2. `scripts/figma_to_tokens.py`
 
 ```
-figma_to_tokens.py <file> [--format css|json|ts|all] [--out FILE] [--out-dir DIR]
+figma_to_tokens.py <file> [--format css|json|ts|dtcg|all|plugin-script] [--out FILE] [--out-dir DIR]
                    [--reverse] [--flat] [--shape …] [--collection NAME]
                    [--color-format oklch|hex] [--unit rem|px] [--full-themes]
                    [--tokens FILE] [--quiet]
@@ -38,6 +38,7 @@ figma_to_tokens.py <file> [--format css|json|ts|all] [--out FILE] [--out-dir DIR
 |---|---|
 | `--format all --out-dir` | Writes `tokens.css`, `tokens.json`, `tokens.ts` together |
 | `--reverse` | Reads a `tokens.json` (or a flat `{name: value}` map), emits a Figma `POST …/variables` body |
+| `--reverse --format plugin-script` | The same variables as Plugin API code, for any plan: run it with the Figma MCP server's `use_figma`, or in a development plugin. It finds collections, modes and variables by name, creates what is missing, updates what differs and deletes nothing |
 | `--flat` | With `--reverse`: one Figma collection instead of one per tier |
 | `--unit px` | Emit px instead of rem (hairlines and strokes stay px regardless) |
 | `--full-themes` | Restate every token in each theme block rather than only the re-points |

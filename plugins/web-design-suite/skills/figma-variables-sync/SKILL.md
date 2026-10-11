@@ -247,19 +247,19 @@ What it does, and what it refuses to do:
 Reverse, to make Figma the mirror:
 
 ```bash
-python scripts/figma_to_tokens.py design/tokens.json --reverse \
-  --out figma-payload.json
+# any plan: Plugin API code for use_figma or a development plugin
+python scripts/figma_to_tokens.py design/tokens.json --reverse --format plugin-script --out figma-variables.js
+# Enterprise: a body for POST /v1/files/:file_key/variables
+python scripts/figma_to_tokens.py design/tokens.json --reverse --out figma-payload.json
 ```
 
-That is a body for `POST /v1/files/:file_key/variables` — collections, modes,
-variables and mode values with temporary ids, `{r,g,b,a}` colours in 0..1,
-`{"type":"VARIABLE_ALIAS","id":…}` references, and a `codeSyntax.WEB` of
-`var(--token)` on every variable so Figma's dev mode shows the real name. It
-holds only the endpoint's four arrays, so it is POSTed as written. Each
-collection's first mode is named by an `UPDATE` on its temporary id (Figma
-creates it with its own name). Primitives get `scopes: []`, so no picker offers
-them: a designer binds `bg/surface`, never `neutral/0` (Law 6). It builds the
-body; it never calls the API.
+Both carry the same variables: aliases as aliases, `{r,g,b,a}` colours in 0..1,
+a `codeSyntax.WEB` of `var(--token)` so dev mode shows the real name,
+each collection's first mode renamed from Figma's "Mode 1", and `scopes: []` on
+primitives, so no picker offers them: a designer binds `bg/surface`, never
+`neutral/0` (Law 6). The script finds everything by name, updates what differs
+and deletes nothing, so a re-run is a sync; the body holds only the endpoint's
+four arrays. Neither calls the API (`references/figma-mapping.md` §14).
 
 **Composites do not cross, in either direction.** `--type-*`, `--motion-*`,
 `--shadow-*`, `--elevation-*` and the `clamp()`ed fluid steps are CSS shorthands;
@@ -318,7 +318,8 @@ old, say so.
 | "Does this design match the system?" | Step 2 |
 | "They used a colour that isn't ours" | Step 3, decision rule |
 | "I need tokens.css from this file" | Step 4 |
-| "How do I get our tokens into Figma?" | Step 4, `--reverse` |
+| "How do I get our tokens into Figma?" | Step 4, `--reverse --format plugin-script` (any plan) |
+| Figma's MCP server is connected | `get_variable_defs` reads a selection, as records; `use_figma` runs the plugin script (`references/figma-mapping.md` §14) |
 | "Which side wins?" | Step 5 |
 | "What does a Figma collection map to?" | `references/figma-mapping.md` §2 |
 | "What does auto-layout map to?" | `references/figma-mapping.md` §9 |
