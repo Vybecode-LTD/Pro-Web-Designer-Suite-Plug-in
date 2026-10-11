@@ -235,8 +235,16 @@ const RAW_COLOR = new RegExp(
  * roles under --space- and the null-outs are the spec's (design-rules.json:
  * tiers), so `p-(--space-section)` and `shadow-(--shadow-none)` pass, as they
  * do in the audit and stylelint. */
+/* A name the project's `names` maps (P31 part 5) is judged by its mapped name
+ * alone, in NAMED_SHORTHAND below, never by its own spelling here (Codex on
+ * #107): `(--neutral-brand)` renamed to a role passes. Prefixes and renamed
+ * names hold only letters, digits, `_` and `-` (project_config checks them). */
+const MAPPED = [
+  ...PROJECT.names.prefixes.map((p) => String.raw`(?!${p}[\w-])`),
+  ...Object.keys(PROJECT.names.rename).map((n) => String.raw`(?!${n.slice(2)}\))`),
+].join('');
 const TIER1_SHORTHAND = new RegExp(
-  String.raw`\((?:[a-z-]+:)?--(?!(?:${[...TIER2_EXCEPTIONS, ...TIER1_NULLS].map((n) => n.slice(2)).join('|')})\))` +
+  String.raw`\((?:[a-z-]+:)?--${MAPPED}(?!(?:${[...TIER2_EXCEPTIONS, ...TIER1_NULLS].map((n) => n.slice(2)).join('|')})\))` +
     String.raw`(?:${Object.keys(TIER1_WITH_ROLE).join('|')})[\w-]*\)`,
 );
 
@@ -271,7 +279,17 @@ const PROJECT_SHORTHAND = SHORTHAND_STEPS.length
 const NAMED_SHORTHAND = (() => {
   const { prefixes, rename } = PROJECT.names;
   const kept = [...TIER2_EXCEPTIONS, ...TIER1_NULLS].map((n) => n.slice(2)).join('|');
-  const parts = prefixes.map((p) => String.raw`--${p}(?!(?:${kept})\))(?:${Object.keys(TIER1_WITH_ROLE).join('|')})[\w-]*`);
+  // What follows a prefix: a primitive with a role, or a step of the project's
+  // own ramps (Codex on #107), as tier1Advice() reads a mapped name.
+  const steps = PROJECT.rampSteps.filter((n) => /^--[\w-]+$/.test(n)).map((n) => n.slice(2));
+  const rest = String.raw`(?:(?:${Object.keys(TIER1_WITH_ROLE).join('|')})[\w-]*` +
+    (steps.length ? `|(?:${steps.join('|')}))` : ')');
+  // grammarName()'s order: a rename first, then the first prefix that fits.
+  const notRenamed = Object.keys(rename).map((n) => String.raw`(?!${n.slice(2)}\))`).join('');
+  const parts = prefixes.map((p, i) => {
+    const earlier = prefixes.slice(0, i).map((q) => String.raw`(?!${q}[\w-])`).join('');
+    return String.raw`--${notRenamed}${earlier}${p}(?!(?:${kept})\))${rest}`;
+  });
   const renamed = Object.keys(rename).filter((n) => /^--[\w-]+$/.test(n) && tier1Advice(n));
   if (renamed.length) parts.push(`(?:${renamed.join('|')})`);
   return parts.length ? new RegExp(String.raw`\((?:[a-z-]+:)?(?:${parts.join('|')})\)`) : null;

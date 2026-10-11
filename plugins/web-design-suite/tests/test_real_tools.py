@@ -763,16 +763,36 @@ class TheGatesReadTheNames(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        from test_rules_spec import SPEC, in_layer, jsx_component
+        from test_rules_spec import SPEC
         names = SPEC["tiers"]["names"]
-        cls.files, cls.verdicts = {}, {}
+        overlaps = names["overlaps"]                 # Codex on #107: the map's order, and ramps
+        cls.found, cls.files, cls.verdicts = {}, {}, {}
+        for key, rules, config in (
+                ("names", names, {"schema": 1, "names": names["config"]}),
+                ("overlaps", overlaps, {"schema": 1, "tokens": "tokens.css", "names": overlaps["config"]})):
+            files, verdicts = cls.examples(rules)
+            extra = {"tokens.css": rules["tokens"]} if "tokens" in rules else {}
+            cls.files[key], cls.verdicts[key] = files, verdicts
+            cls.found[key] = cls.run_gates(f"wds-{key}-", {".design-suite.json": json.dumps(config), **extra}, files)
+            if key == "names":                       # the control: the same files, no config
+                cls.found["none"] = cls.run_gates("wds-names-none-", extra, files)
+
+    @staticmethod
+    def examples(rules):
+        from test_rules_spec import in_layer, jsx_component
+        files, verdicts = {}, {}
         for verdict in ("allowed", "refused"):
-            for n, css in enumerate(names[verdict]):
+            for n, css in enumerate(rules[verdict]):
                 name = f"src/components/{verdict}-{n}.css"
-                cls.files[name], cls.verdicts[name] = in_layer("components", css), verdict
-            for n, jsx in enumerate(names[f"{verdict}_jsx"]):
+                files[name], verdicts[name] = in_layer("components", css), verdict
+            for n, jsx in enumerate(rules[f"{verdict}_jsx"]):
                 name = f"src/components/{verdict.capitalize()}{n}.jsx"
-                cls.files[name], cls.verdicts[name] = jsx_component(jsx), verdict
+                files[name], verdicts[name] = jsx_component(jsx), verdict
+        return files, verdicts
+
+    @classmethod
+    def run_gates(cls, prefix, config, files):
+        """{file: the gates that refuse it under Law 6} in a project of `files`."""
         a11y = entry_url(ESLINT_ROOTS, "eslint-plugin-jsx-a11y")
         design = (CONFIGS / "eslint.design.config.mjs").read_text(encoding="utf-8")
         tools = {"stylelint.config.mjs": (CONFIGS / "stylelint.config.mjs").read_text(encoding="utf-8"),
@@ -783,55 +803,53 @@ class TheGatesReadTheNames(unittest.TestCase):
                                        "  { files: ['**/*.jsx'], languageOptions: { parserOptions: "
                                        "{ ecmaFeatures: { jsx: true } } } },\n"
                                        "  ...design,\n];\n")}
-        cls.found = {}
-        for kind, config in (("names", {".design-suite.json": json.dumps({"schema": 1, "names": names["config"]})}),
-                             ("none", {})):
-            tmp = temp_project(cls, f"wds-names-{kind}-", STYLELINT_MODULES)
-            write_files(tmp, {**tools, **config, **cls.files})
-            css = [n for n in cls.files if n.endswith(".css")]
-            jsx = [n for n in cls.files if n.endswith(".jsx")]
-            found = {name: set() for name in cls.files}
-            proc = subprocess.run([NODE, str(pathlib.Path(STYLELINT_MODULES) / "stylelint" / "bin" / "stylelint.mjs"),
-                                   *css, "--config", "stylelint.config.mjs", "--formatter", "json"],
-                                  cwd=tmp, capture_output=True, timeout=300, env=env())
-            report = json_report(proc)
-            if proc.returncode not in (0, 2) or report is None:
-                raise AssertionError(output(proc))
-            for r in report:
-                rel = pathlib.Path(r["source"]).resolve().relative_to(tmp.resolve()).as_posix()
-                if any(w["rule"] == "design/tier1-primitive" for w in r["warnings"]):
-                    found[rel].add("stylelint")
-            proc = subprocess.run([NODE, str(pathlib.Path(ESLINT_MODULES) / "eslint" / "bin" / "eslint.js"),
-                                   "-c", "eslint.config.mjs", "--format", "json", *jsx],
-                                  cwd=tmp, capture_output=True, timeout=300, env=env())
-            if proc.returncode not in (0, 1):
-                raise AssertionError(output(proc))
-            for r in json.loads(proc.stdout):
-                rel = pathlib.Path(r["filePath"]).resolve().relative_to(tmp.resolve()).as_posix()
-                if any("Law 6" in m["message"] for m in r["messages"] if m["severity"] == 2):
-                    found[rel].add("eslint")
-            proc = run_py("web-design-studio", "audit_design", "src", "--json", cwd=tmp)
-            if proc.returncode not in (0, 1):
-                raise AssertionError(output(proc))
-            for f in json.loads(proc.stdout):
-                rel = "src/" + f["file"].replace("\\", "/").split("src/")[-1]
-                if f["law"] == "L6" and f["severity"] == "error":
-                    found[rel].add("audit")
-            cls.found[kind] = found
+        tmp = temp_project(cls, prefix, STYLELINT_MODULES)
+        write_files(tmp, {**tools, **config, **files})
+        css = [n for n in files if n.endswith(".css")]
+        jsx = [n for n in files if n.endswith(".jsx")]
+        found = {name: set() for name in files}
+        proc = subprocess.run([NODE, str(pathlib.Path(STYLELINT_MODULES) / "stylelint" / "bin" / "stylelint.mjs"),
+                               *css, "--config", "stylelint.config.mjs", "--formatter", "json"],
+                              cwd=tmp, capture_output=True, timeout=300, env=env())
+        report = json_report(proc)
+        if proc.returncode not in (0, 2) or report is None:
+            raise AssertionError(output(proc))
+        for r in report:
+            rel = pathlib.Path(r["source"]).resolve().relative_to(tmp.resolve()).as_posix()
+            if any(w["rule"] == "design/tier1-primitive" for w in r["warnings"]):
+                found[rel].add("stylelint")
+        proc = subprocess.run([NODE, str(pathlib.Path(ESLINT_MODULES) / "eslint" / "bin" / "eslint.js"),
+                               "-c", "eslint.config.mjs", "--format", "json", *jsx],
+                              cwd=tmp, capture_output=True, timeout=300, env=env())
+        if proc.returncode not in (0, 1):
+            raise AssertionError(output(proc))
+        for r in json.loads(proc.stdout):
+            rel = pathlib.Path(r["filePath"]).resolve().relative_to(tmp.resolve()).as_posix()
+            if any("Law 6" in m["message"] for m in r["messages"] if m["severity"] == 2):
+                found[rel].add("eslint")
+        proc = run_py("web-design-studio", "audit_design", "src", "--json", cwd=tmp)
+        if proc.returncode not in (0, 1):
+            raise AssertionError(output(proc))
+        for f in json.loads(proc.stdout):
+            rel = "src/" + f["file"].replace("\\", "/").split("src/")[-1]
+            if f["law"] == "L6" and f["severity"] == "error" and rel in found:
+                found[rel].add("audit")
+        return found
 
     def expected(self, name):
         return {"audit", "stylelint"} if name.endswith(".css") else {"audit", "eslint"}
 
     def test_each_gate_reads_law_6_through_the_names(self):
-        self.assertTrue(self.files)
-        for name, verdict in self.verdicts.items():
-            with self.subTest(file=name, source=self.files[name]):
-                want = self.expected(name) if verdict == "refused" else set()
-                self.assertEqual(want, self.found["names"][name])
+        for key in ("names", "overlaps"):
+            self.assertTrue(self.files[key])
+            for name, verdict in self.verdicts[key].items():
+                with self.subTest(spec=key, file=name, source=self.files[key][name]):
+                    want = self.expected(name) if verdict == "refused" else set()
+                    self.assertEqual(want, self.found[key][name])
 
     def test_without_names_a_prefixed_primitive_is_not_seen(self):
-        for name in self.files:
-            with self.subTest(file=name, source=self.files[name]):
+        for name in self.files["names"]:
+            with self.subTest(file=name, source=self.files["names"][name]):
                 self.assertEqual(set(), self.found["none"][name])
 
 

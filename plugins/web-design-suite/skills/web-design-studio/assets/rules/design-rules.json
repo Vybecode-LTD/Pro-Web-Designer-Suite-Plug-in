@@ -100,7 +100,17 @@
       "refused_jsx": ["<div className=\"bg-(--color-neutral-800)\" />",
                       "<div className=\"p-(--size-space-6)\" />",
                       "<div className=\"border-(--gray-500)\" />",
-                      "<div style={{ '--card-gap': 'var(--size-space-4)' }} />"]
+                      "<div style={{ '--card-gap': 'var(--size-space-4)' }} />"],
+      "overlaps": {
+        "about": "Codex on #107: the gates read a name as grammar_name() does. A rename comes first, then the first prefix that fits, so with color-neutral- before color-, --color-neutral-bg-surface is --bg-surface, a role. A step of the project's own ramps under a prefix (--color-brand-500, with --brand-500 in its tokens) is a primitive with a role. A name the map changes is judged by its mapped name alone, so --neutral-brand renamed to a role passes.",
+        "config": {"prefixes": ["color-neutral-", "color-"], "rename": {"--neutral-brand": "--bg-surface"}},
+        "tokens": "@layer tokens {\n  :root {\n    --brand-500: #b4400a;\n  }\n}\n",
+        "allowed": [".card { background: var(--color-neutral-bg-surface); }",
+                    ".card { border-color: var(--neutral-brand); }"],
+        "refused": [".card { color: var(--color-brand-500); }"],
+        "allowed_jsx": ["<div className=\"bg-(--color-neutral-bg-surface) border-(--neutral-brand)\" />"],
+        "refused_jsx": ["<div className=\"bg-(--color-brand-500)\" />"]
+      }
     }
   },
   "margins_in_components": {
