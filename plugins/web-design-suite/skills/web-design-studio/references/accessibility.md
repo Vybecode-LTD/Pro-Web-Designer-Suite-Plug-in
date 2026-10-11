@@ -281,9 +281,11 @@ So a message about what the dialog did belongs **inside** it: a `popover="manual
 <dialog class="dialog" aria-labelledby="delete-title">
   <h2 id="delete-title">Delete this project?</h2>
   …
-  <div class="toast" popover="manual">Project deleted</div>
+  <div class="toast" popover="manual" role="status"></div>
 </dialog>
 ```
+
+Being reachable is not being announced: `role="status"` makes the toast a live region (4.1.3, and "A toast appears" above). Keep the element in the dialog from the start, show it, then set its text (`toast.showPopover(); toast.textContent = "Project deleted";`): a region that arrives already holding its message is often not read.
 
 ```css
 /* A toast as a popover: in the top layer, placed by inset, not by z-index.

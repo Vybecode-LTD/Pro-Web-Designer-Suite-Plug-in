@@ -62,6 +62,8 @@ if (process.argv[4] === 'top-layer') {
   const { nodes } = await cdp.send('Accessibility.getFullAXTree');
   out.heard = nodes.filter((n) => !n.ignored && n.name && /^Saved (inside|outside)$/.test(n.name.value))
     .map((n) => n.name.value);
+  out.status = nodes.filter((n) => !n.ignored && n.role && n.role.value === 'status')
+    .map((n) => (n.name && n.name.value) || '');
 } else {
   const read = async () => ({ border: await colour('#email', 'borderTopColor'), help: await colour('.field-help', 'color') });
   out.want = { border: await colour('#want-border', 'color'), help: await colour('#want-help', 'color') };
@@ -106,7 +108,8 @@ class TheReferencesInABrowser(TempDirTest):
             "\n#dialog { inline-size: 90vw; block-size: 90vh; max-inline-size: none; max-block-size: none; }"
             "\n#outside { inset: var(--gutter-page) auto auto var(--gutter-page); }")   # apart from the other
         body = ("<div id='ztoast'>z-index toast</div>"
-                "<dialog id='dialog'>Delete?<div id='inside' class='toast' popover='manual'>Saved inside</div></dialog>"
+                "<dialog id='dialog'>Delete?<div id='inside' class='toast' popover='manual' role='status'>"
+                "Saved inside</div></dialog>"
                 "<div id='outside' class='toast' popover='manual'>Saved outside</div>")
         seen = self.run_probe(body, css, "top-layer")
         self.assertEqual(seen["before"], "ztoast", seen)                 # control: on the page, the ladder works
@@ -117,6 +120,11 @@ class TheReferencesInABrowser(TempDirTest):
         self.assertEqual(seen["outside"], "dialog", seen)
         self.assertEqual(seen["inside"], "inside", seen)
         self.assertEqual(set(seen["heard"]), {"Saved inside"}, seen)     # the box and its text
+        self.assertEqual(len(seen["status"]), 1, seen)                   # one live region, reachable (Codex on #113)
+        markup = re.search(r"```html\n(<dialog class=\"dialog\".*?)```",
+                           (STUDIO / "references" / "accessibility.md").read_text(encoding="utf-8"), flags=re.S)
+        self.assertIsNotNone(markup)
+        self.assertIn('popover="manual" role="status"', markup.group(1))
         rect = seen["rect"]                                              # placed by inset, not centred
         self.assertLess(rect["right"], 64, rect)
         self.assertLess(rect["bottom"], 64, rect)
