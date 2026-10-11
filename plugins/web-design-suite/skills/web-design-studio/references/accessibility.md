@@ -262,9 +262,50 @@ A modal dialog must trap focus; nothing else should. Use the platform:
    holds the literal (Law 1). */
 :root { --bg-scrim: oklch(0% 0 0 / 0.5); }
 
-.dialog { z-index: var(--z-modal); box-shadow: var(--elevation-modal); }
+/* No z-index: showModal() puts the dialog in the top layer, where the
+   ladder does not reach (next section). */
+.dialog { box-shadow: var(--elevation-modal); }
 .dialog::backdrop { background: var(--bg-scrim); }
 ```
+
+### The top layer and the z-index ladder
+
+A modal `<dialog>`, a shown popover and a fullscreen element leave the page's stacking contexts for the top layer, and "the last element in the top layer is rendered on top of everything else" ([CSS Positioned Layout 4](https://drafts.csswg.org/css-position-4/#top-layer)). Two consequences the `--z-*` ladder cannot express:
+
+- **Nothing on the page rises above an open modal**, whatever its z-index. A toast at `z-index: var(--z-toast)` (500, the ladder's second rung from the top) sits under the dialog and its backdrop, so the confirmation of the action the dialog just took is hidden by it.
+- **A z-index on a top-layer element orders nothing.** Inside the top layer, the order is the order elements were shown: the last one is on top. `--z-modal` on a dialog opened with `showModal()` does nothing, which is why the rule above has none.
+
+So a message about what the dialog did belongs **inside** it: a `popover="manual"` element in the `<dialog>` (no light dismiss: it closes when your code says) enters the top layer above the dialog when `showPopover()` runs, and it is part of the modal, so it can be clicked and read. A popover shown from elsewhere on the page renders over the dialog as well, but the modal has made the rest of the document inert: clicks pass through it to the dialog, and a screen reader does not reach it. Otherwise show the toast once the dialog has closed. The ladder still orders everything that stays on the page: sticky headers, menus positioned in the document, a hand-rolled overlay.
+
+```html
+<dialog class="dialog" aria-labelledby="delete-title">
+  <h2 id="delete-title">Delete this project?</h2>
+  …
+  <div class="toast" popover="manual">Project deleted</div>
+</dialog>
+```
+
+```css
+/* A toast as a popover: in the top layer, placed by inset, not by z-index.
+   It fades in from @starting-style, and transitions display and overlay
+   with allow-discrete so it stays in the top layer while it fades out. */
+.toast {
+  inset: auto var(--gutter-page) var(--gutter-page) auto;
+  margin: 0;                       /* the UA centres a popover with auto */
+  padding: var(--pad-block-md) var(--pad-inline-md);
+  color: var(--fg-default);
+  background: var(--bg-raised);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-overlay);
+  transition: opacity var(--motion-enter), translate var(--motion-enter),
+              display var(--motion-enter) allow-discrete,
+              overlay var(--motion-enter) allow-discrete;
+}
+.toast:not(:popover-open) { opacity: 0; translate: 0 var(--motion-travel-sm); }
+@starting-style { .toast:popover-open { opacity: 0; translate: 0 var(--motion-travel-sm); } }
+```
+
+`@starting-style` and `transition-behavior: allow-discrete` are Baseline 2024 (Chrome and Edge 117, Firefox 129, Safari 17.5 and 17.4), the Popover API since January 2025 (Safari on iOS 18.3), and `<dialog>` widely available since September 2024 ([web-features](https://github.com/web-platform-dx/web-features/tree/main/features): `starting-style`, `transition-behavior`, `popover`, `dialog`). `overlay` is Chromium's alone (Chrome and Edge 117, not Baseline): elsewhere the toast can leave the top layer before its fade ends, which costs only the exit's look. navigation-code.md's drawer is the same pattern on a `<dialog>`.
 
 ### Skip links
 
@@ -421,9 +462,13 @@ Never `title` — it is a tooltip, not a label, and it does not appear on touch 
 .field { display: grid; gap: var(--gap-tight); }
 .field-help  { font: var(--type-label); color: var(--fg-muted); }
 .field-error { font: var(--type-label); color: var(--fg-danger); }
-.input[aria-invalid="true"] { border-color: var(--border-invalid); }
+.input[aria-invalid="true"], .input:user-invalid { border-color: var(--border-invalid); }
+/* The hint beside an invalid field reads as part of the error. */
+.field:has(:user-invalid) .field-help { color: var(--fg-danger); }
 ```
 (Parents own the gaps — Law 2. The label does not set its own margin.)
+
+**`:user-invalid`, not `:invalid`, for the browser's own checks** (`required`, `type="email"`, `pattern`). `:invalid` matches a required field that is empty on load, so the form opens covered in red before anyone has typed; `:user-invalid` matches only once the user has changed the field or tried to submit. `:has()` lets the field, a fieldset or a form summary follow it with no script. Both are widely available, `:user-invalid` since May 2026 and `:has()` since June 2026 ([web-features](https://github.com/web-platform-dx/web-features/tree/main/features): `user-pseudos`, `has`). Neither changes what a screen reader hears: the message and `aria-invalid` still carry that.
 
 ### Groups
 
