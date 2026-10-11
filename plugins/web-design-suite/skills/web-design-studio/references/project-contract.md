@@ -26,7 +26,7 @@ At the project's root:
 | Key | Holds |
 |---|---|
 | `schema` | `1`. The only key required |
-| `tokens` | The project's token files: a `tokens.css`, a `contract.json`, a DTCG 2025.10 file (`*.json` or `*.tokens`), or a list. A later file's value wins, step by step for a ramp or a scale, so two files may each hold part of one ramp |
+| `tokens` | The project's token files: a `tokens.css`, a `contract.json`, a DTCG 2025.10 file (`*.json` or `*.tokens`) or resolver (`*.resolver.json`), or a list. A later file's value wins, step by step for a ramp or a scale, so two files may each hold part of one ramp |
 | `emailTokens` | The email build's own `email-tokens.json`, a different file that only the email scripts read |
 | `components` | Globs that add to the component files the rule spec names. `*` and `?` stay within a folder, and `**/` is any number of folders, none included |
 | `emails` | Globs of the email templates, read as `components` is: `emails/**/*.html` when the key is left out, and none with `[]` |
@@ -58,7 +58,7 @@ Only a token with a default value is in it; one declared only in a theme or unde
 
 A script that takes a `tokens.css` instead reads it the same way: the custom properties of a rule whose selector starts with `:root` (or `html`, `:where(:root)`, `*`), outside any at-rule but `@layer`, and with no theme or density selector that names a value. It cannot see what extract_system sees, so it takes a token's tier from its value alone: a value that reads another token is a role, and a literal is Tier 1. extract_system reads the name first. On the starter's `tokens.css` the two disagree about eight names, none of them a ramp step or a breakpoint: seven roles with a literal value (`--bg-hover`, `--space-fluid-sm`) and `--shadow-focus`, which reads a token. A `contract.json` is the exact form; give the scripts one when a project's roles matter.
 
-A DTCG 2025.10 file (P31) is any `*.json` or `*.tokens` token file with no `"schema"` that holds a token (`$value`, or a whole-token `$ref`). Each token's name is its path joined by `-`, as Style Dictionary's `name/kebab` and Terrazzo's default write it (`color.bg.surface` is `--color-bg-surface`), a group's `$root` is the group's own name, and a reference is `var(--name)`. Its tiers come from the value, as a `tokens.css`'s do. A value with no CSS form (a typography composite, a boolean) is left out. The scripts read it through `dtcg.py`, a copy of the plugin's `shared/dtcg.py` beside each `project_config.py`, and the lint configs through `project_config.mjs`'s port, held to it by a test.
+A DTCG 2025.10 file (P31) is any `*.json` or `*.tokens` token file with no `"schema"` that holds a token (`$value`, or a whole-token `$ref`). Each token's name is its path joined by `-`, as Style Dictionary's `name/kebab` and Terrazzo's default write it (`color.bg.surface` is `--color-bg-surface`), a group's `$root` is the group's own name, and a reference is `var(--name)`. Its tiers come from the value, as a `tokens.css`'s do. A value with no CSS form (a typography composite, a boolean) is left out. A DTCG resolver (P31 part 3, a JSON file with a `resolutionOrder`) is read as its default: its sets, then each modifier's `default` context, its files found beside it. The scripts read it through `dtcg.py`, a copy of the plugin's `shared/dtcg.py` beside each `project_config.py`, and the lint configs through `project_config.mjs`'s port, held to it by a test.
 
 ## 3. What each script takes from the project's tokens
 

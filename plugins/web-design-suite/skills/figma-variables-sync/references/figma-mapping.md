@@ -620,8 +620,37 @@ invalid token reference (refers to a group, not a token)" (its root tokens secti
 same file gives the same names. DTCG has no
 type for `clamp()`, `calc()`, `em`, `ch` or a `font` shorthand, so each such
 token, and every token that refers to one, is named on stderr and left out
-(exit 1). A DTCG file holds one mode: the default values are written, and each
-theme or density block is named as left out.
+(exit 1). A DTCG file holds one mode: with `--out`, the default values are
+written, and each theme or density block is named as left out.
+
+**Themes, through the resolver.** `--format dtcg --out-dir DIR` writes them all
+with the DTCG resolver module ([2025.10](https://www.designtokens.org/tr/2025.10/resolver/)):
+`tokens.json` holds the default values, `theme-dark.json` (or
+`density-compact.json`) what that block changes, and `tokens.resolver.json`
+puts them together. It has one set, `base`, and one modifier per kind, `theme`
+and `density`, whose first context is the default (`light` for a theme when no
+theme is named so, else `default`) and holds nothing; each other context is its
+file. The resolver processes `resolutionOrder` with "tokens later in the array
+overriding any tokens that came before them", so a theme file holds its
+overrides only, typed against the whole set. A rule that is neither a
+`[data-theme]` nor a `[data-density]` block (`.inverse`, a media query) is
+named and left out. Terrazzo 2 reads a resolver; Style Dictionary 5 says "the
+latest format 2025.10 does not have full support yet"
+([its DTCG page](https://styledictionary.com/info/dtcg/)), so give it
+`tokens.json` and each theme file.
+
+**Reading a resolver.** Both scripts read a `*.resolver.json` (or any JSON with
+a `resolutionOrder`): each modifier is a collection whose modes are its contexts,
+a token's value in a mode the one the resolver gives for that context, the other
+modifiers at their defaults. A `theme` modifier's contexts are `[data-theme]`
+blocks and a `density` modifier's `[data-density]` ones, whatever they are
+called. A source is a file named relative to the resolver, a pointer into one
+(`tokens.json#/color`), inline tokens, a set (`#/sets/base`) or one of its sources
+(`#/sets/base/sources/0`); nothing may point at a modifier or into `resolutionOrder`. A URL, a file
+outside the resolver's folder (absolute, or with a `..` step), a file that cannot be read, a cycle of sets and a modifier with no `default` (its
+first context is read) are named, never silent; a fan-out of sets is refused.
+`read_tokens()`, and so `.design-suite.json`'s `tokens`, reads a resolver as
+its default: each modifier's `default` context.
 
 **Tokens Studio.** A single-file Tokens Studio export keeps each token set under
 its name beside `$themes` and `$metadata.tokenSetOrder`, and its references name

@@ -13,7 +13,7 @@ this script cannot place against a known token name is emitted with its slug and
 flagged loudly, never silently renamed.
 
 INPUT SHAPES (auto-detected by figma_common.py, as for figma_audit.py)
-  rest | plugin | dtcg | records      -- see figma_audit.py's docstring
+  rest | plugin | dtcg | records | resolver   -- see figma_audit.py's docstring
 
 USAGE
 -----
@@ -22,6 +22,9 @@ USAGE
   python scripts/figma_to_tokens.py variables.json --format json --out design/tokens.json
   python scripts/figma_to_tokens.py variables.json --format ts   --out src/lib/tokens.ts
   python scripts/figma_to_tokens.py variables.json --format all  --out-dir build/tokens
+  python scripts/figma_to_tokens.py variables.json --format dtcg --out-dir design/tokens
+  #   tokens.json, theme-dark.json (each theme's overrides) and tokens.resolver.json,
+  #   the DTCG 2025.10 resolver Terrazzo reads; a tokens.css converts the same way
 
   # Code -> Figma (a POST /v1/files/:key/variables body; Enterprise-only endpoint)
   python scripts/figma_to_tokens.py design/tokens.json --reverse --out figma-payload.json
@@ -284,17 +287,20 @@ DENSITY_MODES = {"compact": 0.875, "comfortable": 1.0, "cosy": 1.0, "cozy": 1.0,
                  "spacious": 1.125, "default": 1.0}
 
 
-def mode_selector(mode: str, is_default: bool) -> Tuple[str, str]:
-    """Return (css selector, kind). `kind` is 'root' | 'theme' | 'density'."""
+def mode_selector(mode: str, is_default: bool, kind: str = "") -> Tuple[str, str]:
+    """Return (css selector, kind). `kind` is 'root' | 'theme' | 'density'; a
+    collection that says its kind (a resolver's modifier) is held to it."""
     m = mode.strip().lower()
     if is_default:
         return ":root", "root"
+    if kind in ("theme", "density"):             # a resolver's context is the value itself (Codex on #105)
+        return f'[data-{kind}="{css_escape(mode.strip())}"]', kind
+    if kind == "density" or (m in DENSITY_MODES and kind != "theme"):
+        return f'[data-density="{re.sub(r"[^a-z0-9]+", "-", m).strip("-")}"]', "density"
     if re.fullmatch(r"(dark|night|dark mode|dark theme)", m):
         return '[data-theme="dark"]', "theme"
     if re.fullmatch(r"(light|day|light mode|light theme)", m):
         return '[data-theme="light"]', "theme"
-    if m in DENSITY_MODES:
-        return f'[data-density="{m}"]', "density"
     return f'[data-theme="{re.sub(r"[^a-z0-9]+", "-", m).strip("-")}"]', "theme"
 
 
@@ -331,6 +337,8 @@ class Converter:
                     "unmapped-name", v.name,
                     f"`{v.name}` is not a name in the contract; emitted as `--{name}`. "
                     "Rename it in Figma or add it to the contract -- do not let both exist."))
+        for where, why in doc.unread:
+            self.problems.append(Problem("unread-source", where, f"`{where}`: {why}."))
         for path, why in doc.unsupported:
             self.problems.append(Problem(
                 "unsupported-value", path,
@@ -529,7 +537,7 @@ class Converter:
             if default not in var.values and var.values and not var.partial:
                 default = next(iter(var.values))
             for mode, raw in var.values.items():
-                sel, _ = mode_selector(mode, mode == default)
+                sel, _ = mode_selector(mode, mode == default, col.kind if col else "")
                 out.setdefault(sel, []).append(
                     (self.tier_of(var), self.token_name(var), var, mode, raw))
         for sel in out:
@@ -668,8 +676,132 @@ def emit_dtcg(conv: Converter, source: str) -> str:
     for sel, rows in blocks.items():
         if sel != ":root":
             conv.problems.append(Problem("not written to DTCG", sel,
-                                         f"{sel}: {len(rows)} token(s) left out; a DTCG file holds one mode"))
+                                         f"{sel}: {len(rows)} token(s) left out; a DTCG file holds one mode "
+                                         "(--out-dir writes each theme through a resolver)"))
     return dtcg_text(values, descriptions, deprecated, source, conv.problems)
+
+
+# A theme or density block, `[data-theme="dark"]` (or `:root[...]`, `html[...]`):
+# the modes a resolver can hold. Any other rule is a condition it cannot.
+MODE_SELECTOR = re.compile(r"""^(?::root|html)?\[\s*data-(theme|density)\s*=\s*"""
+                           r"""(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([\w-]+))\s*\]$""", re.S)
+CSS_ESCAPE = re.compile(r"\\(?:([0-9a-fA-F]{1,6})\s?|(.))", re.S)
+
+
+def css_escape(value: str) -> str:
+    """A string's text inside `"..."` in CSS: a backslash and a quote escaped."""
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def css_unescape(text: str) -> str:
+    """What a quoted CSS string holds: `\\"` is `"`, `\\22 ` is `"` too (Codex
+    on #105). A code point past Unicode's is U+FFFD, as CSS reads it."""
+    def one(m: "re.Match[str]") -> str:
+        if m.group(2) is not None:
+            return m.group(2)
+        n = int(m.group(1), 16)
+        return chr(n) if 0 < n <= 0x10FFFF and not 0xD800 <= n <= 0xDFFF else "\ufffd"
+    return CSS_ESCAPE.sub(one, text)
+
+
+def mode_context(m: "re.Match[str]") -> str:
+    """The context a MODE_SELECTOR match names: its value, unescaped."""
+    quoted = m.group(2) if m.group(2) is not None else m.group(3)
+    return css_unescape(quoted) if quoted is not None else m.group(4)
+
+Row = Tuple[str, str, str, Any]                  # (--name, CSS value, description, $deprecated)
+
+
+def dtcg_files(blocks: Dict[str, List[Row]], source: str, problems: List[Problem]) -> Dict[str, str]:
+    """--format dtcg --out-dir (P31 part 3): the default values as tokens.json,
+    each theme's or density's overrides as a file of its own, and
+    tokens.resolver.json, the DTCG resolver that puts them together: one
+    modifier per kind, its first context the default (`:root`), named `light`
+    for a theme when no theme is, else `default`."""
+    name = Path(source).name
+    base = blocks.get(":root", [])
+    values = [(n, v) for n, v, _, _ in base]
+    descriptions = {n: d for n, _, d, _ in base}
+    deprecated = {n: x for n, _, _, x in base}
+    doc, left_out = dtcg.document(values, descriptions, deprecated,
+                                  note=f"Generated by web-design-suite's figma_to_tokens.py from {name}: "
+                                       "the default values; tokens.resolver.json adds each theme. "
+                                       "Edit the source, not this.")
+    problems.extend(Problem("not written to DTCG", n, f"{n}: {why}") for n, why in left_out)
+    out = {"tokens.json": doc}
+    modifiers: Dict[str, Dict[str, Optional[str]]] = {}
+    for sel, rows in blocks.items():
+        m = MODE_SELECTOR.match(sel)
+        if sel == ":root" or not rows:
+            continue
+        if not m:
+            problems.append(Problem("not written to DTCG", sel,
+                                    f"{sel}: {len(rows)} token(s) left out; a resolver holds themes and "
+                                    "densities (`[data-theme]`, `[data-density]`), not other conditions"))
+            continue
+        kind, context = m.group(1), mode_context(m)
+        merged = dict(values)
+        merged.update((n, v) for n, v, _, _ in rows)
+        mode, left_out = dtcg.document(list(merged.items()), {n: d for n, _, d, _ in rows},
+                                       {n: x for n, _, _, x in rows},
+                                       note=f"Generated by web-design-suite's figma_to_tokens.py from {name}: "
+                                            f"what {sel} changes, read through tokens.resolver.json. "
+                                            "Edit the source, not this.",
+                                       only=[n for n, _, _, _ in rows])
+        problems.extend(Problem("not written to DTCG", f"{sel} {n}", f"{sel} {n}: {why}") for n, why in left_out)
+        if len(mode) > 1:                        # more than its $description
+            slug = re.sub(r"[^a-z0-9]+", "-", context.lower()).strip("-") or "mode"
+            file = f"{kind}-{slug}.json"
+            while file in out:
+                file = file[:-5] + "-2.json"
+            out[file] = mode
+            modifiers.setdefault(kind, {})[context] = file
+    listed = []
+    for kind, contexts in modifiers.items():
+        default = "light" if kind == "theme" and "light" not in contexts else "default"
+        while default in contexts:
+            default += "-base"
+        listed.append((kind, default, {default: None, **contexts}))
+    out["tokens.resolver.json"] = dtcg.resolver(
+        "tokens", "tokens.json", listed,
+        description=f"Generated by web-design-suite's figma_to_tokens.py from {name}. Edit the source, not this.")
+    return {f: json.dumps(d, indent=2, ensure_ascii=False) + "\n" for f, d in out.items()}
+
+
+def figma_blocks(conv: Converter) -> Dict[str, List[Row]]:
+    """conv.blocks() as rows, leaving out what already has a problem."""
+    out: Dict[str, List[Row]] = {}
+    for sel, rows in conv.blocks().items():
+        for _tier, token, var, mode, raw in rows:
+            css, ok = conv.css_value(var, mode, raw)
+            if not ok and css.lstrip().startswith("/*"):
+                continue                     # unresolved, or no CSS form: already a problem
+            out.setdefault(sel, []).append((f"--{token}", css, var.description, var.deprecated))
+    return out
+
+
+def css_blocks(path: Path) -> Dict[str, List[Row]]:
+    """A tokens.css's custom properties by the rule that sets them: `:root`
+    as read_tokens() reads it, a theme or density block under its
+    `[data-...="..."]` selector, and any other rule under its own preludes."""
+    out: Dict[str, Dict[str, str]] = {":root": dict(read_tokens([path]).values())}
+    text = path.read_bytes().decode("utf-8-sig", errors="replace")
+    for preludes, declaration in _css_blocks(text):
+        name, colon, value = declaration.partition(":")
+        name, value = name.strip(), " ".join(value.split())
+        if not (colon and name.startswith("--") and value and preludes):
+            continue
+        rule, outer = preludes[-1], preludes[:-1]
+        layered = all(p.lower().startswith("@layer") for p in outer)
+        if layered and ROOT_SELECTOR.match(rule) and not THEME_OR_DENSITY.search(rule):
+            continue                         # a default: read above
+        m = MODE_SELECTOR.match(rule.strip()) if layered else None   # a quoted value keeps its spaces (Codex)
+        if m:
+            where = f'[data-{m.group(1)}="{css_escape(mode_context(m))}"]'
+        else:
+            where = " ".join(p for p in preludes if not p.lower().startswith("@layer"))
+        out.setdefault(where, {})[name] = value      # the cascade: the last one wins
+    return {sel: [(n, v, "", False) for n, v in rows.items()] for sel, rows in out.items()}
 
 
 def dtcg_text(values: Sequence[Tuple[str, str]], descriptions: Dict[str, str],
@@ -699,7 +831,8 @@ def css_to_dtcg(path: Path, problems: List[Problem]) -> str:
             others[where] = others.get(where, 0) + 1
     for where, count in others.items():
         problems.append(Problem("not written to DTCG", where,
-                                f"{where}: {count} token(s) left out; a DTCG file holds one mode"))
+                                f"{where}: {count} token(s) left out; a DTCG file holds one mode "
+                                "(--out-dir writes each theme through a resolver)"))
     return dtcg_text(list(values.items()), {}, {}, str(path), problems)
 
 
@@ -1036,10 +1169,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="dtcg: a DTCG 2025.10 tokens.json of the default mode; the only "
                         "format for a tokens.css input. all: tokens.{css,json,ts}")
     p.add_argument("--out", help="write here instead of stdout")
-    p.add_argument("--out-dir", help="with --format all: write tokens.{css,json,ts} here")
+    p.add_argument("--out-dir", help="with --format all: write tokens.{css,json,ts} here; with --format "
+                                     "dtcg: tokens.json, each theme's file and tokens.resolver.json")
     p.add_argument("--reverse", action="store_true",
                    help="read a tokens.json and emit a Figma variables POST body")
-    p.add_argument("--shape", choices=("rest", "plugin", "dtcg", "records"))
+    p.add_argument("--shape", choices=("rest", "plugin", "dtcg", "records", "resolver"))
     p.add_argument("--collection", default="tokens")
     p.add_argument("--color-format", choices=("oklch", "hex"), default="oklch")
     p.add_argument("--unit", choices=("rem", "px"), default="rem")
@@ -1089,18 +1223,29 @@ def css_main(path: Path, args: argparse.Namespace) -> int:
         return 2
     problems: List[Problem] = []
     try:
-        text = css_to_dtcg(path, problems)
+        if args.out_dir:
+            write_files(dtcg_files(css_blocks(path), str(path), problems), args.out_dir)
+        else:
+            write_out(css_to_dtcg(path, problems), args.out)
     except ConfigError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    write_out(text, args.out)
     report_problems(problems, args.quiet)
     return 1 if problems else 0
+
+
+def write_files(files: Dict[str, str], out_dir: str) -> None:
+    for name, text in files.items():
+        write_out(text, str(Path(out_dir) / name))
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     path = Path(args.path)
+    if args.format == "dtcg" and args.out and args.out_dir:
+        print("--format dtcg takes --out (the default values) or --out-dir (every theme, "
+              "through a resolver), not both.", file=sys.stderr)
+        return 2
     if path.suffix.lower() == ".css":    # reads none of the project's token names (CodeRabbit on #101)
         return css_main(path, args)
     # A flag beats the config: the project's token files only without --tokens (P24).
@@ -1138,7 +1283,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     conv = Converter(doc, color_format=args.color_format, unit=args.unit,
                      theme_diff_only=not args.full_themes)
     emitters = {"css": emit_css, "json": emit_json, "ts": emit_ts}
-    if args.format == "dtcg":
+    if args.format == "dtcg" and args.out_dir:
+        write_files(dtcg_files(figma_blocks(conv), str(path), conv.problems), args.out_dir)
+    elif args.format == "dtcg":
         write_out(emit_dtcg(conv, str(path)), args.out)
     elif args.format == "all":
         out_dir = Path(args.out_dir or ".")

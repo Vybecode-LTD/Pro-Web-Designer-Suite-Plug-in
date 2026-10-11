@@ -213,11 +213,15 @@ python scripts/figma_to_tokens.py design/figma-variables.json --format css \
 
 # code -> a DTCG 2025.10 file, for Tokens Studio, Style Dictionary or Terrazzo
 python scripts/figma_to_tokens.py src/styles/tokens.css --format dtcg --out design/tokens.json
+# ...with every theme, through a DTCG resolver
+python scripts/figma_to_tokens.py src/styles/tokens.css --format dtcg --out-dir design/tokens
 ```
 
 `--format dtcg` writes the default mode, every token typed, colours as 2025.10
 objects and roles as references; a value DTCG has no type for (`clamp()`, `em`)
-is named and left out (`references/figma-mapping.md`, "Writing DTCG").
+is named and left out. `--out-dir` adds each theme's overrides and
+`tokens.resolver.json`, which reads back as modes (`references/figma-mapping.md`,
+"Writing DTCG").
 
 What it does, and what it refuses to do:
 

@@ -308,6 +308,9 @@ class FCollection:
     name: str
     modes: List[str] = field(default_factory=list)
     default_mode: str = ""
+    # "theme" or "density" when the source says which (a resolver's modifier),
+    # so a mode's selector does not rest on its name alone.
+    kind: str = ""
 
 
 @dataclass
@@ -322,6 +325,9 @@ class FDoc:
     # (token path, why) for DTCG values this script cannot read; each one is a
     # finding, because an unaudited token must never look like a clean one.
     unsupported: List[Tuple[str, str]] = field(default_factory=list)
+    # (where, why) for a resolver's sources that could not be read (a missing
+    # file, a URL, a cycle of sets): each one is a finding too.
+    unread: List[Tuple[str, str]] = field(default_factory=list)
 
 
 def _is_leaf_token(node: Any) -> bool:
@@ -342,6 +348,8 @@ def detect_shape(data: Any) -> str:
         return "records"
     if isinstance(data.get("variables"), dict) and isinstance(data.get("variableCollections"), dict):
         return "rest"
+    if dtcg.is_resolver(data):
+        return "resolver"
     return "dtcg"
 
 
@@ -604,6 +612,56 @@ def parse_studio(data: dict) -> FDoc:
     return doc
 
 
+def parse_resolver(data: dict, base: Path) -> FDoc:
+    """A DTCG resolver (P31 part 3). Each modifier is a collection whose modes
+    are its contexts, its default the default, holding the tokens its contexts
+    set; each set is a collection of its own, with one mode. A token's value in
+    a mode is the one the resolver gives for that context, the other
+    modifiers at their defaults."""
+    doc = FDoc(shape="resolver")
+    merged, doc.unread = dtcg.resolver_document(data, base)
+    base_vars, doc.unsupported = _dtcg_vars(merged)
+    themed: Dict[str, str] = {}                  # token -> its modifier
+
+    def add(name: str, node: dict, collection: str, values: Dict[str, Any]) -> FVar:
+        fv = FVar(name=name, collection=collection,
+                  resolved_type=dtcg_type(node.get("$type"), node.get("$value")), values=values,
+                  description=node.get("$description") or "", var_id=name,
+                  deprecated=node.get("$deprecated") or False, dtcg_type=str(node.get("$type") or ""))
+        doc.variables.append(fv)
+        doc.by_id.setdefault(name, fv)
+        doc.by_id.setdefault(name.replace("/", "."), fv)
+        return fv
+
+    for mod in dtcg.resolver_modifiers(data):
+        default = mod.default or mod.contexts[0]
+        kind = mod.name.lower() if mod.name.lower() in ("theme", "density") else ""
+        doc.collections[mod.name] = FCollection(mod.name, list(mod.contexts), default, kind)
+        per_context, names = {}, []
+        for context in mod.contexts:
+            tree, extra = dtcg.resolver_document(data, base, {mod.name: context})
+            per_context[context], more = _dtcg_vars(tree)
+            own, _ = dtcg.resolver_document(data, base, {mod.name: context}, only=mod.name)
+            names += ["/".join(path) for path in dtcg.token_paths(own)]
+            doc.unread += [p for p in extra if p not in doc.unread]
+            doc.unsupported += [p for p in more if p not in doc.unsupported]
+        for name in dict.fromkeys(names):
+            if name in themed:                   # one variable, one collection, as for Studio
+                doc.unsupported.append((name, f"set by two modifiers, {themed[name]} and {mod.name}: "
+                                              f"{mod.name}'s values"))
+                continue
+            nodes = {c: per_context[c][name] for c in mod.contexts if name in per_context[c]}
+            if nodes:
+                themed[name] = mod.name
+                fv = add(name, next(iter(nodes.values())), mod.name, {c: n["$value"] for c, n in nodes.items()})
+                fv.partial = default not in nodes
+    for name, node in base_vars.items():
+        if name not in themed:
+            doc.collections.setdefault("tokens", FCollection("tokens", ["Value"], "Value"))
+            add(name, node, "tokens", {"Value": node["$value"]})
+    return doc
+
+
 def parse_dtcg(data: dict, collection: str) -> FDoc:
     if dtcg.is_studio(data):
         return parse_studio(data)
@@ -651,6 +709,8 @@ def load_document(path: Path, forced: Optional[str], collection: str) -> FDoc:
         doc = parse_plugin(data)
     elif shape == "records":
         doc = parse_records(data, collection)
+    elif shape == "resolver":
+        doc = parse_resolver(data, path.parent)
     else:
         doc = parse_dtcg(data, collection)
     attach_styles(doc, data)

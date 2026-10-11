@@ -991,12 +991,14 @@ function inlinePointers(node, root) {
   }
 }
 
-// [[name, value as CSS or null]] in document order.
-function dtcgEntries(data) {
+// [[name, value as CSS or null]] in document order. `dir` is a resolver's folder.
+function dtcgEntries(data, dir = '.') {
   if (tooDeep(data)) return [];
   let doc;
   try {                                           // as normalise(): a long chain or a fan-out
-    doc = structuredClone(isStudio(data) ? studioDocument(data) : data);
+    if (isStudio(data)) doc = studioDocument(data);
+    else if (isResolver(data)) doc = resolverDocument(data, dir);
+    else doc = structuredClone(data);
     resolveExtends(doc, doc, new Set());
     inlinePointers(doc, doc);
     if (tooDeep(doc) || tooLarge(doc)) return [];
@@ -1059,9 +1061,100 @@ function dtcgEntries(data) {
   return out.filter(([name]) => !cyclic.has(name));
 }
 
+// A resolver (P31 part 3), as resolver_document() reads its default: each set's
+// sources, then each modifier's default context (else its first), merged in
+// resolutionOrder. A `$ref` source is a file beside the resolver, a pointer
+// into one, or a set in the resolver; one that cannot be read is skipped.
+const isResolver = (data) => isObject(data) && Array.isArray(data.resolutionOrder);
+const unescapeRef = (part) => part.replaceAll('~1', '/').replaceAll('~0', '~');
+
+function resolverOrder(data) {
+  const out = [];
+  for (const entry of data.resolutionOrder) {
+    if (!isObject(entry)) continue;
+    if (typeof entry.$ref === 'string') {
+      const m = /^#\/(sets|modifiers)\/([^/]+)$/.exec(entry.$ref);
+      const table = m && isObject(data[m[1]]) ? data[m[1]] : null;
+      const name = m ? unescapeRef(m[2]) : '';
+      if (!table || !has(table, name) || !isObject(table[name])) continue;
+      const own = Object.fromEntries(Object.entries(entry).filter(([k]) => k !== '$ref'));
+      out.push([m[1] === 'sets' ? 'set' : 'modifier', name, { ...table[name], ...own }]);
+    } else if ((entry.type === 'set' || entry.type === 'modifier') && typeof entry.name === 'string') {
+      out.push([entry.type, entry.name, entry]);
+    }
+  }
+  return out;
+}
+
+function resolverDocument(data, dir) {
+  let budget = 100000;                          // a fan-out of sets stops, as in _sources()
+  const sources = (list, seen) => {
+    if (!Array.isArray(list)) return [];
+    const trees = [];
+    for (const source of list) {
+      budget -= 1;
+      if (budget < 0) throw new RangeError('expanded too far');
+      if (!isObject(source)) continue;
+      const ref = source.$ref;
+      if (typeof ref !== 'string') {
+        trees.push(source);
+        continue;
+      }
+      const siblings = Object.fromEntries(Object.entries(source).filter(([k]) => k !== '$ref'));
+      const hash = ref.indexOf('#');
+      const name = hash < 0 ? ref : ref.slice(0, hash);
+      const pointer = hash < 0 ? '' : ref.slice(hash + 1);
+      if (!name) {                              // a set's sources, or one source, as _sources()
+        const target = pointer.startsWith('/') ? jsonPointer(data, `#${pointer}`) : UNSUPPORTED;
+        if (/^\/(modifiers|resolutionOrder)(\/|$)/.test(pointer) || seen.includes(ref) || !isObject(target)) continue;
+        const own = { ...target, ...siblings };
+        trees.push(...sources(/^\/sets\/[^/]+$/.test(pointer) ? own.sources : [own], [...seen, ref]));
+        continue;
+      }
+      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(name)) continue;    // a URL is not read
+      if (/^([\\/]|[A-Za-z]:)/.test(name) || name.split(/[\\/]/).includes('..')) continue;   // outside(), CodeRabbit
+      let tree;
+      try {                                      // its real path in the folder, as file_loader() (Codex)
+        const folder = fs.realpathSync(dir);
+        const target = fs.realpathSync(path.resolve(folder, name));
+        const rel = path.relative(folder, target);
+        if (!rel || rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) continue;
+        tree = readJson(target);
+      } catch (err) {
+        if (err instanceof ConfigError || err?.code) continue;     // missing, unreadable, not JSON
+        throw err;
+      }
+      if (pointer) tree = jsonPointer(tree, `#${pointer}`);
+      if (!isObject(tree) || tooDeep(tree)) continue;
+      trees.push(Object.keys(siblings).length ? { ...tree, ...siblings } : tree);
+    }
+    return trees;
+  };
+  const doc = {};
+  const escapeRef = (part) => part.replaceAll('~', '~0').replaceAll('/', '~1');
+  for (const [kind, name, definition] of resolverOrder(data)) {
+    let trees;
+    if (kind === 'set') {
+      trees = sources(definition.sources, [`#/sets/${escapeRef(name)}`]);
+    } else {
+      const contexts = definition.contexts;
+      if (!isObject(contexts) || !Object.keys(contexts).length) continue;
+      const named = typeof definition.default === 'string' && has(contexts, definition.default);
+      const context = named ? definition.default : Object.keys(contexts)[0];
+      trees = sources(contexts[context], []);
+    }
+    for (const tree of trees) {
+      mergeTree(doc, tree);
+      if (tooDeep(doc) || tooLarge(doc)) throw new RangeError('expanded too far');
+    }
+  }
+  return doc;
+}
+
 function isDtcg(data) {
   if (isObject(data) && has(data, 'schema')) return false;
   if (isStudio(data)) return true;               // a Tokens Studio export, legacy keys or not
+  if (isResolver(data)) return true;             // a resolver: its default
   const holds = (node, depth) => {
     if (!isObject(node) || depth > 64) return false;
     if (depth && (has(node, '$value') || typeof node.$ref === 'string')) return true;
@@ -1070,9 +1163,9 @@ function isDtcg(data) {
   return holds(data, 0);
 }
 
-function dtcgTokens(data) {
+function dtcgTokens(data, dir) {
   const tokens = new Tokens();
-  for (const [name, value] of dtcgEntries(data)) {
+  for (const [name, value] of dtcgEntries(data, dir)) {
     if (value !== null) tokens.add(name, value, value.includes('var(') ? 2 : 1);   // as cssTokens files them
   }
   return tokens;
@@ -1088,7 +1181,7 @@ export function readTokens(paths) {
     let part;
     const json = isContract(file) ? readJson(file) : null;
     if (isContract(file) && isDtcg(json)) {
-      part = dtcgTokens(json);
+      part = dtcgTokens(json, path.dirname(file));
     } else if (isContract(file)) {
       if (!(isObject(json) && has(json, 'schema'))) {
         throw new ConfigError(`${file}: neither a contract.json (no "schema") nor a DTCG token file (no "$value")`);
