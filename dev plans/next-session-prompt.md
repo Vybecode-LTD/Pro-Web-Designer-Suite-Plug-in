@@ -159,7 +159,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 ## 2. Useful facts
 
 - **DTCG (#101, #102).** `shared/dtcg.py` is the master, copied beside every `project_config.py` (`test_dtcg.TheCopiesAreTheMaster`); `project_config.py` loads the copy beside it by path. `normalise()` (the Figma scripts' reading, string forms) and `tokens()` (lossless, CSS names) read 2025.10 and Tokens Studio (`studio_document`, `studio_themes`); `document()` writes 2025.10 from CSS custom properties. `project_config.mjs` ports the reading, numbers formatted as Python's `f"{round(x, 6):g}"`, and `TheNodeReaderAgrees` holds them equal on every value form. `figma_common.parse_studio` makes each Studio theme group a collection; `FVar` carries `deprecated`, `dtcg_type` and `partial`.
-- **The plugin** is `plugins/web-design-suite/` (about 1,040 tests):
+- **The plugin** is `plugins/web-design-suite/` (about 1,015 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
