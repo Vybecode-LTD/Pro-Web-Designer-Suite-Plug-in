@@ -1340,6 +1340,12 @@
  {
   "from": "figma-variables-sync/references/audit-and-reconcile.md",
   "to": "figma-variables-sync/references/figma-mapping.md",
+  "section": "14",
+  "heading": "The REST API, precisely"
+ },
+ {
+  "from": "figma-variables-sync/references/audit-and-reconcile.md",
+  "to": "figma-variables-sync/references/figma-mapping.md",
   "section": "4",
   "heading": "Variable types — what each one can and cannot hold"
  },

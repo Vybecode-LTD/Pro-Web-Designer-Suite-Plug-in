@@ -133,7 +133,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-B3 | — | fixed in 3.5.0: `test_project_config` (`FigmaAuditReadsTheScales`, `FigmaToTokensReadsTheNames`, `AuditReadsTheProject`), PRs #76 and #78 | no way to supply a project contract. |
 | LC-B4 | — | fixed in 3.5.0: /install-gate vendors the gates into `scripts/`, and the README's "In CI" runs the rest by path, PR #85 (`test_commands.TheInstallGate.test_the_vendored_gates_run_without_the_plugin`) | no CI bootstrap. |
 | LC-B5 | — | W12 (3.6.0+) | migration coverage. |
-| LC-B6 | — | W10 (3.6.0+) | Figma plan realities. |
+| LC-B6 | — | fixed in 3.6.0: `test_figma_sync.PlanLimits`, `test_project_config.TheNodeReaderAgrees`, PR #111 | Figma plan realities. |
 | LC-B7 | — | W12 (3.6.0+) | rollout gaps. |
 | LC-B8 | — | fixed in 3.4.0: the parity and worked-run claims gated in #49, #50 and #53; `tokens.css`'s read-only claim names the CI drift check, held by `test_figma_sync.DeterministicOutput` (PR #54) | claims with no gate. |
 | LC-C1 | — | fixed in 3.5.0: `test_project_config` (`FigmaAuditReadsTheContract`, `AuditReadsTheProject`, `DiffSystemReadsTheContract`, `ClusterValuesLandsOnTheProjectsRamps`, `FigmaToTokensReadsTheNames`), PRs #76 and #78; the studio's tables stay as the defaults for a project with no tokens | Add `contract.json`, emitted by extract_system from the project's tokens.css and read through `--tokens` by figma_audit, figma_to_tokens, cluster_values, audit_design and diff_system. |

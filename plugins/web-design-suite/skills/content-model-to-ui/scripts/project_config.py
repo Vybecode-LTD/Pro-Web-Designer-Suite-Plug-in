@@ -95,8 +95,10 @@ CONFIG_NAME = ".design-suite.json"
 CONFIG_SCHEMA = 1
 CONTRACT_SCHEMA = "web-design-suite/contract/1"
 KEYS = ("schema", "tokens", "emailTokens", "components", "emails", "stack", "budgets", "baselines", "hooks",
-        "names")
+        "names", "figma")
 NAMES = ("prefixes", "rename")                               # P31 part 5: a tool's names onto the grammar
+FIGMA = ("plan",)                                            # P32: the Figma plan, whose modes are capped
+FIGMA_PLANS = ("starter", "professional", "organization", "enterprise")
 NAME_PREFIX = re.compile(r"^[A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*-$")
 CUSTOM_PROPERTY = re.compile(r"^--[A-Za-z0-9_-]+$")
 STACKS = ("vanilla-css", "css-modules", "tailwind-v3", "tailwind-v4")
@@ -126,6 +128,7 @@ class ProjectConfig:
     hooks: Dict[str, bool] = field(default_factory=dict)
     prefixes: List[str] = field(default_factory=list)
     rename: Dict[str, str] = field(default_factory=dict)
+    figma_plan: Optional[str] = None
 
     def grammar_name(self, name: str) -> str:
         """`name` in the contract's grammar (P31 part 5): the config's
@@ -289,6 +292,18 @@ def load_config(path: Union[str, Path]) -> ProjectConfig:
                               f'("--gray-500": "--neutral-500")')
         return list(prefixes), dict(rename)
 
+    def figma_plan() -> Optional[str]:
+        value = data.get("figma", {})
+        if not isinstance(value, dict):
+            raise ConfigError(f'{path}: "figma" must be an object')
+        extra = sorted(set(value) - set(FIGMA))
+        if extra:
+            raise ConfigError(f'{path}: unknown key {extra[0]!r} in "figma"; the keys are {", ".join(FIGMA)}')
+        plan = value.get("plan")
+        if plan is not None and plan not in FIGMA_PLANS:
+            raise ConfigError(f'{path}: "figma.plan" must be one of {", ".join(FIGMA_PLANS)}')
+        return plan
+
     components = glob_list("components", [])
     emails = glob_list("emails", EMAILS)
     stack = data.get("stack")
@@ -300,7 +315,7 @@ def load_config(path: Union[str, Path]) -> ProjectConfig:
                          components=components, emails=emails, stack=stack,
                          budgets=path_map("budgets", BUDGETS),
                          baselines=path_map("baselines", BASELINES), hooks=hook_flags(),
-                         **dict(zip(("prefixes", "rename"), name_route())))
+                         **dict(zip(("prefixes", "rename"), name_route())), figma_plan=figma_plan())
 
 
 def project_config(start: Optional[Union[str, Path]] = None) -> Optional[ProjectConfig]:
