@@ -60,7 +60,9 @@
   gate, and the report says `deprecation  marked: $deprecated in OLD`. A ledger record
   for the same name wins. `deprecate.py import FILE --since X --removal Y` writes the marks
   into the ledger, so `status`, `scan` and `mapping` see them; the replacement is the
-  token the reason names (`"Please use {bg.brand} instead"` is `--bg-brand`).
+  token the reason names (`"Please use {bg.brand} instead"` is `--bg-brand`). A later
+  file that sets the token again without the mark, a `tokens.css` or a `contract.json`
+  among them, takes it off.
 
 ### Fixed
 

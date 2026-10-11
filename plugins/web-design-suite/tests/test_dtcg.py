@@ -559,6 +559,22 @@ class DeprecationsReachTheLedger(TempDirTest):
         self.assertEqual("--brand", pc.replacement_of("use {brand.$root}"))
         self.assertEqual("", pc.replacement_of(True))
 
+    def test_a_later_css_or_contract_file_takes_the_mark_off(self):
+        # CodeRabbit on #106: read_tokens() lets a tokens.css or a contract.json
+        # set a token again, and the DTCG file's mark outlived its value.
+        self.write("tokens.css", "@layer tokens {\n  :root {\n    --legacy: #000000;\n  }\n}\n")
+        self.write("contract.json", json.dumps({"schema": "web-design-suite/contract/1",
+                                                "roles": {"--old-accent": "var(--brand)"}}))
+        pc = load_script("design-system-versioning", "project_config")
+        v1, css, contract = (self.tmp / n for n in ("v1.tokens.json", "tokens.css", "contract.json"))
+        self.assertEqual({"--old-accent": "Please use {bg.brand} instead"}, pc.read_deprecations([v1, css]))
+        self.assertEqual({"--legacy": True}, pc.read_deprecations([v1, contract]))
+        self.assertEqual({"--old-accent", "--legacy"}, set(pc.read_deprecations([css, contract, v1])))  # control
+        proc = run_py("design-system-versioning", "deprecate", "import", "v1.tokens.json", "tokens.css",
+                      "--since", "2.1.0", "--removal", "3.0.0", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("recorded: 1 token(s) marked $deprecated", output(proc))
+
 
 THEMED_CSS = """@layer tokens {
   :root {
