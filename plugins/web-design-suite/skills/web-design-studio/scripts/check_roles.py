@@ -95,7 +95,9 @@ class Unresolvable(Exception):
 
 def rules(css: str) -> list[tuple[list[str], dict[str, str]]]:
     """Innermost `selectors { declarations }` blocks outside any @media or
-    @supports (a conditional block is not a theme)."""
+    @supports (a conditional block is not a theme). One @supports is read: a
+    condition on light-dark() holds the roles every current browser uses,
+    over the concrete ones older browsers keep (P33, Codex on #112)."""
     css = re.sub(r"/\*.*?\*/", " ", css, flags=re.S)
     out, stack, start = [], [], 0
     for i, ch in enumerate(css):
@@ -106,7 +108,8 @@ def rules(css: str) -> list[tuple[list[str], dict[str, str]]]:
             prelude = stack.pop() if stack else ""
             body = css[start:i]
             if "{" not in body and not prelude.startswith("@") and not any(
-                    p.startswith(("@media", "@supports", "@container")) for p in stack):
+                    p.startswith(("@media", "@container"))
+                    or (p.startswith("@supports") and "light-dark(" not in p) for p in stack):
                 decls = dict(re.findall(r"(--[\w-]+)\s*:\s*([^;]+);?", body))
                 # Which branch of light-dark() the scope reads (P33).
                 decls.update(re.findall(r"(?<![\w-])(color-scheme)\s*:\s*([^;]+);?", body))
@@ -124,8 +127,22 @@ def scopes(css: str) -> dict[str, dict[str, str]]:
             for sels, decls in blocks:
                 if want in sels:
                     env.update(decls)
+                    if "color-scheme" in decls:   # its var()s are read where it is declared,
+                        env["color-scheme"] = substitute(env, decls["color-scheme"])   # then inherited
         merged[name] = env
     return merged
+
+
+def substitute(env: dict[str, str], value: str) -> str:
+    """`value` with each `var(--x[, fallback])` replaced from `env`, as the
+    browser does before it reads a property (`color-scheme: var(--scheme)`)."""
+    pattern = re.compile(r"var\(\s*(--[\w-]+)\s*(?:,\s*([^()]*))?\)")
+    for _ in range(16):                            # a chain, never a cycle forever
+        new = pattern.sub(lambda m: env.get(m.group(1), m.group(2) or ""), value)
+        if new == value:
+            break
+        value = new
+    return value
 
 
 def schemes(env: dict[str, str]) -> list[str]:

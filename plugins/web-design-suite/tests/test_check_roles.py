@@ -141,6 +141,40 @@ class CheckRoles(TempDirTest):
                 if extra == ".inverse { color-scheme: dark; }":
                     self.assertIn("--fg-default on --bg-inverse (dark, light scheme)", output(proc))
 
+    def test_a_color_scheme_through_var_is_read_where_it_is_declared(self):
+        """Codex on #112: `color-scheme: var(--scheme)` is the value of
+        `--scheme` where it is declared, then inherited: an inverse band that
+        only re-sets `--scheme` keeps its parent's scheme."""
+        roles = ("--bg-canvas: light-dark(oklch(98% 0 0), oklch(15% 0 0));"
+                 " --fg-default: light-dark(oklch(25% 0 0), oklch(15% 0 0));")
+        pairs = self.write("pairs.json", json.dumps([
+            {"fg": "--fg-default", "bg": "--bg-canvas", "min": 4.5, "scopes": ["light", "inverse"]}]))
+        for css, code in ((f":root {{ --scheme: dark; color-scheme: var(--scheme); {roles} }}", 1),
+                          (f":root {{ --scheme: light; color-scheme: var(--scheme, dark); {roles} }}", 0),
+                          (f":root {{ color-scheme: var(--unset, light); {roles} }}", 0),
+                          (f":root {{ --scheme: light; color-scheme: var(--scheme); {roles} }}"
+                           " .inverse { --scheme: dark; }", 0)):
+            with self.subTest(css=css):
+                proc = self.roles(css, "--pairs", pairs)
+                self.assertEqual(proc.returncode, code, output(proc))
+
+    def test_the_light_dark_supports_block_is_what_the_gate_measures(self):
+        """Codex on #112: concrete roles for older browsers, the light-dark()
+        ones inside `@supports (color: light-dark(...))`. The gate measures the
+        roles a current browser renders; any other @supports stays out."""
+        concrete = ":root { --fg-default: oklch(25% 0 0); --bg-canvas: oklch(98% 0 0); }"
+        modern = (":root { color-scheme: light dark; --fg-default: light-dark(oklch(25% 0 0), oklch(30% 0 0));"
+                  " --bg-canvas: light-dark(oklch(98% 0 0), oklch(15% 0 0)); }")
+        pairs = self.write("pairs.json", json.dumps([
+            {"fg": "--fg-default", "bg": "--bg-canvas", "min": 4.5, "scopes": ["light"]}]))
+        for wrapper, code in (("@supports (color: light-dark(#000, #fff))", 1), ("@supports (display: grid)", 0),
+                              ("@media (prefers-color-scheme: dark)", 0)):
+            with self.subTest(wrapper=wrapper):
+                proc = self.roles(f"{concrete} {wrapper} {{ {modern} }}", "--pairs", pairs)
+                self.assertEqual(proc.returncode, code, output(proc))
+                if code:
+                    self.assertIn("--fg-default on --bg-canvas (light, dark scheme)", output(proc))
+
     def test_a_light_dark_that_is_not_one_pair_is_not_a_colour(self):
         for value in ("light-dark(oklch(98% 0 0))", "light-dark(oklch(98% 0 0), oklch(15% 0 0), red)",
                       "light-dark(red, blue) green"):
