@@ -129,7 +129,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | LC-A22 | low | fixed in 3.4.0: `test_figma_sync.ReverseBody` (PR #53) | Three problems with the POST body `--reverse` generates. |
 | LC-A23 | low | fixed in 3.4.0: `test_versioning.DeprecateKeepsRemovalsInAMajor`, `test_token_migration.MigrationPipeline` (the report's ms delta and held-colour advice); the rest docs only (PR #54; versioning's "Four edits" in #50) | Smaller accuracy and consistency items. |
 | LC-B1 | — | W10 (3.6.0+) | no non-Enterprise route into Figma. |
-| LC-B2 | — | W10 (3.6.0+) | Style Dictionary, Tokens Studio and Terrazzo teams get nothing. |
+| LC-B2 | — | fixed in 3.6.0: `test_dtcg` (`TokensStudio`, `TheResolver`, `DeprecationsReachTheLedger`), `test_real_tools.TheGatesReadTheNames`, PRs #101, #102 and #105 to #107 | Style Dictionary, Tokens Studio and Terrazzo teams get nothing. |
 | LC-B3 | — | fixed in 3.5.0: `test_project_config` (`FigmaAuditReadsTheScales`, `FigmaToTokensReadsTheNames`, `AuditReadsTheProject`), PRs #76 and #78 | no way to supply a project contract. |
 | LC-B4 | — | fixed in 3.5.0: /install-gate vendors the gates into `scripts/`, and the README's "In CI" runs the rest by path, PR #85 (`test_commands.TheInstallGate.test_the_vendored_gates_run_without_the_plugin`) | no CI bootstrap. |
 | LC-B5 | — | W12 (3.6.0+) | migration coverage. |

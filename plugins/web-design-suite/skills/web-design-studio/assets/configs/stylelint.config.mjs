@@ -690,11 +690,13 @@ const tierMessages = utils.ruleMessages(tierRuleName, {
 });
 const VAR_NAME = /var\(\s*(--[\w-]+)/g;
 
-/* The advice for a primitive that has a role, or null for anything else. */
+/* The advice for a primitive that has a role, or null for anything else,
+ * read through the project's `names` (P31 part 5), as the audit reads it. */
 const tier1Advice = (ref) => {
-  if (TIER2_EXCEPTIONS.includes(ref) || TIER1_NULLS.includes(ref)) return null;
-  if (PROJECT_RAMP_STEPS.has(ref)) return PROJECT_RAMP_ADVICE;
-  const prefix = Object.keys(TIER1_WITH_ROLE).find((p) => ref.slice(2).startsWith(p));
+  const name = PROJECT.grammarName(ref);
+  if (TIER2_EXCEPTIONS.includes(name) || TIER1_NULLS.includes(name)) return null;
+  if (PROJECT_RAMP_STEPS.has(ref) || PROJECT_RAMP_STEPS.has(name)) return PROJECT_RAMP_ADVICE;
+  const prefix = Object.keys(TIER1_WITH_ROLE).find((p) => name.slice(2).startsWith(p));
   return prefix ? TIER1_WITH_ROLE[prefix] : null;
 };
 

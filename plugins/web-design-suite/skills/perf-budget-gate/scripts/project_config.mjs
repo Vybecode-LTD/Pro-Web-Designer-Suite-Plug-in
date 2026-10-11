@@ -22,12 +22,15 @@ import path from 'node:path';
 
 export const CONFIG_NAME = '.design-suite.json';
 const CONFIG_KEYS = ['schema', 'tokens', 'emailTokens', 'components', 'emails', 'stack', 'budgets', 'baselines',
-                     'hooks'];
+                     'hooks', 'names'];
 const STACKS = ['vanilla-css', 'css-modules', 'tailwind-v3', 'tailwind-v4'];
 const BUDGETS = ['perf', 'a11y'];
 const BASELINES = ['audit', 'a11y', 'perf', 'docs', 'snapshots', 'system'];
 const HOOKS = ['designGate', 'generatedFiles', 'tokenDiff',       // the plugin's hooks a project turns on (P25,
                'a11yGate', 'emailBuild'];                        // P27)
+const NAMES = ['prefixes', 'rename'];                        // P31 part 5: a tool's names onto the grammar
+const NAME_PREFIX = /^[A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*-$/;
+const CUSTOM_PROPERTY = /^--[A-Za-z0-9_-]+$/;
 const EMAILS = ['emails/**/*.html'];                             // the email templates, unless `emails` names them
 
 export class ConfigError extends Error {}
@@ -150,8 +153,35 @@ export function loadConfig(file) {
     if (bad !== undefined) fail(`"hooks.${bad}" must be true or false`);
     return { ...value };
   };
-  return { path: where, root: base, tokens, emailTokens, components, emails, stack,
-           budgets: pathMap('budgets', BUDGETS), baselines: pathMap('baselines', BASELINES), hooks: hookFlags() };
+  const nameRoute = () => {
+    const value = has(data, 'names') ? data.names : {};
+    if (!isObject(value)) fail('"names" must be an object');
+    const extra = Object.keys(value).filter((k) => !NAMES.includes(k)).sort();
+    if (extra.length) fail(`unknown key '${extra[0]}' in "names"; the keys are ${NAMES.join(', ')}`);
+    let prefixes = has(value, 'prefixes') ? value.prefixes : [];
+    if (typeof prefixes === 'string') prefixes = [prefixes];
+    if (!Array.isArray(prefixes) || !prefixes.every((p) => typeof p === 'string' && NAME_PREFIX.test(p)))
+      fail('"names.prefixes" must be a prefix or a list of prefixes, each ending in "-" ("color-")');
+    const rename = has(value, 'rename') ? value.rename : {};
+    if (!isObject(rename) || !Object.entries(rename).every(
+      ([k, v]) => typeof v === 'string' && CUSTOM_PROPERTY.test(k) && CUSTOM_PROPERTY.test(v)))
+      fail('"names.rename" must map a custom property to a custom property ("--gray-500": "--neutral-500")');
+    return { prefixes: [...prefixes], rename: { ...rename } };
+  };
+  const budgets = pathMap('budgets', BUDGETS);
+  const baselines = pathMap('baselines', BASELINES);
+  const hooks = hookFlags();
+  return { path: where, root: base, tokens, emailTokens, components, emails, stack, budgets, baselines, hooks,
+           names: nameRoute() };
+}
+
+// `name` in the contract's grammar (P31 part 5), as grammar_name() reads it:
+// `names.rename` first, else the first of `names.prefixes` it starts with off.
+export function grammarName(config, name) {
+  const names = config?.names ?? { prefixes: [], rename: {} };
+  if (has(names.rename, name)) return names.rename[name];
+  const prefix = names.prefixes.find((p) => name.startsWith(`--${p}`) && name.length > p.length + 2);
+  return prefix ? `--${name.slice(prefix.length + 2)}` : name;
 }
 
 // The config that governs `start`, read and checked, or null.
@@ -1214,7 +1244,10 @@ export function readTokens(paths) {
 // `start` is the working directory, where the audit looks too.
 export function lintProject(start = process.cwd()) {
   const config = projectConfig(start);
-  if (!config) return { config: null, tokenGlobs: [], componentGlobs: [], isComponent: () => false, rampSteps: [] };
+  if (!config) {
+    return { config: null, tokenGlobs: [], componentGlobs: [], isComponent: () => false, rampSteps: [],
+             names: { prefixes: [], rename: {} }, grammarName: (name) => name };
+  }
   const ramps = readTokens(config.tokens).ramps;
   const roots = rootSpellings(config.root, start);
   return {
@@ -1223,5 +1256,7 @@ export function lintProject(start = process.cwd()) {
     componentGlobs: config.components.flatMap((g) => overrideGlobs(roots, g)),
     isComponent: (file) => isComponent(config, file),
     rampSteps: Object.entries(ramps).flatMap(([ramp, steps]) => Object.keys(steps).map((s) => `--${ramp}-${s}`)),
+    names: config.names,                         // P31 part 5
+    grammarName: (name) => grammarName(config, name),
   };
 }

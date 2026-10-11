@@ -244,9 +244,10 @@ const TIER1_SHORTHAND = new RegExp(
  * what `style-prop-custom-properties-only` gives an inline value (Part 3). */
 const VAR_NAME = /var\(\s*(--[\w-]+)/g;
 const tier1Advice = (ref) => {
-  if (TIER2_EXCEPTIONS.includes(ref) || TIER1_NULLS.includes(ref)) return null;
-  if (PROJECT_RAMP_STEPS.has(ref)) return PROJECT_RAMP_ADVICE;
-  const prefix = Object.keys(TIER1_WITH_ROLE).find((p) => ref.slice(2).startsWith(p));
+  const name = PROJECT.grammarName(ref);         // the project's `names` (P31 part 5)
+  if (TIER2_EXCEPTIONS.includes(name) || TIER1_NULLS.includes(name)) return null;
+  if (PROJECT_RAMP_STEPS.has(ref) || PROJECT_RAMP_STEPS.has(name)) return PROJECT_RAMP_ADVICE;
+  const prefix = Object.keys(TIER1_WITH_ROLE).find((p) => name.slice(2).startsWith(p));
   return prefix ? TIER1_WITH_ROLE[prefix] : null;
 };
 
@@ -261,6 +262,20 @@ const SHORTHAND_STEPS = PROJECT.rampSteps.filter(
 const PROJECT_SHORTHAND = SHORTHAND_STEPS.length
   ? new RegExp(String.raw`\((?:[a-z-]+:)?(?:${SHORTHAND_STEPS.join('|')})\)`)
   : null;
+
+/* LAW 6 under the project's `names` (P31 part 5): a shorthand whose name,
+ * mapped onto the grammar, is a primitive with a role. `(--color-neutral-800)`
+ * with the prefix `color-`, or a renamed `(--gray-500)`. A prefix holds only
+ * letters, digits, `_` and `-` (project_config checks it), so it is safe in
+ * the pattern; a page-rhythm role or a null-out under a prefix passes. */
+const NAMED_SHORTHAND = (() => {
+  const { prefixes, rename } = PROJECT.names;
+  const kept = [...TIER2_EXCEPTIONS, ...TIER1_NULLS].map((n) => n.slice(2)).join('|');
+  const parts = prefixes.map((p) => String.raw`--${p}(?!(?:${kept})\))(?:${Object.keys(TIER1_WITH_ROLE).join('|')})[\w-]*`);
+  const renamed = Object.keys(rename).filter((n) => /^--[\w-]+$/.test(n) && tier1Advice(n));
+  if (renamed.length) parts.push(`(?:${renamed.join('|')})`);
+  return parts.length ? new RegExp(String.raw`\((?:[a-z-]+:)?(?:${parts.join('|')})\)`) : null;
+})();
 
 /* =========================================================================
  * PART 2 — SELECTOR SCOPES
@@ -695,6 +710,14 @@ const CORE_RESTRICTED_SYNTAX = [
         'Law 6 (semantic before primitive): (--space-6), (--neutral-800) and friends read a Tier-1 primitive. ' +
           'Use the role class (p-card, bg-surface), or the role variable: p-(--pad-card).'
       ),
+
+      ...(NAMED_SHORTHAND
+        ? forbidInClasses(
+            NAMED_SHORTHAND,
+            "Law 6 (semantic before primitive): under the project's names (.design-suite.json `names`), this " +
+              'reads a Tier-1 primitive that has a role. Use the role class, or the role variable.'
+          )
+        : []),
 
       ...(PROJECT_SHORTHAND
         ? forbidInClasses(

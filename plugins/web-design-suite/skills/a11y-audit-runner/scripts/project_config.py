@@ -94,7 +94,11 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 CONFIG_NAME = ".design-suite.json"
 CONFIG_SCHEMA = 1
 CONTRACT_SCHEMA = "web-design-suite/contract/1"
-KEYS = ("schema", "tokens", "emailTokens", "components", "emails", "stack", "budgets", "baselines", "hooks")
+KEYS = ("schema", "tokens", "emailTokens", "components", "emails", "stack", "budgets", "baselines", "hooks",
+        "names")
+NAMES = ("prefixes", "rename")                               # P31 part 5: a tool's names onto the grammar
+NAME_PREFIX = re.compile(r"^[A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*-$")
+CUSTOM_PROPERTY = re.compile(r"^--[A-Za-z0-9_-]+$")
 STACKS = ("vanilla-css", "css-modules", "tailwind-v3", "tailwind-v4")
 BUDGETS = ("perf", "a11y")
 BASELINES = ("audit", "a11y", "perf", "docs", "snapshots", "system")
@@ -120,6 +124,20 @@ class ProjectConfig:
     budgets: Dict[str, Path] = field(default_factory=dict)
     baselines: Dict[str, Path] = field(default_factory=dict)
     hooks: Dict[str, bool] = field(default_factory=dict)
+    prefixes: List[str] = field(default_factory=list)
+    rename: Dict[str, str] = field(default_factory=dict)
+
+    def grammar_name(self, name: str) -> str:
+        """`name` in the contract's grammar (P31 part 5): the config's
+        `names.rename` first, else the name with the first of its
+        `names.prefixes` it starts with taken off, so a Style Dictionary or
+        Terrazzo name (`--color-bg-surface`) reads as `--bg-surface`."""
+        if name in self.rename:
+            return self.rename[name]
+        for prefix in self.prefixes:
+            if name.startswith("--" + prefix) and len(name) > len(prefix) + 2:
+                return "--" + name[len(prefix) + 2:]
+        return name
 
     @property
     def root(self) -> Path:
@@ -250,6 +268,27 @@ def load_config(path: Union[str, Path]) -> ProjectConfig:
             raise ConfigError(f'{path}: "{key}" must be a glob or a list of globs')
         return list(value)
 
+    def name_route() -> Tuple[List[str], Dict[str, str]]:
+        value = data.get("names", {})
+        if not isinstance(value, dict):
+            raise ConfigError(f'{path}: "names" must be an object')
+        extra = sorted(set(value) - set(NAMES))
+        if extra:
+            raise ConfigError(f'{path}: unknown key {extra[0]!r} in "names"; the keys are {", ".join(NAMES)}')
+        prefixes = value.get("prefixes", [])
+        if isinstance(prefixes, str):
+            prefixes = [prefixes]
+        if not isinstance(prefixes, list) or not all(isinstance(p, str) and NAME_PREFIX.match(p) for p in prefixes):
+            raise ConfigError(f'{path}: "names.prefixes" must be a prefix or a list of prefixes, '
+                              f'each ending in "-" ("color-")')
+        rename = value.get("rename", {})
+        if not isinstance(rename, dict) or not all(
+                isinstance(v, str) and CUSTOM_PROPERTY.match(k) and CUSTOM_PROPERTY.match(v)
+                for k, v in rename.items()):
+            raise ConfigError(f'{path}: "names.rename" must map a custom property to a custom property '
+                              f'("--gray-500": "--neutral-500")')
+        return list(prefixes), dict(rename)
+
     components = glob_list("components", [])
     emails = glob_list("emails", EMAILS)
     stack = data.get("stack")
@@ -260,7 +299,8 @@ def load_config(path: Union[str, Path]) -> ProjectConfig:
                          email_tokens=one_path("emailTokens", email) if email is not None else None,
                          components=components, emails=emails, stack=stack,
                          budgets=path_map("budgets", BUDGETS),
-                         baselines=path_map("baselines", BASELINES), hooks=hook_flags())
+                         baselines=path_map("baselines", BASELINES), hooks=hook_flags(),
+                         **dict(zip(("prefixes", "rename"), name_route())))
 
 
 def project_config(start: Optional[Union[str, Path]] = None) -> Optional[ProjectConfig]:

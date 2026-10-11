@@ -384,11 +384,12 @@ def tier1_advice(ref: str) -> str | None:
     """The role to use instead of `ref` when it is a Tier-1 primitive that has
     one (Law 6), else None. stylelint's design/tier1-primitive and the ESLint
     config's TIER1_SHORTHAND and inline-style check read the same lists."""
-    if ref in TIER2_EXCEPTIONS or ref in TIER1_NULLS:
+    name = PROJECT.config.grammar_name(ref) if PROJECT.config else ref    # its `names` (P31 part 5)
+    if name in TIER2_EXCEPTIONS or name in TIER1_NULLS:
         return None         # a role, or zero, which is zero
-    if ref in PROJECT.ramp_steps:
+    if ref in PROJECT.ramp_steps or name in PROJECT.ramp_steps:
         return PROJECT_RAMP_ADVICE
-    bare = ref[2:]
+    bare = name[2:]
     return next((advice for pfx, advice in TIER1_WITH_ROLE.items() if bare.startswith(pfx)), None)
 
 

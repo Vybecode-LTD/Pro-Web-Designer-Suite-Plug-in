@@ -61,6 +61,14 @@
   for the same name wins. `deprecate.py import FILE --since X --removal Y` writes the marks
   into the ledger, so `status`, `scan` and `mapping` see them; the replacement is the
   token the reason names (`"Please use {bg.brand} instead"` is `--bg-brand`).
+- **Style Dictionary's and Terrazzo's names: part 5** (P31; LC-B2). Both tools join a
+  token's path with `-`, so `color.neutral.500` is `--color-neutral-500` and a component
+  reading it skipped a tier unseen: no gate knew the name. `.design-suite.json` takes
+  `names`: `prefixes` (each ending in `-`) taken off a name that starts with one, and a
+  `rename` table, read first. The audit, stylelint and ESLint read Law 6 through it, in a
+  stylesheet, a `(--name)` class and an inline custom property, and a page-rhythm role or
+  a null-out under a prefix still passes. The spec's `tiers.names` holds the examples,
+  and `project_config.py` and `.mjs` check the key alike.
 
 ### Fixed
 

@@ -582,6 +582,18 @@ CONFIGS = {
     "emails-before-stack": '{"schema": 1, "emails": 3, "stack": "bootstrap"}',
     "hooks-a11y": '{"schema": 1, "hooks": {"a11yGate": "yes"}}',
     "hooks-email": '{"schema": 1, "hooks": {"emailBuild": 1}}',
+    # P31 part 5: a tool's names onto the grammar, and each way to get it wrong.
+    "names": json.dumps({"schema": 1, "names": {"prefixes": ["color-", "size-"],
+                                                "rename": {"--gray-500": "--neutral-500"}}}),
+    "names-one": json.dumps({"schema": 1, "names": {"prefixes": "color-"}}),
+    "names-list": json.dumps({"schema": 1, "names": ["color-"]}),
+    "names-key": json.dumps({"schema": 1, "names": {"prefix": "color-"}}),
+    "names-dash": json.dumps({"schema": 1, "names": {"prefixes": ["color"]}}),
+    "names-empty": json.dumps({"schema": 1, "names": {"prefixes": [""]}}),
+    "names-space": json.dumps({"schema": 1, "names": {"prefixes": ["my color-"]}}),
+    "names-rename": json.dumps({"schema": 1, "names": {"rename": {"gray-500": "--neutral-500"}}}),
+    "names-target": json.dumps({"schema": 1, "names": {"rename": {"--gray-500": 5}}}),
+    "names-rename-list": json.dumps({"schema": 1, "names": {"rename": [["--a", "--b"]]}}),
 }
 
 
@@ -855,7 +867,8 @@ class TheNodeReaderAgrees(TempDirTest):
                        "emailTokens": str(c.email_tokens) if c.email_tokens else None,
                        "components": c.components, "emails": c.emails, "stack": c.stack,
                        "budgets": {k: str(v) for k, v in c.budgets.items()},
-                       "baselines": {k: str(v) for k, v in c.baselines.items()}, "hooks": c.hooks}}
+                       "baselines": {k: str(v) for k, v in c.baselines.items()}, "hooks": c.hooks,
+                       "names": {"prefixes": c.prefixes, "rename": c.rename}}}
 
     def test_every_config_reads_the_same(self):
         files = [self.write(f"{name}/.design-suite.json", text) for name, text in CONFIGS.items()]
