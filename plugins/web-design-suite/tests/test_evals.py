@@ -496,8 +496,8 @@ class TheWorkflow(TempDirTest):
                               capture_output=True, timeout=60)
 
     def test_it_never_runs_on_a_pull_request(self):
-        self.assertEqual({"workflow_dispatch", "push"}, set(self.doc["on"]))
-        self.assertEqual({"tags": ["v*"]}, self.doc["on"]["push"])
+        # Nor on a release tag: the dispatch before the tag gates the release (the owner, 2026-10-11).
+        self.assertEqual({"workflow_dispatch"}, set(self.doc["on"]))
         self.assertEqual({"contents": "read"}, self.doc["permissions"])
         self.assertIs(False, self.steps["actions/checkout"]["with"]["persist-credentials"])
         self.assertIs(False, self.steps["actions/setup-node"]["with"]["package-manager-cache"])
@@ -571,7 +571,7 @@ class TheWorkflow(TempDirTest):
     def test_a_release_runs_both_under_one_ceiling(self):
         """On a tag, routing runs first and the outcome set gets what it left:
         one $15 for both (the owner, 2026-10-10)."""
-        self.assertEqual("${{ inputs.tag || 'all' }}", self.steps["Run the suite"]["env"]["TAG"])
+        self.assertEqual("${{ inputs.tag }}", self.steps["Run the suite"]["env"]["TAG"])
         proc = self.run_step("Run the suite", PLUGIN, ANTHROPIC_API_KEY="k", TAG="all", RUNS="3",
                              STAND_IN_COST="4.25")
         self.assertEqual(0, proc.returncode, output(proc))
