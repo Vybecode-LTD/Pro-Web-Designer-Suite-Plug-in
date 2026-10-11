@@ -28,6 +28,10 @@ USAGE
 
   # Code -> Figma (a POST /v1/files/:key/variables body; Enterprise-only endpoint)
   python scripts/figma_to_tokens.py design/tokens.json --reverse --out figma-payload.json
+  # ...or the same variables as Plugin API code, on any plan: run it with the
+  #   Figma MCP server's use_figma, or in a development plugin (P32)
+  python scripts/figma_to_tokens.py design/tokens.json --reverse --format plugin-script \
+    --out figma-variables.js
 
   # Drift check in CI: regenerate and compare, no writes
   python scripts/figma_to_tokens.py variables.json --format css | diff -u src/styles/tokens.css -
@@ -980,6 +984,11 @@ def read_tokens_json(data: Any) -> Tuple[Dict[str, dict], Dict[str, Dict[str, di
 
 
 def emit_reverse(data: Any, collection_split: bool = True) -> Tuple[str, List[Problem]]:
+    body, problems = reverse_body(data, collection_split)
+    return json.dumps(body, indent=2) + "\n", problems
+
+
+def reverse_body(data: Any, collection_split: bool = True) -> Tuple[dict, List[Problem]]:
     base, themes = read_tokens_json(data)
     problems: List[Problem] = []
 
@@ -1150,7 +1159,165 @@ def emit_reverse(data: Any, collection_split: bool = True) -> Tuple[str, List[Pr
         "variables": variables,
         "variableModeValues": mode_values,
     }
-    return json.dumps(body, indent=2) + "\n", problems
+    return body, problems
+
+
+# The Plugin API reads and writes variables on every plan (LC-B1, LC-C7). The
+# script applies the REST body above through it, so both routes carry the same
+# variables. Figma's guide to `use_figma` says its code "is automatically
+# wrapped in an async context": top-level `await` and `return`, no
+# `figma.closePlugin()`, no `figma.notify()` (it throws there).
+PLUGIN_SCRIPT = """\
+// Plugin API code from figma_to_tokens.py --reverse --format plugin-script.
+// GENERATED -- DO NOT EDIT. Change the tokens, re-run the generator.
+//   source  @SOURCE@
+// Run it with the Figma MCP server's use_figma, which wraps it in an async
+// function, or in a development plugin, inside an async function whose
+// result goes to figma.closePlugin(). It finds collections, modes and
+// variables by name, creates what is missing and updates what differs, and it
+// deletes nothing, so a second run changes nothing.
+
+const BODY = @BODY@;
+
+const LIMIT = 20;  // errors listed in the result: use_figma's response is small
+
+function same(a, b) {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length
+      && a.every((x, i) => same(x, b[i]));
+  }
+  if (typeof a === "number" && typeof b === "number") return Math.abs(a - b) < 1e-4;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return a === b;
+  if (a.type === "VARIABLE_ALIAS" || b.type === "VARIABLE_ALIAS") {
+    return a.type === b.type && a.id === b.id;
+  }
+  return Object.keys(b).every((k) => same(a[k], b[k]));
+}
+
+const result = {
+  collections: { created: 0, found: 0 },
+  modes: { created: 0, renamed: 0, found: 0 },
+  variables: { created: 0, updated: 0, unchanged: 0 },
+  errorCount: 0,
+  errors: [],
+};
+function fail(what, err) {
+  result.errorCount += 1;
+  if (result.errors.length < LIMIT) result.errors.push(`${what}: ${err && err.message ? err.message : err}`);
+}
+
+const local = await figma.variables.getLocalVariableCollectionsAsync();
+const existing = await figma.variables.getLocalVariablesAsync();
+
+const collectionOf = {};
+for (const c of BODY.variableCollections) {
+  let collection = local.find((x) => x.name === c.name);
+  if (collection) {
+    result.collections.found += 1;
+  } else {
+    collection = figma.variables.createVariableCollection(c.name);
+    result.collections.created += 1;
+  }
+  collectionOf[c.id] = collection;
+}
+
+// The REST body's UPDATE names a collection's first mode, which Figma creates
+// as "Mode 1"; each CREATE is a theme. The plan caps the modes, and addMode
+// throws past the cap: Starter has only the first.
+const modeOf = {};
+for (const m of BODY.variableModes) {
+  const collection = collectionOf[m.variableCollectionId];
+  const have = collection.modes.find((x) => x.name === m.name);
+  if (have) {
+    modeOf[m.id] = have.modeId;
+    result.modes.found += 1;
+    continue;
+  }
+  try {
+    if (m.action === "UPDATE") {
+      collection.renameMode(collection.defaultModeId, m.name);
+      modeOf[m.id] = collection.defaultModeId;
+      result.modes.renamed += 1;
+    } else {
+      modeOf[m.id] = collection.addMode(m.name);
+      result.modes.created += 1;
+    }
+  } catch (err) {
+    fail(`mode "${m.name}" in "${collection.name}"`, err);
+  }
+}
+
+const variableOf = {};
+for (const v of BODY.variables) {
+  const collection = collectionOf[v.variableCollectionId];
+  let variable = existing.find((x) => x.variableCollectionId === collection.id && x.name === v.name);
+  try {
+    if (variable && variable.resolvedType !== v.resolvedType) {
+      fail(`variable "${v.name}"`, `it is ${variable.resolvedType} in Figma and ${v.resolvedType} in the tokens; left as it is`);
+      continue;
+    }
+    const entry = { variable, created: !variable, changed: false };
+    if (!variable) {
+      variable = figma.variables.createVariable(v.name, collection, v.resolvedType);
+      entry.variable = variable;
+    }
+    // Primitives carry no scopes, so no picker offers them (Law 6).
+    if (!same([...variable.scopes].sort(), [...v.scopes].sort())) {
+      variable.scopes = v.scopes;
+      entry.changed = true;
+    }
+    if ((variable.codeSyntax || {}).WEB !== v.codeSyntax.WEB) {
+      variable.setVariableCodeSyntax("WEB", v.codeSyntax.WEB);
+      entry.changed = true;
+    }
+    if (v.description !== undefined && variable.description !== v.description) {
+      variable.description = v.description;
+      entry.changed = true;
+    }
+    variableOf[v.id] = entry;
+  } catch (err) {
+    fail(`variable "${v.name}"`, err);
+  }
+}
+
+for (const mv of BODY.variableModeValues) {
+  const entry = variableOf[mv.variableId];
+  const modeId = modeOf[mv.modeId];
+  if (!entry || modeId === undefined) continue;  // its variable or its mode failed, and says so
+  let value = mv.value;
+  if (value && value.type === "VARIABLE_ALIAS") {
+    const target = variableOf[value.id];
+    if (!target) {
+      fail(`variable "${entry.variable.name}"`, "its alias's target was not written");
+      continue;
+    }
+    value = figma.variables.createVariableAlias(target.variable);
+  }
+  if (!entry.created && same(entry.variable.valuesByMode[modeId], value)) continue;
+  try {
+    entry.variable.setValueForMode(modeId, value);
+    entry.changed = true;
+  } catch (err) {
+    fail(`variable "${entry.variable.name}"`, err);
+  }
+}
+
+for (const entry of Object.values(variableOf)) {
+  if (entry.created) result.variables.created += 1;
+  else if (entry.changed) result.variables.updated += 1;
+  else result.variables.unchanged += 1;
+}
+return result;
+"""
+
+
+def emit_plugin_script(data: Any, source: str, collection_split: bool = True) -> Tuple[str, List[Problem]]:
+    """`--reverse --format plugin-script` (P32): the REST body, applied
+    through the Plugin API, which needs no Enterprise plan."""
+    body, problems = reverse_body(data, collection_split)
+    head, _, tail = PLUGIN_SCRIPT.partition("@BODY@")    # a description holding `@SOURCE@` stays as it is
+    head = head.replace("@SOURCE@", " ".join(source.split()))
+    return head + json.dumps(body, separators=(",", ":")) + tail, problems
 
 
 # ===========================================================================
@@ -1165,14 +1332,16 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Exit 0 clean, 1 written with warnings, 2 unreadable input.")
     p.add_argument("path")
-    p.add_argument("--format", choices=("css", "json", "ts", "dtcg", "all"), default="css",
+    p.add_argument("--format", choices=("css", "json", "ts", "dtcg", "all", "plugin-script"), default="css",
                    help="dtcg: a DTCG 2025.10 tokens.json of the default mode; the only "
-                        "format for a tokens.css input. all: tokens.{css,json,ts}")
+                        "format for a tokens.css input. all: tokens.{css,json,ts}. "
+                        "plugin-script, with --reverse: Plugin API code for use_figma or a plugin")
     p.add_argument("--out", help="write here instead of stdout")
     p.add_argument("--out-dir", help="with --format all: write tokens.{css,json,ts} here; with --format "
                                      "dtcg: tokens.json, each theme's file and tokens.resolver.json")
     p.add_argument("--reverse", action="store_true",
-                   help="read a tokens.json and emit a Figma variables POST body")
+                   help="read a tokens.json and emit a Figma variables POST body, or with "
+                        "--format plugin-script the same variables as Plugin API code")
     p.add_argument("--shape", choices=("rest", "plugin", "dtcg", "records", "resolver"))
     p.add_argument("--collection", default="tokens")
     p.add_argument("--color-format", choices=("oklch", "hex"), default="oklch")
@@ -1246,6 +1415,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("--format dtcg takes --out (the default values) or --out-dir (every theme, "
               "through a resolver), not both.", file=sys.stderr)
         return 2
+    if args.format == "plugin-script" and not args.reverse:
+        print("--format plugin-script writes a tokens.json into Figma: add --reverse.", file=sys.stderr)
+        return 2
     if path.suffix.lower() == ".css":    # reads none of the project's token names (CodeRabbit on #101)
         return css_main(path, args)
     # A flag beats the config: the project's token files only without --tokens (P24).
@@ -1262,7 +1434,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         if args.reverse:
             data = json.loads(path.read_bytes())
-            text, problems = emit_reverse(data, collection_split=not args.flat)
+            if args.format == "plugin-script":
+                text, problems = emit_plugin_script(data, str(path), collection_split=not args.flat)
+            else:
+                text, problems = emit_reverse(data, collection_split=not args.flat)
             write_out(text, args.out)
             report_problems(problems, args.quiet)
             return 1 if problems else 0

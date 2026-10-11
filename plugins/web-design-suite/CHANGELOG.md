@@ -73,6 +73,19 @@
   the map as well: a step renamed to a role passes, and one the tokens file spells with a
   prefix is still a primitive. The spec's `tiers.names` holds the examples,
   and `project_config.py` and `.mjs` check the key alike.
+- **Figma on every plan: the Plugin API route** (P32 part 1; LC-B1, LC-C7). The only way
+  into Figma was `--reverse`'s REST body, and `POST /v1/files/:key/variables` needs an
+  Enterprise plan. `figma_to_tokens.py --reverse --format plugin-script` writes the same
+  variables as Plugin API code, which the Figma MCP server's `use_figma` runs (or a
+  development plugin), on any plan. It finds collections, modes and variables by name,
+  renames a new collection's "Mode 1", keeps primitives out of the pickers (`scopes: []`),
+  sets `codeSyntax.WEB` to `var(--token)`, keeps aliases as aliases, updates what differs
+  in place and deletes nothing, so a second run changes nothing. A mode the plan does not
+  allow is reported with Figma's message and the rest is written. It returns counts and
+  the first errors, which is what `use_figma` hands back. SKILL.md routes a connected MCP
+  server: `get_variable_defs` reads a selection, audited as records, and `use_figma` runs
+  the script. The facts are re-read at Figma's Plugin API, MCP and FAQ pages
+  (`references/figma-mapping.md` §14).
 
 ### Fixed
 

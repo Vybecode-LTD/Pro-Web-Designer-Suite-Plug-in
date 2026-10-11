@@ -18,15 +18,19 @@ Regressions covered:
 - LC-C3 (3.4.0): the two scripts' readers were copies that had drifted apart.
 - LC-A22 (3.4.0): the `--reverse` body carried a `_comment` key, never named a
   collection's first mode, and offered primitives in the pickers.
+- LC-B1, LC-C7 (3.6.0): the only route into Figma was the REST body, which
+  needs an Enterprise plan; `--reverse --format plugin-script` writes the same
+  variables as Plugin API code for use_figma or a plugin.
 """
 from __future__ import annotations
 
 import ast
 import json
+import subprocess
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from wds_support import SKILLS, TempDirTest, load_script, output, run_py
+from wds_support import NODE, SKILLS, TempDirTest, env, load_script, output, run_py
 
 DTCG_2025 = {
     "neutral": {"$type": "color",
@@ -369,6 +373,181 @@ class ReverseBody(TempDirTest):
         scopes = {v["name"]: (tier[v["variableCollectionId"]], v["scopes"]) for v in body["variables"]}
         self.assertEqual(scopes["neutral/500"], ("primitive", []))
         self.assertEqual(scopes["bg/surface"], ("semantic", ["FRAME_FILL", "SHAPE_FILL"]))
+
+
+# A stand-in for the Plugin API's `figma.variables`, as its reference pages
+# give it: collections with `modes`, `defaultModeId`, `renameMode` and
+# `addMode` (which throws past the plan's cap), variables with `scopes`,
+# `codeSyntax`, `setVariableCodeSyntax`, `valuesByMode` and `setValueForMode`.
+# The script runs as use_figma runs it, inside an async function, twice, so the
+# second run shows what a re-run changes. Every call is recorded.
+FIGMA_STUB = """
+import { readFileSync } from 'node:fs';
+const code = readFileSync(process.argv[2], 'utf8');
+const modeCap = Number(process.argv[3]);
+const calls = [];
+const collections = [];
+const variables = [];
+let next = 1;
+function collection(name) {
+  const c = {
+    id: 'VariableCollectionId:' + next++, name,
+    modes: [{ modeId: 'mode:' + next++, name: 'Mode 1' }],
+    get defaultModeId() { return this.modes[0].modeId; },
+    renameMode(id, to) {
+      calls.push(['renameMode', name, id === this.defaultModeId ? 'default' : id, to]);
+      this.modes.find((m) => m.modeId === id).name = to;
+    },
+    addMode(to) {
+      if (this.modes.length >= modeCap) throw new Error('in addMode: Limited to ' + modeCap + ' modes only');
+      const id = 'mode:' + next++;
+      this.modes.push({ modeId: id, name: to });
+      calls.push(['addMode', name, to]);
+      return id;
+    },
+  };
+  collections.push(c);
+  return c;
+}
+function variable(name, col, type) {
+  let scopes = ['ALL_SCOPES'];
+  const codeSyntax = {};
+  const v = {
+    id: 'VariableID:' + next++, name, variableCollectionId: col.id, resolvedType: type,
+    description: '', valuesByMode: {}, codeSyntax,
+    get scopes() { return scopes.slice(); },
+    set scopes(s) { calls.push(['scopes', name, s]); scopes = s.slice(); },
+    setVariableCodeSyntax(platform, value) { calls.push(['codeSyntax', name, platform, value]); codeSyntax[platform] = value; },
+    setValueForMode(modeId, value) {
+      if (!col.modes.some((m) => m.modeId === modeId)) throw new Error('no such mode');
+      calls.push(['setValueForMode', name, modeId, value]);
+      this.valuesByMode[modeId] = value;
+    },
+  };
+  variables.push(v);
+  return v;
+}
+const figma = { variables: {
+  async getLocalVariableCollectionsAsync() { return collections.slice(); },
+  async getLocalVariablesAsync() { return variables.slice(); },
+  createVariableCollection(name) { calls.push(['createVariableCollection', name]); return collection(name); },
+  createVariable(name, col, type) {
+    if (typeof col !== 'object') throw new Error('createVariable takes the collection itself');
+    calls.push(['createVariable', name, col.name, type]);
+    return variable(name, col, type);
+  },
+  createVariableAlias(v) { return { type: 'VARIABLE_ALIAS', id: v.id }; },
+} };
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+const run = new AsyncFunction('figma', code);
+const first = await run(figma);
+const firstCalls = calls.splice(0);
+const second = await run(figma);
+console.log(JSON.stringify({
+  first, second, calls: firstCalls, rerunCalls: calls,
+  collections: collections.map((c) => ({ name: c.name, modes: c.modes })),
+  variables: variables.map((v) => ({ id: v.id, name: v.name, scopes: v.scopes,
+                                     codeSyntax: v.codeSyntax, valuesByMode: v.valuesByMode })),
+}));
+"""
+
+
+@unittest.skipUnless(NODE, "node is not on PATH")
+class PluginScript(TempDirTest):
+    """LC-B1, LC-C7 (P32): `--reverse --format plugin-script` writes the
+    variables as Plugin API code, which use_figma runs on any plan."""
+
+    THEMED = {"semantic": {"bg-surface": {"value": "var(--neutral-0)"},
+                           "fg-muted": {"value": "var(--neutral-500)"}},
+              "primitive": {"neutral-0": {"value": "#ffffff"},
+                            "neutral-500": {"value": "#6b6b6b"},
+                            "neutral-900": {"value": "#1a1a1a"}},
+              "themes": {"dark": {"bg-surface": {"value": "var(--neutral-900)"}}}}
+
+    def script(self, tokens=None):
+        path = self.write("tokens.json", json.dumps(tokens or self.THEMED))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", path, "--reverse",
+                      "--format", "plugin-script", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        return proc.stdout.decode("utf-8")
+
+    def run_stub(self, script, mode_cap=10):
+        code = self.write("figma-variables.js", script)
+        stub = self.write("stub.mjs", FIGMA_STUB)
+        proc = subprocess.run([NODE, stub, code, str(mode_cap)], cwd=self.tmp, env=env(),
+                              capture_output=True, timeout=60)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        return json.loads(proc.stdout)
+
+    def test_the_script_runs_as_use_figma_runs_it(self):
+        ran = self.run_stub(self.script())
+        self.assertEqual(ran["first"]["errorCount"], 0, ran["first"])
+        self.assertEqual(ran["first"]["collections"], {"created": 2, "found": 0})
+        self.assertEqual(ran["first"]["variables"]["created"], 5)
+
+    def test_it_renames_mode_1_and_adds_the_themes(self):
+        ran = self.run_stub(self.script())
+        modes = {c["name"]: [m["name"] for m in c["modes"]] for c in ran["collections"]}
+        self.assertEqual(modes, {"primitive": ["Value"], "semantic": ["Light", "Dark"]})
+        self.assertIn(["renameMode", "semantic", "default", "Light"], ran["calls"])
+        self.assertNotIn("Mode 1", json.dumps(ran["collections"]))
+
+    def test_primitives_are_scoped_out_and_every_variable_has_its_css_name(self):
+        ran = self.run_stub(self.script())
+        by_name = {v["name"]: v for v in ran["variables"]}
+        self.assertEqual(by_name["neutral/500"]["scopes"], [])
+        self.assertEqual(by_name["bg/surface"]["scopes"], ["FRAME_FILL", "SHAPE_FILL"])
+        for name, v in by_name.items():
+            with self.subTest(name=name):
+                self.assertEqual(v["codeSyntax"], {"WEB": f"var(--{name.replace('/', '-')})"})
+
+    def test_aliases_stay_aliases_in_every_mode(self):
+        ran = self.run_stub(self.script())
+        by_name = {v["name"]: v for v in ran["variables"]}
+        modes = {m["name"]: m["modeId"] for c in ran["collections"] for m in c["modes"]}
+        surface = by_name["bg/surface"]["valuesByMode"]
+        self.assertEqual(surface[modes["Light"]], {"type": "VARIABLE_ALIAS", "id": by_name["neutral/0"]["id"]})
+        self.assertEqual(surface[modes["Dark"]], {"type": "VARIABLE_ALIAS", "id": by_name["neutral/900"]["id"]})
+        self.assertEqual(by_name["neutral/0"]["valuesByMode"][modes["Value"]], {"r": 1, "g": 1, "b": 1, "a": 1})
+
+    def test_a_second_run_changes_nothing(self):
+        ran = self.run_stub(self.script())
+        self.assertEqual(ran["rerunCalls"], [])
+        self.assertEqual(ran["second"]["collections"], {"created": 0, "found": 2})
+        self.assertEqual(ran["second"]["variables"], {"created": 0, "updated": 0, "unchanged": 5})
+        self.assertEqual(ran["second"]["modes"], {"created": 0, "renamed": 0, "found": 3})
+
+    def test_a_plan_that_caps_the_modes_is_reported_and_the_rest_is_written(self):
+        # Starter: "Anyone on Education, Professional, Organization, and
+        # Enterprise plans can create and use modes for variables."
+        ran = self.run_stub(self.script(), mode_cap=1)
+        self.assertEqual(ran["first"]["errorCount"], 1, ran["first"])
+        self.assertIn('mode "Dark" in "semantic": in addMode: Limited to 1 modes only',
+                      ran["first"]["errors"])
+        self.assertEqual(ran["first"]["variables"]["created"], 5)
+
+    def test_a_changed_token_is_updated_in_place(self):
+        changed = json.loads(json.dumps(self.THEMED))
+        changed["primitive"]["neutral-500"]["value"] = "#5a5a5a"
+        code = self.write("figma-variables.js", self.script(changed))
+        # The changed script runs against the first run's file, as a re-sync does.
+        state = self.write("rerun.mjs", FIGMA_STUB.replace(
+            "const first = await run(figma);",
+            "await new AsyncFunction('figma', readFileSync(process.argv[4], 'utf8'))(figma);\n"
+            "calls.splice(0);\nconst first = await run(figma);"))
+        proc = subprocess.run([NODE, state, code, "10", self.write("old.js", self.script())],
+                              cwd=self.tmp, env=env(), capture_output=True, timeout=60)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        again = json.loads(proc.stdout)
+        self.assertEqual(again["first"]["variables"], {"created": 0, "updated": 1, "unchanged": 4})
+        self.assertEqual([c[:2] for c in again["calls"]], [["setValueForMode", "neutral/500"]])
+
+    def test_plugin_script_needs_reverse(self):
+        path = self.write("tokens.json", json.dumps(self.THEMED))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", path, "--format", "plugin-script",
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("--reverse", output(proc))
 
 
 if __name__ == "__main__":
