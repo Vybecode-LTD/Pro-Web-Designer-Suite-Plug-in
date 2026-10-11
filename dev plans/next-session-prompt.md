@@ -217,7 +217,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - **The graders:** the result graders are `arm: both`; the skill and the gates' verdicts (a regex on the trace, `verdict\\*"\s*:\s*\\*"pass`) are `arm: with-only`.
   - **The tests:** `test_evals.TheOutcomeCases` runs every pattern on `SAMPLES`; a new grader needs samples. It also runs every scaffold and audits every fixture.
   - **The run:** `claude.exe plugin eval . --tag outcome --scaffold --allow-real-servers --ablation with-without -j 2 --trust-plugin --no-publish --model claude-sonnet-5-5 --judge-model claude-haiku-5-5 --allow-tools Write Edit "mcp__plugin_web-design-suite_gates__*"`, with `--allow-tools` last. One run per arm cost $2.21 and took 685 seconds of runs.
-  - **`evals.yml`:** `tag` is `routing`, `outcome` or `all` (a tag push runs `all`). Routing runs with `--ablation none`, then outcome `with-without`, with what routing left of $14.
+  - **`evals.yml`:** `tag` is `routing`, `outcome` or `all`, by hand only: the owner dropped the tag trigger on 2026-10-11 (#110). Routing runs with `--ablation none`, then outcome `with-without`, with what routing left of $14.
 - **The live check (R3).** `dev plans/web-design-suite-3.5.0-live-check.md`. Headless sessions ran as `claude -p "<prompt>" --plugin-dir plugins/web-design-suite --setting-sources project,local --max-budget-usd 0.6 --output-format json --model claude-sonnet-5-5 --permission-mode acceptEdits --allowedTools "Bash(python *)" "Bash(node *)" "mcp__plugin_web-design-suite_gates__*"`, in a scratch copy of a project. The browser commands find Playwright through `NODE_PATH` (the tooling's `node_modules`).
 - **N39 (#98).** `a11y_static.py` leaves a folder's email templates (the config's `emails`) to `lint_email.py` and lists them on stderr; a template named on its own is still read. The gate hook's a11y check stands aside only when `emailBuild` runs.
 - **Baseline keys (#93, N38).** audit_design, a11y_static and perf_audit all write `/` in a key's path (`portable_key`), and read a baseline's keys the same way.
@@ -280,8 +280,7 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 ## 5. Then the rest of Phase 6
 
-**Ask the owner first** (the HANDOFF's open decision, asked again on 2026-10-11 with no answer yet): `evals.yml` runs on a `v*` tag as well as by hand, so a release runs the suite twice. The pre-tag dispatch is the one that gates the release; the tag's own run re-tests the same commit for about $9. Drop the tag trigger, or keep cancelling it?
-
+**Decided on 2026-10-11:** `evals.yml` no longer runs on a `v*` tag (#110); the dispatch before the tag gates the release.
 
 **The owner reordered Phase 6 on 2026-10-11** (the plan's §4 and D6): the non-breaking half ships first as **3.6.0**, then 4.0.0.
 
