@@ -80,11 +80,12 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.diff_system
     from .project_config import (CONTRACT_SCHEMA, ConfigError, is_contract, is_dtcg, project_config,
-                                 read_tokens)
+                                 read_deprecations, read_tokens, replacement_of)
 except ImportError:                               # python scripts/diff_system.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from project_config import (CONTRACT_SCHEMA, ConfigError, is_contract,  # type: ignore[no-redef]
-                                is_dtcg, project_config, read_tokens)
+                                is_dtcg, project_config, read_deprecations, read_tokens,
+                                replacement_of)
 
 SCHEMA = "design-system-versioning/diff@1"
 DOCS_SCHEMA = "design-system-docs/system/1"
@@ -692,6 +693,8 @@ class Snapshot:
     layers: List[str] = field(default_factory=list)
     layers_recorded: bool = True                    # False: a system.json from before 3.4.0
     has_components: bool = False
+    # The tokens a DTCG snapshot marks `$deprecated`, with the reason (P31 part 4).
+    deprecated: Dict[str, Any] = field(default_factory=dict)
     _condition_envs: Dict[str, Dict[str, str]] = field(default_factory=dict, repr=False)
 
     def tier(self, name: str) -> int:
@@ -894,11 +897,12 @@ def _snapshot_from_contract(paths: List[Path], label: str, source: str = "contra
     densities, components or layers."""
     try:
         tokens = read_tokens(paths)
+        deprecated = read_deprecations(paths)
     except ConfigError as exc:
         raise bail(f"diff_system: {exc}")
     snap = Snapshot(label=label, path=str(paths[0]), source=source,
                     impl="project contract" if source == "contract.json" else "DTCG token file",
-                    layers_recorded=False)
+                    layers_recorded=False, deprecated=deprecated)
     base = tokens.values()
     tiers = tokens.tiers()
     for name, value in base.items():
@@ -918,7 +922,8 @@ def as_contract(snap: Snapshot) -> Snapshot:
     note and file a contract leaves out reads as a change. A token declared
     only in a theme or under a condition has no default and is left out."""
     out = Snapshot(label=snap.label, path=snap.path, source=snap.source,
-                   impl=f"{snap.impl}, as a contract", layers_recorded=False)
+                   impl=f"{snap.impl}, as a contract", layers_recorded=False,
+                   deprecated=dict(snap.deprecated))
     base: Dict[str, str] = {}
     for name, tok in snap.tokens.items():
         first = (tok.get("overrides") or [{}])[0]
@@ -1893,6 +1898,18 @@ def load_ledger(path: Optional[str]) -> Tuple[List[Dict[str, Any]], Optional[str
     return list(data.get("deprecations", [])), None
 
 
+def marked_deprecations(old: Snapshot, ledger: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """A record for each token the old DTCG snapshot marks `$deprecated` and
+    the ledger does not hold (P31 part 4): the file announced it a release
+    ago, so removing it now keeps the rule, never in the release that
+    deprecated it."""
+    held = {str(e.get("name", "")) for e in ledger}
+    return [{"name": name, "kind": "token", "since": "", "removal": "",
+             "replacement": replacement_of(reason), "reason": reason if isinstance(reason, str) else "",
+             "marked": f"$deprecated in {old.path}"}
+            for name, reason in old.deprecated.items() if name not in held]
+
+
 def attach_deprecations(changes: Sequence[Change],
                         ledger: Sequence[Dict[str, Any]]) -> None:
     index: Dict[str, Dict[str, Any]] = {}
@@ -2015,7 +2032,9 @@ def render_report(res: Dict[str, Any], changes: Sequence[Change],
                             shown += f", … (+{len(items) - 8})"
                         out.append(f"      blast·{label:<11}{len(items):>3}  {shown}")
             if ch.meta.gate:
-                if ch.deprecation:
+                if ch.deprecation and ch.deprecation.get("marked"):
+                    out.append(f"      deprecation  marked: {ch.deprecation['marked']}")
+                elif ch.deprecation:
                     dep = ch.deprecation
                     out.append(f"      deprecation  recorded, since "
                                f"{dep.get('since', '?')}, removal "
@@ -2469,7 +2488,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ledger, ledger_note = load_ledger(args.deprecations)
     if ledger_note:
         notes.append(ledger_note)
-    attach_deprecations(changes, ledger)
+    marked = marked_deprecations(old, ledger)
+    if marked:
+        notes.append(f"{len(marked)} token(s) the old snapshot marks `$deprecated` count as recorded")
+    attach_deprecations(changes, list(ledger) + marked)
     failures = gate_failures(changes, args.gate)
     checked = [c for c in changes if c.severity == "major"
                and (args.gate == "major" or c.meta.gate)]

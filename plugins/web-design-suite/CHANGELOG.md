@@ -54,6 +54,15 @@
     tokens, a set or one of a set's sources (`#/sets/base/sources/0`); a context keeps the
     spaces in its value (`[data-theme="high contrast"]`); a URL, an unreadable file, a cycle of sets and a modifier with no
     default are named, and a fan-out of sets is refused.
+- **`$deprecated` reaches the release gate: part 4** (P31; LC-C2). A token the old DTCG
+  snapshot marks `$deprecated` (itself, or through its group) counts as recorded in
+  `diff_system.py`: the file announced it a release ago, so removing it now passes the
+  gate, and the report says `deprecation  marked: $deprecated in OLD`. A ledger record
+  for the same name wins. `deprecate.py import FILE --since X --removal Y` writes the marks
+  into the ledger, so `status`, `scan` and `mapping` see them; the replacement is the
+  token the reason names (`"Please use {bg.brand} instead"` is `--bg-brand`). A later
+  file that sets the token again without the mark, a `tokens.css` or a `contract.json`
+  among them, takes it off.
 
 ### Fixed
 

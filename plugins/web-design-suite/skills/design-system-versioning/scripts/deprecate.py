@@ -65,6 +65,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin. project_config.py is a copy of the plugin's shared/ master (P24).
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.deprecate
+    from .project_config import ConfigError, read_deprecations, replacement_of
+except ImportError:                               # python scripts/deprecate.py, or loaded by path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from project_config import ConfigError, read_deprecations, replacement_of  # type: ignore[no-redef]
+
 LEDGER_SCHEMA = "design-system-versioning/deprecations@1"
 MAPPING_SCHEMA = "design-token-migration/mapping@1"
 
@@ -634,6 +643,47 @@ def cmd_add(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_import(args: argparse.Namespace) -> int:
+    """Each token a DTCG file marks `$deprecated` (P31 part 4), recorded as
+    `add` would record it: the reason as given, the replacement the reason
+    names (`{bg.brand}` is `--bg-brand`). A name the ledger holds is kept."""
+    problem = check_window(args.since, args.removal)
+    if problem and not args.force:
+        print(f"deprecate: {problem}\nPass --force if you really mean it.", file=sys.stderr)
+        return 2
+    try:
+        marked = read_deprecations(args.files)
+    except ConfigError as exc:
+        raise bail(f"deprecate: {exc}")
+    ledger_path = Path(args.ledger)
+    ledger = load_ledger(ledger_path)
+    added, kept = [], []
+    for name, reason in marked.items():
+        if find_entry(ledger, name):
+            kept.append(name)
+            continue
+        replacement = replacement_of(reason)
+        ledger["deprecations"].append({
+            "name": name, "kind": "token", "since": args.since, "removal": args.removal,
+            "replacement": replacement, "codemod": "mechanical" if replacement else "none",
+            "reason": reason if isinstance(reason, str) else "",
+            "notes": f"marked $deprecated in {', '.join(args.files)}",
+            "recorded": args.date or _dt.date.today().isoformat(),
+            "status": "active", "marker": "", "usage": {},
+        })
+        added.append(name)
+    if added and not args.dry_run:
+        save_ledger(ledger_path, ledger)
+    print(f"{'DRY RUN — nothing written' if args.dry_run else 'recorded'}: {len(added)} token(s) "
+          f"marked $deprecated, {len(kept)} already in {ledger_path}")
+    for name in added:
+        entry = find_entry(ledger, name) or {}
+        print(f"  {name}  -> {entry.get('replacement') or '(no replacement named)'}")
+    if not marked:
+        print("  no token in it is marked $deprecated")
+    return 0
+
+
 def cmd_mapping(args: argparse.Namespace) -> int:
     ledger_path = Path(args.ledger)
     ledger = load_ledger(ledger_path)
@@ -895,6 +945,7 @@ def build_parser() -> argparse.ArgumentParser:
   python -m scripts.deprecate status --version 3.0.0
   python -m scripts.deprecate mapping -o build/mapping.json
   python -m scripts.deprecate retire --name --fg-subtle
+  python -m scripts.deprecate import design/tokens.json --since 2.1.0 --removal 3.0.0
 """)
     ap.add_argument("--ledger", default="deprecations.json", metavar="FILE",
                     help="the ledger (default: ./deprecations.json)")
@@ -947,6 +998,20 @@ def build_parser() -> argparse.ArgumentParser:
     sc.add_argument("--format", choices=("report", "json"), default="report")
     sc.add_argument("--date", metavar="YYYY-MM-DD")
     sc.set_defaults(func=cmd_scan)
+
+    i = sub.add_parser("import", help="record the tokens a DTCG file marks $deprecated")
+    i.add_argument("files", nargs="+", metavar="FILE",
+                   help="DTCG 2025.10 token files or a resolver, read in order")
+    i.add_argument("--since", required=True, metavar="X.Y.Z",
+                   help="the version that announced them")
+    i.add_argument("--removal", required=True, metavar="X.Y.Z",
+                   help="the version that deletes them")
+    i.add_argument("--date", metavar="YYYY-MM-DD")
+    i.add_argument("--force", action="store_true",
+                   help="record them even when the removal window is too short")
+    i.add_argument("--dry-run", action="store_true",
+                   help="print what would happen; write nothing")
+    i.set_defaults(func=cmd_import)
 
     m = sub.add_parser("mapping", help="emit the codemod mapping for the ledger")
     m.add_argument("-o", "--out", metavar="FILE")
