@@ -294,8 +294,7 @@ def mode_selector(mode: str, is_default: bool, kind: str = "") -> Tuple[str, str
     if is_default:
         return ":root", "root"
     if kind in ("theme", "density"):             # a resolver's context is the value itself (Codex on #105)
-        value = mode.strip().replace("\\", "\\\\").replace('"', '\\"')
-        return f'[data-{kind}="{value}"]', kind
+        return f'[data-{kind}="{css_escape(mode.strip())}"]', kind
     if kind == "density" or (m in DENSITY_MODES and kind != "theme"):
         return f'[data-density="{re.sub(r"[^a-z0-9]+", "-", m).strip("-")}"]', "density"
     if re.fullmatch(r"(dark|night|dark mode|dark theme)", m):
@@ -684,7 +683,31 @@ def emit_dtcg(conv: Converter, source: str) -> str:
 
 # A theme or density block, `[data-theme="dark"]` (or `:root[...]`, `html[...]`):
 # the modes a resolver can hold. Any other rule is a condition it cannot.
-MODE_SELECTOR = re.compile(r"""^(?::root|html)?\[\s*data-(theme|density)\s*=\s*(?:"([^"]*)"|'([^']*)'|([\w-]+))\s*\]$""")
+MODE_SELECTOR = re.compile(r"""^(?::root|html)?\[\s*data-(theme|density)\s*=\s*"""
+                           r"""(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([\w-]+))\s*\]$""", re.S)
+CSS_ESCAPE = re.compile(r"\\(?:([0-9a-fA-F]{1,6})\s?|(.))", re.S)
+
+
+def css_escape(value: str) -> str:
+    """A string's text inside `"..."` in CSS: a backslash and a quote escaped."""
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def css_unescape(text: str) -> str:
+    """What a quoted CSS string holds: `\\"` is `"`, `\\22 ` is `"` too (Codex
+    on #105). A code point past Unicode's is U+FFFD, as CSS reads it."""
+    def one(m: "re.Match[str]") -> str:
+        if m.group(2) is not None:
+            return m.group(2)
+        n = int(m.group(1), 16)
+        return chr(n) if 0 < n <= 0x10FFFF and not 0xD800 <= n <= 0xDFFF else "\ufffd"
+    return CSS_ESCAPE.sub(one, text)
+
+
+def mode_context(m: "re.Match[str]") -> str:
+    """The context a MODE_SELECTOR match names: its value, unescaped."""
+    quoted = m.group(2) if m.group(2) is not None else m.group(3)
+    return css_unescape(quoted) if quoted is not None else m.group(4)
 
 Row = Tuple[str, str, str, Any]                  # (--name, CSS value, description, $deprecated)
 
@@ -716,7 +739,7 @@ def dtcg_files(blocks: Dict[str, List[Row]], source: str, problems: List[Problem
                                     f"{sel}: {len(rows)} token(s) left out; a resolver holds themes and "
                                     "densities (`[data-theme]`, `[data-density]`), not other conditions"))
             continue
-        kind, context = m.group(1), next(g for g in m.groups()[1:] if g is not None)
+        kind, context = m.group(1), mode_context(m)
         merged = dict(values)
         merged.update((n, v) for n, v, _, _ in rows)
         mode, left_out = dtcg.document(list(merged.items()), {n: d for n, _, d, _ in rows},
@@ -774,8 +797,7 @@ def css_blocks(path: Path) -> Dict[str, List[Row]]:
             continue                         # a default: read above
         m = MODE_SELECTOR.match(rule.strip()) if layered else None   # a quoted value keeps its spaces (Codex)
         if m:
-            context = next(g for g in m.groups()[1:] if g is not None)
-            where = f'[data-{m.group(1)}="{context}"]'
+            where = f'[data-{m.group(1)}="{css_escape(mode_context(m))}"]'
         else:
             where = " ".join(p for p in preludes if not p.lower().startswith("@layer"))
         out.setdefault(where, {})[name] = value      # the cascade: the last one wins
