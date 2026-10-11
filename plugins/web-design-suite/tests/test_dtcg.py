@@ -658,7 +658,7 @@ class TheResolver(TempDirTest):
         self.assertEqual("1rem", blocks[":root"]["--space-4"])                         # a set in a set
         self.assertEqual("#ff0000", blocks[":root"]["--accent"])                         # an inline set
         for why in ("`https://example.com/tokens.json` is a URL", "`gone.tokens.json` could not be read",
-                    "`#/sets/base` is part of a cycle of sets", "`#/modifiers/missing` names no set or modifier",
+                    "`#/sets/base` is part of a cycle", "`#/modifiers/missing` names no set or modifier",
                     "names no default among its contexts: `small`"):
             self.assertIn(why, output(proc))
 
@@ -670,6 +670,68 @@ class TheResolver(TempDirTest):
                 "roomy": [], "dark": [{"gap": {"$type": "dimension", "$value": {"value": 8, "unit": "px"}}}]}}]}
         _, text = self.to_css(self.write("d.resolver.json", json.dumps(data)))
         self.assertEqual({"--gap": "0.5rem"}, css_blocks(text)['[data-density="dark"]'])
+
+    def test_a_pointer_may_name_one_source(self):
+        """Codex on #105: the resolver module allows a pointer anywhere but a
+        modifier or resolutionOrder, and only `#/sets/<name>` was read."""
+        data = {"version": "2025.10",
+                "sets": {"base": {"sources": [{"ink": {"$type": "color", "$value": "#111111"}},
+                                              {"$ref": "base.tokens.json"}]}},
+                "modifiers": {"theme": {"default": "light", "contexts": {
+                    "light": [], "dark": [{"$ref": "#/sets/base/sources/0", "ink": {"$type": "color",
+                                                                                     "$value": "#eeeeee"}}]}}},
+                "resolutionOrder": [{"type": "set", "name": "first", "sources": [{"$ref": "#/sets/base/sources/1"}]},
+                                    {"$ref": "#/modifiers/theme"},
+                                    {"type": "set", "name": "bad", "sources": [{"$ref": "#/resolutionOrder/0"},
+                                                                               {"$ref": "#/modifiers/theme/contexts"}]}]}
+        self.write("base.tokens.json", json.dumps(RESOLVER_BASE))
+        proc, text = self.to_css(self.write("p.resolver.json", json.dumps(data)))
+        blocks = css_blocks(text)
+        self.assertEqual("var(--brand-500)", blocks[":root"]["--bg-surface"])           # a file, by pointer
+        self.assertEqual("#eeeeee", blocks['[data-theme="dark"]']["--ink"])              # a source, overridden
+        self.assertEqual(2, output(proc).count("only resolutionOrder may point at a modifier"), output(proc))
+
+    def test_a_context_keeps_the_spaces_in_its_value(self):
+        """Codex on #105: `[data-theme="high contrast"]` became `highcontrast`,
+        and a resolver's context came back slugged, so the selector no longer
+        matched the page's attribute."""
+        css = THEMED_CSS.replace('[data-theme="dark"]', '[data-theme="high contrast"]')
+        proc = self.to_dtcg(self.write("tokens.css", css))
+        resolver = json.loads((self.tmp / "dtcg" / "tokens.resolver.json").read_bytes())
+        self.assertEqual({"light": [], "high contrast": [{"$ref": "theme-high-contrast.json"}]},
+                         resolver["modifiers"]["theme"]["contexts"], output(proc))
+        _, text = self.to_css(self.tmp / "dtcg" / "tokens.resolver.json")
+        self.assertEqual(css_blocks(css), css_blocks(text))
+
+    def test_a_source_outside_the_resolvers_folder_is_not_read(self):
+        """CodeRabbit on #105: `..` or an absolute name read any JSON file the
+        user can read into the project's tokens, and the hooks read a cloned
+        repository's token files on their own."""
+        secret = self.write("secret.tokens.json", json.dumps({"leak": {"$type": "number", "$value": 1}}))
+        self.write("design/base.tokens.json", json.dumps(RESOLVER_BASE))
+        data = {"version": "2025.10", "resolutionOrder": [{"type": "set", "name": "s", "sources": [
+            {"$ref": "base.tokens.json"}, {"$ref": "../secret.tokens.json"}, {"$ref": "sub/..\\..\\secret.tokens.json"},
+            {"$ref": str(secret)}, {"$ref": "/etc/x.json"}, {"$ref": "C:secret.tokens.json"}]}]}
+        src = self.write("design/app.resolver.json", json.dumps(data))
+        pc = load_script("design-system-docs", "project_config")
+        self.assertNotIn("--leak", pc.read_tokens([src]).values())
+        self.assertEqual("var(--brand-500)", pc.read_tokens([src]).roles["--bg-surface"])
+        proc, _ = self.to_css(src)
+        self.assertEqual(5, output(proc).count("is outside the resolver's folder"), output(proc))
+
+    def test_odd_shapes_are_named_not_a_traceback(self):
+        """CodeRabbit on #105: a list `default` raised TypeError, and a list
+        `sets` an AttributeError, in the Python reader."""
+        data = {"version": "2025.10", "sets": ["x"],
+                "modifiers": {"m": {"default": ["a"], "contexts": {"a": [{"x": {"$type": "number", "$value": 1}}],
+                                                                   "b": []}}},
+                "resolutionOrder": [{"type": "set", "name": "s", "sources": [{"$ref": "#/sets/x"}]},
+                                    {"$ref": "#/modifiers/m"}]}
+        dtcg = dtcg_module()
+        doc, problems = dtcg.resolver_document(data, self.tmp)
+        self.assertEqual({"x": {"$type": "number", "$value": 1}}, doc)
+        self.assertEqual([None], [m.default for m in dtcg.resolver_modifiers(data)])
+        self.assertIn(("sets/s/0", "`#/sets/x` points at no object in this resolver, so not read"), problems)
 
     def test_a_fan_out_of_sets_is_refused_not_expanded(self):
         dtcg = dtcg_module()

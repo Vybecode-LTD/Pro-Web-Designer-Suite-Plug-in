@@ -784,6 +784,20 @@ TOKEN_FILES = {
         {"type": "set", "name": "s", "sources": [{"$ref": "base.tokens.json#/brand", "600": {"$value": "#345678"}},
                                                  {"$ref": "base.tokens.json#/nothing"}, {"$ref": "not-json.json"}]},
         {"type": "modifier", "name": "m", "default": 7, "contexts": {"undefined": [], "b": [{"x": {"$value": 1}}]}}]}),
+    "sources.resolver.json": json.dumps({"version": "2025.10",          # Codex on #105: one source by pointer
+        "sets": {"s": {"sources": [{"a": {"$type": "number", "$value": 1}}, {"$ref": "base.tokens.json"}]}},
+        "modifiers": {"m": {"contexts": {"x": [{"$ref": "#/sets/s/sources/0", "b": {"$value": 2}}]}}},
+        "resolutionOrder": [{"type": "set", "name": "t", "sources": [{"$ref": "#/sets/s/sources/1"},
+                                                                     {"$ref": "#/resolutionOrder/0"},
+                                                                     {"$ref": "#/modifiers/m/contexts/x/0"},
+                                                                     {"$ref": "#/sets/s/sources/9"}]},
+                            {"$ref": "#/modifiers/m"}]}),
+    "outside.resolver.json": json.dumps({"version": "2025.10", "sets": ["x"],   # CodeRabbit on #105
+        "modifiers": {"m": {"default": ["a"], "contexts": {"a": [{"x": {"$type": "number", "$value": 1}}]}}},
+        "resolutionOrder": [{"type": "set", "name": "s", "sources": [
+            {"$ref": "../a.css"}, {"$ref": "/etc/x.json"}, {"$ref": "C:base.tokens.json"},
+            {"$ref": "x\\..\\base.tokens.json"}, {"$ref": "#/sets/x"}, {"$ref": "./base.tokens.json"}]},
+            {"$ref": "#/modifiers/m"}]}),
     "fan.resolver.json": json.dumps({"version": "2025.10", "resolutionOrder": [{"$ref": "#/sets/s0"}], "sets": {
         **{f"s{i}": {"sources": [{"$ref": f"#/sets/s{i + 1}"}] * 10} for i in range(9)},
         "s9": {"sources": [{"x": {"$type": "number", "$value": 1}}]}}}),
@@ -796,7 +810,8 @@ TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.
                ["legacy.json"], ["schema-and-tokens.json"], ["studio.json"], ["studio-groups.json"], ["studio-order.json"],
                ["deep.tokens.json"], ["names.tokens.json"], ["pointers.tokens.json"], ["chain.tokens.json"], ["fan.tokens.json"],
                ["studio-math.json"], ["pointer-fan.tokens.json"], ["studio-palettes.json"],
-               ["app.resolver.json"], ["a.css", "app.resolver.json"], ["pointer.resolver.json"], ["fan.resolver.json"]]
+               ["app.resolver.json"], ["a.css", "app.resolver.json"], ["pointer.resolver.json"], ["fan.resolver.json"],
+               ["sources.resolver.json"], ["outside.resolver.json"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).

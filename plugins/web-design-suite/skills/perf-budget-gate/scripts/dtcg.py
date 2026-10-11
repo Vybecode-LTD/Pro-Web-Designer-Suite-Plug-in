@@ -954,8 +954,9 @@ def resolver_modifiers(data: dict) -> List[Modifier]:
     for kind, name, definition in _order(data, []):
         contexts = definition.get("contexts")
         if kind == "modifier" and isinstance(contexts, dict) and contexts:
-            default = definition.get("default")
-            out.append(Modifier(name, list(contexts), default if default in contexts else None))
+            default = definition.get("default")       # a string, or none (CodeRabbit on #105)
+            out.append(Modifier(name, list(contexts), default if isinstance(default, str)
+                                and default in contexts else None))
     return out
 
 
@@ -965,6 +966,13 @@ def file_loader(base: Optional[Union[str, Path]]) -> Loader:
     def load(name: str) -> Any:
         return json.loads((Path(base or ".") / name).read_bytes())
     return load
+
+
+def outside(name: str) -> bool:
+    """A source name that leaves the resolver's folder: absolute (`/x`, `C:x`,
+    `\\server`) or with a `..` step. project_config.mjs's port reads it the
+    same, on every system."""
+    return bool(re.match(r"^([\\/]|[A-Za-z]:)", name)) or ".." in re.split(r"[\\/]", name)
 
 
 def _sources(sources: Any, data: dict, load: Loader, problems: Problems, where: str,
@@ -992,20 +1000,28 @@ def _sources(sources: Any, data: dict, load: Loader, problems: Problems, where: 
         siblings = {k: v for k, v in source.items() if k != "$ref"}
         name, _, pointer = ref.partition("#")
         if not name:                                 # a pointer into the resolver
-            m = re.fullmatch(r"/sets/([^/]+)", pointer)
-            if pointer.startswith("/modifiers/"):
-                problems.append((at, f"`{ref}`: only resolutionOrder may point at a modifier, so not read"))
+            # Anywhere but a modifier or resolutionOrder: a set's sources, or
+            # one source (`#/sets/base/sources/0`) (Codex on #105).
+            target = _pointer(data, "#" + pointer) if pointer.startswith("/") else UNSUPPORTED
+            if re.match(r"/(modifiers|resolutionOrder)(/|$)", pointer):
+                problems.append((at, f"`{ref}`: only resolutionOrder may point at a modifier, and nothing "
+                                     "may point into resolutionOrder, so not read"))
             elif ref in seen:
-                problems.append((at, f"`{ref}` is part of a cycle of sets, so not read"))
-            elif m and isinstance((data.get("sets") or {}).get(_unescape(m.group(1))), dict):
-                definition = dict(data["sets"][_unescape(m.group(1))])
-                definition.update(siblings)
-                trees += _sources(definition.get("sources"), data, load, problems, ref[2:], seen + (ref,), budget)
+                problems.append((at, f"`{ref}` is part of a cycle, so not read"))
+            elif isinstance(target, dict):
+                own = {**target, **siblings}
+                is_set = re.fullmatch(r"/sets/[^/]+", pointer)
+                trees += _sources(own.get("sources") if is_set else [own], data, load, problems, ref[2:],
+                                  seen + (ref,), budget)
             else:
-                problems.append((at, f"`{ref}` points at no set in this resolver, so not read"))
+                problems.append((at, f"`{ref}` points at no object in this resolver, so not read"))
             continue
         if re.match(r"^[a-z][a-z0-9+.-]*://", name, re.I):
             problems.append((at, f"`{name}` is a URL; only files beside the resolver are read"))
+            continue
+        if outside(name):                        # CodeRabbit on #105: a cloned repo's resolver
+            problems.append((at, f"`{name}` is outside the resolver's folder; only files in it or "
+                                 "below are read"))
             continue
         try:
             tree = load(name)
@@ -1069,8 +1085,9 @@ def _resolved(data: dict, load: Loader, picked: Dict[str, str], only: Optional[s
             context = next((c for c in contexts if c.lower() == want), None) if want else None
             if context is None:
                 default = definition.get("default")
-                context = default if default in contexts else next(iter(contexts))
-                if default not in contexts and not want:
+                default = default if isinstance(default, str) and default in contexts else None
+                context = default if default is not None else next(iter(contexts))
+                if default is None and not want:
                     problems.append((f"modifiers/{name}", f"names no default among its contexts: "
                                                           f"`{context}`, its first, is read"))
             trees = _sources(contexts[context], data, load, problems,

@@ -247,6 +247,7 @@ class Finding:
 
 
 CODE_TITLES = {
+    "UNREAD_SOURCE": "Resolver sources that could not be read",
     "OFF_SCALE_SPACING": "Spacing values that are not on the scale",
     "OFF_SCALE_RADIUS": "Corner radii that are not on the scale",
     "OFF_SCALE_TYPE": "Font sizes that are not on the type scale",

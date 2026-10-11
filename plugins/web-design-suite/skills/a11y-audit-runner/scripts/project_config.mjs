@@ -1104,16 +1104,15 @@ function resolverDocument(data, dir) {
       const hash = ref.indexOf('#');
       const name = hash < 0 ? ref : ref.slice(0, hash);
       const pointer = hash < 0 ? '' : ref.slice(hash + 1);
-      if (!name) {
-        const m = /^\/sets\/([^/]+)$/.exec(pointer);
-        const sets = isObject(data.sets) ? data.sets : {};
-        const key = m ? unescapeRef(m[1]) : null;
-        if (m && !seen.includes(ref) && has(sets, key) && isObject(sets[key])) {
-          trees.push(...sources({ ...sets[key], ...siblings }.sources, [...seen, ref]));
-        }
+      if (!name) {                              // a set's sources, or one source, as _sources()
+        const target = pointer.startsWith('/') ? jsonPointer(data, `#${pointer}`) : UNSUPPORTED;
+        if (/^\/(modifiers|resolutionOrder)(\/|$)/.test(pointer) || seen.includes(ref) || !isObject(target)) continue;
+        const own = { ...target, ...siblings };
+        trees.push(...sources(/^\/sets\/[^/]+$/.test(pointer) ? own.sources : [own], [...seen, ref]));
         continue;
       }
       if (/^[a-z][a-z0-9+.-]*:\/\//i.test(name)) continue;    // a URL is not read
+      if (/^([\\/]|[A-Za-z]:)/.test(name) || name.split(/[\\/]/).includes('..')) continue;   // outside(), CodeRabbit
       let tree;
       try {
         tree = readJson(path.resolve(dir, name));       // an absolute name stands, as in Python

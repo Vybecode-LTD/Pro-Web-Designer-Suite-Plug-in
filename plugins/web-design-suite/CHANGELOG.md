@@ -51,7 +51,8 @@
     modifier's as `[data-theme]` blocks and a `density` one's as `[data-density]`.
     `read_tokens()`, and so `.design-suite.json`'s `tokens`, the audit and the lint
     configs, read its default. A source is a file beside it, a pointer into one, inline
-    tokens or a set; a URL, an unreadable file, a cycle of sets and a modifier with no
+    tokens, a set or one of a set's sources (`#/sets/base/sources/0`); a context keeps the
+    spaces in its value (`[data-theme="high contrast"]`); a URL, an unreadable file, a cycle of sets and a modifier with no
     default are named, and a fan-out of sets is refused.
 - **`$deprecated` reaches the release gate: part 4** (P31; LC-C2). A token the old DTCG
   snapshot marks `$deprecated` (itself, or through its group) counts as recorded in
