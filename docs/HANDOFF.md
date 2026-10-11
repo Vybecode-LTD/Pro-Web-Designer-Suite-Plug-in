@@ -1,6 +1,6 @@
 # Handoff
 
-**2026-10-10 (fifth session)**, after P31 part 1 (#101), P31 part 2 (#102) and this docs PR. Phase 6 (4.0.0) is under way: the DTCG reader and writer and the Tokens Studio reading are in `main`; P31 part 3 is next.
+**2026-10-10 (fifth session)**, after P31 part 1 (#101), P31 part 2 (#102) and this docs PR. Phase 6 is under way. **The owner reordered it on 2026-10-11:** the non-breaking half (P31, P32, P33, P38, P39, P40) ships first as **3.6.0**, then 4.0.0 with P36's breaking change. The DTCG reader and writer and the Tokens Studio reading are in `main`; P31 part 3 is next.
 
 **The next session starts from `dev plans/next-session-prompt.md`**: orientation, then P31 part 3 in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
@@ -15,7 +15,7 @@
 ## Next steps
 
 1. **P31 part 3:** themes written through the DTCG resolver module (`--format dtcg` with modes, and reading a `.resolver.json`), `$deprecated` into the deprecation ledger and the diff, and the Style Dictionary and Terrazzo name routes onto the contract's grammar (spec first, all three gates).
-2. Then the rest of Phase 6 in the plan's order, unless the owner says otherwise.
+2. Then P32, P33, P38, P39 and P40, and R3.6 releases 3.6.0. Phase 6b (4.0.0) follows.
 
 ## Open owner decisions
 

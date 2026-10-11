@@ -255,7 +255,7 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 **Items:** LC-C2 and LC-B2, which close with this part. Read each inventory row, then LC-B2's paragraph in `web-design-suite-review/lifecycle.md` (about line 90): its last three bullets are this part.
 
-**What parts 1 and 2 left** (the CHANGELOG's `4.0.0 — unreleased` has the detail):
+**What parts 1 and 2 left** (the CHANGELOG's `3.6.0 — unreleased` has the detail):
 - **Writing themes.** `figma_to_tokens.py --format dtcg` writes the default mode only and names each theme or density block as left out. Write the modes through the DTCG **resolver module** (2025.10, stable): a base `tokens.json`, one file per mode with its overrides, and a `*.resolver.json` with `sets`, `modifiers` (one per theme group, `contexts` per mode, `default`) and `resolutionOrder`. Terrazzo 2 reads it; Style Dictionary 5 does not yet ("does not have full support yet" for 2025.10). Decide: `--out-dir` writes the three, or `--format dtcg` with modes requires `--out-dir`.
 - **Reading a resolver.** `figma_common.load_document` and `read_tokens()` on a `*.resolver.json`: the sets and each modifier's default context, as the default theme; the modifiers as modes, as `parse_studio` does for Tokens Studio's groups. A token two groups set is now named as left out (Codex on #102); the resolver's permutations are the way to write both.
 - **`$deprecated` into the ledger.** `deprecate.py` (design-system-versioning) gains a way to import a DTCG file's `$deprecated` tokens as ledger entries (a subcommand, or `diff_system.py --deprecations` reading `$deprecated` from the new snapshot), so a removal the file already deprecates passes the gate. `dtcg.tokens()` keeps `deprecated` on each `Token`; `figma_common.FVar.deprecated` carries it on the Figma route.
@@ -269,27 +269,32 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 **Evals:** `evals/lifecycle/dtcg-export` grades a DTCG export. Ask the owner before running it (one case, two arms, about $0.30).
 
-**Close:** LC-C2 and LC-B2 in the inventory; the plan's `P31` row renamed `P31 part 3, #N`; the CHANGELOG under `## 4.0.0 — unreleased`.
+**Close:** LC-C2 and LC-B2 in the inventory; the plan's `P31` row renamed `P31 part 3, #N`; the CHANGELOG under `## 3.6.0 — unreleased`.
 
 ## 5. Then the rest of Phase 6
 
 **Ask the owner first** (the HANDOFF's open decision): `evals.yml` runs on a `v*` tag as well as by hand, so a release runs the suite twice. The pre-tag dispatch is the one that gates the release; the tag's own run re-tests the same commit for about $9. This session cancelled it. Drop the tag trigger, or keep cancelling it?
 
 
-The plan's order, unless the owner says otherwise:
+**The owner reordered Phase 6 on 2026-10-11** (the plan's §4 and D6): the non-breaking half ships first as **3.6.0**, then 4.0.0.
+
+Phase 6a, 3.6.0, in this order unless the owner says otherwise:
+- P31 part 3 (§4);
 - P32: Figma on every plan;
 - P33: `light-dark()`;
+- P38: modern CSS;
+- P39: migration coverage;
+- P40: Prisma and Drizzle;
+- R3.6: release 3.6.0 (the eval dispatch first, with the owner's OK; the live check; the tag).
+
+Phase 6b, 4.0.0, after it:
 - P34: runtime coverage;
 - P35: the cheap automatable checks and other engines;
 - P36: Tailwind v4 and decision D4, the breaking change;
 - P37: SCSS, Next.js, Vue, Svelte and Astro;
-- P38: modern CSS;
-- P39: migration coverage;
-- P40: Prisma and Drizzle;
 - P41: email output and right-to-left;
-- P42 and P43: persuasion.
-
-R4 releases 4.0.0. Ask the owner before each eval run, and keep each PR under 100 files for CodeRabbit.
+- P42 and P43: persuasion;
+- R4: release 4.0.0, opening a `## 4.0.0 — unreleased` CHANGELOG heading with its first PR. Ask the owner before each eval run, and keep each PR under 100 files for CodeRabbit.
 
 ## 6. End of session (never skip)
 

@@ -37,7 +37,7 @@ The plugin is done when all of these hold:
 | D3 | **Sass in stylelint** (open since 3.3.0). | Yes: ship `postcss-scss`, in P37, so SCSS gets the same three gates. | P37 |
 | D4 | **The Tailwind lint plugin** (decision 3 of the completion plan). | Decide inside P36, after a spike that runs both plugins over the same fixtures. Switching replaces Part 5 of the ESLint config, so it is breaking: it goes in a major release. | P36 |
 | D5 | **The eval cost cap** (decision 4). | **$15 per full run** (the user, 2026-10-02). A run that would pass it stops first. Routing cases are cheap and run on every release; outcome cases run before each release and when a skill changes. | P29, P30 |
-| D6 | **Phase 6's release number.** | 4.0.0, because of D4. | R4 |
+| D6 | **Phase 6's release number.** | 4.0.0, because of D4. **Amended by the owner, 2026-10-11:** the non-breaking half ships first as 3.6.0 (Phase 6a), and 4.0.0 follows with P36 (Phase 6b). | R3.6, R4 |
 | D7 | **Stacked PRs, merged in batches.** | Yes: up to three stacked PRs, merged in order, as #12 to #14. It saves a review round per PR. | all |
 | D8 | **Phase 7.** | Approve the method in §7 now; approve each new skill when its evidence is in. | P46+ |
 
@@ -131,9 +131,9 @@ Re-read `web-design-suite-review/claude-code-capabilities.md` against the curren
 | P30, #97 | Outcome evals for every area, against a no-plugin baseline: eleven cases in six areas, graded on what the run wrote in both arms and on the skill and the gates' verdicts in the plugin's, the gates run through the MCP server with no Bash; `evals.yml` runs routing, then outcome, under one ceiling; one router fix (`claude-code-capabilities.md` §11) | SS-C7, SB-C6, GT-C10, LC-C10, PS-C7, DL-C7 | `evals/<area>/`, `tests/test_evals.py`, `.github/workflows/evals.yml` | L |
 | R3, #99 | Release 3.5.0: the live check of every hook, command, agent and MCP tool, and the CI template on GitHub (`web-design-suite-3.5.0-live-check.md`), which found N39 (#98) | — | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-### Phase 6 · 4.0.0: broader coverage
+### Phase 6a · 3.6.0: the non-breaking half
 
-The workstreams are independent. Ask the user which comes first; the order below is the default.
+**Reordered by the owner on 2026-10-11:** the items that break nothing ship first, as 3.6.0, so users get them sooner. Only P36 (the Tailwind lint plugin, D4) forces a major release; Phase 6b carries it and the larger items to 4.0.0. The order below is the default; ask the owner before changing it.
 
 | PR | What | Items | Main files | Size |
 |---|---|---|---|---|
@@ -142,13 +142,21 @@ The workstreams are independent. Ask the user which comes first; the order below
 | P31 | Part 3: themes written through the DTCG resolver module, `$deprecated` into the deprecation ledger and the diff, and the Style Dictionary and Terrazzo name routes onto the contract's grammar for the tier and Law 6 checks | LC-C2, LC-B2 | `shared/dtcg.py`, `figma_to_tokens.py`, `deprecate.py`, `diff_system.py`, the gates (spec first) | M-L |
 | P32 | Figma for every plan: a route without Enterprise, through the MCP server or a plugin script, and each plan's mode limits | LC-B1, LC-B6, LC-C7 | figma-variables-sync | M |
 | P33 | Theming without JavaScript: `light-dark()` and `color-scheme` | SS-B3 | starter tokens, theming references | S-M |
+| P38 | Modern CSS the systems teach: `@starting-style`, the top layer instead of z-index wars, `cqi` | SS-B4 | systems references, starter | M |
+| P39 | Migration coverage for CSS-in-JS and Sass functions, and the rollout recipes | LC-B5, LC-B7 | design-token-migration | M |
+| P40 | Schema inputs: Prisma and Drizzle | DL-B3 | `introspect_schema.py`, new fixtures | M |
+| R3.6 | Release 3.6.0 | — | — | S-M |
+
+### Phase 6b · 4.0.0: broader coverage and the breaking change
+
+After 3.6.0. The workstreams are independent; ask the owner which comes first.
+
+| PR | What | Items | Main files | Size |
+|---|---|---|---|---|
 | P34 | Runtime coverage: single-page apps (`--wait-for`, `--steps`), logged-in pages (`--storage-state`), shadow DOM, several URLs and viewports | GT-B1, GT-B2, GT-B3, GT-B4 | the three runtime gates | L |
 | P35 | The cheap automatable checks the coverage table lists, and engines other than Chromium | GT-B6, GT-B9 | a11y gates, `automation-coverage.md` | M-L |
 | P36 | Tailwind v4: its variants, `tw_probe` with a `/tw-probe` command, and the lint plugin (D4) | SB-B5, SB-C3, SB-C4 | `eslint.design.config.mjs` Part 5, new `tw_probe` | L |
 | P37 | SCSS in stylelint (D3), and Next.js App Router, Vue, Svelte and Astro | SB-B6 | configs, stack references, fixtures | L |
-| P38 | Modern CSS the systems teach: `@starting-style`, the top layer instead of z-index wars, `cqi` | SS-B4 | systems references, starter | M |
-| P39 | Migration coverage for CSS-in-JS and Sass functions, and the rollout recipes | LC-B5, LC-B7 | design-token-migration | M |
-| P40 | Schema inputs: Prisma and Drizzle | DL-B3 | `introspect_schema.py`, new fixtures | M |
 | P41 | Email: MJML or React Email output, a right-to-left template, and a client matrix regenerated from caniemail's data | DL-B4, DL-B5, DL-C9 | email-template-system | L |
 | P42 | Persuasion: the UK and EU consumer law to flag for legal review, consent for tracking, price experiments, and persuasive patterns mapped to WCAG | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
 | P43 | More page types and audiences, a claims layer with `lint_claims.py`, routing between the persuasion skills, and MESSAGE_BRIEF to DECISION_LOG | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
