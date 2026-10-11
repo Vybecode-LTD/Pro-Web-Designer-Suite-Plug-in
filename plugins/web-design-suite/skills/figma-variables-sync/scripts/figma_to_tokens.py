@@ -293,6 +293,9 @@ def mode_selector(mode: str, is_default: bool, kind: str = "") -> Tuple[str, str
     m = mode.strip().lower()
     if is_default:
         return ":root", "root"
+    if kind in ("theme", "density"):             # a resolver's context is the value itself (Codex on #105)
+        value = mode.strip().replace("\\", "\\\\").replace('"', '\\"')
+        return f'[data-{kind}="{value}"]', kind
     if kind == "density" or (m in DENSITY_MODES and kind != "theme"):
         return f'[data-density="{re.sub(r"[^a-z0-9]+", "-", m).strip("-")}"]', "density"
     if re.fullmatch(r"(dark|night|dark mode|dark theme)", m):
@@ -681,7 +684,7 @@ def emit_dtcg(conv: Converter, source: str) -> str:
 
 # A theme or density block, `[data-theme="dark"]` (or `:root[...]`, `html[...]`):
 # the modes a resolver can hold. Any other rule is a condition it cannot.
-MODE_SELECTOR = re.compile(r"""^(?::root|html)?\[data-(theme|density)=(?:"([^"]*)"|'([^']*)'|([\w-]+))\]$""")
+MODE_SELECTOR = re.compile(r"""^(?::root|html)?\[\s*data-(theme|density)\s*=\s*(?:"([^"]*)"|'([^']*)'|([\w-]+))\s*\]$""")
 
 Row = Tuple[str, str, str, Any]                  # (--name, CSS value, description, $deprecated)
 
@@ -769,7 +772,7 @@ def css_blocks(path: Path) -> Dict[str, List[Row]]:
         layered = all(p.lower().startswith("@layer") for p in outer)
         if layered and ROOT_SELECTOR.match(rule) and not THEME_OR_DENSITY.search(rule):
             continue                         # a default: read above
-        m = MODE_SELECTOR.match(re.sub(r"\s+", "", rule)) if layered else None
+        m = MODE_SELECTOR.match(rule.strip()) if layered else None   # a quoted value keeps its spaces (Codex)
         if m:
             context = next(g for g in m.groups()[1:] if g is not None)
             where = f'[data-{m.group(1)}="{context}"]'

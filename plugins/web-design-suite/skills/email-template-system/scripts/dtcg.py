@@ -992,17 +992,21 @@ def _sources(sources: Any, data: dict, load: Loader, problems: Problems, where: 
         siblings = {k: v for k, v in source.items() if k != "$ref"}
         name, _, pointer = ref.partition("#")
         if not name:                                 # a pointer into the resolver
-            m = re.fullmatch(r"/sets/([^/]+)", pointer)
-            if pointer.startswith("/modifiers/"):
-                problems.append((at, f"`{ref}`: only resolutionOrder may point at a modifier, so not read"))
+            # Anywhere but a modifier or resolutionOrder: a set's sources, or
+            # one source (`#/sets/base/sources/0`) (Codex on #105).
+            target = _pointer(data, "#" + pointer) if pointer.startswith("/") else UNSUPPORTED
+            if re.match(r"/(modifiers|resolutionOrder)(/|$)", pointer):
+                problems.append((at, f"`{ref}`: only resolutionOrder may point at a modifier, and nothing "
+                                     "may point into resolutionOrder, so not read"))
             elif ref in seen:
-                problems.append((at, f"`{ref}` is part of a cycle of sets, so not read"))
-            elif m and isinstance((data.get("sets") or {}).get(_unescape(m.group(1))), dict):
-                definition = dict(data["sets"][_unescape(m.group(1))])
-                definition.update(siblings)
-                trees += _sources(definition.get("sources"), data, load, problems, ref[2:], seen + (ref,), budget)
+                problems.append((at, f"`{ref}` is part of a cycle, so not read"))
+            elif isinstance(target, dict):
+                own = {**target, **siblings}
+                is_set = re.fullmatch(r"/sets/[^/]+", pointer)
+                trees += _sources(own.get("sources") if is_set else [own], data, load, problems, ref[2:],
+                                  seen + (ref,), budget)
             else:
-                problems.append((at, f"`{ref}` points at no set in this resolver, so not read"))
+                problems.append((at, f"`{ref}` points at no object in this resolver, so not read"))
             continue
         if re.match(r"^[a-z][a-z0-9+.-]*://", name, re.I):
             problems.append((at, f"`{name}` is a URL; only files beside the resolver are read"))

@@ -645,7 +645,8 @@ a token's value in a mode the one the resolver gives for that context, the other
 modifiers at their defaults. A `theme` modifier's contexts are `[data-theme]`
 blocks and a `density` modifier's `[data-density]` ones, whatever they are
 called. A source is a file named relative to the resolver, a pointer into one
-(`tokens.json#/color`), inline tokens, or a set (`#/sets/base`). A URL, a file
+(`tokens.json#/color`), inline tokens, a set (`#/sets/base`) or one of its sources
+(`#/sets/base/sources/0`); nothing may point at a modifier or into `resolutionOrder`. A URL, a file
 that cannot be read, a cycle of sets and a modifier with no `default` (its
 first context is read) are named, never silent; a fan-out of sets is refused.
 `read_tokens()`, and so `.design-suite.json`'s `tokens`, reads a resolver as
