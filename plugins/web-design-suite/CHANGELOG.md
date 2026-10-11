@@ -86,6 +86,17 @@
   server: `get_variable_defs` reads a selection, audited as records, and `use_figma` runs
   the script. The facts are re-read at Figma's Plugin API, MCP and FAQ pages
   (`references/figma-mapping.md` §14).
+- **Each Figma plan's limits** (P32 part 2; LC-B6). A collection's modes are capped by the
+  plan: Starter keeps the first only, Professional allows 10 modes per collection and
+  Organization 20 modes per collection, and the REST API a maximum of 40 modes, each figure
+  re-read at Figma's pages and registered. `figma_audit.py --plan PLAN`, or
+  `.design-suite.json`'s new `figma.plan`, reports `MODE_LIMIT` (error) on a collection past
+  the cap, as a theme, a density and a brand in one collection soon are, and stops asking
+  Starter for a dark mode it cannot hold. `--reverse --format plugin-script --plan` reports
+  the same before the run, and the REST body is held to the endpoint's own cap. Both config
+  readers check the key alike. `figma-mapping.md` §14 adds the plans' table, branch keys
+  (`local` and the POST take one, `published` does not) and the MCP server's Starter
+  allowance.
 
 ### Fixed
 

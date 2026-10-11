@@ -515,6 +515,13 @@ API has moved more than once.
 
 The GETs are Tier 2 for rate limiting; the POST is Tier 3.
 
+**Branches.** `local` and the POST take a branch's key as `file_key`: "This can be
+a file key or branch key. Use `GET /v1/files/:key` with the `branch_data` query
+param to get the branch key." `published` does not: "This must be a main file
+key, not a branch key, as it is not possible to publish from branches." (re-read
+on 2026-10-11 at [the variables endpoints](https://developers.figma.com/docs/rest-api/variables-endpoints/)).
+Branching is an Organization and Enterprise feature.
+
 > **The plan gate is the single most important fact in this document.** The
 > Variables REST API has been Enterprise-only since it launched in June 2023. If
 > the company is on Professional or Organization, **no amount of scripting gets
@@ -638,6 +645,36 @@ drafts" (the FAQ); try it on a draft or a duplicate of the library first.
 
 **In a development plugin.** Put the script's body inside an async function and
 pass its result to `figma.closePlugin(JSON.stringify(result))`.
+
+### Each plan's limits
+
+Re-read on 2026-10-11 at Figma's [plan comparison](https://help.figma.com/hc/en-us/articles/360040328273),
+[Modes for variables](https://help.figma.com/hc/en-us/articles/15343816063383), the REST
+[variables endpoints](https://developers.figma.com/docs/rest-api/variables-endpoints/) and the MCP
+server's [rate limits](https://developers.figma.com/docs/figma-mcp-server/rate-limits-access/).
+
+| Plan | Modes per collection | Branches | The MCP server |
+|---|---|---|---|
+| Starter | The first only: modes are for "Education, Professional, Organization, and Enterprise plans" | No | "If you're on a Starter plan (20 tool calls per month), upgrade" |
+| Professional | "Up to 10 modes per collection" | No | A Dev or Full seat |
+| Organization | "Up to 20 modes per collection" | Yes | A Dev or Full seat |
+| Enterprise | "Unlimited modes with extended collections"; each collection holds a maximum of 40 modes through the REST API | Yes | A Dev or Full seat |
+
+- **A theme, a density and a brand multiply when they share a collection.** Light
+  and Dark by Comfortable and Compact by three brands is 12 modes in one
+  collection, past Professional's 10 modes per collection; in three collections
+  it is 2, 2 and 3. Figma picks a mode per collection, so the split costs
+  nothing: it is what `--format dtcg --out-dir` and a resolver already write.
+- **`figma_audit.py --plan PLAN`**, or `.design-suite.json`'s `figma.plan`,
+  reports `MODE_LIMIT` (error) on each collection past the plan's cap, and with
+  `starter` stops asking for a dark mode (`MISSING_DARK_MODE`) that the plan
+  cannot hold. Without a plan, neither changes.
+- **`--reverse --format plugin-script --plan PLAN`** reports the same before the
+  run (`mode-limit`, exit 1); the script itself reports each mode Figma refuses.
+  The REST body is checked against the endpoint's own maximum of 40 modes.
+- **The Plugin API says only** that `addMode` "is limited by the current file's
+  pricing tier". Older guides give Professional four modes; the plan comparison
+  and Schema 2025's notes give 10, and those are what the audit uses.
 
 **Reading through the MCP server.** `get_variable_defs` "Returns the variables
 and styles used in your Figma selection", not the whole file. Write what it

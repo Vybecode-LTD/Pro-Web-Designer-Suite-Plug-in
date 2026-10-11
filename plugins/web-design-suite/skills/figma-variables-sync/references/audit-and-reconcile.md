@@ -39,7 +39,8 @@ the sentence to use when someone asks whether the check is worth running.
 | Interactive size under 44px | `TAP_TARGET` | error | WCAG 2.2 SC 2.5.8 sets 24×24 as the floor; `--tap-min` sets 44, because 24 is a legal minimum and not a usable one |
 | Text style with no `--type-*` role | `UNMAPPED_TEXT_STYLE` | error | One style per role, not one per usage. Ten roles is the whole type system; an eleventh is a fork |
 | Effect style with no `--elevation-*` role | `UNMAPPED_EFFECT_STYLE` | warn | `Shadow 12 Soft` cannot be re-tuned without renaming it everywhere, so it never gets re-tuned |
-| Semantic colour collection with one mode | `MISSING_DARK_MODE` | warn | Dark mode added later arrives as component overrides, which is the failure Law 6 exists to prevent |
+| Semantic colour collection with one mode | `MISSING_DARK_MODE` | warn | Dark mode added later arrives as component overrides, which is the failure Law 6 exists to prevent. Quiet with `--plan starter`, where a collection keeps its first mode only |
+| More modes in a collection than the Figma plan allows (`--plan`, or `.design-suite.json`'s `figma.plan`) | `MODE_LIMIT` | error | Figma refuses each mode past the cap, so the set cannot be built. Give theme, density and brand a collection each: modes multiply when they share one (`figma-mapping.md` §14, "Each plan's limits") |
 | Missing interaction roles | `MISSING_STATE` | warn | A role that does not exist in the file gets invented during the build by whoever gets there first |
 | Alias pointing at nothing | `BROKEN_ALIAS` | error | A library was not exported, or a variable was deleted. Either way the value in the file is not the value you think |
 | Alias cycle | `ALIAS_CYCLE` | error | No value at the end of it; renders as an invalid custom property, which usually looks like black on black |

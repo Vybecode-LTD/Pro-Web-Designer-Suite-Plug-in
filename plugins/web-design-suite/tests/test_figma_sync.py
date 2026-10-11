@@ -542,12 +542,99 @@ class PluginScript(TempDirTest):
         self.assertEqual(again["first"]["variables"], {"created": 0, "updated": 1, "unchanged": 4})
         self.assertEqual([c[:2] for c in again["calls"]], [["setValueForMode", "neutral/500"]])
 
+    def test_a_plan_that_cannot_hold_the_themes_is_reported_before_the_run(self):
+        # LC-B6: the plan from the flag, else from the project's config.
+        path = self.write("tokens.json", json.dumps(self.THEMED))
+        self.write(".git/HEAD", "x\n")
+        for args, config, code in ((["--plan", "starter"], None, 1), (["--plan", "professional"], None, 0),
+                                   ([], {"plan": "starter"}, 1), (["--plan", "enterprise"], {"plan": "starter"}, 0)):
+            with self.subTest(args=args, config=config):
+                if config:
+                    self.write(".design-suite.json", json.dumps({"schema": 1, "figma": config}))
+                proc = run_py("figma-variables-sync", "figma_to_tokens", path, "--reverse",
+                              "--format", "plugin-script", *args, cwd=self.tmp)
+                self.assertEqual(proc.returncode, code, output(proc))
+                self.assertEqual("mode-limit" in output(proc), code == 1, output(proc))
+                if code:
+                    self.assertIn("`semantic` needs 2 modes, and Starter has no modes beyond", output(proc))
+                    self.assertIn("const BODY", proc.stdout.decode("utf-8"))   # written all the same
+
     def test_plugin_script_needs_reverse(self):
         path = self.write("tokens.json", json.dumps(self.THEMED))
         proc = run_py("figma-variables-sync", "figma_to_tokens", path, "--format", "plugin-script",
                       cwd=self.tmp)
         self.assertEqual(proc.returncode, 2, output(proc))
         self.assertIn("--reverse", output(proc))
+
+
+class PlanLimits(TempDirTest):
+    """LC-B6 (P32): each Figma plan caps a collection's modes. Figma's plan
+    comparison gives Professional "Up to 10 modes per collection" and
+    Organization "Up to 20"; the REST page, "Each collection can have a
+    maximum of 40 modes"; and modes go to "Education, Professional,
+    Organization, and Enterprise plans", so Starter keeps the first."""
+
+    def records(self, modes, roles=("bg/surface", "fg/default", "border/subtle")):
+        return self.write(f"records-{len(modes)}.json", json.dumps([
+            {"name": role, "type": "COLOR", "value": "#ffffff",
+             "collection": "semantic", "mode": mode} for role in roles for mode in modes]))
+
+    def audit(self, path, *args):
+        proc = run_py("figma-variables-sync", "figma_audit", path, "--format", "json", "--fail-on", "never",
+                      *args, cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        return [f for f in json.loads(proc.stdout)["findings"]
+                if f["code"] in ("MODE_LIMIT", "MISSING_DARK_MODE")]
+
+    def test_each_plan_caps_the_modes_per_collection(self):
+        eleven = self.records([f"Theme {n}" for n in range(1, 11)] + ["Dark"])
+        two = self.records(["Light", "Dark"])
+        for path, plan, fires in ((eleven, "professional", True), (eleven, "organization", False),
+                                  (two, "starter", True), (two, "professional", False),
+                                  (self.records([f"T{n}" for n in range(21)]), "organization", True),
+                                  (self.records([f"T{n}" for n in range(40)]), "enterprise", False)):
+            with self.subTest(plan=plan, path=path.name):
+                found = [f for f in self.audit(path, "--plan", plan) if f["code"] == "MODE_LIMIT"]
+                self.assertEqual(bool(found), fires, found)
+                if fires:
+                    self.assertEqual((found[0]["severity"], found[0]["collection"]), ("error", "semantic"))
+
+    def test_without_a_plan_nothing_is_capped(self):
+        self.assertEqual(self.audit(self.records([f"T{n}" for n in range(41)] + ["Dark"])), [])
+
+    def test_no_dark_mode_is_asked_of_starter(self):
+        one = self.records(["Light"])
+        self.assertEqual([f["code"] for f in self.audit(one)], ["MISSING_DARK_MODE"])      # control
+        self.assertEqual(self.audit(one, "--plan", "starter"), [])
+        self.assertEqual([f["code"] for f in self.audit(one, "--plan", "professional")], ["MISSING_DARK_MODE"])
+
+    def test_the_config_names_the_plan_and_the_flag_beats_it(self):
+        self.write(".git/HEAD", "x\n")
+        self.write(".design-suite.json", json.dumps({"schema": 1, "figma": {"plan": "starter"}}))
+        two = self.records(["Light", "Dark"])
+        self.assertEqual([f["code"] for f in self.audit(two)], ["MODE_LIMIT"])
+        self.assertEqual(self.audit(two, "--plan", "professional"), [])
+        self.write(".design-suite.json", json.dumps({"schema": 1, "figma": {"plan": "free"}}))
+        proc = run_py("figma-variables-sync", "figma_audit", two, cwd=self.tmp)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn('"figma.plan" must be one of starter, professional, organization, enterprise', output(proc))
+
+    def test_the_rest_body_keeps_to_the_endpoints_cap(self):
+        tokens = {"semantic": {"bg-surface": {"value": "#ffffff"}},
+                  "themes": {f"t{n}": {"bg-surface": {"value": "#000000"}} for n in range(40)}}
+        proc = run_py("figma-variables-sync", "figma_to_tokens", self.write("tokens.json", json.dumps(tokens)),
+                      "--reverse", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 1, output(proc))
+        self.assertIn("`semantic` needs 41 modes, and the REST API allows 40 per collection.", output(proc))
+        del tokens["themes"]["t0"]
+        proc = run_py("figma-variables-sync", "figma_to_tokens", self.write("tokens.json", json.dumps(tokens)),
+                      "--reverse", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+
+    def test_the_plans_are_the_configs(self):
+        common = load_script("figma-variables-sync", "figma_common")
+        config = load_script("figma-variables-sync", "project_config")
+        self.assertEqual(tuple(common.PLAN_MODES), config.FIGMA_PLANS)
 
 
 if __name__ == "__main__":

@@ -93,14 +93,12 @@ curl -H "X-Figma-Token: $FIGMA_TOKEN" \
 ```
 
 The file key is the segment after `/design/` in the URL. `local` includes
-unpublished drafts, which is usually what you want — the thing you are arguing
-about is rarely published yet. `…/styles` is different on both counts: it needs
+unpublished drafts, usually what you want: the thing argued about is rarely
+published yet. `…/styles` is different on both counts: it needs
 no Enterprise plan (scope `library_content:read`), and it returns **published**
 styles only, so on a file whose styles are still drafts it comes back empty and
-the style checks see nothing; export those with the plugin. It also returns
-style *metadata* only, not the type properties; to get sizes you also read
-`…/nodes`. See
-`references/figma-mapping.md` §7.
+the style checks see nothing; export those with the plugin. It returns style
+metadata only; sizes need `…/nodes` (`references/figma-mapping.md` §7).
 
 **Fallback — a screenshot and the designer's spec.** Legitimate, and not a
 failure. Measure what you can, then send back the *inferred* token list —
@@ -135,6 +133,7 @@ It checks every value against the closed scales and the ramps and reports:
 - tap targets under 44px
 - text styles with no `--type-*` role, effect styles with no `--elevation-*`
 - broken aliases, alias cycles, missing dark mode, missing interaction states
+- with `--plan`, more modes than the Figma plan allows a collection
 
 Then send it:
 
