@@ -594,6 +594,16 @@ CONFIGS = {
     "names-rename": json.dumps({"schema": 1, "names": {"rename": {"gray-500": "--neutral-500"}}}),
     "names-target": json.dumps({"schema": 1, "names": {"rename": {"--gray-500": 5}}}),
     "names-rename-list": json.dumps({"schema": 1, "names": {"rename": [["--a", "--b"]]}}),
+    # P32: the Figma plan, whose modes are capped, and each way to get it wrong.
+    "figma": json.dumps({"schema": 1, "figma": {"plan": "professional"}}),
+    "figma-none": json.dumps({"schema": 1, "figma": {}}),
+    "figma-null": json.dumps({"schema": 1, "figma": {"plan": None}}),
+    "figma-string": json.dumps({"schema": 1, "figma": "starter"}),
+    "figma-key": json.dumps({"schema": 1, "figma": {"seat": "dev"}}),
+    "figma-plan": json.dumps({"schema": 1, "figma": {"plan": "Pro"}}),
+    "figma-case": json.dumps({"schema": 1, "figma": {"plan": "Enterprise"}}),
+    "figma-bool": json.dumps({"schema": 1, "figma": {"plan": True}}),
+    "figma-list": json.dumps({"schema": 1, "figma": {"plan": ["starter"]}}),
 }
 
 
@@ -868,7 +878,8 @@ class TheNodeReaderAgrees(TempDirTest):
                        "components": c.components, "emails": c.emails, "stack": c.stack,
                        "budgets": {k: str(v) for k, v in c.budgets.items()},
                        "baselines": {k: str(v) for k, v in c.baselines.items()}, "hooks": c.hooks,
-                       "names": {"prefixes": c.prefixes, "rename": c.rename}}}
+                       "names": {"prefixes": c.prefixes, "rename": c.rename},
+                       "figma": {"plan": c.figma_plan}}}
 
     def test_every_config_reads_the_same(self):
         files = [self.write(f"{name}/.design-suite.json", text) for name, text in CONFIGS.items()]

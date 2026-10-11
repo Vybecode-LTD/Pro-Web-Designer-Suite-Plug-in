@@ -56,11 +56,12 @@ sys.dont_write_bytecode = True
 # and attach_styles.
 try:                                              # python -m scripts.figma_audit
     from .figma_common import *                   # type: ignore[import-not-found]  # noqa: F403
-    from .project_config import ConfigError, ProjectTokens, read_tokens, token_sources
+    from .project_config import ConfigError, ProjectTokens, project_config, read_tokens, token_sources
 except ImportError:                               # python scripts/figma_audit.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from figma_common import *                    # type: ignore[no-redef]  # noqa: F403
-    from project_config import ConfigError, ProjectTokens, read_tokens, token_sources  # type: ignore[no-redef]
+    from project_config import (ConfigError, ProjectTokens, project_config,  # type: ignore[no-redef]
+                                read_tokens, token_sources)
 
 # ===========================================================================
 # THE CONTRACT. These tables are the closed scales from token-contract.md and
@@ -265,6 +266,7 @@ CODE_TITLES = {
     "UNMAPPED_EFFECT_STYLE": "Effect styles with no elevation role",
     "TEXT_STYLE_OFF_SCALE": "Text styles built from off-scale values",
     "MISSING_DARK_MODE": "Semantic colour collections with no dark mode",
+    "MODE_LIMIT": "Collections with more modes than the Figma plan allows",
     "MISSING_STATE": "Interaction states that were never designed",
     "BROKEN_ALIAS": "Aliases that point at nothing",
     "ALIAS_CYCLE": "Aliases that point at each other",
@@ -356,9 +358,10 @@ def close_enough(value: float, scale: Sequence[float], tol: float = 0.01) -> boo
 
 
 class Auditor:
-    def __init__(self, doc: FDoc, *, tap_min: float = TAP_MIN_PX) -> None:
+    def __init__(self, doc: FDoc, *, tap_min: float = TAP_MIN_PX, plan: Optional[str] = None) -> None:
         self.doc = doc
         self.tap_min = tap_min
+        self.plan = plan
         self.findings: List[Finding] = []
         self.checked = 0
         self._resolved: Dict[Tuple[str, str], Optional[Tuple[float, float, float, float]]] = {}
@@ -438,6 +441,7 @@ class Auditor:
                 elif var.resolved_type == "COLOR":
                     self.check_color(var, mode, raw)
         self.check_contrast()
+        self.check_mode_limit()
         self.check_dark_mode()
         self.check_states()
         self.check_text_styles()
@@ -706,7 +710,31 @@ class Auditor:
                 uniq.append((name, rgb))
         return uniq
 
+    def check_mode_limit(self) -> None:
+        """P32 (LC-B6): theme x density x brand can need more modes than the
+        plan gives a collection, and Figma refuses each one past the cap."""
+        if not self.plan:
+            return
+        cap = PLAN_MODES[self.plan]
+        for cname, col in self.doc.collections.items():
+            if len(col.modes) <= cap:
+                continue
+            self.add(
+                code="MODE_LIMIT", severity="error", collection=cname, mode="-", name=cname,
+                summary=f"`{cname}` has {len(col.modes)} modes; the {self.plan.title()} plan "
+                        f"allows {cap} per collection",
+                detail=plan_limit(self.plan) + " Figma refuses each mode past the cap "
+                       "(\"in addMode: Limited to N modes only\"), so this set cannot be built.",
+                suggestion="give theme, density and brand a collection each: modes multiply "
+                           "when they share one and add up when they do not"
+                           + ("; on Starter, keep one theme in Figma and the rest in code"
+                              if self.plan == "starter" else ""),
+            )
+
     def check_dark_mode(self) -> None:
+        # Where the plan allows one mode, a dark one cannot be asked for (LC-B6).
+        if self.plan and PLAN_MODES[self.plan] == 1:
+            return
         for cname, col in self.doc.collections.items():
             semantic = [v for v in self.doc.variables
                         if v.collection == cname and v.resolved_type == "COLOR"
@@ -1113,6 +1141,9 @@ def build_parser() -> argparse.ArgumentParser:
                         "--contract), repeatable: its colour ramps (any --<name>-<step> holding "
                         "a literal colour) and scales replace the studio's of the same name. "
                         "Without it, the token files a .design-suite.json lists")
+    p.add_argument("--plan", choices=tuple(PLAN_MODES),
+                   help="the Figma plan, whose modes per collection are capped (MODE_LIMIT); "
+                        "default: the .design-suite.json's figma.plan")
     p.add_argument("--no-color", action="store_true")
     p.add_argument("-o", "--out", metavar="FILE", help="write the report to FILE instead of stdout")
     return p
@@ -1141,6 +1172,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # A flag beats the config: the project's token files only without --tokens (P24).
     try:
         sources, config_path = token_sources(args.tokens)
+        config = project_config() if args.plan is None else None
     except ConfigError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -1164,7 +1196,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if scales:
             doc.notes.append(f"scales from {origin}: {', '.join(scales)}")
 
-    auditor = Auditor(doc, tap_min=args.tap_min)
+    plan = args.plan or (config.figma_plan if config else None)
+    if plan:
+        doc.notes.append(f"the Figma plan: {plan}" + ("" if args.plan else f" (from {config.path})"))
+    auditor = Auditor(doc, tap_min=args.tap_min, plan=plan)
     findings = auditor.run()
 
     try:

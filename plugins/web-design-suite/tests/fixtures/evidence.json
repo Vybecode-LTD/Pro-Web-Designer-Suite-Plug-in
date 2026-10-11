@@ -434,6 +434,61 @@
       "docs": [
         "design-critique-gate/references/failure-catalog.md"
       ]
+    },
+    {
+      "figure": "10 modes per collection",
+      "claim": "the variable modes a collection holds on Figma's Professional plan",
+      "source": "Figma, Compare Figma plans and features",
+      "url": "https://help.figma.com/hc/en-us/articles/360040328273",
+      "checked": "2026-10-11",
+      "quote": "Up to 10 modes per collection",
+      "docs": [
+        "figma-variables-sync/references/figma-mapping.md"
+      ]
+    },
+    {
+      "figure": "20 modes per collection",
+      "claim": "the variable modes a collection holds on Figma's Organization plan",
+      "source": "Figma, Compare Figma plans and features",
+      "url": "https://help.figma.com/hc/en-us/articles/360040328273",
+      "checked": "2026-10-11",
+      "quote": "Up to 20 modes per collection",
+      "docs": [
+        "figma-variables-sync/references/figma-mapping.md"
+      ]
+    },
+    {
+      "figure": "40 modes",
+      "claim": "the most modes a collection holds through Figma's Variables REST API",
+      "source": "Figma, REST API: Variables endpoints",
+      "url": "https://developers.figma.com/docs/rest-api/variables-endpoints/",
+      "checked": "2026-10-11",
+      "quote": "Each collection can have a maximum of 40 modes",
+      "docs": [
+        "figma-variables-sync/references/figma-mapping.md"
+      ]
+    },
+    {
+      "figure": "20 tool calls per month",
+      "claim": "the Figma MCP server's allowance on the Starter plan",
+      "source": "Figma, MCP server: Rate limits & access",
+      "url": "https://developers.figma.com/docs/figma-mcp-server/rate-limits-access/",
+      "checked": "2026-10-11",
+      "quote": "If you're on a Starter plan (20 tool calls per month), upgrade to a Pro, Organization, or Enterprise plan.",
+      "docs": [
+        "figma-variables-sync/references/figma-mapping.md"
+      ]
+    },
+    {
+      "figure": "20 tool calls per month",
+      "claim": "the Figma MCP server's allowance for a View or Collab seat on a paid plan",
+      "source": "Figma, MCP server: Rate limits & access",
+      "url": "https://developers.figma.com/docs/figma-mcp-server/rate-limits-access/",
+      "checked": "2026-10-11",
+      "quote": "If you have a View or Collab seat on an Organization or Enterprise plan (20 tool calls per month), upgrade to a Full or Dev seat.",
+      "docs": [
+        "figma-variables-sync/references/figma-mapping.md"
+      ]
     }
   ],
   "not_statistics": [
