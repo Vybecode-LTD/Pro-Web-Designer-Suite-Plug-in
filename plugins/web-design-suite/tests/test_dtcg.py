@@ -17,11 +17,13 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
+import subprocess
 import sys
 import unittest
 
-from wds_support import PLUGIN, SKILLS, TempDirTest, load_script, output, run_py
+from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, load_script, output, run_py
 
 MASTER = PLUGIN / "shared" / "dtcg.py"
 STARTER = SKILLS / "web-design-studio" / "assets" / "starter" / "styles" / "tokens.css"
@@ -718,6 +720,51 @@ class TheResolver(TempDirTest):
         self.assertEqual("var(--brand-500)", pc.read_tokens([src]).roles["--bg-surface"])
         proc, _ = self.to_css(src)
         self.assertEqual(5, output(proc).count("is outside the resolver's folder"), output(proc))
+
+    def test_a_link_out_of_the_resolvers_folder_is_not_followed(self):
+        """Codex on #105: a symlink or a junction inside the folder that
+        points outside it passed the name check, and its JSON was read."""
+        outside = self.write("outside/secret.tokens.json", json.dumps({"leak": {"$type": "number", "$value": 1}}))
+        self.write("design/base.tokens.json", json.dumps(RESOLVER_BASE))
+        link = self.tmp / "design" / "linked"
+        if os.name == "nt":
+            import _winapi
+            _winapi.CreateJunction(str(outside.parent), str(link))
+            self.addCleanup(os.rmdir, link)              # the junction, never its target
+        else:
+            link.symlink_to(outside.parent, target_is_directory=True)
+            self.addCleanup(link.unlink)
+        data = {"version": "2025.10", "resolutionOrder": [{"type": "set", "name": "s", "sources": [
+            {"$ref": "base.tokens.json"}, {"$ref": "linked/secret.tokens.json"}]}]}
+        src = self.write("design/app.resolver.json", json.dumps(data))
+        pc = load_script("design-system-docs", "project_config")
+        tokens = pc.read_tokens([src])
+        self.assertNotIn("--leak", tokens.values())
+        self.assertEqual("var(--brand-500)", tokens.roles["--bg-surface"])
+        proc, _ = self.to_css(src)
+        self.assertIn("`linked/secret.tokens.json` is outside the resolver's folder", output(proc))
+        script = (f"import {{ readTokens }} from {json.dumps((PLUGIN / 'shared' / 'project_config.mjs').as_uri())};\n"
+                  f"console.log(JSON.stringify(readTokens([{json.dumps(str(src))}])));\n")
+        node = subprocess.run([NODE, "--input-type=module", "-e", script], cwd=self.tmp, env=env(),
+                              capture_output=True, timeout=120)
+        self.assertEqual(0, node.returncode, output(node))
+        self.assertNotIn("leak", node.stdout.decode("utf-8"))
+        self.assertIn("--bg-surface", node.stdout.decode("utf-8"))
+
+    def test_a_context_with_a_quote_round_trips(self):
+        """Codex on #105: `[data-theme="say \\"hi\\""]`, which the reader
+        writes for a context with a quote, ended at the escaped quote, so the
+        block was dropped on the way back to DTCG."""
+        css = THEMED_CSS.replace('[data-theme="dark"]', '[data-theme="say \\"hi\\""]')
+        proc = self.to_dtcg(self.write("tokens.css", css))
+        resolver = json.loads((self.tmp / "dtcg" / "tokens.resolver.json").read_bytes())
+        self.assertIn('say "hi"', resolver["modifiers"]["theme"]["contexts"], output(proc))
+        _, text = self.to_css(self.tmp / "dtcg" / "tokens.resolver.json")
+        self.assertEqual(css_blocks(css), css_blocks(text))
+        hex_css = THEMED_CSS.replace('[data-theme="dark"]', "[data-theme='say \\22 hi\\22']")
+        self.to_dtcg(self.write("hex.css", hex_css), "--quiet")
+        resolver = json.loads((self.tmp / "dtcg" / "tokens.resolver.json").read_bytes())
+        self.assertIn('say "hi"', resolver["modifiers"]["theme"]["contexts"])
 
     def test_odd_shapes_are_named_not_a_traceback(self):
         """CodeRabbit on #105: a list `default` raised TypeError, and a list
