@@ -74,6 +74,12 @@
   prefix is still a primitive. The spec's `tiers.names` holds the examples,
   and `project_config.py` and `.mjs` check the key alike.
 
+### Changed
+
+- **`evals.yml` runs only by hand.** A `v*` tag no longer starts it: the dispatch
+  before the tag gates the release, and the tag's own run re-tested the same commit
+  for about $9 (the owner, 2026-10-11).
+
 ### Fixed
 
 - **A reference to a group's own token** (`{brand.$root}`, `#/brand/$root`), the
