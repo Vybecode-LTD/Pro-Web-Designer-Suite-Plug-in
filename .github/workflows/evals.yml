@@ -1,9 +1,11 @@
 # The plugin's eval suite (P29, P30): `claude plugin eval` on plugins/web-design-suite/evals/.
 # Every run is a real model call, billed to the ANTHROPIC_API_KEY secret, so the
-# job runs only when a maintainer starts it and on a release tag, never on a pull
-# request: the repository is public, and a fork's pull request must not spend
-# the key. No case grants a shell: the routing cases list only Skill, and the
-# outcome cases write files and run the gates through the plugin's MCP server,
+# job runs only when a maintainer starts it, never on a pull request: the
+# repository is public, and a fork's pull request must not spend the key. Nor on
+# a release tag: the dispatch before the tag gates the release, and a second run
+# on the tag re-tests the same commit (the owner, 2026-10-11). No case grants a
+# shell: the routing cases list only Skill, and the outcome cases write files
+# and run the gates through the plugin's MCP server,
 # which runs outside the sandbox, so the runner needs no OS sandbox.
 # The CLI and both models are pinned, so a new release or a model rollout is not
 # read as a change in the plugin. The job holds the key, so its actions are pinned
@@ -21,8 +23,6 @@ on:
         description: "Runs per case, 1 to 50"
         required: true
         default: "3"
-  push:
-    tags: ["v*"]
 
 concurrency:
   group: evals-${{ github.ref }}
@@ -58,8 +58,8 @@ jobs:
       # so one wrong run fails it: the threshold is 1.0 (Codex on #95). Routing
       # and outcome share one ceiling, D5's $15 less one run, since a run that
       # has started finishes past it (the evals page's command options): the
-      # outcome set gets what routing left (the owner, 2026-10-10). A release
-      # tag runs both. A routing case cannot pass without the plugin, so it
+      # outcome set gets what routing left (the owner, 2026-10-10). `all`
+      # runs both. A routing case cannot pass without the plugin, so it
       # runs one arm. An outcome case runs both, since Δ is what it measures;
       # its skill and gate graders, which no run without the plugin can pass,
       # are indicators there. The outcome cases write files, start the
@@ -69,8 +69,8 @@ jobs:
         working-directory: plugins/web-design-suite
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          TAG: ${{ inputs.tag || 'all' }}
-          RUNS: ${{ inputs.runs || '3' }}
+          TAG: ${{ inputs.tag }}
+          RUNS: ${{ inputs.runs }}
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then
             echo "::error::The ANTHROPIC_API_KEY repository secret is not set."

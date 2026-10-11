@@ -87,6 +87,12 @@
   the script. The facts are re-read at Figma's Plugin API, MCP and FAQ pages
   (`references/figma-mapping.md` §14).
 
+### Changed
+
+- **`evals.yml` runs only by hand.** A `v*` tag no longer starts it: the dispatch
+  before the tag gates the release, and the tag's own run re-tested the same commit
+  for about $9 (the owner, 2026-10-11).
+
 ### Fixed
 
 - **A reference to a group's own token** (`{brand.$root}`, `#/brand/$root`), the

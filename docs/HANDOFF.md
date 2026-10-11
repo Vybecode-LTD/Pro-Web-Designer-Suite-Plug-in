@@ -21,7 +21,7 @@
 
 ## Open owner decisions
 
-- **`evals.yml` on a tag** (asked again at this session's start, no answer yet): a release runs the suite twice. Drop the tag trigger, or keep cancelling the tag's run?
+- **`evals.yml` on a tag: decided 2026-10-11, dropped** (#110). The workflow runs only by hand; the dispatch before the tag gates the release.
 - **The `dtcg-export` eval** (`evals/lifecycle/dtcg-export`, about $0.30) can be graded against the script route, now with themes: run it when the owner says so.
 
 ## Warnings
