@@ -526,21 +526,44 @@ class PluginScript(TempDirTest):
                       ran["first"]["errors"])
         self.assertEqual(ran["first"]["variables"]["created"], 5)
 
-    def test_a_changed_token_is_updated_in_place(self):
-        changed = json.loads(json.dumps(self.THEMED))
-        changed["primitive"]["neutral-500"]["value"] = "#5a5a5a"
-        code = self.write("figma-variables.js", self.script(changed))
-        # The changed script runs against the first run's file, as a re-sync does.
+    def resync(self, old, new):
+        """The new tokens' script runs against the file the old one wrote, as a re-sync does."""
+        code = self.write("figma-variables.js", self.script(new))
         state = self.write("rerun.mjs", FIGMA_STUB.replace(
             "const first = await run(figma);",
             "await new AsyncFunction('figma', readFileSync(process.argv[4], 'utf8'))(figma);\n"
             "calls.splice(0);\nconst first = await run(figma);"))
-        proc = subprocess.run([NODE, state, code, "10", self.write("old.js", self.script())],
+        proc = subprocess.run([NODE, state, code, "10", self.write("old.js", self.script(old))],
                               cwd=self.tmp, env=env(), capture_output=True, timeout=60)
         self.assertEqual(proc.returncode, 0, output(proc))
-        again = json.loads(proc.stdout)
+        return json.loads(proc.stdout)
+
+    def test_a_changed_token_is_updated_in_place(self):
+        changed = json.loads(json.dumps(self.THEMED))
+        changed["primitive"]["neutral-500"]["value"] = "#5a5a5a"
+        again = self.resync(self.THEMED, changed)
         self.assertEqual(again["first"]["variables"], {"created": 0, "updated": 1, "unchanged": 4})
         self.assertEqual([c[:2] for c in again["calls"]], [["setValueForMode", "neutral/500"]])
+
+    def test_the_default_values_go_to_the_default_mode_whatever_the_names(self):
+        # Codex on #109: `light` and `dark` themes, then `dark` alone. The old
+        # default is `Default`, beside a `Light` theme, and the new body names
+        # the default `Light`: its values must not land on the old theme.
+        old = {"semantic": {"bg-surface": {"value": "#eeeeee"}},
+               "themes": {"light": {"bg-surface": {"value": "#ffffff"}},
+                          "dark": {"bg-surface": {"value": "#111111"}}}}
+        new = {"semantic": {"bg-surface": {"value": "#fafafa"}},
+               "themes": {"dark": {"bg-surface": {"value": "#000000"}}}}
+        ran = self.resync(old, new)
+        semantic = next(c for c in ran["collections"] if c["name"] == "semantic")
+        modes = {m["name"]: m["modeId"] for m in semantic["modes"]}
+        self.assertEqual(list(modes), ["Default", "Dark", "Light"])
+        surface = next(v for v in ran["variables"] if v["name"] == "bg/surface")["valuesByMode"]
+        self.assertAlmostEqual(surface[modes["Default"]]["r"], 250 / 255, places=4)
+        self.assertAlmostEqual(surface[modes["Dark"]]["r"], 0, places=4)
+        self.assertAlmostEqual(surface[modes["Light"]]["r"], 1, places=4)    # the old theme, untouched
+        self.assertEqual(ran["first"]["errorCount"], 1, ran["first"])
+        self.assertIn('another mode has the name, so the default mode keeps "Default"', ran["first"]["errors"][0])
 
     def test_a_plan_that_cannot_hold_the_themes_is_reported_before_the_run(self):
         # LC-B6: the plan from the flag, else from the project's config.

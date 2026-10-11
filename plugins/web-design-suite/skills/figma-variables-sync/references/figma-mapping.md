@@ -629,6 +629,10 @@ so both routes write the same variables:
   nothing. A variable whose type differs in Figma is reported and left as it is:
   `resolvedType` is read-only, so it could only be replaced, and replacing it
   breaks every binding.
+- **The default values go to the default mode**, whatever it is called, and a
+  theme's never do. When a theme set changes (`light` and `dark`, then `dark`
+  alone), a theme mode may already hold the name the default should take: the
+  default keeps its own name, and the clash is reported for a human to settle.
 - **The plan caps the modes.** `addMode` says "This API is limited by the current
   file's pricing tier", and throws past it. The script reports each mode it
   could not add, with Figma's message, and writes the rest.
