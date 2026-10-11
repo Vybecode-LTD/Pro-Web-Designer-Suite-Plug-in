@@ -584,10 +584,71 @@ is POSTed as `--reverse` wrote it.
 
 | Need | Enterprise | Everyone else |
 |---|---|---|
-| Read variables | `GET …/variables/local` | A plugin export (SKILL.md, step 1), or the MCP server's `get_variable_defs` |
-| Write variables | `POST …/variables` | `--reverse` builds the payload; a plugin, `use_figma` through the MCP server, or a human imports it |
+| Read variables | `GET …/variables/local` | A plugin export (SKILL.md, step 1), or the MCP server's `get_variable_defs` for a selection |
+| Write variables | `POST …/variables` | `--reverse --format plugin-script`, run with `use_figma` through the MCP server or in a development plugin (below) |
 | Read styles | `GET …/styles` + `GET …/nodes`, published styles only | The same calls: they need no Enterprise plan. Draft styles need the plugin export |
 | Automate on merge | CI hits the API | CI checks the committed export; a human re-exports when the file changes |
+
+### The Plugin API route, on any plan
+
+Re-read on 2026-10-11 at [`figma.variables`](https://developers.figma.com/docs/plugins/api/figma-variables/),
+[`Variable`](https://developers.figma.com/docs/plugins/api/Variable/),
+[`VariableCollection`](https://developers.figma.com/docs/plugins/api/VariableCollection/), the MCP
+server's [tools](https://developers.figma.com/docs/figma-mcp-server/tools-and-prompts/) and
+[FAQ](https://help.figma.com/hc/en-us/articles/39252411778583-Figma-MCP-server-FAQs), and Figma's
+[guide to `use_figma`](https://github.com/figma/mcp-server-guide/blob/main/skills/figma-use/SKILL.md).
+
+```bash
+python scripts/figma_to_tokens.py design/tokens.json --reverse --format plugin-script \
+  --out figma-variables.js
+```
+
+The script carries the REST body above and applies it through the Plugin API,
+so both routes write the same variables:
+
+| REST body | Plugin API call |
+|---|---|
+| a collection `CREATE` | `figma.variables.createVariableCollection(name)`, unless a local collection has that name |
+| the first mode's `UPDATE` | `collection.renameMode(collection.defaultModeId, name)`: a new collection's one mode is "Mode 1" |
+| a mode `CREATE` | `collection.addMode(name)`, unless the collection has a mode of that name |
+| a variable `CREATE` | `figma.variables.createVariable(name, collection, resolvedType)`: the collection itself, not its id |
+| `scopes` | `variable.scopes = […]`; `[]` on a primitive keeps it out of every picker |
+| `codeSyntax.WEB` | `variable.setVariableCodeSyntax('WEB', 'var(--token)')` |
+| a mode value | `variable.setValueForMode(modeId, value)`; an alias through `figma.variables.createVariableAlias(target)` |
+
+- **It is a sync, not an import.** Collections, modes and variables are found by
+  name; what is missing is created and what differs is updated, in place, so a
+  designer's bindings survive. It deletes nothing, and a second run changes
+  nothing. A variable whose type differs in Figma is reported and left as it is:
+  `resolvedType` is read-only, so it could only be replaced, and replacing it
+  breaks every binding.
+- **The default values go to the default mode**, whatever it is called, and a
+  theme's never do. When a theme set changes (`light` and `dark`, then `dark`
+  alone), a theme mode may already hold the name the default should take: the
+  default keeps its own name, and the clash is reported for a human to settle.
+- **The plan caps the modes.** `addMode` says "This API is limited by the current
+  file's pricing tier", and throws past it. The script reports each mode it
+  could not add, with Figma's message, and writes the rest.
+- **The result is small.** It returns counts (collections, modes and variables
+  created, updated, unchanged) and the first errors, since `use_figma` returns
+  what the code returns, serialised as JSON.
+
+**Through the MCP server.** Pass the file's text as `use_figma`'s code. Figma's
+guide says the code "is automatically wrapped in an async context", so the
+script uses top-level `await` and `return`, and never `figma.closePlugin()` or
+`figma.notify()`, which "throws "not implemented"" there. `use_figma` is
+remote-only, and "A Full Seat is required to write to Figma files outside of
+drafts" (the FAQ); try it on a draft or a duplicate of the library first.
+
+**In a development plugin.** Put the script's body inside an async function and
+pass its result to `figma.closePlugin(JSON.stringify(result))`.
+
+**Reading through the MCP server.** `get_variable_defs` "Returns the variables
+and styles used in your Figma selection", not the whole file. Write what it
+returns as records (`[{"name", "type", "value", "collection", "mode"}]`, one row
+per mode) and audit them with `--shape records`: enough to check one screen.
+For the whole file, the plugin export (SKILL.md, step 1) is still the path. A
+Dev seat reads: "Dev Seats get read-only access outside of their drafts."
 
 Figma announced native import and export of variables conforming to the W3C
 Design Tokens Community Group 1.0 specification, rolling out in stages from late
