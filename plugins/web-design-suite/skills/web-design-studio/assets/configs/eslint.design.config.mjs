@@ -222,7 +222,12 @@ const PROJECT_RAMP_ADVICE = 'a color role (--bg-*, --fg-*, --border-*)';
 
 /* The project's config, from the working directory (N37, in the header). */
 const PROJECT = lintProject();
-const PROJECT_RAMP_STEPS = new Set(PROJECT.rampSteps);
+// The steps as the grammar reads them, through the project's `names`: a prefix
+// comes off, and a renamed step is what it is renamed to, so no longer a step
+// (CodeRabbit on #107). The audit reads them alike.
+const PROJECT_RAMP_STEPS = new Set(
+  PROJECT.rampSteps.filter((n) => !Object.hasOwn(PROJECT.names.rename, n)).map((n) => PROJECT.grammarName(n)),
+);
 const RAW_COLOR = new RegExp(
   /(?:^|[\s(:,'"`[])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z])/.source +
     String.raw`|\b(?:${COLOUR_FUNCTIONS.join('|')})\s*\(`,
@@ -254,7 +259,7 @@ const VAR_NAME = /var\(\s*(--[\w-]+)/g;
 const tier1Advice = (ref) => {
   const name = PROJECT.grammarName(ref);         // the project's `names` (P31 part 5)
   if (TIER2_EXCEPTIONS.includes(name) || TIER1_NULLS.includes(name)) return null;
-  if (PROJECT_RAMP_STEPS.has(ref) || PROJECT_RAMP_STEPS.has(name)) return PROJECT_RAMP_ADVICE;
+  if (PROJECT_RAMP_STEPS.has(name)) return PROJECT_RAMP_ADVICE;
   const prefix = Object.keys(TIER1_WITH_ROLE).find((p) => name.slice(2).startsWith(p));
   return prefix ? TIER1_WITH_ROLE[prefix] : null;
 };
@@ -265,8 +270,9 @@ const tier1Advice = (ref) => {
  * a step TIER1_SHORTHAND already refuses (`--accent-500`) is left to it, and
  * a page-rhythm role or a null-out is not a leak. */
 const SHORTHAND_STEPS = PROJECT.rampSteps.filter(
-  (name) => /^--[\w-]+$/.test(name) && tier1Advice(name) && !TIER1_SHORTHAND.test(`(${name})`),
-);
+  (name) => /^--[\w-]+$/.test(name) && PROJECT.grammarName(name) === name && tier1Advice(name) &&
+    !TIER1_SHORTHAND.test(`(${name})`),
+);                                     // a step the names change is NAMED_SHORTHAND's
 const PROJECT_SHORTHAND = SHORTHAND_STEPS.length
   ? new RegExp(String.raw`\((?:[a-z-]+:)?(?:${SHORTHAND_STEPS.join('|')})\)`)
   : null;
@@ -281,7 +287,7 @@ const NAMED_SHORTHAND = (() => {
   const kept = [...TIER2_EXCEPTIONS, ...TIER1_NULLS].map((n) => n.slice(2)).join('|');
   // What follows a prefix: a primitive with a role, or a step of the project's
   // own ramps (Codex on #107), as tier1Advice() reads a mapped name.
-  const steps = PROJECT.rampSteps.filter((n) => /^--[\w-]+$/.test(n)).map((n) => n.slice(2));
+  const steps = [...PROJECT_RAMP_STEPS].filter((n) => /^--[\w-]+$/.test(n)).map((n) => n.slice(2));
   const rest = String.raw`(?:(?:${Object.keys(TIER1_WITH_ROLE).join('|')})[\w-]*` +
     (steps.length ? `|(?:${steps.join('|')}))` : ')');
   // grammarName()'s order: a rename first, then the first prefix that fits.

@@ -243,7 +243,12 @@ const PROJECT_RAMP_ADVICE = 'a color role (--bg-*, --fg-*, --border-*)';
 
 /* The project's config, from the working directory (N37, above). */
 const PROJECT = lintProject();
-const PROJECT_RAMP_STEPS = new Set(PROJECT.rampSteps);
+// The steps as the grammar reads them, through the project's `names`: a prefix
+// comes off, and a renamed step is what it is renamed to, so no longer a step
+// (CodeRabbit on #107). The audit reads them alike.
+const PROJECT_RAMP_STEPS = new Set(
+  PROJECT.rampSteps.filter((n) => !Object.hasOwn(PROJECT.names.rename, n)).map((n) => PROJECT.grammarName(n)),
+);
 
 /* =========================================================================
  * PART 2 — LOCAL PLUGIN: LAYER ORDER (LAW 5)
@@ -695,7 +700,7 @@ const VAR_NAME = /var\(\s*(--[\w-]+)/g;
 const tier1Advice = (ref) => {
   const name = PROJECT.grammarName(ref);
   if (TIER2_EXCEPTIONS.includes(name) || TIER1_NULLS.includes(name)) return null;
-  if (PROJECT_RAMP_STEPS.has(ref) || PROJECT_RAMP_STEPS.has(name)) return PROJECT_RAMP_ADVICE;
+  if (PROJECT_RAMP_STEPS.has(name)) return PROJECT_RAMP_ADVICE;
   const prefix = Object.keys(TIER1_WITH_ROLE).find((p) => name.slice(2).startsWith(p));
   return prefix ? TIER1_WITH_ROLE[prefix] : null;
 };

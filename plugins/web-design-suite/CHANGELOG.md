@@ -69,7 +69,9 @@
   `names`: `prefixes` (each ending in `-`) taken off a name that starts with one, and a
   `rename` table, read first. The audit, stylelint and ESLint read Law 6 through it, in a
   stylesheet, a `(--name)` class and an inline custom property, and a page-rhythm role or
-  a null-out under a prefix still passes. The spec's `tiers.names` holds the examples,
+  a null-out under a prefix still passes. The project's own ramp steps are read through
+  the map as well: a step renamed to a role passes, and one the tokens file spells with a
+  prefix is still a primitive. The spec's `tiers.names` holds the examples,
   and `project_config.py` and `.mjs` check the key alike.
 
 ### Fixed
