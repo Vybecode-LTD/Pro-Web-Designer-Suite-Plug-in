@@ -26,23 +26,39 @@ STARTER = STUDIO / "assets" / "starter" / "styles" / "tokens.css"
 MODULES = tool_modules("WDS_NODE_MODULES", "playwright", node_path=True)
 
 
-def light_dark_starter() -> str:
-    """The starter as a light-dark() system: each colour role the dark block
-    re-points becomes `light-dark(light, dark)` on :root, and the dark block
-    keeps only `color-scheme: dark`."""
-    css = STARTER.read_text(encoding="utf-8")
-    head, sep, rest = css.partition('  [data-theme="dark"] {')
+def merge_dark(css: str, light_at: str, dark_block: str, roles_re: str) -> str:
+    """Each role the `dark_block` re-points becomes `light-dark(light, dark)`
+    at its first declaration after `light_at`, and leaves the dark block."""
+    head, sep, rest = css.partition(dark_block)
     body, close, tail = rest.partition("\n  }\n")
     # One line each: a comment may name a role (`--border-strong: 5.17:1 on…`) with no `;`.
-    roles = re.findall(r"\n\s*(--(?:bg|fg|border)-[\w-]+):\s*([^;\n]+);", body)
-    assert sep and close and len(roles) > 10, "the starter's dark block moved"
+    roles = re.findall(rf"\n\s*({roles_re}):\s*([^;\n]+);", body)
+    assert sep and close and roles, f"the starter's {dark_block.strip()} block moved"
+    before, mark, after = head.partition(light_at)
+    assert mark, light_at
     for name, dark in roles:
-        head, n = re.subn(rf"(\n\s*{re.escape(name)}:\s*)([^;\n]+);",
-                          lambda m: f"{m.group(1)}light-dark({m.group(2).strip()}, {dark.strip()});", head, count=1)
+        after, n = re.subn(rf"(\n\s*{re.escape(name)}:\s*)([^;\n]+);",
+                           lambda m: f"{m.group(1)}light-dark({m.group(2).strip()}, {dark.strip()});", after, count=1)
         assert n == 1, name
         body = re.sub(rf"\n\s*{re.escape(name)}:\s*[^;\n]+;", "", body, count=1)
-    head = head.replace(":root {", ":root {\n    color-scheme: light dark;", 1)
-    return head + sep + body + close + tail
+    return before + mark + after + sep + body + close + tail
+
+
+def light_dark_starter() -> str:
+    """The starter as a light-dark() system: each colour role the dark block
+    re-points becomes `light-dark(light, dark)` on :root, each role the dark
+    `.inverse` re-points does the same in `.inverse`, and the dark blocks keep
+    only what is not a colour role. :root follows the OS (`light dark`), and
+    `[data-theme="dark"]` keeps its `color-scheme: dark`."""
+    css = STARTER.read_text(encoding="utf-8")
+    css = merge_dark(css, ":root {", '  [data-theme="dark"] {', r"--(?:bg|fg|border)-[\w-]+")
+    css = merge_dark(css, "  .inverse {", '  [data-theme="dark"] .inverse {', r"--[\w-]+")
+    return css.replace(":root {", ":root {\n    color-scheme: light dark;", 1)
+
+
+def by_scheme(results: list) -> set:
+    """What a visitor in each scheme sees, whichever scope's selectors got them there."""
+    return {(r["fg"], r["bg"], r["scheme"], r["ratio"], r["ok"]) for r in results}
 
 
 class CheckRoles(TempDirTest):
@@ -96,25 +112,34 @@ class CheckRoles(TempDirTest):
         ratios, pair for pair, and the same role table."""
         written = light_dark_starter()
         self.assertIn("--bg-canvas:      light-dark(var(--neutral-50), var(--neutral-1000));", written)
+        self.assertIn("--fg-default:     light-dark(var(--neutral-100), var(--neutral-900));", written)
         blocks, ours = self.roles(self.starter(), "--json"), self.roles(written, "--json")
         self.assertEqual(ours.returncode, 0, output(ours))
-        self.assertEqual(json.loads(ours.stdout), json.loads(blocks.stdout))
+        # The light scope follows the OS now, so it is held in both schemes
+        # (Codex on #112): the dark results it adds are the dark theme's.
+        self.assertEqual(by_scheme(json.loads(ours.stdout)), by_scheme(json.loads(blocks.stdout)))
+        self.assertIn(("light", "dark"), {(r["scope"], r["scheme"]) for r in json.loads(ours.stdout)})
         self.assertEqual(self.roles(written, "--table").stdout, self.roles(self.starter(), "--table").stdout)
 
     def test_a_scopes_color_scheme_picks_the_branch(self):
         """An inverse band set `color-scheme: dark` reads the dark branch, and
-        a dark page set `light` reads the light one."""
+        a dark page set `light` reads the light one. A dark scope that leaves
+        `light dark` in place is held in both: the visitor's preference picks
+        the branch, not the selector (Codex on #112)."""
         css = (":root { color-scheme: light dark; --bg-canvas: light-dark(oklch(98% 0 0), oklch(15% 0 0));"
                " --fg-default: light-dark(oklch(25% 0 0), oklch(96% 0 0)); --bg-inverse: oklch(15% 0 0); }"
                " EXTRA")
         pairs = self.write("pairs.json", json.dumps([
             {"fg": "--fg-default", "bg": "--bg-inverse", "min": 4.5, "scopes": ["inverse"], "on": "light"},
             {"fg": "--fg-default", "bg": "--bg-inverse", "min": 4.5, "scopes": ["dark"]}]))
-        for extra, code in (("", 1), (".inverse { color-scheme: dark; }", 0), (".inverse { color-scheme: only dark; }", 0),
-                            ('.inverse { color-scheme: dark; } [data-theme="dark"] { color-scheme: light; }', 1)):
+        forced = '.inverse { color-scheme: %s; } [data-theme="dark"] { color-scheme: %s; }'
+        for extra, code in (("", 1), (forced % ("dark", "dark"), 0), (forced % ("only dark", "only dark"), 0),
+                            (".inverse { color-scheme: dark; }", 1), (forced % ("dark", "light"), 1)):
             with self.subTest(extra=extra):
                 proc = self.roles(css.replace("EXTRA", extra), "--pairs", pairs)
                 self.assertEqual(proc.returncode, code, output(proc))
+                if extra == ".inverse { color-scheme: dark; }":
+                    self.assertIn("--fg-default on --bg-inverse (dark, light scheme)", output(proc))
 
     def test_a_light_dark_that_is_not_one_pair_is_not_a_colour(self):
         for value in ("light-dark(oklch(98% 0 0))", "light-dark(oklch(98% 0 0), oklch(15% 0 0), red)",

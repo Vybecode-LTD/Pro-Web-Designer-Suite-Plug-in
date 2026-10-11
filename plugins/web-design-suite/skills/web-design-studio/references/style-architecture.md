@@ -503,9 +503,9 @@ The flash exists because the theme lives in an attribute only a script can set b
 
 - **A visitor who never chose needs no script.** The page follows the OS from the first paint. A stored choice still comes from the blocking script above, which now only sets the attribute.
 - **Subtrees work, derived tokens included.** `light-dark()` is resolved where the colour is used, not where the role is declared, so `<section data-theme="dark">` is dark inside a light page: its roles, its form fields, and `--elevation-card`, which re-pointing `--shadow-sm` in a `[data-theme]` block cannot reach (it was resolved on `:root`).
-- **Colours only.** It takes two colours (or two images). A shadow works because the colour inside it is one; a token that differs by theme and is not a colour stays in a `[data-theme]` block.
+- **Colours only.** It takes two colours; the image form is newer and has its own support. A shadow works because the colour inside it is one; a token that differs by theme and is not a colour stays in a `[data-theme]` block.
 - **Support.** Baseline 2024: Chrome and Edge 123, Firefox 120, Safari 17.5, newly available since 13 May 2024 and widely available from November 2026 by the 30-month rule ([web-features](https://github.com/web-platform-dx/web-features/blob/main/features/light-dark.yml.dist)). In an older browser the declaration that uses the role is invalid at computed-value time and acts as `unset` (a background goes transparent): keep the starter's `[data-theme]` blocks while those browsers matter.
-- **The gate reads it.** `check_roles.py` takes, in each scope, the branch that scope's `color-scheme` picks (an `.inverse { color-scheme: dark; }` band reads the dark one), else the scope's own theme, and holds both to the same pairs ([color-system.md](color-system.md) §6).
+- **The gate reads it.** `check_roles.py` takes, in each scope, the branch that scope's `color-scheme` names alone (an `.inverse { color-scheme: dark; }` band reads the dark one). Where it allows both (`light dark`), the visitor's preference picks, not the selector, so both branches are held to the same pairs: a `[data-theme="dark"]` that re-points a role but forgets `color-scheme: dark` fails in a light-preference browser, where it renders the light branch ([color-system.md](color-system.md) §6).
 
 ---
 

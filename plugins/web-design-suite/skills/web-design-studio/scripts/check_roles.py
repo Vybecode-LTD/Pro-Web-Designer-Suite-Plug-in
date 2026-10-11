@@ -15,9 +15,10 @@ pairs components actually use:
                                                    (on the dark --bg-inverse)
 
 A role written `light-dark(LIGHT, DARK)` (P33) takes the branch of the scope's
-`color-scheme`: the last one its blocks declare, when that is `light` or
-`dark` alone, else the scope's own theme. So `.inverse { color-scheme: dark }`
-reads an inverse band's roles from their dark branch.
+`color-scheme`, the last one its blocks declare: the one it names alone
+(`.inverse { color-scheme: dark }` reads the dark branch), both when it allows
+both (`light dark`), since the visitor's preference then picks, and light when
+it names neither, as `normal` does.
 
 Text needs 4.5:1 (WCAG 1.4.3). Borders that mark a control's boundary, and the
 focus ring, need 3:1 (1.4.11). Translucent roles (--bg-hover, --bg-scrim) are
@@ -127,14 +128,23 @@ def scopes(css: str) -> dict[str, dict[str, str]]:
     return merged
 
 
-def scheme(env: dict[str, str], scope: str) -> str:
-    """The colour scheme a scope's light-dark() roles take (P33): the scope's
-    `color-scheme` when it names one alone (`dark`, `only light`), else the
-    scope's own theme, which is what `light dark` gives a page in that theme."""
+def schemes(env: dict[str, str]) -> list[str]:
+    """The colour schemes a scope's light-dark() roles can take (P33): the one
+    its `color-scheme` names alone (`dark`, `only light`); both when it allows
+    both (`light dark`), because the visitor's preference picks then, not the
+    scope's name (Codex on #112); light when it names neither, as `normal`."""
     named = set(env.get("color-scheme", "").split()) - {"only"}
     if named in ({"light"}, {"dark"}):
-        return named.pop()
-    return "dark" if scope.startswith("dark") else "light"
+        return [named.pop()]
+    return ["light", "dark"] if {"light", "dark"} <= named else ["light"]
+
+
+def nominal(env: dict[str, str], scope: str) -> str:
+    """The scheme the role table shows for a scope: its own theme when the
+    scope can take it, else the one it is held to."""
+    own = "dark" if scope.startswith("dark") else "light"
+    can = schemes(env)
+    return own if own in can else can[0]
 
 
 def light_dark(value: str):
@@ -196,10 +206,17 @@ def check(css: str, pairs: list[dict]) -> list[dict]:
     for pair in pairs:
         for scope in pair.get("scopes", BOTH):
             on = pair.get("on", scope)
-            ratio = ramp.contrast_ratio_oklch(colour(envs[scope], pair["fg"], scheme(envs[scope], scope)),
-                                              colour(envs[on], pair["bg"], scheme(envs[on], on)))
-            results.append({"fg": pair["fg"], "bg": pair["bg"], "scope": scope, "on": on,
-                            "ratio": round(ratio, 2), "min": pair["min"], "ok": ratio + 1e-9 >= pair["min"]})
+            under, seen = schemes(envs[on]), set()
+            for theme in schemes(envs[scope]):          # each scheme the visitor can be in
+                bg_theme = theme if theme in under else under[0]
+                values = (resolve(envs[scope], pair["fg"], theme), resolve(envs[on], pair["bg"], bg_theme))
+                if values in seen:                       # the same colours: one result is enough
+                    continue
+                seen.add(values)
+                ratio = ramp.contrast_ratio_oklch(colour(envs[scope], pair["fg"], theme),
+                                                  colour(envs[on], pair["bg"], bg_theme))
+                results.append({"fg": pair["fg"], "bg": pair["bg"], "scope": scope, "on": on, "scheme": theme,
+                                "ratio": round(ratio, 2), "min": pair["min"], "ok": ratio + 1e-9 >= pair["min"]})
     return results
 
 
@@ -219,14 +236,14 @@ def table(css: str) -> str:
         value = envs[scope].get(role, "")
         branches = light_dark(value)
         if branches is not None:           # P33: the branch this scope reads
-            value = branches[scheme(envs[scope], scope) == "dark"]
+            value = branches[nominal(envs[scope], scope) == "dark"]
         m = re.fullmatch(r"var\((--[\w-]+)\)", value.strip())
         return f"`{m.group(1)}`" if m else (f"`{value}`" if value else "—")
 
     def on_canvas(scope, role):
         if not role.startswith(("--fg-", "--border-")) or role in ("--fg-on-accent", "--fg-on-inverse"):
             return ""
-        theme = scheme(envs[scope], scope)
+        theme = nominal(envs[scope], scope)
         try:
             return (f"{ramp.contrast_ratio_oklch(colour(envs[scope], role, theme), colour(envs[scope], '--bg-canvas', theme)):.2f}"
                     ":1")
@@ -274,6 +291,8 @@ def main() -> int:
     else:
         for r in failed:
             where = r["scope"] if r["on"] == r["scope"] else f"{r['scope']} on the {r['on']} {r['bg']}"
+            if r["scheme"] != ("dark" if r["scope"].startswith("dark") else "light"):
+                where += f", {r['scheme']} scheme"       # the visitor's preference, under `light dark`
             print(f"FAIL  {r['fg']} on {r['bg']} ({where}): {r['ratio']:.2f}:1, needs {r['min']}:1")
         print(f"role pairs: {len(results) - len(failed)} of {len(results)} pass"
               + ("" if failed else " — every declared pair clears its minimum."))
