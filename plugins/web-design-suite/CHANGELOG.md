@@ -73,6 +73,18 @@
   the map as well: a step renamed to a role passes, and one the tokens file spells with a
   prefix is still a primitive. The spec's `tiers.names` holds the examples,
   and `project_config.py` and `.mjs` check the key alike.
+- **Theming without JavaScript: `light-dark()`** (P33; SS-B3). style-architecture.md §10
+  teaches roles that hold both values, `light-dark(LIGHT, DARK)`, picked by the element's
+  used `color-scheme`: the OS decides from the first paint with no script, form fields
+  follow, and `[data-theme]` stays as the override, one `color-scheme` declaration long.
+  Because the colour is resolved where it is used, a `<section data-theme="dark">` is dark
+  inside a light page, derived tokens such as `--elevation-card` included, which a
+  re-pointing block cannot reach. Support is Baseline 2024 (13 May 2024), widely available
+  from November 2026; keep the blocks while older browsers matter. `check_roles.py` reads
+  a `light-dark()` role in each scope through the branch the scope's `color-scheme` picks
+  (`.inverse { color-scheme: dark; }` reads the dark one), else the scope's own theme, so
+  the starter rewritten that way measures pair for pair as its blocks do. The example runs
+  in a browser in the tests.
 
 ### Fixed
 

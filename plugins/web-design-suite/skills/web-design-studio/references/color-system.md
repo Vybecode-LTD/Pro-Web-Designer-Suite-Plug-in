@@ -366,8 +366,9 @@ reasons, each with a concrete consequence:
 ### The gate: `check_roles.py`
 
 Run it on every change to `tokens.css`; the pre-commit hook does, once the script is vendored. It
-resolves each role per theme (light, dark, and `.inverse` in both) and checks the pairs components
-put together: every text role on every surface at 4.5:1, status text, labels on fills, text in an
+resolves each role per theme (light, dark, and `.inverse` in both), a `light-dark()` role through
+the branch the scope's `color-scheme` picks ([style-architecture.md](style-architecture.md) §10),
+and checks the pairs components put together: every text role on every surface at 4.5:1, status text, labels on fills, text in an
 inverse band on its parent theme's `--bg-inverse`, and control borders and the focus ring at 3:1.
 The starter passes all of them. Two were fixed by hand before the tool existed, and they show what
 it is for:

@@ -481,6 +481,32 @@ The whole token architecture exists so this is true:
 
 Wrap it in `try/catch` — `localStorage` throws in some privacy modes, and an exception here means no theme at all. Also set `color-scheme` so form controls, scrollbars and the browser's own UI match.
 
+### Theming without JavaScript: `light-dark()`
+
+The flash exists because the theme lives in an attribute only a script can set before paint. `light-dark()` moves the choice into CSS: a role holds both values, and the browser picks one from the element's used `color-scheme`. It "returns the first value if the used color scheme is `light` or if no preference is set and the second value if the used color scheme is `dark`" ([MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value/light-dark)). The OS decides by default, native controls follow the same switch, and `[data-theme]` stays as the override, one declaration long:
+
+<!-- light-dark:example -->
+```css
+@layer tokens {
+  :root {
+    color-scheme: light dark;   /* follow the OS: roles, fields and scrollbars together */
+    --bg-canvas:  light-dark(var(--neutral-50),  var(--neutral-1000));
+    --bg-surface: light-dark(var(--neutral-0),   var(--neutral-950));
+    --fg-default: light-dark(var(--neutral-900), var(--neutral-100));
+    --shadow-sm:  0 1px 2px light-dark(oklch(0% 0 0 / 0.06), oklch(0% 0 0 / 0.36));
+    --elevation-card: var(--shadow-sm);
+  }
+  [data-theme="light"] { color-scheme: light; }   /* the user's choice: no role restated */
+  [data-theme="dark"]  { color-scheme: dark; }
+}
+```
+
+- **A visitor who never chose needs no script.** The page follows the OS from the first paint. A stored choice still comes from the blocking script above, which now only sets the attribute.
+- **Subtrees work, derived tokens included.** `light-dark()` is resolved where the colour is used, not where the role is declared, so `<section data-theme="dark">` is dark inside a light page: its roles, its form fields, and `--elevation-card`, which re-pointing `--shadow-sm` in a `[data-theme]` block cannot reach (it was resolved on `:root`).
+- **Colours only.** It takes two colours (or two images). A shadow works because the colour inside it is one; a token that differs by theme and is not a colour stays in a `[data-theme]` block.
+- **Support.** Baseline 2024: Chrome and Edge 123, Firefox 120, Safari 17.5, newly available since 13 May 2024 and widely available from November 2026 by the 30-month rule ([web-features](https://github.com/web-platform-dx/web-features/blob/main/features/light-dark.yml.dist)). In an older browser the declaration that uses the role is invalid at computed-value time and acts as `unset` (a background goes transparent): keep the starter's `[data-theme]` blocks while those browsers matter.
+- **The gate reads it.** `check_roles.py` takes, in each scope, the branch that scope's `color-scheme` picks (an `.inverse { color-scheme: dark; }` band reads the dark one), else the scope's own theme, and holds both to the same pairs ([color-system.md](color-system.md) §6).
+
 ---
 
 ## 11. Containing third-party and legacy CSS

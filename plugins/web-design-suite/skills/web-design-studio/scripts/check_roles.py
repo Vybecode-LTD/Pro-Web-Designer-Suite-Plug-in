@@ -14,6 +14,11 @@ pairs components actually use:
   dark-inverse   dark + .inverse + [data-theme="dark"] .inverse
                                                    (on the dark --bg-inverse)
 
+A role written `light-dark(LIGHT, DARK)` (P33) takes the branch of the scope's
+`color-scheme`: the last one its blocks declare, when that is `light` or
+`dark` alone, else the scope's own theme. So `.inverse { color-scheme: dark }`
+reads an inverse band's roles from their dark branch.
+
 Text needs 4.5:1 (WCAG 1.4.3). Borders that mark a control's boundary, and the
 focus ring, need 3:1 (1.4.11). Translucent roles (--bg-hover, --bg-scrim) are
 overlays; a11y_runtime measures those composited in a browser.
@@ -102,6 +107,8 @@ def rules(css: str) -> list[tuple[list[str], dict[str, str]]]:
             if "{" not in body and not prelude.startswith("@") and not any(
                     p.startswith(("@media", "@supports", "@container")) for p in stack):
                 decls = dict(re.findall(r"(--[\w-]+)\s*:\s*([^;]+);?", body))
+                # Which branch of light-dark() the scope reads (P33).
+                decls.update(re.findall(r"(?<![\w-])(color-scheme)\s*:\s*([^;]+);?", body))
                 out.append(([s.strip() for s in prelude.split(",")], {k: v.strip() for k, v in decls.items()}))
             start = i + 1
     return out
@@ -120,11 +127,48 @@ def scopes(css: str) -> dict[str, dict[str, str]]:
     return merged
 
 
-def resolve(env: dict[str, str], name: str) -> str:
+def scheme(env: dict[str, str], scope: str) -> str:
+    """The colour scheme a scope's light-dark() roles take (P33): the scope's
+    `color-scheme` when it names one alone (`dark`, `only light`), else the
+    scope's own theme, which is what `light dark` gives a page in that theme."""
+    named = set(env.get("color-scheme", "").split()) - {"only"}
+    if named in ({"light"}, {"dark"}):
+        return named.pop()
+    return "dark" if scope.startswith("dark") else "light"
+
+
+def light_dark(value: str):
+    """`light-dark(A, B)` as (A, B), split at its one top-level comma, or None."""
+    m = re.fullmatch(r"light-dark\((.*)\)", value.strip(), flags=re.S)
+    if not m:
+        return None
+    depth, parts, start = 0, [], 0
+    for i, ch in enumerate(m.group(1)):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth < 0:                  # `light-dark(a) b(c)`: not one call
+                return None
+        elif ch == "," and depth == 0:
+            parts.append(m.group(1)[start:i])
+            start = i + 1
+    parts.append(m.group(1)[start:])
+    return (parts[0].strip(), parts[1].strip()) if len(parts) == 2 and depth == 0 else None
+
+
+def resolve(env: dict[str, str], name: str, theme: str = "light") -> str:
     value, seen = env.get(name), {name}
     if value is None:
         raise Unresolvable(f"{name} is not declared")
-    while (m := re.fullmatch(r"var\(\s*(--[\w-]+)\s*(?:,\s*(.+))?\)", value.strip())):
+    while True:
+        branches = light_dark(value)
+        if branches is not None:
+            value = branches[theme == "dark"]
+            continue
+        m = re.fullmatch(r"var\(\s*(--[\w-]+)\s*(?:,\s*(.+))?\)", value.strip())
+        if not m:
+            break
         ref, fallback = m.group(1), m.group(2)
         if ref in seen:
             raise Unresolvable(f"{name}: var() cycle through {ref}")
@@ -135,8 +179,8 @@ def resolve(env: dict[str, str], name: str) -> str:
     return value.strip()
 
 
-def colour(env: dict[str, str], name: str):
-    raw = resolve(env, name)
+def colour(env: dict[str, str], name: str, theme: str = "light"):
+    raw = resolve(env, name, theme)
     try:
         parsed = ramp.parse_color(raw)
     except Exception as exc:  # noqa: BLE001 - the parser's own message is the useful part
@@ -152,7 +196,8 @@ def check(css: str, pairs: list[dict]) -> list[dict]:
     for pair in pairs:
         for scope in pair.get("scopes", BOTH):
             on = pair.get("on", scope)
-            ratio = ramp.contrast_ratio_oklch(colour(envs[scope], pair["fg"]), colour(envs[on], pair["bg"]))
+            ratio = ramp.contrast_ratio_oklch(colour(envs[scope], pair["fg"], scheme(envs[scope], scope)),
+                                              colour(envs[on], pair["bg"], scheme(envs[on], on)))
             results.append({"fg": pair["fg"], "bg": pair["bg"], "scope": scope, "on": on,
                             "ratio": round(ratio, 2), "min": pair["min"], "ok": ratio + 1e-9 >= pair["min"]})
     return results
@@ -170,16 +215,21 @@ def table(css: str) -> str:
     and text roles' ratios on the canvas."""
     envs = scopes(css)
 
-    def step(env, role):
-        value = env.get(role, "")
+    def step(scope, role):
+        value = envs[scope].get(role, "")
+        branches = light_dark(value)
+        if branches is not None:           # P33: the branch this scope reads
+            value = branches[scheme(envs[scope], scope) == "dark"]
         m = re.fullmatch(r"var\((--[\w-]+)\)", value.strip())
         return f"`{m.group(1)}`" if m else (f"`{value}`" if value else "—")
 
     def on_canvas(scope, role):
         if not role.startswith(("--fg-", "--border-")) or role in ("--fg-on-accent", "--fg-on-inverse"):
             return ""
+        theme = scheme(envs[scope], scope)
         try:
-            return f"{ramp.contrast_ratio_oklch(colour(envs[scope], role), colour(envs[scope], '--bg-canvas')):.2f}:1"
+            return (f"{ramp.contrast_ratio_oklch(colour(envs[scope], role, theme), colour(envs[scope], '--bg-canvas', theme)):.2f}"
+                    ":1")
         except Unresolvable:
             return ""
 
@@ -188,7 +238,7 @@ def table(css: str) -> str:
         if role not in envs["light"]:
             continue
         ratios = " / ".join(r for r in (on_canvas("light", role), on_canvas("dark", role)) if r)
-        lines.append(f"| `{role}` | {step(envs['light'], role)} | {step(envs['dark'], role)} | {ratios} |")
+        lines.append(f"| `{role}` | {step('light', role)} | {step('dark', role)} | {ratios} |")
     return "\n".join(lines) + "\n"
 
 
