@@ -27,7 +27,7 @@
 ## Warnings
 
 - **The masters and their copies.** After every merge from a branch below, copy `shared/dtcg.py`, `shared/project_config.py` and `shared/project_config.mjs` over every copy (ten, ten and seven), then run `TheCopiesAreTheMaster`. Git merges each copy on its own.
-- **A worktree in the scratchpad hits Windows' 260-character path limit** (`evals/boundaries/...`): create it with `git -c core.longpaths=true worktree add`, run targeted tests there, and the full `check.py` in the main checkout. This session fixed #105's review findings in a worktree while `check.py` ran in the main one.
+- **A worktree in the scratchpad hits Windows' 260-character path limit** (`evals/boundaries/...`): create it from the repository root with `git -c core.longpaths=true worktree add "PATH" BRANCH` (replace PATH with a folder in the session's scratchpad, never OneDrive, and BRANCH with the PR's branch; it works in cmd.exe and Git Bash alike), run targeted tests there, and the full `check.py` in the main checkout. This session fixed #105's review findings in a worktree while `check.py` ran in the main one.
 - **Bash heredocs eat backslashes**, quoted or not, and a heredoc holding `'''` breaks the shell's parse. Write edit scripts with the Write tool; fix a backslash in one with the Edit tool.
 - **The token counter resets on every `<ci-monitor-event>`**, acknowledgements included. Keep a running total.
 - **The scratch repository** `Vybecode-LTD/wds-gate-scratch` is private and the owner's to delete.
