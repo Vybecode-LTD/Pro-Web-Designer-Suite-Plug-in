@@ -413,6 +413,11 @@ class Auditor:
     # -- checks -------------------------------------------------------------
 
     def run(self) -> List[Finding]:
+        for where, why in self.doc.unread:
+            self.add(code="UNREAD_SOURCE", severity="error", collection="", mode="",
+                     name=where, summary=f"not read: {why}",
+                     detail="A resolver's source this audit cannot read holds tokens nobody checked.",
+                     suggestion="name a file beside the resolver, or fix the `$ref`")
         for path, why in self.doc.unsupported:
             self.add(code="UNSUPPORTED_VALUE", severity="error", collection="", mode="",
                      name=path, summary=f"not audited: {why}",
@@ -1092,7 +1097,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--styles", help="a second JSON holding text/effect styles "
                                     "(e.g. GET /v1/files/:key/styles)")
     p.add_argument("--format", choices=("report", "json", "markdown"), default="report")
-    p.add_argument("--shape", choices=("rest", "plugin", "dtcg", "records"),
+    p.add_argument("--shape", choices=("rest", "plugin", "dtcg", "records", "resolver"),
                    help="skip auto-detection")
     p.add_argument("--collection", default="tokens",
                    help="collection name for shapes that carry none (default: tokens)")

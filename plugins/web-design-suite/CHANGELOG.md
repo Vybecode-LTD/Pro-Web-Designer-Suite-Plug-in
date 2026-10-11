@@ -37,6 +37,22 @@
   work out is named and left out. `read_tokens()` and the Node reader read such a file as
   its default theme. A DTCG `number` or `fontWeight` token is written unitless, where an
   opacity became `0.01rem`.
+- **Themes through the DTCG resolver: part 3** (P31; LC-C2, LC-B2 in part).
+  `figma_to_tokens.py --format dtcg --out-dir DIR` writes every theme with the
+  resolver module (2025.10): `tokens.json` holds the default values, one file each
+  theme or density block changes (`theme-dark.json`, its overrides only, typed against
+  the whole set), and `tokens.resolver.json`, a set and one modifier per kind whose
+  default context is `:root`. It works from a Figma export, a Tokens Studio export or a
+  `tokens.css`; a rule that is no theme or density (`.inverse`, a media query) is named
+  and left out. Where `--out` wrote the default mode alone, a `tokens.css` with
+  `[data-theme="dark"]` now goes to DTCG and back to the same blocks.
+  - **Reading a resolver.** `figma_to_tokens.py` and `figma_audit.py` read a
+    `*.resolver.json` as modes: each modifier a collection of its contexts, a `theme`
+    modifier's as `[data-theme]` blocks and a `density` one's as `[data-density]`.
+    `read_tokens()`, and so `.design-suite.json`'s `tokens`, the audit and the lint
+    configs, read its default. A source is a file beside it, a pointer into one, inline
+    tokens or a set; a URL, an unreadable file, a cycle of sets and a modifier with no
+    default are named, and a fan-out of sets is refused.
 
 ### Fixed
 

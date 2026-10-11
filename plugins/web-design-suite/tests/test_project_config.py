@@ -28,6 +28,7 @@ import subprocess
 import sys
 import unittest
 
+from test_dtcg import RESOLVER, RESOLVER_BASE, RESOLVER_DARK
 from test_figma_sync import PROJECT_ACCENT, STEPS
 from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, load_script, output, run_node, run_py
 
@@ -775,6 +776,17 @@ TOKEN_FILES = {
                                      "loop": {"$extends": "{loop}", "x": {"$type": "color", "$value": "#010101"}},
                                      "p": {"$extends": "{q}", "x": {"$type": "color", "$value": "#020202"}},
                                      "q": {"$extends": "{p}", "y": {"$type": "color", "$value": "#030303"}}}),
+    # P31 part 3: a resolver, its files beside it, with every source form and its faults.
+    "base.tokens.json": json.dumps(RESOLVER_BASE),
+    "dark.tokens.json": json.dumps(RESOLVER_DARK),
+    "app.resolver.json": json.dumps(RESOLVER),
+    "pointer.resolver.json": json.dumps({"version": "2025.10", "resolutionOrder": [
+        {"type": "set", "name": "s", "sources": [{"$ref": "base.tokens.json#/brand", "600": {"$value": "#345678"}},
+                                                 {"$ref": "base.tokens.json#/nothing"}, {"$ref": "not-json.json"}]},
+        {"type": "modifier", "name": "m", "default": 7, "contexts": {"undefined": [], "b": [{"x": {"$value": 1}}]}}]}),
+    "fan.resolver.json": json.dumps({"version": "2025.10", "resolutionOrder": [{"$ref": "#/sets/s0"}], "sets": {
+        **{f"s{i}": {"sources": [{"$ref": f"#/sets/s{i + 1}"}] * 10} for i in range(9)},
+        "s9": {"sources": [{"x": {"$type": "number", "$value": 1}}]}}}),
 }
 TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.css"], ["contract.json"],
                ["contract.json", "a.css"], ["a.css", "contract.json"], ["bad-schema.json"], ["bad-ramps.json"],
@@ -783,7 +795,8 @@ TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.
                ["dtcg.tokens.json"], ["extends.tokens"], ["a.css", "dtcg.tokens.json"], ["dtcg.tokens.json", "a.css"],
                ["legacy.json"], ["schema-and-tokens.json"], ["studio.json"], ["studio-groups.json"], ["studio-order.json"],
                ["deep.tokens.json"], ["names.tokens.json"], ["pointers.tokens.json"], ["chain.tokens.json"], ["fan.tokens.json"],
-               ["studio-math.json"], ["pointer-fan.tokens.json"], ["studio-palettes.json"]]
+               ["studio-math.json"], ["pointer-fan.tokens.json"], ["studio-palettes.json"],
+               ["app.resolver.json"], ["a.css", "app.resolver.json"], ["pointer.resolver.json"], ["fan.resolver.json"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).

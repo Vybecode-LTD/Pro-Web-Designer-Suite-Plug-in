@@ -443,6 +443,8 @@ def is_dtcg(data: Any) -> bool:
     if isinstance(data, dict) and (isinstance(data.get("$themes"), list)
                                    or isinstance(data.get("$metadata"), dict)):
         return True                               # a Tokens Studio export, legacy keys or not
+    if isinstance(data, dict) and isinstance(data.get("resolutionOrder"), list):
+        return True                               # a resolver (P31 part 3): its default
 
     def holds(node: Any, depth: int) -> bool:
         if not isinstance(node, dict) or depth > 64:
@@ -477,8 +479,9 @@ def _dtcg_tokens(path: Path, data: Any) -> ProjectTokens:
     a reference as `var(--name)`, filed by value as a tokens.css is (one that
     reads another token is a role). A value
     with no CSS form (a typography composite, a boolean) is not a custom
-    property, so it is left out."""
-    found, _problems = _dtcg(path).tokens(data)
+    property, so it is left out. A resolver is read as its default, its files
+    found beside it."""
+    found, _problems = _dtcg(path).tokens(data, Path(path).parent)
     tokens = ProjectTokens(sources=[Path(path)])
     for token in found:
         value = token.css()

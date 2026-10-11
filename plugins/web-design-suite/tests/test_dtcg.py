@@ -7,7 +7,9 @@ Regressions covered (each fails on v3.5.0):
 - a DTCG file in `.design-suite.json`'s tokens, or passed as `--tokens`, was
   refused as "not a contract.json", and diff_system refused one as a snapshot;
 - there was no way to write DTCG: figma_to_tokens.py had no `--format dtcg`,
-  a tokens.css could not be converted, and the migration proposal was CSS only.
+  a tokens.css could not be converted, and the migration proposal was CSS only;
+- (part 3) themes could not be written: `--format dtcg` wrote the default mode
+  alone, and a DTCG resolver (`*.resolver.json`) was read as no tokens.
 """
 from __future__ import annotations
 
@@ -478,6 +480,164 @@ class TheProposalIsDtcgToo(TempDirTest):
         self.assertGreater(len(names), 100)
         self.assertLessEqual(names, set(css))
         self.assertTrue(re.match(r"oklch|srgb", doc["accent"]["500"]["$value"]["colorSpace"]))
+
+
+THEMED_CSS = """@layer tokens {
+  :root {
+    --neutral-0: #ffffff;
+    --neutral-900: #1f1d1b;
+    --accent-500: #2563eb;
+    --bg-surface: var(--neutral-0);
+    --fg-default: var(--neutral-900);
+    --space-4: 1rem;
+    --density: 1;
+  }
+  [data-theme="dark"] {
+    --bg-surface: var(--neutral-900);
+    --fg-default: var(--neutral-0);
+  }
+  [data-density="compact"] {
+    --density: 0.875;
+  }
+}
+"""
+BLOCK = re.compile(r"^  ([^{}\n]+?) ?\{\n?(.*?)^  \}", re.M | re.S)
+DECLARATION = re.compile(r"^\s*(--[\w-]+):\s*([^;]+);", re.M)
+
+
+def css_blocks(text):
+    """{selector: {--name: value}} for each block of a tokens.css."""
+    return {m.group(1).strip(): dict(DECLARATION.findall(m.group(2))) for m in BLOCK.finditer(text)}
+
+
+class TheResolver(TempDirTest):
+    """P31 part 3 (LC-C2, LC-B2): themes through the DTCG resolver module.
+    `--format dtcg` wrote the default mode alone and named each theme as left
+    out, and a `*.resolver.json` was not read at all."""
+
+    def to_dtcg(self, src, *args):
+        return run_py("figma-variables-sync", "figma_to_tokens", src, "--format", "dtcg", "--out-dir", "dtcg",
+                      *args, cwd=self.tmp)
+
+    def to_css(self, resolver, *args):
+        proc = run_py("figma-variables-sync", "figma_to_tokens", resolver, "--color-format", "hex", *args,
+                      cwd=self.tmp)
+        return proc, proc.stdout.decode("utf-8").replace("\r\n", "\n")
+
+    def test_a_tokens_css_round_trips_through_a_resolver(self):
+        src = self.write("tokens.css", THEMED_CSS)
+        proc = self.to_dtcg(src)
+        self.assertEqual(0, proc.returncode, output(proc))
+        out = self.tmp / "dtcg"
+        self.assertEqual(["density-compact.json", "theme-dark.json", "tokens.json", "tokens.resolver.json"],
+                         sorted(f.name for f in out.iterdir()))
+        resolver = json.loads((out / "tokens.resolver.json").read_bytes())
+        self.assertEqual("2025.10", resolver["version"])
+        self.assertEqual({"light": [], "dark": [{"$ref": "theme-dark.json"}]},
+                         resolver["modifiers"]["theme"]["contexts"])
+        self.assertEqual("light", resolver["modifiers"]["theme"]["default"])
+        self.assertEqual("default", resolver["modifiers"]["density"]["default"])
+        self.assertEqual([{"$ref": "#/sets/base"}, {"$ref": "#/modifiers/theme"}, {"$ref": "#/modifiers/density"}],
+                         resolver["resolutionOrder"])
+        dark = json.loads((out / "theme-dark.json").read_bytes())
+        self.assertEqual({"$type": "color", "$value": "{neutral.900}"}, dark["bg"]["surface"])
+        self.assertNotIn("neutral", dark)                       # its overrides only
+        proc, text = self.to_css(out / "tokens.resolver.json")
+        self.assertEqual(css_blocks(THEMED_CSS), css_blocks(text), output(proc))
+
+    def test_the_starters_themes_survive_the_trip(self):
+        proc = self.to_dtcg(STARTER)
+        self.assertEqual(1, proc.returncode, output(proc))      # written, with what it left out
+        self.assertIn("[data-theme=\"dark\"] .inverse: 9 token(s) left out", output(proc))
+        self.assertIn("@media (prefers-reduced-motion: reduce) :root: 6 token(s) left out", output(proc))
+        _, text = self.to_css(self.tmp / "dtcg" / "tokens.resolver.json")
+        before, after = css_blocks(STARTER.read_bytes().decode("utf-8")), css_blocks(text)
+        refs = {n: v for n, v in before['[data-theme="dark"]'].items() if v.startswith("var(")}
+        self.assertGreater(len(refs), 20)
+        for name, value in refs.items():
+            # A dark value equal to the default is the default's: --full-themes keeps it.
+            self.assertEqual(value, after['[data-theme="dark"]'].get(name, after[":root"].get(name)), name)
+        self.assertEqual("0.875", after['[data-density="compact"]']["--density"])
+
+    def test_a_tokens_studio_export_writes_its_themes(self):
+        src = self.write("studio.json", json.dumps(STUDIO_REVIEW))
+        proc = self.to_dtcg(src)
+        self.assertNotIn("not written to DTCG", output(proc))
+        resolver = json.loads((self.tmp / "dtcg" / "tokens.resolver.json").read_bytes())
+        self.assertEqual({"light": [], "dark": [{"$ref": "theme-dark.json"}]},
+                         resolver["modifiers"]["theme"]["contexts"])
+        _, text = self.to_css(self.tmp / "dtcg" / "tokens.resolver.json")
+        self.assertEqual({"--bg-surface": "var(--neutral-900)"}, css_blocks(text)['[data-theme="dark"]'])
+
+    def test_a_resolver_is_read_as_modes(self):
+        self.write("base.tokens.json", json.dumps(RESOLVER_BASE))
+        self.write("dark.tokens.json", json.dumps(RESOLVER_DARK))
+        src = self.write("app.resolver.json", json.dumps(RESOLVER))
+        proc, text = self.to_css(src)
+        blocks = css_blocks(text)
+        self.assertEqual("var(--brand-600)", blocks[":root"]["--bg-surface"])            # its default: dark
+        self.assertEqual("var(--brand-500)", blocks['[data-theme="light"]']["--bg-surface"])
+        self.assertEqual("0.75rem", blocks[":root"]["--size"])                          # no default: the first
+        self.assertEqual("1rem", blocks['[data-density="compact"]']["--size"])
+        self.assertEqual("1rem", blocks[":root"]["--space-4"])                         # a set in a set
+        self.assertEqual("#ff0000", blocks[":root"]["--accent"])                         # an inline set
+        for why in ("`https://example.com/tokens.json` is a URL", "`gone.tokens.json` could not be read",
+                    "`#/sets/base` is part of a cycle of sets", "`#/modifiers/missing` names no set or modifier",
+                    "names no default among its contexts: `small`"):
+            self.assertIn(why, output(proc))
+
+    def test_a_density_modifier_keeps_its_contexts_out_of_the_theme(self):
+        data = {"version": "2025.10", "resolutionOrder": [
+            {"type": "set", "name": "base", "sources": [{"gap": {"$type": "dimension",
+                                                                  "$value": {"value": 16, "unit": "px"}}}]},
+            {"type": "modifier", "name": "density", "default": "roomy", "contexts": {
+                "roomy": [], "dark": [{"gap": {"$type": "dimension", "$value": {"value": 8, "unit": "px"}}}]}}]}
+        _, text = self.to_css(self.write("d.resolver.json", json.dumps(data)))
+        self.assertEqual({"--gap": "0.5rem"}, css_blocks(text)['[data-density="dark"]'])
+
+    def test_a_fan_out_of_sets_is_refused_not_expanded(self):
+        dtcg = dtcg_module()
+        sets = {f"s{i}": {"sources": [{"$ref": f"#/sets/s{i + 1}"}] * 10} for i in range(9)}
+        sets["s9"] = {"sources": [{"x": {"$type": "number", "$value": 1}}]}
+        doc, problems = dtcg.resolver_document({"version": "2025.10", "sets": sets,
+                                                "resolutionOrder": [{"$ref": "#/sets/s0"}]}, self.tmp)
+        self.assertEqual({}, doc)
+        self.assertIn("expand past", problems[-1][1])
+
+    def test_out_and_out_dir_are_one_or_the_other(self):
+        src = self.write("tokens.css", THEMED_CSS)
+        proc = self.to_dtcg(src, "--out", "x.json")
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertFalse((self.tmp / "x.json").exists())
+
+    def test_the_project_reads_a_resolvers_default(self):
+        self.write("base.tokens.json", json.dumps(RESOLVER_BASE))
+        self.write("dark.tokens.json", json.dumps(RESOLVER_DARK))
+        src = self.write("app.resolver.json", json.dumps(RESOLVER))
+        pc = load_script("design-system-docs", "project_config")
+        tokens = pc.read_tokens([src])
+        self.assertEqual("var(--brand-600)", tokens.roles["--bg-surface"])
+        self.assertEqual({"500": "#123456", "600": "#234567"}, tokens.ramps["brand"])
+
+
+RESOLVER_BASE = {"brand": {"$type": "color", "500": {"$value": "#123456"}, "600": {"$value": "#234567"}},
+                 "bg": {"surface": {"$type": "color", "$value": "{brand.500}"}}}
+RESOLVER_DARK = {"bg": {"surface": {"$type": "color", "$value": "{brand.600}"}}}
+RESOLVER = {
+    "version": "2025.10",
+    "sets": {"base": {"sources": [{"$ref": "base.tokens.json"}, {"$ref": "#/sets/extra"}]},
+             "extra": {"sources": [{"space": {"4": {"$type": "dimension", "$value": {"value": 1, "unit": "rem"}}}},
+                                   {"$ref": "#/sets/base"}]},
+             "web": {"sources": [{"$ref": "https://example.com/tokens.json"}, {"$ref": "gone.tokens.json"}]}},
+    "modifiers": {"theme": {"contexts": {"light": [], "dark": [{"$ref": "dark.tokens.json"}]}, "default": "dark"},
+                  "density": {"contexts": {
+                      "small": [{"size": {"$type": "dimension", "$value": {"value": 12, "unit": "px"}}}],
+                      "compact": [{"size": {"$type": "dimension", "$value": {"value": 16, "unit": "px"}}}]}}},
+    "resolutionOrder": [{"$ref": "#/sets/base"}, {"$ref": "#/sets/web"}, {"$ref": "#/modifiers/theme"},
+                        {"$ref": "#/modifiers/density"},
+                        {"type": "set", "name": "inline", "sources": [{"accent": {"$type": "color", "$value": "#ff0000"}}]},
+                        {"$ref": "#/modifiers/missing"}, 5],
+}
 
 
 if __name__ == "__main__":

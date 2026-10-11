@@ -32,6 +32,11 @@ READING
   studio_document  a Tokens Studio export (its sets, `$themes`, `$metadata`,
                    the legacy `{value, type}` keys and its math) as one 2025.10
                    tree per theme; tokens() reads its default theme.
+  resolver_document
+                   a resolver (`*.resolver.json`, the 2025.10 resolver module)
+                   as one tree for a choice of contexts, each modifier's
+                   default unless an input picks another; tokens() reads its
+                   default, with the resolver's folder as `base`.
 
 WRITING
   document(values) a 2025.10 document from CSS custom properties: each name
@@ -39,7 +44,11 @@ WRITING
                    name that is also a group's prefix as that group's `$root`,
                    `var(--x)` as a reference, and every token typed. A value
                    DTCG has no type for (`clamp()`, `calc()`, `65ch`, `1em`) is
-                   reported and left out, and so is a reference to it.
+                   reported and left out, and so is a reference to it. With
+                   `only`, the named tokens alone: a theme's overrides, typed
+                   and named against the whole set.
+  resolver(...)    the resolver that puts a base file and each theme's
+                   overrides together.
 
 Dependency-free (Python 3.9+, stdlib only).
 """
@@ -47,10 +56,12 @@ from __future__ import annotations
 
 import colorsys
 import copy
+import json
 import math
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
 
 UNSUPPORTED = object()
 # Group-level keys that are never tokens or groups themselves.
@@ -527,13 +538,16 @@ class Token:
         return text or None
 
 
-def tokens(data: Any) -> Tuple[List[Token], Problems]:
+def tokens(data: Any, base: Optional[Union[str, Path]] = None) -> Tuple[List[Token], Problems]:
     """Every token of a 2025.10 document, flat and in document order, its
     value lossless (see the module's docstring), with the problems. A Tokens
-    Studio export is read as its default theme: each theme group's first."""
+    Studio export is read as its default theme: each theme group's first. A
+    resolver is read as its default, its files found from `base`."""
     studio: Problems = []
     if is_studio(data):                          # its default theme's sets, merged
         data, studio = studio_document(data)
+    elif is_resolver(data):
+        data, studio = resolver_document(data, base)
     doc, problems = normalise(data, lossless=True)
     problems = studio + problems
     out: List[Token] = []
@@ -872,6 +886,233 @@ def studio_paths(data: dict, name: str) -> List[Tuple[str, ...]]:
 
 
 # ---------------------------------------------------------------------------
+# The resolver module: themes as sets and modifiers (P31 part 3)
+# ---------------------------------------------------------------------------
+# A 2025.10 resolver (https://www.designtokens.org/tr/2025.10/resolver/) puts
+# token files together. `sets` and `modifiers` are named in `resolutionOrder`,
+# "tokens later in the array overriding any tokens that came before them". A
+# modifier is one choice (a theme, a density) among its `contexts`, each a list
+# of sources, and `default` names the context read when no input picks one. A
+# source is inline tokens or a `$ref`: a file "relative to this document", a
+# pointer into the resolver (`#/sets/base`), or both (`tokens.json#/color`).
+# Keys beside a `$ref` override what it points at, shallowly. Only
+# `resolutionOrder` may point at a modifier.
+
+RESOLVER_VERSION = "2025.10"
+Loader = Callable[[str], Any]
+
+
+def is_resolver(data: Any) -> bool:
+    return isinstance(data, dict) and isinstance(data.get("resolutionOrder"), list)
+
+
+@dataclass
+class Modifier:
+    name: str
+    contexts: List[str]
+    default: Optional[str]                       # None when it names none, or one it lacks
+
+
+def _unescape(part: str) -> str:
+    return part.replace("~1", "/").replace("~0", "~")
+
+
+def _escape(part: str) -> str:
+    return part.replace("~", "~0").replace("/", "~1")
+
+
+def _order(data: dict, problems: Problems) -> List[Tuple[str, str, dict]]:
+    """`resolutionOrder` as (kind, name, definition), each `$ref` followed
+    into `sets` or `modifiers`, its sibling keys over the definition."""
+    out: List[Tuple[str, str, dict]] = []
+    for i, entry in enumerate(data.get("resolutionOrder") or []):
+        where = f"resolutionOrder/{i}"
+        if not isinstance(entry, dict):
+            problems.append((where, "is not an object, so not read"))
+            continue
+        ref = entry.get("$ref")
+        if isinstance(ref, str):
+            m = re.fullmatch(r"#/(sets|modifiers)/([^/]+)", ref)
+            table = data.get(m.group(1)) if m else None
+            name = _unescape(m.group(2)) if m else ""
+            if not (isinstance(table, dict) and isinstance(table.get(name), dict)):
+                problems.append((where, f"`{ref}` names no set or modifier in this resolver, so not read"))
+                continue
+            definition = dict(table[name])
+            definition.update((k, v) for k, v in entry.items() if k != "$ref")
+            out.append(("set" if m.group(1) == "sets" else "modifier", name, definition))
+        elif entry.get("type") in ("set", "modifier") and isinstance(entry.get("name"), str):
+            out.append((entry["type"], entry["name"], entry))
+        else:
+            problems.append((where, "is neither a `$ref` nor a set or modifier with a `name`, so not read"))
+    return out
+
+
+def resolver_modifiers(data: dict) -> List[Modifier]:
+    """Each modifier `resolutionOrder` names, in its order."""
+    out = []
+    for kind, name, definition in _order(data, []):
+        contexts = definition.get("contexts")
+        if kind == "modifier" and isinstance(contexts, dict) and contexts:
+            default = definition.get("default")
+            out.append(Modifier(name, list(contexts), default if default in contexts else None))
+    return out
+
+
+def file_loader(base: Optional[Union[str, Path]]) -> Loader:
+    """Read a source file named relative to `base` (the resolver's folder):
+    JSON in UTF-8, UTF-16 or UTF-32, with or without a BOM."""
+    def load(name: str) -> Any:
+        return json.loads((Path(base or ".") / name).read_bytes())
+    return load
+
+
+def _sources(sources: Any, data: dict, load: Loader, problems: Problems, where: str,
+             seen: Tuple[str, ...] = (), budget: Optional[List[int]] = None) -> List[dict]:
+    """Each source as a token tree, in order: inline tokens as they are, a
+    `$ref` loaded or followed. What cannot be read is named and skipped. A
+    fan-out of sets that name sets raises RecursionError past MAX_NODES."""
+    budget = [MAX_NODES] if budget is None else budget
+    if not isinstance(sources, list):
+        problems.append((where, "is not a list of sources, so not read"))
+        return []
+    trees: List[dict] = []
+    for i, source in enumerate(sources):
+        at = f"{where}/{i}"
+        budget[0] -= 1
+        if budget[0] < 0:
+            raise RecursionError
+        if not isinstance(source, dict):
+            problems.append((at, "is not an object, so not read"))
+            continue
+        ref = source.get("$ref")
+        if not isinstance(ref, str):
+            trees.append(source)
+            continue
+        siblings = {k: v for k, v in source.items() if k != "$ref"}
+        name, _, pointer = ref.partition("#")
+        if not name:                                 # a pointer into the resolver
+            m = re.fullmatch(r"/sets/([^/]+)", pointer)
+            if pointer.startswith("/modifiers/"):
+                problems.append((at, f"`{ref}`: only resolutionOrder may point at a modifier, so not read"))
+            elif ref in seen:
+                problems.append((at, f"`{ref}` is part of a cycle of sets, so not read"))
+            elif m and isinstance((data.get("sets") or {}).get(_unescape(m.group(1))), dict):
+                definition = dict(data["sets"][_unescape(m.group(1))])
+                definition.update(siblings)
+                trees += _sources(definition.get("sources"), data, load, problems, ref[2:], seen + (ref,), budget)
+            else:
+                problems.append((at, f"`{ref}` points at no set in this resolver, so not read"))
+            continue
+        if re.match(r"^[a-z][a-z0-9+.-]*://", name, re.I):
+            problems.append((at, f"`{name}` is a URL; only files beside the resolver are read"))
+            continue
+        try:
+            tree = load(name)
+        except (OSError, ValueError, RecursionError) as exc:     # missing, unreadable, not JSON
+            problems.append((at, f"`{name}` could not be read ({type(exc).__name__}), so not read"))
+            continue
+        if pointer:
+            tree = _pointer(tree, "#" + pointer)
+        if not isinstance(tree, dict) or too_deep(tree):
+            problems.append((at, f"`{ref}` is not a token tree of at most {MAX_DEPTH} levels, so not read"))
+            continue
+        trees.append({**tree, **siblings} if siblings else tree)
+    return trees
+
+
+def resolver_document(data: dict, base: Optional[Union[str, Path]] = None,
+                      inputs: Optional[Dict[str, str]] = None, only: Optional[str] = None,
+                      load: Optional[Loader] = None) -> Tuple[dict, Problems]:
+    """The tokens the resolver resolves to, merged in `resolutionOrder`: each
+    modifier's context is the one `inputs` picks (names compared without
+    case), else its `default`, else its first, which is reported. With
+    `only`, that modifier's context alone: the tokens it sets."""
+    problems: Problems = []
+    if too_deep(data):
+        return {}, [("(root)", f"nested more than {MAX_DEPTH} levels deep, so not read")]
+    if data.get("version") != RESOLVER_VERSION:
+        problems.append(("version", f"is {data.get('version')!r}, not \"{RESOLVER_VERSION}\": read as "
+                                    f"{RESOLVER_VERSION}"))
+    load = load or file_loader(base)
+    picked = {str(k).lower(): str(v).lower() for k, v in (inputs or {}).items()}
+    doc: Dict[str, Any] = {}
+    budget = [MAX_NODES]
+    try:
+        for tree in _resolved(data, load, picked, only, problems, budget):
+            _merge(doc, tree)
+            if too_deep(doc) or too_large(doc):
+                raise RecursionError
+    except RecursionError:                       # a fan-out of sets, or a merge too big
+        return {}, problems + [("(root)", f"its sources expand past {MAX_DEPTH} levels or "
+                                          f"{MAX_NODES} entries, so not read")]
+    return doc, problems
+
+
+def _resolved(data: dict, load: Loader, picked: Dict[str, str], only: Optional[str],
+              problems: Problems, budget: List[int]) -> Iterator[dict]:
+    """Each source tree resolver_document merges, in order."""
+    for kind, name, definition in _order(data, problems):
+        if kind == "set":
+            if only is not None:
+                continue
+            trees = _sources(definition.get("sources"), data, load, problems, f"sets/{name}",
+                             (f"#/sets/{_escape(name)}",), budget)
+        else:
+            if only is not None and only != name:
+                continue
+            contexts = definition.get("contexts")
+            if not (isinstance(contexts, dict) and contexts):
+                problems.append((f"modifiers/{name}", "declares no contexts, so not read"))
+                continue
+            want = picked.get(name.lower())
+            context = next((c for c in contexts if c.lower() == want), None) if want else None
+            if context is None:
+                default = definition.get("default")
+                context = default if default in contexts else next(iter(contexts))
+                if default not in contexts and not want:
+                    problems.append((f"modifiers/{name}", f"names no default among its contexts: "
+                                                          f"`{context}`, its first, is read"))
+            trees = _sources(contexts[context], data, load, problems,
+                             f"modifiers/{name}/contexts/{context}", (), budget)
+        yield from trees
+
+
+def token_paths(tree: Any) -> List[Tuple[str, ...]]:
+    """The tokens a tree holds, as paths (a group's `$root` at the group's)."""
+    out: List[Tuple[str, ...]] = []
+    stack: List[Tuple[Any, Tuple[str, ...]]] = [(tree, ())]
+    while stack:                                 # without recursing: a source may be deep
+        node, path = stack.pop()
+        if not isinstance(node, dict):
+            continue
+        if path and ("$value" in node or isinstance(node.get("$ref"), str)):
+            out.append(path)
+            continue
+        children = [(child, path if key == "$root" else path + (key,))
+                    for key, child in node.items() if key == "$root" or key not in META_KEYS]
+        stack.extend(reversed(children))
+    return out
+
+
+def resolver(name: str, base_file: str, modifiers: Sequence[Tuple[str, str, Dict[str, Optional[str]]]],
+             description: str = "") -> Dict[str, Any]:
+    """A resolver: the set `base` (one file), then each modifier as (name,
+    default context, {context: its file of overrides, or None for none})."""
+    doc: Dict[str, Any] = {"version": RESOLVER_VERSION, "name": name}
+    if description:
+        doc["description"] = description
+    doc["sets"] = {"base": {"sources": [{"$ref": base_file}]}}
+    if modifiers:
+        doc["modifiers"] = {m: {"contexts": {c: [{"$ref": f}] if f else [] for c, f in contexts.items()},
+                                "default": default}
+                            for m, default, contexts in modifiers}
+    doc["resolutionOrder"] = [{"$ref": "#/sets/base"}] + [{"$ref": f"#/modifiers/{_escape(m)}"}
+                                                          for m, _, _ in modifiers]
+    return doc
+
+
+# ---------------------------------------------------------------------------
 # Writing: CSS custom properties -> a 2025.10 document
 # ---------------------------------------------------------------------------
 
@@ -1166,10 +1407,13 @@ def _why(value: str) -> str:
 
 def document(values: Iterable[Tuple[str, str]], descriptions: Optional[Dict[str, str]] = None,
              deprecated: Optional[Dict[str, Union[bool, str]]] = None,
-             note: str = "") -> Tuple[Dict[str, Any], Problems]:
+             note: str = "", only: Optional[Iterable[str]] = None) -> Tuple[Dict[str, Any], Problems]:
     """A 2025.10 document from (custom property, CSS value) pairs, in order,
-    with the problems as [(name, why)]. See the module's docstring."""
+    with the problems as [(name, why)]. See the module's docstring. With
+    `only`, the document and the problems hold those names alone, typed and
+    placed (`$root` or not) as in the whole set: a theme's overrides."""
     descriptions, deprecated = descriptions or {}, deprecated or {}
+    keep = None if only is None else set(only)
     problems: Problems = []
     parsed: Dict[str, Tuple[Tuple[str, ...], Optional[str], Any]] = {}
     for name, value in values:
@@ -1236,7 +1480,11 @@ def document(values: Iterable[Tuple[str, str]], descriptions: Optional[Dict[str,
     doc: Dict[str, Any] = {}
     if note:
         doc["$description"] = note
+    if keep is not None:
+        problems = [p for p in problems if p[0] in keep]
     for name, (path, kind, val) in parsed.items():
+        if keep is not None and name not in keep:
+            continue
         token: Dict[str, Any] = {"$type": type_of(name),
                                  "$value": target(val) if kind == "$var" else resolve(val)}
         if descriptions.get(name):
