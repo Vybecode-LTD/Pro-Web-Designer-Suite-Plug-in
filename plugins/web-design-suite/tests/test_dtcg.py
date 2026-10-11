@@ -627,6 +627,36 @@ class TheResolver(TempDirTest):
         _, text = self.to_css(self.tmp / "dtcg" / "tokens.resolver.json")
         self.assertEqual(css_blocks(css), css_blocks(text))
 
+    def test_a_source_outside_the_resolvers_folder_is_not_read(self):
+        """CodeRabbit on #105: `..` or an absolute name read any JSON file the
+        user can read into the project's tokens, and the hooks read a cloned
+        repository's token files on their own."""
+        secret = self.write("secret.tokens.json", json.dumps({"leak": {"$type": "number", "$value": 1}}))
+        self.write("design/base.tokens.json", json.dumps(RESOLVER_BASE))
+        data = {"version": "2025.10", "resolutionOrder": [{"type": "set", "name": "s", "sources": [
+            {"$ref": "base.tokens.json"}, {"$ref": "../secret.tokens.json"}, {"$ref": "sub/..\\..\\secret.tokens.json"},
+            {"$ref": str(secret)}, {"$ref": "/etc/x.json"}, {"$ref": "C:secret.tokens.json"}]}]}
+        src = self.write("design/app.resolver.json", json.dumps(data))
+        pc = load_script("design-system-docs", "project_config")
+        self.assertNotIn("--leak", pc.read_tokens([src]).values())
+        self.assertEqual("var(--brand-500)", pc.read_tokens([src]).roles["--bg-surface"])
+        proc, _ = self.to_css(src)
+        self.assertEqual(5, output(proc).count("is outside the resolver's folder"), output(proc))
+
+    def test_odd_shapes_are_named_not_a_traceback(self):
+        """CodeRabbit on #105: a list `default` raised TypeError, and a list
+        `sets` an AttributeError, in the Python reader."""
+        data = {"version": "2025.10", "sets": ["x"],
+                "modifiers": {"m": {"default": ["a"], "contexts": {"a": [{"x": {"$type": "number", "$value": 1}}],
+                                                                   "b": []}}},
+                "resolutionOrder": [{"type": "set", "name": "s", "sources": [{"$ref": "#/sets/x"}]},
+                                    {"$ref": "#/modifiers/m"}]}
+        dtcg = dtcg_module()
+        doc, problems = dtcg.resolver_document(data, self.tmp)
+        self.assertEqual({"x": {"$type": "number", "$value": 1}}, doc)
+        self.assertEqual([None], [m.default for m in dtcg.resolver_modifiers(data)])
+        self.assertIn(("sets/s/0", "`#/sets/x` points at no object in this resolver, so not read"), problems)
+
     def test_a_fan_out_of_sets_is_refused_not_expanded(self):
         dtcg = dtcg_module()
         sets = {f"s{i}": {"sources": [{"$ref": f"#/sets/s{i + 1}"}] * 10} for i in range(9)}

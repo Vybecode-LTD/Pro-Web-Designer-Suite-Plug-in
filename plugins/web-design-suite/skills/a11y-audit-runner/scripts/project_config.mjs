@@ -1112,6 +1112,7 @@ function resolverDocument(data, dir) {
         continue;
       }
       if (/^[a-z][a-z0-9+.-]*:\/\//i.test(name)) continue;    // a URL is not read
+      if (/^([\\/]|[A-Za-z]:)/.test(name) || name.split(/[\\/]/).includes('..')) continue;   // outside(), CodeRabbit
       let tree;
       try {
         tree = readJson(path.resolve(dir, name));       // an absolute name stands, as in Python
