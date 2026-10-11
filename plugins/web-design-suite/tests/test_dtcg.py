@@ -9,7 +9,9 @@ Regressions covered (each fails on v3.5.0):
 - there was no way to write DTCG: figma_to_tokens.py had no `--format dtcg`,
   a tokens.css could not be converted, and the migration proposal was CSS only;
 - (part 3) themes could not be written: `--format dtcg` wrote the default mode
-  alone, and a DTCG resolver (`*.resolver.json`) was read as no tokens.
+  alone, and a DTCG resolver (`*.resolver.json`) was read as no tokens;
+- (part 4) a removal the old DTCG file had marked `$deprecated` failed the
+  release gate, and the deprecation ledger could not take the marks.
 """
 from __future__ import annotations
 
@@ -480,6 +482,80 @@ class TheProposalIsDtcgToo(TempDirTest):
         self.assertGreater(len(names), 100)
         self.assertLessEqual(names, set(css))
         self.assertTrue(re.match(r"oklch|srgb", doc["accent"]["500"]["$value"]["colorSpace"]))
+
+
+DEPRECATING = {"brand": {"$type": "color", "$root": {"$value": "#123456"}, "hover": {"$value": "#234567"}},
+               "bg": {"$type": "color", "brand": {"$value": "{brand.$root}"}},
+               "old": {"$type": "color", "$deprecated": "Please use {bg.brand} instead",
+                       "accent": {"$value": "{brand.hover}"}, "kept": {"$value": "#345678", "$deprecated": False}},
+               "legacy": {"$type": "color", "$value": "#456789", "$deprecated": True},
+               "gone": {"$type": "color", "$value": "#567890"}}
+
+
+class DeprecationsReachTheLedger(TempDirTest):
+    """P31 part 4 (LC-C2, LC-B2): a DTCG file's `$deprecated` reaches the
+    release gate. A removal the old file had already marked failed the gate as
+    if nobody had been warned, and the ledger could not take the marks."""
+
+    def setUp(self):
+        super().setUp()
+        self.write("v1.tokens.json", json.dumps(DEPRECATING))
+        nxt = json.loads(json.dumps(DEPRECATING))
+        for group, name in (("old", "accent"), ("old", "kept"), (None, "legacy"), (None, "gone")):
+            del (nxt[group] if group else nxt)[name]
+        self.write("v2.tokens.json", json.dumps(nxt))
+
+    def diff(self, *args):
+        proc = run_py("design-system-versioning", "diff_system", "v1.tokens.json", "v2.tokens.json",
+                      "--format", "json", "--deprecations", "deprecations.json", *args, cwd=self.tmp)
+        return proc, json.loads(proc.stdout)
+
+    def test_a_removal_the_old_file_deprecated_passes_the_gate(self):
+        proc, report = self.diff()
+        failing = {c["subject"] for c in report["changes"] if c["severity"] == "major" and not c["deprecation"]}
+        self.assertEqual({"--old-kept", "--gone"}, failing)        # unmarked, or marked not deprecated
+        marked = {c["subject"]: c["deprecation"] for c in report["changes"] if c["deprecation"]}
+        self.assertEqual({"--old-accent", "--legacy"}, set(marked))
+        self.assertEqual("--bg-brand", marked["--old-accent"]["replacement"])
+        self.assertEqual("$deprecated in v1.tokens.json", marked["--old-accent"]["marked"])
+        self.assertEqual(1, proc.returncode, output(proc))      # --gone and --old-kept still fail it
+        text = run_py("design-system-versioning", "diff_system", "v1.tokens.json", "v2.tokens.json",
+                      "--deprecations", "deprecations.json", cwd=self.tmp)
+        self.assertIn("deprecation  marked: $deprecated in v1.tokens.json", output(text))
+
+    def test_the_ledger_imports_the_marks(self):
+        proc = run_py("design-system-versioning", "deprecate", "import", "v1.tokens.json", "--since", "2.1.0",
+                      "--removal", "3.0.0", "--date", "2026-10-11", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("recorded: 2 token(s) marked $deprecated, 0 already in deprecations.json", output(proc))
+        ledger = json.loads((self.tmp / "deprecations.json").read_bytes())
+        entries = {e["name"]: e for e in ledger["deprecations"]}
+        self.assertEqual({"--old-accent", "--legacy"}, set(entries))
+        self.assertEqual(("--bg-brand", "mechanical", "Please use {bg.brand} instead"),
+                         tuple(entries["--old-accent"][k] for k in ("replacement", "codemod", "reason")))
+        self.assertEqual(("", "none", ""), tuple(entries["--legacy"][k] for k in ("replacement", "codemod", "reason")))
+        again = run_py("design-system-versioning", "deprecate", "import", "v1.tokens.json", "--since", "2.2.0",
+                       "--removal", "3.0.0", cwd=self.tmp)
+        self.assertIn("recorded: 0 token(s) marked $deprecated, 2 already in", output(again))
+        self.assertEqual("2.1.0", json.loads((self.tmp / "deprecations.json").read_bytes())
+                         ["deprecations"][0]["since"])                     # a ledger entry is kept
+        _, report = self.diff()
+        recorded = {c["subject"]: c["deprecation"] for c in report["changes"] if c["deprecation"]}
+        self.assertEqual("2.1.0", recorded["--old-accent"]["since"])       # the ledger's record wins
+
+    def test_the_removal_window_still_binds(self):
+        proc = run_py("design-system-versioning", "deprecate", "import", "v1.tokens.json", "--since", "3.0.0",
+                      "--removal", "3.0.0", cwd=self.tmp)
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertFalse((self.tmp / "deprecations.json").exists())
+
+    def test_a_later_file_that_sets_a_token_again_takes_the_mark_off(self):
+        self.write("fix.tokens.json", json.dumps({"legacy": {"$type": "color", "$value": "#000000"}}))
+        pc = load_script("design-system-versioning", "project_config")
+        marks = pc.read_deprecations([self.tmp / "v1.tokens.json", self.tmp / "fix.tokens.json"])
+        self.assertEqual({"--old-accent": "Please use {bg.brand} instead"}, marks)
+        self.assertEqual("--brand", pc.replacement_of("use {brand.$root}"))
+        self.assertEqual("", pc.replacement_of(True))
 
 
 THEMED_CSS = """@layer tokens {
