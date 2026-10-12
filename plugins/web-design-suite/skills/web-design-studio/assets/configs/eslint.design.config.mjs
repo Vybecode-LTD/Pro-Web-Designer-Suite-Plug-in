@@ -198,7 +198,8 @@ const COLOUR_FUNCTIONS = [
   'light-dark',
 ];
 const LITERAL_UNITS = [
-  'px', 'rem', 'em', 'ch', 'ex', 'vw', 'vh', 'vmin', 'vmax', '%', 'deg', 's', 'ms',
+  'px', 'rem', 'em', 'ch', 'ex', 'vw', 'vh', 'vmin', 'vmax', 'cqi', 'cqb', 'cqw', 'cqh', 'cqmin',
+  'cqmax', '%', 'deg', 's', 'ms',
 ];
 const TIER1_WITH_ROLE = {
   'space-': 'a proximity/inset role (--gap-related, --pad-card, --space-section)',

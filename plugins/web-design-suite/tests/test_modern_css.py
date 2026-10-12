@@ -14,6 +14,13 @@ Regressions covered:
   field's error state used only
   `aria-invalid`: `:user-invalid` marks the browser's own checks once the
   user has touched the field, not on load.
+- SS-B4 (P38 part 2): typography.md said "use container queries" and never
+  named `cqi`; the type is a token, and its rem term keeps it growing at
+  200% zoom. `font-size-adjust` needs a measured number (`from-font` reads
+  the fallback during a swap), cancels a face's `size-adjust`, and every
+  `font:` shorthand resets it. An alpha variant derived on `:root` alone
+  keeps the light theme's tint in a dark band. `interpolate-size` animates
+  a disclosure to `auto`, and `visibility` keeps its closed links unreachable.
 """
 from __future__ import annotations
 
@@ -64,6 +71,47 @@ if (process.argv[4] === 'top-layer') {
     .map((n) => n.name.value);
   out.status = nodes.filter((n) => !n.ignored && n.role && n.role.value === 'status')
     .map((n) => (n.name && n.name.value) || '');
+} else if (process.argv[4] === 'cqi') {
+  // Zoom at 200% halves the CSS viewport; on screen, a CSS pixel is then two.
+  const sizes = () => page.evaluate(() => [...document.querySelectorAll('[data-probe]')].map(
+    (el) => [el.dataset.probe, parseFloat(getComputedStyle(el).fontSize)]));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  out.at100 = Object.fromEntries(await sizes());
+  await page.setViewportSize({ width: 720, height: 900 });   // tall enough for no scrollbar
+  out.at200 = Object.fromEntries(await sizes());
+} else if (process.argv[4] === 'font-size-adjust') {
+  await page.evaluate(() => document.fonts.ready);
+  out.adjust = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('[id]')].map(
+    (el) => [el.id, { adjust: getComputedStyle(el).fontSizeAdjust, width: el.getBoundingClientRect().width }])));
+  out.faces = await page.evaluate(() => Object.fromEntries([...document.fonts].map((f) => [f.family, f.status])));
+} else if (process.argv[4] === 'overlay') {
+  out.colours = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-probe]')].map(
+    (el) => [el.dataset.probe, getComputedStyle(el)[el.dataset.prop]])));
+} else if (process.argv[4] === 'expand') {
+  const panel = '.disclosure__panel';
+  const heard = async () => {
+    const cdp = await page.context().newCDPSession(page);
+    const { nodes } = await cdp.send('Accessibility.getFullAXTree');
+    return nodes.some((n) => !n.ignored && n.name && n.name.value === 'Panel link');
+  };
+  out.supported = await page.evaluate(() => CSS.supports('interpolate-size', 'allow-keywords'));
+  out.closed = await page.evaluate((s) => ({ height: document.querySelector(s).getBoundingClientRect().height,
+    visible: document.querySelector(s).checkVisibility({ visibilityProperty: true }) }), panel);
+  out.closedHeard = await heard();
+  out.mid = await page.evaluate((s) => {
+    document.querySelector('.disclosure__trigger').setAttribute('aria-expanded', 'true');
+    getComputedStyle(document.querySelector(s)).blockSize;   // starts the transition
+    // Chromium names the physical longhand a logical property's transition runs on.
+    const runs = document.getAnimations().filter((a) => ['block-size', 'height'].includes(a.transitionProperty));
+    for (const a of runs) { a.pause(); a.currentTime = a.effect.getComputedTiming().duration / 2; }
+    return { runs: runs.length, height: document.querySelector(s).getBoundingClientRect().height };
+  }, panel);
+  out.open = await page.evaluate((s) => {
+    for (const a of document.getAnimations()) a.finish();
+    return { height: document.querySelector(s).getBoundingClientRect().height,
+      visible: document.querySelector(s).checkVisibility({ visibilityProperty: true }) };
+  }, panel);
+  out.openHeard = await heard();
 } else {
   const read = async () => ({ border: await colour('#email', 'borderTopColor'), help: await colour('.field-help', 'color') });
   out.want = { border: await colour('#want-border', 'color'), help: await colour('#want-help', 'color') };
@@ -143,6 +191,108 @@ class TheReferencesInABrowser(TempDirTest):
         self.assertNotEqual(seen["onLoad"]["border"], want["border"], seen)   # empty and required, not yet red
         self.assertNotEqual(seen["onLoad"]["help"], want["help"], seen)
         self.assertEqual(seen["touched"], want, seen)                          # typed and left: both follow
+
+    def test_cqi_type_follows_its_container_and_still_grows_with_zoom(self):
+        css = reference_block("typography.md", "--text-fluid-card") + (
+            "\nbody { margin: 0; } .pure { font-size: 3.0882cqi; }")
+        card = "<div class='promo'{}><h2 class='promo__title{}' data-probe='{}'>Headline</h2></div>"
+        body = "".join(card.format(f" style='inline-size: {w}px'", "", w) for w in (360, 700, 1040)) + (
+            card.format("", "", "window") + card.format("", " pure", "pure"))
+        seen = self.run_probe(body, css, "cqi")
+        at100, at200 = seen["at100"], seen["at200"]
+        # The worked example: 35px in a 360px card, 45.5px in 700, 56px in 1040.
+        for width, size in (("360", 35), ("700", 45.5), ("1040", 56)):
+            self.assertAlmostEqual(at100[width], size, delta=0.1, msg=seen)
+            self.assertAlmostEqual(at200[width], size, delta=0.1, msg=seen)   # a fixed card ignores the window
+        # In a card as wide as a 1440px window: on screen, 1.65x at 200%.
+        self.assertAlmostEqual(2 * at200["window"] / at100["window"], 1.65, delta=0.01, msg=seen)
+        self.assertAlmostEqual(2 * at200["pure"] / at100["pure"], 1.0, delta=0.01, msg=seen)   # control: no rem term
+
+    def test_font_size_adjust_needs_a_number_and_a_place_after_the_shorthand(self):
+        css = reference_block("typography.md", "--font-sans-aspect") + (
+            '\n@font-face { font-family: "Geist Sans"; src: url(missing.woff2); }'   # the web font never arrives
+            "\nh3 { font: var(--type-h3); }"                                           # control: no adjust after it
+            '\n.probe { display: inline-block; white-space: nowrap; font: 20px "Geist Sans", sans-serif; }'
+            "\n#none { font-size-adjust: none; } #number { font-size-adjust: var(--font-sans-aspect); }"
+            "\n#from-font { font-size-adjust: from-font; }")
+        body = ("<p id='para'>Body</p><h2 id='heading'>Two</h2><h3 id='control'>Three</h3>"
+                + "".join(f"<br><span class='probe' id='{i}'>xxxxxxxxxxxxxxxxxxxx</span>"
+                          for i in ("none", "number", "from-font")))
+        seen = self.run_probe(body, css, "font-size-adjust")["adjust"]
+        self.assertEqual(seen["para"]["adjust"], "0.53", seen)       # inherited from body
+        self.assertEqual(seen["heading"]["adjust"], "0.53", seen)    # declared after h2's font:
+        self.assertEqual(seen["control"]["adjust"], "none", seen)    # h3's font: reset it
+        self.assertGreater(abs(seen["number"]["width"] - seen["none"]["width"]), 0.5, seen)   # the fallback scaled
+        # from-font reads the fallback itself while the web font is missing: no change.
+        self.assertNotIn(seen["from-font"]["adjust"], ("none", "0.53"), seen)
+        self.assertAlmostEqual(seen["from-font"]["width"], seen["none"]["width"], delta=0.01, msg=seen)
+
+    def test_font_size_adjust_cancels_a_fallback_faces_size_adjust(self):
+        local = 'src: local("Arial"), local("Liberation Sans"), local("DejaVu Sans"), local("Helvetica");'
+        css = reference_block("typography.md", "--font-sans-aspect") + (
+            f'\n@font-face {{ font-family: "Plain"; {local} }}'
+            f'\n@font-face {{ font-family: "Grown"; {local} size-adjust: 150%; }}'
+            "\nspan { display: inline-block; white-space: nowrap; font-size: 20px; }"
+            '\n#plain, #plain-adjusted { font-family: "Plain"; } #grown, #grown-adjusted { font-family: "Grown"; }'
+            "\n#plain, #grown { font-size-adjust: none; }"   # body's would cancel the control's too
+            "\n#plain-adjusted, #grown-adjusted { font-size-adjust: var(--font-sans-aspect); }")
+        body = "".join(f"<span id='{i}'>xxxxxxxxxxxxxxxxxxxx</span><br>"
+                       for i in ("plain", "grown", "plain-adjusted", "grown-adjusted"))
+        seen = self.run_probe(body, css, "font-size-adjust")
+        if seen["faces"] != {"Plain": "loaded", "Grown": "loaded"}:
+            self.skipTest(f"no local Arial, Liberation Sans, DejaVu Sans or Helvetica: {seen['faces']}")
+        width = {k: v["width"] for k, v in seen["adjust"].items()}
+        self.assertAlmostEqual(width["grown"] / width["plain"], 1.5, delta=0.01, msg=width)   # control: it applies
+        self.assertAlmostEqual(width["grown-adjusted"], width["plain-adjusted"], delta=0.01, msg=width)
+
+    def test_an_alpha_variant_follows_its_role_into_a_themed_band(self):
+        css = reference_block("color-system.md", "--bg-accent-subtle") + (
+            "\n:root { --tint-root-only: color-mix(in oklch, var(--bg-accent) 12%, transparent); }"
+            "\n.mix { background: var(--bg-accent-subtle); } .relative { background: var(--bg-danger-subtle); }"
+            "\n.root-only { background: var(--tint-root-only); }"
+            "\n.accent { color: var(--bg-accent); } .danger { color: var(--bg-danger); }")
+        probes = (("mix", "backgroundColor"), ("relative", "backgroundColor"), ("root-only", "backgroundColor"),
+                  ("accent", "color"), ("danger", "color"))
+        def scope(name):
+            return "".join(f"<i class='{c}' data-probe='{name}-{c}' data-prop='{p}'></i>" for c, p in probes)
+        seen = self.run_probe(scope("page") + "<section data-theme='dark'>" + scope("band") + "</section>",
+                              css, "overlay")["colours"]
+
+        def channels(text):
+            m = re.fullmatch(r"oklch\(([\d.]+) ([\d.]+) ([\d.]+)(?: / ([\d.]+))?\)", text)
+            self.assertIsNotNone(m, f"{text!r} in {seen}")
+            return [float(v) for v in m.groups(default="1")]
+
+        for where in ("page", "band"):
+            accent, danger = channels(seen[f"{where}-accent"]), channels(seen[f"{where}-danger"])
+            for name, role in (("mix", accent), ("relative", danger)):
+                got = channels(seen[f"{where}-{name}"])
+                for a, b in zip(got, role[:3] + [0.12]):    # the role's colour, at alpha 0.12
+                    self.assertAlmostEqual(a, b, delta=0.002, msg=f"{where}-{name}: {seen}")
+        self.assertNotEqual(channels(seen["page-accent"]), channels(seen["band-accent"]), seen)   # the band re-points it
+        # Control: derived on :root alone, the band keeps the page's tint.
+        self.assertEqual(seen["band-root-only"], seen["page-root-only"], seen)
+        self.assertNotEqual(seen["band-root-only"], seen["band-mix"], seen)
+
+    def test_a_disclosure_animates_to_auto_and_hides_its_closed_panel(self):
+        css = reference_block("motion-system.md", "interpolate-size")
+        body = ("<div class='disclosure'><button class='disclosure__trigger' aria-expanded='false'>More</button>"
+                "<div class='disclosure__panel'><p style='margin: 0; block-size: 200px'>Body</p>"
+                "<a href='#x'>Panel link</a></div></div>")
+        seen = self.run_probe(body, css, "expand")
+        if not seen["supported"]:
+            self.skipTest("this Chromium has no interpolate-size")
+        self.assertEqual(seen["closed"], {"height": 0, "visible": False}, seen)
+        self.assertFalse(seen["closedHeard"], seen)                       # closed: not reachable
+        self.assertEqual(seen["mid"]["runs"], 1, seen)
+        self.assertTrue(0 < seen["mid"]["height"] < seen["open"]["height"], seen)   # halfway, a height between
+        self.assertGreater(seen["open"]["height"], 200, seen)
+        self.assertTrue(seen["open"]["visible"], seen)
+        self.assertTrue(seen["openHeard"], seen)
+        # Control: without it, 0 to auto has no transition; the panel jumps open.
+        jump = self.run_probe(body, css + "\n:root { interpolate-size: numeric-only; }", "expand")
+        self.assertEqual(jump["mid"]["runs"], 0, jump)
+        self.assertEqual(jump["mid"]["height"], jump["open"]["height"], jump)
 
 
 if __name__ == "__main__":

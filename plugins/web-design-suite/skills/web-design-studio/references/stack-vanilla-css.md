@@ -837,7 +837,7 @@ Note what is *not* being attempted: matching the wide-gamut rendering. The fallb
 
 The `@supports` wrapper is strictly optional here — an unsupporting browser ignores the `@container` block anyway — but wrapping it keeps the enhancement and its precondition in one readable unit, and it stops someone later adding a declaration outside the query that assumes containment.
 
-**Container query units** (`cqi`, `cqw`) have no graceful fallback: a length that does not parse invalidates the whole declaration. If you use them, provide the fallback declaration immediately above, relying on the cascade:
+**Container query units** (`cqi`, `cqw`) are Baseline widely available since 2025-08-14 (Chrome 105, Firefox 110, Safari 16), so on this system's floor a token carries them: typography.md §10's `--type-card-display`. Only on an older floor do they need a fallback. There, a length that does not parse invalidates the whole declaration, so provide the fallback declaration immediately above, relying on the cascade, and keep the unit out of the token:
 
 ```css
 .card__title {

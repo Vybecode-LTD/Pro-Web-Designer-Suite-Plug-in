@@ -51,7 +51,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SS-B1 | — | fixed in 3.2.0 | There is no gate for role-pair contrast. |
 | SS-B2 | — | fixed in 3.3.0: `test_check_roles`, `test_figma_sync.StatusInks`, `test_contract.TheStarterKeepsItsWord` | Tier-2 roles and starter files are missing. |
 | SS-B3 | — | fixed in 3.6.0: `test_check_roles` (`CheckRoles`, `LightDarkInABrowser`), PR #112 | Theming without JavaScript. |
-| SS-B4 | — | W12 (3.6.0+) | Modern CSS the systems references should teach: `@starting-style`, the top layer against the z-index ladder, `cqi`, `font-size-adjust`, `color-mix()`. |
+| SS-B4 | — | fixed in 3.6.0: `test_modern_css.TheReferencesInABrowser`, PRs #113 and #115 | Modern CSS the systems references should teach: `@starting-style`, the top layer against the z-index ladder, `cqi`, `font-size-adjust`, `color-mix()`. |
 | SS-B5 | — | fixed in 3.3.0: `test_numbers.FluidTypeZoom`, `TypeScale.test_a_fluid_span_over_2_5_times_is_refused` | Fluid type and zoom (SC 1.4.4) is only half taught. |
 | SS-B6 | — | fixed in 3.3.0: `test_numbers.ColourRamps` (`test_anchor_seed_*`, `test_the_report_gives_the_seeds_distance_from_500`) | The brand's exact colour isn't preserved. |
 | SS-B7 | — | fixed in 3.3.0: `test_numbers.TypeScale`, `FluidTypeZoom`, `ColourRamps` | Nothing tests docs, tokens and generators against each other. |

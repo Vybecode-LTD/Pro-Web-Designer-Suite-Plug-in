@@ -124,6 +124,27 @@
   error state adds `:user-invalid`, which waits until the user has touched the field, with
   `:has()` for its hint. A new `test_modern_css` runs each snippet in Chromium on the
   starter's tokens, reading the hit test and Chromium's accessibility tree.
+- **Container type, fallback x-height, alpha variants and `height: auto`: modern CSS,
+  part 2** (P38; closes SS-B4). Each snippet runs in Chromium in `test_modern_css`, as
+  written, on the starter's tokens.
+  - **`cqi`** (typography.md §10): type sized to its container, as a fluid token whose
+    role a card's headline reads, worked from two anchors as the viewport steps are. The
+    `rem` intercept keeps it growing with zoom; a pure-`cqi` size does not grow at all.
+    stack-vanilla-css.md no longer keeps the units out of tokens: they are Baseline widely
+    available. `inline_styles.literal_units` in the spec takes the six container units,
+    so an inline `'4cqi'` is a literal for the audit and ESLint.
+  - **`font-size-adjust`** (typography.md §8): one number matches every fallback's
+    x-height to the web font's, and narrows the shift without removing it. Checked in
+    Chromium: `from-font` reads the fallback itself during a swap and changes nothing, a
+    face's `size-adjust` has no effect beside it, and every `font:` shorthand resets it,
+    so it is declared after each role's `font:`.
+  - **`color-mix()` and relative colour** (color-system.md §9): a role's alpha variants
+    derived in the token file, declared on every themed element, since a derived token on
+    `:root` alone keeps the light theme's tint inside a dark band.
+  - **`interpolate-size`** (motion-system.md §7): a disclosure animating to `auto`, in
+    Chromium only and a jump elsewhere, with `visibility` keeping a closed panel's links
+    out of the tab order and the accessibility tree. §5's table pointed to an accordion
+    §7 did not have.
 
 ### Changed
 
