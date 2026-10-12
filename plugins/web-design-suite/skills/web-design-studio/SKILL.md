@@ -151,7 +151,7 @@ Read the file when you hit the decision it covers. Do not read them all up front
 | Read this | When |
 |---|---|
 | `references/spacing-system.md` | **Any time you are about to type a spacing value.** The most important file here. |
-| `references/style-architecture.md` | Setting up a stylesheet, deciding where a declaration goes, or untangling an override |
+| `references/style-architecture.md` | Setting up a stylesheet, deciding where a declaration goes, untangling an override, or theming without JavaScript (`light-dark()`) |
 | `references/color-system.md` | Choosing or verifying a palette, dark mode, contrast, gradients |
 | `references/typography.md` | Type scale, leading, measure, tracking, font loading, fluid type |
 | `references/layout-composition.md` | Page skeletons, grids, container queries, responsive strategy, alignment |
