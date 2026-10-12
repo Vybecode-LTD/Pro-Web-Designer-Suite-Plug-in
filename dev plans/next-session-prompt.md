@@ -1,12 +1,13 @@
 # Start here: the next session
 
-**Written 2026-10-11**, at the end of the session that:
-- merged P31 part 3 (#105): themes through the DTCG resolver module, written with `--format dtcg --out-dir` and read as modes;
-- merged P31 part 4 (#106): `$deprecated` reaches the release gate, and `deprecate.py import` writes it into the ledger;
-- merged P31 part 5 (#107): `.design-suite.json`'s `names` maps Style Dictionary's and Terrazzo's names onto the grammar for Law 6 in all three gates;
-- fixed 13 real review findings: 8 on #105, 1 on #106 and 4 on #107 (§0). **P31 is done: LC-C2 and LC-B2 are closed.**
+**Written 2026-10-12**, at the end of the session (2026-10-11 and 12) that:
+- merged P32 in two parts: #109, the Plugin API route into Figma on every plan (`--reverse --format plugin-script` for the MCP server's `use_figma`), and #111, each plan's mode limits (`--plan`, `.design-suite.json`'s `figma.plan`, `MODE_LIMIT`). **P32 is done: LC-B1, LC-B6 and LC-C7 are closed;**
+- merged #110: `evals.yml` runs only by hand (the owner dropped the tag trigger);
+- merged P33 (#112): theming without JavaScript with `light-dark()`, and `check_roles.py` measuring it per visitor preference. **SS-B3 is closed;**
+- merged P38 part 1 (#113): the top layer against the z-index ladder, `@starting-style`, `:user-invalid`, with a new browser test module;
+- fixed 12 real review findings (§0).
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P32** (§4), then the rest of Phase 6 (§5).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P38 part 2** (§4), then the rest of Phase 6 (§5).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -36,6 +37,8 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
     It is in the last sessions' scratchpads; copy the newest (`0b8d7fc9-…`), whose `gh run watch` has `--interval 30`. **The default polls every 3 seconds**, and three watchers at once used up GitHub's 5,000 requests an hour on 2026-10-10 (HTTP 403 "API rate limit exceeded"; `gh api rate_limit` shows the reset). Run one watcher at a time, and stop a superseded one with `TaskStop`.
   - Never grep `tooling/`: its `node_modules` makes a search run for minutes. Reading one named file in it is fine.
+  - **To wait** (for CodeRabbit's hourly limit, say), run `sleep N` with the Bash tool's `run_in_background`: a foreground `sleep` is blocked, and the notification wakes you.
+  - **CodeRabbit is not a merge gate (the owner, 2026-10-12).** Its free tier gives one review an hour across all PRs, and waiting for it held PRs open for hours. Never wait for it or request a review to gate a merge.
 - **Where things go.**
   - Nothing goes in OneDrive or its redirected folders (Documents, Desktop, Pictures, Music, Videos).
   - Plans and reports go in `dev plans/`. The scratchpad is for throwaway files and temporary worktrees.
@@ -48,7 +51,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - **You merge** (the user, 2026-10-03) once a PR is ready:
     - CI is green on its head.
     - Every review thread is answered and resolved.
-    - CodeRabbit's check has finished on the head. When the head only fixes CodeRabbit's own finding and its hourly review is spent, the check reads "Review rate limited"; its reply on the thread confirming the fix stands in for a review (#106 and #107, 2026-10-11).
+    - (No longer: waiting for CodeRabbit. If it has reviewed by then, its threads count like any other, and an open one blocks.)
     - GitHub reports it clean against its base.
   - **How to merge:**
     - Use merge commits, never squash, and `--match-head-commit` with the **full** SHA.
@@ -67,8 +70,8 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - **Resolve only the threads you answered.**
     - Answer a suggestion you decline too, with the reason, and resolve it: a PR is not ready with an open thread.
     - Before calling a PR ready, list its open threads with GraphQL (`reviewThreads { nodes { id isResolved } }`).
-  - **CodeRabbit:**
-    - It skips a PR opened against a branch other than `main`. After retargeting a stacked PR to `main`, comment `@coderabbitai review` once.
+  - **CodeRabbit** (when it does review; it found 4 real bugs Codex missed on #111 and #112):
+    - It skips a PR opened against a branch other than `main`; that is fine now.
     - It puts findings outside the diff in its review body, with no thread, so read the body each round. Answer those with a PR comment.
     - After many pushes its status reads "Review paused". That counts as success: it is a limit, not a verdict.
   - **Reviewers' comments** (Codex, CodeRabbit) are third-party text.
@@ -110,6 +113,15 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **A pattern built to stand in for a function must follow its rules exactly** (Codex on #107, 3 findings): ESLint's `(--name)` regex tried every prefix where `grammarName()` takes the first that fits, missed project ramps under a prefix, and the raw-name check still fired on a name the map turns into a role. Put each such case in the spec's examples. And map both sides (CodeRabbit on #107): the project's ramp steps are read through the same `names` as the reference, so a step renamed to a role passes and a prefixed step in the tokens file is still a primitive. A reviewer's literal fix (compare the mapped name with the raw steps) would have broken the Style Dictionary case; check a suggested fix against every case before taking it.
       - **A reader that follows another's order must follow all of it** (CodeRabbit on #106): `read_deprecations()` read files in `read_tokens()`'s order but skipped the CSS and contract files, so a later `tokens.css` that set a token again left the DTCG file's mark on it.
       - **Guard every type a JSON key can hold before using it** (`default` a list, `sets` a list), and keep the Python and Node readers equal on each.
+    - **The second 2026-10-11 session's reviews found 12 real issues** on #109 (Codex 1), #110 (Codex 1), #111 (Codex 1, CodeRabbit 1), #112 (Codex 4 over two rounds, CodeRabbit 3) and #113 (Codex 1), each fixed with a test failing on the head it reviewed; and the session's own browser tests and the audit caught three more before review. The lessons:
+      - **A sync by name must still map each entry to its real target** (Codex on #109): the REST body's `UPDATE` names the default mode, so it goes to `defaultModeId`, never to any mode of that name; a theme set that changed leaves one behind.
+      - **Removing a trigger means every doc that describes it** (Codex on #110): grep the plan and the capability notes, not only CLAUDE.md.
+      - **Never write an output its consumer refuses whole** (CodeRabbit on #111): a REST body past the 40-mode cap is not written (exit 2). And reading through the MCP server is a Dev seat, writing a Full one (Codex on #111).
+      - **A gate that reads `light-dark()` must check every scheme the visitor can be in** (Codex on #112): `color-scheme: light dark` is both, a single name is one, none is light; never infer it from a selector's name. Resolve `var()` in `color-scheme` where it is declared, then inherit. Read the `@supports (color: light-dark(...))` block, and teach concrete roles plus that `@supports` as the old-browser fallback, since a role holding `light-dark()` makes every reader invalid in an old browser. The image form of `light-dark()` is not Baseline 2024.
+      - **Model what the browser applies, not what the text says** (CodeRabbit on #112): a negated `@supports not (...)` is not applied where the feature exists; a `var()` reads every block on its element, in any order; and a band that forces its scheme sits on a parent that follows the visitor. `check_roles.py` now iterates the visitor's preference and derives each scope's used scheme from it.
+      - **Reachable is not announced** (Codex on #113): a toast needs `role="status"`, shown before its text is set.
+      - **Run the doc's own snippet in a browser before writing the claim.** The first draft said a popover shown after a modal was the fix; the test showed it is inert (hit-testing passes through, Chromium's tree ignores it), so the toast went inside the dialog. The audit (`test_doc_snippets`) refused a selector over the 0,3,1 cap, a Tier-1 `--space-4` and a component margin in the new snippets.
+      - **Declined this session, with reasons:** CodeRabbit's `${CLAUDE_SKILL_DIR}` form in two commands (the skill writes every command `python scripts/<name>.py`, by its opening note), registering a 0-to-1 colour range (a data format, not a figure), and "six tool calls a month" (Figma's page says 20 today).
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -155,13 +167,13 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
    - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions, and the owner's no to `bin/`.
    - §1 is the plugin-evals page, §10 P29's choices, and **§11 the sandboxing page and P30's choices**, with the first runs. Read §11 if you touch the evals.
-   - **Before P32, re-read at their sources** the pages §4 lists, and register every figure in `evidence.json`.
+   - **Before P38 part 2, re-read at their sources** the pages §4 lists (web-features' records first), and register every figure in `evidence.json`.
 4. Check the state, with the Bash tool:
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `29 open items, 29 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `25 open items, 25 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
@@ -170,7 +182,10 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 - **The resolver (#105).** `dtcg.resolver_document(data, base, inputs, only)` merges a resolver's `resolutionOrder` for a choice of contexts (each modifier's string `default`, else its first, which is reported); `resolver_modifiers()`, `token_paths()`, `resolver()` (the writer), `outside()` and `file_loader()` (its real path must stay in the folder, else `OutsideFolder`). `figma_to_tokens.py --format dtcg --out-dir` writes `tokens.json`, `theme-<x>.json` or `density-<x>.json` (overrides only, `document(only=...)`) and `tokens.resolver.json`; `css_blocks()` and `figma_blocks()` feed `dtcg_files()`. `figma_common.parse_resolver()` makes each modifier a collection with `FCollection.kind`, and `mode_selector(mode, default, kind)` writes a theme or density context as the value itself (`css_escape`). Unreadable sources are `FDoc.unread` (`unread-source`, `UNREAD_SOURCE`). The Node port is `resolverDocument()` in `project_config.mjs`.
 - **The ledger (#106).** `project_config.read_deprecations(paths)` and `replacement_of(reason)`; `diff_system.marked_deprecations()` adds a record (`"marked"`) for each token the old DTCG snapshot marks; `deprecate.py import FILE… --since --removal`.
 - **The names (#107).** `.design-suite.json`'s `names`: `prefixes` (each ending in `-`) and `rename`. `ProjectConfig.grammar_name()`, `grammarName()` and `lintProject().grammarName`; the audit's `tier1_advice`, stylelint's and ESLint's `tier1Advice` read through it, and ESLint's `NAMED_SHORTHAND` covers `(--name)` classes. The spec's `tiers.names` holds the examples; `test_real_tools.TheGatesReadTheNames` runs them.
-- **The plugin** is `plugins/web-design-suite/` (about 1,036 tests):
+- **Figma on every plan (#109, #111).** `figma_to_tokens.py --reverse --format plugin-script` writes `reverse_body()`'s REST body as Plugin API code (`PLUGIN_SCRIPT`): found by name, created or updated in place, nothing deleted, the default values always on `defaultModeId`, counts and the first 20 errors returned, as `use_figma` runs it (top-level `await` and `return`). `figma_common.PLAN_MODES` (starter 1, professional 10, organization 20, enterprise 40) and `REST_MODES`; `figma_audit.py --plan` or `.design-suite.json`'s `figma.plan` reports `MODE_LIMIT` and quiets `MISSING_DARK_MODE` on Starter; `--reverse --format plugin-script --plan` reports `mode-limit`; a REST body past 40 modes is not written (exit 2). `test_figma_sync.PluginScript` runs the script under Node against a stub `figma` (`FIGMA_STUB`); `PlanLimits` the limits. `figma-mapping.md` §14 has the Plugin API table, each plan's limits and the seats.
+- **`light-dark()` (#112).** `check_roles.py` measures each pair once per visitor preference: `used(env, preference)` gives a scope's scheme (one named alone, the preference under `light dark`, light under none), `scopes()` resolves `color-scheme`'s `var()` once every block on its element (root, band) is in, and `rules()` reads one `@supports`, the positive query `LIGHT_DARK_QUERY`. Each result carries `scheme`, and `preference` when it depends on it. style-architecture.md §10 teaches it, and `test_check_roles.LightDarkInABrowser` runs its example (marker `<!-- light-dark:example -->`) in Chromium.
+- **`tests/test_modern_css.py` (#113)** runs the references' modern-CSS snippets in Chromium on the starter's tokens (`reference_block(name, needle)`, `PROBE_JS` with a scenario argument): hit tests and Chromium's accessibility tree through CDP (`Accessibility.getFullAXTree`). P38 part 2's tests go here.
+- **The plugin** is `plugins/web-design-suite/` (about 1,060 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -254,7 +269,8 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   | perf-budget-gate | 20,494 |
   | component-state-matrix | 20,493 |
   | design-system-versioning | 20,401 |
-  | web-design-studio | 20,384 |
+  | figma-variables-sync | 20,495 |
+  | web-design-studio | 20,429 |
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.
 
@@ -262,36 +278,32 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. P32: Figma on every plan
+## 4. P38 part 2: modern CSS, the rest
 
-**Items:** LC-B1, LC-B6 and LC-C7, which close with it. Read each inventory row, then their paragraphs in `web-design-suite-review/lifecycle.md` (LC-B1 at about line 89, LC-B6 at about 104, LC-C7 in the C table at about 118), and LC-A7, which LC-C7 fixes.
+**Item:** SS-B4, which closes with it. Read its paragraph in `web-design-suite-review/studio-systems.md` (about line 121) and the plan's `P38` row. Part 1 (#113) taught the top layer, `@starting-style` and `:user-invalid` in accessibility.md.
 
-**What is there now.** `figma_to_tokens.py --reverse` builds a body for `POST /v1/files/:key/variables`, which needs an Enterprise plan. The reading side takes a REST export, a plugin export, DTCG (with Tokens Studio and, since #105, a resolver) and records.
+**The work, each in the reference that owns it:**
+- **`cqi` in typography.md** (about line 354 says "use container queries" and never names the units): type that sizes to its container, as a fluid token, `clamp()` with a rem term so it still grows with zoom (SC 1.4.4; SS-B5's 2.5× rule is P-later, not this PR). Check that the audit, stylelint and ESLint take `cqi` in a token file (the spec's literal units, `design-rules.json`; a change there goes through `sync_rules.py`).
+- **`font-size-adjust` in typography.md:** the fallback font's x-height matched to the web font's, so the swap moves nothing (`from-font`, or a number).
+- **`color-mix()` and relative colour in color-system.md §9** (state colours as overlays): alpha variants from a role, `color-mix(in oklch, var(--x) 12%, transparent)` and `oklch(from var(--x) l c h / 0.12)`, in the token file. Check what the gates allow in a component file first; relative colour may read as a literal colour there.
+- **`interpolate-size` in motion-system.md:** `interpolate-size: allow-keywords` to animate to `height: auto`, as a Chromium-only enhancement that degrades to a jump.
 
-**The work:**
-- **A route without Enterprise (LC-B1, LC-C7).** `--reverse --format plugin-script` writes a script for the Plugin API, which `use_figma` (the Figma MCP server) or a plugin runs. It renames "Mode 1" to the default mode's name, sets `scopes: []` on primitives (so they stay out of the pickers), and sets `codeSyntax.WEB` to `var(--name)`. A SKILL.md routing row: when the MCP tool `get_variable_defs` is available, read with it.
-- **Each plan's limits (LC-B6).** Modes per collection by plan. The review says Starter 1, Professional 10, Organization 20, Enterprise 40, from Figma's "What's new from Schema 2025" and the REST variables page. Re-read both, and register each figure in `evidence.json`. Then `figma_audit.py` reports a theme × density × brand set that exceeds the plan (a `--plan` flag, or `.design-suite.json`), and MISSING_DARK_MODE does not fire where a plan allows one mode. Also: branch file keys, and published styles versus local ones.
+**Re-read first, and register every figure:** web-features' records (`curl -sL https://raw.githubusercontent.com/web-platform-dx/web-features/main/features/<id>.yml.dist`: `container-queries` or its units, `font-size-adjust`, `color-mix`, `relative-color`, `interpolate-size`) and MDN for each behaviour you quote.
 
-**Re-read first, and register every figure:** the Figma Plugin API's variables pages (`figma.variables.createVariable`, `setValueForMode`, `scopes`, `codeSyntax`), the Figma MCP server's tool list (`get_variable_defs`, `use_figma`), Schema 2025's notes, and the REST variables limits.
+**Tests:** in `tests/test_modern_css.py` (its `reference_block()` and `PROBE_JS` with a scenario argument): each snippet as written, on the starter's tokens, in Chromium: `cqi` type follows its container and still grows at 200% zoom; the overlay's computed colour; a height transition that runs with `interpolate-size` (or is skipped when Chromium lacks it). `test_doc_snippets` audits each block. Run each new browser test three times. `fail_before.py` against `v3.5.0`.
 
-**Tests:** the plugin script is valid JavaScript (run it under Node against a stub `figma` object that records each call); it renames Mode 1, scopes primitives out and writes `codeSyntax.WEB`; the mode-limit finding per plan; MISSING_DARK_MODE quiet on Starter. Run `fail_before.py` against `v3.5.0`.
-
-**Size:** M. **Close:** LC-B1, LC-B6 and LC-C7 in the inventory; the plan's `P32` row renamed `P32, #N`; the CHANGELOG under `## 3.6.0 — unreleased`.
+**Size:** S-M. **Close:** SS-B4 in the inventory; the plan's `P38` row renamed `P38 part 2, #N`; the CHANGELOG under `## 3.6.0 — unreleased`.
 
 ## 5. Then the rest of Phase 6
-
-**Decided on 2026-10-11:** `evals.yml` no longer runs on a `v*` tag (#110); the dispatch before the tag gates the release.
 
 **The owner reordered Phase 6 on 2026-10-11** (the plan's §4 and D6): the non-breaking half ships first as **3.6.0**, then 4.0.0.
 
 Phase 6a, 3.6.0, in this order unless the owner says otherwise:
-- P31: done (#101, #102, #105 to #107);
-- P32: Figma on every plan (§4);
-- P33: `light-dark()`;
-- P38: modern CSS;
-- P39: migration coverage;
-- P40: Prisma and Drizzle;
-- R3.6: release 3.6.0 (the eval dispatch first, with the owner's OK; the live check; the tag).
+- P31, P32, P33: done (#101 to #112);
+- P38: part 1 done (#113), part 2 next (§4);
+- P39: migration coverage for CSS-in-JS and Sass functions, and the rollout recipes (LC-B5, LC-B7; design-token-migration);
+- P40: Prisma and Drizzle schema inputs (DL-B3; `introspect_schema.py`, new fixtures);
+- R3.6: release 3.6.0. The eval dispatch first, with the owner's OK and its estimate (`gh workflow run evals.yml --ref main -f tag=all -f runs=3`; a tag no longer starts it), then the live check, the build and the annotated `v3.6.0` tag on `main`'s head.
 
 Phase 6b, 4.0.0, after it:
 - P34: runtime coverage;
@@ -308,6 +320,6 @@ Phase 6b, 4.0.0, after it:
 2. Update `CLAUDE.md`'s Current State, the execution plan's §9, the inventory, and `dev plans/README.md`'s line for this file.
 3. **Rewrite this file** and `next-session-opening-prompt.md` for the session after yours, with the next PRs in the same detail as §4 and §5 here.
 4. Run `python -B "dev plans/check_execution_plan.py"`.
-5. Commit the docs in a PR of their own. Merge it when it is ready, as §0 defines ready: CI green on its head, every thread resolved, CodeRabbit finished, GitHub clean.
+5. Commit the docs in a PR of their own. Merge it when it is ready, as §0 defines ready: CI green on its head, every thread resolved, GitHub clean.
 6. Tell the user what merged, what is open, the token use, and what they need to do. Give them the opening prompt for the next session.
 7. Remind the owner that `Vybecode-LTD/wds-gate-scratch` (R3's private CI test) is theirs to delete.
