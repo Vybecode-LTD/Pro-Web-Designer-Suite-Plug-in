@@ -766,6 +766,31 @@ class TheCensusReadsEveryStyleSource(TempDirTest):
         self.assertFalse([r for r in mapping["rules"] if "#334455" in r["match"]], mapping["rules"])
         self.assertIn("CSS-in-JS style object", report)
 
+    def test_a_sass_function_seeded_with_a_hex_is_one_decision(self):
+        # Codex on #116: the hex inside was claimed first, so the call read as a plain colour.
+        self.write("src/seeds.scss", ".a { color: color.adjust(#123456, $lightness: 10%); "
+                   "background: darken(#abcdef, 5%); border-color: color.mix(#123456, #fedcba, 50%); }\n")
+        _, data = self.extract("src")
+        self.assertEqual([(c, raw.split("(")[0]) for _, c, _, raw in self.found(data, "seeds.scss")],
+                         [("css-decl", "color.adjust"), ("css-decl", "darken"), ("css-decl", "color.mix")])
+        self.assertEqual({"color-function"}, {l["kind"] for l in data["literals"]})
+
+    def test_a_responsive_array_is_read_item_by_item(self):
+        # Codex on #116: an array value was skipped, and its object claimed, so nothing counted it.
+        self.write("src/Hero.tsx", "export const H = () => <Box sx={{ color: ['#333333', '#444444'], "
+                   "padding: ['8px', '16px'], m: [1, 2] }} css={{ gap: [4, { md: '12px' }] }} />;\n")
+        _, data = self.extract("src")
+        self.assertEqual([(prop, raw) for _, _, prop, raw in self.found(data, "Hero.tsx")], [
+            ("color", "#333333"), ("color", "#444444"), ("padding", "8px"), ("padding", "16px"),
+            ("gap", "4px"), ("gap", "12px")])
+
+    def test_astro_frontmatter_is_read_once(self):
+        # CodeRabbit on #116: a <script> inside the frontmatter's code was a second block.
+        self.write("src/Page.astro", "---\nconst snippet = '<script>const c = \"#121212\";</script>';\n---\n"
+                   "<p>{snippet}</p>\n")
+        _, data = self.extract("src")
+        self.assertEqual([raw for _, _, _, raw in self.found(data, "Page.astro")], ["#121212"])
+
     def test_the_codemod_rewrites_a_style_block_and_leaves_the_attribute(self):
         mapping = self.write("mapping.json", json.dumps(self.MAPPING))
         vue = self.write("src/Card.vue", "<template>\n  <div style=\"margin: 13px\">x</div>\n</template>\n"

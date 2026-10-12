@@ -838,6 +838,20 @@ def literals_from_value(
                    (0, len(masked)))
             return out
 
+    # ---- Sass colour functions, before the colours inside them -------------
+    # `color.adjust(#123456, $lightness: 10%)` is one decision, not a hex
+    # (Codex on #116): the whole call is claimed first.
+    for m in SCSS_COLOR_FN_RE.finditer(masked):
+        got = extract_func_color(masked, masked.index("(", m.start()))
+        if not got:
+            continue
+        body, end = got
+        full = masked[m.start():end]
+        if full.lower().startswith("rgba(") and "$" not in full and "#" not in full:
+            continue
+        record("color-function", value[m.start():end],
+               re.sub(r"\s+", "", full.lower()), (m.start(), end))
+
     # ---- colors ------------------------------------------------------------
     if is_color_prop or is_shadow_prop or context in {"inline-style", "js-string"} \
             or prop_l.startswith("$") or prop_l.startswith("@") or prop_l.startswith("--"):
@@ -857,18 +871,6 @@ def literals_from_value(
         for m in NAMED_COLOR_RE.finditer(masked):
             if prop_l in COLOR_PROPS or prop_l in BORDER_SHORTHAND:
                 record("color", m.group(0), m.group(0).lower(), m.span())
-
-    for m in SCSS_COLOR_FN_RE.finditer(masked):
-        got = extract_func_color(masked, masked.index("(", m.start()))
-        if not got:
-            continue
-        end = m.start() + 0
-        body, end = got
-        full = masked[m.start():end]
-        if full.lower().startswith("rgba(") and "$" not in full and "#" not in full:
-            continue
-        record("color-function", value[m.start():end],
-               re.sub(r"\s+", "", full.lower()), (m.start(), end))
 
     # ---- durations and easings --------------------------------------------
     if is_motion_prop or context == "inline-style":
@@ -976,10 +978,13 @@ def blank_spans(text: str, spans: Iterable[tuple[int, int]]) -> str:
 
 
 def script_blocks(text: str) -> list[tuple[int, int]]:
-    """Each `<script>` block's body, and an Astro component's frontmatter."""
-    spans = [m.span(1) for m in SCRIPT_BLOCK_RE.finditer(HTML_COMMENT_RE.sub(
-        lambda m: _spaces(m.group(0)), text))]
+    """Each `<script>` block's body, and an Astro component's frontmatter. A
+    `<script>` inside the frontmatter's code is not a block (CodeRabbit on #116)."""
     front = ASTRO_FRONTMATTER_RE.match(text)
+    clean = HTML_COMMENT_RE.sub(lambda m: _spaces(m.group(0)), text)
+    if front:
+        clean = blank_spans(clean, [front.span(1)])
+    spans = [m.span(1) for m in SCRIPT_BLOCK_RE.finditer(clean)]
     return ([front.span(1)] if front else []) + spans
 
 
@@ -1232,6 +1237,20 @@ def object_style_literals(clean: str, text: str, open_at: int, end: int, *, fnam
     (`'&:hover'`), media queries, variants and responsive values."""
     out: list[Literal] = []
 
+    def leaf(key: str, prop: str, v: str, at: int) -> None:
+        if v[:1] in "\"'" and v[-1:] == v[:1] and len(v) >= 2:
+            v_text, v_off = v[1:-1], at + 1
+        elif v[:1] == "`" and v[-1:] == "`" and "${" not in v and len(v) >= 2:
+            v_text, v_off = v[1:-1], at + 1
+        elif numbers_are_px and re.fullmatch(r"-?\d*\.?\d+", v):
+            v_text, v_off = (v if prop in JSX_UNITLESS else f"{v}px"), at
+        else:
+            return                            # an expression, a theme step or a token name
+        out.extend(literals_from_value(
+            prop, v_text, v_off, text, file=fname, context="style-object",
+            selector=selector, component=component, declaration=f"{key}: {v}",
+        ))
+
     def walk(start: int, stop: int, inherited: str | None, depth: int) -> None:
         if depth > 32:                        # no real style object nests this deep
             return
@@ -1240,28 +1259,54 @@ def object_style_literals(clean: str, text: str, open_at: int, end: int, *, fnam
             at = start + rel
             v = raw_value.strip()
             lead = len(raw_value) - len(raw_value.lstrip())
+            if prop not in STYLE_PROPS and inherited:
+                prop = inherited
             if v.startswith("{"):
                 inner = at + lead
                 walk(inner + 1, match_braces(clean, inner) - 1,
                      prop if prop in STYLE_PROPS else inherited, depth + 1)
-                continue
-            if prop not in STYLE_PROPS and inherited:
-                prop = inherited
-            if v[:1] in "\"'" and v[-1:] == v[:1] and len(v) >= 2:
-                v_text, v_off = v[1:-1], at + lead + 1
-            elif v[:1] == "`" and v[-1:] == "`" and "${" not in v and len(v) >= 2:
-                v_text, v_off = v[1:-1], at + lead + 1
-            elif numbers_are_px and re.fullmatch(r"-?\d*\.?\d+", v):
-                v_text = v if prop in JSX_UNITLESS else f"{v}px"
-                v_off = at + lead
+            elif v.startswith("["):
+                # A responsive array, one value per breakpoint (Codex on #116).
+                for item, item_at in array_items(clean, at + lead):
+                    if item.startswith("{"):
+                        walk(item_at + 1, match_braces(clean, item_at) - 1, prop, depth + 1)
+                    else:
+                        leaf(key, prop, item, item_at)
             else:
-                continue                      # an expression, a theme step or a token name
-            out.extend(literals_from_value(
-                prop, v_text, v_off, text, file=fname, context="style-object",
-                selector=selector, component=component, declaration=f"{key}: {v}",
-            ))
+                leaf(key, prop, v, at + lead)
 
     walk(open_at + 1, end - 1, None, 0)
+    return out
+
+
+def array_items(text: str, open_at: int) -> list[tuple[str, int]]:
+    """Each top-level item of the array literal whose `[` is at `open_at`,
+    stripped, with the offset it starts at."""
+    out, depth, i, n, start = [], 0, open_at, len(text), open_at + 1
+
+    def push(a: int, b: int) -> None:
+        item = text[a:b]
+        if item.strip():
+            out.append((item.strip(), a + len(item) - len(item.lstrip())))
+
+    while i < n:
+        ch = text[i]
+        if ch in "\"'`":
+            j = i + 1
+            while j < n and text[j] != ch:
+                j += 2 if text[j] == "\\" else 1
+            i = j
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+            if depth == 0:
+                push(start, i)
+                break
+        elif ch == "," and depth == 1:
+            push(start, i)
+            start = i + 1
+        i += 1
     return out
 
 

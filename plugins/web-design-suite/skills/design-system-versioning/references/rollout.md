@@ -251,7 +251,7 @@ That is the entire argument for committing the bump, the codemod and the accepte
 npm deprecate @org/ds@2.1.0 "Re-points --bg-accent below 4.5:1 on --bg-surface. Use 2.1.1."
 ```
 
-It takes a range as well as a version (`@org/ds@"<2.1.1"`), and an empty message (`""`) withdraws it. Only an owner of the package can run it.
+It takes a range as well as a version. Bound a range on both sides, or it takes the good releases before the bad one: `@org/ds@">=2.1.0 <2.1.1"` is 2.1.0, plus any 2.1.1 prerelease, since npm counts prereleases in a range. An empty message (`""`) withdraws it. Only an owner of the package can run it.
 
 **A rollback is data.** Whatever the canary's visual diff failed to show you is a gap in the proof sheet's coverage. Add the missing cell before the retry, or the retry fails the same way.
 
