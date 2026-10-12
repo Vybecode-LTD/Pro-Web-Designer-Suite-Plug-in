@@ -53,7 +53,36 @@ __all__ = [
     "parse_dtcg",
     "load_document",
     "attach_styles",
+    "PLAN_MODES",
+    "REST_MODES",
+    "plan_limit",
 ]
+
+
+# ===========================================================================
+# Each Figma plan's modes per collection (P32; LC-B6), re-read on 2026-10-11.
+# Figma's plan comparison: "Up to 10 modes per collection" (Professional), "Up
+# to 20 modes per collection" (Organization), "Unlimited modes with extended
+# collections" (Enterprise); the REST variables page: "Each collection can have
+# a maximum of 40 modes". Starter has no row: "Anyone on Education,
+# Professional, Organization, and Enterprise plans can create and use modes for
+# variables" (Modes for variables), so a collection keeps its first mode only.
+# The Plugin API's addMode "is limited by the current file's pricing tier".
+# ===========================================================================
+
+PLAN_MODES = {"starter": 1, "professional": 10, "organization": 20, "enterprise": 40}
+REST_MODES = 40
+
+
+def plan_limit(plan: str) -> str:
+    """Why `plan` caps a collection's modes where it does, for a finding."""
+    if plan == "starter":
+        return ("Starter has no modes beyond a collection's first: Figma gives modes to the "
+                "Education, Professional, Organization and Enterprise plans.")
+    if plan == "enterprise":
+        return ("Enterprise allows 40 modes per collection, the REST API's limit; an extended "
+                "collection gives a brand modes of its own.")
+    return f"{plan.title()} allows {PLAN_MODES[plan]} modes per collection."
 
 
 # ===========================================================================

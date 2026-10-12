@@ -32,6 +32,7 @@ At the project's root:
 | `components` | Globs that add to the component files the rule spec names. `*` and `?` stay within a folder, and `**/` is any number of folders, none included |
 | `emails` | Globs of the email templates, read as `components` is: `emails/**/*.html` when the key is left out, and none with `[]` |
 | `stack` | `vanilla-css`, `css-modules`, `tailwind-v3` or `tailwind-v4` |
+| `figma` | `plan`: `starter`, `professional`, `organization` or `enterprise`, the Figma plan, whose modes per collection are capped (P32) |
 | `budgets` | `perf` and `a11y`: the budget files |
 | `baselines` | `audit`, `a11y`, `perf`, `docs` and `snapshots`: where each gate keeps its baseline. `system`: the published snapshot, the system as consumers have it, which `diff_system.py` compares against |
 | `names` | A tool's token names mapped onto the contract's grammar (P31 part 5). `prefixes`: a prefix or a list, each ending in `-`, taken off a name that starts with one (the first that fits), so Style Dictionary's and Terrazzo's `--color-bg-surface` reads as `--bg-surface`. `rename`: one custom property to another (`"--gray-500": "--neutral-500"`), read first. The audit, stylelint and ESLint read Law 6 through it |
@@ -85,6 +86,7 @@ A flag beats each of these, and each falls back to the script's own default.
 | `components` | web-design-studio's `audit_design.py`, and its stylelint and ESLint configs. For ESLint, a JSX or TSX file a glob matches is a component file |
 | `emails` | the `emailBuild` hook |
 | `stack` | content-model-to-ui's `scaffold_ui.py`: `tailwind-v3` and `tailwind-v4` scaffold Tailwind; `css-modules` and `vanilla-css` scaffold CSS Modules, the nearer of its two |
+| `figma.plan` | figma-variables-sync's `figma_audit.py` (`MODE_LIMIT`, and no `MISSING_DARK_MODE` on Starter) and `figma_to_tokens.py --reverse --format plugin-script` |
 | `emailTokens` | email-template-system's `build_email.py` and `lint_email.py --source`. They never read `tokens`: the email build has its own projection of the system |
 | `tokens` (CSS only) | client-presentation-builder's `build_presentation.py`, which builds the deck on the project's `tokens.css` files, in order. A contract cannot style a deck |
 | `budgets.perf` | perf-budget-gate's `perf_audit.py` and `measure_vitals.mjs` |
