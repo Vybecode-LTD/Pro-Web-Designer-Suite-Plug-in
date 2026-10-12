@@ -139,7 +139,7 @@ class CheckRoles(TempDirTest):
                 proc = self.roles(css.replace("EXTRA", extra), "--pairs", pairs)
                 self.assertEqual(proc.returncode, code, output(proc))
                 if extra == ".inverse { color-scheme: dark; }":
-                    self.assertIn("--fg-default on --bg-inverse (dark, light scheme)", output(proc))
+                    self.assertIn("--fg-default on --bg-inverse (dark, light preference)", output(proc))
 
     def test_a_color_scheme_through_var_is_read_where_it_is_declared(self):
         """Codex on #112: `color-scheme: var(--scheme)` is the value of
@@ -173,7 +173,38 @@ class CheckRoles(TempDirTest):
                 proc = self.roles(f"{concrete} {wrapper} {{ {modern} }}", "--pairs", pairs)
                 self.assertEqual(proc.returncode, code, output(proc))
                 if code:
-                    self.assertIn("--fg-default on --bg-canvas (light, dark scheme)", output(proc))
+                    self.assertIn("--fg-default on --bg-canvas (light, dark preference)", output(proc))
+
+    def test_the_gate_models_what_the_browser_applies(self):
+        """CodeRabbit on #112: a negated @supports is not applied by a browser
+        that has light-dark(); `color-scheme: var(--scheme)` reads `--scheme`
+        from any block on the same element, in any order; and a band that
+        forces its scheme still sits on a parent that follows the visitor."""
+        fails = "--fg-default: light-dark(oklch(25% 0 0), oklch(15% 0 0));"     # 1:1 in dark
+        canvas = "--bg-canvas: light-dark(oklch(98% 0 0), oklch(15% 0 0));"
+        canvas_pair = self.write("canvas.json", json.dumps([
+            {"fg": "--fg-default", "bg": "--bg-canvas", "min": 4.5, "scopes": ["light"]}]))
+        band_pair = self.write("band.json", json.dumps([
+            {"fg": "--fg-default", "bg": "--bg-inverse", "min": 4.5, "scopes": ["inverse"], "on": "light"}]))
+        cases = (
+            ("negated @supports",
+             f":root {{ color-scheme: light dark; {fails} {canvas} }}"
+             " @supports not (color: light-dark(#000, #fff)) { :root { --fg-default: oklch(25% 0 0);"
+             " --bg-canvas: oklch(98% 0 0); color-scheme: light; } }", canvas_pair, None),
+            ("order on one element",
+             f":root {{ color-scheme: var(--scheme); {fails} {canvas} }} :root {{ --scheme: dark; }}",
+             canvas_pair, "--fg-default on --bg-canvas (light)"),
+            ("forced band",
+             ":root { color-scheme: light dark; --bg-inverse: light-dark(oklch(98% 0 0), oklch(15% 0 0)); }"
+             " .inverse { color-scheme: dark; --fg-default: light-dark(oklch(15% 0 0), oklch(98% 0 0)); }",
+             band_pair, "(inverse on the light --bg-inverse, light preference)"),
+        )
+        for name, css, pairs, says in cases:
+            with self.subTest(case=name):
+                proc = self.roles(css, "--pairs", pairs)
+                self.assertEqual(proc.returncode, 1, output(proc))
+                if says:
+                    self.assertIn(says, output(proc))
 
     def test_a_light_dark_that_is_not_one_pair_is_not_a_colour(self):
         for value in ("light-dark(oklch(98% 0 0))", "light-dark(oklch(98% 0 0), oklch(15% 0 0), red)",

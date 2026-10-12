@@ -93,6 +93,12 @@ class Unresolvable(Exception):
     pass
 
 
+# The one @supports read: a positive query on light-dark(), which every
+# current browser applies. `not`, `or` and `and` are left out, since the
+# gate cannot tell when they hold (CodeRabbit on #112).
+LIGHT_DARK_QUERY = re.compile(r"@supports\s*\(\s*(?:background-)?color\s*:\s*light-dark\([^()]*\)\s*\)\s*$", re.I)
+
+
 def rules(css: str) -> list[tuple[list[str], dict[str, str]]]:
     """Innermost `selectors { declarations }` blocks outside any @media or
     @supports (a conditional block is not a theme). One @supports is read: a
@@ -109,7 +115,7 @@ def rules(css: str) -> list[tuple[list[str], dict[str, str]]]:
             body = css[start:i]
             if "{" not in body and not prelude.startswith("@") and not any(
                     p.startswith(("@media", "@container"))
-                    or (p.startswith("@supports") and "light-dark(" not in p) for p in stack):
+                    or (p.startswith("@supports") and not LIGHT_DARK_QUERY.match(p)) for p in stack):
                 decls = dict(re.findall(r"(--[\w-]+)\s*:\s*([^;]+);?", body))
                 # Which branch of light-dark() the scope reads (P33).
                 decls.update(re.findall(r"(?<![\w-])(color-scheme)\s*:\s*([^;]+);?", body))
@@ -118,17 +124,28 @@ def rules(css: str) -> list[tuple[list[str], dict[str, str]]]:
     return out
 
 
+def element(selector: str) -> str:
+    """Which element a scope's selector is on: the root (`:root` and its
+    `[data-theme]`) or the inverse band (`.inverse`, and the dark one)."""
+    return "band" if selector.endswith(".inverse") else "root"
+
+
 def scopes(css: str) -> dict[str, dict[str, str]]:
     blocks = rules(css)
     merged = {}
     for name, wanted in SCOPES.items():
         env: dict[str, str] = {}
-        for want in wanted:
-            for sels, decls in blocks:
-                if want in sels:
-                    env.update(decls)
-                    if "color-scheme" in decls:   # its var()s are read where it is declared,
-                        env["color-scheme"] = substitute(env, decls["color-scheme"])   # then inherited
+        for el in dict.fromkeys(element(w) for w in wanted):
+            declared = None
+            for want in (w for w in wanted if element(w) == el):
+                for sels, decls in blocks:
+                    if want in sels:
+                        env.update({k: v for k, v in decls.items() if k != "color-scheme"})
+                        declared = decls.get("color-scheme", declared)
+            # Read once the element's own properties are all in, whatever their
+            # order, then inherited by the band (CodeRabbit on #112).
+            if declared is not None:
+                env["color-scheme"] = substitute(env, declared)
         merged[name] = env
     return merged
 
@@ -143,6 +160,14 @@ def substitute(env: dict[str, str], value: str) -> str:
             break
         value = new
     return value
+
+
+def used(env: dict[str, str], preference: str) -> str:
+    """The scheme a scope uses for a visitor who prefers `preference`: the one
+    its `color-scheme` names alone, the preference under `light dark`, light
+    under none."""
+    can = schemes(env)
+    return preference if preference in can and len(can) == 2 else can[0]
 
 
 def schemes(env: dict[str, str]) -> list[str]:
@@ -223,16 +248,21 @@ def check(css: str, pairs: list[dict]) -> list[dict]:
     for pair in pairs:
         for scope in pair.get("scopes", BOTH):
             on = pair.get("on", scope)
-            under, seen = schemes(envs[on]), set()
-            for theme in schemes(envs[scope]):          # each scheme the visitor can be in
-                bg_theme = theme if theme in under else under[0]
+            seen = set()
+            # Each preference the visitor can have: a scope that forces its
+            # scheme keeps it, and one under `light dark` follows, so a forced
+            # band is also measured on its parent's other scheme (CodeRabbit on #112).
+            for preference in ("light", "dark"):
+                theme, bg_theme = used(envs[scope], preference), used(envs[on], preference)
                 values = (resolve(envs[scope], pair["fg"], theme), resolve(envs[on], pair["bg"], bg_theme))
                 if values in seen:                       # the same colours: one result is enough
                     continue
                 seen.add(values)
                 ratio = ramp.contrast_ratio_oklch(colour(envs[scope], pair["fg"], theme),
                                                   colour(envs[on], pair["bg"], bg_theme))
+                varies = len(schemes(envs[scope])) == 2 or len(schemes(envs[on])) == 2
                 results.append({"fg": pair["fg"], "bg": pair["bg"], "scope": scope, "on": on, "scheme": theme,
+                                **({"preference": preference} if varies else {}),
                                 "ratio": round(ratio, 2), "min": pair["min"], "ok": ratio + 1e-9 >= pair["min"]})
     return results
 
@@ -308,8 +338,8 @@ def main() -> int:
     else:
         for r in failed:
             where = r["scope"] if r["on"] == r["scope"] else f"{r['scope']} on the {r['on']} {r['bg']}"
-            if r["scheme"] != ("dark" if r["scope"].startswith("dark") else "light"):
-                where += f", {r['scheme']} scheme"       # the visitor's preference, under `light dark`
+            if "preference" in r:                        # it depends on the visitor's preference
+                where += f", {r['preference']} preference"
             print(f"FAIL  {r['fg']} on {r['bg']} ({where}): {r['ratio']:.2f}:1, needs {r['min']}:1")
         print(f"role pairs: {len(results) - len(failed)} of {len(results)} pass"
               + ("" if failed else " — every declared pair clears its minimum."))
