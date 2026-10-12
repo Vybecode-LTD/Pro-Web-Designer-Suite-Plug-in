@@ -16,7 +16,7 @@
 
 ## Next steps
 
-1. **R3.6: release 3.6.0**, in this order (the next-session prompt's §4): a live check of what 3.6.0 changed, with the owner's OK; the release PR (`plugin.json` at 3.6.0, the CHANGELOG dated); on its merge, the eval dispatch, with the owner's OK and its estimate (about $11, under `evals.yml`'s $14 ceiling), so the evals run on the commit that is tagged; then the build and the annotated `v3.6.0` tag.
+1. **R3.6: release 3.6.0**, in this order (the next-session prompt's §4): a live check of what 3.6.0 changed, with the owner's OK; the release PR (`plugin.json` at 3.6.0, the CHANGELOG dated); on its merge, the eval dispatch, with the owner's OK and its estimate (about $11, under `evals.yml`'s $14 ceiling), so the evals run on the commit that is tagged (the run's `headSha` must equal it); then the build and the annotated `v3.6.0` tag.
 2. Then Phase 6b (4.0.0): ask the owner which workstream comes first.
 
 ## Open owner decisions
