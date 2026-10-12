@@ -85,6 +85,7 @@ try:                                                # python -m scripts.apply_co
         normalize_length, normalize_time, scan_css_declarations,
         STYLED_TAG_RE, CLASSNAME_RE, CLASSLIST_STRING_RE, CSS_EXT, JS_EXT,
         SKIP_DIRS, is_vendor, is_token_file, GENERATED_MARKERS, norm_path,
+        MARKUP_EXT, PLAIN_CSS_EXT, style_blocks, script_blocks, template_of, keep_only,
         Slot, split_slots, line_comments,
     )
 except ImportError:                                 # python scripts/apply_codemod.py
@@ -95,6 +96,7 @@ except ImportError:                                 # python scripts/apply_codem
         normalize_length, normalize_time, scan_css_declarations,
         STYLED_TAG_RE, CLASSNAME_RE, CLASSLIST_STRING_RE, CSS_EXT, JS_EXT,
         SKIP_DIRS, is_vendor, is_token_file, GENERATED_MARKERS, norm_path,
+        MARKUP_EXT, PLAIN_CSS_EXT, style_blocks, script_blocks, template_of, keep_only,
         Slot, split_slots, line_comments,
     )
 
@@ -733,9 +735,18 @@ def plan_js(text: str, mapping: Mapping, source_name: str,
                               source_name=source_name, skips=skips,
                               blanked=blanked))
 
+    edits.extend(plan_classes(
+        list(CLASSNAME_RE.finditer(clean)) + list(CLASSLIST_STRING_RE.finditer(clean)),
+        text, mapping, consumed))
+    return edits
+
+
+def plan_classes(matches, text: str, mapping: Mapping,
+                 consumed: Sequence[Tuple[int, int]] = ()) -> List[Edit]:
+    """The Tailwind rules, applied to each matched class list."""
+    edits: List[Edit] = []
     seen: set = set()
-    for sm in list(CLASSNAME_RE.finditer(clean)) + \
-            list(CLASSLIST_STRING_RE.finditer(clean)):
+    for sm in matches:
         idx = sm.lastindex or 1
         group = sm.group(idx)
         if group is None:
@@ -752,6 +763,23 @@ def plan_js(text: str, mapping: Mapping, source_name: str,
                 edits.append(Edit(
                     span[0], span[1], rule["replacement"], rule["id"],
                     rule["kind"], text.count("\n", 0, span[0]) + 1, tok))
+    return edits
+
+
+def plan_markup(text: str, mapping: Mapping, source_name: str,
+                skips: List[Skip]) -> List[Edit]:
+    """A Vue, Svelte, Astro or HTML file (LC-B5): each <style> block in its own
+    syntax, its scripts as JS, and the Tailwind classes in its class=""
+    attributes. A style="" attribute is left alone, as JSX's inline styles are."""
+    edits: List[Edit] = []
+    for start, end, suffix, _ in style_blocks(text):
+        if suffix is None:
+            continue                                  # the census reports the block
+        edits.extend(plan_css(text[start:end], mapping, base=start, source_name=source_name,
+                              skips=skips, slash_comments=suffix not in PLAIN_CSS_EXT))
+    for start, end in script_blocks(text):
+        edits.extend(plan_js(keep_only(text, start, end), mapping, source_name, skips))
+    edits.extend(plan_classes(CLASSNAME_RE.finditer(template_of(text)), text, mapping))
     return edits
 
 
@@ -867,7 +895,7 @@ def iter_files(paths: Sequence[str], only: Sequence[str], *,
                            if d not in SKIP_DIRS and not d.startswith(".")]
                 candidates.extend(Path(root) / f for f in sorted(files))
         for fp in candidates:
-            if fp.suffix.lower() not in CSS_EXT | JS_EXT:
+            if fp.suffix.lower() not in CSS_EXT | JS_EXT | MARKUP_EXT:
                 continue
             if is_token_file(fp):
                 continue
@@ -905,11 +933,15 @@ def process(fp: Path, mapping: Mapping, skips: List[Skip]) -> Optional[FileResul
         return None
     if any(mark in text[:800] for mark in GENERATED_MARKERS):
         return None
-    is_css = fp.suffix.lower() in CSS_EXT
+    suffix = fp.suffix.lower()
     try:
-        edits = (plan_css(text, mapping, source_name=norm_path(fp), skips=skips,
-                          slash_comments=line_comments(fp))
-                 if is_css else plan_js(text, mapping, norm_path(fp), skips))
+        if suffix in CSS_EXT:
+            edits = plan_css(text, mapping, source_name=norm_path(fp), skips=skips,
+                             slash_comments=line_comments(fp))
+        elif suffix in MARKUP_EXT:
+            edits = plan_markup(text, mapping, norm_path(fp), skips)
+        else:
+            edits = plan_js(text, mapping, norm_path(fp), skips)
     except Exception as exc:                          # noqa: BLE001
         skips.append(Skip(norm_path(fp), 0,
                           f"planning failed ({type(exc).__name__}: {exc}) — "
@@ -924,7 +956,7 @@ def process(fp: Path, mapping: Mapping, skips: List[Skip]) -> Optional[FileResul
                           f"want the same text — file left untouched", ""))
         return None
     after = splice(text, edits)
-    problem = structurally_sound(text, after, is_css, line_comments(fp))
+    problem = structurally_sound(text, after, suffix in CSS_EXT, line_comments(fp))
     if problem:
         skips.append(Skip(norm_path(fp), 0,
                           f"rewrite failed its safety check ({problem}) — "

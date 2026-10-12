@@ -66,7 +66,7 @@ python -m scripts.extract_literals ./src --format json -o literals.json
 python -m scripts.extract_literals ./src --format csv  -o literals.csv # for the client
 ```
 
-Walks CSS, SCSS, LESS, JS, JSX, TS and TSX. Finds literals in CSS declarations, SCSS/LESS variables, JSX `style={{}}` objects, styled-components and Emotion template literals, Tailwind arbitrary values, and hex colors in JS strings. Records kind, raw text, normalized form, property, file, line, column, and whether the file is one where Laws 2, 4 and 6 bite.
+Walks CSS, SCSS, LESS, JS, JSX, TS and TSX, and the `<style>` blocks, scripts and `style=""` attributes of Vue, Svelte, Astro and HTML files. Finds literals in CSS declarations, SCSS/LESS variables and colour functions (`color.adjust()` and the rest), JSX `style={{}}`, CSS-in-JS style objects (MUI `sx`, `css({})`, vanilla-extract), styled-components and Emotion template literals, Tailwind arbitrary values, and hex colors in JS strings. Records kind, raw text, normalized form, property, file, line, column, and whether the file is one where Laws 2, 4 and 6 bite.
 
 It deliberately does **not** count values inside comments, quoted strings or `url()`. Those are not design decisions, and counting them inflates the estimate you are about to put in front of a client.
 
@@ -138,7 +138,7 @@ It refuses to touch a file with uncommitted changes. It writes to a temp file in
 | Left behind | Why | Where it goes |
 |---|---|---|
 | Child `margin-*` (Law 2) | Deleting a child margin without adding the parent's `gap` collapses the layout. It is a layout change, not a value swap | Phase 4e, by hand, one container at a time — see `migration-strategies.md` §6 |
-| JSX `style={{…}}` (Law 4) | The value can be tokenized, but the *declaration* has to move into a stylesheet, which means a class name. A codemod that invents class names is a codemod nobody reviews | Phase 4f |
+| JSX `style={{…}}`, HTML `style=""` and CSS-in-JS style objects (Law 4) | The value can be tokenized, but the *declaration* has to move into a stylesheet, which means a class name. A codemod that invents class names is a codemod nobody reviews | Phase 4f |
 | `!important` (Law 5) | Removing it changes which rule wins. That is a cascade fix | Phase 4g, after layers are in |
 | Vendor CSS | You layer it, you do not migrate it | Never |
 
