@@ -1,0 +1,114 @@
+// shop.sql, written as a Prisma schema the idiomatic way: models and fields
+// named for JavaScript, mapped to the SQL names. Prisma has no CHECK
+// constraints and no row-level security, and the key from customers to
+// auth.users is in a schema this file does not model.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProductStatus {
+  draft
+  active
+  archived
+
+  @@map("product_status")
+}
+
+enum OrderStatus {
+  pending
+  paid
+  shipped
+  delivered
+  cancelled
+  refunded
+
+  @@map("order_status")
+}
+
+model Category {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String    @unique @db.VarChar(80)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  products  Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title         String        @db.VarChar(120)
+  slug          String        @unique(map: "products_slug_key")
+  priceCents    Int           @map("price_cents")
+  currency      String        @default("USD") @db.Char(3)
+  status        ProductStatus @default(draft)
+  categoryId    String?       @map("category_id") @db.Uuid
+  coverImageUrl String?       @map("cover_image_url")
+  metadata      Json          @default("{}")
+  isFeatured    Boolean       @default(false) @map("is_featured")
+  availableOn   DateTime?     @map("available_on") @db.Date
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  category      Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  tags          ProductTag[]
+  orderItems    OrderItem[]
+
+  @@map("products")
+}
+
+model Tag {
+  id       BigInt       @id @default(autoincrement())
+  name     String       @unique @db.VarChar(40)
+  products ProductTag[]
+
+  @@map("tags")
+}
+
+model ProductTag {
+  productId String  @map("product_id") @db.Uuid
+  tagId     BigInt  @map("tag_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@map("product_tags")
+}
+
+model Customer {
+  id        String   @id @db.Uuid
+  email     String   @unique
+  fullName  String   @map("full_name") @db.VarChar(120)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  orders    Order[]
+
+  @@map("customers")
+}
+
+model Order {
+  id         BigInt      @id @default(autoincrement())
+  customerId String      @map("customer_id") @db.Uuid
+  status     OrderStatus @default(pending)
+  totalCents Int         @map("total_cents")
+  placedAt   DateTime    @default(now()) @map("placed_at")
+  notes      String?
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items      OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id             BigInt  @id @default(autoincrement())
+  orderId        BigInt  @map("order_id")
+  productId      String  @map("product_id") @db.Uuid
+  quantity       Int
+  unitPriceCents Int     @map("unit_price_cents")
+  order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product        Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
