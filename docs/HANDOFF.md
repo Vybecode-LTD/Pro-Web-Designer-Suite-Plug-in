@@ -12,7 +12,8 @@
   - **#111 (P32 part 2): each plan's mode limits.** `figma_audit.py --plan` or `.design-suite.json`'s `figma.plan` (both readers, all copies) reports `MODE_LIMIT` and quiets `MISSING_DARK_MODE` on Starter; a REST body past 40 modes is not written. Closes LC-B6. Codex 1 (seats), CodeRabbit 1 (the REST cap) real; CodeRabbit's "six calls" withdrawn.
   - **#112 (P33): theming without JavaScript with `light-dark()`.** style-architecture.md §10, its example run in Chromium; `check_roles.py` measures each pair per visitor preference. Closes SS-B3. Codex 4 and CodeRabbit 3 real, all in how the gate models the browser.
   - **#113 (P38 part 1): the top layer, `@starting-style`, `:user-invalid`.** A toast inside the modal, with `role="status"`; new `tests/test_modern_css.py`. SS-B4 in part. Codex 1 real.
-- **The plan:** 25 open items, 25 scheduled. About 1,060 tests.
+- **At the end:** `main` is this docs PR's merge (#114), on top of #113's `d369bde`, with CI green on each code PR's head. No other PR is open, and the checkout at `C:\DEV\Pro-Web-Designer-Suite-Plug-in` is on `main` with no other worktree.
+- **The plan:** 25 open items, 25 scheduled. 1,061 tests.
 - **No eval was run** this session (none was asked for).
 
 ## Next steps
