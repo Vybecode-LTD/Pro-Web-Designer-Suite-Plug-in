@@ -112,6 +112,18 @@
   under none, reading `color-scheme` through `var()` and that one `@supports`. The starter
   rewritten that way measures, scheme for scheme, as its blocks do, and the example runs in
   a browser in the tests.
+- **The top layer and the error state: modern CSS, part 1** (P38; SS-B4 in part).
+  accessibility.md gave a modal dialog `z-index: var(--z-modal)`, as if the `--z-*` ladder
+  reached the top layer. It does not: a toast at `--z-toast` sits under an open modal, and
+  a z-index on a top-layer element orders nothing ("the last element in the top layer is
+  rendered on top of everything else"). A new section says so and puts the message about
+  what a dialog did inside it, as a `popover="manual"` with `role="status"`: a popover shown from elsewhere
+  renders over the dialog too, but the modal has made it inert, so clicks pass through it
+  and a screen reader does not reach it. The toast fades in from `@starting-style` and out
+  with `transition-behavior: allow-discrete`, each feature's support stated. The field's
+  error state adds `:user-invalid`, which waits until the user has touched the field, with
+  `:has()` for its hint. A new `test_modern_css` runs each snippet in Chromium on the
+  starter's tokens, reading the hit test and Chromium's accessibility tree.
 
 ### Changed
 
