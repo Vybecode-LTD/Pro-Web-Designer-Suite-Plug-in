@@ -1,13 +1,12 @@
 # Start here: the next session
 
-**Written 2026-10-12**, at the end of the session (2026-10-11 and 12) that:
-- merged P32 in two parts: #109, the Plugin API route into Figma on every plan (`--reverse --format plugin-script` for the MCP server's `use_figma`), and #111, each plan's mode limits (`--plan`, `.design-suite.json`'s `figma.plan`, `MODE_LIMIT`). **P32 is done: LC-B1, LC-B6 and LC-C7 are closed;**
-- merged #110: `evals.yml` runs only by hand (the owner dropped the tag trigger);
-- merged P33 (#112): theming without JavaScript with `light-dark()`, and `check_roles.py` measuring it per visitor preference. **SS-B3 is closed;**
-- merged P38 part 1 (#113): the top layer against the z-index ladder, `@starting-style`, `:user-invalid`, with a new browser test module;
-- fixed 12 real review findings (§0).
+**Written 2026-10-12**, at the end of the session (2026-10-12) that:
+- merged P38 part 2 (#115): `cqi` type in a container, `font-size-adjust` on a stack of its own, a role's alpha variants with `color-mix()` and relative colour, and a disclosure animating to `auto` with `interpolate-size`, each run in Chromium. **SS-B4 is closed;**
+- merged P39 (#116): the migration census reads Sass's module colour functions, Vue, Svelte, Astro and HTML files, and CSS-in-JS style objects, and rollout.md gains its recipes. **LC-B7 is closed, LC-B5 in part** (the rest is P36's);
+- merged P40 (#117): Prisma and Drizzle schemas into content-model-to-ui. **DL-B3 in part** (the rest is P37's);
+- fixed 9 real review findings and 1 CI failure. **Phase 6a's code is done.**
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **P38 part 2** (§4), then the rest of Phase 6 (§5).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **R3.6, the 3.6.0 release** (§4), then Phase 6b (§5).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -121,7 +120,15 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Model what the browser applies, not what the text says** (CodeRabbit on #112): a negated `@supports not (...)` is not applied where the feature exists; a `var()` reads every block on its element, in any order; and a band that forces its scheme sits on a parent that follows the visitor. `check_roles.py` now iterates the visitor's preference and derives each scope's used scheme from it.
       - **Reachable is not announced** (Codex on #113): a toast needs `role="status"`, shown before its text is set.
       - **Run the doc's own snippet in a browser before writing the claim.** The first draft said a popover shown after a modal was the fix; the test showed it is inert (hit-testing passes through, Chromium's tree ignores it), so the toast went inside the dialog. The audit (`test_doc_snippets`) refused a selector over the 0,3,1 cap, a Tier-1 `--space-4` and a component margin in the new snippets.
-      - **Declined this session, with reasons:** CodeRabbit's `${CLAUDE_SKILL_DIR}` form in two commands (the skill writes every command `python scripts/<name>.py`, by its opening note), registering a 0-to-1 colour range (a data format, not a figure), and "six tool calls a month" (Figma's page says 20 today).
+      - **Declined in that session, with reasons:** CodeRabbit's `${CLAUDE_SKILL_DIR}` form in two commands (the skill writes every command `python scripts/<name>.py`, by its opening note), registering a 0-to-1 colour range (a data format, not a figure), and "six tool calls a month" (Figma's page says 20 today).
+    - **The 2026-10-12 session's reviews found 9 real issues** on #115 (Codex 1, CodeRabbit 1), #116 (Codex 2, CodeRabbit 2) and #117 (Codex 2), and CI 1 on #115, each fixed with a test failing on the head it reviewed:
+      - **Read the example against the section above it** (Codex on #115): `font-size-adjust` switched off the `size-adjust` of the re-metricked face in the very stack the section had just built.
+      - **A transition has two ends** (CodeRabbit on #115): `visibility` stays visible through a close, so a panel's links stay reachable by Tab until it ends. `inert` goes with the attribute.
+      - **A census that comes in short sizes the migration wrong** (Codex on #116): a Sass function seeded with a hex counted only the hex, and a responsive array's items were not read. **A file read twice is counted twice** (CodeRabbit on #116): Astro's frontmatter was read as a script and again as markup.
+      - **A deprecation range needs both ends** (CodeRabbit on #116): `npm deprecate @org/ds@">=2.1.0"` deprecates every later release too.
+      - **Every name pattern must meet the ORM's spelling** (Codex on #117): camelCase columns missed the title, sort and label signals, and a Prisma `view` is no entity.
+      - **Assert the formula, not a gap** (CI on #115): a 0.5px width gap between fallbacks held on Windows and failed on Ubuntu, whose fallback's aspect is close to 0.53. The test checks MDN's u = (m/m')s.
+      - **Declined:** CodeRabbit's plugin-root commands in rollout.md (it withdrew the comment).
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -167,13 +174,13 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
    - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions, and the owner's no to `bin/`.
    - §1 is the plugin-evals page, §10 P29's choices, and **§11 the sandboxing page and P30's choices**, with the first runs. Read §11 if you touch the evals.
-   - **Before P38 part 2, re-read at their sources** the pages §4 lists (web-features' records first), and register every figure in `evidence.json`.
+   - **Before R3.6**, read `dev plans/web-design-suite-3.5.0-live-check.md` (the last release's live check) and PR #99's body (its order: the release PR, then the evals, then the tag).
 4. Check the state, with the Bash tool:
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `25 open items, 25 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `23 open items, 23 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
@@ -184,8 +191,10 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 - **The names (#107).** `.design-suite.json`'s `names`: `prefixes` (each ending in `-`) and `rename`. `ProjectConfig.grammar_name()`, `grammarName()` and `lintProject().grammarName`; the audit's `tier1_advice`, stylelint's and ESLint's `tier1Advice` read through it, and ESLint's `NAMED_SHORTHAND` covers `(--name)` classes. The spec's `tiers.names` holds the examples; `test_real_tools.TheGatesReadTheNames` runs them.
 - **Figma on every plan (#109, #111).** `figma_to_tokens.py --reverse --format plugin-script` writes `reverse_body()`'s REST body as Plugin API code (`PLUGIN_SCRIPT`): found by name, created or updated in place, nothing deleted, the default values always on `defaultModeId`, counts and the first 20 errors returned, as `use_figma` runs it (top-level `await` and `return`). `figma_common.PLAN_MODES` (starter 1, professional 10, organization 20, enterprise 40) and `REST_MODES`; `figma_audit.py --plan` or `.design-suite.json`'s `figma.plan` reports `MODE_LIMIT` and quiets `MISSING_DARK_MODE` on Starter; `--reverse --format plugin-script --plan` reports `mode-limit`; a REST body past 40 modes is not written (exit 2). `test_figma_sync.PluginScript` runs the script under Node against a stub `figma` (`FIGMA_STUB`); `PlanLimits` the limits. `figma-mapping.md` §14 has the Plugin API table, each plan's limits and the seats.
 - **`light-dark()` (#112).** `check_roles.py` measures each pair once per visitor preference: `used(env, preference)` gives a scope's scheme (one named alone, the preference under `light dark`, light under none), `scopes()` resolves `color-scheme`'s `var()` once every block on its element (root, band) is in, and `rules()` reads one `@supports`, the positive query `LIGHT_DARK_QUERY`. Each result carries `scheme`, and `preference` when it depends on it. style-architecture.md §10 teaches it, and `test_check_roles.LightDarkInABrowser` runs its example (marker `<!-- light-dark:example -->`) in Chromium.
-- **`tests/test_modern_css.py` (#113)** runs the references' modern-CSS snippets in Chromium on the starter's tokens (`reference_block(name, needle)`, `PROBE_JS` with a scenario argument): hit tests and Chromium's accessibility tree through CDP (`Accessibility.getFullAXTree`). P38 part 2's tests go here.
-- **The plugin** is `plugins/web-design-suite/` (about 1,060 tests):
+- **`tests/test_modern_css.py` (#113)** runs the references' modern-CSS snippets in Chromium on the starter's tokens (`reference_block(name, needle)`, `PROBE_JS` with a scenario argument): hit tests and Chromium's accessibility tree through CDP (`Accessibility.getFullAXTree`). #115 added `cqi`, `font-size-adjust`, the alpha variants and the disclosure (its toggle, a ```js block, runs in the page; `reference_block(name, needle, lang)`); `TheReferencesReadAlone` holds the checks that need no browser.
+- **The migration census (#116).** `extract_literals.py` reads `.vue`, `.svelte`, `.astro` and `.html` (`MARKUP_EXT`): each `<style>` block in its `lang` (`style_blocks()`), scripts and Astro's frontmatter as JavaScript (`script_blocks()`), `style=""` and `class=""` (`extract_markup()`). `object_style_literals()` reads `sx`, `css`, `styled({})`, vanilla-extract and Panda (`STYLE_PROPS`, `STYLE_SHORTHANDS`); a number in `sx` or Panda is a theme step, so only strings count. `cluster_values.HAND_WORK` sets inline styles and style objects aside. `apply_codemod.py` rewrites the style blocks (`plan_markup()`). `test_token_migration.TheCensusReadsEveryStyleSource`.
+- **Prisma and Drizzle (#117).** `introspect_schema.py` parsers 4 and 5, `parse_prisma()` and `parse_drizzle()` (pg-core only; `_ts_args()` is string-aware), chosen by `detect_format()` or `--format`. Each fidelity block names its losses (Prisma: no CHECK, views left out). `_n()` (`_NamePattern`) matches the snake_case signals on camelCase names, and `_canonical()` and `humanise()` read them too. Fixtures `tests/fixtures/supabase/shop.prisma` and `shop.drizzle.ts`; `test_schema_sources.OrmSchemasReadAsTheMigrationDoes`.
+- **The plugin** is `plugins/web-design-suite/` (about 1,080 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -257,6 +266,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - The tag is annotated: `git tag -a vX.Y.Z SHA -m "web-design-suite X.Y.Z"`.
   - To install: unpack the zip's `web-design-suite/` over `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, then run `claude plugin update web-design-suite@web-design-suite` with the bundled CLI (`%APPDATA%\Claude\claude-code\2.1.293\83cb0bd7fed4\claude.exe`; 2.1.288's `36aa8c97bf86` is still there).
 - **CI** runs Windows, Linux and macOS × Python 3.9 and 3.14, with Node 22.
+  - **A push with no checks after a few minutes** is a lost `pull_request` event (a GitHub incident, 2026-10-12): `gh workflow run ci.yml --ref BRANCH`, and a later push fires the PR's own.
   - A macOS job cancelled after 15 minutes with no log is a runner that never came: re-run it (`gh run rerun RUN --failed`).
 - **Python 3.9 is the floor**: no `zip(strict=)`, no `match`, no `str.removeprefix`, no `X | Y` outside annotations. Annotations are fine with `from __future__ import annotations`.
 - **SKILL.md budgets are tight.** The limit is 20,500 bytes, so detail goes in the references. A row you lengthen needs a trim beside it.
@@ -278,41 +288,30 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. P38 part 2: modern CSS, the rest
+## 4. R3.6: release 3.6.0
 
-**Item:** SS-B4, which closes with it. Read its paragraph in `web-design-suite-review/studio-systems.md` (about line 121) and the plan's `P38` row. Part 1 (#113) taught the top layer, `@starting-style` and `:user-invalid` in accessibility.md.
+**Phase 6a's code is merged** (P31, P32, P33, P38, P39, P40: #101 to #117), under `## 3.6.0 — unreleased` in the CHANGELOG. 3.5.0's release (#99) is the model: a release PR, then the evals on its merge, then the tag. **Every paid step needs the owner's OK first, with its estimate.**
 
-**The work, each in the reference that owns it:**
-- **`cqi` in typography.md** (about line 354 says "use container queries" and never names the units): type that sizes to its container, as a fluid token, `clamp()` with a rem term so it still grows with zoom (SC 1.4.4; SS-B5's 2.5× rule is P-later, not this PR). Check that the audit, stylelint and ESLint take `cqi` in a token file (the spec's literal units, `design-rules.json`; a change there goes through `sync_rules.py`).
-- **`font-size-adjust` in typography.md:** the fallback font's x-height matched to the web font's (`from-font`, or a number), which narrows the shift when the web font arrives but does not remove it: widths, ascent and line gap still differ. Pair it with the fallback `@font-face`'s metric overrides (`size-adjust`, `ascent-override`, `descent-override`, `line-gap-override`) where the shift must be smaller, and never promise none (Codex on #114).
-- **`color-mix()` and relative colour in color-system.md §9** (state colours as overlays): alpha variants from a role, `color-mix(in oklch, var(--x) 12%, transparent)` and `oklch(from var(--x) l c h / 0.12)`, in the token file. Check what the gates allow in a component file first; relative colour may read as a literal colour there.
-- **`interpolate-size` in motion-system.md:** `interpolate-size: allow-keywords` to animate to `height: auto`, as a Chromium-only enhancement that degrades to a jump.
+1. **Check.** `main`'s CI green; `plugin.json` still says 3.5.0; `check_execution_plan.py` says 23 and 23.
+2. **The live check, with the owner's OK** (about $1). 3.6.0 adds no hook, command, agent or MCP tool, so test what changed in a live session: one headless session per changed route, with the plugin loaded from `main`, in a scratch copy of a project (the command is §2's *live check*). Suggested: `figma_to_tokens.py --reverse --format plugin-script`; a DTCG resolver export; `check_roles` (the MCP tool) on a `light-dark()` theme; the migration census on a Vue and MUI project; `/schema-to-screens` on `shop.prisma`; a card headline with `cqi` from web-design-studio. Record each in `dev plans/web-design-suite-3.6.0-live-check.md`, and fix what it finds first, each fix in its own PR with its test.
+3. **The release PR.** `plugin.json` at `3.6.0` (`release.yml` refuses a tag that differs), the CHANGELOG's heading `## 3.6.0` dated, the README's three cache paths at 3.6.0, the plan's R3.6 row and §9, the live-check file listed in `dev plans/README.md`. Merge it when it is ready.
+4. **The evals, with the owner's OK:** `gh workflow run evals.yml --ref main -f tag=all -f runs=3` on the release PR's merge (about $11, routing then outcome under one $14 ceiling). Read the run's summary. `--ref` takes a branch, so the run tests `main`'s head when it starts: check `gh run view RUN --json headSha` equals MERGE_SHA, and if `main` moved first, tag the commit the evals ran, never another. Tag only if both sets pass; a failure is diagnosed first.
+5. **The tag.** `python -B tooling/release/build.py OUT_DIR --rev MERGE_SHA` (an empty folder, and the release PR's merge), then `git tag -a v3.6.0 MERGE_SHA -m "web-design-suite 3.6.0"` and push it. `release.yml` creates the release: check its assets and notes. Then install it (§2's *release*) and check that `claude plugin details` says 3.6.0.
 
-**Re-read first, and register every figure:** web-features' records (`curl -sL https://raw.githubusercontent.com/web-platform-dx/web-features/main/features/<id>.yml.dist`: `container-queries` or its units, `font-size-adjust`, `color-mix`, `relative-color`, `interpolate-size`) and MDN for each behaviour you quote.
+**Size:** S-M. **Close:** the plan's R3.6 row renamed `R3.6, #N`; CLAUDE.md's Version line.
 
-**Tests:** in `tests/test_modern_css.py` (its `reference_block()` and `PROBE_JS` with a scenario argument): each snippet as written, on the starter's tokens, in Chromium: `cqi` type follows its container and still grows at 200% zoom; the overlay's computed colour; a height transition that runs with `interpolate-size` (or is skipped when Chromium lacks it). `test_doc_snippets` audits each block. Run each new browser test three times. `fail_before.py` against `v3.5.0`.
+## 5. Then Phase 6b, 4.0.0
 
-**Size:** S-M. **Close:** SS-B4 in the inventory; the plan's `P38` row renamed `P38 part 2, #N`; the CHANGELOG under `## 3.6.0 — unreleased`.
-
-## 5. Then the rest of Phase 6
-
-**The owner reordered Phase 6 on 2026-10-11** (the plan's §4 and D6): the non-breaking half ships first as **3.6.0**, then 4.0.0.
-
-Phase 6a, 3.6.0, in this order unless the owner says otherwise:
-- P31, P32, P33: done (#101 to #112);
-- P38: part 1 done (#113), part 2 next (§4);
-- P39: migration coverage for CSS-in-JS and Sass functions, and the rollout recipes (LC-B5, LC-B7; design-token-migration);
-- P40: Prisma and Drizzle schema inputs (DL-B3; `introspect_schema.py`, new fixtures);
-- R3.6: release 3.6.0. The eval dispatch first, with the owner's OK and its estimate (`gh workflow run evals.yml --ref main -f tag=all -f runs=3`; a tag no longer starts it), then the live check, the build and the annotated `v3.6.0` tag on `main`'s head.
-
-Phase 6b, 4.0.0, after it:
-- P34: runtime coverage;
+**After 3.6.0, ask the owner which workstream comes first** (the plan's §4 says they are independent):
+- P34: runtime coverage (single-page apps, logged-in pages, shadow DOM, several URLs and viewports);
 - P35: the cheap automatable checks and other engines;
-- P36: Tailwind v4 and decision D4, the breaking change;
-- P37: SCSS, Next.js, Vue, Svelte and Astro;
+- P36: Tailwind v4 and decision D4, the breaking change, with LC-B5's rest (v4's `@theme` in the migration);
+- P37: SCSS in stylelint (D3), Next.js App Router, Vue, Svelte and Astro, with DL-B3's rest (a server-action form, Vue and Svelte output);
 - P41: email output and right-to-left;
 - P42 and P43: persuasion;
-- R4: release 4.0.0, opening a `## 4.0.0 — unreleased` CHANGELOG heading with its first PR. Ask the owner before each eval run, and keep each PR under 100 files for CodeRabbit.
+- R4: release 4.0.0, opening a `## 4.0.0 — unreleased` CHANGELOG heading with its first PR.
+
+Ask the owner before each eval run, and keep each PR under 100 files for CodeRabbit.
 
 ## 6. End of session (never skip)
 
