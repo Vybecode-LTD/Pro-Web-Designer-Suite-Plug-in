@@ -93,10 +93,25 @@
   `.design-suite.json`'s new `figma.plan`, reports `MODE_LIMIT` (error) on a collection past
   the cap, as a theme, a density and a brand in one collection soon are, and stops asking
   Starter for a dark mode it cannot hold. `--reverse --format plugin-script --plan` reports
-  the same before the run, and the REST body is held to the endpoint's own cap. Both config
+  the same before the run, and a REST body past the endpoint's own cap is not
+  written (exit 2): Figma refuses the whole request. Both config
   readers check the key alike. `figma-mapping.md` §14 adds the plans' table, branch keys
   (`local` and the POST take one, `published` does not) and the MCP server's Starter
   allowance.
+- **Theming without JavaScript: `light-dark()`** (P33; SS-B3). style-architecture.md §10
+  teaches roles that hold both values, `light-dark(LIGHT, DARK)`, picked by the element's
+  used `color-scheme`: the OS decides from the first paint with no script, form fields
+  follow, and `[data-theme]` stays as the override, one `color-scheme` declaration long.
+  Because the colour is resolved where it is used, a `<section data-theme="dark">` is dark
+  inside a light page, derived tokens such as `--elevation-card` included, which a
+  re-pointing block cannot reach. Support is Baseline 2024 (13 May 2024), widely available
+  from November 2026; for older browsers, concrete roles with the `light-dark()` ones inside
+  `@supports (color: light-dark(#000, #fff))`. `check_roles.py` holds a `light-dark()` role
+  in every scheme the visitor can be in: the one a scope's `color-scheme` names alone
+  (`.inverse { color-scheme: dark; }` reads the dark branch), both under `light dark`, light
+  under none, reading `color-scheme` through `var()` and that one `@supports`. The starter
+  rewritten that way measures, scheme for scheme, as its blocks do, and the example runs in
+  a browser in the tests.
 
 ### Changed
 
