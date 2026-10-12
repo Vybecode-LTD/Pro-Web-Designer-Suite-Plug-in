@@ -14,10 +14,16 @@ mechanically replaceable" does.
 WHAT IT READS
 -------------
   .css .scss .less .pcss         CSS declarations, SCSS/LESS variables,
-                                 `darken()`/`lighten()` calls
+                                 `darken()`/`lighten()` and `color.adjust()`,
+                                 `color.scale()`, `color.change()`, `color.mix()`
   .js .jsx .ts .tsx .mjs .cjs    JSX inline `style={{...}}`, styled-components
-                                 and Emotion template literals, Tailwind
+                                 and Emotion template literals, style objects
+                                 (MUI `sx`, Emotion and Panda `css({...})`,
+                                 vanilla-extract `style({...})`), Tailwind
                                  arbitrary values, hex colors in strings
+  .vue .svelte .astro .html .htm `<style>` blocks (CSS, SCSS, Less), `style=""`
+                                 attributes, Tailwind arbitrary values in
+                                 `class="..."`
 
 Values inside comments, quoted strings and `url()` are deliberately NOT
 counted: they are not design decisions and counting them inflates the estimate
@@ -72,6 +78,22 @@ CSS_EXT = {".css", ".scss", ".less", ".pcss"}
 # count nothing; the census says it was not read instead (N13).
 INDENTED_SASS_EXT = ".sass"
 JS_EXT = {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}
+# Single-file components and pages: their <style> blocks are stylesheets, their
+# style="" attributes inline styles, their class="" attributes class lists (LC-B5).
+MARKUP_EXT = {".vue", ".svelte", ".astro", ".html", ".htm"}
+SFC_EXT = {".vue", ".svelte", ".astro"}           # a component by definition
+STYLE_BLOCK_RE = re.compile(r"(<style\b)([^>]*)>(.*?)</style\s*>", re.IGNORECASE | re.DOTALL)
+SCRIPT_BLOCK_RE = re.compile(r"<script\b[^>]*>(.*?)</script\s*>", re.IGNORECASE | re.DOTALL)
+ASTRO_FRONTMATTER_RE = re.compile(r"\A\s*---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.DOTALL)
+HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+STYLE_LANG_RE = re.compile(r"""\blang\s*=\s*["']?([\w-]+)""", re.IGNORECASE)
+# The suffix a <style lang="…"> block is read as; a language the scanner cannot
+# follow (indented Sass, Stylus) is reported, as a .sass file is.
+STYLE_LANG_SUFFIX = {"": ".css", "css": ".css", "postcss": ".pcss", "pcss": ".pcss",
+                     "scss": ".scss", "less": ".less"}
+# `style="…"` but never Vue's `:style` / `v-bind:style` (an expression) or
+# Svelte's `style:color` directive.
+STYLE_ATTR_RE = re.compile(r"""(?<![\w:@.-])style\s*=\s*(?:"([^"]*)"|'([^']*)')""", re.IGNORECASE)
 
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit",
@@ -175,8 +197,9 @@ LENGTH_RE = re.compile(
 )
 UNITLESS_ZERO_RE = re.compile(r"(?<![\w.#$@-])(-?0(?:\.0+)?)(?![\w.%-])")
 HEX_RE = re.compile(r"#[0-9a-fA-F]{3,8}(?![\w-])")
+# Not after a hyphen: Sass's adjust-color() is not CSS's color() (LC-B5).
 FUNC_COLOR_RE = re.compile(
-    r"\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color-mix|color)\s*\(", re.IGNORECASE
+    r"(?<![\w-])(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color-mix|color)\s*\(", re.IGNORECASE
 )
 NAMED_COLORS = {
     "red", "blue", "green", "black", "white", "gray", "grey", "yellow", "orange",
@@ -194,7 +217,10 @@ NAMED_COLOR_RE = re.compile(
 TIME_RE = re.compile(r"(?<![\w.#$@-])(\d*\.?\d+)\s*(ms|s)(?![\w-])", re.IGNORECASE)
 BEZIER_RE = re.compile(r"\b(cubic-bezier|steps)\s*\([^)]*\)", re.IGNORECASE)
 SCSS_COLOR_FN_RE = re.compile(
-    r"\b(darken|lighten|saturate|desaturate|adjust-hue|fade-in|fade-out|"
+    # The sass:color module's functions first, which the Sass docs send users
+    # to in place of darken() and the rest (LC-B5), then the global names.
+    r"\b(color\.(?:adjust|scale|change|mix)|adjust-color|scale-color|change-color|"
+    r"darken|lighten|saturate|desaturate|adjust-hue|fade-in|fade-out|"
     r"transparentize|opacify|mix|rgba)\s*\(\s*(\$[\w-]+|#[0-9a-fA-F]{3,8})",
     re.IGNORECASE,
 )
@@ -234,6 +260,19 @@ STYLED_TAG_RE = re.compile(
 )
 
 JSX_STYLE_RE = re.compile(r"\bstyle\s*=\s*\{\{")
+# Object styles (LC-B5): MUI's and Emotion's props, the libraries' functions,
+# and styled-components' and Emotion's object form. `style`, `styleVariants`
+# and `recipe` count only in a file importing vanilla-extract, `cva` and
+# `sva` only beside Panda's import: elsewhere those names mean other things.
+OBJECT_STYLE_RE = re.compile(
+    r"\b(?P<prop>sx|css)\s*=\s*\{\s*(?=\{)"
+    r"|\b(?P<fn>css|cva|sva|style|styleVariants|recipe)\s*\(\s*(?=\{)"
+    r"|\bstyled\s*(?:\.\s*[\w$]+|\(\s*[^()]*\))\s*\(\s*(?=\{)"
+)
+VANILLA_ONLY = {"style", "styleVariants", "recipe"}
+PANDA_ONLY = {"cva", "sva"}
+VANILLA_IMPORT_RE = re.compile(r"""from\s+['"]@vanilla-extract/(?:css|recipes)['"]""")
+PANDA_IMPORT_RE = re.compile(r"""from\s+['"](?:[^'"]*styled-system/[\w/-]+|@pandacss/[\w/-]+)['"]""")
 JS_HEX_STRING_RE = re.compile(r"""['"`](#[0-9a-fA-F]{3,8})['"`]""")
 
 CAMEL_BOUNDARY_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
@@ -874,17 +913,22 @@ def literals_from_value(
 # CSS / SCSS / LESS files
 # ---------------------------------------------------------------------------
 
-def extract_css(path: Path, text: str) -> list[Literal]:
+def extract_css(path: Path, text: str, *, suffix: str | None = None,
+                component: bool | None = None) -> list[Literal]:
+    """A stylesheet's literals. `suffix` reads `text` as another syntax (a
+    `<style lang="scss">` block in a .vue file, blanked around to its length)."""
     out: list[Literal] = []
-    blanked = blank_css_comments(text, line_comments(path))
-    component = is_component_file(path)
+    suffix = (suffix or path.suffix).lower()
+    blanked = blank_css_comments(text, suffix not in PLAIN_CSS_EXT)
+    if component is None:
+        component = is_component_file(path)
     fname = norm_path(path)
 
     for d in scan_css_declarations(blanked):
         prop = d.prop
         if prop.startswith("$"):
             context = "scss-var"
-        elif prop.startswith("@") and path.suffix.lower() == ".less":
+        elif prop.startswith("@") and suffix == ".less":
             context = "less-var"
         elif prop.startswith("--"):
             context = "custom-property"
@@ -903,6 +947,92 @@ def extract_css(path: Path, text: str) -> list[Literal]:
             file=fname, context=context, selector=d.selector,
             component=component, declaration=re.sub(r"\s+", " ", decl_text),
         ))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Vue, Svelte, Astro and HTML files (LC-B5)
+# ---------------------------------------------------------------------------
+
+def _spaces(s: str) -> str:
+    return re.sub(r"[^\r\n]", " ", s)
+
+
+def keep_only(text: str, start: int, end: int) -> str:
+    """`text` blanked outside [start, end), newlines kept: offsets and line
+    numbers stay those of the file."""
+    return _spaces(text[:start]) + text[start:end] + _spaces(text[end:])
+
+
+def blank_spans(text: str, spans: Iterable[tuple[int, int]]) -> str:
+    out, at = [], 0
+    for a, b in sorted(spans):
+        if b <= at:
+            continue
+        a = max(a, at)
+        out += [text[at:a], _spaces(text[a:b])]
+        at = b
+    return "".join(out) + text[at:]
+
+
+def script_blocks(text: str) -> list[tuple[int, int]]:
+    """Each `<script>` block's body, and an Astro component's frontmatter."""
+    spans = [m.span(1) for m in SCRIPT_BLOCK_RE.finditer(HTML_COMMENT_RE.sub(
+        lambda m: _spaces(m.group(0)), text))]
+    front = ASTRO_FRONTMATTER_RE.match(text)
+    return ([front.span(1)] if front else []) + spans
+
+
+def style_blocks(text: str) -> list[tuple[int, int, str | None, str]]:
+    """Each `<style>` block outside an HTML comment and a script: its body's
+    (start, end), the suffix it is read as (None for a language the scanner
+    cannot follow) and its `lang`. apply_codemod rewrites the same blocks."""
+    clean = blank_spans(HTML_COMMENT_RE.sub(lambda m: _spaces(m.group(0)), text),
+                        script_blocks(text))
+    out = []
+    for m in STYLE_BLOCK_RE.finditer(clean):
+        lang = STYLE_LANG_RE.search(m.group(2))
+        lang_name = lang.group(1).lower() if lang else ""
+        out.append((m.start(3), m.end(3), STYLE_LANG_SUFFIX.get(lang_name), lang_name))
+    return out
+
+
+def template_of(text: str) -> str:
+    """The markup outside its style and script blocks and its comments."""
+    spans = [(s, e) for s, e, _, _ in style_blocks(text)] + script_blocks(text)
+    spans += [m.span() for m in HTML_COMMENT_RE.finditer(text)]
+    return blank_spans(text, spans)
+
+
+def extract_markup(path: Path, text: str, unread: list[str]) -> list[Literal]:
+    out: list[Literal] = []
+    fname = norm_path(path)
+    component = path.suffix.lower() in SFC_EXT or is_component_file(path)
+    for start, end, suffix, lang in style_blocks(text):
+        if suffix is None:
+            unread.append(f'{fname} (<style lang="{lang}">)')
+            continue
+        out.extend(extract_css(path, keep_only(text, start, end), suffix=suffix,
+                               component=component))
+    for start, end in script_blocks(text):
+        out.extend(extract_js(path, keep_only(text, start, end), component=component))
+    template = template_of(text)
+    # style="" is an inline style: hand work (Law 4), as JSX's style={{}} is.
+    for m in STYLE_ATTR_RE.finditer(template):
+        group = 1 if m.group(1) is not None else 2
+        body, at = m.group(group), m.start(group)
+        for decl in re.finditer(r"[^;]+", body):
+            prop, colon, value = decl.group(0).partition(":")
+            if not colon or "{" in value:          # Svelte and Astro interpolate with {…}
+                continue
+            value_at = at + decl.start() + len(prop) + 1
+            value = re.sub(r"var\(\s*--[\w-]+", lambda mm: " " * len(mm.group(0)), value)
+            out.extend(literals_from_value(
+                prop.strip().lower(), value, value_at, text, file=fname,
+                context="inline-style", selector='style=""', component=component,
+                declaration=re.sub(r"\s+", " ", decl.group(0).strip()),
+            ))
+    out.extend(tailwind_literals(CLASSNAME_RE.finditer(template), text, fname, component))
     return out
 
 
@@ -1034,7 +1164,8 @@ def parse_style_object(body: str) -> list[tuple[str, str, int]]:
                     break
                 v += 1
             raw_value = body[i + 1:v]
-            if key and re.fullmatch(r"[-\w$]+", key):
+            # A selector or a media query (`'&:hover'`) keys a nested object.
+            if key and (re.fullmatch(r"[-\w$]+", key) or raw_value.lstrip().startswith("{")):
                 out.append((key, raw_value, i + 1))
             i = v + 1
             del key_start
@@ -1043,10 +1174,102 @@ def parse_style_object(body: str) -> list[tuple[str, str, int]]:
     return out
 
 
-def extract_js(path: Path, text: str) -> list[Literal]:
+def tailwind_literals(matches: Iterable[re.Match], text: str, fname: str, component: bool,
+                      claimed=lambda pos: False) -> list[Literal]:
+    """The arbitrary values (`p-[13px]`) in each matched class list."""
+    out: list[Literal] = []
+    seen: set[tuple[int, int]] = set()
+    for sm in matches:
+        group = next((g for g in sm.groups() if g is not None), None)
+        if group is None:
+            continue
+        base = sm.start(sm.lastindex or 1)
+        if claimed(base):
+            continue
+        for m in TW_ARBITRARY_RE.finditer(group):
+            span = (base + m.start(), base + m.end())
+            if span in seen:
+                continue
+            seen.add(span)
+            prefix, body = m.group(2), m.group(3)
+            if TW_NON_DESIGN_PREFIX.match(prefix):
+                continue
+            body_clean = body.replace("_", " ")
+            if body_clean.startswith("var(") or body_clean.startswith("--"):
+                continue
+            ln, col = line_col(text, span[0])
+            kind, normalized = classify_tailwind(prefix, body_clean)
+            if not kind:
+                continue
+            out.append(Literal(
+                kind=kind, raw=m.group(0), normalized=normalized,
+                prop=f"tw:{prefix}", file=fname, line=ln, col=col,
+                context="tailwind-arbitrary", selector="className",
+                component=component, declaration=m.group(0),
+            ))
+    return out
+
+
+# The properties a style object's key can name; a key outside them (`xs`, `md`,
+# `primary`) under one that is (`padding: { xs: '8px' }`) takes its parent's.
+STYLE_PROPS = (SPACING_PROPS | SIZE_PROPS | RADIUS_PROPS | BORDER_WIDTH_PROPS | COLOR_PROPS
+               | SHADOW_PROPS | MOTION_PROPS | set(BORDER_SHORTHAND)
+               | {"font", "font-size", "line-height", "letter-spacing", "z-index", "border"})
+# MUI's and Panda's shorthand keys, by their CSS property (kebab-cased).
+STYLE_SHORTHANDS = {
+    "bg": "background", "bgcolor": "background-color", "bg-color": "background-color",
+    "p": "padding", "pt": "padding-top", "pr": "padding-right", "pb": "padding-bottom",
+    "pl": "padding-left", "px": "padding-inline", "py": "padding-block",
+    "m": "margin", "mt": "margin-top", "mr": "margin-right", "mb": "margin-bottom",
+    "ml": "margin-left", "mx": "margin-inline", "my": "margin-block",
+    "w": "width", "h": "height", "rounded": "border-radius",
+}
+
+
+def object_style_literals(clean: str, text: str, open_at: int, end: int, *, fname: str,
+                          component: bool, numbers_are_px: bool, selector: str) -> list[Literal]:
+    """Every literal in a style object, nested objects included: selectors
+    (`'&:hover'`), media queries, variants and responsive values."""
+    out: list[Literal] = []
+
+    def walk(start: int, stop: int, inherited: str | None, depth: int) -> None:
+        if depth > 32:                        # no real style object nests this deep
+            return
+        for key, raw_value, rel in parse_style_object(clean[start:stop]):
+            prop = STYLE_SHORTHANDS.get(kebab(key), kebab(key))
+            at = start + rel
+            v = raw_value.strip()
+            lead = len(raw_value) - len(raw_value.lstrip())
+            if v.startswith("{"):
+                inner = at + lead
+                walk(inner + 1, match_braces(clean, inner) - 1,
+                     prop if prop in STYLE_PROPS else inherited, depth + 1)
+                continue
+            if prop not in STYLE_PROPS and inherited:
+                prop = inherited
+            if v[:1] in "\"'" and v[-1:] == v[:1] and len(v) >= 2:
+                v_text, v_off = v[1:-1], at + lead + 1
+            elif v[:1] == "`" and v[-1:] == "`" and "${" not in v and len(v) >= 2:
+                v_text, v_off = v[1:-1], at + lead + 1
+            elif numbers_are_px and re.fullmatch(r"-?\d*\.?\d+", v):
+                v_text = v if prop in JSX_UNITLESS else f"{v}px"
+                v_off = at + lead
+            else:
+                continue                      # an expression, a theme step or a token name
+            out.extend(literals_from_value(
+                prop, v_text, v_off, text, file=fname, context="style-object",
+                selector=selector, component=component, declaration=f"{key}: {v}",
+            ))
+
+    walk(open_at + 1, end - 1, None, 0)
+    return out
+
+
+def extract_js(path: Path, text: str, *, component: bool | None = None) -> list[Literal]:
     out: list[Literal] = []
     clean = blank_js_comments(text)
-    component = is_component_file(path) or path.suffix.lower() in {".jsx", ".tsx"}
+    if component is None:
+        component = is_component_file(path) or path.suffix.lower() in {".jsx", ".tsx"}
     fname = norm_path(path)
     consumed: list[tuple[int, int]] = []
 
@@ -1106,36 +1329,27 @@ def extract_js(path: Path, text: str) -> list[Literal]:
                 declaration=f"{key}: {v}",
             ))
 
+    # ---- Style objects: MUI sx, css({}), vanilla-extract, styled({}) -------
+    vanilla = bool(VANILLA_IMPORT_RE.search(clean))
+    panda = bool(PANDA_IMPORT_RE.search(clean))
+    for m in OBJECT_STYLE_RE.finditer(clean):
+        name = m.group("prop") or m.group("fn") or "styled"
+        if claimed(m.start()) or (name in VANILLA_ONLY and not vanilla) or (name in PANDA_ONLY and not panda):
+            continue
+        open_at = m.end()
+        end = match_braces(clean, open_at)
+        claim(m.start(), end)
+        # A number is a theme step in MUI's sx and a token name in Panda's
+        # functions, not a pixel length, so only their strings are counted.
+        out.extend(object_style_literals(
+            clean, text, open_at, end, fname=fname, component=component,
+            numbers_are_px=not (name == "sx" or panda),
+            selector=f"{name}={{{{...}}}}" if m.group("prop") else f"{name}({{...}})"))
+
     # ---- Tailwind arbitrary values ----------------------------------------
-    seen_tw: set[tuple[int, int]] = set()
-    for sm in list(CLASSNAME_RE.finditer(clean)) + list(CLASSLIST_STRING_RE.finditer(clean)):
-        group = next((g for g in sm.groups() if g is not None), None)
-        if group is None:
-            continue
-        base = sm.start(sm.lastindex or 1)
-        if claimed(base):
-            continue
-        for m in TW_ARBITRARY_RE.finditer(group):
-            span = (base + m.start(), base + m.end())
-            if span in seen_tw:
-                continue
-            seen_tw.add(span)
-            prefix, body = m.group(2), m.group(3)
-            if TW_NON_DESIGN_PREFIX.match(prefix):
-                continue
-            body_clean = body.replace("_", " ")
-            if body_clean.startswith("var(") or body_clean.startswith("--"):
-                continue
-            ln, col = line_col(text, span[0])
-            kind, normalized = classify_tailwind(prefix, body_clean)
-            if not kind:
-                continue
-            out.append(Literal(
-                kind=kind, raw=m.group(0), normalized=normalized,
-                prop=f"tw:{prefix}", file=fname, line=ln, col=col,
-                context="tailwind-arbitrary", selector="className",
-                component=component, declaration=m.group(0),
-            ))
+    out.extend(tailwind_literals(
+        list(CLASSNAME_RE.finditer(clean)) + list(CLASSLIST_STRING_RE.finditer(clean)),
+        text, fname, component, claimed))
 
     # ---- bare hex colors in JS strings -------------------------------------
     for m in JS_HEX_STRING_RE.finditer(clean):
@@ -1228,7 +1442,7 @@ def iter_files(paths: Sequence[str], *, include_vendor: bool,
         for fp in candidates:
             if fp.suffix.lower() == INDENTED_SASS_EXT and unread is not None:
                 unread.append(fp)
-            if fp.suffix.lower() not in CSS_EXT | JS_EXT:
+            if fp.suffix.lower() not in CSS_EXT | JS_EXT | MARKUP_EXT:
                 continue
             if not include_vendor and not explicit and is_vendor(fp):
                 if vendor_skipped is not None:
@@ -1245,6 +1459,7 @@ def extract(paths: Sequence[str], *, include_vendor: bool = False,
     problems: list[str] = []
     vendor_skipped: list[Path] = []
     unread: list[Path] = []
+    unread_blocks: list[str] = []
     for fp in iter_files(paths, include_vendor=include_vendor,
                          include_tokens=include_tokens,
                          vendor_skipped=vendor_skipped, unread=unread):
@@ -1258,6 +1473,8 @@ def extract(paths: Sequence[str], *, include_vendor: bool = False,
         try:
             if fp.suffix.lower() in CSS_EXT:
                 literals.extend(extract_css(fp, text))
+            elif fp.suffix.lower() in MARKUP_EXT:
+                literals.extend(extract_markup(fp, text, unread_blocks))
             else:
                 literals.extend(extract_js(fp, text))
         except Exception as exc:                     # noqa: BLE001 — never abort a census
@@ -1274,6 +1491,11 @@ def extract(paths: Sequence[str], *, include_vendor: bool = False,
         problems.append(f"did not read {len(unread)} indented Sass file(s): {names}{more} "
                         f"— the census follows braces, which .sass does not have; "
                         f"count their literals in the compiled CSS, or convert them to .scss")
+    if unread_blocks:
+        names = ", ".join(unread_blocks[:5])
+        more = f" and {len(unread_blocks) - 5} more" if len(unread_blocks) > 5 else ""
+        problems.append(f"did not read {len(unread_blocks)} <style> block(s) in a language the census "
+                        f"cannot follow: {names}{more} — count their literals in the compiled CSS")
     literals.sort(key=lambda l: (l.file, l.line, l.col))
     return literals, problems
 

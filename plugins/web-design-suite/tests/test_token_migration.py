@@ -693,5 +693,90 @@ class TheCensusMakesItsFolder(TempDirTest):
         self.assertTrue(literals["literals"])
 
 
+class TheCensusReadsEveryStyleSource(TempDirTest):
+    """LC-B5 (P39): the census missed Sass's module colour functions, the
+    <style> blocks and style="" attributes of Vue, Svelte, Astro and HTML
+    files, and CSS-in-JS style objects, so a migration sized from it came
+    in short, and the codemod never reached the blocks."""
+
+    extract = MigrationPipeline.extract
+    cluster = MigrationPipeline.cluster
+    MAPPING = VendorScopeAndScale.MAPPING
+
+    def found(self, data, name):
+        return [(l["line"], l["context"], l["prop"], l["raw"]) for l in data["literals"]
+                if l["file"].replace("\\", "/").endswith(name)]
+
+    def test_sass_module_colour_functions_are_counted(self):
+        self.write("src/buttons.scss", "$brand: #e16037;\n"
+                   ".a { color: darken($brand, 10%); background: color.adjust($brand, $lightness: -10%); }\n"
+                   ".b { color: color.scale($brand, $lightness: 20%); outline-color: color.change($brand, $alpha: 0.5); }\n"
+                   ".c { color: adjust-color($brand, $blue: 5); }\n")
+        _, data = self.extract("src")
+        functions = [raw.split("(")[0] for _, context, _, raw in self.found(data, "buttons.scss")
+                     if context == "css-decl"]
+        self.assertEqual(functions, ["darken", "color.adjust", "color.scale", "color.change", "adjust-color"])
+
+    def test_style_blocks_of_single_file_components_are_stylesheets(self):
+        self.write("src/Card.vue", "<template>\n  <!-- <div style=\"padding: 99px\"></div> -->\n"
+                   "  <div class=\"card\"><slot /></div>\n</template>\n"
+                   "<script setup>\nconst css = \"<style>.x { margin: 98px; }</style>\";\n</script>\n"
+                   "<style scoped lang=\"scss\">\n.card { padding: 13px; } // .card { margin: 97px; }\n</style>\n"
+                   "<style lang=\"sass\">\n.card\n  margin: 5px\n</style>\n")
+        self.write("src/Badge.svelte", "<span>x</span>\n<style>\n  span { border-radius: 6px; }\n</style>\n")
+        self.write("src/Hero.astro", "---\nconst title = 'Hi';\n---\n<h1>{title}</h1>\n"
+                   "<style>\n  h1 { gap: 21px; }\n</style>\n")
+        _, data = self.extract("src")
+        self.assertEqual(self.found(data, "Card.vue"), [(9, "css-decl", "padding", "13px")])
+        self.assertEqual(self.found(data, "Badge.svelte"), [(3, "css-decl", "border-radius", "6px")])
+        self.assertEqual(self.found(data, "Hero.astro"), [(6, "css-decl", "gap", "21px")])
+        self.assertTrue(all(l["component"] for l in data["literals"]), data["literals"])
+        self.assertTrue(any('Card.vue (<style lang="sass">)' in p for p in data["problems"]), data["problems"])
+
+    def test_style_attributes_are_inline_styles_and_left_to_hand_work(self):
+        self.write("src/page.html", "<p style=\"margin-top: 13px; color: #123456\" class=\"p-[7px]\">x</p>\n"
+                   "<p :style=\"{ color: c }\" style:color=\"red\">y</p>\n<style>p { margin: 13px; }</style>\n")
+        literals, data = self.extract("src")
+        self.assertEqual(self.found(data, "page.html"), [
+            (1, "inline-style", "margin-top", "13px"), (1, "inline-style", "color", "#123456"),
+            (1, "tailwind-arbitrary", "tw:p", "p-[7px]"), (3, "css-decl", "margin", "13px")])
+        mapping, report = self.cluster(literals)
+        mapped = sum(r["occurrences"] for r in mapping["rules"] if "13px" in r["match"])
+        self.assertEqual(mapped, 1, mapping["rules"])                   # the <style> block's, not the attribute's
+        self.assertIn('style=""', report)
+
+    def test_style_objects_are_counted_and_left_to_hand_work(self):
+        self.write("src/Box.tsx", "export const B = () => <Box sx={{ p: 2, color: '#334455', "
+                   "'&:hover': { bgcolor: '#556677' }, padding: { xs: '8px', md: '24px' } }} />;\n"
+                   "export const C = () => <div css={{ marginTop: 12 }} />;\n"
+                   "const S = styled.div({ gap: 18 });\nconst other = style({ padding: 99 });\n")
+        self.write("src/button.css.ts", "import { style } from '@vanilla-extract/css';\n"
+                   "export const button = style({ padding: 10, ':hover': { color: '#778899' } });\n")
+        self.write("src/panda.ts", "import { css } from '../styled-system/css';\n"
+                   "export const c = css({ p: 4, color: '#101010' });\n")
+        literals, data = self.extract("src")
+        self.assertEqual(self.found(data, "Box.tsx"), [
+            (1, "style-object", "color", "#334455"), (1, "style-object", "background-color", "#556677"),
+            (1, "style-object", "padding", "8px"), (1, "style-object", "padding", "24px"),
+            (2, "style-object", "margin-top", "12px"), (3, "style-object", "gap", "18px")])
+        self.assertEqual(self.found(data, "button.css.ts"), [
+            (2, "style-object", "padding", "10px"), (2, "style-object", "color", "#778899")])
+        self.assertEqual(self.found(data, "panda.ts"), [(2, "style-object", "color", "#101010")])
+        mapping, report = self.cluster(literals)
+        self.assertFalse([r for r in mapping["rules"] if "#334455" in r["match"]], mapping["rules"])
+        self.assertIn("CSS-in-JS style object", report)
+
+    def test_the_codemod_rewrites_a_style_block_and_leaves_the_attribute(self):
+        mapping = self.write("mapping.json", json.dumps(self.MAPPING))
+        vue = self.write("src/Card.vue", "<template>\n  <div style=\"margin: 13px\">x</div>\n</template>\n"
+                         "<style lang=\"scss\">\n.card { margin: 13px; } // margin: 13px\n</style>\n")
+        proc = run_py("design-token-migration", "apply_codemod", "-m", mapping, "--apply", "src",
+                      cwd=self.tmp)
+        self.assertEqual(vue.read_text(encoding="utf-8"),
+                         "<template>\n  <div style=\"margin: 13px\">x</div>\n</template>\n"
+                         "<style lang=\"scss\">\n.card { margin: var(--gap-related); } // margin: 13px\n</style>\n",
+                         output(proc))
+
+
 if __name__ == "__main__":
     unittest.main()
