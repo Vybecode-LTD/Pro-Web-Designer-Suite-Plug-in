@@ -556,8 +556,19 @@ Job 1: the panel grows out of its header. `--motion-expand` both ways (§2). Its
   }
 }
 ```
+```js
+// The toggle: the attribute the selector reads, and `inert` with it. A closing
+// panel stays visible, and its links reachable by Tab, until the transition ends.
+for (const trigger of document.querySelectorAll(".disclosure__trigger")) {
+  trigger.addEventListener("click", () => {
+    const open = trigger.getAttribute("aria-expanded") !== "true";
+    trigger.setAttribute("aria-expanded", String(open));
+    trigger.nextElementSibling.inert = !open;   // the panel follows its trigger
+  });
+}
+```
 `interpolate-size: allow-keywords` lets a length animate to an intrinsic size such as `auto`, though never one intrinsic size to another ([MDN, interpolate-size](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/interpolate-size)). It is in Chromium only (Chrome and Edge 129, not Baseline: [web-features](https://github.com/web-platform-dx/web-features/blob/main/features/interpolate-size.yml)), so treat it as an enhancement. Elsewhere `0 → auto` is a jump, and the panel still opens and closes correctly. `visibility` steps at the right end both ways: visible from the start of an opening and until the end of a closing. If the animation must run in every engine, use §5's grid form: `grid-template-rows: 0fr → 1fr` on the panel, with its one child at `min-block-size: 0`.
-**Must not** carry the state alone: the trigger's `aria-expanded` and its chevron say open or closed, and the selector reads the same attribute, so the two cannot disagree. **Must not** leave a closed panel's links focusable: `block-size: 0` hides them from sight, not from Tab.
+**Must not** carry the state alone: the trigger's `aria-expanded` and its chevron say open or closed, and the selector reads the same attribute, so the two cannot disagree. **Must not** leave a closed panel's links focusable: `block-size: 0` hides them from sight, not from Tab, and `visibility` only once a closing ends. `inert`, set as the panel closes, covers the transition before it.
 
 ### Drag affordance
 Job 1. Pick-up `--motion-instant`; drop `--motion-enter`; reorder of displaced siblings via FLIP at `--motion-expand`.

@@ -112,6 +112,23 @@ if (process.argv[4] === 'top-layer') {
       visible: document.querySelector(s).checkVisibility({ visibilityProperty: true }) };
   }, panel);
   out.openHeard = await heard();
+  const tabFromTrigger = async () => {
+    await page.keyboard.press('Tab');
+    return page.evaluate(() => document.activeElement.tagName);
+  };
+  await page.focus('.disclosure__trigger');
+  out.openTab = await tabFromTrigger();
+  out.closing = await page.evaluate((s) => {
+    const trigger = document.querySelector('.disclosure__trigger');
+    trigger.focus();
+    trigger.click();                                    // the reference's own toggle closes it
+    getComputedStyle(document.querySelector(s)).blockSize;
+    const runs = document.getAnimations();              // visibility's transition too
+    for (const a of runs) { a.pause(); a.currentTime = a.effect.getComputedTiming().duration / 2; }
+    return { runs: runs.length, expanded: trigger.getAttribute('aria-expanded'),
+      visible: document.querySelector(s).checkVisibility({ visibilityProperty: true }) };
+  }, panel);
+  out.closingTab = await tabFromTrigger();
 } else {
   const read = async () => ({ border: await colour('#email', 'borderTopColor'), help: await colour('.field-help', 'color') });
   out.want = { border: await colour('#want-border', 'color'), help: await colour('#want-help', 'color') };
@@ -126,12 +143,12 @@ console.log(JSON.stringify(out));
 """
 
 
-def reference_block(name: str, needle: str) -> str:
-    """The ```css block in a web-design-studio reference that holds `needle`."""
+def reference_block(name: str, needle: str, lang: str = "css") -> str:
+    """The ```css (or `lang`) block in a web-design-studio reference that holds `needle`."""
     text = (STUDIO / "references" / name).read_text(encoding="utf-8")
-    blocks = [b for b in re.findall(r"```css\n(.*?)```", text, flags=re.S) if needle in b]
+    blocks = [b for b in re.findall(rf"```{lang}\n(.*?)```", text, flags=re.S) if needle in b]
     if len(blocks) != 1:
-        raise AssertionError(f"{name}: {len(blocks)} css blocks hold {needle!r}")
+        raise AssertionError(f"{name}: {len(blocks)} {lang} blocks hold {needle!r}")
     return blocks[0]
 
 
@@ -281,7 +298,8 @@ class TheReferencesInABrowser(TempDirTest):
         css = reference_block("motion-system.md", "interpolate-size")
         body = ("<div class='disclosure'><button class='disclosure__trigger' aria-expanded='false'>More</button>"
                 "<div class='disclosure__panel'><p style='margin: 0; block-size: 200px'>Body</p>"
-                "<a href='#x'>Panel link</a></div></div>")
+                "<a href='#x'>Panel link</a></div></div>"
+                f"<script>{reference_block('motion-system.md', 'disclosure__trigger', 'js')}</script>")
         seen = self.run_probe(body, css, "expand")
         if not seen["supported"]:
             self.skipTest("this Chromium has no interpolate-size")
@@ -292,6 +310,16 @@ class TheReferencesInABrowser(TempDirTest):
         self.assertGreater(seen["open"]["height"], 200, seen)
         self.assertTrue(seen["open"]["visible"], seen)
         self.assertTrue(seen["openHeard"], seen)
+        # CodeRabbit on #115: closing, the panel stays visible until the
+        # transition ends, so the toggle sets inert with the attribute.
+        self.assertEqual(seen["openTab"], "A", seen)                     # control: Tab reaches it open
+        self.assertEqual(seen["closing"]["expanded"], "false", seen)
+        self.assertTrue(seen["closing"]["runs"] >= 1 and seen["closing"]["visible"], seen)   # mid-close
+        self.assertNotEqual(seen["closingTab"], "A", seen)               # but not while it closes
+        bare = body.replace("trigger.nextElementSibling.inert = !open;", "")
+        self.assertNotEqual(bare, body)
+        bare = self.run_probe(bare, css, "expand")
+        self.assertEqual(bare["closingTab"], "A", bare)                  # control: without inert, it does
         # Control: without it, 0 to auto has no transition; the panel jumps open.
         jump = self.run_probe(body, css + "\n:root { interpolate-size: numeric-only; }", "expand")
         self.assertEqual(jump["mid"]["runs"], 0, jump)

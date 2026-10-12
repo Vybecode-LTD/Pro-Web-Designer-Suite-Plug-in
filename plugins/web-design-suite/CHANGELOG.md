@@ -144,7 +144,8 @@
     `:root` alone keeps the light theme's tint inside a dark band.
   - **`interpolate-size`** (motion-system.md §7): a disclosure animating to `auto`, in
     Chromium only and a jump elsewhere, with `visibility` keeping a closed panel's links
-    out of the tab order and the accessibility tree. §5's table pointed to an accordion
+    out of the tab order and the accessibility tree, and `inert`, which its toggle sets
+    with `aria-expanded`, keeping them out while it closes. §5's table pointed to an accordion
     §7 did not have.
 - **The migration census reads every style source, and the rollout recipes** (P39; LC-B5
   in part, LC-B7).
