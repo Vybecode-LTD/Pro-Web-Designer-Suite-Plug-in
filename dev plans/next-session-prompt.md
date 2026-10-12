@@ -284,7 +284,7 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 **The work, each in the reference that owns it:**
 - **`cqi` in typography.md** (about line 354 says "use container queries" and never names the units): type that sizes to its container, as a fluid token, `clamp()` with a rem term so it still grows with zoom (SC 1.4.4; SS-B5's 2.5× rule is P-later, not this PR). Check that the audit, stylelint and ESLint take `cqi` in a token file (the spec's literal units, `design-rules.json`; a change there goes through `sync_rules.py`).
-- **`font-size-adjust` in typography.md:** the fallback font's x-height matched to the web font's, so the swap moves nothing (`from-font`, or a number).
+- **`font-size-adjust` in typography.md:** the fallback font's x-height matched to the web font's (`from-font`, or a number), which narrows the shift when the web font arrives but does not remove it: widths, ascent and line gap still differ. Pair it with the fallback `@font-face`'s metric overrides (`size-adjust`, `ascent-override`, `descent-override`, `line-gap-override`) where the shift must be smaller, and never promise none (Codex on #114).
 - **`color-mix()` and relative colour in color-system.md §9** (state colours as overlays): alpha variants from a role, `color-mix(in oklch, var(--x) 12%, transparent)` and `oklch(from var(--x) l c h / 0.12)`, in the token file. Check what the gates allow in a component file first; relative colour may read as a literal colour there.
 - **`interpolate-size` in motion-system.md:** `interpolate-size: allow-keywords` to animate to `height: auto`, as a Chromium-only enhancement that degrades to a jump.
 
