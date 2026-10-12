@@ -423,6 +423,27 @@ class OrmSchemasReadAsTheMigrationDoes(SchemaSources):
         self.assertFalse(b["posts.createdAt"]["ui"]["placement"]["form"])      # a system timestamp
         self.assertFalse(b["posts.authorId"]["ui"]["editable"])               # authority (SEC)
 
+    def test_camel_case_names_choose_the_title_the_sort_and_the_labels(self):
+        # Codex on #117: the title, the default sort and the labels read the raw spelling.
+        head = 'datasource db {\n  provider = "postgresql"\n  url = env("DATABASE_URL")\n}\n'
+        self.write("people.prisma", head + "model people {\n  id Int @id\n  email String @unique\n"
+                   "  displayName String\n  createdAt DateTime @default(now()) @db.Timestamptz(6)\n}\n")
+        table = self.introspect(str(self.tmp / "people.prisma"))["tables"][0]
+        self.assertEqual("displayName", table["screens"]["title_column"])
+        self.assertEqual(("createdAt", "desc"), (table["screens"]["default_sort"]["column"],
+                                                 table["screens"]["default_sort"]["direction"]))
+        labels = {c["name"]: c["ui"]["label"] for c in table["columns"]}
+        self.assertEqual(("Display Name", "Created At"), (labels["displayName"], labels["createdAt"]))
+
+    def test_a_prisma_view_is_not_an_entity(self):
+        # Codex on #117: a view became a table with create, edit and delete screens.
+        head = 'datasource db {\n  provider = "postgresql"\n  url = env("DATABASE_URL")\n}\n'
+        self.write("stats.prisma", head + "model orders {\n  id Int @id\n  total Int\n}\n"
+                   "view order_totals {\n  id Int @unique\n  total Int\n  order orders? @relation(fields: [id], references: [id])\n}\n")
+        model = self.introspect(str(self.tmp / "stats.prisma"))
+        self.assertEqual(["orders"], [t["name"] for t in model["tables"]])
+        self.assertIn("views (read-only, so left out)", model["fidelity"]["missing"])
+
 
 class RealSupabaseOutput(SchemaSources):
     """brewr.types.ts is `gen types` for a real 25-table project."""

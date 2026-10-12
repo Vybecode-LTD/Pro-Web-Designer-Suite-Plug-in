@@ -2213,13 +2213,19 @@ def _default_message(kind: str, value: Any, ui: dict[str, Any]) -> str:
 # Screens: which column is the title, what goes on the list, how it lays out
 # ---------------------------------------------------------------------------
 
+def _canonical(table: Table) -> dict[str, str]:
+    """Each column by its snake_case spelling: `displayName` is found as
+    `display_name` and returned as the source spells it (Codex on #117)."""
+    return {_NamePattern.snake(c.name).lower(): c.name for c in table.columns}
+
+
 def _title_column(table: Table) -> str | None:
-    names = {c.name for c in table.columns}
+    names = _canonical(table)
     for cand in TITLE_CANDIDATES:
         if cand in names:
-            col = table.col(cand)
+            col = table.col(names[cand])
             if col and col.type in TEXTUAL_TYPES | {"citext"}:
-                return cand
+                return col.name
     for c in table.columns:
         if c.type in TEXTUAL_TYPES and not c.nullable and c.unique:
             return c.name
@@ -2350,7 +2356,7 @@ def _index_layout(table: Table) -> tuple[str, str]:
 
 
 def _default_sort(table: Table) -> dict[str, Any]:
-    names = {c.name for c in table.columns}
+    names = _canonical(table)
     for cand, direction, why in (
             ("sort_order", "asc", "an explicit ordering column exists, so the "
                                   "product already has an opinion"),
@@ -2359,7 +2365,7 @@ def _default_sort(table: Table) -> dict[str, Any]:
                                    "otherwise, and it is stable under inserts"),
             ("updated_at", "desc", "most-recently-touched first")):
         if cand in names:
-            return {"column": cand, "direction": direction, "signal": why,
+            return {"column": names[cand], "direction": direction, "signal": why,
                     "tiebreak": table.primary_key[0] if table.primary_key else None}
     return {"column": table.primary_key[0] if table.primary_key else None,
             "direction": "asc",
@@ -2655,7 +2661,7 @@ def _propose_groups(table: Table) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 def humanise(name: str) -> str:
-    s = re.sub(r"_id$", "", name)
+    s = re.sub(r"_id$", "", _NamePattern.snake(name), flags=re.I)
     s = s.replace("_", " ").strip()
     words = s.split()
     acronyms = {"id", "url", "uri", "api", "sku", "utm", "ip", "seo", "css",
@@ -2853,6 +2859,10 @@ def parse_prisma(text: str) -> Model:
     clean = _strip_line_comments(text)
     blocks = [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(
         r"^[ \t]*(model|enum|view)\s+(\w+)\s*\{(.*?)^[ \t]*\}", clean, re.M | re.S)]
+    # A view is read-only, so it is no entity with create, edit and delete
+    # screens; it is left out, as the DDL reader leaves out CREATE VIEW (Codex on #117).
+    views = {name for kind, name, _ in blocks if kind == "view"}
+    blocks = [b for b in blocks if b[0] != "view"]
 
     def db_name(body: str, default: str) -> str:
         m = re.search(r'@@map\(\s*(?:name\s*:\s*)?"([^"]+)"', body)
@@ -2878,6 +2888,8 @@ def parse_prisma(text: str) -> Model:
             if not m or line.strip().startswith("@@"):
                 continue
             field, ftype, is_list, optional, attrs = m.groups()
+            if ftype in views:
+                continue
             if ftype in tables:                       # a relation field, not a column
                 rel = _prisma_attr(attrs, "relation")
                 if rel and "fields" in rel:
@@ -2945,7 +2957,8 @@ def parse_prisma(text: str) -> Model:
         "carries": ["tables", "columns", "native types (@db.*)", "lengths", "nullability",
                     "defaults", "primary keys", "foreign keys", "on-delete actions",
                     "unique indexes", "enums"],
-        "missing": ["CHECK constraints (Prisma has none)", "row-level security and policies",
+        "missing": ["CHECK constraints (Prisma has none)", "views (read-only, so left out)",
+                    "row-level security and policies",
                     "column privileges", "keys into schemas the file does not model "
                     "(auth.users)", "row counts / cardinality"],
     }
