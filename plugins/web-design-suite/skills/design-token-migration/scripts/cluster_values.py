@@ -1035,27 +1035,40 @@ def literal_index(payload: dict) -> Dict[str, List[dict]]:
 UNMAPPED_KIND = {"length": "spacing", "font-size": "type", "border-width": "stroke"}
 
 
+# Values the codemod never rewrites, by the census's context: each is moved
+# or replaced by hand, so none is counted as mechanically replaceable.
+HAND_WORK = {
+    "inline-style": (
+        "set in an inline style, JSX's style={{}} or an HTML style=\"\" (Law 4) "
+        "— the codemod does not rewrite these",
+        "Phase 4f: move the declaration into the component's stylesheet under a "
+        "class name, then re-run extract_literals so it is mapped with the rest."),
+    "style-object": (
+        "set in a CSS-in-JS style object (MUI sx, css({}), vanilla-extract, styled({})) "
+        "— the codemod does not rewrite these",
+        "Phase 4f: replace the value with the token by hand: 'var(--token)' in the "
+        "object, or the library's own route to it (a vanilla-extract contract, a "
+        "theme value in sx, a Panda token name)."),
+}
+
+
 def route_inline_styles(idx: Dict[str, List[dict]], prop: Proposal) -> None:
-    """JSX `style={{…}}` values are Law 4 hand work (Phase 4f): apply_codemod
-    never rewrites them, because the declaration has to move into a stylesheet
-    under a class name. Left in the pools they were counted as mechanically
-    replaceable, so they get their own unmapped rows instead."""
+    """Inline styles and CSS-in-JS style objects are hand work (Phase 4f):
+    apply_codemod never rewrites them. Left in the pools they were counted as
+    mechanically replaceable, so they get their own unmapped rows instead."""
     for kind in list(idx):
-        inline = [l for l in idx[kind] if l.get("context") == "inline-style"]
-        if not inline:
+        hand = [l for l in idx[kind] if l.get("context") in HAND_WORK]
+        if not hand:
             continue
-        idx[kind] = [l for l in idx[kind] if l.get("context") != "inline-style"]
-        by_value: Dict[str, List[dict]] = defaultdict(list)
-        for l in inline:
-            by_value[l["normalized"]].append(l)
-        for value, items in sorted(by_value.items()):
+        idx[kind] = [l for l in idx[kind] if l.get("context") not in HAND_WORK]
+        by_value: Dict[tuple, List[dict]] = defaultdict(list)
+        for l in hand:
+            by_value[(l["context"], l["normalized"])].append(l)
+        for (context, value), items in sorted(by_value.items()):
+            reason, recommendation = HAND_WORK[context]
             prop.unmapped.append(Unmapped(
                 kind=UNMAPPED_KIND.get(kind, kind), value=value, occurrences=len(items),
-                where=where_of(items),
-                reason="set in a JSX inline style (Law 4) — the codemod does not rewrite these",
-                recommendation=("Phase 4f: move the declaration into the component's "
-                                "stylesheet under a class name, then re-run "
-                                "extract_literals so it is mapped with the rest."),
+                where=where_of(items), reason=reason, recommendation=recommendation,
             ))
 
 

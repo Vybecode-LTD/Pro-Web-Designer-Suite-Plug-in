@@ -44,7 +44,7 @@ Scan declarations, not lines. A declaration is `prop : value` terminated by `;` 
 
 Also capture **preprocessor variable declarations**: `$brand: #2f6df6`, `@line: #e5e5e5`. These are not tokens, however much they look like them. A SCSS variable is compile-time text substitution with no runtime identity: it cannot be re-pointed by a theme, cannot be read by JS, cannot be overridden per-subtree, and does not appear in the browser at all. Treat it as a literal with a name attached — because that is exactly what it is — and migrate it to a custom property.
 
-Capture `darken()` / `lighten()` / `mix()` calls separately, as kind `color-function`. They are not values; they are values the compiler has not computed yet. `darken($brand, 8%)` is a ramp step nobody wrote down.
+Capture `darken()` / `lighten()` / `mix()` calls, and the `sass:color` module's `color.adjust()`, `color.scale()`, `color.change()` and `color.mix()` (with their global names, `adjust-color()` and the rest), separately, as kind `color-function`. The module's functions are the ones to expect in a current codebase: the [Sass docs](https://sass-lang.com/documentation/modules/color/) list `darken()` among the deprecated functions and leave it out of the module system. They are not values; they are values the compiler has not computed yet. `darken($brand, 8%)` is a ramp step nobody wrote down.
 
 ### CSS Modules
 
@@ -57,6 +57,24 @@ Find the tagged template — `` styled.div` ``, `` styled(Foo).attrs({...})` ``,
 Blank out `${...}` interpolations first. They are JavaScript, not CSS, and a scanner that reads `${(p) => p.pad}px` as a declaration invents a property called `p`. Blanking (replacing with spaces) rather than deleting keeps every offset true.
 
 An interpolation that *holds* a literal — `` background: ${tones.error}; `` with `tones.error = '#d64545'` elsewhere — is found by the JS-string sweep instead, and correctly reported as a color constant in JavaScript rather than a CSS value.
+
+### Vue, Svelte, Astro and HTML files
+
+A single-file component is three sources in one file, and the census reads each as itself:
+- **`<style>` blocks are stylesheets**, in their `lang` (`scss`, `less`, `postcss`, or plain CSS), scanned at the block's offset so line numbers point at real lines. The codemod rewrites them as it rewrites a `.scss` file. A block in a language the scanner cannot follow (`lang="sass"`, Stylus) is named in the census's problems, never silently counted as clean.
+- **`<script>` blocks**, and an Astro component's frontmatter, are read as JavaScript.
+- **`style=""` attributes are inline styles**: counted, and left to Phase 4f like JSX's. Vue's `:style` and Svelte's `style:` directive are expressions, not literals, so they are skipped, as is a declaration that interpolates (`{…}`).
+- **Tailwind arbitrary values** in `class=""` (and Vue's `:class`) are counted and rewritten as in JSX.
+
+A `<style>` inside an HTML comment or a script's string is not a stylesheet, and is not read. Every literal in a `.vue`, `.svelte` or `.astro` file is a component's.
+
+### CSS-in-JS style objects
+
+MUI's `sx={{…}}`, Emotion's `css={{…}}` and `css({…})`, styled-components' and Emotion's `styled.div({…})`, vanilla-extract's `style()`, `styleVariants()` and `recipe()`, and Panda's `css()`, `cva()` and `sva()`. The census reads every level: a selector (`'&:hover'`), a media query, a variant, and a responsive value (`padding: { xs: '8px', md: '24px' }`, read as `padding`). MUI's and Panda's shorthands (`p`, `mt`, `bgcolor`, `bg`, `rounded`) are read as the properties they stand for. `style`, `styleVariants` and `recipe` count only in a file that imports `@vanilla-extract/css` or `@vanilla-extract/recipes`, and `cva` and `sva` only beside Panda's `styled-system` import: elsewhere those names mean other things.
+
+**A number is only sometimes a length.** vanilla-extract, Emotion and styled-components append `px` as React does, unitless properties aside. In MUI's `sx` a spacing number multiplies the theme's spacing, and in Panda a value can name a token, so a bare number in either may be a theme step rather than pixels, and is not counted. Strings are counted everywhere.
+
+The codemod does not rewrite a style object: its value becomes `'var(--token)'` or the library's own route to the token (a vanilla-extract contract, a theme value in `sx`, a Panda token name), which is Phase 4f's decision.
 
 ### JSX inline styles
 
@@ -124,7 +142,7 @@ Property first, value shape second. The property is authoritative because the sa
 | `shadow` | `box-shadow`, `text-shadow` | `--elevation-*` |
 | `duration` / `easing` | property ∈ motion set | `--dur-*` / `--ease-*`, preferably a `--motion-*` pair |
 | `z-index` | `z-index` | `--z-*` |
-| `color-function` | `darken()`, `lighten()`, `mix()` | A ramp step, by hand |
+| `color-function` | `darken()`, `lighten()`, `mix()`, `color.adjust()`, `color.scale()`, `color.change()` | A ramp step, by hand |
 
 **Shorthand slots get the property they actually set.** `padding: 9px 17px` is block padding and inline padding — two different decisions written on one line. Filing both as "padding" throws away the distinction the inset vocabulary is built on, and produces a mapping that turns a page gutter into a card inset. The slot count decides the pattern (1 → all, 2 → block/inline, 3 → block/inline/block, 4 → block/inline/block/inline), and the count includes `0` and `auto`, which is the bug most implementations have.
 

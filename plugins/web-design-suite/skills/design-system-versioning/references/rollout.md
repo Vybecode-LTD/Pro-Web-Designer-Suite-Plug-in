@@ -72,6 +72,41 @@ Every part of that sequence is *correct semver behaviour*. `^2.1.0` means "any 2
 
 The exact pin trades automatic patches for deliberate upgrades. For a dependency that renders your client's product, that trade is not close.
 
+**Let a bot open the upgrade, never merge it.** Renovate and Dependabot can propose each new version as a pull request while the pin stays exact. Renovate's `rangeStrategy: "pin"` converts a range to an exact version, and `minimumReleaseAge` holds a new version back for a while, so a release its publisher deprecates on day one never reaches you ([Renovate, configuration options](https://docs.renovatebot.com/configuration-options/)):
+
+```json
+{
+  "packageRules": [
+    {
+      "matchPackageNames": ["@org/ds"],
+      "rangeStrategy": "pin",
+      "minimumReleaseAge": "3 days",
+      "automerge": false,
+      "labels": ["design-system"]
+    }
+  ]
+}
+```
+
+Dependabot has no pin strategy. With `versioning-strategy: increase` it raises the requirement to the new version, so a requirement saved exact moves from one exact version to the next, and `cooldown` holds a new version back as `minimumReleaseAge` does ([GitHub, Dependabot options reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference)):
+
+```yaml
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-name: "@org/ds"
+    versioning-strategy: increase
+    cooldown:
+      default-days: 3
+    labels: ["design-system"]
+```
+
+The bot's pull request is only §3's step 2. A person finishes it on that branch with steps 3 to 6 (the codemod, the audit, the visual diff, and the accepted baselines in the same commit), and merges it then. A bot that merges its own design-system bump has skipped the acceptance test.
+
 **Commit the lockfile.** An exact `package.json` with no committed lockfile still floats on transitive dependencies, and one of them is usually a PostCSS plugin.
 
 **Record the version where a human can see it.** A `DESIGN-SYSTEM-VERSION` line in the client's README, or a `data-ds-version` attribute on `<html>`, answers the question during an incident without a checkout.
@@ -84,6 +119,13 @@ What a consumer runs, in order. It is six steps and it is the same every time, w
 
 ```bash
 git checkout -b upgrade/ds-3.0.0
+
+# 0. The "before", on the version you are leaving, unless the baselines in
+#    the repository are current. Taken after step 2, baselines would approve
+#    whatever the new version renders (§4).
+python -m scripts.generate_matrix matrix.json --out build/proof-sheet.html
+node scripts/snapshot_matrix.mjs build/proof-sheet.html \
+     --baselines tests/visual/baselines --update-baselines
 
 # 1. Read the guide. Not the changelog — the guide, which is written for you.
 #    Breaking items only, each with what you will see if you skip it.
@@ -202,6 +244,14 @@ That is the entire argument for committing the bump, the codemod and the accepte
 | Caught in one consumer only, others fine | Revert that one. It is a consumer-specific interaction, and it belongs in the guide as a note. |
 
 **Unpublishing is not a rollback.** Yanking a version from the registry breaks the lockfile of anyone who already took it, which converts one consumer's problem into everyone's. Publish a new patch that reverts the change and say plainly in the changelog that 2.1.0 is bad and why.
+
+**Then deprecate the bad version, so nobody new takes it.** `npm deprecate` updates the registry entry so everyone who installs that version gets a warning, and the version stays installable, so lockfiles that already name it still resolve ([npm docs, npm-deprecate](https://docs.npmjs.com/cli/commands/npm-deprecate)). The message is the changelog's sentence:
+
+```bash
+npm deprecate @org/ds@2.1.0 "Re-points --bg-accent below 4.5:1 on --bg-surface. Use 2.1.1."
+```
+
+It takes a range as well as a version. Bound a range on both sides, or it takes the good releases before the bad one: `@org/ds@">=2.1.0 <2.1.1"` is 2.1.0, plus any 2.1.1 prerelease, since npm counts prereleases in a range. An empty message (`""`) withdraws it. Only an owner of the package can run it.
 
 **A rollback is data.** Whatever the canary's visual diff failed to show you is a gap in the proof sheet's coverage. Add the missing cell before the retry, or the retry fails the same way.
 
