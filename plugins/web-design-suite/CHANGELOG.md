@@ -145,6 +145,30 @@
     Chromium only and a jump elsewhere, with `visibility` keeping a closed panel's links
     out of the tab order and the accessibility tree. §5's table pointed to an accordion
     §7 did not have.
+- **The migration census reads every style source, and the rollout recipes** (P39; LC-B5
+  in part, LC-B7).
+  extract_literals counted 1 of a Sass file's 4 module colour functions, never opened a
+  Vue, Svelte, Astro or HTML file, and read no CSS-in-JS object but JSX's `style={{}}`, so
+  a migration sized from it came in short.
+  - **Sass:** `color.adjust()`, `color.scale()`, `color.change()` and `color.mix()`, and
+    their global names, are colour functions, as `darken()` is. CSS's `color()` no longer
+    matches inside `adjust-color()`.
+  - **Vue, Svelte, Astro and HTML:** each `<style>` block is a stylesheet in its `lang`,
+    rewritten by the codemod too; a `lang` the scanner cannot follow (`sass`, Stylus) is
+    named among the problems. Scripts and Astro's frontmatter are read as JavaScript,
+    `style=""` attributes as inline styles, and `class=""` for Tailwind's arbitrary values.
+    A `<style>` in a comment or a script's string is not read.
+  - **Style objects:** MUI's `sx`, Emotion's `css`, `styled.div({})`, vanilla-extract and
+    Panda, every nested level, with MUI's and Panda's shorthands read as their properties.
+    A number in `sx` or Panda may be a theme step, so only strings count there.
+  - **cluster_values** sets style objects aside as hand work beside inline styles, each
+    with its own reason, so neither is counted as mechanically replaceable.
+  - **The rollout** (design-system-versioning's rollout.md): §3's upgrade takes its
+    baselines on the version it leaves, before the install, which would otherwise approve
+    whatever the new version renders; §6 deprecates a bad release with `npm deprecate`; §2
+    has Renovate (`rangeStrategy: "pin"`, `minimumReleaseAge`) and Dependabot
+    (`versioning-strategy: increase`, `cooldown`) recipes that open the upgrade and leave
+    the visual diff and the merge to a person.
 
 ### Changed
 
