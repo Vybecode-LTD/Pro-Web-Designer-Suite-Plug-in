@@ -222,10 +222,13 @@ class TheReferencesInABrowser(TempDirTest):
         self.assertEqual(seen["para"]["adjust"], "0.53", seen)       # inherited from body
         self.assertEqual(seen["heading"]["adjust"], "0.53", seen)    # declared after h2's font:
         self.assertEqual(seen["control"]["adjust"], "none", seen)    # h3's font: reset it
-        self.assertGreater(abs(seen["number"]["width"] - seen["none"]["width"]), 0.5, seen)   # the fallback scaled
-        # from-font reads the fallback itself while the web font is missing: no change.
-        self.assertNotIn(seen["from-font"]["adjust"], ("none", "0.53"), seen)
+        # from-font reads the fallback itself while the web font is missing: its
+        # own ratio, so no change.
+        own = float(seen["from-font"]["adjust"])
         self.assertAlmostEqual(seen["from-font"]["width"], seen["none"]["width"], delta=0.01, msg=seen)
+        # The number scales the fallback by MDN's u = (m / m') s, m' its own
+        # ratio, whatever system font it is (Linux's is close to 0.53).
+        self.assertAlmostEqual(seen["number"]["width"] / seen["none"]["width"], 0.53 / own, delta=0.005, msg=seen)
 
     def test_font_size_adjust_cancels_a_fallback_faces_size_adjust(self):
         local = 'src: local("Arial"), local("Liberation Sans"), local("DejaVu Sans"), local("Helvetica");'
