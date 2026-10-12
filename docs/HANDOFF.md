@@ -16,7 +16,7 @@
 
 ## Next steps
 
-1. **R3.6: release 3.6.0.** First the eval dispatch, with the owner's OK and its estimate (about $11, under `evals.yml`'s $14 ceiling). Then a live check of what 3.6.0 changed, also with the owner's OK. Then `plugin.json` at 3.6.0, the CHANGELOG dated, the build, and the annotated `v3.6.0` tag.
+1. **R3.6: release 3.6.0**, in this order (the next-session prompt's §4): a live check of what 3.6.0 changed, with the owner's OK; the release PR (`plugin.json` at 3.6.0, the CHANGELOG dated); on its merge, the eval dispatch, with the owner's OK and its estimate (about $11, under `evals.yml`'s $14 ceiling), so the evals run on the commit that is tagged; then the build and the annotated `v3.6.0` tag.
 2. Then Phase 6b (4.0.0): ask the owner which workstream comes first.
 
 ## Open owner decisions
@@ -26,7 +26,7 @@
 
 ## Warnings
 
-- **GitHub lost a `pull_request` event** on 2026-10-12 (an incident): #115 got no CI until `gh workflow run ci.yml --ref <branch>`. If a push shows no checks after a few minutes, dispatch it.
+- **GitHub lost a `pull_request` event** on 2026-10-12 (an incident): #115 got no CI until `gh workflow run ci.yml --ref BRANCH`. If a push shows no checks after a few minutes, dispatch it.
 - **A TBT flake:** `test_browser_runtime.VitalsMeasures.test_an_interaction_is_not_counted_in_tbt` failed once on macOS (88 against 50, a load-time task on a busy runner, not the click). Re-run the job; if it recurs, give the page's load more room.
 - **The masters and their copies.** After every merge from a branch below, copy `shared/dtcg.py`, `shared/project_config.py` and `shared/project_config.mjs` over every copy (ten, ten and seven), then run `TheCopiesAreTheMaster`.
 - **A worktree in the scratchpad hits Windows' 260-character path limit:** create it with `git -c core.longpaths=true worktree add "PATH" BRANCH`. `test_file_modes` errors there on a long eval path; ignore it.
