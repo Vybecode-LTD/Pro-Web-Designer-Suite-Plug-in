@@ -311,6 +311,41 @@ line-gap-override = web.lineGap   / (web.unitsPerEm × size-adjust) × 100%
 
 Measure with `fontkit`, `capsize` or `fontaine`; `next/font/local` computes them for you. **Do not copy the percentages above into another project** — they are specific to Geist against Arial, and a wrong `size-adjust` creates the shift it was meant to remove. Verify with a Performance-panel layout-shift recording on a throttled connection, not by eye.
 
+### `font-size-adjust`: one number for every fallback
+
+The re-metricked face is right for the one local font it was measured against. A visitor whose platform has another one gets numbers meant for Arial. `font-size-adjust` takes a single number, the web font's *aspect value* (x-height ÷ em, `OS/2.sxHeight ÷ head.unitsPerEm`). The browser then scales **each** font in the stack so its x-height is that share of the `font-size` ([MDN, font-size-adjust](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/font-size-adjust)). The web font, whose own ratio it is, is unchanged, and whichever fallback the visitor has is matched to it. It narrows the shift but does not remove it: widths, ascent and line gap still differ, so a line can still re-wrap. It is Baseline since 2024-07-25 (Chrome 127, Firefox 118, Safari 17; [web-features](https://github.com/web-platform-dx/web-features/blob/main/features/font-size-adjust.yml)).
+
+Three behaviours the name does not suggest, each checked in Chromium by the suite's tests:
+
+- **Use a number, not `from-font`.** `from-font` reads the number from the first available font, which during the swap is the fallback itself. So it adjusts the fallback to its own ratio, which changes nothing.
+- **It replaces a face's `size-adjust`.** Applied together, MDN says, `size-adjust` "does not have any effect". Choose per stack: the overrides above for a fallback you can measure (one `local()` font), and `font-size-adjust` for one that differs by platform (`system-ui`, `-apple-system`, `"Segoe UI"`, Roboto). So the example below declares its own `--font-sans` without the re-metricked face: it replaces the stack above rather than joining it.
+- **The `font` shorthand resets it.** Every `font: var(--type-*)` sets `font-size-adjust` back to `none`. Declare it after the shorthand in each rule that binds a role, as base.css does with `strong`'s weight. Set once on `body`, it stops at the first heading.
+
+```css
+@layer tokens {
+  :root {
+    /* No "Geist Sans Fallback": font-size-adjust would switch its
+       size-adjust off, so this stack replaces the one above. */
+    --font-sans: "Geist Sans", ui-sans-serif, system-ui, -apple-system,
+                 "Segoe UI", Roboto, sans-serif;
+    /* An example: measure your web font's own. One per family, since
+       --font-mono's x-height is not --font-sans's. */
+    --font-sans-aspect: 0.53;
+  }
+}
+
+@layer base {
+  body {
+    font: var(--type-body);
+    font-size-adjust: var(--font-sans-aspect);   /* after font:, which resets it */
+  }
+  h2 {
+    font: var(--type-h2);
+    font-size-adjust: var(--font-sans-aspect);
+  }
+}
+```
+
 ## 9. OpenType features worth turning on
 
 **Tabular numerals are non-negotiable in data.** Proportional figures have per-digit widths, so a column jitters and cannot be scanned. Any number that sits in a column, updates in place, or is compared to another number gets them.
@@ -372,9 +407,36 @@ The starter's two fluid steps are inside the bound, at 72 / 44 = 1.64× and 110 
 
 **Fluid is right for** display and hero type (110px is right on a 27" monitor and absurd on a 390px phone — this is the whole use case), section headings that would otherwise need two breakpoints, and page-level gutters and section rhythm.
 
-**Fluid is wrong for body copy.** 16px is the minimum comfortable reading size on a phone and still correct on a desktop, because reading distance grows with screen size roughly in step. What should change with viewport is the *measure*, not the size. Fluid body also re-wraps every line continuously during resize, which looks unstable and defeats `text-wrap: balance`. It is equally wrong for **UI labels, buttons, inputs and table text**, which are sized against touch targets (`--tap-min`), icon sizes and control heights — all fixed; a fluid label desynchronises from the 44px target it sits inside. And it is wrong **inside any resizable panel**, because `vw` tracks the viewport, not the container: a fluid heading in a split-pane editor is sized by the browser window. Use container queries there.
+**Fluid is wrong for body copy.** 16px is the minimum comfortable reading size on a phone and still correct on a desktop, because reading distance grows with screen size roughly in step. What should change with viewport is the *measure*, not the size. Fluid body also re-wraps every line continuously during resize, which looks unstable and defeats `text-wrap: balance`. It is equally wrong for **UI labels, buttons, inputs and table text**, which are sized against touch targets (`--tap-min`), icon sizes and control heights — all fixed; a fluid label desynchronises from the 44px target it sits inside. And it is wrong **inside any resizable panel**, because `vw` tracks the viewport, not the container: a fluid heading in a split-pane editor is sized by the browser window. Size it to its container there, with `cqi` (below).
 
 Rule: **fluid above `--text-3xl`, fixed at and below it.**
+
+### Fluid in a container: `cqi`
+
+`1cqi` is 1% of the query container's inline size: the nearest ancestor with `container-type: inline-size` (or `size`). With no container, it falls back to the small viewport unit, `svi` ([MDN, container query length units](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/length#container_query_length_units)). The units are Baseline widely available since 2025-08-14 (Chrome 105, Firefox 110, Safari 16; [web-features](https://github.com/web-platform-dx/web-features/blob/main/features/container-queries.yml)). So the same two anchors work against the container's width, with `cqi` where `vw` was. Worked, for a promo card's headline running 35px in a 360px card to 56px in a 1040px one:
+
+```
+m = (56 − 35) / (1040 − 360) = 0.030882   → 3.0882cqi
+c = 35 − 0.030882 × 360 = 23.882px        → 1.4926rem
+```
+
+```css
+@layer tokens {
+  :root {
+    --text-fluid-card:   clamp(2.1875rem, 1.4926rem + 3.0882cqi, 3.5rem);
+    --type-card-display: var(--weight-bold) var(--text-fluid-card)/var(--leading-tight) var(--font-sans);
+  }
+}
+
+@layer components {
+  .promo        { container-type: inline-size; }
+  .promo__title { font: var(--type-card-display); }
+}
+```
+
+**The token works because `var()` substitutes text.** `cqi` is resolved on the element that reads the role, against that element's container, so one token sizes the headline in every card at once: 35px in a 360px card, 45.5px in a 700px one, 56px in a 1040px one. `container-type: inline-size` contains the card's inline size, so the card takes its width from the grid or flex track it sits in, never from its content.
+
+**Zoom narrows the container too, sometimes faster than the viewport:** a column beside a sidebar of fixed rem width loses whatever the sidebar keeps. The `rem` intercept is what keeps the text growing, exactly as for `vw` above: a pure-`cqi` size (`font-size: 3.0882cqi`) in a container as wide as the window stays the same size on screen at 200%, while this token grows 1.65× there, from a 1440px window. Barvian's 2.5× bound holds here too (56 / 35 = 1.6×); test it by zooming.
 
 ## 11. Hierarchy without size
 

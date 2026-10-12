@@ -133,7 +133,10 @@ COLOUR_FUNCTIONS = [
     "rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch", "color", "color-mix",
     "light-dark",
 ]
-LITERAL_UNITS = ["px", "rem", "em", "ch", "ex", "vw", "vh", "vmin", "vmax", "%", "deg", "s", "ms"]
+LITERAL_UNITS = [
+    "px", "rem", "em", "ch", "ex", "vw", "vh", "vmin", "vmax", "cqi", "cqb", "cqw", "cqh", "cqmin",
+    "cqmax", "%", "deg", "s", "ms",
+]
 GEOMETRY_PROPERTIES = [
     "top", "right", "bottom", "left", "inset", "inset-block", "inset-block-start",
     "inset-block-end", "inset-inline", "inset-inline-start", "inset-inline-end",

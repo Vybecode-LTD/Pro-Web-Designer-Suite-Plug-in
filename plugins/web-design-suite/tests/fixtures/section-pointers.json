@@ -1986,6 +1986,12 @@
   "heading": "FOCUS"
  },
  {
+  "from": "web-design-studio/references/stack-vanilla-css.md",
+  "to": "web-design-studio/references/typography.md",
+  "section": "10",
+  "heading": "Fluid type"
+ },
+ {
   "from": "web-design-studio/references/style-architecture.md",
   "to": "web-design-studio/references/spacing-system.md",
   "section": "8",

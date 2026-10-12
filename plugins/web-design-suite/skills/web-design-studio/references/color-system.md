@@ -531,6 +531,40 @@ The one exception: **selected** is a semantic state, not a physical one, so it k
 own token (`--bg-selected`: `--accent-50` light, `--accent-950` dark). Selection means
 something; hover is just a finger hovering.
 
+### Alpha variants, derived from a role
+
+A tint of a role, such as an accent wash behind a ghost button or a danger wash behind
+an error row, is that role at a lower alpha. Derive it in the token file instead of
+writing it again as a literal, so it follows the role through every theme:
+
+```css
+@layer tokens {
+  /* Theme-derived, so declared on every themed element (tokens.css does the same). */
+  :root, [data-theme] {
+    --bg-accent-subtle: color-mix(in oklch, var(--bg-accent) 12%, transparent);
+    --bg-danger-subtle: oklch(from var(--bg-danger) l c h / 0.12);
+  }
+}
+```
+
+- **`color-mix()` with `transparent` scales the role's alpha.** 12% of an opaque role is
+  alpha 0.12, and of a role already at 0.5 it is 0.06. It is Baseline widely available
+  (Chrome 111, Firefox 113, Safari 16.2; [web-features](https://github.com/web-platform-dx/web-features/blob/main/features/color-mix.yml);
+  [MDN, color-mix()](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/color_value/color-mix)).
+- **Relative colour sets a channel outright.** `oklch(from var(--x) l c h / 0.12)` is
+  alpha 0.12 whatever the role's own, and it can move lightness too (`calc(l + 0.1)`).
+  It is Baseline since 2024-09-16 (Chrome 125, Firefox 128, Safari 18; [web-features](https://github.com/web-platform-dx/web-features/blob/main/features/relative-color.yml);
+  [MDN, using relative colors](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Colors/Using_relative_colors)).
+  On an older floor, give the variant a literal fallback the way §1 does for `oklch()`.
+- **Declare them where the themes are.** A token derived with `var()` is resolved on the
+  element that declares it, then inherited as a finished colour. On `:root` alone, a
+  `<section data-theme="dark">` keeps the light theme's tint. In `:root, [data-theme]`,
+  each themed element derives its own.
+- **A component may derive one too.** `color-mix(in oklch, var(--bg-accent) 20%,
+  transparent)` in a component passes the gates: a colour function with a `var()` among
+  its arguments is derived, and a mix of literals is still refused (`design-rules.json`,
+  `values.colour_functions_rule`). A variant used twice belongs in the token file.
+
 ---
 
 ## 10. Gradients that don't band

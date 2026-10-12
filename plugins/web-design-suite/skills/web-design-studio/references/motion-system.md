@@ -535,6 +535,41 @@ Job 4 (personality) with a touch of 1. `--motion-hover`.
 ```
 **Must not** shift layout — no `margin`, no `height`, nothing that moves a neighbour. **Must not** be the only affordance (the card must look interactive at rest). **Must not** apply on touch, where `:hover` sticks after the tap — hence the `(hover: hover)` guard.
 
+### Accordion / disclosure
+Job 1: the panel grows out of its header. `--motion-expand` both ways (§2). Its height is layout (§5), so animate one panel at a time, never a list of them at once.
+```css
+@layer base {
+  :root { interpolate-size: allow-keywords; }   /* inherited: a size may animate to and from auto */
+}
+
+@layer components {
+  /* job: causality — the panel grows out of its header */
+  .disclosure__panel {
+    block-size: 0;
+    overflow: clip;
+    visibility: hidden;   /* closed: out of the tab order and the accessibility tree */
+    transition: block-size var(--motion-expand), visibility var(--motion-expand);
+  }
+  .disclosure__trigger[aria-expanded="true"] + .disclosure__panel {
+    block-size: auto;
+    visibility: visible;
+  }
+}
+```
+```js
+// The toggle: the attribute the selector reads, and `inert` with it. A closing
+// panel stays visible, and its links reachable by Tab, until the transition ends.
+for (const trigger of document.querySelectorAll(".disclosure__trigger")) {
+  trigger.addEventListener("click", () => {
+    const open = trigger.getAttribute("aria-expanded") !== "true";
+    trigger.setAttribute("aria-expanded", String(open));
+    trigger.nextElementSibling.inert = !open;   // the panel follows its trigger
+  });
+}
+```
+`interpolate-size: allow-keywords` lets a length animate to an intrinsic size such as `auto`, though never one intrinsic size to another ([MDN, interpolate-size](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/interpolate-size)). It is in Chromium only (Chrome and Edge 129, not Baseline: [web-features](https://github.com/web-platform-dx/web-features/blob/main/features/interpolate-size.yml)), so treat it as an enhancement. Elsewhere `0 → auto` is a jump, and the panel still opens and closes correctly. `visibility` steps at the right end both ways: visible from the start of an opening and until the end of a closing. If the animation must run in every engine, use §5's grid form: `grid-template-rows: 0fr → 1fr` on the panel, with its one child at `min-block-size: 0`.
+**Must not** carry the state alone: the trigger's `aria-expanded` and its chevron say open or closed, and the selector reads the same attribute, so the two cannot disagree. **Must not** leave a closed panel's links focusable: `block-size: 0` hides them from sight, not from Tab, and `visibility` only once a closing ends. `inert`, set as the panel closes, covers the transition before it.
+
 ### Drag affordance
 Job 1. Pick-up `--motion-instant`; drop `--motion-enter`; reorder of displaced siblings via FLIP at `--motion-expand`.
 ```css

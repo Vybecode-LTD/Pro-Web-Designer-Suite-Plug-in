@@ -443,10 +443,11 @@
   "inline_styles": {
     "gates": ["audit", "eslint"],
     "rule": "Law 4: the style prop is a second home for a component's styles, where no stylesheet, theme, media query or audit reaches. Its one legal use passes a value only the runtime knows into CSS as a custom property; a design literal there is Law 1 coming back through that exception. A design literal is a string holding a number with one of `literal_units`, a hex, or a colour function (values.colour_functions).",
-    "literal_units": ["px", "rem", "em", "ch", "ex", "vw", "vh", "vmin", "vmax", "%", "deg", "s", "ms"],
+    "literal_units": ["px", "rem", "em", "ch", "ex", "vw", "vh", "vmin", "vmax", "cqi", "cqb", "cqw", "cqh", "cqmin", "cqmax", "%", "deg", "s", "ms"],
     "allowed": ["<div style={{ '--progress': pct }} />", "<div style={span ? { '--card-span': span } : undefined} />"],
     "refused": ["<div style={{ padding: 13 }} />", "<div style={{ '--gap': '12px' }} />",
-                "<div style={{ '--tint': 'hwb(20 10% 30%)' }} />"]
+                "<div style={{ '--tint': 'hwb(20 10% 30%)' }} />",
+                "<div style={{ '--title': '4cqi' }} />"]
   },
   "bindings": {
     "gates": ["audit", "stylelint"],
