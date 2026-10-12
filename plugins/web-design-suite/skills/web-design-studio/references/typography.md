@@ -318,12 +318,16 @@ The re-metricked face is right for the one local font it was measured against. A
 Three behaviours the name does not suggest, each checked in Chromium by the suite's tests:
 
 - **Use a number, not `from-font`.** `from-font` reads the number from the first available font, which during the swap is the fallback itself. So it adjusts the fallback to its own ratio, which changes nothing.
-- **It replaces a face's `size-adjust`.** Applied together, MDN says, `size-adjust` "does not have any effect". Choose per stack: the overrides above for a fallback you can measure (one `local()` font), and `font-size-adjust` for one that differs by platform (`system-ui`, `-apple-system`, `"Segoe UI"`, Roboto).
+- **It replaces a face's `size-adjust`.** Applied together, MDN says, `size-adjust` "does not have any effect". Choose per stack: the overrides above for a fallback you can measure (one `local()` font), and `font-size-adjust` for one that differs by platform (`system-ui`, `-apple-system`, `"Segoe UI"`, Roboto). So the example below declares its own `--font-sans` without the re-metricked face: it replaces the stack above rather than joining it.
 - **The `font` shorthand resets it.** Every `font: var(--type-*)` sets `font-size-adjust` back to `none`. Declare it after the shorthand in each rule that binds a role, as base.css does with `strong`'s weight. Set once on `body`, it stops at the first heading.
 
 ```css
 @layer tokens {
   :root {
+    /* No "Geist Sans Fallback": font-size-adjust would switch its
+       size-adjust off, so this stack replaces the one above. */
+    --font-sans: "Geist Sans", ui-sans-serif, system-ui, -apple-system,
+                 "Segoe UI", Roboto, sans-serif;
     /* An example: measure your web font's own. One per family, since
        --font-mono's x-height is not --font-sans's. */
     --font-sans-aspect: 0.53;

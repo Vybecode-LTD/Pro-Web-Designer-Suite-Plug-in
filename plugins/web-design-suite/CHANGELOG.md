@@ -137,7 +137,8 @@
     x-height to the web font's, and narrows the shift without removing it. Checked in
     Chromium: `from-font` reads the fallback itself during a swap and changes nothing, a
     face's `size-adjust` has no effect beside it, and every `font:` shorthand resets it,
-    so it is declared after each role's `font:`.
+    so it is declared after each role's `font:`, on a stack of its own without the
+    re-metricked face.
   - **`color-mix()` and relative colour** (color-system.md §9): a role's alpha variants
     derived in the token file, declared on every themed element, since a derived token on
     `:root` alone keeps the light theme's tint inside a dark band.

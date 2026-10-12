@@ -298,5 +298,21 @@ class TheReferencesInABrowser(TempDirTest):
         self.assertEqual(jump["mid"]["height"], jump["open"]["height"], jump)
 
 
+class TheReferencesReadAlone(unittest.TestCase):
+
+    def test_font_size_adjust_has_a_stack_without_a_re_metricked_face(self):
+        """Codex on #115: applied to the stack whose first fallback is the
+        re-metricked face, font-size-adjust switches that face's measured
+        size-adjust off (test_font_size_adjust_cancels_a_fallback_faces_size_adjust),
+        so the example declares a stack of its own without it."""
+        text = (STUDIO / "references" / "typography.md").read_text(encoding="utf-8")
+        metricked = set(re.findall(r'@font-face\s*\{[^}]*?font-family:\s*"([^"]+)";[^}]*?\bsize-adjust:', text))
+        self.assertEqual(metricked, {"Geist Sans Fallback"})   # control: the face above is found
+        block = reference_block("typography.md", "--font-sans-aspect")
+        stack = re.search(r"--font-sans:\s*([^;]+);", block)
+        self.assertIsNotNone(stack, "the example reads the stack above, whose fallback it cancels")
+        self.assertFalse(metricked & set(re.findall(r'"([^"]+)"', stack.group(1))), stack.group(1))
+
+
 if __name__ == "__main__":
     unittest.main()
