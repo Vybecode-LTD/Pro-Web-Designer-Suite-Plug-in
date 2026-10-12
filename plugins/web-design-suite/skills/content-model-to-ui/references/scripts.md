@@ -9,7 +9,7 @@ Normalise a schema, propose a UI for every column, and emit the interview.
 | Flag | Does |
 |---|---|
 | `-o`, `--out FILE` | write `model.json` |
-| `--format auto\|ddl\|ts\|json` | override extension detection |
+| `--format auto\|ddl\|ts\|json\|prisma\|drizzle` | override detection: `.prisma`, and a `.ts` or `.js` file with `pgTable(`, are found by themselves |
 | `--schema NAME` | which schema to read from a generated types file (default `public`). The model records it, and the scaffold writes its policies, grants and smoke tests for that schema |
 | `--summary` | the SECURITY block (from DDL), then the human-readable proposal: control, signal and confidence per column |
 | `--questions` | the interview alone, as markdown |
@@ -17,6 +17,8 @@ Normalise a schema, propose a UI for every column, and emit the interview.
 | `--only TABLE` | restrict the model (repeatable or comma-separated) |
 
 Exit `0` model produced · `1` nothing usable in the input · `2` bad invocation.
+
+**Prisma and Drizzle (3.6.0).** A `schema.prisma` gives tables (`@@map`), columns (`@map`), native types (`@db.VarChar(80)`, `@db.Uuid`, `@db.Timestamptz`), defaults, `@id` and `@@id`, `@unique` and `@@unique`, enums, and keys with their `onDelete` from `@relation`. Prisma has no CHECK constraints, so the rules they give (a minimum, a maximum, a length) are missing, and a `DateTime` with no `@db.Timestamptz` is a timestamp without time zone, which the proposal flags as a question. A Drizzle schema (`drizzle-orm/pg-core`) gives each `pgTable`'s columns and their chained modifiers, `pgEnum`, `.references()` and `foreignKey()`, `primaryKey()`, `unique()` and `uniqueIndex()`, and a one-column `check()`. A key to `authUsers` from `drizzle-orm/supabase` is a key to `auth.users`. Neither file carries row-level security as the reader reads it, so the SECURITY block says unknown: introspect the migrations for that. Field names spelt the JavaScript way (`createdAt`, `authorId`) meet the same signals as their snake_case spelling, and the model keeps them as the source spells them.
 
 The model's `fidelity` block records what the source could not carry, so an absent constraint is never mistaken for a permissive one. Confidence is `high` (the schema said so) · `medium` (a strong signal with a plausible alternative) · `low` (a default standing in for a decision nobody has made).
 

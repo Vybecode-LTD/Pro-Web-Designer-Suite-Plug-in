@@ -60,7 +60,7 @@ The full decision procedure, every signal, and the list of what only a human can
 python -m scripts.introspect_schema supabase/migrations/*.sql -o model.json --summary
 ```
 
-Reads a `.sql` DDL file, a `supabase gen types typescript` `.ts` file, or a JSON schema dump, and normalises all three to one `model.json`: tables, columns with type/nullability/default/constraints/comment, primary and foreign keys, unique indexes, enums, and inferred relationships — including the join-table detection that turns two foreign keys in a table with no other meaningful column into a many-to-many edge rather than an entity with two screens nobody wants.
+Reads a `.sql` DDL file, a `supabase gen types typescript` `.ts` file, a Prisma schema, a Drizzle `pgTable` schema, or a JSON schema dump, and normalises all five to one `model.json`: tables, columns with type/nullability/default/constraints/comment, primary and foreign keys, unique indexes, enums, and inferred relationships — including the join-table detection that turns two foreign keys in a table with no other meaningful column into a many-to-many edge rather than an entity with two screens nobody wants.
 
 **Prefer the DDL.** Migrations and a `pg_dump` or `supabase db pull` of them give the same model. Generated types keep the structure but carry no lengths, no CHECKs, no `ON DELETE`, no unique indexes and no key into `auth` — which is exactly the information the mapper wants most. `references/supabase-integration.md` §1 has the fidelity table and the measured difference.
 

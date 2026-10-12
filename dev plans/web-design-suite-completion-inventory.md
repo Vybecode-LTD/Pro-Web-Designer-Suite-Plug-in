@@ -254,7 +254,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-A21 | low | fixed in 3.4.0: the Law 3 row, the weight and size notes, the newsletter's gaps, the announcement's headings, the edge token (PR #59; `test_email.EmailDocClaims`) | Consistency: "same 18 steps" and the email tokens' weight note are wrong. |
 | DL-B1 | high | fixed in 3.3.0: the reference's §9 (`test_docs.SupabaseGuidance.test_the_access_boundary_is_stated`) and the generated `lib/supabase.ts` (`test_policies`) | no data-access boundary. |
 | DL-B2 | high | fixed: 3.3.0 the per-table policies, column grants and a smoke test (`test_policies`); 3.4.0 the server schema, zod and pydantic, `test_scaffold.TheServerSchemaMirrorsTheConstraints` (PR #64) | authorization and server validation belong to nobody. |
-| DL-B3 | medium | W13 (3.6.0+) | stacks the description implies but doesn't serve. |
+| DL-B3 | medium | in part in 3.6.0: `test_schema_sources.OrmSchemasReadAsTheMigrationDoes`, PR #117; server actions and Vue/Svelte output are P37's | stacks the description implies but doesn't serve. |
 | DL-B4 | medium | W13 (3.6.0+) | email frameworks. |
 | DL-B5 | medium | W13 (3.6.0+) | email translation and RTL. |
 | DL-B6 | medium | fixed in 3.4.0: the dark pass and the MSO font check (PR #57), the `nostyle` check and `--source` (PR #58); generated-form ARIA (A9) is its own item | Checks the docs promise but nothing runs: email dark-mode contrast, the MSO font block, the no-`<style>` layout, source literals, generated-form ARIA. |

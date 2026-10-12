@@ -124,6 +124,16 @@
   error state adds `:user-invalid`, which waits until the user has touched the field, with
   `:has()` for its hint. A new `test_modern_css` runs each snippet in Chromium on the
   starter's tokens, reading the hit test and Chromium's accessibility tree.
+- **Prisma and Drizzle schemas in** (P40; DL-B3 in part). content-model-to-ui read SQL,
+  Supabase's generated types and a JSON dump, while its description promised Postgres.
+  `introspect_schema.py` now reads a `schema.prisma` and a Drizzle `pgTable` schema too,
+  found by themselves (`--format prisma|drizzle` to say so). The shop of `shop.sql`,
+  written in each, reads to the same screens: Drizzle's in full, Prisma's less what it
+  cannot say (CHECK constraints, the key to `auth.users`), each loss in the model's
+  `fidelity`. Neither carries row-level security, so the SECURITY block says unknown.
+  Names spelt the JavaScript way (`createdAt`, `authorId`, `priceCents`) now meet the same
+  signals as their snake_case spelling, so a timestamp stays out of the form and an
+  owner key stays read-only.
 
 ### Changed
 
