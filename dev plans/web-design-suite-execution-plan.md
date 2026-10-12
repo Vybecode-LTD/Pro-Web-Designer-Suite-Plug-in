@@ -148,7 +148,7 @@ Re-read `web-design-suite-review/claude-code-capabilities.md` against the curren
 | P38 part 1, #113 | Modern CSS, part 1: the top layer against the `--z-*` ladder (a toast inside the modal, not inert), `@starting-style` and `allow-discrete` for its entry and exit, `:user-invalid` with `:has()` for the error state; each snippet run in Chromium | SS-B4 in part | `accessibility.md`, `tests/test_modern_css.py` | S-M |
 | P38 part 2, #115 | Modern CSS, part 2: `cqi` for type in a container, `font-size-adjust` for fallback x-height, `color-mix()` and relative colour for overlays and alpha variants, `interpolate-size` as a Chromium-only enhancement | SS-B4 | `typography.md`, `color-system.md`, `motion-system.md`, `tests/test_modern_css.py` | S-M |
 | P39, #116 | Migration coverage: Sass's module colour functions, the `<style>` blocks, scripts and `style=""` attributes of Vue, Svelte, Astro and HTML files, and CSS-in-JS style objects, in the census, the clustering and the codemod; the rollout recipes (baselines on the old version first, `npm deprecate`, Renovate and Dependabot with exact pins) | LC-B5 in part, LC-B7 | `extract_literals.py`, `cluster_values.py`, `apply_codemod.py`, `rollout.md`, `tests/test_token_migration.py` | M |
-| P40 | Schema inputs: Prisma and Drizzle | DL-B3 | `introspect_schema.py`, new fixtures | M |
+| P40, #117 | Schema inputs: Prisma and Drizzle, read to the same model as the DDL, camelCase names meeting the snake_case signals | DL-B3 in part | `introspect_schema.py`, `shop.prisma`, `shop.drizzle.ts`, `tests/test_schema_sources.py` | M |
 | R3.6 | Release 3.6.0 | — | — | S-M |
 
 ### Phase 6b · 4.0.0: broader coverage and the breaking change
@@ -160,7 +160,7 @@ After 3.6.0. The workstreams are independent; ask the owner which comes first.
 | P34 | Runtime coverage: single-page apps (`--wait-for`, `--steps`), logged-in pages (`--storage-state`), shadow DOM, several URLs and viewports | GT-B1, GT-B2, GT-B3, GT-B4 | the three runtime gates | L |
 | P35 | The cheap automatable checks the coverage table lists, and engines other than Chromium | GT-B6, GT-B9 | a11y gates, `automation-coverage.md` | M-L |
 | P36 | Tailwind v4: its variants, `tw_probe` with a `/tw-probe` command, and the lint plugin (D4) | SB-B5, SB-C3, SB-C4, LC-B5 (v4's `@theme` in the migration) | `eslint.design.config.mjs` Part 5, new `tw_probe`, `cluster_values.py` | L |
-| P37 | SCSS in stylelint (D3), and Next.js App Router, Vue, Svelte and Astro | SB-B6 | configs, stack references, fixtures | L |
+| P37 | SCSS in stylelint (D3), and Next.js App Router, Vue, Svelte and Astro | SB-B6, DL-B3 (a server-action form variant, Vue and Svelte output) | configs, stack references, fixtures | L |
 | P41 | Email: MJML or React Email output, a right-to-left template, and a client matrix regenerated from caniemail's data | DL-B4, DL-B5, DL-C9 | email-template-system | L |
 | P42 | Persuasion: the UK and EU consumer law to flag for legal review, consent for tracking, price experiments, and persuasive patterns mapped to WCAG | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
 | P43 | More page types and audiences, a claims layer with `lint_claims.py`, routing between the persuasion skills, and MESSAGE_BRIEF to DECISION_LOG | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |

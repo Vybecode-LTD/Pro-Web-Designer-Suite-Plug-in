@@ -172,13 +172,38 @@ def _p(rx: str) -> re.Pattern[str]:
     return re.compile(rx, re.I)
 
 
+class _NamePattern:
+    """A pattern over column and table names that reads camelCase as
+    snake_case: a Prisma or Drizzle field named the JavaScript way
+    (`createdAt`, `authorId`) meets the signals its SQL spelling would (DL-B3).
+    The model keeps the name as the source spells it."""
+
+    def __init__(self, rx: str) -> None:
+        self.re = re.compile(rx, re.I)
+        self.pattern = rx
+
+    @staticmethod
+    def snake(name: str) -> str:
+        return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name)
+
+    def match(self, name: str) -> re.Match[str] | None:
+        return self.re.match(self.snake(name))
+
+    def search(self, name: str) -> re.Match[str] | None:
+        return self.re.search(self.snake(name))
+
+
+def _n(rx: str) -> _NamePattern:
+    return _NamePattern(rx)
+
+
 NAME_RULES: list[tuple[re.Pattern[str], str, str, str, dict[str, Any]]] = [
     # Credentials, by the PATTERNS field-mapping.md promises (`*_token`,
     # `*_hash`, `*_secret`, …), not a list of exact names: `api_token`,
     # `reset_token`, `webhook_secret` and `token_hash` were displayed and
     # editable. Hiding them here is the UI half only — the database must not
     # let anon/authenticated read them at all (see supabase-integration.md).
-    (_p(r"^(password|passwd|pwd|secret|token|salt|otp|totp|api_?key|private_key)$"
+    (_n(r"^(password|passwd|pwd|secret|token|salt|otp|totp|api_?key|private_key)$"
         r"|_(password|passwd|pwd|secret|token|hash|salt|digest|otp)$"
         r"|(^|_)(api|private|secret|access|signing|encryption|client)_key$"
         r"|^encrypted_"),
@@ -189,120 +214,120 @@ NAME_RULES: list[tuple[re.Pattern[str], str, str, str, dict[str, Any]]] = [
      "`select('*')` would still send it to the browser",
      {"write_only": True, "never_display": True}),
 
-    (_p(r"(^|_)(email|email_address|contact_email)$"),
+    (_n(r"(^|_)(email|email_address|contact_email)$"),
      "email-input", "high", "name says email", {"format": "email"}),
 
     # Media BEFORE the generic URL rule. `avatar_url` is a storage object that
     # happens to be addressed by URL; treating it as a link gives the user a
     # text box where they needed an upload with a preview. Order is the fix,
     # and it is the kind of ordering bug that only shows up on a real schema.
-    (_p(r"^(avatar|image|photo|picture|thumbnail|thumb|cover|banner|logo|"
+    (_n(r"^(avatar|image|photo|picture|thumbnail|thumb|cover|banner|logo|"
         r"hero|profile_image|cover_image|hero_image|featured_image)"
         r"(_url|_path|_key|_id)?$"),
      "image-upload", "high",
      "name says image — a storage object, not a string the user types",
      {"storage_backed": True, "media": "image"}),
 
-    (_p(r"^(file|attachment|document|asset|upload|resume|invoice_pdf)"
+    (_n(r"^(file|attachment|document|asset|upload|resume|invoice_pdf)"
         r"(_url|_path|_key)?$"),
      "file-upload", "high", "name says file — a storage object",
      {"storage_backed": True, "media": "file"}),
 
-    (_p(r"(^|_)(url|uri|href|link|website|homepage|permalink|webhook_url)$"),
+    (_n(r"(^|_)(url|uri|href|link|website|homepage|permalink|webhook_url)$"),
      "url-input", "high", "name says URL", {"format": "uri"}),
 
-    (_p(r"(^|_)slug$|^slug$|^handle$|^permalink_slug$"),
+    (_n(r"(^|_)slug$|^slug$|^handle$|^permalink_slug$"),
      "slug-input", "high",
      "name says slug — derived from the title, uniquely indexed, and the "
      "thing a URL breaks on if it changes",
      {"format": "slug", "derive_from_title": True}),
 
-    (_p(r"(^|_)(phone|phone_number|mobile|telephone|tel|fax)$"),
+    (_n(r"(^|_)(phone|phone_number|mobile|telephone|tel|fax)$"),
      "tel-input", "high", "name says phone number", {"format": "tel"}),
 
-    (_p(r"_(cents|minor|minor_units|in_cents|pennies|cent)$"),
+    (_n(r"_(cents|minor|minor_units|in_cents|pennies|cent)$"),
      "currency-input", "high",
      "name declares minor units — the integer is NOT a quantity",
      {"money": {"storage": "minor-units", "scale": 100}}),
 
-    (_p(r"(^|_)(price|amount|cost|total|subtotal|fee|balance|salary|revenue|"
+    (_n(r"(^|_)(price|amount|cost|total|subtotal|fee|balance|salary|revenue|"
         r"charge|refund|discount|tax|shipping|payout|budget|mrr|arr)"
         r"(_[a-z]+)?$"),
      "currency-input", "medium",
      "name is a money word — confirm the storage unit before trusting it",
      {"money": {"storage": "unknown", "scale": None}}),
 
-    (_p(r"(^|_)(rate|percent|percentage|pct|ratio|margin|share)$"),
+    (_n(r"(^|_)(rate|percent|percentage|pct|ratio|margin|share)$"),
      "percent-input", "medium",
      "name is a rate — confirm whether 0.15 or 15 is stored",
      {"percent": {"storage": "unknown"}}),
 
-    (_p(r"^(is|has|can|should|was|are|allow|enable|require)_"),
+    (_n(r"^(is|has|can|should|was|are|allow|enable|require)_"),
      "switch", "high",
      "is_/has_ prefix — a boolean the user flips, not a form checkbox",
      {}),
 
-    (_p(r"_(enabled|disabled|active|visible|published|archived|verified|"
+    (_n(r"_(enabled|disabled|active|visible|published|archived|verified|"
         r"deleted|featured|locked|approved)$"),
      "switch", "medium", "name reads as a state flag", {}),
 
-    (_p(r"^(currency|currency_code|iso_currency)$"),
+    (_n(r"^(currency|currency_code|iso_currency)$"),
      "select", "medium",
      "a currency code is a closed set of about 180 values that nobody types "
      "by hand — and it is the other half of every money column",
      {"options_source": "iso-4217",
       "options": ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF", "SEK"]}),
 
-    (_p(r"^(country|country_code|locale|language|language_code|timezone|"
+    (_n(r"^(country|country_code|locale|language|language_code|timezone|"
         r"time_zone|tz)$"),
      "combobox", "medium",
      "a standards list — long, closed, and searchable; never a text input",
      {"options_source": "standard-list"}),
 
-    (_p(r"(^|_)(description|body|content|summary|excerpt|bio|about|notes?|"
+    (_n(r"(^|_)(description|body|content|summary|excerpt|bio|about|notes?|"
         r"message|comment|abstract|caption|instructions)$"),
      "textarea", "high",
      "name is a long-form field — a single-line input truncates it visually "
      "and users stop writing",
      {"long_form": True}),
 
-    (_p(r"(^|_)(status|state|stage|phase|kind|type|category|level|priority|"
+    (_n(r"(^|_)(status|state|stage|phase|kind|type|category|level|priority|"
         r"severity|visibility|role)$"),
      "select", "medium",
      "name is a state word — almost always a closed set even when the column "
      "is plain text",
      {"closed_set_suspected": True}),
 
-    (_p(r"(^|_)(sort_order|position|rank|ordinal|weight|display_order|"
+    (_n(r"(^|_)(sort_order|position|rank|ordinal|weight|display_order|"
         r"sequence|index)$"),
      "hidden", "high",
      "an ordering column — users reorder by dragging rows, never by typing a "
      "number into a form field",
      {"ordering": True}),
 
-    (_p(r"^(metadata|meta|settings|config|configuration|options|properties|"
+    (_n(r"^(metadata|meta|settings|config|configuration|options|properties|"
         r"attributes|payload|extra|custom_fields|preferences)$"),
      "json-editor", "medium",
      "name is a bag — needs a human to say which keys are real before it can "
      "be anything better than a JSON box",
      {}),
 
-    (_p(r"(^|_)(color|colour|brand_color|accent_color)$"),
+    (_n(r"(^|_)(color|colour|brand_color|accent_color)$"),
      "color-picker", "medium", "name says colour", {}),
 
-    (_p(r"(^|_)(tags|labels|keywords|categories|skills)$"),
+    (_n(r"(^|_)(tags|labels|keywords|categories|skills)$"),
      "tag-input", "medium", "name is a plural bag of short strings", {}),
 
-    (_p(r"^(lat|latitude|lng|lon|longitude|coordinates|location|geom|geog)$"),
+    (_n(r"^(lat|latitude|lng|lon|longitude|coordinates|location|geom|geog)$"),
      "geo-point", "medium", "name is geographic", {}),
 ]
 
 # Timestamp columns that the application writes, not the user.
-SYSTEM_TIMESTAMPS = _p(
+SYSTEM_TIMESTAMPS = _n(
     r"^(created_at|updated_at|inserted_at|modified_at|deleted_at|"
     r"last_seen_at|last_sign_in_at|confirmed_at|email_confirmed_at)$")
 
-TIMESTAMP_SUFFIX = _p(r"_at$|^(created|updated|deleted|published|expires|"
+TIMESTAMP_SUFFIX = _n(r"_at$|^(created|updated|deleted|published|expires|"
                       r"starts|ends|scheduled|completed|due)(_on|_date)?$")
 
 TITLE_CANDIDATES = ("title", "name", "display_name", "full_name", "label",
@@ -313,14 +338,14 @@ TITLE_CANDIDATES = ("title", "name", "display_name", "full_name", "label",
 # Columns a scanning eye gets nothing from. `created_at` / `updated_at` are
 # deliberately absent — they are the most useful default second column there
 # is; the temporal cap in _assign_placement stops them crowding the row.
-LIST_NEVER = _p(r"^(id|.*_id|deleted_at|search_vector|fts|tsv|password.*|"
+LIST_NEVER = _n(r"^(id|.*_id|deleted_at|search_vector|fts|tsv|password.*|"
                 r".*_hash|metadata|settings|config)$")
 
 # Columns that do not make a table a real entity — the join-table test.
-JOIN_TABLE_NOISE = _p(r"^(id|created_at|updated_at|inserted_at|sort_order|"
+JOIN_TABLE_NOISE = _n(r"^(id|created_at|updated_at|inserted_at|sort_order|"
                       r"position|rank|ordinal|display_order)$")
 
-LOOKUP_TABLE_NAMES = _p(r"(status|state|type|kind|category|categories|role|"
+LOOKUP_TABLE_NAMES = _n(r"(status|state|type|kind|category|categories|role|"
                         r"roles|tag|tags|label|labels|currency|currencies|"
                         r"country|countries|plan|plans|tier|tiers)$")
 
@@ -1814,7 +1839,7 @@ def map_columns(model: Model) -> None:
 # Supabase profile policy (`USING (id = auth.uid())`, no WITH CHECK) lets
 # `.update(draft)` write any column the draft carries. A TypeScript type is
 # not access control, so these start read-only and get their own question.
-AUTHORITY = _p(
+AUTHORITY = _n(
     r"^(role|roles|user_role|permissions?|scopes?|admin|is_admin|is_staff|is_superuser"
     r"|is_owner|is_verified|is_approved|is_banned|is_suspended|verified|approved"
     r"|email_verified|owner_id|user_id|author_id|created_by|updated_by|org_id"
@@ -1888,7 +1913,7 @@ def _map_column(model: Model, table: Table, col: Column,
         # right when the choice is the point of the screen and every option
         # must be visible; `status` is a field among twenty others, and three
         # stacked radios there cost more vertical space than they buy.
-        state_word = bool(_p(r"(^|_)(status|state|stage|phase|visibility|"
+        state_word = bool(_n(r"(^|_)(status|state|stage|phase|visibility|"
                              r"role|type|kind|category)$").search(col.name))
         control = ("multi-select" if col.is_array else
                    "radio-group" if n <= 3 and not state_word else
@@ -2067,7 +2092,7 @@ def _temporal(col: Column) -> dict[str, Any]:
 
 def _money_policy(col: Column, existing: dict[str, Any]) -> dict[str, Any]:
     policy = dict(existing)
-    if re.search(r"_(cents|minor|minor_units|in_cents|pennies|cent)$", col.name, re.I):
+    if _n(r"_(cents|minor|minor_units|in_cents|pennies|cent)$").search(col.name):
         policy.update(storage="minor-units", scale=100,
                       note="integer minor units — divide by 100 for display, "
                            "multiply on save, and never let a float touch it")
@@ -2188,13 +2213,19 @@ def _default_message(kind: str, value: Any, ui: dict[str, Any]) -> str:
 # Screens: which column is the title, what goes on the list, how it lays out
 # ---------------------------------------------------------------------------
 
+def _canonical(table: Table) -> dict[str, str]:
+    """Each column by its snake_case spelling: `displayName` is found as
+    `display_name` and returned as the source spells it (Codex on #117)."""
+    return {_NamePattern.snake(c.name).lower(): c.name for c in table.columns}
+
+
 def _title_column(table: Table) -> str | None:
-    names = {c.name for c in table.columns}
+    names = _canonical(table)
     for cand in TITLE_CANDIDATES:
         if cand in names:
-            col = table.col(cand)
+            col = table.col(names[cand])
             if col and col.type in TEXTUAL_TYPES | {"citext"}:
-                return cand
+                return col.name
     for c in table.columns:
         if c.type in TEXTUAL_TYPES and not c.nullable and c.unique:
             return c.name
@@ -2210,7 +2241,7 @@ def _subtitle_column(table: Table, title: str | None) -> str | None:
             continue
         if c.ui.get("control") in ("textarea", "rich-text"):
             return c.name
-        if re.search(r"(description|summary|excerpt|subtitle|tagline)", c.name, re.I):
+        if _n(r"(description|summary|excerpt|subtitle|tagline)").search(c.name):
             return c.name
     return None
 
@@ -2248,7 +2279,7 @@ def _assign_placement(table: Table, title: str | None) -> None:
         # that may never have occurred; anything named for a migration is
         # plumbing that escaped into the schema.
         if c.type in TEMPORAL_TYPES or c.ui.get("temporal"):
-            if _p(r"(legacy|import|sync|migrat|raw|backfill)").search(c.name):
+            if _n(r"(legacy|import|sync|migrat|raw|backfill)").search(c.name):
                 return 5
             if c.name in ("created_at", "updated_at"):
                 return 40
@@ -2300,7 +2331,7 @@ def _index_layout(table: Table) -> tuple[str, str]:
     # the text is the record, and a feed of descriptions is a table with its
     # columns knocked out.
     is_the_text = any(
-        _p(r"^(body|content|message|post|text|comment|excerpt|transcript)$")
+        _n(r"^(body|content|message|post|text|comment|excerpt|transcript)$")
         .match(c.name) for c in table.columns)
     numeric = sum(1 for c in listed
                   if c.ui.get("control") in ("number-input", "stepper",
@@ -2325,7 +2356,7 @@ def _index_layout(table: Table) -> tuple[str, str]:
 
 
 def _default_sort(table: Table) -> dict[str, Any]:
-    names = {c.name for c in table.columns}
+    names = _canonical(table)
     for cand, direction, why in (
             ("sort_order", "asc", "an explicit ordering column exists, so the "
                                   "product already has an opinion"),
@@ -2334,7 +2365,7 @@ def _default_sort(table: Table) -> dict[str, Any]:
                                    "otherwise, and it is stable under inserts"),
             ("updated_at", "desc", "most-recently-touched first")):
         if cand in names:
-            return {"column": cand, "direction": direction, "signal": why,
+            return {"column": names[cand], "direction": direction, "signal": why,
                     "tiebreak": table.primary_key[0] if table.primary_key else None}
     return {"column": table.primary_key[0] if table.primary_key else None,
             "direction": "asc",
@@ -2630,7 +2661,7 @@ def _propose_groups(table: Table) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 def humanise(name: str) -> str:
-    s = re.sub(r"_id$", "", name)
+    s = re.sub(r"_id$", "", _NamePattern.snake(name), flags=re.I)
     s = s.replace("_", " ").strip()
     words = s.split()
     acronyms = {"id", "url", "uri", "api", "sku", "utm", "ip", "seo", "css",
@@ -2764,6 +2795,392 @@ def answers_template(model: Model) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Parser 4 — Prisma schema (DL-B3)
+# ---------------------------------------------------------------------------
+
+PRISMA_SCALARS = {
+    "String": "text", "Int": "integer", "BigInt": "bigint", "Float": "double precision",
+    "Decimal": "numeric(65,30)", "Boolean": "boolean", "DateTime": "timestamp",
+    "Json": "jsonb", "Bytes": "bytea",
+}
+# @db.X native types, as the SQL type they name.
+PRISMA_NATIVE = {
+    "Uuid": "uuid", "Text": "text", "Citext": "citext", "VarChar": "varchar", "Char": "char",
+    "SmallInt": "smallint", "Integer": "integer", "BigInt": "bigint", "Real": "real",
+    "DoublePrecision": "double precision", "Decimal": "numeric", "Money": "money",
+    "Timestamp": "timestamp", "Timestamptz": "timestamptz", "Date": "date", "Time": "time",
+    "Timetz": "timetz", "Boolean": "boolean", "Json": "json", "JsonB": "jsonb", "Inet": "inet",
+}
+PRISMA_ON_DELETE = {"Cascade": "cascade", "SetNull": "set null", "SetDefault": "set default",
+                    "Restrict": "restrict", "NoAction": "no action"}
+
+
+def _strip_line_comments(text: str) -> str:
+    """`//` and `/* */` comments out, strings kept (Prisma and TypeScript)."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch in "\"'`":
+            j = i + 1
+            while j < n and text[j] != ch:
+                j += 2 if text[j] == "\\" else 1
+            out.append(text[i:j + 1])
+            i = j + 1
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            out.append(" " if j < 0 else re.sub(r"[^\n]", " ", text[i:j + 2]))
+            i = n if j < 0 else j + 2
+        else:
+            out.append(ch)
+            i += 1
+    return "".join(out)
+
+
+def _prisma_attr(text: str, name: str) -> str | None:
+    """The argument text of `@name(…)`, balanced; "" for a bare `@name`."""
+    m = re.search(rf"@{re.escape(name)}\b", text)
+    if not m:
+        return None
+    if m.end() < len(text) and text[m.end()] == "(":
+        return _ts_args(text, m.end())[0].strip()
+    return ""
+
+
+def _prisma_list(arg: str, key: str | None = None) -> list[str]:
+    m = re.search(rf"{key}\s*:\s*\[([^\]]*)\]", arg) if key else re.search(r"\[([^\]]*)\]", arg)
+    return [x.strip().strip('"') for x in m.group(1).split(",") if x.strip()] if m else []
+
+
+def parse_prisma(text: str) -> Model:
+    model = Model()
+    clean = _strip_line_comments(text)
+    blocks = [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(
+        r"^[ \t]*(model|enum|view)\s+(\w+)\s*\{(.*?)^[ \t]*\}", clean, re.M | re.S)]
+    # A view is read-only, so it is no entity with create, edit and delete
+    # screens; it is left out, as the DDL reader leaves out CREATE VIEW (Codex on #117).
+    views = {name for kind, name, _ in blocks if kind == "view"}
+    blocks = [b for b in blocks if b[0] != "view"]
+
+    def db_name(body: str, default: str) -> str:
+        m = re.search(r'@@map\(\s*(?:name\s*:\s*)?"([^"]+)"', body)
+        return m.group(1) if m else default
+
+    enums = {name: db_name(body, name) for kind, name, body in blocks if kind == "enum"}
+    for kind, name, body in blocks:
+        if kind == "enum":
+            model.enums[enums[name]] = [
+                (re.search(r'@map\("([^"]+)"\)', line) or re.match(r"\s*(\w+)", line)).group(1)
+                for line in body.splitlines() if re.match(r"\s*\w", line) and not line.strip().startswith("@@")]
+    tables = {name: db_name(body, name) for kind, name, body in blocks if kind != "enum"}
+    fields: dict[str, dict[str, str]] = {}           # model -> field -> column
+    relations: list[tuple[str, str, str]] = []       # (model, target model, attribute text)
+
+    for kind, name, body in blocks:
+        if kind == "enum":
+            continue
+        table = Table(name=tables[name])
+        fields[name] = {}
+        for line in body.splitlines():
+            m = re.match(r"\s*(\w+)\s+(\w+(?:\.\w+)?(?:\([^)]*\))?)(\[\])?(\?)?\s*(.*)$", line)
+            if not m or line.strip().startswith("@@"):
+                continue
+            field, ftype, is_list, optional, attrs = m.groups()
+            if ftype in views:
+                continue
+            if ftype in tables:                       # a relation field, not a column
+                rel = _prisma_attr(attrs, "relation")
+                if rel and "fields" in rel:
+                    relations.append((name, ftype, rel))
+                continue
+            column = (re.search(r'@map\(\s*(?:name\s*:\s*)?"([^"]+)"', attrs) or [None, field])[1]
+            fields[name][field] = column
+            native = re.search(r"@db\.(\w+)(?:\(([^)]*)\))?", attrs)
+            if native and native.group(1) in PRISMA_NATIVE:
+                # A timestamp's (6) is its precision, not a length.
+                args = native.group(2) if native.group(1) not in ("Timestamp", "Timestamptz", "Time", "Timetz") else None
+                raw = PRISMA_NATIVE[native.group(1)] + (f"({args})" if args else "")
+            elif ftype in enums:
+                raw = enums[ftype]
+            else:
+                raw = PRISMA_SCALARS.get(ftype, ftype)
+            ptype, length, precision, scale, _ = normalise_type(raw + ("[]" if is_list else ""))
+            col = Column(name=column, type=ptype, raw_type=f"{ftype}{is_list or ''}{optional or ''}",
+                         max_length=length, numeric_precision=precision, numeric_scale=scale,
+                         is_array=bool(is_list), nullable=bool(optional))
+            col.enum = _enum_named(model, ptype)
+            if _prisma_attr(attrs, "id") is not None:
+                col.primary_key, col.nullable = True, False
+                table.primary_key.append(column)
+            if _prisma_attr(attrs, "unique") is not None:
+                col.unique = True
+                table.unique_indexes.append([column])
+            default = _prisma_attr(attrs, "default")
+            if default is not None:
+                if default.startswith("autoincrement") or default.startswith("sequence"):
+                    col.default, col.generated = "sequence", True
+                else:
+                    gen = re.match(r'dbgenerated\(\s*"(.*)"\s*\)$', default)
+                    col.default = gen.group(1) if gen else (
+                        f"'{default[1:-1]}'" if default.startswith('"') else default)
+            if _prisma_attr(attrs, "updatedAt") is not None:
+                col.default = "now()"
+            table.columns.append(col)
+        for key, kind_ in (("@@id", "pk"), ("@@unique", "unique")):
+            for mm in re.finditer(rf"{key}\(", body):
+                cols = [fields[name].get(f, f) for f in _prisma_list(_balanced_slice(body, mm.end() - 1) or "")]
+                if not cols:
+                    continue
+                if kind_ == "pk":
+                    table.primary_key = cols
+                    for c in cols:
+                        table.col(c).primary_key, table.col(c).nullable = True, False
+                else:
+                    table.unique_indexes.append(cols)
+        model.tables.append(table)
+
+    for source, target, rel in relations:
+        local = [fields[source].get(f, f) for f in _prisma_list(rel, "fields")]
+        remote = [fields[target].get(f, f) for f in _prisma_list(rel, "references")]
+        on_delete = re.search(r"onDelete\s*:\s*(\w+)", rel)
+        col = model.table(tables[source]).col(local[0]) if local else None
+        if col:
+            col.foreign_key = {"table": tables[target], "column": remote[0] if remote else "id",
+                               "on_delete": PRISMA_ON_DELETE.get(on_delete.group(1)) if on_delete else None}
+
+    if not model.tables:
+        raise SchemaError("No `model` blocks found in the Prisma schema.")
+    model.fidelity = {
+        "source_format": "prisma",
+        "carries": ["tables", "columns", "native types (@db.*)", "lengths", "nullability",
+                    "defaults", "primary keys", "foreign keys", "on-delete actions",
+                    "unique indexes", "enums"],
+        "missing": ["CHECK constraints (Prisma has none)", "views (read-only, so left out)",
+                    "row-level security and policies",
+                    "column privileges", "keys into schemas the file does not model "
+                    "(auth.users)", "row counts / cardinality"],
+    }
+    return model
+
+
+# ---------------------------------------------------------------------------
+# Parser 5 — Drizzle ORM schema, drizzle-orm/pg-core (DL-B3)
+# ---------------------------------------------------------------------------
+
+DRIZZLE_TYPES = {
+    "uuid": "uuid", "text": "text", "varchar": "varchar", "char": "char", "citext": "citext",
+    "integer": "integer", "int": "integer", "smallint": "smallint", "bigint": "bigint",
+    "serial": "serial", "bigserial": "bigserial", "smallserial": "smallserial",
+    "real": "real", "doublePrecision": "double precision", "numeric": "numeric",
+    "decimal": "numeric", "boolean": "boolean", "date": "date", "timestamp": "timestamp",
+    "time": "time", "interval": "interval", "json": "json", "jsonb": "jsonb", "inet": "inet",
+}
+# Supabase's auth tables, as drizzle-orm/supabase exports them.
+DRIZZLE_KNOWN_TABLES = {"authUsers": "users"}
+
+
+def _ts_args(text: str, open_at: int) -> tuple[str, int]:
+    """The text inside the bracket at `open_at`, and the index past its close.
+    Strings are skipped, so a `)` inside one does not close the call."""
+    depth, i, n = 0, open_at, len(text)
+    while i < n:
+        ch = text[i]
+        if ch in "\"'`":
+            j = i + 1
+            while j < n and text[j] != ch:
+                j += 2 if text[j] == "\\" else 1
+            i = j
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+            if depth == 0:
+                return text[open_at + 1:i], i + 1
+        i += 1
+    return text[open_at + 1:], n
+
+
+def _ts_split(body: str) -> list[str]:
+    """Top-level comma-separated items of an object, array or argument list."""
+    out, depth, start, i, n = [], 0, 0, 0, len(body)
+    while i < n:
+        ch = body[i]
+        if ch in "\"'`":
+            j = i + 1
+            while j < n and body[j] != ch:
+                j += 2 if body[j] == "\\" else 1
+            i = j
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            out.append(body[start:i])
+            start = i + 1
+        i += 1
+    out.append(body[start:])
+    return [x.strip() for x in out if x.strip()]
+
+
+def _ts_string(arg: str) -> str | None:
+    m = re.fullmatch(r"""\s*(["'`])(.*)\1\s*""", arg, re.S)
+    return m.group(2) if m else None
+
+
+def parse_drizzle(text: str) -> Model:
+    model = Model()
+    clean = _strip_line_comments(text)
+    enum_vars: dict[str, str] = {}
+    for m in re.finditer(r"\b(?:const|let)\s+(\w+)\s*=\s*\w*?[pP]gEnum\(", clean):
+        args = _ts_split(_ts_args(clean, m.end() - 1)[0])
+        name = _ts_string(args[0]) if args else None
+        if name:
+            enum_vars[m.group(1)] = name
+            model.enums[name] = re.findall(r"""["']([^"']+)["']""", args[1]) if len(args) > 1 else []
+
+    tables: list[tuple[str, Table, dict[str, str], list[tuple[Column, str]], str]] = []
+    var_names: dict[str, tuple[str, dict[str, str]]] = {}
+    for m in re.finditer(r"\b(?:const|let)\s+(\w+)\s*=\s*(?:\w+\.)?pgTable(?:\.withRLS)?\(", clean):
+        args = _ts_split(_ts_args(clean, m.end() - 1)[0])
+        name = _ts_string(args[0]) if args else None
+        if not name or len(args) < 2 or not args[1].startswith("{"):
+            continue
+        table = Table(name=name)
+        keys: dict[str, str] = {}
+        refs: list[tuple[Column, str]] = []
+        for entry in _ts_split(args[1][1:-1]):
+            em = re.match(r"""["']?(\w+)["']?\s*:\s*(\w+)\s*\(""", entry)
+            if not em:
+                continue
+            key, fn = em.groups()
+            call, at = _ts_args(entry, em.end() - 1)
+            call_args = _ts_split(call)
+            column = (_ts_string(call_args[0]) if call_args else None) or key
+            opts = next((a for a in call_args if a.startswith("{")), "")
+            keys[key] = column
+            if fn in enum_vars:
+                raw = enum_vars[fn]
+            else:
+                raw = DRIZZLE_TYPES.get(fn, fn)
+                length = re.search(r"\blength\s*:\s*(\d+)", opts)
+                prec = re.search(r"\bprecision\s*:\s*(\d+)", opts)
+                scale = re.search(r"\bscale\s*:\s*(\d+)", opts)
+                if raw == "timestamp" and re.search(r"withTimezone\s*:\s*true", opts):
+                    raw = "timestamptz"
+                if length:
+                    raw += f"({length.group(1)})"
+                elif prec and raw == "numeric":
+                    raw += f"({prec.group(1)}{',' + scale.group(1) if scale else ''})"
+            chain = entry[at:]
+            ptype, length_, precision, scale_, _ = normalise_type(raw + ("[]" if ".array(" in chain else ""))
+            col = Column(name=column, type=ptype, raw_type=f"{fn}()", max_length=length_,
+                         numeric_precision=precision, numeric_scale=scale_,
+                         is_array=".array(" in chain, nullable=True)
+            col.enum = _enum_named(model, ptype)
+            if fn in ("serial", "bigserial", "smallserial"):
+                col.default, col.generated, col.nullable = "sequence", True, False
+            if ".notNull(" in chain:
+                col.nullable = False
+            if ".primaryKey(" in chain:
+                col.primary_key, col.nullable = True, False
+                table.primary_key.append(column)
+            if re.search(r"\.unique\(", chain):
+                col.unique = True
+                table.unique_indexes.append([column])
+            if re.search(r"\.generated(?:Always|ByDefault)AsIdentity\(|\.generatedAlwaysAs\(", chain):
+                col.generated = True
+            dm = re.search(r"\.(defaultNow|defaultRandom|default|\$defaultFn)\(", chain)
+            if dm:
+                col.default = {"defaultNow": "now()", "defaultRandom": "gen_random_uuid()",
+                               "$defaultFn": "client-supplied"}.get(
+                    dm.group(1), (_ts_args(chain, dm.end() - 1)[0]).strip())
+            rm = re.search(r"\.references\(", chain)
+            if rm:
+                refs.append((col, _ts_args(chain, rm.end() - 1)[0]))
+            table.columns.append(col)
+        extra = args[2] if len(args) > 2 else ""
+        tables.append((m.group(1), table, keys, refs, extra))
+        var_names[m.group(1)] = (name, keys)
+
+    def target(expr: str) -> tuple[str, str] | None:
+        tm = re.search(r"(\w+)\.(\w+)\s*$", expr.split("=>")[-1].strip().strip("()"))
+        if not tm:
+            return None
+        if tm.group(1) in var_names:
+            t_name, t_keys = var_names[tm.group(1)]
+            return t_name, t_keys.get(tm.group(2), tm.group(2))
+        if tm.group(1) in DRIZZLE_KNOWN_TABLES:
+            return DRIZZLE_KNOWN_TABLES[tm.group(1)], tm.group(2)
+        return None
+
+    def on_delete(opts: str) -> str | None:
+        m = re.search(r"""onDelete\s*[:(]\s*["']([\w ]+)["']""", opts)
+        return m.group(1).lower() if m else None
+
+    for _, table, keys, refs, extra in tables:
+        for col, ref in refs:
+            parts = _ts_split(ref)
+            found = target(parts[0]) if parts else None
+            if found:
+                col.foreign_key = {"table": found[0], "column": found[1],
+                                   "on_delete": on_delete(ref)}
+
+        def cols_of(s: str) -> list[str]:
+            return [keys.get(k, k) for k in re.findall(r"\b\w+\.(\w+)\b", s)]
+
+        for cm in re.finditer(r"\b(primaryKey|uniqueIndex|unique|check|foreignKey)\s*\(", extra):
+            call, at = _ts_args(extra, cm.end() - 1)
+            kind = cm.group(1)
+            tail = extra[at:at + 200]
+            if kind == "primaryKey":
+                cols = cols_of(call)
+                table.primary_key = cols
+                for c in cols:
+                    if table.col(c):
+                        table.col(c).primary_key, table.col(c).nullable = True, False
+            elif kind in ("unique", "uniqueIndex"):
+                on = re.match(r"\s*\.on\(", tail)
+                if on:
+                    cols = cols_of(_ts_args(tail, on.end() - 1)[0])
+                    table.unique_indexes.append(cols)
+                    if len(cols) == 1 and table.col(cols[0]):
+                        table.col(cols[0]).unique = True
+            elif kind == "check":
+                sm = re.search(r"sql\s*`(.*?)`", call, re.S)
+                if sm:
+                    expr = re.sub(r"\$\{\s*\w+\.(\w+)\s*\}", lambda x: keys.get(x.group(1), x.group(1)),
+                                  sm.group(1))
+                    named = [c for c in table.columns if re.search(rf"\b{re.escape(c.name)}\b", expr)]
+                    if len(named) == 1:
+                        named[0].checks.append(expr.strip())
+            elif kind == "foreignKey":
+                local = cols_of(re.search(r"columns\s*:\s*\[([^\]]*)\]", call).group(1)) \
+                    if re.search(r"columns\s*:\s*\[", call) else []
+                remote = re.search(r"foreignColumns\s*:\s*\[\s*([^\]]*)\]", call)
+                found = target(remote.group(1).split(",")[0]) if remote else None
+                if local and found and table.col(local[0]):
+                    od = re.match(r"\s*\.onDelete\(\s*[\"']([\w ]+)[\"']", tail)
+                    table.col(local[0]).foreign_key = {
+                        "table": found[0], "column": found[1],
+                        "on_delete": od.group(1).lower() if od else None}
+        model.tables.append(table)
+
+    if not model.tables:
+        raise SchemaError("No `pgTable(…)` found. The Drizzle reader reads drizzle-orm/pg-core schemas.")
+    model.fidelity = {
+        "source_format": "drizzle",
+        "carries": ["tables", "columns", "types", "lengths", "nullability", "defaults",
+                    "generated", "primary keys", "foreign keys", "on-delete actions",
+                    "unique indexes", "enums", "CHECK constraints (one column each)"],
+        "missing": ["row-level security and policies (pgPolicy is not read)",
+                    "column privileges", "row counts / cardinality"],
+    }
+    return model
+
+
+# ---------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------
 
@@ -2771,6 +3188,10 @@ def detect_format(path: Path, text: str) -> str:
     ext = path.suffix.lower()
     if ext in (".sql", ".ddl", ".pgsql"):
         return "ddl"
+    if ext == ".prisma":
+        return "prisma"
+    if ext in (".ts", ".tsx", ".d.ts", ".js", ".mjs") and "pgTable(" in text:
+        return "drizzle"
     if ext in (".ts", ".tsx", ".d.ts"):
         return "ts"
     if ext == ".json":
@@ -2782,8 +3203,10 @@ def detect_format(path: Path, text: str) -> str:
         return "ddl"
     if "Database" in text and "Tables:" in text:
         return "ts"
+    if re.search(r"^\s*model\s+\w+\s*\{", text, re.M) and "datasource" in text:
+        return "prisma"
     raise SchemaError(
-        f"Cannot tell what {path.name} is. Pass --format ddl|ts|json.")
+        f"Cannot tell what {path.name} is. Pass --format ddl|ts|json|prisma|drizzle.")
 
 
 def build_model(path: Path, text: str, fmt: str, schema: str) -> Model:
@@ -2793,6 +3216,10 @@ def build_model(path: Path, text: str, fmt: str, schema: str) -> Model:
         model = parse_gen_types(text, schema)
     elif fmt == "json":
         model = parse_json_schema(text)
+    elif fmt == "prisma":
+        model = parse_prisma(text)
+    elif fmt == "drizzle":
+        model = parse_drizzle(text)
     else:
         raise SchemaError(f"Unknown format `{fmt}`.")
     infer_structure(model)
@@ -2819,7 +3246,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("-o", "--out", metavar="FILE",
                     help="write model.json here (default: stdout as JSON, "
                          "unless --summary or --questions is given)")
-    ap.add_argument("--format", choices=("auto", "ddl", "ts", "json"),
+    ap.add_argument("--format", choices=("auto", "ddl", "ts", "json", "prisma", "drizzle"),
                     default="auto", help="override extension detection")
     ap.add_argument("--schema", dest="pg_schema", default="public",
                     metavar="NAME",

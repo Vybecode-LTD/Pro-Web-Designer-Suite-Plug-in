@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+from collections import Counter
 
 from wds_support import PLUGIN, TempDirTest, output, run_py
 
@@ -348,6 +349,100 @@ export type Database = {
         self.assertIsNotNone(claim, "the §1 claim moved")
         self.assertEqual((int(claim.group(1)), int(claim.group(2))),
                          (sum(len(r) for r in lost.values()), len(lost)), lost)
+
+
+class OrmSchemasReadAsTheMigrationDoes(SchemaSources):
+    """DL-B3 (P40): "Supabase or Postgres" and no Prisma or Drizzle input. The
+    shop of shop.sql, written in each, reads to the same screens, less what
+    the format cannot say."""
+
+    def compare(self, source):
+        ddl, other = self.introspect("shop.sql"), self.introspect(source)
+        self.assertEqual(ddl["enums"], other["enums"])
+        a, b = columns(ddl), columns(other)
+        self.assertEqual(sorted(a), sorted(b))
+        differ = {}
+        for name in a:
+            fa, fb = facts(a[name]), facts(b[name])
+            # shop.sql makes the slug unique with a separate index, which the
+            # DDL reader keeps in unique_indexes, not on the column; the rules agree.
+            if name == "products.slug":
+                fa.pop("unique"), fb.pop("unique")
+            changed = {k: (fa[k], fb[k]) for k in fa if fa[k] != fb[k]}
+            if changed:
+                differ[name] = changed
+        return ddl, other, differ
+
+    def test_a_drizzle_schema_reads_as_the_ddl(self):
+        ddl, drizzle, differ = self.compare("shop.drizzle.ts")
+        self.assertEqual({}, differ)
+        self.assertEqual(structure(ddl), structure(drizzle))
+        self.assertEqual("drizzle", drizzle["fidelity"]["source_format"])
+        _, summary = self.introspect("shop.drizzle.ts", summary=True)
+        self.assertIn("SECURITY    unknown", summary)               # RLS is not in the file
+
+    def test_a_prisma_schema_reads_as_the_ddl_less_its_documented_losses(self):
+        ddl, prisma, differ = self.compare("shop.prisma")
+        # The key to auth.users is outside the file, as it is outside the API types.
+        self.assertEqual("users", differ.pop("customers.id")["foreign_key"][0][0])
+        # Prisma has no CHECK constraints: only the rules they gave are lost.
+        for name, changed in differ.items():
+            with self.subTest(column=name):
+                self.assertEqual({"rules"}, set(changed))
+                lost = Counter(changed["rules"][0]) - Counter(changed["rules"][1])
+                self.assertTrue(lost and all(kind in ("min", "max", "maxLength") for kind, _ in lost), lost)
+                self.assertFalse(Counter(changed["rules"][1]) - Counter(changed["rules"][0]))
+        self.assertEqual({"orders.notes", "orders.total_cents", "order_items.quantity",
+                          "order_items.unit_price_cents", "products.price_cents"}, set(differ))
+        self.assertIn("CHECK constraints (Prisma has none)", prisma["fidelity"]["missing"])
+        ours = {k: v for k, v in structure(prisma).items() if k != "customers"}
+        self.assertEqual({k: v for k, v in structure(ddl).items() if k != "customers"}, ours)
+
+    def test_camel_case_fields_meet_the_snake_case_signals(self):
+        # Prisma without @map, and Drizzle keys with no SQL name: the columns
+        # are camelCase, and the signals (`_at`, `_id`, `is_`) must still fire.
+        def prisma(names):
+            fields = "\n".join(f"  {n} {t}" for n, t in names)
+            return ('datasource db {\n  provider = "postgresql"\n  url = env("DATABASE_URL")\n}\n'
+                    f"model posts {{\n{fields}\n}}\n")
+        shape = [("id", "BigInt @id @default(autoincrement())"), ("title", "String"),
+                 ("{author}", "String @db.Uuid"), ("{published}", "Boolean @default(false)"),
+                 ("{created}", "DateTime @default(now()) @db.Timestamptz(6)"), ("{price}", "Int")]
+        snake = {"author": "author_id", "published": "is_published", "created": "created_at",
+                 "price": "price_cents"}
+        camel = {"author": "authorId", "published": "isPublished", "created": "createdAt",
+                 "price": "priceCents"}
+        for spelling in (snake, camel):
+            self.write(f"{spelling['author']}.prisma",
+                       prisma([(n.format(**spelling), t) for n, t in shape]))
+        a = columns(self.introspect(str(self.tmp / "author_id.prisma")))
+        b = columns(self.introspect(str(self.tmp / "authorId.prisma")))
+        for key, name in snake.items():
+            with self.subTest(column=name):
+                self.assertEqual(facts(a[f"posts.{name}"]), facts(b[f"posts.{camel[key]}"]))
+        self.assertFalse(b["posts.createdAt"]["ui"]["placement"]["form"])      # a system timestamp
+        self.assertFalse(b["posts.authorId"]["ui"]["editable"])               # authority (SEC)
+
+    def test_camel_case_names_choose_the_title_the_sort_and_the_labels(self):
+        # Codex on #117: the title, the default sort and the labels read the raw spelling.
+        head = 'datasource db {\n  provider = "postgresql"\n  url = env("DATABASE_URL")\n}\n'
+        self.write("people.prisma", head + "model people {\n  id Int @id\n  email String @unique\n"
+                   "  displayName String\n  createdAt DateTime @default(now()) @db.Timestamptz(6)\n}\n")
+        table = self.introspect(str(self.tmp / "people.prisma"))["tables"][0]
+        self.assertEqual("displayName", table["screens"]["title_column"])
+        self.assertEqual(("createdAt", "desc"), (table["screens"]["default_sort"]["column"],
+                                                 table["screens"]["default_sort"]["direction"]))
+        labels = {c["name"]: c["ui"]["label"] for c in table["columns"]}
+        self.assertEqual(("Display Name", "Created At"), (labels["displayName"], labels["createdAt"]))
+
+    def test_a_prisma_view_is_not_an_entity(self):
+        # Codex on #117: a view became a table with create, edit and delete screens.
+        head = 'datasource db {\n  provider = "postgresql"\n  url = env("DATABASE_URL")\n}\n'
+        self.write("stats.prisma", head + "model orders {\n  id Int @id\n  total Int\n}\n"
+                   "view order_totals {\n  id Int @unique\n  total Int\n  order orders? @relation(fields: [id], references: [id])\n}\n")
+        model = self.introspect(str(self.tmp / "stats.prisma"))
+        self.assertEqual(["orders"], [t["name"] for t in model["tables"]])
+        self.assertIn("views (read-only, so left out)", model["fidelity"]["missing"])
 
 
 class RealSupabaseOutput(SchemaSources):
