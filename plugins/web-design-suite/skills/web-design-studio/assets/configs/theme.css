@@ -718,7 +718,9 @@
    `max-w-*`, and a container query condition — like a media query — cannot
    read a custom property. A `var()` there produces an invalid condition
    that the browser drops without a word. `@utility` only ever emits a
-   declaration, so it is safe.
+   declaration, so it is safe. With the namespace gone, `@md:` generates
+   nothing: a container query is a `@custom-variant` with a literal
+   condition, named by its role (stack-tailwind.md §2.10).
 
    Line length is a spacing decision, not a typographic afterthought: 60-75
    characters is the readable band and `max-w-prose` is how you hit it.

@@ -271,9 +271,14 @@ async function main() {
       return die(`cannot read @import "${id}" (${file}): ${err.code || err.message}`);
     }
   };
+  // `@source inline("p-card")` puts its classes in the very first build, so
+  // asking for one adds no rule and it would read as not generated. Those
+  // lines are set aside: a class counts for what Tailwind generates when
+  // asked. `@source not inline()` stays, and still blocks its classes.
+  const withoutInline = (css) => css.replace(/@source\s+inline\(\s*(?:"[^"]*"|'[^']*')\s*\)\s*;?/g, '');
   const loadStylesheet = async (id, base) => {
     const file = resolveImport(id, base);
-    return { path: file, base: path.dirname(file), content: read(file, id) };
+    return { path: file, base: path.dirname(file), content: withoutInline(read(file, id)) };
   };
   // The project's stylesheets in cascade order, each after the files it
   // imports (an @import precedes every rule of its file). Tailwind's own
@@ -296,7 +301,7 @@ async function main() {
     return { path: file, base: path.dirname(file), module: mod.default ?? mod };
   };
 
-  const source = read(entry, args.entry);
+  const source = withoutInline(read(entry, args.entry));
   let compiler;
   try {
     compiler = await compile(source, { base: path.dirname(entry), from: entry, loadStylesheet, loadModule });

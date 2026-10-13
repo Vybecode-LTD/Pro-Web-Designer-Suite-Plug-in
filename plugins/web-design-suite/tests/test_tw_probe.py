@@ -10,8 +10,10 @@ the project's node_modules), and break it the ways a project does.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import unittest
+from pathlib import Path
 
 from wds_support import NODE, SKILLS, TOOLING_V3, TempDirTest, env, output, tool_modules
 
@@ -22,8 +24,8 @@ TAILWIND = tool_modules("WDS_TAILWIND_MODULES", "tailwindcss")
 TAILWIND_V3 = tool_modules("WDS_TAILWIND_V3_MODULES", "tailwindcss", default=TOOLING_V3)
 
 
-@unittest.skipUnless(NODE and TAILWIND, "set WDS_TAILWIND_MODULES to a node_modules with tailwindcss 4")
-class TheProbe(TempDirTest):
+class ProbeProject(TempDirTest):
+    """The starter's Tailwind wiring in src/styles/, as a project copies it."""
 
     def setUp(self):
         super().setUp()
@@ -44,6 +46,10 @@ class TheProbe(TempDirTest):
     def add_theme(self, css: str):
         self.write("src/styles/index.css",
                    (self.tmp / "src/styles/index.css").read_bytes().decode("utf-8") + css)
+
+
+@unittest.skipUnless(NODE and TAILWIND, "set WDS_TAILWIND_MODULES to a node_modules with tailwindcss 4")
+class TheProbe(ProbeProject):
 
     def test_the_starters_theme_passes(self):
         """Every role it declares gives its class, and no stock class survives."""
@@ -96,6 +102,14 @@ class TheProbe(TempDirTest):
         self.assertIn({"variable": "--container-card", "class": "@card:block", "generates": True}, report["roles"])
         self.assertEqual([{"class": "@card:p-card", "generates": True}], report["probe"])
 
+    def test_an_inline_source_does_not_hide_its_classes(self):
+        """`@source inline()` put its classes in the first build, so asking
+        for them added nothing and the roles read as missing (SB-B5's doc test)."""
+        self.add_theme('@source inline("bg-surface {hover:,}p-card");\n')
+        report = self.report("hover:p-card")
+        self.assertEqual("pass", report["verdict"], report["failures"])
+        self.assertEqual([{"class": "hover:p-card", "generates": True}], report["probe"])
+
     def test_a_namespace_cleared_after_its_variables_drops_them(self):
         self.add_theme("@theme { --radius-*: initial; }\n")
         roles = {r["variable"] for r in self.report()["roles"]}
@@ -121,6 +135,96 @@ class TheProbe(TempDirTest):
         proc = self.probe(modules=TAILWIND_V3)
         self.assertEqual(2, proc.returncode, output(proc))
         self.assertIn("tailwindConfig", output(proc))
+
+
+REFERENCE = SKILLS / "web-design-studio" / "references" / "stack-tailwind.md"
+# Compiles one stylesheet with the given tailwindcss, as the build does, and
+# prints what it generates for the candidates.
+COMPILE = r"""
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [twDir, file, candidatesJson] = process.argv.slice(2);
+const { compile } = await import(pathToFileURL(path.join(twDir, 'dist', 'lib.mjs')).href);
+const loadStylesheet = async (id, base) => {
+  let p;
+  if (id === 'tailwindcss' || id.startsWith('tailwindcss/')) {
+    let sub = id === 'tailwindcss' ? 'index.css' : id.slice('tailwindcss/'.length);
+    if (!path.extname(sub)) sub += '.css';
+    p = path.join(twDir, sub);
+  } else p = path.resolve(base, id);
+  return { path: p, base: path.dirname(p), content: fs.readFileSync(p, 'utf8') };
+};
+const compiler = await compile(fs.readFileSync(file, 'utf8'), { base: path.dirname(file), loadStylesheet });
+process.stdout.write(compiler.build(JSON.parse(candidatesJson)));
+"""
+
+
+def variants_block() -> str:
+    """The CSS block stack-tailwind.md §2.10 marks, as a project copies it."""
+    m = re.search(r"<!-- tw-probe:variants -->\n```css\n(.*?)```", REFERENCE.read_bytes().decode("utf-8"), re.S)
+    if not m:
+        raise AssertionError("stack-tailwind.md marks no variants block")
+    return m.group(1)
+
+
+@unittest.skipUnless(NODE and TAILWIND, "set WDS_TAILWIND_MODULES to a node_modules with tailwindcss 4")
+class TheVariantsTheReferenceTeaches(ProbeProject):
+    """SB-B5: stack-tailwind.md §2.10, compiled as written against the
+    starter's wiring: the variants v4 keeps after `--*: initial`, the ones it
+    loses, and the files that need the theme from outside the entry."""
+
+    def compile(self, rel: str, candidates=()) -> str:
+        harness = self.write("compile.mjs", COMPILE)
+        proc = subprocess.run([NODE, str(harness), str(Path(TAILWIND) / "tailwindcss"), str(self.tmp / rel),
+                               json.dumps(list(candidates))],
+                              cwd=self.tmp, capture_output=True, timeout=300, env=env())
+        self.assertEqual(0, proc.returncode, output(proc))
+        return proc.stdout.decode("utf-8")
+
+    def test_each_variant_the_section_names_generates(self):
+        self.add_theme(variants_block())
+        expect = ["cq-wide:p-card-lg", "cq-card-wide:p-card", "@container", "@container/card",
+                  "motion-safe:motion-hover", "motion-reduce:transform-none", "motion-reduce:animate-none",
+                  "forced-colors:border-stroke", "starting:opacity-0", "transition-opacity",
+                  "not-hover:bg-surface", "not-data-open:hidden"]
+        refuse = ["@md:p-card-lg", "space-y-related", "space-x-related"]
+        proc = self.probe(*[a for c in expect for a in ("--expect", c)],
+                          *[a for c in refuse for a in ("--refuse", c)])
+        self.assertEqual(0, proc.returncode, output(proc))
+
+    def test_the_container_variants_are_literal_queries(self):
+        self.add_theme(variants_block())
+        css = self.compile("src/styles/index.css", ["cq-wide:p-card-lg", "cq-card-wide:p-card", "@container/card"])
+        self.assertIn("@container (inline-size >= 40rem)", css)
+        self.assertIn("@container card (inline-size >= 40rem)", css)
+        self.assertRegex(css, r"container-name:\s*card")
+        self.assertNotIn("max-w-", css)
+
+    def test_inline_sources_generate_with_no_candidate(self):
+        self.add_theme(variants_block())
+        css = self.compile("src/styles/index.css")
+        for selector in (".bg-surface", ".p-card", r".hover\:p-card"):
+            with self.subTest(selector=selector):
+                self.assertIn(selector + " {", css.replace(":hover", ""))
+
+    def test_a_module_reads_the_theme_through_reference_only(self):
+        """Without `@reference`, `@variant dark` compiles with no error
+        against Tailwind's own dark, the media query, not the project's."""
+        body = ".card { @variant dark { color: var(--fg-default); } }\n"
+        self.write("src/components/card.module.css", body)
+        alone = self.compile("src/components/card.module.css")
+        self.assertIn("prefers-color-scheme: dark", alone)
+        self.assertNotIn("data-theme", alone)
+        self.write("src/components/card.module.css", '@reference "../styles/index.css";\n' + body)
+        referenced = self.compile("src/components/card.module.css")
+        self.assertIn('[data-theme="dark"]', referenced)
+        self.assertNotIn("prefers-color-scheme", referenced)
+        self.assertNotIn(".stack", referenced, "a reference emits none of the entry")
+        self.write("src/components/card.module.css", '@import "../styles/index.css";\n' + body)
+        imported = self.compile("src/components/card.module.css")
+        self.assertIn(".stack", imported, "an import copies the entry in")
+        self.assertGreater(len(imported), 30000)
 
 
 if __name__ == "__main__":
