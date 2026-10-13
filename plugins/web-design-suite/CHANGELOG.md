@@ -220,7 +220,7 @@
   `no-fake-countdown` eval, the reply built only the honest countdown and never said why
   the resetting one deceives, and its judges failed it. landing-page-conversion's
   ethics boundary now opens by asking for the why in the reply: the pattern, that it
-  deceives, and that regulators act on it (3.6.0's evals).
+  deceives, and the law behind it (3.6.0's evals).
 
 ## 3.5.0 — 2026-10-10
 
