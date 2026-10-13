@@ -79,13 +79,13 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.diff_system
-    from .project_config import (CONTRACT_SCHEMA, ConfigError, is_contract, is_dtcg, project_config,
-                                 read_deprecations, read_tokens, replacement_of)
+    from .project_config import (CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract, is_dtcg,
+                                 project_config, read_deprecations, read_tokens, replacement_of)
 except ImportError:                               # python scripts/diff_system.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import (CONTRACT_SCHEMA, ConfigError, is_contract,  # type: ignore[no-redef]
-                                is_dtcg, project_config, read_deprecations, read_tokens,
-                                replacement_of)
+    from project_config import (CONTRACT_SCHEMA, ConfigError, _dtcg,  # type: ignore[no-redef]
+                                is_contract, is_dtcg, project_config, read_deprecations,
+                                read_tokens, replacement_of)
 
 SCHEMA = "design-system-versioning/diff@1"
 DOCS_SCHEMA = "design-system-docs/system/1"
@@ -1348,6 +1348,96 @@ def detect_renames(old: Snapshot, new: Snapshot,
     return out
 
 
+def _equivalent(name: str, a: Any, b: Any) -> bool:
+    """Whether two spellings of one token's value mean the same thing:
+    `oklch(88% 0.078 42)` and `oklch(88.0% 0.078 42)`, `0px 1px 2px 0px …`
+    and `0 1px 2px …`, `cubic-bezier(0, 0, 1, 1)` and `linear`. A DTCG file
+    read back spells each value its own way, so against the stylesheet it was
+    written from, every primitive read as edited and the bump as major (the
+    3.6.0 live check). Both must parse, through dtcg.py's css_value(), to
+    the same type and value. A value it cannot type whole (`600ms linear`,
+    what a transition resolves to) is the same when each top-level part is."""
+    if a == b:
+        return True
+    if not (isinstance(a, str) and isinstance(b, str)):
+        return False
+    try:
+        module = _dtcg(Path(__file__))
+    except ConfigError:                           # vendored without dtcg.py: text only
+        return False
+    (ka, va), (kb, vb) = module.css_value(name, a), module.css_value(name, b)
+    if ka is not None or kb is not None:
+        return ka == kb and va == vb
+    pa, pb = _parts(a), _parts(b)
+    if len(pa) < 2 or len(pa) != len(pb):
+        return False
+    for x, y in zip(pa, pb):
+        kx, vx = module.css_value(name, x)
+        if x != y and (kx is None or (kx, vx) != module.css_value(name, y)):
+            return False
+    return True
+
+
+def _parts(text: str) -> List[str]:
+    """`text` cut at its top-level spaces and commas, each comma a part."""
+    out: List[str] = []
+    depth, cur = 0, ""
+    for ch in text:
+        depth += (ch == "(") - (ch == ")")
+        if depth == 0 and (ch.isspace() or ch == ","):
+            out += [cur] if cur else []
+            out += [","] if ch == "," else []
+            cur = ""
+        else:
+            cur += ch
+    return out + ([cur] if cur else [])
+
+
+def dtcg_cannot_hold(old: Snapshot, new: Snapshot) -> List[str]:
+    """The new snapshot's tokens a DTCG 2025.10 file cannot hold, when the old
+    snapshot is one and the new is not: a `clamp()`, a `ch` or an `em`, or a
+    reference to one of those (dtcg.py's document() leaves each out). The old
+    file could never have carried them, so they are not new: against the
+    stylesheet it was written from, 53 of the starter's tokens read as added
+    and an unchanged system as a minor release (the 3.6.0 live check)."""
+    if old.source != "DTCG" or new.source == "DTCG":
+        return []
+    try:
+        module = _dtcg(Path(__file__))
+    except ConfigError:
+        return []
+    _doc, problems = module.document((n, str(t.get("raw", ""))) for n, t in new.tokens.items())
+    return sorted({name for name, _why in problems} - set(old.tokens))
+
+
+def align_spellings(old: Snapshot, new: Snapshot) -> None:
+    """Give the old snapshot the new one's spelling wherever the two mean the
+    same (`_equivalent`): a token's raw text, what it resolves to in each
+    theme and density, and each override. Only a change of meaning is left to
+    report, and the report quotes the new snapshot's text."""
+    for name in old.tokens.keys() & new.tokens.keys():
+        told, tnew = old.tokens[name], new.tokens[name]
+        if "raw" in tnew and _equivalent(name, told.get("raw"), tnew["raw"]):
+            told["raw"] = tnew["raw"]
+        for theme, got in (told.get("resolved") or {}).items():
+            other = (tnew.get("resolved") or {}).get(theme)
+            if isinstance(got, dict) and isinstance(other, dict):
+                for key in ("display", "value"):
+                    if key in other and _equivalent(name, got.get(key), other[key]):
+                        got[key] = other[key]
+        dens, other_dens = told.get("density"), tnew.get("density")
+        if isinstance(dens, dict) and isinstance(other_dens, dict):
+            for density, got in dens.items():
+                if density in other_dens and _equivalent(name, got, other_dens[density]):
+                    dens[density] = other_dens[density]
+        theirs = {(o.get("context"), o.get("label")): o for o in tnew.get("overrides", [])}
+        for ov in told.get("overrides", []):
+            match = theirs.get((ov.get("context"), ov.get("label")))
+            if match is not None and "value" in match and \
+                    _equivalent(name, ov.get("value"), match["value"]):
+                ov["value"] = match["value"]
+
+
 def _override_fingerprint(tok: Dict[str, Any]) -> Tuple[Tuple[str, str, str], ...]:
     return tuple(sorted(
         (str(o.get("context")), str(o.get("label")), str(o.get("value")))
@@ -1497,10 +1587,10 @@ def contrast_deltas(old: Snapshot, new: Snapshot, rename: Dict[str, str],
 
 
 def diff_tokens(old: Snapshot, new: Snapshot, out: List[Change],
-                inherited: List[str]) -> Tuple[Dict[str, str], set]:
+                inherited: List[str], unheld: Sequence[str] = ()) -> Tuple[Dict[str, str], set]:
     old_names, new_names = set(old.tokens), set(new.tokens)
     removed = sorted(old_names - new_names)
-    added = sorted(new_names - old_names)
+    added = sorted(new_names - old_names - set(unheld))
     rename = detect_renames(old, new, removed, added)
     renamed_new = set(rename.values())
     changed_values: set = set()
@@ -2450,16 +2540,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     contract = bool(kinds)
     if contract:
         old, new = as_contract(old), as_contract(new)
+    align_spellings(old, new)
+    unheld = dtcg_cannot_hold(old, new)
 
     changes: List[Change] = []
     inherited: List[str] = []
-    rename, changed_values = diff_tokens(old, new, changes, inherited)
+    rename, changed_values = diff_tokens(old, new, changes, inherited, unheld)
     diff_components(old, new, changes)
     notes: List[str] = []
     if contract:
         notes.append(f"{' and '.join(kinds)} hold{'s' if len(kinds) == 1 else ''} default values and "
                      "tiers only, so only those were compared: no themes, densities, conditions, notes, "
                      "layers or components")
+    if unheld:
+        shown = ", ".join(unheld[:8]) + (f", … (+{len(unheld) - 8})" if len(unheld) > 8 else "")
+        notes.append(f"{len(unheld)} token(s) a DTCG 2025.10 file cannot hold were not compared, "
+                     f"since the old file could not have carried them: {shown}")
     layer_note = None if contract else diff_layers(old, new, changes)
     if layer_note:
         notes.append(layer_note)

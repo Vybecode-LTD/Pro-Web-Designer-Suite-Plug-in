@@ -194,6 +194,14 @@
   spelling 2025.10 gives it, was left unresolved (P31).
 - **A group's `$deprecated`** did not reach its tokens; now each one that does not say
   otherwise carries it, and the description notes it (P31).
+- **A value spelt another way was a change** in `diff_system.py`: `oklch(88% …)` for
+  `oklch(88.0% …)`, `0px 1px 2px 0px …` for `0 1px 2px …`, `cubic-bezier(0, 0, 1, 1)`
+  for `linear`. Two values are now the same when they parse to the same DTCG type and
+  value, part by part for a value with no type of its own. Against the stylesheet it
+  was written from, a published DTCG file read 27 primitives as edited, and the 53
+  tokens it cannot hold (`clamp()`, `ch`, `em`, and what reads them) as added: a major
+  release for an unchanged system. Those tokens are now set aside, with a note naming
+  them (the 3.6.0 live check).
 
 ## 3.5.0 — 2026-10-10
 

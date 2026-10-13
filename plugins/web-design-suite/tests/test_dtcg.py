@@ -11,7 +11,10 @@ Regressions covered (each fails on v3.5.0):
 - (part 3) themes could not be written: `--format dtcg` wrote the default mode
   alone, and a DTCG resolver (`*.resolver.json`) was read as no tokens;
 - (part 4) a removal the old DTCG file had marked `$deprecated` failed the
-  release gate, and the deprecation ledger could not take the marks.
+  release gate, and the deprecation ledger could not take the marks;
+- (the 3.6.0 live check) a DTCG file against the stylesheet it was written
+  from was a major release: every value it spells another way was an edit,
+  and every token it cannot hold was added.
 """
 from __future__ import annotations
 
@@ -574,6 +577,52 @@ class DeprecationsReachTheLedger(TempDirTest):
                       "--since", "2.1.0", "--removal", "3.0.0", cwd=self.tmp)
         self.assertEqual(0, proc.returncode, output(proc))
         self.assertIn("recorded: 1 token(s) marked $deprecated", output(proc))
+
+
+class ASnapshotAgainstItsStylesheet(TempDirTest):
+    """The 3.6.0 live check: a published DTCG file against the stylesheet it
+    was written from read 27 primitives as edited (`oklch(88% …)` for the
+    source's `oklch(88.0% …)`, `0px 1px 2px 0px …` for `0 1px 2px …`,
+    `cubic-bezier(0, 0, 1, 1)` for `linear`), and the 53 tokens a DTCG file
+    cannot hold as added: a major release for an unchanged system."""
+
+    def diff(self, old, new):
+        proc = run_py("design-system-versioning", "diff_system", old, new, "--format", "json",
+                      cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        report = json.loads(proc.stdout)
+        return [(c["kind"], c["subject"]) for c in report["changes"]], report["notes"]
+
+    def publish(self):
+        proc = run_py("figma-variables-sync", "figma_to_tokens", str(STARTER), "--format", "dtcg",
+                      "--out-dir", "published", "--quiet", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))   # 1: written, the untyped values named
+        return "published/tokens.json"
+
+    def test_an_unchanged_system_is_no_change(self):
+        changes, notes = self.diff(self.publish(), str(STARTER))
+        self.assertEqual([], changes)
+        self.assertTrue(any(n.startswith("53 token(s) a DTCG 2025.10 file cannot hold") for n in notes),
+                        notes)
+
+    def test_a_spelling_is_not_an_edit(self):
+        css = STARTER.read_bytes().decode("utf-8")
+        respelled = (css.replace("--accent-200: oklch(88.0% 0.078 42);", "--accent-200: oklch(88% 0.078 42);")
+                     .replace("--shadow-xs:  0 1px 2px  oklch(0% 0 0 / 0.05);",
+                              "--shadow-xs: 0px 1px 2px 0px oklch(0% 0 0 / 0.050);")
+                     .replace("--ease-linear:  linear;", "--ease-linear: cubic-bezier(0, 0, 1, 1);"))
+        self.assertEqual(3, sum(a != b for a, b in zip(css.splitlines(), respelled.splitlines())))
+        self.write("v1/tokens.css", respelled)                 # one name: a file's own is compared too
+        self.write("v2/tokens.css", css)
+        self.assertEqual([], self.diff("v1/tokens.css", "v2/tokens.css")[0])
+
+    def test_a_real_edit_is_still_one(self):
+        """The guard: the alignment must not swallow a change of value."""
+        css = STARTER.read_bytes().decode("utf-8").replace(
+            "--accent-200: oklch(88.0% 0.078 42);", "--accent-200: oklch(90% 0.078 42);")
+        self.write("tokens.css", css)
+        self.assertEqual([("tier1-value-changed", "--accent-200")],
+                         self.diff(self.publish(), "tokens.css")[0])
 
 
 THEMED_CSS = """@layer tokens {
