@@ -1,12 +1,14 @@
 # Start here: the next session
 
-**Written 2026-10-12**, at the end of the session (2026-10-12) that:
-- merged P38 part 2 (#115): `cqi` type in a container, `font-size-adjust` on a stack of its own, a role's alpha variants with `color-mix()` and relative colour, and a disclosure animating to `auto` with `interpolate-size`, each run in Chromium. **SS-B4 is closed;**
-- merged P39 (#116): the migration census reads Sass's module colour functions, Vue, Svelte, Astro and HTML files, and CSS-in-JS style objects, and rollout.md gains its recipes. **LC-B7 is closed, LC-B5 in part** (the rest is P36's);
-- merged P40 (#117): Prisma and Drizzle schemas into content-model-to-ui. **DL-B3 in part** (the rest is P37's);
-- fixed 9 real review findings and 1 CI failure. **Phase 6a's code is done.**
+**Written 2026-10-13**, at the end of the session (2026-10-13) that released **3.6.0**, Phase 6a:
+- **The live check** of each route 3.6.0 changed: 8 headless sessions and 3 reruns, for $2.92 (`dev plans/web-design-suite-3.6.0-live-check.md`). It found three defects, each fixed before the release:
+  - #119: `diff_system.py`, comparing a published DTCG file with the stylesheet it was written from, read an unchanged system as major. The DTCG writer now keeps what it leaves out, with values and marks, in its `$extensions`.
+  - #120: `figma_to_tokens.py --reverse` now reads a `tokens.css`, a DTCG file and a resolver, each theme a Figma mode.
+  - #121: the router and figma-variables-sync's description name Tokens Studio.
+- **The release:** the release PR (#122), then the evals on its merge: routing 23 of 23 and outcome 10 of 11 on `d2c1f9b` ($9.35 of the $14 ceiling). The miss was `no-fake-countdown`: one of three runs never said why the resetting timer deceives. #123 fixed the persuasion skill, and the case then passed 3 of 3 on `d91a146` ($0.32), with a +1.00 difference over no plugin. The tag `v3.6.0` is on `d91a146`.
+- **Reviews:** 14 real findings fixed (Codex 12, CodeRabbit 2).
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work in detail: **R3.6, the 3.6.0 release** (§4), then Phase 6b (§5).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **Phase 6b, 4.0.0** (§4). The owner chooses its first workstream.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -19,7 +21,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 - **Budget.** A session may run up to **750 thousand tokens, with no compacting** (the user, 2026-10-02). About 95 thousand of it is spent before the first message.
   - Report usage after each PR, and warn early.
-  - Stop and write the handoff (§6) well before the cap. The end-of-session docs take about 40 thousand.
+  - Stop and write the handoff (§5) well before the cap. The end-of-session docs take about 40 thousand.
   - **The `total_tokens left` counter resets** when the app delivers a `<ci-monitor-event>`, and on some of the user's messages, but not on a background task's notification. It reset on every review event last session, acknowledgements included.
     - Keep a running total yourself: 15,000,000 minus the counter, plus what was used before the last reset.
     - **Count from the first turn.** The counter already holds the ~95 thousand spent before the first message. Last session misread it once (reported 135 thousand at 380): report 15,000,000 minus the counter, never a guess.
@@ -34,7 +36,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
     - waits for CodeRabbit's check to leave `pending`;
     - prints the checks, `mergeStateStatus`, the open-thread count and the reviews by commit.
 
-    It is in the last sessions' scratchpads; copy the newest (`0b8d7fc9-…`), whose `gh run watch` has `--interval 30`. **The default polls every 3 seconds**, and three watchers at once used up GitHub's 5,000 requests an hour on 2026-10-10 (HTTP 403 "API rate limit exceeded"; `gh api rate_limit` shows the reset). Run one watcher at a time, and stop a superseded one with `TaskStop`.
+    It is in the last sessions' scratchpads; copy the newest (`315825e6-…`), whose `gh run watch` has `--interval 30` and which waits for CodeRabbit 3 minutes at most. **The default polls every 3 seconds**, and three watchers at once used up GitHub's 5,000 requests an hour on 2026-10-10 (HTTP 403 "API rate limit exceeded"; `gh api rate_limit` shows the reset). Run one watcher at a time, and stop a superseded one with `TaskStop`.
   - Never grep `tooling/`: its `node_modules` makes a search run for minutes. Reading one named file in it is fine.
   - **To wait** (for CodeRabbit's hourly limit, say), run `sleep N` with the Bash tool's `run_in_background`: a foreground `sleep` is blocked, and the notification wakes you.
   - **CodeRabbit is not a merge gate (the owner, 2026-10-12).** Its free tier gives one review an hour across all PRs, and waiting for it held PRs open for hours. Never wait for it or request a review to gate a merge.
@@ -129,11 +131,25 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Every name pattern must meet the ORM's spelling** (Codex on #117): camelCase columns missed the title, sort and label signals, and a Prisma `view` is no entity.
       - **Assert the formula, not a gap** (CI on #115): a 0.5px width gap between fallbacks held on Windows and failed on Ubuntu, whose fallback's aspect is close to 0.53. The test checks MDN's u = (m/m')s.
       - **Declined:** CodeRabbit's plugin-root commands in rollout.md (it withdrew the comment).
+    - **The 2026-10-13 session's reviews found 14 real issues**: #119 (Codex 7, over three rounds), #120 (Codex 3, CodeRabbit 1), #121 (Codex 1) and #123 (Codex 1, CodeRabbit 1). Each was fixed with a test failing on the head it reviewed. The lessons, for any converter between formats:
+      - **Write down what a format cannot hold, when the file is written**, with the values and the marks:
+        - representability is not provenance: a `clamp()` added since is new;
+        - a name alone hides a changed value;
+        - a lost `$deprecated` fails the gate.
+
+        Read the record from every file a config lists, in order, and from a resolver's default contexts only.
+      - **Compare by meaning, then keep what the parser erases.** `oklch(88%)` is `oklch(88.0%)`, but `"serif"` is not `serif`.
+      - **Keep each value's type, and the scope that carries its modes.** A duration is a FLOAT and a boolean a BOOLEAN. A token a theme sets is semantic, whatever its name.
+      - **Never discard a reader's problems.** An empty result is not a clean conversion.
+      - **A route must answer the words a user says.** "Tokens Studio" without "Figma" reached no skill.
+      - **A rule that asks for a claim says when it holds** (#123). "Cite a law only if it applies": conversion-audit.md §11 ties the DSA to platforms and ROSCA to negative options.
+      - **Resolve only the threads you answered.** A loop that resolved every open thread closed one of Codex's that had not been read yet (#123). Answer each by its id, then resolve that one.
+      - **Read `check.py`'s exit line before pushing.** #121 went up with a 207-character description (the limit is 200), in the same command that read the result.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
   - The Bash tool is Git Bash. Any command you give the user must work in cmd.exe.
-  - **The desktop app is an MSIX package**, so its `AppData\Roaming` is really `C:\Users\vybec\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming`. Claude's tools see the bundled CLI at `%APPDATA%\Claude\claude-code\2.1.293\83cb0bd7fed4\claude.exe`; the owner's terminal does not ("cannot find the file"). Give the owner the real path. The credentials are in `C:\Users\vybec\.claude`, which both see.
+  - **The desktop app is an MSIX package**, so its `AppData\Roaming` is really `C:\Users\vybec\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming`. Claude's tools see the bundled CLI at `%APPDATA%\Claude\claude-code\2.1.295\d2e29494ec83\claude.exe`; the owner's terminal does not ("cannot find the file"). Give the owner the real path. The credentials are in `C:\Users\vybec\.claude`, which both see. On 2026-10-13 the CLI's sign-in had expired (`auth status` said `"loggedIn": false`); the owner ran `claude.exe auth login` with the real path.
   - **The terminal tool** (`run_in_terminal`) reported a long command as unfinished while it was in fact running `auth login`, and closing the tab cancelled the sign-in. Read the tab before closing it.
   - **Bash heredocs eat backslashes** (`\\` becomes `\`, `\n` becomes a newline), even quoted ones. It bit three times last session: a `\n` in a test became a real newline, and an edit script failed to match.
     - Write any script or test code that holds a backslash with the Write tool into a scratch `.py` file, and run that. Or use the Edit tool, which is safe.
@@ -174,7 +190,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
    - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions, and the owner's no to `bin/`.
    - §1 is the plugin-evals page, §10 P29's choices, and **§11 the sandboxing page and P30's choices**, with the first runs. Read §11 if you touch the evals.
-   - **Before R3.6**, read `dev plans/web-design-suite-3.5.0-live-check.md` (the last release's live check) and PR #99's body (its order: the release PR, then the evals, then the tag).
+   - The two live checks, `dev plans/web-design-suite-3.5.0-live-check.md` and `web-design-suite-3.6.0-live-check.md`, show how a release is checked; read them before R4.
 4. Check the state, with the Bash tool:
    ```bash
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
@@ -194,7 +210,19 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 - **`tests/test_modern_css.py` (#113)** runs the references' modern-CSS snippets in Chromium on the starter's tokens (`reference_block(name, needle)`, `PROBE_JS` with a scenario argument): hit tests and Chromium's accessibility tree through CDP (`Accessibility.getFullAXTree`). #115 added `cqi`, `font-size-adjust`, the alpha variants and the disclosure (its toggle, a ```js block, runs in the page; `reference_block(name, needle, lang)`); `TheReferencesReadAlone` holds the checks that need no browser.
 - **The migration census (#116).** `extract_literals.py` reads `.vue`, `.svelte`, `.astro` and `.html` (`MARKUP_EXT`): each `<style>` block in its `lang` (`style_blocks()`), scripts and Astro's frontmatter as JavaScript (`script_blocks()`), `style=""` and `class=""` (`extract_markup()`). `object_style_literals()` reads `sx`, `css`, `styled({})`, vanilla-extract and Panda (`STYLE_PROPS`, `STYLE_SHORTHANDS`); a number in `sx` or Panda is a theme step, so only strings count. `cluster_values.HAND_WORK` sets inline styles and style objects aside. `apply_codemod.py` rewrites the style blocks (`plan_markup()`). `test_token_migration.TheCensusReadsEveryStyleSource`.
 - **Prisma and Drizzle (#117).** `introspect_schema.py` parsers 4 and 5, `parse_prisma()` and `parse_drizzle()` (pg-core only; `_ts_args()` is string-aware), chosen by `detect_format()` or `--format`. Each fidelity block names its losses (Prisma: no CHECK, views left out). `_n()` (`_NamePattern`) matches the snake_case signals on camelCase names, and `_canonical()` and `humanise()` read them too. Fixtures `tests/fixtures/supabase/shop.prisma` and `shop.drizzle.ts`; `test_schema_sources.OrmSchemasReadAsTheMigrationDoes`.
-- **The plugin** is `plugins/web-design-suite/` (about 1,080 tests):
+- **The DTCG record (#119).** `dtcg.document()` keeps each token it leaves out, with its CSS value, in the document's root `$extensions` (`dtcg.EXTENSION`, `io.github.vybecode-ltd.web-design-suite`). `notWritten` holds the values, and `deprecated` the marks it could not carry. The readers are `not_written()` and `not_written_marks()`.
+  - `diff_system._snapshot_from_contract()` restores them through `recorded()`: from every path, in order, and from a resolver's `dtcg.default_sources()` only.
+  - `_equivalent()` compares two spellings through `css_value()`, part by part for an untyped value; `_families()` keeps a quoted keyword distinct.
+  - `align_spellings()` runs before the diff.
+  - `test_dtcg.ASnapshotAgainstItsStylesheet`.
+- **`--reverse` from any token format (#120).** `figma_to_tokens.reverse_data()` turns a `tokens.css`, a DTCG document or a resolver into `read_tokens_json()`'s tiered shape:
+  - each `[data-theme]` block, or each context of a resolver modifier named for a theme, scheme or mode, is a mode;
+  - each entry carries its Figma type (`REVERSE_TYPES`, or a CSS duration);
+  - a themed token is semantic;
+  - the reader's problems are reported (`not read`, `not carried to Figma`).
+
+  `reverse_main()` serves the REST body and `--format plugin-script`. See `test_figma_sync.ReverseReadsEveryTokenFormat`.
+- **The plugin** is `plugins/web-design-suite/` (about 1,096 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -242,7 +270,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - **The tests:** `test_evals.TheOutcomeCases` runs every pattern on `SAMPLES`; a new grader needs samples. It also runs every scaffold and audits every fixture.
   - **The run:** `claude.exe plugin eval . --tag outcome --scaffold --allow-real-servers --ablation with-without -j 2 --trust-plugin --no-publish --model claude-sonnet-5-5 --judge-model claude-haiku-5-5 --allow-tools Write Edit "mcp__plugin_web-design-suite_gates__*"`, with `--allow-tools` last. One run per arm cost $2.21 and took 685 seconds of runs.
   - **`evals.yml`:** `tag` is `routing`, `outcome` or `all`, by hand only: the owner dropped the tag trigger on 2026-10-11 (#110). Routing runs with `--ablation none`, then outcome `with-without`, with what routing left of $14.
-- **The live check (R3).** `dev plans/web-design-suite-3.5.0-live-check.md`. Headless sessions ran as `claude -p "<prompt>" --plugin-dir plugins/web-design-suite --setting-sources project,local --max-budget-usd 0.6 --output-format json --model claude-sonnet-5-5 --permission-mode acceptEdits --allowedTools "Bash(python *)" "Bash(node *)" "mcp__plugin_web-design-suite_gates__*"`, in a scratch copy of a project. The browser commands find Playwright through `NODE_PATH` (the tooling's `node_modules`).
+- **The live checks (R3, R3.6).** `dev plans/web-design-suite-3.5.0-live-check.md` and `web-design-suite-3.6.0-live-check.md`. R3.6's runner allowed every Bash and PowerShell command, plus `--add-dir` for the plugin, on its reruns: a narrow allow-list refused Claude's compound commands (`S=…; python …`), and two sessions went around the scripts. Headless sessions ran as `claude -p "<prompt>" --plugin-dir plugins/web-design-suite --setting-sources project,local --max-budget-usd 0.6 --output-format json --model claude-sonnet-5-5 --permission-mode acceptEdits --allowedTools "Bash(python *)" "Bash(node *)" "mcp__plugin_web-design-suite_gates__*"`, in a scratch copy of a project. The browser commands find Playwright through `NODE_PATH` (the tooling's `node_modules`).
 - **N39 (#98).** `a11y_static.py` leaves a folder's email templates (the config's `emails`) to `lint_email.py` and lists them on stderr; a template named on its own is still read. The gate hook's a11y check stands aside only when `emailBuild` runs.
 - **Baseline keys (#93, N38).** audit_design, a11y_static and perf_audit all write `/` in a key's path (`portable_key`), and read a baseline's keys the same way.
 - **The scripts, by skill:**
@@ -258,13 +286,13 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   | design-system-versioning | `deprecate.py`, `diff_system.py` |
   | design-token-migration | `apply_codemod.py`, `cluster_values.py`, `extract_literals.py` |
   | email-template-system | `build_email.py`, `lint_email.py`, `render_email.mjs` |
-  | figma-variables-sync | `dtcg_values.py`, `figma_audit.py`, `figma_common.py`, `figma_to_tokens.py` |
+  | figma-variables-sync | `figma_audit.py`, `figma_common.py`, `figma_to_tokens.py` (3.6.0 removed `dtcg_values.py` in favour of `dtcg.py`) |
   | perf-budget-gate | `crux_check.py`, `perf_audit.py`, `measure_vitals.mjs` |
   | web-design-studio | `audit_design.py`, `check_roles.py`, `generate_color_ramp.py`, `generate_type_scale.py` |
 
 - **The release** is `python -B tooling/release/build.py OUT --rev SHA`, then a `v*` tag on that commit. `release.yml` is the only thing that creates a release.
   - The tag is annotated: `git tag -a vX.Y.Z SHA -m "web-design-suite X.Y.Z"`.
-  - To install: unpack the zip's `web-design-suite/` over `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, then run `claude plugin update web-design-suite@web-design-suite` with the bundled CLI (`%APPDATA%\Claude\claude-code\2.1.293\83cb0bd7fed4\claude.exe`; 2.1.288's `36aa8c97bf86` is still there).
+  - To install: the zip's `web-design-suite/` is the whole marketplace, `marketplace.json` included. **Replace** `C:\Users\vybec\.claude\local-marketplaces\web-design-suite` with it, not unpack over it, or a file a release removed stays (3.6.0 removed `dtcg_values.py`). Unpack and copy with Python and a `\\?\` prefix from a script file: the eval paths pass 260 characters, and a heredoc eats the backslashes. 3.5.0's copy is in `%TEMP%\wds350-backup`. then run `claude plugin update web-design-suite@web-design-suite` with the bundled CLI (`%APPDATA%\Claude\claude-code\2.1.295\d2e29494ec83\claude.exe`; 2.1.288's `36aa8c97bf86` is still there).
 - **CI** runs Windows, Linux and macOS × Python 3.9 and 3.14, with Node 22.
   - **A push with no checks after a few minutes** is a lost `pull_request` event (a GitHub incident, 2026-10-12): `gh workflow run ci.yml --ref BRANCH`, and a later push fires the PR's own.
   - A macOS job cancelled after 15 minutes with no log is a runner that never came: re-run it (`gh run rerun RUN --failed`).
@@ -279,7 +307,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   | perf-budget-gate | 20,494 |
   | component-state-matrix | 20,493 |
   | design-system-versioning | 20,401 |
-  | figma-variables-sync | 20,495 |
+  | figma-variables-sync | 20,484 |
   | web-design-studio | 20,429 |
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.
@@ -288,36 +316,34 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. R3.6: release 3.6.0
+## 4. Phase 6b, 4.0.0
 
-**Phase 6a's code is merged** (P31, P32, P33, P38, P39, P40: #101 to #117), under `## 3.6.0 — unreleased` in the CHANGELOG. 3.5.0's release (#99) is the model: a release PR, then the evals on its merge, then the tag. **Every paid step needs the owner's OK first, with its estimate.**
+**First, ask the owner which workstream comes first.** The plan's §4 says they are independent. Each is one or more PRs under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
-1. **Check.** `main`'s CI green; `plugin.json` still says 3.5.0; `check_execution_plan.py` says 23 and 23.
-2. **The live check, with the owner's OK** (about $1). 3.6.0 adds no hook, command, agent or MCP tool, so test what changed in a live session: one headless session per changed route, with the plugin loaded from `main`, in a scratch copy of a project (the command is §2's *live check*). Suggested: `figma_to_tokens.py --reverse --format plugin-script`; a DTCG resolver export; `check_roles` (the MCP tool) on a `light-dark()` theme; the migration census on a Vue and MUI project; `/schema-to-screens` on `shop.prisma`; a card headline with `cqi` from web-design-studio. Record each in `dev plans/web-design-suite-3.6.0-live-check.md`, and fix what it finds first, each fix in its own PR with its test.
-3. **The release PR.** `plugin.json` at `3.6.0` (`release.yml` refuses a tag that differs), the CHANGELOG's heading `## 3.6.0` dated, the README's three cache paths at 3.6.0, the plan's R3.6 row and §9, the live-check file listed in `dev plans/README.md`. Merge it when it is ready.
-4. **The evals, with the owner's OK:** `gh workflow run evals.yml --ref main -f tag=all -f runs=3` on the release PR's merge (about $11, routing then outcome under one $14 ceiling). Read the run's summary. `--ref` takes a branch, so the run tests `main`'s head when it starts: check `gh run view RUN --json headSha` equals MERGE_SHA, and if `main` moved first, tag the commit the evals ran, never another. Tag only if both sets pass; a failure is diagnosed first.
-5. **The tag.** `python -B tooling/release/build.py OUT_DIR --rev MERGE_SHA` (an empty folder, and the release PR's merge), then `git tag -a v3.6.0 MERGE_SHA -m "web-design-suite 3.6.0"` and push it. `release.yml` creates the release: check its assets and notes. Then install it (§2's *release*) and check that `claude plugin details` says 3.6.0.
+| Item | Scope | Closes | Main files | Size |
+|---|---|---|---|---|
+| P34 | Runtime coverage: single-page apps (`--wait-for`, `--steps`), logged-in pages (`--storage-state`), shadow DOM, several URLs and viewports | GT-B1 to GT-B4 | the three runtime gates (`a11y_runtime.mjs`, `measure_vitals.mjs`, `snapshot_matrix.mjs`) | L |
+| P35 | The cheap automatable checks the coverage table lists, and engines other than Chromium | GT-B6, GT-B9 | the a11y gates, `automation-coverage.md` | M-L |
+| P36 | Tailwind v4: its variants, `tw_probe` with a `/tw-probe` command, and the lint plugin (decision D4, **the breaking change**) | SB-B5, SB-C3, SB-C4, LC-B5's rest (v4's `@theme` in the migration) | `eslint.design.config.mjs` Part 5, a new `tw_probe`, `cluster_values.py` | L |
+| P37 | SCSS in stylelint (D3), and Next.js App Router, Vue, Svelte and Astro | SB-B6, DL-B3's rest (a server-action form, Vue and Svelte output) | the configs, the stack references, fixtures | L |
+| P41 | Email: MJML or React Email output, a right-to-left template, and a client matrix from caniemail's data | DL-B4, DL-B5, DL-C9 | email-template-system | L |
+| P42 | Persuasion: the UK and EU consumer law to flag for legal review, consent for tracking, price experiments, and persuasive patterns mapped to WCAG | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
+| P43 | More page types and audiences, a claims layer with `lint_claims.py`, routing between the persuasion skills, and MESSAGE_BRIEF to DECISION_LOG | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
+| R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-**Size:** S-M. **Close:** the plan's R3.6 row renamed `R3.6, #N`; CLAUDE.md's Version line.
+- **The first PR of Phase 6b** opens a `## 4.0.0 — unreleased` heading in the CHANGELOG.
+- **P36 is the breaking change (D4).** Read the plan's §2 on D4 before it, and say in its PR what a 3.x user must change.
+- **Facts from outside** (a law, a browser engine, caniemail's data, Tailwind v4's API) are re-read at the source on the day, and a figure goes into `evidence.json`.
+- **A candidate for P36's `cluster_values.py` work**, from the live check: the migration's proposal matches a colour to a role by ΔE alone, so a grey (`#6b7280`) landed on `--fg-warning`. It is not an item yet: ask the owner before scheduling it.
+- **R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate), the release PR, the evals on its merge (the owner's OK, about $11, `headSha` checked), then the tag.
 
-## 5. Then Phase 6b, 4.0.0
+Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 
-**After 3.6.0, ask the owner which workstream comes first** (the plan's §4 says they are independent):
-- P34: runtime coverage (single-page apps, logged-in pages, shadow DOM, several URLs and viewports);
-- P35: the cheap automatable checks and other engines;
-- P36: Tailwind v4 and decision D4, the breaking change, with LC-B5's rest (v4's `@theme` in the migration);
-- P37: SCSS in stylelint (D3), Next.js App Router, Vue, Svelte and Astro, with DL-B3's rest (a server-action form, Vue and Svelte output);
-- P41: email output and right-to-left;
-- P42 and P43: persuasion;
-- R4: release 4.0.0, opening a `## 4.0.0 — unreleased` CHANGELOG heading with its first PR.
-
-Ask the owner before each eval run, and keep each PR under 100 files for CodeRabbit.
-
-## 6. End of session (never skip)
+## 5. End of session (never skip)
 
 1. Rewrite `docs/HANDOFF.md`: one page, with the state, next steps, blockers and warnings.
 2. Update `CLAUDE.md`'s Current State, the execution plan's §9, the inventory, and `dev plans/README.md`'s line for this file.
-3. **Rewrite this file** and `next-session-opening-prompt.md` for the session after yours, with the next PRs in the same detail as §4 and §5 here.
+3. **Rewrite this file** and `next-session-opening-prompt.md` for the session after yours, with the next PRs in the same detail as §4 here.
 4. Run `python -B "dev plans/check_execution_plan.py"`.
 5. Commit the docs in a PR of their own. Merge it when it is ready, as §0 defines ready: CI green on its head, every thread resolved, GitHub clean.
 6. Tell the user what merged, what is open, the token use, and what they need to do. Give them the opening prompt for the next session.
