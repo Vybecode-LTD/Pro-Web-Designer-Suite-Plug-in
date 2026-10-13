@@ -880,7 +880,7 @@ class TailwindPluginBlock:
     the working directory. The fixtures for the conflict and shorthand rules
     are the examples the block's own comments give."""
 
-    MAJOR = MODULES = None
+    MAJOR = MODULES = OTHER = None
     EXTRA: dict[str, str] = {}
 
     @classmethod
@@ -889,7 +889,14 @@ class TailwindPluginBlock:
 
     @classmethod
     def setUpClass(cls):
-        tmp = temp_project(cls, "wds-twlint-", cls.MODULES)
+        # The project's own tools are in app/node_modules. The folder ESLint
+        # runs from, a monorepo root, holds the other Tailwind major, which
+        # the plugin would read without its `cwd` (Codex and CodeRabbit on #125).
+        tmp = class_temp_dir(cls, "wds-twlint-")
+        (tmp / "app").mkdir()
+        cls.addClassCleanup(link_folder(pathlib.Path(cls.MODULES).resolve(), tmp / "app" / "node_modules"))
+        if cls.OTHER:
+            cls.addClassCleanup(link_folder(pathlib.Path(cls.OTHER).resolve(), tmp / "node_modules"))
         block = tailwind_part5(ESLINT_CONFIG_TEXT, cls.MAJOR)
         conflict, *not_conflict = documented_examples(block, "better-tailwindcss/no-conflicting-classes")
         cls.shorthand, cls.merged = documented_examples(block, "better-tailwindcss/enforce-shorthand-classes")[:2]
@@ -919,6 +926,10 @@ class TailwindPluginBlock:
                  **{f"app/{name}": text for name, text in cls.tailwind_files().items()}}
         for name, attr in cls.cases.items():
             files[f"app/src/components/{name}.jsx"] = JSX_FIXTURE.format(name=name, attr=attr)
+        # The helpers outside any className attribute (Codex on #125): the
+        # plugin's defaults read `cx`, the block's selectors `classNames`.
+        files["app/src/components/Standalone.jsx"] = (
+            "export const classes = cx('bg-surfca');\nexport const more = classNames('bg-surfcb');\n")
         write_files(tmp, files)
         proc = subprocess.run([NODE, str(pathlib.Path(cls.MODULES) / "eslint" / "bin" / "eslint.js"),
                                "-c", "app/eslint.config.mjs", "--format", "json", "app/src/components"],
@@ -947,6 +958,11 @@ class TailwindPluginBlock:
         for typo in ("bg-surfce", "p-crad"):
             with self.subTest(typo=typo):
                 self.assertIn(typo, found, "classNames() strings and object keys")
+        found = " ".join(m["message"] for m in self.messages["Standalone"]
+                         if m["ruleId"] == "better-tailwindcss/no-unknown-classes")
+        for typo in ("bg-surfca", "bg-surfcb"):
+            with self.subTest(standalone=typo):
+                self.assertIn(typo, found, "a helper's call outside className")
 
     def test_the_documented_conflict_is_caught_on_v4_only(self):
         """The block's comment says the rule reports nothing on v3."""
@@ -984,6 +1000,7 @@ class TailwindPluginBlock:
 class TailwindPluginV4(TailwindPluginBlock, unittest.TestCase):
     MAJOR = 4
     MODULES = TAILWIND_V4_LINT
+    OTHER = TAILWIND_V3_LINT
     EXTRA = {# theme.css's own @utility classes, and a typo of one.
              "Utilities": 'className="focus-ring tap-target motion-hover page-gutter z-modal max-w-prose border-hairline"',
              "UtilityTypo": 'className="motion-hovr"',
@@ -1023,6 +1040,7 @@ class TailwindPluginV4(TailwindPluginBlock, unittest.TestCase):
 class TailwindPluginV3(TailwindPluginBlock, unittest.TestCase):
     MAJOR = 3
     MODULES = TAILWIND_V3_LINT
+    OTHER = TAILWIND_V4_LINT
     EXTRA = {# The utilities tailwind.config.ts adds with addUtilities, and a
              # typo of one: the plugin learns them from the config, so no
              # ownClasses entry may hide the typo.

@@ -900,10 +900,12 @@ const componentConfig = {
  *     classes its plugins add with `addUtilities` (focus-ring, tap-target,
  *     motion-*). Its line goes in place of `entryPoint`.
  *
- * The plugin reads both paths "relative to the current working directory",
- * and ESLint runs from a monorepo root or a git hook as often as from the
- * project, so the block anchors them at the project: the nearest folder
- * above this file that holds a package.json.
+ * The plugin resolves `tailwindcss`, and reads both paths, from its `cwd`
+ * setting, which is ESLint's working directory unless set (its settings
+ * page). ESLint runs from a monorepo root or a git hook as often as from the
+ * project, where a root's own Tailwind, perhaps the other major, would be
+ * the one read. So the block sets `cwd` to the project, the nearest folder
+ * above this file that holds a package.json, and anchors both paths there.
  *
  * `no-unknown-classes` is the valuable rule. Tailwind generates nothing for
  * a class that does not exist and says nothing, so a misspelt role class,
@@ -988,6 +990,8 @@ const componentConfig = {
 //   plugins: { 'better-tailwindcss': betterTailwind },
 //   settings: {
 //     'better-tailwindcss': {
+//       // Resolve tailwindcss from the project, not from where ESLint runs.
+//       cwd: project,
 //       // Tailwind v4: the entry that imports tailwindcss and theme.css (stack-tailwind.md §2).
 //       entryPoint: path.join(project, 'src/styles/index.css'),
 //       // Tailwind v3: this line in place of entryPoint.

@@ -533,6 +533,7 @@ class DependencyFacts(unittest.TestCase):
         self.assertRegex(block, r"entryPoint: path\.join\(project,", "v4 reads the CSS entry, anchored")
         self.assertRegex(tailwind_part5(text, 3), r"tailwindConfig: path\.join\(project,",
                          "v3 reads the config, anchored")
+        self.assertIn("cwd: project,", block, "tailwindcss resolved from the project (#125)")
         self.assertNotIn("configs.", block, "the recommended configs sort and wrap classes")
         rules = re.findall(r"'better-tailwindcss/([\w-]+)'", block)
         self.assertGreater(len(rules), 3)
