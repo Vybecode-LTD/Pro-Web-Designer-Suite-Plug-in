@@ -68,6 +68,9 @@ UNSUPPORTED = object()
 META_KEYS = {"$schema", "$description", "$extensions", "$type", "$deprecated",
              "$extends"}
 Problems = List[Tuple[str, str]]
+# The document's own `$extensions` key, reverse-domain as 2025.10 recommends:
+# `notWritten` lists the custom properties document() left out.
+EXTENSION = "io.github.vybecode-ltd.web-design-suite"
 
 
 def _fmt(n: float) -> str:
@@ -1530,4 +1533,16 @@ def document(values: Iterable[Tuple[str, str]], descriptions: Optional[Dict[str,
             node.setdefault(key, {})["$root"] = token
         else:
             node[key] = token
+    if keep is None and problems:
+        # Kept in the file, so a diff against the stylesheet it was written
+        # from can tell a token left out from one added since (Codex on #119).
+        doc["$extensions"] = {EXTENSION: {"notWritten": sorted({name for name, _ in problems})}}
     return doc, problems
+
+
+def not_written(data: Any) -> List[str]:
+    """The custom properties a document says document() left out of it."""
+    ext = data.get("$extensions") if isinstance(data, dict) else None
+    own = ext.get(EXTENSION) if isinstance(ext, dict) else None
+    names = own.get("notWritten") if isinstance(own, dict) else None
+    return [n for n in names if isinstance(n, str)] if isinstance(names, list) else []

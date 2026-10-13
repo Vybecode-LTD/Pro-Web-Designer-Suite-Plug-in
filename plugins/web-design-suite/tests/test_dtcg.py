@@ -116,7 +116,8 @@ class TheWriter(unittest.TestCase):
         self.assertIn("reads --space-fluid, which is not written", why["--section"])
         self.assertIn("reads another token inside an expression", why["--gap"])
         self.assertIn("cycle", why["--a"] + why["--b"])
-        self.assertEqual({"space"}, set(doc))
+        self.assertEqual({"space", "$extensions"}, set(doc))
+        self.assertEqual(sorted(why), self.dtcg.not_written(doc))  # kept in the file (Codex on #119)
 
     def test_a_name_that_is_also_a_group_is_its_root(self):
         doc, problems = self.dtcg.document([("--brand", "#e8440a"), ("--brand-hover", "#c63a08"),
@@ -600,10 +601,38 @@ class ASnapshotAgainstItsStylesheet(TempDirTest):
         return "published/tokens.json"
 
     def test_an_unchanged_system_is_no_change(self):
-        changes, notes = self.diff(self.publish(), str(STARTER))
-        self.assertEqual([], changes)
-        self.assertTrue(any(n.startswith("53 token(s) a DTCG 2025.10 file cannot hold") for n in notes),
-                        notes)
+        published = self.publish()
+        recorded = json.loads((self.tmp / published).read_bytes())["$extensions"][
+            "io.github.vybecode-ltd.web-design-suite"]["notWritten"]
+        self.assertEqual(53, len(recorded))
+        self.assertIn("--space-fluid-sm", recorded)
+        for old in (published, "published/tokens.resolver.json"):   # a resolver's, in its sources
+            with self.subTest(old=old):
+                changes, notes = self.diff(old, str(STARTER))
+                self.assertEqual([], changes)
+                self.assertTrue(any(n.startswith("53 token(s) the old DTCG file records as not written")
+                                    for n in notes), notes)
+
+    def test_a_token_added_since_is_still_added(self):
+        """Codex on #119: what DTCG cannot hold is not therefore old. Only the
+        names the file recorded are set aside."""
+        published = self.publish()
+        css = STARTER.read_bytes().decode("utf-8").replace(
+            "--accent-200: oklch(88.0% 0.078 42);",
+            "--accent-200: oklch(88.0% 0.078 42);\n    --size-hero: clamp(2rem, 1rem + 4vw, 4rem);")
+        self.write("tokens.css", css)
+        self.assertEqual([("tier1-added", "--size-hero")], self.diff(published, "tokens.css")[0])
+
+    def test_a_record_of_another_shape_is_no_record(self):
+        published = self.publish()
+        doc = json.loads((self.tmp / published).read_bytes())
+        for ext in ([], {"io.github.vybecode-ltd.web-design-suite": "x"},
+                    {"io.github.vybecode-ltd.web-design-suite": {"notWritten": "--space-fluid-sm"}}):
+            with self.subTest(ext=ext):
+                doc["$extensions"] = ext
+                self.write("other.tokens.json", json.dumps(doc))
+                changes, _notes = self.diff("other.tokens.json", str(STARTER))
+                self.assertEqual(53, len([c for c in changes if c[0].endswith("-added")]))
 
     def test_a_spelling_is_not_an_edit(self):
         css = STARTER.read_bytes().decode("utf-8")

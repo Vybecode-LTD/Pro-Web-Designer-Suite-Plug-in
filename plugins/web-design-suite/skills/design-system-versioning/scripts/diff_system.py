@@ -1393,21 +1393,52 @@ def _parts(text: str) -> List[str]:
     return out + ([cur] if cur else [])
 
 
-def dtcg_cannot_hold(old: Snapshot, new: Snapshot) -> List[str]:
-    """The new snapshot's tokens a DTCG 2025.10 file cannot hold, when the old
-    snapshot is one and the new is not: a `clamp()`, a `ch` or an `em`, or a
-    reference to one of those (dtcg.py's document() leaves each out). The old
-    file could never have carried them, so they are not new: against the
-    stylesheet it was written from, 53 of the starter's tokens read as added
-    and an unchanged system as a minor release (the 3.6.0 live check)."""
-    if old.source != "DTCG" or new.source == "DTCG":
+def not_written(old: Snapshot, new: Snapshot) -> List[str]:
+    """The new snapshot's tokens the old DTCG file records as left out when it
+    was written: a `clamp()`, a `ch` or an `em`, or a reference to one, which
+    2025.10 cannot hold (dtcg.py's document() keeps their names in the file's
+    `$extensions`). They are not new: against the stylesheet it was written
+    from, 53 of the starter's tokens read as added and an unchanged system as
+    a minor release (the 3.6.0 live check). Only the recorded names are set
+    aside, so a `clamp()` token added since is still added (Codex on #119).
+    A resolver's record is in its sources, read from its own folder."""
+    if old.source != "DTCG":
         return []
     try:
         module = _dtcg(Path(__file__))
-    except ConfigError:
+        data = json.loads(Path(old.path).read_bytes())
+    except (ConfigError, OSError, ValueError):
         return []
-    _doc, problems = module.document((n, str(t.get("raw", ""))) for n, t in new.tokens.items())
-    return sorted({name for name, _why in problems} - set(old.tokens))
+    recorded = set(module.not_written(data))
+    if module.is_resolver(data):
+        load = module.file_loader(Path(old.path).parent)
+        for ref in _file_refs(data)[:64]:
+            if module.outside(ref):
+                continue
+            try:
+                recorded.update(module.not_written(load(ref)))
+            except (OSError, ValueError):
+                continue
+    return sorted(n for n in recorded if n in new.tokens and n not in old.tokens)
+
+
+def _file_refs(data: Any) -> List[str]:
+    """Each file a resolver's `$ref`s name (the part before `#`), in order."""
+    out: List[str] = []
+    stack: List[Tuple[Any, int]] = [(data, 0)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > 32:
+            continue
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            name = ref.split("#", 1)[0] if isinstance(ref, str) else ""
+            if name and name not in out:
+                out.append(name)
+            stack.extend((v, depth + 1) for v in reversed(list(node.values())))
+        elif isinstance(node, list):
+            stack.extend((v, depth + 1) for v in reversed(node))
+    return out
 
 
 def align_spellings(old: Snapshot, new: Snapshot) -> None:
@@ -2541,7 +2572,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if contract:
         old, new = as_contract(old), as_contract(new)
     align_spellings(old, new)
-    unheld = dtcg_cannot_hold(old, new)
+    unheld = not_written(old, new)
 
     changes: List[Change] = []
     inherited: List[str] = []
@@ -2554,8 +2585,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                      "layers or components")
     if unheld:
         shown = ", ".join(unheld[:8]) + (f", … (+{len(unheld) - 8})" if len(unheld) > 8 else "")
-        notes.append(f"{len(unheld)} token(s) a DTCG 2025.10 file cannot hold were not compared, "
-                     f"since the old file could not have carried them: {shown}")
+        notes.append(f"{len(unheld)} token(s) the old DTCG file records as not written (2025.10 cannot "
+                     f"hold them) were not compared: {shown}")
     layer_note = None if contract else diff_layers(old, new, changes)
     if layer_note:
         notes.append(layer_note)
