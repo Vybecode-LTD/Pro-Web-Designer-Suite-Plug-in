@@ -68,17 +68,24 @@ const NAMESPACES = [
   ['--animate-', (k) => `animate-${k}`],
 ];
 
-// A sample of Tailwind's defaults, each with what keeps it alive. A theme
-// that replaced the scale (`--*: initial`) generates none of them.
+// A sample of Tailwind's defaults: each class, what keeps it alive, and the
+// theme variables that would make it the project's own. A theme that
+// replaced the scale (`--*: initial`) generates none of them, unless it
+// declares one of those variables itself: `--spacing-4` gives `p-4`, `gap-4`
+// and `w-4` on purpose (Codex on #126).
 const STOCK = [
-  ['p-4', '--spacing'], ['m-2', '--spacing'], ['gap-4', '--spacing'], ['w-4', '--spacing'],
-  ['leading-7', '--spacing'],
-  ['bg-neutral-800', '--color-*'], ['bg-gray-100', '--color-*'], ['text-white', '--color-*'],
-  ['text-sm', '--text-*'], ['font-bold', '--font-weight-*'], ['font-sans', '--font-*'],
-  ['tracking-wide', '--tracking-*'], ['rounded-lg', '--radius-*'], ['shadow-md', '--shadow-*'],
-  ['inset-shadow-xs', '--inset-shadow-*'], ['drop-shadow-md', '--drop-shadow-*'],
-  ['max-w-md', '--container-*'], ['blur-md', '--blur-*'], ['ease-out', '--ease-*'],
-  ['animate-spin', '--animate-*'], ['aspect-video', '--aspect-*'], ['perspective-near', '--perspective-*'],
+  ['p-4', '--spacing', ['--spacing-4']], ['m-2', '--spacing', ['--spacing-2']],
+  ['gap-4', '--spacing', ['--spacing-4']], ['w-4', '--spacing', ['--spacing-4']],
+  ['leading-7', '--spacing', ['--leading-7', '--spacing-7']],
+  ['bg-neutral-800', '--color-*', ['--color-neutral-800']], ['bg-gray-100', '--color-*', ['--color-gray-100']],
+  ['text-white', '--color-*', ['--color-white']], ['text-sm', '--text-*', ['--text-sm']],
+  ['font-bold', '--font-weight-*', ['--font-weight-bold']], ['font-sans', '--font-*', ['--font-sans']],
+  ['tracking-wide', '--tracking-*', ['--tracking-wide']], ['rounded-lg', '--radius-*', ['--radius-lg']],
+  ['shadow-md', '--shadow-*', ['--shadow-md']], ['inset-shadow-xs', '--inset-shadow-*', ['--inset-shadow-xs']],
+  ['drop-shadow-md', '--drop-shadow-*', ['--drop-shadow-md']],
+  ['max-w-md', '--container-*', ['--container-md', '--spacing-md']], ['blur-md', '--blur-*', ['--blur-md']],
+  ['ease-out', '--ease-*', ['--ease-out']], ['animate-spin', '--animate-*', ['--animate-spin']],
+  ['aspect-video', '--aspect-*', ['--aspect-video']], ['perspective-near', '--perspective-*', ['--perspective-near']],
 ];
 
 function die(message) {
@@ -271,9 +278,14 @@ async function main() {
       return die(`cannot read @import "${id}" (${file}): ${err.code || err.message}`);
     }
   };
+  // `@source inline("p-card")` puts its classes in the very first build, so
+  // asking for one adds no rule and it would read as not generated. Those
+  // lines are set aside: a class counts for what Tailwind generates when
+  // asked. `@source not inline()` stays, and still blocks its classes.
+  const withoutInline = (css) => css.replace(/@source\s+inline\(\s*(?:"[^"]*"|'[^']*')\s*\)\s*;?/g, '');
   const loadStylesheet = async (id, base) => {
     const file = resolveImport(id, base);
-    return { path: file, base: path.dirname(file), content: read(file, id) };
+    return { path: file, base: path.dirname(file), content: withoutInline(read(file, id)) };
   };
   // The project's stylesheets in cascade order, each after the files it
   // imports (an @import precedes every rule of its file). Tailwind's own
@@ -282,10 +294,13 @@ async function main() {
     if (seen.has(file)) return out;
     seen.add(file);
     const text = read(file, id).replace(/\/\*[\s\S]*?\*\//g, '');
-    for (const m of text.matchAll(/@(?:import|reference)\s+(?:url\(\s*)?["']([^"']+)["']/g)) {
-      const child = resolveImport(m[1], path.dirname(file));
+    // `@import "x"`, `@import url("x")` and an unquoted `@import url(x)`.
+    const imports = /@(?:import|reference)\s+(?:url\(\s*(?:"([^"]+)"|'([^']+)'|([^)\s]+))\s*\)|"([^"]+)"|'([^']+)')/g;
+    for (const m of text.matchAll(imports)) {
+      const id = m.slice(1).find(Boolean);
+      const child = resolveImport(id, path.dirname(file));
       const inTailwind = !path.relative(twDir, child).startsWith('..') && !path.isAbsolute(path.relative(twDir, child));
-      if (!inTailwind) ownSheets(child, m[1], seen, out);
+      if (!inTailwind) ownSheets(child, id, seen, out);
     }
     out.push(text);
     return out;
@@ -296,7 +311,7 @@ async function main() {
     return { path: file, base: path.dirname(file), module: mod.default ?? mod };
   };
 
-  const source = read(entry, args.entry);
+  const source = withoutInline(read(entry, args.entry));
   let compiler;
   try {
     compiler = await compile(source, { base: path.dirname(entry), from: entry, loadStylesheet, loadModule });
@@ -306,8 +321,8 @@ async function main() {
 
   const variables = themeVariables(ownSheets(entry, args.entry));
   const roles = [...variables.keys()].map((v) => ({ variable: v, class: roleClass(v) })).filter((r) => r.class);
-  const own = new Set(roles.map((r) => r.class));
-  const stock = STOCK.filter(([cls]) => !own.has(cls)).map(([cls, clear]) => ({ class: cls, clear }));
+  const stock = STOCK.filter(([, , owners]) => !owners.some((v) => variables.has(v)))
+    .map(([cls, clear]) => ({ class: cls, clear }));
 
   // One compiler, the candidates added one at a time: what a step adds to a
   // class's selectors is what Tailwind generated for it, and the project's
