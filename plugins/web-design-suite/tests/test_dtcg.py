@@ -656,6 +656,48 @@ class ASnapshotAgainstItsStylesheet(TempDirTest):
         self.write("other.tokens.json", json.dumps(doc))
         self.assertEqual(53, len(self.diff("other.tokens.json", str(STARTER))[0]))
 
+    def test_every_listed_file_s_record_is_read(self):
+        """Codex on #119: with several DTCG files in `.design-suite.json`, the
+        record was read from the first alone."""
+        self.publish()
+        extra, _ = dtcg_module().document([("--extra", "4px"), ("--size-hero", "clamp(2rem, 1rem + 4vw, 4rem)")])
+        self.write("published/extra.tokens.json", json.dumps(extra))
+        self.write(".git/HEAD", "x\n")
+        self.write(".design-suite.json", json.dumps(
+            {"schema": 1, "tokens": ["published/tokens.json", "published/extra.tokens.json"]}))
+        old = self.starter_with("--accent-200: oklch(88.0% 0.078 42);",
+                                "--accent-200: oklch(88.0% 0.078 42);\n    --extra: 4px;\n"
+                                "    --size-hero: clamp(2rem, 1rem + 4vw, 4rem);")
+        proc = run_py("design-system-versioning", "diff_system", old, "--format", "json", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        self.assertEqual([], json.loads(proc.stdout)["changes"])
+
+    def test_a_resolver_reads_its_default_contexts_record_only(self):
+        """Codex on #119: a record in a context the default does not select
+        (the dark theme's file) was read into the default snapshot."""
+        self.publish()
+        dark = json.loads((self.tmp / "published" / "theme-dark.json").read_bytes())
+        dark["$extensions"] = {self.EXT: {"notWritten": {"--size-hero": "clamp(2rem, 1rem + 4vw, 4rem)"}}}
+        self.write("published/theme-dark.json", json.dumps(dark))
+        self.assertEqual([], self.diff("published/tokens.resolver.json", str(STARTER))[0])
+
+    def test_a_recorded_token_keeps_its_deprecation(self):
+        """Codex on #119: a deprecated token the file could not hold lost its
+        mark, so removing it failed the names gate."""
+        dtcg = dtcg_module()
+        v1, _ = dtcg.document([("--space-4", "1rem"), ("--hero", "clamp(1rem, 2vw, 2rem)")],
+                              deprecated={"--hero": "Use {space.4} instead"})
+        self.assertEqual({"--hero": "Use {space.4} instead"}, dtcg.not_written_marks(v1))
+        self.write("v1.tokens.json", json.dumps(v1))
+        self.write("v2.tokens.json", json.dumps(dtcg.document([("--space-4", "1rem")])[0]))
+        self.write("deprecations.json", json.dumps({"schema": "design-system-versioning/deprecations@1",
+                                                    "deprecations": []}))
+        proc = run_py("design-system-versioning", "diff_system", "v1.tokens.json", "v2.tokens.json",
+                      "--format", "json", "--deprecations", "deprecations.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        gone = {c["subject"]: c for c in json.loads(proc.stdout)["changes"]}
+        self.assertEqual("$deprecated in v1.tokens.json", gone["--hero"]["deprecation"]["marked"])
+
     def test_a_quoted_keyword_is_another_family(self):
         """Codex on #119: `"serif"` names a family called serif, `serif` the
         generic one. Any other name is the same family quoted or not."""

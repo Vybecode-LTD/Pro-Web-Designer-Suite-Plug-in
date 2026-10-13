@@ -963,6 +963,25 @@ def resolver_modifiers(data: dict) -> List[Modifier]:
     return out
 
 
+def default_sources(data: dict) -> List[Any]:
+    """The sources a resolver's default resolution reads, in its order: each
+    set's, and each modifier's default context's (its string `default`, else
+    its first), as resolver_document() picks them."""
+    out: List[Any] = []
+    for kind, _name, definition in _order(data, []):
+        sources = definition.get("sources")
+        if kind == "modifier":
+            contexts = definition.get("contexts")
+            if not (isinstance(contexts, dict) and contexts):
+                continue
+            default = definition.get("default")
+            sources = contexts[default] if isinstance(default, str) and default in contexts \
+                else next(iter(contexts.values()))
+        if isinstance(sources, list):
+            out.extend(sources)
+    return out
+
+
 class OutsideFolder(OSError):
     """A source whose real path is not in the resolver's folder."""
 
@@ -1540,17 +1559,30 @@ def document(values: Iterable[Tuple[str, str]], descriptions: Optional[Dict[str,
         # stylesheet it was written from compares them too: a token left out
         # is neither added nor removed, and a new clamp() is still a change
         # (Codex on #119).
-        doc["$extensions"] = {EXTENSION: {"notWritten": {
-            name: str(given.get(name, "")) for name in sorted({n for n, _ in problems})}}}
+        names = sorted({n for n, _ in problems})
+        own: Dict[str, Any] = {"notWritten": {name: str(given.get(name, "")) for name in names}}
+        marks = {name: deprecated[name] for name in names if deprecated.get(name)}
+        if marks:                                # a $deprecated the file could not carry (Codex on #119)
+            own["deprecated"] = marks
+        doc["$extensions"] = {EXTENSION: own}
     return doc, problems
+
+
+def _own(data: Any, key: str) -> dict:
+    ext = data.get("$extensions") if isinstance(data, dict) else None
+    own = ext.get(EXTENSION) if isinstance(ext, dict) else None
+    held = own.get(key) if isinstance(own, dict) else None
+    return held if isinstance(held, dict) else {}
 
 
 def not_written(data: Any) -> Dict[str, str]:
     """The custom properties a document says document() left out of it,
     with their CSS values."""
-    ext = data.get("$extensions") if isinstance(data, dict) else None
-    own = ext.get(EXTENSION) if isinstance(ext, dict) else None
-    held = own.get("notWritten") if isinstance(own, dict) else None
-    if not isinstance(held, dict):
-        return {}
-    return {n: v for n, v in held.items() if isinstance(n, str) and n.startswith("--") and isinstance(v, str)}
+    return {n: v for n, v in _own(data, "notWritten").items()
+            if isinstance(n, str) and n.startswith("--") and isinstance(v, str)}
+
+
+def not_written_marks(data: Any) -> Dict[str, Union[bool, str]]:
+    """The `$deprecated` of each token not written, as `true` or its reason."""
+    return {n: v for n, v in _own(data, "deprecated").items()
+            if isinstance(n, str) and n.startswith("--") and (v is True or (isinstance(v, str) and v))}

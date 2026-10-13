@@ -900,11 +900,21 @@ def _snapshot_from_contract(paths: List[Path], label: str, source: str = "contra
         deprecated = read_deprecations(paths)
     except ConfigError as exc:
         raise bail(f"diff_system: {exc}")
-    if source == "DTCG":
-        held = tokens.values()
-        for name, value in recorded(paths[0]).items():
-            if name not in held:                 # filed as read_tokens files a tokens.css's
-                tokens.add(name, value, 2 if "var(" in value else 1)
+    values: Dict[str, str] = {}
+    marks: Dict[str, Any] = {}
+    for path in paths:                           # every file, in order: a later one wins (Codex on #119)
+        got, got_marks = recorded(path)
+        for name, value in got.items():
+            values[name] = value
+            marks.pop(name, None)
+            if name in got_marks:
+                marks[name] = got_marks[name]
+    held = tokens.values()
+    for name, value in values.items():
+        if name not in held:                     # filed as read_tokens files a tokens.css's
+            tokens.add(name, value, 2 if "var(" in value else 1)
+            if name in marks:
+                deprecated[name] = marks[name]
     snap = Snapshot(label=label, path=str(paths[0]), source=source,
                     impl="project contract" if source == "contract.json" else "DTCG token file",
                     layers_recorded=False, deprecated=deprecated)
@@ -1428,7 +1438,7 @@ def _parts(text: str) -> List[str]:
     return out + ([cur] if cur else [])
 
 
-def recorded(path: Path) -> Dict[str, str]:
+def recorded(path: Path) -> Tuple[Dict[str, str], Dict[str, Any]]:
     """The tokens a DTCG file records as left out when it was written, with
     their CSS values: a `clamp()`, a `ch` or an `em`, or a reference to one,
     which 2025.10 cannot hold (dtcg.py's document() keeps them in the file's
@@ -1436,24 +1446,35 @@ def recorded(path: Path) -> Dict[str, str]:
     other token. Without them, against the stylesheet it was written from,
     53 of the starter's tokens read as added (the 3.6.0 live check), or as
     removed the other way round; and a token's new `clamp()` went unseen
-    (Codex on #119). A resolver's record is in its sources, in its folder."""
+    (Codex on #119). Each one's `$deprecated` comes back with it. A
+    resolver's record is in the sources its default contexts read, in its
+    folder; a later source wins, as in the resolution."""
     try:
         module = _dtcg(Path(__file__))
         data = json.loads(Path(path).read_bytes())
     except (ConfigError, OSError, ValueError):
-        return {}
-    out = dict(module.not_written(data))
+        return {}, {}
+    docs = [data]
     if module.is_resolver(data):
         load = module.file_loader(Path(path).parent)
-        for ref in _file_refs(data)[:64]:
+        docs = []
+        for ref in _file_refs(module.default_sources(data))[:64]:
             if module.outside(ref):
                 continue
             try:
-                for name, value in module.not_written(load(ref)).items():
-                    out.setdefault(name, value)
+                docs.append(load(ref))
             except (OSError, ValueError):
                 continue
-    return out
+    values: Dict[str, str] = {}
+    marks: Dict[str, Any] = {}
+    for doc in docs:
+        got, got_marks = module.not_written(doc), module.not_written_marks(doc)
+        for name, value in got.items():
+            values[name] = value
+            marks.pop(name, None)
+            if name in got_marks:
+                marks[name] = got_marks[name]
+    return values, marks
 
 
 def _file_refs(data: Any) -> List[str]:
