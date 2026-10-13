@@ -104,11 +104,33 @@ class TheProbe(ProbeProject):
 
     def test_an_inline_source_does_not_hide_its_classes(self):
         """`@source inline()` put its classes in the first build, so asking
-        for them added nothing and the roles read as missing (SB-B5's doc test)."""
-        self.add_theme('@source inline("bg-surface {hover:,}p-card");\n')
+        for them added nothing: a role read as missing, and an inline `p-4`
+        hid a surviving `--spacing` (Codex and CodeRabbit on #126)."""
+        self.add_theme('@source inline("bg-surface {hover:,}p-card p-4");\n')
         report = self.report("hover:p-card")
         self.assertEqual("pass", report["verdict"], report["failures"])
         self.assertEqual([{"class": "hover:p-card", "generates": True}], report["probe"])
+        self.add_theme("@theme { --spacing: 0.25rem; }\n")
+        self.assertIn("p-4", {s["class"] for s in self.report()["stock"] if s["generates"]})
+
+    def test_a_declared_name_owns_every_class_it_gives(self):
+        """Codex on #126: `--spacing-4` gives `p-4`, `gap-4` and `w-4` on
+        purpose, and `--container-md` gives `max-w-md`; none is a stock leak."""
+        self.add_theme("@theme { --spacing-4: 1rem; --container-md: 28rem; }\n")
+        report = self.report()
+        self.assertEqual("pass", report["verdict"], report["failures"])
+        self.assertFalse({"p-4", "gap-4", "w-4", "max-w-md"} & {s["class"] for s in report["stock"]})
+
+    def test_an_unquoted_url_import_is_followed(self):
+        """Codex on #126: `@import url(./more.css)` compiled, but its @theme
+        was never read."""
+        self.write("src/styles/more.css", "@theme { --color-extra: oklch(60% 0.1 200); }\n")
+        entry = (self.tmp / "src/styles/index.css").read_bytes().decode("utf-8")
+        # After theme.css, whose `--*: initial` would clear it.
+        self.write("src/styles/index.css",
+                   entry.replace('@import "./theme.css";', '@import "./theme.css";\n@import url(./more.css);', 1))
+        roles = {r["variable"]: r for r in self.report()["roles"]}
+        self.assertIn("--color-extra", roles)
 
     def test_a_namespace_cleared_after_its_variables_drops_them(self):
         self.add_theme("@theme { --radius-*: initial; }\n")

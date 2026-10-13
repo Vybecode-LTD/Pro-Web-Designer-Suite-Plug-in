@@ -194,7 +194,7 @@ python -m scripts.generate_color_ramp --check "#ffffff" "oklch(56.5% 0.176 42)"
 python -m scripts.generate_type_scale --preview      # the starter's scale (--preset studio)
 
 # Tailwind v4: every role class generates and no stock one does (stack-tailwind.md §2.9).
-node scripts/tw_probe.mjs
+node "${CLAUDE_SKILL_DIR}/scripts/tw_probe.mjs"
 ```
 
 `check_roles.py` is the palette's gate: it resolves every Tier-2 role in light, dark and `.inverse`, checks the pairs components put together, and prints the role table `references/color-system.md` §6 quotes (`--table`). Run it on every change to `tokens.css`.

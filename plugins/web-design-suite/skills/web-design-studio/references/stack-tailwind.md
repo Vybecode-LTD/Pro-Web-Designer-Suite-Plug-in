@@ -322,9 +322,10 @@ in `NODE_PATH`, and checks two things:
   brings back every numeric spacing class (§1.4).
 
 ```bash
-node scripts/tw_probe.mjs                                 # from the project's root
-node scripts/tw_probe.mjs p-card md:p-card --refuse p-4   # and the classes you name
-node scripts/tw_probe.mjs --entry app/globals.css --json
+# From the project's root; the script stays in the skill (/install-gate does not copy it).
+node "${CLAUDE_SKILL_DIR}/scripts/tw_probe.mjs"
+node "${CLAUDE_SKILL_DIR}/scripts/tw_probe.mjs" p-card md:p-card --refuse p-4
+node "${CLAUDE_SKILL_DIR}/scripts/tw_probe.mjs" --entry app/globals.css --json
 ```
 
 It exits 1 when a check fails, so it can gate CI; `/web-design-suite:tw-probe`
