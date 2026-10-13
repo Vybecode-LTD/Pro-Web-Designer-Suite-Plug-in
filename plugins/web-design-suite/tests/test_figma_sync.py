@@ -707,6 +707,45 @@ class ReverseReadsEveryTokenFormat(TempDirTest):
         self.assertFalse({"sets", "resolutionOrder", "modifiers", "version"} & set(names), sorted(names)[:10])
         self.assertIn("modifier `density` left out", out)
 
+    def test_a_dtcg_type_is_kept(self):
+        """Codex on #120: through the CSS text, a duration was a STRING and a
+        boolean was dropped."""
+        self.write("t.tokens.json", json.dumps({
+            "dur": {"fast": {"$type": "duration", "$value": {"value": 0.2, "unit": "s"}}},
+            "flag": {"$value": True},
+            "ink": {"$type": "color", "$value": "#111111"}}))
+        doc = json.loads((self.tmp / "t.tokens.json").read_bytes())
+        doc["heading"] = {"$type": "typography", "$value": {"fontFamily": "Inter", "fontSize": "1rem",
+                                                            "fontWeight": 700, "lineHeight": 1.2}}
+        self.write("t.tokens.json", json.dumps(doc))
+        names, values, out = self.body("t.tokens.json")
+        self.assertIn("heading: a typography value in a form", out)    # the reader's note (CodeRabbit on #120)
+        body = json.loads((self.tmp / "body.json").read_bytes())
+        kinds = {v["name"]: v["resolvedType"] for v in body["variables"]}
+        self.assertEqual({"dur/fast": "FLOAT", "flag": "BOOLEAN", "ink": "COLOR"}, kinds)
+        self.assertEqual(200, values[("Value", names["dur/fast"])])
+        self.assertIs(True, values[("Value", names["flag"])])
+
+    def test_a_project_literal_keeps_its_theme(self):
+        """Codex on #120: `--surface: #fff`, re-pointed by the dark theme, was
+        a primitive, which has one mode, so its Dark value was lost."""
+        self.write("tokens.css", '@layer tokens {\n  :root { --surface: #ffffff; }\n'
+                                 '  [data-theme="dark"] { --surface: #111111; }\n}\n')
+        names, values, _out = self.body("tokens.css")
+        self.assertAlmostEqual(0x11 / 255, values[("Dark", names["surface"])]["r"], places=5)
+        self.assertAlmostEqual(1.0, values[("Light", names["surface"])]["r"], places=5)
+
+    def test_a_broken_resolver_is_not_a_clean_conversion(self):
+        """Codex on #120: a missing source gave an empty body and exit 0."""
+        self.write("r.resolver.json", json.dumps({
+            "version": "2025.10", "sets": {"base": {"sources": [{"$ref": "missing.json"}]}},
+            "resolutionOrder": [{"$ref": "#/sets/base"}]}))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", "r.resolver.json", "--reverse",
+                      "--out", "body.json", cwd=self.tmp)
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("missing.json", output(proc))
+        self.assertIn("no token read", output(proc))
+
     def test_a_dtcg_document_s_groups_are_not_variables(self):
         self.published()
         names, values, _out = self.body("dtcg/tokens.json")

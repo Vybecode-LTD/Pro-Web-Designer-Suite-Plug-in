@@ -986,6 +986,10 @@ def read_tokens_json(data: Any) -> Tuple[Dict[str, dict], Dict[str, Dict[str, di
     return base, themes
 
 
+# A DTCG type's Figma type, where the CSS text alone would read as a string.
+REVERSE_TYPES = {"color": "COLOR", "dimension": "FLOAT", "number": "FLOAT", "duration": "FLOAT"}
+
+
 def reverse_data(path: Path, data: Any) -> Tuple[Any, List[Problem]]:
     """What --reverse reads, in read_tokens_json()'s shape. This script's own
     tokens.json and a flat map pass as they are. A tokens.css (`data` None), a
@@ -996,17 +1000,47 @@ def reverse_data(path: Path, data: Any) -> Tuple[Any, List[Problem]]:
     3.6.0 live check). What a mode cannot carry, a density or another
     condition, is named."""
     problems: List[Problem] = []
-    base: Dict[str, str] = {}
-    themes: Dict[str, Dict[str, str]] = {}
+    base: Dict[str, dict] = {}
+    themes: Dict[str, Dict[str, dict]] = {}
 
-    def css_of(doc: Any) -> Dict[str, str]:
-        found, _ = dtcg.tokens(doc, path.parent)
-        return {t.name: t.css() for t in found if t.css() is not None}
+    def entry(value: Any, dtcg_type: Optional[str] = None) -> dict:
+        """A value as reverse_body() reads it, its Figma type kept: a
+        DTCG duration or a CSS `150ms` is a FLOAT, not a string, and a
+        boolean is a BOOLEAN (Codex on #120)."""
+        if isinstance(value, bool):
+            return {"value": value, "type": "BOOLEAN"}
+        kind = REVERSE_TYPES.get(dtcg_type or "")
+        if kind is None and as_px(value) is None and as_ms(value) is not None:
+            kind = "FLOAT"
+        return {"value": value, "type": kind} if kind else {"value": value}
+
+    def noted(notes: Any, where: str) -> None:
+        # A source missing, malformed or outside the folder is said, never a
+        # clean conversion of whatever was left (Codex on #120).
+        problems.extend(Problem("not read", f"{where}{n}", f"{where}{n}: {why}") for n, why in notes)
+
+    def entries(doc: Any, where: str) -> Dict[str, dict]:
+        found, notes = dtcg.tokens(doc, path.parent)
+        noted(notes, where)
+        out: Dict[str, dict] = {}
+        for t in found:
+            if isinstance(t.value, bool) or t.css() is not None:
+                out[t.name] = entry(t.value if isinstance(t.value, bool) else t.css(), t.type)
+            else:                                    # a typography composite, say (CodeRabbit on #120)
+                problems.append(Problem("not carried to Figma", f"{where}{t.name}",
+                                        f"{where}{t.name}: a {t.type or 'value'} with no CSS form, "
+                                        "so no Figma variable"))
+        return out
+
+    def resolved(inputs: Optional[Dict[str, str]], where: str) -> Dict[str, dict]:
+        doc, notes = dtcg.resolver_document(data, path.parent, inputs)
+        noted(notes, where)
+        return entries(doc, where)
 
     if data is None:                                         # a tokens.css
         for sel, rows in css_blocks(path).items():
             m = MODE_SELECTOR.match(sel)
-            values = {n: v for n, v, _, _ in rows}
+            values = {n: entry(v) for n, v, _, _ in rows}
             if sel == ":root":
                 base = values
             elif m and m.group(1) == "theme":
@@ -1016,7 +1050,7 @@ def reverse_data(path: Path, data: Any) -> Tuple[Any, List[Problem]]:
                                         f"{sel}: {len(values)} token(s) left out; a Figma mode carries a "
                                         "theme (`[data-theme]`), not a density or another condition"))
     elif dtcg.is_resolver(data):
-        base = css_of(dtcg.resolver_document(data, path.parent)[0])
+        base = resolved(None, "")
         for mod in dtcg.resolver_modifiers(data):
             if not re.search(r"theme|scheme|mode", mod.name, re.I):
                 problems.append(Problem("not carried to Figma", mod.name,
@@ -1026,19 +1060,26 @@ def reverse_data(path: Path, data: Any) -> Tuple[Any, List[Problem]]:
             default = mod.default or mod.contexts[0]
             for ctx in mod.contexts:
                 if ctx != default:
-                    got = css_of(dtcg.resolver_document(data, path.parent, {mod.name: ctx})[0])
-                    themes[ctx] = {n: v for n, v in got.items() if base.get(n) != v}
+                    got = resolved({mod.name: ctx}, f"{mod.name}={ctx}: ")
+                    themes[ctx] = {n: e for n, e in got.items() if base.get(n) != e}
     elif dtcg.is_document(data):
-        base = css_of(data)
+        base = entries(data, "")
     else:
         return data, problems
+    if not base:
+        problems.append(Problem("not read", str(path), f"{path}: no token read, so nothing goes into Figma"))
+    # A token a theme sets goes where the modes are: a project's own
+    # `--surface: #fff` re-pointed by its dark theme lost its Dark value as a
+    # primitive, which has one mode (Codex on #120).
+    themed = {n for rows in themes.values() for n in rows}
     out: Dict[str, Any] = {"primitive": {}, "semantic": {}, "themes": {}}
-    for name, value in base.items():
+    for name, item in base.items():
         short = name[2:]
-        tier = KNOWN.get(short) or ("semantic" if "var(" in value else "primitive")
-        out.setdefault(tier, {})[short] = {"value": value}
+        by_value = "semantic" if "var(" in str(item["value"]) else "primitive"
+        tier = "semantic" if name in themed else KNOWN.get(short) or by_value
+        out.setdefault(tier, {})[short] = item
     for theme, rows in themes.items():
-        out["themes"][theme] = {n[2:]: {"value": v} for n, v in rows.items()}
+        out["themes"][theme] = {n[2:]: e for n, e in rows.items()}
     return out, problems
 
 
