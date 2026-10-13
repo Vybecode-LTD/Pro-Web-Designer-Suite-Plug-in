@@ -1777,6 +1777,12 @@
  },
  {
   "from": "web-design-studio/SKILL.md",
+  "to": "web-design-studio/references/stack-tailwind.md",
+  "section": "2.9",
+  "heading": "Check what the theme generates: `tw_probe`"
+ },
+ {
+  "from": "web-design-studio/SKILL.md",
   "to": "web-design-studio/references/style-architecture.md",
   "section": "6",
   "heading": "The component stylesheet shape"
@@ -2026,5 +2032,11 @@
   "to": "web-design-studio/references/typography.md",
   "section": "15",
   "heading": "Audit before it ships (Law 9)"
+ },
+ {
+  "from": "web-design-studio/scripts/tw_probe.mjs",
+  "to": "web-design-studio/references/stack-tailwind.md",
+  "section": "2",
+  "heading": "Tailwind v4: wiring `@theme`"
  }
 ]

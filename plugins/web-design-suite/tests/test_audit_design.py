@@ -617,6 +617,19 @@ class JsxClassesAndCssInJs(TempDirTest):
         self.assertTrue(any(line == 5 for _, line in found), found)      # the 13px margin
         self.assertFalse(any(line == 4 for _, line in found), found)     # an interpolation is not a literal
 
+    def test_a_file_name_in_a_template_is_not_a_css_template(self):
+        """4.0.0, P36: `${file}.css` read as an emotion `css` template, so the
+        rest of tw_probe.mjs was audited as unlayered CSS. A real one still is."""
+        found = self.rules(
+            "const file = (name) => `${name}.css`;\n"
+            "const more = (dir) => `${dir}/theme.css`;\n"
+            "export function each(sheets) { for (const css of sheets) { use(css); } }\n"
+            "const x = css`\n"
+            "  color: #ff0000;\n"
+            "`;\n")
+        self.assertEqual([("raw-color", 5)], [(r, line) for r, line in found if r != "unlayered"], found)
+        self.assertFalse([line for r, line in found if line < 4], found)
+
     def test_clean_helpers_and_templates_stay_clean(self):
         self.assertEqual(self.findings(
             "import styled from 'styled-components';\n"

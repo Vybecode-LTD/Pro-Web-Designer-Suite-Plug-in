@@ -82,7 +82,7 @@ plugins/web-design-suite/         the plugin (the only folder that ships)
   shared/token-contract.md        the master copy of the contract (13 copies must match it)
   shared/dtcg.py                  DTCG 2025.10 and Tokens Studio, read and write (a copy beside each project_config.py)
   hooks/                          hooks.json and design_hooks.mjs: the opt-in gate, token diff and guard, the router
-  workflow-commands/              the fifteen commands only the user invokes (/gate, /new-system, /deck...), added by plugin.json's `skills`
+  workflow-commands/              the sixteen commands only the user invokes (/gate, /new-system, /deck...), added by plugin.json's `skills`
   agents/                         the six subagents (design-critic, gate-runner, the auditors and reviewers)
   mcp/, .mcp.json                 the MCP server: the gates as tools (node design_gates.mjs)
   evals/                          claude plugin eval cases: routing/ (one per skill), boundaries/ (sibling pairs), and outcome cases in build/, systems/, gates/, lifecycle/, persuasion/, delivery/

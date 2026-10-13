@@ -5,6 +5,36 @@
 Phase 6b. 4.0.0 is a major release because Part 5 of the ESLint config moves to another
 Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it again.
 
+### Added
+
+- **`tw_probe.mjs` and `/tw-probe`** (P36 part 2; SB-C3). web-design-studio's new
+  script compiles a Tailwind v4 project's entry stylesheet with the project's own
+  tailwindcss and checks what it generates. Tailwind writes no CSS for a class it does not
+  know, and says nothing, so "`--*: initial` removed `p-4`" was a claim nobody saw fail.
+  - **Roles:** every variable an `@theme` block declares in one of Tailwind's utility
+    namespaces (tailwindcss.com's table: `--color-*`, `--spacing-*`, `--breakpoint-*`,
+    `--container-*` and the rest) must give its class.
+  - **Stock:** none of a sample of Tailwind's defaults may generate, unless the theme
+    declares that name itself. A failure names what survived: a kept `--spacing` alone
+    brings `p-4`, `w-4` and `leading-7` back.
+  - **Classes you name** are reported, and `--expect` and `--refuse` hold them.
+  - It exits 1 on a failure and 2 when it cannot run. The stylesheets are read in cascade
+    order, each after its imports; Tailwind's own files are left out, and a class the
+    stylesheet defines itself (`.stack`) is not counted as Tailwind's. On Tailwind 3 it
+    exits 2 and points at Part 5's `tailwindConfig` line.
+  - `/web-design-suite:tw-probe` runs it from the project's root and explains each
+    failure: the sixteenth command. stack-tailwind.md §2.9 teaches it.
+  - Tests: `test_tw_probe.TheProbe` runs it on the starter's own Tailwind wiring and on
+    the ways a project breaks it; `test_commands.TheChains` runs the command's step.
+
+### Fixed
+
+- **The audit read a file name as a CSS-in-JS template** (found by the audit of
+  `tw_probe.mjs`). Its emotion pattern took the `css` of `` `${file}.css` `` for a `css`
+  tag, so the rest of the file was audited as unlayered CSS with long selectors. A tag is
+  now a name of its own, with no `.`, `$` or word character before it; a real
+  `` css` `` template is still audited (`test_audit_design.JsxClassesAndCssInJs`).
+
 ### Upgrading
 
 - **Part 5 of `eslint.design.config.mjs` uses eslint-plugin-better-tailwindcss** (P36;
