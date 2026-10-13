@@ -726,9 +726,9 @@ invalid token reference (refers to a group, not a token)" (its root tokens secti
 same file gives the same names. DTCG has no
 type for `clamp()`, `calc()`, `em`, `ch` or a `font` shorthand, so each such
 token, and every token that refers to one, is named on stderr and left out
-(exit 1). The file keeps their names too, in its root `$extensions`
-(`io.github.vybecode-ltd.web-design-suite`, `notWritten`), so `diff_system.py`
-can tell a token left out from one added since. A DTCG file holds one mode: with `--out`, the default values are
+(exit 1). The file keeps each one with its CSS value in its root `$extensions`
+(`io.github.vybecode-ltd.web-design-suite`, `notWritten`), which other tools
+ignore and `diff_system.py` reads back, so they are compared like any other token. A DTCG file holds one mode: with `--out`, the default values are
 written, and each theme or density block is named as left out.
 
 **Themes, through the resolver.** `--format dtcg --out-dir DIR` writes them all

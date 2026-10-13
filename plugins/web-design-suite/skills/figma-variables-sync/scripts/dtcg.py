@@ -69,7 +69,7 @@ META_KEYS = {"$schema", "$description", "$extensions", "$type", "$deprecated",
              "$extends"}
 Problems = List[Tuple[str, str]]
 # The document's own `$extensions` key, reverse-domain as 2025.10 recommends:
-# `notWritten` lists the custom properties document() left out.
+# `notWritten` holds each custom property document() left out, with its value.
 EXTENSION = "io.github.vybecode-ltd.web-design-suite"
 
 
@@ -1450,7 +1450,9 @@ def document(values: Iterable[Tuple[str, str]], descriptions: Optional[Dict[str,
     keep = None if only is None else set(only)
     problems: Problems = []
     parsed: Dict[str, Tuple[Tuple[str, ...], Optional[str], Any]] = {}
+    given: Dict[str, str] = {}
     for name, value in values:
+        given[name] = value
         path = path_of(name)
         if path is None:
             problems.append((name, "a DTCG name cannot hold `{`, `}`, `.` or a leading `$`"))
@@ -1534,15 +1536,21 @@ def document(values: Iterable[Tuple[str, str]], descriptions: Optional[Dict[str,
         else:
             node[key] = token
     if keep is None and problems:
-        # Kept in the file, so a diff against the stylesheet it was written
-        # from can tell a token left out from one added since (Codex on #119).
-        doc["$extensions"] = {EXTENSION: {"notWritten": sorted({name for name, _ in problems})}}
+        # Kept in the file with their values, so a diff against the
+        # stylesheet it was written from compares them too: a token left out
+        # is neither added nor removed, and a new clamp() is still a change
+        # (Codex on #119).
+        doc["$extensions"] = {EXTENSION: {"notWritten": {
+            name: str(given.get(name, "")) for name in sorted({n for n, _ in problems})}}}
     return doc, problems
 
 
-def not_written(data: Any) -> List[str]:
-    """The custom properties a document says document() left out of it."""
+def not_written(data: Any) -> Dict[str, str]:
+    """The custom properties a document says document() left out of it,
+    with their CSS values."""
     ext = data.get("$extensions") if isinstance(data, dict) else None
     own = ext.get(EXTENSION) if isinstance(ext, dict) else None
-    names = own.get("notWritten") if isinstance(own, dict) else None
-    return [n for n in names if isinstance(n, str)] if isinstance(names, list) else []
+    held = own.get("notWritten") if isinstance(own, dict) else None
+    if not isinstance(held, dict):
+        return {}
+    return {n: v for n, v in held.items() if isinstance(n, str) and n.startswith("--") and isinstance(v, str)}

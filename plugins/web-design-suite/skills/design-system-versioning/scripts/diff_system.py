@@ -900,6 +900,11 @@ def _snapshot_from_contract(paths: List[Path], label: str, source: str = "contra
         deprecated = read_deprecations(paths)
     except ConfigError as exc:
         raise bail(f"diff_system: {exc}")
+    if source == "DTCG":
+        held = tokens.values()
+        for name, value in recorded(paths[0]).items():
+            if name not in held:                 # filed as read_tokens files a tokens.css's
+                tokens.add(name, value, 2 if "var(" in value else 1)
     snap = Snapshot(label=label, path=str(paths[0]), source=source,
                     impl="project contract" if source == "contract.json" else "DTCG token file",
                     layers_recorded=False, deprecated=deprecated)
@@ -1366,6 +1371,8 @@ def _equivalent(name: str, a: Any, b: Any) -> bool:
     except ConfigError:                           # vendored without dtcg.py: text only
         return False
     (ka, va), (kb, vb) = module.css_value(name, a), module.css_value(name, b)
+    if ka == kb == "fontFamily":
+        return _families(a) == _families(b)
     if ka is not None or kb is not None:
         return ka == kb and va == vb
     pa, pb = _parts(a), _parts(b)
@@ -1376,6 +1383,34 @@ def _equivalent(name: str, a: Any, b: Any) -> bool:
         if x != y and (kx is None or (kx, vx) != module.css_value(name, y)):
             return False
     return True
+
+
+# A quoted keyword is a family of that name, not the keyword: `"serif"` is not
+# `serif` (Codex on #119). Any other name is the same family quoted or not.
+FAMILY_KEYWORDS = {"serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-serif",
+                   "ui-sans-serif", "ui-monospace", "ui-rounded", "math", "emoji", "fangsong",
+                   "inherit", "initial", "unset", "revert", "revert-layer", "default"}
+
+
+def _families(text: str) -> List[Tuple[str, bool]]:
+    """A font stack as (name, a quoted keyword?) for each family, in order."""
+    out: List[Tuple[str, bool]] = []
+    quote, cur = "", ""
+    for ch in text + ",":
+        if quote:
+            quote = "" if ch == quote else quote
+            cur += ch
+        elif ch in "\"'":
+            quote, cur = ch, cur + ch
+        elif ch == ",":
+            part = cur.strip()
+            quoted = len(part) > 1 and part[0] == part[-1] and part[0] in "\"'"
+            family = " ".join((part[1:-1] if quoted else part).split())
+            out.append((family, quoted and family.lower() in FAMILY_KEYWORDS))
+            cur = ""
+        else:
+            cur += ch
+    return out
 
 
 def _parts(text: str) -> List[str]:
@@ -1393,33 +1428,32 @@ def _parts(text: str) -> List[str]:
     return out + ([cur] if cur else [])
 
 
-def not_written(old: Snapshot, new: Snapshot) -> List[str]:
-    """The new snapshot's tokens the old DTCG file records as left out when it
-    was written: a `clamp()`, a `ch` or an `em`, or a reference to one, which
-    2025.10 cannot hold (dtcg.py's document() keeps their names in the file's
-    `$extensions`). They are not new: against the stylesheet it was written
-    from, 53 of the starter's tokens read as added and an unchanged system as
-    a minor release (the 3.6.0 live check). Only the recorded names are set
-    aside, so a `clamp()` token added since is still added (Codex on #119).
-    A resolver's record is in its sources, read from its own folder."""
-    if old.source != "DTCG":
-        return []
+def recorded(path: Path) -> Dict[str, str]:
+    """The tokens a DTCG file records as left out when it was written, with
+    their CSS values: a `clamp()`, a `ch` or an `em`, or a reference to one,
+    which 2025.10 cannot hold (dtcg.py's document() keeps them in the file's
+    `$extensions`). Read back into its snapshot, they are compared like any
+    other token. Without them, against the stylesheet it was written from,
+    53 of the starter's tokens read as added (the 3.6.0 live check), or as
+    removed the other way round; and a token's new `clamp()` went unseen
+    (Codex on #119). A resolver's record is in its sources, in its folder."""
     try:
         module = _dtcg(Path(__file__))
-        data = json.loads(Path(old.path).read_bytes())
+        data = json.loads(Path(path).read_bytes())
     except (ConfigError, OSError, ValueError):
-        return []
-    recorded = set(module.not_written(data))
+        return {}
+    out = dict(module.not_written(data))
     if module.is_resolver(data):
-        load = module.file_loader(Path(old.path).parent)
+        load = module.file_loader(Path(path).parent)
         for ref in _file_refs(data)[:64]:
             if module.outside(ref):
                 continue
             try:
-                recorded.update(module.not_written(load(ref)))
+                for name, value in module.not_written(load(ref)).items():
+                    out.setdefault(name, value)
             except (OSError, ValueError):
                 continue
-    return sorted(n for n in recorded if n in new.tokens and n not in old.tokens)
+    return out
 
 
 def _file_refs(data: Any) -> List[str]:
@@ -1618,10 +1652,10 @@ def contrast_deltas(old: Snapshot, new: Snapshot, rename: Dict[str, str],
 
 
 def diff_tokens(old: Snapshot, new: Snapshot, out: List[Change],
-                inherited: List[str], unheld: Sequence[str] = ()) -> Tuple[Dict[str, str], set]:
+                inherited: List[str]) -> Tuple[Dict[str, str], set]:
     old_names, new_names = set(old.tokens), set(new.tokens)
     removed = sorted(old_names - new_names)
-    added = sorted(new_names - old_names - set(unheld))
+    added = sorted(new_names - old_names)
     rename = detect_renames(old, new, removed, added)
     renamed_new = set(rename.values())
     changed_values: set = set()
@@ -2572,21 +2606,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if contract:
         old, new = as_contract(old), as_contract(new)
     align_spellings(old, new)
-    unheld = not_written(old, new)
 
     changes: List[Change] = []
     inherited: List[str] = []
-    rename, changed_values = diff_tokens(old, new, changes, inherited, unheld)
+    rename, changed_values = diff_tokens(old, new, changes, inherited)
     diff_components(old, new, changes)
     notes: List[str] = []
     if contract:
         notes.append(f"{' and '.join(kinds)} hold{'s' if len(kinds) == 1 else ''} default values and "
                      "tiers only, so only those were compared: no themes, densities, conditions, notes, "
                      "layers or components")
-    if unheld:
-        shown = ", ".join(unheld[:8]) + (f", … (+{len(unheld) - 8})" if len(unheld) > 8 else "")
-        notes.append(f"{len(unheld)} token(s) the old DTCG file records as not written (2025.10 cannot "
-                     f"hold them) were not compared: {shown}")
     layer_note = None if contract else diff_layers(old, new, changes)
     if layer_note:
         notes.append(layer_note)

@@ -200,10 +200,12 @@
   value, part by part for a value with no type of its own. Against the stylesheet it
   was written from, a published DTCG file read 27 primitives as edited, and the 53
   tokens it cannot hold (`clamp()`, `ch`, `em`, and what reads them) as added: a major
-  release for an unchanged system. The DTCG writer now keeps the names it leaves out
-  in the file's `$extensions` (`io.github.vybecode-ltd.web-design-suite`, `notWritten`),
-  and only those are set aside, with a note naming them: a `clamp()` token added since
-  is still added (the 3.6.0 live check; Codex on #119).
+  release for an unchanged system. The DTCG writer now keeps each token it leaves out,
+  with its value, in the file's `$extensions` (`io.github.vybecode-ltd.web-design-suite`,
+  `notWritten`), and diff_system reads them back into whichever snapshot is the DTCG
+  file: a `clamp()` added since, or changed, is still a change, either way round. A
+  quoted keyword (`"serif"`) stays another family than the keyword (the 3.6.0 live
+  check; Codex on #119).
 
 ## 3.5.0 — 2026-10-10
 
