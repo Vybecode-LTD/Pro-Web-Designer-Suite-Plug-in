@@ -212,6 +212,9 @@
   and no Dark mode. It now reads a `tokens.css`, a DTCG 2025.10 file and a resolver:
   each theme (`[data-theme]`, or a resolver's `theme` contexts) is a mode of the
   semantic collection, and a density or another condition is named and left out (the
+- **A Tokens Studio export never reached figma-variables-sync.** A prompt about one
+  that did not say "Figma" heard no skill, and the session wrote its own converter.
+  The router now hears "Tokens Studio", and the skill's description names it (the
   3.6.0 live check).
 
 ## 3.5.0 — 2026-10-10

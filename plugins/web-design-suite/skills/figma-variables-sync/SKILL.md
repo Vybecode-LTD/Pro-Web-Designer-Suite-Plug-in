@@ -1,6 +1,6 @@
 ---
 name: figma-variables-sync
-description: Keep Figma and code on one token vocabulary. Audits a design file, generates tokens.css from a Figma export, pushes tokens back as variables, and catches drift in CI. Not for building pages.
+description: Keep Figma and code on one token vocabulary. Audits designs, generates tokens.css from a Figma or Tokens Studio export, pushes tokens back as variables, catches drift in CI. Not for building pages.
 ---
 
 # Figma Variables Sync
@@ -336,10 +336,10 @@ old, say so.
 ## Scripts
 
 Both are stdlib-only Python 3.9+, run by path from the project root, and detect their
-input shape: REST `variables/local`, a plugin `{"collections": […]}` export, W3C
-DTCG nested tokens (including 2025.10's object values, `$ref`, `$extends` and
+input shape: REST `variables/local`, a plugin `{"collections": […]}` export,
+DTCG tokens (including 2025.10's object values, `$ref`, `$extends` and
 `$root`), a Tokens Studio export (its `$themes` read as modes, its math worked
-out), or a flat list of `{name, type, value}` records. A composed colour's
+out), or a list of `{name, type, value}` records. A composed colour's
 opacity is Figma's percentage, 0–100, and an aliased colour keeps its link as
 `color-mix(in oklch, var(--x) 8%, transparent)`. Output carries no clock time
 (set `SOURCE_DATE_EPOCH` to stamp a date), so the CI drift check compares like

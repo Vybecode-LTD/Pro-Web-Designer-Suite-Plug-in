@@ -62,7 +62,8 @@ const OFF = /^(?:false|0|no|off)$/i;
 const ROUTES = [
   ['a11y-audit-runner', 'accessibility audits',
    [/\b(?:WCAG|axe-core|a11y|screen[- ]?readers?)\b/i, /\baccessib\w* (?:audit|check|test|review)/i]],
-  ['figma-variables-sync', 'Figma variables and tokens', [/\bfigma\b[^.?!]*\b(?:variables?|tokens?|styles?)\b/i]],
+  ['figma-variables-sync', 'Figma variables and tokens', [/\bfigma\b[^.?!]*\b(?:variables?|tokens?|styles?)\b/i,
+                                                          /\btokens studio\b/i]],   // R3.6's live check
   ['email-template-system', 'HTML email', [/\b(?:html e-?mails?|e-?mail templates?|newsletters?|MJML)\b/i]],
   ['perf-budget-gate', 'performance budgets', [/\b(?:core web vitals|lighthouse|performance budgets?|page ?speed)\b/i,
                                                 /\b(?:LCP|INP|CLS|TTFB)\b/]],
