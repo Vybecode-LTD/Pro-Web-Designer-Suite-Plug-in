@@ -113,6 +113,20 @@ class TheProbe(ProbeProject):
         self.add_theme("@theme { --spacing: 0.25rem; }\n")
         self.assertIn("p-4", {s["class"] for s in self.report()["stock"] if s["generates"]})
 
+    def test_a_prefixed_theme_is_probed_with_its_prefix(self):
+        """Codex on #126: with `prefix(tw)` Tailwind knows `tw:bg-surface`,
+        so unprefixed candidates failed every role and passed every stock."""
+        self.write("src/styles/index.css", '@import "tailwindcss" prefix(tw);\n')
+        report = self.report()
+        self.assertIn("tw:bg-neutral-800", {s["class"] for s in report["stock"] if s["generates"]})
+        entry = (CONFIGS / "index.tailwind.css").read_bytes().decode("utf-8")
+        self.write("src/styles/index.css", entry.replace(
+            '@import "tailwindcss/theme.css"     layer(theme);',
+            '@import "tailwindcss/theme.css"     layer(theme) prefix(tw);', 1))
+        report = self.report()
+        self.assertEqual("pass", report["verdict"], report["failures"])
+        self.assertIn("tw:bg-surface", {r["class"] for r in report["roles"]})
+
     def test_a_declared_name_owns_every_class_it_gives(self):
         """Codex on #126: `--spacing-4` gives `p-4`, `gap-4` and `w-4` on
         purpose, and `--container-md` gives `max-w-md`; none is a stock leak."""
