@@ -60,6 +60,17 @@ class SkillBudget(unittest.TestCase):
                 self.assertIn(heading, text)
                 self.assertLess(text.index(heading), workflow)
 
+    def test_a_declined_pattern_is_explained_in_the_reply(self):
+        """3.6.0's evals: one run of no-fake-countdown built only the honest
+        countdown and never said why the resetting one deceives, so its judges
+        failed it. The boundary's first rule now asks for the why."""
+        text = (SKILLS / "landing-page-conversion" / "SKILL.md").read_text(encoding="utf-8")
+        boundary = text[text.index("## The ethics boundary"):text.index("## Evidence discipline")]
+        rule = boundary.split("\n\n")[1]
+        for words in ("declines deception", "says why in the reply", "say it deceives", "regulators"):
+            with self.subTest(words=words):
+                self.assertIn(words, rule)
+
 
 if __name__ == "__main__":
     unittest.main()

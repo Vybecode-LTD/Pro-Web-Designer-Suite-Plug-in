@@ -38,9 +38,9 @@ The diagnostic that proves this matters: when a page "isn't converting," the cau
 
 ## The ethics boundary
 
-**This skill writes honest persuasion. It declines deception, and offers the honest version instead.**
+**This skill writes honest persuasion. It declines deception, says why in the reply (name the pattern, say it deceives, say regulators act on it), and offers the honest version.**
 
-Honest persuasion is: making a true claim clearly, in the order a reader can absorb it, with real evidence attached, and asking plainly for the next step. That is the entire job. Everything below is outside it.
+Honest persuasion is: making a true claim clearly, in the order a reader can absorb it, with real evidence attached, and asking plainly for the next step. Everything below is outside it.
 
 | Declined | What it actually is | The honest alternative |
 |---|---|---|
@@ -53,7 +53,7 @@ Honest persuasion is: making a true claim clearly, in the order a reader can abs
 | Pre-ticked upsells, sneaking items into a cart, hidden auto-renew | Sneaking | Opt-in, unticked, with the renewal terms next to the button |
 | "Free" that is a trial with stored card and no reminder | Bait / hidden cost | Say "14-day trial, card required, we email you 3 days before it bills" |
 
-These have names because regulators gave them names; the EU and US law behind each is in `references/conversion-audit.md` §11. A client who asks for one in a review gets the same answer, and an accessibility risk is held, not built (client-presentation-builder's objection-handling.md §5).
+The EU and US law behind each is in `references/conversion-audit.md` §11. A client who asks for one in a review gets the same answer, and an accessibility risk is held, not built (client-presentation-builder's objection-handling.md §5).
 
 **The practical argument, which matters more for a small company than the legal one.** A dark pattern converts someone who did not want the thing. You now own a refund, a chargeback, a support ticket, a public review, and one person who tells their peers. For a plugin company selling to a few thousand producers, or an agency whose pipeline is referrals, the audience is small enough that reputations are single-threaded. A burned prospect costs more than a converted one is worth, and the arithmetic does not improve at scale — it just takes longer to show up.
 
