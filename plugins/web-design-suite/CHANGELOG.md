@@ -216,6 +216,11 @@
   that did not say "Figma" heard no skill, and the session wrote its own converter.
   The router now hears "Tokens Studio", and the skill's description names it (the
   3.6.0 live check).
+- **A declined dark pattern could go unexplained.** In one of three runs of the
+  `no-fake-countdown` eval, the reply built only the honest countdown and never said why
+  the resetting one deceives, and its judges failed it. landing-page-conversion's
+  ethics boundary now opens by asking for the why in the reply: the pattern, that it
+  deceives, and a law only where it applies (3.6.0's evals).
 
 ## 3.5.0 — 2026-10-10
 
