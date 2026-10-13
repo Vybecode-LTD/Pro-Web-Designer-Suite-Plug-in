@@ -880,7 +880,7 @@ class TailwindPluginBlock:
     the working directory. The fixtures for the conflict and shorthand rules
     are the examples the block's own comments give."""
 
-    MAJOR = MODULES = None
+    MAJOR = MODULES = OTHER = None
     EXTRA: dict[str, str] = {}
 
     @classmethod
@@ -889,7 +889,14 @@ class TailwindPluginBlock:
 
     @classmethod
     def setUpClass(cls):
-        tmp = temp_project(cls, "wds-twlint-", cls.MODULES)
+        # The project's own tools are in app/node_modules. The folder ESLint
+        # runs from, a monorepo root, holds the other Tailwind major, which
+        # the plugin would read without its `cwd` (Codex and CodeRabbit on #125).
+        tmp = class_temp_dir(cls, "wds-twlint-")
+        (tmp / "app").mkdir()
+        cls.addClassCleanup(link_folder(pathlib.Path(cls.MODULES).resolve(), tmp / "app" / "node_modules"))
+        if cls.OTHER:
+            cls.addClassCleanup(link_folder(pathlib.Path(cls.OTHER).resolve(), tmp / "node_modules"))
         block = tailwind_part5(ESLINT_CONFIG_TEXT, cls.MAJOR)
         conflict, *not_conflict = documented_examples(block, "better-tailwindcss/no-conflicting-classes")
         cls.shorthand, cls.merged = documented_examples(block, "better-tailwindcss/enforce-shorthand-classes")[:2]
@@ -984,6 +991,7 @@ class TailwindPluginBlock:
 class TailwindPluginV4(TailwindPluginBlock, unittest.TestCase):
     MAJOR = 4
     MODULES = TAILWIND_V4_LINT
+    OTHER = TAILWIND_V3_LINT
     EXTRA = {# theme.css's own @utility classes, and a typo of one.
              "Utilities": 'className="focus-ring tap-target motion-hover page-gutter z-modal max-w-prose border-hairline"',
              "UtilityTypo": 'className="motion-hovr"',
@@ -1023,6 +1031,7 @@ class TailwindPluginV4(TailwindPluginBlock, unittest.TestCase):
 class TailwindPluginV3(TailwindPluginBlock, unittest.TestCase):
     MAJOR = 3
     MODULES = TAILWIND_V3_LINT
+    OTHER = TAILWIND_V4_LINT
     EXTRA = {# The utilities tailwind.config.ts adds with addUtilities, and a
              # typo of one: the plugin learns them from the config, so no
              # ownClasses entry may hide the typo.

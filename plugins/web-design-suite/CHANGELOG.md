@@ -15,8 +15,10 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
      Tailwind 3.3 or later or 4.1.17 or later).
   2. Copy the new block. On Tailwind v4 it reads your entry CSS (`entryPoint`, which
      replaces `cssConfigPath`); on v3 its `tailwindConfig` line takes `entryPoint`'s
-     place (it replaces `config`). Both are anchored at the project, as the old v3 block
-     was, because the plugin reads them from the working directory.
+     place (it replaces `config`). The block sets the plugin's `cwd` to the project and
+     anchors both paths there, because the plugin resolves `tailwindcss` and reads its
+     paths from ESLint's working directory otherwise: from a monorepo root, the root's
+     Tailwind, perhaps the other major.
   3. Rename the rules you configured yourself: `no-custom-classname` is
      `no-unknown-classes` (its `whitelist` is `ignore`), `no-contradicting-classname` is
      `no-conflicting-classes`, `enforces-shorthand` is `enforce-shorthand-classes`, each
