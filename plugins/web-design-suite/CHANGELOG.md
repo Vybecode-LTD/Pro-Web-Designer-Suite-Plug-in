@@ -206,6 +206,10 @@
   file: a `clamp()` added since, or changed, is still a change, either way round. A
   quoted keyword (`"serif"`) stays another family than the keyword (the 3.6.0 live
   check; Codex on #119).
+- **A Tokens Studio export never reached figma-variables-sync.** A prompt about one
+  that did not say "Figma" heard no skill, and the session wrote its own converter.
+  The router now hears "Tokens Studio", and the skill's description names it (the
+  3.6.0 live check).
 
 ## 3.5.0 — 2026-10-10
 

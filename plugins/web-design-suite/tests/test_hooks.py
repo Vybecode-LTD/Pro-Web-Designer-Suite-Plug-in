@@ -567,6 +567,9 @@ class TheRouter(HookTest):
         cases = {"Run an axe audit of the checkout against WCAG 2.2": ["a11y-audit-runner"],
                  "Check the form's screen-reader labels": ["a11y-audit-runner"],      # the eval run on #95
                  "Sync our Figma variables into tokens.css": ["figma-variables-sync"],
+                 # R3.6's live check: no word of Figma, and the session wrote its own converter
+                 "Our designers keep their tokens in Tokens Studio. Turn their export, "
+                 "design/tokens-studio.json, into CSS custom properties": ["figma-variables-sync"],
                  "Critique this design system's docs site": ["design-system-docs", "design-critique-gate"],
                  "Generate the token reference and prop tables": ["design-system-docs"],
                  "We need a documentation site for our design system": ["design-system-docs", "web-design-studio"],
