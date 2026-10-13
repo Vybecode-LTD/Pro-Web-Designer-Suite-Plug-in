@@ -482,18 +482,23 @@ class CiRecipes(unittest.TestCase):
 #   stylelint 17.15.0; stylelint-config-standard 40.0.0 peers stylelint ^17.0.0
 #   eslint 10.11.0; ESLint 9 reached end of life on 2026-08-06
 #   eslint-plugin-jsx-a11y 6.10.2 peers eslint "^3 || ... || ^9"
-#   eslint-plugin-tailwindcss 4.4.0 is "Made for Tailwind CSS v4" (peer
-#   tailwindcss ^4); v3 projects stay on 3.x
+# And on 2026-10-13, for 4.0.0 (decision D4): eslint-plugin-better-tailwindcss
+# 4.9.0 peers eslint "^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0" and tailwindcss
+# "^3.3.0 || ^4.1.17"; its README's rule table, at the v4.9.0 tag, gives the
+# rules below and marks four of them v4 only.
 CONFIG_DIR = SKILLS / "web-design-studio" / "assets" / "configs"
-TAILWIND_PLUGIN_RULES = {
-    4: {"classnames-order", "enforces-canonical-classname", "enforces-negative-arbitrary-values",
-        "enforces-shorthand", "important-modifier-suffix", "no-arbitrary-value",
-        "no-contradicting-classname", "no-custom-classname", "no-unnecessary-arbitrary-value"},
-    3: {"classnames-order", "enforces-negative-arbitrary-values", "enforces-shorthand",
-        "migration-from-tailwind-2", "no-arbitrary-value", "no-custom-classname",
-        "no-contradicting-classname", "no-unnecessary-arbitrary-value"},
-}
-
+BETTER_TAILWIND_RULES = {
+    "enforce-consistent-line-wrapping", "enforce-consistent-class-order", "enforce-consistent-variant-order",
+    "enforce-consistent-variable-syntax", "enforce-consistent-important-position", "enforce-shorthand-classes",
+    "enforce-logical-properties", "enforce-canonical-classes", "no-duplicate-classes", "no-deprecated-classes",
+    "no-unnecessary-whitespace", "no-concatenated-classes", "no-unknown-classes", "no-conflicting-classes",
+    "no-restricted-classes"}
+V4_ONLY = {"enforce-consistent-variant-order", "enforce-canonical-classes", "no-deprecated-classes",
+           "no-conflicting-classes"}
+# The rules that sort or wrap classes: Part 5 says class order is the
+# formatter's, never a lint rule's.
+ORDER_RULES = {"enforce-consistent-line-wrapping", "enforce-consistent-class-order",
+               "enforce-consistent-variant-order"}
 
 def major(text: str, package: str):
     m = re.search(rf"(?<![\w-]){re.escape(package)}@\^?(\d+)", text)
@@ -519,22 +524,28 @@ class DependencyFacts(unittest.TestCase):
         self.assertRegex(head, r'"overrides":\s*\{\s*"eslint-plugin-jsx-a11y":\s*'
                                r'\{\s*"eslint":\s*"\$eslint"\s*\}')
 
-    def test_each_tailwind_plugin_block_fits_its_major(self):
+    def test_the_tailwind_block_fits_the_plugin(self):
         text = (CONFIG_DIR / "eslint.design.config.mjs").read_text(encoding="utf-8")
         part5 = text.split("PART 5", 1)[1].split("EXPORTS", 1)[0]
-        _, found = tailwind_part5(text)
-        self.assertEqual(sorted(found), [3, 4], "one block per plugin major")
-        self.assertIn("cssConfigPath", found[4], "4.x reads the v4 CSS entry")
-        self.assertNotRegex(found[4], r"\b(config|callees):", "v3 settings; 4.x ignores them")
-        self.assertRegex(part5, r"eslint-plugin-tailwindcss@3\b", "a v3 project pins 3.x")
-        for plugin_major, block in found.items():
-            for rule in re.findall(r"'tailwindcss/([\w-]+)'", block):
-                with self.subTest(major=plugin_major, rule=rule):
-                    self.assertIn(rule, TAILWIND_PLUGIN_RULES[plugin_major])
-        lines = part5.splitlines()
-        for i, line in enumerate(lines):
-            if "tailwindcss/no-arbitrary-value" in line:
-                self.assertNotIn("!important", lines[i - 1], "the rule is about arbitrary values")
+        block = tailwind_part5(text)
+        self.assertIn("from 'eslint-plugin-better-tailwindcss'", block)
+        self.assertNotIn("eslint-plugin-tailwindcss'", block, "the plugin 4.0.0 moved from (D4)")
+        self.assertRegex(block, r"entryPoint: path\.join\(project,", "v4 reads the CSS entry, anchored")
+        self.assertRegex(tailwind_part5(text, 3), r"tailwindConfig: path\.join\(project,",
+                         "v3 reads the config, anchored")
+        self.assertIn("cwd: project,", block, "tailwindcss resolved from the project (#125)")
+        self.assertNotIn("configs.", block, "the recommended configs sort and wrap classes")
+        rules = re.findall(r"'better-tailwindcss/([\w-]+)'", block)
+        self.assertGreater(len(rules), 3)
+        lines = block.splitlines()
+        for rule in rules:
+            with self.subTest(rule=rule):
+                self.assertIn(rule, BETTER_TAILWIND_RULES)
+                self.assertNotIn(rule, ORDER_RULES)
+                if rule in V4_ONLY:
+                    at = next(n for n, line in enumerate(lines) if f"'better-tailwindcss/{rule}'" in line)
+                    self.assertIn("v4", " ".join(lines[max(0, at - 4):at]), "say a rule is v4's")
+        self.assertIn("npm i -D eslint-plugin-better-tailwindcss", part5)
 
 
 # ---------------------------------------------------------------------------

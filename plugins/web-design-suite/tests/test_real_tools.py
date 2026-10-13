@@ -9,15 +9,15 @@ variable set to `off` switches its tests off (wds_support.tool_roots):
                            and typescript-eslint; or several, separated by the
                            path separator, each package taken from the first
                            that has it (ESLint 10 from one project, jsx-a11y
-                           from another). With eslint-plugin-tailwindcss 4 and
-                           tailwindcss 4 beside them, the v4 half of the
-                           ESLint config's Part 5 runs too
+                           from another). With eslint-plugin-better-tailwindcss
+                           and tailwindcss 4 beside them, the ESLint config's
+                           Part 5 runs on Tailwind v4 too
   WDS_TAILWIND_MODULES     a node_modules with tailwindcss 4 and @tailwindcss/node
                            (tailwind-merge too, for the merge config)
   WDS_STYLELINT_MODULES    a node_modules with stylelint 17 and
                            stylelint-config-standard 40
-  WDS_TAILWIND_V3_MODULES  a node_modules with eslint, eslint-plugin-tailwindcss 3
-                           and tailwindcss 3, for the v3 half of Part 5
+  WDS_TAILWIND_V3_MODULES  a node_modules with eslint, eslint-plugin-better-tailwindcss
+                           and tailwindcss 3, for Part 5 on Tailwind v3
 
 Nothing is installed or downloaded. The configs are copied into a temporary
 directory, either with their package imports pointed at those folders by
@@ -51,6 +51,8 @@ Regressions covered:
   the v3 whitelist hid typos of the utilities the plugin already knew; the
   helper fixture used `cn`, a default, so the v4 `functions` list went
   untested.
+- 4.0.0 (decision D4): Part 5 moved to eslint-plugin-better-tailwindcss, one
+  block for both majors; the old plugin's two blocks were tested the same way.
 """
 from __future__ import annotations
 
@@ -100,10 +102,10 @@ def package_major(root: str, package: str) -> int | None:
 
 
 def tailwind_lint_modules(roots: list[str], major: int) -> str | None:
-    """The first of `roots` holding ESLint with eslint-plugin-tailwindcss and
-    tailwindcss, both of `major`."""
+    """The first of `roots` holding ESLint, eslint-plugin-better-tailwindcss 4
+    and tailwindcss of `major`."""
     return next((r for r in roots if package_major(r, "eslint")
-                 and package_major(r, "eslint-plugin-tailwindcss") == major
+                 and package_major(r, "eslint-plugin-better-tailwindcss") == 4
                  and package_major(r, "tailwindcss") == major), None)
 
 
@@ -865,19 +867,20 @@ def documented_examples(block: str, rule: str) -> list[str]:
     return re.findall(r"`([^`]+)`", " ".join(comment))
 
 
-JSX_FIXTURE = "export const {name} = ({{ cx }}) => <div {attr} />;\n"
-TAILWIND_PART5 = tailwind_part5((CONFIGS / "eslint.design.config.mjs").read_text(encoding="utf-8"))
+JSX_FIXTURE = "export const {name} = ({{ cx, classNames, on }}) => <div {attr} />;\n"
+ESLINT_CONFIG_TEXT = (CONFIGS / "eslint.design.config.mjs").read_text(encoding="utf-8")
 
 
 class TailwindPluginBlock:
-    """One block of the ESLint config's Part 5, uncommented with the lines the
-    blocks share, run by the real eslint-plugin-tailwindcss in a project wired
-    as the docs say. ESLint runs from the folder above the project, as it does
-    from a monorepo root or a git hook: ESLint 10 loads a config from whichever
-    folder it lints. The fixtures for the contradiction and shorthand rules are
-    the examples the block's own comments give."""
+    """The ESLint config's Part 5, uncommented for one Tailwind major as a
+    project copies it, run by the real eslint-plugin-better-tailwindcss in a
+    project wired as the docs say. ESLint runs from the folder above the
+    project, as it does from a monorepo root or a git hook: ESLint 10 loads a
+    config from whichever folder it lints, and the plugin reads its paths from
+    the working directory. The fixtures for the conflict and shorthand rules
+    are the examples the block's own comments give."""
 
-    MAJOR = CONST = MODULES = None
+    MAJOR = MODULES = OTHER = None
     EXTRA: dict[str, str] = {}
 
     @classmethod
@@ -886,32 +889,47 @@ class TailwindPluginBlock:
 
     @classmethod
     def setUpClass(cls):
-        tmp = temp_project(cls, "wds-twlint-", cls.MODULES)
-        shared, blocks = TAILWIND_PART5
-        block = blocks[cls.MAJOR]
-        conflict, *not_conflict = documented_examples(block, "tailwindcss/no-contradicting-classname")
-        cls.shorthand, cls.merged = documented_examples(block, "tailwindcss/enforces-shorthand")[:2]
+        # The project's own tools are in app/node_modules. The folder ESLint
+        # runs from, a monorepo root, holds the other Tailwind major, which
+        # the plugin would read without its `cwd` (Codex and CodeRabbit on #125).
+        tmp = class_temp_dir(cls, "wds-twlint-")
+        (tmp / "app").mkdir()
+        cls.addClassCleanup(link_folder(pathlib.Path(cls.MODULES).resolve(), tmp / "app" / "node_modules"))
+        if cls.OTHER:
+            cls.addClassCleanup(link_folder(pathlib.Path(cls.OTHER).resolve(), tmp / "node_modules"))
+        block = tailwind_part5(ESLINT_CONFIG_TEXT, cls.MAJOR)
+        conflict, *not_conflict = documented_examples(block, "better-tailwindcss/no-conflicting-classes")
+        cls.shorthand, cls.merged = documented_examples(block, "better-tailwindcss/enforce-shorthand-classes")[:2]
         cls.cases = {"Roles": 'className="p-card bg-surface text-default"',
                      "Misspelt": 'className="p-card bg-surfce"',
                      "OffScale": 'className="p-4 bg-neutral-800"',
-                     # `cx` is in both blocks' helper lists and in neither plugin's defaults.
+                     # `cx` is one of the plugin's defaults; `classNames` is a
+                     # helper Part 2 reads that the block adds, strings and keys.
                      "Helper": "className={cx('bg-surfce', 'p-card')}",
+                     "ClassNames": "className={classNames('bg-surfce', { 'p-crad': on })}",
                      "Conflict": f'className="{conflict}"',
                      "Shorthand": f'className="{cls.shorthand}"',
+                     "Duplicate": 'className="p-card p-card"',
                      # Classes the starter's own CSS defines, and a typo of one.
                      "Starter": 'className="stack cluster--tight with-sidebar__rail u-isolate"',
                      "StarterTypo": 'className="stak"',
+                     # A variant on a class Tailwind does not know generates
+                     # nothing either: the entries are anchored.
+                     "StarterVariant": 'className="md:stack"',
                      **({"NotAConflict": f'className="{not_conflict[0]}"'} if not_conflict else {}),
                      **cls.EXTRA}
         files = {"app/package.json": '{ "name": "app", "private": true }\n',
                  "app/eslint.config.mjs": (
-                     "import tailwind from 'eslint-plugin-tailwindcss';\n" + shared + block
-                     + "export default [\n"
-                       "  { files: ['**/*.jsx'], languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } } },\n"
-                       f"  {cls.CONST},\n];\n"),
+                     block + "export default [\n"
+                     "  { files: ['**/*.jsx'], languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } } },\n"
+                     "  tailwindConfig,\n];\n"),
                  **{f"app/{name}": text for name, text in cls.tailwind_files().items()}}
         for name, attr in cls.cases.items():
             files[f"app/src/components/{name}.jsx"] = JSX_FIXTURE.format(name=name, attr=attr)
+        # The helpers outside any className attribute (Codex on #125): the
+        # plugin's defaults read `cx`, the block's selectors `classNames`.
+        files["app/src/components/Standalone.jsx"] = (
+            "export const classes = cx('bg-surfca');\nexport const more = classNames('bg-surfcb');\n")
         write_files(tmp, files)
         proc = subprocess.run([NODE, str(pathlib.Path(cls.MODULES) / "eslint" / "bin" / "eslint.js"),
                                "-c", "app/eslint.config.mjs", "--format", "json", "app/src/components"],
@@ -931,60 +949,101 @@ class TailwindPluginBlock:
     def test_a_class_the_theme_does_not_generate_is_refused(self):
         for name in ("Misspelt", "OffScale"):
             with self.subTest(fixture=self.cases[name]):
-                self.assertIn("tailwindcss/no-custom-classname", self.rules_in(name))
+                self.assertIn("better-tailwindcss/no-unknown-classes", self.rules_in(name))
 
     def test_class_helpers_are_read(self):
-        self.assertIn("tailwindcss/no-custom-classname", self.rules_in("Helper"))
+        self.assertIn("better-tailwindcss/no-unknown-classes", self.rules_in("Helper"))
+        found = " ".join(m["message"] for m in self.messages["ClassNames"]
+                         if m["ruleId"] == "better-tailwindcss/no-unknown-classes")
+        for typo in ("bg-surfce", "p-crad"):
+            with self.subTest(typo=typo):
+                self.assertIn(typo, found, "classNames() strings and object keys")
+        found = " ".join(m["message"] for m in self.messages["Standalone"]
+                         if m["ruleId"] == "better-tailwindcss/no-unknown-classes")
+        for typo in ("bg-surfca", "bg-surfcb"):
+            with self.subTest(standalone=typo):
+                self.assertIn(typo, found, "a helper's call outside className")
 
-    def test_the_documented_contradiction_is_caught(self):
-        self.assertIn("tailwindcss/no-contradicting-classname", self.rules_in("Conflict"),
-                      self.cases["Conflict"])
+    def test_the_documented_conflict_is_caught_on_v4_only(self):
+        """The block's comment says the rule reports nothing on v3."""
+        rules = self.rules_in("Conflict")
+        if self.MAJOR == 4:
+            self.assertIn("better-tailwindcss/no-conflicting-classes", rules, self.cases["Conflict"])
+        else:
+            self.assertNotIn("better-tailwindcss/no-conflicting-classes", rules)
 
-    def test_what_the_comment_calls_no_contradiction_is_not_flagged(self):
+    def test_what_the_comment_calls_no_conflict_is_not_flagged(self):
         if "NotAConflict" not in self.cases:
             self.skipTest("the comment names no non-conflict")
-        self.assertNotIn("tailwindcss/no-contradicting-classname", self.rules_in("NotAConflict"))
+        self.assertNotIn("better-tailwindcss/no-conflicting-classes", self.rules_in("NotAConflict"))
 
     def test_the_documented_shorthand_is_suggested(self):
         messages = [m["message"] for m in self.messages["Shorthand"]
-                    if m["ruleId"] == "tailwindcss/enforces-shorthand"]
+                    if m["ruleId"] == "better-tailwindcss/enforce-shorthand-classes"]
         self.assertTrue(messages, self.cases["Shorthand"])
         self.assertIn(self.merged, " ".join(messages))
 
+    def test_a_duplicate_is_refused(self):
+        self.assertIn("better-tailwindcss/no-duplicate-classes", self.rules_in("Duplicate"))
+
     def test_the_starters_own_classes_pass_and_a_typo_does_not(self):
-        """3.2.1 review: both blocks reported every layout primitive (`stack`,
-        `cluster`) as an unknown class."""
+        """3.2.1 review: both of the old plugin's blocks reported every layout
+        primitive (`stack`, `cluster`) as an unknown class."""
         self.assertEqual([], self.rules_in("Starter"))
-        self.assertIn("tailwindcss/no-custom-classname", self.rules_in("StarterTypo"))
+        for name in ("StarterTypo", "StarterVariant"):
+            with self.subTest(fixture=self.cases[name]):
+                self.assertIn("better-tailwindcss/no-unknown-classes", self.rules_in(name))
 
 
 @unittest.skipUnless(NODE and TAILWIND_V4_LINT,
-                     "set WDS_ESLINT_MODULES to a node_modules with eslint-plugin-tailwindcss 4 and tailwindcss 4")
+                     "set WDS_ESLINT_MODULES to a node_modules with eslint-plugin-better-tailwindcss and tailwindcss 4")
 class TailwindPluginV4(TailwindPluginBlock, unittest.TestCase):
     MAJOR = 4
-    CONST = "tailwindConfig"
     MODULES = TAILWIND_V4_LINT
+    OTHER = TAILWIND_V3_LINT
+    EXTRA = {# theme.css's own @utility classes, and a typo of one.
+             "Utilities": 'className="focus-ring tap-target motion-hover page-gutter z-modal max-w-prose border-hairline"',
+             "UtilityTypo": 'className="motion-hovr"',
+             # A component's blocks, which detectComponentClasses learns from
+             # the entry's `@layer components`, and a typo of one.
+             "Component": 'className="card card__title"',
+             "ComponentTypo": 'className="crad"',
+             # The block's comment: v4 keeps `flex-grow` for compatibility.
+             "Deprecated": 'className="flex-grow"'}
 
     @classmethod
     def tailwind_files(cls) -> dict[str, str]:
-        files = {"src/styles/index.css": (CONFIGS / "index.tailwind.css").read_text(encoding="utf-8"),
+        entry = (CONFIGS / "index.tailwind.css").read_text(encoding="utf-8")
+        files = {"src/styles/index.css": entry + '@import "./components/card.css";\n',
                  "src/styles/theme.css": (CONFIGS / "theme.css").read_text(encoding="utf-8"),
-                 "src/styles/components/card.css": "@layer components {}\n"}
+                 "src/styles/components/card.css": (
+                     "@layer components {\n  .card { padding: var(--pad-card); }\n"
+                     "  .card__title { font: var(--type-h3); }\n}\n")}
         for name in ("tokens.css", "base.css", "layout.css"):
             files[f"src/styles/{name}"] = (STARTER_STYLES / name).read_text(encoding="utf-8")
         return files
+
+    def test_theme_utilities_pass_and_a_typo_does_not(self):
+        self.assertEqual([], self.rules_in("Utilities"))
+        self.assertIn("better-tailwindcss/no-unknown-classes", self.rules_in("UtilityTypo"))
+
+    def test_a_components_own_classes_need_no_entry(self):
+        self.assertEqual([], self.rules_in("Component"))
+        self.assertIn("better-tailwindcss/no-unknown-classes", self.rules_in("ComponentTypo"))
+
+    def test_a_deprecated_class_is_refused(self):
+        self.assertIn("better-tailwindcss/no-deprecated-classes", self.rules_in("Deprecated"))
 
 
 @unittest.skipUnless(NODE and TAILWIND_V3_LINT,
                      "set WDS_TAILWIND_V3_MODULES to run the Tailwind v3 plugin fixtures")
 class TailwindPluginV3(TailwindPluginBlock, unittest.TestCase):
     MAJOR = 3
-    CONST = "tailwindV3Config"
     MODULES = TAILWIND_V3_LINT
-    EXTRA = {"Arbitrary": 'className="p-[13px]"',
-             # The utilities tailwind.config.ts adds with addUtilities, and a
-             # typo of one: 3.x learns them from the config, so no whitelist
-             # entry may hide the typo.
+    OTHER = TAILWIND_V4_LINT
+    EXTRA = {# The utilities tailwind.config.ts adds with addUtilities, and a
+             # typo of one: the plugin learns them from the config, so no
+             # ownClasses entry may hide the typo.
              "Utilities": 'className="focus-ring tap-target motion-hover page-gutter grid-layout"',
              "UtilityTypo": 'className="motion-hovr"'}
 
@@ -992,12 +1051,18 @@ class TailwindPluginV3(TailwindPluginBlock, unittest.TestCase):
     def tailwind_files(cls) -> dict[str, str]:
         return {"tailwind.config.ts": (CONFIGS / "tailwind.config.ts").read_text(encoding="utf-8")}
 
-    def test_arbitrary_values_are_refused(self):
-        self.assertIn("tailwindcss/no-arbitrary-value", self.rules_in("Arbitrary"))
-
     def test_the_configs_own_utilities_pass_and_a_typo_does_not(self):
         self.assertEqual([], self.rules_in("Utilities"))
-        self.assertIn("tailwindcss/no-custom-classname", self.rules_in("UtilityTypo"))
+        self.assertIn("better-tailwindcss/no-unknown-classes", self.rules_in("UtilityTypo"))
+
+
+def own_classes(config_text: str) -> str:
+    """Part 5's `ownClasses` declaration, uncommented, alone."""
+    block = tailwind_part5(config_text)
+    m = re.search(r"^const ownClasses = \[.*?^\];", block, flags=re.M | re.S)
+    if not m:
+        raise AssertionError("Part 5 declares no ownClasses")
+    return m.group(0)
 
 
 @unittest.skipUnless(NODE, "needs node to read the config's ownClasses")
@@ -1006,16 +1071,19 @@ class OwnClassesCoverTheStarter(unittest.TestCase):
     defines, so the list cannot fall behind the file it describes."""
 
     def test_every_class_in_layout_css_is_listed(self):
-        shared, _ = TAILWIND_PART5
         proc = subprocess.run([NODE, "--input-type=module", "-e",
-                               shared + "\nconsole.log(JSON.stringify(ownClasses));"],
+                               own_classes(ESLINT_CONFIG_TEXT) + "\nconsole.log(JSON.stringify(ownClasses));"],
                               capture_output=True, timeout=60, env=env())
         self.assertEqual(0, proc.returncode, output(proc))
-        patterns = [re.compile(f"(?:{p})") for p in json.loads(proc.stdout)]
+        entries = json.loads(proc.stdout)
+        # The plugin tests an entry unanchored, so each carries its anchors.
+        self.assertEqual([], [e for e in entries if not (e.startswith("^") and e.endswith("$"))])
+        patterns = [re.compile(e) for e in entries]
         css = re.sub(r"/\*.*?\*/", "", (STARTER_STYLES / "layout.css").read_text(encoding="utf-8"), flags=re.S)
         classes = sorted(set(re.findall(r"(?<![\w-])\.([a-z][a-z0-9_-]*)", css)))
         self.assertGreater(len(classes), 50)
-        self.assertEqual([], [c for c in classes if not any(p.fullmatch(c) for p in patterns)])
+        self.assertEqual([], [c for c in classes if not any(p.search(c) for p in patterns)])
+        self.assertFalse([p for p in patterns if p.search("stackk") or p.search("md:stack")])
 
 
 if __name__ == "__main__":

@@ -79,10 +79,10 @@ def tool_modules(var: str, *packages: str, default: pathlib.Path | None = TOOLIN
                  if all((pathlib.Path(root) / p).is_dir() for p in packages)), None)
 
 
-def tailwind_part5(config_text: str) -> tuple[str, dict[int, str]]:
-    """Part 5 of eslint.design.config.mjs, uncommented as a project copies it:
-    the shared lines between the `import tailwind` line and the first block, and
-    each block by the plugin major its title names."""
+def tailwind_part5(config_text: str, major: int = 4) -> str:
+    """Part 5 of eslint.design.config.mjs, uncommented as a project copies it
+    for Tailwind `major`, from its first `import` line: on v3 the commented
+    `tailwindConfig` line takes the place of `entryPoint`, as the block says."""
     part5 = config_text.split("PART 5", 1)[1].split("EXPORTS", 1)[0]
     code = []
     for line in part5.splitlines():
@@ -90,11 +90,16 @@ def tailwind_part5(config_text: str) -> tuple[str, dict[int, str]]:
             code.append(re.sub(r"^// ?", "", line))
         elif code:
             break
-    text = "\n".join(code)
-    text = text.split("import tailwind from 'eslint-plugin-tailwindcss';", 1)[1]
-    pieces = re.split(r"^Tailwind v\d, eslint-plugin-tailwindcss@(\d+):\n", text, flags=re.M)
-    blocks = {int(pieces[i]): pieces[i + 1].rstrip() + "\n" for i in range(1, len(pieces), 2)}
-    return pieces[0].strip() + "\n", blocks
+    first = next(n for n, line in enumerate(code) if line.startswith("import "))
+    code = code[first:]
+    if major == 3:
+        entry = [n for n, line in enumerate(code) if line.strip().startswith("entryPoint:")]
+        config = [n for n, line in enumerate(code) if line.strip().startswith("// tailwindConfig:")]
+        if len(entry) != 1 or len(config) != 1:
+            raise AssertionError("Part 5 needs one entryPoint line and one commented tailwindConfig line")
+        code[config[0]] = code[config[0]].replace("// tailwindConfig:", "tailwindConfig:", 1)
+        del code[entry[0]]
+    return "\n".join(code).rstrip() + "\n"
 
 
 # The variables that tie git to one repository, as `git rev-parse

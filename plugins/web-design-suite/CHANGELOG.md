@@ -1,5 +1,50 @@
 # Changelog
 
+## 4.0.0 — unreleased
+
+Phase 6b. 4.0.0 is a major release because Part 5 of the ESLint config moves to another
+Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it again.
+
+### Upgrading
+
+- **Part 5 of `eslint.design.config.mjs` uses eslint-plugin-better-tailwindcss** (P36;
+  SB-C4, decision D4), one plugin for both Tailwind majors, in place of
+  eslint-plugin-tailwindcss 4.x for v4 and a pinned 3.x for v3. If you copied Part 5:
+  1. `npm uninstall eslint-plugin-tailwindcss`, then
+     `npm i -D eslint-plugin-better-tailwindcss` (4.9.0 peers ESLint 7 to 10, and
+     Tailwind 3.3 or later or 4.1.17 or later).
+  2. Copy the new block. On Tailwind v4 it reads your entry CSS (`entryPoint`, which
+     replaces `cssConfigPath`); on v3 its `tailwindConfig` line takes `entryPoint`'s
+     place (it replaces `config`). The block sets the plugin's `cwd` to the project and
+     anchors both paths there, because the plugin resolves `tailwindcss` and reads its
+     paths from ESLint's working directory otherwise: from a monorepo root, the root's
+     Tailwind, perhaps the other major.
+  3. Rename the rules you configured yourself: `no-custom-classname` is
+     `no-unknown-classes` (its `whitelist` is `ignore`), `no-contradicting-classname` is
+     `no-conflicting-classes`, `enforces-shorthand` is `enforce-shorthand-classes`, each
+     under the `better-tailwindcss/` prefix.
+  4. **Anchor your own `ownClasses` entries** (`'^card(?:__[a-z0-9-]+)?$'`): the new rule
+     tests each entry unanchored, so `card` would also pass `cardd`. On v4 you can drop
+     the entries for classes your `@layer components` defines: `detectComponentClasses`
+     learns them from the entry. The layout primitives and `u-*` utilities still need
+     theirs.
+
+  What changes in what it reports:
+  - **New:** a duplicate class (`p-card p-card`) and, on v4, a class v4 keeps only for
+    compatibility (`flex-grow` is `grow`).
+  - **`classNames()` and `classnames()`** are read, as Part 2 reads them: the block adds
+    them to the plugin's default helpers.
+  - **Lost on v3:** the conflicting-class check. The plugin's rule compares the CSS v4
+    generates and reports nothing on v3.
+  - **Dropped:** the old v3 block's `no-arbitrary-value`. Part 1 already refuses an
+    arbitrary value on every stack, with no plugin.
+
+  The spike that decided it ran both plugins over the same project and fixtures
+  (`dev plans/web-design-suite-d4-spike.md`): they found the same typos, off-scale
+  classes and conflicts, in about the same time once warm. The tests run the new block
+  through the real plugin on Tailwind 4.3 and 3.4 (`test_real_tools.TailwindPluginV4`
+  and `TailwindPluginV3`).
+
 ## 3.6.0 — 2026-10-13
 
 ### Added

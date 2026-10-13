@@ -888,125 +888,136 @@ const componentConfig = {
 /* =========================================================================
  * PART 5 — TAILWIND PLUGIN SETTINGS
  * =========================================================================
- * `eslint-plugin-tailwindcss` has two lines, and they learn the class
- * universe from different places (registry and README, 2026-09):
+ * `eslint-plugin-better-tailwindcss` (4.9.0; the registry, its README and
+ * its settings page, 2026-10-13) learns the class universe from the
+ * project's own Tailwind, either major, through one setting:
  *
- *   - 4.x (4.4.0) is made for Tailwind v4. It reads the CSS entry named by
- *     `settings.tailwindcss.cssConfigPath`, the file that imports
- *     tailwindcss and theme.css. `no-custom-classname` is the valuable rule
- *     there: v4 generates nothing for a class that does not exist and says
- *     nothing, so a misspelt role class ships as a silent no-op.
+ *   - Tailwind v4: `entryPoint`, the CSS file that imports tailwindcss and
+ *     theme.css. With `detectComponentClasses`, the classes the entry's
+ *     `@layer components` defines are known too, so a component's own
+ *     blocks (`card`, `card__title`) need no entry in `ownClasses`.
+ *   - Tailwind v3: `tailwindConfig`, the `tailwind.config.ts`, including the
+ *     classes its plugins add with `addUtilities` (focus-ring, tap-target,
+ *     motion-*). Its line goes in place of `entryPoint`.
  *
- *   - 3.x reads a v3 `tailwind.config.js`, including the classes its
- *     plugins add with `addUtilities`. A v3 project must pin it
- *     (`npm i -D eslint-plugin-tailwindcss@3`): an unpinned install now
- *     brings 4.x, which requires tailwindcss ^4. After `corePlugins: {
- *     space: false }` and a replaced scale, `no-custom-classname` catches a
- *     large and useful set of classes that simply do not exist. 3.18 cannot
- *     find tailwindcss from a relative config path ("Could not resolve
- *     tailwindcss"), and ESLint 10 loads this file from whichever folder it
- *     is linting, so the block anchors the path at the project: the nearest
- *     folder above this file that holds a package.json.
+ * The plugin resolves `tailwindcss`, and reads both paths, from its `cwd`
+ * setting, which is ESLint's working directory unless set (its settings
+ * page). ESLint runs from a monorepo root or a git hook as often as from the
+ * project, where a root's own Tailwind, perhaps the other major, would be
+ * the one read. So the block sets `cwd` to the project, the nearest folder
+ * above this file that holds a package.json, and anchors both paths there.
  *
- * Neither plugin knows the classes your own CSS defines. `ownClasses` lists
- * the starter's layout primitives (`stack`, `cluster--tight`,
- * `with-sidebar__rail`) and its `u-*` utilities; add each of your
- * components' blocks the same way before you make the rule an error, or
- * every one of them is reported. Keep each entry self-contained: 4.x reads
- * an entry as `^entry$`, so a bare `a|b` would pass any class starting with
- * `a`.
+ * `no-unknown-classes` is the valuable rule. Tailwind generates nothing for
+ * a class that does not exist and says nothing, so a misspelt role class,
+ * or a stock `p-4` after the theme replaced the scale, ships as a silent
+ * no-op. The plugin cannot know the classes your own CSS defines outside
+ * `@layer components`: `ownClasses` lists the starter's layout primitives
+ * (`stack`, `cluster--tight`, `with-sidebar__rail`) and its `u-*`
+ * utilities. On v3 it knows no component's classes either, so add each of
+ * your components' blocks the same way before you make the rule an error.
+ * The rule tests each entry as a regular expression against the whole class,
+ * variants included, unanchored: keep the `^…$`, or `stack` would also pass
+ * `stackk` and `md:stack`, which generate nothing.
  *
- * The suite's tests run both blocks below, uncommented, through the real
- * plugin (4.4 with Tailwind 4.3, 3.18 with Tailwind 3.4), from a folder
- * above the project, over the starter's own classes and a set of typos.
+ * Its defaults read `cn`, `clsx`, `cva`, `tv`, `twMerge`, `twJoin` and
+ * `cx`; `classHelpers` adds `classNames` and `classnames`, which Part 2
+ * reads too.
+ *
+ * The suite's tests run this block, uncommented, through the real plugin
+ * (4.9 with Tailwind 4.3, and with Tailwind 3.4 by the v3 line), from a
+ * folder above the project, over the starter's own classes and a set of
+ * typos.
  *
  * Either way, the custom rules in Part 3 and the selector rules in Part 4
- * already cover arbitrary values, `!important`, off-scale spacing and stock
- * palette classes. The plugin adds `no-custom-classname`,
- * `no-contradicting-classname` (`p-card p-card-lg` on one element) and
- * `enforces-shorthand` (`pt-card pb-card` → `py-card`).
+ * already cover arbitrary values, `!important` in either position,
+ * off-scale spacing, stock palette classes and the literal utilities
+ * (`duration-300`, `z-50`, `bg-accent/37`, `p-(--space-6)`), with no plugin
+ * at all. So this block adds only what needs Tailwind's own knowledge: the
+ * unknown class, the conflict (`p-card p-card-lg` on one element), the
+ * shorthand (`pt-card pb-card` is `py-card`), the duplicate and, on v4, the
+ * deprecated class.
  *
- * `prettier-plugin-tailwindcss` is a separate, unconditional requirement
- * and works on both versions. Class ORDER is not enforced by this file and
- * must not be: a lint rule that reorders class names produces a diff on
- * every file and an argument in every review. Prettier sorts on save, the
- * order stops being a decision, and Law 5's "layout → box → typography →
- * visual → interactive → state" reading order is simply what the formatter
+ * Before 4.0.0 this part used `eslint-plugin-tailwindcss`, 4.x for v4 and a
+ * pinned 3.x for v3 (decision D4 in the suite's plan; CHANGELOG 4.0.0 has
+ * the move). The one thing v3 loses is the conflict: the plugin's
+ * `no-conflicting-classes` compares the CSS v4 generates, and reports
+ * nothing on v3.
+ *
+ * Class ORDER is not enforced by this file and must not be, so the plugin's
+ * `recommended` configs, which sort and wrap classes, are not used: a lint
+ * rule that reorders class names produces a diff on every file and an
+ * argument in every review. `prettier-plugin-tailwindcss`, a separate and
+ * unconditional requirement on both versions, sorts on save, the order
+ * stops being a decision, and Law 5's "layout → box → typography → visual
+ * → interactive → state" reading order is simply what the formatter
  * produces.
  * ========================================================================= */
 
-// import tailwind from 'eslint-plugin-tailwindcss';
+// npm i -D eslint-plugin-better-tailwindcss
 //
-// // The classes your own CSS defines, which neither plugin can know (see
-// // the note above). Add your components' blocks, one entry each.
-// const ownClasses = [
-//   '(?:band|bleed-(?:full|prose|wide)|center|cluster|cover|flow|frame|grid|imposter(?:-anchor)?'
-//     + '|media-object|page-grid|page-shell|prose|reel|region(?:-compact)?|row|sections|skip-link'
-//     + '|split|stack|subsections|switcher|with-sidebar)(?:__[a-z0-9-]+)?(?:--[a-z0-9-]+)?',
-//   'u-[a-z0-9-]+',
-// ];
-//
-// Tailwind v4, eslint-plugin-tailwindcss@4:
-// const tailwindConfig = {
-//   name: 'design-laws/tailwind',
-//   files: ['**/*.{jsx,tsx}'],
-//   plugins: { tailwindcss: tailwind },
-//   settings: {
-//     tailwindcss: {
-//       // The entry that imports tailwindcss and theme.css (stack-tailwind.md §2).
-//       cssConfigPath: './src/styles/index.css',
-//       // Our own composers, so the plugin lints their string arguments too.
-//       functions: ['cn', 'clsx', 'classNames', 'cva', 'tv', 'twMerge', 'cx'],
-//     },
-//   },
-//   rules: {
-//     // Law 3: a class the theme does not generate is off the scale, and v4
-//     // drops it without a word.
-//     'tailwindcss/no-custom-classname': ['error', { whitelist: ownClasses }],
-//     // Law 3: `p-card p-card-lg` — two values for one property; the one
-//     // that wins is whichever Tailwind emits last, not the one written
-//     // last. (`p-card px-inline-md` is not a conflict: the longhand
-//     // always follows the shorthand.)
-//     'tailwindcss/no-contradicting-classname': 'error',
-//     // Readability: `pt-card pb-card` is `py-card`.
-//     'tailwindcss/enforces-shorthand': 'warn',
-//   },
-// };
-//
-// Tailwind v3, eslint-plugin-tailwindcss@3:
+// import betterTailwind from 'eslint-plugin-better-tailwindcss';
+// import { getDefaultSelectors } from 'eslint-plugin-better-tailwindcss/defaults';
+// import { MatcherType, SelectorKind } from 'eslint-plugin-better-tailwindcss/types';
 // import fs from 'node:fs';
 // import path from 'node:path';
+//
 // // The project: the nearest folder above this file with a package.json.
 // let project = import.meta.dirname;
 // while (!fs.existsSync(path.join(project, 'package.json')) && path.dirname(project) !== project) {
 //   project = path.dirname(project);
 // }
-// const tailwindV3Config = {
-//   name: 'design-laws/tailwind-v3',
+//
+// // The classes your own CSS defines outside `@layer components`, which the
+// // plugin cannot know (see the note above), one anchored pattern each.
+// const ownClasses = [
+//   '^(?:band|bleed-(?:full|prose|wide)|center|cluster|cover|flow|frame|grid|imposter(?:-anchor)?'
+//     + '|media-object|page-grid|page-shell|prose|reel|region(?:-compact)?|row|sections|skip-link'
+//     + '|split|stack|subsections|switcher|with-sidebar)(?:__[a-z0-9-]+)?(?:--[a-z0-9-]+)?$',
+//   '^u-[a-z0-9-]+$',
+// ];
+//
+// // The class helpers Part 2 reads that the plugin's defaults do not: their
+// // string arguments and the keys of their object arguments.
+// const classHelpers = [MatcherType.String, MatcherType.ObjectKey].map((type) => ({
+//   kind: SelectorKind.Callee,
+//   name: '^class[Nn]ames$',
+//   match: [{ type }],
+// }));
+//
+// const tailwindConfig = {
+//   name: 'design-laws/tailwind',
 //   files: ['**/*.{jsx,tsx}'],
-//   plugins: { tailwindcss: tailwind },
+//   plugins: { 'better-tailwindcss': betterTailwind },
 //   settings: {
-//     tailwindcss: {
-//       // Absolute, so it holds from any folder ESLint runs in (see the note above).
-//       config: path.join(project, 'tailwind.config.ts'),
-//       // Our own composers, so the plugin lints their string arguments too.
-//       callees: ['cn', 'clsx', 'classNames', 'cva', 'tv', 'twMerge', 'cx'],
+//     'better-tailwindcss': {
+//       // Resolve tailwindcss from the project, not from where ESLint runs.
+//       cwd: project,
+//       // Tailwind v4: the entry that imports tailwindcss and theme.css (stack-tailwind.md §2).
+//       entryPoint: path.join(project, 'src/styles/index.css'),
+//       // Tailwind v3: this line in place of entryPoint.
+//       // tailwindConfig: path.join(project, 'tailwind.config.ts'),
+//       // v4: the classes `@layer components` defines are known classes.
+//       detectComponentClasses: true,
+//       selectors: [...getDefaultSelectors(), ...classHelpers],
 //     },
 //   },
 //   rules: {
-//     // Law 3: a class that does not exist in the theme is, by definition,
-//     // off the scale. 3.x also learns the classes the config's plugins add
-//     // with `addUtilities` (focus-ring, tap-target, motion-*).
-//     'tailwindcss/no-custom-classname': ['error', { cssFiles: [], whitelist: ownClasses }],
+//     // Law 3: a class the theme does not generate is off the scale, and
+//     // Tailwind drops it without a word.
+//     'better-tailwindcss/no-unknown-classes': ['error', { ignore: ownClasses }],
 //     // Law 3: `p-card p-card-lg` — two values for one property; the one
 //     // that wins is whichever Tailwind emits last, not the one written
 //     // last. (`p-card px-inline-md` is not a conflict: the longhand
-//     // always follows the shorthand.)
-//     'tailwindcss/no-contradicting-classname': 'error',
+//     // always follows the shorthand.) v4 only: on v3 it reports nothing.
+//     'better-tailwindcss/no-conflicting-classes': 'error',
 //     // Readability: `pt-card pb-card` is `py-card`.
-//     'tailwindcss/enforces-shorthand': 'warn',
-//     // Law 3: no arbitrary values. Part 3 bans them too; belt and braces.
-//     'tailwindcss/no-arbitrary-value': 'error',
+//     'better-tailwindcss/enforce-shorthand-classes': 'warn',
+//     // `p-card p-card`: a leftover of a merge, and a second reading for
+//     // every reviewer.
+//     'better-tailwindcss/no-duplicate-classes': 'error',
+//     // v4 keeps v3's old names only for compatibility: `flex-grow` is
+//     // `grow`, `overflow-ellipsis` is `text-ellipsis`.
+//     'better-tailwindcss/no-deprecated-classes': 'error',
 //   },
 // };
 
