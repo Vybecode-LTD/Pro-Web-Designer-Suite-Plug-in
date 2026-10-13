@@ -38,9 +38,9 @@ The diagnostic that proves this matters: when a page "isn't converting," the cau
 
 ## The ethics boundary
 
-**This skill writes honest persuasion. It declines deception, says why in the reply (name the pattern, say it deceives, cite the law behind it), and offers the honest version.**
+**This skill writes honest persuasion. It declines deception, says why in the reply (name the pattern and say it deceives; cite a law only if it applies), and offers the honest version.**
 
-Honest persuasion is: making a true claim clearly, in the order a reader can absorb it, with real evidence attached, and asking plainly for the next step. Everything below is outside it.
+Honest persuasion is: making a true claim clearly, in the order a reader can absorb it, with real evidence, and asking plainly for the next step. Everything below is outside it.
 
 | Declined | What it actually is | The honest alternative |
 |---|---|---|

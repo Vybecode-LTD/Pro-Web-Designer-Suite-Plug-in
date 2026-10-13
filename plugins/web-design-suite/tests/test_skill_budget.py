@@ -63,13 +63,13 @@ class SkillBudget(unittest.TestCase):
     def test_a_declined_pattern_is_explained_in_the_reply(self):
         """3.6.0's evals: one run of no-fake-countdown built only the honest
         countdown and never said why the resetting one deceives, so its judges
-        failed it. The boundary's first rule now asks for the why, and the law
-        behind it is the one the next paragraph sends to conversion-audit.md §11
-        (CodeRabbit on #123)."""
+        failed it. The boundary's first rule now asks for the why, and for a law
+        only where it applies: conversion-audit.md §11 ties the DSA to platforms
+        and ROSCA to negative options (CodeRabbit and Codex on #123)."""
         text = (SKILLS / "landing-page-conversion" / "SKILL.md").read_text(encoding="utf-8")
         boundary = text[text.index("## The ethics boundary"):text.index("## Evidence discipline")]
         rule = boundary.split("\n\n")[1]
-        for words in ("declines deception", "says why in the reply", "say it deceives", "cite the law behind it"):
+        for words in ("declines deception", "says why in the reply", "say it deceives", "cite a law only if it applies"):
             with self.subTest(words=words):
                 self.assertIn(words, rule)
 
