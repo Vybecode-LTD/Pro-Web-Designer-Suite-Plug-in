@@ -926,6 +926,10 @@ class TailwindPluginBlock:
                  **{f"app/{name}": text for name, text in cls.tailwind_files().items()}}
         for name, attr in cls.cases.items():
             files[f"app/src/components/{name}.jsx"] = JSX_FIXTURE.format(name=name, attr=attr)
+        # The helpers outside any className attribute (Codex on #125): the
+        # plugin's defaults read `cx`, the block's selectors `classNames`.
+        files["app/src/components/Standalone.jsx"] = (
+            "export const classes = cx('bg-surfca');\nexport const more = classNames('bg-surfcb');\n")
         write_files(tmp, files)
         proc = subprocess.run([NODE, str(pathlib.Path(cls.MODULES) / "eslint" / "bin" / "eslint.js"),
                                "-c", "app/eslint.config.mjs", "--format", "json", "app/src/components"],
@@ -954,6 +958,11 @@ class TailwindPluginBlock:
         for typo in ("bg-surfce", "p-crad"):
             with self.subTest(typo=typo):
                 self.assertIn(typo, found, "classNames() strings and object keys")
+        found = " ".join(m["message"] for m in self.messages["Standalone"]
+                         if m["ruleId"] == "better-tailwindcss/no-unknown-classes")
+        for typo in ("bg-surfca", "bg-surfcb"):
+            with self.subTest(standalone=typo):
+                self.assertIn(typo, found, "a helper's call outside className")
 
     def test_the_documented_conflict_is_caught_on_v4_only(self):
         """The block's comment says the rule reports nothing on v3."""
