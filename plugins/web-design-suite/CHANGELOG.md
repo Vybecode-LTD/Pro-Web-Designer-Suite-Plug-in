@@ -206,6 +206,13 @@
   file: a `clamp()` added since, or changed, is still a change, either way round. A
   quoted keyword (`"serif"`) stays another family than the keyword (the 3.6.0 live
   check; Codex on #119).
+- **`--reverse` had no route from a project's tokens into Figma.** It refused a
+  `tokens.css`, and given a DTCG file it read the document as a flat map, so its groups,
+  or a resolver's own keys (`sets`, `resolutionOrder`), became variables, with exit 0
+  and no Dark mode. It now reads a `tokens.css`, a DTCG 2025.10 file and a resolver:
+  each theme (`[data-theme]`, or a resolver's `theme` contexts) is a mode of the
+  semantic collection, and a density or another condition is named and left out (the
+  3.6.0 live check).
 
 ## 3.5.0 — 2026-10-10
 
