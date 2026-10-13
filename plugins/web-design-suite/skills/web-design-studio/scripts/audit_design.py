@@ -459,9 +459,11 @@ TW_IMPORTANT_SUFFIX = re.compile(r"(?<![\w!\[:-])[a-z][\w:./\[\]()-]*[\w\])]!(?=
 CLASS_HELPER = re.compile(r"\b(?:cn|clsx|classNames|classnames|cva|tv|twMerge|twJoin|cx)\s*\(")
 JS_STRING = re.compile(r"""(['"`])((?:\\.|(?!\1)[^\\])*?)\1""", re.S)
 # styled-components / emotion templates: their bodies are CSS. A tag is a name
-# of its own: the `css` of `${file}.css` is a file's extension (P36).
+# of its own, or a member of one (`emotion.css`), never the end of a file name:
+# `${file}.css`, `./theme.css` and `my-theme.css` are extensions (P36, #126).
 CSS_IN_JS = re.compile(
-    r"(?<![\w$.])(?:styled(?:\.[A-Za-z]\w*|\s*\([^()]*\))(?:\s*\.attrs\s*\([^()]*\))?|css)\s*`")
+    r"(?<![\w$./`'\"-])(?:styled(?:\.[A-Za-z]\w*|\s*\([^()]*\))(?:\s*\.attrs\s*\([^()]*\))?"
+    r"|(?:[A-Za-z_$][\w$]*\.)?css)\s*`")
 
 # Templates
 STYLE_BLOCK = re.compile(r"<style\b[^>]*>(.*?)</style\s*>", re.I | re.S)

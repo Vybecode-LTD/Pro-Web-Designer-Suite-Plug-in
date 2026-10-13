@@ -319,10 +319,17 @@ async function main() {
     die(`Tailwind could not compile ${args.entry}: ${err.message}`);
   }
 
-  const variables = themeVariables(ownSheets(entry, args.entry));
-  const roles = [...variables.keys()].map((v) => ({ variable: v, class: roleClass(v) })).filter((r) => r.class);
+  const sheets = ownSheets(entry, args.entry);
+  const variables = themeVariables(sheets);
+  // `@import "tailwindcss" prefix(tw)`: every class Tailwind knows is then
+  // `tw:bg-surface`, so the automatic candidates carry the prefix (Codex on
+  // #126). Classes you name are taken as you type them.
+  const found = sheets.join('\n').match(/@(?:import|theme)\b[^;{]*\bprefix\(\s*([A-Za-z][\w-]*)\s*\)/);
+  const prefix = found ? `${found[1]}:` : '';
+  const roles = [...variables.keys()].map((v) => ({ variable: v, class: roleClass(v) }))
+    .filter((r) => r.class).map((r) => ({ ...r, class: prefix + r.class }));
   const stock = STOCK.filter(([, , owners]) => !owners.some((v) => variables.has(v)))
-    .map(([cls, clear]) => ({ class: cls, clear }));
+    .map(([cls, clear]) => ({ class: prefix + cls, clear }));
 
   // One compiler, the candidates added one at a time: what a step adds to a
   // class's selectors is what Tailwind generated for it, and the project's
