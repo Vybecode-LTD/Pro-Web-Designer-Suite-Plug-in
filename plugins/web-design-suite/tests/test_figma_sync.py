@@ -21,6 +21,9 @@ Regressions covered:
 - LC-B1, LC-C7 (3.6.0): the only route into Figma was the REST body, which
   needs an Enterprise plan; `--reverse --format plugin-script` writes the same
   variables as Plugin API code for use_figma or a plugin.
+- the 3.6.0 live check: `--reverse` read a DTCG file as a flat map, its groups
+  and a resolver's keys made variables, with exit 0; and a tokens.css had no
+  route into Figma at all.
 """
 from __future__ import annotations
 
@@ -661,6 +664,94 @@ class PlanLimits(TempDirTest):
         common = load_script("figma-variables-sync", "figma_common")
         config = load_script("figma-variables-sync", "project_config")
         self.assertEqual(tuple(common.PLAN_MODES), config.FIGMA_PLANS)
+
+
+class ReverseReadsEveryTokenFormat(TempDirTest):
+    """The 3.6.0 live check: asked to put a project's tokens.css into Figma
+    with its light and dark themes, a session found no route. `--reverse`
+    refused the CSS, and given the DTCG files `--format dtcg --out-dir` writes
+    it made variables of a document's groups and a resolver's own keys
+    (`sets`, `resolutionOrder`), with exit 0 and no Dark mode."""
+
+    STARTER = SKILLS / "web-design-studio" / "assets" / "starter" / "styles" / "tokens.css"
+
+    def body(self, src):
+        proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--reverse", "--out", "body.json",
+                      cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        body = json.loads((self.tmp / "body.json").read_bytes())
+        names = {v["name"]: v["id"] for v in body["variables"]}
+        modes = {m["id"]: m["name"] for m in body["variableModes"]}
+        values = {(modes[m["modeId"]], m["variableId"]): m["value"] for m in body["variableModeValues"]}
+        return names, values, output(proc)
+
+    def published(self):
+        proc = run_py("figma-variables-sync", "figma_to_tokens", str(self.STARTER), "--format", "dtcg",
+                      "--out-dir", "dtcg", "--quiet", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+
+    def assert_themed(self, names, values):
+        surface = names["bg/surface"]
+        self.assertEqual("tmp_var_neutral_0", values[("Light", surface)]["id"])
+        self.assertEqual("tmp_var_neutral_950", values[("Dark", surface)]["id"])   # [data-theme="dark"]
+
+    def test_a_tokens_css_goes_in_with_its_themes_as_modes(self):
+        names, values, out = self.body(str(self.STARTER))
+        self.assert_themed(names, values)
+        self.assertIn('[data-density="compact"]: 1 token(s) left out', out)
+
+    def test_a_resolver_s_theme_contexts_are_modes(self):
+        self.published()
+        names, values, out = self.body("dtcg/tokens.resolver.json")
+        self.assert_themed(names, values)
+        self.assertFalse({"sets", "resolutionOrder", "modifiers", "version"} & set(names), sorted(names)[:10])
+        self.assertIn("modifier `density` left out", out)
+
+    def test_a_dtcg_type_is_kept(self):
+        """Codex on #120: through the CSS text, a duration was a STRING and a
+        boolean was dropped."""
+        self.write("t.tokens.json", json.dumps({
+            "dur": {"fast": {"$type": "duration", "$value": {"value": 0.2, "unit": "s"}}},
+            "flag": {"$value": True},
+            "ink": {"$type": "color", "$value": "#111111"}}))
+        doc = json.loads((self.tmp / "t.tokens.json").read_bytes())
+        doc["heading"] = {"$type": "typography", "$value": {"fontFamily": "Inter", "fontSize": "1rem",
+                                                            "fontWeight": 700, "lineHeight": 1.2}}
+        self.write("t.tokens.json", json.dumps(doc))
+        names, values, out = self.body("t.tokens.json")
+        self.assertIn("heading: a typography value in a form", out)    # the reader's note (CodeRabbit on #120)
+        body = json.loads((self.tmp / "body.json").read_bytes())
+        kinds = {v["name"]: v["resolvedType"] for v in body["variables"]}
+        self.assertEqual({"dur/fast": "FLOAT", "flag": "BOOLEAN", "ink": "COLOR"}, kinds)
+        self.assertEqual(200, values[("Value", names["dur/fast"])])
+        self.assertIs(True, values[("Value", names["flag"])])
+
+    def test_a_project_literal_keeps_its_theme(self):
+        """Codex on #120: `--surface: #fff`, re-pointed by the dark theme, was
+        a primitive, which has one mode, so its Dark value was lost."""
+        self.write("tokens.css", '@layer tokens {\n  :root { --surface: #ffffff; }\n'
+                                 '  [data-theme="dark"] { --surface: #111111; }\n}\n')
+        names, values, _out = self.body("tokens.css")
+        self.assertAlmostEqual(0x11 / 255, values[("Dark", names["surface"])]["r"], places=5)
+        self.assertAlmostEqual(1.0, values[("Light", names["surface"])]["r"], places=5)
+
+    def test_a_broken_resolver_is_not_a_clean_conversion(self):
+        """Codex on #120: a missing source gave an empty body and exit 0."""
+        self.write("r.resolver.json", json.dumps({
+            "version": "2025.10", "sets": {"base": {"sources": [{"$ref": "missing.json"}]}},
+            "resolutionOrder": [{"$ref": "#/sets/base"}]}))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", "r.resolver.json", "--reverse",
+                      "--out", "body.json", cwd=self.tmp)
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("missing.json", output(proc))
+        self.assertIn("no token read", output(proc))
+
+    def test_a_dtcg_document_s_groups_are_not_variables(self):
+        self.published()
+        names, values, _out = self.body("dtcg/tokens.json")
+        self.assertIn("bg/surface", names)
+        self.assertFalse({"bg", "accent", "neutral", "$description"} & set(names))
+        self.assertEqual("tmp_var_neutral_0", values[("Value", names["bg/surface"])]["id"])
 
 
 if __name__ == "__main__":

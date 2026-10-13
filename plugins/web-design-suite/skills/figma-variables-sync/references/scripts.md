@@ -38,7 +38,7 @@ figma_to_tokens.py <file> [--format css|json|ts|dtcg|all|plugin-script] [--out F
 | Flag | Does |
 |---|---|
 | `--format all --out-dir` | Writes `tokens.css`, `tokens.json`, `tokens.ts` together |
-| `--reverse` | Reads a `tokens.json` (or a flat `{name: value}` map), emits a Figma `POST …/variables` body |
+| `--reverse` | Reads a `tokens.css`, a DTCG 2025.10 file or resolver, this script's `tokens.json`, or a flat `{name: value}` map, and emits a Figma `POST …/variables` body. Each theme (`[data-theme]`, or a resolver's `theme` contexts) is a mode of the semantic collection; a density or another condition is named and left out |
 | `--reverse --format plugin-script` | The same variables as Plugin API code, for any plan: run it with the Figma MCP server's `use_figma`, or in a development plugin. It finds collections, modes and variables by name, creates what is missing, updates what differs and deletes nothing |
 | `--flat` | With `--reverse`: one Figma collection instead of one per tier |
 | `--plan` | With `--reverse --format plugin-script`: the Figma plan, as for the audit; a collection it cannot hold is reported before the run. The REST body is always held to the endpoint's own cap: past it, nothing is written and the exit is 2 |

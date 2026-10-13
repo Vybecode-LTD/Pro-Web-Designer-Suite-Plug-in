@@ -247,9 +247,9 @@ Reverse, to make Figma the mirror:
 
 ```bash
 # any plan: Plugin API code for use_figma or a development plugin
-python scripts/figma_to_tokens.py design/tokens.json --reverse --format plugin-script --out figma-variables.js
+python scripts/figma_to_tokens.py styles/tokens.css --reverse --format plugin-script --out figma-variables.js
 # Enterprise: a body for POST /v1/files/:file_key/variables
-python scripts/figma_to_tokens.py design/tokens.json --reverse --out figma-payload.json
+python scripts/figma_to_tokens.py styles/tokens.css --reverse --out figma-payload.json
 ```
 
 Both carry the same variables: aliases as aliases, `{r,g,b,a}` colours in 0..1,

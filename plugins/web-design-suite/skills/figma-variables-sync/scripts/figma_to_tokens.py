@@ -26,7 +26,9 @@ USAGE
   #   tokens.json, theme-dark.json (each theme's overrides) and tokens.resolver.json,
   #   the DTCG 2025.10 resolver Terrazzo reads; a tokens.css converts the same way
 
-  # Code -> Figma (a POST /v1/files/:key/variables body; Enterprise-only endpoint)
+  # Code -> Figma (a POST /v1/files/:key/variables body; Enterprise-only endpoint),
+  #   from a tokens.css, a DTCG file or resolver, or this script's tokens.json;
+  #   each theme is a mode
   python scripts/figma_to_tokens.py design/tokens.json --reverse --out figma-payload.json
   # ...or the same variables as Plugin API code, on any plan: run it with the
   #   Figma MCP server's use_figma, or in a development plugin (P32)
@@ -984,6 +986,126 @@ def read_tokens_json(data: Any) -> Tuple[Dict[str, dict], Dict[str, Dict[str, di
     return base, themes
 
 
+# A DTCG type's Figma type, where the CSS text alone would read as a string.
+REVERSE_TYPES = {"color": "COLOR", "dimension": "FLOAT", "number": "FLOAT", "duration": "FLOAT"}
+
+
+def reverse_data(path: Path, data: Any) -> Tuple[Any, List[Problem]]:
+    """What --reverse reads, in read_tokens_json()'s shape. This script's own
+    tokens.json and a flat map pass as they are. A tokens.css (`data` None), a
+    DTCG 2025.10 document or a resolver becomes {tier: {name: entry},
+    "themes": {theme: {name: entry}}}, each theme a Figma mode: before, a DTCG
+    file was read as a flat map, its groups made variables (`sets`,
+    `resolutionOrder`), and a tokens.css had no route into Figma at all (the
+    3.6.0 live check). What a mode cannot carry, a density or another
+    condition, is named."""
+    problems: List[Problem] = []
+    base: Dict[str, dict] = {}
+    themes: Dict[str, Dict[str, dict]] = {}
+
+    def entry(value: Any, dtcg_type: Optional[str] = None) -> dict:
+        """A value as reverse_body() reads it, its Figma type kept: a
+        DTCG duration or a CSS `150ms` is a FLOAT, not a string, and a
+        boolean is a BOOLEAN (Codex on #120)."""
+        if isinstance(value, bool):
+            return {"value": value, "type": "BOOLEAN"}
+        kind = REVERSE_TYPES.get(dtcg_type or "")
+        if kind is None and as_px(value) is None and as_ms(value) is not None:
+            kind = "FLOAT"
+        return {"value": value, "type": kind} if kind else {"value": value}
+
+    def noted(notes: Any, where: str) -> None:
+        # A source missing, malformed or outside the folder is said, never a
+        # clean conversion of whatever was left (Codex on #120).
+        problems.extend(Problem("not read", f"{where}{n}", f"{where}{n}: {why}") for n, why in notes)
+
+    def entries(doc: Any, where: str) -> Dict[str, dict]:
+        found, notes = dtcg.tokens(doc, path.parent)
+        noted(notes, where)
+        out: Dict[str, dict] = {}
+        for t in found:
+            if isinstance(t.value, bool) or t.css() is not None:
+                out[t.name] = entry(t.value if isinstance(t.value, bool) else t.css(), t.type)
+            else:                                    # a typography composite, say (CodeRabbit on #120)
+                problems.append(Problem("not carried to Figma", f"{where}{t.name}",
+                                        f"{where}{t.name}: a {t.type or 'value'} with no CSS form, "
+                                        "so no Figma variable"))
+        return out
+
+    def resolved(inputs: Optional[Dict[str, str]], where: str) -> Dict[str, dict]:
+        doc, notes = dtcg.resolver_document(data, path.parent, inputs)
+        noted(notes, where)
+        return entries(doc, where)
+
+    if data is None:                                         # a tokens.css
+        for sel, rows in css_blocks(path).items():
+            m = MODE_SELECTOR.match(sel)
+            values = {n: entry(v) for n, v, _, _ in rows}
+            if sel == ":root":
+                base = values
+            elif m and m.group(1) == "theme":
+                themes[mode_context(m)] = values
+            elif values:
+                problems.append(Problem("not carried to Figma", sel,
+                                        f"{sel}: {len(values)} token(s) left out; a Figma mode carries a "
+                                        "theme (`[data-theme]`), not a density or another condition"))
+    elif dtcg.is_resolver(data):
+        base = resolved(None, "")
+        for mod in dtcg.resolver_modifiers(data):
+            if not re.search(r"theme|scheme|mode", mod.name, re.I):
+                problems.append(Problem("not carried to Figma", mod.name,
+                                        f"modifier `{mod.name}` left out; a Figma mode carries a theme, "
+                                        "not a density or another condition"))
+                continue
+            default = mod.default or mod.contexts[0]
+            for ctx in mod.contexts:
+                if ctx != default:
+                    got = resolved({mod.name: ctx}, f"{mod.name}={ctx}: ")
+                    themes[ctx] = {n: e for n, e in got.items() if base.get(n) != e}
+    elif dtcg.is_document(data):
+        base = entries(data, "")
+    else:
+        return data, problems
+    if not base:
+        problems.append(Problem("not read", str(path), f"{path}: no token read, so nothing goes into Figma"))
+    # A token a theme sets goes where the modes are: a project's own
+    # `--surface: #fff` re-pointed by its dark theme lost its Dark value as a
+    # primitive, which has one mode (Codex on #120).
+    themed = {n for rows in themes.values() for n in rows}
+    out: Dict[str, Any] = {"primitive": {}, "semantic": {}, "themes": {}}
+    for name, item in base.items():
+        short = name[2:]
+        by_value = "semantic" if "var(" in str(item["value"]) else "primitive"
+        tier = "semantic" if name in themed else KNOWN.get(short) or by_value
+        out.setdefault(tier, {})[short] = item
+    for theme, rows in themes.items():
+        out["themes"][theme] = {n[2:]: e for n, e in rows.items()}
+    return out, problems
+
+
+def reverse_main(path: Path, args: argparse.Namespace, data: Any) -> int:
+    """--reverse: the REST body, or with --format plugin-script the same
+    variables as Plugin API code, from any input reverse_data() reads."""
+    data, read = reverse_data(path, data)
+    if args.format == "plugin-script":
+        config = project_config() if args.plan is None else None
+        plan = args.plan or (config.figma_plan if config else None)
+        text, problems = emit_plugin_script(data, str(path), collection_split=not args.flat, plan=plan)
+    else:
+        text, problems = emit_reverse(data, collection_split=not args.flat)
+        if any(p.kind == "mode-limit" for p in problems):
+            # Figma refuses the whole POST, so a body past the cap is a
+            # trap: write nothing (CodeRabbit on #111).
+            report_problems(read + problems, args.quiet)
+            print("No body written: Figma refuses a POST with a collection past its mode cap. "
+                  "Split the modes across collections, or use --format plugin-script.",
+                  file=sys.stderr)
+            return 2
+    write_out(text, args.out)
+    report_problems(read + problems, args.quiet)
+    return 1 if read or problems else 0
+
+
 def emit_reverse(data: Any, collection_split: bool = True) -> Tuple[str, List[Problem]]:
     body, problems = reverse_body(data, collection_split)
     # The endpoint is Enterprise's, so its own cap applies whatever the plan.
@@ -1420,9 +1542,21 @@ def report_problems(problems: Sequence[Problem], quiet: bool) -> None:
 
 
 def css_main(path: Path, args: argparse.Namespace) -> int:
-    """A tokens.css converts to --format dtcg only."""
-    if args.format != "dtcg" or args.reverse:
-        print(f"{path} is CSS: it converts to --format dtcg only.", file=sys.stderr)
+    """A tokens.css converts to --format dtcg, or goes into Figma with
+    --reverse (the REST body, or --format plugin-script)."""
+    if args.reverse:
+        if args.format not in ("css", "json", "plugin-script"):
+            print(f"{path}: --reverse writes the REST body or, with --format plugin-script, "
+                  "Plugin API code.", file=sys.stderr)
+            return 2
+        try:
+            return reverse_main(path, args, None)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"could not read {path}: {exc}", file=sys.stderr)
+            return 2
+    if args.format != "dtcg":
+        print(f"{path} is CSS: it converts to --format dtcg, or into Figma with --reverse.",
+              file=sys.stderr)
         return 2
     problems: List[Problem] = []
     try:
@@ -1467,25 +1601,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
     try:
         if args.reverse:
-            data = json.loads(path.read_bytes())
-            if args.format == "plugin-script":
-                config = project_config() if args.plan is None else None
-                plan = args.plan or (config.figma_plan if config else None)
-                text, problems = emit_plugin_script(data, str(path), collection_split=not args.flat,
-                                                    plan=plan)
-            else:
-                text, problems = emit_reverse(data, collection_split=not args.flat)
-                if any(p.kind == "mode-limit" for p in problems):
-                    # Figma refuses the whole POST, so a body past the cap is a
-                    # trap: write nothing (CodeRabbit on #111).
-                    report_problems(problems, args.quiet)
-                    print("No body written: Figma refuses a POST with a collection past its mode cap. "
-                          "Split the modes across collections, or use --format plugin-script.",
-                          file=sys.stderr)
-                    return 2
-            write_out(text, args.out)
-            report_problems(problems, args.quiet)
-            return 1 if problems else 0
+            return reverse_main(path, args, json.loads(path.read_bytes()))
         doc = load_document(path, args.shape, args.collection)
     except ConfigError as exc:
         print(f"error: {exc}", file=sys.stderr)
