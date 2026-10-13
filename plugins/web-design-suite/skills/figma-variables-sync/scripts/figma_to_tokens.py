@@ -26,7 +26,9 @@ USAGE
   #   tokens.json, theme-dark.json (each theme's overrides) and tokens.resolver.json,
   #   the DTCG 2025.10 resolver Terrazzo reads; a tokens.css converts the same way
 
-  # Code -> Figma (a POST /v1/files/:key/variables body; Enterprise-only endpoint)
+  # Code -> Figma (a POST /v1/files/:key/variables body; Enterprise-only endpoint),
+  #   from a tokens.css, a DTCG file or resolver, or this script's tokens.json;
+  #   each theme is a mode
   python scripts/figma_to_tokens.py design/tokens.json --reverse --out figma-payload.json
   # ...or the same variables as Plugin API code, on any plan: run it with the
   #   Figma MCP server's use_figma, or in a development plugin (P32)
@@ -984,6 +986,85 @@ def read_tokens_json(data: Any) -> Tuple[Dict[str, dict], Dict[str, Dict[str, di
     return base, themes
 
 
+def reverse_data(path: Path, data: Any) -> Tuple[Any, List[Problem]]:
+    """What --reverse reads, in read_tokens_json()'s shape. This script's own
+    tokens.json and a flat map pass as they are. A tokens.css (`data` None), a
+    DTCG 2025.10 document or a resolver becomes {tier: {name: entry},
+    "themes": {theme: {name: entry}}}, each theme a Figma mode: before, a DTCG
+    file was read as a flat map, its groups made variables (`sets`,
+    `resolutionOrder`), and a tokens.css had no route into Figma at all (the
+    3.6.0 live check). What a mode cannot carry, a density or another
+    condition, is named."""
+    problems: List[Problem] = []
+    base: Dict[str, str] = {}
+    themes: Dict[str, Dict[str, str]] = {}
+
+    def css_of(doc: Any) -> Dict[str, str]:
+        found, _ = dtcg.tokens(doc, path.parent)
+        return {t.name: t.css() for t in found if t.css() is not None}
+
+    if data is None:                                         # a tokens.css
+        for sel, rows in css_blocks(path).items():
+            m = MODE_SELECTOR.match(sel)
+            values = {n: v for n, v, _, _ in rows}
+            if sel == ":root":
+                base = values
+            elif m and m.group(1) == "theme":
+                themes[mode_context(m)] = values
+            elif values:
+                problems.append(Problem("not carried to Figma", sel,
+                                        f"{sel}: {len(values)} token(s) left out; a Figma mode carries a "
+                                        "theme (`[data-theme]`), not a density or another condition"))
+    elif dtcg.is_resolver(data):
+        base = css_of(dtcg.resolver_document(data, path.parent)[0])
+        for mod in dtcg.resolver_modifiers(data):
+            if not re.search(r"theme|scheme|mode", mod.name, re.I):
+                problems.append(Problem("not carried to Figma", mod.name,
+                                        f"modifier `{mod.name}` left out; a Figma mode carries a theme, "
+                                        "not a density or another condition"))
+                continue
+            default = mod.default or mod.contexts[0]
+            for ctx in mod.contexts:
+                if ctx != default:
+                    got = css_of(dtcg.resolver_document(data, path.parent, {mod.name: ctx})[0])
+                    themes[ctx] = {n: v for n, v in got.items() if base.get(n) != v}
+    elif dtcg.is_document(data):
+        base = css_of(data)
+    else:
+        return data, problems
+    out: Dict[str, Any] = {"primitive": {}, "semantic": {}, "themes": {}}
+    for name, value in base.items():
+        short = name[2:]
+        tier = KNOWN.get(short) or ("semantic" if "var(" in value else "primitive")
+        out.setdefault(tier, {})[short] = {"value": value}
+    for theme, rows in themes.items():
+        out["themes"][theme] = {n[2:]: {"value": v} for n, v in rows.items()}
+    return out, problems
+
+
+def reverse_main(path: Path, args: argparse.Namespace, data: Any) -> int:
+    """--reverse: the REST body, or with --format plugin-script the same
+    variables as Plugin API code, from any input reverse_data() reads."""
+    data, read = reverse_data(path, data)
+    if args.format == "plugin-script":
+        config = project_config() if args.plan is None else None
+        plan = args.plan or (config.figma_plan if config else None)
+        text, problems = emit_plugin_script(data, str(path), collection_split=not args.flat, plan=plan)
+    else:
+        text, problems = emit_reverse(data, collection_split=not args.flat)
+        if any(p.kind == "mode-limit" for p in problems):
+            # Figma refuses the whole POST, so a body past the cap is a
+            # trap: write nothing (CodeRabbit on #111).
+            report_problems(read + problems, args.quiet)
+            print("No body written: Figma refuses a POST with a collection past its mode cap. "
+                  "Split the modes across collections, or use --format plugin-script.",
+                  file=sys.stderr)
+            return 2
+    write_out(text, args.out)
+    report_problems(read + problems, args.quiet)
+    return 1 if read or problems else 0
+
+
 def emit_reverse(data: Any, collection_split: bool = True) -> Tuple[str, List[Problem]]:
     body, problems = reverse_body(data, collection_split)
     # The endpoint is Enterprise's, so its own cap applies whatever the plan.
@@ -1420,9 +1501,21 @@ def report_problems(problems: Sequence[Problem], quiet: bool) -> None:
 
 
 def css_main(path: Path, args: argparse.Namespace) -> int:
-    """A tokens.css converts to --format dtcg only."""
-    if args.format != "dtcg" or args.reverse:
-        print(f"{path} is CSS: it converts to --format dtcg only.", file=sys.stderr)
+    """A tokens.css converts to --format dtcg, or goes into Figma with
+    --reverse (the REST body, or --format plugin-script)."""
+    if args.reverse:
+        if args.format not in ("css", "json", "plugin-script"):
+            print(f"{path}: --reverse writes the REST body or, with --format plugin-script, "
+                  "Plugin API code.", file=sys.stderr)
+            return 2
+        try:
+            return reverse_main(path, args, None)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"could not read {path}: {exc}", file=sys.stderr)
+            return 2
+    if args.format != "dtcg":
+        print(f"{path} is CSS: it converts to --format dtcg, or into Figma with --reverse.",
+              file=sys.stderr)
         return 2
     problems: List[Problem] = []
     try:
@@ -1467,25 +1560,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
     try:
         if args.reverse:
-            data = json.loads(path.read_bytes())
-            if args.format == "plugin-script":
-                config = project_config() if args.plan is None else None
-                plan = args.plan or (config.figma_plan if config else None)
-                text, problems = emit_plugin_script(data, str(path), collection_split=not args.flat,
-                                                    plan=plan)
-            else:
-                text, problems = emit_reverse(data, collection_split=not args.flat)
-                if any(p.kind == "mode-limit" for p in problems):
-                    # Figma refuses the whole POST, so a body past the cap is a
-                    # trap: write nothing (CodeRabbit on #111).
-                    report_problems(problems, args.quiet)
-                    print("No body written: Figma refuses a POST with a collection past its mode cap. "
-                          "Split the modes across collections, or use --format plugin-script.",
-                          file=sys.stderr)
-                    return 2
-            write_out(text, args.out)
-            report_problems(problems, args.quiet)
-            return 1 if problems else 0
+            return reverse_main(path, args, json.loads(path.read_bytes()))
         doc = load_document(path, args.shape, args.collection)
     except ConfigError as exc:
         print(f"error: {exc}", file=sys.stderr)
