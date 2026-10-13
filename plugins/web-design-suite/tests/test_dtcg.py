@@ -11,7 +11,10 @@ Regressions covered (each fails on v3.5.0):
 - (part 3) themes could not be written: `--format dtcg` wrote the default mode
   alone, and a DTCG resolver (`*.resolver.json`) was read as no tokens;
 - (part 4) a removal the old DTCG file had marked `$deprecated` failed the
-  release gate, and the deprecation ledger could not take the marks.
+  release gate, and the deprecation ledger could not take the marks;
+- (the 3.6.0 live check) a DTCG file against the stylesheet it was written
+  from was a major release: every value it spells another way was an edit,
+  and every token it cannot hold was added.
 """
 from __future__ import annotations
 
@@ -113,7 +116,10 @@ class TheWriter(unittest.TestCase):
         self.assertIn("reads --space-fluid, which is not written", why["--section"])
         self.assertIn("reads another token inside an expression", why["--gap"])
         self.assertIn("cycle", why["--a"] + why["--b"])
-        self.assertEqual({"space"}, set(doc))
+        self.assertEqual({"space", "$extensions"}, set(doc))
+        held = self.dtcg.not_written(doc)                           # kept in the file (Codex on #119)
+        self.assertEqual(sorted(why), sorted(held))
+        self.assertEqual("65ch", held["--measure"])
 
     def test_a_name_that_is_also_a_group_is_its_root(self):
         doc, problems = self.dtcg.document([("--brand", "#e8440a"), ("--brand-hover", "#c63a08"),
@@ -574,6 +580,150 @@ class DeprecationsReachTheLedger(TempDirTest):
                       "--since", "2.1.0", "--removal", "3.0.0", cwd=self.tmp)
         self.assertEqual(0, proc.returncode, output(proc))
         self.assertIn("recorded: 1 token(s) marked $deprecated", output(proc))
+
+
+class ASnapshotAgainstItsStylesheet(TempDirTest):
+    """The 3.6.0 live check: a published DTCG file against the stylesheet it
+    was written from read 27 primitives as edited (`oklch(88% …)` for the
+    source's `oklch(88.0% …)`, `0px 1px 2px 0px …` for `0 1px 2px …`,
+    `cubic-bezier(0, 0, 1, 1)` for `linear`), and the 53 tokens a DTCG file
+    cannot hold as added: a major release for an unchanged system. The file
+    now records those 53 with their values, and diff_system reads them back
+    (Codex on #119, three findings)."""
+
+    EXT = "io.github.vybecode-ltd.web-design-suite"
+
+    def diff(self, old, new):
+        proc = run_py("design-system-versioning", "diff_system", old, new, "--format", "json",
+                      cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        report = json.loads(proc.stdout)
+        return [(c["kind"], c["subject"]) for c in report["changes"]], report["notes"]
+
+    def publish(self):
+        proc = run_py("figma-variables-sync", "figma_to_tokens", str(STARTER), "--format", "dtcg",
+                      "--out-dir", "published", "--quiet", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))   # 1: written, the untyped values named
+        return "published/tokens.json"
+
+    def starter_with(self, old, new):
+        css = STARTER.read_bytes().decode("utf-8")
+        self.assertEqual(1, css.count(old))
+        self.write("tokens.css", css.replace(old, new))
+        return "tokens.css"
+
+    def test_an_unchanged_system_is_no_change(self):
+        published = self.publish()
+        held = json.loads((self.tmp / published).read_bytes())["$extensions"][self.EXT]["notWritten"]
+        self.assertEqual(53, len(held))
+        self.assertEqual("clamp(1rem, 0.8208rem + 0.755vw, 1.5rem)", held["--space-fluid-sm"])
+        for old in (published, "published/tokens.resolver.json"):   # a resolver's, in its sources
+            with self.subTest(old=old):
+                self.assertEqual([], self.diff(old, str(STARTER))[0])
+
+    def test_the_other_way_is_no_change_either(self):
+        """Codex on #119: a stylesheet against its DTCG export read the 53 as
+        removed, a major bump that failed the names gate."""
+        self.assertEqual([], self.diff(str(STARTER), self.publish())[0])
+
+    def test_a_token_added_since_is_still_added(self):
+        """Codex on #119: what DTCG cannot hold is not therefore old."""
+        published = self.publish()
+        new = self.starter_with("--accent-200: oklch(88.0% 0.078 42);",
+                                "--accent-200: oklch(88.0% 0.078 42);\n    --size-hero: clamp(2rem, 1rem + 4vw, 4rem);")
+        self.assertEqual([("tier1-added", "--size-hero")], self.diff(published, new)[0])
+
+    def test_a_recorded_token_that_changed_is_a_change(self):
+        """Codex on #119: the record kept names alone, so a new clamp() for a
+        recorded token went unseen."""
+        published = self.publish()
+        new = self.starter_with("--space-fluid-sm:  clamp(1rem,    0.8208rem + 0.755vw, 1.5rem);",
+                                "--space-fluid-sm:  clamp(1rem, 0.75rem + 1vw, 1.5rem);")
+        # as a stylesheet against the stylesheet reports it: the starter's tiers are by name
+        self.assertEqual([("tier2-repointed", "--space-fluid-sm")], self.diff(published, new)[0])
+
+    def test_a_record_of_another_shape_is_no_record(self):
+        published = self.publish()
+        doc = json.loads((self.tmp / published).read_bytes())
+        for own in ("x", {"notWritten": "--space-fluid-sm"}, {"notWritten": ["--space-fluid-sm"]},
+                    {"notWritten": {"--space-fluid-sm": 5, "space": "1rem"}}):
+            with self.subTest(own=own):
+                doc["$extensions"] = {self.EXT: own}
+                self.write("other.tokens.json", json.dumps(doc))
+                changes, _notes = self.diff("other.tokens.json", str(STARTER))
+                self.assertEqual(53, len([c for c in changes if c[0].endswith("-added")]))
+        doc["$extensions"] = []
+        self.write("other.tokens.json", json.dumps(doc))
+        self.assertEqual(53, len(self.diff("other.tokens.json", str(STARTER))[0]))
+
+    def test_every_listed_file_s_record_is_read(self):
+        """Codex on #119: with several DTCG files in `.design-suite.json`, the
+        record was read from the first alone."""
+        self.publish()
+        extra, _ = dtcg_module().document([("--extra", "4px"), ("--size-hero", "clamp(2rem, 1rem + 4vw, 4rem)")])
+        self.write("published/extra.tokens.json", json.dumps(extra))
+        self.write(".git/HEAD", "x\n")
+        self.write(".design-suite.json", json.dumps(
+            {"schema": 1, "tokens": ["published/tokens.json", "published/extra.tokens.json"]}))
+        old = self.starter_with("--accent-200: oklch(88.0% 0.078 42);",
+                                "--accent-200: oklch(88.0% 0.078 42);\n    --extra: 4px;\n"
+                                "    --size-hero: clamp(2rem, 1rem + 4vw, 4rem);")
+        proc = run_py("design-system-versioning", "diff_system", old, "--format", "json", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        self.assertEqual([], json.loads(proc.stdout)["changes"])
+
+    def test_a_resolver_reads_its_default_contexts_record_only(self):
+        """Codex on #119: a record in a context the default does not select
+        (the dark theme's file) was read into the default snapshot."""
+        self.publish()
+        dark = json.loads((self.tmp / "published" / "theme-dark.json").read_bytes())
+        dark["$extensions"] = {self.EXT: {"notWritten": {"--size-hero": "clamp(2rem, 1rem + 4vw, 4rem)"}}}
+        self.write("published/theme-dark.json", json.dumps(dark))
+        self.assertEqual([], self.diff("published/tokens.resolver.json", str(STARTER))[0])
+
+    def test_a_recorded_token_keeps_its_deprecation(self):
+        """Codex on #119: a deprecated token the file could not hold lost its
+        mark, so removing it failed the names gate."""
+        dtcg = dtcg_module()
+        v1, _ = dtcg.document([("--space-4", "1rem"), ("--hero", "clamp(1rem, 2vw, 2rem)")],
+                              deprecated={"--hero": "Use {space.4} instead"})
+        self.assertEqual({"--hero": "Use {space.4} instead"}, dtcg.not_written_marks(v1))
+        self.write("v1.tokens.json", json.dumps(v1))
+        self.write("v2.tokens.json", json.dumps(dtcg.document([("--space-4", "1rem")])[0]))
+        self.write("deprecations.json", json.dumps({"schema": "design-system-versioning/deprecations@1",
+                                                    "deprecations": []}))
+        proc = run_py("design-system-versioning", "diff_system", "v1.tokens.json", "v2.tokens.json",
+                      "--format", "json", "--deprecations", "deprecations.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        gone = {c["subject"]: c for c in json.loads(proc.stdout)["changes"]}
+        self.assertEqual("$deprecated in v1.tokens.json", gone["--hero"]["deprecation"]["marked"])
+
+    def test_a_quoted_keyword_is_another_family(self):
+        """Codex on #119: `"serif"` names a family called serif, `serif` the
+        generic one. Any other name is the same family quoted or not."""
+        self.write("v1/tokens.css", ':root {\n  --font-display: "serif";\n  --font-body: "Inter", sans-serif;\n}\n')
+        self.write("v2/tokens.css", ":root {\n  --font-display: serif;\n  --font-body: Inter, sans-serif;\n}\n")
+        self.assertEqual([("tier1-value-changed", "--font-display")],
+                         self.diff("v1/tokens.css", "v2/tokens.css")[0])
+
+    def test_a_spelling_is_not_an_edit(self):
+        css = STARTER.read_bytes().decode("utf-8")
+        respelled = (css.replace("--accent-200: oklch(88.0% 0.078 42);", "--accent-200: oklch(88% 0.078 42);")
+                     .replace("--shadow-xs:  0 1px 2px  oklch(0% 0 0 / 0.05);",
+                              "--shadow-xs: 0px 1px 2px 0px oklch(0% 0 0 / 0.050);")
+                     .replace("--ease-linear:  linear;", "--ease-linear: cubic-bezier(0, 0, 1, 1);"))
+        self.assertEqual(3, sum(a != b for a, b in zip(css.splitlines(), respelled.splitlines())))
+        self.write("v1/tokens.css", respelled)                 # one name: a file's own is compared too
+        self.write("v2/tokens.css", css)
+        self.assertEqual([], self.diff("v1/tokens.css", "v2/tokens.css")[0])
+
+    def test_a_real_edit_is_still_one(self):
+        """The guard: the alignment must not swallow a change of value."""
+        css = STARTER.read_bytes().decode("utf-8").replace(
+            "--accent-200: oklch(88.0% 0.078 42);", "--accent-200: oklch(90% 0.078 42);")
+        self.write("tokens.css", css)
+        self.assertEqual([("tier1-value-changed", "--accent-200")],
+                         self.diff(self.publish(), "tokens.css")[0])
 
 
 THEMED_CSS = """@layer tokens {

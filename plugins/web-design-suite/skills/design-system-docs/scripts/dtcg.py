@@ -68,6 +68,9 @@ UNSUPPORTED = object()
 META_KEYS = {"$schema", "$description", "$extensions", "$type", "$deprecated",
              "$extends"}
 Problems = List[Tuple[str, str]]
+# The document's own `$extensions` key, reverse-domain as 2025.10 recommends:
+# `notWritten` holds each custom property document() left out, with its value.
+EXTENSION = "io.github.vybecode-ltd.web-design-suite"
 
 
 def _fmt(n: float) -> str:
@@ -960,6 +963,25 @@ def resolver_modifiers(data: dict) -> List[Modifier]:
     return out
 
 
+def default_sources(data: dict) -> List[Any]:
+    """The sources a resolver's default resolution reads, in its order: each
+    set's, and each modifier's default context's (its string `default`, else
+    its first), as resolver_document() picks them."""
+    out: List[Any] = []
+    for kind, _name, definition in _order(data, []):
+        sources = definition.get("sources")
+        if kind == "modifier":
+            contexts = definition.get("contexts")
+            if not (isinstance(contexts, dict) and contexts):
+                continue
+            default = definition.get("default")
+            sources = contexts[default] if isinstance(default, str) and default in contexts \
+                else next(iter(contexts.values()))
+        if isinstance(sources, list):
+            out.extend(sources)
+    return out
+
+
 class OutsideFolder(OSError):
     """A source whose real path is not in the resolver's folder."""
 
@@ -1447,7 +1469,9 @@ def document(values: Iterable[Tuple[str, str]], descriptions: Optional[Dict[str,
     keep = None if only is None else set(only)
     problems: Problems = []
     parsed: Dict[str, Tuple[Tuple[str, ...], Optional[str], Any]] = {}
+    given: Dict[str, str] = {}
     for name, value in values:
+        given[name] = value
         path = path_of(name)
         if path is None:
             problems.append((name, "a DTCG name cannot hold `{`, `}`, `.` or a leading `$`"))
@@ -1530,4 +1554,35 @@ def document(values: Iterable[Tuple[str, str]], descriptions: Optional[Dict[str,
             node.setdefault(key, {})["$root"] = token
         else:
             node[key] = token
+    if keep is None and problems:
+        # Kept in the file with their values, so a diff against the
+        # stylesheet it was written from compares them too: a token left out
+        # is neither added nor removed, and a new clamp() is still a change
+        # (Codex on #119).
+        names = sorted({n for n, _ in problems})
+        own: Dict[str, Any] = {"notWritten": {name: str(given.get(name, "")) for name in names}}
+        marks = {name: deprecated[name] for name in names if deprecated.get(name)}
+        if marks:                                # a $deprecated the file could not carry (Codex on #119)
+            own["deprecated"] = marks
+        doc["$extensions"] = {EXTENSION: own}
     return doc, problems
+
+
+def _own(data: Any, key: str) -> dict:
+    ext = data.get("$extensions") if isinstance(data, dict) else None
+    own = ext.get(EXTENSION) if isinstance(ext, dict) else None
+    held = own.get(key) if isinstance(own, dict) else None
+    return held if isinstance(held, dict) else {}
+
+
+def not_written(data: Any) -> Dict[str, str]:
+    """The custom properties a document says document() left out of it,
+    with their CSS values."""
+    return {n: v for n, v in _own(data, "notWritten").items()
+            if isinstance(n, str) and n.startswith("--") and isinstance(v, str)}
+
+
+def not_written_marks(data: Any) -> Dict[str, Union[bool, str]]:
+    """The `$deprecated` of each token not written, as `true` or its reason."""
+    return {n: v for n, v in _own(data, "deprecated").items()
+            if isinstance(n, str) and n.startswith("--") and (v is True or (isinstance(v, str) and v))}
