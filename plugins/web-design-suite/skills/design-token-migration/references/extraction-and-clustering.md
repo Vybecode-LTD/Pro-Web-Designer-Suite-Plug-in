@@ -99,6 +99,16 @@ Underscores are Tailwind's space escape: `shadow-[0_1px_3px_rgba(0,0,0,0.08)]` i
 
 Skip the prefixes that are not design values: `grid-cols-[…]`, `aspect-[…]`, `content-[…]`, `data-[…]`, `aria-[…]`, `supports-[…]`. A grid track list is layout structure, not a token.
 
+### Tailwind v4's numeric classes
+
+In v4, `p-4` is `padding: calc(var(--spacing) * 4)` ([padding](https://tailwindcss.com/docs/padding)). While the theme keeps `--spacing`, every multiple of it is a class, so the census counts each at its value (context `tailwind-spacing`): `p-4` is `1rem` at the stock `0.25rem`.
+- **The value.** The census reads `--spacing` from each stylesheet that imports `tailwindcss` (or `tailwindcss/utilities`), following its imports in order, as Tailwind builds the theme (a package's from the nearest `node_modules`; a URL import is the browser's):
+  - the stock value comes from the installed `tailwindcss/theme.css`, else `0.25rem` ([theme](https://tailwindcss.com/docs/theme));
+  - `--*: initial`, `--spacing-*: initial` and `--spacing: initial` clear it, and a `default` block never overrides the project's.
+- **The classes.** Padding, margin, gap, `space-*`, inset, width, height and `size-*`, the `-` negatives where Tailwind has them (`-mt-4`, `-top-2`, never `-p-4`), any variants and `!`, and a project's `prefix(tw)` (`tw:p-4`). In a script they are read only where classes go: a `class` or `className` attribute, a `className={…}` expression, and the arguments of a class helper (`cn()`, `clsx()`, `cva()` and the rest of Part 5's lint plugin's list), since a bare `"p-4"` may be any data. A number counts only as Tailwind 4.3.3 takes it: a multiple of 0.25, written plainly (`p-2.5` and `p-2.25`, not `p-2.50`, `p-04` or `p-0.3`).
+- **What it does not count.** A `leading-6` is counted but not mapped: a `--type-*` role carries leading. Entries that disagree on `--spacing`, a `--spacing` that is no length (`var(--space-1)`), or an import the census cannot read (a package not installed) count none, and the census says why.
+- **The rewrite.** The proposal maps each class by its role, as it maps `p-[13px]`, and the codemod rewrites only the utility, whatever its variants: `md:-mt-4` becomes `md:-mt-grouped`, and `p-4.5` is never read as `p-4`.
+
 ### Hex colors in JS strings
 
 ```js
@@ -223,7 +233,10 @@ It is also single linkage's famous failure mode. So the chain is capped: **a mer
 ### Mapping a cluster to a token
 
 1. Compute the frequency-weighted centroid in sRGB, convert to OKLab.
-2. Find the nearest ramp step by ΔE across the neutral, accent and status ramps — with the same tint guard, so a chromatic source may not land on a near-achromatic step. `#fff8e1` measures marginally closer to `--neutral-50` than to `--warning-100`, and letting ΔE decide would quietly turn a notice background into the page canvas.
+2. Find its **family** first, then the nearest step within it by ΔE (N40). ΔE alone sent the grey `#6b7280` to `--fg-warning`: its little chroma kept it off the neutral steps, and the nearest of the rest was a status colour of the opposite hue.
+   - **A neutral lands only on the neutral ramp.** A neutral is a colour whose chroma is under half of what sRGB holds at its lightness and hue. Absolute chroma cannot tell: the slate grey `#0f172a` has C 0.040, and the red tint `#fef2f2` only 0.013.
+   - **A colour lands only on a step within 30° of its hue**, so a status hue lands on its status. When no ramp has its hue (a second brand colour), it takes the nearest chromatic step, and its ΔE puts the rule up for review.
+   - **A tint still never lands on a neutral step.** `#fff8e1` measures marginally closer to `--neutral-50` than to `--warning-100`, and letting ΔE decide would quietly turn a notice background into the page canvas.
 3. Pick the **Tier-2 role from the step and the property class**, not from the step alone.
 
 | Ramp step | as `color` | as `background` | as `border-color` |
@@ -252,9 +265,9 @@ Report before and after. A role that *loses* contrast relative to the original i
 
 ### Deriving the ramps from the codebase
 
-**Accent seed:** the most-used chromatic cluster (C ≥ 0.04), preferring one that is not sitting on a status hue. This matters more than it sounds: a token file whose accent is visibly *their* blue gets adopted, and one whose accent came from a style guide gets ignored.
+**Accent seed:** the most-used chromatic cluster (C ≥ 0.04, and no neutral by the family rule above: the muted `#5f8890` has C 0.047 and is a grey), preferring one that is not sitting on a status hue. This matters more than it sounds: a token file whose accent is visibly *their* blue gets adopted, and one whose accent came from a style guide gets ignored.
 
-**Neutral hue:** the circular mean of the grays, weighted by count × chroma, restricted to 0.001 ≤ C ≤ 0.012. Chroma weighting is essential — a hue angle read off a color with C = 0.001 is numerical noise and would otherwise outvote a real one. Below an evidence floor, keep the house default (75°, warm graphite). A codebase whose grays are `#333` and `#666` has no neutral temperature to preserve, and inventing one is worse than defaulting.
+**Neutral hue:** the circular mean of the grays, weighted by count × chroma, restricted to the neutrals with C ≥ 0.001; a tint has a hue of its own and gives none. Chroma weighting is essential — a hue angle read off a color with C = 0.001 is numerical noise and would otherwise outvote a real one. Below an evidence floor, keep the house default (75°, warm graphite). A codebase whose grays are `#333` and `#666` has no neutral temperature to preserve, and inventing one is worse than defaulting.
 
 Everything else — the L curve, the chroma falloff, the hue drift — comes from the studio's tuned tables, unchanged. Those are the house style and the migration does not get a vote.
 

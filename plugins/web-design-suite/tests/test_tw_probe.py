@@ -263,5 +263,55 @@ class TheVariantsTheReferenceTeaches(ProbeProject):
         self.assertGreater(len(imported), 30000)
 
 
+MIGRATIONS = SKILLS / "design-token-migration" / "references" / "framework-migrations.md"
+
+
+def migration_block(mark: str) -> str:
+    """A CSS block framework-migrations.md §5 marks, as a project copies it."""
+    m = re.search(rf"<!-- tw-migrate:{mark} -->\n```css\n(.*?)```", MIGRATIONS.read_bytes().decode("utf-8"), re.S)
+    if not m:
+        raise AssertionError(f"framework-migrations.md marks no {mark} block")
+    return m.group(1)
+
+
+@unittest.skipUnless(NODE and TAILWIND, "set WDS_TAILWIND_MODULES to a node_modules with tailwindcss 4")
+class TheMigrationsMoveOne(ProbeProject):
+    """LC-B5 (P36): framework-migrations.md §5's Move 1 in v4's form, compiled as
+    written. Named keys beside `--spacing` leave every numeric class, the
+    cleared theme leaves none, and the section's tw_probe command tells them apart."""
+
+    compile = TheVariantsTheReferenceTeaches.compile
+    NUMERIC = ["p-4", "gap-2.5", "-mt-4"]
+
+    def command(self) -> list:
+        m = re.search(r'tw_probe\.mjs" (.+)$', MIGRATIONS.read_bytes().decode("utf-8"), re.M)
+        self.assertIsNotNone(m, "§5 gives no tw_probe command")
+        return m.group(1).split()
+
+    def generated(self, css: str, classes) -> list:
+        return [c for c in classes if "." + c.replace(".", "\\.") + " {" in css]
+
+    def test_named_keys_beside_spacing_leave_the_numeric_classes(self):
+        self.write("src/styles/index.css", '@import "tailwindcss";\n' + migration_block("wrong"))
+        css = self.compile("src/styles/index.css", [*self.NUMERIC, "p-card"])
+        self.assertEqual(self.generated(css, [*self.NUMERIC, "p-card"]), [*self.NUMERIC, "p-card"])
+        proc = self.probe(*self.command())
+        self.assertEqual(1, proc.returncode, output(proc))
+        for cls in self.NUMERIC:
+            self.assertIn(f"{cls}: refused, but generates", output(proc))
+
+    def test_the_cleared_theme_leaves_only_the_roles(self):
+        self.write("src/styles/index.css", '@import "tailwindcss";\n' + migration_block("right"))
+        roles = ["p-card", "-mt-grouped", "gap-related", "px-inline-md", "py-block-sm", "p-well"]
+        css = self.compile("src/styles/index.css", [*self.NUMERIC, *roles])
+        self.assertEqual(self.generated(css, [*self.NUMERIC, *roles]), roles)
+        proc = self.probe(*self.command())
+        self.assertEqual(0, proc.returncode, output(proc))
+
+    def test_clearing_the_spacing_namespace_takes_spacing_with_it(self):
+        self.write("src/styles/index.css", '@import "tailwindcss";\n@theme {\n  --spacing-*: initial;\n}\n')
+        self.assertEqual(self.generated(self.compile("src/styles/index.css", self.NUMERIC), self.NUMERIC), [])
+
+
 if __name__ == "__main__":
     unittest.main()

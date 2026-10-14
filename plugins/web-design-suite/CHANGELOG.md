@@ -46,7 +46,53 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   - `test_tw_probe.TheVariantsTheReferenceTeaches` compiles the section's marked block as
     written and checks each claim.
 
+- **The migration counts Tailwind v4's numeric classes** (P36 part 4; LC-B5). In v4,
+  `p-4` is `calc(var(--spacing) * 4)`, so while the theme keeps `--spacing` every multiple
+  is a class, and the census counted none: a migration sized from it came in short.
+  - **The census** reads `--spacing` from each entry that imports `tailwindcss`, through
+    its imports in order, as Tailwind builds the theme. The stock value comes from the
+    installed `theme.css`, else `0.25rem`. `--*: initial`, `--spacing-*: initial` and
+    `--spacing: initial` clear it, and a `default` block never overrides the project's.
+  - **The classes:** padding, margin, gap, `space-*`, inset, width, height, `size-*` and
+    `leading-*`, each counted at N × `--spacing` with its variants, `!`, its negative
+    where Tailwind has one (`-mt-4`, never `-p-4`) and the project's `prefix(tw)`. A
+    number counts only as Tailwind 4.3.3 takes it: `p-2.25` yes, `p-2.50` and `p-0.3` no.
+    Entries that disagree, a `--spacing` that is no length, or an import it cannot read
+    (a package not installed: its theme can set `--spacing`) count none and say why.
+  - **The proposal** maps each to its role as it maps `p-[13px]` (`p-4` to `p-well`,
+    `-mt-4` to `-mt-grouped`), and reports `leading-6` for its `--type-*` role. **The
+    codemod** rewrites only the utility, matched whole: `md:p-4` becomes `md:p-well`, and
+    `p-4.5`, `-p-4` and `sp-4` are never read as `p-4`. In a script, both read a numeric
+    class only where classes go: a class attribute, a `className={…}` expression and a
+    class helper's arguments (`cn()`, `clsx()`, `cva()`…), since a bare `"p-4"` may be
+    any data (Codex on #129).
+  - framework-migrations.md §5 gives **Move 1 in v4's form**: named `--spacing-*` keys
+    beside `--spacing` replace nothing, `--*: initial` does, the census runs before it, and
+    `tw_probe --refuse p-4` checks it.
+  - Tests: `test_token_migration.TheV4SpacingCensus`; `test_tw_probe.TheMigrationsMoveOne`
+    compiles §5's two blocks and runs its command.
+
 ### Fixed
+
+- **The migration matched a colour to a role by ΔE alone** (N40, from R3.6's live
+  check). `cluster_values.py` sent the grey `#6b7280` to `--fg-warning`: its little
+  chroma kept it off the neutral steps, and the nearest of the rest was a status colour of
+  the opposite hue. Slate greys landed on the accent and info ramps, and green and amber
+  tints on `--accent-50`. A colour's family now comes first:
+  - a neutral (chroma under half of what sRGB holds at its lightness and hue) lands only
+    on the neutral ramp;
+  - any other colour lands only on a step within 30° of its hue, so a status hue lands on
+    its status;
+  - ΔE ranks within the family;
+  - the ramps are built by the same reading: a muted grey (`#5f8890`, C 0.047) seeds no
+    accent and gives the neutrals their hue (Codex on #129).
+
+  `test_token_migration.ColoursKeepTheirFamily` holds 23 greys, tints and status colours
+  to their families.
+- **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
+  became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
+  too. It is a width and a height, so it is a size: reported when no `--width-*` role
+  fits (`test_token_migration.TheV4SpacingCensus.test_a_size_is_no_padding`).
 
 - **`tw_probe` read an `@source inline()` class as missing** (found by SB-B5's doc
   test). Its classes are in the first build, so asking for one added no rule, and a role

@@ -66,7 +66,7 @@ python -m scripts.extract_literals ./src --format json -o literals.json
 python -m scripts.extract_literals ./src --format csv  -o literals.csv # for the client
 ```
 
-Walks CSS, SCSS, LESS, JS, JSX, TS and TSX, and the `<style>` blocks, scripts and `style=""` attributes of Vue, Svelte, Astro and HTML files. Finds literals in CSS declarations, SCSS/LESS variables and colour functions (`color.adjust()` and the rest), JSX `style={{}}`, CSS-in-JS style objects (MUI `sx`, `css({})`, vanilla-extract), styled-components and Emotion template literals, Tailwind arbitrary values, and hex colors in JS strings. Records kind, raw text, normalized form, property, file, line, column, and whether the file is one where Laws 2, 4 and 6 bite.
+Walks CSS, SCSS, LESS, JS, JSX, TS and TSX, and the `<style>` blocks, scripts and `style=""` attributes of Vue, Svelte, Astro and HTML files. Finds literals in CSS declarations, SCSS/LESS variables and colour functions (`color.adjust()` and the rest), JSX `style={{}}`, CSS-in-JS style objects (MUI `sx`, `css({})`, vanilla-extract), styled-components and Emotion template literals, Tailwind arbitrary values, v4's numeric classes while the theme keeps `--spacing` (`p-4` at 4 × `--spacing`), and hex colors in JS strings. Records kind, raw text, normalized form, property, file, line, column, and whether the file is one where Laws 2, 4 and 6 bite.
 
 It deliberately does **not** count values inside comments, quoted strings or `url()`. Those are not design decisions, and counting them inflates the estimate you are about to put in front of a client.
 
