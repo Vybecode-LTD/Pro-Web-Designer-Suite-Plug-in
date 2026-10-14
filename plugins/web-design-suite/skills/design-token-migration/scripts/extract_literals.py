@@ -1579,19 +1579,63 @@ CLASS_HELPER_RE = re.compile(r"(?<![\w$])(?:" + "|".join(CLASS_HELPERS) + r")\s*
 CLASS_EXPRESSION_RE = re.compile(r"\b(?:className|class)\s*=\s*\{")
 
 
+def blank_js_strings(text: str) -> str:
+    """`text` with each string's and template's contents blanked, the quotes
+    and a template's `${…}` code kept, so a search for syntax never matches
+    inside data. Same length, so offsets carry over."""
+    out, i, n = list(text), 0, len(text)
+    modes, braces = ["code"], [0]          # a brace count for each code level
+    while i < n:
+        ch = text[i]
+        if modes[-1] == "template":
+            if ch == "`":
+                modes.pop()
+            elif ch == "$" and text[i + 1:i + 2] == "{":
+                modes.append("code")
+                braces.append(0)
+                i += 1
+            elif ch == "\\":
+                out[i] = " "
+                if i + 1 < n and text[i + 1] != "\n":
+                    out[i + 1] = " "
+                i += 1
+            elif ch != "\n":
+                out[i] = " "
+        elif ch in "'\"":
+            j = i + 1
+            while j < n and text[j] not in (ch, "\n"):
+                step = 2 if text[j] == "\\" and j + 1 < n and text[j + 1] != "\n" else 1
+                for k in range(j, j + step):
+                    out[k] = " "
+                j += step
+            i = j
+        elif ch == "`":
+            modes.append("template")
+        elif ch == "{":
+            braces[-1] += 1
+        elif ch == "}":
+            if braces[-1] == 0 and len(modes) > 1:       # the end of a ${ … }
+                modes.pop()
+                braces.pop()
+            else:
+                braces[-1] -= 1
+        i += 1
+    return "".join(out)
+
+
 def class_list_spans(clean: str) -> list[tuple[int, int]]:
     """Where a script's class lists are: a `className={…}` expression and a
     class helper's arguments (`cn("p-4", ok && "mt-1")`). A numeric class is
-    read only there, since a bare `"p-4"` may be any data (Codex on #129)."""
-    spans = [(m.end(), match_braces(clean, m.end() - 1)) for m in CLASS_EXPRESSION_RE.finditer(clean)]
-    for m in CLASS_HELPER_RE.finditer(clean):
+    read only there, since a bare `"p-4"` may be any data (Codex on #129).
+    Both are found in code only: `'cn('` is a string, not a call."""
+    code = blank_js_strings(clean)
+    spans = [(m.end(), match_braces(code, m.end() - 1)) for m in CLASS_EXPRESSION_RE.finditer(code)]
+    for m in CLASS_HELPER_RE.finditer(code):
         depth, i, quote = 1, m.end(), ""
-        while i < len(clean) and depth:
-            ch = clean[i]
+        while i < len(code) and depth:
+            ch = code[i]
             if quote:
-                if ch == "\\":
-                    i += 1
-                elif ch == quote:
+                if ch == quote:
                     quote = ""
             elif ch in "'\"`":
                 quote = ch
@@ -1630,6 +1674,34 @@ def _theme_blocks(css: str) -> Iterator[tuple[str, list[str]]]:
                 start = i + 1
             i += 1
         yield m.group(1), decls
+
+
+def _package_sheet(target: str, start: Path) -> Path | None:
+    """A package's stylesheet as an `@import` finds it: the package in the
+    nearest `node_modules`, then its subpath, its package.json's `style`, or
+    its `index.css`. None when it is not installed."""
+    parts = target.split("/")
+    cut = 2 if target.startswith("@") else 1
+    name, sub = "/".join(parts[:cut]), "/".join(parts[cut:])
+    for folder in [start, *start.parents]:
+        root = folder / "node_modules" / name
+        if not root.is_dir():
+            continue
+        if sub:
+            found = root / sub
+            return found if found.is_file() or found.suffix else found.with_name(found.name + ".css")
+        try:
+            meta = json.loads((root / "package.json").read_bytes())
+        except (OSError, ValueError):
+            meta = {}
+        exports = meta.get("exports") if isinstance(meta, dict) else None
+        dot = exports.get(".") if isinstance(exports, dict) else None
+        for choice in (meta.get("style") if isinstance(meta, dict) else None,
+                       dot.get("style") if isinstance(dot, dict) else None, "index.css"):
+            if isinstance(choice, str) and (root / choice).is_file():
+                return root / choice
+        return None
+    return None
 
 
 def _stock_spacing(entry: Path) -> tuple[str, str]:
@@ -1682,12 +1754,18 @@ def tailwind_spacing(entry: Path) -> TwSpacing | None:
                 prefix = TW_PREFIX_RE.search(options)
                 if prefix:
                     state["prefix"] = prefix.group(1)
-            elif re.match(r"[a-z][\w+.-]*:", target) or target.startswith("@"):
-                unread.append(target)                 # a URL or a package: not followed
+            elif re.match(r"[a-z][\w+.-]*:", target) or target.startswith("//"):
+                continue                              # a URL: Tailwind leaves it to the browser
             else:
                 found = Path(os.path.normpath(sheet.parent / target))     # named as the census names it
                 if not found.exists() and not found.suffix:
                     found = found.with_name(found.name + ".css")
+                if not found.exists() and not target.startswith((".", "/")):
+                    package = _package_sheet(target, sheet.parent)
+                    if package is None:
+                        unread.append(target)                 # not installed
+                        continue
+                    found = package
                 read(found)
         for options, decls in _theme_blocks(css):
             prefix = TW_PREFIX_RE.search(options)
@@ -1771,24 +1849,29 @@ def tailwind_theme(paths: Sequence[str], *, include_vendor: bool,
     if not entries:
         return None, entries
     unread = sorted({u for e in entries for u in e.unread})
-    skipped = (f"; imports not followed: {', '.join(unread[:5])}"
-               + (f" and {len(unread) - 5} more" if len(unread) > 5 else "")) if unread else ""
+    if unread:
+        # A stylesheet the census cannot read can set or clear --spacing
+        # (Codex on #129), so a count at the value read would be wrong.
+        more = f" and {len(unread) - 5} more" if len(unread) > 5 else ""
+        problems.append(f"the Tailwind v4 entries import what the census could not read "
+                        f"({', '.join(unread[:5])}{more}), which can set --spacing, so the numeric "
+                        f"classes (p-4) were not counted: install the dependencies and run it again")
+        return None, entries
     kinds = {(e.value, e.prefix) for e in entries}
     if len(kinds) > 1:
         said = ", ".join(f"{e.entry} {e.value or 'cleared'}" for e in entries)
         problems.append(f"the Tailwind v4 entries disagree on --spacing ({said}), so the numeric "
-                        f"classes (p-4) were not counted: run the census on each app{skipped}")
+                        f"classes (p-4) were not counted: run the census on each app")
         return None, entries
     tw = entries[0]
     if tw.value is None:
         problems.append(f"{tw.entry} clears --spacing, so a numeric class (p-4) generates "
-                        f"nothing there and is not counted: tw_probe.mjs lists any left{skipped}")
+                        f"nothing there and is not counted: tw_probe.mjs lists any left")
         return None, entries
     if not tw.length():
         problems.append(f"--spacing is `{tw.value}` ({tw.source}), not a length the census "
-                        f"can multiply, so the numeric classes (p-4) were not counted{skipped}")
+                        f"can multiply, so the numeric classes (p-4) were not counted")
         return None, entries
-    tw.unread = unread
     return tw, entries
 
 
@@ -1844,8 +1927,7 @@ def extract(paths: Sequence[str], *, include_vendor: bool = False,
         counted = sum(1 for l in literals if l.context == "tailwind-spacing")
         problems.append(f"counted {counted} numeric Tailwind class(es) (p-4 is 4 x --spacing) at "
                         f"--spacing: {tw.value}, from {tw.source} through {tw.entry}"
-                        + (f", prefix {tw.prefix}:" if tw.prefix else "")
-                        + (f"; imports not followed: {', '.join(tw.unread)}" if tw.unread else ""))
+                        + (f", prefix {tw.prefix}:" if tw.prefix else ""))
         if tailwind is not None:
             tailwind["counted"] = counted
     literals.sort(key=lambda l: (l.file, l.line, l.col))

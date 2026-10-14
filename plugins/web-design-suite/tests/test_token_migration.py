@@ -923,6 +923,35 @@ class TheV4SpacingCensus(TempDirTest):
         self.assertIn('className={on ? "p-well" : ', text)
         self.assertIn('cn("gap-grouped", on && "mt-fused")', text)
 
+    def test_a_helper_named_in_a_string_opens_no_class_list(self):
+        # Codex on #129: `'cn('` is data, so it must not make the rest of the
+        # file a class list.
+        page = self.write("src/Page.tsx", "const syntax = 'cn(';\nconst pageCode = \"p-4\";\n"
+                                          "const t = `${cn(\"mt-1\")} cn(`;\nconst row = \"m-2\";\n"
+                                          "export const P = () => <i className={cn(\"gap-4\")} />;\n")
+        literals, data = self.project()
+        found = [(l["line"], l["raw"]) for l in data["literals"]
+                 if l["context"] == "tailwind-spacing" and l["file"].endswith("Page.tsx")]
+        self.assertEqual(found, [(5, "gap-4")])
+        self.cluster(literals)
+        self.apply(self.tmp / "proposal" / "mapping.json")
+        self.assertIn('const pageCode = "p-4";', page.read_text(encoding="utf-8"))
+        self.assertIn('const row = "m-2";', page.read_text(encoding="utf-8"))
+
+    def test_a_package_theme_is_read_or_nothing_is_counted(self):
+        # Codex on #129: a package the entry imports can set --spacing, so it is
+        # read where it is installed, and the count is withheld where it is not.
+        # A URL import is the browser's, not Tailwind's.
+        entry = '@import "tailwindcss";\n@import url(https://fonts.example.com/css2);\n@import "@acme/theme";\n'
+        _, data = self.project(entry=entry)
+        self.assertEqual(self.counted(data), [])
+        self.said(data, "the Tailwind v4 entries import what the census could not read (@acme/theme), "
+                        "which can set --spacing")
+        self.write("node_modules/@acme/theme/package.json", '{"name": "@acme/theme", "style": "dist/theme.css"}')
+        self.write("node_modules/@acme/theme/dist/theme.css", "@theme {\n  --spacing: 4px;\n}\n")
+        _, data = self.project(entry=entry)
+        self.assertIn(("p-4", "16px", "tw:p"), self.counted(data))
+
     def test_a_size_is_no_padding(self):
         # CodeRabbit on #129: size-4 is an icon's width and height, so a padding
         # role (size-well) would resize every icon when --pad-well moved.

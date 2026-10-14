@@ -102,11 +102,11 @@ Skip the prefixes that are not design values: `grid-cols-[…]`, `aspect-[…]`,
 ### Tailwind v4's numeric classes
 
 In v4, `p-4` is `padding: calc(var(--spacing) * 4)` ([padding](https://tailwindcss.com/docs/padding)). While the theme keeps `--spacing`, every multiple of it is a class, so the census counts each at its value (context `tailwind-spacing`): `p-4` is `1rem` at the stock `0.25rem`.
-- **The value.** The census reads `--spacing` from each stylesheet that imports `tailwindcss` (or `tailwindcss/utilities`), following its local imports in order, as Tailwind builds the theme:
+- **The value.** The census reads `--spacing` from each stylesheet that imports `tailwindcss` (or `tailwindcss/utilities`), following its imports in order, as Tailwind builds the theme (a package's from the nearest `node_modules`; a URL import is the browser's):
   - the stock value comes from the installed `tailwindcss/theme.css`, else `0.25rem` ([theme](https://tailwindcss.com/docs/theme));
   - `--*: initial`, `--spacing-*: initial` and `--spacing: initial` clear it, and a `default` block never overrides the project's.
 - **The classes.** Padding, margin, gap, `space-*`, inset, width, height and `size-*`, the `-` negatives where Tailwind has them (`-mt-4`, `-top-2`, never `-p-4`), any variants and `!`, and a project's `prefix(tw)` (`tw:p-4`). In a script they are read only where classes go: a `class` or `className` attribute, a `className={…}` expression, and the arguments of a class helper (`cn()`, `clsx()`, `cva()` and the rest of Part 5's lint plugin's list), since a bare `"p-4"` may be any data. A number counts only as Tailwind 4.3.3 takes it: a multiple of 0.25, written plainly (`p-2.5` and `p-2.25`, not `p-2.50`, `p-04` or `p-0.3`).
-- **What it does not count.** A `leading-6` is counted but not mapped: a `--type-*` role carries leading. Entries that disagree on `--spacing`, or a `--spacing` that is no length (`var(--space-1)`), count none, and the census says why.
+- **What it does not count.** A `leading-6` is counted but not mapped: a `--type-*` role carries leading. Entries that disagree on `--spacing`, a `--spacing` that is no length (`var(--space-1)`), or an import the census cannot read (a package not installed) count none, and the census says why.
 - **The rewrite.** The proposal maps each class by its role, as it maps `p-[13px]`, and the codemod rewrites only the utility, whatever its variants: `md:-mt-4` becomes `md:-mt-grouped`, and `p-4.5` is never read as `p-4`.
 
 ### Hex colors in JS strings

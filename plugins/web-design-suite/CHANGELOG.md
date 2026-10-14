@@ -57,7 +57,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
     `leading-*`, each counted at N × `--spacing` with its variants, `!`, its negative
     where Tailwind has one (`-mt-4`, never `-p-4`) and the project's `prefix(tw)`. A
     number counts only as Tailwind 4.3.3 takes it: `p-2.25` yes, `p-2.50` and `p-0.3` no.
-    Entries that disagree, or a `--spacing` that is no length, count none and say why.
+    Entries that disagree, a `--spacing` that is no length, or an import it cannot read
+    (a package not installed: its theme can set `--spacing`) count none and say why.
   - **The proposal** maps each to its role as it maps `p-[13px]` (`p-4` to `p-well`,
     `-mt-4` to `-mt-grouped`), and reports `leading-6` for its `--type-*` role. **The
     codemod** rewrites only the utility, matched whole: `md:p-4` becomes `md:p-well`, and
