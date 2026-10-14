@@ -1775,13 +1775,18 @@ def style_object_keys(inner: str) -> list[str]:
     """The property names a style object sets, one per depth-0 entry.
 
     An entry's key is what stands before its first depth-0 colon, or the whole
-    entry for a shorthand (`{ color }`); a spread or a computed key names none.
-    Reading every `'x' :` in the text took the ternary in `{ '--progress':
-    open ? '1' : '0' }` for a key named `1` (audit H8)."""
+    entry for a shorthand (`{ color }`); a computed key names none, and a
+    spread names the keys of the object literals it can evaluate to
+    (`spread_keys`). Reading every `'x' :` in the text took the ternary in
+    `{ '--progress': open ? '1' : '0' }` for a key named `1` (audit H8)."""
     names: list[str] = []
     depth, start, colon, quote, k, n = 0, 0, -1, "", 0, len(inner)
 
     def entry(end: int) -> None:
+        text = inner[start:end].strip()
+        if text.startswith("..."):
+            names.extend(spread_keys(text[3:]))
+            return
         key = inner[start:colon if colon >= 0 else end]
         m = STYLE_KEY.match(key)
         if m and (colon >= 0 or m.group(3)):
@@ -1808,6 +1813,38 @@ def style_object_keys(inner: str) -> list[str]:
         k += 1
     if inner[start:].strip():
         entry(n)
+    return names
+
+
+def spread_keys(expr: str) -> list[str]:
+    """The keys of the object literals a spread's operand can evaluate to:
+    `...{ color: 'red' }`, `...(on ? { color: 'red' } : {})`, `...(on && {…})`
+    (Codex on #132). A name (`...base`) cannot be read, and an object passed
+    to a call (`...fn({ color })`) or held in an array is not the spread."""
+    names: list[str] = []
+    opaque: list[bool] = []            # per open ( or [: a call's arguments or an array
+    k, n = 0, len(expr)
+    while k < n:
+        c = expr[k]
+        if c in "\"'`":
+            q, k = c, k + 1
+            while k < n and expr[k] != q:
+                k += 2 if expr[k] == "\\" else 1
+        elif c == "(":
+            before = expr[:k].rstrip()[-1:]
+            opaque.append(bool(before) and (before.isalnum() or before in "_$)]"))
+        elif c == "[":
+            opaque.append(True)
+        elif c in ")]":
+            if opaque:
+                opaque.pop()
+        elif c == "{":
+            end = match_braces(expr, k)
+            if not any(opaque):
+                names.extend(style_object_keys(expr[k + 1:end - 1]))
+            k = end
+            continue
+        k += 1
     return names
 
 

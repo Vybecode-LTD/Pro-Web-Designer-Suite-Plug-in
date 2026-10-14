@@ -601,7 +601,9 @@ class JsxClassesAndCssInJs(TempDirTest):
         for style in ("{{ '--progress': open ? '1' : '0' }}",
                       "{{ ...base, '--progress': open ? '1' : '0' }}",
                       "{{ '--progress': open ? '1' : '0' } as React.CSSProperties}",
-                      "{{ '--span': n, \"--lift\": raised ? 'var(--shadow-raised)' : 'none' }}"):
+                      "{{ '--span': n, \"--lift\": raised ? 'var(--shadow-raised)' : 'none' }}",
+                      "{{ ...(open ? { '--progress': '1' } : {}) }}",
+                      "{{ ...fn({ zIndex: 3 }) }}"):                 # a call's argument is not the spread
             with self.subTest(style=style):
                 self.assertEqual([], self.rules(
                     f"export const T = ({{ open, n, raised, base }}) => <div style={style} />;\n"))
@@ -610,7 +612,12 @@ class JsxClassesAndCssInJs(TempDirTest):
         for style, prop in (("{{ fontWeight: on ? 600 : 400 }}", "fontWeight"),
                             ("{{ '--progress': on ? '1' : '0', 'zIndex': 3 }}", "zIndex"),
                             ("{{ zIndex }}", "zIndex"),
-                            ("{{ zIndex: 3 } as React.CSSProperties}", "zIndex")):
+                            ("{{ zIndex: 3 } as React.CSSProperties}", "zIndex"),
+                            # Codex on #132: a spread's own object literal is set inline.
+                            ("{{ ...{ zIndex: 3 } }}", "zIndex"),
+                            ("{{ ...(on ? { zIndex: 3 } : {}) }}", "zIndex"),
+                            ("{{ ...on && { 'zIndex': 3 }, '--x': n }}", "zIndex"),
+                            ("{{ ...(on ? { ...{ zIndex: 3 } } : base) }}", "zIndex")):
             with self.subTest(style=style):
                 found = [f for f in self.findings(
                     f"export const T = ({{ on, zIndex }}) => <div style={style} />;\n")

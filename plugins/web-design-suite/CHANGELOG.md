@@ -134,7 +134,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 - **The audit read a ternary in an inline custom property as a property** (H8). In
   `style={{ '--progress': open ? '1' : '0' }}`, the one inline style the spec allows, the
   quoted `'1' :` was taken for a key and refused. A style object's keys are its depth-0
-  entries' now, in `{{ … } as CSSProperties}` and a shorthand `{{ zIndex }}` too
+  entries' now, in `{{ … } as CSSProperties}` a shorthand `{{ zIndex }}`, and a spread's own object literals
+  (`...(on ? { zIndex: 3 } : {})`, Codex on #132) too
   (`test_audit_design.JsxClassesAndCssInJs`).
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
