@@ -1460,14 +1460,26 @@ def _nest(parent: str, child: str) -> str:
     and a selector without one is a descendant of it."""
     if not parent:
         return child
-    if "," in parent:
+    if len(_selector_list(parent)) > 1:
         parent = f":is({parent})"
-    parts = []
-    for part in child.split(","):
-        part = part.strip()
-        parts.append(part.replace("&", parent) if "&" in part
-                     else f"{parent} {part}")
-    return ", ".join(parts)
+    return ", ".join(part.replace("&", parent) if "&" in part else f"{parent} {part}"
+                     for part in _selector_list(child))
+
+
+def _selector_list(selector: str) -> list[str]:
+    """A selector list's parts, split at depth-0 commas only: the comma in
+    `&:is(:hover, :focus-visible)` is not a list's (CodeRabbit on #132)."""
+    parts, depth, start = [], 0, 0
+    for i, c in enumerate(selector):
+        if c in "([":
+            depth += 1
+        elif c in ")]":
+            depth -= 1
+        elif c == "," and depth == 0:
+            parts.append(selector[start:i].strip())
+            start = i + 1
+    parts.append(selector[start:].strip())
+    return [p for p in parts if p]
 
 
 def css_rules(src: str, line_of) -> list[tuple[str, int, str, int]]:

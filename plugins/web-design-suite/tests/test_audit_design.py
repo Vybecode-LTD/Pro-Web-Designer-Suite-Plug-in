@@ -625,6 +625,17 @@ class JsxClassesAndCssInJs(TempDirTest):
                 self.assertEqual(1, len(found))
                 self.assertIn(f"property: {prop}.", found[0]["message"])
 
+    def test_a_comment_in_a_markup_files_style_object_hides_no_key(self):
+        """CodeRabbit on #132: markup (Astro) reaches the style-object reader
+        with its comments, and `/* note */ zIndex` was no key."""
+        path = self.write("src/components/Thing.astro",
+                          "---\nconst on = true;\n---\n<div style={{ /* note */ zIndex: on ? 3 : 4 }}>x</div>\n")
+        proc = run_py("web-design-studio", "audit_design", path, "--json", cwd=self.tmp)
+        data = json.loads(proc.stdout)
+        found = [f for f in (data["findings"] if isinstance(data, dict) else data) if f["rule"] == "inline-style"]
+        self.assertEqual(1, len(found), output(proc))
+        self.assertIn("property: zIndex.", found[0]["message"])
+
     def test_an_arbitrary_property_is_refused(self):
         self.assertIn("tw-arbitrary-property", [r for r, _ in self.rules(
             'export const T = () => <span className="[padding:13px] [--gap:4px]" />;\n')])

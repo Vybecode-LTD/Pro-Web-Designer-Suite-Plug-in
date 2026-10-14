@@ -360,6 +360,13 @@ class MatrixStates(TempDirTest):
                                 '<span class="chip" {attrs}>{content}</span>', ["default", "hover", "active"])
         self.assertIn(self.COVERED, output(proc))                   # the control
 
+    def test_a_focus_within_ring_covers_the_focus_visible_cell(self):
+        # CodeRabbit on #132: the cell carries focus-within, so its mirror renders.
+        proc, _ = self.generate(".chip { color: #222; }\n.chip:focus-within { outline: 2px solid #222; }\n",
+                                '<span class="chip" {attrs}>{content}</span>', ["default", "focus-visible"])
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn(self.COVERED, output(proc))
+
     def test_an_undeclared_state_names_the_way_to_declare_it(self):
         proc, _ = self.generate(".chip {}\n", '<span class="chip" {attrs}>{content}</span>',
                                 ["default", "selected"])
@@ -955,6 +962,11 @@ class A11yStaticReadsNestedRules(TempDirTest):
         self.assertIn("`.btn:focus-visible`", found[0]["message"])
         css = ".btn {\n  &:focus-visible {\n    @media (hover: hover) { outline: none; }\n  }\n}\n"
         self.assertEqual([("outline-none-no-replacement", 3)], self.rules(css))
+        # CodeRabbit on #132: a comma inside :is() is not the list's.
+        css = ".a, .b {\n  &:is(:hover, :focus-visible) { outline: none; box-shadow: 0 0 0 2px red; }\n}\n"
+        found = self.findings(css)[1]
+        self.assertEqual([("focus-ring-shadow-only", 2)], [(f["rule"], f["line"]) for f in found])
+        self.assertIn("`:is(.a, .b):is(:hover, :focus-visible)`", found[0]["message"])
 
     def test_the_controls(self):
         self.assertEqual([("outline-none-no-replacement", 1)], self.rules(".btn:focus { outline: none; }\n"))

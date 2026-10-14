@@ -88,7 +88,7 @@ STATE_MODEL: Dict[str, Dict[str, Any]] = {
         # (GT-A12).
         "attrs": {"data-force-state": "focus-visible focus focus-within"},
         "force": "focus-visible",
-        "detect": [":focus-visible", ":focus"],
+        "detect": [":focus-visible", ":focus", ":focus-within"],
         "blurb": "keyboard focus; the ring must survive forced-colors",
     },
     "active": {

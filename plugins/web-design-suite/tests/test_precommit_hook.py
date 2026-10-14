@@ -311,6 +311,27 @@ class PreCommitHook(TempDirTest):
                 self.assertIn("tier1-leak", out)
                 self.assertIn("--ocean-500", out)
 
+    def test_the_index_mode_never_writes_through_a_staged_symlink(self):
+        """CodeRabbit on #132: a staged .design-suite.json that is a symlink
+        is checked out as one, and rewriting the scratch tree's copy rewrote
+        its target, outside the scratch tree."""
+        outside = self.tmp / "outside" / "suite.json"
+        outside.parent.mkdir()
+        text = json.dumps({"schema": 1, "tokens": ["tokens.css"], "baselines": {"audit": "audit.json"}})
+        outside.write_text(text, encoding="utf-8")
+        subprocess.run([GIT, "-C", str(self.repo), "config", "core.symlinks", "true"], check=True,
+                       capture_output=True, env=env())
+        try:
+            os.symlink(outside, self.repo / ".design-suite.json")
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"no symlinks here: {exc}")
+        subprocess.run([GIT, "-C", str(self.repo), "add", ".design-suite.json"], check=True,
+                       capture_output=True, env=env())
+        self.stage("components/card.css", "@layer components {\n  .card { padding: var(--pad-card); }\n}\n")
+        code, out = self.run_hook(DESIGN_GATE_INDEX="1")
+        self.assertNotIn("Traceback", out)
+        self.assertEqual(text, outside.read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

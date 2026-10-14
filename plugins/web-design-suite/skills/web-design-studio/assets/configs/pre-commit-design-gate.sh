@@ -233,15 +233,23 @@ if [ "${DESIGN_GATE_INDEX:-0}" = "1" ]; then
   mkdir -p "$AUDIT_ROOT" || exit 1
   tr '\n' '\0' < "$STAGED" | git checkout-index -z --stdin --prefix="$AUDIT_ROOT/" || exit 1
   for f in .design-suite.json .design-baseline.json .a11y-baseline.json; do
-    if [ -f "$f" ] && [ ! -e "$AUDIT_ROOT/$f" ]; then cp "$f" "$AUDIT_ROOT/$f" || exit 1; fi
+    if [ -f "$f" ] && [ ! -e "$AUDIT_ROOT/$f" ] && [ ! -L "$AUDIT_ROOT/$f" ]; then
+      cp "$f" "$AUDIT_ROOT/$f" || exit 1
+    fi
   done
   if [ -f "$AUDIT_ROOT/.design-suite.json" ] && [ -n "$PYTHON" ]; then
     "$PYTHON" - "$REPO_ROOT" "$AUDIT_ROOT" <<'PY' || exit 1
 import codecs, json, os, shutil, sys
 repo, root = sys.argv[1], sys.argv[2]
 path = os.path.join(root, ".design-suite.json")
-with open(path, "rb") as fh:
-    raw = fh.read()
+# A staged symlink is checked out as one: read what it points at, or the
+# working tree's config when the link dangles in the scratch tree.
+try:
+    with open(path, "rb") as fh:
+        raw = fh.read()
+except OSError:
+    with open(os.path.join(repo, ".design-suite.json"), "rb") as fh:
+        raw = fh.read()
 if raw.startswith((codecs.BOM_UTF32_LE, codecs.BOM_UTF32_BE)):
     encoding = "utf-32"
 elif raw.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
@@ -258,8 +266,8 @@ def here(value, copy=False):
     is copied to the same place, since its keys are paths relative to it."""
     if not isinstance(value, str) or os.path.isabs(value):
         return value
-    if os.path.exists(os.path.join(root, value)):
-        return value        # staged: the index's copy is here
+    if os.path.lexists(os.path.join(root, value)):
+        return value        # staged: the index's copy (or link) is here
     real = os.path.normpath(os.path.join(repo, value))
     inside = not os.path.relpath(real, repo).startswith(os.pardir)
     if copy and inside and os.path.isfile(real):
@@ -277,8 +285,11 @@ if isinstance(config, dict):
         if isinstance(config.get(section), dict):
             config[section] = {k: here(v, section == "baselines")
                                for k, v in config[section].items()}
-    with open(path, "w", encoding="utf-8") as fh:
+    # Replace the entry, never write through it: a staged symlink's target
+    # is outside the scratch tree (CodeRabbit on #132).
+    with open(path + ".tmp", "w", encoding="utf-8") as fh:
         json.dump(config, fh, indent=2)
+    os.replace(path + ".tmp", path)
 PY
   fi
 fi

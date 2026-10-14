@@ -1779,6 +1779,7 @@ def style_object_keys(inner: str) -> list[str]:
     spread names the keys of the object literals it can evaluate to
     (`spread_keys`). Reading every `'x' :` in the text took the ternary in
     `{ '--progress': open ? '1' : '0' }` for a key named `1` (audit H8)."""
+    inner = strip_js_comments(inner)   # `{ /* note */ color: … }` (CodeRabbit on #132)
     names: list[str] = []
     depth, start, colon, quote, k, n = 0, 0, -1, "", 0, len(inner)
 

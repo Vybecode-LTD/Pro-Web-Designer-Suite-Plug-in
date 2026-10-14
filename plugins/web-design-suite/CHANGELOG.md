@@ -108,7 +108,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   rules were pooled: any `box-shadow` beside an `outline: none` counted as its ring, and
   the focus test read the at-rule's prelude. The starter's `base.css` is all `@layer
   base`, so a reset planted there passed. Each rule is now read on its own at any depth,
-  a nested `&` rule against its parent. Reading them found two more: a comment's newlines
+  a nested `&` rule against its parent (a comma inside `:is()` is not the list's,
+  CodeRabbit on #132). Reading them found two more: a comment's newlines
   were blanked, so every line after a multi-line comment was misnumbered and its ignore
   comment missed; and a focus rule that moves a skip link on-screen (`translate: 0 0`)
   was called invisible (`test_content_and_a11y.A11yStaticReadsNestedRules`).
@@ -117,7 +118,9 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   none, and `.chip { &:hover {…} }` mirrored as `&[data-force-state~="hover"]`, which
   matches nothing; the summary still said every state had a rule. States inside `:is()`
   and `:where()` are mirrored, a nested rule is read with its parent, and a forced state
-  is covered only when a mirror was written (`test_content_and_a11y.MatrixStates`,
+  is covered only when a mirror was written; a `:focus-within` ring covers the
+  focus-visible cell, which carries it (CodeRabbit on #132)
+  (`test_content_and_a11y.MatrixStates`,
   `test_browser_runtime.MatrixSeesStateChanges`).
 - **The accessibility gate did not know Vue's or Angular's bindings** (H6). `<img
   :alt="d">` had no alt and a bound `aria-label` no label, so a Vue project with the hook
@@ -130,12 +133,15 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   no baseline: a baselined finding refused the commit, and a project ramp's primitive
   passed. The tree now holds `.design-suite.json`, its baselines at their own paths (their
   keys are relative to them) and the default baselines; a token file the config names
-  that is not staged is read from the working tree (`test_precommit_hook.PreCommitHook`).
+  that is not staged is read from the working tree. A staged symlink is replaced in the
+  scratch tree, never written through (CodeRabbit on #132)
+  (`test_precommit_hook.PreCommitHook`).
 - **The audit read a ternary in an inline custom property as a property** (H8). In
   `style={{ '--progress': open ? '1' : '0' }}`, the one inline style the spec allows, the
   quoted `'1' :` was taken for a key and refused. A style object's keys are its depth-0
   entries' now, in `{{ … } as CSSProperties}` a shorthand `{{ zIndex }}`, and a spread's own object literals
-  (`...(on ? { zIndex: 3 } : {})`, Codex on #132) too
+  (`...(on ? { zIndex: 3 } : {})`, Codex on #132) too, and a comment before a key in
+  markup hides it no longer (CodeRabbit on #132)
   (`test_audit_design.JsxClassesAndCssInJs`).
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
