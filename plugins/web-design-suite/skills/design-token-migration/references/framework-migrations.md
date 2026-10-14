@@ -332,6 +332,43 @@ export default {
 
 `extend` leaves `p-4`, `bg-neutral-800` and `text-sm` alive next to yours — two scales in one codebase and a drift nobody can grep for. A top-level key removes the stock classes, so an off-scale class **does not exist**: Tailwind generates no CSS for it. That is silent, not a build error. The element simply ships unstyled, so the lint rules are what find it (Part 5 of `eslint.design.config.mjs`). The config shape is Law 3; the lint rules enforce it.
 
+**In v4 the theme is CSS, and the trap moves.** `p-4` is `calc(var(--spacing) * 4)` ([padding](https://tailwindcss.com/docs/padding)): while the theme keeps the one `--spacing` variable, every multiple of it is a class, `p-4`, `gap-2.5` and `-mt-4` alike. Named keys beside it replace nothing:
+
+<!-- tw-migrate:wrong -->
+```css
+/* example: wrong. In v4, a named key beside the stock --spacing: p-4 still generates */
+@import "tailwindcss";
+@theme {
+  --spacing-card: var(--pad-card);
+}
+```
+
+<!-- tw-migrate:right -->
+```css
+/* RIGHT in v4: clear the stock theme, then give each role its key */
+@import "tailwindcss";
+@theme {
+  --*: initial;
+  --spacing-0: var(--space-0);
+  --spacing-fused: var(--gap-fused);     --spacing-tight: var(--gap-tight);
+  --spacing-related: var(--gap-related); --spacing-grouped: var(--gap-grouped);
+  --spacing-separate: var(--gap-separate); --spacing-distinct: var(--gap-distinct);
+  --spacing-inline-sm: var(--pad-inline-sm); --spacing-inline-md: var(--pad-inline-md);
+  --spacing-block-sm: var(--pad-block-sm);   --spacing-block-md: var(--pad-block-md);
+  --spacing-card: var(--pad-card);       --spacing-well: var(--pad-well);
+}
+```
+
+`--*: initial` clears every namespace, colours and breakpoints too, so the annotated `theme.css` gives back each one the system uses. `--spacing-*: initial` alone also takes `--spacing` with it: Tailwind 4.3.3 then generates no `p-4`, though its [theme page](https://tailwindcss.com/docs/theme) does not say so.
+
+**Run the census before Move 1.** Until the theme clears `--spacing`, the census counts each numeric class at its value, the proposal maps it to a role, and the codemod rewrites it with the arbitrary values in Move 2: `p-4` becomes `p-well`, and `-mt-4` `-mt-grouped` (extraction-and-clustering.md has the rules). Afterwards, a `p-4` left in the markup generates nothing, and the census says so instead of counting it.
+
+**Then check Move 1 with the project's own Tailwind.** `tw_probe.mjs` (stack-tailwind.md §2.9, `/web-design-suite:tw-probe`) compiles the entry and exits 1 while a refused class still generates:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/tw_probe.mjs" --refuse p-4 --refuse gap-2.5 --refuse -mt-4 p-card
+```
+
 The full annotated config is `assets/configs/tailwind.config.ts` (v3) or `assets/configs/theme.css` (v4) in the `web-design-studio` skill. Do not hand-write it.
 
 ### Move 2 — sweep the arbitrary values
@@ -357,7 +394,7 @@ Three Tailwind-specific things the sweep does not fix:
 
 | Left behind | Why | Fix |
 |---|---|---|
-| `text-white`, `bg-gray-100` — stock classes | Not arbitrary, so not in the census. They stop existing when the theme is replaced, silently: no CSS and no build error, just an unstyled element | Fix during Move 1: the design ESLint config finds them (its Part 5), and a visual diff of each screen confirms |
+| `text-white`, `bg-gray-100` — stock colour and type classes | Not arbitrary, so not in the census (only v4's numeric spacing classes are, until Move 1). They stop existing when the theme is replaced, silently: no CSS and no build error, just an unstyled element | Fix during Move 1: the design ESLint config finds them (its Part 5), and a visual diff of each screen confirms |
 | `space-x-4` / `space-y-4` | Compiles to child margins with a `:not(:last-child)` selector — the Law 2 double-ownership problem behind a nicer name | `gap-*` on the parent |
 | `!p-4` (important modifier) | Inverts layer order, same as `!important` | Fix the layer or the variant |
 

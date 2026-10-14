@@ -53,7 +53,7 @@ import time
 import unittest
 
 import test_starter_css as starter
-from wds_support import SKILLS, TempDirTest, env, output, run_py, temp_dir
+from wds_support import SKILLS, TempDirTest, env, load_script, output, run_py, temp_dir
 
 GIT = shutil.which("git")
 CSS = ".card { margin: 13px; }\n"
@@ -801,6 +801,171 @@ class TheCensusReadsEveryStyleSource(TempDirTest):
                          "<template>\n  <div style=\"margin: 13px\">x</div>\n</template>\n"
                          "<style lang=\"scss\">\n.card { margin: var(--gap-related); } // margin: 13px\n</style>\n",
                          output(proc))
+
+
+class TheV4SpacingCensus(TempDirTest):
+    """LC-B5 (P36): in Tailwind v4, `p-4` is `calc(var(--spacing) * 4)`, so a
+    theme that keeps `--spacing` has every numeric class, and the census counted
+    none of them. A migration sized from it came in short, and the codemod left
+    each one behind. Each Tailwind fact here was asked of 4.3.3, the tooling's."""
+
+    extract = MigrationPipeline.extract
+    cluster = MigrationPipeline.cluster
+    CARD = ('export const C = () => (\n'
+            '  <div className="p-4 md:px-3 -mt-4 gap-2.5 hover:p-6! p-0 p-0.3 p-04 -p-4 w-px text-sm">\n'
+            '    <span className={cn("gap-4", ok && "leading-6")}>x</span>\n'
+            '  </div>\n);\n')
+
+    def counted(self, data):
+        return [(l["raw"], l["normalized"], l["prop"]) for l in data["literals"]
+                if l["context"] == "tailwind-spacing"]
+
+    def project(self, theme="@theme {\n  --color-brand: #2f6df6;\n}\n", entry='@import "tailwindcss";\n'):
+        self.write("src/app.css", entry + '@import "./theme.css";\n')
+        self.write("src/theme.css", theme)
+        self.write("src/Card.tsx", self.CARD)
+        return self.extract("src")
+
+    def said(self, data, text):
+        self.assertTrue(any(text in p for p in data["problems"]), data["problems"])
+
+    def apply(self, mapping, src="src"):
+        proc = run_py("design-token-migration", "apply_codemod", "-m", mapping, "--apply", src, cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+
+    def test_each_numeric_class_is_counted_at_the_stock_spacing(self):
+        _, data = self.project()
+        self.assertEqual(self.counted(data), [
+            ("p-4", "1rem", "tw:p"), ("px-3", "0.75rem", "tw:px"), ("-mt-4", "-1rem", "tw:mt"),
+            ("gap-2.5", "0.625rem", "tw:gap"), ("p-6", "1.5rem", "tw:p"),
+            ("gap-4", "1rem", "tw:gap"), ("leading-6", "1.5rem", "tw:leading")])
+        self.assertEqual((data["tailwind"]["spacing"], data["tailwind"]["counted"]), ("0.25rem", 7))
+        self.said(data, "counted 7 numeric Tailwind class(es) (p-4 is 4 x --spacing) at --spacing: 0.25rem, "
+                        "from Tailwind's stock theme through src/app.css")
+
+    def test_the_project_spacing_is_the_multiplier(self):
+        _, data = self.project("@theme {\n  --spacing: 4px;\n}\n@theme default {\n  --spacing: 8px;\n}\n")
+        self.assertIn(("p-4", "16px", "tw:p"), self.counted(data))     # a later default block overrides nothing
+        self.assertIn(("-mt-4", "-16px", "tw:mt"), self.counted(data))
+        self.assertEqual(data["tailwind"]["entries"][0]["source"], "src/theme.css")
+
+    def test_the_installed_tailwind_gives_the_stock_spacing(self):
+        self.write("node_modules/tailwindcss/theme.css", "@theme default {\n  --spacing: 0.3rem;\n}\n")
+        _, data = self.project()
+        self.assertIn(("p-4", "1.2rem", "tw:p"), self.counted(data))
+        self.assertEqual(data["tailwind"]["entries"][0]["source"], "node_modules/tailwindcss/theme.css")
+
+    def test_a_theme_that_clears_spacing_has_no_numeric_class(self):
+        # `--spacing-*: initial` takes `--spacing` with it: 4.3.3 generates no p-4.
+        for clear in ("--*: initial;", "--spacing-*: initial;", "--spacing: initial;"):
+            with self.subTest(clear=clear):
+                _, data = self.project(f"@theme {{\n  {clear}\n  --spacing-well: var(--pad-well);\n}}\n")
+                self.assertEqual(self.counted(data), [])
+                self.said(data, "src/app.css clears --spacing, so a numeric class (p-4) generates nothing")
+
+    def test_named_keys_alone_leave_every_numeric_class(self):
+        # The trap framework-migrations.md §5 names: adding --spacing-* keys replaces nothing.
+        _, data = self.project("@theme {\n  --spacing-well: var(--pad-well);\n}\n")
+        self.assertIn(("p-4", "1rem", "tw:p"), self.counted(data))
+
+    def test_a_spacing_that_is_no_length_is_reported(self):
+        _, data = self.project("@theme inline {\n  --spacing: var(--space-1);\n}\n")
+        self.assertEqual(self.counted(data), [])
+        self.said(data, "--spacing is `var(--space-1)` (src/theme.css), not a length the census can multiply")
+
+    def test_without_a_v4_entry_no_class_is_counted(self):
+        self.write("src/app.css", "@tailwind base;\n@tailwind utilities;\n")
+        self.write("src/Card.tsx", self.CARD)
+        _, data = self.extract("src")
+        self.assertEqual(self.counted(data), [])
+        self.assertNotIn("tailwind", data)
+
+    def test_entries_that_disagree_count_none(self):
+        self.write("app/a.css", '@import "tailwindcss";\n')
+        self.write("app/b.css", '@import "tailwindcss";\n@theme {\n  --spacing: 4px;\n}\n')
+        self.write("app/Card.tsx", self.CARD)
+        _, data = self.extract("app")
+        self.assertEqual(self.counted(data), [])
+        self.said(data, "the Tailwind v4 entries disagree on --spacing (app/a.css 0.25rem, app/b.css 4px)")
+
+    def test_the_proposal_maps_them_and_the_codemod_rewrites_them(self):
+        self.write("src/Panel.vue", '<template>\n  <div class="p-4 md:gap-4">x</div>\n</template>\n')
+        literals, _ = self.project()
+        mapping, report = self.cluster(literals)
+        rules = {r["match"][0]: r["replacement"] for r in mapping["rules"] if r["scope"] == "tailwind"}
+        for match, replacement in (("p-4", "p-well"), ("px-3", "px-inline-sm"), ("-mt-4", "-mt-grouped"),
+                                   ("p-6", "p-card"), ("gap-4", "gap-grouped")):
+            self.assertEqual(rules.get(match), replacement, rules)
+        self.assertNotIn("leading-6", rules)
+        self.assertIn("Remove leading-6 once the element's text class reads a --type-* role", report)
+        self.apply(self.tmp / "proposal" / "mapping.json")
+        card = self.tmp.joinpath("src", "Card.tsx").read_text(encoding="utf-8")
+        self.assertRegex(card, r'className="p-well md:px-inline-sm -mt-grouped gap-\w+ hover:p-card! '
+                               r'p-0 p-0\.3 p-04 -p-4 w-px text-sm"')
+        self.assertIn('class="p-well md:gap-grouped"', self.tmp.joinpath("src", "Panel.vue").read_text(encoding="utf-8"))
+
+    def test_a_numeric_rule_rewrites_only_its_own_class(self):
+        mapping = self.write("mapping.json", json.dumps({
+            "schema": "design-token-migration/mapping@1",
+            "rules": [{"id": "tw-p", "kind": "spacing", "scope": "tailwind", "match": ["p-4"],
+                       "replacement": "p-well", "confidence": "exact"}]}))
+        card = self.write("src/Card.tsx", 'export const C = () => <div className="p-4 p-4.5 -p-4 sp-4 '
+                                          'md:p-4 p-4! [&:hover]:p-4 p-40" />;\n')
+        self.apply(mapping)
+        self.assertIn('className="p-well p-4.5 -p-4 sp-4 md:p-well p-well! [&:hover]:p-well p-40"',
+                      card.read_text(encoding="utf-8"))
+
+    def test_a_prefix_is_part_of_the_class(self):
+        self.write("src/app.css", '@import "tailwindcss" prefix(tw);\n')
+        card = self.write("src/Card.tsx", 'export const C = () => <div className="tw:p-4 tw:md:px-3 p-4" />;\n')
+        literals, data = self.extract("src")
+        self.assertEqual(self.counted(data), [("tw:p-4", "1rem", "tw:p"), ("tw:px-3", "0.75rem", "tw:px")])
+        self.cluster(literals)
+        self.apply(self.tmp / "proposal" / "mapping.json")
+        self.assertIn('className="tw:p-well tw:md:px-inline-sm p-4"', card.read_text(encoding="utf-8"))
+
+
+class ColoursKeepTheirFamily(TempDirTest):
+    """N40 (R3.6's live check): the proposal matched a colour to a role by ΔE
+    alone, so the grey #6b7280 became --fg-warning. A neutral lands on a
+    neutral role, a status hue on its status, and ΔE ranks within the family."""
+
+    def ramps(self, cv):
+        accent = cv.build_accent_ramp(cv.parse_any_color("#2f6df6")[0], "accent")
+        status = {name: cv.Ramp(name, dict(steps)) for name, steps in cv.STATUS_RAMPS.items()}
+        return {"neutral": cv.build_neutral_ramp(75.0), "accent": accent, **status}
+
+    def test_the_grey_of_the_live_check_lands_on_a_neutral_role(self):
+        self.write("src/card.css", ".meta { color: #6b7280; }\n.title { color: #111827; }\n"
+                                   ".link { color: #2f6df6; }\n")
+        mapping, _ = MigrationPipeline.cluster(self, MigrationPipeline.extract(self, "src")[0])
+        cv = load_script("design-token-migration", "cluster_values")
+        token = next(r["token"] for r in mapping["rules"] if "#6b7280" in r["match"])
+        self.assertIn(token, set(cv.FG_ROLE_BY_STEP.values()))
+
+    def test_each_colour_keeps_its_family(self):
+        cv = load_script("design-token-migration", "cluster_values")
+        ramps = self.ramps(cv)
+        families = {
+            "neutral": ["#6b7280", "#64748b", "#94a3b8", "#374151", "#1e293b", "#0f172a", "#71717a",
+                        "#78716c", "#f8fafc", "#e5e7eb"],
+            "warning": ["#fff8e1", "#fffbeb", "#fefce8", "#f59e0b", "#a16207"],
+            "danger": ["#fef2f2", "#dc2626"], "success": ["#ecfdf5", "#f0fdf4", "#16a34a"],
+            "accent": ["#eff6ff", "#2f6df6", "#3b82f6"],
+        }
+        for family, colours in families.items():
+            for colour in colours:
+                with self.subTest(colour=colour):
+                    lab = cv.rgb_to_oklab(cv.parse_any_color(colour)[0])
+                    self.assertEqual(cv.nearest_ramp_step(lab, ramps)[0], family)
+
+    def test_absolute_chroma_cannot_tell_a_grey_from_a_tint(self):
+        # is_neutral()'s docstring: a slate grey has more chroma than a red tint.
+        cv = load_script("design-token-migration", "cluster_values")
+        for colour, chroma, neutral in (("#0f172a", 0.040, True), ("#fef2f2", 0.013, False)):
+            with self.subTest(colour=colour):
+                L, C, H = cv.oklab_to_oklch(*cv.rgb_to_oklab(cv.parse_any_color(colour)[0]))
+                self.assertEqual((round(C, 3), cv.is_neutral(L, C, H)), (chroma, neutral))
 
 
 if __name__ == "__main__":

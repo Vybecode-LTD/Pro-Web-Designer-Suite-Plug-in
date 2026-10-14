@@ -506,13 +506,31 @@ TW_COLOR_CLASS = {
 }
 
 
+# The census's Tailwind contexts: an arbitrary value (`p-[13px]`), and a v4
+# numeric class counted at the theme's `--spacing` (`p-4`).
+TW_CONTEXTS = {"tailwind-arbitrary", "tailwind-spacing"}
+
+
+def tw_utility_prefix(raw: str) -> str:
+    """The utility a Tailwind class's rule keeps: `md:px` of `md:px-[18px]`,
+    `-mt` of `-mt-4` (a numeric class's rule rewrites only its utility, so
+    the project prefix of `tw:p-4` stays where it is)."""
+    if "-[" in raw:
+        return raw.split("-[")[0]
+    return raw.split(":")[-1].rsplit("-", 1)[0]
+
+
 def tw_prop_class(prefix: str) -> str:
     if prefix in {"p", "size"}:
         return "pad-all"
     if prefix in {"px", "pl", "pr", "ps", "pe"}:
         return "pad-inline"
-    if prefix in {"py", "pt", "pb"}:
+    if prefix in {"py", "pt", "pb", "pbs", "pbe"}:
         return "pad-block"
+    if prefix == "leading":
+        return "leading"
+    if prefix in {"inset", "inset-x", "inset-y", "top", "right", "bottom", "left"}:
+        return "inset"
     # Before the margin test: max-w/min-w/max-h/min-h start with "m" too.
     if prefix in {"w", "h", "min-w", "max-w", "min-h", "max-h"}:
         return "size"
@@ -809,33 +827,67 @@ def project_ramps(tokens: ProjectTokens, prop: Proposal) -> Dict[str, Dict[int, 
     return out
 
 
+NEUTRAL_SHARE = 0.5      # under this share of the chroma sRGB holds, a colour is a neutral
+
+
+def max_chroma(L: float, H: float) -> float:
+    """The most chroma sRGB holds at this lightness and hue."""
+    lo, hi = 0.0, 0.5
+    for _ in range(24):
+        mid = (lo + hi) / 2
+        if all(-1e-6 <= c <= 1 + 1e-6 for c in oklch_to_rgb(L, mid, H)):
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
+def is_neutral(L: float, C: float, H: float) -> bool:
+    """A grey, however cool or warm: its chroma is under half of what sRGB
+    holds at its lightness and hue. Absolute chroma cannot tell: the slate
+    grey #0f172a has C 0.040 and is a neutral, the red tint #fef2f2 C 0.013
+    and is a danger tint (test_token_migration measures both)."""
+    if C < ACHROMATIC_C:
+        return True
+    cap = max_chroma(L, H)
+    return cap <= 0.0 or C / cap < NEUTRAL_SHARE
+
+
 def nearest_ramp_step(lab: Tuple[float, float, float],
                       ramps: Dict[str, Ramp]) -> Tuple[str, int, float]:
-    """Nearest (ramp, step) to a color, by OKLab dE.
+    """Nearest (ramp, step) to a color: its family first, then OKLab dE (N40).
 
-    A tint may not land on a neutral step. Near white, OKLab compresses hard
-    enough that `#fff8e1` measures marginally closer to `--neutral-50` than to
-    `--warning-100`, which would quietly turn a notice background into the page
-    canvas. Chroma is the design intent here and dE is not allowed to overrule
-    it — the same rule the clustering guard applies.
+    By dE alone, the grey `#6b7280` landed on `--warning-700` (R3.6's live
+    check): its little chroma kept it off the neutral steps, and the nearest of
+    the rest was a status colour of the opposite hue. So a neutral lands only
+    on the neutral ramp, and a colour only on a step within HUE_GUARD_DEG of its
+    hue, a status hue on its status; dE ranks within the family. A tint still
+    never lands on a neutral step: near white, OKLab compresses hard enough that
+    `#fff8e1` measures closer to `--neutral-50` than to `--warning-100`, which
+    would quietly turn a notice background into the page canvas.
     """
-    _L, C, _H = oklab_to_oklch(*lab)
-    tinted = C >= TINT_C
-    best = ("", 0, math.inf)
-    for name, ramp in ramps.items():
-        for step, (_sl, sc, _sh) in ramp.steps.items():
-            if tinted and sc < CHROMATIC_C:
-                continue
-            d = delta_e_ok(lab, rgb_to_oklab(ramp.rgb(step)))
-            if d < best[2]:
-                best = (name, step, d)
-    if not best[0]:                      # every step filtered out: fall back
+    L, C, H = oklab_to_oklch(*lab)
+    neutral = is_neutral(L, C, H)
+
+    def nearest(hue_bound: bool, family: bool = True) -> Tuple[str, int, float]:
+        best = ("", 0, math.inf)
         for name, ramp in ramps.items():
-            for step in ramp.steps:
+            if family and (name == "neutral") != neutral:
+                continue
+            for step, (_sl, _sc, sh) in ramp.steps.items():
+                if hue_bound and abs(((H - sh + 180.0) % 360.0) - 180.0) > HUE_GUARD_DEG:
+                    continue
                 d = delta_e_ok(lab, rgb_to_oklab(ramp.rgb(step)))
                 if d < best[2]:
                     best = (name, step, d)
-    return best
+        return best
+
+    # A colour of no ramp's hue (a second brand colour) takes the nearest
+    # chromatic step, and its dE puts the rule up for review.
+    best = nearest(not neutral)
+    if not best[0]:
+        best = nearest(False)
+    return best if best[0] else nearest(False, family=False)
 
 
 # Ramp step -> Tier-2 role, per property class. This table IS the color half of
@@ -1109,14 +1161,25 @@ def cluster_spacing(lits: Sequence[dict], tol: float, prop: Proposal,
         table = PROP_CLASS_TABLE.get(klass)
         for px in sorted(by_class[klass]):
             items = by_class[klass][px]
+            if klass == "leading":                 # v4's leading-6: a line height, not a gap
+                prop.unmapped.append(Unmapped(
+                    kind="line-height", value=f"{px:g}px", occurrences=len(items),
+                    where=where_of(items),
+                    reason="a --type-* role already carries leading in its font shorthand",
+                    recommendation=f"Remove {', '.join(sorted({l['raw'] for l in items}))} "
+                                   f"once the element's text class reads a --type-* role "
+                                   f"(text-body), which sets its line height. Two sources "
+                                   f"for leading is how a heading ends up at body leading.",
+                ))
+                continue
             # Strip the sign: the rule is about the MAGNITUDE. A `-13px`
             # listed as its own match would be replaced by a bare
             # `var(--gap-related)`, silently flipping a negative margin
             # positive. apply_codemod re-applies the sign as
             # `calc(var(--token) * -1)`.
             raws = sorted({l["normalized"].lstrip("-") for l in items})
-            tw_items = [l for l in items if l["context"] == "tailwind-arbitrary"]
-            css_items = [l for l in items if l["context"] != "tailwind-arbitrary"]
+            tw_items = [l for l in items if l["context"] in TW_CONTEXTS]
+            css_items = [l for l in items if l["context"] not in TW_CONTEXTS]
             snapped = snap_to_scale(px, SPACE_PX, tol, weights, tie_prefers="down")
             if snapped is None:
                 nearest = min(SPACE_PX, key=lambda s: abs(s - px))
@@ -1172,7 +1235,7 @@ def cluster_spacing(lits: Sequence[dict], tol: float, prop: Proposal,
                 key = TOKEN_TW_KEY.get(token)
                 if key:
                     for tw in sorted({l["raw"] for l in tw_items}):
-                        prefix = tw.split("-[")[0]
+                        prefix = tw_utility_prefix(tw)
                         prop.rules.append(Rule(
                             id=f"tw-{rid:03d}-{prefix}", kind="spacing",
                             scope="tailwind", match=[tw],
@@ -1181,7 +1244,8 @@ def cluster_spacing(lits: Sequence[dict], tol: float, prop: Proposal,
                             occurrences=sum(1 for l in tw_items if l["raw"] == tw),
                             delta_px=round(delta, 3), confidence=confidence,
                             note=note or "Tailwind theme key, see "
-                                         "assets/configs/tailwind.config.ts",
+                                         "assets/configs/tailwind.config.ts (v3) "
+                                         "or theme.css (v4)",
                         ))
                 else:
                     prop.unmapped.append(Unmapped(
@@ -1189,9 +1253,10 @@ def cluster_spacing(lits: Sequence[dict], tol: float, prop: Proposal,
                         occurrences=len(tw_items), where=where_of(tw_items),
                         reason=f"snaps to {step:g}px, which the Tailwind theme "
                                f"exposes under no spacing key",
-                        recommendation="Add a theme key in tailwind.config.ts "
-                                       "pointing at the Tier-2 role, or move the "
-                                       "value to a rung the ladder already has.",
+                        recommendation="Add a theme key pointing at the Tier-2 role "
+                                       "(tailwind.config.ts in v3, an @theme "
+                                       "--spacing-* in v4), or move the value to a "
+                                       "rung the ladder already has.",
                     ))
 
 
@@ -1290,8 +1355,8 @@ def cluster_type(lits: Sequence[dict], tol: float, prop: Proposal) -> None:
             note = (f"{px:g}px was equidistant; snapped {'UP' if delta > 0 else 'DOWN'} "
                     f"to {step:g}px." + (" Text does not shrink to settle a tie."
                                          if delta > 0 else ""))
-        css_items = [l for l in items if l["context"] != "tailwind-arbitrary"]
-        tw_items = [l for l in items if l["context"] == "tailwind-arbitrary"]
+        css_items = [l for l in items if l["context"] not in TW_CONTEXTS]
+        tw_items = [l for l in items if l["context"] in TW_CONTEXTS]
         if css_items:
             prop.rules.append(Rule(
                 id=f"ty-{i:03d}", kind="type", scope="declaration",
@@ -1347,8 +1412,8 @@ def cluster_simple(lits: Sequence[dict], steps: Sequence[Tuple[float, str]],
         step, delta, _tie = got
         token = name[step]
         confidence = "exact" if abs(delta) < 1e-9 else "snapped"
-        css_items = [l for l in items if l["context"] != "tailwind-arbitrary"]
-        tw_items = [l for l in items if l["context"] == "tailwind-arbitrary"]
+        css_items = [l for l in items if l["context"] not in TW_CONTEXTS]
+        tw_items = [l for l in items if l["context"] in TW_CONTEXTS]
         if css_items:
             prop.rules.append(Rule(
                 id=f"{kind[:2]}-{i:03d}", kind=kind, scope="value",
@@ -1411,8 +1476,8 @@ def cluster_motion(lits: Sequence[dict], tol: float, prop: Proposal) -> None:
         step, delta, _ = got
         token = dict(DUR_STEPS)[step]
         role = next(r for limit, r in MOTION_ROLE if ms <= limit)
-        css_items = [l for l in items if l["context"] != "tailwind-arbitrary"]
-        tw_items = [l for l in items if l["context"] == "tailwind-arbitrary"]
+        css_items = [l for l in items if l["context"] not in TW_CONTEXTS]
+        tw_items = [l for l in items if l["context"] in TW_CONTEXTS]
         if css_items:
             # Two rules, deliberately. A whole `transition: opacity 250ms ease`
             # collapses to the Tier-2 PAIR, because a duration and an easing
@@ -1839,7 +1904,7 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
             prop.provenance[role].append(
                 f"{', '.join(c.members)} x{len(items)} ({klass})")
 
-            tw_items = [l for l in items if l["context"] == "tailwind-arbitrary"]
+            tw_items = [l for l in items if l["context"] in TW_CONTEXTS]
             tw_key = TW_COLOR_KEY.get(role)
             if tw_items and tw_key:
                 for tw in sorted({l["raw"] for l in tw_items}):

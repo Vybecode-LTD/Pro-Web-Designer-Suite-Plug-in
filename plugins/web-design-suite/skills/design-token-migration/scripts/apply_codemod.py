@@ -86,7 +86,7 @@ try:                                                # python -m scripts.apply_co
         STYLED_TAG_RE, CLASSNAME_RE, CLASSLIST_STRING_RE, CSS_EXT, JS_EXT,
         SKIP_DIRS, is_vendor, is_token_file, GENERATED_MARKERS, norm_path,
         MARKUP_EXT, PLAIN_CSS_EXT, style_blocks, script_blocks, template_of, keep_only,
-        Slot, split_slots, line_comments,
+        Slot, split_slots, line_comments, TW_TOKEN_RE, tw_utility,
     )
 except ImportError:                                 # python scripts/apply_codemod.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -97,7 +97,7 @@ except ImportError:                                 # python scripts/apply_codem
         STYLED_TAG_RE, CLASSNAME_RE, CLASSLIST_STRING_RE, CSS_EXT, JS_EXT,
         SKIP_DIRS, is_vendor, is_token_file, GENERATED_MARKERS, norm_path,
         MARKUP_EXT, PLAIN_CSS_EXT, style_blocks, script_blocks, template_of, keep_only,
-        Slot, split_slots, line_comments,
+        Slot, split_slots, line_comments, TW_TOKEN_RE, tw_utility,
     )
 
 LENGTH_RE = re.compile(r"^(-?\d*\.?\d+)(px|rem|em|pt|pc|in|cm|mm|q)$", re.IGNORECASE)
@@ -755,6 +755,8 @@ def plan_classes(matches, text: str, mapping: Mapping,
         if any(a <= base < b for a, b in consumed):
             continue
         for tok, rule in mapping.tw_rules.items():
+            if "[" not in tok:
+                continue                      # a numeric class: token by token, below
             for hit in re.finditer(re.escape(tok) + r"(?![\w\[-])", group):
                 span = (base + hit.start(), base + hit.end())
                 if span in seen:
@@ -763,6 +765,24 @@ def plan_classes(matches, text: str, mapping: Mapping,
                 edits.append(Edit(
                     span[0], span[1], rule["replacement"], rule["id"],
                     rule["kind"], text.count("\n", 0, span[0]) + 1, tok))
+        # A v4 numeric class (`p-4`, the project prefix's `tw:p-4`) is matched
+        # as a whole utility, whatever its variants and `!`, so `p-4` is never
+        # found inside `p-4.5`, `-p-4` or `sp-4`; only the utility is rewritten.
+        for hit in TW_TOKEN_RE.finditer(group) if mapping.tw_rules else ():
+            variants, utility, at = tw_utility(hit.group(0))
+            keys = ([f"{variants[0]}:{utility}"] if variants else []) + [utility]
+            rule = next((mapping.tw_rules[k] for k in keys
+                         if "[" not in k and k in mapping.tw_rules), None)
+            if rule is None:
+                continue
+            start = base + hit.start() + at
+            span = (start, start + len(utility))
+            if span in seen:
+                continue
+            seen.add(span)
+            edits.append(Edit(
+                span[0], span[1], rule["replacement"], rule["id"],
+                rule["kind"], text.count("\n", 0, span[0]) + 1, utility))
     return edits
 
 

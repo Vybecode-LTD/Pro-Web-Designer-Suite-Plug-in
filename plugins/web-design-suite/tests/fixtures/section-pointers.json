@@ -1014,6 +1014,12 @@
   "heading": "Bootstrap, Material and other framework overrides"
  },
  {
+  "from": "design-token-migration/references/framework-migrations.md",
+  "to": "web-design-studio/references/stack-tailwind.md",
+  "section": "2.9",
+  "heading": "Check what the theme generates: `tw_probe`"
+ },
+ {
   "from": "design-token-migration/references/migration-strategies.md",
   "to": "design-token-migration/references/framework-migrations.md",
   "section": "6",
