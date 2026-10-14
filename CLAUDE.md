@@ -55,7 +55,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 - **Backslashes in heredocs.** The Bash tool unescapes `\\` inside heredocs, so write Python that contains backslash escapes with the Edit tool.
 - **Linked `node_modules`.** The real-tool tests give their temp project a linked `node_modules`: a junction on Windows. Remove a junction with Python's `os.rmdir`, never `rm -rf`.
 - **stylelint 17** writes its JSON report to stderr, clean or not; stdout stays empty.
-- **eslint-plugin-better-tailwindcss** reads `entryPoint` and `tailwindConfig` from the working directory, so Part 5 anchors them at the project: ESLint 10 loads a config from whichever folder it lints.
+- **eslint-plugin-better-tailwindcss** resolves `tailwindcss`, and reads `entryPoint` and `tailwindConfig`, from its `cwd` setting, ESLint's working directory unless set. Part 5 sets `cwd` to the project and anchors both paths there (#125): ESLint 10 loads a config from whichever folder it lints.
 - **Never write into OneDrive** or the folders redirected into it (Documents, Desktop, Pictures, Music, Videos). Downloads is safe.
 - **The desktop app is an MSIX package.** Its bundled CLI is really in `C:\Users\vybec\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude-code\`; Claude's tools see it under `%APPDATA%`, the owner's terminal does not. Give the owner the real path.
 - **Evals are real model calls** on the owner's account. From the plugin: `claude plugin eval . --tag routing --ablation none --trust-plugin --no-publish --model claude-sonnet-5-5 --output-dir <scratchpad>` with the bundled CLI (signed in, 2026-10-10), about $0.09 a routing run. Ask the owner before any run.
@@ -82,7 +82,7 @@ plugins/web-design-suite/         the plugin (the only folder that ships)
   shared/token-contract.md        the master copy of the contract (13 copies must match it)
   shared/dtcg.py                  DTCG 2025.10 and Tokens Studio, read and write (a copy beside each project_config.py)
   hooks/                          hooks.json and design_hooks.mjs: the opt-in gate, token diff and guard, the router
-  workflow-commands/              the fifteen commands only the user invokes (/gate, /new-system, /deck...), added by plugin.json's `skills`
+  workflow-commands/              the sixteen commands only the user invokes (/gate, /new-system, /deck...), added by plugin.json's `skills`
   agents/                         the six subagents (design-critic, gate-runner, the auditors and reviewers)
   mcp/, .mcp.json                 the MCP server: the gates as tools (node design_gates.mjs)
   evals/                          claude plugin eval cases: routing/ (one per skill), boundaries/ (sibling pairs), and outcome cases in build/, systems/, gates/, lifecycle/, persuasion/, delivery/

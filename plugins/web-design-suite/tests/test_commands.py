@@ -55,9 +55,9 @@ PAGE = ('<!doctype html>\n<html lang="en">\n<head><title>Home</title></head>\n'
         '<body><main><h1>Home</h1></main></body>\n</html>\n')
 needs_yaml = unittest.skipUnless(NODE and YAML_MODULES, "node and js-yaml (tooling/main) are not installed")
 NAMES = ["contrast", "critique", "deck", "docs-check", "email-build", "figma-sync", "gate", "gate-a11y", "gate-matrix",
-         "gate-perf", "install-gate", "migrate", "new-system", "release-check", "schema-to-screens"]
+         "gate-perf", "install-gate", "migrate", "new-system", "release-check", "schema-to-screens", "tw-probe"]
 PLACEHOLDERS = ("$ARGUMENTS", "PATHS", "TOKENS", "EXPORT", "FG", "BG", "BRAND", "OPTIONS", "SCHEMA", "TEMPLATE",
-                "NAME", "TARGET", "DIST", "URL", "MANIFEST")
+                "NAME", "TARGET", "DIST", "URL", "MANIFEST", "ENTRY")
 # Bash(python "${CLAUDE_SKILL_DIR}/scripts/x.py" *), or a skill's script by the
 # plugin's root, with any fixed arguments before the wildcard.
 RULE = re.compile(r'Bash\((python3?|node) ("\$\{(CLAUDE_SKILL_DIR|CLAUDE_PLUGIN_ROOT)\}/([\w./-]+)"(?: [^\s*()]+)*) \*\)')
@@ -624,6 +624,25 @@ class TheChains(ChainTest):
         proc = self.run_step(pair, {"FG": ["#767676"], "BG": ["#ffffff"]})
         self.assertEqual(0, proc.returncode, output(proc))
         self.assertRegex(output(proc), r"PASS\s+4\.5:1")
+
+    def test_tw_probe_checks_the_theme_and_the_named_classes(self):
+        """SB-C3: the project's own Tailwind v4 compiles its entry; a kept
+        `--spacing` brings `p-4` back, and the step says so."""
+        self.command = "tw-probe"
+        (step,) = self.steps()
+        configs = PLUGIN / "skills" / "web-design-studio" / "assets" / "configs"
+        self.starter("tokens.css", "base.css", "layout.css")
+        self.write("src/styles/theme.css", (configs / "theme.css").read_bytes().decode("utf-8"))
+        entry = (configs / "index.tailwind.css").read_bytes().decode("utf-8")
+        self.write("src/styles/index.css", entry)
+        values = {"ENTRY": ["src/styles/index.css"], "OPTIONS": ["p-card", "--expect", "bg-surface"]}
+        proc = self.run_step(step, values)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("p-card: generates", output(proc))
+        self.write("src/styles/index.css", entry + "@theme { --spacing: 0.25rem; }\n")
+        proc = self.run_step(step, values)
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("p-4: Tailwind's default generates", output(proc))
 
     def test_figma_questions_it_cannot_write_are_not_a_finding(self):
         """CodeRabbit on #87: an --out it could not write ended in a

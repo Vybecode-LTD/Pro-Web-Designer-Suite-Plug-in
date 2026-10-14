@@ -141,6 +141,9 @@ The plugin's `design_hooks` option, set to false in `/config`, turns them all of
   ramps, a type scale and the starter styles, with every role pair's contrast checked.
 - **`/web-design-suite:contrast`** checks the role pairs in the project's tokens, or one
   foreground on one background.
+- **`/web-design-suite:tw-probe`** compiles a Tailwind v4 project's entry with its own
+  tailwindcss: every role class its theme declares must generate, none of Tailwind's
+  stock classes may, and it reports on any class you name.
 - **`/web-design-suite:migrate`** takes a token migration's census and proposes the
   mapping. It changes nothing.
 - **`/web-design-suite:release-check`** extracts, diffs and gates the system against the

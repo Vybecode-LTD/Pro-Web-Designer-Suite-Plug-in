@@ -16,7 +16,7 @@ description: Build design systems and front-end architecture enforced by an audi
 > The commands below are written `python -m scripts.<name>`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (audit_design.py, check_roles.py, generate_color_ramp.py, generate_type_scale.py).
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (audit_design.py, check_roles.py, generate_color_ramp.py, generate_type_scale.py, tw_probe.mjs).
 
 A complete method for designing and building websites that look considered and stay coherent when more than one person touches them.
 
@@ -173,7 +173,7 @@ Read the file when you hit the decision it covers. Do not read them all up front
 
 ## Scripts
 
-All stdlib-only Python 3, no dependencies.
+Python 3, standard library only; `tw_probe.mjs` is Node, with the project's own Tailwind v4.
 
 ```bash
 # The gate. Law 9.
@@ -181,11 +181,8 @@ python -m scripts.audit_design src/                    # audit
 python -m scripts.audit_design src/ --strict           # warnings fail too
 python -m scripts.audit_design src/ --json             # machine-readable
 python -m scripts.audit_design src/ --sarif > design.sarif   # for a code-scanning upload
-git diff --name-only -z origin/main... | python -m scripts.audit_design --files-from -
-                                                       # CI: the files a change touched
-python -m scripts.audit_design src/ --write-baseline .design-baseline.json
-                                                       # adopt on a legacy repo:
-                                                       # only NEW findings fail
+git diff --name-only -z origin/main... | python -m scripts.audit_design --files-from -   # CI: the changed files
+python -m scripts.audit_design src/ --write-baseline .design-baseline.json   # legacy repo: only NEW findings fail
 python -m scripts.audit_design src/ --tokens contract.json  # a project's own tokens
 python -m scripts.check_roles src/styles/tokens.css   # role pairs per theme: text 4.5:1,
                                                        # borders and the focus ring 3:1
@@ -195,6 +192,9 @@ python -m scripts.generate_color_ramp "#e8440a" --anchor-seed --name accent --fo
 python -m scripts.generate_color_ramp "#e8440a" --neutral --neutral-hue 75 --name neutral
 python -m scripts.generate_color_ramp --check "#ffffff" "oklch(56.5% 0.176 42)"
 python -m scripts.generate_type_scale --preview      # the starter's scale (--preset studio)
+
+# Tailwind v4: every role class generates and no stock one does (stack-tailwind.md §2.9).
+node "${CLAUDE_SKILL_DIR}/scripts/tw_probe.mjs"
 ```
 
 `check_roles.py` is the palette's gate: it resolves every Tier-2 role in light, dark and `.inverse`, checks the pairs components put together, and prints the role table `references/color-system.md` §6 quotes (`--table`). Run it on every change to `tokens.css`.

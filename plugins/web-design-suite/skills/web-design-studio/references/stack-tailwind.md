@@ -88,7 +88,7 @@ p-card   gap-related   bg-surface   text-muted   rounded-panel   shadow-card
 
 The deletion converts a *review* problem ("someone should notice `p-6` here")
 into a *build* problem (the element is visibly unpadded in dev). Reviews are
-sampled; builds are not.
+sampled; builds are not. And `tw_probe` (§2.9) turns it into a check that fails.
 
 The consequence is the point, not a side effect: **you cannot express an
 off-system value in a class name any more.** When a designer hands you a 28px
@@ -303,6 +303,36 @@ CSS cannot express `--radius-lg: var(--radius-lg)`. So every Tailwind entry
 
 That is Law 6 arriving for free. The collision is not an obstacle to work
 around; it is the constraint that makes the wrong thing unwriteable.
+
+### 2.9 Check what the theme generates: `tw_probe`
+
+Every claim in this section fails silently: Tailwind generates no CSS for a
+class it does not know, and no error. `scripts/tw_probe.mjs` (SB-C3) makes
+them facts. It compiles the project's entry with the project's own
+tailwindcss 4, found in the `node_modules` folders above the working folder or
+in `NODE_PATH`, and checks two things:
+
+- **Roles:** every variable an `@theme` block declares in one of Tailwind's
+  utility namespaces gives its class. `--color-surface` gives `bg-surface`,
+  `--spacing-card` gives `p-card`, `--breakpoint-md` gives the `md:` variant,
+  `--container-card` the `@card:` one.
+- **Stock:** none of a sample of Tailwind's defaults generates (`p-4`,
+  `bg-neutral-800`, `text-sm`, `rounded-lg`), unless the theme declares that
+  name itself. One that does names what survived: a kept `--spacing` alone
+  brings back every numeric spacing class (§1.4).
+
+```bash
+# From the project's root; the script stays in the skill (/install-gate does not copy it).
+node "${CLAUDE_SKILL_DIR}/scripts/tw_probe.mjs"
+node "${CLAUDE_SKILL_DIR}/scripts/tw_probe.mjs" p-card md:p-card --refuse p-4
+node "${CLAUDE_SKILL_DIR}/scripts/tw_probe.mjs" --entry app/globals.css --json
+```
+
+It exits 1 when a check fails, so it can gate CI; `/web-design-suite:tw-probe`
+runs it and explains each failure. A class the stylesheet itself defines
+(`.stack` in layout.css) is not Tailwind's and does not count: Part 5 of the
+ESLint config, which reads the same entry, knows those. Tailwind 3 has no CSS
+entry to compile, so there the lint block's `tailwindConfig` line does the job.
 
 ---
 
