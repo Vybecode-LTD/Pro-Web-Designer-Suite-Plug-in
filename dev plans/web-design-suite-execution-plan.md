@@ -169,6 +169,20 @@ After 3.6.0. The workstreams are independent; ask the owner which comes first.
 | P43 | More page types and audiences, a claims layer with `lint_claims.py`, routing between the persuasion skills, and MESSAGE_BRIEF to DECISION_LOG | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
 | R4 | Release 4.0.0 | — | — | M |
 
+### Phase 6c · 4.0.0: the 2026-10-14 audit
+
+The owner's audit of `main` at `9391774` (`dev plans/web-design-suite-audit-2026-10-14.md`): 114 findings, grouped as N41 to N47 in the completion plan, in the audit's own order (its §6). Every row comes before R4; **where the rows go among P34, P35, P37, P41, P42 and P43 is the owner's call.** Each PR names the audit IDs it closes, with a fail-before test on `v3.6.0`, and greps the plugin for the same construct before it closes one (the audit's class 2).
+
+| PR | What | Items | Main files | Size |
+|---|---|---|---|---|
+| P44 part 1, #130 | The tools that rewrite a project's files: the codemod's class match bound on both ends, and line endings kept by the codemod, `deprecate`'s marker and its ledger (audit C1, C2, H1) | N41 | `apply_codemod.py`, `deprecate.py` | S |
+| P44 | The gates that pass what they should fail (audit H4 to H8) | N42 | `a11y_static.py`, `generate_matrix.py`, `pre-commit-design-gate.sh`, `audit_design.py` | M |
+| P45 | Silent wrong output in sync, docs and scaffold (audit H2, H3, H9, H10) | N43 | `figma_to_tokens.py`, `extract_system.py`, `introspect_schema.py` | M |
+| P46 | The proposal's arithmetic and recipe, and two tests (audit H11 to H15) | N44 | `cluster_values.py`, `apply_codemod.py`, the migration references, the tests H15 names | M |
+| P47 | The cross-cutting classes, one PR each: the `--out` guard, the JSON type guards, the encoding readers, the discarded diagnostics, the cmd.exe placeholders, and each class's check (audit §7) | N45 | the scripts each class names, `tests/` | L |
+| P48 | The medium findings, one PR per §3 area | N46 | per area | L |
+| P49 | The low findings and doc fixes, per area | N47 | per area | M |
+
 ## 5. What moved, and why
 
 Each of these moved into the PR that already has its file open:
@@ -247,4 +261,5 @@ Update this table in each PR.
 | 4 | #38 (2026-10-04): P9; #39 (2026-10-05): P10 part 1; #40: P10 part 2; #41: P11; #42: P12 part 1; #44: P12 part 2; #45: P13 part 1; #46: P13 part 2; #48: P14; #49: P15 part 1; #50: P15 part 2; #53: P16; #54: P17; #56 (2026-10-06): the hydration flake; #57: P18 part 1; #58: P18 part 2; #59: P19; #60: the session's docs and three late fixes; #61: the email cascade; #62: P44 and P45 scheduled; #64 (2026-10-07): P20; #65: P21 part 1; #66: P21 part 2; #67: P44; #69: P22 part 1; #70: P23; #71: P22 part 2; #73: P45; #74: R2 | GT-C13, N34, GT-A5, GT-A14, GT-C2, SB-B3, GT-A8, GT-A16, GT-A18, GT-C5, GT-A12, GT-A13, GT-C3, GT-B7, GT-B8, GT-A6, GT-A17, GT-C11, GT-B5, LC-A8, LC-A9, LC-C5, LC-A11, LC-A12, LC-A19, LC-A14, LC-C4, LC-C12, LC-A22, LC-C3, LC-A17, LC-A23, LC-B8, LC-C6, DL-A10, DL-A11, DL-A12, DL-A20, DL-A13, DL-B6, DL-C3, DL-C5, DL-A14, DL-A21, DL-B7, DL-A8, DL-A9, DL-B2, PS-A5, PS-A6, PS-A7, PS-A10, PS-A12, PS-A13, PS-A19, PS-B7, PS-C1, N36, PS-C2, PS-A17, PS-A20, PS-A21, PS-A8, PS-A9, PS-A14, PS-A15, PS-A16, PS-A18, PS-A22, PS-B5, PS-C5, N35 | 3.4.0, released 2026-10-07: #74 merged as `5990347`, tagged `v3.4.0`, published by `release.yml` |
 | 5 | #76 (2026-10-07): P24 part 1; #78 (2026-10-08): P24 part 2; #79: P24 part 3; #80: the session's docs; #81: P24 part 4; #82: P25 part 1; #83: the session's docs; #84 (2026-10-09): P25 part 2; #85: P26 part 1; #86: the session's docs; #87: P26 part 2; #88: P26 part 3; #89: P27 part 1; #90: the session's docs; #91 (2026-10-10): P27 part 2; #92: P28 part 1; #93: N38, the baseline keys; #94: the session's docs; #95: P29, the eval suite and the routing cases, and P28 part 2 not built (the owner); #96: the session's docs; #97: P30, the outcome evals; #98: N39, email templates left to the email lint; #99: R3, release 3.5.0; #100: the session's docs | LC-C1, LC-B3, N37, XC-C2, LC-C8, GT-C12, LC-B4, XC-C8, PS-C11, XC-C3, XC-C4, PS-C4, SS-C6, LC-C9, GT-C9, N38, XC-B1, XC-C1, XC-B2, SS-C7, SB-C6, GT-C10, LC-C10, PS-C7, DL-C7, N39 | 3.5.0, released 2026-10-10: #99 merged as `44637c1`, tagged `v3.5.0`, published by `release.yml` |
 | 6 | #101 (2026-10-10): P31 part 1; #102: P31 part 2; #105 (2026-10-11): P31 part 3; #106: P31 part 4; #107: P31 part 5; #108: the session's docs; #109: P32 part 1; #110: evals by hand only; #111: P32 part 2; #112: P33; #113: P38 part 1; #114: the session's docs; #115 (2026-10-12): P38 part 2; #116: P39; #117: P40; #118: the session's docs; #119 (2026-10-13): diff_system against a DTCG file; #120: `--reverse` from every token format; #121: Tokens Studio's route; #122: R3.6, the release; #123: the evals' persuasion miss | LC-C2 (#106), LC-B2 (#107), LC-B1 and LC-C7 (#109), LC-B6 (#111), SS-B3 (#112), SS-B4 (#115), LC-B7 (#116) | 3.6.0 (Phase 6a) |
-| 6b | #125 (2026-10-13): P36 part 1; #126: P36 part 2; #127: P36 part 3; #128: the session's docs | SB-C4 (#125), SB-C3 (#126), SB-B5 (#127) | 4.0.0 (Phase 6b) |
+| 6b | #125 (2026-10-13): P36 part 1; #126: P36 part 2; #127: P36 part 3; #128: the session's docs; #129 (2026-10-14): P36 part 4 | SB-C4 (#125), SB-C3 (#126), SB-B5 (#127), LC-B5 and N40 (#129) | 4.0.0 (Phase 6b) |
+| 6c | #130 (2026-10-14): P44 part 1; #131: the session's docs and the audit | N41 (#130) | 4.0.0 (Phase 6c) |
