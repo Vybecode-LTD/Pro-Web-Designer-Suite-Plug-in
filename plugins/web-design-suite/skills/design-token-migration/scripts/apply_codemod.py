@@ -1122,7 +1122,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 r.after.splitlines(keepends=True),
                 fromfile=f"a/{norm_path(r.path)}",
                 tofile=f"b/{norm_path(r.path)}", n=2)
-            sys.stdout.writelines(diff)
+            # As the bytes are (Codex on #130): a CRLF file's lines already end
+            # in \r\n, and Windows' text-mode stdout made each one \r\r\n.
+            raw = getattr(sys.stdout, "buffer", None)
+            if raw is None:
+                sys.stdout.writelines(diff)
+            else:
+                sys.stdout.flush()
+                raw.write("".join(diff).encode(sys.stdout.encoding or "utf-8", errors="replace"))
+                raw.flush()
 
     print()
     print("=" * 72)

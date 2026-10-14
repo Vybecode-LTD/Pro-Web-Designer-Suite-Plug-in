@@ -1021,6 +1021,9 @@ class TheCodemodRewritesOnlyWhatItMatched(TempDirTest):
                      self.write("dry.json", json.dumps({"schema": "design-token-migration/mapping@1",
                                                        "rules": rules})), "src", cwd=self.tmp)
         self.assertEqual(output(dry).count("\n-    margin"), 1, output(dry))
+        # Codex on #130: the diff is written as its bytes are, not CRLF doubled to \r\r\n.
+        self.assertNotIn(b"\r\r\n", dry.stdout)
+        self.assertIn(b"\n-    margin: 13px;\r\n+    margin: var(--gap-related);\r\n", dry.stdout)
         self.apply(rules, "src")
         self.assertEqual(css.read_bytes(), "\r\n".join(lines).replace("13px", "var(--gap-related)").encode("utf-8"))
         self.assertEqual(jsx.read_bytes().count(b"\r\n"), 3)

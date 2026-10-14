@@ -100,7 +100,9 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   came back LF on every line, which the dry run never showed; `deprecate add --source`
   wrote the token file in the platform's newline, LF to CRLF on Windows and CRLF to LF
   elsewhere, and its ledger the same way. Each now reads and writes the bytes' own endings,
-  and a marker takes the file's (`test_versioning.TheMarkerKeepsTheFilesLineEndings`).
+  and a marker takes the file's (`test_versioning.TheMarkerKeepsTheFilesLineEndings`). The
+  dry run's diff is written as its bytes are, where Windows' stdout doubled a CRLF line's
+  `\r` (Codex on #130).
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
   too. It is a width and a height, so it is a size: reported when no `--width-*` role
