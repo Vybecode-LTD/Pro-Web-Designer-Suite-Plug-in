@@ -155,6 +155,38 @@ class MigrationsThatDumpsRewrite(SchemaSources):
         self.assertTrue(id_["generated"])
         self.assertFalse(id_["ui"]["placement"]["form"])
 
+    def test_an_enum_extended_later_has_every_value(self):
+        """Audit H9: only CREATE TYPE fed the enums, so a value a later
+        migration added was refused by the server draft and missing from the
+        form's choices."""
+        self.write("schema.sql", "create type order_status as enum ('pending', 'paid');\n"
+                   "create table orders (id uuid primary key, status order_status not null default 'pending');\n"
+                   "alter type public.order_status add value 'shipped';\n"
+                   "alter type order_status add value if not exists 'draft' before 'paid';\n"
+                   "alter type order_status add value if not exists 'shipped';\n"
+                   "alter type order_status add value 'refunded' after 'shipped';\n"
+                   "alter type order_status rename value 'paid' to 'settled';\n"
+                   "alter type other_enum add value 'x';\n")              # created elsewhere: left alone
+        model = self.introspect("schema.sql")
+        self.assertEqual({"order_status": ["pending", "draft", "settled", "shipped", "refunded"]},
+                         model["enums"])
+        self.assertEqual("order_status", columns(model)["orders.status"]["enum"])
+
+    def test_a_tables_tail_stays_out_of_its_last_column(self):
+        """Audit H10: the column list ended at the statement's last `)`, so a
+        `PARTITION BY`, `WITH` or `INHERITS` tail ran into the last column and
+        a trailing table CHECK was lost."""
+        self.write("schema.sql",
+                   "create table t1 (id uuid primary key, created_at timestamptz not null default now())"
+                   " partition by range (created_at);\n"
+                   "create table t2 (id uuid primary key, title text not null, check (char_length(title) <= 80))"
+                   " with (fillfactor = 70);\n"
+                   "create table t3 (id uuid primary key, label text default 'a (b') inherits (base);\n")
+        cols = columns(self.introspect("schema.sql"))
+        self.assertEqual("now()", cols["t1.created_at"]["default"])
+        self.assertIn(("maxLength", 80), rules(cols["t2.title"]))
+        self.assertEqual("'a (b'", cols["t3.label"]["default"])
+
     def test_columns_added_and_changed_later_are_replayed(self):
         # Migrations are read in order (N14); a column added later was dropped.
         self.write("schema.sql", "create table t (id uuid primary key, legacy text, title text);\n"

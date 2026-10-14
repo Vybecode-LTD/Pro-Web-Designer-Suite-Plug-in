@@ -258,6 +258,41 @@ class ExtractSystemWritesTheContract(TempDirTest):
         self.assertIn("unknown key 'tokenz'", output(proc))
 
 
+class ABomOnTheTokenFile(TempDirTest):
+    """Audit H3: extract_system, build_docs and diff_system read a token file
+    as plain UTF-8, so a BOM made the first selector `\\ufeff:root`: every
+    token was theme-only, the contract empty, and diff_system called the
+    whole system removed and added again."""
+
+    STARTER = SKILLS / "web-design-studio" / "assets" / "starter" / "styles" / "tokens.css"
+
+    def files(self):
+        plain = self.STARTER.read_bytes()
+        self.assertFalse(plain.startswith(b"\xef\xbb\xbf"))
+        self.write("plain/tokens.css", plain)
+        self.write("bom/tokens.css", b"\xef\xbb\xbf" + plain)
+
+    def test_extract_system_reads_it_as_the_plain_file(self):
+        self.files()
+        made = []
+        for side in ("plain", "bom"):
+            proc = run_py("design-system-docs", "extract_system", "--tokens", "tokens.css", "--out",
+                          "system.json", "--contract", "contract.json", cwd=self.tmp / side)
+            self.assertEqual(0, proc.returncode, output(proc))
+            made.append([(self.tmp / side / name).read_bytes() for name in ("system.json", "contract.json")])
+        self.assertEqual(made[0], made[1])
+        self.assertIn(b'"accent": {', made[1][1])                        # the control: not empty
+
+    def test_diff_system_finds_no_change(self):
+        self.files()
+        self.write("old/tokens.css", (self.tmp / "plain" / "tokens.css").read_bytes())
+        self.write("new/tokens.css", (self.tmp / "bom" / "tokens.css").read_bytes())
+        proc = run_py("design-system-versioning", "diff_system", "old/tokens.css", "new/tokens.css",
+                      "--format", "json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual([], json.loads(proc.stdout)["changes"])
+
+
 class FigmaAuditReadsTheContract(TempDirTest):
     """LC-C1: the project's ramps from a contract.json, or from the config."""
 

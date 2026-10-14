@@ -634,6 +634,10 @@ RE_CREATE_ENUM = _p(r"^\s*create\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+as\s+enum\s*
 RE_CREATE_INDEX = _p(r"^\s*create\s+(unique\s+)?index(?:\s+concurrently)?"
                      r"(?:\s+if\s+not\s+exists)?\s+(?:\"[^\"]+\"|[\w.])+\s+on\s+((?:\"[^\"]+\"|[\w.])+)"
                      r"(?:\s+using\s+\w+)?\s*\((.*?)\)\s*(where\b.*)?$")
+RE_ALTER_ENUM_ADD = _p(r"^\s*alter\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+add\s+value(?:\s+if\s+not\s+exists)?"
+                       r"\s+'([^']*)'(?:\s+(before|after)\s+'([^']*)')?\s*$")
+RE_ALTER_ENUM_RENAME = _p(r"^\s*alter\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+rename\s+value\s+'([^']*)'"
+                          r"\s+to\s+'([^']*)'\s*$")
 RE_ALTER_TABLE = _p(r"^\s*alter\s+table(?:\s+if\s+exists)?(?:\s+only)?\s+((?:\"[^\"]+\"|[\w.])+)\s+(.*)$")
 RE_ADD_CONSTRAINT = _p(r"^add\s+(?:constraint\s+(?:\"[^\"]+\"|[\w$]+)\s+)?"
                        r"(?=(?:primary\s+key|foreign\s+key|unique|check|exclude|not\s+null)\b)")
@@ -886,6 +890,26 @@ def parse_ddl(text: str) -> Model:
             model.enums[name] = [v for v in values if v]
             continue
 
+        # Migrations extend an enum rather than recreate it (audit H9). Only
+        # an enum these files created is changed: one created elsewhere has
+        # values this run never saw.
+        m = RE_ALTER_ENUM_ADD.match(one_line)
+        if m:
+            values = model.enums.get(bare_table_name(m.group(1)))
+            if values is not None and m.group(2) not in values:
+                at = len(values)
+                if m.group(4) in values:
+                    at = values.index(m.group(4)) + (m.group(3).lower() == "after")
+                values.insert(at, m.group(2))
+            continue
+
+        m = RE_ALTER_ENUM_RENAME.match(one_line)
+        if m:
+            values = model.enums.get(bare_table_name(m.group(1)))
+            if values is not None and m.group(2) in values:
+                values[values.index(m.group(2))] = m.group(3)
+            continue
+
         m = RE_CREATE_TABLE.match(one_line)
         if m:
             model.tables.append(_parse_create_table(stmt, model))
@@ -998,8 +1022,10 @@ def _parse_create_table(stmt: str, model: Model) -> Table:
     head_end = stmt.index("(")
     m = RE_CREATE_TABLE.match(re.sub(r"\s+", " ", stmt))
     name = bare_table_name(m.group(1)) if m else "unknown"
-    body_end = stmt.rindex(")")
-    body = stmt[head_end + 1:body_end]
+    # The column list's own closing paren: a tail (`PARTITION BY RANGE (…)`,
+    # `WITH (…)`, `INHERITS (…)`) has parens too, and the last one ran into
+    # the last column (audit H10).
+    body = _balanced_slice(stmt, head_end)
     table = Table(name=name)
 
     constraints = []
@@ -1103,8 +1129,14 @@ def _parse_column_def(item: str, table: Table, model: Model) -> Column | None:
 
 
 def _balanced_slice(text: str, open_idx: int) -> str:
+    """The text inside the parenthesis opened at `open_idx`, a paren inside a
+    string literal (`default '('`) skipped."""
     depth, i, n = 0, open_idx, len(text)
     while i < n:
+        if text[i] in "'\"":
+            end = text.find(text[i], i + 1)       # '' and "" escapes are two literals
+            i = n if end < 0 else end + 1
+            continue
         if text[i] == "(":
             depth += 1
         elif text[i] == ")":

@@ -695,6 +695,24 @@ class ReverseReadsEveryTokenFormat(TempDirTest):
         self.assertEqual("tmp_var_neutral_0", values[("Light", surface)]["id"])
         self.assertEqual("tmp_var_neutral_950", values[("Dark", surface)]["id"])   # [data-theme="dark"]
 
+    def test_a_themes_alias_that_cannot_cross_is_reported(self):
+        """Audit H2: pass 2 read the default values only, so a Dark value
+        aliasing an undeclared token was left out of the body with exit 0 and
+        nothing said, and Figma showed the Light alias in Dark."""
+        css = (":root {\n  --neutral-0: oklch(100% 0 0);\n  --neutral-950: oklch(15% 0 0);\n"
+               "  --fg-link: var(--neutral-950);\n}\n[data-theme=\"dark\"] {\n  --fg-link: var({dark});\n}\n")
+        self.write("good.css", css.replace("{dark}", "--neutral-0"))
+        self.write("bad.css", css.replace("{dark}", "--accent-300"))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", "good.css", "--reverse", "--out", "good.json",
+                      cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))                # the control
+        proc = run_py("figma-variables-sync", "figma_to_tokens", "bad.css", "--reverse", "--out", "bad.json",
+                      cwd=self.tmp)
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("In the Dark mode, `--fg-link` aliases `--accent-300`", output(proc))
+        self.assertNotIn("Dropped from the payload", output(proc))
+        self.assertIn("--accent-300", output(proc))
+
     def test_a_tokens_css_goes_in_with_its_themes_as_modes(self):
         names, values, out = self.body(str(self.STARTER))
         self.assert_themed(names, values)
