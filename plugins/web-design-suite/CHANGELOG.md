@@ -116,12 +116,14 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 - **The schema reader missed a migration's enum values** (H9). Only `CREATE TYPE` fed the
   enums, so a value `ALTER TYPE … ADD VALUE` added was refused by the scaffold's server
   draft and missing from the form. `ADD VALUE` (with `IF NOT EXISTS`, `BEFORE` and
-  `AFTER`) and `RENAME VALUE` are replayed on an enum the files created
+  `AFTER`) and `RENAME VALUE` are replayed on an enum the files created, and a label's
+  `''` is one apostrophe there and in `CREATE TYPE` (Codex on #133)
   (`test_schema_sources.MigrationsThatDumpsRewrite`).
 - **A table's tail ran into its last column** (H10). The column list ended at the
   statement's last `)`, so `PARTITION BY RANGE (created_at)`, `WITH (…)` or `INHERITS
   (…)` became part of the last column's default, and a trailing table CHECK was lost. The
-  list ends at its own closing paren now, a paren inside a string skipped
+  list ends at its own closing paren now, a paren inside a string or a `$$…$$` body
+  skipped (Codex on #133)
   (`test_schema_sources.MigrationsThatDumpsRewrite`).
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have

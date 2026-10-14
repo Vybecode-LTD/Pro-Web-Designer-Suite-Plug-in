@@ -187,6 +187,22 @@ class MigrationsThatDumpsRewrite(SchemaSources):
         self.assertIn(("maxLength", 80), rules(cols["t2.title"]))
         self.assertEqual("'a (b'", cols["t3.label"]["default"])
 
+    def test_a_dollar_quoted_default_ends_nothing(self):
+        # Codex on #133: a `)` inside `$$…$$` ended the column list there.
+        self.write("schema.sql", "create table t4 (id uuid primary key, note text default $$a ) b$$, "
+                                 "title text not null);\n")
+        cols = columns(self.introspect("schema.sql"))
+        self.assertEqual("$$a ) b$$", cols["t4.note"]["default"])
+        self.assertIn("t4.title", cols)
+
+    def test_an_enum_label_with_a_quote_is_read_as_postgres_stores_it(self):
+        # Codex on #133: '' is one apostrophe, in CREATE TYPE and ALTER TYPE alike.
+        self.write("schema.sql", "create type role as enum ('it''s', 'b');\n"
+                                 "create table members (id uuid primary key, role role not null);\n"
+                                 "alter type role add value 'owner''s' before 'b';\n"
+                                 "alter type role rename value 'it''s' to 'its';\n")
+        self.assertEqual({"role": ["its", "owner's", "b"]}, self.introspect("schema.sql")["enums"])
+
     def test_columns_added_and_changed_later_are_replayed(self):
         # Migrations are read in order (N14); a column added later was dropped.
         self.write("schema.sql", "create table t (id uuid primary key, legacy text, title text);\n"
