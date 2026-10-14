@@ -1,14 +1,15 @@
 # Start here: the next session
 
-**Written 2026-10-13**, at the end of the session (2026-10-13) that released **3.6.0**, Phase 6a:
-- **The live check** of each route 3.6.0 changed: 8 headless sessions and 3 reruns, for $2.92 (`dev plans/web-design-suite-3.6.0-live-check.md`). It found three defects, each fixed before the release:
-  - #119: `diff_system.py`, comparing a published DTCG file with the stylesheet it was written from, read an unchanged system as major. The DTCG writer now keeps what it leaves out, with values and marks, in its `$extensions`.
-  - #120: `figma_to_tokens.py --reverse` now reads a `tokens.css`, a DTCG file and a resolver, each theme a Figma mode.
-  - #121: the router and figma-variables-sync's description name Tokens Studio.
-- **The release:** the release PR (#122), then the evals on its merge: routing 23 of 23 and outcome 10 of 11 on `d2c1f9b` ($9.35 of the $14 ceiling). The miss was `no-fake-countdown`: one of three runs never said why the resetting timer deceives. #123 fixed the persuasion skill, and the case then passed 3 of 3 on `d91a146` ($0.32), with a +1.00 difference over no plugin. The tag `v3.6.0` is on `d91a146`.
-- **Reviews:** 14 real findings fixed (Codex 12, CodeRabbit 2).
+**Written 2026-10-13**, at the end of the session (the day's second) that began **Phase 6b, 4.0.0** with P36, Tailwind v4. The owner chose P36 first. Three PRs merged:
+- **#125, P36 part 1 (D4, the breaking change).**
+  - Part 5 of `eslint.design.config.mjs` now uses eslint-plugin-better-tailwindcss 4.9.0, for both majors. The spike that decided it is `dev plans/web-design-suite-d4-spike.md`.
+  - The CHANGELOG has `## 4.0.0 — unreleased`, with the upgrade steps.
+- **#126, P36 part 2 (SB-C3):** `tw_probe.mjs` and `/tw-probe`, the sixteenth command.
+- **#127, P36 part 3 (SB-B5):** v4's variants, stack-tailwind.md §2.10, compiled from the reference by a test.
+- **Reviews:** 7 real findings, all fixed with tests: Codex 6, CodeRabbit 3, two of them the same as Codex's. One Codex claim was declined with evidence. `check.py` and a doc test found 3 more before review.
+- **The owner also scheduled N40** (the migration's ΔE-only colour match, from R3.6's live check) with P36's last part.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **Phase 6b, 4.0.0** (§4). The owner chooses its first workstream.
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P36's last part**, then the owner's next Phase 6b workstream (§4).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -145,6 +146,14 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **A rule that asks for a claim says when it holds** (#123). "Cite a law only if it applies": conversion-audit.md §11 ties the DSA to platforms and ROSCA to negative options.
       - **Resolve only the threads you answered.** A loop that resolved every open thread closed one of Codex's that had not been read yet (#123). Answer each by its id, then resolve that one.
       - **Read `check.py`'s exit line before pushing.** #121 went up with a 207-character description (the limit is 200), in the same command that read the result.
+    - **The second 2026-10-13 session's reviews found 7 real issues:** #125 (one, which Codex and CodeRabbit both found) and #126 (six over two rounds). Each was fixed with a test failing on the head it reviewed. The lessons, for any tool that wraps another:
+      - **A plugin resolves its package from somewhere.** better-tailwindcss resolves `tailwindcss` from its `cwd` setting, which is ESLint's folder unless set. Test from a folder that holds the *other* version (#125's fixture: the project's tools in `app/node_modules`, the other major at the root).
+      - **A fixture that nests the case hides the question.** `cx()` inside `className` passed whatever the callee list held. Codex then read `cx` as missing; 4.9.0's `DEFAULT_CALLEE_SELECTORS` has it, so the claim was declined with that evidence and a standalone fixture.
+      - **A checker of a format honours every way the format names a thing** (#126): an unquoted `@import url(x)`, `prefix(tw)`, a variable that gives several classes (`--spacing-4` gives `p-4`, `gap-4` and `w-4`), and a safelist (`@source inline()`) that is in the first build.
+      - **A fix that narrows a pattern must keep the valid forms beside it** (#126, round 2). The lookbehind that stopped `${file}.css` from reading as an emotion tag also dropped `emotion.css`. List the valid neighbours before narrowing.
+      - **Compile the doc's own example.** §2.10's block found `tw_probe`'s inline-source bug before review did.
+      - **The plugin's own scripts pass the plugin's gates.** The audit reads a `.mjs` for CSS-in-JS, and `test_powershell_json` refuses `JSON.parse(fs.readFileSync(…))`. Use a BOM-aware `readJson`.
+      - **A stacked PR retargeted to `main` starts CodeRabbit's review.** It is still not a gate (#127 merged with it pending).
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -171,7 +180,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - Redirect a background `check.py` to a file in the scratchpad (`> check.txt 2>&1`), not through `tail`. Give it `timeout` 3600000.
   - Run a single test module from `tests/` (`cd tests && python -B -m unittest test_x`); `tests.test_x` from the plugin root does not import.
 - **Fail before, pass after.** Every fix gets a regression test, seen failing on the previous release's tag and passing now.
-  - Run `python -B tools/fail_before.py TEST_IDS` from `plugins/web-design-suite`. The default REV is the latest `v*` tag, **`v3.5.0`** from this session on. For a PR that builds on unreleased work, also run it against `main`'s head, with the **full** SHA: that table shows what the PR itself fixed (#78 and #79 did both).
+  - Run `python -B tools/fail_before.py TEST_IDS` from `plugins/web-design-suite`. The default REV is the latest `v*` tag, **`v3.6.0`** until R4. For a PR that builds on unreleased work, also run it against `main`'s head, with the **full** SHA: that table shows what the PR itself fixed (#78 and #79 did both).
   - A review fix runs against the head it fixes, with the **full** SHA. In the Bash tool that is `--rev $(git rev-parse SHORT)`; a short one is refused.
   - **`fail_before.py` swaps the plugin, not the tests**, so a fix to test code shows as a control: say so.
   - Run a new browser test several times, in Playwright's Chromium and in the installed Chrome, before you push it.
@@ -201,6 +210,21 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 ## 2. Useful facts
 
+- **Part 5, the Tailwind lint block (#125, D4).**
+  - One commented block for eslint-plugin-better-tailwindcss 4.9.0. Tailwind v4 reads `entryPoint`, and v3's `tailwindConfig` line takes its place.
+  - `cwd: project`, the nearest folder above the config with a `package.json`; both paths are anchored there.
+  - `detectComponentClasses` (v4: `@layer components` classes are known), and `getDefaultSelectors()` plus `classHelpers` (`classNames`, `classnames`).
+  - `ownClasses` entries are anchored `^…$`, because the rule tests them unanchored.
+  - The rules: `no-unknown-classes` (`ignore: ownClasses`), `no-conflicting-classes` (v4 only), `enforce-shorthand-classes` (warn), `no-duplicate-classes`, `no-deprecated-classes`. No `recommended` config, no order rules.
+  - `wds_support.tailwind_part5(text, major)` uncomments it, swapping the v3 line in. `test_real_tools.TailwindPluginV4`/`V3` run it from a folder that holds the other major; `test_recipes.DependencyFacts` holds the rule names to 4.9.0's README.
+  - Both tooling folders pin better-tailwindcss 4.9.0.
+- **`tw_probe.mjs` (#126, #127)** is in web-design-studio's `scripts/`, Node 20.19+ with the project's tailwindcss 4 (the `node_modules` above the cwd, then `NODE_PATH`).
+  - `ownSheets()` reads the stylesheets in cascade order, each after its imports, with Tailwind's own files left out. `themeVariables()` follows the `@theme` blocks, clearing on `--*: initial`.
+  - `NAMESPACES` maps a variable to its class (tailwindcss.com's table). `STOCK` holds each sample class with its hint and the variables that make it the project's own.
+  - `withoutInline()` sets `@source inline()` aside. The `prefix(x)` of an `@import` or `@theme` is applied to the automatic candidates.
+  - One compiler, the candidates added one at a time; `selectorCount()` with `cssEscape()`.
+  - Exit codes: 0, 1, 2 (Tailwind 3 is 2).
+  - `/web-design-suite:tw-probe` runs it, and stack-tailwind.md §2.9 teaches it. §2.10's marked block (`<!-- tw-probe:variants -->`) is compiled by `test_tw_probe.TheVariantsTheReferenceTeaches`, whose `COMPILE` harness compiles a module on its own.
 - **DTCG (#101, #102).** `shared/dtcg.py` is the master, copied beside every `project_config.py` (`test_dtcg.TheCopiesAreTheMaster`); `project_config.py` loads the copy beside it by path. `normalise()` (the Figma scripts' reading, string forms) and `tokens()` (lossless, CSS names) read 2025.10 and Tokens Studio (`studio_document`, `studio_themes`); `document()` writes 2025.10 from CSS custom properties. `project_config.mjs` ports the reading, numbers formatted as Python's `f"{round(x, 6):g}"`, and `TheNodeReaderAgrees` holds them equal on every value form. `figma_common.parse_studio` makes each Studio theme group a collection; `FVar` carries `deprecated`, `dtcg_type` and `partial`.
 - **The resolver (#105).** `dtcg.resolver_document(data, base, inputs, only)` merges a resolver's `resolutionOrder` for a choice of contexts (each modifier's string `default`, else its first, which is reported); `resolver_modifiers()`, `token_paths()`, `resolver()` (the writer), `outside()` and `file_loader()` (its real path must stay in the folder, else `OutsideFolder`). `figma_to_tokens.py --format dtcg --out-dir` writes `tokens.json`, `theme-<x>.json` or `density-<x>.json` (overrides only, `document(only=...)`) and `tokens.resolver.json`; `css_blocks()` and `figma_blocks()` feed `dtcg_files()`. `figma_common.parse_resolver()` makes each modifier a collection with `FCollection.kind`, and `mode_selector(mode, default, kind)` writes a theme or density context as the value itself (`css_escape`). Unreadable sources are `FDoc.unread` (`unread-source`, `UNREAD_SOURCE`). The Node port is `resolverDocument()` in `project_config.mjs`.
 - **The ledger (#106).** `project_config.read_deprecations(paths)` and `replacement_of(reason)`; `diff_system.marked_deprecations()` adds a record (`"marked"`) for each token the old DTCG snapshot marks; `deprecate.py import FILE… --since --removal`.
@@ -222,7 +246,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - the reader's problems are reported (`not read`, `not carried to Figma`).
 
   `reverse_main()` serves the REST body and `--format plugin-script`. See `test_figma_sync.ReverseReadsEveryTokenFormat`.
-- **The plugin** is `plugins/web-design-suite/` (about 1,096 tests):
+- **The plugin** is `plugins/web-design-suite/` (about 1,119 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -250,7 +274,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - Each has `disable-model-invocation: true` and an `allowed-tools` list of `Bash(python "${CLAUDE_SKILL_DIR}/scripts/X" *)` and its `python3` form. Every command its body runs must be one it allows (`test_commands.TheCommandFiles`, which parses the frontmatter with js-yaml from `tooling/main`).
   - `/gate` (`run_gates.py`): `audit_design --strict`, `a11y_static --strict`, `perf_audit` on `--dist` or `dist/`/`build/`, one verdict.
   - `/install-gate` (`install_gate.py`): vendors ten files from three skills into the project's `scripts/`, with `scripts/design-gates.json` (SHA-256s, the version), and writes `.github/workflows/design-gates.yml` from `templates/design-gates.yml`. The jobs are `gates` (Linux, `mcr.microsoft.com/playwright:v<project's pin>-noble`, `apt-get install python3`), `windows` (the static gates) and `baselines` (`workflow_dispatch`, `update-baselines`). `TESTED_PLAYWRIGHT` must equal `tooling/main`'s playwright (a test holds it).
-  - **Fifteen commands now** (#85, #87, #88, #89): gate, install-gate; new-system, contrast, migrate, release-check, figma-sync, docs-check; schema-to-screens, email-build, deck, gate-a11y, gate-perf, gate-matrix; critique. `gate`, `install-gate`, `new-system`, `release-check` and `deck` have runners in their own `scripts/`; the other ten are chains whose body runs the skills' scripts by `${CLAUDE_PLUGIN_ROOT}/skills/<skill>/scripts/<script>`, browser steps through `node`. A command that writes reports puts them in its own folder under `design-reports/` (`release`, `migration`, `docs`, `figma`, `screens`, `email`, `deck`, `critique`, `a11y`, `perf`, `matrix`), never `build/` or `dist/`, which `/gate` reads as the build; `/gate`, `/contrast` and `/install-gate` write none.
+  - **Sixteen commands now** (#85, #87, #88, #89, #126): gate, install-gate; new-system, contrast, migrate, release-check, figma-sync, docs-check; schema-to-screens, email-build, deck, gate-a11y, gate-perf, gate-matrix; critique; tw-probe (a chain whose step runs `tw_probe.mjs` by `${CLAUDE_PLUGIN_ROOT}`, placeholders `ENTRY` and `OPTIONS`). `gate`, `install-gate`, `new-system`, `release-check` and `deck` have runners in their own `scripts/`; the other ten are chains whose body runs the skills' scripts by `${CLAUDE_PLUGIN_ROOT}/skills/<skill>/scripts/<script>`, browser steps through `node`. A command that writes reports puts them in its own folder under `design-reports/` (`release`, `migration`, `docs`, `figma`, `screens`, `email`, `deck`, `critique`, `a11y`, `perf`, `matrix`), never `build/` or `dist/`, which `/gate` reads as the build; `/gate`, `/contrast` and `/install-gate` write none.
   - `TheCommandFiles` checks every command in a body's bash blocks starts with a rule's prefix, every rule is run, and each `python` rule has its `python3` twin. `ChainTest` runs a body's commands in order on a fixture with each placeholder (`PLACEHOLDERS`) given the test's values; `TheBrowserSteps` runs the browser steps with the tooling's Playwright.
   - **The commands have not run in a live session either**: before R3, invoke each from `claude --plugin-dir plugins/web-design-suite`.
 - **The subagents (#89)** are `agents/*.md`: `design-critic` (design-critique-gate preloaded, `omitClaudeMd: true`, returns one JSON block), `gate-runner`, `a11y-auditor`, `design-auditor`, `supabase-security-reviewer`, `codemod-batch-reviewer`. None has Edit or Write, but each has Bash for the skills' scripts, so "read-only" is an instruction, not a sandbox. `test_agents` holds their frontmatter to the fields a plugin agent honours, their preloaded skills, and every script they name. `/critique` delegates to the critic in its body (the skills page documents `context: fork`'s `agent` only for built-in and `.claude/agents/` agents). They have not run live either.
@@ -294,7 +318,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   | email-template-system | `build_email.py`, `lint_email.py`, `render_email.mjs` |
   | figma-variables-sync | `figma_audit.py`, `figma_common.py`, `figma_to_tokens.py` (3.6.0 removed `dtcg_values.py` in favour of `dtcg.py`) |
   | perf-budget-gate | `crux_check.py`, `perf_audit.py`, `measure_vitals.mjs` |
-  | web-design-studio | `audit_design.py`, `check_roles.py`, `generate_color_ramp.py`, `generate_type_scale.py` |
+  | web-design-studio | `audit_design.py`, `check_roles.py`, `generate_color_ramp.py`, `generate_type_scale.py`, `tw_probe.mjs` |
 
 - **The release** is `python -B tooling/release/build.py OUT --rev SHA`, then a `v*` tag on that commit. `release.yml` is the only thing that creates a release.
   - The tag is annotated: `git tag -a vX.Y.Z SHA -m "web-design-suite X.Y.Z"`.
@@ -314,7 +338,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   | component-state-matrix | 20,493 |
   | design-system-versioning | 20,401 |
   | figma-variables-sync | 20,484 |
-  | web-design-studio | 20,429 |
+  | web-design-studio | 20,450 |
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.
 
@@ -322,26 +346,33 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. Phase 6b, 4.0.0
+## 4. Phase 6b, 4.0.0: P36's last part, then the owner's next workstream
 
-**First, ask the owner which workstream comes first.** The plan's §4 says they are independent. Each is one or more PRs under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+**First, P36's last part**: the plan's `P36` row, one PR under 100 files. Then **ask the owner which workstream follows**. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
+| P36 | Tailwind v4's `@theme` in the migration, and the colour match (N40) | LC-B5's rest, N40 | `extract_literals.py`, `cluster_values.py`, `apply_codemod.py`, `framework-migrations.md` | M |
 | P34 | Runtime coverage: single-page apps (`--wait-for`, `--steps`), logged-in pages (`--storage-state`), shadow DOM, several URLs and viewports | GT-B1 to GT-B4 | the three runtime gates (`a11y_runtime.mjs`, `measure_vitals.mjs`, `snapshot_matrix.mjs`) | L |
 | P35 | The cheap automatable checks the coverage table lists, and engines other than Chromium | GT-B6, GT-B9 | the a11y gates, `automation-coverage.md` | M-L |
-| P36 | Tailwind v4: its variants, `tw_probe` with a `/tw-probe` command, and the lint plugin (decision D4, **the breaking change**) | SB-B5, SB-C3, SB-C4, LC-B5's rest (v4's `@theme` in the migration) | `eslint.design.config.mjs` Part 5, a new `tw_probe`, `cluster_values.py` | L |
 | P37 | SCSS in stylelint (D3), and Next.js App Router, Vue, Svelte and Astro | SB-B6, DL-B3's rest (a server-action form, Vue and Svelte output) | the configs, the stack references, fixtures | L |
 | P41 | Email: MJML or React Email output, a right-to-left template, and a client matrix from caniemail's data | DL-B4, DL-B5, DL-C9 | email-template-system | L |
 | P42 | Persuasion: the UK and EU consumer law to flag for legal review, consent for tracking, price experiments, and persuasive patterns mapped to WCAG | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
 | P43 | More page types and audiences, a claims layer with `lint_claims.py`, routing between the persuasion skills, and MESSAGE_BRIEF to DECISION_LOG | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-- **The first PR of Phase 6b** opens a `## 4.0.0 — unreleased` heading in the CHANGELOG.
-- **P36 is the breaking change (D4).** Read the plan's §2 on D4 before it, and say in its PR what a 3.x user must change.
-- **Facts from outside** (a law, a browser engine, caniemail's data, Tailwind v4's API) are re-read at the source on the day, and a figure goes into `evidence.json`.
-- **A candidate for P36's `cluster_values.py` work**, from the live check: the migration's proposal matches a colour to a role by ΔE alone, so a grey (`#6b7280`) landed on `--fg-warning`. It is not an item yet: ask the owner before scheduling it.
-- **R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate), the release PR, the evals on its merge (the owner's OK, about $11, `headSha` checked), then the tag.
+**P36's last part, in detail.** Read LC-B5 in `dev plans/web-design-suite-review/lifecycle.md` (line 97) and N40 in the completion plan.
+
+1. **The census.** In a v4 project, `@theme { --spacing: X }` makes every numeric spacing class real: `p-4` is `calc(var(--spacing) * 4)`. `extract_literals.py` today counts only arbitrary values (`TW_ARBITRARY_RE`, `tailwind_literals()`); framework-migrations.md §5 says stock classes "are not in the census".
+   - When the project's theme keeps `--spacing` (read its `@theme` the way `tw_probe`'s `themeVariables()` does, in Python), count each numeric spacing class at its value, `N × X`, with a context of its own (for example `tailwind-spacing`).
+   - Then the clustering maps it to a role, and `apply_codemod.py` rewrites it as it rewrites `p-[13px]`.
+   - Mind `leading-N`, `w-N`, `gap-N` and the `-` negatives. Check the class prefixes against the v4 docs that day.
+2. **The doc.** framework-migrations.md §5 Move 1 has only the v3 config. Add v4's form: `@theme { --*: initial; … }`, the trap (replacing `--spacing-*` keys leaves `p-4` while `--spacing` stays), and `tw_probe` as Move 1's check (`--refuse p-4`).
+3. **N40.** `cluster_values.py` matches a colour to a role by ΔE alone, so `#6b7280` landed on `--fg-warning` in R3.6's `/migrate src` (`web-design-suite-3.6.0-live-check.md`, S5). Match by hue family and chroma first: a neutral (low chroma) goes only to a neutral role and a status hue to its status, and ΔE ranks within the family. Test on that grey.
+4. **Tests:** `test_token_migration` (the census, the proposal, the codemod on a v4 fixture), failing on `v3.6.0`; `TheWorkedRun` can move. The CHANGELOG goes under 4.0.0.
+
+- **Facts from outside** (a law, a browser engine, caniemail's data, Tailwind's API) are re-read at the source on the day, and a figure goes into `evidence.json`.
+- **R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate), the release PR, the evals on its merge (the owner's OK, about $11, `headSha` checked), then the tag. Its live check must cover Part 5's new block in a real project, `/tw-probe`, and the v3 upgrade path.
 
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 
