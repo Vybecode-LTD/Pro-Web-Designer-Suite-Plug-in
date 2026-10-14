@@ -46,7 +46,8 @@
   - `perf_audit.py` and an unbundled `@import` chain;
   - the TBT flake on macOS;
   - `test_critique_snapshots`;
-  - three tokens outside Display P3;
+  - three tokens outside Display P3, and `check_roles.py` clipping outside sRGB (`contrast_ratio_oklch` clamps the channels instead of following the browser's gamut mapping);
+  - the worked examples are tests;
   - a local build never matches the release's checksums;
   - don't grep `tooling/`;
   - the repository is public;
