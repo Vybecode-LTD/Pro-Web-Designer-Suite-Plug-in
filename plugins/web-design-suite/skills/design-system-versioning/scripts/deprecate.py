@@ -154,8 +154,14 @@ def load_ledger(path: Path) -> Dict[str, Any]:
 def save_ledger(path: Path, data: Dict[str, Any]) -> None:
     data["deprecations"].sort(key=lambda d: (str(d.get("kind")), str(d.get("name"))))
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n",
-                    encoding="utf-8")
+    # The ledger keeps the ending it has (H1's sibling): the platform's newline
+    # turned an LF ledger CRLF on Windows, a whole-file diff for one entry.
+    try:
+        crlf = b"\r\n" in path.read_bytes()
+    except OSError:
+        crlf = False
+    with open(path, "w", encoding="utf-8", newline="\r\n" if crlf else "\n") as fh:
+        fh.write(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 
 
 def find_entry(ledger: Dict[str, Any], name: str) -> Optional[Dict[str, Any]]:
@@ -214,7 +220,11 @@ class Injection:
 
 
 def inject_marker(path: Path, entry: Dict[str, Any]) -> Injection:
-    text = path.read_text(encoding="utf-8")
+    # Read and written as the bytes are (H1, the 2026-10-14 audit): universal
+    # newlines turned one marker line into a whole-file diff, LF to CRLF on
+    # Windows and CRLF to LF elsewhere. The marker takes the file's own ending.
+    with open(path, encoding="utf-8", newline="") as fh:
+        text = fh.read()
     lines = text.splitlines(keepends=True)
     target = locate(lines, entry, path.suffix.lower())
     if target is None:
@@ -222,18 +232,24 @@ def inject_marker(path: Path, entry: Dict[str, Any]) -> Injection:
     idx, indent = target
     css = path.suffix.lower() in CSS_EXT
     body = marker_text(entry)
-    line = (f"{indent}/* {body} */\n" if css else f"{indent}/** {body} */\n")
+    ending = "\r\n" if text.count("\r\n") * 2 > text.count("\n") else "\n"
+    line = (f"{indent}/* {body} */" if css else f"{indent}/** {body} */") + ending
     prev = lines[idx - 1] if idx > 0 else ""
     m = MARKER_RE.search(prev)
     if m and m.group("name") == entry["name"]:
         if prev == line:
             return Injection(str(path), idx + 1, "already-current")
         lines[idx - 1] = line
-        path.write_text("".join(lines), encoding="utf-8")
+        _write_as_read(path, "".join(lines))
         return Injection(str(path), idx + 1, "replaced")
     lines.insert(idx, line)
-    path.write_text("".join(lines), encoding="utf-8")
+    _write_as_read(path, "".join(lines))
     return Injection(str(path), idx + 2, "inserted")
+
+
+def _write_as_read(path: Path, text: str) -> None:
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
 
 
 def locate(lines: Sequence[str], entry: Dict[str, Any],
