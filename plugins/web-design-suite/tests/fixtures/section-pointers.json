@@ -1836,6 +1836,12 @@
   "heading": "RADIUS, BORDER, ELEVATION"
  },
  {
+  "from": "web-design-studio/assets/configs/theme.css",
+  "to": "web-design-studio/references/stack-tailwind.md",
+  "section": "2.10",
+  "heading": "Variants after `--*: initial`"
+ },
+ {
   "from": "web-design-studio/assets/rules/design-rules.json",
   "to": "web-design-studio/assets/configs/theme.css",
   "section": "0",

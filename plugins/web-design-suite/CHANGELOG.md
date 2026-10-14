@@ -27,8 +27,31 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   - Tests: `test_tw_probe.TheProbe` runs it on the starter's own Tailwind wiring and on
     the ways a project breaks it; `test_commands.TheChains` runs the command's step.
 
+- **Tailwind v4's variants after `--*: initial`** (P36 part 3; SB-B5), in
+  stack-tailwind.md §2.10, each compiled with Tailwind 4.3.3 against the starter's wiring:
+  - **Container queries:** `@md:` reads `--container-*`, which §2.5 keeps out, so it
+    generates nothing. A container query is a `@custom-variant` with a literal condition,
+    named by its role (`cq-wide`, and `cq-card-wide` for a named `@container/card`), which
+    also adds no `max-w-*` class. theme.css's note says so.
+  - **`motion-reduce:`** is for what the motion tokens cannot stop, a transform at rest or
+    an autoplaying animation: the `motion-*` classes already go to 1ms.
+  - **`forced-colors:`, `starting:` (`@starting-style`) and `not-*`**, with what each is
+    for; `not-[…]` stays refused as an arbitrary selector.
+  - **`@reference`** in a CSS module or a Vue, Svelte or Astro `<style>`: without it,
+    `@variant dark` compiles with no error against Tailwind's own
+    `prefers-color-scheme`, not the project's `[data-theme="dark"]`; `@import` copies the
+    whole entry (about 36 KB of the starter's CSS) into each module.
+  - **`@source inline()`** for classes no source names (a CMS field), and
+    **`@source not inline()`** for classes that must never generate.
+  - `test_tw_probe.TheVariantsTheReferenceTeaches` compiles the section's marked block as
+    written and checks each claim.
+
 ### Fixed
 
+- **`tw_probe` read an `@source inline()` class as missing** (found by SB-B5's doc
+  test). Its classes are in the first build, so asking for one added no rule, and a role
+  it named failed the check. Those lines are set aside when compiling; `@source not
+  inline()` stays (`test_tw_probe.TheProbe.test_an_inline_source_does_not_hide_its_classes`).
 - **The audit read a file name as a CSS-in-JS template** (found by the audit of
   `tw_probe.mjs`). Its emotion pattern took the `css` of `` `${file}.css` `` for a `css`
   tag, so the rest of the file was audited as unlayered CSS with long selectors. A tag is

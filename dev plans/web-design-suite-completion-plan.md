@@ -144,6 +144,8 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 
 **N39 · a11y_static read email templates as pages (found in R3's live check).** *Done for 3.5.0 (#98): `test_content_and_a11y.A11yStaticLeavesEmails`, `test_hooks.TheA11yGate`.* `/gate` failed a project on the plugin's own receipt template: a11y_static reported no `<main>` landmark and an outline reset on `img`, rules for a page, not a letter, and the a11y hook said the same after each edit to a template. A folder's email templates (the config's `emails`) are now left to lint_email.py, which checks their alt text, language and contrast; a template named on its own is still read, and the hook leaves templates to the email build when that runs (Codex on #98: with it off, a template would have gone unchecked).
 
+**N40 · The migration proposal matches a colour to a role by ΔE alone (found in R3.6's live check).** Scheduled for 4.0.0 with P36's last part (the owner, 2026-10-13). On `/migrate src`, `cluster_values.py` mapped a grey (`#6b7280`) to `--fg-warning`: the nearest role by ΔE, though a neutral is never a status colour. A role is to be matched by its hue family and chroma as well as ΔE, so a neutral lands on a neutral role and a status hue on its status, with a test on that grey.
+
 **N3 · The references' CSS against the stylelint config.** *Done for 3.3.0.* 56 of the 170 CSS snippet files failed it at 3.2.1. The failures by rule:
 - 27 `selector-max-type`;
 - 20 value allowlist;

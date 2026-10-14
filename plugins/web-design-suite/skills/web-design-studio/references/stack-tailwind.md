@@ -334,6 +334,61 @@ runs it and explains each failure. A class the stylesheet itself defines
 ESLint config, which reads the same entry, knows those. Tailwind 3 has no CSS
 entry to compile, so there the lint block's `tailwindConfig` line does the job.
 
+### 2.10 Variants after `--*: initial`
+
+Most of v4's variants read no theme, so `--*: initial` leaves them alone.
+Two do read it, and some project files need the theme from outside the
+entry. Each of these was compiled with Tailwind 4.3.3 against this file's
+own wiring (SB-B5), and `tw_probe` (§2.9) checks a project's:
+
+<!-- tw-probe:variants -->
+```css
+/* Container queries. `@md:` read `--container-*`, which §2.5 keeps out,
+   so it generates nothing. Name each query by its role, with a literal
+   condition, as a breakpoint is (§2.4). */
+@custom-variant cq-wide (@container (inline-size >= 40rem));
+@custom-variant cq-card-wide (@container card (inline-size >= 40rem));
+
+/* Classes no source file names: a CMS field, a database row. Role classes
+   only, and braces expand: this is bg-surface, p-card and hover:p-card. */
+@source inline("bg-surface {hover:,}p-card");
+
+/* Classes that must never generate, wherever a dependency's markup names
+   them: these two still exist after --*: initial, and Law 2 refuses both. */
+@source not inline("{space-x-,space-y-}related");
+```
+
+- **Container queries.** The parent takes `@container` (or `@container/card`
+  for a named one, which `cq-card-wide` queries), and the child
+  `cq-wide:p-card-lg`. A `var()` in the condition is as invalid as in a
+  media query. The custom variant also adds no `max-w-*` class, which giving
+  back `--container-*` would.
+- **`motion-safe:` and `motion-reduce:`.** The `motion-*` classes need
+  neither: tokens.css sets every `--dur-*` to 1ms under
+  `prefers-reduced-motion`, so a transition built from them already stops.
+  `motion-reduce:` is for what no duration removes: a transform that moves
+  the element at rest (`motion-reduce:transform-none`) and an animation that
+  plays on its own (`motion-reduce:animate-none`).
+- **`forced-colors:`** wraps a class in `@media (forced-colors: active)`,
+  where the browser removes box shadows and paints in the system's colours:
+  a control whose outline is a shadow gets `forced-colors:border-stroke`.
+- **`starting:`** is `@starting-style`, the first frame of an entry
+  transition (navigation-patterns.md has it for the top layer):
+  `starting:opacity-0 transition-opacity motion-enter`.
+- **`not-*`** negates a variant: `not-hover:bg-surface`,
+  `not-data-open:hidden`. `not-[…]` is an arbitrary selector, which Part 1
+  of the ESLint config refuses.
+- **`@reference` in a CSS module or a component's `<style>`.** A file the
+  entry does not import, a `.module.css`, or a Vue, Svelte or Astro
+  `<style>` block, is compiled on its own. To use `@variant dark` there, it
+  starts with `@reference "../styles/index.css";` (the path to the entry).
+  That brings the theme and the custom variants and emits none of it.
+  `@import` would copy the whole entry into the module: about 36 KB of
+  the starter's CSS each time. With neither, the file compiles **without an
+  error** against Tailwind's own `dark`, `@media (prefers-color-scheme:
+  dark)`, not this file's `[data-theme="dark"]`, so a page set to dark
+  stays light in that component.
+
 ---
 
 ## 3. `@theme` vs `@theme inline`, and why dark mode breaks
