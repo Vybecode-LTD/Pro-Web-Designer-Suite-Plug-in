@@ -88,7 +88,7 @@ STATE_MODEL: Dict[str, Dict[str, Any]] = {
         # (GT-A12).
         "attrs": {"data-force-state": "focus-visible focus focus-within"},
         "force": "focus-visible",
-        "detect": [":focus-visible", ":focus"],
+        "detect": [":focus-visible", ":focus", ":focus-within"],
         "blurb": "keyboard focus; the ring must survive forced-colors",
     },
     "active": {
@@ -278,21 +278,25 @@ def parse_css(css: str) -> List[Node]:
     return root
 
 
-def transpose_selector(selector: str) -> Optional[str]:
+def transpose_selector(selector: str) -> Tuple[Optional[str], List[str]]:
     """Rewrite `.b:hover:not(:disabled)` -> `.b[data-force-state~="hover"]:not(:disabled)`.
 
-    Only pseudo-classes at paren depth 0 are rewritten: `:not(:hover)` is a
-    *guard*, not a state, and rewriting it would invert the rule. Comma parts
-    with no forceable pseudo-class are dropped — keeping them would apply the
-    hover styles unconditionally, which is the exact bug this tool exists to
-    find.
+    Returns the rewritten selector (None when no part has a state) and the
+    states it forces. A pseudo-class is rewritten at paren depth 0 and inside
+    `:is()` and `:where()`, which only group; inside `:not()`, `:has()` or any
+    other function it is a *guard*, not a state, and rewriting it would invert
+    the rule. Comma parts with no forceable pseudo-class are dropped — keeping
+    them would apply the hover styles unconditionally, which is the exact bug
+    this tool exists to find.
     """
     kept: List[str] = []
+    names: List[str] = []
     for part in split_selector_list(selector):
         rewritten, hits = transpose_part(part)
         if hits:
             kept.append(rewritten)
-    return ", ".join(kept) if kept else None
+            names.extend(hits)
+    return (", ".join(kept) if kept else None), names
 
 
 def split_selector_list(selector: str) -> List[str]:
@@ -313,22 +317,53 @@ def split_selector_list(selector: str) -> List[str]:
     return parts
 
 
-def transpose_part(part: str) -> Tuple[str, int]:
-    out: List[str] = []
+GROUPING_PSEUDO = ("is", "where")
+FUNCTION_NAME_RE = re.compile(r":([\w-]+)\Z")
+
+
+def _close_paren(text: str, open_idx: int) -> int:
     depth = 0
+    for k in range(open_idx, len(text)):
+        if text[k] == "(":
+            depth += 1
+        elif text[k] == ")":
+            depth -= 1
+            if depth == 0:
+                return k
+    return len(text) - 1
+
+
+def transpose_part(part: str) -> Tuple[str, List[str]]:
+    """One compound selector, its states rewritten. In an `:is()`/`:where()`
+    holding a state, an arm without one never matches: `.chip:is(:hover,
+    .danger)` mirrored with `.danger` live re-applied the hover styles to every
+    danger chip, after the component's own rules (Codex on #132). It becomes
+    `.danger:not(*)`, which keeps its specificity, since `:is()` takes its
+    most specific arm's. A group holding no state is a condition and stays
+    whole; any other function's argument is a guard."""
+    out: List[str] = []
     i, n = 0, len(part)
-    hits = 0
+    hits: List[str] = []
     while i < n:
         ch = part[i]
         if ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth = max(0, depth - 1)
-        if ch == ":" and depth == 0:
+            close = _close_paren(part, i)
+            m = FUNCTION_NAME_RE.search(part, max(0, i - 40), i)
+            if m and m.group(1).lower() in GROUPING_PSEUDO:
+                arms = [transpose_part(arm) for arm in split_selector_list(part[i + 1:close])]
+                if any(h for _, h in arms):
+                    out.append("(" + ", ".join(arm if h else f"{arm}:not(*)" for arm, h in arms) + ")")
+                    hits.extend(name for _, h in arms for name in h)
+                    i = close + 1
+                    continue
+            out.append(part[i:close + 1])
+            i = close + 1
+            continue
+        if ch == ":":
             m = PSEUDO_RE.match(part, i)
             if m:
                 out.append('[data-force-state~="%s"]' % m.group(1))
-                hits += 1
+                hits.append(m.group(1))
                 i = m.end()
                 continue
         out.append(ch)
@@ -336,21 +371,55 @@ def transpose_part(part: str) -> Tuple[str, int]:
     return "".join(out), hits
 
 
+def nest_selector(parent: str, child: str) -> str:
+    """A nested rule's selector as CSS nesting reads it: `&` is the parent
+    (an `:is()` of it when it is a list), and a part without one is its
+    descendant. Mirroring `&:hover` as written matched nothing."""
+    if len(split_selector_list(parent)) > 1:
+        parent = f":is({parent})"
+    return ", ".join(part.replace("&", parent) if "&" in part else f"{parent} {part}"
+                     for part in split_selector_list(child))
+
+
+def force_rules(nodes: Sequence[Node]) -> List[Tuple[Tuple[str, ...], str, str, List[str]]]:
+    """Every mirror rule: (its at-rule context, the rewritten selector, the
+    declarations, the states it forces). Nested rules are resolved against
+    their parent, and declarations straight inside an at-rule nested in a rule
+    (`.b:hover { @media (x) { color: red } }`) belong to that rule."""
+    rules: List[Tuple[Tuple[str, ...], str, str, List[str]]] = []
+
+    def add(stack: Tuple[str, ...], sel: str, body: str) -> None:
+        mirrored, names = transpose_selector(sel)
+        if mirrored and body.strip():
+            rules.append((stack, mirrored, body, names))
+
+    def walk(items: Sequence[Node], stack: Tuple[str, ...], parent: Optional[str]) -> None:
+        for nd in items:
+            if nd.kind == "at-block":
+                inner = stack + (nd.head,)
+                if parent is not None:
+                    add(inner, parent, ";\n  ".join(
+                        c.body for c in nd.children if c.kind == "text" and c.body))
+                walk(nd.children, inner, parent)
+            elif nd.kind == "rule":
+                sel = nest_selector(parent, nd.head) if parent is not None else nd.head
+                add(stack, sel, nd.body)
+                walk(nd.children, stack, sel)
+
+    walk(nodes, (), None)
+    return rules
+
+
+def forced_states(css_text: str) -> set:
+    """The states a mirror rule was written for: what "covered" means for a
+    state the sheet has to force."""
+    return {name for *_, names in force_rules(parse_css(css_text)) for name in names}
+
+
 def build_force_shim(nodes: Sequence[Node]) -> str:
     """Emit mirrored rules for every forceable pseudo-class, context intact."""
     lines: List[str] = []
-
-    def walk(items: Sequence[Node], stack: Tuple[str, ...]) -> None:
-        for nd in items:
-            if nd.kind == "at-block":
-                walk(nd.children, stack + (nd.head,))
-            elif nd.kind == "rule":
-                sel = transpose_selector(nd.head)
-                if sel and nd.body.strip():
-                    emit(stack, sel, nd.body)
-                walk(nd.children, stack)
-
-    def emit(stack: Tuple[str, ...], sel: str, body: str) -> None:
+    for stack, sel, body, _ in force_rules(nodes):
         indent = ""
         for head in stack:
             lines.append(f"{indent}{head} {{")
@@ -361,8 +430,6 @@ def build_force_shim(nodes: Sequence[Node]) -> str:
         lines.append(f"{indent}}}")
         for k in range(len(stack) - 1, -1, -1):
             lines.append(f"{'  ' * k}}}")
-
-    walk(nodes, ())
     return "\n".join(lines)
 
 
@@ -458,16 +525,27 @@ def detect_states(css_text: str, states: Iterable[str],
     `:where(:focus-visible)` rule in base.css, so a miss here is a prompt, not a
     verdict — the cell still renders, and you look at it. A combination
     (`selected+hover`) is covered when each of its states is.
+
+    A pseudo-class the sheet forces (`:hover`) counts only when a mirror rule
+    was written for it: one inside `:not()` or `:has()`, or in a rule with no
+    declarations, renders the same as default, so it covers nothing.
     """
     model = model if model is not None else STATE_MODEL
     flat = strip_comments(css_text)
+    forced = forced_states(css_text)
+
+    def found(needle: str) -> bool:
+        if needle.startswith(":") and needle[1:] in FORCEABLE_PSEUDO:
+            return needle[1:] in forced
+        return needle in flat
+
     result: Dict[str, bool] = {}
     for st in states:
         parts = st.split("+")
         hits = []
         for part in parts:
             needles = overrides.get(part, model.get(part, {}).get("detect"))
-            hits.append(True if not needles else any(nd in flat for nd in needles))
+            hits.append(True if not needles else any(found(nd) for nd in needles))
         result[st] = all(hits)
     return result
 

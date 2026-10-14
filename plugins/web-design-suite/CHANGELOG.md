@@ -103,6 +103,48 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   and a marker takes the file's (`test_versioning.TheMarkerKeepsTheFilesLineEndings`). The
   dry run's diff is written as its bytes are, where Windows' stdout doubled a CRLF line's
   `\r` (Codex on #130).
+- **The accessibility gate never read a rule inside `@layer`, `@media` or `@supports`**
+  (H4, the 2026-10-14 audit). `a11y_static` split CSS at depth 0 only, so an at-rule's
+  rules were pooled: any `box-shadow` beside an `outline: none` counted as its ring, and
+  the focus test read the at-rule's prelude. The starter's `base.css` is all `@layer
+  base`, so a reset planted there passed. Each rule is now read on its own at any depth,
+  a nested `&` rule against its parent (a comma inside `:is()` is not the list's,
+  CodeRabbit on #132), and a condition nested in a rule is read with the rule's own
+  declarations (Codex on #132). Reading them found two more: a comment's newlines
+  were blanked, so every line after a multi-line comment was misnumbered and its ignore
+  comment missed; and a focus rule that moves a skip link on-screen (`translate: 0 0`)
+  was called invisible (`test_content_and_a11y.A11yStaticReadsNestedRules`).
+- **The state matrix called a state covered that it never rendered** (H5). Only a
+  pseudo-class at depth 0 got a mirror rule, so `.btn:is(:hover, :focus-visible)` got
+  none, and `.chip { &:hover {…} }` mirrored as `&[data-force-state~="hover"]`, which
+  matches nothing; the summary still said every state had a rule. States inside `:is()`
+  and `:where()` are mirrored, an arm with no state made never to match
+  (`.danger:not(*)`, Codex on #132), a nested rule is read with its parent, and a forced state
+  is covered only when a mirror was written; a `:focus-within` ring covers the
+  focus-visible cell, which carries it (CodeRabbit on #132)
+  (`test_content_and_a11y.MatrixStates`,
+  `test_browser_runtime.MatrixSeesStateChanges`).
+- **The accessibility gate did not know Vue's or Angular's bindings** (H6). `<img
+  :alt="d">` had no alt and a bound `aria-label` no label, so a Vue project with the hook
+  was blocked on every bound attribute. `:x`, `v-bind:x`, `[x]` and `[attr.x]` are the
+  attribute `x`, a string literal read as its text; `@click`, `v-on:click`, Svelte's
+  `on:click` and `(click)` are click handlers, which a `<div>` must not carry alone
+  (`test_content_and_a11y.A11yStaticReadsBoundAttributes`).
+- **The hook's index mode ran without the project's config** (H7). `DESIGN_GATE_INDEX=1`
+  audited a scratch tree of the staged files alone, so the audit read no token files and
+  no baseline: a baselined finding refused the commit, and a project ramp's primitive
+  passed. The tree now holds `.design-suite.json`, its baselines at their own paths (their
+  keys are relative to them) and the default baselines; a token file the config names
+  that is not staged is read from the working tree. A staged symlink is replaced in the
+  scratch tree, never written through (CodeRabbit on #132)
+  (`test_precommit_hook.PreCommitHook`).
+- **The audit read a ternary in an inline custom property as a property** (H8). In
+  `style={{ '--progress': open ? '1' : '0' }}`, the one inline style the spec allows, the
+  quoted `'1' :` was taken for a key and refused. A style object's keys are its depth-0
+  entries' now, in `{{ … } as CSSProperties}` a shorthand `{{ zIndex }}`, and a spread's own object literals
+  (`...(on ? { zIndex: 3 } : {})`, Codex on #132) too, and a comment before a key in
+  markup hides it no longer (CodeRabbit on #132)
+  (`test_audit_design.JsxClassesAndCssInJs`).
 - **`--reverse` left out a theme's value without a word** (H2, the 2026-10-14 audit). A
   `[data-theme="dark"]` alias to a token the file does not declare was dropped from the
   body with exit 0 and nothing said, so Figma showed the Light alias in Dark. It is

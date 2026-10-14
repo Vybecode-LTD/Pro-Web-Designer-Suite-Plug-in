@@ -20,6 +20,7 @@ Regressions covered:
 """
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import shutil
@@ -262,6 +263,74 @@ class PreCommitHook(TempDirTest):
         code, out = self.run_hook(DESIGN_GATE_INDEX="1")
         self.assertEqual(code, 1, out)                   # what would be committed is not
         self.assertIn("13px", out)
+
+    def write_baseline(self, rel):
+        proc = subprocess.run([PY, "-B", "-m", "scripts.audit_design", "components/card.css",
+                               "--write-baseline", rel], cwd=self.repo, env=env(), capture_output=True,
+                              timeout=180)
+        self.assertEqual(proc.returncode, 0, (proc.stdout + proc.stderr).decode("utf-8", "replace"))
+
+    def test_the_index_mode_reads_the_baseline(self):
+        """Audit H7: the scratch tree held only the staged files, so the audit
+        ran there with no baseline, and a finding it freezes refused the
+        commit in index mode alone."""
+        self.stage("components/card.css", "@layer components {\n  .card { padding: 13px; }\n}\n")
+        for config, baseline in ((None, ".design-baseline.json"),
+                                 ({"schema": 1, "baselines": {"audit": "design/audit.json"}},
+                                  "design/audit.json")):
+            with self.subTest(baseline=baseline):
+                for leftover in (".design-suite.json", ".design-baseline.json", "design/audit.json"):
+                    if (self.repo / leftover).exists():
+                        (self.repo / leftover).unlink()
+                if config is not None:
+                    (self.repo / ".design-suite.json").write_text(json.dumps(config), encoding="utf-8")
+                code, out = self.run_hook(DESIGN_GATE_INDEX="1")
+                self.assertEqual(code, 1, out)           # the control: unfrozen, it fails
+                self.write_baseline(baseline)
+                code, out = self.run_hook()
+                self.assertEqual(code, 0, out)
+                code, out = self.run_hook(DESIGN_GATE_INDEX="1")
+                self.assertEqual(code, 0, out)
+
+    def test_the_index_mode_reads_the_configs_token_files(self):
+        """Audit H7: without .design-suite.json the audit read none of the
+        project's token files, so a primitive of the project's own ramp read
+        by a component passed in index mode alone."""
+        (self.repo / "styles").mkdir()
+        (self.repo / "styles" / "brand.css").write_text(
+            ":root {\n  --ocean-500: oklch(55% 0.2 250);\n  --bg-accent: var(--ocean-500);\n}\n",
+            encoding="utf-8")
+        (self.repo / ".design-suite.json").write_text(
+            json.dumps({"schema": 1, "tokens": ["tokens.css", "styles/brand.css"]}), encoding="utf-8")
+        self.stage("components/card.css",
+                   "@layer components {\n  .card { background: var(--ocean-500); }\n}\n")
+        for index in (None, "1"):
+            with self.subTest(index=index):
+                code, out = self.run_hook(DESIGN_GATE_INDEX=index)
+                self.assertEqual(code, 1, out)
+                self.assertIn("tier1-leak", out)
+                self.assertIn("--ocean-500", out)
+
+    def test_the_index_mode_never_writes_through_a_staged_symlink(self):
+        """CodeRabbit on #132: a staged .design-suite.json that is a symlink
+        is checked out as one, and rewriting the scratch tree's copy rewrote
+        its target, outside the scratch tree."""
+        outside = self.tmp / "outside" / "suite.json"
+        outside.parent.mkdir()
+        text = json.dumps({"schema": 1, "tokens": ["tokens.css"], "baselines": {"audit": "audit.json"}})
+        outside.write_text(text, encoding="utf-8")
+        subprocess.run([GIT, "-C", str(self.repo), "config", "core.symlinks", "true"], check=True,
+                       capture_output=True, env=env())
+        try:
+            os.symlink(outside, self.repo / ".design-suite.json")
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"no symlinks here: {exc}")
+        subprocess.run([GIT, "-C", str(self.repo), "add", ".design-suite.json"], check=True,
+                       capture_output=True, env=env())
+        self.stage("components/card.css", "@layer components {\n  .card { padding: var(--pad-card); }\n}\n")
+        code, out = self.run_hook(DESIGN_GATE_INDEX="1")
+        self.assertNotIn("Traceback", out)
+        self.assertEqual(text, outside.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

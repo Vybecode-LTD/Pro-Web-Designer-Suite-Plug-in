@@ -595,6 +595,47 @@ class JsxClassesAndCssInJs(TempDirTest):
             'group-[.is-open]:p-card" />;\n')
         self.assertEqual([f for f in allowed if f["rule"] == "tw-arbitrary"], [])
 
+    def test_a_custom_property_a_ternary_sets_is_the_licensed_use(self):
+        """Audit H8: the keys were every `'x' :` in the object, so the quoted
+        consequent of `open ? '1' : '0'` read as a property named 1."""
+        for style in ("{{ '--progress': open ? '1' : '0' }}",
+                      "{{ ...base, '--progress': open ? '1' : '0' }}",
+                      "{{ '--progress': open ? '1' : '0' } as React.CSSProperties}",
+                      "{{ '--span': n, \"--lift\": raised ? 'var(--shadow-raised)' : 'none' }}",
+                      "{{ ...(open ? { '--progress': '1' } : {}) }}",
+                      "{{ ...fn({ zIndex: 3 }) }}"):                 # a call's argument is not the spread
+            with self.subTest(style=style):
+                self.assertEqual([], self.rules(
+                    f"export const T = ({{ open, n, raised, base }}) => <div style={style} />;\n"))
+
+    def test_a_visual_property_in_a_style_object_is_still_refused(self):
+        for style, prop in (("{{ fontWeight: on ? 600 : 400 }}", "fontWeight"),
+                            ("{{ '--progress': on ? '1' : '0', 'zIndex': 3 }}", "zIndex"),
+                            ("{{ zIndex }}", "zIndex"),
+                            ("{{ zIndex: 3 } as React.CSSProperties}", "zIndex"),
+                            # Codex on #132: a spread's own object literal is set inline.
+                            ("{{ ...{ zIndex: 3 } }}", "zIndex"),
+                            ("{{ ...(on ? { zIndex: 3 } : {}) }}", "zIndex"),
+                            ("{{ ...on && { 'zIndex': 3 }, '--x': n }}", "zIndex"),
+                            ("{{ ...(on ? { ...{ zIndex: 3 } } : base) }}", "zIndex")):
+            with self.subTest(style=style):
+                found = [f for f in self.findings(
+                    f"export const T = ({{ on, zIndex }}) => <div style={style} />;\n")
+                    if f["rule"] == "inline-style"]
+                self.assertEqual(1, len(found))
+                self.assertIn(f"property: {prop}.", found[0]["message"])
+
+    def test_a_comment_in_a_markup_files_style_object_hides_no_key(self):
+        """CodeRabbit on #132: markup (Astro) reaches the style-object reader
+        with its comments, and `/* note */ zIndex` was no key."""
+        path = self.write("src/components/Thing.astro",
+                          "---\nconst on = true;\n---\n<div style={{ /* note */ zIndex: on ? 3 : 4 }}>x</div>\n")
+        proc = run_py("web-design-studio", "audit_design", path, "--json", cwd=self.tmp)
+        data = json.loads(proc.stdout)
+        found = [f for f in (data["findings"] if isinstance(data, dict) else data) if f["rule"] == "inline-style"]
+        self.assertEqual(1, len(found), output(proc))
+        self.assertIn("property: zIndex.", found[0]["message"])
+
     def test_an_arbitrary_property_is_refused(self):
         self.assertIn("tw-arbitrary-property", [r for r, _ in self.rules(
             'export const T = () => <span className="[padding:13px] [--gap:4px]" />;\n')])
