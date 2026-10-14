@@ -162,7 +162,7 @@ The ring is the `outline`, and that is not a style choice. Windows High Contrast
 
 ### 1.8 Precedence — which state wins when two are true
 
-States overlap constantly: a disabled button is also hovered, an invalid input is also focused. Decide the precedence once, encode it in guards, and the sheet will show you whether you got it right — the state pass renders each state in isolation, so any cell that looks like a *different* row's cell is a precedence bug. To render two at once, list them joined with `+` in `states` (`"selected+hover"`): the cell carries both states' attributes, and it is covered when each state has a rule.
+States overlap constantly: a disabled button is also hovered, an invalid input is also focused. Decide the precedence once, encode it in guards, and the sheet will show you whether you got it right — the state pass renders each state in isolation, so any cell that looks like a *different* row's cell is a precedence bug. To render two at once, list them joined with `+` in `states` (`"selected+hover"`): the cell carries both states' attributes, and it is covered when each state has a rule: for `:hover`, `:focus-visible` or `:active`, one the sheet could mirror (not one inside `:not()` or `:has()`, and not an empty one).
 
 | Both true | Winner | Why |
 |---|---|---|

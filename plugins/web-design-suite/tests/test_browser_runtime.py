@@ -33,7 +33,7 @@ import time
 import unittest
 
 from test_browser_scripts import installed_browsers
-from wds_support import NODE, TempDirTest, output, run_node, tool_modules
+from wds_support import NODE, TempDirTest, output, run_node, run_py, tool_modules
 
 
 def node_modules() -> str | None:
@@ -416,6 +416,23 @@ class MatrixSeesStateChanges(TempDirTest):
         self.assertEqual(proc.returncode, 1, output(proc))
         self.assertIn("st_hover", output(proc))
         self.assertIn("no visible style", output(proc))
+
+    def test_a_generated_sheet_renders_grouped_and_nested_states(self):
+        """Audit H5, end to end: a hover inside `:is()` and a nested `&:active`
+        got no mirror rule, so their cells rendered as default."""
+        self.write("chip.css", ".chip { display: inline-block; padding: 8px 16px; background: #fff; color: #222; }\n"
+                               ".chip:is(:hover) { background: #ddd; }\n"
+                               ".chip { &:active { background: #999; } }\n")
+        self.write("matrix.json", json.dumps({
+            "$schema": "component-state-matrix/1", "themes": ["light"], "densities": ["comfortable"],
+            "components": [{"name": "chip", "css": "chip.css", "states": ["default", "hover", "active"],
+                            "template": '<span class="chip" {attrs}>{content}</span>'}]}))
+        proc = run_py("component-state-matrix", "generate_matrix", "matrix.json", "--out", "sheet.html",
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        proc = self.snapshot(self.tmp / "sheet.html", "--allow-new")
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertNotIn("no visible style", output(proc))
 
     def test_a_sheet_with_a_strict_csp_is_captured(self):
         """GT-A5, in snapshot_matrix: the freeze stylesheet was refused there too."""

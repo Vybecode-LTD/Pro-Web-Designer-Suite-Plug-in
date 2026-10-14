@@ -179,7 +179,7 @@ You cannot hover 200 cells at once, so the generator reads each component's own 
 /* generated */  .button[data-force-state~="hover"]:not(:disabled) { --button-bg: var(--bg-hover); }
 ```
 
-Identical specificity (0,3,0 both ways), same layer, later in document order — so it wins on order, not on a fight. Pseudo-classes inside `:not(...)` are left alone, because those are guards, not states. At-rule context is preserved, so a hover rule behind `@media (hover: hover)` stays behind it — and will therefore render only when the harness reports a fine pointer. Headless Chromium does; a mobile emulation context does not. If a hover row looks empty, check for that media query before you conclude the state is missing.
+Same specificity (0,3,0), same layer, later in the document: it wins on order. States inside `:is()`/`:where()` and nested `&:hover` rules are mirrored; inside `:not()` or `:has()` they are guards, not states, and left alone. At-rule context is preserved, so a hover rule behind `@media (hover: hover)` stays behind it — and will therefore render only when the harness reports a fine pointer. Headless Chromium does; a mobile emulation context does not. If a hover row looks empty, check for that query first.
 
 ### The token rebind
 

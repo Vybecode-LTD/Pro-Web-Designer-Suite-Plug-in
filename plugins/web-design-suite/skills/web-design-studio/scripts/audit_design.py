@@ -1768,15 +1768,96 @@ def _line_finder(text: str):
     return lambda pos: bisect.bisect_right(starts, pos)
 
 
+STYLE_KEY = re.compile(r"""\s*(?:(['"])((?:(?!\1)[^\\]|\\.)*)\1|([A-Za-z_$][\w$]*))\s*\Z""", re.S)
+
+
+def style_object_keys(inner: str) -> list[str]:
+    """The property names a style object sets, one per depth-0 entry.
+
+    An entry's key is what stands before its first depth-0 colon, or the whole
+    entry for a shorthand (`{ color }`); a computed key names none, and a
+    spread names the keys of the object literals it can evaluate to
+    (`spread_keys`). Reading every `'x' :` in the text took the ternary in
+    `{ '--progress': open ? '1' : '0' }` for a key named `1` (audit H8)."""
+    inner = strip_js_comments(inner)   # `{ /* note */ color: … }` (CodeRabbit on #132)
+    names: list[str] = []
+    depth, start, colon, quote, k, n = 0, 0, -1, "", 0, len(inner)
+
+    def entry(end: int) -> None:
+        text = inner[start:end].strip()
+        if text.startswith("..."):
+            names.extend(spread_keys(text[3:]))
+            return
+        key = inner[start:colon if colon >= 0 else end]
+        m = STYLE_KEY.match(key)
+        if m and (colon >= 0 or m.group(3)):
+            names.append(m.group(2) if m.group(1) else m.group(3))
+
+    while k < n:
+        c = inner[k]
+        if quote:
+            if c == "\\":
+                k += 1
+            elif c == quote:
+                quote = ""
+        elif c in "'\"`":
+            quote = c
+        elif c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif depth == 0 and c == ":" and colon < 0:
+            colon = k
+        elif depth == 0 and c == ",":
+            entry(k)
+            start, colon = k + 1, -1
+        k += 1
+    if inner[start:].strip():
+        entry(n)
+    return names
+
+
+def spread_keys(expr: str) -> list[str]:
+    """The keys of the object literals a spread's operand can evaluate to:
+    `...{ color: 'red' }`, `...(on ? { color: 'red' } : {})`, `...(on && {…})`
+    (Codex on #132). A name (`...base`) cannot be read, and an object passed
+    to a call (`...fn({ color })`) or held in an array is not the spread."""
+    names: list[str] = []
+    opaque: list[bool] = []            # per open ( or [: a call's arguments or an array
+    k, n = 0, len(expr)
+    while k < n:
+        c = expr[k]
+        if c in "\"'`":
+            q, k = c, k + 1
+            while k < n and expr[k] != q:
+                k += 2 if expr[k] == "\\" else 1
+        elif c == "(":
+            before = expr[:k].rstrip()[-1:]
+            opaque.append(bool(before) and (before.isalnum() or before in "_$)]"))
+        elif c == "[":
+            opaque.append(True)
+        elif c in ")]":
+            if opaque:
+                opaque.pop()
+        elif c == "{":
+            end = match_braces(expr, k)
+            if not any(opaque):
+                names.extend(style_object_keys(expr[k + 1:end - 1]))
+            k = end
+            continue
+        k += 1
+    return names
+
+
 def _audit_jsx_styles(clean: str, line_of, add) -> None:
     # ---- L4 inline style ---------------------------------------------------
     for m in JSX_STYLE.finditer(clean):
         open_at = clean.index("{", m.start())
         end = match_braces(clean, open_at)
         body = clean[open_at:end]
-        inner = body[2:-2] if body.endswith("}}") else body
-        keys = re.findall(r"(?:^|[{,\s])\s*(?:['\"]([^'\"]+)['\"]|([A-Za-z_$][\w$]*))\s*:", inner)
-        names = [a or b for a, b in keys]
+        # The object itself, also in `{{ … } as CSSProperties}`.
+        inner = body[2:match_braces(body, 1) - 1]
+        names = style_object_keys(inner)
         offenders = [k for k in names if not k.startswith("--")]
         if not names:
             continue
