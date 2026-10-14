@@ -521,7 +521,7 @@ def tw_utility_prefix(raw: str) -> str:
 
 
 def tw_prop_class(prefix: str) -> str:
-    if prefix in {"p", "size"}:
+    if prefix == "p":
         return "pad-all"
     if prefix in {"px", "pl", "pr", "ps", "pe"}:
         return "pad-inline"
@@ -532,7 +532,8 @@ def tw_prop_class(prefix: str) -> str:
     if prefix in {"inset", "inset-x", "inset-y", "top", "right", "bottom", "left"}:
         return "inset"
     # Before the margin test: max-w/min-w/max-h/min-h start with "m" too.
-    if prefix in {"w", "h", "min-w", "max-w", "min-h", "max-h"}:
+    # size-* sets a width and a height, never a padding (CodeRabbit on #129).
+    if prefix in {"w", "h", "size", "min-w", "max-w", "min-h", "max-h"}:
         return "size"
     if prefix.startswith(("m", "gap", "space")):
         return "gap"

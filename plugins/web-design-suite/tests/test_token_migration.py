@@ -904,6 +904,19 @@ class TheV4SpacingCensus(TempDirTest):
                                r'p-0 p-0\.3 p-04 -p-4 w-px text-sm"')
         self.assertIn('class="p-well md:gap-grouped"', self.tmp.joinpath("src", "Panel.vue").read_text(encoding="utf-8"))
 
+    def test_a_size_is_no_padding(self):
+        # CodeRabbit on #129: size-4 is an icon's width and height, so a padding
+        # role (size-well) would resize every icon when --pad-well moved.
+        self.write("src/Icon.tsx", 'export const I = () => <svg className="size-4 size-[16px] p-4" />;\n')
+        literals, data = self.project()
+        self.assertIn(("size-4", "1rem", "tw:size"), self.counted(data))
+        mapping, report = self.cluster(literals)
+        sizes = [r for r in mapping["rules"] if r["match"][0].startswith("size-")]
+        self.assertEqual(sizes, [])
+        self.assertIn("Where: src/Icon.tsx:1  \nWhy it does not map: snaps to 16px, which has no Tier-2 "
+                      "role for `size`", report)
+        self.assertIn("p-well", {r["replacement"] for r in mapping["rules"]})
+
     def test_a_numeric_rule_rewrites_only_its_own_class(self):
         mapping = self.write("mapping.json", json.dumps({
             "schema": "design-token-migration/mapping@1",

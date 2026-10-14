@@ -83,6 +83,10 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
   `test_token_migration.ColoursKeepTheirFamily` holds 23 greys, tints and status colours
   to their families.
+- **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
+  became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
+  too. It is a width and a height, so it is a size: reported when no `--width-*` role
+  fits (`test_token_migration.TheV4SpacingCensus.test_a_size_is_no_padding`).
 
 - **`tw_probe` read an `@source inline()` class as missing** (found by SB-B5's doc
   test). Its classes are in the first build, so asking for one added no rule, and a role
