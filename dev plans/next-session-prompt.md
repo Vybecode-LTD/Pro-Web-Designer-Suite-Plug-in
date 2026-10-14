@@ -5,17 +5,17 @@
   - The migration counts Tailwind v4's numeric classes (`p-4` at N × `--spacing`), maps them to roles and rewrites them.
   - framework-migrations.md §5 has Move 1 in v4's form, compiled by a test.
   - Colours are matched by family (a neutral, or a hue within 30°), then ΔE.
-- **#130, P44 part 1 (the audit's C1, C2 and H1).** The codemod's arbitrary-class match is bound on both ends. The codemod, `deprecate`'s marker and its ledger keep a file's line endings, and the dry run's diff is written as its bytes are.
+- **#130, P50 part 1 (the audit's C1, C2 and H1).** The codemod's arbitrary-class match is bound on both ends. The codemod, `deprecate`'s marker and its ledger keep a file's line endings, and the dry run's diff is written as its bytes are.
 - **#131, this session's docs**, with the audit committed and scheduled.
 - **Reviews:**
   - #129 had 7 real findings: Codex 4 over two rounds, CodeRabbit 2, CI 1.
   - #130 had 1: Codex, the dry run's `\r\r\n` on Windows.
   - All were fixed with tests failing on the head they reviewed.
 - **The owner's audit**, `dev plans/web-design-suite-audit-2026-10-14.md`, found 114 findings on `main` at `9391774`: 2 critical, 15 high, 49 medium, 48 low.
-  - It is scheduled as N41 to N47 (completion plan) and Phase 6c, P44 to P49 (execution plan), all before R4.
+  - It is scheduled as N41 to N47 (completion plan) and Phase 6c, P50 to P55 (execution plan), all before R4.
   - The owner chose to commit it, and C1, C2 and H1 first.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P44, the audit's gates (H4 to H8)**, after asking the owner where Phase 6c goes (§4).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P50, the audit's gates (H4 to H8)**, after asking the owner where Phase 6c goes (§4).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -209,7 +209,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 ## 1. Orient (keep it under about 40 thousand tokens)
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`.
-2. Read the execution plan's §2 and §6, and its Phase 6 tables in §4 (P31 to P49 and R4: each item's scope and main files). Phase 6c is the audit: read the audit's §6 and §7, and each finding a PR closes, never the whole file at once.
+2. Read the execution plan's §2 and §6, and its Phase 6 tables in §4 (P31 to P55 and R4: each item's scope and main files). Phase 6c is the audit: read the audit's §6 and §7, and each finding a PR closes, never the whole file at once.
 3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
    - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions, and the owner's no to `bin/`.
    - §1 is the plugin-evals page, §10 P29's choices, and **§11 the sandboxing page and P30's choices**, with the first runs. Read §11 if you touch the evals.
@@ -368,29 +368,29 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. Phase 6c, 4.0.0: the audit, from P44
+## 4. Phase 6c, 4.0.0: the audit, from P50
 
-**First, ask the owner where Phase 6c goes** among Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43), or whether it all goes first. The audit's own order is P44 to P49. Then start there, one PR under 100 files at a time. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+**First, ask the owner where Phase 6c goes** among Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43), or whether it all goes first. The audit's own order is P50 to P55. Then start there, one PR under 100 files at a time. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P44 | The gates that pass what they should fail (audit H4 to H8) | N42 | `a11y_static.py`, `generate_matrix.py`, `pre-commit-design-gate.sh`, `audit_design.py` | M |
-| P45 | Silent wrong output in sync, docs and scaffold (audit H2, H3, H9, H10) | N43 | `figma_to_tokens.py`, `extract_system.py`, `introspect_schema.py` | M |
-| P46 | The proposal's arithmetic and recipe, and two tests (audit H11 to H15) | N44 | `cluster_values.py`, `apply_codemod.py`, the migration references | M |
-| P47 | The cross-cutting classes, one PR each (audit §6 step 5, §7) | N45 | per class | L |
-| P48 | The medium findings, one PR per §3 area | N46 | per area | L |
-| P49 | The low findings and doc fixes | N47 | per area | M |
+| P50 | The gates that pass what they should fail (audit H4 to H8) | N42 | `a11y_static.py`, `generate_matrix.py`, `pre-commit-design-gate.sh`, `audit_design.py` | M |
+| P51 | Silent wrong output in sync, docs and scaffold (audit H2, H3, H9, H10) | N43 | `figma_to_tokens.py`, `extract_system.py`, `introspect_schema.py` | M |
+| P52 | The proposal's arithmetic and recipe, and two tests (audit H11 to H15) | N44 | `cluster_values.py`, `apply_codemod.py`, the migration references | M |
+| P53 | The cross-cutting classes, one PR each (audit §6 step 5, §7) | N45 | per class | L |
+| P54 | The medium findings, one PR per §3 area | N46 | per area | L |
+| P55 | The low findings and doc fixes | N47 | per area | M |
 | P34, P35, P37, P41, P42, P43 | Phase 6b's workstreams, where the owner places them | see §4 of the plan | | |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-**P44 in detail.** Read the audit's H4 to H8 (its §2, lines 44 to 68) for the files, lines and fixes.
+**P50 in detail.** Read the audit's H4 to H8 (its §2, lines 44 to 68) for the files, lines and fixes.
 
 1. **H4, `a11y_static.audit_css()`.** It splits blocks at depth 0 only, so `outline: none` inside `@layer`, `@media` or `@supports` is never seen. The starter's own `base.css` is all `@layer base`. Read blocks recursively, carrying the at-rule stack as `generate_matrix.parse_css` does, and decide per rule.
 2. **H5, `generate_matrix`.** States inside `:is()`/`:where()` and a nested `&:hover` get no mirror rule, yet the summary says covered. Rewrite them inside `:is()` and `:where()`, prefix nested selectors with the parent, and make `detect_states` count a state only when a mirror was written.
 3. **H6, `a11y_static` on Vue.** It doesn't know `:attr` and `v-bind:attr` (`<img :alt>` reads as no alt). Normalise them, and Angular's `[attr]`, to the attribute. Keep a positive control: `<img :src>` with no alt still fails.
 4. **H7, the pre-commit hook's `DESIGN_GATE_INDEX=1`.** It audits the index without `.design-suite.json` or the baseline. Put both into `AUDIT_ROOT` (from HEAD when not staged), and test it with a baselined finding.
 5. **H8, the audit's inline-style keys.** `style={{ '--progress': open ? '1' : '0' }}` reads `'1'` as a key. Blank strings before reading keys, and take a quoted key only after `{` or a depth-0 `,`.
-6. **Tests:** each fails on `v3.6.0` first. Then grep the plugin for the same construct (the audit's class 2), and run `check.py` with `WDS_NODE_MODULES` set. The CHANGELOG goes under 4.0.0's Fixed. Mark N42 done in the completion plan, and rename the `P44` row `P44 part 2, #N`.
+6. **Tests:** each fails on `v3.6.0` first. Then grep the plugin for the same construct (the audit's class 2), and run `check.py` with `WDS_NODE_MODULES` set. The CHANGELOG goes under 4.0.0's Fixed. Mark N42 done in the completion plan, and rename the `P50` row `P50 part 2, #N`.
 
 - **The audit's fixtures** were in its session's scratchpad (`3985bfd1-…`), which Storage Sense can empty. Rebuild a case from the audit's text if it is gone.
 - **Facts from outside** are re-read at the source on the day, and a figure goes into `evidence.json`.
