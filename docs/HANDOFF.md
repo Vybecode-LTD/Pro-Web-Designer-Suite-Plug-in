@@ -1,52 +1,44 @@
 # Handoff
 
-**2026-10-13, second session**, after P36's first three parts (Phase 6b, 4.0.0) and this docs PR. **Next: P36's last part** (LC-B5's v4 `--spacing` census and N40), unless the owner picks another workstream.
+**2026-10-14**, after P36's last part (Phase 6b), the owner's audit, and the audit's first fix (Phase 6c). **Next: P50, the audit's gates (H4 to H8)**, unless the owner places Phase 6c elsewhere among Phase 6b's workstreams.
 
 **The next session starts from `dev plans/next-session-prompt.md`**: orientation, then the work in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
 ## State
 
-- **Phase 6b has begun.** The owner chose P36 (Tailwind v4) first. Three PRs merged, each with CI green on its head, every thread resolved and GitHub clean:
-  - **#125, P36 part 1, decision D4: the breaking change.**
-    - Part 5 of `eslint.design.config.mjs` moves to **eslint-plugin-better-tailwindcss 4.9.0**: one block for Tailwind v4 (`entryPoint`) and v3 (`tailwindConfig`), with the plugin's `cwd` set to the project.
-    - The spike (`dev plans/web-design-suite-d4-spike.md`) ran both plugins over the same fixtures, and the owner chose the move. v3 loses the conflict check.
-    - The CHANGELOG has `## 4.0.0 — unreleased`, with the upgrade steps. Codex 2 and CodeRabbit 1 (the same `cwd` finding); Codex's `cx` claim was declined with evidence.
-  - **#126, P36 part 2, SB-C3: `tw_probe.mjs` and `/tw-probe`**, the sixteenth command.
-    - It compiles a v4 entry with the project's own tailwindcss.
-    - Every `@theme` role must give its class, and none of a stock sample may generate.
-    - Two review rounds: Codex 5 and CodeRabbit 2, all fixed with tests (inline sources, `url()` imports, names that own several classes, the prefix, the skill path). It also fixed the audit, which read `${file}.css` as an emotion template.
-  - **#127, P36 part 3, SB-B5: stack-tailwind.md §2.10**, v4's variants after `--*: initial`.
-    - Container queries become literal `@custom-variant`s; it covers `motion-reduce:`, `forced-colors:`, `starting:`, `not-*`, `@reference` in modules, and `@source inline()`.
-    - Each claim is compiled from the reference by a test. Codex: no findings.
-- **The owner's decisions:** P36 first; D4, the switch for both majors; N40 scheduled with P36's last part (the ΔE colour match from R3.6's live check).
-- **At the end:** `main` is this docs PR's merge. No other PR is open. The checkout is on `main`, with no other worktree.
-- **The plan:** 21 open items, 21 scheduled. About 1,119 tests.
+- **P36 is done.** #129, its part 4, merged on 2026-10-14 (LC-B5's rest and N40):
+  - **The census** counts Tailwind v4's numeric classes (`p-4` at N × `--spacing`), reading `--spacing` through each entry's imports as Tailwind builds the theme. In a script it reads them only where classes go: a class attribute, a `className={…}` expression, a class helper's arguments.
+  - **The proposal** maps them, and **the codemod** rewrites only the utility, matched whole.
+  - **framework-migrations.md §5** gives Move 1 in v4's form, compiled by a test.
+  - **Colours** are matched by family first: a neutral (under half of sRGB's chroma at its lightness and hue) only to the neutral ramp, any other colour within 30° of its hue. ΔE then ranks within the family, and the ramps are seeded by the same test.
+  - **Reviews:** 7 real findings, all fixed with tests: Codex 4 over two rounds, CodeRabbit 2 (one a stale plan line), and CI 1 (stylelint on the doc's own `@import`).
+- **The owner's audit**, `dev plans/web-design-suite-audit-2026-10-14.md`, covers `main` at `9391774`: 114 findings (2 critical, 15 high, 49 medium, 48 low). It is scheduled as N41 to N47 in the completion plan and as Phase 6c, P50 to P55, in the execution plan, all before R4.
+- **#130 (P50 part 1)** closed the audit's C1, C2 and H1: the codemod's arbitrary-class match is bound on both ends, and the codemod, `deprecate`'s marker and its ledger keep a file's line endings.
+- **At the end:** `main` is this docs PR's merge; no other PR is open. The plan: 25 open items, 25 scheduled. About 1,147 tests.
 
 ## Next steps
 
-1. **P36's last part** (the plan's `P36` row): LC-B5's rest and N40.
-   - A v4 project that keeps `--spacing` has every numeric class, so the census counts `p-4` at its value, the proposal maps it, and the codemod rewrites it.
-   - framework-migrations.md §5 gets Move 1 in v4's form, with `tw_probe` as its check.
-   - `cluster_values.py` matches a colour by hue family and chroma, not ΔE alone.
-2. Then the owner's next workstream: P34, P35, P37, P41, or P42 and P43.
-3. R4 follows R3.6's order: a live check, the release PR, the evals on its merge, the tag.
+1. **P50:** the audit's H4 to H8, the gates that pass what they should fail. Each fix gets a fail-before test on `v3.6.0`, then a grep for the same construct across the plugin (the audit's class 2).
+2. **Then P51 and P52** (H2, H3, H9, H10; H11 to H15), then P53's cross-cutting classes, then the mediums (P54) and the lows (P55).
+3. **Phase 6b's other workstreams** (P34, P35, P37, P41, P42 and P43) come where the owner places them.
+4. **R4** follows R3.6's order: a live check, the release PR, the evals on its merge, then the tag.
 
 ## Open owner decisions
 
-- Which workstream follows P36.
+- Where Phase 6c goes among P34, P35, P37, P41, P42 and P43, or whether it all goes first.
 
 ## Warnings
 
-- **Bash heredocs eat backslashes.** It happened four times this session. Write such code with the Write tool into a script file, or use Edit.
-- **A doc's own example finds the bug.** Compiling §2.10's block found `tw_probe`'s inline-source bug.
-- **The audit is a gate on the plugin's own scripts too:** a JS file is read for CSS-in-JS, and `test_powershell_json` refuses `JSON.parse(fs.readFileSync(…))`.
-- **CodeRabbit reviews a stacked PR when it is retargeted to `main`.** That review is not a gate.
-- **The masters and their copies.** After a merge from below, copy `shared/dtcg.py` and both `project_config` masters over every copy. This session touched none.
+- **Stage by name, never `git add -A`, while a file the owner is writing sits untracked in the checkout.** It put the audit on #129's branch (added in `aa95250`, removed in `b78d77b`; the owner chose to keep that history).
+- **`check.py` skips `test_real_tools` without the tools' modules.** Run it with `WDS_NODE_MODULES` pointing at `tooling/main/node_modules`, or a snippet stylelint refuses reaches CI (it did on #129).
+- **A doc's CSS block is filed by the snippet audit**: its `@theme` goes to the theme file, and the rest to a component inside `@layer components`, where an `@import` is invalid. Show the theme alone.
+- **Bash heredocs eat backslashes** (twice more this session). Write such code with the Edit tool.
+- **The `VitalsUnderCsp` positive control flaked once on Windows with Python 3.14** (main's CI on 2026-10-14, green on a re-run): the shift went unmeasured. Watch for a repeat.
 - **Still open from earlier:**
   - `perf_audit.py` and an unbundled `@import` chain;
   - the TBT flake on macOS;
   - `test_critique_snapshots`;
-  - three tokens outside Display P3, and `check_roles.py` clipping outside sRGB (`contrast_ratio_oklch` clamps the channels instead of following the browser's gamut mapping);
+  - three tokens outside Display P3, and `check_roles.py` clipping outside sRGB;
   - the worked examples are tests;
   - a local build never matches the release's checksums;
   - don't grep `tooling/`;

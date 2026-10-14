@@ -1,15 +1,21 @@
 # Start here: the next session
 
-**Written 2026-10-13**, at the end of the session (the day's second) that began **Phase 6b, 4.0.0** with P36, Tailwind v4. The owner chose P36 first. Three PRs merged:
-- **#125, P36 part 1 (D4, the breaking change).**
-  - Part 5 of `eslint.design.config.mjs` now uses eslint-plugin-better-tailwindcss 4.9.0, for both majors. The spike that decided it is `dev plans/web-design-suite-d4-spike.md`.
-  - The CHANGELOG has `## 4.0.0 — unreleased`, with the upgrade steps.
-- **#126, P36 part 2 (SB-C3):** `tw_probe.mjs` and `/tw-probe`, the sixteenth command.
-- **#127, P36 part 3 (SB-B5):** v4's variants, stack-tailwind.md §2.10, compiled from the reference by a test.
-- **Reviews:** 7 real findings, all fixed with tests: Codex 6, CodeRabbit 3, two of them the same as Codex's. One Codex claim was declined with evidence. `check.py` and a doc test found 3 more before review.
-- **The owner also scheduled N40** (the migration's ΔE-only colour match, from R3.6's live check) with P36's last part.
+**Written 2026-10-14**, at the end of the session that finished **P36** (Phase 6b) and took in **the owner's audit** (Phase 6c). Three PRs merged:
+- **#129, P36 part 4 (LC-B5's rest, N40).**
+  - The migration counts Tailwind v4's numeric classes (`p-4` at N × `--spacing`), maps them to roles and rewrites them.
+  - framework-migrations.md §5 has Move 1 in v4's form, compiled by a test.
+  - Colours are matched by family (a neutral, or a hue within 30°), then ΔE.
+- **#130, P50 part 1 (the audit's C1, C2 and H1).** The codemod's arbitrary-class match is bound on both ends. The codemod, `deprecate`'s marker and its ledger keep a file's line endings, and the dry run's diff is written as its bytes are.
+- **#131, this session's docs**, with the audit committed and scheduled.
+- **Reviews:**
+  - #129 had 7 real findings: Codex 4 over two rounds, CodeRabbit 2, CI 1.
+  - #130 had 1: Codex, the dry run's `\r\r\n` on Windows.
+  - All were fixed with tests failing on the head they reviewed.
+- **The owner's audit**, `dev plans/web-design-suite-audit-2026-10-14.md`, found 114 findings on `main` at `9391774`: 2 critical, 15 high, 49 medium, 48 low.
+  - It is scheduled as N41 to N47 (completion plan) and Phase 6c, P50 to P55 (execution plan), all before R4.
+  - The owner chose to commit it, and C1, C2 and H1 first.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P36's last part**, then the owner's next Phase 6b workstream (§4).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P50, the audit's gates (H4 to H8)**, after asking the owner where Phase 6c goes (§4).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -154,6 +160,14 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Compile the doc's own example.** §2.10's block found `tw_probe`'s inline-source bug before review did.
       - **The plugin's own scripts pass the plugin's gates.** The audit reads a `.mjs` for CSS-in-JS, and `test_powershell_json` refuses `JSON.parse(fs.readFileSync(…))`. Use a BOM-aware `readJson`.
       - **A stacked PR retargeted to `main` starts CodeRabbit's review.** It is still not a gate (#127 merged with it pending).
+    - **The 2026-10-14 session's reviews found 8 real issues:** #129 (Codex 4 over two rounds, CodeRabbit 2, CI 1) and #130 (Codex 1). Each was fixed with a test failing on the head it reviewed. The lessons, for any reader of a project's source:
+      - **A token in a string is not a class.** `"p-4"` alone may be data, so a numeric class is read only where classes go: a class attribute, a `className={…}` expression, a class helper's arguments. Find that syntax in code only: `'cn('` is a string, not a call (`blank_js_strings()`).
+      - **What the reader cannot read can change the answer.** A package an entry imports may set `--spacing`, so it is read from `node_modules`, and one still unread withholds the count rather than guessing.
+      - **One rule for one question.** The colour family test (`is_neutral()`) decides the matching, so it decides the ramps' seeding too.
+      - **A class name is a class, not a family.** `size-*` is a size; classing it with `p` gave icons a padding role.
+      - **A file a tool rewrites keeps its bytes**, its endings included, and so does what the tool prints about it: text-mode stdout on Windows turned a CRLF diff into `\r\r\n`.
+      - **Run `check.py` with `WDS_NODE_MODULES` set** to `tooling/main/node_modules`, or `test_real_tools` skips and a snippet stylelint refuses reaches CI (#129: an `@import` the snippet audit put inside `@layer components`).
+      - **Stage by name.** `git add -A` staged the owner's in-progress audit into #129 (`aa95250`, removed in `b78d77b`).
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -195,7 +209,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 ## 1. Orient (keep it under about 40 thousand tokens)
 
 1. Read the repository's `CLAUDE.md` and `docs/HANDOFF.md`.
-2. Read the execution plan's §2 and §6, and its Phase 6 table in §4 (P31 to P43 and R4: each item's scope and main files).
+2. Read the execution plan's §2 and §6, and its Phase 6 tables in §4 (P31 to P55 and R4: each item's scope and main files). Phase 6c is the audit: read the audit's §6 and §7, and each finding a PR closes, never the whole file at once.
 3. Read `dev plans/web-design-suite-review/claude-code-capabilities.md` §2, §3, §6 and §8. §6 is the hooks re-read (P25), and §8 the 2026-10-09 re-read of the sub-agents page, with `/critique`'s choice to delegate in its body.
    - §9 is the 2026-10-10 re-read of the MCP page and the manifest reference's `mcpServers`, `lspServers` and `bin/`, with the MCP server's and the LSP spike's decisions, and the owner's no to `bin/`.
    - §1 is the plugin-evals page, §10 P29's choices, and **§11 the sandboxing page and P30's choices**, with the first runs. Read §11 if you touch the evals.
@@ -205,7 +219,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `21 open items, 21 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `25 open items, 25 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
@@ -225,6 +239,14 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - One compiler, the candidates added one at a time; `selectorCount()` with `cssEscape()`.
   - Exit codes: 0, 1, 2 (Tailwind 3 is 2).
   - `/web-design-suite:tw-probe` runs it, and stack-tailwind.md §2.9 teaches it. §2.10's marked block (`<!-- tw-probe:variants -->`) is compiled by `test_tw_probe.TheVariantsTheReferenceTeaches`, whose `COMPILE` harness compiles a module on its own.
+- **The v4 census (#129).** `extract_literals.tailwind_theme()` finds each stylesheet importing `tailwindcss` (or `tailwindcss/utilities`); `tailwind_spacing()` follows its imports in order, a package's through `_package_sheet()` (the nearest `node_modules`: its subpath, `style`, or `index.css`), skipping URLs.
+  - It applies the theme as Tailwind builds it: `--*: initial`, `--spacing-*: initial` and `--spacing: initial` clear `--spacing`, and a `default` block never overrides the project's. The stock value comes from the installed `theme.css`, else `TW_STOCK_SPACING` (`0.25rem`).
+  - It counts nothing when entries disagree, `--spacing` is no length, or an import is unread; `problems` says why, and the JSON's `tailwind` block names the entries.
+  - `tailwind_literals()` reads each class token (`TW_TOKEN_RE`, `tw_utility()`, `tw_multiplier()`, `TW_NUMERIC_RE`, `TW_NEGATIVE_UTILITIES`) as context `tailwind-spacing`, raw `utility` or `prefix:utility`. In a script it reads them only in `class_list_spans()` (a `className={…}` expression, `CLASS_HELPERS`' arguments, found in `blank_js_strings()`' code).
+  - `cluster_values.TW_CONTEXTS` and `tw_utility_prefix()` build the rule (`p-4` to `p-well`); `tw_prop_class()` puts `size` with the sizes and `leading` apart. `apply_codemod.plan_classes()` rewrites a numeric class token by token, the utility only, and an arbitrary one with both boundaries (C1).
+  - Tests: `test_token_migration.TheV4SpacingCensus`, `test_tw_probe.TheMigrationsMoveOne` (§5's marked blocks `<!-- tw-migrate:wrong -->` and `right`, the import added by the test).
+- **Colour families (#129, N40).** `cluster_values.is_neutral(L, C, H)`: chroma under `NEUTRAL_SHARE` (0.5) of `max_chroma(L, H)`, sRGB's. `nearest_ramp_step()` lands a neutral on the neutral ramp only and any other colour on a step within `HUE_GUARD_DEG` of its hue, ΔE within. `cluster_color_phase()` seeds the accent and the neutral hue by the same test. `test_token_migration.ColoursKeepTheirFamily`.
+- **Line endings (#130).** `apply_codemod.process()` and `deprecate.inject_marker()` read with `newline=""`; the marker takes the file's dominant ending, `save_ledger()` keeps the ledger's, and the dry run's diff goes to `sys.stdout.buffer`. `test_token_migration.TheCodemodRewritesOnlyWhatItMatched`, `test_versioning.TheMarkerKeepsTheFilesLineEndings`.
 - **DTCG (#101, #102).** `shared/dtcg.py` is the master, copied beside every `project_config.py` (`test_dtcg.TheCopiesAreTheMaster`); `project_config.py` loads the copy beside it by path. `normalise()` (the Figma scripts' reading, string forms) and `tokens()` (lossless, CSS names) read 2025.10 and Tokens Studio (`studio_document`, `studio_themes`); `document()` writes 2025.10 from CSS custom properties. `project_config.mjs` ports the reading, numbers formatted as Python's `f"{round(x, 6):g}"`, and `TheNodeReaderAgrees` holds them equal on every value form. `figma_common.parse_studio` makes each Studio theme group a collection; `FVar` carries `deprecated`, `dtcg_type` and `partial`.
 - **The resolver (#105).** `dtcg.resolver_document(data, base, inputs, only)` merges a resolver's `resolutionOrder` for a choice of contexts (each modifier's string `default`, else its first, which is reported); `resolver_modifiers()`, `token_paths()`, `resolver()` (the writer), `outside()` and `file_loader()` (its real path must stay in the folder, else `OutsideFolder`). `figma_to_tokens.py --format dtcg --out-dir` writes `tokens.json`, `theme-<x>.json` or `density-<x>.json` (overrides only, `document(only=...)`) and `tokens.resolver.json`; `css_blocks()` and `figma_blocks()` feed `dtcg_files()`. `figma_common.parse_resolver()` makes each modifier a collection with `FCollection.kind`, and `mode_selector(mode, default, kind)` writes a theme or density context as the value itself (`css_escape`). Unreadable sources are `FDoc.unread` (`unread-source`, `UNREAD_SOURCE`). The Node port is `resolverDocument()` in `project_config.mjs`.
 - **The ledger (#106).** `project_config.read_deprecations(paths)` and `replacement_of(reason)`; `diff_system.marked_deprecations()` adds a record (`"marked"`) for each token the old DTCG snapshot marks; `deprecate.py import FILE… --since --removal`.
@@ -246,7 +268,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - the reader's problems are reported (`not read`, `not carried to Figma`).
 
   `reverse_main()` serves the REST body and `--format plugin-script`. See `test_figma_sync.ReverseReadsEveryTokenFormat`.
-- **The plugin** is `plugins/web-design-suite/` (about 1,119 tests):
+- **The plugin** is `plugins/web-design-suite/` (about 1,147 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -346,33 +368,33 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. Phase 6b, 4.0.0: P36's last part, then the owner's next workstream
+## 4. Phase 6c, 4.0.0: the audit, from P50
 
-**First, P36's last part**: the plan's `P36` row, one PR under 100 files. Then **ask the owner which workstream follows**. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+**First, ask the owner where Phase 6c goes** among Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43), or whether it all goes first. The audit's own order is P50 to P55. Then start there, one PR under 100 files at a time. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P36 | Tailwind v4's `@theme` in the migration, and the colour match (N40) | LC-B5's rest, N40 | `extract_literals.py`, `cluster_values.py`, `apply_codemod.py`, `framework-migrations.md` | M |
-| P34 | Runtime coverage: single-page apps (`--wait-for`, `--steps`), logged-in pages (`--storage-state`), shadow DOM, several URLs and viewports | GT-B1 to GT-B4 | the three runtime gates (`a11y_runtime.mjs`, `measure_vitals.mjs`, `snapshot_matrix.mjs`) | L |
-| P35 | The cheap automatable checks the coverage table lists, and engines other than Chromium | GT-B6, GT-B9 | the a11y gates, `automation-coverage.md` | M-L |
-| P37 | SCSS in stylelint (D3), and Next.js App Router, Vue, Svelte and Astro | SB-B6, DL-B3's rest (a server-action form, Vue and Svelte output) | the configs, the stack references, fixtures | L |
-| P41 | Email: MJML or React Email output, a right-to-left template, and a client matrix from caniemail's data | DL-B4, DL-B5, DL-C9 | email-template-system | L |
-| P42 | Persuasion: the UK and EU consumer law to flag for legal review, consent for tracking, price experiments, and persuasive patterns mapped to WCAG | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
-| P43 | More page types and audiences, a claims layer with `lint_claims.py`, routing between the persuasion skills, and MESSAGE_BRIEF to DECISION_LOG | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
+| P50 | The gates that pass what they should fail (audit H4 to H8) | N42 | `a11y_static.py`, `generate_matrix.py`, `pre-commit-design-gate.sh`, `audit_design.py` | M |
+| P51 | Silent wrong output in sync, docs and scaffold (audit H2, H3, H9, H10) | N43 | `figma_to_tokens.py`, `extract_system.py`, `introspect_schema.py` | M |
+| P52 | The proposal's arithmetic and recipe, and two tests (audit H11 to H15) | N44 | `cluster_values.py`, `apply_codemod.py`, the migration references | M |
+| P53 | The cross-cutting classes, one PR each (audit §6 step 5, §7) | N45 | per class | L |
+| P54 | The medium findings, one PR per §3 area | N46 | per area | L |
+| P55 | The low findings and doc fixes | N47 | per area | M |
+| P34, P35, P37, P41, P42, P43 | Phase 6b's workstreams, where the owner places them | see §4 of the plan | | |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-**P36's last part, in detail.** Read LC-B5 in `dev plans/web-design-suite-review/lifecycle.md` (line 97) and N40 in the completion plan.
+**P50 in detail.** Read the audit's H4 to H8 (its §2, lines 44 to 68) for the files, lines and fixes.
 
-1. **The census.** In a v4 project, `@theme { --spacing: X }` makes every numeric spacing class real: `p-4` is `calc(var(--spacing) * 4)`. `extract_literals.py` today counts only arbitrary values (`TW_ARBITRARY_RE`, `tailwind_literals()`); framework-migrations.md §5 says stock classes "are not in the census".
-   - When the project's theme keeps `--spacing` (read its `@theme` the way `tw_probe`'s `themeVariables()` does, in Python), count each numeric spacing class at its value, `N × X`, with a context of its own (for example `tailwind-spacing`).
-   - Then the clustering maps it to a role, and `apply_codemod.py` rewrites it as it rewrites `p-[13px]`.
-   - Mind `leading-N`, `w-N`, `gap-N` and the `-` negatives. Check the class prefixes against the v4 docs that day.
-2. **The doc.** framework-migrations.md §5 Move 1 has only the v3 config. Add v4's form: `@theme { --*: initial; … }`, the trap (replacing `--spacing-*` keys leaves `p-4` while `--spacing` stays), and `tw_probe` as Move 1's check (`--refuse p-4`).
-3. **N40.** `cluster_values.py` matches a colour to a role by ΔE alone, so `#6b7280` landed on `--fg-warning` in R3.6's `/migrate src` (`web-design-suite-3.6.0-live-check.md`, S5). Match by hue family and chroma first: a neutral (low chroma) goes only to a neutral role and a status hue to its status, and ΔE ranks within the family. Test on that grey.
-4. **Tests:** `test_token_migration` (the census, the proposal, the codemod on a v4 fixture), failing on `v3.6.0`; `TheWorkedRun` can move. The CHANGELOG goes under 4.0.0.
+1. **H4, `a11y_static.audit_css()`.** It splits blocks at depth 0 only, so `outline: none` inside `@layer`, `@media` or `@supports` is never seen. The starter's own `base.css` is all `@layer base`. Read blocks recursively, carrying the at-rule stack as `generate_matrix.parse_css` does, and decide per rule.
+2. **H5, `generate_matrix`.** States inside `:is()`/`:where()` and a nested `&:hover` get no mirror rule, yet the summary says covered. Rewrite them inside `:is()` and `:where()`, prefix nested selectors with the parent, and make `detect_states` count a state only when a mirror was written.
+3. **H6, `a11y_static` on Vue.** It doesn't know `:attr` and `v-bind:attr` (`<img :alt>` reads as no alt). Normalise them, and Angular's `[attr]`, to the attribute. Keep a positive control: `<img :src>` with no alt still fails.
+4. **H7, the pre-commit hook's `DESIGN_GATE_INDEX=1`.** It audits the index without `.design-suite.json` or the baseline. Put both into `AUDIT_ROOT` (from HEAD when not staged), and test it with a baselined finding.
+5. **H8, the audit's inline-style keys.** `style={{ '--progress': open ? '1' : '0' }}` reads `'1'` as a key. Blank strings before reading keys, and take a quoted key only after `{` or a depth-0 `,`.
+6. **Tests:** each fails on `v3.6.0` first. Then grep the plugin for the same construct (the audit's class 2), and run `check.py` with `WDS_NODE_MODULES` set. The CHANGELOG goes under 4.0.0's Fixed. Mark N42 done in the completion plan, and rename the `P50` row `P50 part 2, #N`.
 
-- **Facts from outside** (a law, a browser engine, caniemail's data, Tailwind's API) are re-read at the source on the day, and a figure goes into `evidence.json`.
-- **R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate), the release PR, the evals on its merge (the owner's OK, about $11, `headSha` checked), then the tag. Its live check must cover Part 5's new block in a real project, `/tw-probe`, and the v3 upgrade path.
+- **The audit's fixtures** were in its session's scratchpad (`3985bfd1-…`), which Storage Sense can empty. Rebuild a case from the audit's text if it is gone.
+- **Facts from outside** are re-read at the source on the day, and a figure goes into `evidence.json`.
+- **R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate), the release PR, the evals on its merge (the owner's OK, about $11, `headSha` checked), then the tag. Its live check covers Part 5's new block in a real project, `/tw-probe`, the v3 upgrade path, and the v4 census on a real Tailwind 4 project.
 
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 

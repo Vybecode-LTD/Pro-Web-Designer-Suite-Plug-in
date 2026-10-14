@@ -12,14 +12,14 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is public (since 2026-09-28), and MIT-licensed like the plugin.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
-## Current state (2026-10-13)
+## Current state (2026-10-14)
 
 - **Version:** 3.6.0 is the latest release (`v3.6.0`, `d91a146`, published by `release.yml`). It completes Phase 6a (#101 to #123): DTCG 2025.10, Tokens Studio and the resolver; Figma on every plan, with each plan's mode limits; `light-dark()`; modern CSS; the migration census of every style source; and Prisma and Drizzle. R3.6's live check is `dev plans/web-design-suite-3.6.0-live-check.md`.
 - **Installed:** 3.6.0, from the release zip (2026-10-13). The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** about 1,119. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Tests:** about 1,147. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
 - **Evals:** 23 routing cases and 11 outcome cases. `evals.yml` runs both only by hand (`tag=all`), under one $14 ceiling; the dispatch before a release's tag gates it, and a tag starts no run (the owner, 2026-10-11). The outcome cases grant Write, Edit and the gate MCP tools, never Bash. In `claude-code-capabilities.md`, §1 is the evals page, §10 P29's choices, and §11 the sandboxing page and P30's choices.
-- **Active work:** Phase 6b in `dev plans/web-design-suite-execution-plan.md`, shipping as 4.0.0. P36 (Tailwind v4) came first: parts 1 to 3 merged on 2026-10-13. #125 is D4, Part 5 on eslint-plugin-better-tailwindcss, the breaking change; #126 is `tw_probe.mjs` and `/tw-probe`; #127 is v4's variants. Next is P36's last part (LC-B5's v4 `--spacing` census, N40), then P34, P35, P37, P41, P42 and P43 in the owner's order, then R4. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 21 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Active work:** 4.0.0. P36 (Tailwind v4, Phase 6b) is done: parts 1 to 4 merged by 2026-10-14 (#125 to #127, #129: the v4 census and N40, colours matched by family). The owner's audit of 2026-10-14 (`dev plans/web-design-suite-audit-2026-10-14.md`, 114 findings) is Phase 6c, N41 to N47, P50 to P55, before R4; #130 closed its C1, C2 and H1. Next is P50 (the audit's gates, H4 to H8) unless the owner places Phase 6c among P34, P35, P37, P41, P42 and P43. Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 25 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 

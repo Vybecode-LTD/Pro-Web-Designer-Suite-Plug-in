@@ -146,6 +146,22 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 
 **N40 · The migration proposal matches a colour to a role by ΔE alone (found in R3.6's live check).** *Done for 4.0.0 (PR #129): `test_token_migration.ColoursKeepTheirFamily`.* The owner scheduled it with P36's last part on 2026-10-13. On `/migrate src`, `cluster_values.py` mapped a grey (`#6b7280`) to `--fg-warning`: the nearest role by ΔE, though a neutral is never a status colour. A role is to be matched by its hue family and chroma as well as ΔE, so a neutral lands on a neutral role and a status hue on its status, with a test on that grey.
 
+**The 2026-10-14 audit.** The owner ran a full audit of `main` at `9391774` on 2026-10-14: `dev plans/web-design-suite-audit-2026-10-14.md`, 114 findings (2 critical, 15 high, 49 medium, 48 low), each traced in the source and most demonstrated on a crafted input. Its IDs (C1, H1, S1, V1…) are its own; these items group them in the order its §6 recommends, and each PR closes the findings it names with a fail-before test on `v3.6.0`. Its fixtures were in that session's scratchpad (§9), which Storage Sense can empty: rebuild a case from the audit's text when a fixture is gone.
+
+**N41 · The tools that rewrite a project's files (audit C1, C2, H1).** *Done for 4.0.0 (PR #130): `test_token_migration.TheCodemodRewritesOnlyWhatItMatched`, `test_versioning.TheMarkerKeepsTheFilesLineEndings`.* The codemod's arbitrary-class match had no left boundary, and the codemod and `deprecate add --source` turned a file's line endings; `deprecate`'s ledger had the same bug.
+
+**N42 · The gates that pass what they should fail, or fail what they should pass (audit H4 to H8).** `a11y_static` and `outline: none` inside `@layer`, `@media` and `@supports` (H4), and Vue's `:attr` and `v-bind:attr` (H6); `generate_matrix` and states inside `:is()`, `:where()` and nested `&:hover` (H5); the pre-commit hook's `DESIGN_GATE_INDEX=1` without the project's config or baseline (H7); the audit and a ternary inside an inline style's custom property (H8).
+
+**N43 · Silent wrong output in sync, docs and scaffold (audit H2, H3, H9, H10).** `figma_to_tokens --reverse` drops a theme's alias to an undeclared token (H2); a BOM on `tokens.css` makes `extract_system` file every `:root` token as theme-only (H3); `introspect_schema` ignores `ALTER TYPE … ADD VALUE` (H9) and reads a `PARTITION BY`, `WITH (…)` or `INHERITS (…)` tail into the last column (H10).
+
+**N44 · The migration proposal's arithmetic and recipe, and two tests (audit H11 to H15).** Colours and px letter-spacing the proposal drops silently (H11); rules the codemod can never apply counted as mechanically replaceable (H12); the unreachable width-token path (H13); the rebase-conflict recipe the codemod refuses (H14); and two tests that cannot do what they claim (H15).
+
+**N45 · The audit's cross-cutting classes (its §6 step 5 and §7), one PR each.** The `--out` guard (V7, E9, G4); the JSON type guards (S1, V8, G3, G11, G15, E13, W6, S10); the encoding readers (S8, W7); the discarded diagnostics (S2, V11, V12, M9); the cmd.exe placeholders (D4, G13, E14); and each class's check in §7, so a reviewer stops finding the next case.
+
+**N46 · The audit's medium findings, by skill (its §3).** Each §3.x area is one PR: shared readers, hooks and MCP; web-design-studio; design-token-migration; versioning, docs and Figma; content, presentation and email; the runtime gates, the matrix and the critique; docs, CI and release; the test suite.
+
+**N47 · The audit's low findings and doc fixes (its §3).** Nits, dead code and doc claims, swept per area after N46.
+
 **N3 · The references' CSS against the stylelint config.** *Done for 3.3.0.* 56 of the 170 CSS snippet files failed it at 3.2.1. The failures by rule:
 - 27 `selector-max-type`;
 - 20 value allowlist;
