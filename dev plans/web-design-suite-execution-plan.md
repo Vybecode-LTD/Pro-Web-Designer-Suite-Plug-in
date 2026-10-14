@@ -170,7 +170,7 @@ After 3.6.0. The workstreams are independent; ask the owner which comes first.
 
 ### Phase 6c · 4.0.0: the 2026-10-14 audit
 
-The owner's audit of `main` at `9391774` (`dev plans/web-design-suite-audit-2026-10-14.md`): 114 findings, grouped as N41 to N47 in the completion plan, in the audit's own order (its §6). Every row comes before R4; **where the rows go among P34, P35, P37, P41, P42 and P43 is the owner's call.** Each PR names the audit IDs it closes, with a fail-before test on `v3.6.0`, and greps the plugin for the same construct before it closes one (the audit's class 2).
+The owner's audit of `main` at `9391774` (`dev plans/web-design-suite-audit-2026-10-14.md`): 114 findings, grouped as N41 to N47 in the completion plan, in the audit's own order (its §6). Every row comes before R4. **The owner placed it on 2026-10-14: all of Phase 6c (P50 to P55) comes first, then P34, P35, P37, P41, P42 and P43.** Each PR names the audit IDs it closes, with a fail-before test on `v3.6.0`, and greps the plugin for the same construct before it closes one (the audit's class 2).
 
 | PR | What | Items | Main files | Size |
 |---|---|---|---|---|

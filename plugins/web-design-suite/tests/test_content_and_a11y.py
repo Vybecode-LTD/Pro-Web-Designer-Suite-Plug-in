@@ -322,6 +322,44 @@ class MatrixStates(TempDirTest):
                                     '<span class="chip" {attrs}>{content}</span>', states, custom)
         self.assertNotIn("chip:selected", output(proc))              # the rule is found
 
+    COVERED = "every declared state has a matching rule"
+
+    def test_states_inside_is_and_where_are_mirrored(self):
+        # Audit H5: only depth-0 pseudo-classes were rewritten, so these got
+        # no mirror, rendered as default, and the summary still said covered.
+        css = (".chip { color: #222; }\n.chip:is(:hover, :focus-visible) { color: #000; }\n"
+               ":where(.chip:active) { color: #444; }\n")
+        proc, sheet = self.generate(css, '<span class="chip" tabindex="0" {attrs}>{content}</span>',
+                                    ["default", "hover", "focus-visible", "active"])
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn('.chip:is([data-force-state~="hover"], [data-force-state~="focus-visible"])', sheet)
+        self.assertIn(':where(.chip[data-force-state~="active"])', sheet)
+        self.assertIn(self.COVERED, output(proc))
+
+    def test_a_nested_state_is_mirrored_with_its_parent(self):
+        css = (".chip {\n  color: #222;\n  &:hover { color: #000; }\n"
+               "  @media (hover: hover) { &:active { color: #444; } }\n}\n")
+        proc, sheet = self.generate(css, '<span class="chip" {attrs}>{content}</span>',
+                                    ["default", "hover", "active"])
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn('.chip[data-force-state~="hover"] {', sheet)
+        self.assertRegex(sheet, r'@media \(hover: hover\) \{\s*\.chip\[data-force-state~="active"\] \{')
+        self.assertNotIn('&[data-force-state', sheet)
+        self.assertIn(self.COVERED, output(proc))
+
+    def test_a_guard_or_an_empty_rule_covers_nothing(self):
+        css = ".chip { color: #222; }\n.chip:not(:hover) { color: #000; }\n.chip:active {}\n"
+        proc, sheet = self.generate(css, '<span class="chip" {attrs}>{content}</span>',
+                                    ["default", "hover", "active"])
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertNotIn(self.COVERED, output(proc))
+        self.assertIn("chip:hover", output(proc))
+        self.assertIn("chip:active", output(proc))
+        self.assertIn(":not(:hover)", sheet)                       # the guard is left alone
+        proc, _ = self.generate(".chip:hover { color: #000; }\n.chip:active { color: #444; }\n",
+                                '<span class="chip" {attrs}>{content}</span>', ["default", "hover", "active"])
+        self.assertIn(self.COVERED, output(proc))                   # the control
+
     def test_an_undeclared_state_names_the_way_to_declare_it(self):
         proc, _ = self.generate(".chip {}\n", '<span class="chip" {attrs}>{content}</span>',
                                 ["default", "selected"])
@@ -869,6 +907,115 @@ class StaticBestPractice(TempDirTest):
                 self.assertEqual(("warning", "best practice"), found.get(rule))
         proc = run_py("a11y-audit-runner", "a11y_static", page, "--strict", cwd=self.tmp)
         self.assertEqual(proc.returncode, 1, output(proc))          # --strict still fails on them
+
+
+class A11yStaticReadsNestedRules(TempDirTest):
+    """Audit H4: the CSS check split blocks at depth 0 only, so a rule inside
+    `@layer`, `@media` or `@supports`, or nested with `&`, was never read on
+    its own. Its declarations were pooled with its siblings' (any
+    `box-shadow` nearby counted as the ring), and the focus selector was
+    tested on the at-rule's prelude. The starter's base.css is all `@layer
+    base`, so a reset planted there audited clean."""
+
+    def findings(self, css, name="style.css"):
+        self.write(name, css)
+        proc = run_py("a11y-audit-runner", "a11y_static", name, "--json", cwd=self.tmp)
+        return proc, json.loads(proc.stdout)["findings"]
+
+    def rules(self, css):
+        return [(f["rule"], f["line"]) for f in self.findings(css)[1]]
+
+    def test_a_reset_inside_the_starters_layer_is_reported_on_its_line(self):
+        base = (SKILLS / "web-design-studio" / "assets" / "starter" / "styles" / "base.css").read_text(encoding="utf-8")
+        planted, n = re.subn(r"^@layer base \{\n", "@layer base {\n  .btn:focus-visible { outline: none; }\n",
+                             base, count=1, flags=re.M)
+        self.assertEqual(1, n)
+        line = planted[:planted.index(".btn:focus-visible")].count("\n") + 1
+        self.assertGreater(line, 20)                    # below the header comment's lines
+        self.assertEqual([], self.rules(base))          # the control: the starter is clean
+        proc, found = self.findings(planted)
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertEqual([("outline-none-no-replacement", line)], [(f["rule"], f["line"]) for f in found])
+
+    def test_a_reset_inside_a_condition_is_read_apart_from_its_siblings(self):
+        for at in ("@media (hover: hover)", "@supports (display: grid)", "@layer components",
+                   "@container card (width > 30rem)"):
+            with self.subTest(at=at):
+                css = f"{at} {{\n  .card {{ box-shadow: 0 0 0 2px red; }}\n  .btn:focus {{ outline: none; }}\n}}\n"
+                self.assertEqual([("outline-none-no-replacement", 3)], self.rules(css))
+
+    def test_a_shadow_only_ring_inside_a_layer_is_reported(self):
+        css = "@layer components {\n  .btn:focus-visible {\n    outline: none;\n    box-shadow: 0 0 0 2px red;\n  }\n}\n"
+        self.assertEqual([("focus-ring-shadow-only", 4)], self.rules(css))
+
+    def test_a_nested_focus_rule_is_resolved_against_its_parent(self):
+        css = ".btn {\n  box-shadow: 0 1px 2px black;\n  &:focus-visible { outline: none; }\n}\n"
+        found = self.findings(css)[1]
+        self.assertEqual([("outline-none-no-replacement", 3)], [(f["rule"], f["line"]) for f in found])
+        self.assertIn("`.btn:focus-visible`", found[0]["message"])
+        css = ".btn {\n  &:focus-visible {\n    @media (hover: hover) { outline: none; }\n  }\n}\n"
+        self.assertEqual([("outline-none-no-replacement", 3)], self.rules(css))
+
+    def test_the_controls(self):
+        self.assertEqual([("outline-none-no-replacement", 1)], self.rules(".btn:focus { outline: none; }\n"))
+        self.assertEqual([], self.rules("@layer base {\n  :focus-visible { outline: 2px solid; }\n}\n"))
+        self.assertEqual([], self.rules('@font-face { font-family: "X}"; src: url(x.woff2); }\n'
+                                        '.a::after { content: "{"; }\n'))
+        self.assertEqual([("focus-rule-invisible", 1)], self.rules(".skip:focus-visible { cursor: pointer; }\n"))
+
+    def test_a_skip_link_moved_on_screen_is_visible(self):
+        # Reading the starter's layers found its skip link called invisible:
+        # moved on-screen on focus, not ringed.
+        for decl in ("translate: 0 0", "inset-block-start: 0", "clip-path: none", "opacity: 1"):
+            with self.subTest(decl=decl):
+                self.assertEqual([], self.rules(f".skip:focus-visible {{ {decl}; }}\n"))
+
+    def test_a_style_block_in_markup_is_read_the_same(self):
+        page = ('<!doctype html><html lang="en"><title>t</title><style>\n@layer base {\n'
+                "  .a { box-shadow: 0 0 0 1px red; }\n  .btn:focus { outline: none; }\n}\n</style>"
+                "<main><h1>t</h1></main></html>\n")
+        self.assertEqual([("outline-none-no-replacement", 4)],
+                         [(f["rule"], f["line"]) for f in self.findings(page, "page.html")[1]])
+
+
+class A11yStaticReadsBoundAttributes(TempDirTest):
+    """Audit H6: `.vue` files were audited, but `:alt` and `v-bind:alt` were
+    not read as `alt`, so `<img :alt="d">` had no alt and a bound label was no
+    label; a Vue project with the pre-commit hook was blocked on every bound
+    attribute. Angular's `[alt]` and `[attr.aria-label]`, and the event
+    bindings (`@click`, `v-on:click`, `on:click`, `(click)`), are the same
+    construct."""
+
+    def rules(self, body, name="c.vue"):
+        self.write(name, f"<template>\n<main><h1>t</h1>\n{body}\n</main>\n</template>\n")
+        proc = run_py("a11y-audit-runner", "a11y_static", name, "--json", cwd=self.tmp)
+        return sorted(f["rule"] for f in json.loads(proc.stdout)["findings"])
+
+    def test_a_bound_attribute_is_the_attribute(self):
+        for body in ('<img :alt="d" src="x.png">', '<img v-bind:alt="d" src="x.png">',
+                     '<img :alt.attr="d" src="x.png">', '<img [alt]="d" src="x.png">',
+                     '<img alt="" :src="s">', '<input :id="i" :aria-label="lbl" :autocomplete="ac">',
+                     '<input [attr.aria-label]="lbl" [autocomplete]="ac">',
+                     '<button :aria-label="lbl"></button>', '<button v-bind:aria-label="lbl"></button>'):
+            with self.subTest(body=body):
+                self.assertEqual([], self.rules(body))
+
+    def test_a_bound_string_literal_is_read_as_its_text(self):
+        self.assertEqual([], self.rules('<img :alt="\'Company name\'" src="x.png">'))
+        self.assertEqual(["alt-placeholder"], self.rules('<img :alt="\'image\'" src="x.png">'))
+
+    def test_the_controls(self):
+        self.assertEqual(["img-no-alt"], self.rules('<img :src="s">'))
+        self.assertEqual(["img-no-alt"], self.rules('<img [src]="s">'))
+        self.assertEqual(["img-no-alt"], self.rules('<img [class.wide]="w" src="x.png">'))
+        self.assertIn("empty-control", self.rules('<button :class="c"></button>'))
+
+    def test_an_event_binding_is_a_handler(self):
+        for body in ('<div @click="go">x</div>', '<div v-on:click.prevent="go">x</div>',
+                     '<div on:click={go}>x</div>', '<div (click)="go()">x</div>'):
+            with self.subTest(body=body):
+                self.assertEqual(["handler-on-noninteractive"], self.rules(body))
+        self.assertEqual([], self.rules('<button @click="go">Go</button>'))     # the control
 
 
 if __name__ == "__main__":

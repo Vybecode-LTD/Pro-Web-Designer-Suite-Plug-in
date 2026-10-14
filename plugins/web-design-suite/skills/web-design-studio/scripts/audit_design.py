@@ -1768,15 +1768,58 @@ def _line_finder(text: str):
     return lambda pos: bisect.bisect_right(starts, pos)
 
 
+STYLE_KEY = re.compile(r"""\s*(?:(['"])((?:(?!\1)[^\\]|\\.)*)\1|([A-Za-z_$][\w$]*))\s*\Z""", re.S)
+
+
+def style_object_keys(inner: str) -> list[str]:
+    """The property names a style object sets, one per depth-0 entry.
+
+    An entry's key is what stands before its first depth-0 colon, or the whole
+    entry for a shorthand (`{ color }`); a spread or a computed key names none.
+    Reading every `'x' :` in the text took the ternary in `{ '--progress':
+    open ? '1' : '0' }` for a key named `1` (audit H8)."""
+    names: list[str] = []
+    depth, start, colon, quote, k, n = 0, 0, -1, "", 0, len(inner)
+
+    def entry(end: int) -> None:
+        key = inner[start:colon if colon >= 0 else end]
+        m = STYLE_KEY.match(key)
+        if m and (colon >= 0 or m.group(3)):
+            names.append(m.group(2) if m.group(1) else m.group(3))
+
+    while k < n:
+        c = inner[k]
+        if quote:
+            if c == "\\":
+                k += 1
+            elif c == quote:
+                quote = ""
+        elif c in "'\"`":
+            quote = c
+        elif c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif depth == 0 and c == ":" and colon < 0:
+            colon = k
+        elif depth == 0 and c == ",":
+            entry(k)
+            start, colon = k + 1, -1
+        k += 1
+    if inner[start:].strip():
+        entry(n)
+    return names
+
+
 def _audit_jsx_styles(clean: str, line_of, add) -> None:
     # ---- L4 inline style ---------------------------------------------------
     for m in JSX_STYLE.finditer(clean):
         open_at = clean.index("{", m.start())
         end = match_braces(clean, open_at)
         body = clean[open_at:end]
-        inner = body[2:-2] if body.endswith("}}") else body
-        keys = re.findall(r"(?:^|[{,\s])\s*(?:['\"]([^'\"]+)['\"]|([A-Za-z_$][\w$]*))\s*:", inner)
-        names = [a or b for a, b in keys]
+        # The object itself, also in `{{ … } as CSSProperties}`.
+        inner = body[2:match_braces(body, 1) - 1]
+        names = style_object_keys(inner)
         offenders = [k for k in names if not k.startswith("--")]
         if not names:
             continue

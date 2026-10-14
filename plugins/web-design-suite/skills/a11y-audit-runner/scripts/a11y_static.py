@@ -387,6 +387,38 @@ ATTR_NAME = re.compile(r"[A-Za-z_@:$][\w:.$@-]*")
 # "empty" — a false positive on a dynamic value is how a team disables a linter.
 EXPR = "\x00EXPR\x00"
 
+# Angular's bindings, which ATTR_NAME cannot start: `[alt]`, `[attr.aria-label]`,
+# `(click)` and the two-way `[(ngModel)]`.
+NG_BINDING = re.compile(r"\[\(?[A-Za-z][\w.:-]*\)?\]|\([A-Za-z][\w.:-]*\)")
+VUE_MODIFIERS = re.compile(r"\.(prop|attr|camel)$")
+
+
+def bound_attr(raw: str) -> tuple[str | None, bool]:
+    """The attribute a framework's binding sets, and whether it is bound.
+
+    Vue's `:alt` and `v-bind:alt`, and Angular's `[alt]` and `[attr.alt]`,
+    set `alt` to an expression; Vue's `@click` and `v-on:click`, Svelte's
+    `on:click` and Angular's `(click)` are `onclick`. Read as written, `<img
+    :alt="d">` had no alt and `<div @click>` no handler (audit H6). A class or
+    style binding (`[class.x]`) names no attribute, so its key is None."""
+    name = raw.lower()
+    if name.startswith("[("):
+        return name.strip("[()]"), True
+    if name.startswith("["):
+        inner = name[1:-1]
+        if inner.startswith(("class.", "style.")):
+            return None, True
+        return (inner[5:] if inner.startswith("attr.") else inner), True
+    if name.startswith("("):
+        return "on" + name[1:-1].split(".")[0], True
+    for prefix in ("v-on:", "@", "on:"):
+        if name.startswith(prefix) and len(name) > len(prefix):
+            return "on" + re.split(r"[.|]", name[len(prefix):])[0], True
+    for prefix in ("v-bind:", ":"):
+        if name.startswith(prefix) and len(name) > len(prefix):
+            return VUE_MODIFIERS.sub("", name[len(prefix):]), True
+    return name, False
+
 
 @dataclass
 class Tag:
@@ -465,7 +497,7 @@ def scan_tags(text: str) -> list[Tag]:
                 k = _skip_braces(text, k)
                 attrs["\x00spread"] = EXPR
                 continue
-            am = ATTR_NAME.match(text, k)
+            am = ATTR_NAME.match(text, k) or NG_BINDING.match(text, k)
             if not am:
                 k += 1
                 continue
@@ -475,6 +507,7 @@ def scan_tags(text: str) -> list[Tag]:
             while k < n and text[k].isspace():
                 k += 1
             value: str = ""
+            quoted = False
             if k < n and text[k] == "=":
                 k += 1
                 while k < n and text[k].isspace():
@@ -485,6 +518,7 @@ def scan_tags(text: str) -> list[Tag]:
                     if end < 0:
                         end = n
                     value = text[k + 1:end]
+                    quoted = True
                     k = end + 1
                 elif k < n and text[k] == "{":
                     start = k
@@ -498,10 +532,15 @@ def scan_tags(text: str) -> list[Tag]:
                     vm = re.match(r"[^\s>]+", text[k:])
                     value = vm.group(0) if vm else ""
                     k += len(value)
-            key = raw_name.lower()
+            key, bound = bound_attr(raw_name)
+            if bound:
+                # A bound value is an expression: knowable only when it is a
+                # string literal (`:alt="'Logo'"`), and unknown otherwise.
+                lit = re.fullmatch(r"""\s*(['"`])([^'"`]*)\1\s*""", value) if quoted else None
+                value = lit.group(2) if lit else EXPR
             # React spells them camelCase; normalise so one rule covers both.
             key = {"classname": "class", "htmlfor": "for"}.get(key, key)
-            if key not in attrs:
+            if key and key not in attrs:
                 attrs[key] = value
                 attr_lines[key] = aline
         tags.append(Tag(name.lower() if name[:1].islower() else name,
@@ -1406,6 +1445,78 @@ def _lev(a: str, b: str) -> int:
 
 OUTLINE_KILLED = re.compile(r"^(none|0|0px|0rem|hidden)$", re.I)
 FOCUS_SEL = re.compile(r":focus(-visible|-within)?\b", re.I)
+# What a focus rule can change that a sighted keyboard user sees: a ring, a
+# colour, or a skip link moved on-screen (`translate: 0 0`, `inset`, `clip`).
+FOCUS_VISIBLE = {"color", "filter", "transform", "translate", "scale", "rotate",
+                 "opacity", "visibility", "text-shadow", "top", "right",
+                 "bottom", "left"}
+FOCUS_VISIBLE_PREFIXES = ("outline", "border", "background", "box-shadow",
+                          "text-decoration", "inset", "clip")
+CSS_STRING = re.compile(r"\"(?:[^\"\\\n]|\\.)*\"|'(?:[^'\\\n]|\\.)*'")
+
+
+def _nest(parent: str, child: str) -> str:
+    """A nested rule's selector, as CSS nesting reads it: `&` is the parent,
+    and a selector without one is a descendant of it."""
+    if not parent:
+        return child
+    if "," in parent:
+        parent = f":is({parent})"
+    parts = []
+    for part in child.split(","):
+        part = part.strip()
+        parts.append(part.replace("&", parent) if "&" in part
+                     else f"{parent} {part}")
+    return ", ".join(parts)
+
+
+def css_rules(src: str, line_of) -> list[tuple[str, int, str, int]]:
+    """Every style rule at any depth, as (selector, line, own body, offset).
+
+    The body keeps only the rule's own declarations: each nested block,
+    prelude included, is blanked to spaces, so a sibling rule's `box-shadow`
+    inside the same `@layer` never stands in for this rule's ring. Rules
+    inside `@layer`, `@media`, `@supports`, `@container` or `@scope` are read
+    as rules; a nested rule's selector is resolved against its parent; and
+    declarations straight inside a conditional group nested in a style rule
+    (`.btn { @media (hover: hover) { outline: none } }`) belong to that rule.
+    A top-level at-rule's own declarations (`@font-face`, `@page`) are no
+    style rule and are skipped.
+    """
+    scan = CSS_STRING.sub(lambda m: " " * len(m.group(0)), src)
+    rules: list[tuple[str, int, str, int]] = []
+    # Each open block: [the selector its declarations apply to (None for
+    # none), its prelude's start, its body's start, its child blocks' spans].
+    stack: list[list] = []
+    prelude_start = 0
+    for i, c in enumerate(scan):
+        if c == "{":
+            prelude = src[prelude_start:i].strip()
+            parent = next((f[0] for f in reversed(stack) if f[0] is not None),
+                          None)
+            if prelude.startswith("@"):
+                stack.append([parent, prelude_start, i + 1, []])
+            else:
+                sel = _nest(parent, prelude) if parent else prelude
+                stack.append([sel, prelude_start, i + 1, []])
+            prelude_start = i + 1
+        elif c == "}":
+            if not stack:
+                prelude_start = i + 1
+                continue
+            sel, start, body_start, children = stack.pop()
+            body = list(src[body_start:i])
+            for a, b in children:
+                body[a - body_start:b - body_start] = " " * (b - a)
+            if sel is not None:
+                rules.append((sel, line_of(body_start - 1), "".join(body),
+                              body_start))
+            if stack:
+                stack[-1][3].append((start, i + 1))
+            prelude_start = i + 1
+        elif c == ";":
+            prelude_start = i + 1
+    return rules
 
 
 def audit_css(path: Path, text: str, origin: str | None = None,
@@ -1424,43 +1535,13 @@ def audit_css(path: Path, text: str, origin: str | None = None,
         findings.append(Finding(str(path), real, cat, rule, sc, sev, msg, fix,
                                 snippet[:200]))
 
-    src = re.sub(r"/\*.*?\*/", lambda m: " " * len(m.group(0)), text, flags=re.S)
+    # Comments blanked with their newlines kept, or every line after a
+    # multi-line comment is misnumbered and its ignore pragma missed.
+    src = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group(0)),
+                 text, flags=re.S)
     line_of = _line_finder(src)
 
-    # Rule blocks: selector { declarations }. Nesting is rare in a focus rule
-    # and a nested block simply audits as its own block, which is correct.
-    depth = 0
-    buf: list[str] = []
-    sel = ""
-    sel_line = 1
-    body_start = 0
-    i, n = 0, len(src)
-    blocks: list[tuple[str, int, str, int]] = []
-    while i < n:
-        c = src[i]
-        if c == "{":
-            if depth == 0:
-                sel = "".join(buf).strip()
-                sel_line = line_of(i)
-                body_start = i + 1
-                buf = []
-            depth += 1
-            i += 1
-            continue
-        if c == "}":
-            depth -= 1
-            if depth == 0:
-                blocks.append((sel, sel_line, src[body_start:i], body_start))
-                buf = []
-            i += 1
-            continue
-        if depth == 0:
-            buf.append(c)
-        i += 1
-
-    for sel, sel_line, body, body_off in blocks:
-        if sel.startswith("@") and "{" not in body:
-            continue
+    for sel, sel_line, body, body_off in css_rules(src, line_of):
         decls: dict[str, tuple[str, int]] = {}
         for m in re.finditer(r"([-\w]+)\s*:\s*([^;{}]+)", body):
             prop = m.group(1).strip().lower()
@@ -1510,11 +1591,8 @@ def audit_css(path: Path, text: str, origin: str | None = None,
                     "references/token-contract.md, Accessibility floor.")
         # A focus rule that changes nothing visible at all.
         if FOCUS_SEL.search(sel) and decls and not any(
-                p in decls for p in ("outline", "outline-color", "outline-style",
-                                     "outline-width", "box-shadow", "border",
-                                     "border-color", "background",
-                                     "background-color", "color",
-                                     "text-decoration", "filter", "transform")):
+                p in FOCUS_VISIBLE or p.startswith(FOCUS_VISIBLE_PREFIXES)
+                for p in decls):
             add(sel_line, "K", "focus-rule-invisible", "2.4.7", "warning",
                 f"`{sel.strip()[:60]}` is a focus rule that sets no visible "
                 f"property.",

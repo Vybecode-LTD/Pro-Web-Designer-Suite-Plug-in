@@ -218,11 +218,69 @@ fi
 # DESIGN_GATE_INDEX=1 copies the STAGED content of the staged files into a
 # scratch tree and runs the Python stages there, with the repo root on
 # PYTHONPATH so `-m scripts.audit_design` still resolves.
+#
+# The scratch tree also needs what the stages read beside those files:
+# .design-suite.json, the token files and baselines it names, and the default
+# baselines. Without them the audit read no tokens and no baseline, and every
+# baselined finding refused the commit. A staged one is already there, as
+# staged; the rest are the working tree's, as the default mode reads them:
+# the config is copied in, and each path it names that is not staged is
+# rewritten to the working tree's absolute path (a resolver's sources and a
+# file outside the repository are found from there).
 AUDIT_ROOT="$REPO_ROOT"
 if [ "${DESIGN_GATE_INDEX:-0}" = "1" ]; then
   AUDIT_ROOT="$TMP_DIR/index"
   mkdir -p "$AUDIT_ROOT" || exit 1
   tr '\n' '\0' < "$STAGED" | git checkout-index -z --stdin --prefix="$AUDIT_ROOT/" || exit 1
+  for f in .design-suite.json .design-baseline.json .a11y-baseline.json; do
+    if [ -f "$f" ] && [ ! -e "$AUDIT_ROOT/$f" ]; then cp "$f" "$AUDIT_ROOT/$f" || exit 1; fi
+  done
+  if [ -f "$AUDIT_ROOT/.design-suite.json" ] && [ -n "$PYTHON" ]; then
+    "$PYTHON" - "$REPO_ROOT" "$AUDIT_ROOT" <<'PY' || exit 1
+import codecs, json, os, shutil, sys
+repo, root = sys.argv[1], sys.argv[2]
+path = os.path.join(root, ".design-suite.json")
+with open(path, "rb") as fh:
+    raw = fh.read()
+if raw.startswith((codecs.BOM_UTF32_LE, codecs.BOM_UTF32_BE)):
+    encoding = "utf-32"
+elif raw.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+    encoding = "utf-16"
+else:
+    encoding = "utf-8-sig"
+try:
+    config = json.loads(raw.decode(encoding))
+except ValueError:
+    sys.exit(0)             # broken: the stages report it, as they do unstaged
+
+def here(value, copy=False):
+    """A path the config names, as the scratch tree must read it. A baseline
+    is copied to the same place, since its keys are paths relative to it."""
+    if not isinstance(value, str) or os.path.isabs(value):
+        return value
+    if os.path.exists(os.path.join(root, value)):
+        return value        # staged: the index's copy is here
+    real = os.path.normpath(os.path.join(repo, value))
+    inside = not os.path.relpath(real, repo).startswith(os.pardir)
+    if copy and inside and os.path.isfile(real):
+        os.makedirs(os.path.dirname(os.path.join(root, value)) or root, exist_ok=True)
+        shutil.copyfile(real, os.path.join(root, value))
+        return value
+    return real
+
+if isinstance(config, dict):
+    for key in ("tokens", "emailTokens"):
+        if key in config:
+            value = config[key]
+            config[key] = [here(v) for v in value] if isinstance(value, list) else here(value)
+    for section in ("baselines", "budgets"):
+        if isinstance(config.get(section), dict):
+            config[section] = {k: here(v, section == "baselines")
+                               for k, v in config[section].items()}
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(config, fh, indent=2)
+PY
+  fi
 fi
 
 # py_stage <args...>: run Python where the stage should look.
