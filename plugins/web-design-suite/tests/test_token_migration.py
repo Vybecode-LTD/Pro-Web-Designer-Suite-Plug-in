@@ -986,6 +986,48 @@ class TheV4SpacingCensus(TempDirTest):
         self.assertIn('className="tw:p-well tw:md:px-inline-sm p-4"', card.read_text(encoding="utf-8"))
 
 
+class TheCodemodRewritesOnlyWhatItMatched(TempDirTest):
+    """C1 and C2 (the 2026-10-14 audit), in the tool that rewrites a project's
+    files: an arbitrary value's rule matched inside a longer class, and every
+    CRLF came back LF, which the dry run never showed."""
+
+    def apply(self, rules, *paths):
+        mapping = self.write("mapping.json", json.dumps({"schema": "design-token-migration/mapping@1",
+                                                         "rules": rules}))
+        return run_py("design-token-migration", "apply_codemod", "-m", mapping, "--apply", *paths,
+                      cwd=self.tmp)
+
+    def test_an_arbitrary_rule_matches_only_its_own_class(self):
+        rule = lambda tok, new: {"id": f"tw-{tok}", "kind": "spacing", "scope": "tailwind",  # noqa: E731
+                                 "match": [tok], "replacement": new, "confidence": "exact"}
+        card = self.write("src/Card.tsx", 'export const C = () => <div className="p-[16px] top-[16px] '
+                                          'gap-[16px] -p-[16px] sp-[16px] md:p-[16px] min-w-[16px] '
+                                          'w-[16px] -mt-[16px] mt-[16px]" />;\n')
+        proc = self.apply([rule("p-[16px]", "p-well"), rule("gap-[16px]", "gap-grouped"),
+                           rule("w-[16px]", "w-icon"), rule("mt-[16px]", "mt-grouped")], "src")
+        self.assertNotIn("two rules want the same text", output(proc))
+        self.assertIn('className="p-well top-[16px] gap-grouped -p-[16px] sp-[16px] md:p-[16px] '
+                      'min-w-[16px] w-icon -mt-[16px] mt-grouped"', card.read_text(encoding="utf-8"))
+
+    def test_untouched_lines_keep_their_crlf(self):
+        lines = ["@layer components {", "  .card {", "    margin: 13px;", "    color: inherit;", "  }", "}", ""]
+        css = self.write("src/card.css", "\r\n".join(lines).encode("utf-8"))
+        jsx = self.write("src/Card.tsx", "\r\n".join(['// a card', 'export const C = () =>',
+                                                     '  <div className="p-[16px]" />;', '']).encode("utf-8"))
+        rules = [*VendorScopeAndScale.MAPPING["rules"],
+                 {"id": "tw-p", "kind": "spacing", "scope": "tailwind", "match": ["p-[16px]"],
+                  "replacement": "p-well", "confidence": "exact"}]
+        dry = run_py("design-token-migration", "apply_codemod", "-m",
+                     self.write("dry.json", json.dumps({"schema": "design-token-migration/mapping@1",
+                                                       "rules": rules})), "src", cwd=self.tmp)
+        self.assertEqual(output(dry).count("\n-    margin"), 1, output(dry))
+        self.apply(rules, "src")
+        self.assertEqual(css.read_bytes(), "\r\n".join(lines).replace("13px", "var(--gap-related)").encode("utf-8"))
+        self.assertEqual(jsx.read_bytes().count(b"\r\n"), 3)
+        self.assertNotIn(b"\n", jsx.read_bytes().replace(b"\r\n", b""))
+        self.assertIn(b'className="p-well"', jsx.read_bytes())
+
+
 class ColoursKeepTheirFamily(TempDirTest):
     """N40 (R3.6's live check): the proposal matched a colour to a role by ΔE
     alone, so the grey #6b7280 became --fg-warning. A neutral lands on a

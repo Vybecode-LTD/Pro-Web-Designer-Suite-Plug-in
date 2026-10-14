@@ -89,6 +89,18 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
   `test_token_migration.ColoursKeepTheirFamily` holds 23 greys, tints and status colours
   to their families.
+- **The codemod rewrote classes inside longer ones** (C1, the 2026-10-14 audit). An
+  arbitrary value's rule had a right boundary only, so `p-[16px]` matched in
+  `top-[16px]`, `-p-[16px]` and `sp-[16px]`, and `w-[16px]` in `min-w-[16px]`; when
+  `gap-[16px]` had its own rule the two edits overlapped and the whole file was skipped.
+  The match now has the census's left boundary too
+  (`test_token_migration.TheCodemodRewritesOnlyWhatItMatched`).
+- **The codemod and `deprecate` turned a file's line endings** (C2 and H1, the
+  2026-10-14 audit). `apply_codemod --apply` read with universal newlines, so a CRLF file
+  came back LF on every line, which the dry run never showed; `deprecate add --source`
+  wrote the token file in the platform's newline, LF to CRLF on Windows and CRLF to LF
+  elsewhere, and its ledger the same way. Each now reads and writes the bytes' own endings,
+  and a marker takes the file's (`test_versioning.TheMarkerKeepsTheFilesLineEndings`).
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
   too. It is a width and a height, so it is a size: reported when no `--width-*` role
