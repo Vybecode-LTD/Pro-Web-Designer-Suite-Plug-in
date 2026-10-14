@@ -360,6 +360,15 @@ class MatrixStates(TempDirTest):
                                 '<span class="chip" {attrs}>{content}</span>', ["default", "hover", "active"])
         self.assertIn(self.COVERED, output(proc))                   # the control
 
+    def test_an_unforced_arm_of_a_group_never_matches_in_the_mirror(self):
+        # Codex on #132: `.danger` kept live re-applied the hover styles to every
+        # danger chip, after the component's rules; `:not(*)` keeps its specificity.
+        css = ".chip { color: #222; }\n.chip:is(:hover, .danger) { color: #000; }\n"
+        proc, sheet = self.generate(css, '<span class="chip" {attrs}>{content}</span>', ["default", "hover"])
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn('.chip:is([data-force-state~="hover"], .danger:not(*)) {', sheet)
+        self.assertNotIn('"hover"], .danger)', sheet)
+
     def test_a_focus_within_ring_covers_the_focus_visible_cell(self):
         # CodeRabbit on #132: the cell carries focus-within, so its mirror renders.
         proc, _ = self.generate(".chip { color: #222; }\n.chip:focus-within { outline: 2px solid #222; }\n",
@@ -954,6 +963,14 @@ class A11yStaticReadsNestedRules(TempDirTest):
     def test_a_shadow_only_ring_inside_a_layer_is_reported(self):
         css = "@layer components {\n  .btn:focus-visible {\n    outline: none;\n    box-shadow: 0 0 0 2px red;\n  }\n}\n"
         self.assertEqual([("focus-ring-shadow-only", 4)], self.rules(css))
+
+    def test_a_condition_nested_in_a_rule_keeps_the_rules_declarations(self):
+        # Codex on #132: the rule's border still applies under the condition.
+        css = ".btn:focus {\n  border: 2px solid;\n  @media (forced-colors: active) { outline: none; }\n}\n"
+        self.assertEqual([], self.rules(css))
+        # The rule's own reset, read again under each condition, is reported once.
+        css = ".btn:focus {\n  outline: none;\n  @media (x) { color: red; }\n  @media (y) { color: blue; }\n}\n"
+        self.assertEqual([("outline-none-no-replacement", 2)], self.rules(css))
 
     def test_a_nested_focus_rule_is_resolved_against_its_parent(self):
         css = ".btn {\n  box-shadow: 0 1px 2px black;\n  &:focus-visible { outline: none; }\n}\n"

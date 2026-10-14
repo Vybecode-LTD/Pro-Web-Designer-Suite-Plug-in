@@ -1483,51 +1483,71 @@ def _selector_list(selector: str) -> list[str]:
 
 
 def css_rules(src: str, line_of) -> list[tuple[str, int, str, int]]:
-    """Every style rule at any depth, as (selector, line, own body, offset).
+    """Every style rule at any depth, as (selector, line, body, offset).
 
-    The body keeps only the rule's own declarations: each nested block,
-    prelude included, is blanked to spaces, so a sibling rule's `box-shadow`
-    inside the same `@layer` never stands in for this rule's ring. Rules
-    inside `@layer`, `@media`, `@supports`, `@container` or `@scope` are read
-    as rules; a nested rule's selector is resolved against its parent; and
-    declarations straight inside a conditional group nested in a style rule
-    (`.btn { @media (hover: hover) { outline: none } }`) belong to that rule.
-    A top-level at-rule's own declarations (`@font-face`, `@page`) are no
-    style rule and are skipped.
+    A rule's body keeps only its own declarations: each nested block, prelude
+    included, is blanked to spaces, so a sibling rule's `box-shadow` inside
+    the same `@layer` never stands in for this rule's ring. Rules inside
+    `@layer`, `@media`, `@supports`, `@container` or `@scope` are read as
+    rules, and a nested rule's selector is resolved against its parent. A
+    conditional group nested in a style rule (`.btn:focus { border: 2px solid;
+    @media (forced-colors: active) { outline: none } }`) is read as that rule
+    under the condition: the rule's own declarations with the group's laid
+    over them in place, since both apply there (Codex on #132). A top-level
+    at-rule's own declarations (`@font-face`, `@page`) are no style rule and
+    are skipped.
     """
     scan = CSS_STRING.sub(lambda m: " " * len(m.group(0)), src)
-    rules: list[tuple[str, int, str, int]] = []
-    # Each open block: [the selector its declarations apply to (None for
-    # none), its prelude's start, its body's start, its child blocks' spans].
-    stack: list[list] = []
+    # Each block: the selector its declarations apply to (None for none),
+    # whether it is an at-rule, its prelude's and body's starts, its child
+    # blocks' spans, its enclosing block and, once closed, its own text.
+    blocks: list[dict] = []
+    stack: list[dict] = []
     prelude_start = 0
     for i, c in enumerate(scan):
         if c == "{":
             prelude = src[prelude_start:i].strip()
-            parent = next((f[0] for f in reversed(stack) if f[0] is not None),
+            parent = next((b["sel"] for b in reversed(stack) if b["sel"] is not None),
                           None)
-            if prelude.startswith("@"):
-                stack.append([parent, prelude_start, i + 1, []])
-            else:
-                sel = _nest(parent, prelude) if parent else prelude
-                stack.append([sel, prelude_start, i + 1, []])
+            at = prelude.startswith("@")
+            sel = parent if at else (_nest(parent, prelude) if parent else prelude)
+            stack.append({"sel": sel, "at": at, "start": prelude_start, "body": i + 1,
+                          "children": [], "up": stack[-1] if stack else None})
             prelude_start = i + 1
         elif c == "}":
             if not stack:
                 prelude_start = i + 1
                 continue
-            sel, start, body_start, children = stack.pop()
-            body = list(src[body_start:i])
-            for a, b in children:
-                body[a - body_start:b - body_start] = " " * (b - a)
-            if sel is not None:
-                rules.append((sel, line_of(body_start - 1), "".join(body),
-                              body_start))
+            block = stack.pop()
+            own = list(src[block["body"]:i])
+            for a, b in block["children"]:
+                own[a - block["body"]:b - block["body"]] = " " * (b - a)
+            block["own"] = "".join(own)
+            blocks.append(block)
             if stack:
-                stack[-1][3].append((start, i + 1))
+                stack[-1]["children"].append((block["start"], i + 1))
             prelude_start = i + 1
         elif c == ";":
             prelude_start = i + 1
+
+    rules: list[tuple[str, int, str, int]] = []
+    for block in blocks:
+        if block["sel"] is None:
+            continue
+        if not block["at"]:
+            rules.append((block["sel"], line_of(block["body"] - 1), block["own"],
+                          block["body"]))
+            continue
+        chain, rule = [block], block["up"]
+        while rule["at"]:
+            chain.append(rule)
+            rule = rule["up"]
+        text = list(rule["own"])
+        for group in chain:
+            for k, ch in enumerate(group["own"]):
+                if not ch.isspace():
+                    text[group["body"] - rule["body"] + k] = ch
+        rules.append((block["sel"], line_of(rule["body"] - 1), "".join(text), rule["body"]))
     return rules
 
 
@@ -1536,12 +1556,16 @@ def audit_css(path: Path, text: str, origin: str | None = None,
     findings: list[Finding] = []
     lines = (origin or text).splitlines()
     file_ignores, line_ignores = extract_pragmas(text)
+    # A rule read again under each condition nested in it finds its own
+    # problems again, on the same line: report each once.
+    seen: set[tuple[int, str, str]] = set()
 
     def add(line: int, cat: str, rule: str, sc: str, sev: str,
             msg: str, fix: str) -> None:
         tags = line_ignores.get(line, set()) | file_ignores
-        if cat in tags or rule.upper() in tags or "ALL" in tags:
+        if cat in tags or rule.upper() in tags or "ALL" in tags or (line, rule, msg) in seen:
             return
+        seen.add((line, rule, msg))
         real = line + line_offset
         snippet = lines[real - 1].strip() if 0 < real <= len(lines) else ""
         findings.append(Finding(str(path), real, cat, rule, sc, sev, msg, fix,

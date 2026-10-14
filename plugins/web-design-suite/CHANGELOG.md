@@ -109,7 +109,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   the focus test read the at-rule's prelude. The starter's `base.css` is all `@layer
   base`, so a reset planted there passed. Each rule is now read on its own at any depth,
   a nested `&` rule against its parent (a comma inside `:is()` is not the list's,
-  CodeRabbit on #132). Reading them found two more: a comment's newlines
+  CodeRabbit on #132), and a condition nested in a rule is read with the rule's own
+  declarations (Codex on #132). Reading them found two more: a comment's newlines
   were blanked, so every line after a multi-line comment was misnumbered and its ignore
   comment missed; and a focus rule that moves a skip link on-screen (`translate: 0 0`)
   was called invisible (`test_content_and_a11y.A11yStaticReadsNestedRules`).
@@ -117,7 +118,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   pseudo-class at depth 0 got a mirror rule, so `.btn:is(:hover, :focus-visible)` got
   none, and `.chip { &:hover {…} }` mirrored as `&[data-force-state~="hover"]`, which
   matches nothing; the summary still said every state had a rule. States inside `:is()`
-  and `:where()` are mirrored, a nested rule is read with its parent, and a forced state
+  and `:where()` are mirrored, an arm with no state made never to match
+  (`.danger:not(*)`, Codex on #132), a nested rule is read with its parent, and a forced state
   is covered only when a mirror was written; a `:focus-within` ring covers the
   focus-visible cell, which carries it (CodeRabbit on #132)
   (`test_content_and_a11y.MatrixStates`,

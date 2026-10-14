@@ -321,21 +321,45 @@ GROUPING_PSEUDO = ("is", "where")
 FUNCTION_NAME_RE = re.compile(r":([\w-]+)\Z")
 
 
+def _close_paren(text: str, open_idx: int) -> int:
+    depth = 0
+    for k in range(open_idx, len(text)):
+        if text[k] == "(":
+            depth += 1
+        elif text[k] == ")":
+            depth -= 1
+            if depth == 0:
+                return k
+    return len(text) - 1
+
+
 def transpose_part(part: str) -> Tuple[str, List[str]]:
+    """One compound selector, its states rewritten. In an `:is()`/`:where()`
+    holding a state, an arm without one never matches: `.chip:is(:hover,
+    .danger)` mirrored with `.danger` live re-applied the hover styles to every
+    danger chip, after the component's own rules (Codex on #132). It becomes
+    `.danger:not(*)`, which keeps its specificity, since `:is()` takes its
+    most specific arm's. A group holding no state is a condition and stays
+    whole; any other function's argument is a guard."""
     out: List[str] = []
-    # One entry per open paren: may a state inside it be rewritten?
-    groups: List[bool] = []
     i, n = 0, len(part)
     hits: List[str] = []
     while i < n:
         ch = part[i]
         if ch == "(":
+            close = _close_paren(part, i)
             m = FUNCTION_NAME_RE.search(part, max(0, i - 40), i)
-            groups.append(bool(m) and m.group(1).lower() in GROUPING_PSEUDO)
-        elif ch == ")":
-            if groups:
-                groups.pop()
-        elif ch == ":" and all(groups):
+            if m and m.group(1).lower() in GROUPING_PSEUDO:
+                arms = [transpose_part(arm) for arm in split_selector_list(part[i + 1:close])]
+                if any(h for _, h in arms):
+                    out.append("(" + ", ".join(arm if h else f"{arm}:not(*)" for arm, h in arms) + ")")
+                    hits.extend(name for _, h in arms for name in h)
+                    i = close + 1
+                    continue
+            out.append(part[i:close + 1])
+            i = close + 1
+            continue
+        if ch == ":":
             m = PSEUDO_RE.match(part, i)
             if m:
                 out.append('[data-force-state~="%s"]' % m.group(1))
