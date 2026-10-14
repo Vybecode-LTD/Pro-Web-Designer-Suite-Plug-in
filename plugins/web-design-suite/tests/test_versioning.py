@@ -350,6 +350,49 @@ class DeprecateKeepsRemovalsInAMajor(TempDirTest):
         self.assertEqual(self.add("2.2.0", "--force", "--notes", "deliberate").returncode, 0)
 
 
+class TheMarkerKeepsTheFilesLineEndings(TempDirTest):
+    """H1 (the 2026-10-14 audit): `deprecate add --source` read the token file
+    with universal newlines and wrote it in the platform's, so one marker line
+    became a whole-file diff: LF came back CRLF on Windows, CRLF LF elsewhere."""
+
+    LINES = (":root {", "  --fg-faint: #6b6b6b;", "  --fg-subtle: #767676;", "}", "")
+
+    def add(self, ledger, tokens):
+        proc = run_py("design-system-versioning", "deprecate", "--ledger", ledger, "add",
+                      "--name=--fg-subtle", "--kind", "token", "--since", "2.1.0", "--removal", "3.0.0",
+                      "--replacement=--fg-faint", "--source", tokens, cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+
+    def test_one_line_is_added_in_the_files_own_ending(self):
+        for n, ending in enumerate(("\n", "\r\n")):
+            with self.subTest(ending=repr(ending)):
+                before = ending.join(self.LINES).encode("utf-8")
+                tokens = self.write(f"tokens{n}.css", before)
+                self.add(self.tmp / f"dep{n}.json", tokens)
+                after = tokens.read_bytes().splitlines(keepends=True)
+                added = [line for line in after if b"@deprecated" in line]
+                self.assertEqual(len(added), 1, after)
+                self.assertTrue(added[0].endswith(ending.encode()), added)
+                self.assertEqual([line for line in after if line not in added],
+                                 before.splitlines(keepends=True))
+                self.add(self.tmp / f"dep{n}.json", tokens)          # a second run is already current
+                self.assertEqual(tokens.read_bytes().splitlines(keepends=True), after)
+
+    def test_the_ledger_keeps_its_own_ending(self):
+        # The same bug in the ledger deprecate rewrites whole.
+        tokens = self.write("tokens.css", "\n".join(self.LINES))
+        for n, ending in enumerate(("\n", "\r\n")):
+            with self.subTest(ending=repr(ending)):
+                ledger = self.write(f"dep{n}.json", ending.join(['{', '  "schema": "design-system-versioning/deprecations@1",',
+                                                                '  "deprecations": []', '}', '']).encode())
+                self.add(ledger, tokens)
+                data = ledger.read_bytes()
+                lines = data.split(b"\n")[:-1]
+                self.assertGreater(len(lines), 4, data)
+                self.assertEqual({line.endswith(b"\r") for line in lines}, {ending == "\r\n"}, data)
+                self.assertIn(b"--fg-subtle", data)
+
+
 class DeprecateRewritesAndCountsAColourRename(TempDirTest):
     """LC-A14, the review's `fx/dep/client`: a colour rename beside a
     font-weight, and the scan's labels on one-line rules."""

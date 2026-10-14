@@ -760,7 +760,10 @@ def plan_classes(matches, text: str, mapping: Mapping,
         for tok, rule in mapping.tw_rules.items():
             if "[" not in tok:
                 continue                      # a numeric class: token by token, below
-            for hit in re.finditer(re.escape(tok) + r"(?![\w\[-])", group):
+            # Both ends bound, as the census's TW_ARBITRARY_RE binds them (C1, the
+            # 2026-10-14 audit): `p-[16px]` is never found in `top-[16px]`,
+            # `-p-[16px]` or `md:p-[16px]`, which the census counts on their own.
+            for hit in re.finditer(r"(?<![\w:./-])" + re.escape(tok) + r"(?![\w\[-])", group):
                 span = (base + hit.start(), base + hit.end())
                 if span in seen:
                     continue
@@ -950,7 +953,11 @@ class FileResult:
 
 def process(fp: Path, mapping: Mapping, skips: List[Skip]) -> Optional[FileResult]:
     try:
-        text = fp.read_text(encoding="utf-8")
+        # The bytes' own line endings (C2, the 2026-10-14 audit): universal
+        # newlines wrote a CRLF file back LF on every line, and the dry run,
+        # planned on the translated text, never showed it.
+        with open(fp, encoding="utf-8", newline="") as fh:
+            text = fh.read()
     except (OSError, UnicodeDecodeError) as exc:
         skips.append(Skip(norm_path(fp), 0, f"unreadable: {exc}", ""))
         return None
@@ -1115,7 +1122,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 r.after.splitlines(keepends=True),
                 fromfile=f"a/{norm_path(r.path)}",
                 tofile=f"b/{norm_path(r.path)}", n=2)
-            sys.stdout.writelines(diff)
+            # As the bytes are (Codex on #130): a CRLF file's lines already end
+            # in \r\n, and Windows' text-mode stdout made each one \r\r\n.
+            raw = getattr(sys.stdout, "buffer", None)
+            if raw is None:
+                sys.stdout.writelines(diff)
+            else:
+                sys.stdout.flush()
+                raw.write("".join(diff).encode(sys.stdout.encoding or "utf-8", errors="replace"))
+                raw.flush()
 
     print()
     print("=" * 72)
