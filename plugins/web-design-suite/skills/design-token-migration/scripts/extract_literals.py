@@ -69,7 +69,7 @@ import re
 import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Iterable, Iterator, Sequence
+from typing import Callable, Iterable, Iterator, Sequence
 
 # ---------------------------------------------------------------------------
 # What counts as source
@@ -1182,9 +1182,11 @@ def parse_style_object(body: str) -> list[tuple[str, str, int]]:
 
 
 def tailwind_literals(matches: Iterable[re.Match], text: str, fname: str, component: bool,
-                      claimed=lambda pos: False, tw: TwSpacing | None = None) -> list[Literal]:
+                      claimed=lambda pos: False, tw: TwSpacing | None = None,
+                      class_list=lambda sm: True) -> list[Literal]:
     """The arbitrary values (`p-[13px]`) in each matched class list, and with a
-    v4 theme that keeps `--spacing` (`tw`), its numeric classes (`p-4`)."""
+    v4 theme that keeps `--spacing` (`tw`), its numeric classes (`p-4`) in
+    each match `class_list` takes for a class list."""
     out: list[Literal] = []
     seen: set[tuple[int, int]] = set()
     step = tw.length() if tw else None
@@ -1195,7 +1197,7 @@ def tailwind_literals(matches: Iterable[re.Match], text: str, fname: str, compon
         base = sm.start(sm.lastindex or 1)
         if claimed(base):
             continue
-        for m in TW_TOKEN_RE.finditer(group) if step else ():
+        for m in TW_TOKEN_RE.finditer(group) if step and class_list(sm) else ():
             variants, utility, at = tw_utility(m.group(0))
             if tw.prefix and variants[:1] != [tw.prefix]:
                 continue
@@ -1420,7 +1422,7 @@ def extract_js(path: Path, text: str, *, component: bool | None = None,
     # ---- Tailwind arbitrary values ----------------------------------------
     out.extend(tailwind_literals(
         list(CLASSNAME_RE.finditer(clean)) + list(CLASSLIST_STRING_RE.finditer(clean)),
-        text, fname, component, claimed, tw))
+        text, fname, component, claimed, tw, in_class_list(class_list_spans(clean))))
 
     # ---- bare hex colors in JS strings -------------------------------------
     for m in JS_HEX_STRING_RE.finditer(clean):
@@ -1567,6 +1569,45 @@ def tw_multiplier(text: str) -> float | None:
         return None
     canonical = str(int(num)) if num.is_integer() else repr(num)
     return num if canonical == text else None
+
+
+# The calls whose strings are class lists: eslint-plugin-better-tailwindcss
+# 4.9.0's default callees, and the classNames and classnames Part 5 adds.
+CLASS_HELPERS = ("cc", "clb", "clsx", "cn", "cnb", "ctl", "cva", "cx", "dcnb", "objstr",
+                 "tv", "twJoin", "twMerge", "classNames", "classnames")
+CLASS_HELPER_RE = re.compile(r"(?<![\w$])(?:" + "|".join(CLASS_HELPERS) + r")\s*\(")
+CLASS_EXPRESSION_RE = re.compile(r"\b(?:className|class)\s*=\s*\{")
+
+
+def class_list_spans(clean: str) -> list[tuple[int, int]]:
+    """Where a script's class lists are: a `className={…}` expression and a
+    class helper's arguments (`cn("p-4", ok && "mt-1")`). A numeric class is
+    read only there, since a bare `"p-4"` may be any data (Codex on #129)."""
+    spans = [(m.end(), match_braces(clean, m.end() - 1)) for m in CLASS_EXPRESSION_RE.finditer(clean)]
+    for m in CLASS_HELPER_RE.finditer(clean):
+        depth, i, quote = 1, m.end(), ""
+        while i < len(clean) and depth:
+            ch = clean[i]
+            if quote:
+                if ch == "\\":
+                    i += 1
+                elif ch == quote:
+                    quote = ""
+            elif ch in "'\"`":
+                quote = ch
+            elif ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            i += 1
+        spans.append((m.end(), i))
+    return spans
+
+
+def in_class_list(spans: Sequence[tuple[int, int]]) -> Callable[[re.Match], bool]:
+    """Whether a matched string is a class list: a `class=""` or `className=""`
+    attribute, or a string inside one of `spans`."""
+    return lambda sm: sm.re is CLASSNAME_RE or any(a <= sm.start() < b for a, b in spans)
 
 
 def _theme_blocks(css: str) -> Iterator[tuple[str, list[str]]]:

@@ -86,7 +86,7 @@ try:                                                # python -m scripts.apply_co
         STYLED_TAG_RE, CLASSNAME_RE, CLASSLIST_STRING_RE, CSS_EXT, JS_EXT,
         SKIP_DIRS, is_vendor, is_token_file, GENERATED_MARKERS, norm_path,
         MARKUP_EXT, PLAIN_CSS_EXT, style_blocks, script_blocks, template_of, keep_only,
-        Slot, split_slots, line_comments, TW_TOKEN_RE, tw_utility,
+        Slot, split_slots, line_comments, TW_TOKEN_RE, tw_utility, class_list_spans, in_class_list,
     )
 except ImportError:                                 # python scripts/apply_codemod.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -97,7 +97,7 @@ except ImportError:                                 # python scripts/apply_codem
         STYLED_TAG_RE, CLASSNAME_RE, CLASSLIST_STRING_RE, CSS_EXT, JS_EXT,
         SKIP_DIRS, is_vendor, is_token_file, GENERATED_MARKERS, norm_path,
         MARKUP_EXT, PLAIN_CSS_EXT, style_blocks, script_blocks, template_of, keep_only,
-        Slot, split_slots, line_comments, TW_TOKEN_RE, tw_utility,
+        Slot, split_slots, line_comments, TW_TOKEN_RE, tw_utility, class_list_spans, in_class_list,
     )
 
 LENGTH_RE = re.compile(r"^(-?\d*\.?\d+)(px|rem|em|pt|pc|in|cm|mm|q)$", re.IGNORECASE)
@@ -737,13 +737,16 @@ def plan_js(text: str, mapping: Mapping, source_name: str,
 
     edits.extend(plan_classes(
         list(CLASSNAME_RE.finditer(clean)) + list(CLASSLIST_STRING_RE.finditer(clean)),
-        text, mapping, consumed))
+        text, mapping, consumed, in_class_list(class_list_spans(clean))))
     return edits
 
 
 def plan_classes(matches, text: str, mapping: Mapping,
-                 consumed: Sequence[Tuple[int, int]] = ()) -> List[Edit]:
-    """The Tailwind rules, applied to each matched class list."""
+                 consumed: Sequence[Tuple[int, int]] = (),
+                 class_list=lambda sm: True) -> List[Edit]:
+    """The Tailwind rules, applied to each matched class list; a numeric
+    class's, only to the matches `class_list` takes for one (the census's
+    reading: a bare `"p-4"` in a script may be any data)."""
     edits: List[Edit] = []
     seen: set = set()
     for sm in matches:
@@ -768,7 +771,7 @@ def plan_classes(matches, text: str, mapping: Mapping,
         # A v4 numeric class (`p-4`, the project prefix's `tw:p-4`) is matched
         # as a whole utility, whatever its variants and `!`, so `p-4` is never
         # found inside `p-4.5`, `-p-4` or `sp-4`; only the utility is rewritten.
-        for hit in TW_TOKEN_RE.finditer(group) if mapping.tw_rules else ():
+        for hit in TW_TOKEN_RE.finditer(group) if mapping.tw_rules and class_list(sm) else ():
             variants, utility, at = tw_utility(hit.group(0))
             keys = ([f"{variants[0]}:{utility}"] if variants else []) + [utility]
             rule = next((mapping.tw_rules[k] for k in keys

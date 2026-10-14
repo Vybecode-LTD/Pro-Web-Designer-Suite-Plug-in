@@ -904,6 +904,25 @@ class TheV4SpacingCensus(TempDirTest):
                                r'p-0 p-0\.3 p-04 -p-4 w-px text-sm"')
         self.assertIn('class="p-well md:gap-grouped"', self.tmp.joinpath("src", "Panel.vue").read_text(encoding="utf-8"))
 
+    def test_a_script_string_is_a_class_list_only_where_classes_go(self):
+        # Codex on #129: `"p-4"` alone may be any data (a page code), so only a
+        # class attribute, a className={…} expression and a class helper's
+        # arguments are read for numeric classes, and rewritten.
+        page = self.write("src/Page.tsx", 'const pageCode = "p-4";\nconst row = { id: "m-2" };\n'
+                                          'export const P = ({ on }) => <div className={on ? "p-4" : "m-2"}>\n'
+                                          '  <i className={cn("gap-4", on && "mt-1")} /><b className="px-3" />\n'
+                                          '  {twMerge(`py-2 ${x}`)}</div>;\n')
+        literals, data = self.project()
+        found = [(l["line"], l["raw"]) for l in data["literals"]
+                 if l["context"] == "tailwind-spacing" and l["file"].endswith("Page.tsx")]
+        self.assertEqual(found, [(3, "p-4"), (3, "m-2"), (4, "gap-4"), (4, "mt-1"), (4, "px-3"), (5, "py-2")])
+        self.cluster(literals)
+        self.apply(self.tmp / "proposal" / "mapping.json")
+        text = page.read_text(encoding="utf-8")
+        self.assertIn('const pageCode = "p-4";\nconst row = { id: "m-2" };\n', text)
+        self.assertIn('className={on ? "p-well" : ', text)
+        self.assertIn('cn("gap-grouped", on && "mt-fused")', text)
+
     def test_a_size_is_no_padding(self):
         # CodeRabbit on #129: size-4 is an icon's width and height, so a padding
         # role (size-well) would resize every icon when --pad-well moved.
@@ -955,6 +974,15 @@ class ColoursKeepTheirFamily(TempDirTest):
         cv = load_script("design-token-migration", "cluster_values")
         token = next(r["token"] for r in mapping["rules"] if "#6b7280" in r["match"])
         self.assertIn(token, set(cv.FG_ROLE_BY_STEP.values()))
+
+    def test_a_muted_grey_seeds_no_accent(self):
+        # Codex on #129: the ramps are built by the same reading. #5f8890 is a
+        # grey with C 0.047, so it gives the neutrals their hue, not the accent.
+        self.write("src/card.css", ".a { color: #5f8890; }\n.b { border-color: #5f8890; }\n"
+                                   ".c { background: #5f8890; }\n.d { background: #2f6df6; }\n")
+        _, report = MigrationPipeline.cluster(self, MigrationPipeline.extract(self, "src")[0])
+        self.assertIn("Accent seeded from #2f6df6", report)
+        self.assertRegex(report, r"Neutral hue 21\d(\.\d)?deg")
 
     def test_each_colour_keeps_its_family(self):
         cv = load_script("design-token-migration", "cluster_values")

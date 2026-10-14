@@ -61,7 +61,10 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   - **The proposal** maps each to its role as it maps `p-[13px]` (`p-4` to `p-well`,
     `-mt-4` to `-mt-grouped`), and reports `leading-6` for its `--type-*` role. **The
     codemod** rewrites only the utility, matched whole: `md:p-4` becomes `md:p-well`, and
-    `p-4.5`, `-p-4` and `sp-4` are never read as `p-4`.
+    `p-4.5`, `-p-4` and `sp-4` are never read as `p-4`. In a script, both read a numeric
+    class only where classes go: a class attribute, a `className={…}` expression and a
+    class helper's arguments (`cn()`, `clsx()`, `cva()`…), since a bare `"p-4"` may be
+    any data (Codex on #129).
   - framework-migrations.md §5 gives **Move 1 in v4's form**: named `--spacing-*` keys
     beside `--spacing` replace nothing, `--*: initial` does, the census runs before it, and
     `tw_probe --refuse p-4` checks it.
@@ -79,7 +82,9 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
     on the neutral ramp;
   - any other colour lands only on a step within 30° of its hue, so a status hue lands on
     its status;
-  - ΔE ranks within the family.
+  - ΔE ranks within the family;
+  - the ramps are built by the same reading: a muted grey (`#5f8890`, C 0.047) seeds no
+    accent and gives the neutrals their hue (Codex on #129).
 
   `test_token_migration.ColoursKeepTheirFamily` holds 23 greys, tints and status colours
   to their families.

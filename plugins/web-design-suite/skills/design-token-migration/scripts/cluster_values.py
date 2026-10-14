@@ -1746,12 +1746,14 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
     neutral_hues: List[Tuple[int, float]] = []
     for c in clusters:
         L, C, H = oklab_to_oklch(*c.centroid_lab)
-        if C >= 0.04:
+        # A colour is a neutral as nearest_ramp_step() reads it (Codex on #129):
+        # the muted #5f8890 (C 0.047) is a grey, so it seeds no accent, and its
+        # hue is the neutrals' temperature. A tint, with a hue of its own, is
+        # neither. The contract's neutral ramp peaks at C 0.009 whatever the hue.
+        neutral = is_neutral(L, C, H)
+        if C >= 0.04 and not neutral:
             chromatic.append((c.total, c))
-        elif 0.001 <= C <= 0.012:
-            # Above 0.012 it is a tint with a hue of its own, not a neutral
-            # whose temperature we are trying to read. The contract's neutral
-            # ramp peaks at C 0.009.
+        elif neutral and C >= 0.001:
             neutral_hues.append((c.total * C, H))
     if accent_override:
         seed_rgb, _a = parse_any_color(accent_override)

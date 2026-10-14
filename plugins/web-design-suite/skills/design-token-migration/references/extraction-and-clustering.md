@@ -105,7 +105,7 @@ In v4, `p-4` is `padding: calc(var(--spacing) * 4)` ([padding](https://tailwindc
 - **The value.** The census reads `--spacing` from each stylesheet that imports `tailwindcss` (or `tailwindcss/utilities`), following its local imports in order, as Tailwind builds the theme:
   - the stock value comes from the installed `tailwindcss/theme.css`, else `0.25rem` ([theme](https://tailwindcss.com/docs/theme));
   - `--*: initial`, `--spacing-*: initial` and `--spacing: initial` clear it, and a `default` block never overrides the project's.
-- **The classes.** Padding, margin, gap, `space-*`, inset, width, height and `size-*`, the `-` negatives where Tailwind has them (`-mt-4`, `-top-2`, never `-p-4`), any variants and `!`, and a project's `prefix(tw)` (`tw:p-4`). A number counts only as Tailwind 4.3.3 takes it: a multiple of 0.25, written plainly (`p-2.5` and `p-2.25`, not `p-2.50`, `p-04` or `p-0.3`).
+- **The classes.** Padding, margin, gap, `space-*`, inset, width, height and `size-*`, the `-` negatives where Tailwind has them (`-mt-4`, `-top-2`, never `-p-4`), any variants and `!`, and a project's `prefix(tw)` (`tw:p-4`). In a script they are read only where classes go: a `class` or `className` attribute, a `className={…}` expression, and the arguments of a class helper (`cn()`, `clsx()`, `cva()` and the rest of Part 5's lint plugin's list), since a bare `"p-4"` may be any data. A number counts only as Tailwind 4.3.3 takes it: a multiple of 0.25, written plainly (`p-2.5` and `p-2.25`, not `p-2.50`, `p-04` or `p-0.3`).
 - **What it does not count.** A `leading-6` is counted but not mapped: a `--type-*` role carries leading. Entries that disagree on `--spacing`, or a `--spacing` that is no length (`var(--space-1)`), count none, and the census says why.
 - **The rewrite.** The proposal maps each class by its role, as it maps `p-[13px]`, and the codemod rewrites only the utility, whatever its variants: `md:-mt-4` becomes `md:-mt-grouped`, and `p-4.5` is never read as `p-4`.
 
@@ -265,9 +265,9 @@ Report before and after. A role that *loses* contrast relative to the original i
 
 ### Deriving the ramps from the codebase
 
-**Accent seed:** the most-used chromatic cluster (C ≥ 0.04), preferring one that is not sitting on a status hue. This matters more than it sounds: a token file whose accent is visibly *their* blue gets adopted, and one whose accent came from a style guide gets ignored.
+**Accent seed:** the most-used chromatic cluster (C ≥ 0.04, and no neutral by the family rule above: the muted `#5f8890` has C 0.047 and is a grey), preferring one that is not sitting on a status hue. This matters more than it sounds: a token file whose accent is visibly *their* blue gets adopted, and one whose accent came from a style guide gets ignored.
 
-**Neutral hue:** the circular mean of the grays, weighted by count × chroma, restricted to 0.001 ≤ C ≤ 0.012. Chroma weighting is essential — a hue angle read off a color with C = 0.001 is numerical noise and would otherwise outvote a real one. Below an evidence floor, keep the house default (75°, warm graphite). A codebase whose grays are `#333` and `#666` has no neutral temperature to preserve, and inventing one is worse than defaulting.
+**Neutral hue:** the circular mean of the grays, weighted by count × chroma, restricted to the neutrals with C ≥ 0.001; a tint has a hue of its own and gives none. Chroma weighting is essential — a hue angle read off a color with C = 0.001 is numerical noise and would otherwise outvote a real one. Below an evidence floor, keep the house default (75°, warm graphite). A codebase whose grays are `#333` and `#666` has no neutral temperature to preserve, and inventing one is worse than defaulting.
 
 Everything else — the L curve, the chroma falloff, the hue drift — comes from the studio's tuned tables, unchanged. Those are the house style and the migration does not get a vote.
 

@@ -292,7 +292,7 @@ class TheMigrationsMoveOne(ProbeProject):
         return [c for c in classes if "." + c.replace(".", "\\.") + " {" in css]
 
     def test_named_keys_beside_spacing_leave_the_numeric_classes(self):
-        self.write("src/styles/index.css", migration_block("wrong"))
+        self.write("src/styles/index.css", '@import "tailwindcss";\n' + migration_block("wrong"))
         css = self.compile("src/styles/index.css", [*self.NUMERIC, "p-card"])
         self.assertEqual(self.generated(css, [*self.NUMERIC, "p-card"]), [*self.NUMERIC, "p-card"])
         proc = self.probe(*self.command())
@@ -301,7 +301,7 @@ class TheMigrationsMoveOne(ProbeProject):
             self.assertIn(f"{cls}: refused, but generates", output(proc))
 
     def test_the_cleared_theme_leaves_only_the_roles(self):
-        self.write("src/styles/index.css", migration_block("right"))
+        self.write("src/styles/index.css", '@import "tailwindcss";\n' + migration_block("right"))
         roles = ["p-card", "-mt-grouped", "gap-related", "px-inline-md", "py-block-sm", "p-well"]
         css = self.compile("src/styles/index.css", [*self.NUMERIC, *roles])
         self.assertEqual(self.generated(css, [*self.NUMERIC, *roles]), roles)

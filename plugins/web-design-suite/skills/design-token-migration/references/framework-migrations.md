@@ -332,12 +332,11 @@ export default {
 
 `extend` leaves `p-4`, `bg-neutral-800` and `text-sm` alive next to yours — two scales in one codebase and a drift nobody can grep for. A top-level key removes the stock classes, so an off-scale class **does not exist**: Tailwind generates no CSS for it. That is silent, not a build error. The element simply ships unstyled, so the lint rules are what find it (Part 5 of `eslint.design.config.mjs`). The config shape is Law 3; the lint rules enforce it.
 
-**In v4 the theme is CSS, and the trap moves.** `p-4` is `calc(var(--spacing) * 4)` ([padding](https://tailwindcss.com/docs/padding)): while the theme keeps the one `--spacing` variable, every multiple of it is a class, `p-4`, `gap-2.5` and `-mt-4` alike. Named keys beside it replace nothing:
+**In v4 the theme is CSS, and the trap moves.** `p-4` is `calc(var(--spacing) * 4)` ([padding](https://tailwindcss.com/docs/padding)): while the theme keeps the one `--spacing` variable, every multiple of it is a class, `p-4`, `gap-2.5` and `-mt-4` alike. Named keys beside it replace nothing. Both blocks go in the stylesheet that imports `tailwindcss`, after the import:
 
 <!-- tw-migrate:wrong -->
 ```css
 /* example: wrong. In v4, a named key beside the stock --spacing: p-4 still generates */
-@import "tailwindcss";
 @theme {
   --spacing-card: var(--pad-card);
 }
@@ -345,8 +344,7 @@ export default {
 
 <!-- tw-migrate:right -->
 ```css
-/* RIGHT in v4: clear the stock theme, then give each role its key */
-@import "tailwindcss";
+/* RIGHT in v4, after the entry's @import "tailwindcss": clear the stock theme, then give each role its key */
 @theme {
   --*: initial;
   --spacing-0: var(--space-0);
