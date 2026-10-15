@@ -246,7 +246,11 @@ KEYWORD_OK = {
 }
 
 # Tailwind arbitrary value: `p-[13px]`, `text-[#3a3a3a]`, `duration-[350ms]`.
-TW_ARBITRARY_RE = re.compile(r"(?<![\w:./-])((?:[a-z]+:)*)([a-z][\w-]*?)-\[([^\]\s]+)\]")
+# Group 1 is the variants and a negative's `-`: a variant may hold digits and
+# hyphens (`2xl:`, `group-hover:`, `max-md:`) or an arbitrary part
+# (`data-[state=open]:`), and `-mt-[13px]` is negative (the audit's M2).
+TW_ARBITRARY_RE = re.compile(
+    r"(?<![\w:./-])((?:[\w-]+(?:\[[^\]\s]*\])?:)*-?)([a-z][\w-]*?)-\[([^\]\s]+)\]")
 # Arbitrary values that are not design values — grid tracks, aspect ratios,
 # content strings, data/aria selectors.
 TW_NON_DESIGN_PREFIX = re.compile(
@@ -747,9 +751,13 @@ def classify_length(prop: str) -> str:
         return "border-width"
     if prop == "letter-spacing":
         return "tracking"
-    if prop in SPACING_PROPS or prop in SIZE_PROPS:
+    # A spacing or size property, `flex` (its basis), or a variable, whose
+    # purpose its name does not tell. Any other property's length (`font`'s
+    # size, `transform`, `filter`, a grid track) is no spacing decision, and
+    # counted as one it swelled "distinct spacing values" (the audit's M3).
+    if prop in SPACING_PROPS or prop in SIZE_PROPS or prop == "flex" or prop.startswith(("$", "@", "--")):
         return "length"
-    return "length"
+    return "other-length"
 
 
 def normalize_length(num: str, unit: str) -> str:
@@ -1976,7 +1984,7 @@ def extract(paths: Sequence[str], *, include_vendor: bool = False,
 
 KIND_ORDER = ["length", "color", "font-size", "radius", "duration", "shadow",
               "z-index", "border-width", "line-height", "easing", "tracking",
-              "color-function"]
+              "color-function", "other-length"]
 
 
 def render_report(literals: Sequence[Literal], *, top: int,

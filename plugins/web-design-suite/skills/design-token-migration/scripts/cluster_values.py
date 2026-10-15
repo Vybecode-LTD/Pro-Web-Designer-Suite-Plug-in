@@ -518,8 +518,8 @@ def tw_utility_prefix(raw: str) -> str:
     """The utility a Tailwind class's rule keeps: `md:px` of `md:px-[18px]`,
     `-mt` of `-mt-4` (a numeric class's rule rewrites only its utility, so
     the project prefix of `tw:p-4` stays where it is)."""
-    if "-[" in raw:
-        return raw.split("-[")[0]
+    if "-[" in raw:                     # the value's bracket, not a variant's (M2)
+        return raw.rsplit("-[", 1)[0]
     return raw.split(":")[-1].rsplit("-", 1)[0]
 
 
@@ -1155,12 +1155,34 @@ def cluster_spacing(lits: Sequence[dict], tol: float, prop: Proposal,
                     kind_label: str = "length") -> None:
     """Snap every length onto the closed 4px scale, per property class."""
     by_class: Dict[str, Dict[float, List[dict]]] = defaultdict(lambda: defaultdict(list))
+    held: Dict[Tuple[str, float], List[dict]] = defaultdict(list)
     for l in lits:
         px = to_px(l["normalized"])
         if px is None or px == 0:
             continue
+        if l["context"] in ("scss-var", "less-var"):
+            held[(l["prop"], abs(px))].append(l)
+            continue
         klass = prop_class_for(l["prop"], "length")
         by_class[klass][abs(px)].append(l)
+
+    # A length a preprocessor variable holds gets the advice a colour held so
+    # gets (held_colour): delete the variable, use the role at each call site.
+    # It was told to add a Tier-2 role for `other` (the audit's M6).
+    for (holder, px), items in sorted(held.items()):
+        nearest = min(SPACE_PX, key=lambda s: abs(s - px))
+        scale = (f"{px:g}px is {SPACE_NAME.get(nearest, 'a step')} on the scale" if abs(nearest - px) <= tol
+                 else f"{px:g}px is off the scale")
+        prop.unmapped.append(Unmapped(
+            kind="spacing", value=f"{px:g}px", occurrences=len(items), where=where_of(items),
+            reason=f"held in the preprocessor variable `{holder}`",
+            recommendation=f"Delete it, and use the spacing role at each call site "
+                           f"(`var(--gap-related)`, `var(--pad-well)`, whichever that site "
+                           f"means); {scale}. Re-pointed, `{holder}: var(--space-4)` is a "
+                           f"tier that means nothing (framework-migrations.md). Keep a "
+                           f"variable only for a value the browser cannot hold, such as "
+                           f"a breakpoint inside `@media`.",
+        ))
 
     # Frequency weights: how much mass already sits ON each step, across the
     # whole codebase. A tie goes to the crowd.
@@ -1674,6 +1696,19 @@ def cluster_z(lits: Sequence[dict], prop: Proposal) -> None:
     """
     values = sorted({int(l["normalized"]) for l in lits
                      if re.fullmatch(r"-?\d+", l["normalized"])})
+    # A negative z-index puts an element behind its stacking context's own
+    # background, and every rung is above --z-base: ranked onto one, -1
+    # became --z-raised (10), its sign flipped (the audit's M4).
+    for v in [v for v in values if v < 0]:
+        items = [l for l in lits if l["normalized"] == str(v)]
+        prop.unmapped.append(Unmapped(
+            kind="z-index", value=str(v), occurrences=len(items), where=where_of(items),
+            reason="a negative z-index, below every rung of the ladder",
+            recommendation="Keep it as written: it means 'behind the content of this "
+                           "stacking context', which no rung says. Give the parent "
+                           "`isolation: isolate` so it cannot slip behind the page.",
+        ))
+    values = [v for v in values if v >= 0]
     if not values:
         return
     if len(values) > len(Z_LADDER):
@@ -1705,6 +1740,37 @@ def cluster_z(lits: Sequence[dict], prop: Proposal) -> None:
                  f"one', and rank is the only part of it worth keeping.",
         ))
         prop.provenance[rung].append(f"z-index {v} x{len(items)}")
+
+
+# What to do with a length no scale owns, by the property it sits in (M3).
+OTHER_LENGTH_ADVICE = (
+    (("transform", "translate"), "A movement, not a space: keep it, or read a --space-* step "
+                                 "where it must line up with the layout."),
+    (("filter", "backdrop-filter"), "An effect's radius, not a space: keep it, or name it as the "
+                                    "component's own custom property if it repeats."),
+    (("grid-template-columns", "grid-template-rows", "grid-template", "grid-auto-columns",
+      "grid-auto-rows"), "A track size is a layout decision: a --width-* role, minmax() or fr, "
+                         "not a spacing step."),
+    (("font",), "The size of a `font` shorthand: set the whole shorthand from the type role "
+                "(`font: var(--type-body)`), which carries the size and the leading."),
+)
+
+
+def route_other_lengths(lits: Sequence[dict], prop: Proposal) -> None:
+    """A length outside the spacing and size properties: a row to look at
+    by hand, never a spacing value (the audit's M3)."""
+    groups: Dict[Tuple[str, str], List[dict]] = defaultdict(list)
+    for l in lits:
+        groups[(l["prop"], l["normalized"])].append(l)
+    for (where_prop, value), items in sorted(groups.items()):
+        advice = next((a for props, a in OTHER_LENGTH_ADVICE if where_prop in props),
+                      f"No scale owns `{where_prop}`: keep the value, or name it as the "
+                      f"component's own custom property if it repeats.")
+        prop.unmapped.append(Unmapped(
+            kind="other-length", value=value, occurrences=len(items), where=where_of(items),
+            reason=f"a length in `{where_prop}`, which no spacing or size step owns",
+            recommendation=advice,
+        ))
 
 
 def cluster_leading(lits: Sequence[dict], prop: Proposal) -> None:
@@ -2799,6 +2865,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     cluster_easing(idx.get("easing", []), prop)
     cluster_shadows(idx.get("shadow", []), prop)
     cluster_z(idx.get("z-index", []), prop)
+    route_other_lengths(idx.get("other-length", []), prop)
     cluster_leading(idx.get("line-height", []), prop)
     cluster_tracking(idx.get("tracking", []), prop)
 
