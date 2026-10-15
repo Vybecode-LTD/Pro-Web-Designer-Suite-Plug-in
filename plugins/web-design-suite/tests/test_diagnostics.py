@@ -57,6 +57,9 @@ class TheTokenReadersKeepTheirProblems(TempDirTest):
                 self.assertNotIn("Traceback", output(proc))
                 self.assertRegex(proc.stderr.decode("utf-8", "replace"),
                                  rf"{gate}: warning: \S*t\.tokens\.json: heading: {re.escape(WHY)}")
+        quiet = run_py("figma-variables-sync", "figma_to_tokens", "--quiet", *self.GATES["figma_to_tokens"][2],
+                       cwd=self.tmp)                                  # "do not print warnings" (Codex on #140)
+        self.assertNotIn("warning:", output(quiet))
 
 
 class TheFigmaScriptsSayWhatTheyLeftOut(TempDirTest):

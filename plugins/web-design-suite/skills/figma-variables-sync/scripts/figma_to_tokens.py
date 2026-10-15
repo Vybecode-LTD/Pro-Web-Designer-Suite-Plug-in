@@ -1615,7 +1615,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         sources, config_path = token_sources(args.tokens)
         if sources:
             project = read_tokens(sources)
-            for problem in project.problems:              # what a DTCG file could not give (S2)
+            for problem in [] if args.quiet else project.problems:   # S2; --quiet: no warnings (Codex on #140)
                 print(f"figma_to_tokens: warning: {problem}", file=sys.stderr)
             added = use_project_names(project)
             origin = ", ".join(str(s) for s in sources) + (f" (from {config_path})" if config_path else "")
