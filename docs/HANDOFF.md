@@ -1,43 +1,42 @@
 # Handoff
 
-**2026-10-15**, after P52 and P53 part 1 of Phase 6c, the owner's audit. **Next: P53 part 2, the JSON type guards (the audit's S1, V8, G3, G11, G15, E13, W6, S10).** The owner placed all of Phase 6c (P50 to P55) before Phase 6b's remaining workstreams.
+**2026-10-15 (second session)**, after P53 parts 2 to 4 of Phase 6c, the owner's audit. **Next: P53's last class, the cmd.exe placeholders (the audit's D4, G13, E14), then P54, the mediums.** The owner placed all of Phase 6c (P50 to P55) before Phase 6b's remaining workstreams.
 
 **The next session starts from `dev plans/next-session-prompt.md`**: orientation, then the work in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
 ## State
 
-- **#135, P52 (N44, the audit's H11 to H15)**, merged as `a888fb5`:
-  - The migration's reconciliation accounts for every census literal:
-    - a colour the proposal cannot parse (`oklch()`, `lab()`, `lch()`, `hwb()`, `color()`, `hsl(turn)`) gets an unmapped row;
-    - so does a `letter-spacing` in `px`;
-    - and so does a project ramp step it cannot read.
-  - What it calls mechanically replaceable is what `--apply` rewrites:
-    - the codemod takes named colours;
-    - a `color-mix()` with a colour written out is one colour function;
-    - a duration counts at the one rule that rewrites it.
-  - A width (never a height) meets the `--width-*` steps first. A width rule's class is `width`, which the codemod gives only `width`, `min-width` and `max-width`.
-  - H14 did not reproduce: during a rebase `--ours` is HEAD, so the recipe's staged file is clean. A test now runs the recipe end to end.
-  - H15:
-    - the UTF-8 test reads every entry script's `__main__` block, with a positive control;
-    - six scripts gained the reconfigure: `check_roles.py` and the five workflow commands' scripts;
-    - CI runs the Pydantic test with `pydantic>=2,<3` and `WDS_REQUIRE_PYDANTIC`.
-  - **Reviews:** 3 real findings, all fixed with tests failing on the head they reviewed: Codex 2 (a height took a width step, at the proposal and then at the codemod) and CodeRabbit 1 (a duration counted twice, the audit's F7).
-- **#136, P53 part 1 (N45, the `--out` guard: V7, E9, G4, class 5)**, merged as `7e59f90`:
-  - One helper decides: `refuse_overwrite()` in `shared/project_config.py`, and `refuseOverwrite()` in `shared/browser_common.mjs`, which reads a `file://` URL as its file.
-  - Fifteen Python writers and two Node ones call it before writing, and exit 2 with the input untouched.
-  - It compares against the files actually read: a glob's matches, a folder's files, every file of a snapshot (`Snapshot.sources`), the token files and budgets the config names, screenshots and their captions, the manifest's templates, `--prose`, and the deck's bundled tokens.
-  - `critique_report.py` and `generate_matrix.py` carry the master's function verbatim, held equal by `test_out_guard`.
-  - **Reviews:** Codex 12 real findings over two rounds, all fixed with tests failing on the head they reviewed. One more was declined with evidence: a Windows drive path never matches the URL-scheme pattern.
-- **At the end:** `main` is this docs PR's merge; no other PR is open. The plan: 22 open items, 22 scheduled. About 1,198 tests.
+- **#138, P53 part 2 (the JSON type guards: S1, S10, V8, G3, G11, G15, E13, W6; §7 class 6)**, merged as `4701883`:
+  - Every loader checks a JSON file's shape where it reads it, and exits 2 naming the file and the key. `introspect_schema` exits 1, its documented code. A baseline of the wrong shape is read as an unreadable one, as before.
+  - The token readers leave out a non-string `$type`, in Python and in Node. A `$deprecated` that is neither a string nor a boolean is named.
+  - `perf_audit`'s `budget_problem()` is ported to `measure_vitals.mjs`; both refuse a non-finite limit, and a `null` in `bytes` or `lab` still lifts a default.
+  - `test_json_guards` has a row per loader, and fails on a script that reads JSON with no row.
+  - **Reviews:** 9 real findings over three rounds (CodeRabbit 5, Codex 4). The class was a value that is present but falsy (`[]`, `0`, `false`), which `or {}` read as empty, plus fields the readers index without checking.
+- **#139, P53 part 3 (the encoding readers: S8, W7; class 4)**, merged as `551d918`:
+  - `project_config.read_text()` and `decode_text()` follow `json.detect_encoding()`, so a UTF-16 `tokens.css` reads in Python and in Node.
+  - Every script's project reads go through them, or through a local `_read_text()` in the four scripts that run on their own.
+  - The codemod and `deprecate add --source` write a file back in its own encoding (`text_encoding()`).
+  - `test_encodings`. **Reviews:** none (Codex 👍).
+- **#140, P53 part 4 (the discarded diagnostics: S2, V11, V12, M9, and `diff_system`'s contrast skip; class 7)**, merged as `7b28cbf`:
+  - `ProjectTokens.problems` is printed by the five gates that read a project's tokens.
+  - `--reverse` names a `clamped` colour, and "no variables" lists what the input held.
+  - The codemod gives a generated file a skip row, and `diff_system` notes a pair a change reaches that it cannot measure.
+  - `test_diagnostics`. **Reviews:** 3 real findings (Codex 1: `--quiet`; CodeRabbit 2: a translucent pair, and the two formats with no notes).
+- **At the end:**
+  - `main` is this docs PR's merge, and no other PR is open.
+  - The plan: 22 open items, 22 scheduled. About 1,223 tests.
+  - This session used about 570 thousand tokens.
 
 ## Next steps
 
-1. **P53 part 2: the JSON type guards** (S1, V8, G3, G11, G15, E13, W6, S10). Validate at load, exit 2 naming the key, with a test per loader for `[]`, a string, and a list where an object is expected.
-2. **Then P53's other classes**, one PR each:
-   - the encoding readers (S8, W7);
-   - the discarded diagnostics (S2, V11, V12, M9, and `diff_system`'s contrast check that skips a colour it cannot parse, found beside H11);
-   - the cmd.exe placeholders (D4, G13, E14).
-3. **Then the mediums (P54) and the lows (P55).** Then Phase 6b's workstreams, in the owner's order, then **R4**.
+1. **P53's last class: the cmd.exe placeholders** (D4, G13, E14):
+   - `CLAUDE.md:44`'s `<ids>`;
+   - the `<export>` in the prompt's live-check command;
+   - `design-critique-gate/SKILL.md`'s `<path>`;
+   - the email skill's bash-only quick start.
+
+   Extend `test_docs.PasteableCommands` to every fenced block and inline command in `CLAUDE.md`, the SKILL.md files and the plans, with placeholders in capitals. Size the sweep first: the plans hold many Bash-tool blocks, which are bash on purpose.
+2. **Then P54, the mediums**, one PR per §3 area, and **P55, the lows**. Then Phase 6b's workstreams in the owner's order, then **R4**.
 
 ## Open owner decisions
 
@@ -45,13 +44,16 @@
 
 ## Warnings
 
-- **Codex finds the next case of a class every round.** #136 took 12 findings over two rounds, all of the form "the guard compares the spelling, not the file read". For P53's other classes, list every way each script finds its inputs before writing the fix: globs, folders, the config's paths, defaults, bundled assets and URLs.
-- **CodeRabbit is optional** (the owner): never wait for it, and fix its real findings when it posts them. It ran out of free reviews on #136.
-- **A merge commit made with `-m` and then committed with `--no-edit` after conflicts** keeps git's `# Conflicts:` list after the `Co-Authored-By:` line (`97e5c31`). Harmless, but write the message with `git commit -F` after resolving instead.
-- **The audit session's worktree is still registered:** `…\3985bfd1-…\scratchpad\wt`, detached at `9391774`. Its fixtures (`migration\fx1..fx7` and the others) are still there, and they were what showed H14 was a staged-against-HEAD case, not a rebase. Once P53 to P55 no longer need them, remove it with `git worktree remove "C:\Users\vybec\AppData\Local\Temp\claude\C--DEV-Pro-Web-Designer-Suite-Plug-in\3985bfd1-4280-462b-8333-0e682826a220\scratchpad\wt"`, which works in cmd.exe too.
+- **Found this session, not yet fixed (for P54):**
+  - `diff_system`'s snapshot resolver reads an 8-digit hex alpha (`#2563eb80`) as opaque, so its contrast is measured as if solid. `oklch(… / 0.5)` is read as translucent.
+  - `extract_system --tokens` reads a JSON file as CSS, so a DTCG token file gives zero tokens with exit 0.
+- **A present but falsy value is the next case of class 6.** `x.get(k) or {}` reads `[]`, `0` and `false` as empty. Use `_given()` (`build_presentation`), or check `is None` first.
+- **Bash heredocs ate `\n` twice this session** in test edits: a string written through a heredoc became real newlines. Use the Edit tool, or write a script file with the Write tool.
+- **Don't edit a script while `check.py` runs.** This session did once (the perf budget) and reran the affected modules afterwards.
+- **The audit session's worktree is still registered**: `…\3985bfd1-…\scratchpad\wt`, detached at `9391774`. Its fixtures may still help P54. Remove it once they don't, with `git worktree remove "C:\Users\vybec\AppData\Local\Temp\claude\C--DEV-Pro-Web-Designer-Suite-Plug-in\3985bfd1-4280-462b-8333-0e682826a220\scratchpad\wt"`.
 - **Still open from earlier:**
   - Vue's `:style` binding is not read by the audit's `style=""` reader (P54);
-  - the `VitalsUnderCsp` flake on Windows with Python 3.14, and the TBT flake on macOS;
+  - the `VitalsUnderCsp` flake, now seen on macOS with Python 3.14 too (main's run of #137; its rerun passed), and the TBT flake on macOS;
   - `perf_audit.py` and an unbundled `@import` chain;
   - three tokens outside Display P3;
   - a local build never matches the release's checksums;

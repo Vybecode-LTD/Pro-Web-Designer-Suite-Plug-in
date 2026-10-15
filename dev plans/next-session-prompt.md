@@ -1,16 +1,12 @@
 # Start here: the next session
 
-**Written 2026-10-15**, at the end of the session that did P52 and P53 part 1 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Two PRs and this docs PR merged:
-- **#135, P52 (N44, the audit's H11 to H15)**, merged as `a888fb5`. The migration's reconciliation adds up:
-  - every census literal is in a rule or an unmapped row: unparsed colours, `px` tracking, a project ramp step it cannot read;
-  - what it calls mechanically replaceable is what `--apply` rewrites: named colours, `color-mix()` as one colour function, a duration counted at one rule;
-  - a width (never a height) meets the `--width-*` steps first, and the codemod gives a width rule only to `width`, `min-width` and `max-width`;
-  - H14 did not reproduce: during a rebase `--ours` is HEAD, and a test runs the recipe;
-  - H15: the UTF-8 scan reads every entry script's `__main__` block with a control, six scripts gained the reconfigure, and CI runs the Pydantic test with `pydantic>=2,<3`.
-- **#136, P53 part 1 (N45, the `--out` guard: V7, E9, G4, class 5)**, merged as `7e59f90`. `refuse_overwrite()` and `refuseOverwrite()` in the masters, called by fifteen Python writers and two Node ones, against the files actually read.
-- **Reviews:** #135 had 3 real findings (Codex 2, CodeRabbit 1). #136 had 12 over two rounds (Codex), and one more declined with evidence. All were fixed with tests failing on the head they reviewed.
+**Written 2026-10-15**, at the end of the second session that day, which did P53 parts 2 to 4 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Three PRs and this docs PR merged:
+- **#138, P53 part 2 (the JSON type guards: S1, S10, V8, G3, G11, G15, E13, W6; §7 class 6)**, merged as `4701883`. Every loader checks a JSON file's shape where it reads it and exits 2 naming the file and the key; `test_json_guards` has a row per loader and fails on a reader with none.
+- **#139, P53 part 3 (the encoding readers: S8, W7; class 4)**, merged as `551d918`. `read_text()` follows `json.detect_encoding()`, the rewriters keep a file's encoding, and `test_encodings` scans for `encoding="utf-8"` reads.
+- **#140, P53 part 4 (the discarded diagnostics: S2, V11, V12, M9, the contrast skip; class 7)**, merged as `7b28cbf`. `ProjectTokens.problems`, `clamped`, `left_out()`, the codemod's skip row and `diff_system`'s unmeasured pairs; `test_diagnostics`.
+- **Reviews:** #138 had 9 real findings over three rounds (CodeRabbit 5, Codex 4), #139 none, and #140 3 (Codex 1, CodeRabbit 2). All were fixed with tests failing on the head they reviewed.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P53 part 2, the JSON type guards (the audit's S1, V8, G3, G11, G15, E13, W6, S10)** (§4).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P53's last class, the cmd.exe placeholders (the audit's D4, G13, E14)**, then **P54** (§4).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -180,6 +176,12 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **One literal, one rule.** A duration in a `transition` shorthand was counted at the `--motion-*` pair and at the Tier-1 step; count each where the codemod would rewrite it (`takes_motion_pair()` follows `plan_motion()`).
       - **Run an audit finding's own fixture before fixing it.** H14's fixture staged a change against HEAD in a plain repository. The recipe stages HEAD's own version during a rebase, which is clean, so the finding did not reproduce.
       - **Declined, with evidence:** Codex read `^[a-z][a-z0-9+.-]+:` as matching `C:\site`; it needs two characters before the colon, and `test_node_agrees` passes drive paths on Windows.
+    - **The second 2026-10-15 session's reviews found 12 real issues:** #138 (CodeRabbit 5, Codex 4 over three rounds) and #140 (Codex 1, CodeRabbit 2); #139 had none. Each was fixed with a test failing on the head it reviewed. The lessons, for any check of a value's type:
+      - **A present value is checked as it is, before any default.** `x.get(k) or {}` reads `[]`, `0`, `false` and `""` as empty, so a wrong type passes. Default only a missing or null key (`_given()` in `build_presentation`, `is None` elsewhere), then check.
+      - **Check every field the reader indexes, not only the top level.** `build_docs` indexed `stats`, each token's `raw` and `tier` and each component's sockets; the codemod `rule["match"]`; `cluster_values` five literal fields; the flat dump's `constraints` and `key_column_usage`.
+      - **A number from JSON can be infinite.** Python reads `1e400` and `Infinity` as `inf`, under which every page passed: `math.isfinite`.
+      - **A flag's promise binds new output.** `--quiet` says "do not print warnings", so a new warning follows it.
+      - **Name what cannot be measured, for every reason.** A translucent pair was still skipped silently, and two output formats carry no notes, so they print on stderr.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -282,6 +284,20 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - `diff_system.Snapshot.sources` lists every file a snapshot read. `generate_matrix.Manifest.templates_path` keeps the templates file.
   - `test_out_guard.CASES` and `NODE_CASES` are the table: one row per writer and per way of finding an input.
   - Not guarded, by decision: `figma_to_tokens` over `--tokens` (the Figma-to-code workflow), and the folder writers (`build_docs`, `scaffold_ui`, `new_system`) and snapshot writers.
+- **The JSON type guards (#138).**
+  - `tests/test_json_guards.py`: `CASES` and `NODE_CASES` hold one row per loader, fed `[]`, `"x"`, `5` and the row's own wrong keys. `LISTS` names the loaders where `[]` is valid. `test_the_table_reaches_every_loader` fails on a script that reads JSON (`json.loads(` or `readJsonFile(`) with no row and no exemption.
+  - The checks:
+    - `dtcg._bad_type()` and `_own_deprecated()`, and `badType` in `readTokens()`;
+    - `perf_audit.budget_problem()`, ported as `measure_vitals.mjs`' `budgetProblem()`, and `_number()` (finite);
+    - `check_roles.valid_pairs()`, `critique_report._flag()` and `_count()`;
+    - `build_presentation._given()`, `_object()` and `_objects()`, `build_docs.system_problem()`, `apply_codemod.rules_problem()`, and `introspect_schema`'s `objects()`.
+  - A baseline of the wrong shape prints "could not read baseline … auditing everything", as an unreadable one did.
+- **The encoding readers (#139).** `project_config.decode_text()`, `read_text()` and `text_encoding()`; Node's `jsonText(buf, fatal)` reads CSS non-fatally. `audit_design`, `a11y_static`, `check_roles` and `generate_matrix` carry a local `_read_text()`. `test_encodings.NoScriptReadsUtf8Only` allows only `install_gate`'s `TEMPLATE.read_text`.
+- **The diagnostics (#140).**
+  - `ProjectTokens.problems` (strings `file: token: why`), and `read_deprecations(paths, problems)` collects them when it is given a list.
+  - `figma_common.out_of_srgb()` and `left_out()`.
+  - `diff_system.contrast_deltas(..., unmeasured)` names a pair that a changed token reaches and that is unresolved, translucent or unparseable.
+  - `test_diagnostics.NoProblemListIsDropped` scans for `_problems`, and for `[0]` on `tokens()` or `normalise()`.
 - **DTCG (#101, #102).** `shared/dtcg.py` is the master, copied beside every `project_config.py` (`test_dtcg.TheCopiesAreTheMaster`); `project_config.py` loads the copy beside it by path. `normalise()` (the Figma scripts' reading, string forms) and `tokens()` (lossless, CSS names) read 2025.10 and Tokens Studio (`studio_document`, `studio_themes`); `document()` writes 2025.10 from CSS custom properties. `project_config.mjs` ports the reading, numbers formatted as Python's `f"{round(x, 6):g}"`, and `TheNodeReaderAgrees` holds them equal on every value form. `figma_common.parse_studio` makes each Studio theme group a collection; `FVar` carries `deprecated`, `dtcg_type` and `partial`.
 - **The resolver (#105).** `dtcg.resolver_document(data, base, inputs, only)` merges a resolver's `resolutionOrder` for a choice of contexts (each modifier's string `default`, else its first, which is reported); `resolver_modifiers()`, `token_paths()`, `resolver()` (the writer), `outside()` and `file_loader()` (its real path must stay in the folder, else `OutsideFolder`). `figma_to_tokens.py --format dtcg --out-dir` writes `tokens.json`, `theme-<x>.json` or `density-<x>.json` (overrides only, `document(only=...)`) and `tokens.resolver.json`; `css_blocks()` and `figma_blocks()` feed `dtcg_files()`. `figma_common.parse_resolver()` makes each modifier a collection with `FCollection.kind`, and `mode_selector(mode, default, kind)` writes a theme or density context as the value itself (`css_escape`). Unreadable sources are `FDoc.unread` (`unread-source`, `UNREAD_SOURCE`). The Node port is `resolverDocument()` in `project_config.mjs`.
 - **The ledger (#106).** `project_config.read_deprecations(paths)` and `replacement_of(reason)`; `diff_system.marked_deprecations()` adds a record (`"marked"`) for each token the old DTCG snapshot marks; `deprecate.py import FILE… --since --removal`.
@@ -303,7 +319,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - the reader's problems are reported (`not read`, `not carried to Figma`).
 
   `reverse_main()` serves the REST body and `--format plugin-script`. See `test_figma_sync.ReverseReadsEveryTokenFormat`.
-- **The plugin** is `plugins/web-design-suite/` (about 1,147 tests):
+- **The plugin** is `plugins/web-design-suite/` (about 1,223 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -403,49 +419,32 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. Phase 6c, 4.0.0: the audit, from P53 part 2
+## 4. Phase 6c, 4.0.0: the audit, from P53's last class
 
-**The owner placed all of Phase 6c first (2026-10-14).** Its order is P53's remaining classes, one PR each, then P54 and P55, then Phase 6b's workstreams (ask the owner which comes first then). Keep each PR under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+**The owner placed all of Phase 6c first (2026-10-14).** Its order is P53's last class, then P54 and P55, then Phase 6b's workstreams (ask the owner which comes first then). Keep each PR under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P53 | The cross-cutting classes, one PR each: the JSON type guards, the encoding readers, the discarded diagnostics, the cmd.exe placeholders, and each class's check (audit §7) | N45 | per class | L |
+| P53 | The cross-cutting class still to come: the cmd.exe placeholders, and its check (audit §7 class 9) | N45 | `CLAUDE.md`, the SKILL.md files, the plans, `tests/test_docs.py` | S |
 | P54 | The medium findings, one PR per §3 area | N46 | per area | L |
 | P55 | The low findings and doc fixes | N47 | per area | M |
 | P34, P35, P37, P41, P42, P43 | Phase 6b's workstreams, after Phase 6c | see §4 of the plan | | |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-**P53 part 2, the JSON type guards, in detail** (the audit's §3; its §7 class 6: "validate at load, exit 2 naming the key; a test per loader with `[]`, a string and a list where an object is expected").
+**P53's last class, the cmd.exe placeholders, in detail** (the audit's §3.7 and §3.6, its §7 class 9: "extend `test_docs.PasteableCommands` to every fenced block and inline command in `CLAUDE.md`, the SKILL.md files and the plans; placeholders in capitals, never `<…>`"):
+1. **D4.** `CLAUDE.md:44` has an unquoted `<ids>` in a command for cmd.exe (cmd says "The syntax of the command is incorrect"). This file's live-check command has `--plugin-dir <export>/plugins/…` inside a bash block.
+2. **G13.** `design-critique-gate/SKILL.md` (about :210): `python -m scripts.audit_design <path> --json > audit.json` fails in cmd.exe, where `<path>` is a redirection.
+3. **E14.** `email-template-system/SKILL.md` (about :58-78): the quick start is bash-only (`mkdir -p`, `cp`, `cat`).
+4. **The check:**
+   - Size the sweep before writing it. `grep -n '<[a-z][a-z-]*>'` over the fenced blocks of `CLAUDE.md`, the SKILL.md files, the workflow commands and the plans will show how many placeholders there are.
+   - The plans' Bash-tool blocks are bash on purpose: the rule is placeholders in capitals, not cmd.exe syntax everywhere. Decide which blocks the test reads and say why in its docstring.
+   - Keep the existing README rules (`not_portable()`) for the README.
+   - A SKILL.md near its 20,500-byte budget may need a trim beside a longer command.
+5. **Tests:** each fails on `v3.6.0` first. Run `test_docs` and `check.py` with `WDS_NODE_MODULES`. The CHANGELOG goes under 4.0.0's Fixed. Add the row `P53 part 5, #N` above the `P53` row and remove that row, since P53 is then done.
 
-1. **S1.** `shared/dtcg.py` `convert` (about :214): a group `$type` that is not a string (`5`, `["color"]`, `true`) over an object value is an `AttributeError` traceback, not a `ConfigError`, in `read_tokens` and every gate above it. Node reads the file. Guard with `isinstance`, report a problem, and add a parity test in `TheNodeReaderAgrees`. **Copy `dtcg.py` over its ten copies.**
-2. **S10.** `dtcg.py` (about :563, :338-340): a `$deprecated` of any JSON type is carried as the reason. Take a string or a boolean (`false` cancels an enclosing group's deprecation, which `dtcg.py` handles and `test_dtcg` exercises), and report any other type (Codex on #137).
-3. **V8.** A non-object JSON top level (`[]`) is a traceback in `diff_system.load_ledger` (about :2069, exit 1, the gate's code), in `deprecate.py` (about :147), and in `build_docs.py` (about :1409 and :1445; the baseline is never shape-checked). `load_snapshot` already guards.
-4. **G3.** Budget values are not type-checked in `perf_audit.py` (about :1056 to :1218: `"css": "60KB"` is a `TypeError`, and a list section an `AttributeError`). `measure_vitals.mjs` (about :877-880) and `a11y_runtime.mjs` (about :2256-2257, :1753-1760) silently skip such a value; read their full text in the audit.
-5. **G11.** `critique_report.py` (about :341): `int(raw.get("count"))` sits outside `CritiqueError`, and at :318 `bool("false")` is true, which demotes a major finding to taste.
-6. **G15.** `a11y_static.py` (about :1764): a baseline that is not a list (`5`) is a `TypeError`. `perf_audit.load_baseline` (about :1189) crashes the same way.
-7. **E13.** `build_presentation.py` `load_perf` (about :450) and `load_a11y` (about :551-558) call `.get` on list items with no `isinstance` check (`load_audit` has one).
-8. **W6.** `check_roles.py`:
-   - about :249: a string `scopes` is iterated as characters (`bad pairs file: 'l'`);
-   - about :266: `min: "4.5"` is a `TypeError`, since :329 catches only `OSError`, `ValueError` and `KeyError`.
-
-   Validate each pair, and exit 2.
-9. **The check (§7):** a table test like `test_out_guard`, one row per loader, each fed `[]`, `"x"`, `5` and a list where an object is expected. Each must exit 2 with the key named, never a traceback. **Before writing a guard, list every way the loader is reached** (a flag, the config, a default, a baseline), since Codex finds the next one each round.
-10. **Tests:** each fails on `v3.6.0` first. Grep the plugin for the same construct (the audit's class 2), and run `check.py` with `WDS_NODE_MODULES` set. The CHANGELOG goes under 4.0.0's Fixed. Add the row `P53 part 2, #N` above the `P53` row, and take the class out of the `P53` row's scope.
-
-**Then, one PR each:**
-- **The encoding readers** (S8, W7). `project_config.py` (about :473) and `.mjs` (about :441) decode CSS as UTF-8 only, so a UTF-16LE `tokens.css` reads as zero tokens. Decode by BOM or raise `ConfigError`. `check_roles.py` (about :321) gives a `UnicodeDecodeError` traceback on a UTF-16 file. Rule: `grep -n 'read_text(encoding="utf-8")'` should return nothing in the scripts.
-- **The discarded diagnostics** (S2, V11, V12, M9, and `diff_system`'s contrast check that skips a colour it cannot parse, `except ColorError: continue`, found beside H11):
-  - `project_config._dtcg_tokens` and `read_deprecations` drop `dtcg.tokens()`' problems;
-  - `figma_common.oklch_to_rgb` clamps silently in `--reverse`;
-  - an input whose only tokens are unsupported reads "contains no variables";
-  - a `GENERATED_MARKERS` file is dropped with no `Skip` row.
-- **The cmd.exe placeholders** (D4, G13, E14):
-  - `CLAUDE.md:44`'s `<ids>`;
-  - the `<export>` placeholder in this file's live-check command;
-  - `design-critique-gate/SKILL.md:210`'s `<path>`;
-  - the email skill's bash-only quick start.
-
-  Extend `test_docs.PasteableCommands` to every fenced block and inline command in `CLAUDE.md`, the SKILL.md files and the plans: placeholders in capitals, never `<…>`.
+**Then P54, the mediums, one PR per §3 area** (the audit's §3.1 to §3.8, the `medium` entries). Read each area's entries by section; list each finding's own fixture before fixing it, as H14 did not reproduce. Two found this session go in with them:
+- `diff_system`'s snapshot resolver reads an 8-digit hex alpha (`#2563eb80`) as opaque, so its contrast is measured as if solid (§3.4);
+- `extract_system --tokens` reads a JSON file as CSS, so a DTCG token file gives zero tokens with exit 0 (§3.4).
 
 - **The audit's fixtures** are in its session's scratchpad (`3985bfd1-…\scratchpad\migration\fx1..fx7`, `studio\`, `shared\fx`, …), which Storage Sense can empty. Run a finding's own fixture before fixing it (H14 did not reproduce). Rebuild a case from the audit's text if it is gone.
 - **Facts from outside** are re-read at the source on the day, and a figure goes into `evidence.json`.
