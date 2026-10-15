@@ -461,7 +461,7 @@ CLASS_ATTR = re.compile(r"""(?:className|class)\s*=\s*(?:\{?\s*)?["'`]([^"'`]*)[
 # value is off the scale, as the ESLint config also rules.
 TW_ARBITRARY_OK = re.compile(
     r"^(?:data|aria|group|peer|has|not|in|supports|nth|nth-last)-\["
-    r"|^(?:bg|mask)-\[url\(|^content-\[['\"]")
+    r"|^(?:bg|mask)-\[url\([^()\]]*\)\]$|^content-\[['\"]")     # the url alone (Codex on #145)
 TW_ARBITRARY_PROPERTY = re.compile(r"(?<![-\w])\[-{0,2}[a-zA-Z][\w-]*:[^\]\s]+\]")
 TW_IMPORTANT_SUFFIX = re.compile(r"(?<![\w!\[:-])[a-z][\w:./\[\]()-]*[\w\])]!(?=\s|$)")
 # Class strings also arrive as arguments of the class helpers (the ESLint
@@ -1233,8 +1233,14 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     saw_layer_statement = True
                     layer_statement_line = ev[2]
                     declared = [s.strip() for s in stmt[6:].strip().rstrip(";").split(",")]
-                    stated_layers.update(declared)
-                    present = [d for d in declared if d in LAYER_ORDER]
+                    # A dotted name declares its parent too, as in stylelint
+                    # (CodeRabbit on #145): `legacy.skin` places `legacy`.
+                    stated_layers.update(declared, (d.split(".")[0] for d in declared))
+                    # A sub-layer names its parent where it stands
+                    # (`components.skin` before `base` ranks components
+                    # first), and a name's first mention fixes it (Codex on #145).
+                    present = list(dict.fromkeys(p for p in (d.split(".")[0] for d in declared)
+                                                 if p in LAYER_ORDER))
                     if present != [c for c in LAYER_ORDER if c in present]:
                         add(ev[2], "L5", "layer-order", "error",
                             f"Layer statement is out of order: {', '.join(declared)}.",

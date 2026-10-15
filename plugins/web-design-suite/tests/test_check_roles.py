@@ -102,6 +102,50 @@ class CheckRoles(TempDirTest):
         self.assertEqual(proc.returncode, 1, output(proc))
         self.assertIn("--fg-default on --bg-inverse (inverse on the light --bg-inverse)", output(proc))
 
+    def with_fg_default(self, value: str) -> str:
+        css, n = re.subn(r"(--fg-default:\s*)[^;]+;", lambda m: f"{m.group(1)}{value};", self.starter(), count=1)
+        self.assertEqual(n, 1)
+        return css
+
+    def test_a_translucent_role_is_not_measured_as_if_it_were_solid(self):
+        """The audit's W1: `#00000080` was read as solid black, 20:1 on the
+        canvas, and `oklch(… / 0.5)` was "not a colour": the translucency
+        check came after a parser that drops a hex's alpha and refuses a
+        function's. A translucent role is a11y_runtime's to measure."""
+        for value in ("#00000080", "#0008", "oklch(20% 0 0 / 0.5)", "oklch(20% 0 0 / 50%)"):
+            with self.subTest(value=value):
+                proc = self.roles(self.with_fg_default(value))
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn(f"--fg-default = {value} is translucent", output(proc))
+        proc = self.roles(self.with_fg_default("#1a1a1aff"))           # an opaque alpha is opaque
+        self.assertEqual(proc.returncode, 0, output(proc))
+
+    def test_a_colour_outside_srgb_is_held_to_its_worse_fallback(self):
+        """The audit's W2: the gate clipped the channels, under which
+        `oklch(59% 0.35 273)` is 6.49:1 on white; chroma-mapped, as a browser
+        may show it, 4.40:1. `worst_contrast` takes the worse of the two."""
+        proc = self.roles(self.with_fg_default("oklch(59% 0.35 273)"))
+        self.assertEqual(proc.returncode, 1, output(proc))
+        self.assertRegex(output(proc), r"--fg-default on --bg-canvas \(light\)")
+
+    def test_the_ramps_check_refuses_alpha_and_takes_the_worse_fallback(self):
+        """W1 and W2 in `generate_color_ramp.py --check`."""
+        proc = run_py("web-design-studio", "generate_color_ramp", "--check", "#00000080", "#fafafa", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("translucent", output(proc))
+        proc = run_py("web-design-studio", "generate_color_ramp", "--check", "oklch(59% 0.35 273)", "#ffffff",
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn("contrast ratio  4.40:1  (outside sRGB", output(proc))
+        self.assertRegex(output(proc), r"FAIL\s+4\.5:1  Body text")
+        # A ramp from a translucent seed, or on a translucent canvas, was built
+        # as if solid (CodeRabbit on #145).
+        for argv in (["#e8440a80"], ["#e8440a", "--canvas", "#ffffff80"]):
+            with self.subTest(argv=argv):
+                proc = run_py("web-design-studio", "generate_color_ramp", *argv, cwd=self.tmp)
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn("translucent", output(proc))
+
     def test_a_role_that_does_not_resolve_is_a_bad_invocation(self):
         proc = self.roles(":root { --fg-default: var(--nope); --bg-canvas: oklch(98% 0 0); }")
         self.assertEqual(proc.returncode, 2, output(proc))

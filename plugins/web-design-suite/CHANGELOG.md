@@ -309,6 +309,31 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
   M1 (a duration counted at two rules) did not reproduce: #135 fixed it.
   `test_token_migration.TheAuditsMigrationMediums` and `TheRoleTableIsTheCode`.
+- **web-design-studio's gates measured and ruled four things wrong** (the audit's W1 to
+  W5):
+  - `check_roles` read `--fg-default: #00000080` as solid black, 20:1 on the canvas,
+    and called `oklch(… / 0.5)` "not a colour": its translucency check ran after a
+    parser that drops a hex's alpha and refuses a function's. It runs first now, and
+    `generate_color_ramp.py --check` and its seed refuse a translucent colour too
+    (`alpha_of()`, `opaque_color()`);
+  - both measured a colour outside sRGB with its channels clipped, under which
+    `oklch(59% 0.35 273)` is 6.49:1 on white; chroma-mapped, as a browser may show it,
+    it is 4.40:1. They take the worse of the two (`worst_contrast`), as the ramp's own
+    table did, and `--check` says so;
+  - `tw_probe` cleared every key under `--font-*: initial`, where Tailwind keeps the
+    weights and sizes (and four other namespaces' keys), so a theme's own `font-bold`
+    read as a stock class that survived (`KEPT_UNDER`, from tailwindcss 4.3.3);
+  - stylelint refused a layer statement with a layer of the project's own between the
+    canonical ones (`…, overrides, print`), which the spec and the audit allow. Both
+    gates read a sub-layer in a statement as its parent where it stands, so
+    `reset, components.skin, base` is out of order (Codex on #145);
+  - ESLint refused `bg-[url(…)]`, `mask-[url(…)]` and `content-['…']`, which the audit
+    exempts: neither can be a token. Both exempt a `url()` only when it is the whole
+    value, so `bg-[url(…),linear-gradient(13deg,…)]` is refused (Codex on #145).
+
+  The spec has the layer examples and a `tailwind_arbitrary` section, which both gates
+  run (`test_rules_spec`, `test_real_tools`); `test_check_roles` and `test_tw_probe` hold
+  the rest.
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
   too. It is a width and a height, so it is a size: reported when no `--width-*` role

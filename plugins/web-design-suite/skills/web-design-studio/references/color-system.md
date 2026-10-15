@@ -313,14 +313,14 @@ tokens again.
 | `--fg-muted` | `--neutral-600` | `--neutral-300` | 6.35:1 / 13.80:1 |
 | `--fg-subtle` | `--neutral-500` | `--neutral-400` | 4.91:1 / 8.22:1 |
 | `--fg-disabled` | `--neutral-400` | `--neutral-700` | 2.40:1 / 2.12:1 |
-| `--fg-accent` | `--accent-700` | `--accent-400` | 6.92:1 / 7.91:1 |
-| `--fg-link` | `--accent-700` | `--accent-400` | 6.92:1 / 7.91:1 |
+| `--fg-accent` | `--accent-700` | `--accent-400` | 6.90:1 / 7.91:1 |
+| `--fg-link` | `--accent-700` | `--accent-400` | 6.90:1 / 7.91:1 |
 | `--fg-on-accent` | `--neutral-0` | `--neutral-1000` |  |
 | `--fg-on-inverse` | `--neutral-50` | `--neutral-900` |  |
 | `--border-subtle` | `--neutral-200` | `--neutral-900` | 1.20:1 / 1.14:1 |
 | `--border-default` | `--neutral-300` | `--neutral-800` | 1.43:1 / 1.42:1 |
 | `--border-strong` | `--neutral-500` | `--neutral-500` | 4.91:1 / 4.02:1 |
-| `--border-focus` | `--accent-600` | `--accent-600` | 4.67:1 / 4.23:1 |
+| `--border-focus` | `--accent-600` | `--accent-600` | 4.66:1 / 4.23:1 |
 | `--bg-accent` | `--accent-600` | `--accent-500` |  |
 | `--bg-accent-hover` | `--accent-700` | `--accent-400` |  |
 | `--fg-danger` | `--danger-700` | `--danger-400` | 7.72:1 / 5.65:1 |
