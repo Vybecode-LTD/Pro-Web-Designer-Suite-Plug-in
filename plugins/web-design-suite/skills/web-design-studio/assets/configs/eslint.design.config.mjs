@@ -99,7 +99,7 @@ import { lintProject } from './project_config.mjs';
  * image's `bg-[url(…)]`/`mask-[url(…)]` and a pseudo-element's
  * `content-['…']`, which cannot be tokens: the audit's TW_ARBITRARY_OK. */
 const ARBITRARY_VALUE =
-  /(?<![-\w])(?!(?:data|aria|group|peer|has|not|in|supports|nth|nth-last)\b)(?!(?:bg|mask)-\[url\(|content-\[['"])[a-zA-Z][\w-]*-\[/;
+  /(?<![-\w])(?!(?:data|aria|group|peer|has|not|in|supports|nth|nth-last)\b)(?!(?:bg|mask)-\[url\([^()\]]*\)\]|content-\[['"])[a-zA-Z][\w-]*-\[/;
 
 /* LAW 1 — Tailwind arbitrary PROPERTIES: `[mask-type:luminance]`,
  * `[--my-var:4px]`. A whole declaration smuggled into a class attribute.

@@ -227,9 +227,11 @@
       "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;\n@import url(\"vendor/datepicker.css\") layer(vendor);",
       "@layer reset, tokens, base, layout, components, utilities;\n@layer components {\n  @layer base, skin;\n}\n@layer components.base { .card { --card-bg: var(--bg-surface); } }\n@layer components.skin { .card { --card-bg: var(--bg-sunken); } }",
       "@layer reset, vendor, tokens, base, layout, components, utilities, overrides, print;",
-      "@layer reset, tokens, base, legacy, layout, components;\n@layer legacy {\n  .old-card { color: var(--fg-default); }\n}"
+      "@layer reset, tokens, base, legacy, layout, components;\n@layer legacy {\n  .old-card { color: var(--fg-default); }\n}",
+      "@layer reset, tokens, base, layout, components, base.print;"
     ],
     "refused": [
+      "@layer reset, components.skin, base;",
       "@layer reset, tokens, vendor, base, layout, components, utilities, overrides;",
       "@layer vendor, reset, tokens, base, layout, components, utilities, overrides;",
       "@layer reset, tokens, base, layout, components, utilities, overrides;\n@import url(\"vendor/datepicker.css\") layer(vendor);",
@@ -456,7 +458,8 @@
     "rule": "Law 1 in a class: a Tailwind arbitrary value (`p-[17px]`, `bg-[#e8440a]`) is a literal off the scale. Two are not design values and pass: an image's `url()` (`bg-[url(…)]`, `mask-[url(…)]`) and a pseudo-element's content string (`content-['…']`). An arbitrary variant (`data-[state=open]:`, `aria-[expanded=true]:`, `group-[.open]:`) selects a state and carries no value.",
     "allowed": ["<div className=\"bg-[url(/hero.jpg)] bg-cover\" />", "<span className=\"before:content-['→']\" />",
                 "<div className=\"mask-[url(/fade.svg)]\" />", "<div className=\"data-[state=open]:bg-surface\" />"],
-    "refused": ["<div className=\"p-[17px]\" />", "<div className=\"bg-[#e8440a]\" />"]
+    "refused": ["<div className=\"p-[17px]\" />", "<div className=\"bg-[#e8440a]\" />",
+                "<div className=\"bg-[url(/noise.png),linear-gradient(13deg,var(--bg-surface),var(--bg-accent))]\" />"]
   },
   "bindings": {
     "gates": ["audit", "stylelint"],

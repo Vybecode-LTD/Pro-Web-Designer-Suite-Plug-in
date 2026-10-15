@@ -339,10 +339,16 @@ const layerOrderRule = (primary) => (root, result) => {
        * audit allow (the audit's W4): only the canonical names are ordered. */
       let cursor = -1;
       let ordered = true;
+      const placed = new Set();
       for (const name of declared) {
-        const idx = LAYER_ORDER.indexOf(name);
-        if (idx === -1) continue;
-        if (idx <= cursor) {
+        /* A sub-layer names its parent where it stands: `components.skin`
+         * before `base` ranks components first (Codex on #145). A parent
+         * named again keeps its first place. */
+        const parent = name.split('.')[0].trim();
+        const idx = LAYER_ORDER.indexOf(parent);
+        if (idx === -1 || placed.has(parent)) continue;
+        placed.add(parent);
+        if (idx < cursor) {
           ordered = false;
           break;
         }

@@ -306,9 +306,12 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
     weights and sizes (and four other namespaces' keys), so a theme's own `font-bold`
     read as a stock class that survived (`KEPT_UNDER`, from tailwindcss 4.3.3);
   - stylelint refused a layer statement with a layer of the project's own between the
-    canonical ones (`…, overrides, print`), which the spec and the audit allow;
+    canonical ones (`…, overrides, print`), which the spec and the audit allow. Both
+    gates read a sub-layer in a statement as its parent where it stands, so
+    `reset, components.skin, base` is out of order (Codex on #145);
   - ESLint refused `bg-[url(…)]`, `mask-[url(…)]` and `content-['…']`, which the audit
-    exempts: neither can be a token.
+    exempts: neither can be a token. Both exempt a `url()` only when it is the whole
+    value, so `bg-[url(…),linear-gradient(13deg,…)]` is refused (Codex on #145).
 
   The spec has the layer examples and a `tailwind_arbitrary` section, which both gates
   run (`test_rules_spec`, `test_real_tools`); `test_check_roles` and `test_tw_probe` hold
