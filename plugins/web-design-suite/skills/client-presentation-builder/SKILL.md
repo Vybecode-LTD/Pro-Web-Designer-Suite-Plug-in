@@ -13,7 +13,7 @@ description: Present design work to a client or team as reasoning, not taste, wi
 > python "${CLAUDE_SKILL_DIR}/scripts/build_presentation.py" DECISION_LOG.md --audience client --dry-run
 > ```
 >
-> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
 > This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_presentation.py).

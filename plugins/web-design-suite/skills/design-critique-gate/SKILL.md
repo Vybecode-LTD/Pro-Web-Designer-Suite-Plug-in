@@ -13,7 +13,7 @@ description: Adversarial design review before a client sees the work, with ranke
 > python "${CLAUDE_SKILL_DIR}/scripts/critique_report.py" findings.json --audit audit.json
 > ```
 >
-> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
 > This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (critique_report.py, critique_snapshots.mjs).
@@ -207,7 +207,7 @@ The work is judged on the default state and used in the others.
 Cite, do not re-implement. This layer is two commands:
 
 ```bash
-python -m scripts.audit_design <path> --json > audit.json     # web-design-studio
+python -m scripts.audit_design PATH --json > audit.json       # web-design-studio
 ```
 
 then work `web-design-studio/references/review-checklist.md` — all 91 checks, twelve

@@ -140,7 +140,7 @@ Most diffs are intentional. The workflow has to make accepting them cheap, or pe
 5. For each failure, answer ONE question: did I mean to do this?
       yes -> continue
       no  -> fix the CSS, go to 2
-6. Accept, where the gate runs:   gh workflow run baselines.yml --ref <your branch>   (§7)
+6. Accept, where the gate runs:   gh workflow run baselines.yml --ref BRANCH   (§7)
 7. Commit the CSS change and the baseline change IN THE SAME COMMIT.
 ```
 
@@ -329,7 +329,7 @@ GitHub starts a `workflow_dispatch` run only for a workflow file that is on the 
 gh workflow run baselines.yml --ref "$(git branch --show-current)"
 gh run list --workflow baselines.yml --limit 1     # the run's id, once it has finished
 rm -rf tests/visual/baselines                      # the artifact is the whole set
-gh run download <id> --name baselines --dir tests/visual/baselines
+gh run download RUN_ID --name baselines --dir tests/visual/baselines
 git add tests/visual/baselines                     # after you have looked at them
 ```
 
