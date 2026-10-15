@@ -225,7 +225,9 @@
       "@layer reset, tokens, base, layout, components;",
       "@layer reset, vendor, tokens, theme, base, layout, components, utilities, overrides;",
       "@layer reset, vendor, tokens, base, layout, components, utilities, overrides;\n@import url(\"vendor/datepicker.css\") layer(vendor);",
-      "@layer reset, tokens, base, layout, components, utilities;\n@layer components {\n  @layer base, skin;\n}\n@layer components.base { .card { --card-bg: var(--bg-surface); } }\n@layer components.skin { .card { --card-bg: var(--bg-sunken); } }"
+      "@layer reset, tokens, base, layout, components, utilities;\n@layer components {\n  @layer base, skin;\n}\n@layer components.base { .card { --card-bg: var(--bg-surface); } }\n@layer components.skin { .card { --card-bg: var(--bg-sunken); } }",
+      "@layer reset, vendor, tokens, base, layout, components, utilities, overrides, print;",
+      "@layer reset, tokens, base, legacy, layout, components;\n@layer legacy {\n  .old-card { color: var(--fg-default); }\n}"
     ],
     "refused": [
       "@layer reset, tokens, vendor, base, layout, components, utilities, overrides;",
@@ -448,6 +450,13 @@
     "refused": ["<div style={{ padding: 13 }} />", "<div style={{ '--gap': '12px' }} />",
                 "<div style={{ '--tint': 'hwb(20 10% 30%)' }} />",
                 "<div style={{ '--title': '4cqi' }} />"]
+  },
+  "tailwind_arbitrary": {
+    "gates": ["audit", "eslint"],
+    "rule": "Law 1 in a class: a Tailwind arbitrary value (`p-[17px]`, `bg-[#e8440a]`) is a literal off the scale. Two are not design values and pass: an image's `url()` (`bg-[url(…)]`, `mask-[url(…)]`) and a pseudo-element's content string (`content-['…']`). An arbitrary variant (`data-[state=open]:`, `aria-[expanded=true]:`, `group-[.open]:`) selects a state and carries no value.",
+    "allowed": ["<div className=\"bg-[url(/hero.jpg)] bg-cover\" />", "<span className=\"before:content-['→']\" />",
+                "<div className=\"mask-[url(/fade.svg)]\" />", "<div className=\"data-[state=open]:bg-surface\" />"],
+    "refused": ["<div className=\"p-[17px]\" />", "<div className=\"bg-[#e8440a]\" />"]
   },
   "bindings": {
     "gates": ["audit", "stylelint"],

@@ -159,8 +159,21 @@ function packageStylesheet(id, base) {
   return path.join(dir, style);
 }
 
+// What Tailwind's clearNamespace() keeps under a namespace it clears
+// (ignoredThemeKeyMap, tailwindcss 4.3.3): `--font-*: initial` leaves the
+// weights and sizes, `--text-*: initial` the colour and the decoration.
+const KEPT_UNDER = new Map([
+  ['--font', ['--font-weight', '--font-size']],
+  ['--inset', ['--inset-shadow', '--inset-ring']],
+  ['--text', ['--text-color', '--text-decoration-color', '--text-decoration-thickness', '--text-indent',
+    '--text-shadow', '--text-underline-offset']],
+  ['--grid-column', ['--grid-column-start', '--grid-column-end']],
+  ['--grid-row', ['--grid-row-start', '--grid-row-end']],
+]);
+
 // Every @theme block's top-level custom properties, in order, with
-// `--*: initial` and `--ns-*: initial` clearing what came before.
+// `--*: initial` and `--ns-*: initial` clearing what came before, as
+// Tailwind clears them: every name starting with `--ns`, but KEPT_UNDER's.
 function themeVariables(sheets) {
   const vars = new Map();
   for (const css of sheets) {
@@ -191,7 +204,11 @@ function themeVariables(sheets) {
         if (value === 'initial') {
           if (name === '--*') vars.clear();
           else if (name.endsWith('-*')) {
-            for (const k of [...vars.keys()]) if (k.startsWith(name.slice(0, -1))) vars.delete(k);
+            const ns = name.slice(0, -2);
+            const kept = KEPT_UNDER.get(ns) ?? [];
+            for (const k of [...vars.keys()]) {
+              if (k.startsWith(ns) && !kept.some((p) => k.startsWith(p))) vars.delete(k);
+            }
           } else vars.delete(name);
         } else if (!name.includes('*')) {
           vars.set(name, value);

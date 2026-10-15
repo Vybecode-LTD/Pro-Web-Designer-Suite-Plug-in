@@ -131,6 +131,8 @@ def spec_examples() -> list[Example]:
             add("bindings", verdict, declaration, f"@theme inline {{\n  {declaration};\n}}\n")
         for jsx in SPEC["inline_styles"][verdict]:
             add("inline_styles", verdict, jsx, jsx_component(jsx), ext="tsx")
+        for jsx in SPEC["tailwind_arbitrary"][verdict]:     # the audit's W5
+            add("tailwind_arbitrary", verdict, jsx, jsx_component(jsx), ext="tsx")
         for jsx in SPEC["tiers"][f"{verdict}_jsx"]:          # P45: Law 6 in a class or a style
             add("tiers", verdict, jsx, jsx_component(jsx), ext="tsx")
         for css in SPEC["tiers"]["stylesheets"][verdict]:    # outside a component file

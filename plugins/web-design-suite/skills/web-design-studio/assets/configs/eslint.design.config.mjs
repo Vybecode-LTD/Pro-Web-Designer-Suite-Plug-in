@@ -95,9 +95,11 @@ import { lintProject } from './project_config.mjs';
  * `has-[img]:`, `supports-[display:grid]:`, `not-[...]`, `nth-[2n]:`. Those
  * select a STATE; they carry no value and cannot drift off-scale. Banning
  * them would make every Radix/Headless-UI integration unreachable, and a
- * rule that blocks correct code gets switched off wholesale. */
+ * rule that blocks correct code gets switched off wholesale. So are an
+ * image's `bg-[url(…)]`/`mask-[url(…)]` and a pseudo-element's
+ * `content-['…']`, which cannot be tokens: the audit's TW_ARBITRARY_OK. */
 const ARBITRARY_VALUE =
-  /(?<![-\w])(?!(?:data|aria|group|peer|has|not|in|supports|nth|nth-last)\b)[a-zA-Z][\w-]*-\[/;
+  /(?<![-\w])(?!(?:data|aria|group|peer|has|not|in|supports|nth|nth-last)\b)(?!(?:bg|mask)-\[url\(|content-\[['"])[a-zA-Z][\w-]*-\[/;
 
 /* LAW 1 — Tailwind arbitrary PROPERTIES: `[mask-type:luminance]`,
  * `[--my-var:4px]`. A whole declaration smuggled into a class attribute.

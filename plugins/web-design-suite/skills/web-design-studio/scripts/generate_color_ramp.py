@@ -269,6 +269,34 @@ def hex_to_rgb(hex_str: str) -> Tuple[float, float, float]:
     return (int(h[0:2], 16) / 255.0, int(h[2:4], 16) / 255.0, int(h[4:6], 16) / 255.0)
 
 
+def alpha_of(value: str) -> float:
+    """The alpha a colour gives: a hex's last digit or pair (`#rgba`,
+    `#rrggbbaa`), or what follows a function's `/`; 1.0 when it gives none.
+    parse_color() reads the colour without it, so a contrast measured on a
+    translucent colour is measured as if it were solid (the audit's W1)."""
+    text = value.strip()
+    m = _HEX_RE.match(text)
+    if m:
+        h = m.group(1)
+        pair = h[3] * 2 if len(h) == 4 else h[6:] if len(h) == 8 else "ff"
+        return int(pair, 16) / 255.0
+    m = re.search(r"/\s*([0-9]*\.?[0-9]+)\s*(%?)\s*\)\s*$", text)
+    if m:
+        return min(1.0, float(m.group(1)) / (100.0 if m.group(2) else 1.0))
+    return 1.0
+
+
+def opaque_color(value: str) -> Tuple[float, float, float]:
+    """parse_color() for a colour whose contrast is measured: a translucent
+    one is refused, since its contrast depends on what is under it."""
+    if alpha_of(value) < 1.0:
+        raise ColorError(
+            f"{value!r} is translucent (alpha {alpha_of(value):.2f}): its contrast depends on "
+            "what is under it. Measure the colour it composites to."
+        )
+    return parse_color(value)
+
+
 def parse_color(value: str) -> Tuple[float, float, float]:
     """Parse '#e8440a' or 'oklch(64.5% 0.188 42)' into (L, C, H). L is 0..1."""
     text = value.strip()
@@ -741,9 +769,9 @@ def seed_report(name: str, seed: Tuple[float, float, float], ramp: Sequence[Swat
 
 
 def check_pair(fg_raw: str, bg_raw: str) -> str:
-    fg = parse_color(fg_raw)
-    bg = parse_color(bg_raw)
-    ratio = contrast_ratio_oklch(fg, bg)
+    fg = opaque_color(fg_raw)
+    bg = opaque_color(bg_raw)
+    ratio = worst_contrast(fg, bg)        # W2: the worse of clipped and chroma-mapped
 
     fg_hex = rgb_to_hex(*clamp_rgb(oklch_to_rgb(*fg)))
     bg_hex = rgb_to_hex(*clamp_rgb(oklch_to_rgb(*bg)))
@@ -763,6 +791,8 @@ def check_pair(fg_raw: str, bg_raw: str) -> str:
         f"  contrast ratio  {ratio:.2f}:1",
         "",
     ]
+    if not (in_srgb_gamut(*fg) and in_srgb_gamut(*bg)):
+        lines[3:4] = [lines[3] + "  (outside sRGB: the worse of its clipped and chroma-mapped fallbacks)"]
     for label, threshold in rows:
         lines.append(f"  {verdict(ratio, threshold):<5} {threshold:>4}:1  {label}")
     return "\n".join(lines)
@@ -920,8 +950,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "ramp takes only the seed's hue."
             )
 
-        seed = parse_color(args.seed)
-        canvas = parse_color(args.canvas)
+        seed = opaque_color(args.seed)
+        canvas = opaque_color(args.canvas)
         steps = parse_steps(args.steps, args.neutral)
 
         ramp = build_ramp(

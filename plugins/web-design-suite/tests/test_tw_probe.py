@@ -152,6 +152,20 @@ class TheProbe(ProbeProject):
         self.assertFalse([v for v in roles if v.startswith("--radius-")])
         self.assertTrue([v for v in roles if v.startswith("--color-")])
 
+    def test_a_cleared_namespace_keeps_what_tailwind_keeps_under_it(self):
+        """The audit's W3: Tailwind's clearNamespace() keeps `--font-weight-*`
+        and `--font-size-*` under `--font-*: initial`. The probe cleared them,
+        so the theme's own `font-bold` read as a stock class that survived."""
+        self.add_theme("@theme {\n  --font-weight-bold: 700;\n  --font-*: initial;\n}\n")
+        proc = self.probe()
+        self.assertEqual(0, proc.returncode, output(proc))
+        report = self.report()
+        roles = {r["variable"]: r for r in report["roles"]}
+        self.assertEqual("font-bold", roles["--font-weight-bold"]["class"])
+        self.assertTrue(roles["--font-weight-bold"]["generates"])
+        self.assertFalse([v for v in roles if v.startswith("--font-") and not v.startswith("--font-weight-")])
+        self.assertEqual([], [s["class"] for s in report["stock"] if s["generates"]])
+
     def test_what_it_cannot_run_on_exits_2(self):
         for args, modules, message in (
                 (("--entry", "src/missing.css"), None, "no entry stylesheet"),

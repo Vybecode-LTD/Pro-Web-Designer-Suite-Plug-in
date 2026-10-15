@@ -284,7 +284,7 @@ const layerMessages = utils.ruleMessages(layerRuleName, {
   unknownLayer: (name) =>
     `Law 5 (layers, not specificity): "@layer ${name}" is not one of [${LAYER_ORDER.join(', ')}]. ` +
     `An undeclared layer is appended AFTER every declared one, so this rule now beats utilities and overrides. ` +
-    `If the layer is real, add it to the canonical order; if it is a typo, it is the most expensive kind.`,
+    `If the layer is real, name it in this file's @layer statement, between the canonical layers; if it is a typo, it is the most expensive kind.`,
   undeclaredImport: (name) =>
     `Law 5 (layers, not specificity): \`layer(${name})\` imports into a layer the @layer statement does not name. ` +
     `A layer first named by its import is appended after overrides, so these rules beat every rule you write. Name it in the statement.`,
@@ -334,21 +334,14 @@ const layerOrderRule = (primary) => (root, result) => {
         .filter(Boolean);
       declared.forEach((name) => declaredNames.add(name));
 
-      /* Subsequence check: omitting a layer is fine, reordering is not. */
+      /* Subsequence check: omitting a layer is fine, reordering is not. A
+       * layer of the project's own may sit between them, as the spec and the
+       * audit allow (the audit's W4): only the canonical names are ordered. */
       let cursor = -1;
       let ordered = true;
       for (const name of declared) {
         const idx = LAYER_ORDER.indexOf(name);
-        if (idx === -1) {
-          utils.report({
-            message: layerMessages.unknownLayer(name),
-            node: atRule,
-            result,
-            ruleName: layerRuleName,
-          });
-          ordered = false;
-          break;
-        }
+        if (idx === -1) continue;
         if (idx <= cursor) {
           ordered = false;
           break;
@@ -369,7 +362,8 @@ const layerOrderRule = (primary) => (root, result) => {
     /* A BLOCK: `@layer components { … }`, or a sub-layer by its full name,
      * `@layer components.skin { … }`, whose parent is what has to be known. */
     const name = atRule.params.trim();
-    if (name && !LAYER_ORDER.includes(name.split('.')[0].trim())) {
+    const parent = name.split('.')[0].trim();
+    if (name && !LAYER_ORDER.includes(parent) && !declaredNames.has(parent)) {
       utils.report({
         message: layerMessages.unknownLayer(name),
         node: atRule,

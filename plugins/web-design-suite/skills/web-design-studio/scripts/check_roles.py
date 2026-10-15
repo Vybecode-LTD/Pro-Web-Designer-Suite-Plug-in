@@ -241,13 +241,14 @@ def resolve(env: dict[str, str], name: str, theme: str = "light") -> str:
 
 def colour(env: dict[str, str], name: str, theme: str = "light"):
     raw = resolve(env, name, theme)
+    # Before parsing (the audit's W1): the parser reads `#00000080` as solid
+    # black and refuses `oklch(… / 0.5)`, so the old check after it never ran.
+    if ramp.alpha_of(raw) < 1:
+        raise Unresolvable(f"{name} = {raw} is translucent; measure it composited")
     try:
-        parsed = ramp.parse_color(raw)
+        return ramp.parse_color(raw)
     except Exception as exc:  # noqa: BLE001 - the parser's own message is the useful part
         raise Unresolvable(f"{name} = {raw}: not a colour ({exc})") from None
-    if re.search(r"/\s*0?\.\d+\s*\)|/\s*\d+%\s*\)", raw):
-        raise Unresolvable(f"{name} = {raw} is translucent; measure it composited")
-    return parsed
 
 
 def valid_pairs(pairs: object) -> list[dict]:
@@ -288,7 +289,7 @@ def check(css: str, pairs: list[dict]) -> list[dict]:
                 if values in seen:                       # the same colours: one result is enough
                     continue
                 seen.add(values)
-                ratio = ramp.contrast_ratio_oklch(colour(envs[scope], pair["fg"], theme),
+                ratio = ramp.worst_contrast(colour(envs[scope], pair["fg"], theme),
                                                   colour(envs[on], pair["bg"], bg_theme))
                 varies = len(schemes(envs[scope])) == 2 or len(schemes(envs[on])) == 2
                 results.append({"fg": pair["fg"], "bg": pair["bg"], "scope": scope, "on": on, "scheme": theme,
@@ -322,7 +323,7 @@ def table(css: str) -> str:
             return ""
         theme = nominal(envs[scope], scope)
         try:
-            return (f"{ramp.contrast_ratio_oklch(colour(envs[scope], role, theme), colour(envs[scope], '--bg-canvas', theme)):.2f}"
+            return (f"{ramp.worst_contrast(colour(envs[scope], role, theme), colour(envs[scope], '--bg-canvas', theme)):.2f}"
                     ":1")
         except Unresolvable:
             return ""
