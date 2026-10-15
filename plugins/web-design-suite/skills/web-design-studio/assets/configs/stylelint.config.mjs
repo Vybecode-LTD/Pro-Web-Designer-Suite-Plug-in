@@ -332,7 +332,9 @@ const layerOrderRule = (primary) => (root, result) => {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-      declared.forEach((name) => declaredNames.add(name));
+      /* A dotted name declares its parent too: `legacy.skin` here lets a
+       * later `@layer legacy.skin { … }` open (CodeRabbit on #145). */
+      declared.forEach((name) => declaredNames.add(name).add(name.split('.')[0].trim()));
 
       /* Subsequence check: omitting a layer is fine, reordering is not. A
        * layer of the project's own may sit between them, as the spec and the

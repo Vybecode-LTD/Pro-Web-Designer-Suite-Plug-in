@@ -228,7 +228,8 @@
       "@layer reset, tokens, base, layout, components, utilities;\n@layer components {\n  @layer base, skin;\n}\n@layer components.base { .card { --card-bg: var(--bg-surface); } }\n@layer components.skin { .card { --card-bg: var(--bg-sunken); } }",
       "@layer reset, vendor, tokens, base, layout, components, utilities, overrides, print;",
       "@layer reset, tokens, base, legacy, layout, components;\n@layer legacy {\n  .old-card { color: var(--fg-default); }\n}",
-      "@layer reset, tokens, base, layout, components, base.print;"
+      "@layer reset, tokens, base, layout, components, base.print;",
+      "@layer reset, tokens, base, layout, components, legacy.skin;\n@layer legacy.skin {\n  .old-card { color: var(--fg-default); }\n}"
     ],
     "refused": [
       "@layer reset, components.skin, base;",

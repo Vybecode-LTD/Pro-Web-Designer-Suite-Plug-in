@@ -138,6 +138,13 @@ class CheckRoles(TempDirTest):
         self.assertEqual(proc.returncode, 0, output(proc))
         self.assertIn("contrast ratio  4.40:1  (outside sRGB", output(proc))
         self.assertRegex(output(proc), r"FAIL\s+4\.5:1  Body text")
+        # A ramp from a translucent seed, or on a translucent canvas, was built
+        # as if solid (CodeRabbit on #145).
+        for argv in (["#e8440a80"], ["#e8440a", "--canvas", "#ffffff80"]):
+            with self.subTest(argv=argv):
+                proc = run_py("web-design-studio", "generate_color_ramp", *argv, cwd=self.tmp)
+                self.assertEqual(proc.returncode, 2, output(proc))
+                self.assertIn("translucent", output(proc))
 
     def test_a_role_that_does_not_resolve_is_a_bad_invocation(self):
         proc = self.roles(":root { --fg-default: var(--nope); --bg-canvas: oklch(98% 0 0); }")
