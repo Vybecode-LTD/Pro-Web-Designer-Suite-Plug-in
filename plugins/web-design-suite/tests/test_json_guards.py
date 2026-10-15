@@ -85,11 +85,14 @@ CASES = {
         ({"ledger": {"assets": [5]}}, "`ledger.assets[0]`"),
         ({"ledger": {"assets": [{"transfer": "x"}]}}, "`ledger.assets[0].transfer`"),
         ({"ledger": {}, "budget": [1]}, "`budget`"),
-        ({"ledger": {}, "findings": [5]}, "`findings[0]`")]),
+        ({"ledger": {}, "findings": [5]}, "`findings[0]`"),
+        ({"ledger": []}, "`ledger`"), ({"ledger": False}, "`ledger`"),                   # Codex on #138
+        ({"ledger": {"assets": {}}}, "`ledger.assets`")]),
     "build_presentation --a11y": ("client-presentation-builder", "build_presentation",
                                   ["DECISION_LOG.md", "--a11y", "BAD", "--dry-run"], CODE, [
         ({"violations": 5}, "`violations`"),
-        ({"violations": [5]}, "`violations[0]`"), ([5], "bad.json")]),
+        ({"violations": [5]}, "`violations[0]`"), ([5], "bad.json"),
+        ({"tool": "a11y_runtime", "findings": [5]}, "`findings[0]`")]),               # Codex on #138
     "build_presentation --audit": ("client-presentation-builder", "build_presentation",
                                    ["DECISION_LOG.md", "--audit", "BAD", "--dry-run"], CODE, []),
     "build_docs system": ("design-system-docs", "build_docs", ["BAD", "--out", "site"], CODE, [
