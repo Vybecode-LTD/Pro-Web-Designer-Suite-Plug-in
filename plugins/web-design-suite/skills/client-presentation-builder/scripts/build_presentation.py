@@ -386,6 +386,13 @@ def _read_json(path: Path) -> Any:
             f"check that nothing else printed to stdout — use `--json > file`.") from exc
 
 
+def _given(data: dict, key: str, default: Any) -> Any:
+    """`data[key]`, or `default` when it is missing or null: a present `[]` or
+    `false` is checked as it is, not read as empty by `or` (Codex on #138)."""
+    value = data.get(key)
+    return default if value is None else value
+
+
 def _object(value: Any, path: Path, key: str) -> dict:
     """`value` if it is a JSON object, else a BuildError naming the key (E13)."""
     if not isinstance(value, dict):
@@ -452,14 +459,14 @@ def load_perf(path: Path) -> PerfFacts:
         raise BuildError(
             f"{path} does not look like `perf_audit.py --json` output "
             f"(expected an object with a `ledger` key).")
-    ledger = _object(data.get("ledger") or {}, path, "ledger")
-    by_kind = {k: v for k, v in _object(ledger.get("bytes") or {}, path, "ledger.bytes").items()
+    ledger = _object(_given(data, "ledger", {}), path, "ledger")
+    by_kind = {k: v for k, v in _object(_given(ledger, "bytes", {}), path, "ledger.bytes").items()
                if isinstance(v, int)}
-    budget = _object(_object(data.get("budget") or {}, path, "budget").get("bytes") or {},
+    budget = _object(_given(_object(_given(data, "budget", {}), path, "budget"), "bytes", {}),
                      path, "budget.bytes")
     budget_by_kind = {k: v for k, v in budget.items() if isinstance(v, int)}
-    findings = _objects(data.get("findings") or [], path, "findings")
-    assets = _objects(ledger.get("assets") or [], path, "ledger.assets")
+    findings = _objects(_given(data, "findings", []), path, "findings")
+    assets = _objects(_given(ledger, "assets", []), path, "ledger.assets")
     if assets and not isinstance(assets[0].get("transfer", 0), int):
         raise BuildError(f"{path}: `ledger.assets[0].transfer` must be a number of bytes.")
     return PerfFacts(
@@ -529,6 +536,7 @@ def load_a11y(path: Path) -> A11yFacts:
                 f"`a11y_runtime.mjs --json` or `a11y_static.py --json` output, "
                 f"or axe-core results (`violations`).")
         if vs is None and isinstance(run.get("findings"), list):
+            _objects(run["findings"], path, "findings")     # `[5]` read as a clean result (Codex on #138)
             # The suite's own shape: `a11y_runtime.mjs --json` (one target,
             # findings with a check, a rule, a success criterion, a severity
             # and the nodes) and `a11y_static.py --json` (findings per
