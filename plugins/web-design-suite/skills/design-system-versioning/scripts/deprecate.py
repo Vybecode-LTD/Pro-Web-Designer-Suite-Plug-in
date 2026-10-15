@@ -69,10 +69,10 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.deprecate
-    from .project_config import ConfigError, read_deprecations, replacement_of
+    from .project_config import ConfigError, read_deprecations, refuse_overwrite, replacement_of
 except ImportError:                               # python scripts/deprecate.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import ConfigError, read_deprecations, replacement_of  # type: ignore[no-redef]
+    from project_config import ConfigError, read_deprecations, refuse_overwrite, replacement_of  # type: ignore[no-redef]
 
 LEDGER_SCHEMA = "design-system-versioning/deprecations@1"
 MAPPING_SCHEMA = "design-token-migration/mapping@1"
@@ -702,6 +702,10 @@ def cmd_import(args: argparse.Namespace) -> int:
 
 def cmd_mapping(args: argparse.Namespace) -> int:
     ledger_path = Path(args.ledger)
+    clash = refuse_overwrite(args.out, ledger_path)                  # the audit's class 5
+    if clash:
+        print(f"deprecate: {clash}", file=sys.stderr)
+        return 2
     ledger = load_ledger(ledger_path)
     mapping, manual = build_mapping(ledger, ledger_path)
     text = json.dumps(mapping, indent=2, ensure_ascii=False) + "\n"

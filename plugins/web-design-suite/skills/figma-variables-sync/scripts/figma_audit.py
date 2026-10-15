@@ -56,11 +56,11 @@ sys.dont_write_bytecode = True
 # and attach_styles.
 try:                                              # python -m scripts.figma_audit
     from .figma_common import *                   # type: ignore[import-not-found]  # noqa: F403
-    from .project_config import ConfigError, ProjectTokens, project_config, read_tokens, token_sources
+    from .project_config import refuse_overwrite, ConfigError, ProjectTokens, project_config, read_tokens, token_sources
 except ImportError:                               # python scripts/figma_audit.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from figma_common import *                    # type: ignore[no-redef]  # noqa: F403
-    from project_config import (ConfigError, ProjectTokens, project_config,  # type: ignore[no-redef]
+    from project_config import (refuse_overwrite, ConfigError, ProjectTokens, project_config,  # type: ignore[no-redef]
                                 read_tokens, token_sources)
 
 # ===========================================================================
@@ -1151,6 +1151,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
+    clash = refuse_overwrite(args.out, args.path, args.styles, *args.tokens)     # V7
+    if clash:
+        print(f"figma_audit: {clash}", file=sys.stderr)
+        return 2
     try:
         doc = load_document(Path(args.path), args.shape, args.collection)
         if args.styles:
@@ -1175,6 +1179,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         config = project_config() if args.plan is None else None
     except ConfigError as exc:
         print(f"error: {exc}", file=sys.stderr)
+        return 2
+    clash = refuse_overwrite(args.out, *sources)    # the config's token files too (Codex on #136)
+    if clash:
+        print(f"figma_audit: {clash}", file=sys.stderr)
         return 2
     if sources:
         origin = ", ".join(str(s) for s in sources) + (f" (from {config_path})" if config_path else "")

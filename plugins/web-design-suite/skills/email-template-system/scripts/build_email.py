@@ -77,10 +77,10 @@ from typing import Iterable
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.build_email
-    from .project_config import ConfigError, config_path, project_config
+    from .project_config import refuse_overwrite, ConfigError, config_path, project_config
 except ImportError:                               # python scripts/build_email.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import ConfigError, config_path, project_config  # type: ignore[no-redef]
+    from project_config import refuse_overwrite, ConfigError, config_path, project_config  # type: ignore[no-redef]
 
 GMAIL_CLIP_BYTES = 102_400  # 100 KiB. Verified figure — see the matrix reference.
 GMAIL_STYLE_BYTES = 16_384  # Gmail's ceiling on all <style> content, counted together.
@@ -1338,6 +1338,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     tokens_path = (Path(args.tokens) if args.tokens else
                    config.email_tokens if config and config.email_tokens else default_tokens_path())
+    clash = refuse_overwrite(args.out, source_path, tokens_path)              # the audit's E9
+    if clash:
+        print("error: %s" % clash, file=sys.stderr)
+        return 2
     try:
         tokens = load_tokens(tokens_path)
     except TokenError as exc:

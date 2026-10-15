@@ -115,7 +115,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { FREEZE_ANIMATIONS_CSS, contrastRatio, launchBrowser, loadPlaywright, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile } from './browser_common.mjs';
+import { FREEZE_ANIMATIONS_CSS, contrastRatio, launchBrowser, loadPlaywright, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, refuseOverwrite } from './browser_common.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TAGS = 'wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice';
@@ -223,6 +223,16 @@ function parseArgs(argv) {
     die('pass exactly one of --url, --file and --matrix; they are three ' +
         'different jobs and combining them would silently audit one of them');
   }
+  // The report never replaces what it audits (the owner's audit of 2026-10-14,
+  // G4): a file:// URL's page and the budget the config names included, so
+  // the config is read here, before axe is looked for (Codex on #136).
+  let configured = null;
+  if (opts.budget === null) {
+    try { configured = projectConfig()?.budgets.a11y ?? null; } catch { /* reported where the budget is read */ }
+  }
+  const clash = refuseOverwrite(opts.report, opts.file, opts.url, opts.matrix, opts.keymap,
+                                opts.budget ?? configured, opts.axe);
+  if (clash) die(clash);
   // Ignoring an option is how a run reports on less than its caller asked for:
   // `--only contrast` on a page used to run every check.
   if (opts.only.length && !opts.matrix) {

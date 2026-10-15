@@ -64,10 +64,10 @@ SCHEMA = "design-system-docs/system/1"
 # suite's scripts through one module, shared/project_config.py, of which this
 # is a copy.
 try:                                              # python -m scripts.extract_system
-    from .project_config import CONTRACT_SCHEMA, ConfigError, is_contract, token_sources
+    from .project_config import CONTRACT_SCHEMA, ConfigError, is_contract, refuse_overwrite, token_sources
 except ImportError:                               # python scripts/extract_system.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import CONTRACT_SCHEMA, ConfigError, is_contract, token_sources  # type: ignore[no-redef]
+    from project_config import CONTRACT_SCHEMA, ConfigError, is_contract, refuse_overwrite, token_sources  # type: ignore[no-redef]
 
 # ===========================================================================
 # 1. COLOR MATH
@@ -2121,6 +2121,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     data = ex.to_dict()
     data["meta"] = {"color_impl": COLOR_IMPL, "root_font_size": args.root_font_size}
     text = json.dumps(data, indent=2, sort_keys=False, ensure_ascii=False) + "\n"
+    # Both outputs, against every input: the prose read through --prose too (Codex on #136).
+    prose = Path(args.prose) if args.prose else None
+    read = [*args.paths, *token_files, *css_files, *prop_files,
+            *((p for p in prose.rglob("*") if p.is_file()) if prose and prose.is_dir() else [prose])]
+    for dest in (args.out, args.contract):
+        clash = refuse_overwrite(dest, *read)
+        if clash:
+            print(f"extract_system: {clash}", file=sys.stderr)
+            return 2
     if args.out == "-":
         sys.stdout.write(text)
     else:

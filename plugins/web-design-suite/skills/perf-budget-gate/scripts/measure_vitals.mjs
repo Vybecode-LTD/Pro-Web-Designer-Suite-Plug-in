@@ -90,7 +90,7 @@ import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { launchBrowser, loadPlaywright, projectConfig, readJsonFile } from './browser_common.mjs';
+import { launchBrowser, loadPlaywright, projectConfig, readJsonFile, refuseOverwrite } from './browser_common.mjs';
 
 // Lighthouse's mobile profile is 150 ms RTT, 1.6 Mbps down, 750 Kbps up and
 // 4x CPU. CDP adds its latency to each request once, where a round trip is
@@ -797,6 +797,11 @@ async function main() {
   if (opts.budget === null) {
     try { opts.budget = projectConfig()?.budgets.perf ?? null; } catch (err) { die(err.message); }
   }
+  // The report never replaces the page it measures (the owner's audit of
+  // 2026-10-14, G4), a file:// URL's page and the configured budget included
+  // (Codex on #136).
+  const clash = refuseOverwrite(opts.report, opts.target, opts.budget);
+  if (clash) die(clash);
   const lab = loadLabBudget(opts.budget, opts.pageType);
 
   const { chromium } = await loadPlaywright(die, 'node measure_vitals.mjs ...');

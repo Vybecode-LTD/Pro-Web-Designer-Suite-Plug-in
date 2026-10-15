@@ -77,11 +77,11 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.cluster_values
     from . import dtcg                            # type: ignore[import-not-found]
-    from .project_config import ConfigError, ProjectTokens, read_tokens, token_sources
+    from .project_config import ConfigError, ProjectTokens, read_tokens, refuse_overwrite, token_sources
 except ImportError:                               # python scripts/cluster_values.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import dtcg                                   # type: ignore[no-redef]
-    from project_config import ConfigError, ProjectTokens, read_tokens, token_sources  # type: ignore[no-redef]
+    from project_config import ConfigError, ProjectTokens, read_tokens, refuse_overwrite, token_sources  # type: ignore[no-redef]
 
 # ===========================================================================
 # COLOR MATH
@@ -2754,6 +2754,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ConfigError as exc:
         print(f"cluster_values: {exc}", file=sys.stderr)
         return 2
+    # The proposal is reviewed before it is copied in: -o never lands its
+    # tokens.css on the project's, nor its mapping on the census (class 5).
+    if not args.dry_run:
+        for dest in ("tokens.css", "mapping.json", "reconciliation.md"):
+            clash = refuse_overwrite(Path(args.output) / dest, args.literals, *sources)
+            if clash:
+                print(f"cluster_values: {clash}", file=sys.stderr)
+                return 2
     route_inline_styles(idx, prop)
 
     neutral, accent, status = cluster_color_phase(

@@ -71,6 +71,15 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Callable, Iterable, Iterator, Sequence
 
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin. project_config.py is a copy of the plugin's shared/ master (P24).
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.extract_literals
+    from .project_config import refuse_overwrite  # type: ignore[import-not-found]
+except ImportError:                               # python scripts/extract_literals.py, or loaded by path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from project_config import refuse_overwrite   # type: ignore[no-redef]
+
 # ---------------------------------------------------------------------------
 # What counts as source
 # ---------------------------------------------------------------------------
@@ -2140,11 +2149,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-
     missing = [p for p in args.paths if not Path(p).exists()]
     if missing:
         print(f"extract_literals: no such path: {', '.join(missing)}",
               file=sys.stderr)
+        return 2
+    # Against every file the census reads, a folder's included (the audit's
+    # class 5; Codex on #136).
+    scanned = iter_files(args.paths, include_vendor=args.include_vendor,
+                         include_tokens=args.include_tokens)
+    clash = refuse_overwrite(args.output, *args.paths, *scanned)
+    if clash:
+        print(f"extract_literals: {clash}", file=sys.stderr)
         return 2
 
     tailwind: dict = {}

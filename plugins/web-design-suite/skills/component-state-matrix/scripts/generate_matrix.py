@@ -50,10 +50,37 @@ import argparse
 import html
 import itertools
 import json
+import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
+
+
+# shared/project_config.py's refuse_overwrite(), verbatim: this skill has no
+# copy of the reader (test_out_guard.TheGuardIsShared holds them equal).
+def refuse_overwrite(out: Optional[Union[str, Path]],
+                     *inputs: Optional[Union[str, Path]]) -> Optional[str]:
+    """The message a script prints, then exits 2 on, when `out` is one of its
+    inputs; None when it is none of them (the owner's audit of 2026-10-14,
+    class 5: V7, E9, G4). An existing pair is compared by file identity, which
+    sees a link and a case-folded name; any other by its resolved path. `-`
+    is stdin or stdout, never a file."""
+    if not out or str(out) == "-":
+        return None
+    for given in inputs:
+        if not given or str(given) == "-":
+            continue
+        a, b = Path(out), Path(given)
+        try:
+            same = os.path.samefile(a, b) if a.exists() and b.exists() else (
+                os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b)))
+        except OSError:
+            same = False
+        if same:
+            return f"{out} is the input {given}: writing there would replace it. Choose another output."
+    return None
+
 
 SCHEMA = "component-state-matrix/1"
 
@@ -765,8 +792,10 @@ class Manifest:
         self.themes = as_list(raw.get("themes")) or list(DEFAULT_THEMES)
         self.densities = as_list(raw.get("densities")) or list(DEFAULT_DENSITIES)
         self.templates: Dict[str, str] = {}
+        self.templates_path: Optional[Path] = None
         if raw.get("templates"):
-            self.templates = read_templates(resolve(self.root, raw["templates"], "templates"))
+            self.templates_path = resolve(self.root, raw["templates"], "templates")
+            self.templates = read_templates(self.templates_path)
         comps = raw.get("components")
         if not isinstance(comps, list) or not comps:
             raise ManifestError(
@@ -1662,6 +1691,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         if not mpath.exists():
             raise ManifestError(f"no such manifest: {mpath}")
         man = Manifest(mpath, Path(args.root) if args.root else None)
+        # Neither the sheet nor its chrome replaces what it is built from
+        # (the owner's audit of 2026-10-14, class 5).
+        inputs = [mpath, man.tokens, man.templates_path, *man.base,     # templates: Codex on #136
+                  *(p for c in man.components for p in c.css_paths)]
+        for dest in (args.out, args.emit_css):
+            clash = refuse_overwrite(dest, *inputs)
+            if clash:
+                raise ManifestError(clash)
 
         themes = args.themes or man.themes
         densities = args.densities or man.densities
