@@ -131,8 +131,8 @@ A pragma survives review because it is argued. A baseline entry survives review 
 ```sh
 # pre-commit: only what you touched, fast, before the context switch —
 # web-design-studio's shipped hook, not a hand-written one
-cp <web-design-studio>/assets/configs/pre-commit-design-gate.sh .git/hooks/pre-commit
-cp <web-design-studio>/assets/configs/pre-commit-design-gate.sh .git/hooks/commit-msg
+cp WEB_DESIGN_STUDIO/assets/configs/pre-commit-design-gate.sh .git/hooks/pre-commit
+cp WEB_DESIGN_STUDIO/assets/configs/pre-commit-design-gate.sh .git/hooks/commit-msg
 
 # CI: everything, against the baseline
 python -m scripts.audit_design ./src
@@ -333,7 +333,7 @@ migrate(components): colors → role tokens [43 replacements, 7 files]
 
 **Revert one batch:**
 ```sh
-git revert <sha>          # values only — always safe, no manual conflict
+git revert SHA            # values only — always safe, no manual conflict
 ```
 
 **Revert everything:**

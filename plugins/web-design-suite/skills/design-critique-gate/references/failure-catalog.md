@@ -312,7 +312,7 @@ card the control with one accessible name.
 **Seen as.** Nothing — until a rebrand takes three weeks instead of an afternoon.
 **Mechanism.** Literals and Tier-1 tokens in component rules are decisions nobody can find, so they survive
 every theme, density and brand change unchanged, diverging further each time.
-**Confirm.** `python -m scripts.audit_design <path>`. Any finding, not "only warnings".
+**Confirm.** `python -m scripts.audit_design PATH`. Any finding, not "only warnings".
 **Fix.** Add the missing Tier-2 *role*, not the missing value — every failure is a diagnosis of the system,
 per the checklist's "what to do when a check fails".
 

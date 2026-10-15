@@ -13,7 +13,7 @@ description: Write and structure landing, pricing and product pages, from positi
 > python "${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py" src/ --strict
 > ```
 >
-> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
 > From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
@@ -230,7 +230,7 @@ Two passes, both in `references/conversion-audit.md`:
 Then run the design gate:
 
 ```bash
-python -m scripts.audit_design <path>      # from web-design-studio
+python -m scripts.audit_design PATH        # from web-design-studio
 ```
 
 Law 9 applies here exactly as it does in the studio skill: nothing ships un-audited.
