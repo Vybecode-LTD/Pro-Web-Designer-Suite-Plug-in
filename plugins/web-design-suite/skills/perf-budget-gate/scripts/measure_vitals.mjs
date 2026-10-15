@@ -90,7 +90,7 @@ import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { launchBrowser, loadPlaywright, projectConfig, readJsonFile } from './browser_common.mjs';
+import { launchBrowser, loadPlaywright, projectConfig, readJsonFile, refuseOverwrite } from './browser_common.mjs';
 
 // Lighthouse's mobile profile is 150 ms RTT, 1.6 Mbps down, 750 Kbps up and
 // 4x CPU. CDP adds its latency to each request once, where a round trip is
@@ -185,6 +185,9 @@ function parseArgs(argv) {
     }
   }
   if (!opts.target) die('needs a URL or file to measure (try --help)');
+  // The report never replaces the page it measures (the owner's audit of 2026-10-14, G4).
+  const clash = refuseOverwrite(opts.report, /^https?:\/\//i.test(opts.target) ? null : opts.target, opts.budget);
+  if (clash) die(clash);
   if (!THROTTLE[opts.throttle]) {
     die(`unknown --throttle "${opts.throttle}"; pick one of ` +
         Object.keys(THROTTLE).join(', '));

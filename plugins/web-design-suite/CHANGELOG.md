@@ -168,6 +168,17 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   list ends at its own closing paren now, a paren inside a string or a `$$…$$` body
   skipped (Codex on #133)
   (`test_schema_sources.MigrationsThatDumpsRewrite`).
+- **An output could replace its own input** (the audit's V7, E9 and G4, and its class 5).
+  `--out` equal to the input replaced a Figma export with its audit report, a published
+  snapshot with its diff, an email's source with its build or its lint report, the
+  findings with their critique, and an audited page with its JSON report, each with exit
+  0. `build_presentation --emit-css DIR` wrote `DIR/tokens.css` over the project's own,
+  and `cluster_values -o` could land its proposal on it too. One helper decides now,
+  `refuse_overwrite()` in `project_config.py` and `refuseOverwrite()` in
+  `browser_common.mjs`, and every writer whose output can be one of its inputs calls it
+  before it writes anything: exit 2, the input untouched. `figma_to_tokens` still writes
+  over the project's `--tokens`, which is the Figma-to-code workflow
+  (`test_out_guard`).
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
   too. It is a width and a height, so it is a size: reported when no `--width-*` role

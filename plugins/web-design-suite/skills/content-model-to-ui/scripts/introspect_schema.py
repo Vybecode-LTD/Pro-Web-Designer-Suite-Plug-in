@@ -74,6 +74,15 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any, Iterable
 
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin. project_config.py is a copy of the plugin's shared/ master (P24).
+sys.dont_write_bytecode = True
+try:                                              # python -m scripts.introspect_schema
+    from .project_config import refuse_overwrite  # type: ignore[import-not-found]
+except ImportError:                               # python scripts/introspect_schema.py, or loaded by path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from project_config import refuse_overwrite   # type: ignore[no-redef]
+
 MODEL_SCHEMA = "content-model-to-ui/model/1"
 
 # ---------------------------------------------------------------------------
@@ -3329,6 +3338,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--only", action="append", metavar="TABLE",
                     help="restrict the model to these tables (repeatable)")
     args = ap.parse_args(argv)
+    for dest in (args.out, args.answers_template):                      # the audit's class 5
+        clash = refuse_overwrite(dest, *args.schema)
+        if clash:
+            print(f"introspect_schema: {clash}", file=sys.stderr)
+            return 2
 
     # cmd.exe hands `supabase/migrations/*.sql` over as written, so expand a
     # pattern here; sorted, which is the order migrations are applied in.

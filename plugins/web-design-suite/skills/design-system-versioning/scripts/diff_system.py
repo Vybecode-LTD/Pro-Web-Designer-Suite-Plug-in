@@ -79,11 +79,11 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.diff_system
-    from .project_config import (CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract, is_dtcg,
+    from .project_config import (refuse_overwrite, CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract, is_dtcg,
                                  project_config, read_deprecations, read_tokens, replacement_of)
 except ImportError:                               # python scripts/diff_system.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import (CONTRACT_SCHEMA, ConfigError, _dtcg,  # type: ignore[no-redef]
+    from project_config import (refuse_overwrite, CONTRACT_SCHEMA, ConfigError, _dtcg,  # type: ignore[no-redef]
                                 is_contract, is_dtcg, project_config, read_deprecations,
                                 read_tokens, replacement_of)
 
@@ -2622,6 +2622,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
            else published_snapshot("old", no_upstream=args.no_upstream))
     new = (load_snapshot(args.new, "new", no_upstream=args.no_upstream) if args.new
            else project_snapshot("new", no_upstream=args.no_upstream))
+    # The published snapshot, above all, is never the report (the audit's V7).
+    clash = refuse_overwrite(args.out, args.old, args.new, old.path, new.path, args.deprecations,
+                             args.mapping if args.format == "migration-guide" else None)
+    if clash:
+        print(f"diff_system: {clash}", file=sys.stderr)
+        return 2
     kinds = [DEFAULTS_ONLY[s] for s in dict.fromkeys((old.source, new.source)) if s in DEFAULTS_ONLY]
     contract = bool(kinds)
     if contract:

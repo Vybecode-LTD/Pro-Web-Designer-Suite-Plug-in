@@ -188,6 +188,29 @@ def glob_regex(pattern: str) -> "re.Pattern[str]":
     return re.compile("".join(out) + r"\Z")
 
 
+def refuse_overwrite(out: Optional[Union[str, Path]],
+                     *inputs: Optional[Union[str, Path]]) -> Optional[str]:
+    """The message a script prints, then exits 2 on, when `out` is one of its
+    inputs; None when it is none of them (the owner's audit of 2026-10-14,
+    class 5: V7, E9, G4). An existing pair is compared by file identity, which
+    sees a link and a case-folded name; any other by its resolved path. `-`
+    is stdin or stdout, never a file."""
+    if not out or str(out) == "-":
+        return None
+    for given in inputs:
+        if not given or str(given) == "-":
+            continue
+        a, b = Path(out), Path(given)
+        try:
+            same = os.path.samefile(a, b) if a.exists() and b.exists() else (
+                os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b)))
+        except OSError:
+            same = False
+        if same:
+            return f"{out} is the input {given}: writing there would replace it. Choose another output."
+    return None
+
+
 def find_config(start: Optional[Union[str, Path]] = None) -> Optional[Path]:
     """The `.design-suite.json` that governs `start` (default: the working
     directory), or None: the first one walking up, never past the folder

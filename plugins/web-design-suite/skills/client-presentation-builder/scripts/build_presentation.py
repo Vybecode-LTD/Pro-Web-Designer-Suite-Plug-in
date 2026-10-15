@@ -79,10 +79,10 @@ from typing import Any
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.build_presentation
-    from .project_config import ConfigError, is_contract, project_config
+    from .project_config import refuse_overwrite, ConfigError, is_contract, project_config
 except ImportError:                               # python scripts/build_presentation.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import ConfigError, is_contract, project_config  # type: ignore[no-redef]
+    from project_config import refuse_overwrite, ConfigError, is_contract, project_config  # type: ignore[no-redef]
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 
@@ -2870,6 +2870,18 @@ def main(argv: list[str] | None = None) -> int:
         return refuse_blockers(blockers) if blockers else 0
     if blockers:
         return refuse_blockers(blockers)
+
+    # No output replaces an input: --emit-css DIR writes DIR/tokens.css, which
+    # may be the project's own (the audit's E9).
+    inputs = [args.decisions, args.audit, args.perf, args.a11y, args.manual, args.defence,
+              args.tokens, *((config.tokens or []) if config else [])]
+    emitted = [Path(args.emit_css) / name for name in ("tokens.css", "deck-components.css")] \
+        if args.emit_css else []
+    for dest in (args.out, args.notes, args.handout, *emitted):
+        clash = refuse_overwrite(dest, *inputs)
+        if clash:
+            print(f"build_presentation: {clash}", file=sys.stderr)
+            return 2
 
     out_path = Path(args.out)
     html_text = render_html(plan, inp, args.audience, tokens_css)
