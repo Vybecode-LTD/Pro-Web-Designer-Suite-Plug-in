@@ -63,12 +63,48 @@ CASES = {
     "generate_matrix": ("component-state-matrix", "generate_matrix.py",
                         {"matrix.json": MATRIX, "chip.css": ".chip { color: red; }\n"},
                         ["matrix.json", "--out", "chip.css"]),
+    # Codex on #136: the files an input stands for, not its spelling.
+    "introspect_schema, a glob": ("content-model-to-ui", "introspect_schema.py",
+                                  {"m/001.sql": "create table t (id int primary key);\n"},
+                                  ["m/*.sql", "-o", "m/001.sql"]),
+    "extract_literals, a folder": ("design-token-migration", "extract_literals.py",
+                                   {"src/a.css": ".a { margin: 13px; }\n"}, ["src", "-o", "src/a.css"]),
+    "diff_system, a snapshot's second file": ("design-system-versioning", "diff_system.py",
+                                              {"old/tokens.css": STARTER, "old/theme.css": ":root { }\n",
+                                               "new.css": STARTER},
+                                              ["old", "new.css", "--out", "old/theme.css"]),
+    "diff_system, a snapshot's other file": ("design-system-versioning", "diff_system.py",
+                                             {"old/tokens.css": STARTER, "old/theme.css": ":root { }\n",
+                                              "new.css": STARTER},
+                                             ["old", "new.css", "--out", "old/tokens.css"]),
+    "build_presentation, a screenshot": ("client-presentation-builder", "build_presentation.py",
+                                         {"DECISION_LOG.md": DECISIONS, "shots/home.png": "png"},
+                                         ["DECISION_LOG.md", "--screenshots", "shots", "-o", "shots/home.png"]),
+    "figma_audit, the config's tokens": ("figma-variables-sync", "figma_audit.py",
+                                         {".git/HEAD": "x\n", "export.json": json.dumps(
+                                             {"collections": [{"name": "semantic", "modes": [{"name": "Light", "variables": [
+                                                 {"name": "bg/surface", "type": "COLOR", "value": "#ffffff"}]}]}]}),
+                                          "tokens.css": STARTER, ".design-suite.json": '{"schema": 1, "tokens": "tokens.css"}'},
+                                         ["export.json", "--out", "tokens.css"]),
+    "lint_email, the config's tokens": ("email-template-system", "lint_email.py",
+                                        {".git/HEAD": "x\n", "email.html": EMAIL, "t.json": "{}",
+                                         ".design-suite.json": '{"schema": 1, "emailTokens": "t.json"}'},
+                                        ["email.html", "--source", "-o", "t.json"]),
 }
 NODE_CASES = {
     "a11y_runtime": ("a11y-audit-runner", "a11y_runtime.mjs", {"page.html": EMAIL},
                      ["--file", "page.html", "--report", "page.html"]),
     "measure_vitals": ("perf-budget-gate", "measure_vitals.mjs", {"page.html": EMAIL},
                        ["page.html", "--report", "page.html"]),
+    # Codex on #136: the budget the project's config names, read after parsing.
+    "measure_vitals, the config's budget": ("perf-budget-gate", "measure_vitals.mjs",
+                                            {".git/HEAD": "x\n", "page.html": EMAIL, "budget.json": "{}",
+                                             ".design-suite.json": '{"schema": 1, "budgets": {"perf": "budget.json"}}'},
+                                            ["page.html", "--report", "budget.json"]),
+    "a11y_runtime, the config's budget": ("a11y-audit-runner", "a11y_runtime.mjs",
+                                          {".git/HEAD": "x\n", "page.html": EMAIL, "budget.json": "{}",
+                                           ".design-suite.json": '{"schema": 1, "budgets": {"a11y": "budget.json"}}'},
+                                          ["--file", "page.html", "--report", "budget.json"]),
 }
 
 
@@ -106,6 +142,19 @@ class EveryWriterRefusesItsInput(TempDirTest):
                 self.reset()
                 written = self.stage(files)
                 proc = run_node(skill, script, *args, cwd=self.tmp)
+                self.check(proc, written)
+
+    @unittest.skipUnless(NODE, "node is not installed")
+    def test_a_file_url_is_its_file(self):
+        # Codex on #136: `--url file:///…/page.html` named the page by URL, so
+        # a report at the page's path passed the guard.
+        for skill, script, flag in (("a11y-audit-runner", "a11y_runtime.mjs", ["--url"]),
+                                    ("perf-budget-gate", "measure_vitals.mjs", [])):
+            with self.subTest(script=script):
+                self.reset()
+                written = self.stage({"page.html": EMAIL})
+                proc = run_node(skill, script, *flag, (self.tmp / "page.html").as_uri(),
+                                "--report", "page.html", cwd=self.tmp)
                 self.check(proc, written)
 
     def test_the_cluster_values_proposal_never_lands_on_the_projects_tokens(self):

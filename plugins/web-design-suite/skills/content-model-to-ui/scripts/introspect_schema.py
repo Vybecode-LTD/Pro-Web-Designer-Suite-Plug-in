@@ -3338,18 +3338,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--only", action="append", metavar="TABLE",
                     help="restrict the model to these tables (repeatable)")
     args = ap.parse_args(argv)
-    for dest in (args.out, args.answers_template):                      # the audit's class 5
-        clash = refuse_overwrite(dest, *args.schema)
-        if clash:
-            print(f"introspect_schema: {clash}", file=sys.stderr)
-            return 2
-
     # cmd.exe hands `supabase/migrations/*.sql` over as written, so expand a
     # pattern here; sorted, which is the order migrations are applied in.
     paths = []
     for given in args.schema:
         matched = sorted(glob.glob(given)) if any(ch in given for ch in "*?[") else []
         paths += [Path(p) for p in matched] or [Path(given)]
+    # Against the files a pattern expands to, not the pattern (the audit's
+    # class 5; Codex on #136).
+    for dest in (args.out, args.answers_template):
+        clash = refuse_overwrite(dest, *paths)
+        if clash:
+            print(f"introspect_schema: {clash}", file=sys.stderr)
+            return 2
     path = paths[0]
     texts: list[str] = []
     for each in paths:

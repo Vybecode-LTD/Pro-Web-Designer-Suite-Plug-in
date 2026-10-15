@@ -696,6 +696,9 @@ class Snapshot:
     # The tokens a DTCG snapshot marks `$deprecated`, with the reason (P31 part 4).
     deprecated: Dict[str, Any] = field(default_factory=dict)
     _condition_envs: Dict[str, Dict[str, str]] = field(default_factory=dict, repr=False)
+    # Every file the snapshot was read from: no report may replace one (the
+    # audit's class 5; Codex on #136).
+    sources: List[str] = field(default_factory=list)
 
     def tier(self, name: str) -> int:
         return int(self.tokens.get(name, {}).get("tier", 0))
@@ -765,7 +768,7 @@ MODULE_FILE = re.compile(r"\.module\.(?:css|scss|sass|less|pcss)$", re.I)
 
 
 def _normalize_docs_json(data: Dict[str, Any], label: str, path: str) -> Snapshot:
-    snap = Snapshot(label=label, path=path, source="system.json",
+    snap = Snapshot(label=label, path=path, source="system.json", sources=[path],
                     impl="design-system-docs/system.json",
                     themes=list(data.get("themes") or ["light"]),
                     densities=list(data.get("densities") or []),
@@ -917,7 +920,7 @@ def _snapshot_from_contract(paths: List[Path], label: str, source: str = "contra
                 deprecated[name] = marks[name]
     snap = Snapshot(label=label, path=str(paths[0]), source=source,
                     impl="project contract" if source == "contract.json" else "DTCG token file",
-                    layers_recorded=False, deprecated=deprecated)
+                    layers_recorded=False, deprecated=deprecated, sources=[str(p) for p in paths])
     base = tokens.values()
     tiers = tokens.tiers()
     for name, value in base.items():
@@ -1086,8 +1089,11 @@ def _load_css(paths: List[Path], label: str, no_upstream: bool) -> Snapshot:
     if extractor is not None:
         snap = _snapshot_from_css_upstream(paths, label, extractor)
         if snap is not None:
+            snap.sources = [str(p) for p in paths]
             return snap
-    return _snapshot_from_css_vendored(paths, label)
+    snap = _snapshot_from_css_vendored(paths, label)
+    snap.sources = [str(p) for p in paths]
+    return snap
 
 
 # ===========================================================================
@@ -2623,7 +2629,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     new = (load_snapshot(args.new, "new", no_upstream=args.no_upstream) if args.new
            else project_snapshot("new", no_upstream=args.no_upstream))
     # The published snapshot, above all, is never the report (the audit's V7).
-    clash = refuse_overwrite(args.out, args.old, args.new, old.path, new.path, args.deprecations,
+    clash = refuse_overwrite(args.out, args.old, args.new, *old.sources, *new.sources, args.deprecations,
                              args.mapping if args.format == "migration-guide" else None)
     if clash:
         print(f"diff_system: {clash}", file=sys.stderr)

@@ -15,7 +15,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -168,8 +168,16 @@ export function readJsonFile(file) {
 // The message a script prints, then exits 2 on, when `out` is one of its
 // inputs; null when it is none of them (the owner's audit of 2026-10-14,
 // class 5: G4). project_config.py's refuse_overwrite() in Node: an existing
-// pair is compared by file identity, any other by its resolved path.
+// pair is compared by file identity, any other by its resolved path. A
+// file:// URL is its file, and a web URL no file at all (Codex on #136).
 export function refuseOverwrite(out, ...inputs) {
+  const local = (p) => {
+    if (typeof p !== 'string' || !/^[a-z][a-z0-9+.-]+:/i.test(p)) return p;
+    if (!/^file:/i.test(p)) return null;
+    try { return fileURLToPath(p); } catch { return null; }
+  };
+  out = local(out);
+  inputs = inputs.map(local);
   if (!out || out === '-') return null;
   const id = (p) => { try { const s = fs.statSync(p, { bigint: true }); return `${s.dev}:${s.ino}`; } catch { return null; } };
   const fold = (p) => (process.platform === 'win32' ? p.toLowerCase() : p);

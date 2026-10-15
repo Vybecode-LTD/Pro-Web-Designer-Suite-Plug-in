@@ -185,9 +185,6 @@ function parseArgs(argv) {
     }
   }
   if (!opts.target) die('needs a URL or file to measure (try --help)');
-  // The report never replaces the page it measures (the owner's audit of 2026-10-14, G4).
-  const clash = refuseOverwrite(opts.report, /^https?:\/\//i.test(opts.target) ? null : opts.target, opts.budget);
-  if (clash) die(clash);
   if (!THROTTLE[opts.throttle]) {
     die(`unknown --throttle "${opts.throttle}"; pick one of ` +
         Object.keys(THROTTLE).join(', '));
@@ -800,6 +797,11 @@ async function main() {
   if (opts.budget === null) {
     try { opts.budget = projectConfig()?.budgets.perf ?? null; } catch (err) { die(err.message); }
   }
+  // The report never replaces the page it measures (the owner's audit of
+  // 2026-10-14, G4), a file:// URL's page and the configured budget included
+  // (Codex on #136).
+  const clash = refuseOverwrite(opts.report, opts.target, opts.budget);
+  if (clash) die(clash);
   const lab = loadLabBudget(opts.budget, opts.pageType);
 
   const { chromium } = await loadPlaywright(die, 'node measure_vitals.mjs ...');

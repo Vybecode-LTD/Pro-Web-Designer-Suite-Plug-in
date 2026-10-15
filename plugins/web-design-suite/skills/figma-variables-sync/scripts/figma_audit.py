@@ -1180,6 +1180,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except ConfigError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    clash = refuse_overwrite(args.out, *sources)    # the config's token files too (Codex on #136)
+    if clash:
+        print(f"figma_audit: {clash}", file=sys.stderr)
+        return 2
     if sources:
         origin = ", ".join(str(s) for s in sources) + (f" (from {config_path})" if config_path else "")
         try:

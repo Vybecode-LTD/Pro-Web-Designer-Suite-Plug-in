@@ -2875,6 +2875,10 @@ def main(argv: list[str] | None = None) -> int:
     # may be the project's own (the audit's E9).
     inputs = [args.decisions, args.audit, args.perf, args.a11y, args.manual, args.defence,
               args.tokens, *((config.tokens or []) if config else [])]
+    if args.screenshots and Path(args.screenshots).is_dir():
+        # Each image load_screenshots() inlines, and its caption (Codex on #136).
+        inputs += [q for p in Path(args.screenshots).iterdir() if p.suffix.lower() in IMAGE_EXT
+                   for q in (p, p.with_suffix(".txt"))]
     emitted = [Path(args.emit_css) / name for name in ("tokens.css", "deck-components.css")] \
         if args.emit_css else []
     for dest in (args.out, args.notes, args.handout, *emitted):

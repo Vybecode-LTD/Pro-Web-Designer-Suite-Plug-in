@@ -2122,15 +2122,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    clash = refuse_overwrite(args.output, *args.paths)                  # the audit's class 5
-    if clash:
-        print(f"extract_literals: {clash}", file=sys.stderr)
-        return 2
-
     missing = [p for p in args.paths if not Path(p).exists()]
     if missing:
         print(f"extract_literals: no such path: {', '.join(missing)}",
               file=sys.stderr)
+        return 2
+    # Against every file the census reads, a folder's included (the audit's
+    # class 5; Codex on #136).
+    scanned = iter_files(args.paths, include_vendor=args.include_vendor,
+                         include_tokens=args.include_tokens)
+    clash = refuse_overwrite(args.output, *args.paths, *scanned)
+    if clash:
+        print(f"extract_literals: {clash}", file=sys.stderr)
         return 2
 
     tailwind: dict = {}

@@ -1196,6 +1196,10 @@ def main(argv=None) -> int:
             return 2
         tokens_path = (Path(args.tokens) if args.tokens else
                        config.email_tokens if config and config.email_tokens else default_tokens_path())
+        clash = refuse_overwrite(args.out, tokens_path)       # the file read, however found (Codex on #136)
+        if clash:
+            print("error: %s" % clash, file=sys.stderr)
+            return 2
         try:
             tokens = load_tokens(tokens_path)
         except TokenError as exc:
