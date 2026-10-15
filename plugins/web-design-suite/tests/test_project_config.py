@@ -569,6 +569,16 @@ class ClusterValuesLandsOnTheProjectsRamps(TempDirTest):
         other, _ = self.propose("--tokens", "src/app.css")                    # so does --tokens
         self.assertEqual(self.accent(derived, 600), self.accent(other, 600))
 
+    def test_a_step_it_cannot_read_is_named(self):
+        # P52, the audit's class 7 beside H11: a step in hwb() was rebuilt
+        # without a word, as if the project had not declared it.
+        self.write("hwb.css", ":root {\n  --accent-500: oklch(60% 0.2 150);\n  --accent-600: hwb(150 10% 30%);\n"
+                              "  --accent-700: rgb(0 0 0 / 50%);\n}\n")
+        _, report = self.propose("--tokens", "hwb.css")
+        self.assertIn("accent (1 of 11 steps)", report)
+        self.assertIn("--accent-600 (hwb(150 10% 30%)), --accent-700 (rgb(0 0 0 / 50%), translucent) "
+                      "could not be read", report)
+
 
 # Part 3: the budgets, the other baselines, emailTokens, stack and the deck's
 # tokens, and the Node reader the browser scripts share.

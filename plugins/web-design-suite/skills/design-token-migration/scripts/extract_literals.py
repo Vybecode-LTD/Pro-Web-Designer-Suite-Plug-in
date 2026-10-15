@@ -789,6 +789,18 @@ def normalize_color(raw: str) -> str:
     return re.sub(r"\s+", " ", s)
 
 
+def mixes_a_literal(body: str) -> bool:
+    """Whether a color-mix() body holds a colour written out: a hex, a named
+    colour, or a colour function that reads no custom property."""
+    if HEX_RE.search(body) or NAMED_COLOR_RE.search(body):
+        return True
+    for m in FUNC_COLOR_RE.finditer(body):
+        got = extract_func_color(body, m.end() - 1)
+        if got and m.group(1).lower() != "color-mix" and "var(--" not in got[0]:
+            return True
+    return False
+
+
 def extract_func_color(value: str, start: int) -> tuple[str, int] | None:
     """Return the full `rgba( ... )` text starting at `start`, and its end."""
     depth, i, n = 0, start, len(value)
@@ -866,6 +878,21 @@ def literals_from_value(
     # ---- colors ------------------------------------------------------------
     if is_color_prop or is_shadow_prop or context in {"inline-style", "js-string"} \
             or prop_l.startswith("$") or prop_l.startswith("@") or prop_l.startswith("--"):
+        # A colour inside color-mix() is part of a mix the codemod cannot
+        # rewrite, so the call is claimed before the hex pass, and counted as
+        # one colour function when it mixes a literal (H12).
+        for m in FUNC_COLOR_RE.finditer(masked):
+            if m.group(1).lower() != "color-mix":
+                continue
+            got = extract_func_color(masked, m.end() - 1)
+            if not got:
+                continue
+            body, end = got
+            if mixes_a_literal(body):
+                record("color-function", value[m.start():end],
+                       re.sub(r"\s+", " ", (m.group(1) + body).lower()), (m.start(), end))
+            else:
+                seen_spans.append((m.start(), end))
         for m in HEX_RE.finditer(masked):
             record("color", m.group(0), normalize_color(m.group(0)), m.span())
         for m in FUNC_COLOR_RE.finditer(masked):

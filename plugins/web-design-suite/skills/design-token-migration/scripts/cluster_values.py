@@ -400,6 +400,9 @@ TRACKING_STEPS: List[Tuple[float, str]] = [
 WIDTH_STEPS: List[Tuple[float, str]] = [
     (448, "--width-form"), (1152, "--width-content"), (1440, "--width-wide"),
 ]
+# The properties a --width-* role may replace: a horizontal size, never a
+# height, nor flex-basis, which is a height in a column.
+WIDTH_PROPS = {"width", "min-width", "max-width", "tw:w", "tw:min-w", "tw:max-w"}
 EASINGS: List[Tuple[str, Tuple[float, float, float, float]]] = [
     ("--ease-out", (0.22, 1.0, 0.36, 1.0)),
     ("--ease-in", (0.64, 0.0, 0.78, 0.0)),
@@ -807,6 +810,7 @@ def project_ramps(tokens: ProjectTokens, prop: Proposal) -> Dict[str, Dict[int, 
     A ramp the contract does not name has no roles to land on, so it is
     named in the notes and left out."""
     out: Dict[str, Dict[int, Tuple[float, float, float]]] = {}
+    unread: List[str] = []
     for name, steps in tokens.ramps.items():
         if name not in CONTRACT_RAMPS:
             prop.notes.append(f"The project's tokens declare a `{name}` ramp, which the contract "
@@ -820,11 +824,20 @@ def project_ramps(tokens: ProjectTokens, prop: Proposal) -> Dict[str, Dict[int, 
                 try:
                     rgb, alpha = parse_any_color(value)
                 except ColorError:
-                    continue                 # a colour space this script does not read
+                    # A colour space this script does not read: named, so the
+                    # step built in its place is not taken for the project's.
+                    unread.append(f"--{name}-{step} ({value.strip()})")
+                    continue
                 if alpha < 0.999:
+                    unread.append(f"--{name}-{step} ({value.strip()}, translucent)")
                     continue
                 lch = oklab_to_oklch(*rgb_to_oklab(rgb))
             out.setdefault(name, {})[int(step)] = lch
+    if unread:
+        prop.notes.append(f"The project's {', '.join(unread)} could not be read as an opaque colour in "
+                          f"oklch(), hex, rgb(), hsl() or a name, so the migration builds "
+                          f"{'that step' if len(unread) == 1 else 'those steps'} as it would without "
+                          f"the project's tokens.")
     return out
 
 
@@ -1181,7 +1194,13 @@ def cluster_spacing(lits: Sequence[dict], tol: float, prop: Proposal,
             raws = sorted({l["normalized"].lstrip("-") for l in items})
             tw_items = [l for l in items if l["context"] in TW_CONTEXTS]
             css_items = [l for l in items if l["context"] not in TW_CONTEXTS]
-            snapped = snap_to_scale(px, SPACE_PX, tol, weights, tie_prefers="down")
+            # A width meets the width steps before the 4px scale, which ends at
+            # 192px: snapped first, 1152px never reached --width-content (H13).
+            # Only a width: the codemod applies a rule by class and value, so a
+            # height of the same value would read --width-form (Codex on #135).
+            width = (snap_to_scale(px, [w for w, _ in WIDTH_STEPS], 24.0)
+                     if klass == "size" and all(l["prop"] in WIDTH_PROPS for l in items) else None)
+            snapped = width or snap_to_scale(px, SPACE_PX, tol, weights, tie_prefers="down")
             if snapped is None:
                 nearest = min(SPACE_PX, key=lambda s: abs(s - px))
                 prop.unmapped.append(Unmapped(
@@ -1196,13 +1215,10 @@ def cluster_spacing(lits: Sequence[dict], tol: float, prop: Proposal,
             rid += 1
             token = ""
             note = ""
-            if table and step in table:
+            if width:
+                token = dict(WIDTH_STEPS)[step]
+            elif table and step in table:
                 token = table[step]
-            elif klass in ("size",):
-                got = snap_to_scale(px, [w for w, _ in WIDTH_STEPS], 24.0)
-                if got:
-                    token = dict(WIDTH_STEPS)[got[0]]
-                    step, delta = got[0], got[1]
             if not token:
                 prop.unmapped.append(Unmapped(
                     kind="spacing", value=f"{px:g}px", occurrences=len(items),
@@ -1221,10 +1237,13 @@ def cluster_spacing(lits: Sequence[dict], tol: float, prop: Proposal,
                 note = (f"{px:g}px was equidistant between two steps; "
                         f"resolved to {step:g}px by frequency.")
             if css_items:
+                # A width rule's class is `width`, which apply_codemod gives
+                # only width, min-width and max-width: a height written after
+                # the proposal never takes it (Codex on #135).
                 prop.rules.append(Rule(
                     id=f"sp-{rid:03d}-{klass}", kind="spacing", scope="value",
                     match=raws, replacement=f"var({token})", token=token,
-                    prop_classes=[klass],
+                    prop_classes=["width" if width else klass],
                     props=sorted({l["prop"] for l in css_items
                                   if not l["prop"].startswith("tw:")}),
                     occurrences=len(css_items), delta_px=round(delta, 3),
@@ -1269,6 +1288,18 @@ def _spacing_recommendation(px: float, klass: str) -> str:
                 f"--space-section / --space-subsection / --space-block — rather "
                 f"than freezing {px:g}px, which is cramped at 1440px and a "
                 f"scroll tax at 390px.")
+    top = SPACE_PX[-1]
+    if px > top:
+        # Past the top step, "between 192px and 192px" says nothing (H13).
+        if klass == "size":
+            widths = ", ".join(f"{w:g}px {name}" for w, name in WIDTH_STEPS)
+            return (f"{px:g}px is above the spacing scale, which ends at {top:g}px "
+                    f"({SPACE_NAME[top]}). A size this large is a layout decision: for "
+                    f"a width, a --width-* role ({widths}); for any size, a fluid "
+                    f"min() or clamp(), or a percentage.")
+        return (f"{px:g}px is above the scale, which ends at {top:g}px "
+                f"({SPACE_NAME[top]}). A space this large is a layout decision, not "
+                f"a rung: the fluid --space-section, a width, or a position.")
     return (f"Decide between {lo:g}px ({SPACE_NAME.get(lo, '?')}) and "
             f"{hi:g}px ({SPACE_NAME.get(hi, '?')}) by RELATIONSHIP, not by "
             f"which is closer. If neither reads right, the layout is wrong, "
@@ -1441,6 +1472,27 @@ def _to_ms(normalized: str) -> Optional[float]:
     return float(m.group(1)) if m else None
 
 
+MOTION_TIME = re.compile(r"(?<![\w.#$@-])\d*\.?\d+(?:ms|s)(?![\w-])", re.IGNORECASE)
+
+
+def takes_motion_pair(lit: dict) -> bool:
+    """Whether apply_codemod's plan_motion() rewrites this duration's
+    declaration to a --motion-* pair: a transition or animation shorthand
+    whose every layer holds exactly one time. Any other duration is
+    rewritten on its own, by the Tier-1 rule (CodeRabbit on #135)."""
+    if lit["prop"] not in ("transition", "animation"):
+        return False
+    value = lit.get("declaration", "").partition(":")[2]
+    layers, depth, start = [], 0, 0
+    for i, ch in enumerate(value):
+        depth += (ch == "(") - (ch == ")")
+        if ch == "," and depth == 0:
+            layers.append(value[start:i])
+            start = i + 1
+    layers.append(value[start:])
+    return all(len(MOTION_TIME.findall(layer)) == 1 for layer in layers)
+
+
 def cluster_motion(lits: Sequence[dict], tol: float, prop: Proposal) -> None:
     """Durations become --dur-*; whole transitions become a --motion-* pair.
 
@@ -1479,35 +1531,39 @@ def cluster_motion(lits: Sequence[dict], tol: float, prop: Proposal) -> None:
         role = next(r for limit, r in MOTION_ROLE if ms <= limit)
         css_items = [l for l in items if l["context"] not in TW_CONTEXTS]
         tw_items = [l for l in items if l["context"] in TW_CONTEXTS]
-        if css_items:
-            # Two rules, deliberately. A whole `transition: opacity 250ms ease`
-            # collapses to the Tier-2 PAIR, because a duration and an easing
-            # that live in separate tokens drift apart inside a quarter. A bare
-            # `transition-duration` has no easing to pair with, so it falls
-            # back to the Tier-1 step.
+        # Two rules, deliberately. A whole `transition: opacity 250ms ease`
+        # collapses to the Tier-2 PAIR, because a duration and an easing that
+        # live in separate tokens drift apart inside a quarter. A bare
+        # `transition-duration` has no easing to pair with, so it falls back to
+        # the Tier-1 step. Each occurrence is counted at the one rule that
+        # rewrites it, so the reconciliation adds up.
+        paired = [l for l in css_items if takes_motion_pair(l)]
+        single = [l for l in css_items if not takes_motion_pair(l)]
+        if paired:
             prop.rules.append(Rule(
                 id=f"mo-{i:03d}-pair", kind="duration", scope="motion",
                 match=raws, replacement=f"var({role})", token=role,
                 prop_classes=["motion"], props=["transition", "animation"],
-                occurrences=len(css_items), delta_px=round(delta, 3),
+                occurrences=len(paired), delta_px=round(delta, 3),
                 confidence="review",
                 note=f"{ms:g}ms -> {role}. Confirm the ROLE, not the number: "
                      f"enter and exit are deliberately asymmetric (things "
                      f"arrive slower than they leave).",
             ))
+            prop.provenance[role].append(f"{ms:g}ms x{len(paired)}")
+        if single:
             prop.rules.append(Rule(
                 id=f"mo-{i:03d}", kind="duration", scope="value",
                 match=raws, replacement=f"var({token})", token=token,
                 prop_classes=["duration"],
                 props=["transition-duration", "animation-duration",
                        "transition-delay", "animation-delay"],
-                occurrences=len(css_items), delta_px=round(delta, 3),
+                occurrences=len(single), delta_px=round(delta, 3),
                 confidence="exact" if abs(delta) < 1e-9 else "snapped",
                 note=f"Tier 1, for a standalone duration property. A whole "
                      f"`transition` shorthand takes var({role}) instead.",
             ))
-            prop.provenance[token].append(f"{ms:g}ms x{len(css_items)}")
-            prop.provenance[role].append(f"{ms:g}ms x{len(css_items)}")
+            prop.provenance[token].append(f"{ms:g}ms x{len(single)}")
         if tw_items:
             prop.unmapped.append(Unmapped(
                 kind="tailwind", value=", ".join(sorted({l["raw"] for l in tw_items})),
@@ -1674,6 +1730,18 @@ def cluster_tracking(lits: Sequence[dict], prop: Proposal) -> None:
         items = [l for l in lits if l["normalized"] == value]
         m = re.fullmatch(r"(-?[\d.]+)em", value)
         if not m:
+            # A tracking step is a share of the font size. `1px` is not one
+            # until the size is known, so it is a row, never dropped (H11).
+            prop.unmapped.append(Unmapped(
+                kind="tracking", value=value, occurrences=len(items),
+                where=where_of(items),
+                reason="not in em: a tracking step is a share of the font size, "
+                       "and this value is not one until the size is known",
+                recommendation="Divide it by the element's font size (1px at 14px "
+                               "is 0.071em), then take the nearest --tracking-* "
+                               "step. Written in em, it stays right when the "
+                               "type scale moves.",
+            ))
             continue
         v = float(m.group(1))
         token, delta = min(((name, abs(v - step)) for step, name in TRACKING_STEPS),
@@ -1740,6 +1808,19 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
         freq[l["normalized"]] += 1
 
     clusters = cluster_colors(freq, tol)
+    # A colour the proposal cannot read is still in the census, so it gets a
+    # row of its own rather than vanishing from the reconciliation (H11).
+    clustered = {member for c in clusters for member in c.counts}
+    for value in sorted(set(freq) - clustered):
+        items = [l for l in lits if l["normalized"] == value]
+        prop.unmapped.append(Unmapped(
+            kind="color", value=value, occurrences=len(items), where=where_of(items),
+            reason="the proposal reads hex, rgb(), hsl() in degrees and the named "
+                   "colours, so this form is matched to no ramp step",
+            recommendation="Map it by hand: find the ramp step it stands for, then "
+                           "rewrite it to that step's role. The codemod leaves it "
+                           "as it is.",
+        ))
 
     # ---- choose the accent seed -------------------------------------------
     chromatic: List[Tuple[int, ColorCluster]] = []
@@ -2714,6 +2795,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         for l in cf:
             by_val[l["normalized"]].append(l)
         for value, items in sorted(by_val.items()):
+            if value.startswith("color-mix("):
+                prop.unmapped.append(Unmapped(
+                    kind="color-function", value=value, occurrences=len(items),
+                    where=where_of(items),
+                    reason="a mix with a colour written out, which the codemod "
+                           "does not rewrite inside color-mix()",
+                    recommendation="Replace the colour inside with the role it "
+                                   "stands for, by hand: color-mix(in oklch, "
+                                   "var(--bg-accent) 40%, var(--bg-surface)). A "
+                                   "mix of roles follows the theme; a mix of a hex "
+                                   "does not.",
+                ))
+                continue
             prop.unmapped.append(Unmapped(
                 kind="color-function", value=value, occurrences=len(items),
                 where=where_of(items),
