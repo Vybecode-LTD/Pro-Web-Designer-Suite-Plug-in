@@ -13,7 +13,7 @@
 - **At the end:**
   - `main` is `e55727f` plus this docs PR (#146); #145 is the only other open PR.
   - The plan: 21 open items, 21 scheduled. About 1,240 tests.
-  - This session used about 600 thousand tokens.
+  - This session used about 565 thousand tokens.
 
 ## Next steps
 
