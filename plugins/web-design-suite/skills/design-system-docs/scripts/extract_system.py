@@ -1526,7 +1526,7 @@ class Extractor:
     # -- tokens -----------------------------------------------------------
     def read_tokens(self, files: Sequence[Path]) -> None:
         for path in files:
-            cf = CssFile(self.rel(path), path.read_text(encoding="utf-8"))
+            cf = CssFile(self.rel(path), path.read_text(encoding="utf-8-sig"))
             self.token_files.append(cf)
         base_env: Dict[str, str] = {}
         overrides: Dict[str, List[Dict[str, Any]]] = {}
@@ -1697,12 +1697,12 @@ class Extractor:
     # -- components -------------------------------------------------------
     def read_components(self, css_files: Sequence[Path], prop_files: Sequence[Path]) -> None:
         for path in css_files:
-            self.component_files.append(CssFile(self.rel(path), path.read_text(encoding="utf-8")))
+            self.component_files.append(CssFile(self.rel(path), path.read_text(encoding="utf-8-sig")))
         self.components = parse_components(self.component_files, self.resolvers)
 
         prop_index: Dict[str, Dict[str, Any]] = {}
         for path in prop_files:
-            text = path.read_text(encoding="utf-8")
+            text = path.read_text(encoding="utf-8-sig")
             for entry in parse_props_file(self.rel(path), text):
                 prop_index[kebab(entry["component"])] = entry
             self.prop_files.append(self.rel(path))

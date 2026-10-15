@@ -155,6 +155,65 @@ class MigrationsThatDumpsRewrite(SchemaSources):
         self.assertTrue(id_["generated"])
         self.assertFalse(id_["ui"]["placement"]["form"])
 
+    def test_an_enum_extended_later_has_every_value(self):
+        """Audit H9: only CREATE TYPE fed the enums, so a value a later
+        migration added was refused by the server draft and missing from the
+        form's choices."""
+        self.write("schema.sql", "create type order_status as enum ('pending', 'paid');\n"
+                   "create table orders (id uuid primary key, status order_status not null default 'pending');\n"
+                   "alter type public.order_status add value 'shipped';\n"
+                   "alter type order_status add value if not exists 'draft' before 'paid';\n"
+                   "alter type order_status add value if not exists 'shipped';\n"
+                   "alter type order_status add value 'refunded' after 'shipped';\n"
+                   "alter type order_status rename value 'paid' to 'settled';\n"
+                   "alter type other_enum add value 'x';\n")              # created elsewhere: left alone
+        model = self.introspect("schema.sql")
+        self.assertEqual({"order_status": ["pending", "draft", "settled", "shipped", "refunded"]},
+                         model["enums"])
+        self.assertEqual("order_status", columns(model)["orders.status"]["enum"])
+
+    def test_a_tables_tail_stays_out_of_its_last_column(self):
+        """Audit H10: the column list ended at the statement's last `)`, so a
+        `PARTITION BY`, `WITH` or `INHERITS` tail ran into the last column and
+        a trailing table CHECK was lost."""
+        self.write("schema.sql",
+                   "create table t1 (id uuid primary key, created_at timestamptz not null default now())"
+                   " partition by range (created_at);\n"
+                   "create table t2 (id uuid primary key, title text not null, check (char_length(title) <= 80))"
+                   " with (fillfactor = 70);\n"
+                   "create table t3 (id uuid primary key, label text default 'a (b') inherits (base);\n")
+        cols = columns(self.introspect("schema.sql"))
+        self.assertEqual("now()", cols["t1.created_at"]["default"])
+        self.assertIn(("maxLength", 80), rules(cols["t2.title"]))
+        self.assertEqual("'a (b'", cols["t3.label"]["default"])
+
+    def test_a_dollar_quoted_default_ends_nothing(self):
+        # Codex on #133: a `)` inside `$$…$$` ended the column list there.
+        # The tail makes the old last-paren slice fail too (CodeRabbit on #133).
+        self.write("schema.sql", "create table t4 (id uuid primary key, note text default $$a ) b$$, "
+                                 "title text not null default 'x') inherits (base);\n")
+        cols = columns(self.introspect("schema.sql"))
+        self.assertEqual("$$a ) b$$", cols["t4.note"]["default"])
+        self.assertEqual("'x'", cols["t4.title"]["default"])
+
+    def test_an_enum_label_with_a_quote_is_read_as_postgres_stores_it(self):
+        # Codex on #133: '' is one apostrophe, in CREATE TYPE and ALTER TYPE alike.
+        self.write("schema.sql", "create type role as enum ('it''s', 'b');\n"
+                                 "create table members (id uuid primary key, role role not null);\n"
+                                 "alter type role add value 'owner''s' before 'b';\n"
+                                 "alter type role rename value 'it''s' to 'its';\n")
+        self.assertEqual({"role": ["its", "owner's", "b"]}, self.introspect("schema.sql")["enums"])
+
+    def test_an_enum_label_keeps_its_spaces(self):
+        # Codex on #133: the statement was collapsed to one line, label included.
+        self.write("schema.sql", "create type stage as enum ('needs  review', 'done');\n"
+                                 "create table tasks (id uuid primary key, stage stage not null);\n"
+                                 "alter type stage add value 'on  hold' before 'done';\n"
+                                 "alter type stage rename value 'needs  review' to 'in\n  review';\n"
+                                 "create type kind as enum ('a\nb', 'c');\n")    # CodeRabbit on #133
+        self.assertEqual({"stage": ["in\n  review", "on  hold", "done"], "kind": ["a\nb", "c"]},
+                         self.introspect("schema.sql")["enums"])
+
     def test_columns_added_and_changed_later_are_replayed(self):
         # Migrations are read in order (N14); a column added later was dropped.
         self.write("schema.sql", "create table t (id uuid primary key, legacy text, title text);\n"

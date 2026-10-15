@@ -831,7 +831,7 @@ def _layers_from(paths: Sequence[Path]) -> List[str]:
     out: List[str] = []
     for p in paths:
         try:
-            text = p.read_text(encoding="utf-8")
+            text = p.read_text(encoding="utf-8-sig")
         except OSError:
             continue
         for m in LAYER_STMT.finditer(text):
@@ -848,7 +848,7 @@ def _snapshot_from_css_vendored(paths: List[Path], label: str) -> Snapshot:
     overrides: Dict[str, List[Dict[str, Any]]] = {}
     themes: List[str] = ["light"]
     for p in paths:
-        decls, found_themes, layers = parse_token_css(p.read_text(encoding="utf-8"))
+        decls, found_themes, layers = parse_token_css(p.read_text(encoding="utf-8-sig"))
         for t in found_themes:
             if t not in themes:
                 themes.append(t)

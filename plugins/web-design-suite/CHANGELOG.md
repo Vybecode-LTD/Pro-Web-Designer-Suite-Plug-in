@@ -145,6 +145,29 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   (`...(on ? { zIndex: 3 } : {})`, Codex on #132) too, and a comment before a key in
   markup hides it no longer (CodeRabbit on #132)
   (`test_audit_design.JsxClassesAndCssInJs`).
+- **`--reverse` left out a theme's value without a word** (H2, the 2026-10-14 audit). A
+  `[data-theme="dark"]` alias to a token the file does not declare was dropped from the
+  body with exit 0 and nothing said, so Figma showed the Light alias in Dark. It is
+  reported now, the mode named, and the exit is 1
+  (`test_figma_sync.ReverseReadsEveryTokenFormat`).
+- **A UTF-8 BOM on `tokens.css` emptied the system** (H3). `extract_system`, `build_docs`
+  and `diff_system` read it as plain UTF-8, so the first selector was `﻿:root`:
+  every token was theme-only, the contract empty, and `diff_system` called the whole
+  system removed and added (218 majors on the starter). They read the BOM now
+  (`test_project_config.ABomOnTheTokenFile`).
+- **The schema reader missed a migration's enum values** (H9). Only `CREATE TYPE` fed the
+  enums, so a value `ALTER TYPE … ADD VALUE` added was refused by the scaffold's server
+  draft and missing from the form. `ADD VALUE` (with `IF NOT EXISTS`, `BEFORE` and
+  `AFTER`) and `RENAME VALUE` are replayed on an enum the files created, and a label's
+  `''` is one apostrophe there and in `CREATE TYPE`, and its spaces are kept (Codex on
+  #133)
+  (`test_schema_sources.MigrationsThatDumpsRewrite`).
+- **A table's tail ran into its last column** (H10). The column list ended at the
+  statement's last `)`, so `PARTITION BY RANGE (created_at)`, `WITH (…)` or `INHERITS
+  (…)` became part of the last column's default, and a trailing table CHECK was lost. The
+  list ends at its own closing paren now, a paren inside a string or a `$$…$$` body
+  skipped (Codex on #133)
+  (`test_schema_sources.MigrationsThatDumpsRewrite`).
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
   too. It is a width and a height, so it is a size: reported when no `--width-*` role

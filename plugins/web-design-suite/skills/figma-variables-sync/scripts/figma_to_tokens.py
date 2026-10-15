@@ -1273,7 +1273,15 @@ def reverse_body(data: Any, collection_split: bool = True) -> Tuple[dict, List[P
                 src = themes[theme].get(token) or entry
                 tvalue, terr = to_figma_value(token, src, token_type(src, token, base))
                 if terr:
-                    continue        # already reported; the default mode carries the token
+                    # Pass 2 reads the default values only, so a theme's own
+                    # value that cannot cross was dropped without a word, and
+                    # Figma showed the default in that mode (audit H2).
+                    why = terr.split(" Dropped from the payload")[0]
+                    problems.append(Problem(
+                        "dropped", f"{token} [{theme.title()}]",
+                        f"In the {theme.title()} mode, {why} That mode's value is left out, so "
+                        "Figma shows the default mode's value there until it is corrected."))
+                    continue
                 mode_values.append({"variableId": var_id_of[token], "modeId": tmid,
                                     "value": tvalue})
 

@@ -172,6 +172,12 @@ def _p(rx: str) -> re.Pattern[str]:
     return re.compile(rx, re.I)
 
 
+def _ps(rx: str) -> re.Pattern[str]:
+    """For a statement whose string literals keep their own whitespace, newlines
+    included: `.` crosses them (CodeRabbit on #133)."""
+    return re.compile(rx, re.I | re.S)
+
+
 class _NamePattern:
     """A pattern over column and table names that reads camelCase as
     snake_case: a Prisma or Drizzle field named the JavaScript way
@@ -486,6 +492,16 @@ def dollar_quote_end(text: str, i: int) -> int | None:
     return len(text) if close == -1 else close + len(m.group(0))
 
 
+def one_line_outside_strings(stmt: str) -> str:
+    """The statement on one line, each run of whitespace one space, except
+    inside a string literal: `'needs  review'` is the label Postgres stores
+    (Codex on #133)."""
+    out: list[str] = []
+    for i, part in enumerate(re.split(r"('(?:[^']|'')*')", stmt)):
+        out.append(part if i % 2 else re.sub(r"\s+", " ", part))
+    return "".join(out).strip()
+
+
 def split_top_level(text: str, sep: str) -> list[str]:
     """Split on `sep` at paren depth 0, respecting quotes."""
     parts: list[str] = []
@@ -630,10 +646,23 @@ COL_MODIFIER_SPLIT = _p(r"\s+")
 
 RE_CREATE_TABLE = _p(r"^\s*create\s+(?:unlogged\s+|temp\s+|temporary\s+)?table"
                      r"(?:\s+if\s+not\s+exists)?\s+((?:\"[^\"]+\"|[\w.])+)\s*\(")
-RE_CREATE_ENUM = _p(r"^\s*create\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+as\s+enum\s*\((.*)\)\s*$")
+RE_CREATE_ENUM = _ps(r"^\s*create\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+as\s+enum\s*\((.*)\)\s*$")
 RE_CREATE_INDEX = _p(r"^\s*create\s+(unique\s+)?index(?:\s+concurrently)?"
                      r"(?:\s+if\s+not\s+exists)?\s+(?:\"[^\"]+\"|[\w.])+\s+on\s+((?:\"[^\"]+\"|[\w.])+)"
                      r"(?:\s+using\s+\w+)?\s*\((.*?)\)\s*(where\b.*)?$")
+RE_ALTER_ENUM_ADD = _ps(r"^\s*alter\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+add\s+value(?:\s+if\s+not\s+exists)?"
+                       r"\s+'((?:[^']|'')*)'(?:\s+(before|after)\s+'((?:[^']|'')*)')?\s*$")
+RE_ALTER_ENUM_RENAME = _ps(r"^\s*alter\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+rename\s+value\s+'((?:[^']|'')*)'"
+                          r"\s+to\s+'((?:[^']|'')*)'\s*$")
+
+
+def enum_label(literal: str) -> str:
+    """An enum label as Postgres stores it: `'owner''s'` is `owner's` (Codex
+    on #133), in CREATE TYPE and ALTER TYPE alike."""
+    literal = literal.strip()
+    if len(literal) >= 2 and literal[0] == literal[-1] == "'":
+        return literal[1:-1].replace("''", "'")
+    return literal.strip("'")
 RE_ALTER_TABLE = _p(r"^\s*alter\s+table(?:\s+if\s+exists)?(?:\s+only)?\s+((?:\"[^\"]+\"|[\w.])+)\s+(.*)$")
 RE_ADD_CONSTRAINT = _p(r"^add\s+(?:constraint\s+(?:\"[^\"]+\"|[\w$]+)\s+)?"
                        r"(?=(?:primary\s+key|foreign\s+key|unique|check|exclude|not\s+null)\b)")
@@ -878,12 +907,37 @@ def parse_ddl(text: str) -> Model:
 
     for stmt in statements:
         one_line = re.sub(r"\s+", " ", stmt).strip()
+        # An enum's labels are read with their own whitespace (Codex on #133).
+        exact = one_line_outside_strings(stmt)
 
-        m = RE_CREATE_ENUM.match(one_line)
+        m = RE_CREATE_ENUM.match(exact)
         if m:
             name = bare_table_name(m.group(1))
-            values = [v.strip().strip("'") for v in split_top_level(m.group(2), ",")]
+            values = [enum_label(v) for v in split_top_level(m.group(2), ",")]
             model.enums[name] = [v for v in values if v]
+            continue
+
+        # Migrations extend an enum rather than recreate it (audit H9). Only
+        # an enum these files created is changed: one created elsewhere has
+        # values this run never saw.
+        m = RE_ALTER_ENUM_ADD.match(exact)
+        if m:
+            values = model.enums.get(bare_table_name(m.group(1)))
+            label = enum_label(f"'{m.group(2)}'")
+            anchor = enum_label(f"'{m.group(4)}'") if m.group(4) is not None else None
+            if values is not None and label not in values:
+                at = len(values)
+                if anchor in values:
+                    at = values.index(anchor) + (m.group(3).lower() == "after")
+                values.insert(at, label)
+            continue
+
+        m = RE_ALTER_ENUM_RENAME.match(exact)
+        if m:
+            values = model.enums.get(bare_table_name(m.group(1)))
+            old, new = enum_label(f"'{m.group(2)}'"), enum_label(f"'{m.group(3)}'")
+            if values is not None and old in values:
+                values[values.index(old)] = new
             continue
 
         m = RE_CREATE_TABLE.match(one_line)
@@ -998,8 +1052,10 @@ def _parse_create_table(stmt: str, model: Model) -> Table:
     head_end = stmt.index("(")
     m = RE_CREATE_TABLE.match(re.sub(r"\s+", " ", stmt))
     name = bare_table_name(m.group(1)) if m else "unknown"
-    body_end = stmt.rindex(")")
-    body = stmt[head_end + 1:body_end]
+    # The column list's own closing paren: a tail (`PARTITION BY RANGE (…)`,
+    # `WITH (…)`, `INHERITS (…)`) has parens too, and the last one ran into
+    # the last column (audit H10).
+    body = _balanced_slice(stmt, head_end)
     table = Table(name=name)
 
     constraints = []
@@ -1103,8 +1159,19 @@ def _parse_column_def(item: str, table: Table, model: Model) -> Column | None:
 
 
 def _balanced_slice(text: str, open_idx: int) -> str:
+    """The text inside the parenthesis opened at `open_idx`, a paren inside a
+    string literal (`default '('`) or a dollar-quoted body (`default $$a ) b$$`,
+    Codex on #133) skipped."""
     depth, i, n = 0, open_idx, len(text)
     while i < n:
+        if text[i] in "'\"":
+            end = text.find(text[i], i + 1)       # '' and "" escapes are two literals
+            i = n if end < 0 else end + 1
+            continue
+        end = dollar_quote_end(text, i) if text[i] == "$" else None
+        if end is not None:
+            i = end
+            continue
         if text[i] == "(":
             depth += 1
         elif text[i] == ")":
