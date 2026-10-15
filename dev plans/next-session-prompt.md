@@ -1,13 +1,15 @@
 # Start here: the next session
 
-**Written 2026-10-15**, at the end of the third session that day, which finished P53 and did P54 parts 1 to 3 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Four PRs merged and one is open:
+**Written 2026-10-15**, at the end of the third session that day, which finished P53 and did P54 parts 1 to 4 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Seven PRs merged, and no PR is open:
 - **#142, P53 part 5 (the cmd.exe placeholders: D4, G13, E14; §7 class 9)**, merged as `8be665f`. Every placeholder in a command is in capitals; the email quick start pastes into bash, PowerShell and cmd; `test_docs.PlaceholdersInCapitals` reads every shell fence and inline command in the plugin's docs and the repository's live docs. **P53 is done; N45 is closed.**
 - **#143, P54 part 1 (§3.1: S3, S4)**, merged as `6bb88c5`. The router hears a shared word (a token, a critique, a state, Lighthouse) only beside one of the skill's own (`about()`); `dtcg.css_colour()` reads the legacy comma form under `rgb()` and `hsl()`.
 - **#144, P54 part 3 (§3.3: M2 to M6; M1 did not reproduce)**, merged as `e55727f`. The census counts every Tailwind variant and a minus, files `other-length` apart, keeps a z-index's sign; the §6 role table is `role_for()`'s.
-- **#145, P54 part 2 (§3.2: W1 to W5)**, **open at the end**: green and clean at `4bf3564`, then `main` (#144) merged in as `3a7a922` and a last CodeRabbit fix as `3d480f3`, whose CI was running. Merge it first (§3).
+- **#145, P54 part 2 (§3.2: W1 to W5)**, merged as `fb2280a`: translucent colours refused before parsing, `worst_contrast`, `tw_probe`'s `KEPT_UNDER`, inserted and dotted layers in both CSS gates, the `url()` exemption only when the url is the whole value.
+- **#147, P54 part 4 (§3.4's first half: V4, V5, V6, V9, the 8-digit hex)**, merged as `cc0562b`. `deprecate scan` skips the suite's own records, `deprecate add` refuses a dead or undeclared `--replacement`, `build_docs` escapes its inlined index, `diff_system` reads a contract folder and a hex's alpha.
+- **#146** and **#148**, the session's docs.
 - **Reviews:** 17 real findings, each fixed with a test failing on the head it reviewed: #142 4 (Codex 1, CodeRabbit 3, one declined with reasons and withdrawn), #143 2 (Codex), #144 1 (Codex), #145 6 (Codex 2 over two rounds, CodeRabbit 2, and two more the audit shared).
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **merge #145, then P54's remaining areas, §3.4 to §3.8** (§4).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P54 part 5, §3.4's second half (V2, V3, V10, `extract_system --tokens` on JSON), then §3.5 to §3.8** (§4).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -192,6 +194,8 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Resolve only the threads you answered, by id.** A loop over every unresolved thread closed two CodeRabbit threads that had not been read (#145); they were reopened, answered and resolved.
       - **`git add -u` before `check.py` stages the work for the next commit, whatever its message**: #145's fixes went into `f761c84` under the role table's message, already pushed. Commit the work first, then run the check.
       - **A merge from `main` brings back a row the earlier PR removed.** Each branch cut before #142 restored the `| P53 |` row; drop it after keeping both sides (`keep_both.py`, `merge_n46.py` in this session's scratchpad show the method).
+      - **A fix in one reader must reach every path to it** (Codex on #147): `diff_system` reads snapshots through `extract_system`'s resolver unless `--no-upstream`, and the first test passed that flag, which hid the default path. Run a reader's test both ways.
+      - **The tools decode escapes:** the Edit tool turned a JSON unicode escape written in a CHANGELOG line into the character itself, and GNU `sed` reads a backslash-u in a replacement as "uppercase the next". Write such text with Python and `chr(92)`, and read the line back.
       - **Declined, with reasons:** CodeRabbit asked the email quick start to use path-form commands; every skill's opening note sets the module form's convention, and the SKILL.md was 3 bytes under budget. It withdrew.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
@@ -432,16 +436,15 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.
 
-## 3. First: the state of `main`, and #145
+## 3. First: the state of `main`
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then:
-- **#145** (P54 part 2, §3.2) was open at the end, every thread resolved, its last head `3d480f3` (CI running). If its CI is green and GitHub says clean, merge it (merge commit, `--match-head-commit` with the full SHA), then delete `fix/studio-mediums`. If `main` moved, merge `main` in first, keeping both sides of the CHANGELOG and the plan.
-- **The docs PR, #146**, may still be open: merge it the same way once green.
+- **The docs PR, #148**, may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
 - Then read `docs/HANDOFF.md`'s Warnings.
 
 ## 4. Phase 6c, 4.0.0: P54's remaining areas, then P55
 
-**The owner placed all of Phase 6c first (2026-10-14).** P53 is done (#136, #138, #139, #140, #142). P54 is one PR per audit §3 area: parts 1 to 3 merged (§3.1 #143, §3.2 #145, §3.3 #144). Five areas remain, then P55 (the lows), then Phase 6b's workstreams (ask the owner which comes first then). Keep each PR under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+**The owner placed all of Phase 6c first (2026-10-14).** P53 is done (#136, #138, #139, #140, #142). P54 is one PR per audit §3 area: parts 1 to 4 merged (§3.1 #143, §3.2 #145, §3.3 #144, §3.4's first half #147). §3.4's second half and four areas remain, then P55 (the lows), then Phase 6b's workstreams (ask the owner which comes first then). Keep each PR under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
@@ -452,17 +455,13 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 **Run each finding's own fixture first.** Last session M1 did not reproduce (#135 had fixed it), and the audit's line numbers have drifted. The fixtures are in the audit's scratchpad (`3985bfd1-…\scratchpad\migration\fx1..fx7`, `studio\`, `shared\fx`, …), which Storage Sense can empty: rebuild a case from the audit's text if it is gone. **Already closed by P53, so skip them:** V7, V8, V11, E9, G3, G4, S1, S2, W6, W7.
 
-**P54 part 4, §3.4 (design-system-versioning, design-system-docs, figma-variables-sync).** Next.
+**P54 part 5, §3.4's second half (design-system-versioning, design-system-docs, figma-variables-sync).** Next. #147 closed V4, V5, V6, V9 and the 8-digit hex (`TheAuditsVersioningMediums`); add the next tests to that class.
 - **V2.** `diff_system._snapshot_from_contract()`: with several DTCG files, a later file's `notWritten` value loses to an earlier file's written value (`if name not in held`); last wins elsewhere. Walk the files once, in order, as `read_tokens` does.
 - **V3.** `deprecate.py import` reads `read_deprecations()` only; the `$deprecated` marks in the root `$extensions` (`not_written_marks()`) that `diff_system` honours are never imported. Do it once, in the shared `read_deprecations`.
-- **V4.** `deprecate scan` reads `.json`, `.md` and `.mdx`, so the migration's own `mapping.json` (its rules hold `var(--fg-faint)`) scans as manual hits, "NOT SAFE to remove", forever. Skip a JSON whose `schema` is the mapping's or the ledger's.
-- **V5.** `deprecate add --replacement` is never looked up: a replacement that is itself deprecated, or undeclared in `--source`, is accepted.
-- **V6.** `build_docs.py` inlines the search index into `<script>` unescaped: a `</script>` in a note ends it. Replace `</` with `<\/`.
-- **V9.** versioning's `scripts.md` and `diff_system --help` say "a `contract.json`, or a directory containing one"; `load_snapshot` looks in a folder for `system.json`, `tokens.css` and `theme.css` only (exit 2).
 - **V10.** The "copy the scripts into your own `scripts/`" notes in three SKILL.md files name only the command scripts, not the `project_config.py`, `dtcg.py` and `figma_common.py` they import, and `install_gate.py` vendors none of these three skills' commands, so a copied command fails with `ModuleNotFoundError`: each note must name its helpers. Mind the SKILL.md budgets (§2).
-- **Found by the 2026-10-15 sessions:** `diff_system`'s snapshot resolver reads `#2563eb80` as opaque, so its contrast is measured as if solid (`generate_color_ramp.alpha_of()` exists since #145); and `extract_system --tokens` reads a JSON file as CSS, so a DTCG token file gives zero tokens with exit 0.
+- **Found 2026-10-15:** `extract_system --tokens` reads a JSON file as CSS, so a DTCG token file gives zero tokens with exit 0. Read it through `project_config.read_tokens`, as the gates do.
 
-**P54 part 5, §3.5 (content-model-to-ui, client-presentation-builder, email-template-system).**
+**P54 part 6, §3.5 (content-model-to-ui, client-presentation-builder, email-template-system).**
 - **E1.** `introspect_schema._temporal`: a naive `timestamp` `created_at`/`updated_at` (every Prisma `DateTime @default(now())`, Drizzle `timestamp()` without `withTimezone`) becomes an editable field; `system` is used in the `date` and `timestamptz` branches only.
 - **E2.** `scaffold_ui.py`: a table name goes into output paths unsanitised (`../evil` writes above `features/`). Refuse `/`, `\`, `..`, NUL, or slug it.
 - **E3.** `scaffold_ui.py`: a column `"2fa"` gives a TSX and a Python syntax error; `"it's"` an unterminated string. `class`, `default`, `from`, `display-name` and `naïve` already work: keep them as controls. The audit suggests `json.dumps` for names, `errors[…]` when the key differs, and a `_` prefix for a leading digit.
@@ -473,23 +472,23 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 - **E8.** The three templates do not pass `lint_email --source` (6, 6 and 1 warnings), though SKILL.md says they compile clean. The SKILL.md is at its budget.
 - **E10.** `build_presentation`: header placeholders (`<company>`, `<your name>`, `<YYYY-MM-DD>`, `<stage>`) reach the cover and footer with no gap reported.
 
-**P54 part 6, §3.6 (a11y-audit-runner, perf-budget-gate, component-state-matrix, design-critique-gate).**
+**P54 part 7, §3.6 (a11y-audit-runner, perf-budget-gate, component-state-matrix, design-critique-gate).**
 - **G1.** `a11y_static`'s `aria-hidden-focusable` counts descendants that cannot take focus (`type="hidden"`, `hidden`, `inert`, `tabindex="-1"`), and only direct children.
 - **G2.** `a11y_static._has_name` looks one level deep and has no case for a capitalised component child: `<button><Icon/></button>` must be "cannot tell".
 - **G5.** `a11y_runtime.mjs`' `forcedColorsSurvey`: the unanchored `/button|a|summary/` matches `main`, `nav`, `span`…; anchor it.
 - **G6.** The macOS TBT flake has a cause: the control click lands at load + 500 ms, inside the fixture's 3-second task on a slow runner. Make it deterministic.
 - **G7.** `automation-coverage.md` §3 reads as this suite's coverage, but several mechanisms are in neither gate (1.3.4, 2.4.11, 3.3.8…).
 
-**P54 part 7, §3.7 (docs, CI, release).**
+**P54 part 8, §3.7 (docs, CI, release).**
 - **D1.** HANDOFF lists "a local build never matches the release's checksums" as open, and `tooling/README.md` says byte-identical; `build.py` explains why (zlib-ng on Windows Python 3.14). Make the docs say it.
 - **D2.** `release.yml` pins `actions/checkout` and `setup-uv` by tag while holding `contents: write`; pin both to SHAs, `persist-credentials: false`, as `evals.yml` does.
 - **D3.** The plugin README says "the three browser scripts need Node"; there are six `.mjs` entry scripts.
 
-**P54 part 8, §3.8 (the test suite).**
+**P54 part 9, §3.8 (the test suite).**
 - **T1.** `test_evidence.test_no_entry_outlives_its_figure` passes when any `also` substring is in the doc; require the figure itself.
 - **T2.** Wall-clock thresholds on shared runners (`test_content_and_a11y` `assertLess(large, 20)`, the TBT medians, `test_token_migration`); keep the ratio bounds, drop the absolute ones.
 
-**Each PR:** run each finding's fixture first; tests fail on `v3.6.0` first (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES`; the CHANGELOG under 4.0.0's Fixed; a row `P54 part N, #N` above the `P54` row, and a note in the completion plan's N46. After part 8, remove the `P54` row and mark N46 done.
+**Each PR:** run each finding's fixture first; tests fail on `v3.6.0` first (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES`; the CHANGELOG under 4.0.0's Fixed; a row `P54 part N, #N` above the `P54` row, and a note in the completion plan's N46. After part 9, remove the `P54` row and mark N46 done.
 
 **R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed (a Vue project's bound attributes, the index-mode hook), the migration's reconciliation on a real codebase (P52), and the router (#143).
 
