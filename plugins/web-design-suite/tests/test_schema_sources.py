@@ -189,11 +189,12 @@ class MigrationsThatDumpsRewrite(SchemaSources):
 
     def test_a_dollar_quoted_default_ends_nothing(self):
         # Codex on #133: a `)` inside `$$…$$` ended the column list there.
+        # The tail makes the old last-paren slice fail too (CodeRabbit on #133).
         self.write("schema.sql", "create table t4 (id uuid primary key, note text default $$a ) b$$, "
-                                 "title text not null);\n")
+                                 "title text not null default 'x') inherits (base);\n")
         cols = columns(self.introspect("schema.sql"))
         self.assertEqual("$$a ) b$$", cols["t4.note"]["default"])
-        self.assertIn("t4.title", cols)
+        self.assertEqual("'x'", cols["t4.title"]["default"])
 
     def test_an_enum_label_with_a_quote_is_read_as_postgres_stores_it(self):
         # Codex on #133: '' is one apostrophe, in CREATE TYPE and ALTER TYPE alike.
@@ -208,8 +209,10 @@ class MigrationsThatDumpsRewrite(SchemaSources):
         self.write("schema.sql", "create type stage as enum ('needs  review', 'done');\n"
                                  "create table tasks (id uuid primary key, stage stage not null);\n"
                                  "alter type stage add value 'on  hold' before 'done';\n"
-                                 "alter type stage rename value 'needs  review' to 'in\n  review';\n")
-        self.assertEqual({"stage": ["in\n  review", "on  hold", "done"]}, self.introspect("schema.sql")["enums"])
+                                 "alter type stage rename value 'needs  review' to 'in\n  review';\n"
+                                 "create type kind as enum ('a\nb', 'c');\n")    # CodeRabbit on #133
+        self.assertEqual({"stage": ["in\n  review", "on  hold", "done"], "kind": ["a\nb", "c"]},
+                         self.introspect("schema.sql")["enums"])
 
     def test_columns_added_and_changed_later_are_replayed(self):
         # Migrations are read in order (N14); a column added later was dropped.

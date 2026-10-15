@@ -1280,8 +1280,7 @@ def reverse_body(data: Any, collection_split: bool = True) -> Tuple[dict, List[P
                     problems.append(Problem(
                         "dropped", f"{token} [{theme.title()}]",
                         f"In the {theme.title()} mode, {why} That mode's value is left out, so "
-                        "Figma shows the default mode's value there: declare the token or "
-                        "fix the alias."))
+                        "Figma shows the default mode's value there until it is corrected."))
                     continue
                 mode_values.append({"variableId": var_id_of[token], "modeId": tmid,
                                     "value": tvalue})

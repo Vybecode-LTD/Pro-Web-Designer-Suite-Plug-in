@@ -172,6 +172,12 @@ def _p(rx: str) -> re.Pattern[str]:
     return re.compile(rx, re.I)
 
 
+def _ps(rx: str) -> re.Pattern[str]:
+    """For a statement whose string literals keep their own whitespace, newlines
+    included: `.` crosses them (CodeRabbit on #133)."""
+    return re.compile(rx, re.I | re.S)
+
+
 class _NamePattern:
     """A pattern over column and table names that reads camelCase as
     snake_case: a Prisma or Drizzle field named the JavaScript way
@@ -640,13 +646,13 @@ COL_MODIFIER_SPLIT = _p(r"\s+")
 
 RE_CREATE_TABLE = _p(r"^\s*create\s+(?:unlogged\s+|temp\s+|temporary\s+)?table"
                      r"(?:\s+if\s+not\s+exists)?\s+((?:\"[^\"]+\"|[\w.])+)\s*\(")
-RE_CREATE_ENUM = _p(r"^\s*create\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+as\s+enum\s*\((.*)\)\s*$")
+RE_CREATE_ENUM = _ps(r"^\s*create\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+as\s+enum\s*\((.*)\)\s*$")
 RE_CREATE_INDEX = _p(r"^\s*create\s+(unique\s+)?index(?:\s+concurrently)?"
                      r"(?:\s+if\s+not\s+exists)?\s+(?:\"[^\"]+\"|[\w.])+\s+on\s+((?:\"[^\"]+\"|[\w.])+)"
                      r"(?:\s+using\s+\w+)?\s*\((.*?)\)\s*(where\b.*)?$")
-RE_ALTER_ENUM_ADD = _p(r"^\s*alter\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+add\s+value(?:\s+if\s+not\s+exists)?"
+RE_ALTER_ENUM_ADD = _ps(r"^\s*alter\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+add\s+value(?:\s+if\s+not\s+exists)?"
                        r"\s+'((?:[^']|'')*)'(?:\s+(before|after)\s+'((?:[^']|'')*)')?\s*$")
-RE_ALTER_ENUM_RENAME = _p(r"^\s*alter\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+rename\s+value\s+'((?:[^']|'')*)'"
+RE_ALTER_ENUM_RENAME = _ps(r"^\s*alter\s+type\s+((?:\"[^\"]+\"|[\w.])+)\s+rename\s+value\s+'((?:[^']|'')*)'"
                           r"\s+to\s+'((?:[^']|'')*)'\s*$")
 
 
@@ -900,9 +906,11 @@ def parse_ddl(text: str) -> Model:
     statements = [s.strip() for s in split_top_level(clean, ";") if s.strip()]
 
     for stmt in statements:
-        one_line = one_line_outside_strings(stmt)
+        one_line = re.sub(r"\s+", " ", stmt).strip()
+        # An enum's labels are read with their own whitespace (Codex on #133).
+        exact = one_line_outside_strings(stmt)
 
-        m = RE_CREATE_ENUM.match(one_line)
+        m = RE_CREATE_ENUM.match(exact)
         if m:
             name = bare_table_name(m.group(1))
             values = [enum_label(v) for v in split_top_level(m.group(2), ",")]
@@ -912,7 +920,7 @@ def parse_ddl(text: str) -> Model:
         # Migrations extend an enum rather than recreate it (audit H9). Only
         # an enum these files created is changed: one created elsewhere has
         # values this run never saw.
-        m = RE_ALTER_ENUM_ADD.match(one_line)
+        m = RE_ALTER_ENUM_ADD.match(exact)
         if m:
             values = model.enums.get(bare_table_name(m.group(1)))
             label = enum_label(f"'{m.group(2)}'")
@@ -924,7 +932,7 @@ def parse_ddl(text: str) -> Model:
                 values.insert(at, label)
             continue
 
-        m = RE_ALTER_ENUM_RENAME.match(one_line)
+        m = RE_ALTER_ENUM_RENAME.match(exact)
         if m:
             values = model.enums.get(bare_table_name(m.group(1)))
             old, new = enum_label(f"'{m.group(2)}'"), enum_label(f"'{m.group(3)}'")
