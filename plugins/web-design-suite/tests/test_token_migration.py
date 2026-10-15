@@ -1195,6 +1195,18 @@ class TheProposalAccountsForTheCensus(TempDirTest):
         self.assertNotIn("and 192px", row["recommendation"])
         self.assertIn("above the spacing scale", row["recommendation"])
 
+    def test_a_height_takes_no_width_step(self):
+        # Codex on #135: the codemod applies a rule by class and value, so a
+        # height near a width step, or a width that shares its value with a
+        # height, would have read --width-form.
+        self.write("src/a.css", ".a { height: 448px; }\n.b { min-height: 1140px; }\n"
+                                ".c { width: 1440px; }\n.d { max-height: 1440px; }\n.e { max-width: 1152px; }\n")
+        mapping, _ = MigrationPipeline.cluster(self, MigrationPipeline.extract(self, "src")[0])
+        widths = {r["match"][0]: r["token"] for r in mapping["rules"] if r["token"].startswith("--width-")}
+        self.assertEqual(widths, {"1152px": "--width-content"})
+        rows = {u["value"] for u in mapping["unmapped"]}
+        self.assertLessEqual({"448px", "1140px", "1440px"}, rows)
+
 
 if __name__ == "__main__":
     unittest.main()

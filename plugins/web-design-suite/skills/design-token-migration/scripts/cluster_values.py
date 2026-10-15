@@ -400,6 +400,9 @@ TRACKING_STEPS: List[Tuple[float, str]] = [
 WIDTH_STEPS: List[Tuple[float, str]] = [
     (448, "--width-form"), (1152, "--width-content"), (1440, "--width-wide"),
 ]
+# The properties a --width-* role may replace: a horizontal size, never a
+# height, nor flex-basis, which is a height in a column.
+WIDTH_PROPS = {"width", "min-width", "max-width", "tw:w", "tw:min-w", "tw:max-w"}
 EASINGS: List[Tuple[str, Tuple[float, float, float, float]]] = [
     ("--ease-out", (0.22, 1.0, 0.36, 1.0)),
     ("--ease-in", (0.64, 0.0, 0.78, 0.0)),
@@ -1193,8 +1196,10 @@ def cluster_spacing(lits: Sequence[dict], tol: float, prop: Proposal,
             css_items = [l for l in items if l["context"] not in TW_CONTEXTS]
             # A width meets the width steps before the 4px scale, which ends at
             # 192px: snapped first, 1152px never reached --width-content (H13).
+            # Only a width: the codemod applies a rule by class and value, so a
+            # height of the same value would read --width-form (Codex on #135).
             width = (snap_to_scale(px, [w for w, _ in WIDTH_STEPS], 24.0)
-                     if klass == "size" else None)
+                     if klass == "size" and all(l["prop"] in WIDTH_PROPS for l in items) else None)
             snapped = width or snap_to_scale(px, SPACE_PX, tol, weights, tie_prefers="down")
             if snapped is None:
                 nearest = min(SPACE_PX, key=lambda s: abs(s - px))
@@ -1286,9 +1291,9 @@ def _spacing_recommendation(px: float, klass: str) -> str:
         if klass == "size":
             widths = ", ".join(f"{w:g}px {name}" for w, name in WIDTH_STEPS)
             return (f"{px:g}px is above the spacing scale, which ends at {top:g}px "
-                    f"({SPACE_NAME[top]}), and more than 24px from every width step "
-                    f"({widths}). A width this size is a layout decision: take a "
-                    f"--width-* role, a fluid min() or clamp(), or a percentage.")
+                    f"({SPACE_NAME[top]}). A size this large is a layout decision: for "
+                    f"a width, a --width-* role ({widths}); for any size, a fluid "
+                    f"min() or clamp(), or a percentage.")
         return (f"{px:g}px is above the scale, which ends at {top:g}px "
                 f"({SPACE_NAME[top]}). A space this large is a layout decision, not "
                 f"a rung: the fluid --space-section, a width, or a position.")

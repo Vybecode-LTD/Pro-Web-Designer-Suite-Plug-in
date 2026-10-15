@@ -181,8 +181,9 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 - **A width never reached its width step** (H13). The proposal snapped a length to the 4px
   scale, which ends at 192px, before trying `--width-form`, `--width-content` and
   `--width-wide`, so `max-width: 1152px` was unmapped and every length past 195px read
-  "Decide between 192px and 192px". A width or height meets the width steps first, and
-  past the scale the advice says so
+  "Decide between 192px and 192px". A width meets the width steps first (a height never:
+  the codemod would apply the rule to it, Codex on #135), and past the scale the advice
+  says so
   (`TheProposalAccountsForTheCensus.test_a_width_reaches_its_width_step`).
 - **A project's ramp step the proposal could not read was rebuilt without a word** (found
   beside H11). A step in `hwb()`, or a translucent one, was built as if the project had

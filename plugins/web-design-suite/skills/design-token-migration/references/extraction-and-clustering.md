@@ -142,7 +142,7 @@ Property first, value shape second. The property is authoritative because the sa
 
 | Kind | Decided by | Maps onto |
 |---|---|---|
-| `length` | property ∈ spacing/size set | The closed 4px scale → proximity ladder or inset roles; a width or height meets the `--width-*` steps first |
+| `length` | property ∈ spacing/size set | The closed 4px scale → proximity ladder or inset roles; a width (never a height) meets the `--width-*` steps first |
 | `radius` | property ∈ radius set | `--radius-*` |
 | `border-width` | property ∈ border-width set, or a length slot in a `border` shorthand | `--stroke-*` |
 | `font-size` | `font-size`, or `text-[…]` with a length | `--type-*` (whole-declaration rewrite) |
