@@ -459,19 +459,19 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 - **V5.** `deprecate add --replacement` is never looked up: a replacement that is itself deprecated, or undeclared in `--source`, is accepted.
 - **V6.** `build_docs.py` inlines the search index into `<script>` unescaped: a `</script>` in a note ends it. Replace `</` with `<\/`.
 - **V9.** versioning's `scripts.md` and `diff_system --help` say "a `contract.json`, or a directory containing one"; `load_snapshot` looks in a folder for `system.json`, `tokens.css` and `theme.css` only (exit 2).
-- **V10.** The "copy the scripts into your own `scripts/`" notes in three SKILL.md files name only the command scripts, not the `project_config.py`, `dtcg.py` and `figma_common.py` they import (`install_gate.py` vendors them). Mind the SKILL.md budgets (§2).
+- **V10.** The "copy the scripts into your own `scripts/`" notes in three SKILL.md files name only the command scripts, not the `project_config.py`, `dtcg.py` and `figma_common.py` they import, and `install_gate.py` vendors none of these three skills' commands, so a copied command fails with `ModuleNotFoundError`: each note must name its helpers. Mind the SKILL.md budgets (§2).
 - **Found by the 2026-10-15 sessions:** `diff_system`'s snapshot resolver reads `#2563eb80` as opaque, so its contrast is measured as if solid (`generate_color_ramp.alpha_of()` exists since #145); and `extract_system --tokens` reads a JSON file as CSS, so a DTCG token file gives zero tokens with exit 0.
 
 **P54 part 5, §3.5 (content-model-to-ui, client-presentation-builder, email-template-system).**
 - **E1.** `introspect_schema._temporal`: a naive `timestamp` `created_at`/`updated_at` (every Prisma `DateTime @default(now())`, Drizzle `timestamp()` without `withTimezone`) becomes an editable field; `system` is used in the `date` and `timestamptz` branches only.
 - **E2.** `scaffold_ui.py`: a table name goes into output paths unsanitised (`../evil` writes above `features/`). Refuse `/`, `\`, `..`, NUL, or slug it.
-- **E3.** `scaffold_ui.py`: a column `"2fa"` gives a TSX and a Python syntax error; `"it's"` an unterminated string; `class`, `default` and `from` collide with keywords.
+- **E3.** `scaffold_ui.py`: a column `"2fa"` gives a TSX and a Python syntax error; `"it's"` an unterminated string. `class`, `default`, `from`, `display-name` and `naïve` already work: keep them as controls. The audit suggests `json.dumps` for names, `errors[…]` when the key differs, and a `_` prefix for a leading digit.
 - **E4.** `introspect_schema._pinned_to_caller` misses `auth.uid()::text = owner_id::text`, `(auth.jwt() ->> 'sub')::uuid = user_id` and `auth.uid() = "userId"`: false `authority-writable` warnings.
 - **E5.** `detect_format` tests `"pgTable("`, while `parse_drizzle` accepts `pgTable.withRLS(`.
 - **E6.** `build_email.minify_html` joins words across inline siblings (`<strong>Hello</strong> <em>world</em>`).
 - **E7.** `email-client-matrix.md` says the templates keep "600–750 bytes" of `<style>`; the build measures 751, 919 and 830.
 - **E8.** The three templates do not pass `lint_email --source` (6, 6 and 1 warnings), though SKILL.md says they compile clean. The SKILL.md is at its budget.
-- **E10.** `build_presentation`: header placeholders (`<company>`, `<your name>`, `<YYYY-MM-DD>`) reach the cover and footer with no gap reported.
+- **E10.** `build_presentation`: header placeholders (`<company>`, `<your name>`, `<YYYY-MM-DD>`, `<stage>`) reach the cover and footer with no gap reported.
 
 **P54 part 6, §3.6 (a11y-audit-runner, perf-budget-gate, component-state-matrix, design-critique-gate).**
 - **G1.** `a11y_static`'s `aria-hidden-focusable` counts descendants that cannot take focus (`type="hidden"`, `hidden`, `inert`, `tabindex="-1"`), and only direct children.
