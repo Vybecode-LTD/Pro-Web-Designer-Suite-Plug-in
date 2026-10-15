@@ -4,7 +4,7 @@
 - **#142, P53 part 5 (the cmd.exe placeholders: D4, G13, E14; §7 class 9)**, merged as `8be665f`. Every placeholder in a command is in capitals; the email quick start pastes into bash, PowerShell and cmd; `test_docs.PlaceholdersInCapitals` reads every shell fence and inline command in the plugin's docs and the repository's live docs. **P53 is done; N45 is closed.**
 - **#143, P54 part 1 (§3.1: S3, S4)**, merged as `6bb88c5`. The router hears a shared word (a token, a critique, a state, Lighthouse) only beside one of the skill's own (`about()`); `dtcg.css_colour()` reads the legacy comma form under `rgb()` and `hsl()`.
 - **#144, P54 part 3 (§3.3: M2 to M6; M1 did not reproduce)**, merged as `e55727f`. The census counts every Tailwind variant and a minus, files `other-length` apart, keeps a z-index's sign; the §6 role table is `role_for()`'s.
-- **#145, P54 part 2 (§3.2: W1 to W5)**, **open at the end**: green and clean at `4bf3564`, then `main` (#144) merged in as `3a7a922`, whose CI was running. Merge it first (§3).
+- **#145, P54 part 2 (§3.2: W1 to W5)**, **open at the end**: green and clean at `4bf3564`, then `main` (#144) merged in as `3a7a922` and a last CodeRabbit fix as `3d480f3`, whose CI was running. Merge it first (§3).
 - **Reviews:** 17 real findings, each fixed with a test failing on the head it reviewed: #142 4 (Codex 1, CodeRabbit 3, one declined with reasons and withdrawn), #143 2 (Codex), #144 1 (Codex), #145 6 (Codex 2 over two rounds, CodeRabbit 2, and two more the audit shared).
 
 Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **merge #145, then P54's remaining areas, §3.4 to §3.8** (§4).
@@ -435,7 +435,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 ## 3. First: the state of `main`, and #145
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then:
-- **#145** (P54 part 2, §3.2) was open at the end, every thread resolved, its last head `3a7a922` (`main` merged in, CI running). If its CI is green and GitHub says clean, merge it (merge commit, `--match-head-commit` with the full SHA), then delete `fix/studio-mediums`. If `main` moved, merge `main` in first, keeping both sides of the CHANGELOG and the plan.
+- **#145** (P54 part 2, §3.2) was open at the end, every thread resolved, its last head `3d480f3` (CI running). If its CI is green and GitHub says clean, merge it (merge commit, `--match-head-commit` with the full SHA), then delete `fix/studio-mediums`. If `main` moved, merge `main` in first, keeping both sides of the CHANGELOG and the plan.
 - **The docs PR, #146**, may still be open: merge it the same way once green.
 - Then read `docs/HANDOFF.md`'s Warnings.
 

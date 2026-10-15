@@ -9,7 +9,7 @@
 - **#142, P53 part 5 (the cmd.exe placeholders: D4, G13, E14)**, merged as `8be665f`. Placeholders in capitals everywhere a command is shown; the email quick start pastes into bash, PowerShell and cmd; `test_docs.PlaceholdersInCapitals`. **P53 is done (N45 closed).** Reviews: Codex 1, CodeRabbit 3 (one declined, withdrawn).
 - **#143, P54 part 1 (§3.1: S3, S4)**, merged as `6bb88c5`. The router hears a shared word only beside the skill's own (`about()`); `rgb()`/`hsl()` keep a fourth comma argument. Reviews: Codex 2 (DTCG as context; commas required).
 - **#144, P54 part 3 (§3.3: M2 to M6)**, merged as `e55727f`. Tailwind variants and minus counted; `other-length`; a z-index's sign kept; the §6 role table is `role_for()`'s; a preprocessor variable's length deleted as a colour's is. M1 did not reproduce (#135 fixed it). Reviews: Codex 1 (a Tailwind z-index).
-- **#145, P54 part 2 (§3.2: W1 to W5)**, **open**: every thread resolved; green and clean at `4bf3564`, then `main` merged in as `3a7a922`, CI running at the end. Translucent colours refused before parsing, `worst_contrast` in `check_roles` and `--check`, `tw_probe`'s `KEPT_UNDER`, inserted layers in stylelint, the `url()` exemption in ESLint. Reviews: Codex 2 and CodeRabbit 2, plus the audit's twin gaps Codex found.
+- **#145, P54 part 2 (§3.2: W1 to W5)**, **open**: every thread resolved; green and clean at `4bf3564`, then `main` merged in as `3a7a922` and a last CodeRabbit fix as `3d480f3` (the audit's declared layers), CI running at the end. Translucent colours refused before parsing, `worst_contrast` in `check_roles` and `--check`, `tw_probe`'s `KEPT_UNDER`, inserted layers in stylelint, the `url()` exemption in ESLint. Reviews: Codex 2 and CodeRabbit 2, plus the audit's twin gaps Codex found.
 - **At the end:**
   - `main` is `e55727f` plus this docs PR (#146); #145 is the only other open PR.
   - The plan: 21 open items, 21 scheduled. About 1,240 tests.
@@ -17,7 +17,7 @@
 
 ## Next steps
 
-1. **Merge #145** once its CI is green on `3a7a922` (or merge `main` in again if it moved), then this docs PR if it is still open.
+1. **Merge #145** once its CI is green on `3d480f3` (or merge `main` in again if it moved), then this docs PR if it is still open.
 2. **P54 part 4, §3.4** (versioning, docs, Figma): V2, V3, V4, V5, V6, V9, V10, and the two finds below. Then §3.5 (E1 to E8, E10), §3.6 (G1, G2, G5 to G7), §3.7 (D1 to D3), §3.8 (T1, T2), one PR each; the prompt's §4 lists each finding. Run each finding's fixture first.
 3. **Then P55, the lows.** Then Phase 6b's workstreams in the owner's order, then **R4**.
 
