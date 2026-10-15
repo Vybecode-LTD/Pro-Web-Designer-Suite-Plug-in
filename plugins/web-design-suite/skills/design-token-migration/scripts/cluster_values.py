@@ -1237,10 +1237,13 @@ def cluster_spacing(lits: Sequence[dict], tol: float, prop: Proposal,
                 note = (f"{px:g}px was equidistant between two steps; "
                         f"resolved to {step:g}px by frequency.")
             if css_items:
+                # A width rule's class is `width`, which apply_codemod gives
+                # only width, min-width and max-width: a height written after
+                # the proposal never takes it (Codex on #135).
                 prop.rules.append(Rule(
                     id=f"sp-{rid:03d}-{klass}", kind="spacing", scope="value",
                     match=raws, replacement=f"var({token})", token=token,
-                    prop_classes=[klass],
+                    prop_classes=["width" if width else klass],
                     props=sorted({l["prop"] for l in css_items
                                   if not l["prop"].startswith("tw:")}),
                     occurrences=len(css_items), delta_px=round(delta, 3),

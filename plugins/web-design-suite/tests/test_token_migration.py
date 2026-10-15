@@ -1212,6 +1212,19 @@ class TheProposalAccountsForTheCensus(TempDirTest):
         rows = {u["value"] for u in mapping["unmapped"]}
         self.assertLessEqual({"448px", "1140px", "1440px"}, rows)
 
+    def test_a_height_written_after_the_proposal_keeps_its_value(self):
+        # Codex on #135, round 2: the codemod applies a rule by class and
+        # value, so a height a teammate adds before the mapping is applied
+        # needs a class no width rule reaches.
+        self.write("src/a.css", ".a { width: 448px; }\n")
+        MigrationPipeline.cluster(self, MigrationPipeline.extract(self, "src")[0])
+        self.write("src/a.css", ".a { width: 448px; }\n.b { height: 448px; min-height: 448px; }\n")
+        proc = run_py("design-token-migration", "apply_codemod", "-m", self.tmp / "proposal" / "mapping.json",
+                      "--apply", "src", cwd=self.tmp)
+        self.assertEqual((self.tmp / "src" / "a.css").read_text(encoding="utf-8"),
+                         ".a { width: var(--width-form); }\n.b { height: 448px; min-height: 448px; }\n",
+                         output(proc))
+
 
 if __name__ == "__main__":
     unittest.main()

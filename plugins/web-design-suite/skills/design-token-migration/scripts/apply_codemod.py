@@ -150,8 +150,10 @@ PROP_SLOT_CLASS = {
     "column-rule-color": "border", "stroke": "border",
     "box-shadow": "shadow", "text-shadow": "shadow",
     "z-index": "z-index", "letter-spacing": "tracking",
-    "width": "size", "height": "size", "max-width": "size",
-    "min-width": "size", "max-height": "size", "min-height": "size",
+    # A width is a class of its own: a --width-* rule (cluster_values gives
+    # it the class `width`) never reaches a height (Codex on #135).
+    "width": "width", "height": "size", "max-width": "width",
+    "min-width": "width", "max-height": "size", "min-height": "size",
 }
 RADIUS_PROPS = {"border-radius", "border-top-left-radius",
                 "border-top-right-radius", "border-bottom-left-radius",
