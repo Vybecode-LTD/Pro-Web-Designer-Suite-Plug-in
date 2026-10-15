@@ -2072,12 +2072,17 @@ def load_ledger(path: Optional[str]) -> Tuple[List[Dict[str, Any]], Optional[str
         data = json.loads(p.read_bytes())
     except (OSError, json.JSONDecodeError) as exc:
         raise bail(f"diff_system: {p} is not readable JSON ({exc}).")
-    if str(data.get("schema", "")).split("@")[0] != LEDGER_SCHEMA.split("@")[0]:
+    schema = data.get("schema") if isinstance(data, dict) else None   # `[]` was a traceback (V8)
+    if str(schema or "").split("@")[0] != LEDGER_SCHEMA.split("@")[0]:
         raise bail(
             f"diff_system: {p} is not a deprecation ledger "
-            f"(schema={data.get('schema')!r}). Create one with:\n"
+            f"(schema={schema!r}). Create one with:\n"
             f"  python -m scripts.deprecate add --name <NAME> --kind token …")
-    return list(data.get("deprecations", [])), None
+    entries = data.get("deprecations", [])
+    if not isinstance(entries, list) or not all(isinstance(e, dict) and isinstance(e.get("name"), str)
+                                                for e in entries):
+        raise bail(f"diff_system: {p}: `deprecations` must be a list of objects, each with a `name`.")
+    return list(entries), None
 
 
 def marked_deprecations(old: Snapshot, ledger: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:

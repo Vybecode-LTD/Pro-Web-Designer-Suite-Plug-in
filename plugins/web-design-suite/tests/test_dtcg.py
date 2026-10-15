@@ -463,6 +463,42 @@ class TheEdgesOfTheFormat(TempDirTest):
         self.assertIn("/* (deprecated: gone * / body { display: none }) */", css)
         self.assertNotIn("*/ body", css)
 
+    def test_a_type_that_is_not_a_string_is_named(self):
+        """S1 (the 2026-10-14 audit): a `$type` of 5, ["color"] or true over an
+        object value was an AttributeError in read_tokens and every gate above
+        it. The token, or the group, is left out and named."""
+        doc = {"five": {"$type": 5, "a": {"$value": {"colorSpace": "srgb", "components": [1, 0, 0]}}},
+               "list": {"b": {"$type": ["color"], "$value": {"colorSpace": "srgb", "components": [0, 1, 0]}}},
+               "flag": {"$type": True, "c": {"$value": {"value": 4, "unit": "px"}}},
+               "brand": {"$type": "color", "500": {"$value": "#2563eb"}}}
+        toks, problems = self.dtcg.tokens(doc)
+        self.assertEqual(["--brand-500"], [t.name for t in toks])
+        self.assertEqual({"five": "`$type` is 5, not a string, so this is not read",
+                          "list/b": "`$type` is [\"color\"], not a string, so this is not read",
+                          "flag": "`$type` is true, not a string, so this is not read"}, dict(problems))
+        tokens = self.read(doc)
+        self.assertEqual({"500": "#2563eb"}, tokens.ramps["brand"])
+        self.assertNotIn("five", json.dumps(tokens.values()))
+        legacy = self.write("legacy.json", json.dumps({"a": {"value": "#ffffff", "type": 5}}))
+        proc = run_py("figma-variables-sync", "figma_audit", legacy, cwd=self.tmp)   # figma_common.dtcg_type
+        self.assertNotIn("Traceback", output(proc))
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+
+    def test_a_deprecation_that_is_neither_a_string_nor_a_boolean_is_named(self):
+        """S10 (Codex on #137): a `$deprecated` of any JSON type was carried as
+        the reason. A string or a boolean is read (false undoes a group's);
+        anything else is named, and the token keeps what it inherits."""
+        doc = {"ink": {"$type": "color", "$value": "#111111", "$deprecated": {"reason": "x"}},
+               "old": {"$type": "color", "$deprecated": "use ink",
+                       "a": {"$value": "#222222", "$deprecated": 5},
+                       "b": {"$value": "#333333", "$deprecated": False}},
+               "odd": {"$type": "color", "$deprecated": [1], "c": {"$value": "#444444"}}}
+        toks, problems = self.dtcg.tokens(doc)
+        self.assertEqual({"--ink": False, "--old-a": "use ink", "--old-b": False, "--odd-c": False},
+                         {t.name: t.deprecated for t in toks})
+        self.assertEqual(["ink", "old/a", "odd"], [where for where, _ in problems])
+        self.assertIn("`$deprecated` is {\"reason\": \"x\"}, neither a string nor a boolean", problems[0][1])
+
     def test_a_tokens_css_converts_whatever_the_project_lists(self):
         self.write(".git/HEAD", "x\n")
         self.write(".design-suite.json", '{"schema": 1, "tokens": "missing.json"}')

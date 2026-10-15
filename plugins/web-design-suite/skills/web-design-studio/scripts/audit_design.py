@@ -2632,9 +2632,12 @@ def main(argv: list[str] | None = None) -> int:
     baseline: set[str] = set()
     if bp.exists():
         try:
-            baseline = {portable_key(k) for k in json.loads(bp.read_bytes())}
-        except (OSError, json.JSONDecodeError):
-            print(f"audit_design: could not read baseline {bp}; auditing everything.",
+            keys = json.loads(bp.read_bytes())
+            if not isinstance(keys, list) or not all(isinstance(k, str) for k in keys):
+                raise ValueError("not a list of finding keys")     # `5` was a traceback (G15)
+            baseline = {portable_key(k) for k in keys}
+        except (OSError, ValueError) as exc:
+            print(f"audit_design: could not read baseline {bp} ({exc}); auditing everything.",
                   file=sys.stderr)
     elif baseline_file:
         print(f"audit_design: baseline {baseline_file} not found; auditing everything.",

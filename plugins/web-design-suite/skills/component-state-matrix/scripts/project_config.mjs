@@ -1048,7 +1048,10 @@ function dtcgEntries(data, dir = '.') {
     throw err;
   }
   const out = [];
+  // A `$type` that is not a string leaves its token, or its group, out (S1).
+  const badType = (node) => has(node, '$type') && typeof node.$type !== 'string';
   const token = (node, path, kind) => {
+    if (badType(node)) return;
     const type = has(node, '$type') ? node.$type : kind;
     let value;
     if (!has(node, '$value')) {
@@ -1073,6 +1076,7 @@ function dtcgEntries(data, dir = '.') {
       token(node, path, kind);
       return;
     }
+    if (badType(node)) return;
     const groupKind = has(node, '$type') ? node.$type : kind;
     for (const [key, child] of Object.entries(node)) {
       if (key === '$root') {

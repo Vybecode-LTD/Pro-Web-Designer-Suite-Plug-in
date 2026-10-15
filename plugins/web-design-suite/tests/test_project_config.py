@@ -868,6 +868,11 @@ TOKEN_FILES = {
     "fan.resolver.json": json.dumps({"version": "2025.10", "resolutionOrder": [{"$ref": "#/sets/s0"}], "sets": {
         **{f"s{i}": {"sources": [{"$ref": f"#/sets/s{i + 1}"}] * 10} for i in range(9)},
         "s9": {"sources": [{"x": {"$type": "number", "$value": 1}}]}}}),
+    "types.tokens.json": json.dumps({                          # S1: a `$type` that is not a string
+        "five": {"$type": 5, "a": {"$value": {"colorSpace": "srgb", "components": [1, 0, 0]}}},
+        "list": {"b": {"$type": ["color"], "$value": {"colorSpace": "srgb", "components": [0, 1, 0]}}},
+        "flag": {"$type": True, "c": {"$value": {"value": 4, "unit": "px"}}},
+        "brand": {"$type": "color", "500": {"$value": "#2563eb"}}}),
 }
 TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.css"], ["contract.json"],
                ["contract.json", "a.css"], ["a.css", "contract.json"], ["bad-schema.json"], ["bad-ramps.json"],
@@ -878,7 +883,7 @@ TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.
                ["deep.tokens.json"], ["names.tokens.json"], ["pointers.tokens.json"], ["chain.tokens.json"], ["fan.tokens.json"],
                ["studio-math.json"], ["pointer-fan.tokens.json"], ["studio-palettes.json"],
                ["app.resolver.json"], ["a.css", "app.resolver.json"], ["pointer.resolver.json"], ["fan.resolver.json"],
-               ["sources.resolver.json"], ["outside.resolver.json"]]
+               ["sources.resolver.json"], ["outside.resolver.json"], ["types.tokens.json"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).
@@ -992,6 +997,9 @@ class TheNodeReaderAgrees(TempDirTest):
         self.assertEqual("lab(50 40 59.5)", dtcg_case["ramps"]["brand"]["960"])
         deep = python(cases[TOKEN_CASES.index(["deep.tokens.json"])])["ok"]
         self.assertEqual({}, deep["scales"])
+        typed = python(cases[TOKEN_CASES.index(["types.tokens.json"])])["ok"]      # S1: only the string $type
+        self.assertEqual({"brand": {"500": "#2563eb"}}, typed["ramps"])
+        self.assertNotRegex(json.dumps(typed), r"five|list|flag")
 
     def test_the_component_globs_match_the_same(self):
         """N37: ESLint asks isComponent() which JSX files are components, as

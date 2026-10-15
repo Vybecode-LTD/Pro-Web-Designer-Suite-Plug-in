@@ -648,6 +648,51 @@ function globMatch(pattern, value) {
   return rx.test(value);
 }
 
+// perf_audit.py's budget_problem(), ported, so a budget file one gate refuses
+// the other refuses too (G3): a string limit passed every page here.
+const LIMIT_SECTIONS = ['bytes', 'requests', 'largest_asset', 'third_party', 'lab'];
+
+function budgetProblem(data) {
+  const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const isNumber = (v) => typeof v === 'number' && Number.isFinite(v);
+  const shown = (v) => JSON.stringify(v).slice(0, 40);
+  const limits = (where, block) => {
+    if (!isObject(block)) return `\`${where}\` must be an object, not ${shown(block)}`;
+    for (const name of LIMIT_SECTIONS) {
+      if (!(name in block)) continue;
+      if (!isObject(block[name])) return `\`${where}.${name}\` must be an object of numbers, not ${shown(block[name])}`;
+      for (const [key, value] of Object.entries(block[name])) {
+        if (!(isNumber(value) || (value === null && ['bytes', 'lab'].includes(name)))) {   // null lifts a default
+          return `\`${where}.${name}.${key}\` must be a number, not ${shown(value)}`;
+        }
+      }
+    }
+    return null;
+  };
+  if (!isObject(data)) return `the top level must be an object, not ${shown(data)}`;
+  if ('measure' in data && typeof data.measure !== 'string') return `\`measure\` must be a string, not ${shown(data.measure)}`;
+  const origins = 'first_party_origins' in data ? data.first_party_origins : [];
+  if (!Array.isArray(origins) || !origins.every((o) => typeof o === 'string')) {
+    return `\`first_party_origins\` must be a list of origins, not ${shown(origins)}`;
+  }
+  if ('defaults' in data) {
+    const problem = limits('defaults', data.defaults);
+    if (problem) return problem;
+  }
+  const growth = 'growth' in data ? data.growth : {};
+  if (!isObject(growth)) return `\`growth\` must be an object of percentages, not ${shown(growth)}`;
+  for (const [key, value] of Object.entries(growth)) {
+    if (!isNumber(value)) return `\`growth.${key}\` must be a number, not ${shown(value)}`;
+  }
+  const pages = 'pages' in data ? data.pages : {};
+  if (!isObject(pages)) return `\`pages\` must be an object of page types, not ${shown(pages)}`;
+  for (const [pattern, over] of Object.entries(pages)) {
+    const problem = limits(`pages.${pattern}`, over);
+    if (problem) return problem;
+  }
+  return null;
+}
+
 function loadLabBudget(file, pageType) {
   if (!file) return null;
   if (!fs.existsSync(file)) die(`no such budget file: ${file}`);
@@ -657,6 +702,8 @@ function loadLabBudget(file, pageType) {
   } catch (err) {
     die(`cannot parse ${file}: ${err.message}`);
   }
+  const problem = budgetProblem(data);
+  if (problem) die(`${file}: ${problem}`);
   if (data.$schema && data.$schema !== 'perf-budget-gate/1') {
     die(`${file} declares $schema "${data.$schema}"; ` +
         'this tool understands "perf-budget-gate/1"');

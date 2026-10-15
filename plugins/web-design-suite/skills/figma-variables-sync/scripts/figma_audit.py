@@ -1157,12 +1157,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
     try:
         doc = load_document(Path(args.path), args.shape, args.collection)
-        if args.styles:
-            extra = json.loads(Path(args.styles).read_bytes())
-            attach_styles(doc, extra)
     except (ValueError, OSError, json.JSONDecodeError) as exc:
         print(f"could not read {args.path}: {exc}", file=sys.stderr)
         return 2
+    if args.styles:
+        try:
+            extra = json.loads(Path(args.styles).read_bytes())
+        except (ValueError, OSError) as exc:
+            print(f"could not read {args.styles}: {exc}", file=sys.stderr)
+            return 2
+        if not isinstance(extra, dict):                # a `5` was ignored without a word
+            print(f"could not read {args.styles}: a styles file is the REST API's object "
+                  f"(`meta.styles`), not {json.dumps(extra)[:40]}", file=sys.stderr)
+            return 2
+        attach_styles(doc, extra)
 
     if not doc.variables and not doc.text_styles and not doc.effect_styles:
         # "Clean" here would be a lie with consequences: an empty result is a

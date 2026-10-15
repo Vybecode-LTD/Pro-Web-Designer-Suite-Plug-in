@@ -217,6 +217,29 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   (Codex on #136). `figma_to_tokens` still writes
   over the project's `--tokens`, which is the Figma-to-code workflow
   (`test_out_guard`).
+- **A JSON file of the wrong shape was a traceback, or was read as something else**
+  (the audit's S1, S10, V8, G3, G11, G15, E13 and W6, and its class 6). A traceback
+  exits 1, the gates' "it fired" code; worse, `check_roles` read a string `scopes` as
+  letters, `critique_report` read `"is_taste": "false"` as true and made a major finding
+  taste, and `measure_vitals.mjs` and `a11y_runtime.mjs` passed every page against a
+  limit written as a string. Every loader checks the shape where it reads the file now,
+  and exits 2 naming the file and the key (`defaults.bytes.css`, `rules[0].match`,
+  `pair 0: min`):
+  - the token readers leave out a token or group whose `$type` is not a string, and
+    name it; Node's reader leaves out the same ones. A `$deprecated` that is neither a
+    string nor a boolean is named, and the token keeps its group's;
+  - the deprecation ledger (`diff_system --deprecations`, `deprecate --ledger`), a
+    `system.json` and the docs baseline (`build_docs`), a perf budget (`perf_audit`,
+    `measure_vitals.mjs`, the same check in both), an a11y budget, the pairs file,
+    the findings, the deck's perf and a11y evidence, the codemod's mapping, the census,
+    the content model and its answers, a Figma styles file and the CrUX lab file;
+  - `introspect_schema` names a JSON dump's `tables`, `columns`, `foreign_keys` or
+    `enums` of the wrong type, with exit 1, its code for an input it cannot use;
+  - a baseline of the wrong shape (`audit_design`, `a11y_static`, `perf_audit`) is read
+    as an unreadable one, as before: named on stderr, and everything audited.
+
+  `test_json_guards` feeds every loader `[]`, a string, a number and its own wrong keys,
+  and fails when a script that reads JSON has no row.
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
   too. It is a width and a height, so it is a size: reported when no `--width-*` role

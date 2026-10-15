@@ -541,7 +541,7 @@ def parse_records(data: Any, collection: str) -> FDoc:
 
 
 def dtcg_type(declared: Optional[str], value: Any) -> str:
-    if declared:
+    if isinstance(declared, str) and declared:   # a legacy `type: 5` is no type (S1)
         d = declared.lower()
         if d == "color":
             return "COLOR"

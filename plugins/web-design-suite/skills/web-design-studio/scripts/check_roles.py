@@ -242,6 +242,28 @@ def colour(env: dict[str, str], name: str, theme: str = "light"):
     return parsed
 
 
+def valid_pairs(pairs: object) -> list[dict]:
+    """A pairs file's pairs, or ValueError naming the pair and the key (W6):
+    a string `scopes` was read as letters, and `min: "4.5"` a traceback."""
+    if not isinstance(pairs, list):
+        raise ValueError(f"the top level must be a list of pairs, not {json.dumps(pairs)[:40]}")
+    for i, pair in enumerate(pairs):
+        if not isinstance(pair, dict):
+            raise ValueError(f"pair {i} must be an object, not {json.dumps(pair)[:40]}")
+        for key in ("fg", "bg"):
+            if not isinstance(pair.get(key), str):
+                raise ValueError(f"pair {i}: `{key}` must be a custom property's name")
+        if isinstance(pair.get("min"), bool) or not isinstance(pair.get("min"), (int, float)):
+            raise ValueError(f"pair {i}: `min` must be a number, not "
+                             f"{json.dumps(pair['min']) if 'min' in pair else 'missing'}")
+        scopes = pair.get("scopes", BOTH)
+        if not isinstance(scopes, list) or not all(isinstance(s, str) for s in scopes):
+            raise ValueError(f"pair {i}: `scopes` must be a list of scope names, not {json.dumps(scopes)[:40]}")
+        if not isinstance(pair.get("on", ""), str):
+            raise ValueError(f"pair {i}: `on` must be a scope's name")
+    return pairs
+
+
 def check(css: str, pairs: list[dict]) -> list[dict]:
     envs = scopes(css)
     results = []
@@ -324,10 +346,10 @@ def main() -> int:
         return 0
     try:
         # bytes: json detects UTF-16 and a BOM, which PowerShell's `>` writes
-        pairs = json.loads(pathlib.Path(args.pairs).read_bytes()) if args.pairs else default_pairs()
+        pairs = valid_pairs(json.loads(pathlib.Path(args.pairs).read_bytes())) if args.pairs else default_pairs()
         results = check(css, pairs)
     except (OSError, ValueError, KeyError) as exc:
-        print(f"check_roles: bad pairs file: {exc}", file=sys.stderr)
+        print(f"check_roles: bad pairs file {args.pairs}: {exc}", file=sys.stderr)
         return 2
     except Unresolvable as exc:
         print(f"check_roles: {exc}", file=sys.stderr)
