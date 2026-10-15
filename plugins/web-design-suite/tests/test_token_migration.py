@@ -46,6 +46,7 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -118,6 +119,52 @@ class ApplyCodemodDirtyGuard(TempDirTest):
         proc = self.apply(repo, cwd=repo)
         for name in ("new.css", "other.css"):
             self.assertEqual((repo / name).read_text(encoding="utf-8"), CSS, f"{name}: {output(proc)}")
+
+    @unittest.skipUnless(GIT, "git is not installed")
+    def test_the_rebase_recipe_migrates_the_teammates_version(self):
+        """H14 (the owner's audit of 2026-10-14) read §9's recipe as unworkable:
+        it stages the conflicted file, then runs the codemod, which refuses
+        uncommitted changes. It works, because once added the file matches
+        HEAD: during a rebase, --ours is HEAD. The recipe runs here as the
+        reference gives it."""
+        text = (SKILLS / "design-token-migration" / "references" / "migration-strategies.md").read_text(
+            encoding="utf-8")
+        block = text.split("then migrate it again:", 1)[1].split("```sh", 1)[1].split("```", 1)[0]
+        recipe = [shlex.split(line) for line in block.strip().splitlines()]
+        repo = self.git_repo("rebase")
+        git = [GIT, "-C", str(repo), "-c", "user.name=wds-test", "-c", "user.email=wds-test@example.invalid",
+               "-c", "core.autocrlf=false"]
+
+        def run(*args):
+            proc = subprocess.run(git + list(args), capture_output=True, env=env(GIT_EDITOR="true"))
+            self.assertEqual(proc.returncode, 0, f"git {' '.join(args)}: {output(proc)}")
+
+        css = repo / "path" / "to" / "conflicted.css"
+        css.parent.mkdir(parents=True)
+        (repo / "proposal").mkdir()
+        shutil.copy(self.mapping, repo / "proposal" / "mapping.json")
+        css.write_bytes(b".card {\n  margin: 13px;\n}\n")
+        for args in (["add", "."], ["commit", "-q", "-m", "base"], ["branch", "-M", "main"],
+                     ["checkout", "-q", "-b", "migrate"]):
+            run(*args)
+        self.apply(css, cwd=repo)
+        run("commit", "-qam", "migrate")
+        run("checkout", "-q", "main")
+        css.write_bytes(b".card {\n  margin: 13px; gap: 13px;\n}\n")     # the teammate's edit
+        run("commit", "-qam", "teammate")
+        run("checkout", "-q", "migrate")
+        rebase = subprocess.run(git + ["rebase", "main"], capture_output=True, env=env())
+        self.assertNotEqual(rebase.returncode, 0, "the fixture must conflict")
+        for argv in recipe:
+            if argv[0] == "git":
+                run(*argv[1:])
+                continue
+            self.assertEqual(argv[:3], ["python", "-m", "scripts.apply_codemod"])
+            proc = subprocess.run([sys.executable, *argv[1:]], cwd=repo, capture_output=True,
+                                  env=env(PYTHONPATH=str(SKILLS / "design-token-migration")))
+            self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertEqual(css.read_bytes(), b".card {\n  margin: var(--space-3); gap: var(--space-3);\n}\n")
+        self.assertFalse((repo / ".git" / "rebase-merge").exists(), "the rebase did not finish")
 
 
 class MigrationPipeline(TempDirTest):
@@ -1081,6 +1128,102 @@ class ColoursKeepTheirFamily(TempDirTest):
             with self.subTest(colour=colour):
                 L, C, H = cv.oklab_to_oklch(*cv.rgb_to_oklab(cv.parse_any_color(colour)[0]))
                 self.assertEqual((round(C, 3), cv.is_neutral(L, C, H)), (chroma, neutral))
+
+
+CENSUS = (".a { color: oklch(60% 0.15 250); background: hwb(200 10% 20%); }\n"
+          ".b { color: lab(50% 40 59); border-color: lch(52% 72 56); }\n"
+          ".c { color: color(display-p3 1 0 0); background: hsl(0.5turn 50% 50%); }\n"
+          ".d { letter-spacing: 1px; margin: 13px; }\n"
+          ".e { color: white; background: #fafafa; }\n"
+          ".f { background: color-mix(in srgb, #2f6df6 40%, white); }\n"
+          ".g { max-width: 1152px; width: 448px; height: 300px; }\n"
+          ".h { letter-spacing: 0.02em; padding: 16px; }\n"
+          # CodeRabbit on #135: a duration in a shorthand was counted at both
+          # the --motion-* pair and the Tier-1 step. The last layer holds two
+          # times, so its durations are rewritten one by one.
+          ".i { transition: opacity 220ms ease; }\n.j { transition-duration: 220ms; }\n"
+          ".k { animation: spin 220ms linear; }\n.l { transition: opacity 220ms ease 80ms; }\n")
+
+
+class TheProposalAccountsForTheCensus(TempDirTest):
+    """H11 to H13 (the owner's audit of 2026-10-14). The reconciliation is the
+    estimate put in front of a client, so every literal the census counts is in
+    a rule or an unmapped row, and what it counts as mechanically replaceable
+    is what the codemod rewrites."""
+
+    def propose(self):
+        self.write("src/a.css", CENSUS)
+        literals, census = MigrationPipeline.extract(self, "src")
+        mapping, report = MigrationPipeline.cluster(self, literals)
+        return census, mapping, report
+
+    def test_every_census_literal_is_in_a_rule_or_an_unmapped_row(self):
+        # H11: a colour the proposal could not parse, and letter-spacing in
+        # px, were in neither.
+        census, mapping, _ = self.propose()
+        accounted = (sum(r["occurrences"] for r in mapping["rules"])
+                     + sum(u["occurrences"] for u in mapping["unmapped"]))
+        self.assertEqual(accounted, census["counts"]["literals"], mapping)
+        rows = {u["value"] for u in mapping["unmapped"]}
+        for value in ("oklch(60% 0.15 250)", "hwb(200 10% 20%)", "lab(50% 40 59)", "lch(52% 72 56)",
+                      "color(display-p3 1 0 0)", "hsl(0.5turn 50% 50%)", "1px"):
+            with self.subTest(value=value):
+                self.assertIn(value, rows)
+
+    def test_what_is_counted_replaceable_is_what_the_codemod_rewrites(self):
+        # H12: `color: white` had a rule the codemod never applied, and a hex
+        # inside color-mix() was counted with a rule it could not apply.
+        _, _, report = self.propose()
+        proc = run_py("design-token-migration", "apply_codemod", "-m", self.tmp / "proposal" / "mapping.json",
+                      "--apply", "src", cwd=self.tmp)
+        rewritten = re.search(r"(\d+) replacement\(s\)", output(proc))
+        replaceable = re.search(r"\| Mechanically replaceable \| (\d+) \|", report)
+        self.assertIsNotNone(rewritten, output(proc))
+        self.assertEqual(int(rewritten.group(1)), int(replaceable.group(1)), output(proc))
+        self.assertNotIn("color: white;", (self.tmp / "src" / "a.css").read_text(encoding="utf-8"))
+
+    def test_a_colour_mix_of_a_literal_is_one_colour_function(self):
+        self.write("src/a.css", ".f { background: color-mix(in srgb, #2f6df6 40%, white); }\n"
+                                ".g { background: color-mix(in oklch, var(--bg-accent) 40%, var(--bg-surface)); }\n")
+        _, census = MigrationPipeline.extract(self, "src")
+        self.assertEqual([(l["kind"], l["normalized"]) for l in census["literals"]],
+                         [("color-function", "color-mix(in srgb, #2f6df6 40%, white)")])
+
+    def test_a_width_reaches_its_width_step(self):
+        # H13: the width steps were tried only after a snap to the 4px scale,
+        # which ends at 192px, so every length past 195px read "Decide between
+        # 192px and 192px".
+        _, mapping, _ = self.propose()
+        tokens = {r["match"][0]: r["token"] for r in mapping["rules"] if r["kind"] == "spacing"}
+        self.assertEqual((tokens.get("1152px"), tokens.get("448px")), ("--width-content", "--width-form"))
+        row = next(u for u in mapping["unmapped"] if u["value"] == "300px")
+        self.assertNotIn("and 192px", row["recommendation"])
+        self.assertIn("above the spacing scale", row["recommendation"])
+
+    def test_a_height_takes_no_width_step(self):
+        # Codex on #135: the codemod applies a rule by class and value, so a
+        # height near a width step, or a width that shares its value with a
+        # height, would have read --width-form.
+        self.write("src/a.css", ".a { height: 448px; }\n.b { min-height: 1140px; }\n"
+                                ".c { width: 1440px; }\n.d { max-height: 1440px; }\n.e { max-width: 1152px; }\n")
+        mapping, _ = MigrationPipeline.cluster(self, MigrationPipeline.extract(self, "src")[0])
+        widths = {r["match"][0]: r["token"] for r in mapping["rules"] if r["token"].startswith("--width-")}
+        self.assertEqual(widths, {"1152px": "--width-content"})
+        rows = {u["value"] for u in mapping["unmapped"]}
+        self.assertLessEqual({"448px", "1140px", "1440px"}, rows)
+
+    def test_a_height_written_after_the_proposal_keeps_its_value(self):
+        # Codex on #135, round 2: the codemod applies a rule by class and
+        # value, so a height a teammate adds before the mapping is applied
+        # needs a class no width rule reaches.
+        self.write("src/a.css", ".a { width: 448px; }\n")
+        MigrationPipeline.cluster(self, MigrationPipeline.extract(self, "src")[0])
+        self.write("src/a.css", ".a { width: 448px; }\n.b { height: 448px; min-height: 448px; }\n")
+        proc = run_py("design-token-migration", "apply_codemod", "-m", self.tmp / "proposal" / "mapping.json",
+                      "--apply", "src", cwd=self.tmp)
+        self.assertEqual((self.tmp / "src" / "a.css").read_text(encoding="utf-8"),
+                         ".a { width: var(--width-form); }\n.b { height: 448px; min-height: 448px; }\n",
+                         output(proc))
 
 
 if __name__ == "__main__":

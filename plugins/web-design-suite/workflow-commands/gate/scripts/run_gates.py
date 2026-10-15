@@ -90,4 +90,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing a dash or an arrow writes cp1252 or raises. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

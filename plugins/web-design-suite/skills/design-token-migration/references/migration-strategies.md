@@ -376,7 +376,7 @@ Five habits, in order of effect:
    git add path/to/conflicted.css
    git rebase --continue
    ```
-   The first `git add` marks the conflict resolved, which the codemod needs — it refuses files with uncommitted changes. The mapping is deterministic, so the result is the teammate's edit, migrated. Hand-resolving a tokenization conflict is how one file ends up half-migrated, and nobody will ever notice.
+   The first `git add` marks the conflict resolved, which the codemod needs — it refuses files with uncommitted changes, and an unmerged file is one. Once added, the file matches `HEAD` (during a rebase `--ours` *is* `HEAD`), so nothing in it is uncommitted. The mapping is deterministic, so the result is the teammate's edit, migrated. Hand-resolving a tokenization conflict is how one file ends up half-migrated, and nobody will ever notice.
 
 **4. Land `tokens.css` on main first, alone.** It changes no rendering. Once it is on main, every subsequent branch is only *using* tokens, not introducing them, and the conflict surface halves.
 

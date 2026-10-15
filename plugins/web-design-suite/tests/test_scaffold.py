@@ -21,7 +21,7 @@ import subprocess
 import sys
 import unittest
 
-from wds_support import SKILLS, TempDirTest, class_temp_dir, env, load_script, output, run_py, tool_modules
+from wds_support import REPO, SKILLS, TempDirTest, class_temp_dir, env, load_script, output, run_py, tool_modules
 
 DDL = """\
 CREATE TYPE priority AS ENUM ('low', 'normal', 'high');
@@ -393,6 +393,10 @@ class TheServerSchemaMirrorsTheConstraints(Answered):
         try:
             import pydantic  # noqa: F401
         except ImportError:
+            # CI runs this test once more with pydantic, and fails it there
+            # rather than skipping (H15: it skipped on every CI cell).
+            if os.environ.get("WDS_REQUIRE_PYDANTIC"):
+                self.fail("WDS_REQUIRE_PYDANTIC is set, and pydantic is not installed")
             self.skipTest("pydantic is not installed here")
         script = (
             "import sys; sys.path.insert(0, 'src/server')\n"
@@ -420,6 +424,21 @@ class TheServerSchemaMirrorsTheConstraints(Answered):
         proc = subprocess.run([sys.executable, "-B", "-c", script], cwd=self.tmp, capture_output=True,
                               env=env())
         self.assertEqual(proc.returncode, 0, output(proc))
+
+    def test_ci_runs_the_pydantic_test_with_pydantic(self):
+        """H15 (the owner's audit of 2026-10-14): the suite runs under `uv run
+        --no-project`, which has no pydantic, so the test above skipped on every
+        CI cell. A step of its own runs it with Pydantic 2, the major the
+        scaffold writes for."""
+        ci = REPO / ".github" / "workflows" / "ci.yml" if REPO else None
+        if not (ci and ci.is_file()):
+            self.skipTest("the repository's workflows are not here")
+        steps = ci.read_text(encoding="utf-8").split("\n      - ")
+        test = f"test_scaffold.{type(self).__name__}.test_pydantic_itself_accepts_a_draft_the_database_would"
+        step = next((s for s in steps if test in s), "")
+        self.assertIn('--with "pydantic>=2,<3"', step)
+        self.assertIn('WDS_REQUIRE_PYDANTIC: "1"', step)
+        self.assertIn("--python ${{ matrix.python }}", step)
 
 
 class TheGeneratedTypeScriptParses(Answered):
