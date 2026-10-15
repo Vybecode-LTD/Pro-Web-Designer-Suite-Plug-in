@@ -301,7 +301,9 @@ def rules_problem(rules: Any) -> Optional[str]:
             if not isinstance(rule.get(key), str):
                 return f"`rules[{i}].{key}` must be a string"
         for key in ("match", "props", "prop_classes"):
-            value = rule.get(key) or []
+            value = rule.get(key, None if key == "match" else [])   # match is required (CodeRabbit on #138)
+            if value is None and key != "match":
+                continue
             if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
                 return f"`rules[{i}].{key}` must be a list of strings"
         if not isinstance(rule.get("scope", "value"), str):

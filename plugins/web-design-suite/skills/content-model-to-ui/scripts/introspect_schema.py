@@ -1651,7 +1651,9 @@ def parse_json_schema(text: str) -> Model:
         if not isinstance(value, list) or not all(isinstance(v, dict) for v in value):
             raise SchemaError(f"`{key}` must be a list of objects.")
 
-    enums = data.get("enums") or {}
+    enums = data.get("enums", {})
+    if enums is None:
+        enums = {}
     if not isinstance(enums, dict) or not all(isinstance(v, list) for v in enums.values()):
         raise SchemaError("`enums` must be an object of lists of labels.")
     for name, values in enums.items():
@@ -1659,8 +1661,11 @@ def parse_json_schema(text: str) -> Model:
 
     tables_in = data.get("tables")
     if tables_in is None and "columns" in data:
-        objects(data["columns"], "columns")
+        for key in ("columns", "constraints", "key_column_usage"):   # CodeRabbit on #138
+            objects(data.get(key, []), key)
         tables_in = _group_flat_columns(data)
+    if tables_in is not None and not isinstance(tables_in, (list, dict)):
+        objects(tables_in, "tables")
     if not tables_in:
         raise SchemaError(
             'No tables found. Expected {"tables":[{"name":…,"columns":[…]}]} '
@@ -1672,7 +1677,8 @@ def parse_json_schema(text: str) -> Model:
     objects(tables_in, "tables")
     for i, t in enumerate(tables_in):
         for key in ("columns", "foreign_keys"):
-            objects(t.get(key) or [], f"tables[{i}].{key}")
+            if t.get(key) is not None:                   # `0` is no empty list (CodeRabbit on #138)
+                objects(t[key], f"tables[{i}].{key}")
 
     for t in tables_in:
         table = Table(name=t.get("name") or t.get("table_name") or "unknown",
