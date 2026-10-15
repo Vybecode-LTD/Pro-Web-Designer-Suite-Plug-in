@@ -1,12 +1,13 @@
 # Start here: the next session
 
-**Written 2026-10-15**, at the end of the second session that day, which did P53 parts 2 to 4 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Three PRs and this docs PR merged:
-- **#138, P53 part 2 (the JSON type guards: S1, S10, V8, G3, G11, G15, E13, W6; §7 class 6)**, merged as `4701883`. Every loader checks a JSON file's shape where it reads it and exits 2 naming the file and the key; `test_json_guards` has a row per loader and fails on a reader with none.
-- **#139, P53 part 3 (the encoding readers: S8, W7; class 4)**, merged as `551d918`. `read_text()` follows `json.detect_encoding()`, the rewriters keep a file's encoding, and `test_encodings` scans for `encoding="utf-8"` reads.
-- **#140, P53 part 4 (the discarded diagnostics: S2, V11, V12, M9, the contrast skip; class 7)**, merged as `7b28cbf`. `ProjectTokens.problems`, `clamped`, `left_out()`, the codemod's skip row and `diff_system`'s unmeasured pairs; `test_diagnostics`.
-- **Reviews:** #138 had 9 real findings over three rounds (CodeRabbit 5, Codex 4), #139 none, and #140 3 (Codex 1, CodeRabbit 2). All were fixed with tests failing on the head they reviewed.
+**Written 2026-10-15**, at the end of the third session that day, which finished P53 and did P54 parts 1 to 3 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Four PRs merged and one is open:
+- **#142, P53 part 5 (the cmd.exe placeholders: D4, G13, E14; §7 class 9)**, merged as `8be665f`. Every placeholder in a command is in capitals; the email quick start pastes into bash, PowerShell and cmd; `test_docs.PlaceholdersInCapitals` reads every shell fence and inline command in the plugin's docs and the repository's live docs. **P53 is done; N45 is closed.**
+- **#143, P54 part 1 (§3.1: S3, S4)**, merged as `6bb88c5`. The router hears a shared word (a token, a critique, a state, Lighthouse) only beside one of the skill's own (`about()`); `dtcg.css_colour()` reads the legacy comma form under `rgb()` and `hsl()`.
+- **#144, P54 part 3 (§3.3: M2 to M6; M1 did not reproduce)**, merged as `e55727f`. The census counts every Tailwind variant and a minus, files `other-length` apart, keeps a z-index's sign; the §6 role table is `role_for()`'s.
+- **#145, P54 part 2 (§3.2: W1 to W5)**, **open at the end**: green and clean at `4bf3564`, then `main` (#144) merged in as `3a7a922` and a last CodeRabbit fix as `3d480f3`, whose CI was running. Merge it first (§3).
+- **Reviews:** 17 real findings, each fixed with a test failing on the head it reviewed: #142 4 (Codex 1, CodeRabbit 3, one declined with reasons and withdrawn), #143 2 (Codex), #144 1 (Codex), #145 6 (Codex 2 over two rounds, CodeRabbit 2, and two more the audit shared).
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P53's last class, the cmd.exe placeholders (the audit's D4, G13, E14)**, then **P54** (§4).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **merge #145, then P54's remaining areas, §3.4 to §3.8** (§4).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -182,6 +183,16 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **A number from JSON can be infinite.** Python reads `1e400` and `Infinity` as `inf`, under which every page passed: `math.isfinite`.
       - **A flag's promise binds new output.** `--quiet` says "do not print warnings", so a new warning follows it.
       - **Name what cannot be measured, for every reason.** A translucent pair was still skipped silently, and two output formats carry no notes, so they print on stderr.
+    - **The third 2026-10-15 session's reviews found 17 real issues**, each fixed with a test failing on the head it reviewed. The lessons:
+      - **A narrowed pattern must keep the domain's own spellings** (Codex on #143): the router's design-token context missed `DTCG`, `Tokens Studio` and `Style Dictionary`, so "Deprecate the old DTCG token" stopped routing.
+      - **Read the grammar, not the list of names** (Codex on #143): CSS Color 4's fourth argument is legacy comma syntax only; `rgb(1 2 3 0.5)` is not a colour.
+      - **A sign the pattern now captures must reach the value** (Codex on #144): `-z-[1]` was counted as 1. And a value rule never applies to a class, so a Tailwind z-index class is a row by hand.
+      - **When one gate is fixed, look for the same gap in its twin** (Codex on #145, twice): a sub-layer in a statement (`components.skin` before `base`) and a `url()` that is not the whole value passed stylelint, ESLint *and* the audit. Fix both gates and pin the case in the spec.
+      - **A test's claim must be checkable by the test** (CodeRabbit on #142): `not_portable()` had no rule for `cp`, `cat` or `mkdir -p`, so the quick-start test could not see E14 return. And an untagged README fence is a command.
+      - **Resolve only the threads you answered, by id.** A loop over every unresolved thread closed two CodeRabbit threads that had not been read (#145); they were reopened, answered and resolved.
+      - **`git add -u` before `check.py` stages the work for the next commit, whatever its message**: #145's fixes went into `f761c84` under the role table's message, already pushed. Commit the work first, then run the check.
+      - **A merge from `main` brings back a row the earlier PR removed.** Each branch cut before #142 restored the `| P53 |` row; drop it after keeping both sides (`keep_both.py`, `merge_n46.py` in this session's scratchpad show the method).
+      - **Declined, with reasons:** CodeRabbit asked the email quick start to use path-form commands; every skill's opening note sets the module form's convention, and the SKILL.md was 3 bytes under budget. It withdrew.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -233,7 +244,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `22 open items, 22 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `21 open items, 21 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
@@ -319,7 +330,13 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - the reader's problems are reported (`not read`, `not carried to Figma`).
 
   `reverse_main()` serves the REST body and `--format plugin-script`. See `test_figma_sync.ReverseReadsEveryTokenFormat`.
-- **The plugin** is `plugins/web-design-suite/` (about 1,223 tests):
+- **Placeholders (#142).** `test_docs.PlaceholdersInCapitals`: `ANGLE_PLACEHOLDER` (not after `<` or a word character), `COMMAND_TAGS`, `COMMAND_SPAN`, `doc_commands(text, untagged)` (a README's untagged fences count), `LIVE_DOCS` (the README, CLAUDE.md, the HANDOFF and the plans a session works from; the audit, reports, reviews and live checks are records). `NOT_PORTABLE` refuses `cp`, `cat`, `mv`, `rm`, `ls`, `touch` and `mkdir -p`. The email quick start is a copy step for Claude plus three `python -m scripts.…` commands.
+- **The router's context (#143).** `design_hooks.mjs`: `about(CONTEXT, rx)` builds `^(?=[\s\S]*CONTEXT)[\s\S]*rx`; `DESIGN_TOKEN` (colour, spacing, theme, `tokens.css`, a `--property`, DTCG, Tokens Studio, Style Dictionary, components, prop tables…) gates `migrat… tokens`, `deprecat… tokens` and `token reference`; `DESIGN_WORK` gates `critique`; `COMPONENT` gates `every state`; `PAGE_SPEED` gates `lighthouse`. `test_hooks.TheRouter.test_a_word_another_domain_shares_needs_the_skills_own_beside_it` holds both sides.
+- **Colour measurement (#145).** `generate_color_ramp.alpha_of()` (a hex's alpha or what follows `/`) and `opaque_color()` (refuses alpha < 1) for `--check`, the seed and the canvas; `check_roles.colour()` tests translucency before parsing. `check_roles` and `--check` measure with `worst_contrast` (clipped and chroma-mapped). The starter's accent-600 and accent-700 sit just outside sRGB, so color-system.md's `--table` block, accessibility.md's 4.66:1 and 4.91:1 and email-tokens.json's 7.27:1 and 6.90:1 are at the worse fallback.
+- **Tailwind's kept keys (#145).** `tw_probe.mjs`' `KEPT_UNDER` mirrors tailwindcss 4.3.3's `ignoredThemeKeyMap` (`--font` keeps `--font-weight` and `--font-size`, `--inset`, `--text`, `--grid-column`, `--grid-row`), and a namespace is cleared by `startsWith(ns)` as `clearNamespace()` does.
+- **Layers and arbitrary values (#145).** stylelint's `design/layer-order` and the audit order a statement's canonical parents (`components.skin` is `components` where it stands; a parent named again keeps its first place) and skip a project's own layers; a dotted name declares its parent for later blocks. ESLint's `ARBITRARY_VALUE` and the audit's `TW_ARBITRARY_OK` exempt `bg-[url(…)]`/`mask-[url(…)]` only when the url is the whole value, and `content-['…']`. The spec's `layers` and `tailwind_arbitrary` sections hold both gates.
+- **The migration (#144).** `extract_literals.TW_ARBITRARY_RE`'s group 1 is the variants (`[\w-]+(?:\[…\])?:`) and a minus; a negative z-index class is negated. `classify_length()` returns `other-length` outside the spacing and size sets (but `flex` and variables stay `length`); `cluster_values.route_other_lengths()` gives each a row with `OTHER_LENGTH_ADVICE`. `cluster_z()` puts negatives and Tailwind classes in rows; `cluster_spacing()` gives a preprocessor variable's length `held_colour`'s advice. `tw_utility_prefix()` splits at the last `-[`. `TheAuditsMigrationMediums`, `TheRoleTableIsTheCode` (reads extraction-and-clustering.md §6 through `role_for()`).
+- **The plugin** is `plugins/web-design-suite/` (about 1,240 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -415,46 +432,66 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.
 
-## 3. First: the state of `main`
+## 3. First: the state of `main`, and #145
 
-Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
+Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then:
+- **#145** (P54 part 2, §3.2) was open at the end, every thread resolved, its last head `3d480f3` (CI running). If its CI is green and GitHub says clean, merge it (merge commit, `--match-head-commit` with the full SHA), then delete `fix/studio-mediums`. If `main` moved, merge `main` in first, keeping both sides of the CHANGELOG and the plan.
+- **The docs PR, #146**, may still be open: merge it the same way once green.
+- Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. Phase 6c, 4.0.0: the audit, from P53's last class
+## 4. Phase 6c, 4.0.0: P54's remaining areas, then P55
 
-**The owner placed all of Phase 6c first (2026-10-14).** Its order is P53's last class, then P54 and P55, then Phase 6b's workstreams (ask the owner which comes first then). Keep each PR under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+**The owner placed all of Phase 6c first (2026-10-14).** P53 is done (#136, #138, #139, #140, #142). P54 is one PR per audit §3 area: parts 1 to 3 merged (§3.1 #143, §3.2 #145, §3.3 #144). Five areas remain, then P55 (the lows), then Phase 6b's workstreams (ask the owner which comes first then). Keep each PR under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P53 | The cross-cutting class still to come: the cmd.exe placeholders, and its check (audit §7 class 9) | N45 | `CLAUDE.md`, the SKILL.md files, the plans, `tests/test_docs.py` | S |
-| P54 | The medium findings, one PR per §3 area | N46 | per area | L |
+| P54 | The medium findings, one PR per §3 area: §3.4 to §3.8 left | N46 | per area | L |
 | P55 | The low findings and doc fixes | N47 | per area | M |
 | P34, P35, P37, P41, P42, P43 | Phase 6b's workstreams, after Phase 6c | see §4 of the plan | | |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-**P53's last class, the cmd.exe placeholders, in detail** (the audit's §3.7 and §3.6, its §7 class 9: "extend `test_docs.PasteableCommands` to every fenced block and inline command in `CLAUDE.md`, the SKILL.md files and the plans; placeholders in capitals, never `<…>`"):
-1. **D4.** `CLAUDE.md:44` has an unquoted `<ids>` in a command for cmd.exe (cmd says "The syntax of the command is incorrect"). This file's live-check command has `--plugin-dir <export>/plugins/…` inside a bash block.
-2. **G13.** `design-critique-gate/SKILL.md` (about :210): its `audit_design` command took its path as an angle-bracket placeholder, which cmd.exe reads as a redirection; it is `python -m scripts.audit_design PATH --json > audit.json` now.
-3. **E14.** `email-template-system/SKILL.md` (about :58-78): the quick start is bash-only (`mkdir -p`, `cp`, `cat`).
-4. **The check:**
-   - Size the sweep before writing it. `grep -n '<[a-z][a-z-]*>'` over the fenced blocks of `CLAUDE.md`, the SKILL.md files, the workflow commands and the plans will show how many placeholders there are.
-   - The plans' Bash-tool blocks are bash on purpose: the rule is placeholders in capitals, not cmd.exe syntax everywhere. Decide which blocks the test reads and say why in its docstring.
-   - Keep the existing README rules (`not_portable()`) for the README.
-   - A SKILL.md near its 20,500-byte budget may need a trim beside a longer command.
-5. **Tests:** each fails on `v3.6.0` first. Run `test_docs` and `check.py` with `WDS_NODE_MODULES`. The CHANGELOG goes under 4.0.0's Fixed. Add the row `P53 part 5, #N` above the `P53` row and remove that row, since P53 is then done.
+**Run each finding's own fixture first.** Last session M1 did not reproduce (#135 had fixed it), and the audit's line numbers have drifted. The fixtures are in the audit's scratchpad (`3985bfd1-…\scratchpad\migration\fx1..fx7`, `studio\`, `shared\fx`, …), which Storage Sense can empty: rebuild a case from the audit's text if it is gone. **Already closed by P53, so skip them:** V7, V8, V11, E9, G3, G4, S1, S2, W6, W7.
 
-**Then P54, the mediums, one PR per §3 area** (the audit's §3.1 to §3.8, the `medium` entries). Read each area's entries by section; list each finding's own fixture before fixing it, as H14 did not reproduce. Two found this session go in with them:
-- `diff_system`'s snapshot resolver reads an 8-digit hex alpha (`#2563eb80`) as opaque, so its contrast is measured as if solid (§3.4);
-- `extract_system --tokens` reads a JSON file as CSS, so a DTCG token file gives zero tokens with exit 0 (§3.4).
+**P54 part 4, §3.4 (design-system-versioning, design-system-docs, figma-variables-sync).** Next.
+- **V2.** `diff_system._snapshot_from_contract()`: with several DTCG files, a later file's `notWritten` value loses to an earlier file's written value (`if name not in held`); last wins elsewhere. Walk the files once, in order, as `read_tokens` does.
+- **V3.** `deprecate.py import` reads `read_deprecations()` only; the `$deprecated` marks in the root `$extensions` (`not_written_marks()`) that `diff_system` honours are never imported. Do it once, in the shared `read_deprecations`.
+- **V4.** `deprecate scan` reads `.json`, `.md` and `.mdx`, so the migration's own `mapping.json` (its rules hold `var(--fg-faint)`) scans as manual hits, "NOT SAFE to remove", forever. Skip a JSON whose `schema` is the mapping's or the ledger's.
+- **V5.** `deprecate add --replacement` is never looked up: a replacement that is itself deprecated, or undeclared in `--source`, is accepted.
+- **V6.** `build_docs.py` inlines the search index into `<script>` unescaped: a `</script>` in a note ends it. Replace `</` with `<\/`.
+- **V9.** versioning's `scripts.md` and `diff_system --help` say "a `contract.json`, or a directory containing one"; `load_snapshot` looks in a folder for `system.json`, `tokens.css` and `theme.css` only (exit 2).
+- **V10.** The "copy the scripts into your own `scripts/`" notes in three SKILL.md files name only the command scripts, not the `project_config.py`, `dtcg.py` and `figma_common.py` they import, and `install_gate.py` vendors none of these three skills' commands, so a copied command fails with `ModuleNotFoundError`: each note must name its helpers. Mind the SKILL.md budgets (§2).
+- **Found by the 2026-10-15 sessions:** `diff_system`'s snapshot resolver reads `#2563eb80` as opaque, so its contrast is measured as if solid (`generate_color_ramp.alpha_of()` exists since #145); and `extract_system --tokens` reads a JSON file as CSS, so a DTCG token file gives zero tokens with exit 0.
 
-- **The audit's fixtures** are in its session's scratchpad (`3985bfd1-…\scratchpad\migration\fx1..fx7`, `studio\`, `shared\fx`, …), which Storage Sense can empty. Run a finding's own fixture before fixing it (H14 did not reproduce). Rebuild a case from the audit's text if it is gone.
-- **Facts from outside** are re-read at the source on the day, and a figure goes into `evidence.json`.
-- **R4** follows R3.6's order:
-  - a live check of what changed (the owner's OK, with its estimate);
-  - the release PR;
-  - the evals on its merge (the owner's OK, about $11, with `headSha` checked);
-  - then the tag.
+**P54 part 5, §3.5 (content-model-to-ui, client-presentation-builder, email-template-system).**
+- **E1.** `introspect_schema._temporal`: a naive `timestamp` `created_at`/`updated_at` (every Prisma `DateTime @default(now())`, Drizzle `timestamp()` without `withTimezone`) becomes an editable field; `system` is used in the `date` and `timestamptz` branches only.
+- **E2.** `scaffold_ui.py`: a table name goes into output paths unsanitised (`../evil` writes above `features/`). Refuse `/`, `\`, `..`, NUL, or slug it.
+- **E3.** `scaffold_ui.py`: a column `"2fa"` gives a TSX and a Python syntax error; `"it's"` an unterminated string. `class`, `default`, `from`, `display-name` and `naïve` already work: keep them as controls. The audit suggests `json.dumps` for names, `errors[…]` when the key differs, and a `_` prefix for a leading digit.
+- **E4.** `introspect_schema._pinned_to_caller` misses `auth.uid()::text = owner_id::text`, `(auth.jwt() ->> 'sub')::uuid = user_id` and `auth.uid() = "userId"`: false `authority-writable` warnings.
+- **E5.** `detect_format` tests `"pgTable("`, while `parse_drizzle` accepts `pgTable.withRLS(`.
+- **E6.** `build_email.minify_html` joins words across inline siblings (`<strong>Hello</strong> <em>world</em>`).
+- **E7.** `email-client-matrix.md` says the templates keep "600–750 bytes" of `<style>`; the build measures 751, 919 and 830.
+- **E8.** The three templates do not pass `lint_email --source` (6, 6 and 1 warnings), though SKILL.md says they compile clean. The SKILL.md is at its budget.
+- **E10.** `build_presentation`: header placeholders (`<company>`, `<your name>`, `<YYYY-MM-DD>`, `<stage>`) reach the cover and footer with no gap reported.
 
-  Its live check covers Part 5's new block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed (a Vue project's bound attributes, the index-mode hook), and the migration's reconciliation on a real codebase (P52).
+**P54 part 6, §3.6 (a11y-audit-runner, perf-budget-gate, component-state-matrix, design-critique-gate).**
+- **G1.** `a11y_static`'s `aria-hidden-focusable` counts descendants that cannot take focus (`type="hidden"`, `hidden`, `inert`, `tabindex="-1"`), and only direct children.
+- **G2.** `a11y_static._has_name` looks one level deep and has no case for a capitalised component child: `<button><Icon/></button>` must be "cannot tell".
+- **G5.** `a11y_runtime.mjs`' `forcedColorsSurvey`: the unanchored `/button|a|summary/` matches `main`, `nav`, `span`…; anchor it.
+- **G6.** The macOS TBT flake has a cause: the control click lands at load + 500 ms, inside the fixture's 3-second task on a slow runner. Make it deterministic.
+- **G7.** `automation-coverage.md` §3 reads as this suite's coverage, but several mechanisms are in neither gate (1.3.4, 2.4.11, 3.3.8…).
+
+**P54 part 7, §3.7 (docs, CI, release).**
+- **D1.** HANDOFF lists "a local build never matches the release's checksums" as open, and `tooling/README.md` says byte-identical; `build.py` explains why (zlib-ng on Windows Python 3.14). Make the docs say it.
+- **D2.** `release.yml` pins `actions/checkout` and `setup-uv` by tag while holding `contents: write`; pin both to SHAs, `persist-credentials: false`, as `evals.yml` does.
+- **D3.** The plugin README says "the three browser scripts need Node"; there are six `.mjs` entry scripts.
+
+**P54 part 8, §3.8 (the test suite).**
+- **T1.** `test_evidence.test_no_entry_outlives_its_figure` passes when any `also` substring is in the doc; require the figure itself.
+- **T2.** Wall-clock thresholds on shared runners (`test_content_and_a11y` `assertLess(large, 20)`, the TBT medians, `test_token_migration`); keep the ratio bounds, drop the absolute ones.
+
+**Each PR:** run each finding's fixture first; tests fail on `v3.6.0` first (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES`; the CHANGELOG under 4.0.0's Fixed; a row `P54 part N, #N` above the `P54` row, and a note in the completion plan's N46. After part 8, remove the `P54` row and mark N46 done.
+
+**R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed (a Vue project's bound attributes, the index-mode hook), the migration's reconciliation on a real codebase (P52), and the router (#143).
 
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 
