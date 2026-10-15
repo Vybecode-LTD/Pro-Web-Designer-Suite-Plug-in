@@ -508,7 +508,8 @@ def iter_files(root: Path) -> Iterator[Path]:
 # The suite's own records name tokens without using them: the ledger, a
 # migration mapping (whose rules hold `var(--old)`), a scan report, a docs
 # snapshot. Read as consumers, a token was "NOT SAFE to remove" forever (V4).
-SUITE_SCHEMAS = ("design-system-versioning/", "design-token-migration/", "design-system-docs/")
+SUITE_SCHEMAS = ("design-system-versioning/", "design-token-migration/", "design-system-docs/",
+                 "web-design-suite/")                 # a contract.json (Codex on #147)
 
 
 def suite_record(path: Path, text: str) -> bool:
@@ -609,7 +610,9 @@ def replacement_problem(ledger: Dict[str, Any], name: str, replacement: str,
         return (f"--replacement {replacement} is {state} (since {other.get('since', '?')})"
                 + (f"; point {name} at {after}, which replaces it" if after else ""))
     if replacement.startswith("--") and sources:
-        decl = re.compile(r"(?m)^\s*" + re.escape(replacement) + r"\s*:")
+        # Anywhere a declaration starts, `:root { --x: 1; }` and minified CSS
+        # included (Codex on #147); `var(--x)` is never followed by a colon.
+        decl = re.compile(r"(?<![\w-])" + re.escape(replacement) + r"\s*:")
         texts = []
         for raw in sources:
             try:

@@ -510,6 +510,8 @@ class TheAuditsVersioningMediums(TempDirTest):
                                            "--removal", "2.0.0", "--replacement=--fg-faint").returncode)
         self.assertEqual(0, self.deprecate("mapping", "-o", self.tmp / "proj" / "mapping.json").returncode)
         self.write("proj/notes.json", json.dumps({"todo": "var(--fg-subtle) in the old header"}))   # not ours: read
+        self.write("proj/contract.json", json.dumps({"schema": "web-design-suite/contract/1",       # Codex on #147
+                                                     "roles": {"--fg-muted": "var(--fg-subtle)"}}))
         proc = self.deprecate("scan", self.tmp / "proj", "--format", "json")
         hits = [h for per in json.loads(proc.stdout)["results"]["--fg-subtle"].values() for h in per]
         self.assertEqual(["app.css", "notes.json"], sorted(pathlib.Path(h["file"]).name for h in hits))
@@ -517,7 +519,8 @@ class TheAuditsVersioningMediums(TempDirTest):
     def test_a_replacement_must_be_live_and_declared(self):
         """V5: `--replacement` was never looked up, so the mapping could rewrite
         one deprecated name onto another, or onto a name no source declares."""
-        self.write("proj/tokens.css", ":root {\n  --fg-faint: #777777;\n  --fg-subtle: #666666;\n}\n")
+        # The replacement shares a line with its selector (Codex on #147).
+        self.write("proj/tokens.css", ":root { --fg-faint: #777777;\n  --fg-subtle: #666666;\n}\n")
         tokens = str(self.tmp / "proj" / "tokens.css")
         add = ("add", "--kind", "token", "--since", "1.5.0", "--removal", "2.0.0")
         self.assertEqual(0, self.deprecate(*add, "--name=--fg-subtle", "--replacement=--fg-faint").returncode)
@@ -566,11 +569,12 @@ class TheAuditsVersioningMediums(TempDirTest):
         old = ":root {\n  --brand-500: #2563eb80;\n  --fg-default: var(--brand-500);\n  --bg-canvas: #ffffff;\n}\n"
         self.write("old.css", old)
         self.write("new.css", old.replace("#2563eb80", "#2563eb99"))
-        proc = run_py("design-system-versioning", "diff_system", "old.css", "new.css", "--no-upstream",
-                      "--format", "json", cwd=self.tmp)
-        report = json.loads(proc.stdout)
-        self.assertTrue(any("--fg-default on --bg-canvas [light]: translucent" in n for n in report["notes"]),
-                        report["notes"])
+        for upstream in ((), ("--no-upstream",)):          # extract_system reads it by default (Codex on #147)
+            with self.subTest(upstream=upstream):
+                proc = run_py("design-system-versioning", "diff_system", "old.css", "new.css", *upstream,
+                              "--format", "json", cwd=self.tmp)
+                notes = json.loads(proc.stdout)["notes"]
+                self.assertTrue(any("--fg-default on --bg-canvas [light]: translucent" in n for n in notes), notes)
 
 
 if __name__ == "__main__":
