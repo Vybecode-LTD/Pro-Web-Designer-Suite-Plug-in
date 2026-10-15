@@ -505,6 +505,23 @@ def iter_files(root: Path) -> Iterator[Path]:
                 yield p
 
 
+# The suite's own records name tokens without using them: the ledger, a
+# migration mapping (whose rules hold `var(--old)`), a scan report, a docs
+# snapshot. Read as consumers, a token was "NOT SAFE to remove" forever (V4).
+SUITE_SCHEMAS = ("design-system-versioning/", "design-token-migration/", "design-system-docs/",
+                 "web-design-suite/")                 # a contract.json (Codex on #147)
+
+
+def suite_record(path: Path, text: str) -> bool:
+    if path.suffix.lower() != ".json":
+        return False
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return False
+    return isinstance(data, dict) and str(data.get("schema", "")).startswith(SUITE_SCHEMAS)
+
+
 def scan_one(root: Path, entry: Dict[str, Any]) -> List[Hit]:
     name = str(entry["name"])
     consumer = root.name or str(root)
@@ -521,7 +538,7 @@ def scan_one(root: Path, entry: Dict[str, Any]) -> List[Hit]:
             text = read_text(path)
         except (OSError, UnicodeDecodeError):
             continue
-        if name not in text:
+        if name not in text or suite_record(path, text):
             continue
         is_css = path.suffix.lower() in CSS_EXT
         for i, raw in enumerate(text.splitlines(), 1):
@@ -578,6 +595,36 @@ def classify_hit(raw: str, path: Path, name: str,
 # ===========================================================================
 
 
+def replacement_problem(ledger: Dict[str, Any], name: str, replacement: str,
+                        sources: Sequence[str]) -> str:
+    """Why `--replacement` cannot stand, or "" (the audit's V5): the mapping
+    would rewrite one deprecated or missing name onto another."""
+    if not replacement:
+        return ""
+    if replacement == name:
+        return f"--replacement {replacement} is the token being deprecated"
+    other = find_entry(ledger, replacement)
+    if other:
+        state = "removed" if other.get("status") == "removed" else "itself deprecated"
+        after = other.get("replacement") or ""
+        return (f"--replacement {replacement} is {state} (since {other.get('since', '?')})"
+                + (f"; point {name} at {after}, which replaces it" if after else ""))
+    if replacement.startswith("--") and sources:
+        # Anywhere a declaration starts, `:root { --x: 1; }` and minified CSS
+        # included (Codex on #147); `var(--x)` is never followed by a colon.
+        decl = re.compile(r"(?<![\w-])" + re.escape(replacement) + r"\s*:")
+        texts = []
+        for raw in sources:
+            try:
+                # A commented-out declaration declares nothing (CodeRabbit on #147).
+                texts.append(re.sub(r"/\*.*?\*/", " ", read_text(Path(raw)), flags=re.S))
+            except (OSError, UnicodeDecodeError):
+                pass                                # the source check below names it
+        if texts and not any(decl.search(t) for t in texts):
+            return f"--replacement {replacement} is declared in none of --source ({', '.join(sources)})"
+    return ""
+
+
 def cmd_add(args: argparse.Namespace) -> int:
     ledger_path = Path(args.ledger)
     ledger = load_ledger(ledger_path)
@@ -589,6 +636,10 @@ def cmd_add(args: argparse.Namespace) -> int:
               f"Pass --force if you really mean it, and write the reason into "
               f"--notes so the next person knows it was deliberate.",
               file=sys.stderr)
+        return 2
+    problem = replacement_problem(ledger, args.name, args.replacement or "", args.source or [])
+    if problem and not args.force:
+        print(f"deprecate: {problem}\nPass --force if you really mean it.", file=sys.stderr)
         return 2
     codemod = args.codemod
     if codemod == "auto":

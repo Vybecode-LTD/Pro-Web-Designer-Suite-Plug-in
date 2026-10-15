@@ -38,7 +38,7 @@ Exit `0` clean · `1` the gate fired · `2` bad invocation.
 |---|---|
 | `add` | record a deprecation, inject the marker, emit the codemod |
 | `status [--version X.Y.Z]` | what is pending, what is due, what is still in use |
-| `scan REPO…` | actual usage across consumer repos, per call site, labelled `codemod` or `manual` |
+| `scan REPO…` | actual usage across consumer repos, per call site, labelled `codemod` or `manual`; the suite's own JSON records (a ledger, a mapping, a scan report, a docs snapshot) name tokens without using them, and are skipped |
 | `mapping [-o FILE]` | re-emit the whole ledger's `mapping.json` |
 | `retire --name NAME` | mark it removed; refuses while the last scan shows usage |
 | `import FILE… --since --removal` | record each token a DTCG file marks `$deprecated` (below) |
@@ -47,7 +47,7 @@ Exit `0` clean · `1` the gate fired · `2` bad invocation.
 |---|---|
 | `--name` `--kind` | the subject; `token` · `socket` · `component` · `variant` · `state` · `prop` · `theme` · `repoint` |
 | `--since` `--removal` | the promise. A removal less than a minor version away is refused |
-| `--replacement` | what to use instead; omit when there is no one-to-one |
+| `--replacement` | what to use instead; omit when there is no one-to-one. Refused (exit 2, unless `--force`) when it is the token itself, is deprecated or removed in the ledger, or is declared in none of the `--source` files |
 | `--reason` `--notes` | why, and what the codemod will not do for them |
 | `--codemod auto\|mechanical\|manual\|none` | `auto` is mechanical when a replacement exists |
 | `--source FILE` | inject the marker here (repeatable); idempotent |

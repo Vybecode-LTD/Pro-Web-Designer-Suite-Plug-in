@@ -895,10 +895,15 @@ class Resolver:
                 return Resolved("unresolved", text, reason=str(exc), kind="color")
             return Resolved("exact", text, kind="color", hex=hexval, alpha=alpha)
         if _HEX_RE.match(text.strip()):
+            # `#rgba` and `#rrggbbaa` carry an alpha, which parse_color drops;
+            # diff_system reads its snapshots through here (Codex on #147).
+            digits = text.strip().lstrip("#")
+            pair = digits[3] * 2 if len(digits) == 4 else digits[6:] if len(digits) == 8 else "ff"
             try:
                 lch = parse_color(text.strip())
                 return Resolved("exact", text, kind="color",
-                                hex=rgb_to_hex(*clamp_rgb(oklch_to_rgb(*lch))))
+                                hex=rgb_to_hex(*clamp_rgb(oklch_to_rgb(*lch))),
+                                alpha=round(int(pair, 16) / 255, 4))
             except ColorError as exc:
                 return Resolved("unresolved", text, reason=str(exc), kind="color")
 

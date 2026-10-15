@@ -291,6 +291,22 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   `rgb(255, 0, 0, 0.5)` and `hsl(0, 100%, 50%, 0.5)`, the legacy form under the names
   CSS Color 4 made aliases of `rgba()` and `hsla()`, were left out of a DTCG document as
   unsupported; they are written with their alpha (`test_dtcg.TheWriter`).
+- **Versioning and the docs site misread five things** (the audit's V4, V5, V6 and V9,
+  and one found beside them):
+  - `deprecate scan` read the suite's own JSON records as consumers: the mapping's
+    rules hold `var(--fg-subtle)`, so the token was "NOT SAFE to remove" forever. A
+    ledger, a mapping, a scan report and a docs snapshot are skipped;
+  - `deprecate add --replacement` was never looked up. It is refused (exit 2, unless
+    `--force`) when it is the token itself, is deprecated or removed, or is declared in
+    none of the `--source` files;
+  - `build_docs` inlined the search index into a `<script>`, so a `</script>` in a
+    token's note ended it; every `<` is written as `\u003c`;
+  - `diff_system` searched a folder for `system.json` and `tokens.css` only, though the
+    docs promise a folder holding a `contract.json` too;
+  - `diff_system` read `#2563eb80` as solid and measured its contrast; an 8-digit or
+    4-digit hex now carries its alpha, and the pair is a translucent note.
+
+  `test_versioning.TheAuditsVersioningMediums`.
 - **The migration's census and proposal misread five things** (the audit's M2 to M6):
   - a Tailwind class with a variant of digits, hyphens or brackets (`2xl:`,
     `group-hover:`, `data-[state=open]:`) or a minus (`-mt-[13px]`) was never counted,
