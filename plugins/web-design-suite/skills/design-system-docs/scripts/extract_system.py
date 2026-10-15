@@ -2121,10 +2121,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     data = ex.to_dict()
     data["meta"] = {"color_impl": COLOR_IMPL, "root_font_size": args.root_font_size}
     text = json.dumps(data, indent=2, sort_keys=False, ensure_ascii=False) + "\n"
-    clash = refuse_overwrite(args.out, *args.paths, *token_files, *css_files, *prop_files)   # class 5
-    if clash:
-        print(f"extract_system: {clash}", file=sys.stderr)
-        return 2
+    # Both outputs, against every input: the prose read through --prose too (Codex on #136).
+    prose = Path(args.prose) if args.prose else None
+    read = [*args.paths, *token_files, *css_files, *prop_files,
+            *((p for p in prose.rglob("*") if p.is_file()) if prose and prose.is_dir() else [prose])]
+    for dest in (args.out, args.contract):
+        clash = refuse_overwrite(dest, *read)
+        if clash:
+            print(f"extract_system: {clash}", file=sys.stderr)
+            return 2
     if args.out == "-":
         sys.stdout.write(text)
     else:

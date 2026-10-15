@@ -792,8 +792,10 @@ class Manifest:
         self.themes = as_list(raw.get("themes")) or list(DEFAULT_THEMES)
         self.densities = as_list(raw.get("densities")) or list(DEFAULT_DENSITIES)
         self.templates: Dict[str, str] = {}
+        self.templates_path: Optional[Path] = None
         if raw.get("templates"):
-            self.templates = read_templates(resolve(self.root, raw["templates"], "templates"))
+            self.templates_path = resolve(self.root, raw["templates"], "templates")
+            self.templates = read_templates(self.templates_path)
         comps = raw.get("components")
         if not isinstance(comps, list) or not comps:
             raise ManifestError(
@@ -1691,7 +1693,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         man = Manifest(mpath, Path(args.root) if args.root else None)
         # Neither the sheet nor its chrome replaces what it is built from
         # (the owner's audit of 2026-10-14, class 5).
-        inputs = [mpath, man.tokens, *man.base, *(p for c in man.components for p in c.css_paths)]
+        inputs = [mpath, man.tokens, man.templates_path, *man.base,     # templates: Codex on #136
+                  *(p for c in man.components for p in c.css_paths)]
         for dest in (args.out, args.emit_css):
             clash = refuse_overwrite(dest, *inputs)
             if clash:

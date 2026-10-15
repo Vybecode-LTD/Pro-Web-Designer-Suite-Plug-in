@@ -2875,6 +2875,8 @@ def main(argv: list[str] | None = None) -> int:
     # may be the project's own (the audit's E9).
     inputs = [args.decisions, args.audit, args.perf, args.a11y, args.manual, args.defence,
               args.tokens, *((config.tokens or []) if config else [])]
+    if Path(tokens_from).is_file():          # the bundled tokens, when nothing else named one (Codex on #136)
+        inputs.append(tokens_from)
     if args.screenshots and Path(args.screenshots).is_dir():
         # Each image load_screenshots() inlines, and its caption (Codex on #136).
         inputs += [q for p in Path(args.screenshots).iterdir() if p.suffix.lower() in IMAGE_EXT

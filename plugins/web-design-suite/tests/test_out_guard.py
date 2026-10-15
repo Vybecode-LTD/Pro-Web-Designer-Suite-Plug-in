@@ -14,6 +14,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import unittest
 
 from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, load_script, output, run_node, run_py
@@ -86,6 +87,17 @@ CASES = {
                                                  {"name": "bg/surface", "type": "COLOR", "value": "#ffffff"}]}]}]}),
                                           "tokens.css": STARTER, ".design-suite.json": '{"schema": 1, "tokens": "tokens.css"}'},
                                          ["export.json", "--out", "tokens.css"]),
+    # Codex on #136, round 2: every output, and every input read.
+    "extract_system --contract": ("design-system-docs", "extract_system.py", {"tokens.css": STARTER},
+                                  ["tokens.css", "--contract", "tokens.css"]),
+    "extract_system, the prose": ("design-system-docs", "extract_system.py",
+                                  {"tokens.css": STARTER, "docs/a.md": "# A\n"},
+                                  ["tokens.css", "--prose", "docs", "--out", "docs/a.md"]),
+    "generate_matrix, its templates": ("component-state-matrix", "generate_matrix.py",
+                                       {"matrix.json": MATRIX.replace('"densities"', '"templates": "t.html", "densities"'),
+                                        "chip.css": ".chip { color: red; }\n",
+                                        "t.html": '<template id="chip"><button class="chip">Chip</button></template>\n'},
+                                       ["matrix.json", "--out", "t.html"]),
     "lint_email, the config's tokens": ("email-template-system", "lint_email.py",
                                         {".git/HEAD": "x\n", "email.html": EMAIL, "t.json": "{}",
                                          ".design-suite.json": '{"schema": 1, "emailTokens": "t.json"}'},
@@ -156,6 +168,22 @@ class EveryWriterRefusesItsInput(TempDirTest):
                 proc = run_node(skill, script, *flag, (self.tmp / "page.html").as_uri(),
                                 "--report", "page.html", cwd=self.tmp)
                 self.check(proc, written)
+
+    def test_the_deck_never_lands_on_its_bundled_tokens(self):
+        # Codex on #136, round 2: with no --tokens and no config, the deck reads
+        # the skill's own assets/deck-tokens.css. A copy of the skill runs here,
+        # so a failure cannot touch the plugin.
+        skill = self.tmp / "skill"
+        shutil.copytree(SKILLS / "client-presentation-builder", skill,
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        self.write(".git/HEAD", "x\n")
+        written = self.stage({"DECISION_LOG.md": DECISIONS})
+        bundled = skill / "assets" / "deck-tokens.css"
+        written[bundled.relative_to(self.tmp).as_posix()] = bundled.read_bytes()
+        proc = subprocess.run([sys.executable, "-B", str(skill / "scripts" / "build_presentation.py"),
+                               "DECISION_LOG.md", "-o", str(bundled)], cwd=self.tmp, capture_output=True,
+                              env=env(), timeout=120)
+        self.check(proc, written)
 
     def test_the_cluster_values_proposal_never_lands_on_the_projects_tokens(self):
         self.write("src/a.css", ".a { margin: 13px; }\n")
