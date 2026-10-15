@@ -3539,7 +3539,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"scaffold_ui: {mp} is not a {MODEL_SCHEMA} document. Run "
               f"introspect_schema.py first.", file=sys.stderr)
         return 2
-    tables = model.get("tables") or []
+    tables = model.get("tables", [])                 # `{}` is no empty list (CodeRabbit on #138)
     if not isinstance(tables, list) or not all(isinstance(t, dict) and isinstance(t.get("name"), str)
                                                for t in tables):
         print(f"scaffold_ui: {mp}: `tables` must be a list of named objects.", file=sys.stderr)

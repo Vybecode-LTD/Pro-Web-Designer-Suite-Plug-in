@@ -69,6 +69,7 @@ import argparse
 import fnmatch
 import gzip
 import json
+import math
 import os
 import posixpath
 import re
@@ -1045,7 +1046,8 @@ LIMIT_SECTIONS = ("bytes", "requests", "largest_asset", "third_party", "lab")
 
 
 def _number(value: object) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    """A finite number: `1e400` parses as inf, under which every page passes (Codex on #138)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def budget_problem(data: object) -> str | None:

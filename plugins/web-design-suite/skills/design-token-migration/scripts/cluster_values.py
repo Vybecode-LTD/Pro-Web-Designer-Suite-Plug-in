@@ -2746,6 +2746,15 @@ def main(argv: Sequence[str] | None = None) -> int:
               f"with --format json.", file=sys.stderr)
         return 2
 
+    literals = payload.get("literals")                # `{}` read as an empty census (CodeRabbit on #138)
+    if not isinstance(literals, list) or not all(
+            isinstance(lit, dict) and all(isinstance(lit.get(k), str)
+                                          for k in ("kind", "prop", "raw", "normalized", "context"))
+            for lit in literals):
+        print(f"cluster_values: {src}: `literals` must be a list of extract_literals.py's objects "
+              f"(kind, prop, raw, normalized and context as strings).", file=sys.stderr)
+        return 2
+
     idx = literal_index(payload)
     prop = Proposal()
     # A flag beats the config: the project's token files only without --tokens (P24).

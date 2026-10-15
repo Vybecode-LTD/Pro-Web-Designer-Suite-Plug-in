@@ -1192,6 +1192,24 @@ def system_problem(data: Any) -> Optional[str]:
         if not isinstance(items, list) or not all(isinstance(i, dict) and isinstance(i.get("name"), str)
                                                   for i in items):
             return f"has a `{key}` that is not a list of named objects"
+    # What the site and the diff index (CodeRabbit on #138): the counts, each
+    # token's value and tier, each contrast row, and each component's sockets.
+    stats = data.get("stats")
+    if not isinstance(stats, dict) or not all(isinstance(stats.get(k), int) and not isinstance(stats.get(k), bool)
+                                              for k in ("tokens", "components", "sockets")):
+        return "has no `stats` object with whole-number `tokens`, `components` and `sockets`"
+    for i, token in enumerate(data.get("tokens", [])):
+        if not isinstance(token.get("raw"), str) or "tier" not in token:
+            return f"has a `tokens[{i}]` with no `raw` string or no `tier`"
+        rows = token.get("contrast", [])
+        if not isinstance(rows, list) or not all(isinstance(c, dict) and {"against", "theme", "ratio"} <= set(c)
+                                                 and isinstance(c["ratio"], (int, float)) for c in rows):
+            return f"has a `tokens[{i}].contrast` that is not a list of against/theme/ratio rows"
+    for i, component in enumerate(data.get("components", [])):
+        sockets = component.get("sockets")
+        if not isinstance(sockets, list) or not all(isinstance(s, dict) and isinstance(s.get("name"), str)
+                                                    and "default" in s for s in sockets):
+            return f"has a `components[{i}].sockets` that is not a list of named sockets with defaults"
     return None
 
 

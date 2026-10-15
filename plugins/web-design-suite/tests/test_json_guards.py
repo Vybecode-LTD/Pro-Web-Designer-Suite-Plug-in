@@ -26,10 +26,12 @@ DECISIONS = ("# Test deck\n\n## Decisions\n\n### D1 — Tokens\n"
              "**Constraint:** Many developers touch the CSS.\n**Choice:** A closed token system.\n")
 LEDGER = "design-system-versioning/deprecations@1"
 SYSTEM = "design-system-docs/system/1"
+STATS = {"tokens": 0, "components": 0, "sockets": 0}
+LITERALS = "design-token-migration/literals@1"
 FINDING = {"layer": "craft", "severity": "major", "title": "t"}
 FILES = {"tokens.css": TOKENS, "src/a.css": ".a { color: var(--fg-default); }\n",
          "dist/index.html": EMAIL, "DECISION_LOG.md": DECISIONS, "a.html": EMAIL, "findings.json": "[]",
-         "system.json": json.dumps({"schema": SYSTEM, "tokens": [], "components": []}),
+         "system.json": json.dumps({"schema": SYSTEM, "stats": STATS, "tokens": [], "components": []}),
          "export.tokens.json": json.dumps({"c": {"$type": "color", "$value": "#ffffff"}}), "axe.js": ""}
 MODEL = "content-model-to-ui/model/1"
 MAPPING = "design-token-migration/mapping@1"
@@ -62,7 +64,8 @@ CASES = {
         ({"pages": {"home": {"largest_asset": {"js": True}}}}, "`pages.home.largest_asset.js`"),
         ({"growth": {"js_pct": "5"}}, "`growth.js_pct`"),
         ({"first_party_origins": "https://a.example"}, "`first_party_origins`"),
-        ({"measure": 5}, "`measure`")]),
+        ({"measure": 5}, "`measure`"),
+        ({"defaults": {"bytes": {"total": float("inf")}}}, "`defaults.bytes.total`")]),   # Codex on #138: 1e400
     "perf_audit --baseline": ("perf-budget-gate", "perf_audit", ["dist", "--baseline", "BAD"], BASELINE, [
         ({"findings": 5}, "could not read baseline"),
         ({"totals": [1]}, "could not read baseline"),
@@ -91,10 +94,16 @@ CASES = {
                                    ["DECISION_LOG.md", "--audit", "BAD", "--dry-run"], CODE, []),
     "build_docs system": ("design-system-docs", "build_docs", ["BAD", "--out", "site"], CODE, [
         ({"schema": SYSTEM, "tokens": {}}, "`tokens`"),
-        ({"schema": SYSTEM, "components": [5]}, "`components`")]),
+        ({"schema": SYSTEM, "components": [5]}, "`components`"),
+        ({"schema": SYSTEM, "tokens": [], "components": []}, "`stats`"),             # CodeRabbit on #138
+        ({"schema": SYSTEM, "stats": STATS, "tokens": [{"name": "--a"}]}, "`tokens[0]`"),
+        ({"schema": SYSTEM, "stats": STATS, "components": [{"name": "c", "sockets": 5}]},
+         "`components[0].sockets`")]),
     "build_docs --baseline": ("design-system-docs", "build_docs",
                               ["system.json", "--check", "--baseline", "BAD"], CODE, [
-        ({"schema": SYSTEM, "tokens": [{"raw": "#fff"}]}, "`tokens`")]),
+        ({"schema": SYSTEM, "tokens": [{"raw": "#fff"}]}, "`tokens`"),
+        ({"schema": SYSTEM, "stats": STATS, "components": [],
+          "tokens": [{"name": "--a", "raw": "#fff", "tier": 1, "contrast": [5]}]}, "`tokens[0].contrast`")]),
     "diff_system --deprecations": ("design-system-versioning", "diff_system",
                                    ["tokens.css", "tokens.css", "--deprecations", "BAD"], CODE, [
         ({"schema": LEDGER, "deprecations": {}}, "`deprecations`"),
@@ -107,9 +116,14 @@ CASES = {
         ({"schema": MAPPING, "rules": [5]}, "`rules[0]`"),
         ({"schema": MAPPING, "rules": [{"kind": "color", "replacement": "var(--x)", "match": "#fff"}]},
          "`rules[0].match`"),
-        ({"schema": MAPPING, "rules": [{"kind": "color", "match": ["#fff"]}]}, "`rules[0].replacement`")]),
+        ({"schema": MAPPING, "rules": [{"kind": "color", "match": ["#fff"]}]}, "`rules[0].replacement`"),
+        ({"schema": MAPPING, "rules": [{"kind": "color", "replacement": "x"}]}, "`rules[0].match`"),
+        ({"schema": MAPPING, "rules": [{"kind": "color", "replacement": "x", "match": ["#fff"], "props": 0}]},
+         "`rules[0].props`")]),
     "cluster_values": ("design-token-migration", "cluster_values", ["BAD", "--dry-run"], CODE, [
-        ({"literals": {}}, "literals")]),
+        ({"literals": {}}, "literals"),
+        ({"schema": LITERALS, "literals": {}}, "`literals`"),                         # CodeRabbit on #138
+        ({"schema": LITERALS, "literals": [{"kind": "color"}]}, "`literals`")]),
     "lint_email --tokens": ("email-template-system", "lint_email", ["--source", "--tokens", "BAD", "a.html"], CODE, [
         ({"tokens": []}, "tokens")]),
     "build_email --tokens": ("email-template-system", "build_email", ["a.html", "--tokens", "BAD"], CODE, []),
@@ -121,14 +135,19 @@ CASES = {
         ({"$schema": "component-state-matrix/1", "components": {}}, "components")]),
     "scaffold_ui": ("content-model-to-ui", "scaffold_ui", ["BAD", "--dry-run"], CODE, [
         ({"$schema": MODEL, "tables": {"a": 1}}, "`tables`"),
-        ({"$schema": MODEL, "tables": [5]}, "`tables`")]),
+        ({"$schema": MODEL, "tables": [5]}, "`tables`"),
+        ({"$schema": MODEL, "tables": {}}, "`tables`")]),                              # CodeRabbit on #138
     "introspect_schema": ("content-model-to-ui", "introspect_schema", ["BAD", "--format", "json"], 1, [
         ({"tables": 5}, "`tables`"),
         ({"tables": {"a": 5}}, "`tables`"),
         ({"tables": [{"name": "a", "columns": 5}]}, "`tables[0].columns`"),
         ({"tables": [{"name": "a", "columns": [], "foreign_keys": [5]}]}, "`tables[0].foreign_keys`"),
         ({"enums": ["x"], "tables": [{"name": "a"}]}, "`enums`"),
-        ({"columns": 5}, "`columns`")]),
+        ({"columns": 5}, "`columns`"),
+        ({"columns": [{"table_name": "a"}], "constraints": 5}, "`constraints`"),      # CodeRabbit on #138
+        ({"tables": [{"name": "a", "columns": 0}]}, "`tables[0].columns`"),
+        ({"enums": 0, "tables": [{"name": "a"}]}, "`enums`"),
+        ({"tables": 0}, "`tables`")]),
     "crux_check --lab": ("perf-budget-gate", "crux_check",
                          ["--origin", "https://a.example", "--lab", "BAD", "--response", "BAD"], CODE, []),
 }
@@ -195,6 +214,24 @@ class EveryLoaderChecksTheShape(TempDirTest):
                         or "readJsonFile(" in p.read_text(encoding="utf-8"))}
         self.assertTrue(readers, "found no script that reads JSON")
         self.assertEqual(set(), readers - tested - exempt)
+
+
+class TheAnswersFile(TempDirTest):
+    """scaffold_ui --answers, on a model introspect_schema wrote (CodeRabbit on #138)."""
+
+    def test_answers_must_be_an_object(self):
+        dump = self.write("dump.json", json.dumps({"tables": [{"name": "posts", "primary_key": ["id"], "columns": [
+            {"name": "id", "type": "uuid", "nullable": False}, {"name": "title", "type": "text"}]}]}))
+        made = run_py("content-model-to-ui", "introspect_schema", dump, "-o", "model.json", cwd=self.tmp)
+        self.assertEqual(0, made.returncode, output(made))
+        for value in ([], "x", 5):
+            with self.subTest(answers=value):
+                self.write("answers.json", json.dumps(value))
+                proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--answers", "answers.json",
+                              "--dry-run", cwd=self.tmp)
+                self.assertNotIn("Traceback", output(proc))
+                self.assertEqual(2, proc.returncode, output(proc))
+                self.assertIn("answers.json must be an object of answers", output(proc))
 
 
 class TheValuesMeanWhatTheySay(TempDirTest):
