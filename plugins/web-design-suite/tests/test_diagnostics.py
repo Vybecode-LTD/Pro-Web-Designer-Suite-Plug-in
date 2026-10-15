@@ -106,6 +106,21 @@ class TheContrastItCannotMeasureIsNamed(TempDirTest):
                       "--format", "json", cwd=self.tmp)
         notes = json.loads(proc.stdout)["notes"]
         self.assertTrue(any("contrast not measured" in n and "--fg-default on --bg-canvas" in n for n in notes), notes)
+        for fmt in ("changelog", "migration-guide"):                 # their text has no notes (CodeRabbit on #140)
+            with self.subTest(format=fmt):
+                text = run_py("design-system-versioning", "diff_system", "old.css", "new.css", "--no-upstream",
+                              "--format", fmt, cwd=self.tmp)
+                self.assertIn("contrast not measured: --fg-default on --bg-canvas", text.stderr.decode("utf-8"))
+
+    def test_a_translucent_pair_a_change_reaches_is_a_note(self):
+        """CodeRabbit on #140: its contrast depends on the backdrop, and it is named."""
+        old = ":root {\n  --brand-500: oklch(56% 0.2 260 / 0.5);\n  --fg-default: var(--brand-500);\n  --bg-canvas: #ffffff;\n}\n"
+        self.write("old.css", old)
+        self.write("new.css", old.replace("/ 0.5)", "/ 0.6)"))
+        proc = run_py("design-system-versioning", "diff_system", "old.css", "new.css", "--no-upstream",
+                      "--format", "json", cwd=self.tmp)
+        notes = json.loads(proc.stdout)["notes"]
+        self.assertTrue(any("--fg-default on --bg-canvas [light]: translucent" in n for n in notes), notes)
 
 
 class NoProblemListIsDropped(unittest.TestCase):

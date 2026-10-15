@@ -1653,15 +1653,18 @@ def contrast_deltas(old: Snapshot, new: Snapshot, rename: Dict[str, str],
                 if unmeasured is not None and reached:
                     unmeasured.append(f"{fg_new} on {bg_new} [{theme}]: not resolved to a colour")
                 continue
-            if min(a[2], b[2], c[2], d[2]) < 1.0:
-                continue        # translucent: the honest answer is "it depends"
+            if min(a[2], b[2], c[2], d[2]) < 1.0:   # translucent: the honest answer is "it depends"
+                if unmeasured is not None and reached:  # named too (CodeRabbit on #140)
+                    unmeasured.append(f"{fg_new} on {bg_new} [{theme}]: translucent, so it depends "
+                                      f"on the backdrop")
+                continue
             try:
                 before = contrast_ratio_oklch(parse_color(a[0]), parse_color(b[0]))
                 after = contrast_ratio_oklch(parse_color(c[0]), parse_color(d[0]))
             except ColorError:
                 if unmeasured is not None and reached:
-                    unmeasured.append(f"{fg_new} on {bg_new} [{theme}]: "
-                                      f"{a[0]} / {b[0]} -> {c[0]} / {d[0]}")
+                    unmeasured.append(f"{fg_new} on {bg_new} [{theme}]: a colour this script cannot "
+                                      f"parse ({a[0]} / {b[0]} -> {c[0]} / {d[0]})")
                 continue
             if abs(before - after) < 0.005:
                 continue
@@ -2691,7 +2694,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     contrast = ([] if args.no_contrast
                 else contrast_deltas(old, new, rename, changed_values, unmeasured))
     if unmeasured:
-        notes.append("contrast not measured, a colour this script cannot parse: " + "; ".join(unmeasured))
+        notes.append("contrast not measured: " + "; ".join(unmeasured))
 
     ledger, ledger_note = load_ledger(args.deprecations)
     if ledger_note:
@@ -2760,6 +2763,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                       args.mapping)
     else:
         text = render_report(res, ordered, contrast, notes)
+    if args.format in ("changelog", "migration-guide"):    # their text has no notes (CodeRabbit on #140)
+        for pair in unmeasured:
+            print(f"diff_system: contrast not measured: {pair}", file=sys.stderr)
 
     if args.out:
         outp = Path(args.out)
