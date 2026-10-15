@@ -1277,6 +1277,8 @@ def tailwind_literals(matches: Iterable[re.Match], text: str, fname: str, compon
             kind, normalized = classify_tailwind(prefix, body_clean)
             if not kind:
                 continue
+            if kind == "z-index" and m.group(1).endswith("-"):     # `-z-[1]` is -1 (Codex on #144)
+                normalized = str(-int(normalized))
             out.append(Literal(
                 kind=kind, raw=m.group(0), normalized=normalized,
                 prop=f"tw:{prefix}", file=fname, line=ln, col=col,

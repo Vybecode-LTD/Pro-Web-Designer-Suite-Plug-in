@@ -1694,6 +1694,19 @@ def cluster_z(lits: Sequence[dict], prop: Proposal) -> None:
     encoded, and it is the one kind where the script must not guess silently —
     every mapping here is marked for review.
     """
+    # A Tailwind class (`z-[5]`, `-z-[1]`) takes no value rule: the codemod
+    # rewrites a declaration's value, never a class, so it was counted as
+    # replaceable and left as it was (Codex on #144). It is one row, by hand.
+    tw = [l for l in lits if l["context"] in TW_CONTEXTS]
+    if tw:
+        prop.unmapped.append(Unmapped(
+            kind="tailwind", value=", ".join(sorted({l["raw"] for l in tw})),
+            occurrences=len(tw), where=where_of(tw), reason="arbitrary Tailwind z-index",
+            recommendation="Bind the theme's z-index keys to the --z-* rungs and use those "
+                           "classes; a negative one stays as written, with `isolate` on "
+                           "the parent.",
+        ))
+    lits = [l for l in lits if l["context"] not in TW_CONTEXTS]
     values = sorted({int(l["normalized"]) for l in lits
                      if re.fullmatch(r"-?\d+", l["normalized"])})
     # A negative z-index puts an element behind its stacking context's own

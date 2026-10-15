@@ -1192,6 +1192,19 @@ class TheAuditsMigrationMediums(TempDirTest):
         self.assertEqual([["10"]], [r["match"] for r in mapping["rules"] if r["kind"] == "z-index"])
         self.assertIn("-1", [u["value"] for u in mapping["unmapped"] if u["kind"] == "z-index"])
 
+    def test_a_tailwind_z_index_keeps_its_sign_and_takes_no_value_rule(self):
+        """Codex on #144: `-z-[1]` was read as 1, and a class took a value
+        rule the codemod never applies to a class, so it was counted as
+        replaceable and left as it was."""
+        census, mapping = self.propose({"src/T.tsx": 'export const T = () => <div className="-z-[1] z-[5]" />;\n',
+                                        "src/a.css": ".a { z-index: 5; }\n"})
+        self.assertEqual({"-z-[1]": "-1", "z-[5]": "5"},
+                         {l["raw"]: l["normalized"] for l in census["literals"] if l["context"] != "css-decl"})
+        rules = [r for r in mapping["rules"] if r["kind"] == "z-index"]
+        self.assertEqual([(["5"], 1)], [(r["match"], r["occurrences"]) for r in rules])
+        rows = [u for u in mapping["unmapped"] if u["kind"] == "tailwind"]
+        self.assertEqual([("-z-[1], z-[5]", 2)], [(u["value"], u["occurrences"]) for u in rows])
+
     def test_a_length_a_preprocessor_variable_holds_is_deleted_as_a_colour_is(self):
         """M6: `$gutter: 24px` was told to add a Tier-2 role for `other`,
         while `$brand: #2f6df6` was told to delete the variable."""
