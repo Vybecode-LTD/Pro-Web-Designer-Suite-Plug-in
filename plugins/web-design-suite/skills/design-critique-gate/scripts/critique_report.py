@@ -332,6 +332,33 @@ def _str_list(value: Any) -> list[str]:
     return [str(v).strip() for v in (value or []) if str(v).strip()]
 
 
+def _flag(raw: dict, key: str, where: str) -> bool:
+    """A boolean field, or "true"/"false" as text. `bool("false")` was true,
+    which made a major finding taste (G11)."""
+    value = raw.get(key)
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().lower() in ("true", "false"):
+        return value.strip().lower() == "true"
+    raise CritiqueError(f"{where}: '{key}' must be true or false, not {json.dumps(value)}")
+
+
+def _count(raw: dict, where: str) -> int:
+    """How many places a finding covers: a whole number from 1 (G11)."""
+    value = raw.get("count", 1)
+    if value is None or (value == 0 and not isinstance(value, bool)):
+        return 1                                       # as `or 1` read them before
+    if isinstance(value, str) and value.strip().isdigit():
+        value = int(value.strip())
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise CritiqueError(f"{where}: 'count' must be a whole number from 1, not {json.dumps(value)}")
+    return value
+
+
 def parse_finding(raw: Any, where: str) -> Finding:
     if not isinstance(raw, dict):
         raise CritiqueError(f"{where}: expected an object, got {type(raw).__name__}")
@@ -342,7 +369,7 @@ def parse_finding(raw: Any, where: str) -> Finding:
             "Every finding needs at minimum layer, severity and title."
         )
     severity = normalise_severity(raw["severity"], where)
-    is_taste = bool(raw.get("is_taste", False))
+    is_taste = _flag(raw, "is_taste", where)
     if severity == "taste":
         is_taste = True
     if is_taste and severity != "taste":
@@ -359,13 +386,13 @@ def parse_finding(raw: Any, where: str) -> Finding:
         fix=str(raw.get("fix", "")).strip(),
         confidence=normalise_confidence(raw.get("confidence"), where),
         is_taste=is_taste,
-        defend=bool(raw.get("defend", False)),
+        defend=_flag(raw, "defend", where),
         id=str(raw.get("id", "")).strip(),
         ref=str(raw.get("ref", "")).strip(),
         status=normalise_status(raw.get("status"), where),
         covers=_str_list(raw.get("covers")),
         source=str(raw.get("source", "hand")).strip() or "hand",
-        count=int(raw.get("count", 1) or 1),
+        count=_count(raw, where),
     )
     return f
 

@@ -315,9 +315,33 @@ def _overlay(base: dict, own: dict) -> None:
             base[key] = copy.deepcopy(value)
 
 
+def _bad_type(node: dict) -> Optional[str]:
+    """Why a node's `$type` cannot be read, or None: it is a string (S1)."""
+    if "$type" in node and not isinstance(node["$type"], str):
+        return f"`$type` is {json.dumps(node['$type'])}, not a string, so this is not read"
+    return None
+
+
+def _own_deprecated(node: dict, inherited: Any, name: str, problems: Problems) -> Any:
+    """A node's `$deprecated` if it is a string or a boolean, else what it
+    inherits, with the problem named (S10). `false` undoes a group's."""
+    if "$deprecated" not in node:
+        return inherited
+    mark = node["$deprecated"]
+    if isinstance(mark, (str, bool)):
+        return mark
+    problems.append((name, f"`$deprecated` is {json.dumps(mark)}, neither a string nor a "
+                           f"boolean, so it is not read"))
+    return inherited
+
+
 def _token(node: dict, path: List[str], kind: Optional[str], deprecated: Any,
            problems: Problems, lossless: bool) -> Optional[dict]:
     name = "/".join(path) or "$root"
+    bad = _bad_type(node)
+    if bad:
+        problems.append((name, bad))
+        return None
     kind = node.get("$type", kind)
     tok = {k: v for k, v in node.items() if k not in ("$ref", "$deprecated")}
     if "$value" not in node:                     # the whole token is a $ref
@@ -335,7 +359,7 @@ def _token(node: dict, path: List[str], kind: Optional[str], deprecated: Any,
         tok["$value"] = value
     if kind and "$type" not in tok:
         tok["$type"] = kind
-    deprecated = node.get("$deprecated", deprecated)  # its own, or its group's (false undoes it)
+    deprecated = _own_deprecated(node, deprecated, name, problems)  # its own, or its group's
     if deprecated:
         tok["$deprecated"] = deprecated
     return tok
@@ -352,8 +376,12 @@ def _walk(node: Any, path: List[str], kind: Optional[str], deprecated: Any,
         return node
     if "$value" in node or "$ref" in node:
         return _token(node, path, kind, deprecated, problems, lossless)
+    bad = _bad_type(node)
+    if bad:                                      # its tokens' type is unknown (S1)
+        problems.append(("/".join(path) or "(root)", bad))
+        return None
     group_kind = node.get("$type", kind)
-    group_deprecated = node.get("$deprecated", deprecated)
+    group_deprecated = _own_deprecated(node, deprecated, "/".join(path) or "(root)", problems)
     out: Dict[str, Any] = {}
     for key, child in node.items():
         if key in META_KEYS:
@@ -387,7 +415,8 @@ def normalise(data: Any, lossless: bool = False) -> Tuple[Any, Problems]:
     except RecursionError:                       # a long chain or a fan-out (CodeRabbit on #101)
         return {}, [("(root)", f"`$extends` or `$ref` expand it past {MAX_DEPTH} levels or "
                                f"{MAX_NODES} entries, so not read")]
-    return _walk(doc, [], None, None, problems, lossless), problems
+    walked = _walk(doc, [], None, None, problems, lossless)
+    return (walked if walked is not None else {}), problems
 
 
 def _pointer(root: Any, ref: str) -> Any:

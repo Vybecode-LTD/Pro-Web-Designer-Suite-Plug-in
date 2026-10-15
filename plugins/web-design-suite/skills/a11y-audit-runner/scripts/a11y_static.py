@@ -1875,9 +1875,12 @@ def main(argv: list[str] | None = None) -> int:
               or ".a11y-baseline.json")
     if bp.exists():
         try:
-            baseline = {portable_key(k) for k in json.loads(bp.read_bytes()) if isinstance(k, str)}
-        except (OSError, json.JSONDecodeError):
-            print(f"a11y_static: could not read baseline {bp}; auditing "
+            keys = json.loads(bp.read_bytes())
+            if not isinstance(keys, list) or not all(isinstance(k, str) for k in keys):
+                raise ValueError("not a list of finding keys")     # `5` was a traceback (G15)
+            baseline = {portable_key(k) for k in keys}
+        except (OSError, ValueError) as exc:
+            print(f"a11y_static: could not read baseline {bp} ({exc}); auditing "
                   f"everything.", file=sys.stderr)
     if baseline:
         findings = [f for f in findings if f.key() not in baseline]

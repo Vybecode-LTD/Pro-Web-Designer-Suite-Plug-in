@@ -1180,6 +1180,21 @@ RATIO_RE = re.compile(r"(\d+\.\d+)\s*:\s*1")
 TOKEN_MENTION = re.compile(r"--[a-z][\w-]*")
 
 
+def system_problem(data: Any) -> Optional[str]:
+    """What keeps a system.json from being read, or None (V8): a top level
+    of `[]` was an AttributeError here, and the baseline was never checked."""
+    if not isinstance(data, dict):
+        return f"is not extract_system.py's object (its top level is {json.dumps(data)[:40]})"
+    if data.get("schema") != SCHEMA:
+        return f"has schema {data.get('schema')!r}; expected {SCHEMA!r}"
+    for key in ("tokens", "components"):
+        items = data.get(key, [])
+        if not isinstance(items, list) or not all(isinstance(i, dict) and isinstance(i.get("name"), str)
+                                                  for i in items):
+            return f"has a `{key}` that is not a list of named objects"
+    return None
+
+
 def diff_systems(old: Dict[str, Any], new: Dict[str, Any]) -> List[str]:
     """A readable report of what changed. A JSON dump is not a report."""
     out: List[str] = []
@@ -1406,9 +1421,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except json.JSONDecodeError as exc:
         print(f"error: {args.system} is not valid JSON: {exc}", file=sys.stderr)
         return 2
-    if system.get("schema") != SCHEMA:
-        print(f"error: {args.system} has schema {system.get('schema')!r}; expected {SCHEMA!r}. "
-              "Regenerate it with extract_system.py.", file=sys.stderr)
+    problem = system_problem(system)
+    if problem:
+        print(f"error: {args.system} {problem}. Regenerate it with extract_system.py.", file=sys.stderr)
         return 2
 
     prose = Path(args.prose) if args.prose else None
@@ -1442,7 +1457,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 2
         problems: List[str] = []
         if baseline and baseline.is_file():
-            old = json.loads(baseline.read_bytes())
+            try:
+                old = json.loads(baseline.read_bytes())
+            except (OSError, ValueError) as exc:
+                print(f"error: the baseline {baseline} is not readable JSON ({exc}).", file=sys.stderr)
+                return 2
+            problem = system_problem(old)              # never shape-checked before (V8)
+            if problem:
+                print(f"error: the baseline {baseline} {problem}. Commit the system.json that "
+                      "extract_system.py wrote.", file=sys.stderr)
+                return 2
             problems += diff_systems(old, system)
         elif baseline:
             print(f"note: no baseline at {baseline}; checking prose only.", file=sys.stderr)

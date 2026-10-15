@@ -1041,6 +1041,61 @@ def read_jsonc(raw: bytes):
     return json.loads("".join(out))
 
 
+LIMIT_SECTIONS = ("bytes", "requests", "largest_asset", "third_party", "lab")
+
+
+def _number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def budget_problem(data: object) -> str | None:
+    """The first value of a budget file the gates cannot use, named by its
+    key, or None (G3): `"css": "60KB"` was a traceback here, and passed every
+    page in measure_vitals.mjs, which keeps a port of this check. A `bytes`
+    or `lab` limit may be null, which lifts a default."""
+    def shown(value: object) -> str:
+        return json.dumps(value)[:40]
+
+    def limits(where: str, block: object) -> str | None:
+        if not isinstance(block, dict):
+            return f"`{where}` must be an object, not {shown(block)}"
+        for name in LIMIT_SECTIONS:
+            if name not in block:
+                continue
+            if not isinstance(block[name], dict):
+                return f"`{where}.{name}` must be an object of numbers, not {shown(block[name])}"
+            for key, value in block[name].items():
+                if not (_number(value) or (value is None and name in ("bytes", "lab"))):
+                    return f"`{where}.{name}.{key}` must be a number, not {shown(value)}"
+        return None
+
+    if not isinstance(data, dict):
+        return f"the top level must be an object, not {shown(data)}"
+    if not isinstance(data.get("measure", ""), str):
+        return f"`measure` must be a string, not {shown(data['measure'])}"
+    origins = data.get("first_party_origins", [])
+    if not isinstance(origins, list) or not all(isinstance(o, str) for o in origins):
+        return f"`first_party_origins` must be a list of origins, not {shown(origins)}"
+    if "defaults" in data:
+        problem = limits("defaults", data["defaults"])
+        if problem:
+            return problem
+    growth = data.get("growth", {})
+    if not isinstance(growth, dict):
+        return f"`growth` must be an object of percentages, not {shown(growth)}"
+    for key, value in growth.items():
+        if not _number(value):
+            return f"`growth.{key}` must be a number, not {shown(value)}"
+    pages = data.get("pages", {})
+    if not isinstance(pages, dict):
+        return f"`pages` must be an object of page types, not {shown(pages)}"
+    for pattern, over in pages.items():
+        problem = limits(f"pages.{pattern}", over)
+        if problem:
+            return problem
+    return None
+
+
 def load_budget(path: str | None) -> tuple[dict, str]:
     """Returns (budget, provenance). A missing file is not an error — it is a
     prompt to go and set one."""
@@ -1053,6 +1108,9 @@ def load_budget(path: str | None) -> tuple[dict, str]:
         data = read_jsonc(p.read_bytes())
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise SystemExit(f"perf_audit: cannot read budget {path}: {exc}")
+    problem = budget_problem(data)
+    if problem:
+        raise SystemExit(f"perf_audit: {path}: {problem}")
     if data.get("$schema") not in (None, "perf-budget-gate/1"):
         raise SystemExit(
             f"perf_audit: {path} declares $schema {data.get('$schema')!r}; "
@@ -1186,9 +1244,15 @@ def load_baseline(path: str) -> tuple[set[str], dict]:
         print(f"perf_audit: could not read baseline {p}; auditing everything.",
               file=sys.stderr)
         return set(), {}
-    keys = data if isinstance(data, list) else (data.get("findings") or [])   # a list: audit_design's form
-    found = {portable_key(k) for k in keys if isinstance(k, str)}
-    return found, ({} if isinstance(data, list) else (data.get("totals") or {}))
+    keys = data if isinstance(data, list) else (data.get("findings") or []) if isinstance(data, dict) else None
+    totals = (data.get("totals") or {}) if isinstance(data, dict) else {}   # a list: audit_design's form
+    sizes = totals.get("bytes") or {} if isinstance(totals, dict) else None
+    if (not isinstance(keys, list) or not all(isinstance(k, str) for k in keys)
+            or not isinstance(sizes, dict) or not all(_number(v) for v in sizes.values())):
+        print(f"perf_audit: could not read baseline {p} (not a list of finding keys, or an object of "
+              f"`findings` and numeric `totals`); auditing everything.", file=sys.stderr)   # G15
+        return set(), {}
+    return {portable_key(k) for k in keys}, totals
 
 
 def check_growth(ledger: Ledger, totals: dict, growth: dict) -> list[Finding]:

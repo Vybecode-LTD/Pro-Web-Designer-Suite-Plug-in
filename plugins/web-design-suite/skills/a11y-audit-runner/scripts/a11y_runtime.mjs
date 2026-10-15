@@ -1756,16 +1756,24 @@ function loadBudget(file) {
   let data;
   try { data = readJsonFile(file); }
   catch (err) { die(`cannot parse ${file}: ${err.message}`); }
+  // A limit that is not a number passed every count without a word, and a
+  // top level that is not an object read as no limits (G3).
+  const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  if (!isObject(data)) die(`${file}: the top level must be an object, not ${JSON.stringify(data).slice(0, 40)}`);
   if (data.$schema && data.$schema !== 'a11y-audit-runner/1') {
     die(`${file} declares $schema "${data.$schema}"; this tool understands ` +
         '"a11y-audit-runner/1"');
   }
+  if ('defaults' in data && !isObject(data.defaults)) die(`${file}: \`defaults\` must be an object of limits`);
   const limits = Object.assign({}, data.defaults || data);
   delete limits.$schema;
-  for (const k of Object.keys(limits)) {
+  for (const [k, limit] of Object.entries(limits)) {
     if (!(k in BUDGET_KEYS)) {
       die(`${file}: unknown budget key "${k}". Known keys:\n    ` +
           Object.keys(BUDGET_KEYS).join('\n    '));
+    }
+    if (typeof limit !== 'number' || !Number.isFinite(limit)) {
+      die(`${file}: \`${k}\` must be a number, not ${JSON.stringify(limit)}`);
     }
   }
   return limits;

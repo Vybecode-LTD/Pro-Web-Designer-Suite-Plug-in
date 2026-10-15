@@ -70,7 +70,7 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 # The CSS scanner, the comment blanker and the normalizers live in
 # extract_literals.py. One implementation, or the codemod and the census
@@ -289,6 +289,26 @@ def is_negative(text: str) -> bool:
 # The mapping
 # ---------------------------------------------------------------------------
 
+def rules_problem(rules: Any) -> Optional[str]:
+    """What keeps a mapping's `rules` from being applied, naming the rule and
+    the key, or None: `{}` here was a traceback (the audit's class 6)."""
+    if not isinstance(rules, list):
+        return f"`rules` must be a list, not {json.dumps(rules)[:40]}"
+    for i, rule in enumerate(rules):
+        if not isinstance(rule, dict):
+            return f"`rules[{i}]` must be an object"
+        for key in ("kind", "replacement"):
+            if not isinstance(rule.get(key), str):
+                return f"`rules[{i}].{key}` must be a string"
+        for key in ("match", "props", "prop_classes"):
+            value = rule.get(key) or []
+            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+                return f"`rules[{i}].{key}` must be a list of strings"
+        if not isinstance(rule.get("scope", "value"), str):
+            return f"`rules[{i}].scope` must be a string"
+    return None
+
+
 @dataclass
 class Mapping:
     value_rules: Dict[Tuple[str, str], dict] = field(default_factory=dict)
@@ -314,6 +334,11 @@ class Mapping:
         if str(schema or "").split("@")[0] != "design-token-migration/mapping":
             print(f"apply_codemod: {path} is not a codemod mapping "
                   f"(schema={schema!r}). It must come from cluster_values.py.",
+                  file=sys.stderr)
+            raise SystemExit(2)
+        problem = rules_problem(payload.get("rules", []))
+        if problem:
+            print(f"apply_codemod: {path}: {problem}. It must come from cluster_values.py.",
                   file=sys.stderr)
             raise SystemExit(2)
         m = cls()

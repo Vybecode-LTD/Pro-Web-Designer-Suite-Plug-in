@@ -144,10 +144,14 @@ def load_ledger(path: Path) -> Dict[str, Any]:
         raise bail(f"deprecate: {path} is not readable JSON ({exc}). "
                          f"Fix it or move it aside; this script will not "
                          f"overwrite a file it cannot read.")
-    if str(data.get("schema", "")).split("@")[0] != LEDGER_SCHEMA.split("@")[0]:
+    schema = data.get("schema") if isinstance(data, dict) else None   # `[]` was a traceback (V8)
+    if str(schema or "").split("@")[0] != LEDGER_SCHEMA.split("@")[0]:
         raise bail(f"deprecate: {path} is not a deprecation ledger "
-                         f"(schema={data.get('schema')!r}).")
-    data.setdefault("deprecations", [])
+                         f"(schema={schema!r}).")
+    entries = data.setdefault("deprecations", [])
+    if not isinstance(entries, list) or not all(isinstance(e, dict) and isinstance(e.get("name"), str)
+                                                for e in entries):
+        raise bail(f"deprecate: {path}: `deprecations` must be a list of objects, each with a `name`.")
     return data
 
 

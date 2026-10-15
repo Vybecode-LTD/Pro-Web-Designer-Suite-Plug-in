@@ -102,10 +102,10 @@ def measurement(value: Any) -> Optional[float]:
     return None
 
 
-def lab_medians(report: Any) -> Dict[str, float]:
+def lab_medians(report: Any, path: Any = "") -> Dict[str, float]:
     stats = report.get("stats") if isinstance(report, dict) else None
     if not isinstance(stats, dict):
-        raise CheckError("the lab file has no `stats`: write it with "
+        raise CheckError(f"the lab file {path} has no `stats` object: write it with "
                          "`measure_vitals.mjs URL --report vitals.json`.")
     out = {}
     for key, (_, label, _) in METRICS.items():
@@ -275,7 +275,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         if not (math.isfinite(args.ratio) and args.ratio > 0):
             raise CheckError("--ratio must be a finite number above 0")
         lab_report = read_json(Path(args.lab), "lab file")
-        lab = lab_medians(lab_report)
+        lab = lab_medians(lab_report, args.lab)
         target = {"origin": args.origin} if args.origin else {"url": args.url}
         response = (read_json(Path(args.response), "response")
                     if args.response else query(target, args.form_factor))

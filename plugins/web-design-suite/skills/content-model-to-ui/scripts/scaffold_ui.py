@@ -3535,10 +3535,15 @@ def main(argv: list[str] | None = None) -> int:
     except json.JSONDecodeError as exc:
         print(f"scaffold_ui: {mp} is not valid JSON: {exc}", file=sys.stderr)
         return 2
-    if model.get("$schema") != MODEL_SCHEMA:
+    if not isinstance(model, dict) or model.get("$schema") != MODEL_SCHEMA:   # `[]` was a traceback
         print(f"scaffold_ui: {mp} is not a {MODEL_SCHEMA} document. Run "
               f"introspect_schema.py first.", file=sys.stderr)
-        return 1
+        return 2
+    tables = model.get("tables") or []
+    if not isinstance(tables, list) or not all(isinstance(t, dict) and isinstance(t.get("name"), str)
+                                               for t in tables):
+        print(f"scaffold_ui: {mp}: `tables` must be a list of named objects.", file=sys.stderr)
+        return 2
     if not model.get("tables"):
         print("scaffold_ui: the model has no tables.", file=sys.stderr)
         return 1
@@ -3554,6 +3559,10 @@ def main(argv: list[str] | None = None) -> int:
         except json.JSONDecodeError as exc:
             print(f"scaffold_ui: {apath} is not valid JSON: {exc}",
                   file=sys.stderr)
+            return 2
+        if not isinstance(answers_data, dict):
+            print(f"scaffold_ui: {apath} must be an object of answers, not "
+                  f"{json.dumps(answers_data)[:40]}.", file=sys.stderr)
             return 2
     ans = Answers(answers_data)
 

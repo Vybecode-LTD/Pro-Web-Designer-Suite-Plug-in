@@ -1647,11 +1647,19 @@ def parse_json_schema(text: str) -> Model:
     if not isinstance(data, dict):
         raise SchemaError("Expected a JSON object or a list of tables.")
 
-    for name, values in (data.get("enums") or {}).items():
+    def objects(value: Any, key: str) -> None:        # `{"tables": 5}` was a traceback (class 6)
+        if not isinstance(value, list) or not all(isinstance(v, dict) for v in value):
+            raise SchemaError(f"`{key}` must be a list of objects.")
+
+    enums = data.get("enums") or {}
+    if not isinstance(enums, dict) or not all(isinstance(v, list) for v in enums.values()):
+        raise SchemaError("`enums` must be an object of lists of labels.")
+    for name, values in enums.items():
         model.enums[name] = list(values)
 
     tables_in = data.get("tables")
     if tables_in is None and "columns" in data:
+        objects(data["columns"], "columns")
         tables_in = _group_flat_columns(data)
     if not tables_in:
         raise SchemaError(
@@ -1659,7 +1667,12 @@ def parse_json_schema(text: str) -> Model:
             'or a flat information_schema dump {"columns":[{"table_name":…}]}.')
 
     if isinstance(tables_in, dict):
+        objects(list(tables_in.values()), "tables")
         tables_in = [{"name": k, **v} for k, v in tables_in.items()]
+    objects(tables_in, "tables")
+    for i, t in enumerate(tables_in):
+        for key in ("columns", "foreign_keys"):
+            objects(t.get(key) or [], f"tables[{i}].{key}")
 
     for t in tables_in:
         table = Table(name=t.get("name") or t.get("table_name") or "unknown",
@@ -3379,7 +3392,7 @@ def main(argv: list[str] | None = None) -> int:
         fmt = args.format if args.format != "auto" else detect_format(path, text)
         model = build_model(path, text, fmt, args.pg_schema)
     except SchemaError as exc:
-        print(f"introspect_schema: {exc}", file=sys.stderr)
+        print(f"introspect_schema: {', '.join(str(each) for each in paths)}: {exc}", file=sys.stderr)
         return 1
 
     if args.only:

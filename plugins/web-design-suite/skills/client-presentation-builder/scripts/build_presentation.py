@@ -386,6 +386,23 @@ def _read_json(path: Path) -> Any:
             f"check that nothing else printed to stdout — use `--json > file`.") from exc
 
 
+def _object(value: Any, path: Path, key: str) -> dict:
+    """`value` if it is a JSON object, else a BuildError naming the key (E13)."""
+    if not isinstance(value, dict):
+        raise BuildError(f"{path}: `{key}` must be an object, not {json.dumps(value)[:40]}")
+    return value
+
+
+def _objects(value: Any, path: Path, key: str) -> list:
+    """`value` if it is a list of objects, else a BuildError naming the key:
+    `.get` on a list item was an AttributeError (E13)."""
+    if not isinstance(value, list):
+        raise BuildError(f"{path}: `{key}` must be a list, not {json.dumps(value)[:40]}")
+    for i, item in enumerate(value):
+        _object(item, path, f"{key}[{i}]")
+    return value
+
+
 @dataclass
 class AuditFacts:
     source: str
@@ -435,18 +452,22 @@ def load_perf(path: Path) -> PerfFacts:
         raise BuildError(
             f"{path} does not look like `perf_audit.py --json` output "
             f"(expected an object with a `ledger` key).")
-    ledger = data.get("ledger") or {}
-    by_kind = {k: v for k, v in (ledger.get("bytes") or {}).items()
+    ledger = _object(data.get("ledger") or {}, path, "ledger")
+    by_kind = {k: v for k, v in _object(ledger.get("bytes") or {}, path, "ledger.bytes").items()
                if isinstance(v, int)}
-    budget = (data.get("budget") or {}).get("bytes") or {}
-    findings = data.get("findings") or []
-    assets = ledger.get("assets") or []
+    budget = _object(_object(data.get("budget") or {}, path, "budget").get("bytes") or {},
+                     path, "budget.bytes")
+    budget_by_kind = {k: v for k, v in budget.items() if isinstance(v, int)}
+    findings = _objects(data.get("findings") or [], path, "findings")
+    assets = _objects(ledger.get("assets") or [], path, "ledger.assets")
+    if assets and not isinstance(assets[0].get("transfer", 0), int):
+        raise BuildError(f"{path}: `ledger.assets[0].transfer` must be a number of bytes.")
     return PerfFacts(
         source=str(path),
         total_bytes=by_kind.get("total"),
-        budget_total=budget.get("total"),
+        budget_total=budget_by_kind.get("total"),
         by_kind=by_kind,
-        budget_by_kind={k: v for k, v in budget.items() if isinstance(v, int)},
+        budget_by_kind=budget_by_kind,
         errors=sum(1 for f in findings if f.get("severity") == "error"),
         warnings=sum(1 for f in findings if f.get("severity") == "warning"),
         largest=assets[0] if assets else None,
@@ -483,9 +504,12 @@ def load_a11y(path: Path) -> A11yFacts:
     scope, scope_path = "page(s) scanned", "count(results)"
     shape_seen: str | None = None
     for run in runs:
-        if not isinstance(run, dict):
-            continue
+        if not isinstance(run, dict):                  # `5` read as no violations (E13)
+            raise BuildError(f"{path} must hold axe results or an a11y report as objects, "
+                             f"not {json.dumps(run)[:40]}.")
         vs = run.get("violations")
+        if vs is not None:
+            _objects(vs, path, "violations")
         # One file, one shape: a list that mixes axe results with the suite's
         # reports would add pages to files under one label.
         shape = ("axe" if vs is not None else str(run.get("tool") or "findings"))
@@ -550,11 +574,12 @@ def load_a11y(path: Path) -> A11yFacts:
             pages += 1
         for v in vs:
             violations += 1
-            impact = (v.get("impact") or "unspecified").lower()
-            n = len(v.get("nodes") or []) or 1
+            impact = str(v.get("impact") or "unspecified").lower()
+            found = v.get("nodes")
+            n = len(found) if isinstance(found, list) and found else 1
             nodes += n
             by_impact[impact] = by_impact.get(impact, 0) + n
-            rid = v.get("id") or v.get("rule") or "unnamed"
+            rid = str(v.get("id") or v.get("rule") or "unnamed")
             rules[rid] = rules.get(rid, 0) + n
         if isinstance(run.get("passes"), list):
             saw_passes = True
