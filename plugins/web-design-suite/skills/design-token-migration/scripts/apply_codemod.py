@@ -1073,7 +1073,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     mapping = Mapping.load(mapping_path, args.kind, args.skip_review)
-    if not (mapping.value_rules or mapping.decl_rules or mapping.tw_rules):
+    # A motion pair is a rule too: a codebase whose durations all sit in
+    # whole `transition` shorthands has no other duration rule.
+    if not (mapping.value_rules or mapping.decl_rules or mapping.tw_rules or mapping.motion_rules):
         print(f"apply_codemod: the mapping has no rules matching "
               f"--kind {', '.join(args.kind or [])}. Kinds present: "
               f"{', '.join(sorted(mapping.kinds)) or '(none)'}.", file=sys.stderr)

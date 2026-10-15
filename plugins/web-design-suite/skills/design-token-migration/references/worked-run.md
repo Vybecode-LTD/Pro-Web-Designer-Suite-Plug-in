@@ -16,7 +16,7 @@ python -m scripts.extract_literals ./src                 # read the census first
 python -m scripts.extract_literals ./src --format json -o literals.json
 
 python -m scripts.cluster_values literals.json -o ./proposal
-#   cluster_values: 69 rule(s) covering 104 occurrence(s); 17 need review; 22 need a design decision.
+#   cluster_values: 66 rule(s) covering 99 occurrence(s); 17 need review; 22 need a design decision.
 
 cp proposal/tokens.css src/styles/tokens.css && git commit -am "tokens.css"
 

@@ -1469,6 +1469,27 @@ def _to_ms(normalized: str) -> Optional[float]:
     return float(m.group(1)) if m else None
 
 
+MOTION_TIME = re.compile(r"(?<![\w.#$@-])\d*\.?\d+(?:ms|s)(?![\w-])", re.IGNORECASE)
+
+
+def takes_motion_pair(lit: dict) -> bool:
+    """Whether apply_codemod's plan_motion() rewrites this duration's
+    declaration to a --motion-* pair: a transition or animation shorthand
+    whose every layer holds exactly one time. Any other duration is
+    rewritten on its own, by the Tier-1 rule (CodeRabbit on #135)."""
+    if lit["prop"] not in ("transition", "animation"):
+        return False
+    value = lit.get("declaration", "").partition(":")[2]
+    layers, depth, start = [], 0, 0
+    for i, ch in enumerate(value):
+        depth += (ch == "(") - (ch == ")")
+        if ch == "," and depth == 0:
+            layers.append(value[start:i])
+            start = i + 1
+    layers.append(value[start:])
+    return all(len(MOTION_TIME.findall(layer)) == 1 for layer in layers)
+
+
 def cluster_motion(lits: Sequence[dict], tol: float, prop: Proposal) -> None:
     """Durations become --dur-*; whole transitions become a --motion-* pair.
 
@@ -1507,35 +1528,39 @@ def cluster_motion(lits: Sequence[dict], tol: float, prop: Proposal) -> None:
         role = next(r for limit, r in MOTION_ROLE if ms <= limit)
         css_items = [l for l in items if l["context"] not in TW_CONTEXTS]
         tw_items = [l for l in items if l["context"] in TW_CONTEXTS]
-        if css_items:
-            # Two rules, deliberately. A whole `transition: opacity 250ms ease`
-            # collapses to the Tier-2 PAIR, because a duration and an easing
-            # that live in separate tokens drift apart inside a quarter. A bare
-            # `transition-duration` has no easing to pair with, so it falls
-            # back to the Tier-1 step.
+        # Two rules, deliberately. A whole `transition: opacity 250ms ease`
+        # collapses to the Tier-2 PAIR, because a duration and an easing that
+        # live in separate tokens drift apart inside a quarter. A bare
+        # `transition-duration` has no easing to pair with, so it falls back to
+        # the Tier-1 step. Each occurrence is counted at the one rule that
+        # rewrites it, so the reconciliation adds up.
+        paired = [l for l in css_items if takes_motion_pair(l)]
+        single = [l for l in css_items if not takes_motion_pair(l)]
+        if paired:
             prop.rules.append(Rule(
                 id=f"mo-{i:03d}-pair", kind="duration", scope="motion",
                 match=raws, replacement=f"var({role})", token=role,
                 prop_classes=["motion"], props=["transition", "animation"],
-                occurrences=len(css_items), delta_px=round(delta, 3),
+                occurrences=len(paired), delta_px=round(delta, 3),
                 confidence="review",
                 note=f"{ms:g}ms -> {role}. Confirm the ROLE, not the number: "
                      f"enter and exit are deliberately asymmetric (things "
                      f"arrive slower than they leave).",
             ))
+            prop.provenance[role].append(f"{ms:g}ms x{len(paired)}")
+        if single:
             prop.rules.append(Rule(
                 id=f"mo-{i:03d}", kind="duration", scope="value",
                 match=raws, replacement=f"var({token})", token=token,
                 prop_classes=["duration"],
                 props=["transition-duration", "animation-duration",
                        "transition-delay", "animation-delay"],
-                occurrences=len(css_items), delta_px=round(delta, 3),
+                occurrences=len(single), delta_px=round(delta, 3),
                 confidence="exact" if abs(delta) < 1e-9 else "snapped",
                 note=f"Tier 1, for a standalone duration property. A whole "
                      f"`transition` shorthand takes var({role}) instead.",
             ))
-            prop.provenance[token].append(f"{ms:g}ms x{len(css_items)}")
-            prop.provenance[role].append(f"{ms:g}ms x{len(css_items)}")
+            prop.provenance[token].append(f"{ms:g}ms x{len(single)}")
         if tw_items:
             prop.unmapped.append(Unmapped(
                 kind="tailwind", value=", ".join(sorted({l["raw"] for l in tw_items})),

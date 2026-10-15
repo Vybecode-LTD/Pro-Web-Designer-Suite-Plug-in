@@ -1137,7 +1137,12 @@ CENSUS = (".a { color: oklch(60% 0.15 250); background: hwb(200 10% 20%); }\n"
           ".e { color: white; background: #fafafa; }\n"
           ".f { background: color-mix(in srgb, #2f6df6 40%, white); }\n"
           ".g { max-width: 1152px; width: 448px; height: 300px; }\n"
-          ".h { letter-spacing: 0.02em; padding: 16px; }\n")
+          ".h { letter-spacing: 0.02em; padding: 16px; }\n"
+          # CodeRabbit on #135: a duration in a shorthand was counted at both
+          # the --motion-* pair and the Tier-1 step. The last layer holds two
+          # times, so its durations are rewritten one by one.
+          ".i { transition: opacity 220ms ease; }\n.j { transition-duration: 220ms; }\n"
+          ".k { animation: spin 220ms linear; }\n.l { transition: opacity 220ms ease 80ms; }\n")
 
 
 class TheProposalAccountsForTheCensus(TempDirTest):

@@ -175,7 +175,10 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   by hand now. And `color: white` got a rule the codemod never applied, since a named
   colour was no colour slot to it, and a hex inside `color-mix()` was counted with a rule
   it could not apply. The codemod takes the census's named colours, and a `color-mix()`
-  with a colour written out is one colour function, mapped by hand. What the
+  with a colour written out is one colour function, mapped by hand. A duration in a
+  whole `transition` shorthand was counted at both its `--motion-*` pair and its Tier-1
+  step; it counts at the one rule that rewrites it, and the codemod no longer refuses a
+  mapping whose duration rules are all pairs (CodeRabbit on #135). What the
   reconciliation counts as mechanically replaceable is what `--apply` rewrites
   (`test_token_migration.TheProposalAccountsForTheCensus`).
 - **A width never reached its width step** (H13). The proposal snapped a length to the 4px
