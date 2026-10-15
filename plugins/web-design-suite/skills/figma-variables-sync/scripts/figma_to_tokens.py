@@ -1179,6 +1179,10 @@ def reverse_body(data: Any, collection_split: bool = True) -> Tuple[dict, List[P
             rgba = exact or parsed
             if rgba is None:
                 return None, f"`--{token}` is typed COLOR but `{raw}` does not parse as one."
+            if exact is None and out_of_srgb(raw):        # Figma holds sRGB: say so (V11)
+                problems.append(Problem("clamped", token, (
+                    f"`--{token}` = `{raw}` lies outside sRGB, so Figma gets it clamped to "
+                    f"{rgb_to_hex(*rgba[:3])}. Give the token a `hex`, or bring it into sRGB.")))
             alpha = entry.get("alpha")
             if alpha is None:
                 alpha = parsed[3] if parsed is not None else rgba[3]
@@ -1610,7 +1614,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         sources, config_path = token_sources(args.tokens)
         if sources:
-            added = use_project_names(read_tokens(sources))
+            project = read_tokens(sources)
+            for problem in project.problems:              # what a DTCG file could not give (S2)
+                print(f"figma_to_tokens: warning: {problem}", file=sys.stderr)
+            added = use_project_names(project)
             origin = ", ".join(str(s) for s in sources) + (f" (from {config_path})" if config_path else "")
             if not args.quiet:
                 print(f"token names from {origin}: {len(added)} beyond the starter's", file=sys.stderr)
@@ -1630,8 +1637,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if not doc.variables:
         print(f"{path} parsed as `{doc.shape}` but contains no variables. Emitting an empty "
-              "token file would quietly wipe a real one; pass --shape to force a shape.",
-              file=sys.stderr)
+              "token file would quietly wipe a real one; pass --shape to force a shape."
+              + left_out(doc), file=sys.stderr)
         return 2
 
     conv = Converter(doc, color_format=args.color_format, unit=args.unit,

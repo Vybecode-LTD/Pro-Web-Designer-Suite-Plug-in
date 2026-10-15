@@ -2760,7 +2760,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     # A flag beats the config: the project's token files only without --tokens (P24).
     try:
         sources, _config = token_sources(args.tokens)
-        project = project_ramps(read_tokens(sources), prop) if sources else None
+        read = read_tokens(sources) if sources else None
+        project = project_ramps(read, prop) if read else None
+        for problem in read.problems if read else []:     # what a DTCG file could not give (S2)
+            print(f"cluster_values: warning: {problem}", file=sys.stderr)
     except ConfigError as exc:
         print(f"cluster_values: {exc}", file=sys.stderr)
         return 2

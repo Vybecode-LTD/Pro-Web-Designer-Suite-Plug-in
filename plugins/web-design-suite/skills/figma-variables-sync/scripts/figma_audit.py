@@ -1178,7 +1178,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         # system with nothing wrong with it.
         print(f"{args.path} parsed as `{doc.shape}` but contains no variables and no styles. "
               "That is a wrong file or an export shape this script does not know; pass "
-              "--shape to force one.", file=sys.stderr)
+              "--shape to force one." + left_out(doc), file=sys.stderr)
         return 2
 
     # A flag beats the config: the project's token files only without --tokens (P24).
@@ -1201,6 +1201,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         except ConfigError as exc:
             print(f"could not read the project's tokens: {exc}", file=sys.stderr)
             return 2
+        for problem in tokens.problems:                   # what a DTCG file could not give (S2)
+            print(f"figma_audit: warning: {problem}", file=sys.stderr)
         ramps = load_project_ramps(tokens)
         if ramps:
             use_ramps(ramps)

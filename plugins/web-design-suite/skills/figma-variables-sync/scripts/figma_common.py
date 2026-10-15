@@ -28,6 +28,8 @@ except ImportError:                               # python scripts/<script>.py
 
 __all__ = [
     "dtcg",
+    "out_of_srgb",
+    "left_out",
     "PX_PER_REM",
     "srgb_to_linear",
     "linear_to_srgb",
@@ -136,6 +138,31 @@ def oklch_to_rgb(L_pct: float, C: float, H: float) -> Tuple[float, float, float]
     """OKLCH (L in percent) -> sRGB 0..1, clamped to gamut."""
     lr, lg, lb = oklab_to_linear_srgb(*oklch_to_oklab(L_pct / 100.0, C, H))
     return tuple(min(1.0, max(0.0, linear_to_srgb(c))) for c in (lr, lg, lb))  # type: ignore
+
+
+def left_out(doc: "FDoc", limit: int = 20) -> str:
+    """What a document read held but could not give, one line each, for the
+    message that says it gave no variables (V12): an input whose only tokens
+    were unsupported read as a wrong shape."""
+    rows = [f"  {where}: {why}" for where, why in [*doc.unread, *doc.unsupported]]
+    more = f"\n  ... and {len(rows) - limit} more" if len(rows) > limit else ""
+    return ("\nWhat it held and could not give:\n" + "\n".join(rows[:limit]) + more) if rows else ""
+
+
+def out_of_srgb(value: Any) -> bool:
+    """Whether an `oklch()` colour lies outside sRGB, so as_color() clamps it:
+    `oklch(70% 0.3 150)` became `r 0, g 0.797, b 0` without a word (V11)."""
+    m = _OKLCH_FN.match(value.strip()) if isinstance(value, str) else None
+    if not m:
+        return False
+    parts = [p.strip() for p in re.split(r"[\s/]+", m.group(1)) if p.strip()]
+    try:
+        L = float(parts[0][:-1]) if parts[0].endswith("%") else float(parts[0]) * 100.0
+        C, H = float(parts[1]), (float(parts[2].rstrip("deg")) if len(parts) > 2 else 0.0)
+    except (ValueError, IndexError):
+        return False
+    linear = oklab_to_linear_srgb(*oklch_to_oklab(L / 100.0, C, H))
+    return any(ch < -1e-4 or ch > 1 + 1e-4 for ch in linear)
 
 
 def rgb_to_hex(r: float, g: float, b: float) -> str:
