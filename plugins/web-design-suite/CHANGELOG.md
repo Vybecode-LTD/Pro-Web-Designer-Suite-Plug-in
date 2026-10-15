@@ -240,6 +240,17 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
   `test_json_guards` feeds every loader `[]`, a string, a number and its own wrong keys,
   and fails when a script that reads JSON has no row.
+- **A UTF-16 file read as garbage** (the audit's S8 and W7, and its class 4). PowerShell
+  5.1's `>` writes UTF-16LE. The token readers decoded CSS as UTF-8 only, so such a
+  `tokens.css` read as no tokens and every `var(--x)` was "unknown", in Python and in
+  Node; `check_roles` gave a traceback. Every script now reads a project's text through
+  `project_config.read_text()`, which finds the encoding as `json.detect_encoding()`
+  does (a byte-order mark, else the zero bytes), or through a copy of it in the scripts
+  that run on their own (`audit_design`, `a11y_static`, `check_roles`,
+  `generate_matrix`). The codemod and `deprecate add --source` write a file back in the
+  encoding they read it in, its mark and byte order included (`text_encoding()`); a
+  UTF-16 file was skipped as unreadable by the one and a traceback in the other
+  (`test_encodings`, which also fails on a script that reads with `encoding="utf-8"`).
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
   too. It is a width and a height, so it is a size: reported when no `--width-*` role

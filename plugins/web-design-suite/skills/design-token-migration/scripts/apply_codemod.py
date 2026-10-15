@@ -89,6 +89,7 @@ try:                                                # python -m scripts.apply_co
         Slot, split_slots, line_comments, TW_TOKEN_RE, tw_utility, class_list_spans, in_class_list,
         NAMED_COLORS,
     )
+    from .project_config import text_encoding        # type: ignore[import-not-found]
 except ImportError:                                 # python scripts/apply_codemod.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from extract_literals import (                  # type: ignore[no-redef]
@@ -101,6 +102,7 @@ except ImportError:                                 # python scripts/apply_codem
         Slot, split_slots, line_comments, TW_TOKEN_RE, tw_utility, class_list_spans, in_class_list,
         NAMED_COLORS,
     )
+    from project_config import text_encoding         # type: ignore[no-redef]
 
 LENGTH_RE = re.compile(r"^(-?\d*\.?\d+)(px|rem|em|pt|pc|in|cm|mm|q)$", re.IGNORECASE)
 TIME_RE = re.compile(r"^(\d*\.?\d+)(ms|s)$", re.IGNORECASE)
@@ -982,6 +984,8 @@ class FileResult:
     after: str
     written: bool = False
     skipped: str = ""
+    codec: str = "utf-8"                # written back as read (class 4)
+    bom: bytes = b""
 
 
 def process(fp: Path, mapping: Mapping, skips: List[Skip]) -> Optional[FileResult]:
@@ -989,8 +993,10 @@ def process(fp: Path, mapping: Mapping, skips: List[Skip]) -> Optional[FileResul
         # The bytes' own line endings (C2, the 2026-10-14 audit): universal
         # newlines wrote a CRLF file back LF on every line, and the dry run,
         # planned on the translated text, never showed it.
-        with open(fp, encoding="utf-8", newline="") as fh:
-            text = fh.read()
+        # And its own encoding: a UTF-16 file was skipped as unreadable (class 4).
+        raw = fp.read_bytes()
+        codec, bom = text_encoding(raw)
+        text = raw[len(bom):].decode(codec)
     except (OSError, UnicodeDecodeError) as exc:
         skips.append(Skip(norm_path(fp), 0, f"unreadable: {exc}", ""))
         return None
@@ -1025,10 +1031,10 @@ def process(fp: Path, mapping: Mapping, skips: List[Skip]) -> Optional[FileResul
                           f"rewrite failed its safety check ({problem}) — "
                           f"file left untouched", ""))
         return None
-    return FileResult(fp, edits, text, after)
+    return FileResult(fp, edits, text, after, codec=codec, bom=bom)
 
 
-def write_atomically(fp: Path, content: str) -> None:
+def write_atomically(fp: Path, content: str, codec: str = "utf-8", bom: bytes = b"") -> None:
     """Temp file in the same directory, fsync, then os.replace.
 
     Same directory because os.replace is only atomic within a filesystem, and
@@ -1037,8 +1043,8 @@ def write_atomically(fp: Path, content: str) -> None:
     fd, tmp = tempfile.mkstemp(dir=str(fp.parent), prefix=f".{fp.name}.",
                                suffix=".codemod")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="") as fh:
-            fh.write(content)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(bom + content.encode(codec))
             fh.flush()
             os.fsync(fh.fileno())
         os.replace(tmp, fp)
@@ -1139,7 +1145,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             continue
         if args.apply:
             try:
-                write_atomically(fp, res.after)
+                write_atomically(fp, res.after, res.codec, res.bom)
                 res.written = True
             except OSError as exc:
                 res.skipped = f"could not write: {exc}"

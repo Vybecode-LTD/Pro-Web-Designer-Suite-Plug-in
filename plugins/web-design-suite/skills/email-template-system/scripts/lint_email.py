@@ -73,9 +73,9 @@ except ImportError:                               # python scripts/lint_email.py
                              default_tokens_path, dropped_message, load_dropped, load_tokens,
                              parse_declarations, parse_stylesheet, sets_broad_font)
 try:                                              # python -m scripts.lint_email
-    from .project_config import refuse_overwrite, ConfigError, project_config
+    from .project_config import read_text, refuse_overwrite, ConfigError, project_config
 except ImportError:                               # python scripts/lint_email.py
-    from project_config import refuse_overwrite, ConfigError, project_config  # type: ignore[no-redef]
+    from project_config import read_text, refuse_overwrite, ConfigError, project_config  # type: ignore[no-redef]
 
 GMAIL_CLIP_BYTES = 102_400
 GMAIL_STYLE_BYTES = 16_384
@@ -1214,7 +1214,7 @@ def main(argv=None) -> int:
     for name in args.files:
         path = Path(name)
         try:
-            source = path.read_text(encoding="utf-8")
+            source = read_text(path)
         except OSError as exc:
             print("error: cannot read %s: %s" % (path, exc), file=sys.stderr)
             return 2

@@ -67,6 +67,14 @@ SURFACES = ["--bg-canvas", "--bg-surface", "--bg-raised", "--bg-sunken"]
 BOTH = ["light", "dark"]
 
 
+def _read_text(path: pathlib.Path) -> str:
+    """A project's text file in the encoding json.detect_encoding() finds: a
+    UTF-16 file (PowerShell 5.1's `>`) read as UTF-8 was garbage (class 4).
+    project_config.read_text(), kept here so this script runs on its own."""
+    raw = pathlib.Path(path).read_bytes()
+    return raw.decode(json.detect_encoding(raw), errors="replace")
+
+
 def default_pairs() -> list[dict]:
     """The pairs the starter's components actually put together."""
     pairs = [{"fg": fg, "bg": bg, "min": 4.5, "scopes": BOTH} for fg in TEXT for bg in SURFACES]
@@ -340,7 +348,7 @@ def main() -> int:
     if not path.is_file():
         print(f"check_roles: no such file: {path}", file=sys.stderr)
         return 2
-    css = path.read_text(encoding="utf-8-sig")
+    css = _read_text(path)
     if args.table:
         sys.stdout.write(table(css))
         return 0

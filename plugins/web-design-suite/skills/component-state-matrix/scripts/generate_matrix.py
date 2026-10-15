@@ -59,6 +59,15 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 
 # shared/project_config.py's refuse_overwrite(), verbatim: this skill has no
 # copy of the reader (test_out_guard.TheGuardIsShared holds them equal).
+
+def _read_text(path: Path) -> str:
+    """A project's text file in the encoding json.detect_encoding() finds: a
+    UTF-16 file (PowerShell 5.1's `>`) read as UTF-8 was garbage (class 4).
+    project_config.read_text(), kept here so this script runs on its own."""
+    raw = Path(path).read_bytes()
+    return raw.decode(json.detect_encoding(raw), errors="replace")
+
+
 def refuse_overwrite(out: Optional[Union[str, Path]],
                      *inputs: Optional[Union[str, Path]]) -> Optional[str]:
     """The message a script prints, then exits 2 on, when `out` is one of its
@@ -840,7 +849,7 @@ def resolve(root: Path, rel: str, where: str) -> Path:
 
 def read_text(path: Path) -> str:
     try:
-        return path.read_text(encoding="utf-8")
+        return _read_text(path)
     except OSError as exc:
         raise ManifestError(f"cannot read {path}: {exc}") from None
 

@@ -60,11 +60,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.build_docs
     from .extract_system import CssFile, SEVEN_STATES, strip_guards
-    from .project_config import ConfigError, config_path, project_config
+    from .project_config import read_text, ConfigError, config_path, project_config
 except ImportError:                               # python scripts/build_docs.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from extract_system import CssFile, SEVEN_STATES, strip_guards
-    from project_config import ConfigError, config_path, project_config  # type: ignore[no-redef]
+    from project_config import read_text, ConfigError, config_path, project_config  # type: ignore[no-redef]
 
 SCHEMA = "design-system-docs/system/1"
 
@@ -820,7 +820,7 @@ def forced_state_css(css_paths: Sequence[Path]) -> str:
     out: List[str] = []
     for path in css_paths:
         try:
-            cf = CssFile(str(path), path.read_text(encoding="utf-8-sig"))
+            cf = CssFile(str(path), read_text(path))
         except OSError:
             continue
         for rule in cf.rules:
@@ -866,7 +866,7 @@ class Site:
             return ""
         p = self.prose / rel
         try:
-            return p.read_text(encoding="utf-8-sig")
+            return read_text(p)
         except OSError:
             return ""
 
@@ -1298,7 +1298,7 @@ def check_prose(system: Dict[str, Any], prose: Path) -> List[str]:
 
     for path in sorted(prose.rglob("*.md")):
         rel = path.relative_to(prose)
-        text = path.read_text(encoding="utf-8-sig")
+        text = read_text(path)
         if rel.parts[0] == "components" and path.stem not in comps and not path.stem.endswith(
                 ".example"):
             out.append(f"{rel}: documents `{path.stem}`, which is not in the source")
@@ -1352,7 +1352,7 @@ def check_examples(system: Dict[str, Any], prose: Optional[Path]) -> List[str]:
     for path in sorted(prose.rglob("*.md")):
         rel = path.relative_to(prose)
         blocks: List[Dict[str, str]] = []
-        render_markdown(path.read_text(encoding="utf-8-sig"), collect=blocks)
+        render_markdown(read_text(path), collect=blocks)
         for i, block in enumerate(blocks):
             if block["lang"] not in ("css", "scss"):
                 continue
@@ -1366,7 +1366,7 @@ def check_examples(system: Dict[str, Any], prose: Optional[Path]) -> List[str]:
     # class is spelled `class="…"`, not a `.class { }` selector.
     for path in sorted(prose.rglob("*.example.html")):
         rel = path.relative_to(prose)
-        code = path.read_text(encoding="utf-8-sig")
+        code = read_text(path)
         check_vars(rel, "override", code)
         for attr in re.findall(r'class\s*=\s*"([^"]*)"', code):
             for cls in attr.split():

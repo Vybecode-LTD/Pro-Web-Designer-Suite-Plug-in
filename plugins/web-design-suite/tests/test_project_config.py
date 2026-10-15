@@ -873,6 +873,9 @@ TOKEN_FILES = {
         "list": {"b": {"$type": ["color"], "$value": {"colorSpace": "srgb", "components": [0, 1, 0]}}},
         "flag": {"$type": True, "c": {"$value": {"value": 4, "unit": "px"}}},
         "brand": {"$type": "color", "500": {"$value": "#2563eb"}}}),
+    # S8: PowerShell 5.1's `>` writes UTF-16LE with its mark; without one, by its zero bytes
+    "utf16.css": ":root {\n  --brand-500: #2563eb;\n  --bg-canvas: var(--brand-500);\n}\n".encode("utf-16"),
+    "utf16be.css": ":root {\n  --brand-500: #2563eb;\n}\n".encode("utf-16-be"),
 }
 TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.css"], ["contract.json"],
                ["contract.json", "a.css"], ["a.css", "contract.json"], ["bad-schema.json"], ["bad-ramps.json"],
@@ -883,7 +886,7 @@ TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.
                ["deep.tokens.json"], ["names.tokens.json"], ["pointers.tokens.json"], ["chain.tokens.json"], ["fan.tokens.json"],
                ["studio-math.json"], ["pointer-fan.tokens.json"], ["studio-palettes.json"],
                ["app.resolver.json"], ["a.css", "app.resolver.json"], ["pointer.resolver.json"], ["fan.resolver.json"],
-               ["sources.resolver.json"], ["outside.resolver.json"], ["types.tokens.json"]]
+               ["sources.resolver.json"], ["outside.resolver.json"], ["types.tokens.json"], ["utf16.css"], ["utf16be.css"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).
@@ -1000,6 +1003,8 @@ class TheNodeReaderAgrees(TempDirTest):
         typed = python(cases[TOKEN_CASES.index(["types.tokens.json"])])["ok"]      # S1: only the string $type
         self.assertEqual({"brand": {"500": "#2563eb"}}, typed["ramps"])
         self.assertNotRegex(json.dumps(typed), r"five|list|flag")
+        for name in ("utf16.css", "utf16be.css"):                                  # S8: read, not empty
+            self.assertEqual({"500": "#2563eb"}, python(cases[TOKEN_CASES.index([name])])["ok"]["ramps"]["brand"])
 
     def test_the_component_globs_match_the_same(self):
         """N37: ESLint asks isComponent() which JSX files are components, as

@@ -227,6 +227,34 @@ def find_config(start: Optional[Union[str, Path]] = None) -> Optional[Path]:
     return None
 
 
+def decode_text(raw: bytes) -> str:
+    """A text file's bytes in the encoding json.detect_encoding() finds: UTF-8
+    with or without a BOM, UTF-16 and UTF-32 by their BOM or their zero bytes.
+    PowerShell 5.1's `>` writes UTF-16LE, which read as UTF-8 gave a
+    tokens.css no tokens and check_roles a traceback (the audit's S8, W7).
+    A byte UTF-8 cannot decode stays a U+FFFD, as before."""
+    return raw.decode(json.detect_encoding(raw), errors="replace")
+
+
+def read_text(path: Union[str, Path]) -> str:
+    """A project's text file, whatever encoding it was saved in (class 4)."""
+    return decode_text(Path(path).read_bytes())
+
+
+BOMS = ((b"\xff\xfe\x00\x00", "utf-32-le"), (b"\x00\x00\xfe\xff", "utf-32-be"), (b"\xef\xbb\xbf", "utf-8"),
+        (b"\xff\xfe", "utf-16-le"), (b"\xfe\xff", "utf-16-be"))
+
+
+def text_encoding(raw: bytes) -> Tuple[str, bytes]:
+    """(the codec, the byte-order mark) of a file a script rewrites, so it is
+    written back in the encoding it was read in: a UTF-16 file the codemod or
+    `deprecate add --source` touched became UTF-8, or a traceback (class 4)."""
+    for bom, codec in BOMS:                      # UTF-32's mark begins with UTF-16's: it goes first
+        if raw.startswith(bom):
+            return codec, bom
+    return json.detect_encoding(raw), b""
+
+
 def _read_json(path: Path) -> Any:
     try:
         return json.loads(Path(path).read_bytes())    # json finds the encoding, a BOM included
@@ -493,7 +521,7 @@ def _css_blocks(text: str) -> Iterator[Tuple[List[str], str]]:
 
 def _css_tokens(path: Path) -> ProjectTokens:
     try:
-        text = Path(path).read_bytes().decode("utf-8-sig", errors="replace")
+        text = read_text(path)
     except OSError as exc:
         raise ConfigError(f"{path}: {exc.strerror or exc}") from exc
     defaults: Dict[str, str] = {}
