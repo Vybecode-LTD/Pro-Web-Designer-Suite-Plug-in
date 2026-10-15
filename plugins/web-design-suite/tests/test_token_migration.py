@@ -1145,6 +1145,114 @@ CENSUS = (".a { color: oklch(60% 0.15 250); background: hwb(200 10% 20%); }\n"
           ".k { animation: spin 220ms linear; }\n.l { transition: opacity 220ms ease 80ms; }\n")
 
 
+class TheAuditsMigrationMediums(TempDirTest):
+    """The audit of 2026-10-14's §3.3 mediums. M1, a duration counted at two
+    rules, did not reproduce: #135 fixed it, and TheProposalAccountsForTheCensus
+    holds it."""
+
+    def propose(self, files: dict):
+        for rel, text in files.items():
+            self.write(rel, text)
+        literals, census = MigrationPipeline.extract(self, "src")
+        mapping, _ = MigrationPipeline.cluster(self, literals)
+        return census, mapping
+
+    def test_a_class_with_any_variant_or_a_minus_is_counted_and_keeps_them(self):
+        """M2: `(?:[a-z]+:)*` and a lookbehind that refused `-` read no `2xl:`,
+        `group-hover:`, `data-[state=open]:` or `-mt-`, so those were never
+        counted and never rewritten; and a rule for `data-[state=open]:p-[16px]`
+        would have rewritten it to `data-well`."""
+        classes = ["-mt-[16px]", "2xl:p-[16px]", "group-hover:p-[16px]", "peer-focus:p-[16px]",
+                   "data-[state=open]:p-[16px]", "aria-checked:p-[16px]", "max-md:p-[16px]", "md:hover:p-[16px]"]
+        census, mapping = self.propose({"src/T.tsx": f'export const T = () => <div className="{" ".join(classes)}" />;\n'})
+        self.assertEqual(sorted(classes), sorted(l["raw"] for l in census["literals"]))
+        rules = {r["match"][0]: r["replacement"] for r in mapping["rules"] if r.get("scope") == "tailwind"}
+        self.assertEqual(sorted(classes), sorted(rules))
+        for cls, replacement in rules.items():
+            with self.subTest(cls=cls):
+                self.assertTrue(replacement.startswith(cls.rsplit("-[", 1)[0] + "-"), replacement)
+
+    def test_a_length_outside_spacing_and_size_is_not_a_spacing_value(self):
+        """M3: the size in a `font` shorthand, a `transform`, a `filter` and a
+        grid track were filed as spacing, and counted as distinct spacing values."""
+        census, mapping = self.propose({"src/a.css": ".a { font: 700 14px/1.5 sans-serif; transform: translateY(13px); "
+                                                     "filter: blur(4px); grid-template-columns: 200px 1fr; "
+                                                     "padding: 16px; flex: 1 1 240px; }\n"})
+        self.assertEqual({"font": "other-length", "transform": "other-length", "filter": "other-length",
+                          "grid-template-columns": "other-length", "padding": "length", "flex": "length"},
+                         {l["prop"]: l["kind"] for l in census["literals"]})
+        rows = {u["value"]: u for u in mapping["unmapped"] if u["kind"] == "other-length"}
+        self.assertEqual({"14px", "13px", "4px", "200px"}, set(rows))
+        self.assertIn("`font: var(--type-body)`", rows["14px"]["recommendation"])
+        self.assertIn("minmax()", rows["200px"]["recommendation"])
+
+    def test_a_negative_z_index_keeps_its_sign(self):
+        """M4: ranked onto the first rung, `-1` became `var(--z-raised)`, 10."""
+        _, mapping = self.propose({"src/a.css": ".b { z-index: -1; }\n.c { z-index: 10; }\n"})
+        self.assertEqual([["10"]], [r["match"] for r in mapping["rules"] if r["kind"] == "z-index"])
+        self.assertIn("-1", [u["value"] for u in mapping["unmapped"] if u["kind"] == "z-index"])
+
+    def test_a_tailwind_z_index_keeps_its_sign_and_takes_no_value_rule(self):
+        """Codex on #144: `-z-[1]` was read as 1, and a class took a value
+        rule the codemod never applies to a class, so it was counted as
+        replaceable and left as it was."""
+        census, mapping = self.propose({"src/T.tsx": 'export const T = () => <div className="-z-[1] z-[5]" />;\n',
+                                        "src/a.css": ".a { z-index: 5; }\n"})
+        self.assertEqual({"-z-[1]": "-1", "z-[5]": "5"},
+                         {l["raw"]: l["normalized"] for l in census["literals"] if l["context"] != "css-decl"})
+        rules = [r for r in mapping["rules"] if r["kind"] == "z-index"]
+        self.assertEqual([(["5"], 1)], [(r["match"], r["occurrences"]) for r in rules])
+        rows = [u for u in mapping["unmapped"] if u["kind"] == "tailwind"]
+        self.assertEqual([("-z-[1], z-[5]", 2)], [(u["value"], u["occurrences"]) for u in rows])
+
+    def test_a_length_a_preprocessor_variable_holds_is_deleted_as_a_colour_is(self):
+        """M6: `$gutter: 24px` was told to add a Tier-2 role for `other`,
+        while `$brand: #2f6df6` was told to delete the variable."""
+        _, mapping = self.propose({"src/_vars.scss": "$gutter: 24px;\n$brand: #2f6df6;\n"})
+        rows = {u["value"]: u for u in mapping["unmapped"]}
+        for value, holder in (("24px", "$gutter"), ("#2f6df6", "$brand")):
+            with self.subTest(holder=holder):
+                self.assertEqual(f"held in the preprocessor variable `{holder}`", rows[value]["reason"])
+                self.assertTrue(rows[value]["recommendation"].startswith("Delete it"), rows[value])
+
+
+class TheRoleTableIsTheCode(unittest.TestCase):
+    """M5: extraction-and-clustering.md §6's role table disagreed with
+    `role_for()` in three cells the audit named, and in six more."""
+
+    STEPS = {"neutral": [0, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950, 1000],
+             "other": [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]}
+
+    def test_every_cell_is_what_role_for_returns(self):
+        cv = load_script("design-token-migration", "cluster_values")
+        text = (SKILLS / "design-token-migration" / "references" / "extraction-and-clustering.md").read_text(
+            encoding="utf-8")
+        rows = re.findall(r"^\| (neutral|accent|status)[- ]([^|]+?) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|$", text, re.M)
+        self.assertGreater(len(rows), 15)
+        covered: dict = {}
+        for ramp, steps_text, *cells in rows:
+            universe = self.STEPS["neutral" if ramp == "neutral" else "other"]
+            bound = re.fullmatch(r"([≤≥])\s*(\d+)", steps_text.strip())
+            if bound:
+                steps = [s for s in universe if (s <= int(bound[2]) if bound[1] == "≤" else s >= int(bound[2]))]
+            elif "–" in steps_text:
+                lo, hi = (int(n) for n in steps_text.split("–"))
+                steps = [s for s in universe if lo <= s <= hi]
+            else:
+                steps = [int(n) for n in steps_text.split("/")]
+            for name in (("success", "warning", "danger") if ramp == "status" else (ramp,)):
+                covered.setdefault(name, []).extend(steps)
+                for step in steps:
+                    for klass, cell in zip(("fg", "bg", "border"), cells):
+                        role = re.search(r"`(--[^`]+)`", cell)
+                        with self.subTest(ramp=name, step=step, klass=klass):
+                            self.assertEqual(role.group(1).replace("<status>", name) if role else "",
+                                             cv.role_for(name, step, klass)[0])
+        for name, steps in covered.items():
+            with self.subTest(ramp=name):                   # every step, once
+                self.assertEqual(self.STEPS["neutral" if name == "neutral" else "other"], sorted(steps))
+
+
 class TheProposalAccountsForTheCensus(TempDirTest):
     """H11 to H13 (the owner's audit of 2026-10-14). The reconciliation is the
     estimate put in front of a client, so every literal the census counts is in

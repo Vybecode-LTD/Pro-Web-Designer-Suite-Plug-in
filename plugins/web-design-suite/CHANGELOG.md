@@ -291,6 +291,24 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   `rgb(255, 0, 0, 0.5)` and `hsl(0, 100%, 50%, 0.5)`, the legacy form under the names
   CSS Color 4 made aliases of `rgba()` and `hsla()`, were left out of a DTCG document as
   unsupported; they are written with their alpha (`test_dtcg.TheWriter`).
+- **The migration's census and proposal misread five things** (the audit's M2 to M6):
+  - a Tailwind class with a variant of digits, hyphens or brackets (`2xl:`,
+    `group-hover:`, `data-[state=open]:`) or a minus (`-mt-[13px]`) was never counted,
+    so never rewritten; and a rule for `data-[state=open]:p-[16px]` would have rewritten
+    it to `data-well`;
+  - a length in a property outside the spacing and size sets (the size in a `font`
+    shorthand, `transform`, `filter`, a grid track) was filed as spacing and counted
+    among the distinct spacing values. It is `other-length` now, a row to look at by
+    hand, with advice by property;
+  - `z-index: -1` was ranked onto the first rung and rewritten to `var(--z-raised)`,
+    its sign flipped. A negative z-index is a row of its own;
+  - extraction-and-clustering.md §6's role table disagreed with `role_for()` in nine
+    cells; it is rewritten from the code, and a test reads every cell back through it;
+  - `$gutter: 24px` was told to add a Tier-2 role, where `$brand: #2f6df6` was told to
+    delete the variable. A length a preprocessor variable holds gets the same advice.
+
+  M1 (a duration counted at two rules) did not reproduce: #135 fixed it.
+  `test_token_migration.TheAuditsMigrationMediums` and `TheRoleTableIsTheCode`.
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
   too. It is a width and a height, so it is a size: reported when no `--width-*` role
