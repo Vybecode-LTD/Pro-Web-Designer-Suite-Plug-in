@@ -170,6 +170,11 @@ class TheWriter(unittest.TestCase):
                 self.assertEqual([], problems)
                 self.assertEqual("color", doc["scrim"]["$type"])
                 self.assertEqual({}, self.dtcg.not_written(doc))
+        # A fourth argument is legacy syntax, comma-separated; the modern form
+        # puts alpha after `/` (Codex on #143, CSS Color 4 §4.1).
+        for css in ("rgb(1 2 3 0.5)", "rgba(1 2 3 0.5)", "hsl(0 100% 50% 0.5)"):
+            with self.subTest(css=css):
+                self.assertIsNone(self.dtcg.css_colour(css))
 
 
 DTCG_ROOTS = {

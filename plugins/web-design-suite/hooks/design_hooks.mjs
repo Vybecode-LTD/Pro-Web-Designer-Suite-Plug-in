@@ -63,7 +63,7 @@ const OFF = /^(?:false|0|no|off)$/i;
 // "the lighthouse keeper" are not design work. `about(CONTEXT, rx)` matches
 // `rx` in a prompt that has the context anywhere in it.
 const about = (context, rx) => new RegExp(String.raw`^(?=[\s\S]*(?:${context.source}))[\s\S]*${rx.source}`, rx.flags);
-const DESIGN_TOKEN = /\bdesign[- ]?(?:tokens?|system)\b|\btokens\.(?:css|json)\b|\b(?:colou?rs?|spacing|typography|palette|themes?|CSS|tailwind|figma|pixels?|hard-?coded|components?|prop tables?)\b|(?:^|[\s`(])--[a-z][\w-]*/;
+const DESIGN_TOKEN = /\bdesign[- ]?(?:tokens?|system)\b|\btokens\.(?:css|json)\b|\b(?:colou?rs?|spacing|typography|palette|themes?|CSS|tailwind|figma|DTCG|tokens studio|style dictionary|pixels?|hard-?coded|components?|prop tables?)\b|(?:^|[\s`(])--[a-z][\w-]*/;
 const DESIGN_WORK = /\b(?:designs?|pages?|homepage|screens?|layouts?|UI|UX|sites?|website|mock-?ups?|wireframes?|components?|dashboards?|interfaces?|apps?|figma|hero|landing|forms?|buttons?|typography|colou?rs?|visual\w*|brand\w*)\b/;
 const COMPONENT = new RegExp(String.raw`\b(?:design system|components?|buttons?|inputs?|checkbox\w*|selects?|dropdowns?|`
   + String.raw`toggles?|tabs?|cards?|modals?|dialogs?|menus?|links?|fields?|chips?|badges?|tooltips?|accordions?|widgets?|`

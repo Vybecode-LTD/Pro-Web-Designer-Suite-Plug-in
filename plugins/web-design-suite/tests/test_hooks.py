@@ -606,7 +606,11 @@ class TheRouter(HookTest):
                 "Write the token reference for our design system": "design-system-docs",
                 "Critique the layout of our signup page": "design-critique-gate",
                 "Show every state of the dropdown": "component-state-matrix",
-                "Our Lighthouse score fell to 61": "perf-budget-gate"}
+                "Our Lighthouse score fell to 61": "perf-budget-gate",
+                # the token formats the plugin reads are design tokens too (Codex on #143)
+                "Deprecate the old DTCG token": "design-system-versioning",
+                "Write the DTCG token reference": "design-system-docs",
+                "Migrate the Style Dictionary tokens to the new names": "design-token-migration"}
         for prompt, skill in ours.items():
             with self.subTest(prompt=prompt):
                 self.assertIn(skill, self.routed(prompt))
