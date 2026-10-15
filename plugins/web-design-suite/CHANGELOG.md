@@ -279,6 +279,18 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   (`test_docs.PlaceholdersInCapitals`, which reads every shell fence and inline command
   in the skills, the references, the agents and the workflow commands, and the
   repository's live docs).
+- **The router heard another domain's words as design work** (the audit's S3). "Deprecate
+  the old JWT tokens" was sent to design-system-versioning, "migrate the session tokens
+  to Redis" to design-token-migration, "token reference docs for the OAuth API" to
+  design-system-docs, "critique my essay" to design-critique-gate, "every state in the
+  US" to component-state-matrix and "the lighthouse keeper" to perf-budget-gate. Each
+  shared word now routes only beside one of the skill's own (a colour, `tokens.css`, a
+  page, a component, a score), as "a patch release?" has since #97
+  (`test_hooks.TheRouter`).
+- **`rgb()` and `hsl()` lost a fourth comma argument** (the audit's S4).
+  `rgb(255, 0, 0, 0.5)` and `hsl(0, 100%, 50%, 0.5)`, the legacy form under the names
+  CSS Color 4 made aliases of `rgba()` and `hsla()`, were left out of a DTCG document as
+  unsupported; they are written with their alpha (`test_dtcg.TheWriter`).
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
   too. It is a width and a height, so it is a size: reported when no `--width-*` role
