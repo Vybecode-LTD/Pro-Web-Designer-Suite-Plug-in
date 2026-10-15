@@ -57,6 +57,19 @@ const LIMIT = 9000;           // Claude Code caps additionalContext at 10,000 ch
 const BUDGET = 160000;        // the scripts' time together, inside hooks.json's 180 seconds
 const OFF = /^(?:false|0|no|off)$/i;
 
+// A word another domain shares is heard only beside one of the skill's own
+// (Codex on #97, the audit's S3): "deprecate the old JWT tokens", "migrate the
+// session tokens to Redis", "critique my essay", "every state in the US" and
+// "the lighthouse keeper" are not design work. `about(CONTEXT, rx)` matches
+// `rx` in a prompt that has the context anywhere in it.
+const about = (context, rx) => new RegExp(String.raw`^(?=[\s\S]*(?:${context.source}))[\s\S]*${rx.source}`, rx.flags);
+const DESIGN_TOKEN = /\bdesign[- ]?(?:tokens?|system)\b|\btokens\.(?:css|json)\b|\b(?:colou?rs?|spacing|typography|palette|themes?|CSS|tailwind|figma|pixels?|hard-?coded|components?|prop tables?)\b|(?:^|[\s`(])--[a-z][\w-]*/;
+const DESIGN_WORK = /\b(?:designs?|pages?|homepage|screens?|layouts?|UI|UX|sites?|website|mock-?ups?|wireframes?|components?|dashboards?|interfaces?|apps?|figma|hero|landing|forms?|buttons?|typography|colou?rs?|visual\w*|brand\w*)\b/;
+const COMPONENT = new RegExp(String.raw`\b(?:design system|components?|buttons?|inputs?|checkbox\w*|selects?|dropdowns?|`
+  + String.raw`toggles?|tabs?|cards?|modals?|dialogs?|menus?|links?|fields?|chips?|badges?|tooltips?|accordions?|widgets?|`
+  + String.raw`hover|focus|disabled|storybook|UI)\b`);
+const PAGE_SPEED = /\b(?:scores?|performance|perf|audits?|reports?|CI|(?:home)?pages?|sites?|website|load\w*|speed|budgets?|metrics?|vitals|mobile|desktop|SEO)\b/;
+
 // A skill, what it covers, and the words that name its work. Up to two are
 // named, in this order, so the specific ones come before the studio.
 const ROUTES = [
@@ -65,26 +78,27 @@ const ROUTES = [
   ['figma-variables-sync', 'Figma variables and tokens', [/\bfigma\b[^.?!]*\b(?:variables?|tokens?|styles?)\b/i,
                                                           /\btokens studio\b/i]],   // R3.6's live check
   ['email-template-system', 'HTML email', [/\b(?:html e-?mails?|e-?mail templates?|newsletters?|MJML)\b/i]],
-  ['perf-budget-gate', 'performance budgets', [/\b(?:core web vitals|lighthouse|performance budgets?|page ?speed)\b/i,
-                                                /\b(?:LCP|INP|CLS|TTFB)\b/]],
+  ['perf-budget-gate', 'performance budgets', [/\b(?:core web vitals|performance budgets?|page ?speed)\b/i,
+                                                /\b(?:LCP|INP|CLS|TTFB)\b/, about(PAGE_SPEED, /\blighthouse\b/i)]],
   ['design-token-migration', 'migrating a codebase onto tokens',
-   [/\b(?:hard-?coded|magic) (?:values?|colou?rs?|numbers?|pixels?)\b/i, /\bmigrat\w*\b[^.?!]*\btokens?\b/i,
+   [/\b(?:hard-?coded|magic) (?:values?|colou?rs?|numbers?|pixels?)\b/i, about(DESIGN_TOKEN, /\bmigrat\w*\b[^.?!]*\btokens?\b/i),
     /\bcodemods?\b/i]],
   ['design-system-versioning', 'versioning a design system',
-   [/\b(?:semver|breaking changes?|deprecat\w*)\b[^.?!]*\b(?:tokens?|design system)\b/i,
+   [about(DESIGN_TOKEN, /\b(?:semver|breaking changes?|deprecat\w*)\b[^.?!]*\b(?:tokens?|design system)\b/i),
     // "a patch release?" asked of a token change, anywhere in the prompt: a
     // file name such as tokens.css ends the sentence the pattern above reads.
     // Design tokens only: an API's auth token is not one (Codex on #97).
     /^(?=[\s\S]*(?:\bdesign[- ]tokens?\b|\btokens\.(?:css|json)\b|\bdesign[- ]system\b|(?:^|[\s`(])--[a-z][\w-]*))[\s\S]*\b(?:patch|minor|major) (?:release|version)s?\b/i]],
   ['design-system-docs', 'design-system documentation',
    [/\b(?:style ?guides?|storybook|design[- ]system(?:'s)? (?:docs|documentation|site))\b/i,
-    /\btoken references?\b/i, /\b(?:docs|documentation|props? tables?)\b[^.?!]*\bdesign[- ]system\b/i]],
-  ['component-state-matrix', 'every state of a component', [/\b(?:state matrix|every state|visual regression)\b/i]],
+    about(DESIGN_TOKEN, /\btoken references?\b/i), /\b(?:docs|documentation|props? tables?)\b[^.?!]*\bdesign[- ]system\b/i]],
+  ['component-state-matrix', 'every state of a component', [/\b(?:state matrix|visual regression)\b/i,
+                                                                     about(COMPONENT, /\bevery state\b/i)]],
   ['content-model-to-ui', 'screens from a data model',
    [/\b(?:CRUD|admin (?:screens?|panel|ui))\b/i, /\b(?:schema|supabase|prisma)\b[^.?!]*\b(?:forms?|screens?)\b/i]],
   ['landing-page-conversion', 'pages that convert', [/\b(?:landing pages?|conversion rates?|hero sections?|pricing pages?)\b/i,
                                                      /\bCTAs?\b/]],
-  ['design-critique-gate', 'design critique', [/\b(?:critique|design review)\b/i,
+  ['design-critique-gate', 'design critique', [/\bdesign review\b/i, about(DESIGN_WORK, /\bcritique\b/i),
                                                /\blooks? (?:professional|amateur\w*|cheap|dated)\b/i]],
   ['client-presentation-builder', 'client presentations', [/\b(?:client presentations?|pitch decks?)\b/i]],
   ['web-design-studio', 'design systems and building them',

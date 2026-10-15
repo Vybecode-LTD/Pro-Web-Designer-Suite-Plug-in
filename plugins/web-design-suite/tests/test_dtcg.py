@@ -157,6 +157,20 @@ class TheWriter(unittest.TestCase):
         self.assertEqual(0.5, self.dtcg.css_colour("rgb(232 68 10 / 50%)")["alpha"])
         self.assertNotIn("hex", self.dtcg.css_colour("lab(50 40 59.5)"))
 
+    def test_the_legacy_comma_form_keeps_its_alpha_under_either_name(self):
+        """The audit's S4: `rgb()` and `rgba()` are aliases since CSS Color 4,
+        and so are `hsl()` and `hsla()`, but a fourth comma argument was read
+        only after the `a` names, so `rgb(255, 0, 0, 0.5)` was not written."""
+        for short, long in (("rgb(255, 0, 0, 0.5)", "rgba(255, 0, 0, 0.5)"),
+                            ("hsl(0, 100%, 50%, 0.5)", "hsla(0, 100%, 50%, 0.5)")):
+            with self.subTest(css=short):
+                self.assertEqual(self.dtcg.css_colour(long), self.dtcg.css_colour(short))
+                self.assertEqual(0.5, self.dtcg.css_colour(short)["alpha"])
+                doc, problems = self.dtcg.document([("--scrim", short)])
+                self.assertEqual([], problems)
+                self.assertEqual("color", doc["scrim"]["$type"])
+                self.assertEqual({}, self.dtcg.not_written(doc))
+
 
 DTCG_ROOTS = {
     "brand": {"$type": "color", "$root": {"$value": {"colorSpace": "srgb", "components": [0.9, 0.3, 0.05]}},
