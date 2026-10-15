@@ -1,12 +1,12 @@
 # Start here: the next session
 
-**Written 2026-10-15**, at the end of the third session that day, which finished P53 and did P54 parts 1 to 4 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Seven PRs merged, and no PR is open:
+**Written 2026-10-15**, at the end of the third session that day, which finished P53 and did P54 parts 1 to 4 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Six PRs merged, and this docs PR, #148, merges once green (§3):
 - **#142, P53 part 5 (the cmd.exe placeholders: D4, G13, E14; §7 class 9)**, merged as `8be665f`. Every placeholder in a command is in capitals; the email quick start pastes into bash, PowerShell and cmd; `test_docs.PlaceholdersInCapitals` reads every shell fence and inline command in the plugin's docs and the repository's live docs. **P53 is done; N45 is closed.**
 - **#143, P54 part 1 (§3.1: S3, S4)**, merged as `6bb88c5`. The router hears a shared word (a token, a critique, a state, Lighthouse) only beside one of the skill's own (`about()`); `dtcg.css_colour()` reads the legacy comma form under `rgb()` and `hsl()`.
 - **#144, P54 part 3 (§3.3: M2 to M6; M1 did not reproduce)**, merged as `e55727f`. The census counts every Tailwind variant and a minus, files `other-length` apart, keeps a z-index's sign; the §6 role table is `role_for()`'s.
 - **#145, P54 part 2 (§3.2: W1 to W5)**, merged as `fb2280a`: translucent colours refused before parsing, `worst_contrast`, `tw_probe`'s `KEPT_UNDER`, inserted and dotted layers in both CSS gates, the `url()` exemption only when the url is the whole value.
 - **#147, P54 part 4 (§3.4's first half: V4, V5, V6, V9, the 8-digit hex)**, merged as `cc0562b`. `deprecate scan` skips the suite's own records, `deprecate add` refuses a dead or undeclared `--replacement`, `build_docs` escapes its inlined index, `diff_system` reads a contract folder and a hex's alpha.
-- **#146** and **#148**, the session's docs.
+- **#146**, the session's first docs PR, merged; **#148**, these docs, open until §3 merges it.
 - **Reviews:** 17 real findings, each fixed with a test failing on the head it reviewed: #142 4 (Codex 1, CodeRabbit 3, one declined with reasons and withdrawn), #143 2 (Codex), #144 1 (Codex), #145 6 (Codex 2 over two rounds, CodeRabbit 2, and two more the audit shared).
 
 Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P54 part 5, §3.4's second half (V2, V3, V10, `extract_system --tokens` on JSON), then §3.5 to §3.8** (§4).
