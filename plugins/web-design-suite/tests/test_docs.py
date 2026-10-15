@@ -729,15 +729,19 @@ class ScriptInvocation(TempDirTest):
 
     def test_the_email_quick_start_copies_the_template_into_the_project(self):
         """The quick start's copy is a step for Claude since P53 part 5 (E14):
-        `Copy `SOURCE` to `DESTINATION``, not a `cp` line."""
+        `Copy `SOURCE` to `DESTINATION``, not a `cp` line. It names the
+        folder to create, which `mkdir -p` did (Codex on #142): a copy into a
+        project with no `emails/` fails."""
         text = (SKILLS / "email-template-system" / "SKILL.md").read_text(encoding="utf-8")
-        copies = re.findall(r"\bCopy `([^`]+)` to `([^`]+)`", section(text, "Quick start"))
+        quick = section(text, "Quick start")
+        copies = re.findall(r"\bCopy `([^`]+)` to `([^`]+)`", quick)
         self.assertTrue(copies)
         for src, dst in copies:
             with self.subTest(dst=dst):
                 self.assertTrue(src.startswith("${CLAUDE_SKILL_DIR}/assets/templates/"), src)
                 self.assertTrue((SKILLS / "email-template-system" / src.split("}/", 1)[1]).is_file(), src)
                 self.assertNotIn("assets/", dst)
+                self.assertIn(f"creating `{dst.rsplit('/', 1)[0]}/` if it is missing", quick)
 
     def test_running_a_script_by_path_leaves_no_bytecode_beside_it(self):
         for skill, script in (("figma-variables-sync", "figma_to_tokens.py"),

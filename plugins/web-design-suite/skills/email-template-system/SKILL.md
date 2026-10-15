@@ -56,7 +56,7 @@ That is the entire exception. Anything beyond it — a hardcoded colour, a hand-
 
 ## Quick start
 
-1. Copy `${CLAUDE_SKILL_DIR}/assets/templates/transactional-receipt.html` to `emails/my-email.html`: a template that already compiles clean, copied INTO the project, where it is committed. The plugin's copy is replaced on every update.
+1. Copy `${CLAUDE_SKILL_DIR}/assets/templates/transactional-receipt.html` to `emails/my-email.html`, creating `emails/` if it is missing: a template that already compiles clean, copied INTO the project, where it is committed. The plugin's copy is replaced on every update.
 2. Edit the copy: tokens only, no literals, utilities declared last. Lint it; compile it (resolve tokens, inline the CSS, keep the media queries, add the Outlook scaffolding, write the plain-text part, report bytes); gate the build:
 
 ```bash
