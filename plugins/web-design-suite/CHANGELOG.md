@@ -251,6 +251,23 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   encoding they read it in, its mark and byte order included (`text_encoding()`); a
   UTF-16 file was skipped as unreadable by the one and a traceback in the other
   (`test_encodings`, which also fails on a script that reads with `encoding="utf-8"`).
+- **What a script could not use was dropped without a word** (the audit's S2, V11, V12
+  and M9, and its class 7):
+  - `read_tokens()` and `read_deprecations()` threw away every problem `dtcg.tokens()`
+    reported, so a resolver with sixteen of them read silently. `ProjectTokens` carries
+    them as `problems`, and the five gates that read a project's tokens (`audit_design`,
+    `diff_system`, `cluster_values`, `figma_audit`, `figma_to_tokens`) print each as a
+    warning;
+  - `figma_to_tokens --reverse` clamped a colour outside sRGB (`oklch(70% 0.3 150)`)
+    with exit 0; it is now a `clamped` problem with the hex Figma gets, exit 1;
+  - an input whose only tokens are unsupported said "contains no variables … pass
+    `--shape`"; the message now lists what it held and could not give;
+  - the codemod dropped a generated file with no skip row; it has one;
+  - `diff_system` skipped a pair whose contrast it could not measure (a colour it
+    cannot resolve or parse); a pair a changed token reaches is now a note.
+
+  `test_diagnostics`, which also fails on a `_problems` or a `[0]` on `tokens()` or
+  `normalise()` anywhere in the scripts.
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
   too. It is a width and a height, so it is a size: reported when no `--width-*` role

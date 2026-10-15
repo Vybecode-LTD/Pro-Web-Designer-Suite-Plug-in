@@ -438,6 +438,9 @@ class ProjectTokens:
     roles: Dict[str, str] = field(default_factory=dict)
     breakpoints: Dict[str, str] = field(default_factory=dict)
     constants: Dict[str, str] = field(default_factory=dict)
+    # What a DTCG file or resolver could not give, as "file: token: why": the
+    # gates print each as a warning, where they were dropped (the audit's S2).
+    problems: List[str] = field(default_factory=list)
 
     def values(self) -> Dict[str, str]:
         """Every name, as `--name`, with its default value."""
@@ -587,8 +590,8 @@ def _dtcg_tokens(path: Path, data: Any) -> ProjectTokens:
     with no CSS form (a typography composite, a boolean) is not a custom
     property, so it is left out. A resolver is read as its default, its files
     found beside it."""
-    found, _problems = _dtcg(path).tokens(data, Path(path).parent)
-    tokens = ProjectTokens(sources=[Path(path)])
+    found, problems = _dtcg(path).tokens(data, Path(path).parent)
+    tokens = ProjectTokens(sources=[Path(path)], problems=[f"{path}: {where}: {why}" for where, why in problems])
     for token in found:
         value = token.css()
         if value is not None:
@@ -596,7 +599,8 @@ def _dtcg_tokens(path: Path, data: Any) -> ProjectTokens:
     return tokens
 
 
-def read_deprecations(paths: Sequence[Union[str, Path]]) -> Dict[str, Union[bool, str]]:
+def read_deprecations(paths: Sequence[Union[str, Path]],
+                      problems: Optional[List[str]] = None) -> Dict[str, Union[bool, str]]:
     """The tokens the DTCG files among `paths` mark `$deprecated` (P31 part
     4), by CSS name, with the reason when one is given, in the order
     read_tokens() reads them: a later file that sets a token again without
@@ -609,7 +613,9 @@ def read_deprecations(paths: Sequence[Union[str, Path]]) -> Dict[str, Union[bool
             for name in read_tokens([path]).values():
                 out.pop(name, None)
             continue
-        found, _problems = _dtcg(path).tokens(data, path.parent)
+        found, dropped = _dtcg(path).tokens(data, path.parent)
+        if problems is not None:                  # read_tokens() reports them too: collect only if asked (S2)
+            problems += [f"{path}: {where}: {why}" for where, why in dropped]
         for token in found:
             out.pop(token.name, None)
             if token.deprecated:
@@ -655,6 +661,7 @@ def read_tokens(paths: Sequence[Union[str, Path]]) -> ProjectTokens:
                 mine.setdefault(name, {}).update(steps)
         for section in ("roles", "breakpoints", "constants"):
             getattr(out, section).update(getattr(part, section))
+        out.problems += part.problems
     for name, steps in out.ramps.items():
         out.ramps[name] = dict(sorted(steps.items(), key=lambda kv: int(kv[0])))
     return out

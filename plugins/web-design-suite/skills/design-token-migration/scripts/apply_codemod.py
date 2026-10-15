@@ -1001,6 +1001,8 @@ def process(fp: Path, mapping: Mapping, skips: List[Skip]) -> Optional[FileResul
         skips.append(Skip(norm_path(fp), 0, f"unreadable: {exc}", ""))
         return None
     if any(mark in text[:800] for mark in GENERATED_MARKERS):
+        skips.append(Skip(norm_path(fp), 0, "generated: a marker in its first 800 characters says "
+                          "a tool writes it; migrate its source instead", ""))   # M9: no silent drop
         return None
     suffix = fp.suffix.lower()
     try:

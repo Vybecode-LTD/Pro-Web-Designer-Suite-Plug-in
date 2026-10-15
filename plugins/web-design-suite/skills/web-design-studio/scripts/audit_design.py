@@ -386,6 +386,8 @@ PROJECT = Project()      # its ramp steps draw PROJECT_RAMP_ADVICE (design-rules
 def use_project(config: ProjectConfig | None, sources: list[Path]) -> None:
     """Audit against a project: `config` (or None) and its token files."""
     tokens = read_tokens(sources)
+    for problem in getattr(tokens, "problems", []):     # what a DTCG file could not give (S2)
+        print(f"audit_design: warning: {problem}", file=sys.stderr)
     PROJECT.config = config
     PROJECT.token_files = {Path(p).resolve() for p in sources}
     raw = {f"--{ramp}-{step}" for ramp, steps in tokens.ramps.items() for step in steps}
