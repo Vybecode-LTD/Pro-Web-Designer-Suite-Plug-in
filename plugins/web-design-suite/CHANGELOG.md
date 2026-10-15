@@ -159,7 +159,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   enums, so a value `ALTER TYPE … ADD VALUE` added was refused by the scaffold's server
   draft and missing from the form. `ADD VALUE` (with `IF NOT EXISTS`, `BEFORE` and
   `AFTER`) and `RENAME VALUE` are replayed on an enum the files created, and a label's
-  `''` is one apostrophe there and in `CREATE TYPE` (Codex on #133)
+  `''` is one apostrophe there and in `CREATE TYPE`, and its spaces are kept (Codex on
+  #133)
   (`test_schema_sources.MigrationsThatDumpsRewrite`).
 - **A table's tail ran into its last column** (H10). The column list ended at the
   statement's last `)`, so `PARTITION BY RANGE (created_at)`, `WITH (…)` or `INHERITS

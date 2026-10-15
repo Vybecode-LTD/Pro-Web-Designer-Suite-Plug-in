@@ -486,6 +486,16 @@ def dollar_quote_end(text: str, i: int) -> int | None:
     return len(text) if close == -1 else close + len(m.group(0))
 
 
+def one_line_outside_strings(stmt: str) -> str:
+    """The statement on one line, each run of whitespace one space, except
+    inside a string literal: `'needs  review'` is the label Postgres stores
+    (Codex on #133)."""
+    out: list[str] = []
+    for i, part in enumerate(re.split(r"('(?:[^']|'')*')", stmt)):
+        out.append(part if i % 2 else re.sub(r"\s+", " ", part))
+    return "".join(out).strip()
+
+
 def split_top_level(text: str, sep: str) -> list[str]:
     """Split on `sep` at paren depth 0, respecting quotes."""
     parts: list[str] = []
@@ -890,7 +900,7 @@ def parse_ddl(text: str) -> Model:
     statements = [s.strip() for s in split_top_level(clean, ";") if s.strip()]
 
     for stmt in statements:
-        one_line = re.sub(r"\s+", " ", stmt).strip()
+        one_line = one_line_outside_strings(stmt)
 
         m = RE_CREATE_ENUM.match(one_line)
         if m:

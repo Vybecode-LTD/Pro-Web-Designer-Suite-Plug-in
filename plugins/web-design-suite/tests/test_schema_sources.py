@@ -203,6 +203,14 @@ class MigrationsThatDumpsRewrite(SchemaSources):
                                  "alter type role rename value 'it''s' to 'its';\n")
         self.assertEqual({"role": ["its", "owner's", "b"]}, self.introspect("schema.sql")["enums"])
 
+    def test_an_enum_label_keeps_its_spaces(self):
+        # Codex on #133: the statement was collapsed to one line, label included.
+        self.write("schema.sql", "create type stage as enum ('needs  review', 'done');\n"
+                                 "create table tasks (id uuid primary key, stage stage not null);\n"
+                                 "alter type stage add value 'on  hold' before 'done';\n"
+                                 "alter type stage rename value 'needs  review' to 'in\n  review';\n")
+        self.assertEqual({"stage": ["in\n  review", "on  hold", "done"]}, self.introspect("schema.sql")["enums"])
+
     def test_columns_added_and_changed_later_are_replayed(self):
         # Migrations are read in order (N14); a column added later was dropped.
         self.write("schema.sql", "create table t (id uuid primary key, legacy text, title text);\n"
