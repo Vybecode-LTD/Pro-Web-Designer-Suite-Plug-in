@@ -413,6 +413,8 @@ NOT_PORTABLE = {
     "a home shorthand": re.compile(r"(?:^|\s)~"),
     "a single-quoted argument, which cmd keeps quoted": re.compile(r"'"),
     "a glob, which only bash expands": re.compile(r"\*"),
+    # CodeRabbit on #142: E14's quick start was these, and none passed a rule.
+    "a POSIX command cmd lacks (cp, cat, mkdir -p…)": re.compile(r"^(?:cp|cat|mv|rm|ls|touch|mkdir\s+-p)\b"),
 }
 SHELL_LANGS = {"bash", "sh", "shell", "console", ""}
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
@@ -479,7 +481,8 @@ class PasteableCommands(unittest.TestCase):
     def test_the_check_sees_what_breaks(self):
         for line in ('M="$WDS/scripts"', 'python "$M/x.py" src/   # dry run', "python3 x.py", "a \\",
                      "a && b", "python x.py --out /tmp/b.html", "python x.py 'a b'", "python x.py src/*.css",
-                     "python x.py ~/src", "cmd %WDS%", "echo $(date)"):
+                     "python x.py ~/src", "cmd %WDS%", "echo $(date)",
+                     "cp a.html emails/a.html", "cat build/a.txt", "mkdir -p emails"):
             with self.subTest(line=line):
                 self.assertTrue(not_portable(line))
         self.assertEqual([], not_portable('python "$WDS/a/b.py" "#e8440a" --name accent -o proposal/'))
@@ -566,18 +569,20 @@ COMMAND_SPAN = re.compile(r"(?:python|py|node|npx|npm|uv|claude(?:\.exe)?|gh|git
 # The repository's docs a session works from. The other plans are records
 # (the audit, the reports, the reviews, the live checks): they quote what was
 # run or found, and rewriting them would change the record.
-LIVE_DOCS = ("CLAUDE.md", "docs/HANDOFF.md", "dev plans/README.md", "dev plans/next-session-prompt.md",
+LIVE_DOCS = ("README.md", "CLAUDE.md", "docs/HANDOFF.md", "dev plans/README.md", "dev plans/next-session-prompt.md",
              "dev plans/next-session-opening-prompt.md", "dev plans/web-design-suite-execution-plan.md",
              "dev plans/web-design-suite-completion-plan.md", "dev plans/web-design-suite-completion-inventory.md")
 
 
-def doc_commands(text: str) -> list[str]:
+def doc_commands(text: str, untagged: bool = False) -> list[str]:
     """A markdown file's commands: every line of a fence tagged as a shell,
     one inside a blockquote too (the SKILL.md files open with one), and every
-    inline code span that starts with a command. An untagged fence is left
-    out: in the skills it is sample output or a usage line."""
+    inline code span that starts with a command. An untagged fence is read
+    only when `untagged` says so, as a README's are commands (CodeRabbit on
+    #142); in the skills it is sample output or a usage line."""
     unquoted = "\n".join(re.sub(r"^ {0,3}> ?", "", line) for line in text.splitlines())
-    lines = [line for block in shell_fences(unquoted, COMMAND_TAGS) for line in block.splitlines()]
+    tags = COMMAND_TAGS | {""} if untagged else COMMAND_TAGS
+    lines = [line for block in shell_fences(unquoted, tags) for line in block.splitlines()]
     return lines + [span for span in re.findall(r"`([^`\n]+)`", unquoted) if COMMAND_SPAN.match(span)]
 
 
@@ -601,7 +606,7 @@ class PlaceholdersInCapitals(unittest.TestCase):
     def assertNoAngleBrackets(self, files, root):
         found = 0
         for path in files:
-            for line in doc_commands(path.read_text(encoding="utf-8")):
+            for line in doc_commands(path.read_text(encoding="utf-8"), untagged=path.name == "README.md"):
                 found += 1
                 with self.subTest(file=path.relative_to(root).as_posix(), command=line.strip()[:100]):
                     self.assertIsNone(ANGLE_PLACEHOLDER.search(line))
@@ -623,6 +628,8 @@ class PlaceholdersInCapitals(unittest.TestCase):
                 "```\nfigma_audit.py <file>\n```\n"
                 "Run `npm ls <pkg>`; the `<img>` element.\n")
         self.assertEqual(["python -m scripts.<name>", "npm ls <pkg>"], doc_commands(text))
+        self.assertEqual(["python -m scripts.<name>", "figma_audit.py <file>", "npm ls <pkg>"],
+                         doc_commands(text, untagged=True))                  # a README's (CodeRabbit on #142)
 
     def test_no_command_the_plugin_documents_has_one_in_angle_brackets(self):
         files = sorted([*SKILLS.glob("*/SKILL.md"), *SKILLS.glob("*/references/*.md"),

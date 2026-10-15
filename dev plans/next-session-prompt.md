@@ -433,7 +433,7 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 **P53's last class, the cmd.exe placeholders, in detail** (the audit's §3.7 and §3.6, its §7 class 9: "extend `test_docs.PasteableCommands` to every fenced block and inline command in `CLAUDE.md`, the SKILL.md files and the plans; placeholders in capitals, never `<…>`"):
 1. **D4.** `CLAUDE.md:44` has an unquoted `<ids>` in a command for cmd.exe (cmd says "The syntax of the command is incorrect"). This file's live-check command has `--plugin-dir <export>/plugins/…` inside a bash block.
-2. **G13.** `design-critique-gate/SKILL.md` (about :210): `scripts.audit_design <path> --json > audit.json` fails in cmd.exe, where `<path>` is a redirection.
+2. **G13.** `design-critique-gate/SKILL.md` (about :210): its `audit_design` command took its path as an angle-bracket placeholder, which cmd.exe reads as a redirection; it is `python -m scripts.audit_design PATH --json > audit.json` now.
 3. **E14.** `email-template-system/SKILL.md` (about :58-78): the quick start is bash-only (`mkdir -p`, `cp`, `cat`).
 4. **The check:**
    - Size the sweep before writing it. `grep -n '<[a-z][a-z-]*>'` over the fenced blocks of `CLAUDE.md`, the SKILL.md files, the workflow commands and the plans will show how many placeholders there are.
