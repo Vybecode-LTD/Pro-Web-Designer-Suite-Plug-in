@@ -30,18 +30,18 @@ npm ci --prefix tooling/main          # once; it downloads no browser (tooling/R
 npm ci --prefix tooling/tailwind-v3   # once
 cd plugins/web-design-suite
 python -B tools/check.py              # every PR: pointers, snippets, the plan, the audit, budgets, the affected tests
-python -B tools/fail_before.py <test ids> [--rev REV]      # the fail-before table; REV defaults to the latest v* tag
+python -B tools/fail_before.py TEST_IDS [--rev REV]      # the fail-before table; REV defaults to the latest v* tag
 python -B -m unittest discover -s tests                     # the whole suite; -B keeps bytecode out of the plugin
 python tools/check_pointers.py        # § pointers; --write-register after editing one, then read the diff
 python tools/sync_snippets.py --check # starter code quoted in the references
 python tools/sync_rules.py --check    # the spec's data in the gates; without --check it rewrites the blocks
 python skills/web-design-studio/scripts/audit_design.py skills --strict
-cd ../.. && python -B tooling/release/build.py <empty folder> [--rev REV]   # the zip, the .skill files, SHA256SUMS
+cd ../.. && python -B tooling/release/build.py EMPTY_FOLDER [--rev REV]   # the zip, the .skill files, SHA256SUMS
 ```
 
 CI (`.github/workflows/ci.yml`) runs the whole suite on Windows, Linux and macOS at Python 3.9 and 3.14 for every PR, so locally `check.py` is enough (decision D1). A pushed `v*` tag makes `release.yml` build and create the GitHub release; nothing else creates one.
 
-`fail_before.py` unpacks the revision through `git archive` and sets `WDS_PLUGIN_ROOT` and `WDS_PLUGIN_REV` for the first run. By hand, the same is `set "WDS_PLUGIN_ROOT=<unpacked plugin>" && python -B -m unittest <ids>` in cmd.exe.
+`fail_before.py` unpacks the revision through `git archive` and sets `WDS_PLUGIN_ROOT` and `WDS_PLUGIN_REV` for the first run. By hand, the same is `set "WDS_PLUGIN_ROOT=UNPACKED_PLUGIN" && python -B -m unittest TEST_IDS` in cmd.exe.
 
 The Python floor runs with `uv run --no-project --python 3.9 python -B -m unittest discover -s tests`, which works in cmd as well.
 
@@ -58,7 +58,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 - **eslint-plugin-better-tailwindcss** resolves `tailwindcss`, and reads `entryPoint` and `tailwindConfig`, from its `cwd` setting, ESLint's working directory unless set. Part 5 sets `cwd` to the project and anchors both paths there (#125): ESLint 10 loads a config from whichever folder it lints.
 - **Never write into OneDrive** or the folders redirected into it (Documents, Desktop, Pictures, Music, Videos). Downloads is safe.
 - **The desktop app is an MSIX package.** Its bundled CLI is really in `C:\Users\vybec\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude-code\`; Claude's tools see it under `%APPDATA%`, the owner's terminal does not. Give the owner the real path.
-- **Evals are real model calls** on the owner's account. From the plugin: `claude plugin eval . --tag routing --ablation none --trust-plugin --no-publish --model claude-sonnet-5-5 --output-dir <scratchpad>` with the bundled CLI (signed in, 2026-10-10), about $0.09 a routing run. Ask the owner before any run.
+- **Evals are real model calls** on the owner's account. From the plugin: `claude plugin eval . --tag routing --ablation none --trust-plugin --no-publish --model claude-sonnet-5-5 --output-dir SCRATCHPAD` with the bundled CLI (signed in, 2026-10-10), about $0.09 a routing run. Ask the owner before any run.
 - **Commands you give the user** to run must work in cmd.exe. (The Commands block above is for the Bash tool.)
 - **Never run `npm ci` in a worktree whose `tooling/*/node_modules` is a junction**: it deletes the real toolchain through the link.
 - **The reader's copies.** `shared/project_config.py` and `shared/dtcg.py` have ten copies each, `shared/project_config.mjs` seven (`hooks/` among them). After a merge from a branch below, copy the three masters over every copy: git merges each copy on its own.

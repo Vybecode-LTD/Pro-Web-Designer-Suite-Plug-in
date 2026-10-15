@@ -16,7 +16,7 @@ The canonical implementation is `tokens.css` in the `web-design-studio` skill.
 6. **Semantic before primitive.** Components read Tier-2 roles (`--pad-card`), never Tier-1 primitives (`--space-6`).
 7. **Density is a dial.** Compactness is `--density` (0.875 / 1 / 1.125), not a second set of styles.
 8. **Novel patterns pass the gate.** Nothing ships that a first-time user cannot operate with a keyboard.
-9. **Nothing ships un-audited.** `python -m scripts.audit_design <path>` exits clean.
+9. **Nothing ships un-audited.** `python -m scripts.audit_design PATH` exits clean.
 
 ---
 

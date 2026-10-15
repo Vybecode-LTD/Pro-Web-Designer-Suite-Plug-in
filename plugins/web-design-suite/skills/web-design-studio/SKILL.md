@@ -13,7 +13,7 @@ description: Build design systems and front-end architecture enforced by an audi
 > python "${CLAUDE_SKILL_DIR}/scripts/generate_color_ramp.py" "#e8440a" --name accent --format css
 > ```
 >
-> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
 > This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (audit_design.py, check_roles.py, generate_color_ramp.py, generate_type_scale.py, tw_probe.mjs).
@@ -49,7 +49,7 @@ These are the whole skill compressed. Everything in `references/` is one of them
 
 **8. Novel patterns pass the gate.** Invention is expected. Shipping something a first-time user cannot operate with a keyboard is not. Every invented pattern clears the hard-fail checklist in `references/pattern-invention.md` before it enters a build.
 
-**9. Nothing ships un-audited.** `python -m scripts.audit_design <path>` must exit clean. Not "looks fine to me" — clean.
+**9. Nothing ships un-audited.** `python -m scripts.audit_design PATH` must exit clean. Not "looks fine to me" — clean.
 
 ---
 

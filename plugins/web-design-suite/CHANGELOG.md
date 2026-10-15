@@ -268,6 +268,17 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
   `test_diagnostics`, which also fails on a `_problems` or a `[0]` on `tokens()` or
   `normalise()` anywhere in the scripts.
+- **A placeholder in angle brackets broke the command it sat in** (the audit's D4, G13
+  and E14, and its class 9). `python -m scripts.audit_design <path> --json > audit.json`
+  reads `<path>` as a redirection, in cmd.exe and in bash alike, and 45 commands in the
+  skills, the references and the README were written so. A placeholder is now in
+  capitals (`PATH`, `RUN_ID`, a colour quoted as `"FOCUS"`); a11y-audit-runner's hook
+  recipe copies from `${CLAUDE_PLUGIN_ROOT}` instead of `<web-design-studio>`; and the
+  email quick start, which was `mkdir -p`, `cp` and `cat` with a `\` continuation, is a
+  copy step for Claude and three commands that paste into bash, PowerShell and cmd
+  (`test_docs.PlaceholdersInCapitals`, which reads every shell fence and inline command
+  in the skills, the references, the agents and the workflow commands, and the
+  repository's live docs).
 - **The router heard another domain's words as design work** (the audit's S3). "Deprecate
   the old JWT tokens" was sent to design-system-versioning, "migrate the session tokens
   to Redis" to design-token-migration, "token reference docs for the OAuth API" to

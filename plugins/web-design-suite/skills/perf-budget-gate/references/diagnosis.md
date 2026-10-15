@@ -315,7 +315,7 @@ Where the weight usually is, in the order you will find it:
 | A whole icon set for nine icons | 40–300 KB | Per-icon imports, or inline SVG |
 | A chart/editor/map library on a page that may not show it | 100–500 KB | Dynamic import behind the interaction |
 | A polyfill bundle for browsers you do not support | 30–80 KB | Raise the browserslist target and look at the diff |
-| Two versions of the same package | 2× that package | `npm ls <pkg>`, then dedupe or add an override |
+| Two versions of the same package | 2× that package | `npm ls PACKAGE`, then dedupe or add an override |
 | A "utils" barrel file defeating tree-shaking | varies | Import from the module, not the barrel |
 | Moment/lodash-style deep imports missed | 70 KB | `lodash-es` + named imports, or drop it |
 

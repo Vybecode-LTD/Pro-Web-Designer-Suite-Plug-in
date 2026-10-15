@@ -13,7 +13,7 @@ description: Keep Figma and code on one token vocabulary. Audits designs, genera
 > python "${CLAUDE_SKILL_DIR}/scripts/figma_audit.py" design/figma-variables.json
 > ```
 >
-> The commands below are written `python scripts/<name>.py`. That form is for a project that
+> The commands below are written `python scripts/NAME.py`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
 > This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (figma_audit.py, figma_to_tokens.py).
