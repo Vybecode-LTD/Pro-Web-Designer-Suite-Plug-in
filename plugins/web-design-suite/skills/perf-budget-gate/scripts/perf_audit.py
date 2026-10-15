@@ -83,10 +83,10 @@ from typing import Iterable, Iterator
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.perf_audit
-    from .project_config import ConfigError, config_path, project_config
+    from .project_config import read_text, ConfigError, config_path, project_config
 except ImportError:                               # python scripts/perf_audit.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import ConfigError, config_path, project_config  # type: ignore[no-redef]
+    from project_config import read_text, ConfigError, config_path, project_config  # type: ignore[no-redef]
 
 # ---------------------------------------------------------------------------
 # Configuration — the vocabulary this skill enforces.
@@ -1557,7 +1557,7 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
         if ext not in SRC_EXT:
             return
         try:
-            text = fp.read_text(encoding="utf-8", errors="replace")
+            text = read_text(fp)
         except OSError:
             return
         try:

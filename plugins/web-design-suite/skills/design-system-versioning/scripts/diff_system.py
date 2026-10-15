@@ -79,11 +79,11 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.diff_system
-    from .project_config import (refuse_overwrite, CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract, is_dtcg,
+    from .project_config import (read_text, refuse_overwrite, CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract, is_dtcg,
                                  project_config, read_deprecations, read_tokens, replacement_of)
 except ImportError:                               # python scripts/diff_system.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import (refuse_overwrite, CONTRACT_SCHEMA, ConfigError, _dtcg,  # type: ignore[no-redef]
+    from project_config import (read_text, refuse_overwrite, CONTRACT_SCHEMA, ConfigError, _dtcg,  # type: ignore[no-redef]
                                 is_contract, is_dtcg, project_config, read_deprecations,
                                 read_tokens, replacement_of)
 
@@ -834,7 +834,7 @@ def _layers_from(paths: Sequence[Path]) -> List[str]:
     out: List[str] = []
     for p in paths:
         try:
-            text = p.read_text(encoding="utf-8-sig")
+            text = read_text(p)
         except OSError:
             continue
         for m in LAYER_STMT.finditer(text):
@@ -851,7 +851,7 @@ def _snapshot_from_css_vendored(paths: List[Path], label: str) -> Snapshot:
     overrides: Dict[str, List[Dict[str, Any]]] = {}
     themes: List[str] = ["light"]
     for p in paths:
-        decls, found_themes, layers = parse_token_css(p.read_text(encoding="utf-8-sig"))
+        decls, found_themes, layers = parse_token_css(read_text(p))
         for t in found_themes:
             if t not in themes:
                 themes.append(t)

@@ -75,10 +75,10 @@ from typing import Callable, Iterable, Iterator, Sequence
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.extract_literals
-    from .project_config import refuse_overwrite  # type: ignore[import-not-found]
+    from .project_config import read_text, refuse_overwrite  # type: ignore[import-not-found]
 except ImportError:                               # python scripts/extract_literals.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import refuse_overwrite   # type: ignore[no-redef]
+    from project_config import read_text, refuse_overwrite   # type: ignore[no-redef]
 
 # ---------------------------------------------------------------------------
 # What counts as source
@@ -1746,7 +1746,7 @@ def _stock_spacing(entry: Path) -> tuple[str, str]:
         theme = folder / "node_modules" / "tailwindcss" / "theme.css"
         if theme.is_file():
             try:
-                found = re.search(r"--spacing\s*:\s*([^;]+);", theme.read_text(encoding="utf-8"))
+                found = re.search(r"--spacing\s*:\s*([^;]+);", read_text(theme))
             except OSError:
                 break
             if found:
@@ -1772,7 +1772,7 @@ def tailwind_spacing(entry: Path) -> TwSpacing | None:
             return
         seen.add(key)
         try:
-            css = blank_css_comments(sheet.read_text(encoding="utf-8", errors="replace"),
+            css = blank_css_comments(read_text(sheet),
                                      slash_comments=False)
         except OSError:
             unread.append(norm_path(sheet))
@@ -1875,7 +1875,7 @@ def tailwind_theme(paths: Sequence[str], *, include_vendor: bool,
         if fp.suffix.lower() not in (".css", ".pcss"):
             continue
         try:
-            head = fp.read_text(encoding="utf-8", errors="replace")
+            head = read_text(fp)
         except OSError:
             continue
         if "tailwindcss" in head:
@@ -1927,7 +1927,7 @@ def extract(paths: Sequence[str], *, include_vendor: bool = False,
                          include_tokens=include_tokens,
                          vendor_skipped=vendor_skipped, unread=unread):
         try:
-            text = fp.read_text(encoding="utf-8", errors="replace")
+            text = read_text(fp)
         except OSError as exc:
             problems.append(f"{fp}: unreadable ({exc})")
             continue

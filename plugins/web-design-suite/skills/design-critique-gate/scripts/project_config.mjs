@@ -64,7 +64,7 @@ export function findConfig(start = process.cwd()) {
 // in bytes: UTF-32 or UTF-16 by their byte-order marks, UTF-8 with or without
 // one, and UTF-16 or UTF-32 of either order without one, by where the zero
 // bytes fall (Codex on #81: a UTF-16BE file was refused here and read there).
-function jsonText(buf) {
+function jsonText(buf, fatal = true) {
   const starts = (...bytes) => buf.length >= bytes.length && bytes.every((b, i) => buf[i] === b);
   let enc = 'utf-8';
   let skip = 0;
@@ -86,8 +86,8 @@ function jsonText(buf) {
     }
     return text;
   }
-  if (enc === 'utf-16be') return new TextDecoder('utf-16le', { fatal: true }).decode(Buffer.from(body).swap16());
-  return new TextDecoder(enc, { fatal: true, ignoreBOM: true }).decode(body);
+  if (enc === 'utf-16be') return new TextDecoder('utf-16le', { fatal }).decode(Buffer.from(body).swap16());
+  return new TextDecoder(enc, { fatal, ignoreBOM: true }).decode(body);
 }
 
 // A JSON file as Python's json reads bytes (jsonText). The hooks read a config
@@ -438,7 +438,7 @@ function* cssBlocks(source) {
 function cssTokens(file) {
   let text;
   try {
-    text = fs.readFileSync(file).toString('utf8').replace(/^﻿/, '');
+    text = jsonText(fs.readFileSync(file), false);   // UTF-16 too, as decode_text() (S8)
   } catch (err) {
     throw new ConfigError(`${file}: ${err.code === 'ENOENT' ? 'No such file or directory' : err.message}`);
   }

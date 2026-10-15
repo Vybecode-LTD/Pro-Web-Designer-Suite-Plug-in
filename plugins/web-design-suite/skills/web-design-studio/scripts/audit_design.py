@@ -271,6 +271,14 @@ SASS_VARIABLE_REF = re.compile(r"(?<![\w-])(?:[\w-]+\.)?\$[\w-]+")      # $space
 SASS_INTERPOLATION = re.compile(r"#\{([^{}]*)\}")
 
 
+def _read_text(path: Path) -> str:
+    """A project's text file in the encoding json.detect_encoding() finds: a
+    UTF-16 file (PowerShell 5.1's `>`) read as UTF-8 was garbage (class 4).
+    project_config.read_text(), kept here so this script runs on its own."""
+    raw = Path(path).read_bytes()
+    return raw.decode(json.detect_encoding(raw), errors="replace")
+
+
 def sass_as_css(value: str) -> str:
     """`value` as the CSS it stands for, as far as the audit can tell: each
     Sass variable read as a token, and each interpolation as the expression
@@ -2367,7 +2375,7 @@ def audit_run(paths: list[str]) -> tuple[list[Finding], int, list[tuple[Path, st
         try:
             # utf-8-sig: PowerShell 5.1's Set-Content -Encoding utf8 writes a
             # BOM, and a BOM before `@layer` read as a rule outside any layer.
-            text = fp.read_text(encoding="utf-8-sig", errors="replace")
+            text = _read_text(fp)
         except OSError:
             continue
         if kind == "template" and is_html_email(text):

@@ -343,6 +343,15 @@ BARE_URL = re.compile(r"^\s*(https?://|www\.)\S*\s*$", re.I)
 # Findings
 # ---------------------------------------------------------------------------
 
+
+def _read_text(path: Path) -> str:
+    """A project's text file in the encoding json.detect_encoding() finds: a
+    UTF-16 file (PowerShell 5.1's `>`) read as UTF-8 was garbage (class 4).
+    project_config.read_text(), kept here so this script runs on its own."""
+    raw = Path(path).read_bytes()
+    return raw.decode(json.detect_encoding(raw), errors="replace")
+
+
 @dataclass
 class Finding:
     file: str
@@ -1705,7 +1714,7 @@ def audit_run(paths: list[str], leave=None, left: list[Path] | None = None) -> t
             skipped.append(fp)
             continue
         try:
-            text = fp.read_text(encoding="utf-8", errors="replace")
+            text = _read_text(fp)
         except OSError:
             continue
         if any(mark in text[:800] for mark in GENERATED_MARKERS):

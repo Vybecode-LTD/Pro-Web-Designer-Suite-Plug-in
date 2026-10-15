@@ -77,10 +77,10 @@ from typing import Iterable
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.build_email
-    from .project_config import refuse_overwrite, ConfigError, config_path, project_config
+    from .project_config import read_text, refuse_overwrite, ConfigError, config_path, project_config
 except ImportError:                               # python scripts/build_email.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import refuse_overwrite, ConfigError, config_path, project_config  # type: ignore[no-redef]
+    from project_config import read_text, refuse_overwrite, ConfigError, config_path, project_config  # type: ignore[no-redef]
 
 GMAIL_CLIP_BYTES = 102_400  # 100 KiB. Verified figure — see the matrix reference.
 GMAIL_STYLE_BYTES = 16_384  # Gmail's ceiling on all <style> content, counted together.
@@ -1324,7 +1324,7 @@ def main(argv: list[str] | None = None) -> int:
 
     source_path = Path(args.source)
     try:
-        source = source_path.read_text(encoding="utf-8")
+        source = read_text(source_path)
     except OSError as exc:
         print("error: cannot read %s: %s" % (source_path, exc), file=sys.stderr)
         return 2

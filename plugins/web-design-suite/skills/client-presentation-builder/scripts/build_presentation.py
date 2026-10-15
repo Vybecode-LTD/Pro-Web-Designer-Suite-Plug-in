@@ -79,10 +79,10 @@ from typing import Any
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.build_presentation
-    from .project_config import refuse_overwrite, ConfigError, is_contract, project_config
+    from .project_config import read_text, refuse_overwrite, ConfigError, is_contract, project_config
 except ImportError:                               # python scripts/build_presentation.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import refuse_overwrite, ConfigError, is_contract, project_config  # type: ignore[no-redef]
+    from project_config import read_text, refuse_overwrite, ConfigError, is_contract, project_config  # type: ignore[no-redef]
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 
@@ -622,7 +622,7 @@ def _md_table(block: list[str]) -> list[list[str]]:
 def load_defence(path: Path) -> DefenceFacts:
     """Consume `critique_report.py --format defence`. Do not re-derive it."""
     try:
-        text = path.read_text(encoding="utf-8")
+        text = read_text(path)
     except OSError as exc:
         raise BuildError(f"cannot read {path}: {exc}") from exc
 
@@ -691,7 +691,7 @@ def load_screenshots(directory: Path) -> tuple[list[Shot], list[tuple[Shot, Shot
         caption_file = p.with_suffix(".txt")
         caption = ""
         if caption_file.exists():
-            caption = caption_file.read_text(encoding="utf-8").strip()
+            caption = read_text(caption_file).strip()
         if not caption:
             caption = re.sub(r"^\d+[-_. ]*", "", group or stem)
             caption = caption.replace("-", " ").replace("_", " ").strip()
@@ -2749,14 +2749,14 @@ def find_tokens(explicit: str | None, configured: list[Path] | None = None) -> t
             raise BuildError(f"the project's .design-suite.json lists {', '.join(missing)}, "
                              "which does not exist")
         if css:
-            return ("\n".join(p.read_text(encoding="utf-8") for p in css),
+            return ("\n".join(read_text(p) for p in css),
                     ", ".join(str(p) for p in css))
     candidates.append(SKILL_ROOT / "assets" / "deck-tokens.css")
     candidates.append(SKILL_ROOT.parent / "web-design-studio" / "assets" /
                       "starter" / "styles" / "tokens.css")
     for c in candidates:
         if c.exists():
-            return c.read_text(encoding="utf-8"), str(c)
+            return read_text(c), str(c)
     raise BuildError(
         "no tokens.css found. Pass --tokens path/to/tokens.css — the deck is "
         "built on the same token contract as the work it presents.")
@@ -2843,7 +2843,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"{log_path} does not exist. Start from "
                 f"assets/DECISION_LOG.md — the deck is assembled from it, "
                 f"not invented the night before.")
-        log = parse_decision_log(log_path.read_text(encoding="utf-8"), log_path)
+        log = parse_decision_log(read_text(log_path), log_path)
         if not log.decisions:
             raise BuildError(
                 f"{log_path} contains no decisions. The parser expects "
@@ -2875,7 +2875,7 @@ def main(argv: list[str] | None = None) -> int:
             manual_path = Path(args.manual)
             if not manual_path.exists():
                 raise BuildError(f"{manual_path} does not exist (--manual).")
-            inp.manual = manual_path.read_text(encoding="utf-8")
+            inp.manual = read_text(manual_path)
 
         # A flag beats the project's .design-suite.json (P24).
         config = None if args.tokens else project_config()

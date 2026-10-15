@@ -69,10 +69,10 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.deprecate
-    from .project_config import ConfigError, read_deprecations, refuse_overwrite, replacement_of
+    from .project_config import read_text, text_encoding, ConfigError, read_deprecations, refuse_overwrite, replacement_of
 except ImportError:                               # python scripts/deprecate.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import ConfigError, read_deprecations, refuse_overwrite, replacement_of  # type: ignore[no-redef]
+    from project_config import read_text, text_encoding, ConfigError, read_deprecations, refuse_overwrite, replacement_of  # type: ignore[no-redef]
 
 LEDGER_SCHEMA = "design-system-versioning/deprecations@1"
 MAPPING_SCHEMA = "design-token-migration/mapping@1"
@@ -220,15 +220,20 @@ TS_EXT = {".ts", ".tsx", ".js", ".jsx", ".mjs"}
 class Injection:
     path: str
     line: int
-    action: str          # inserted | replaced | already-current | not-found
+    action: str          # inserted | replaced | already-current | not-found | unreadable
 
 
 def inject_marker(path: Path, entry: Dict[str, Any]) -> Injection:
     # Read and written as the bytes are (H1, the 2026-10-14 audit): universal
     # newlines turned one marker line into a whole-file diff, LF to CRLF on
     # Windows and CRLF to LF elsewhere. The marker takes the file's own ending.
-    with open(path, encoding="utf-8", newline="") as fh:
-        text = fh.read()
+    # And in its own encoding: a UTF-16 file was a traceback (class 4).
+    raw = path.read_bytes()
+    codec, bom = text_encoding(raw)
+    try:
+        text = raw[len(bom):].decode(codec)
+    except UnicodeDecodeError:
+        return Injection(str(path), 0, "unreadable")
     lines = text.splitlines(keepends=True)
     target = locate(lines, entry, path.suffix.lower())
     if target is None:
@@ -244,16 +249,15 @@ def inject_marker(path: Path, entry: Dict[str, Any]) -> Injection:
         if prev == line:
             return Injection(str(path), idx + 1, "already-current")
         lines[idx - 1] = line
-        _write_as_read(path, "".join(lines))
+        _write_as_read(path, "".join(lines), codec, bom)
         return Injection(str(path), idx + 1, "replaced")
     lines.insert(idx, line)
-    _write_as_read(path, "".join(lines))
+    _write_as_read(path, "".join(lines), codec, bom)
     return Injection(str(path), idx + 2, "inserted")
 
 
-def _write_as_read(path: Path, text: str) -> None:
-    with open(path, "w", encoding="utf-8", newline="") as fh:
-        fh.write(text)
+def _write_as_read(path: Path, text: str, codec: str = "utf-8", bom: bytes = b"") -> None:
+    path.write_bytes(bom + text.encode(codec))
 
 
 def locate(lines: Sequence[str], entry: Dict[str, Any],
@@ -514,7 +518,7 @@ def scan_one(root: Path, entry: Dict[str, Any]) -> List[Hit]:
     hits: List[Hit] = []
     for path in iter_files(root):
         try:
-            text = path.read_text(encoding="utf-8")
+            text = read_text(path)
         except (OSError, UnicodeDecodeError):
             continue
         if name not in text:
@@ -643,9 +647,13 @@ def cmd_add(args: argparse.Namespace) -> int:
         verb = {"inserted": "marker inserted", "replaced": "marker updated",
                 "already-current": "marker already current",
                 "dry-run": "marker would be injected",
-                "not-found": "MARKER NOT PLACED"}[inj.action]
+                "not-found": "MARKER NOT PLACED", "unreadable": "MARKER NOT PLACED"}[inj.action]
         where = f"{inj.path}:{inj.line}" if inj.line else inj.path
         print(f"  {verb:<26}{where}")
+        if inj.action == "unreadable":
+            print(f"      the file is not text in an encoding this script reads. "
+                  f"Add the marker by hand:")
+            print(f"      /* {marker_text(entry)} */")
         if inj.action == "not-found":
             print(f"      could not find a declaration of {entry['name']} in "
                   f"that file. Add the marker by hand:")

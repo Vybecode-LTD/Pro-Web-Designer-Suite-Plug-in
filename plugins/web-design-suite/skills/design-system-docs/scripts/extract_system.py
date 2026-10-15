@@ -64,10 +64,10 @@ SCHEMA = "design-system-docs/system/1"
 # suite's scripts through one module, shared/project_config.py, of which this
 # is a copy.
 try:                                              # python -m scripts.extract_system
-    from .project_config import CONTRACT_SCHEMA, ConfigError, is_contract, refuse_overwrite, token_sources
+    from .project_config import read_text, CONTRACT_SCHEMA, ConfigError, is_contract, refuse_overwrite, token_sources
 except ImportError:                               # python scripts/extract_system.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import CONTRACT_SCHEMA, ConfigError, is_contract, refuse_overwrite, token_sources  # type: ignore[no-redef]
+    from project_config import read_text, CONTRACT_SCHEMA, ConfigError, is_contract, refuse_overwrite, token_sources  # type: ignore[no-redef]
 
 # ===========================================================================
 # 1. COLOR MATH
@@ -1526,7 +1526,7 @@ class Extractor:
     # -- tokens -----------------------------------------------------------
     def read_tokens(self, files: Sequence[Path]) -> None:
         for path in files:
-            cf = CssFile(self.rel(path), path.read_text(encoding="utf-8-sig"))
+            cf = CssFile(self.rel(path), read_text(path))
             self.token_files.append(cf)
         base_env: Dict[str, str] = {}
         overrides: Dict[str, List[Dict[str, Any]]] = {}
@@ -1697,12 +1697,12 @@ class Extractor:
     # -- components -------------------------------------------------------
     def read_components(self, css_files: Sequence[Path], prop_files: Sequence[Path]) -> None:
         for path in css_files:
-            self.component_files.append(CssFile(self.rel(path), path.read_text(encoding="utf-8-sig")))
+            self.component_files.append(CssFile(self.rel(path), read_text(path)))
         self.components = parse_components(self.component_files, self.resolvers)
 
         prop_index: Dict[str, Dict[str, Any]] = {}
         for path in prop_files:
-            text = path.read_text(encoding="utf-8-sig")
+            text = read_text(path)
             for entry in parse_props_file(self.rel(path), text):
                 prop_index[kebab(entry["component"])] = entry
             self.prop_files.append(self.rel(path))
