@@ -48,7 +48,7 @@
 - **Codex finds the next case of a class every round.** #136 took 12 findings over two rounds, all of the form "the guard compares the spelling, not the file read". For P53's other classes, list every way each script finds its inputs before writing the fix: globs, folders, the config's paths, defaults, bundled assets and URLs.
 - **CodeRabbit is optional** (the owner): never wait for it, and fix its real findings when it posts them. It ran out of free reviews on #136.
 - **A merge commit made with `-m` and then committed with `--no-edit` after conflicts** keeps git's `# Conflicts:` list after the `Co-Authored-By:` line (`97e5c31`). Harmless, but write the message with `git commit -F` after resolving instead.
-- **The audit session's worktree is still registered:** `…\3985bfd1-…\scratchpad\wt`, detached at `9391774`. Its fixtures (`migration\fx1..fx7` and the others) are still there, and they were what showed H14 was a staged-against-HEAD case, not a rebase. Remove it with `git worktree remove` once P53 to P55 no longer need them.
+- **The audit session's worktree is still registered:** `…\3985bfd1-…\scratchpad\wt`, detached at `9391774`. Its fixtures (`migration\fx1..fx7` and the others) are still there, and they were what showed H14 was a staged-against-HEAD case, not a rebase. Once P53 to P55 no longer need them, remove it with `git worktree remove "C:\Users\vybec\AppData\Local\Temp\claude\C--DEV-Pro-Web-Designer-Suite-Plug-in\3985bfd1-4280-462b-8333-0e682826a220\scratchpad\wt"`, which works in cmd.exe too.
 - **Still open from earlier:**
   - Vue's `:style` binding is not read by the audit's `style=""` reader (P54);
   - the `VitalsUnderCsp` flake on Windows with Python 3.14, and the TBT flake on macOS;
