@@ -16,7 +16,7 @@ python -m scripts.extract_literals ./src                 # read the census first
 python -m scripts.extract_literals ./src --format json -o literals.json
 
 python -m scripts.cluster_values literals.json -o ./proposal
-#   cluster_values: 68 rule(s) covering 103 occurrence(s); 16 need review; 23 need a design decision.
+#   cluster_values: 69 rule(s) covering 104 occurrence(s); 17 need review; 22 need a design decision.
 
 cp proposal/tokens.css src/styles/tokens.css && git commit -am "tokens.css"
 
@@ -24,14 +24,14 @@ for kind in color spacing type radius stroke duration shadow z-index tracking; d
   python -m scripts.apply_codemod ./src -m proposal/mapping.json --kind "$kind" --apply
   git commit -am "migrate: $kind"
 done
-#   91 replacements: color 30, spacing 24, type 10, radius 9, stroke 5, duration 5, shadow 4, z-index 4
+#   92 replacements: color 30, spacing 25, type 10, radius 9, stroke 5, duration 5, shadow 4, z-index 4
 ```
 
 | | Before | After |
 |---|---:|---:|
-| Audit errors | 119 | **37** |
+| Audit errors | 119 | **36** |
 | Audit warnings | 4 | 4 |
-| L1 Tokens or nothing | 103 | **24** |
+| L1 Tokens or nothing | 103 | **23** |
 | L3 The scale is closed | 5 | **2** |
 | L2 Parents own the gaps | 3 | 3 |
 | L4 One home per component | 2 | 2 |
@@ -39,7 +39,7 @@ done
 
 L1 and L3 collapse; L2, L4 and L5 do not move at all, because those are phases 4e–4g and nothing has been done to them yet. **That shape is what a correct run looks like.** A migration that claims to have fixed all five laws in one codemod has either deleted something or is not measuring.
 
-The 37 remaining errors are, in full:
+The 36 remaining errors are, in full:
 
 | Count | Finding | Waiting on |
 |---:|---|---|
@@ -51,7 +51,7 @@ The 37 remaining errors are, in full:
 | 2 | `L3 tw-arbitrary` | `py-[3px]` and `text-[11px]` — both reported |
 | 2 | `L4 inline-style` | Phase 4f — hand work, a class name each |
 | 2 | `L1 raw-weight` | The weights beside those raw sizes; the `--type-*` role carries them |
-| 2 | `L1 raw-size` | `max-width: 1140px` and `560px`: a width token is a decision |
+| 1 | `L1 raw-size` | `560px`: no width step is within 24px, so a width token is a decision. (`max-width: 1140px` became `--width-content`, a 12px move in the review list.) |
 | 1 | `L1 raw-stroke` | `outline-offset: 2px` |
 | 1 | `L1 sass-literal` | `$gutter: 24px` |
 | 1 | `L5 important` | Phase 4g, after layers |

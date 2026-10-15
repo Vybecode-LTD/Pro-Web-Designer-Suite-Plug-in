@@ -142,17 +142,17 @@ Property first, value shape second. The property is authoritative because the sa
 
 | Kind | Decided by | Maps onto |
 |---|---|---|
-| `length` | property ∈ spacing/size set | The closed 4px scale → proximity ladder or inset roles |
+| `length` | property ∈ spacing/size set | The closed 4px scale → proximity ladder or inset roles; a width or height meets the `--width-*` steps first |
 | `radius` | property ∈ radius set | `--radius-*` |
 | `border-width` | property ∈ border-width set, or a length slot in a `border` shorthand | `--stroke-*` |
 | `font-size` | `font-size`, or `text-[…]` with a length | `--type-*` (whole-declaration rewrite) |
 | `line-height` | `line-height` with a bare ratio | Deleted — the `--type-*` role carries it |
-| `tracking` | `letter-spacing` | `--tracking-*` |
-| `color` | property ∈ color set, or a hex/`rgb()` slot anywhere | Ramp step → Tier-2 role |
+| `tracking` | `letter-spacing` | `--tracking-*` from an `em` value; a `px` one is a row to convert by hand, since a step is a share of the font size |
+| `color` | property ∈ color set, or a hex/`rgb()` slot anywhere | Ramp step → Tier-2 role, from a hex, `rgb()`, `hsl()` in degrees or a name; `oklch()`, `lab()`, `lch()`, `hwb()` and `color()` are rows to map by hand |
 | `shadow` | `box-shadow`, `text-shadow` | `--elevation-*` |
 | `duration` / `easing` | property ∈ motion set | `--dur-*` / `--ease-*`, preferably a `--motion-*` pair |
 | `z-index` | `z-index` | `--z-*` |
-| `color-function` | `darken()`, `lighten()`, `mix()`, `color.adjust()`, `color.scale()`, `color.change()` | A ramp step, by hand |
+| `color-function` | `darken()`, `lighten()`, `mix()`, `color.adjust()`, `color.scale()`, `color.change()`, and a `color-mix()` with a colour written out | A ramp step, or a mix of roles, by hand |
 
 **Shorthand slots get the property they actually set.** `padding: 9px 17px` is block padding and inline padding — two different decisions written on one line. Filing both as "padding" throws away the distinction the inset vocabulary is built on, and produces a mapping that turns a page gutter into a card inset. The slot count decides the pattern (1 → all, 2 → block/inline, 3 → block/inline/block, 4 → block/inline/block/inline), and the count includes `0` and `auto`, which is the bug most implementations have.
 

@@ -87,6 +87,7 @@ try:                                                # python -m scripts.apply_co
         SKIP_DIRS, is_vendor, is_token_file, GENERATED_MARKERS, norm_path,
         MARKUP_EXT, PLAIN_CSS_EXT, style_blocks, script_blocks, template_of, keep_only,
         Slot, split_slots, line_comments, TW_TOKEN_RE, tw_utility, class_list_spans, in_class_list,
+        NAMED_COLORS,
     )
 except ImportError:                                 # python scripts/apply_codemod.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -98,6 +99,7 @@ except ImportError:                                 # python scripts/apply_codem
         SKIP_DIRS, is_vendor, is_token_file, GENERATED_MARKERS, norm_path,
         MARKUP_EXT, PLAIN_CSS_EXT, style_blocks, script_blocks, template_of, keep_only,
         Slot, split_slots, line_comments, TW_TOKEN_RE, tw_utility, class_list_spans, in_class_list,
+        NAMED_COLORS,
     )
 
 LENGTH_RE = re.compile(r"^(-?\d*\.?\d+)(px|rem|em|pt|pc|in|cm|mm|q)$", re.IGNORECASE)
@@ -249,7 +251,9 @@ def slot_classes(prop: str, slots: Sequence[Slot]) -> List[str]:
 
 def is_color_slot(text: str) -> bool:
     t = text.strip().lower()
-    return bool(HEX_RE.match(t)) or bool(
+    # A named colour too: the census counts it and the proposal writes its
+    # rule, so a slot holding one must take that rule (H12).
+    return bool(HEX_RE.match(t)) or t in NAMED_COLORS or bool(
         re.match(r"^(rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(", t))
 
 

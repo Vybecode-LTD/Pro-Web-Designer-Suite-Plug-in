@@ -168,6 +168,36 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   list ends at its own closing paren now, a paren inside a string or a `$$…$$` body
   skipped (Codex on #133)
   (`test_schema_sources.MigrationsThatDumpsRewrite`).
+- **The migration's estimate left literals out, and counted rules that never fire** (H11,
+  H12). `cluster_values.py` put a colour it could not parse (`oklch()`, `lab()`, `lch()`,
+  `hwb()`, `color()`, `hsl(0.5turn …)`) and a `letter-spacing` in `px` in neither a rule
+  nor a row, so the reconciliation no longer added up to the census. Each is a row to map
+  by hand now. And `color: white` got a rule the codemod never applied, since a named
+  colour was no colour slot to it, and a hex inside `color-mix()` was counted with a rule
+  it could not apply. The codemod takes the census's named colours, and a `color-mix()`
+  with a colour written out is one colour function, mapped by hand. What the
+  reconciliation counts as mechanically replaceable is what `--apply` rewrites
+  (`test_token_migration.TheProposalAccountsForTheCensus`).
+- **A width never reached its width step** (H13). The proposal snapped a length to the 4px
+  scale, which ends at 192px, before trying `--width-form`, `--width-content` and
+  `--width-wide`, so `max-width: 1152px` was unmapped and every length past 195px read
+  "Decide between 192px and 192px". A width or height meets the width steps first, and
+  past the scale the advice says so
+  (`TheProposalAccountsForTheCensus.test_a_width_reaches_its_width_step`).
+- **A project's ramp step the proposal could not read was rebuilt without a word** (found
+  beside H11). A step in `hwb()`, or a translucent one, was built as if the project had
+  not declared it. The report names each such step now
+  (`test_project_config.ClusterValuesLandsOnTheProjectsRamps`).
+- **Six scripts wrote to a Windows pipe in the ANSI code page** (H15). `check_roles.py`
+  sent its verdict's dash as cp1252, and the five workflow commands' scripts had no UTF-8
+  reconfigure either. The test that ran every script's `--help` could not see it, since no
+  help holds a non-ASCII byte. Every entry script's `__main__` block is read for the
+  reconfigure now, with a control that proves the scan fires, and the workflow commands
+  are covered (`test_utf8_output`).
+- **The Pydantic test skipped on every CI cell** (H15). The suite runs under `uv run
+  --no-project`, which has no pydantic, so the scaffold's model never met Pydantic in CI.
+  A step of its own runs that test with `pydantic>=2,<3`, and `WDS_REQUIRE_PYDANTIC` fails
+  it there rather than skipping (`test_scaffold.TheServerSchemaMirrorsTheConstraints`).
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
   too. It is a width and a height, so it is a size: reported when no `--width-*` role
