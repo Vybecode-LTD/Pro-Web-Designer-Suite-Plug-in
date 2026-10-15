@@ -88,7 +88,7 @@
     "--fg-on-accent":  { "value": "var(--neutral-0)",   "tier": 2, "status": "survives", "contrast": "4.91:1 on --bg-accent" },
     "--fg-on-inverse": { "value": "var(--neutral-50)",  "tier": 2, "status": "survives", "contrast": "17.32:1 on --bg-inverse" },
     "--fg-accent":     { "value": "var(--accent-700)",  "tier": 2, "status": "survives", "contrast": "7.28:1 on --bg-surface" },
-    "--fg-link":       { "value": "var(--accent-700)",  "tier": 2, "status": "survives", "contrast": "7.28:1 on --bg-surface, 6.92:1 on --bg-canvas" },
+    "--fg-link":       { "value": "var(--accent-700)",  "tier": 2, "status": "survives", "contrast": "7.27:1 on --bg-surface, 6.90:1 on --bg-canvas" },
 
     "--border-subtle":  { "value": "var(--neutral-200)", "tier": 2, "status": "survives" },
     "--border-default": { "value": "var(--neutral-300)", "tier": 2, "status": "survives" },

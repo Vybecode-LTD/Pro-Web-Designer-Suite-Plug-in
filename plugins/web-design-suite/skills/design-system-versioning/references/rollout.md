@@ -230,7 +230,7 @@ The thing a canary catches that a test suite cannot is **what the guide forgot t
 Rolling back a design-system upgrade is cheap **if** the upgrade was one commit and the pin was exact:
 
 ```bash
-git revert <the upgrade commit>   # version bump, codemod and baselines together
+git revert UPGRADE_COMMIT   # version bump, codemod and baselines together
 npm ci
 ```
 

@@ -13,7 +13,7 @@ description: Test a site against WCAG 2.2 AA with axe-core, keyboard, focus, con
 > python "${CLAUDE_SKILL_DIR}/scripts/a11y_static.py" src/
 > ```
 >
-> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
 > This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (a11y_runtime.mjs, a11y_static.py).
@@ -85,12 +85,12 @@ Existing debt is frozen; new violations fail immediately. **A gate that fails on
 Wire it into the design gate's hook — one hook, both gates, and the commit is refused if either fails. Use the shipped hook rather than a hand-written one: it quotes file names with spaces, skips files that are not code, and reports every gate's verdict.
 
 ```bash
-cp <web-design-studio>/assets/configs/pre-commit-design-gate.sh .git/hooks/pre-commit
-cp <web-design-studio>/assets/configs/pre-commit-design-gate.sh .git/hooks/commit-msg   # records bypasses
+cp "${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/assets/configs/pre-commit-design-gate.sh" .git/hooks/pre-commit
+cp "${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/assets/configs/pre-commit-design-gate.sh" .git/hooks/commit-msg   # records bypasses
 mkdir -p scripts
-cp <web-design-studio>/scripts/audit_design.py scripts/        # Law 9
-cp <web-design-studio>/scripts/project_config.py scripts/      # its .design-suite.json reader
-cp <a11y-audit-runner>/scripts/a11y_static.py scripts/         # the accessibility floor
+cp "${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py" scripts/     # Law 9
+cp "${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/project_config.py" scripts/   # its .design-suite.json reader
+cp "${CLAUDE_SKILL_DIR}/scripts/a11y_static.py" scripts/                                  # the accessibility floor
 ```
 
 The hook runs `a11y_static` on the staged files whenever `scripts/a11y_static.py` is present (set `DESIGN_GATE_A11Y_MODULE` if you keep it elsewhere). A hand-rolled `.githooks/pre-commit` with no shebang does not run at all under Git for Windows, and one without `set -e` passes whenever its LAST command passes.

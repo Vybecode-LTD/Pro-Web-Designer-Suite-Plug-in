@@ -198,7 +198,7 @@ Why that shape:
 - **Two rings: a 2px gap in the canvas color, then a 2px ring in `--border-focus`.** The canvas gap is what makes it legible on a dark button, a photo, or an accent fill: the indicator never sits directly against the component's own color.
 - **The ring is an `outline`, not a `box-shadow`.** A component that draws its own `box-shadow` — a button's elevation, a card's shadow — sits in a later layer and replaces any ring drawn with `box-shadow`, so the keyboard user sees nothing (2.4.7). No component sets `outline`, so this ring survives all of them; a component with its own shadow loses only the gap.
 - **It satisfies 2.4.13's geometry**: the accent ring is a 2px-thick perimeter around the whole component, which is the minimum area the criterion asks for.
-- **It satisfies the 3:1 contrast requirement.** `--border-focus` is `--accent-600`; measured against `--bg-canvas` it is **4.67:1** in light mode and **4.23:1** in dark (where `--border-focus` is deliberately *not* re-pointed, and does not need to be). Against `--bg-surface` in light mode it is 4.92:1. Verify any change with `python -m scripts.generate_color_ramp --check '<focus>' '<adjacent>'`.
+- **It satisfies the 3:1 contrast requirement.** `--border-focus` is `--accent-600`; measured against `--bg-canvas` it is **4.66:1** in light mode and **4.23:1** in dark (where `--border-focus` is deliberately *not* re-pointed, and does not need to be). Against `--bg-surface` in light mode it is 4.91:1. Verify any change with `python -m scripts.generate_color_ramp --check "FOCUS" "ADJACENT"`.
 - **Forced colors keep it.** In forced-colors mode `box-shadow` is discarded, so a shadow-only ring vanishes completely; an outline is repainted in a system color and stays. That is the difference between a working and a non-existent focus ring for Windows High Contrast users (`accessibility-testing.md` §3).
 
 **Never `outline: none` without a replacement in the same rule.** If you find one, the fix is not to add the outline back at a different specificity; the fix is to delete the reset.
@@ -408,7 +408,7 @@ Check any pair:
 
 ```bash
 python -m scripts.generate_color_ramp --check 'oklch(56.5% 0.176 42)' 'oklch(98.2% 0.003 75)'
-# → 4.67:1  (--border-focus on --bg-canvas)
+# → 4.66:1  (--border-focus on --bg-canvas)
 ```
 
 ---
