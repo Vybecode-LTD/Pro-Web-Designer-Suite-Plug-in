@@ -1233,7 +1233,9 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     saw_layer_statement = True
                     layer_statement_line = ev[2]
                     declared = [s.strip() for s in stmt[6:].strip().rstrip(";").split(",")]
-                    stated_layers.update(declared)
+                    # A dotted name declares its parent too, as in stylelint
+                    # (CodeRabbit on #145): `legacy.skin` places `legacy`.
+                    stated_layers.update(declared, (d.split(".")[0] for d in declared))
                     # A sub-layer names its parent where it stands
                     # (`components.skin` before `base` ranks components
                     # first), and a name's first mention fixes it (Codex on #145).
