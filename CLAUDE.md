@@ -12,14 +12,14 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is public (since 2026-09-28), and MIT-licensed like the plugin.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
-## Current state (2026-10-14, second session)
+## Current state (2026-10-15)
 
 - **Version:** 3.6.0 is the latest release (`v3.6.0`, `d91a146`, published by `release.yml`). It completes Phase 6a (#101 to #123): DTCG 2025.10, Tokens Studio and the resolver; Figma on every plan, with each plan's mode limits; `light-dark()`; modern CSS; the migration census of every style source; and Prisma and Drizzle. R3.6's live check is `dev plans/web-design-suite-3.6.0-live-check.md`.
 - **Installed:** 3.6.0, from the release zip (2026-10-13). The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`, but sessions load `C:\Users\vybec\.claude\plugins\cache\web-design-suite\web-design-suite\<version>`, which `claude plugin update` refreshes only when the version changes.
-- **Tests:** about 1,177. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
+- **Tests:** about 1,198. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
 - **Evals:** 23 routing cases and 11 outcome cases. `evals.yml` runs both only by hand (`tag=all`), under one $14 ceiling; the dispatch before a release's tag gates it, and a tag starts no run (the owner, 2026-10-11). The outcome cases grant Write, Edit and the gate MCP tools, never Bash. In `claude-code-capabilities.md`, §1 is the evals page, §10 P29's choices, and §11 the sandboxing page and P30's choices.
-- **Active work:** 4.0.0. P36 (Tailwind v4, Phase 6b) is done: parts 1 to 4 merged by 2026-10-14 (#125 to #127, #129: the v4 census and N40, colours matched by family). The owner's audit of 2026-10-14 (`dev plans/web-design-suite-audit-2026-10-14.md`, 114 findings) is Phase 6c, N41 to N47, P50 to P55, before R4, and the owner placed all of it before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42, P43). #130 closed its C1, C2 and H1, #132 its H4 to H8 (P50 part 2) and #133 its H2, H3, H9 and H10 (P51). Next is P52 (the proposal's arithmetic and recipe, and two tests: H11 to H15). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
-- **Open:** 23 items, every one scheduled in the execution plan (`check_execution_plan.py`).
+- **Active work:** 4.0.0. P36 (Tailwind v4, Phase 6b) is done: parts 1 to 4 merged by 2026-10-14 (#125 to #127, #129: the v4 census and N40, colours matched by family). The owner's audit of 2026-10-14 (`dev plans/web-design-suite-audit-2026-10-14.md`, 114 findings) is Phase 6c, N41 to N47, P50 to P55, before R4, and the owner placed all of it before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42, P43). #130 closed its C1, C2 and H1, #132 its H4 to H8 (P50 part 2), #133 its H2, H3, H9 and H10 (P51), #135 its H11 to H15 (P52) and #136 the `--out` guard (P53 part 1: V7, E9, G4). Next is P53 part 2 (the JSON type guards: S1, V8, G3, G11, G15, E13, W6, S10). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Open:** 22 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
 

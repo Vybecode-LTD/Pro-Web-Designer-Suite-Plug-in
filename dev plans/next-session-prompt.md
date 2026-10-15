@@ -1,18 +1,16 @@
 # Start here: the next session
 
-**Written 2026-10-14**, at the end of the second session that day, which worked on **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Two PRs and this docs PR merged:
-- **#132, P50 part 2 (N42, the audit's H4 to H8)**, merged as `6257623`. The gates that passed what they should fail:
-  - `a11y_static` reads every CSS rule at any depth (`css_rules()`), so `outline: none` inside `@layer`, `@media` or `@supports` is seen. It also reads Vue's and Angular's bound attributes (`bound_attr()`).
-  - `generate_matrix` mirrors states inside `:is()` and `:where()`, and nested rules (`force_rules()`). A forced state is covered only when a mirror was written.
-  - The hook's `DESIGN_GATE_INDEX=1` carries the config and its baselines.
-  - The audit reads a style object's keys by entry (`style_object_keys()`).
-- **#133, P51 (N43, the audit's H2, H3, H9 and H10)**, merged as `f603b02`:
-  - `--reverse` names a theme's value it cannot carry, and exits 1.
-  - Three readers take a BOM.
-  - The schema reader replays `ALTER TYPE … ADD VALUE` and ends a table's column list at its own paren.
-- **Reviews:** #132 had 7 real findings (Codex 3 over two rounds, CodeRabbit 4) and #133 had 6 (Codex 3 over two rounds, CodeRabbit 3). All were fixed with tests failing on the head they reviewed.
+**Written 2026-10-15**, at the end of the session that did P52 and P53 part 1 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Two PRs and this docs PR merged:
+- **#135, P52 (N44, the audit's H11 to H15)**, merged as `a888fb5`. The migration's reconciliation adds up:
+  - every census literal is in a rule or an unmapped row: unparsed colours, `px` tracking, a project ramp step it cannot read;
+  - what it calls mechanically replaceable is what `--apply` rewrites: named colours, `color-mix()` as one colour function, a duration counted at one rule;
+  - a width (never a height) meets the `--width-*` steps first, and the codemod gives a width rule only to `width`, `min-width` and `max-width`;
+  - H14 did not reproduce: during a rebase `--ours` is HEAD, and a test runs the recipe;
+  - H15: the UTF-8 scan reads every entry script's `__main__` block with a control, six scripts gained the reconfigure, and CI runs the Pydantic test with `pydantic>=2,<3`.
+- **#136, P53 part 1 (N45, the `--out` guard: V7, E9, G4, class 5)**, merged as `7e59f90`. `refuse_overwrite()` and `refuseOverwrite()` in the masters, called by fifteen Python writers and two Node ones, against the files actually read.
+- **Reviews:** #135 had 3 real findings (Codex 2, CodeRabbit 1). #136 had 12 over two rounds (Codex), and one more declined with evidence. All were fixed with tests failing on the head they reviewed.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P52, the migration proposal's arithmetic and recipe, and two tests (the audit's H11 to H15)** (§4).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P53 part 2, the JSON type guards (the audit's S1, V8, G3, G11, G15, E13, W6, S10)** (§4).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -176,6 +174,12 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Normalise only what the branch can bear.** Keeping string whitespace for every statement broke the `.*` patterns on a label with a newline; the enum branches match an exact form with `re.S`, the rest the collapsed line (CodeRabbit on #133).
       - **A fix's test must fail on the old code.** The dollar-quote case passed on v3.6.0 until it had a table tail (CodeRabbit on #133). Run `fail_before.py` on `v3.6.0` for every new test, not only on the reviewed head.
       - **Ask Codex once after a round of fixes** (`@codex review`): it found more on #132 and #133's second round. Then merge when the next fixes are small and tested.
+    - **The 2026-10-15 session's reviews found 15 real issues:** #135 (Codex 2, CodeRabbit 1) and #136 (Codex 12 over two rounds). Each was fixed with a test failing on the head it reviewed. The lessons, for any guard over a script's inputs:
+      - **Guard the files read, not the arguments typed.** Every round on #136 found the next spelling: a glob's matches, the files under a folder, every file of a snapshot, the config's token files and budgets, screenshots and their captions, a manifest's templates, `--prose`, a bundled default, a `file://` URL. Before writing a guard, list every way the script finds an input, then guard where they are all known.
+      - **A proposal's rule meets files written after it.** A check over the literals the census saw does not protect a height added before the mapping is applied: the codemod must refuse it too (a `width` class of its own).
+      - **One literal, one rule.** A duration in a `transition` shorthand was counted at the `--motion-*` pair and at the Tier-1 step; count each where the codemod would rewrite it (`takes_motion_pair()` follows `plan_motion()`).
+      - **Run an audit finding's own fixture before fixing it.** H14's fixture staged a change against HEAD in a plain repository. The recipe stages HEAD's own version during a rebase, which is clean, so the finding did not reproduce.
+      - **Declined, with evidence:** Codex read `^[a-z][a-z0-9+.-]+:` as matching `C:\site`; it needs two characters before the colon, and `test_node_agrees` passes drive paths on Windows.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -227,7 +231,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `25 open items, 25 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `22 open items, 22 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
@@ -263,6 +267,21 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 - **The schema reader (#133).** `introspect_schema.one_line_outside_strings()` collapses whitespace outside string literals only. `RE_ALTER_ENUM_ADD` and `RE_ALTER_ENUM_RENAME` change an enum the files created; `enum_label()` unescapes `''`. `_balanced_slice()` skips strings and `$$` bodies, and ends a `CREATE TABLE`'s column list. `test_schema_sources.MigrationsThatDumpsRewrite`.
 - **`--reverse` and a theme (#133).** `reverse_body()` pass 3 adds a `dropped` problem (`"{token} [{Theme}]"`) for a theme's value that cannot cross; the exit is 1. `test_figma_sync.ReverseReadsEveryTokenFormat`.
 - **A BOM (#133).** `extract_system`, `build_docs` and `diff_system` read with `utf-8-sig`. `test_project_config.ABomOnTheTokenFile`. The wider encoding class (UTF-16, every script) is P53's.
+- **The reconciliation (#135).** `cluster_values` adds an `Unmapped` row for every census value it cannot place:
+  - a colour no cluster took (`clustered`);
+  - non-`em` tracking;
+  - a `color-mix()` colour function, with its own advice;
+  - `project_ramps()` names a step it cannot read, or a translucent one.
+
+  `takes_motion_pair()` follows `apply_codemod.plan_motion()`, so a duration counts at one rule. `WIDTH_PROPS` gates the `--width-*` snap, and a width rule's `prop_classes` is `["width"]`, which `apply_codemod.PROP_SLOT_CLASS` gives only `width`, `min-width` and `max-width`. `extract_literals.mixes_a_literal()` decides a `color-mix()`, claimed before the hex pass. `test_token_migration.TheProposalAccountsForTheCensus`, `ApplyCodemodDirtyGuard.test_the_rebase_recipe_migrates_the_teammates_version`.
+- **UTF-8 out (#135).** `test_utf8_output.writes_utf8()` reads each entry script's `__main__` block with `ast`: a `reconfigure(encoding="utf-8")` over `sys.stdout` and `sys.stderr` before `main()`. Scripts in `skills/*/scripts` and `workflow-commands/*/scripts`; a library has no `__main__` block. CI's "Pydantic runs the scaffold's model" step sets `WDS_REQUIRE_PYDANTIC`.
+- **The `--out` guard (#136).**
+  - `project_config.refuse_overwrite(out, *inputs)` returns the message, or None. It compares by `os.path.samefile` when both exist, else by normcased realpath, and skips `-`.
+  - `browser_common.refuseOverwrite(out, ...inputs)` does the same with `dev:ino` and a case fold on win32. It reads a `file://` URL as its file and a web URL as none.
+  - `critique_report.py` and `generate_matrix.py` carry the Python function verbatim (`TheGuardIsShared`).
+  - `diff_system.Snapshot.sources` lists every file a snapshot read. `generate_matrix.Manifest.templates_path` keeps the templates file.
+  - `test_out_guard.CASES` and `NODE_CASES` are the table: one row per writer and per way of finding an input.
+  - Not guarded, by decision: `figma_to_tokens` over `--tokens` (the Figma-to-code workflow), and the folder writers (`build_docs`, `scaffold_ui`, `new_system`) and snapshot writers.
 - **DTCG (#101, #102).** `shared/dtcg.py` is the master, copied beside every `project_config.py` (`test_dtcg.TheCopiesAreTheMaster`); `project_config.py` loads the copy beside it by path. `normalise()` (the Figma scripts' reading, string forms) and `tokens()` (lossless, CSS names) read 2025.10 and Tokens Studio (`studio_document`, `studio_themes`); `document()` writes 2025.10 from CSS custom properties. `project_config.mjs` ports the reading, numbers formatted as Python's `f"{round(x, 6):g}"`, and `TheNodeReaderAgrees` holds them equal on every value form. `figma_common.parse_studio` makes each Studio theme group a collection; `FVar` carries `deprecated`, `dtcg_type` and `partial`.
 - **The resolver (#105).** `dtcg.resolver_document(data, base, inputs, only)` merges a resolver's `resolutionOrder` for a choice of contexts (each modifier's string `default`, else its first, which is reported); `resolver_modifiers()`, `token_paths()`, `resolver()` (the writer), `outside()` and `file_loader()` (its real path must stay in the folder, else `OutsideFolder`). `figma_to_tokens.py --format dtcg --out-dir` writes `tokens.json`, `theme-<x>.json` or `density-<x>.json` (overrides only, `document(only=...)`) and `tokens.resolver.json`; `css_blocks()` and `figma_blocks()` feed `dtcg_files()`. `figma_common.parse_resolver()` makes each modifier a collection with `FCollection.kind`, and `mode_selector(mode, default, kind)` writes a theme or density context as the value itself (`css_escape`). Unreadable sources are `FDoc.unread` (`unread-source`, `UNREAD_SOURCE`). The Node port is `resolverDocument()` in `project_config.mjs`.
 - **The ledger (#106).** `project_config.read_deprecations(paths)` and `replacement_of(reason)`; `diff_system.marked_deprecations()` adds a record (`"marked"`) for each token the old DTCG snapshot marks; `deprecate.py import FILE… --since --removal`.
@@ -384,31 +403,59 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. Phase 6c, 4.0.0: the audit, from P52
+## 4. Phase 6c, 4.0.0: the audit, from P53 part 2
 
-**The owner placed all of Phase 6c first (2026-10-14).** Its order is P52, then P53 to P55, then Phase 6b's workstreams (ask the owner which comes first then). Keep each PR under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+**The owner placed all of Phase 6c first (2026-10-14).** Its order is P53's remaining classes, one PR each, then P54 and P55, then Phase 6b's workstreams (ask the owner which comes first then). Keep each PR under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P52 | The proposal's arithmetic and recipe, and two tests (audit H11 to H15) | N44 | `cluster_values.py`, `apply_codemod.py`, the migration references, the tests H15 names | M |
-| P53 | The cross-cutting classes, one PR each (audit §6 step 5, §7) | N45 | per class | L |
+| P53 | The cross-cutting classes, one PR each: the JSON type guards, the encoding readers, the discarded diagnostics, the cmd.exe placeholders, and each class's check (audit §7) | N45 | per class | L |
 | P54 | The medium findings, one PR per §3 area | N46 | per area | L |
 | P55 | The low findings and doc fixes | N47 | per area | M |
 | P34, P35, P37, P41, P42, P43 | Phase 6b's workstreams, after Phase 6c | see §4 of the plan | | |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-**P52 in detail.** Read the audit's H11 to H15 (its §2, lines 79 to 102) for the files, lines and fixes.
+**P53 part 2, the JSON type guards, in detail** (the audit's §3; its §7 class 6: "validate at load, exit 2 naming the key; a test per loader with `[]`, a string and a list where an object is expected").
 
-1. **H11, `cluster_values.py`.** The census counts `oklch()`, `hwb()`, `lab()`, `lch()`, `color()`, `hsl(0.5turn …)` and `letter-spacing: 1px`, but the proposal puts them in neither `rules` nor `unmapped` (`except ColorError: continue`; the non-`em` tracking `continue`). Emit an `Unmapped` row for each. Test: every census literal lands in a rule or an unmapped row.
-2. **H12, rules the codemod never applies.** `apply_codemod.is_color_slot` takes a hex or a function only, so `color: white` gets a rule that never fires. A hex inside `color-mix()` is counted before its span is claimed (`extract_literals.py`). Accept `NAMED_COLORS` in `is_color_slot`, and claim the `color-mix` span before the hex pass (or recurse into it). The "mechanically replaceable" count must equal what `--apply` rewrites.
-3. **H13, the width path.** `cluster_values` snaps to 4px before testing `klass == "size"` against `WIDTH_STEPS`, so `max-width: 1152px` never reaches `--width-content`, and the advice reads "Decide between 192px and 192px". Test `size` first; say "above the scale" past `SPACE_PX[-1]`.
-4. **H14, the rebase recipe.** `migration-strategies.md` (around lines 373 to 379) stages a file, then runs the codemod, which refuses a staged file (`dirty_files` takes every porcelain entry). Treat a fully staged file (`M `, `A `) as clean, or have the recipe pass `--force` and say why it is safe. Run the recipe in a test.
-5. **H15, two tests.** `test_utf8_output.test_every_script_writes_utf8_to_a_pipe` proves nothing: no script's `--help` holds a non-ASCII byte. Give it a positive control (the source calls the reconfigure helper, with a stub that proves the scan fires), and cover `workflow-commands/*/scripts`. The pydantic test in `test_scaffold.py` skips on every CI cell (`uv run --no-project`); give that class `--with pydantic` in `ci.yml`, with the major pinned.
-6. **Tests:** each fails on `v3.6.0` first. Then grep the plugin for the same construct (the audit's class 2), and run `check.py` with `WDS_NODE_MODULES` set. The CHANGELOG goes under 4.0.0's Fixed. Mark N44 done in the completion plan, and rename the `P52` row `P52, #N`.
+1. **S1.** `shared/dtcg.py` `convert` (about :214): a group `$type` that is not a string (`5`, `["color"]`, `true`) over an object value is an `AttributeError` traceback, not a `ConfigError`, in `read_tokens` and every gate above it. Node reads the file. Guard with `isinstance`, report a problem, and add a parity test in `TheNodeReaderAgrees`. **Copy `dtcg.py` over its ten copies.**
+2. **S10.** `dtcg.py` (about :563, :338-340): a `$deprecated` of any JSON type is carried as the reason. Take a string or a boolean (`false` cancels an enclosing group's deprecation, which `dtcg.py` handles and `test_dtcg` exercises), and report any other type (Codex on #137).
+3. **V8.** A non-object JSON top level (`[]`) is a traceback in `diff_system.load_ledger` (about :2069, exit 1, the gate's code), in `deprecate.py` (about :147), and in `build_docs.py` (about :1409 and :1445; the baseline is never shape-checked). `load_snapshot` already guards.
+4. **G3.** Budget values are not type-checked in `perf_audit.py` (about :1056 to :1218: `"css": "60KB"` is a `TypeError`, and a list section an `AttributeError`). `measure_vitals.mjs` (about :877-880) and `a11y_runtime.mjs` (about :2256-2257, :1753-1760) silently skip such a value; read their full text in the audit.
+5. **G11.** `critique_report.py` (about :341): `int(raw.get("count"))` sits outside `CritiqueError`, and at :318 `bool("false")` is true, which demotes a major finding to taste.
+6. **G15.** `a11y_static.py` (about :1764): a baseline that is not a list (`5`) is a `TypeError`. `perf_audit.load_baseline` (about :1189) crashes the same way.
+7. **E13.** `build_presentation.py` `load_perf` (about :450) and `load_a11y` (about :551-558) call `.get` on list items with no `isinstance` check (`load_audit` has one).
+8. **W6.** `check_roles.py`:
+   - about :249: a string `scopes` is iterated as characters (`bad pairs file: 'l'`);
+   - about :266: `min: "4.5"` is a `TypeError`, since :329 catches only `OSError`, `ValueError` and `KeyError`.
 
-- **The audit's fixtures** were in its session's scratchpad (`3985bfd1-…`), which Storage Sense can empty. Rebuild a case from the audit's text if it is gone.
+   Validate each pair, and exit 2.
+9. **The check (§7):** a table test like `test_out_guard`, one row per loader, each fed `[]`, `"x"`, `5` and a list where an object is expected. Each must exit 2 with the key named, never a traceback. **Before writing a guard, list every way the loader is reached** (a flag, the config, a default, a baseline), since Codex finds the next one each round.
+10. **Tests:** each fails on `v3.6.0` first. Grep the plugin for the same construct (the audit's class 2), and run `check.py` with `WDS_NODE_MODULES` set. The CHANGELOG goes under 4.0.0's Fixed. Add the row `P53 part 2, #N` above the `P53` row, and take the class out of the `P53` row's scope.
+
+**Then, one PR each:**
+- **The encoding readers** (S8, W7). `project_config.py` (about :473) and `.mjs` (about :441) decode CSS as UTF-8 only, so a UTF-16LE `tokens.css` reads as zero tokens. Decode by BOM or raise `ConfigError`. `check_roles.py` (about :321) gives a `UnicodeDecodeError` traceback on a UTF-16 file. Rule: `grep -n 'read_text(encoding="utf-8")'` should return nothing in the scripts.
+- **The discarded diagnostics** (S2, V11, V12, M9, and `diff_system`'s contrast check that skips a colour it cannot parse, `except ColorError: continue`, found beside H11):
+  - `project_config._dtcg_tokens` and `read_deprecations` drop `dtcg.tokens()`' problems;
+  - `figma_common.oklch_to_rgb` clamps silently in `--reverse`;
+  - an input whose only tokens are unsupported reads "contains no variables";
+  - a `GENERATED_MARKERS` file is dropped with no `Skip` row.
+- **The cmd.exe placeholders** (D4, G13, E14):
+  - `CLAUDE.md:44`'s `<ids>`;
+  - the `<export>` placeholder in this file's live-check command;
+  - `design-critique-gate/SKILL.md:210`'s `<path>`;
+  - the email skill's bash-only quick start.
+
+  Extend `test_docs.PasteableCommands` to every fenced block and inline command in `CLAUDE.md`, the SKILL.md files and the plans: placeholders in capitals, never `<…>`.
+
+- **The audit's fixtures** are in its session's scratchpad (`3985bfd1-…\scratchpad\migration\fx1..fx7`, `studio\`, `shared\fx`, …), which Storage Sense can empty. Run a finding's own fixture before fixing it (H14 did not reproduce). Rebuild a case from the audit's text if it is gone.
 - **Facts from outside** are re-read at the source on the day, and a figure goes into `evidence.json`.
-- **R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate), the release PR, the evals on its merge (the owner's OK, about $11, `headSha` checked), then the tag. Its live check covers Part 5's new block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, and the gates P50 changed (a Vue project's bound attributes, the index-mode hook).
+- **R4** follows R3.6's order:
+  - a live check of what changed (the owner's OK, with its estimate);
+  - the release PR;
+  - the evals on its merge (the owner's OK, about $11, with `headSha` checked);
+  - then the tag.
+
+  Its live check covers Part 5's new block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed (a Vue project's bound attributes, the index-mode hook), and the migration's reconciliation on a real codebase (P52).
 
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 
