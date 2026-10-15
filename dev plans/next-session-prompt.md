@@ -1,21 +1,18 @@
 # Start here: the next session
 
-**Written 2026-10-14**, at the end of the session that finished **P36** (Phase 6b) and took in **the owner's audit** (Phase 6c). Three PRs merged:
-- **#129, P36 part 4 (LC-B5's rest, N40).**
-  - The migration counts Tailwind v4's numeric classes (`p-4` at N × `--spacing`), maps them to roles and rewrites them.
-  - framework-migrations.md §5 has Move 1 in v4's form, compiled by a test.
-  - Colours are matched by family (a neutral, or a hue within 30°), then ΔE.
-- **#130, P50 part 1 (the audit's C1, C2 and H1).** The codemod's arbitrary-class match is bound on both ends. The codemod, `deprecate`'s marker and its ledger keep a file's line endings, and the dry run's diff is written as its bytes are.
-- **#131, this session's docs**, with the audit committed and scheduled.
-- **Reviews:**
-  - #129 had 7 real findings: Codex 4 over two rounds, CodeRabbit 2, CI 1.
-  - #130 had 1: Codex, the dry run's `\r\r\n` on Windows.
-  - All were fixed with tests failing on the head they reviewed.
-- **The owner's audit**, `dev plans/web-design-suite-audit-2026-10-14.md`, found 114 findings on `main` at `9391774`: 2 critical, 15 high, 49 medium, 48 low.
-  - It is scheduled as N41 to N47 (completion plan) and Phase 6c, P50 to P55 (execution plan), all before R4.
-  - The owner chose to commit it, and C1, C2 and H1 first.
+**Written 2026-10-14**, at the end of the second session that day, which worked on **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Two PRs and this docs PR merged:
+- **#132, P50 part 2 (N42, the audit's H4 to H8)**, merged as `6257623`. The gates that passed what they should fail:
+  - `a11y_static` reads every CSS rule at any depth (`css_rules()`), so `outline: none` inside `@layer`, `@media` or `@supports` is seen. It also reads Vue's and Angular's bound attributes (`bound_attr()`).
+  - `generate_matrix` mirrors states inside `:is()` and `:where()`, and nested rules (`force_rules()`). A forced state is covered only when a mirror was written.
+  - The hook's `DESIGN_GATE_INDEX=1` carries the config and its baselines.
+  - The audit reads a style object's keys by entry (`style_object_keys()`).
+- **#133, P51 (N43, the audit's H2, H3, H9 and H10)**, merged as `f603b02`:
+  - `--reverse` names a theme's value it cannot carry, and exits 1.
+  - Three readers take a BOM.
+  - The schema reader replays `ALTER TYPE … ADD VALUE` and ends a table's column list at its own paren.
+- **Reviews:** #132 had 7 real findings (Codex 3 over two rounds, CodeRabbit 4) and #133 had 6 (Codex 3 over two rounds, CodeRabbit 3). All were fixed with tests failing on the head they reviewed.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P50, the audit's gates (H4 to H8)**, after asking the owner where Phase 6c goes (§4).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P52, the migration proposal's arithmetic and recipe, and two tests (the audit's H11 to H15)** (§4).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -168,6 +165,17 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **A file a tool rewrites keeps its bytes**, its endings included, and so does what the tool prints about it: text-mode stdout on Windows turned a CRLF diff into `\r\r\n`.
       - **Run `check.py` with `WDS_NODE_MODULES` set** to `tooling/main/node_modules`, or `test_real_tools` skips and a snippet stylelint refuses reaches CI (#129: an `@import` the snippet audit put inside `@layer components`).
       - **Stage by name.** `git add -A` staged the owner's in-progress audit into #129 (`aa95250`, removed in `b78d77b`).
+    - **The second 2026-10-14 session's reviews found 13 real issues:** #132 (Codex 3 over two rounds, CodeRabbit 4) and #133 (Codex 3 over two rounds, CodeRabbit 3). Each was fixed with a test failing on the head it reviewed. The lessons, for any reader of a language's syntax:
+      - **A selector list splits at depth-0 commas only.** `&:is(:hover, :focus-visible)` is one selector (CodeRabbit).
+      - **A mirror rule must not widen what it matches.** `.chip:is(:hover, .danger)` mirrored with `.danger` live re-applied the hover styles to every danger chip, after the component's rules. An unforced arm becomes `arm:not(*)`, which keeps its specificity (Codex).
+      - **A condition nested in a rule is that rule under the condition.** Its declarations join the rule's own (Codex).
+      - **A detect list must match what the cell carries.** The focus-visible cell carries `focus-within`, so `:focus-within` covers it (CodeRabbit).
+      - **A file the hook writes in a scratch tree may be a staged symlink.** Write a temp file and `os.replace` it; check `lexists`, not `exists` (CodeRabbit).
+      - **Read what the reader before you erased.** The audit got JS comments stripped for `.tsx` but not for Astro markup, so the comment test must use the markup path (CodeRabbit). A spread's own object literal is set inline too (Codex).
+      - **A string literal is the language's, not the parser's.** Dollar quotes (`$$a ) b$$`), a doubled `''` and runs of spaces inside a label all survive (Codex on #133, three findings over two rounds).
+      - **Normalise only what the branch can bear.** Keeping string whitespace for every statement broke the `.*` patterns on a label with a newline; the enum branches match an exact form with `re.S`, the rest the collapsed line (CodeRabbit on #133).
+      - **A fix's test must fail on the old code.** The dollar-quote case passed on v3.6.0 until it had a table tail (CodeRabbit on #133). Run `fail_before.py` on `v3.6.0` for every new test, not only on the reviewed head.
+      - **Ask Codex once after a round of fixes** (`@codex review`): it found more on #132 and #133's second round. Then merge when the next fixes are small and tested.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -247,6 +255,14 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - Tests: `test_token_migration.TheV4SpacingCensus`, `test_tw_probe.TheMigrationsMoveOne` (§5's marked blocks `<!-- tw-migrate:wrong -->` and `right`, the import added by the test).
 - **Colour families (#129, N40).** `cluster_values.is_neutral(L, C, H)`: chroma under `NEUTRAL_SHARE` (0.5) of `max_chroma(L, H)`, sRGB's. `nearest_ramp_step()` lands a neutral on the neutral ramp only and any other colour on a step within `HUE_GUARD_DEG` of its hue, ΔE within. `cluster_color_phase()` seeds the accent and the neutral hue by the same test. `test_token_migration.ColoursKeepTheirFamily`.
 - **Line endings (#130).** `apply_codemod.process()` and `deprecate.inject_marker()` read with `newline=""`; the marker takes the file's dominant ending, `save_ledger()` keeps the ledger's, and the dry run's diff goes to `sys.stdout.buffer`. `test_token_migration.TheCodemodRewritesOnlyWhatItMatched`, `test_versioning.TheMarkerKeepsTheFilesLineEndings`.
+- **The CSS reader in `a11y_static` (#132).** `css_rules(src, line_of)` returns every style rule at any depth as `(selector, line, body, offset)`. Each body keeps its own declarations, nested blocks blanked. A conditional group nested in a style rule is read with the rule's own declarations overlaid. `_nest()` resolves `&` (`_selector_list()`, depth-0 commas). `audit_css()` blanks comments with their newlines kept and reports a `(line, rule, message)` once. `FOCUS_VISIBLE` and `FOCUS_VISIBLE_PREFIXES` decide a visible focus rule. `test_content_and_a11y.A11yStaticReadsNestedRules`.
+- **Bound attributes (#132).** `a11y_static.bound_attr(raw)` maps `:x`, `v-bind:x` (`.prop`, `.attr`, `.camel`), `[x]` and `[attr.x]` to `x`. A quoted string literal is read as its text, anything else as `EXPR`. `@click`, `v-on:click`, `on:click` and `(click)` become `onclick`, and `[class.x]` gives no key. `NG_BINDING` matches Angular's forms. `A11yStaticReadsBoundAttributes`.
+- **The matrix's mirrors (#132).** `generate_matrix.transpose_part()` rewrites a state at depth 0 and inside `:is()`/`:where()`, recursively; an unforced arm of a group that holds a state becomes `arm:not(*)`. `nest_selector()`, `force_rules()` (shared by `build_force_shim()` and `forced_states()`) and `detect_states()` count a forced state only when a mirror was written. Focus-visible's `detect` includes `:focus-within`. `MatrixStates`, `test_browser_runtime.MatrixSeesStateChanges`.
+- **The hook's index mode (#132).** `pre-commit-design-gate.sh` copies `.design-suite.json` and the default baselines into `AUDIT_ROOT`. An inline Python rewrites the scratch config: an unstaged token or budget file becomes the working tree's absolute path, and a baseline is copied to its own relative path, since the audit's keys are relative to the baseline's folder. It writes a temp file and `os.replace`s it. `test_precommit_hook.PreCommitHook`; the symlink test skips on Windows without the right.
+- **Style-object keys (#132).** `audit_design.style_object_keys(inner)` blanks comments, then takes each depth-0 entry's key. `spread_keys()` reads a spread's own object literals (not a name, a call's argument or an array). `_audit_jsx_styles` reads the object inside `{{ … } as X}` too. `JsxClassesAndCssInJs`.
+- **The schema reader (#133).** `introspect_schema.one_line_outside_strings()` collapses whitespace outside string literals only. `RE_ALTER_ENUM_ADD` and `RE_ALTER_ENUM_RENAME` change an enum the files created; `enum_label()` unescapes `''`. `_balanced_slice()` skips strings and `$$` bodies, and ends a `CREATE TABLE`'s column list. `test_schema_sources.MigrationsThatDumpsRewrite`.
+- **`--reverse` and a theme (#133).** `reverse_body()` pass 3 adds a `dropped` problem (`"{token} [{Theme}]"`) for a theme's value that cannot cross; the exit is 1. `test_figma_sync.ReverseReadsEveryTokenFormat`.
+- **A BOM (#133).** `extract_system`, `build_docs` and `diff_system` read with `utf-8-sig`. `test_project_config.ABomOnTheTokenFile`. The wider encoding class (UTF-16, every script) is P53's.
 - **DTCG (#101, #102).** `shared/dtcg.py` is the master, copied beside every `project_config.py` (`test_dtcg.TheCopiesAreTheMaster`); `project_config.py` loads the copy beside it by path. `normalise()` (the Figma scripts' reading, string forms) and `tokens()` (lossless, CSS names) read 2025.10 and Tokens Studio (`studio_document`, `studio_themes`); `document()` writes 2025.10 from CSS custom properties. `project_config.mjs` ports the reading, numbers formatted as Python's `f"{round(x, 6):g}"`, and `TheNodeReaderAgrees` holds them equal on every value form. `figma_common.parse_studio` makes each Studio theme group a collection; `FVar` carries `deprecated`, `dtcg_type` and `partial`.
 - **The resolver (#105).** `dtcg.resolver_document(data, base, inputs, only)` merges a resolver's `resolutionOrder` for a choice of contexts (each modifier's string `default`, else its first, which is reported); `resolver_modifiers()`, `token_paths()`, `resolver()` (the writer), `outside()` and `file_loader()` (its real path must stay in the folder, else `OutsideFolder`). `figma_to_tokens.py --format dtcg --out-dir` writes `tokens.json`, `theme-<x>.json` or `density-<x>.json` (overrides only, `document(only=...)`) and `tokens.resolver.json`; `css_blocks()` and `figma_blocks()` feed `dtcg_files()`. `figma_common.parse_resolver()` makes each modifier a collection with `FCollection.kind`, and `mode_selector(mode, default, kind)` writes a theme or density context as the value itself (`css_escape`). Unreadable sources are `FDoc.unread` (`unread-source`, `UNREAD_SOURCE`). The Node port is `resolverDocument()` in `project_config.mjs`.
 - **The ledger (#106).** `project_config.read_deprecations(paths)` and `replacement_of(reason)`; `diff_system.marked_deprecations()` adds a record (`"marked"`) for each token the old DTCG snapshot marks; `deprecate.py import FILE… --since --removal`.
@@ -357,7 +373,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   | email-template-system | 20,497 |
   | landing-page-conversion | 20,497 |
   | perf-budget-gate | 20,494 |
-  | component-state-matrix | 20,493 |
+  | component-state-matrix | 20,472 |
   | design-system-versioning | 20,401 |
   | figma-variables-sync | 20,484 |
   | web-design-studio | 20,450 |
@@ -368,33 +384,31 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then read `docs/HANDOFF.md`'s Warnings.
 
-## 4. Phase 6c, 4.0.0: the audit, from P50
+## 4. Phase 6c, 4.0.0: the audit, from P52
 
-**First, ask the owner where Phase 6c goes** among Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43), or whether it all goes first. The audit's own order is P50 to P55. Then start there, one PR under 100 files at a time. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+**The owner placed all of Phase 6c first (2026-10-14).** Its order is P52, then P53 to P55, then Phase 6b's workstreams (ask the owner which comes first then). Keep each PR under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P50 | The gates that pass what they should fail (audit H4 to H8) | N42 | `a11y_static.py`, `generate_matrix.py`, `pre-commit-design-gate.sh`, `audit_design.py` | M |
-| P51 | Silent wrong output in sync, docs and scaffold (audit H2, H3, H9, H10) | N43 | `figma_to_tokens.py`, `extract_system.py`, `introspect_schema.py` | M |
-| P52 | The proposal's arithmetic and recipe, and two tests (audit H11 to H15) | N44 | `cluster_values.py`, `apply_codemod.py`, the migration references | M |
+| P52 | The proposal's arithmetic and recipe, and two tests (audit H11 to H15) | N44 | `cluster_values.py`, `apply_codemod.py`, the migration references, the tests H15 names | M |
 | P53 | The cross-cutting classes, one PR each (audit §6 step 5, §7) | N45 | per class | L |
 | P54 | The medium findings, one PR per §3 area | N46 | per area | L |
 | P55 | The low findings and doc fixes | N47 | per area | M |
-| P34, P35, P37, P41, P42, P43 | Phase 6b's workstreams, where the owner places them | see §4 of the plan | | |
+| P34, P35, P37, P41, P42, P43 | Phase 6b's workstreams, after Phase 6c | see §4 of the plan | | |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-**P50 in detail.** Read the audit's H4 to H8 (its §2, lines 44 to 68) for the files, lines and fixes.
+**P52 in detail.** Read the audit's H11 to H15 (its §2, lines 79 to 102) for the files, lines and fixes.
 
-1. **H4, `a11y_static.audit_css()`.** It splits blocks at depth 0 only, so `outline: none` inside `@layer`, `@media` or `@supports` is never seen. The starter's own `base.css` is all `@layer base`. Read blocks recursively, carrying the at-rule stack as `generate_matrix.parse_css` does, and decide per rule.
-2. **H5, `generate_matrix`.** States inside `:is()`/`:where()` and a nested `&:hover` get no mirror rule, yet the summary says covered. Rewrite them inside `:is()` and `:where()`, prefix nested selectors with the parent, and make `detect_states` count a state only when a mirror was written.
-3. **H6, `a11y_static` on Vue.** It doesn't know `:attr` and `v-bind:attr` (`<img :alt>` reads as no alt). Normalise them, and Angular's `[attr]`, to the attribute. Keep a positive control: `<img :src>` with no alt still fails.
-4. **H7, the pre-commit hook's `DESIGN_GATE_INDEX=1`.** It audits the index without `.design-suite.json` or the baseline. Put both into `AUDIT_ROOT` (from HEAD when not staged), and test it with a baselined finding.
-5. **H8, the audit's inline-style keys.** `style={{ '--progress': open ? '1' : '0' }}` reads `'1'` as a key. Blank strings before reading keys, and take a quoted key only after `{` or a depth-0 `,`.
-6. **Tests:** each fails on `v3.6.0` first. Then grep the plugin for the same construct (the audit's class 2), and run `check.py` with `WDS_NODE_MODULES` set. The CHANGELOG goes under 4.0.0's Fixed. Mark N42 done in the completion plan, and rename the `P50` row `P50 part 2, #N`.
+1. **H11, `cluster_values.py`.** The census counts `oklch()`, `hwb()`, `lab()`, `lch()`, `color()`, `hsl(0.5turn …)` and `letter-spacing: 1px`, but the proposal puts them in neither `rules` nor `unmapped` (`except ColorError: continue`; the non-`em` tracking `continue`). Emit an `Unmapped` row for each. Test: every census literal lands in a rule or an unmapped row.
+2. **H12, rules the codemod never applies.** `apply_codemod.is_color_slot` takes a hex or a function only, so `color: white` gets a rule that never fires. A hex inside `color-mix()` is counted before its span is claimed (`extract_literals.py`). Accept `NAMED_COLORS` in `is_color_slot`, and claim the `color-mix` span before the hex pass (or recurse into it). The "mechanically replaceable" count must equal what `--apply` rewrites.
+3. **H13, the width path.** `cluster_values` snaps to 4px before testing `klass == "size"` against `WIDTH_STEPS`, so `max-width: 1152px` never reaches `--width-content`, and the advice reads "Decide between 192px and 192px". Test `size` first; say "above the scale" past `SPACE_PX[-1]`.
+4. **H14, the rebase recipe.** `migration-strategies.md` (around lines 373 to 379) stages a file, then runs the codemod, which refuses a staged file (`dirty_files` takes every porcelain entry). Treat a fully staged file (`M `, `A `) as clean, or have the recipe pass `--force` and say why it is safe. Run the recipe in a test.
+5. **H15, two tests.** `test_utf8_output.test_every_script_writes_utf8_to_a_pipe` proves nothing: no script's `--help` holds a non-ASCII byte. Give it a positive control (the source calls the reconfigure helper, with a stub that proves the scan fires), and cover `workflow-commands/*/scripts`. The pydantic test in `test_scaffold.py` skips on every CI cell (`uv run --no-project`); give that class `--with pydantic` in `ci.yml`, with the major pinned.
+6. **Tests:** each fails on `v3.6.0` first. Then grep the plugin for the same construct (the audit's class 2), and run `check.py` with `WDS_NODE_MODULES` set. The CHANGELOG goes under 4.0.0's Fixed. Mark N44 done in the completion plan, and rename the `P52` row `P52, #N`.
 
 - **The audit's fixtures** were in its session's scratchpad (`3985bfd1-…`), which Storage Sense can empty. Rebuild a case from the audit's text if it is gone.
 - **Facts from outside** are re-read at the source on the day, and a figure goes into `evidence.json`.
-- **R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate), the release PR, the evals on its merge (the owner's OK, about $11, `headSha` checked), then the tag. Its live check covers Part 5's new block in a real project, `/tw-probe`, the v3 upgrade path, and the v4 census on a real Tailwind 4 project.
+- **R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate), the release PR, the evals on its merge (the owner's OK, about $11, `headSha` checked), then the tag. Its live check covers Part 5's new block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, and the gates P50 changed (a Vue project's bound attributes, the index-mode hook).
 
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 
