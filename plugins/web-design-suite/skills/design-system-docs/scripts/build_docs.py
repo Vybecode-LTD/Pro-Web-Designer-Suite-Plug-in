@@ -1114,7 +1114,9 @@ class Site:
         if self.examples:
             inline += '<link rel="stylesheet" href="assets/forced-states.css">'
 
-        index_json = json.dumps(self.index, ensure_ascii=False)
+        # Inlined in a <script>: a `</script>` in a note would end it (the
+        # audit's V6), so every `<` is written as its JSON escape.
+        index_json = json.dumps(self.index, ensure_ascii=False).replace("<", "\\u003c")
         written: List[str] = []
         for key, title, body in pages:
             html_text = page_shell(title=title, project=self.project, nav=self.nav(key),

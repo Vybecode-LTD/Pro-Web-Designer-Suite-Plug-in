@@ -656,8 +656,13 @@ def resolve_display(raw: str, env: Dict[str, str]) -> Dict[str, Any]:
         except ColorError:
             return entry
         entry["hex"] = rgb_to_hex(*clamp_rgb(oklch_to_rgb(*lch)))
-        entry["alpha"] = 1.0
-        entry["display"] = entry["hex"]
+        # `#rgba` and `#rrggbbaa` carry an alpha, which parse_color drops:
+        # `#2563eb80` was measured as solid (found 2026-10-15, for §3.4).
+        digits = text.strip().lstrip("#")
+        pair = digits[3] * 2 if len(digits) == 4 else digits[6:] if len(digits) == 8 else "ff"
+        alpha = round(int(pair, 16) / 255, 4)
+        entry["alpha"] = alpha
+        entry["display"] = entry["hex"] if alpha >= 1.0 else f"{entry['hex']} @ {alpha:.2f}α"
         return entry
     px = _eval_expr(text)
     if px is not None:
@@ -1011,14 +1016,14 @@ def load_snapshot(raw: str, label: str, *, no_upstream: bool = False) -> Snapsho
         raise bail(f"diff_system: no such snapshot: {raw}")
     if p.is_dir():
         css = sorted(list(p.rglob("tokens.css")) + list(p.rglob("theme.css")))
-        js = sorted(p.rglob("system.json"))
+        js = sorted(p.rglob("system.json")) or sorted(p.rglob("contract.json"))   # V9: as documented
         if js:
             p = js[0]
         elif css:
             return _load_css(css, label, no_upstream)
         else:
             raise bail(
-                f"diff_system: {raw} contains neither system.json nor tokens.css.\n"
+                f"diff_system: {raw} contains no system.json, contract.json or tokens.css.\n"
                 f"Point at one directly, or generate a snapshot with:\n"
                 f"  python -m scripts.extract_system {raw} --out system.json")
     if is_contract(p):                                   # .json or .tokens

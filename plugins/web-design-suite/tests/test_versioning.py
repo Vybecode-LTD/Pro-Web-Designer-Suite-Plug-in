@@ -493,5 +493,85 @@ class TheWorkedRelease(TempDirTest):
                 self.assertIn(f"{before}:1 {after}:1", report)
 
 
+class TheAuditsVersioningMediums(TempDirTest):
+    """P54 part 4, the audit of 2026-10-14's §3.4: V4, V5, V6, V9, and the
+    8-digit hex the 2026-10-15 session found. V2, V3, V10 and
+    `extract_system --tokens` on a JSON file are the next part's."""
+
+    def deprecate(self, *args):
+        return run_py("design-system-versioning", "deprecate", "--ledger", self.tmp / "proj" / "deprecations.json",
+                      *args, cwd=self.tmp)
+
+    def test_the_scan_skips_the_suites_own_records(self):
+        """V4: the mapping's rules hold `var(--fg-subtle)`, so the scan read it
+        as a use, "NOT SAFE to remove", forever; the ledger and a scan report too."""
+        self.write("proj/app.css", ".a { color: var(--fg-subtle); }\n")
+        self.assertEqual(0, self.deprecate("add", "--name=--fg-subtle", "--kind", "token", "--since", "1.5.0",
+                                           "--removal", "2.0.0", "--replacement=--fg-faint").returncode)
+        self.assertEqual(0, self.deprecate("mapping", "-o", self.tmp / "proj" / "mapping.json").returncode)
+        self.write("proj/notes.json", json.dumps({"todo": "var(--fg-subtle) in the old header"}))   # not ours: read
+        proc = self.deprecate("scan", self.tmp / "proj", "--format", "json")
+        hits = [h for per in json.loads(proc.stdout)["results"]["--fg-subtle"].values() for h in per]
+        self.assertEqual(["app.css", "notes.json"], sorted(pathlib.Path(h["file"]).name for h in hits))
+
+    def test_a_replacement_must_be_live_and_declared(self):
+        """V5: `--replacement` was never looked up, so the mapping could rewrite
+        one deprecated name onto another, or onto a name no source declares."""
+        self.write("proj/tokens.css", ":root {\n  --fg-faint: #777777;\n  --fg-subtle: #666666;\n}\n")
+        tokens = str(self.tmp / "proj" / "tokens.css")
+        add = ("add", "--kind", "token", "--since", "1.5.0", "--removal", "2.0.0")
+        self.assertEqual(0, self.deprecate(*add, "--name=--fg-subtle", "--replacement=--fg-faint").returncode)
+        for argv, said in ((["--name=--fg-muted", "--replacement=--fg-subtle"], "is itself deprecated"),
+                           (["--name=--fg-muted", "--replacement=--fg-gone", "--source", tokens],
+                            "declared in none of --source"),
+                           (["--name=--fg-muted", "--replacement=--fg-muted"], "is the token being deprecated")):
+            with self.subTest(argv=argv):
+                proc = self.deprecate(*add, *argv)
+                self.assertEqual(2, proc.returncode, output(proc))
+                self.assertIn(said, output(proc))
+        self.assertEqual(0, self.deprecate(*add, "--name=--fg-muted", "--replacement=--fg-subtle",
+                                           "--force").returncode)
+        self.assertEqual(0, self.deprecate(*add, "--name=--fg-strong", "--replacement=--fg-faint",
+                                           "--source", tokens, "--dry-run").returncode)
+
+    def test_a_note_cannot_end_the_inlined_search_index(self):
+        """V6: build_docs inlines the search index into a <script>, and a
+        `</script>` in a token's note ended it."""
+        self.write("tokens.css", ":root {\n  --fg-default: #111111;   /* body text </script><b>x</b> */\n"
+                                 "  --bg-canvas: #ffffff;\n}\n")
+        run_py("design-system-docs", "extract_system", "tokens.css", "--out", "system.json", cwd=self.tmp)
+        self.assertIn("</script><b>", (self.tmp / "system.json").read_text(encoding="utf-8"))
+        proc = run_py("design-system-docs", "build_docs", "system.json", "--out", "site", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        pages = sorted((self.tmp / "site").glob("*.html"))
+        self.assertTrue(pages)
+        for page in pages:
+            with self.subTest(page=page.name):
+                self.assertNotIn("</script><b>", page.read_text(encoding="utf-8"))
+
+    def test_a_folder_that_holds_a_contract_is_a_snapshot(self):
+        """V9: the docs say "a contract.json, or a directory containing one";
+        a folder was searched for system.json and tokens.css only (exit 2)."""
+        self.write("tokens.css", ":root {\n  --fg-default: #111111;\n  --bg-canvas: #ffffff;\n}\n")
+        for v in ("v1", "v2"):
+            run_py("design-system-docs", "extract_system", "tokens.css", "--contract", f"{v}/contract.json",
+                   cwd=self.tmp)
+        proc = run_py("design-system-versioning", "diff_system", "v1", "v2", "--no-upstream", "--format", "json",
+                      cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+
+    def test_an_eight_digit_hex_is_translucent(self):
+        """Found 2026-10-15: `#2563eb80` was read as solid, so its contrast was
+        measured; `oklch(… / 0.5)` was already a translucent note."""
+        old = ":root {\n  --brand-500: #2563eb80;\n  --fg-default: var(--brand-500);\n  --bg-canvas: #ffffff;\n}\n"
+        self.write("old.css", old)
+        self.write("new.css", old.replace("#2563eb80", "#2563eb99"))
+        proc = run_py("design-system-versioning", "diff_system", "old.css", "new.css", "--no-upstream",
+                      "--format", "json", cwd=self.tmp)
+        report = json.loads(proc.stdout)
+        self.assertTrue(any("--fg-default on --bg-canvas [light]: translucent" in n for n in report["notes"]),
+                        report["notes"])
+
+
 if __name__ == "__main__":
     unittest.main()
