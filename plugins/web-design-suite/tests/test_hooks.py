@@ -588,6 +588,33 @@ class TheRouter(HookTest):
             with self.subTest(prompt=prompt):
                 self.assertEqual(skills, self.routed(prompt))
 
+    def test_a_word_another_domain_shares_needs_the_skills_own_beside_it(self):
+        """The audit's S3: on v3.6.0 each of these was sent to the skill
+        named, for one shared word (a token, a critique, a state, Lighthouse).
+        With the skill's own words beside it, the same word still routes."""
+        elsewhere = {"Deprecate the old JWT tokens": "design-system-versioning",
+                     "Migrate the session tokens to Redis": "design-token-migration",
+                     "Write token reference docs for the OAuth API": "design-system-docs",
+                     "Critique my essay on Victorian poetry": "design-critique-gate",
+                     "List every state in the US with its capital": "component-state-matrix",
+                     "The lighthouse keeper story needs a hero section": "perf-budget-gate"}
+        for prompt, skill in elsewhere.items():
+            with self.subTest(prompt=prompt):
+                self.assertNotIn(skill, self.routed(prompt))
+        ours = {"Deprecate the old colour tokens in tokens.css": "design-system-versioning",
+                "Migrate the legacy theme tokens to the new names": "design-token-migration",
+                "Write the token reference for our design system": "design-system-docs",
+                "Critique the layout of our signup page": "design-critique-gate",
+                "Show every state of the dropdown": "component-state-matrix",
+                "Our Lighthouse score fell to 61": "perf-budget-gate",
+                # the token formats the plugin reads are design tokens too (Codex on #143)
+                "Deprecate the old DTCG token": "design-system-versioning",
+                "Write the DTCG token reference": "design-system-docs",
+                "Migrate the Style Dictionary tokens to the new names": "design-token-migration"}
+        for prompt, skill in ours.items():
+            with self.subTest(prompt=prompt):
+                self.assertIn(skill, self.routed(prompt))
+
     def test_other_prompts_and_named_skills_hear_nothing(self):
         for prompt in ("Fix the login bug", "Rename the class in utils.ts",
                        "Add prop tables to our React library's README",     # library docs (Codex on #95)

@@ -1306,7 +1306,7 @@ def css_colour(text: str) -> Optional[dict]:
     args = [a for a in re.split(r"[\s,]+", body.strip()) if a]
     try:
         alpha = 1.0 if not alpha_text.strip() else float(_part(alpha_text, 1.0))
-        if fn in ("rgba", "hsla") and len(args) == 4:
+        if fn in ("rgb", "rgba", "hsl", "hsla") and len(args) == 4 and "," in body:   # the legacy form only
             alpha, args = float(_part(args[3], 1.0)), args[:3]
         space = fn
         if fn == "color":
