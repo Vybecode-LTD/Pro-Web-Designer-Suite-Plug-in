@@ -520,7 +520,8 @@ class TheAuditsVersioningMediums(TempDirTest):
         """V5: `--replacement` was never looked up, so the mapping could rewrite
         one deprecated name onto another, or onto a name no source declares."""
         # The replacement shares a line with its selector (Codex on #147).
-        self.write("proj/tokens.css", ":root { --fg-faint: #777777;\n  --fg-subtle: #666666;\n}\n")
+        self.write("proj/tokens.css", ":root { --fg-faint: #777777;\n  --fg-subtle: #666666;\n"
+                                      "  /* --fg-gone: #888888; retired */\n}\n")     # a comment declares nothing
         tokens = str(self.tmp / "proj" / "tokens.css")
         add = ("add", "--kind", "token", "--since", "1.5.0", "--removal", "2.0.0")
         self.assertEqual(0, self.deprecate(*add, "--name=--fg-subtle", "--replacement=--fg-faint").returncode)

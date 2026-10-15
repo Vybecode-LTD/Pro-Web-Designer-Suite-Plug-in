@@ -616,7 +616,8 @@ def replacement_problem(ledger: Dict[str, Any], name: str, replacement: str,
         texts = []
         for raw in sources:
             try:
-                texts.append(read_text(Path(raw)))
+                # A commented-out declaration declares nothing (CodeRabbit on #147).
+                texts.append(re.sub(r"/\*.*?\*/", " ", read_text(Path(raw)), flags=re.S))
             except (OSError, UnicodeDecodeError):
                 pass                                # the source check below names it
         if texts and not any(decl.search(t) for t in texts):

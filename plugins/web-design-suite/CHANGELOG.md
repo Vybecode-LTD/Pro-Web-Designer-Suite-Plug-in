@@ -300,7 +300,7 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
     `--force`) when it is the token itself, is deprecated or removed, or is declared in
     none of the `--source` files;
   - `build_docs` inlined the search index into a `<script>`, so a `</script>` in a
-    token's note ended it; every `<` is written as `<`;
+    token's note ended it; every `<` is written as `\u003c`;
   - `diff_system` searched a folder for `system.json` and `tokens.css` only, though the
     docs promise a folder holding a `contract.json` too;
   - `diff_system` read `#2563eb80` as solid and measured its contrast; an 8-digit or
