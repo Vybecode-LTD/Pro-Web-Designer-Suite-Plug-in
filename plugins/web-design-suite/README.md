@@ -184,7 +184,7 @@ The reports go in `design-reports/`, which a project usually leaves out of git.
 (`python -m scripts.audit_design`), so after `/web-design-suite:install-gate` a clean
 checkout has them. For another skill's script in CI, such as `diff_system.py` or
 `build_docs.py`, check the plugin out at a release tag and run the script by path,
-`python <plugin>/skills/<skill>/scripts/<script>.py`. A script run by path finds the
+`python PLUGIN/skills/SKILL/scripts/SCRIPT.py`. A script run by path finds the
 helpers beside it, so it needs no `PYTHONPATH`.
 
 ---

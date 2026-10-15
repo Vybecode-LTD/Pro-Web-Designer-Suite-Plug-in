@@ -13,7 +13,7 @@ description: Build HTML email that survives Outlook, Gmail and dark mode, compil
 > python "${CLAUDE_SKILL_DIR}/scripts/build_email.py" emails/my-email.html --out build/my-email.html
 > ```
 >
-> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
 > This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_email.py, lint_email.py, render_email.mjs).
@@ -56,26 +56,16 @@ That is the entire exception. Anything beyond it — a hardcoded colour, a hand-
 
 ## Quick start
 
+1. Copy `${CLAUDE_SKILL_DIR}/assets/templates/transactional-receipt.html` to `emails/my-email.html`: a template that already compiles clean, copied INTO the project, where it is committed. The plugin's copy is replaced on every update.
+2. Edit the copy: tokens only, no literals, utilities declared last. Lint it; compile it (resolve tokens, inline the CSS, keep the media queries, add the Outlook scaffolding, write the plain-text part, report bytes); gate the build:
+
 ```bash
-# 1. Start from a template that already compiles clean — copied INTO the project,
-#    where it is committed; the plugin's copy is replaced on every update
-mkdir -p emails
-cp "${CLAUDE_SKILL_DIR}/assets/templates/transactional-receipt.html" emails/my-email.html
-
-# 2. Edit the copy — tokens only, no literals, utilities declared last
 python -m scripts.lint_email emails/my-email.html --source
-
-# 3. Compile: resolve tokens, inline the CSS, keep the media queries,
-#    add the Outlook scaffolding, write the plain-text part, report bytes
-python -m scripts.build_email emails/my-email.html \
-    --out build/my-email.html --text build/my-email.txt
-
-# 4. Gate it
+python -m scripts.build_email emails/my-email.html --out build/my-email.html --text build/my-email.txt
 python -m scripts.lint_email build/my-email.html
-
-# 5. Read the plain-text part with your own eyes. Somebody receives it.
-cat build/my-email.txt
 ```
+
+3. Read the plain-text part, `build/my-email.txt`, with your own eyes. Somebody receives it.
 
 Python scripts: stdlib. `render_email.mjs`: Node and Playwright.
 

@@ -558,7 +558,99 @@ class PasteableCommands(unittest.TestCase):
             self.assertTrue(pinned.startswith("6.0."), f"tooling/main pins typescript {pinned or 'nowhere'}")
 
 
-SHIPPED = sorted({p.stem for p in SKILLS.glob("*/scripts/*") if p.suffix in {".py", ".mjs"}},
+# A placeholder in angle brackets is a redirection to bash and to cmd alike.
+# Not after another `<` (a heredoc) or a word character (a generic, `a<b>`).
+ANGLE_PLACEHOLDER = re.compile(r"(?<![<\w])<[A-Za-z][^<>\n]*>")
+COMMAND_TAGS = {"bash", "sh", "shell", "console", "cmd", "bat", "powershell", "pwsh", "ps1"}
+COMMAND_SPAN = re.compile(r"(?:python|py|node|npx|npm|uv|claude(?:\.exe)?|gh|git|cd|set|cp|mkdir|cat)\s")
+# The repository's docs a session works from. The other plans are records
+# (the audit, the reports, the reviews, the live checks): they quote what was
+# run or found, and rewriting them would change the record.
+LIVE_DOCS = ("CLAUDE.md", "docs/HANDOFF.md", "dev plans/README.md", "dev plans/next-session-prompt.md",
+             "dev plans/next-session-opening-prompt.md", "dev plans/web-design-suite-execution-plan.md",
+             "dev plans/web-design-suite-completion-plan.md", "dev plans/web-design-suite-completion-inventory.md")
+
+
+def doc_commands(text: str) -> list[str]:
+    """A markdown file's commands: every line of a fence tagged as a shell,
+    one inside a blockquote too (the SKILL.md files open with one), and every
+    inline code span that starts with a command. An untagged fence is left
+    out: in the skills it is sample output or a usage line."""
+    unquoted = "\n".join(re.sub(r"^ {0,3}> ?", "", line) for line in text.splitlines())
+    lines = [line for block in shell_fences(unquoted, COMMAND_TAGS) for line in block.splitlines()]
+    return lines + [span for span in re.findall(r"`([^`\n]+)`", unquoted) if COMMAND_SPAN.match(span)]
+
+
+def section(text: str, heading: str) -> str:
+    """The body of a `## heading`, up to the next heading of that level."""
+    parts = re.split(r"^## " + re.escape(heading) + r"[ \t]*$", text, maxsplit=1, flags=re.M)
+    return re.split(r"^## ", parts[1], maxsplit=1, flags=re.M)[0] if len(parts) == 2 else ""
+
+
+class PlaceholdersInCapitals(unittest.TestCase):
+    """P53 part 5 (the audit of 2026-10-14's D4, G13 and E14, its §7 class 9):
+    `python -m scripts.audit_design <path> --json > audit.json` reads `<path>`
+    as a redirection, in cmd ("The system cannot find the file specified") and
+    in bash alike; CLAUDE.md's cmd.exe command ended `unittest <ids>`. A
+    placeholder in a command is written in capitals (`PATH`, `TEST_IDS`, and a
+    colour quoted, `"FG"`). The README's commands are held to more by
+    PasteableCommands; the skills' commands are run by Claude, in its own
+    shell, so only the placeholder rule binds them, and the one quick start a
+    user is told to follow (E14) pastes into every shell too."""
+
+    def assertNoAngleBrackets(self, files, root):
+        found = 0
+        for path in files:
+            for line in doc_commands(path.read_text(encoding="utf-8")):
+                found += 1
+                with self.subTest(file=path.relative_to(root).as_posix(), command=line.strip()[:100]):
+                    self.assertIsNone(ANGLE_PLACEHOLDER.search(line))
+        return found
+
+    def test_the_check_sees_a_placeholder_and_nothing_else(self):
+        for line in ("python -m scripts.audit_design <path> --json > audit.json",
+                     'set "WDS_PLUGIN_ROOT=X" && python -B -m unittest <ids>',
+                     "cp <web-design-studio>/scripts/audit_design.py scripts/",
+                     "gh run download <id> --name baselines"):
+            with self.subTest(line=line):
+                self.assertTrue(ANGLE_PLACEHOLDER.search(line))
+        for line in ("python -m scripts.audit_design PATH --json > audit.json 2>&1",
+                     "cat <<'EOF' > notes.txt", "sort < in.txt > out.txt", "const a = useRef<HTMLElement>(null)"):
+            with self.subTest(line=line):
+                self.assertIsNone(ANGLE_PLACEHOLDER.search(line))
+        text = ("> ```bash\n> python -m scripts.<name>\n> ```\n"
+                "```css\n.a::after { content: '<b>'; }\n```\n"
+                "```\nfigma_audit.py <file>\n```\n"
+                "Run `npm ls <pkg>`; the `<img>` element.\n")
+        self.assertEqual(["python -m scripts.<name>", "npm ls <pkg>"], doc_commands(text))
+
+    def test_no_command_the_plugin_documents_has_one_in_angle_brackets(self):
+        files = sorted([*SKILLS.glob("*/SKILL.md"), *SKILLS.glob("*/references/*.md"),
+                        *PLUGIN.glob("workflow-commands/*/SKILL.md"), *PLUGIN.glob("agents/*.md"),
+                        PLUGIN / "shared" / "token-contract.md", PLUGIN / "README.md"])
+        self.assertGreater(len(files), 100)
+        self.assertGreater(self.assertNoAngleBrackets(files, PLUGIN), 500)
+
+    def test_no_command_the_repositorys_live_docs_give_has_one(self):
+        """The tests' own repository: fail_before.py swaps the plugin, not these."""
+        if not (REPO and (REPO / "CLAUDE.md").is_file() and (REPO / "dev plans").is_dir()):
+            self.skipTest("no repository around the tests (a release's copy)")
+        files = [REPO / rel for rel in LIVE_DOCS]
+        self.assertEqual([], [p.name for p in files if not p.is_file()])
+        self.assertGreater(self.assertNoAngleBrackets(files, REPO), 50)
+
+    def test_the_email_quick_start_pastes_into_bash_powershell_and_cmd(self):
+        """E14: it was `mkdir -p`, `cp` and `cat`, with a `\\` continuation,
+        none of which cmd runs. The copy is a step for Claude now."""
+        quick = section((SKILLS / "email-template-system" / "SKILL.md").read_text(encoding="utf-8"), "Quick start")
+        lines = [line for block in shell_fences(quick, COMMAND_TAGS) for line in block.splitlines() if line.strip()]
+        self.assertGreater(len(lines), 2)
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertEqual([], not_portable(line))
+
+
+SHIPPED =sorted({p.stem for p in SKILLS.glob("*/scripts/*") if p.suffix in {".py", ".mjs"}},
                  key=len, reverse=True)
 # A suite script however a doc spells its path: -m scripts.x, scripts/x.py,
 # "${CLAUDE_SKILL_DIR}/scripts/x.py", "$WDS/x.py", <skill>/scripts/x.mjs.
@@ -636,12 +728,15 @@ class ScriptInvocation(TempDirTest):
                     self.assertTrue((base / rel).is_file(), f"{var}/{rel}")
 
     def test_the_email_quick_start_copies_the_template_into_the_project(self):
+        """The quick start's copy is a step for Claude since P53 part 5 (E14):
+        `Copy `SOURCE` to `DESTINATION``, not a `cp` line."""
         text = (SKILLS / "email-template-system" / "SKILL.md").read_text(encoding="utf-8")
-        copies = re.findall(r"^\s*cp\s+(\S+)\s+(\S+)", text, re.M)
+        copies = re.findall(r"\bCopy `([^`]+)` to `([^`]+)`", section(text, "Quick start"))
         self.assertTrue(copies)
         for src, dst in copies:
             with self.subTest(dst=dst):
-                self.assertIn("${CLAUDE_SKILL_DIR}", src)
+                self.assertTrue(src.startswith("${CLAUDE_SKILL_DIR}/assets/templates/"), src)
+                self.assertTrue((SKILLS / "email-template-system" / src.split("}/", 1)[1]).is_file(), src)
                 self.assertNotIn("assets/", dst)
 
     def test_running_a_script_by_path_leaves_no_bytecode_beside_it(self):

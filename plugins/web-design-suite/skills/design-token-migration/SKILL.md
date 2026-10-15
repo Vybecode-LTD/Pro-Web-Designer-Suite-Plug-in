@@ -13,7 +13,7 @@ description: Migrate an existing codebase onto design tokens, from a census of h
 > python "${CLAUDE_SKILL_DIR}/scripts/extract_literals.py" ./src
 > ```
 >
-> The commands below are written `python -m scripts.<name>`. That form is for a project that
+> The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; when you run one here, use the path form.
 > This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (apply_codemod.py, cluster_values.py, extract_literals.py).
