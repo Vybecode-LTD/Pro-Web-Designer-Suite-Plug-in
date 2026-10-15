@@ -153,6 +153,7 @@ Property first, value shape second. The property is authoritative because the sa
 | `duration` / `easing` | property ∈ motion set | `--dur-*` / `--ease-*`, preferably a `--motion-*` pair |
 | `z-index` | `z-index` | `--z-*` |
 | `color-function` | `darken()`, `lighten()`, `mix()`, `color.adjust()`, `color.scale()`, `color.change()`, and a `color-mix()` with a colour written out | A ramp step, or a mix of roles, by hand |
+| `other-length` | a length in any other property: the size in a `font` shorthand, `transform`, `filter`, a grid track | A row to look at by hand, with advice by property; never counted as spacing |
 
 **Shorthand slots get the property they actually set.** `padding: 9px 17px` is block padding and inline padding — two different decisions written on one line. Filing both as "padding" throws away the distinction the inset vocabulary is built on, and produces a mapping that turns a page gutter into a card inset. The slot count decides the pattern (1 → all, 2 → block/inline, 3 → block/inline/block, 4 → block/inline/block/inline), and the count includes `0` and `auto`, which is the bug most implementations have.
 
@@ -243,17 +244,27 @@ It is also single linkage's famous failure mode. So the chain is capped: **a mer
 |---|---|---|---|
 | neutral-0 | `--fg-on-accent` | `--bg-surface` | — |
 | neutral-50 | `--fg-on-inverse` | `--bg-canvas` | — |
-| neutral-100/200 | — | `--bg-sunken` | `--border-subtle` |
+| neutral-100 | `--fg-on-inverse` | `--bg-sunken` | `--border-subtle` |
+| neutral-200 | — | `--bg-sunken` | `--border-subtle` |
 | neutral-300 | `--fg-disabled` | `--bg-disabled` | `--border-default` |
+| neutral-400 | `--fg-disabled` | `--bg-disabled` | `--border-strong` |
 | neutral-500 | `--fg-subtle` | — | `--border-strong` |
 | neutral-600/700 | `--fg-muted` | — | — |
-| neutral-800/900 | `--fg-default` | `--bg-inverse` | — |
-| neutral-950 | `--fg-strong` | `--bg-inverse` | — |
+| neutral-800 | `--fg-default` | — | — |
+| neutral-900 | `--fg-default` | `--bg-inverse` | — |
+| neutral-950/1000 | `--fg-strong` | `--bg-inverse` | — |
 | accent ≤ 100 | *(too light for text)* | `--bg-selected` | *(too light for a line)* |
-| accent 400–600 | — | `--bg-accent` | `--border-accent` |
-| accent ≥ 600 | `--fg-accent` | `--bg-accent-hover` | `--border-focus` |
-| status 500 | — | `--bg-<status>` | — |
-| status 700 | `--fg-<status>` | — | — |
+| accent 200 | *(too light for text)* | *(between tint and fill)* | *(too light for a line)* |
+| accent 300 | *(too light for text)* | *(between tint and fill)* | `--border-accent` |
+| accent 400–500 | *(too light for text)* | `--bg-accent` | `--border-accent` |
+| accent 600 | `--fg-accent` | `--bg-accent` | `--border-focus` |
+| accent 700 | `--fg-accent` | `--bg-accent-hover` | `--border-focus` |
+| accent ≥ 800 | `--fg-accent` | — | `--border-focus` |
+| status ≤ 300 | — | *(a subtle tint, not the fill)* | — |
+| status 400–500 | — | `--bg-<status>` | — |
+| status ≥ 600 | `--fg-<status>` | `--bg-<status>` | — |
+
+`role_for()` in `cluster_values.py` is this table; `test_token_migration.TheRoleTableIsTheCode` reads every cell back through it.
 
 The step guards on the accent row are not pedantry. `--bg-accent` **is** accent-600; pointing a pale `#eef2ff` badge fill at it turns a tint into a saturated button, and that is the single most visible way an automated color migration goes wrong.
 
