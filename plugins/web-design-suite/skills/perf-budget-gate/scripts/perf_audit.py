@@ -1785,6 +1785,11 @@ def main(argv: list[str] | None = None) -> int:
         wanted = {c.upper() for c in args.category}
         findings = [f for f in findings if f.cat in wanted]
 
+    if ledger.not_counted:              # before --write-baseline's return too (Codex on #159)
+        print(f"perf_audit: not counted, as a bundle analyzer's report by its name: "
+              f"{', '.join(ledger.not_counted)}. If one is a page the site serves, "
+              f"rename it, or count it with --include-maps.", file=sys.stderr)
+
     if args.write_baseline:
         payload = {
             "$schema": "perf-budget-gate/baseline/1",
@@ -1836,11 +1841,6 @@ def main(argv: list[str] | None = None) -> int:
             sys.stdout.write("\n")
         sys.stdout.write(report(findings, use_color=use_color,
                                 show_fix=not args.quiet))
-
-    if ledger.not_counted:
-        print(f"perf_audit: not counted, as a bundle analyzer's report by its name: "
-              f"{', '.join(ledger.not_counted)}. If one is a page the site serves, "
-              f"rename it, or count it with --include-maps.", file=sys.stderr)
 
     failing = [f for f in findings
                if f.severity == "error" or (args.strict and f.severity == "warning")]

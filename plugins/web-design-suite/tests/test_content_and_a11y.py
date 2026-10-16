@@ -1213,6 +1213,7 @@ class TheAuditsRuntimeLows(TempDirTest):
                 found = self.findings("f.css", f"a:focus-visible {{ outline: 2px solid red; {decl}; }}\n")
                 self.assertEqual(want, [f["rule"] for f in found].count("focus-ring-transition"))
 
+    @unittest.skipUnless(NODE, "node is not installed")      # CodeRabbit on #159
     def test_axes_two_digit_criteria_are_named(self):
         """G12: `/^wcag\\d{3}$/` dropped axe's `wcag1412` (avoid-inline-spacing),
         so its finding named no criterion."""
@@ -1241,6 +1242,10 @@ class TheAuditsRuntimeLows(TempDirTest):
         both = run_py("perf-budget-gate", "perf_audit", "dist", "--json", "--include-maps", cwd=self.tmp)
         self.assertEqual([], json.loads(both.stdout)["ledger"]["not_counted"])
         self.assertEqual(3, len(json.loads(both.stdout)["ledger"]["assets"]))
+        # A baseline recorded without them says so too (Codex on #159).
+        base = run_py("perf-budget-gate", "perf_audit", "dist", "--write-baseline", "base.json", cwd=self.tmp)
+        self.assertEqual(0, base.returncode, output(base))
+        self.assertIn("report.html", base.stderr.decode("utf-8"))
 
     def test_the_header_claims_only_the_checks_perf_audit_makes(self):
         """G14 and G16: the header listed a missing-srcset check no rule makes,
