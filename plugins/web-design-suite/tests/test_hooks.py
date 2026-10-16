@@ -311,7 +311,7 @@ class TheEmailBuild(HookTest):
         temp.mkdir()
         roots = {"TEMP": str(temp), "TMP": str(temp), "TMPDIR": str(temp)}
         text = self.context("emails/newsletter.html", **roots)
-        self.assertIn("email build: emails/newsletter.html has 1 error and 6 warnings", text)
+        self.assertIn("email build: emails/newsletter.html has 1 error (", text)     # the template's source lints clean (E8)
         self.assertIn("- the build, links: no unsubscribe link found", text)
         self.assertEqual([], list(temp.iterdir()))                           # the build's folder removed
         roots = {name: str(self.tmp / "no-temp") for name in roots}           # the control: the build is made there

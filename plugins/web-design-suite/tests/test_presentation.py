@@ -379,5 +379,40 @@ class CritiqueDocs(unittest.TestCase):
         self.assertIn(checklist_time.lstrip("+"), row)
 
 
+class TheHeadersPlaceholders(TempDirTest):
+    """P54 part 6, the audit of 2026-10-14's §3.5: E10. The template's header
+    placeholders (`<company>`, `<your name>`, `<YYYY-MM-DD>`, `<stage>`)
+    reached the cover and the footer with no gap, and a placeholder date
+    counted as a date."""
+
+    HEADER = ("**Project:** `<product / engagement>`\n**Client:** `<company>`\n"
+              "**Presenter:** `<your name>`\n**Date:** `<YYYY-MM-DD>`\n"
+              "**Stage:** `<first concept | iteration 2 | final sign-off | internal handoff>`\n\n")
+
+    def build(self, header):
+        text = decision_log("D1 — Tokens").replace("## Decisions", header + "## Decisions", 1)
+        log = self.write("DECISION_LOG.md", text)
+        proc = run_py("client-presentation-builder", "build_presentation", log, "-o", self.tmp / "deck.html",
+                      cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        return output(proc), (self.tmp / "deck.html").read_bytes().decode("utf-8")
+
+    def test_a_placeholder_is_a_gap_and_stays_off_the_deck(self):
+        said, deck = self.build(self.HEADER)
+        deck = re.sub(r"<li>The decision log header.*?</li>", "", deck)     # the gaps name them, as they should
+        for key, held in (("client", "<company>"), ("presenter", "<your name>"), ("date", "<YYYY-MM-DD>"),
+                          ("project", "<product / engagement>")):
+            with self.subTest(key=key):
+                self.assertIn(f"header's {key} is still the template's `{held}`", said)
+                self.assertNotIn(held.replace("<", "&lt;").replace(">", "&gt;"), deck)
+        self.assertIn("No date in the decision log header", said)
+
+    def test_a_filled_header_reaches_the_cover(self):                           # the control
+        said, deck = self.build("**Client:** Northbeam\n**Presenter:** Sam\n**Date:** 2026-10-16\n\n")
+        self.assertNotIn("still the template's", said)
+        self.assertIn("Northbeam", deck)
+        self.assertIn("2026-10-16", deck)
+
+
 if __name__ == "__main__":
     unittest.main()
