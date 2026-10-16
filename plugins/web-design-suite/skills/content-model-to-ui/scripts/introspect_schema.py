@@ -769,18 +769,66 @@ def _apply_privileges(table: Table, verb: str, privileges: str, grantees: str) -
         table.update_columns += [c for c in columns if c not in table.update_columns]
 
 
+# A cast changes the type a side is compared as, not whom it names.
+SQL_CAST = re.compile(r"::\s*(?:\"[^\"]*\"|[A-Za-z_][\w.]*)(?:\s*\[\s*\])*")
+AUTH_CALL = re.compile(r"\bauth\.\w+\s*\(", re.I)
+COLUMN_REF = re.compile(r'(?:(?:"(?:[^"]|"")+"|[A-Za-z_]\w*)\s*\.\s*)*(?:"(?:[^"]|"")+"|[A-Za-z_]\w*)')
+
+
+def _side_end(text: str, i: int, step: int) -> int:
+    """Where one side of a comparison ends, walking from `i` by `step` (1 or
+    -1): at the bracket that closes its own depth, a comma, or an `and` or
+    `or`. Returns the index just past the side's far end."""
+    opening, closing = ("(", ")") if step > 0 else (")", "(")
+    depth = 0
+    while 0 <= i < len(text):
+        ch = text[i]
+        if ch == opening:
+            depth += 1
+        elif ch == closing:
+            if depth == 0:
+                break
+            depth -= 1
+        elif depth == 0 and ch == ",":
+            break
+        elif depth == 0 and step > 0 and re.match(r"(?<![\w$])(?:and|or)(?![\w$])", text[i:], re.I) \
+                and (i == 0 or not re.match(r"[\w$]", text[i - 1])):
+            break
+        elif depth == 0 and step < 0 and re.search(r"(?<![\w$])(?:and|or)$", text[:i + 1], re.I) \
+                and (i + 1 == len(text) or not re.match(r"[\w$]", text[i + 1])):
+            break
+        i += step
+    return i if step > 0 else i + 1
+
+
+def _sides(check: str) -> Iterable[tuple[str, str, str, str]]:
+    """Each `=` comparison in a condition, as its two sides, and the right
+    side with its strings and quoted names masked. They are masked first, so
+    a `)`, an `=` or an `and` inside one ends nothing, and `'auth.uid()'` is
+    no call."""
+    masked = "".join(m.group(0) if m.group("other") else "\x00" * len(m.group(0))
+                     for m in SQL_PIECES.finditer(check))
+    for m in re.finditer(r"(?<![<>!=:-])=(?![=>])", masked):
+        start, end = _side_end(masked, m.start() - 1, -1), _side_end(masked, m.end(), 1)
+        yield check[start:m.start()], check[m.end():end], masked[start:m.start()], masked[m.end():end]
+
+
 def _pinned_to_caller(column: str, check: str) -> bool:
     """Whether a policy condition fixes `column` to who is calling:
-    `owner_id = auth.uid()`, `org_id = (select … auth.uid() …)`. Naming the
-    column is not enough: `role in ('member', 'admin')` lets a member choose."""
-    col = re.escape(column)
-    if re.search(rf"auth\.\w+\s*\(\s*\)[\s)]*=\s*{col}(?!\w)", check, re.I):
-        return True
-    for m in re.finditer(rf"(?<![\w.]){col}\s*=\s*", check, re.I):
-        rest = check[m.end():]
-        operand = "(" + _balanced_slice(rest, 0) + ")" if rest.startswith("(") else re.split(r"\s", rest, 1)[0]
-        if re.search(r"\bauth\.\w+\s*\(", operand, re.I):
-            return True
+    `owner_id = auth.uid()`, `org_id = (select … auth.uid() …)`, either way
+    round, through casts (`auth.uid()::text = owner_id::text`), a JWT claim
+    (`(auth.jwt() ->> 'sub')::uuid = user_id`) or a quoted camelCase name
+    (`auth.uid() = "userId"`, every Prisma-created database: the audit's E4).
+    One side must be the column itself, so `auth.uid() = any(editors)` does
+    not pin `editors`. Naming the column is not enough: `role in ('member',
+    'admin')` lets a member choose."""
+    for left, right, masked_left, masked_right in _sides(check):
+        for mine, other in ((left, masked_right), (right, masked_left)):
+            bare = SQL_CAST.sub("", mine).strip()
+            while bare.startswith("(") and bare.endswith(")"):
+                bare = bare[1:-1].strip()
+            if COLUMN_REF.fullmatch(bare) and _names(bare, column) and AUTH_CALL.search(other):
+                return True
     return False
 
 
@@ -2177,12 +2225,23 @@ def _temporal(col: Column) -> dict[str, Any]:
                           "with an explicit zone or two users will read two "
                           "different times from one value.",
                 "temporal": {"granularity": "instant", "timezone": "viewer"}}
+    naive = {"granularity": "instant", "timezone": "ambiguous", "warning": "naive timestamp"}
+    if system:
+        # Every Prisma `DateTime @default(now())` and Drizzle `timestamp()`
+        # without `withTimezone` lands here (the audit's E1): the database
+        # writes it all the same, so it is never a form field.
+        return {"control": "readonly-timestamp", "editable": False,
+                "confidence": "high",
+                "signal": "a system timestamp — the database writes it, so it "
+                          "is displayed and never edited. `timestamp` WITHOUT "
+                          "time zone, so it cannot answer 'when' outside the "
+                          "server's zone: ask.",
+                "temporal": naive}
     return {"control": "datetime-picker", "confidence": "low",
             "signal": "`timestamp` WITHOUT time zone — this column cannot "
                       "answer 'when' for anyone outside the server's zone. "
                       "Treat as a schema bug and ask.",
-            "temporal": {"granularity": "instant", "timezone": "ambiguous",
-                         "warning": "naive timestamp"}}
+            "temporal": naive}
 
 
 def _money_policy(col: Column, existing: dict[str, Any]) -> dict[str, Any]:
@@ -3285,7 +3344,7 @@ def detect_format(path: Path, text: str) -> str:
         return "ddl"
     if ext == ".prisma":
         return "prisma"
-    if ext in (".ts", ".tsx", ".d.ts", ".js", ".mjs") and "pgTable(" in text:
+    if ext in (".ts", ".tsx", ".d.ts", ".js", ".mjs") and re.search(r"\bpgTable(?:\.withRLS)?\(", text):
         return "drizzle"
     if ext in (".ts", ".tsx", ".d.ts"):
         return "ts"

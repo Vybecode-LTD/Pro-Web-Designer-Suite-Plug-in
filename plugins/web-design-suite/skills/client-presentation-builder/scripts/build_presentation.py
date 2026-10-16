@@ -125,6 +125,10 @@ FIELD_ALIASES = {
     "superseded by": "reversal",
 }
 
+# The header's placeholders are written as the template writes them, any case:
+# `<company>`, `<your name>`, `<YYYY-MM-DD>`.
+HEADER_PLACEHOLDER = re.compile(r"<[^<>]{2,}>")
+
 META_ALIASES = {
     "project": "project", "client": "client", "presenter": "presenter",
     "author": "presenter", "date": "date", "meeting": "meeting",
@@ -181,6 +185,9 @@ class DecisionLog:
     sections: dict[str, str] = field(default_factory=dict)
     decisions: list[Decision] = field(default_factory=list)
     path: Path | None = None
+    # Header fields still holding the template's placeholder (`<company>`,
+    # `<YYYY-MM-DD>`), by name, with the placeholder: read as missing (E10).
+    unfilled: dict[str, str] = field(default_factory=dict)
 
 
 _HEAD = re.compile(r"^(#{1,4})\s+(.*?)\s*$")
@@ -307,7 +314,10 @@ def parse_decision_log(text: str, path: Path | None = None) -> DecisionLog:
             else:
                 canon_meta = META_ALIASES.get(key)
                 if canon_meta and not log.decisions:
-                    log.meta.setdefault(canon_meta, value)
+                    if HEADER_PLACEHOLDER.fullmatch(value.strip("`").strip()):
+                        log.unfilled.setdefault(canon_meta, value.strip("`").strip())
+                    else:
+                        log.meta.setdefault(canon_meta, value)
                     continue
         if field_name is not None:
             if raw.strip() == "":
@@ -1360,6 +1370,9 @@ def _cover(inp: Inputs, audience: str) -> Slide:
         "their words, then the one sentence that says what changed. The first "
         "ninety seconds decide whether the rest is heard as reasoning or as "
         "decoration.")
+    for key, held in inp.log.unfilled.items():
+        s.gaps.append(f"The decision log header's {key} is still the template's `{held}`: "
+                      f"fill it in, or delete the line. It is left off the deck.")
     if not meta.get("date"):
         s.gaps.append("No date in the decision log header. A deck with no date "
                       "cannot be cited later in a scope argument.")

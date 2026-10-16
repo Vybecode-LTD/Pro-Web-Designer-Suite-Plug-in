@@ -101,7 +101,7 @@ The default is in **bold**. Everything else in the row is reachable by a signal.
 | `boolean` | **switch** · checkbox | `is_` / `has_` prefix → switch (acts immediately). Otherwise checkbox (part of a form submission) |
 | `date` | **date-picker** | Hard rule: a date is a calendar day. It must never become a datetime (§8) |
 | `timestamptz` | **datetime-picker** · readonly-timestamp | A system timestamp name (`created_at`, `updated_at`) → read-only |
-| `timestamp` (no tz) | **datetime-picker** + a warning | Cannot answer "when" for anyone outside the server's zone. Treat as a schema bug and ask |
+| `timestamp` (no tz) | **datetime-picker** · readonly-timestamp, + a warning | Cannot answer "when" for anyone outside the server's zone. Treat as a schema bug and ask. A system timestamp name → read-only all the same: every Prisma `DateTime @default(now())` and Drizzle `timestamp()` without `withTimezone` is one |
 | `time` / `timetz` | **time-picker** | Wall-clock |
 | `interval` | **number-input** + unit select | No good native control. Usually should be two columns or an integer of minutes |
 | `uuid` | **hidden** · readonly-text · reference control | PK with a default → hidden. FK → §6. A bare non-key uuid is an external id — read-only |

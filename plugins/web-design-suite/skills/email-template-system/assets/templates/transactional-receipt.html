@@ -135,8 +135,8 @@
 
   /* Retained — @media. This is the only breakpoint the email has. */
   @media only screen and (max-width: var(--email-bp-stack)) {
-    .pad { padding-left: 20px !important; padding-right: 20px !important; }
-    .h1 { font-size: 26px !important; line-height: 32px !important; }
+    .pad { padding-left: var(--email-gutter-mobile) !important; padding-right: var(--email-gutter-mobile) !important; }
+    .h1 { font-size: var(--email-h1-size-mobile) !important; line-height: var(--email-h1-line-mobile) !important; }
     .stack { display: block !important; width: 100% !important; }
     .stack-amount { text-align: left !important; padding-top: var(--gap-fused) !important; }
   }
@@ -182,7 +182,7 @@
         <img src="https://cdn.example.com/northbeam/logo-2x.png" width="132" height="28" alt="Northbeam" style="width:132px;height:28px;">
       </td>
     </tr>
-    <tr><td style="height:1px;background-color:var(--border-subtle);font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="height:var(--stroke-hairline);background-color:var(--border-subtle);font-size:0;line-height:0;">&nbsp;</td></tr>
 
     <!-- CONFIRMATION -->
     <tr>
