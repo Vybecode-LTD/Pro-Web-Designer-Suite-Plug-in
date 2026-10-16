@@ -291,6 +291,26 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   `rgb(255, 0, 0, 0.5)` and `hsl(0, 100%, 50%, 0.5)`, the legacy form under the names
   CSS Color 4 made aliases of `rgba()` and `hsla()`, were left out of a DTCG document as
   unsupported; they are written with their alpha (`test_dtcg.TheWriter`).
+- **The accessibility gates misread four things, and the coverage table claimed more than
+  they run** (the audit's G1, G2, G5, G6 and G7):
+  - `aria-hidden-focusable` read only an element's direct children, and counted those
+    that take no focus. It reads the whole subtree now, skips a `hidden` or `inert` one,
+    and counts a link with its `href`, a control not disabled, no `type="hidden"`, and
+    any element with a non-negative `tabindex`;
+  - `empty-control` looked one level deep for a name, and read a component child
+    (`<button><Icon/></button>`) as nothing. It looks at any depth, and a component is
+    "cannot tell";
+  - the runtime's forced-colours survey matched `button|a|summary` anywhere in a tag's
+    name, so a filled `main`, `nav`, `span` or `table` counted as a fill-only control;
+  - the macOS TBT flake had a cause: the control click came at load + 500 ms, inside
+    the fixture's 3-second task on a slow runner. It clicks at 5 s, after the task, and
+    the test asserts when it clicked;
+  - automation-coverage.md §3 read as this suite's coverage. It now says the table is
+    what a tool can decide, and marks the eleven rows whose mechanism neither gate
+    runs (1.3.4, one of the seven Full rows, among them). SKILL.md says this suite runs
+    six of the seven a tool decides outright.
+
+  `test_content_and_a11y.TheAuditsRuntimeMediums`, `test_browser_runtime.TheForcedColoursSurvey`.
 - **The release job, the tooling README and the plugin README were wrong on three
   counts** (the audit's D1, D2 and D3):
   - `release.yml` pinned `actions/checkout` and `astral-sh/setup-uv` by tag while the

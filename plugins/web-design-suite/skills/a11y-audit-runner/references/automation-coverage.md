@@ -50,7 +50,7 @@ A useful way to hold it: **the machine checks the grammar; a person checks the s
 
 ## 3. The coverage table
 
-Each row cross-references `accessibility.md` §1 rather than restating it. **Full** means a tool decides correctly with no human input. **Partial** means a tool decides a proper subset, and the remainder needs a person or a declared expectation. **None** means the answer depends on meaning.
+Each row cross-references `accessibility.md` §1 rather than restating it. **Full** means a tool decides correctly with no human input. **Partial** means a tool decides a proper subset, and the remainder needs a person or a declared expectation. **None** means the answer depends on meaning. The table says what a tool can decide, not what this skill's two gates do: a row whose mechanism neither `a11y_static.py` nor `a11y_runtime.mjs` runs says *Not in this suite.* Of the seven **Full** rows, this suite decides six; it has no orientation check (1.3.4), and axe leaves its `css-orientation-lock` out: the rule is tagged `experimental`, a tag this suite does not ask for.
 
 | SC | Auto | What a tool can decide | What it cannot, and why |
 |---|---|---|---|
@@ -63,7 +63,7 @@ Each row cross-references `accessibility.md` §1 rather than restating it. **Ful
 | **1.3.1** Info & Relationships | **Partial** | heading level skips, missing/duplicate landmarks, `<table>` without `<th scope>`, radio sets outside a `<fieldset>` | **Whether the structure describes the content.** Every heading can be at the right level and the outline still be meaningless. A `<div>` grid that looks like a table but is not is invisible here |
 | **1.3.2** Meaningful Sequence | **Partial** | DOM order vs visual order disagreements from CSS `order`, `grid-area`, `position: absolute` | **Which order is the meaningful one.** The tool can say the two disagree; only a reader knows which is right |
 | **1.3.3** Sensory Characteristics | **None** | — | "Click the button on the right" is ordinary English. Detecting it requires understanding that the sentence identifies a control by position |
-| **1.3.4** Orientation | Full | a CSS or meta orientation lock | — |
+| **1.3.4** Orientation | Full | a CSS or meta orientation lock *Not in this suite.* | — |
 | **1.3.5** Identify Input Purpose | **Full** | a personal-data field with no `autocomplete`, or with an invalid token | Whether the token chosen is the *right* one for the field is nearly always inferable from the name and label, so this is one of the few content-ish criteria a tool genuinely closes |
 | **1.4.1** Use of Color | **None** | (a tool can flag links with no underline in body text — a heuristic, not the criterion) | Requires knowing what information the colour carries. A red border on an invalid field is a failure; a red brand accent is not, and they are the same CSS |
 | **1.4.2** Audio Control | **Partial** | `autoplay` media that is not `muted` | Whether it plays for more than 3 seconds, and whether a control near the top of the page stops it |
@@ -72,13 +72,13 @@ Each row cross-references `accessibility.md` §1 rather than restating it. **Ful
 | **1.4.5** Images of Text | **None** | — | Requires reading the image |
 | **1.4.10** Reflow | **Partial** | two-dimensional scrolling at a 320px-equivalent viewport, with the widest offender named | Whether content or functionality was *lost* rather than merely rearranged |
 | **1.4.11** Non-text Contrast | **Partial** | focus-ring contrast measured in pixels; icon and border contrast against a solid adjacent colour | **Which boundaries are "required to identify the control"** — that is a design judgement about affordance, not a property of the CSS |
-| **1.4.12** Text Spacing | **Partial** | inject the bookmarklet CSS and diff for clipping | Whether the clipping matters, and whether meaning survived |
-| **1.4.13** Content on Hover/Focus | **Partial** | Esc dismissal is drivable; persistence can be timed | **Hoverable** — whether the pointer can travel into it without it vanishing — is a geometry-and-timing question that is drivable in principle and reliably wrong in practice |
+| **1.4.12** Text Spacing | **Partial** | inject the bookmarklet CSS and diff for clipping *Not in this suite.* | Whether the clipping matters, and whether meaning survived |
+| **1.4.13** Content on Hover/Focus | **Partial** | Esc dismissal is drivable; persistence can be timed *Not in this suite.* | **Hoverable** — whether the pointer can travel into it without it vanishing — is a geometry-and-timing question that is drivable in principle and reliably wrong in practice |
 | **2.1.1** Keyboard | **Partial** | a focusable element the tab sequence never reaches; a click handler on a non-interactive element with no role, tabindex or key handler; a declared key map that does not hold | **Whether every FUNCTION is operable.** A tool does not know what the functions are. Drag-to-reorder with no keyboard path is invisible to it |
 | **2.1.2** No Keyboard Trap | **Full** | drive Tab and Shift+Tab and detect a cycle shorter than the page's tab stops | Third-party iframes are opaque; the tool can see focus enter and not come back, which is usually enough |
-| **2.1.4** Character Key Shortcuts | **Partial** | single-key listeners on `document` | Whether they are focus-scoped or remappable |
+| **2.1.4** Character Key Shortcuts | **Partial** | single-key listeners on `document` *Not in this suite.* | Whether they are focus-scoped or remappable |
 | **2.2.1** Timing Adjustable | **None** | — | Requires knowing a time limit exists and what it governs |
-| **2.2.2** Pause, Stop, Hide | **Partial** | CSS animations over 5s with no pause control; `autoplay` media | Whether a control elsewhere pauses it |
+| **2.2.2** Pause, Stop, Hide | **Partial** | CSS animations over 5s with no pause control; `autoplay` media *Not in this suite.* | Whether a control elsewhere pauses it |
 | **2.3.1** Three Flashes | **Partial** | frame-differencing a recording, in principle | Nobody does this in CI. Treat as manual |
 | **2.4.1** Bypass Blocks | **Partial** | a skip link exists, is first, is focusable and is not `display: none` | Whether it lands somewhere useful |
 | **2.4.2** Page Titled | **Partial** | `<title>` exists and is non-empty | **Whether it is descriptive and unique.** `<title>Home</title>` on nine pages passes |
@@ -87,7 +87,7 @@ Each row cross-references `accessibility.md` §1 rather than restating it. **Ful
 | **2.4.5** Multiple Ways | **None** | — | A site-level architecture question |
 | **2.4.6** Headings and Labels | **None** | — | "Describes topic or purpose" is the whole criterion, and it is a judgement about language |
 | **2.4.7** Focus Visible | **Full** *(rendered)* | screenshot focused vs unfocused, measure the delta and its contrast. `outline: none` in source is a hint; pixels are the answer | Nothing meaningful. This is the criterion automation closes best once you stop reading CSS and start measuring |
-| **2.4.11** Focus Not Obscured | **Partial** | compare the focused element's rect against sticky/fixed elements' rects | Partial obscuring is permitted at AA; deciding "entirely hidden" at the edges is fiddly |
+| **2.4.11** Focus Not Obscured | **Partial** | compare the focused element's rect against sticky/fixed elements' rects *Not in this suite.* | Partial obscuring is permitted at AA; deciding "entirely hidden" at the edges is fiddly |
 | **2.5.1** Pointer Gestures | **None** | — | Requires knowing a gesture exists |
 | **2.5.2** Pointer Cancellation | **Partial** | actions bound to `pointerdown`/`mousedown` rather than `click` | Whether the down-event *executes* the function or only previews it |
 | **2.5.3** Label in Name | **Full** | the visible text is not contained in the computed accessible name | Ordering subtleties in a few languages |
@@ -96,16 +96,16 @@ Each row cross-references `accessibility.md` §1 rather than restating it. **Ful
 | **2.5.8** Target Size | **Partial** | measure every target's rect | The **spacing**, **inline**, **equivalent** and **essential** exceptions all need judgement; axe gets the geometry right and the exceptions approximately |
 | **3.1.1** Language of Page | **Full** | `lang` present and a valid BCP 47 tag | Whether it matches the actual language — detectable heuristically, not a conformance result |
 | **3.1.2** Language of Parts | **None** | — | Requires detecting a language change in running text |
-| **3.2.1 / 3.2.2** On Focus / On Input | **Partial** | drive focus and change events and watch for navigation or DOM replacement | What counts as a "change of context" is partly a judgement |
+| **3.2.1 / 3.2.2** On Focus / On Input | **Partial** | drive focus and change events and watch for navigation or DOM replacement *Not in this suite.* | What counts as a "change of context" is partly a judgement |
 | **3.2.3 / 3.2.4 / 3.2.6** Consistency | **Partial** | compare nav order and component names across a crawl | Whether two differently-named things do the same job |
-| **3.3.1** Error Identification | **Partial** | submit invalid and check for `aria-invalid`, a described-by error, a live region | **Whether the error was identified in TEXT the user can act on** |
+| **3.3.1** Error Identification | **Partial** | submit invalid and check for `aria-invalid`, a described-by error, a live region *Not in this suite.* | **Whether the error was identified in TEXT the user can act on** |
 | **3.3.2** Labels or Instructions | **Full** | no label by any of the four mechanisms | Whether the label says the right thing (that is 2.4.6, above) |
 | **3.3.3** Error Suggestion | **None** | — | "When the fix is known, suggest it" is a judgement about both the fix and the suggestion |
 | **3.3.4** Error Prevention | **None** | — | Requires knowing which submissions are legal, financial or irreversible |
 | **3.3.7** Redundant Entry | **None** | — | Requires knowing what was already entered and whether re-entry is essential |
-| **3.3.8** Accessible Authentication | **Partial** | `onpaste` blocked on a password or OTP field; split single-character OTP inputs; missing `autocomplete` on credentials | Whether a CAPTCHA's alternative path is genuinely equivalent |
+| **3.3.8** Accessible Authentication | **Partial** | `onpaste` blocked on a password or OTP field; split single-character OTP inputs; missing `autocomplete` on credentials *This suite checks the `autocomplete` only (1.3.5's check).* | Whether a CAPTCHA's alternative path is genuinely equivalent |
 | **4.1.2** Name, Role, Value | **Partial** | empty computed accessible names, invalid roles, invalid ARIA values, ARIA references that resolve to nothing, states that never change when driven | **Whether the name is a good name**, and whether the role is the *right* role for what the thing does |
-| **4.1.3** Status Messages | **Partial** | a live region exists before its content changes; an action produced no announcement at all | **Whether the announcement was timely, once, and useful** |
+| **4.1.3** Status Messages | **Partial** | a live region exists before its content changes; an action produced no announcement at all *Not in this suite.* | **Whether the announcement was timely, once, and useful** |
 
 Count the criteria. A tool fully decides 7 of the 55 A and AA criteria, decides part of 31 more, and leaves 17 that need a person. That is coverage counted by criterion. §6 counts barriers and issues instead, which are different quantities, so its numbers differ.
 

@@ -1047,5 +1047,89 @@ class A11yStaticReadsBoundAttributes(TempDirTest):
         self.assertEqual([], self.rules('<button @click="go">Go</button>'))     # the control
 
 
+class TheAuditsRuntimeMediums(TempDirTest):
+    """P54 part 7, the audit of 2026-10-14's §3.6: G1 and G2, a11y_static's
+    reading of what is nested in an element."""
+
+    def rules(self, name, text):
+        self.write(name, text)
+        proc = run_py("a11y-audit-runner", "a11y_static", name, "--json", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return [f["rule"] for f in json.loads(proc.stdout)["findings"]]
+
+    def test_aria_hidden_counts_the_tab_stops_at_any_depth(self):
+        """G1: only direct children were read, so a link two levels down was
+        missed, and a child that takes no focus (`type="hidden"`, `hidden`,
+        `inert`, `tabindex="-1"`) was counted."""
+        cases = {
+            '<div aria-hidden="true"><ul><li><a href="/x">x</a></li></ul></div>': 1,
+            '<div aria-hidden="true"><p><span tabindex="0">x</span></p></div>': 1,
+            '<div aria-hidden="true"><input type="hidden" name="t"></div>': 0,
+            '<div aria-hidden="true"><a href="/x" tabindex="-1">x</a></div>': 0,
+            '<div aria-hidden="true"><div hidden><button>x</button></div></div>': 0,
+            '<div aria-hidden="true" inert><a href="/x">x</a></div>': 0,
+            '<div aria-hidden="true"><section inert><a href="/x">x</a></section></div>': 0,
+            '<div aria-hidden="true"><div hidden="false"><button>x</button></div></div>': 0,   # boolean:
+            '<div aria-hidden="true"><div inert="false"><a href="/x">x</a></div></div>': 0,    # present is on
+        }
+        bound = {                                                # Codex on #151: a bound value may be false
+            '<div aria-hidden="true"><button hidden={open}>x</button></div>': 1,
+            '<div aria-hidden="true"><section inert={busy}><a href="/x">x</a></section></div>': 1,
+        }
+        for jsx, want in bound.items():
+            with self.subTest(jsx=jsx):
+                got = self.rules("Widget.tsx", f"export function W() {{ return {jsx}; }}\n")
+                self.assertEqual(want, got.count("aria-hidden-focusable"))
+        for html, want in cases.items():
+            with self.subTest(html=html):
+                got = self.rules("page.html", f"<!doctype html><html lang=\"en\"><title>t</title><main>{html}</main></html>")
+                self.assertEqual(want, got.count("aria-hidden-focusable"))
+
+    def test_a_control_named_inside_or_by_a_component_is_not_empty(self):
+        """G2: the name was looked for one level deep, and a component child
+        (`<Icon/>`) read as nothing, though the file's own rule says what a
+        component renders cannot be told."""
+        cases = {
+            "<button><span><img src=\"x.png\" alt=\"Close\" /></span></button>": False,
+            "<button><Icon name=\"close\" /></button>": False,
+            "<button><span><span aria-label=\"Close\"></span></span></button>": False,
+            "<button><span><img src=\"x.png\" alt=\"\" /></span></button>": True,   # the control
+            "<button><span aria-hidden=\"true\"><img src=\"x.png\" alt=\"Close\" /></span></button>": True,
+            "<button><span aria-hidden=\"true\"><Icon name=\"close\" /></span></button>": True,   # Codex on #151
+        }
+        for jsx, empty in cases.items():
+            with self.subTest(jsx=jsx):
+                got = self.rules("Widget.tsx", f"export function W() {{ return {jsx}; }}\n")
+                self.assertEqual(empty, "empty-control" in got)
+
+    def test_the_coverage_table_says_what_this_suite_runs(self):
+        """G7: automation-coverage.md §3 read as this suite's coverage, but the
+        mechanism of 1.3.4 (a "Full" row), 2.4.11, 3.3.8 and nine more is in
+        neither gate, though SKILL.md read as if it caught all 7. A Full row names
+        a check one of the two gates runs, or says it is not in this suite; a
+        marked row's criterion is in neither gate; the count is the table's."""
+        skill = SKILLS / "a11y-audit-runner"
+        doc = (skill / "references" / "automation-coverage.md").read_bytes().decode("utf-8")
+        table = doc[doc.index("## 3. The coverage table"):doc.index("## 4. ")]
+        gates = "".join((skill / "scripts" / n).read_bytes().decode("utf-8")
+                        for n in ("a11y_static.py", "a11y_runtime.mjs"))
+        rows = re.findall(r"^\| \*\*([^*]+)\*\*[^|]*\|([^|]*)\|(.*)$", table, re.M)
+        self.assertEqual(len([line for line in table.splitlines() if line.startswith("| **")]), len(rows))
+        self.assertGreater(len(rows), 50)
+        decided = 0
+        for named, auto, rest in rows:                  # `3.2.3 / 3.2.4 / 3.2.6` too (CodeRabbit on #151)
+            criteria = re.findall(r"\d\.\d+\.\d+", named)
+            with self.subTest(sc=named):
+                self.assertTrue(criteria)
+                in_a_gate = any(re.search(rf"(?<![\d.]){re.escape(sc)}(?!\d)", gates) for sc in criteria)
+                marked = "*Not in this suite.*" in rest
+                if marked:
+                    self.assertFalse(in_a_gate, "marked, but a gate names it")
+                elif "Full" in auto:
+                    self.assertTrue(in_a_gate, "a Full row this suite does not run")
+                    decided += 1
+        self.assertIn(f"(this suite runs {decided} of them)", (skill / "SKILL.md").read_bytes().decode("utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -567,6 +567,50 @@ class Node:
     descendants: list   # list[Node]
 
 
+def subtree(node: Node, skip=None):
+    """Every element under `node`, at any depth, in order: `descendants`
+    holds the direct children only, so `<div aria-hidden="true"><ul><li><a
+    href>` went unread (the audit's G1). `skip(child)` true leaves that
+    child's whole subtree out."""
+    stack = list(reversed(node.descendants))
+    while stack:
+        d = stack.pop()
+        if skip and skip(d):
+            continue
+        yield d
+        stack.extend(reversed(d.descendants))
+
+
+def _out_of_reach(node: Node) -> bool:
+    """`hidden` or `inert`, written as such: nothing in it takes focus. Both
+    are boolean attributes, so `hidden="false"` hides too (CodeRabbit on
+    #151). A bound value (`hidden={open}`, `:inert="busy"`) may be false, so
+    it is read as reachable and stays audited (Codex on #151)."""
+    a = node.tag.attrs
+    return any(k in a and a[k] != EXPR for k in ("hidden", "inert"))
+
+
+def _silent(node: Node) -> bool:
+    """Out of the accessibility tree as written: `hidden`, `inert` or
+    `aria-hidden="true"`. Nothing in it names a control (Codex on #151)."""
+    return _out_of_reach(node) or str(node.tag.attrs.get("aria-hidden", "")).strip().lower() == "true"
+
+
+def _tab_stop(node: Node) -> bool:
+    """Whether a keyboard user can Tab to the element (G1): a negative
+    `tabindex` takes it out, a non-negative one puts any element in; a link
+    needs its `href`; a disabled control and `<input type="hidden">` are out."""
+    a = node.tag.attrs
+    index = str(a.get("tabindex", a.get("tabIndex", ""))).strip()
+    if index.lstrip("-").isdigit():
+        return not index.startswith("-")
+    if node.tag.name not in FOCUSABLE_SEL or "disabled" in a:
+        return False
+    if node.tag.name == "a" and a.get("href") is None:
+        return False
+    return not (node.tag.name == "input" and str(a.get("type", "")).lower() == "hidden")
+
+
 def build_tree(text: str, tags: list[Tag]) -> list[Node]:
     """Pair open and close tags. Unbalanced markup is normal in templates, so a
     tag that is never closed simply gets an empty body rather than derailing
@@ -948,12 +992,8 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                         "which Safari needs, and which this rule allows.)")
 
         # ---- K: aria-hidden / presentational over focusable content -------
-        if str(a.get("aria-hidden", "")).lower() == "true" and node:
-            focusables = [d for d in node.descendants
-                          if d.tag.name in FOCUSABLE_SEL
-                          and not (d.tag.name == "a" and d.tag.attrs.get("href") is None)
-                          and "disabled" not in d.tag.attrs
-                          or str(d.tag.attrs.get("tabindex", "")).strip() in ("0",)]
+        if str(a.get("aria-hidden", "")).lower() == "true" and node and not _out_of_reach(node):
+            focusables = [d for d in subtree(node, _out_of_reach) if _tab_stop(d)]
             if focusables:
                 add(line, "K", "aria-hidden-focusable", "1.3.1 / 4.1.2", "error",
                     f"`aria-hidden=\"true\"` on <{name}> which contains "
@@ -1382,7 +1422,9 @@ def _has_name(t: Tag, a: dict, inner: str, node) -> bool:
         if v == EXPR or (v is not None and str(v).strip()):
             return True
     if node:
-        for d in node.descendants:
+        for d in subtree(node, _silent):            # at any depth (G2), not what is hidden
+            if d.tag.name[:1].isupper():
+                return True                          # a component's name: cannot tell (G2)
             da = d.tag.attrs
             if d.tag.name == "img" and str(da.get("alt", "")).strip():
                 return True
