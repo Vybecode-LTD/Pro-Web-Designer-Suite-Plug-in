@@ -291,6 +291,18 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   `rgb(255, 0, 0, 0.5)` and `hsl(0, 100%, 50%, 0.5)`, the legacy form under the names
   CSS Color 4 made aliases of `rgba()` and `hsla()`, were left out of a DTCG document as
   unsupported; they are written with their alpha (`test_dtcg.TheWriter`).
+- **The release job, the tooling README and the plugin README were wrong on three
+  counts** (the audit's D1, D2 and D3):
+  - `release.yml` pinned `actions/checkout` and `astral-sh/setup-uv` by tag while the
+    job holds `contents: write` and `GH_TOKEN`, and checkout kept its credential. Both
+    are pinned to commit SHAs and checkout sets `persist-credentials: false`, as
+    `evals.yml` does;
+  - `tooling/README.md` said a build is byte-identical on a rebuild. It is with the
+    same zlib; Windows' Python 3.14 deflates with zlib-ng, so a local build's bytes and
+    `SHA256SUMS` differ from the release's, and `compare.py` compares by content;
+  - the plugin README said three browser scripts need Node; six `.mjs` scripts do.
+
+  `test_release_build.TheAuditsReleaseMediums`.
 - **The schema reader, the scaffold, the email build and the deck misread nine things**
   (the audit's E1 to E8 and E10):
   - a naive `timestamp` named `created_at` or `updated_at` (every Prisma `DateTime
