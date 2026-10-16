@@ -292,7 +292,7 @@ class DiffSystemClassifiesWhatSystemJsonRecords(TempDirTest):
     # -- LC-C5: the layer order -------------------------------------------
 
     def test_system_json_records_the_layer_order(self):
-        data = json.loads(open(self.snapshot("v1"), encoding="utf-8").read())
+        data = json.loads(pathlib.Path(self.snapshot("v1")).read_bytes())
         self.assertEqual(data["layers"], ["reset, tokens, base, components, utilities"])
 
     def test_a_layer_reorder_between_two_snapshots_is_major(self):
@@ -306,7 +306,7 @@ class DiffSystemClassifiesWhatSystemJsonRecords(TempDirTest):
 
     def test_an_older_snapshot_without_the_layer_order_says_to_re_extract(self):
         old = self.snapshot("v1")
-        data = json.loads(open(old, encoding="utf-8").read())
+        data = json.loads(pathlib.Path(old).read_bytes())
         del data["layers"]
         legacy = self.write("legacy/system.json", json.dumps(data))
         res = self.diff(str(legacy), self.snapshot("v2"))
@@ -471,9 +471,10 @@ class TheWorkedRelease(TempDirTest):
         old = (SKILLS / "web-design-studio" / "assets" / "starter" / "styles" / "tokens.css").read_text(encoding="utf-8")
         new = old
         for edit in fx["edits"]:
-            count = new.count(edit["old"])
-            self.assertTrue(count == 1 or (edit.get("all") and count), edit)
-            new = new.replace(edit["old"], edit["new"])
+            with self.subTest(edit=edit):
+                count = new.count(edit["old"])
+                self.assertTrue(count == 1 or (edit.get("all") and count), edit)
+                new = new.replace(edit["old"], edit["new"])
         a, b = self.write("a/tokens.css", old), self.write("b/tokens.css", new)
         proc = run_py("design-system-versioning", "diff_system", a, b,
                       "--from-version", fx["from_version"], cwd=self.tmp)
@@ -522,7 +523,8 @@ class TheAuditsVersioningMediums(TempDirTest):
         self.assertEqual(kinds, set(rows))
         self.assertNotIn("component-renamed", kinds)
         for kind in ("theme-override-changed", "theme-override-removed"):
-            self.assertIn("patch if it resolves as before", rows[kind])
+            with self.subTest(kind=kind):
+                self.assertIn("patch if it resolves as before", rows[kind])
 
     def test_another_docs_schema_version_is_refused(self):
         """V14 (audit, 2026-10-14): diff_system read any design-system-docs

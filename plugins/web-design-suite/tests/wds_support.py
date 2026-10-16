@@ -19,6 +19,10 @@ import sys
 import tempfile
 import unittest
 
+# Loading a script (load_script, and the modules that load their own) must not
+# leave a __pycache__ in the plugin, whether or not the run gave -B (T7).
+sys.dont_write_bytecode = True
+
 PLUGIN = pathlib.Path(os.environ.get("WDS_PLUGIN_ROOT")
                       or pathlib.Path(__file__).resolve().parents[1])
 SKILLS = PLUGIN / "skills"

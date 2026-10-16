@@ -486,9 +486,11 @@ class MatrixModel(TempDirTest):
         ltr = [s for s in stages if "--f_label--" in s]
         self.assertTrue(rtl and ltr, stages[:3])
         for stage in rtl:
-            self.assertIn(' dir="rtl" lang="ar"', stage)
+            with self.subTest(stage=stage):
+                self.assertIn(' dir="rtl" lang="ar"', stage)
         for stage in ltr:
-            self.assertNotIn(" dir=", stage)
+            with self.subTest(stage=stage):
+                self.assertNotIn(" dir=", stage)
         self.assertIn(">حفظ</span>", sheet)
 
     def test_a_fixture_with_a_bad_direction_or_key_is_refused(self):
@@ -579,7 +581,8 @@ class SupabaseSecurityDefaults(TempDirTest):
         draft = types.split("export type ProfileDraft", 1)[1].split(">;", 1)[0]
         self.assertIn("'display_name'", draft)
         for name in ("role", "is_admin", "credits", "org_id", "api_token", "reset_token"):
-            self.assertNotIn(f"'{name}'", draft)
+            with self.subTest(name=name):
+                self.assertNotIn(f"'{name}'", draft)
 
     def test_a_human_can_release_an_authority_column(self):
         answers = self.write("answers.json", json.dumps(

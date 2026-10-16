@@ -230,13 +230,15 @@ class NotesNeverReachTheClient(Deck):
                                "Every decision, for the record", "Where every number came from",
                                "deck-provenance", "<script", "aria-hidden", "data-deck-notes",
                                "Fix before presenting"):
-            self.assertIn(presenter_only, deck)
-            self.assertNotIn(presenter_only, kept, presenter_only)
+            with self.subTest(presenter_only=presenter_only):
+                self.assertIn(presenter_only, deck)
+                self.assertNotIn(presenter_only, kept, presenter_only)
         self.assertIn('data-handout="on"', kept)
         self.assertIn('<meta name="deck-handout" content="yes">', kept)
         for slide in ("What changed since last time", "Accessibility, stated honestly",
                       "Single-column form", "A static hero with one message"):
-            self.assertIn(slide, kept)
+            with self.subTest(slide=slide):
+                self.assertIn(slide, kept)
         self.assertIn("data-kind='decision'", kept)
 
     def test_the_handouts_css_is_the_decks_and_passes_the_gate(self):
@@ -256,9 +258,11 @@ class TheSayThisLinesCarryOnlyWhatTheInputsGive(Deck):
         text = (SKILLS / "client-presentation-builder" / "references" / "evidence.md").read_text(encoding="utf-8")
         for invented in ("under two seconds", "eleven lines", "4.6 to 1", "four-second wait",
                          "roughly a third of"):
-            self.assertNotIn(invented, text, invented)
+            with self.subTest(invented=invented):
+                self.assertNotIn(invented, text, invented)
         for placeholder in ("`<total>`", "`<ratio>` to 1", "`<N>` re-pointed tokens", "measure_vitals.mjs"):
-            self.assertIn(placeholder, text, placeholder)
+            with self.subTest(placeholder=placeholder):
+                self.assertIn(placeholder, text, placeholder)
         self.assertIn("41% of 143 planted barriers", text)
         self.assertIn("57% of issues by volume", text)
 
@@ -295,14 +299,16 @@ class ThePresenterWindow(Deck):
                       "Number.isInteger(data.index)", "if (peer && event.source === peer && data && data.deck === deckId)",
                       "data-deck-presenter-badge", 'key === "p" || key === "P"', "openPresenter()",
                       "show(data.index, true, false, true)", ">P<", "a presenter window"):
-            self.assertIn(piece, html, piece)
+            with self.subTest(piece=piece):
+                self.assertIn(piece, html, piece)
         handout = self.tmp / "handout.html"
         proc = self.build(decision_log("D1 — Tokens"), "-o", self.tmp / "d.html", "--handout", handout)
         self.assertEqual(proc.returncode, 0, output(proc))
         self.assertNotIn("peer = event.source", html)
         kept = handout.read_text(encoding="utf-8")
         for piece in ("BroadcastChannel", "data-deck-presenter", "Presenter"):
-            self.assertNotIn(piece, kept, piece)
+            with self.subTest(piece=piece):
+                self.assertNotIn(piece, kept, piece)
 
 
 class SinceLastTimeAndTheStage(Deck):
@@ -393,9 +399,11 @@ class TheDocsKeepTheirOwnRules(unittest.TestCase):
         painted = re.findall(r"^  <section [^\n]*section--(?:surface|sunken|inverse)[^\n]*\n([^\n]*)", text, re.M)
         self.assertEqual(len(painted), 5)
         for opening in re.findall(r"^  <section [^\n]*section--(?:surface|sunken|inverse)[^\n]*$", text, re.M):
-            self.assertIn("bleed-full", opening, opening)
+            with self.subTest(opening=opening):
+                self.assertIn("bleed-full", opening, opening)
         for following in painted:
-            self.assertEqual(following.strip(), '<div class="page-grid">', following)
+            with self.subTest(following=following):
+                self.assertEqual(following.strip(), '<div class="page-grid">', following)
         self.assertEqual(text.count("</div>\n  </section>"), 6, "the hero and the five bands")
 
 

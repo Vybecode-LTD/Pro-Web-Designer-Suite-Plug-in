@@ -109,7 +109,8 @@ class EvidenceRegister(unittest.TestCase):
                              ("limits <style> to 16 kB", "16 kB"),
                              ("adds 54 KB of HTML", "54 KB"),
                              ("more than 102kb, then Gmail", "102kb")):
-            self.assertEqual(FIGURE.findall(text), [figure], text)
+            with self.subTest(text=text, figure=figure):
+                self.assertEqual(FIGURE.findall(text), [figure], text)
         self.assertEqual(FIGURE.findall("a 48px-tall button, 100 × 1024, 4.5:1"), [])
         registered = {v for e in REGISTER["entries"] for v in values(e)}
         self.assertIn(norm("102 KB"), registered)
@@ -118,23 +119,25 @@ class EvidenceRegister(unittest.TestCase):
                     "email-template-system/references/email-client-matrix.md",
                     "email-template-system/references/email-architecture.md",
                     "email-template-system/references/email-workflow.md"):
-            self.assertIn(norm("16,384-byte"), registered_for(doc))
-            self.assertIn(norm("102 KB"), registered_for(doc))
-            # The docs call the threshold what the sources call it, 102 KB,
-            # and say the byte-exact figure is measured.
-            text = (SKILLS / doc).read_text(encoding="utf-8")
-            self.assertIn("102 KB", text, doc)
-            self.assertRegex(text, r"measured[:,]? ?(?:at )?102,400 bytes|102,400 bytes is the measured value|\(102,400 bytes, measured\)", doc)
+            with self.subTest(doc=doc):
+                self.assertIn(norm("16,384-byte"), registered_for(doc))
+                self.assertIn(norm("102 KB"), registered_for(doc))
+                # The docs call the threshold what the sources call it, 102 KB,
+                # and say the byte-exact figure is measured.
+                text = (SKILLS / doc).read_text(encoding="utf-8")
+                self.assertIn("102 KB", text, doc)
+                self.assertRegex(text, r"measured[:,]? ?(?:at )?102,400 bytes|102,400 bytes is the measured value|\(102,400 bytes, measured\)", doc)
         # The scripts enforce what the register records: the <style> ceiling
         # is the registered figure, and the clipping constant is the measured
         # 102,400 the docs name beside the ESPs' 102 KB.
         style_entry = next(e for e in REGISTER["entries"] if e["figure"] == "16,384 bytes")
         style_bytes = int(re.sub(r"\D", "", style_entry["figure"]))
         for script in ("build_email", "lint_email"):
-            source = (SKILLS / "email-template-system" / "scripts" / f"{script}.py").read_text(encoding="utf-8")
-            constants = dict(re.findall(r"^(GMAIL_\w+_BYTES) = ([\d_]+)", source, re.M))
-            self.assertEqual(int(constants["GMAIL_STYLE_BYTES"].replace("_", "")), style_bytes, script)
-            self.assertEqual(int(constants["GMAIL_CLIP_BYTES"].replace("_", "")), 102_400, script)
+            with self.subTest(script=script):
+                source = (SKILLS / "email-template-system" / "scripts" / f"{script}.py").read_text(encoding="utf-8")
+                constants = dict(re.findall(r"^(GMAIL_\w+_BYTES) = ([\d_]+)", source, re.M))
+                self.assertEqual(int(constants["GMAIL_STYLE_BYTES"].replace("_", "")), style_bytes, script)
+                self.assertEqual(int(constants["GMAIL_CLIP_BYTES"].replace("_", "")), 102_400, script)
 
     def test_every_attributed_figure_is_registered(self):
         seen = 0
@@ -191,7 +194,8 @@ class EvidenceRegister(unittest.TestCase):
                             ("143", "1/143 of it"), ("143", "a 2-143 range"), ("41%", "41%-43%"),
                             ("143", "143 - 200 failures"), ("143", "143 / 200"), ("143", "1 / 143"),
                             ("143", "a 2 – 143 range"), ("41%", "41% – 43%")):
-            self.assertFalse(quoted(value, norm(text)), text)
+            with self.subTest(value=value, text=text):
+                self.assertFalse(quoted(value, norm(text)), text)
         entry = {"figure": "16,384 bytes", "also": ["16,384-byte", "16384 bytes", "16 kB"]}
         self.assertEqual(spellings(entry), ["16,384 bytes", "16,384-byte", "16384 bytes"])
         old = {"figure": "19 categories", "also": ["143"]}

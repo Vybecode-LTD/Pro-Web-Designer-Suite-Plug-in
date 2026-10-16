@@ -1,4 +1,4 @@
-"""Four of ruff's checks, kept without ruff (the suite is standard library only).
+"""Five of ruff's checks, kept without ruff (the suite is standard library only).
 
 D9 and G16 (audit, 2026-10-14): a reviewer with lint on listed unused imports
 (F401), f-strings with nothing to format (F541), locals assigned and never
@@ -83,7 +83,17 @@ def raise_without_from(tree: ast.Module) -> list[str]:
     return out
 
 
-CHECKS = {"F401": unused_imports, "F541": empty_fstrings, "F841": unread_locals, "B904": raise_without_from}
+def unclosed_opens(tree: ast.Module) -> list[str]:
+    """SIM115's plain case, T10 (audit, 2026-10-14): `open(…).read()` leaves
+    the file to the collector, a ResourceWarning under -W error."""
+    return [str(n.lineno) for n in ast.walk(tree)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+            and isinstance(n.func.value, ast.Call) and isinstance(n.func.value.func, ast.Name)
+            and n.func.value.func.id == "open"]
+
+
+CHECKS = {"F401": unused_imports, "F541": empty_fstrings, "F841": unread_locals, "B904": raise_without_from,
+          "SIM115": unclosed_opens}
 
 
 class TheChecksFindTheirCase(unittest.TestCase):
@@ -106,6 +116,49 @@ class TheChecksFindTheirCase(unittest.TestCase):
         self.assertEqual([], self.found("B904", "try:\n    pass\nexcept ValueError as exc:\n    raise\n"
                                                 "try:\n    pass\nexcept ValueError as exc:\n    raise exc\n"
                                                 "try:\n    pass\nexcept ValueError:\n    raise TypeError() from None\n"))
+        self.assertEqual(["1"], self.found("SIM115", "data = open('a').read()\nwith open('b') as f:\n    f.read()\n"))
+
+
+def loops_without_subtest(tree: ast.Module) -> list[str]:
+    """T8 (audit, 2026-10-14): a loop in a test method that asserts with no
+    `subTest` stops at its first failure and hides the rest. A loop inside a
+    subTest, or holding one, is fine; so is one outside a method on `self`."""
+    def is_subtest(node):
+        return isinstance(node, ast.With) and any(
+            isinstance(i.context_expr, ast.Call) and isinstance(i.context_expr.func, ast.Attribute)
+            and i.context_expr.func.attr == "subTest" for i in node.items)
+
+    def asserts(node):
+        return any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr.startswith("assert")
+                   and isinstance(n.func.value, ast.Name) and n.func.value.id == "self" for n in ast.walk(node))
+
+    out = []
+
+    def visit(node, method, inside):
+        for child in ast.iter_child_nodes(node):
+            own = method
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                own = bool(child.args.args) and child.args.args[0].arg == "self"
+            if (isinstance(child, ast.For) and own and not inside and asserts(child)
+                    and not any(is_subtest(n) for n in ast.walk(child))):
+                out.append(str(child.lineno))
+                continue
+            visit(child, own, inside or is_subtest(child))
+    visit(tree, False, False)
+    return out
+
+
+class TheTestsLoops(unittest.TestCase):
+
+    def test_an_assertion_loop_reports_each_case(self):
+        flagged = ("class T:\n    def test_x(self):\n        for v in (1, 2):\n            self.assertTrue(v)\n"
+                   "        for v in (1, 2):\n            with self.subTest(v=v):\n                self.assertTrue(v)\n")
+        self.assertEqual(["3"], loops_without_subtest(ast.parse(flagged)))
+        tests = sorted((PLUGIN / "tests").glob("test_*.py"))
+        self.assertGreater(len(tests), 40)
+        for path in tests:
+            with self.subTest(file=path.name):
+                self.assertEqual([], loops_without_subtest(ast.parse(path.read_bytes())))
 
 
 class ThePluginsPython(unittest.TestCase):

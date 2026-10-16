@@ -269,9 +269,10 @@ class ColourRamps(TempDirTest):
     def assert_reproduce_the_starter(self, commands):
         printed = {}
         for args in commands:
-            proc = self.generate(*args)
-            self.assertEqual(proc.returncode, 0, output(proc))
-            printed.update(self.values(proc.stdout.decode("utf-8")))
+            with self.subTest(args=args):
+                proc = self.generate(*args)
+                self.assertEqual(proc.returncode, 0, output(proc))
+                printed.update(self.values(proc.stdout.decode("utf-8")))
         starter = self.values(TOKENS.read_text(encoding="utf-8"))
         self.assertEqual(len(starter), 24)
         self.assertEqual(printed, starter)
@@ -451,7 +452,8 @@ class ByteBudgets(unittest.TestCase):
         self.assertEqual(ttfb, 4 * rtt + server)
         for figure in (f"{ttfb:,} ms", f"four {rtt} ms round trips", f"{server} ms of server time",
                        f"{rest} ms at {kbps} Kbps", f"{rest * kbps / 8 / 1000:g} KB"):
-            self.assertIn(figure, para)
+            with self.subTest(figure=figure):
+                self.assertIn(figure, para)
 
     def test_skill_md_quotes_the_table(self):
         text = (SKILLS / "perf-budget-gate" / "SKILL.md").read_text(encoding="utf-8")

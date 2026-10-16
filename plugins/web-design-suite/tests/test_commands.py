@@ -256,13 +256,15 @@ class TheInstallGate(CommandTest):
         flow = load_yaml(text)
         self.assertEqual({"gates", "windows", "baselines"}, set(flow["jobs"]))
         for job in ("gates", "baselines"):
-            self.assertEqual("mcr.microsoft.com/playwright:v1.62.1-noble", flow["jobs"][job]["container"])
+            with self.subTest(job=job):
+                self.assertEqual("mcr.microsoft.com/playwright:v1.62.1-noble", flow["jobs"][job]["container"])
         self.assertEqual("windows-latest", flow["jobs"]["windows"]["runs-on"])
         checkouts = [s for job in flow["jobs"].values() for s in job["steps"]
                      if s.get("uses", "").startswith("actions/checkout@")]
         self.assertEqual(3, len(checkouts))
         for step in checkouts:                    # CodeRabbit on #85: no token for npm's install scripts
-            self.assertIs(False, step["with"]["persist-credentials"])
+            with self.subTest(step=step):
+                self.assertIs(False, step["with"]["persist-credentials"])
         self.assertIn("update-baselines", flow["on"]["workflow_dispatch"]["inputs"])
         runs = "\n".join(step.get("run", "") for step in flow["jobs"]["gates"]["steps"])
         self.assertIn("npx wait-on http://127.0.0.1:8080", runs)
@@ -325,7 +327,8 @@ class TheInstallGate(CommandTest):
                 proc = self.run_py(*line.split()[1:])
                 self.assertEqual(0, proc.returncode, output(proc))
         for name in ("audit", "a11y", "perf"):
-            self.assertTrue((self.tmp / "ci" / f"{name}.json").is_file(), name)
+            with self.subTest(name=name):
+                self.assertTrue((self.tmp / "ci" / f"{name}.json").is_file(), name)
         self.assertEqual(0, self.run_py("scripts/audit_design.py", "--strict").returncode)   # the leak, recorded
 
     def test_a_missing_or_ranged_playwright(self):
@@ -512,10 +515,12 @@ class TheNewSystem(ChainTest):
         self.assertEqual(0, proc.returncode, output(proc))
         tokens = (self.tmp / "src" / "styles" / "tokens.css").read_text(encoding="utf-8")
         for stale in ("Ember", "--neutral-hue 75", "Verified ", "ratio 1.200", "Same 380 -> 1440"):
-            self.assertNotIn(stale, tokens)
+            with self.subTest(stale=stale):
+                self.assertNotIn(stale, tokens)
         for note in ('"#2563eb" --anchor-seed prints it', '"#2563eb" --neutral --neutral-hue 250 prints it',
                      "--ratio 1.125 --dual-ratio 1.25 prints these steps", "The starter measured 4.60:1"):
-            self.assertIn(note, " ".join(tokens.split()))
+            with self.subTest(note=note):
+                self.assertIn(note, " ".join(tokens.split()))
         body = split_front(COMMANDS / "new-system" / "SKILL.md")[1]      # CodeRabbit on #87
         self.assertIn('Exit 2 after "wrote 7 files" means the files are there', " ".join(body.split()))
 
@@ -667,9 +672,10 @@ class TheChains(ChainTest):
         steps = self.steps()
         self.assertEqual(2, len(steps))
         for step in steps:
-            proc = self.run_step(step, {})
-            self.assertEqual(0, proc.returncode, output(proc))
-            self.assertIn("Muted text fails", output(proc))
+            with self.subTest(step=step):
+                proc = self.run_step(step, {})
+                self.assertEqual(0, proc.returncode, output(proc))
+                self.assertIn("Muted text fails", output(proc))
         self.assertEqual(before, (self.tmp / "design-reports" / "critique" / "findings.json").read_bytes())
 
     def test_migrate_takes_the_census_and_changes_nothing(self):
@@ -680,8 +686,9 @@ class TheChains(ChainTest):
         steps = self.steps()
         self.assertEqual(3, len(steps))
         for step in steps:
-            proc = self.run_step(step, {"PATHS": ["src"]})
-            self.assertEqual(0, proc.returncode, output(proc))
+            with self.subTest(step=step):
+                proc = self.run_step(step, {"PATHS": ["src"]})
+                self.assertEqual(0, proc.returncode, output(proc))
         self.assertTrue((self.tmp / "design-reports" / "migration" / "proposal" / "reconciliation.md").is_file())
         self.assertEqual(before, tree(self.tmp / "src"))
 
@@ -697,8 +704,9 @@ class TheChains(ChainTest):
         self.assertIn("space/odd", handoff.read_text(encoding="utf-8"))
         self.write("export.json", json.dumps(clean))
         for step, values in ((audit, {}), (generate, {}), (compare, {"TOKENS": ["src/styles/tokens.css"]})):
-            proc = self.run_step(step, {"EXPORT": ["export.json"], **values})
-            self.assertEqual(0, proc.returncode, output(proc))
+            with self.subTest(step=step, values=values):
+                proc = self.run_step(step, {"EXPORT": ["export.json"], **values})
+                self.assertEqual(0, proc.returncode, output(proc))
         self.assertTrue((self.tmp / "design-reports" / "figma" / "tokens" / "tokens.css").is_file())
         self.assertIn("major", output(proc))                              # the starter's tokens it lacks
 
@@ -708,8 +716,9 @@ class TheChains(ChainTest):
         self.write(".design-suite.json", json.dumps({"schema": 1, "baselines": {"docs": "docs/system.json"}}))
         extract, check = self.steps()
         for step in (extract, check):
-            proc = self.run_step(step, {"PATHS": ["src"]})
-            self.assertEqual(0, proc.returncode, output(proc))
+            with self.subTest(step=step):
+                proc = self.run_step(step, {"PATHS": ["src"]})
+                self.assertEqual(0, proc.returncode, output(proc))
         self.starter(rename=("--fg-subtle:", "--fg-faint:"))
         self.assertEqual(0, self.run_step(extract, {"PATHS": ["src"]}).returncode)
         proc = self.run_step(check, {})
@@ -802,8 +811,9 @@ class TheDeliveryChains(ChainTest):
         steps = self.steps()
         self.assertEqual(6, len(steps))
         for step in steps:
-            proc = self.run_step(step, {"SCHEMA": ["shop.sql"]})
-            self.assertEqual(0, proc.returncode, output(proc))
+            with self.subTest(step=step):
+                proc = self.run_step(step, {"SCHEMA": ["shop.sql"]})
+                self.assertEqual(0, proc.returncode, output(proc))
         self.assertIn("design audit: clean", output(proc))
         self.assertTrue(list((self.tmp / "src").rglob("*.tsx")))
 
@@ -812,12 +822,14 @@ class TheDeliveryChains(ChainTest):
         self.write("notes.sql", NO_RLS)
         introspect, _, answers, dry_run, scaffold, _ = self.steps()
         for step in (introspect, answers):
-            self.assertEqual(0, self.run_step(step, {"SCHEMA": ["notes.sql"]}).returncode)
+            with self.subTest(step=step):
+                self.assertEqual(0, self.run_step(step, {"SCHEMA": ["notes.sql"]}).returncode)
         before = tree(self.tmp / "src")
         for step in (dry_run, scaffold):
-            proc = self.run_step(step, {})
-            self.assertEqual(1, proc.returncode, output(proc))
-            self.assertIn("row-level security is off", output(proc))
+            with self.subTest(step=step):
+                proc = self.run_step(step, {})
+                self.assertEqual(1, proc.returncode, output(proc))
+                self.assertIn("row-level security is off", output(proc))
         self.assertEqual(before, tree(self.tmp / "src"))                  # nothing written
 
     def test_email_build_lints_compiles_and_lints_again(self):
@@ -827,8 +839,9 @@ class TheDeliveryChains(ChainTest):
         steps = self.steps()
         self.assertEqual(4, len(steps))
         for step in steps[:3]:
-            proc = self.run_step(step, {"TEMPLATE": ["emails/receipt.html"], "NAME": ["receipt"]})
-            self.assertEqual(0, proc.returncode, output(proc))
+            with self.subTest(step=step):
+                proc = self.run_step(step, {"TEMPLATE": ["emails/receipt.html"], "NAME": ["receipt"]})
+                self.assertEqual(0, proc.returncode, output(proc))
         self.assertTrue((self.tmp / "design-reports" / "email" / "receipt.txt").is_file())
 
 

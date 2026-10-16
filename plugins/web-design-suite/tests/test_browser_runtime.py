@@ -218,7 +218,8 @@ class RuntimeInABrowser(TempDirTest):
                 '</body></html>')
         errors = self.rules(self.runtime(html, *only("taborder", "names")))
         for rule in ("keyboard-trap", "unreachable-control", "no-accessible-name"):
-            self.assertNotIn(rule, errors)
+            with self.subTest(rule=rule):
+                self.assertNotIn(rule, errors)
 
     def test_focus_inside_an_iframe_moves_and_the_frame_is_audited(self):
         """GT-A2: a same-origin payment frame."""

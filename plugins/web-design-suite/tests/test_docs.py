@@ -313,7 +313,8 @@ class SupabaseSamples(TempDirTest):
         self.assertEqual(proc.returncode, 0, output(proc))
         got = json.loads(proc.stdout)
         for case in got["hostile"]:
-            self.assertIn("threw", case)                   # never reaches .or()
+            with self.subTest(case=case):
+                self.assertIn("threw", case)                   # never reaches .or()
         self.assertEqual(len(got["valid"].get("or", [])), 1, got["valid"])
         self.assertEqual(got["hidden"], "rejected")        # RLS hid the row: 0 rows, no error
         self.assertEqual(got["denied"], "rejected")        # 42501
@@ -440,7 +441,8 @@ class Manifests(unittest.TestCase):
         entry = self.load(self.PLUGIN_MARKET)["plugins"][0]
         self.assertEqual(plugin["name"], entry["name"])
         for field in ("license", "homepage", "author"):
-            self.assertEqual(plugin[field], entry[field], field)
+            with self.subTest(field=field):
+                self.assertEqual(plugin[field], entry[field], field)
 
 
 # What bash, PowerShell 5.1 and cmd do not read alike (XC-B5). A command a
@@ -971,7 +973,10 @@ class NoMachinePaths(unittest.TestCase):
 
 
 PYTHON_FLOOR = (3, 9)
-SCRIPTS = sorted(p for folder in ("skills", "tests", "tools") for p in (PLUGIN / folder).rglob("*.py"))
+# T5 (audit, 2026-10-14): the workflow commands' runners and the shared readers too.
+SCRIPTS = sorted(p for folder in ("skills", "workflow-commands", "shared", "tests", "tools")
+                 for p in (PLUGIN / folder).rglob("*.py"))
+RUNNERS = sorted([*SKILLS.glob("*/scripts/*.py"), *PLUGIN.glob("workflow-commands/*/scripts/*.py")])
 
 
 def floor_python() -> str | None:
@@ -1010,6 +1015,8 @@ class PythonFloor(unittest.TestCase):
 
     def test_every_script_parses_with_the_floors_grammar(self):
         self.assertGreater(len(SCRIPTS), 40)
+        folders = {p.relative_to(PLUGIN).parts[0] for p in SCRIPTS}
+        self.assertLessEqual({"skills", "workflow-commands", "shared", "tests", "tools"}, folders)
         for path in SCRIPTS:
             with self.subTest(script=path.relative_to(PLUGIN).as_posix()):
                 ast.parse(path.read_bytes(), feature_version=PYTHON_FLOOR)
@@ -1024,7 +1031,7 @@ class PythonFloor(unittest.TestCase):
                                    "    compile(open(p, 'rb').read(), p, 'exec')\n", *map(str, SCRIPTS)],
                                   capture_output=True, env=env(), timeout=120)
         self.assertEqual(0, compiled.returncode, output(compiled))
-        for script in sorted(SKILLS.glob("*/scripts/*.py")):
+        for script in RUNNERS:
             with self.subTest(script=script.relative_to(PLUGIN).as_posix()):
                 proc = subprocess.run([FLOOR_PYTHON, str(script), "--help"], capture_output=True,
                                       env=env(), timeout=60)

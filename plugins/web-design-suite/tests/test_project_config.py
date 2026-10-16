@@ -28,7 +28,7 @@ import subprocess
 import sys
 import unittest
 
-from test_dtcg import RESOLVER, RESOLVER_BASE, RESOLVER_DARK
+from test_dtcg import RESOLVER, RESOLVER_BASE, RESOLVER_DARK, srgb
 from test_figma_sync import PROJECT_ACCENT, STEPS
 from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, load_script, output, run_node, run_py
 
@@ -276,10 +276,11 @@ class ABomOnTheTokenFile(TempDirTest):
         self.files()
         made = []
         for side in ("plain", "bom"):
-            proc = run_py("design-system-docs", "extract_system", "--tokens", "tokens.css", "--out",
-                          "system.json", "--contract", "contract.json", cwd=self.tmp / side)
-            self.assertEqual(0, proc.returncode, output(proc))
-            made.append([(self.tmp / side / name).read_bytes() for name in ("system.json", "contract.json")])
+            with self.subTest(side=side):
+                proc = run_py("design-system-docs", "extract_system", "--tokens", "tokens.css", "--out",
+                              "system.json", "--contract", "contract.json", cwd=self.tmp / side)
+                self.assertEqual(0, proc.returncode, output(proc))
+                made.append([(self.tmp / side / name).read_bytes() for name in ("system.json", "contract.json")])
         self.assertEqual(made[0], made[1])
         self.assertIn(b'"accent": {', made[1][1])                        # the control: not empty
 
@@ -367,9 +368,11 @@ class FigmaAuditReadsTheScales(TempDirTest):
         self.write(".design-suite.json", '{"schema": 1, "tokens": "tokens.css"}')
         off = self.off_scale()
         for name in ("spacing/off", "breakpoint/off", "duration/off"):
-            self.assertNotIn(name, off)                                     # the project's steps
+            with self.subTest(name=name):
+                self.assertNotIn(name, off)                                     # the project's steps
         for name in ("spacing/on", "breakpoint/on", "duration/on", "radius/off"):
-            self.assertIn(name, off)                                        # not the studio's; radius untouched
+            with self.subTest(name=name):
+                self.assertIn(name, off)                                        # not the studio's; radius untouched
 
 
 class AuditReadsTheProject(TempDirTest):
@@ -819,9 +822,9 @@ TOKEN_FILES = {
     "utf16be.json": ("﻿" + json.dumps({"schema": CONTRACT, "ramps": {"brand": {"500": "#123456"}}})).encode("utf-16-be"),
     # P31: DTCG 2025.10 documents, every value form dtcg.py writes as CSS.
     "dtcg.tokens.json": json.dumps(DTCG_EVERY_FORM),
-    "extends.tokens": json.dumps({"base": {"$type": "color", "fg": {"$value": "#111111"}, "bg": {"$value": "#ffffff"}},
-                                  "print": {"$extends": "{base}", "fg": {"$value": "#000000"}},
-                                  "loop": {"$extends": "{loop}", "x": {"$value": "#010101", "$type": "color"}}}),
+    "extends.tokens": json.dumps({"base": {"$type": "color", "fg": {"$value": srgb("#111111")}, "bg": {"$value": srgb("#ffffff")}},
+                                  "print": {"$extends": "{base}", "fg": {"$value": srgb("#000000")}},
+                                  "loop": {"$extends": "{loop}", "x": {"$value": srgb("#010101"), "$type": "color"}}}),
     "legacy.json": json.dumps({"global": {"neutral": {"0": {"value": "#ffffff", "type": "color"}}}}),
     "schema-and-tokens.json": json.dumps({"schema": "x", "a": {"$value": "#fff", "$type": "color"}}),
     # P31 part 2: Tokens Studio exports, legacy and 2025.10 keys, themes, groups and math.
@@ -836,19 +839,19 @@ TOKEN_FILES = {
     "fan.tokens.json": json.dumps(EXTENDS_FAN),
     "deep.tokens.json": json.dumps({"top": {"$type": "color", "$value": "#fff"}, "deep": json.loads(
         '{"g": ' * 70 + '{"$type": "color", "$value": "#000"}' + "}" * 70)}),
-    "names.tokens.json": json.dumps({"Button background": {"$type": "color", "$value": "#ffffff"},
+    "names.tokens.json": json.dumps({"Button background": {"$type": "color", "$value": srgb("#ffffff")},
                                      "A/B (x)": {"$type": "color", "$value": "{Button background}"},
                                      "veil": {"$type": "color", "$value": {"colorSpace": "srgb", "components": [1, 0, 0],
                                                                            "alpha": 0.9995}},
-                                     "loop": {"$extends": "{loop}", "x": {"$type": "color", "$value": "#010101"}},
-                                     "p": {"$extends": "{q}", "x": {"$type": "color", "$value": "#020202"}},
-                                     "q": {"$extends": "{p}", "y": {"$type": "color", "$value": "#030303"}}}),
+                                     "loop": {"$extends": "{loop}", "x": {"$type": "color", "$value": srgb("#010101")}},
+                                     "p": {"$extends": "{q}", "x": {"$type": "color", "$value": srgb("#020202")}},
+                                     "q": {"$extends": "{p}", "y": {"$type": "color", "$value": srgb("#030303")}}}),
     # P31 part 3: a resolver, its files beside it, with every source form and its faults.
     "base.tokens.json": json.dumps(RESOLVER_BASE),
     "dark.tokens.json": json.dumps(RESOLVER_DARK),
     "app.resolver.json": json.dumps(RESOLVER),
     "pointer.resolver.json": json.dumps({"version": "2025.10", "resolutionOrder": [
-        {"type": "set", "name": "s", "sources": [{"$ref": "base.tokens.json#/brand", "600": {"$value": "#345678"}},
+        {"type": "set", "name": "s", "sources": [{"$ref": "base.tokens.json#/brand", "600": {"$value": srgb("#345678")}},
                                                  {"$ref": "base.tokens.json#/nothing"}, {"$ref": "not-json.json"}]},
         {"type": "modifier", "name": "m", "default": 7, "contexts": {"undefined": [], "b": [{"x": {"$value": 1}}]}}]}),
     "sources.resolver.json": json.dumps({"version": "2025.10",          # Codex on #105: one source by pointer
@@ -872,11 +875,11 @@ TOKEN_FILES = {
         "five": {"$type": 5, "a": {"$value": {"colorSpace": "srgb", "components": [1, 0, 0]}}},
         "list": {"b": {"$type": ["color"], "$value": {"colorSpace": "srgb", "components": [0, 1, 0]}}},
         "flag": {"$type": True, "c": {"$value": {"value": 4, "unit": "px"}}},
-        "brand": {"$type": "color", "500": {"$value": "#2563eb"}}}),
+        "brand": {"$type": "color", "500": {"$value": srgb("#2563eb")}}}),
     # S5, S6, S7: a reference with spaces round it, digits that are not ASCII,
     # and `components` given as an object, read alike by both readers.
     "lows.tokens.json": json.dumps({
-        "brand": {"$type": "color", "500": {"$value": "#2563eb"}},
+        "brand": {"$type": "color", "500": {"$value": srgb("#2563eb")}},
         "bg": {"$type": "color", "spaced": {"$value": " {brand.500} "},
                "keys": {"$value": {"colorSpace": "srgb", "components": {"1": 0, "0": 0, "0.5": 0}}},
                "alpha": {"$value": {"colorSpace": "srgb", "components": [1, 0, 0], "alpha": "٠.٥"}}},
@@ -1028,7 +1031,8 @@ class TheNodeReaderAgrees(TempDirTest):
         self.assertEqual({"brand": {"500": "#2563eb"}}, typed["ramps"])
         self.assertNotRegex(json.dumps(typed), r"five|list|flag")
         for name in ("utf16.css", "utf16be.css"):                                  # S8: read, not empty
-            self.assertEqual({"500": "#2563eb"}, python(cases[TOKEN_CASES.index([name])])["ok"]["ramps"]["brand"])
+            with self.subTest(name=name):
+                self.assertEqual({"500": "#2563eb"}, python(cases[TOKEN_CASES.index([name])])["ok"]["ramps"]["brand"])
 
     def test_the_component_globs_match_the_same(self):
         """N37: ESLint asks isComponent() which JSX files are components, as

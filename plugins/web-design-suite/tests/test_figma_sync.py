@@ -96,7 +96,8 @@ class Dtcg2025(TempDirTest):
         for decl in ("--space-6: 1.5rem;", "--dur-base: 220ms;",
                      "--bg-surface: var(--neutral-0);", "--fg-muted: var(--neutral-500);",
                      "--fg-subtle: var(--neutral-500);", "--accent-600: oklch(56.5% 0.176 42);"):
-            self.assertIn(decl, css)
+            with self.subTest(decl=decl):
+                self.assertIn(decl, css)
         self.assertRegex(css, r"--neutral-500: oklch\([\d.]+% [\d.]+ [\d.]+\);")
         self.assertEqual(proc.returncode, 0, output(proc))
 

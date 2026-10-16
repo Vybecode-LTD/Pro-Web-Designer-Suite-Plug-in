@@ -219,8 +219,9 @@ class TheReferencesInABrowser(TempDirTest):
         at100, at200 = seen["at100"], seen["at200"]
         # The worked example: 35px in a 360px card, 45.5px in 700, 56px in 1040.
         for width, size in (("360", 35), ("700", 45.5), ("1040", 56)):
-            self.assertAlmostEqual(at100[width], size, delta=0.1, msg=seen)
-            self.assertAlmostEqual(at200[width], size, delta=0.1, msg=seen)   # a fixed card ignores the window
+            with self.subTest(width=width, size=size):
+                self.assertAlmostEqual(at100[width], size, delta=0.1, msg=seen)
+                self.assertAlmostEqual(at200[width], size, delta=0.1, msg=seen)   # a fixed card ignores the window
         # In a card as wide as a 1440px window: on screen, 1.65x at 200%.
         self.assertAlmostEqual(2 * at200["window"] / at100["window"], 1.65, delta=0.01, msg=seen)
         self.assertAlmostEqual(2 * at200["pure"] / at100["pure"], 1.0, delta=0.01, msg=seen)   # control: no rem term
@@ -284,11 +285,12 @@ class TheReferencesInABrowser(TempDirTest):
             return [float(v) for v in m.groups(default="1")]
 
         for where in ("page", "band"):
-            accent, danger = channels(seen[f"{where}-accent"]), channels(seen[f"{where}-danger"])
-            for name, role in (("mix", accent), ("relative", danger)):
-                got = channels(seen[f"{where}-{name}"])
-                for a, b in zip(got, role[:3] + [0.12]):    # the role's colour, at alpha 0.12
-                    self.assertAlmostEqual(a, b, delta=0.002, msg=f"{where}-{name}: {seen}")
+            with self.subTest(where=where):
+                accent, danger = channels(seen[f"{where}-accent"]), channels(seen[f"{where}-danger"])
+                for name, role in (("mix", accent), ("relative", danger)):
+                    got = channels(seen[f"{where}-{name}"])
+                    for a, b in zip(got, role[:3] + [0.12]):    # the role's colour, at alpha 0.12
+                        self.assertAlmostEqual(a, b, delta=0.002, msg=f"{where}-{name}: {seen}")
         self.assertNotEqual(channels(seen["page-accent"]), channels(seen["band-accent"]), seen)   # the band re-points it
         # Control: derived on :root alone, the band keeps the page's tint.
         self.assertEqual(seen["band-root-only"], seen["page-root-only"], seen)
