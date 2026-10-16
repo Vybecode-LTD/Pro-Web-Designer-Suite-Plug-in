@@ -476,7 +476,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   - `introspect_schema` read Prisma's `Unsupported("geometry")` as a type named
     `unsupported`, with a text input; it reads the type it names, as the SQL does (a
     map picker), and `Unsupported("geography(Point, 4326)")` is no longer cut at its
-    first `)`;
+    first `)`. Neither reader takes a PostGIS SRID for a length any more: only text
+    and bit types have one (Codex on #159);
   - `perf_audit` skipped a `report.html` or `stats.html` without a word. It still
     leaves a bundle analyzer's report out, and names each on stderr and in the JSON's
     `ledger.not_counted`, so a real page of that name is seen;
