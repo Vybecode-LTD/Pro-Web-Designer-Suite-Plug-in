@@ -1204,7 +1204,7 @@ async function forcedColorsSurvey(page) {
       const hasFill = cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
         cs.backgroundColor !== 'transparent';
       if (hasFill && noBorder &&
-          /button|a|summary/.test(el.tagName.toLowerCase())) {
+          /^(button|a|summary)$/.test(el.tagName.toLowerCase())) {
         fillOnly++;
         if (examples.fillOnly.length < 4) examples.fillOnly.push(window.__a11y.cssPath(el));
       }
