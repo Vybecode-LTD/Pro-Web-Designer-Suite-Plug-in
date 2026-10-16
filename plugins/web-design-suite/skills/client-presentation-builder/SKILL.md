@@ -15,8 +15,8 @@ description: Present design work to a client or team as reasoning, not taste, wi
 >
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
-> do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_presentation.py).
+> do; here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_presentation.py; copy their helpers too: dtcg.py, project_config.py).
 > From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`; `${CLAUDE_PLUGIN_ROOT}/skills/design-critique-gate/scripts/critique_report.py`; `${CLAUDE_PLUGIN_ROOT}/skills/perf-budget-gate/scripts/perf_audit.py`.
 
 A design presented without its reasoning is just taste. In a room full of people with
@@ -46,7 +46,7 @@ referendum on taste that the most senior person in the room wins by default.
 A stakeholder can absolutely approve **"we optimised for scanning over density, because the
 analytics say 70% of sessions are under forty seconds."** That has a constraint they can
 check, an alternative they can prefer, and a cost they can accept or reject. It is a
-business decision, which is a thing they are qualified to make and, crucially, a thing they
+business decision, which is a thing they are qualified to make and a thing they
 can be held to later.
 
 | What you show | What the room can say | What you get |
@@ -120,7 +120,7 @@ reconstruction and it will sound like one.
 | `DECISION_LOG.md` | `assets/DECISION_LOG.md`, kept as you worked | Every decision in the five-part shape |
 | `audit.json` | `audit_design.py --json` (web-design-studio) | "Every value comes from one file" |
 | `perf.json` | `perf_audit.py --json` (perf-budget-gate) | Weight against a budget agreed up front |
-| `a11y.json` | `a11y_runtime.mjs --json`, `a11y_static.py --json` or axe results | The accessibility claim you can actually make: "passes" only when it records no violations, "keyboard-tested by hand" only when the decision log has a `## Tested by hand` section, or `--manual FILE`, saying what was tested |
+| `a11y.json` | `a11y_runtime.mjs --json`, `a11y_static.py --json` or axe results | The accessibility claim you can make: "passes" only when it records no violations, "keyboard-tested by hand" only when the decision log has a `## Tested by hand` section, or `--manual FILE`, saying what was tested |
 | `defence.md` | `critique_report.py --format defence` (design-critique-gate) | The decisions needing an out-loud justification, the taste calls, the flaws you are carrying |
 | `shots/` | Screenshots at the width the decision was made at | The work |
 
@@ -155,7 +155,7 @@ Full taxonomy, the mixed-room rule, and what loses each of them:
 
 ### 3. Build the narrative
 
-Pick the structure for the situation you are actually in — first concept, iteration review,
+Pick the structure for the situation you are in — first concept, iteration review,
 final sign-off, redesigning something the client is attached to, internal walkthrough — from
 `references/narrative-structure.md` §3. They are genuinely different shapes, not one deck
 with different titles.
@@ -209,7 +209,7 @@ front of a client into a ten-minute conversation where being persuaded is free.
 ### 6. Capture what was decided in the room
 
 **The deliverable everyone forgets.** Fill `assets/MEETING_RECORD.md` and send it the same
-day: what was approved, what changed and who asked, what is still open with an owner and a
+day: what was approved, what changed and who asked, what is open with an owner and a
 default, and what each change cost.
 
 It doubles as scope protection, and it works because it is not adversarial — it is a summary

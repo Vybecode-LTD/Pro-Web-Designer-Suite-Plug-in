@@ -605,7 +605,9 @@ def read_deprecations(paths: Sequence[Union[str, Path]],
     4), by CSS name, with the reason when one is given, in the order
     read_tokens() reads them: a later file that sets a token again without
     the mark takes it off. A contract.json or a tokens.css marks none, so
-    each token it sets loses its mark (CodeRabbit on #106)."""
+    each token it sets loses its mark (CodeRabbit on #106). A token a DTCG
+    file records as left out (dtcg.recorded) keeps the mark the record
+    gives it, so `deprecate.py import` reads it too (the audit's V3)."""
     out: Dict[str, Union[bool, str]] = {}
     for path in map(Path, paths):
         data = _read_json(path) if is_contract(path) else None
@@ -620,6 +622,11 @@ def read_deprecations(paths: Sequence[Union[str, Path]],
             out.pop(token.name, None)
             if token.deprecated:
                 out[token.name] = token.deprecated
+        left_out, marks = _dtcg(path).recorded(data, path.parent)
+        for name in left_out:
+            out.pop(name, None)
+            if name in marks:
+                out[name] = marks[name]
     return out
 
 

@@ -15,7 +15,7 @@ description: Write and structure landing, pricing and product pages, from positi
 >
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
-> do; when you run one here, use the path form.
+> do; here, use the path form.
 > From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
 
 The sibling skill `web-design-studio` owns **form**: tokens, spacing, architecture, navigation, the audit gate. It says nothing about what a page should *say* or in what order. That omission is deliberate, and this skill is the missing half.

@@ -1615,3 +1615,52 @@ def not_written_marks(data: Any) -> Dict[str, Union[bool, str]]:
     """The `$deprecated` of each token not written, as `true` or its reason."""
     return {n: v for n, v in _own(data, "deprecated").items()
             if isinstance(n, str) and n.startswith("--") and (v is True or (isinstance(v, str) and v))}
+
+
+def recorded(data: Any, base: Optional[Union[str, Path]]) -> Tuple[Dict[str, str], Dict[str, Union[bool, str]]]:
+    """The record of a document or a resolver: each token document() left
+    out, with its CSS value, and the `$deprecated` of each. A resolver's is in
+    the sources its default contexts read, in its folder `base`; a later
+    source wins, as in the resolution, and takes an earlier one's mark off.
+    diff_system and project_config's read_deprecations both read it here
+    (the audit's V2 and V3)."""
+    docs = [data]
+    if is_resolver(data):
+        load = file_loader(base)
+        docs = []
+        for ref in _file_refs(default_sources(data))[:64]:
+            if outside(ref):
+                continue
+            try:
+                docs.append(load(ref))
+            except (OSError, ValueError):
+                continue
+    values: Dict[str, str] = {}
+    marks: Dict[str, Union[bool, str]] = {}
+    for doc in docs:
+        got, got_marks = not_written(doc), not_written_marks(doc)
+        for name, value in got.items():
+            values[name] = value
+            marks.pop(name, None)
+            if name in got_marks:
+                marks[name] = got_marks[name]
+    return values, marks
+
+
+def _file_refs(data: Any) -> List[str]:
+    """Each file a resolver's `$ref`s name (the part before `#`), in order."""
+    out: List[str] = []
+    stack: List[Tuple[Any, int]] = [(data, 0)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > 32:
+            continue
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            name = ref.split("#", 1)[0] if isinstance(ref, str) else ""
+            if name and name not in out:
+                out.append(name)
+            stack.extend((v, depth + 1) for v in reversed(list(node.values())))
+        elif isinstance(node, list):
+            stack.extend((v, depth + 1) for v in reversed(node))
+    return out
