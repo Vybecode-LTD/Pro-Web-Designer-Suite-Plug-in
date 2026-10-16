@@ -44,12 +44,14 @@ Regressions covered:
 """
 from __future__ import annotations
 
+import ast
 import json
 import re
+import subprocess
 import time
 import unittest
 
-from wds_support import SKILLS, TempDirTest, output, run_py
+from wds_support import NODE, SKILLS, TempDirTest, env, output, run_py
 
 
 class NullableFromTopLevelNotNull(TempDirTest):
@@ -1134,3 +1136,125 @@ class TheAuditsRuntimeMediums(TempDirTest):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def assigned_never_read(src):
+    """ruff's F841: a plain `name = …` in a function that the function, and
+    the functions inside it, never read."""
+    tree = ast.parse(src)
+    out = []
+    for fn in ast.walk(tree):
+        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        read = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+        shared = {name for n in ast.walk(fn) if isinstance(n, (ast.Global, ast.Nonlocal)) for name in n.names}
+        for node in ast.walk(fn):
+            for t in node.targets if isinstance(node, ast.Assign) else []:
+                if isinstance(t, ast.Name) and t.id not in read | shared and not t.id.startswith("_"):
+                    out.append(f"{fn.name}: {t.id}")
+    return out
+
+
+class TheAuditsRuntimeLows(TempDirTest):
+    """P55 part 4, the audit of 2026-10-14's §3.6: G8, G9, G10, G12, G14 and
+    G16 (E13, G11 and G15 were closed by #138, E14 and G13 by #142)."""
+
+    def findings(self, name, text):
+        self.write(name, text)
+        proc = run_py("a11y-audit-runner", "a11y_static", name, "--json", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return json.loads(proc.stdout)["findings"]
+
+    def test_a_bound_attribute_is_quoted_as_an_expression(self):
+        """G9: the `EXPR` sentinel reached the messages and the JSON as
+        `type="\\x00expr\\x00"`; a bound `name` hid the `id` beside it."""
+        found = self.findings("Form.jsx", "export function F({ kind, field }) {\n  return (<form>\n"
+                                          "    <input type={kind} />\n"
+                                          "    <input type=\"text\" name={field} id=\"email\" />\n"
+                                          "    <input type=\"email\" name={field} />\n  </form>);\n}\n")
+        messages = [f["message"] for f in found]
+        self.assertEqual([], [m for m in messages if "\x00" in m])
+        self.assertIn("<input type={…}> has no label by any of the four mechanisms.", messages)
+        named = sorted(m.split(">")[0] for m in messages if "autocomplete" in m)
+        self.assertEqual(["<input id=\"email\"", "<input name={…}"], named)
+
+    def test_only_a_job_title_and_a_numbers_own_purposes_ask_for_autocomplete(self):
+        """G9: `^title$&` could never match (a post's `title` must not read as
+        a job title, so it is gone), and `unit` asked a number input for
+        `address-line2`: a number takes only a number's purposes."""
+        cases = {
+            '<input type="text" name="job_title" />': "organization-title",
+            '<input type="text" name="title" />': None,
+            '<input type="number" name="units" />': None,
+            '<input type="text" name="unit" />': "address-line2",
+            '<input type="number" name="birth_year" />': "bday",
+            '<input type="number" name="postal_code" />': "postal-code",
+        }
+        for tag, want in cases.items():
+            with self.subTest(tag=tag):
+                found = self.findings("page.html", f"<!doctype html><html lang=\"en\"><title>t</title>"
+                                                   f"<main><label>x {tag}</label></main></html>")
+                got = [re.search(r"expected `([\w-]+)`", f["message"]).group(1)
+                       for f in found if f["rule"] == "missing-autocomplete"]
+                self.assertEqual([want] if want else [], got)
+
+    def test_a_transition_of_the_outline_colour_is_allowed(self):
+        """G10: the fix text allows transitioning the ring's colour, but
+        `\\boutline\\b` matched `outline-color` too."""
+        cases = {
+            "transition: outline-color 0.2s": 0,
+            "transition: color 0.2s, outline-color 0.2s ease": 0,
+            "transition: outline 0.2s": 1,
+            "transition: outline-offset 0.2s, color 1s": 1,
+            "transition: outline-width 0.2s, outline-color 0.2s": 1,
+        }
+        for decl, want in cases.items():
+            with self.subTest(decl=decl):
+                found = self.findings("f.css", f"a:focus-visible {{ outline: 2px solid red; {decl}; }}\n")
+                self.assertEqual(want, [f["rule"] for f in found].count("focus-ring-transition"))
+
+    @unittest.skipUnless(NODE, "node is not installed")      # CodeRabbit on #159
+    def test_axes_two_digit_criteria_are_named(self):
+        """G12: `/^wcag\\d{3}$/` dropped axe's `wcag1412` (avoid-inline-spacing),
+        so its finding named no criterion."""
+        src = (SKILLS / "a11y-audit-runner" / "scripts" / "a11y_runtime.mjs").read_text(encoding="utf-8")
+        helper = re.search(r"^function wcagCriterion\(.*?^\}\n", src, re.S | re.M)
+        self.assertIsNotNone(helper, "a11y_runtime.mjs has no wcagCriterion() helper")
+        cases = [["cat.structure", "wcag21aa", "wcag1412"], ["wcag2a", "wcag111"],
+                 ["wcag2aa", "wcag143"], ["wcag22aa", "wcag2411"], ["best-practice"], ["wcag21aa"]]
+        js = helper.group(0) + "console.log(JSON.stringify(%s.map(wcagCriterion)));" % json.dumps(cases)
+        proc = subprocess.run([NODE, "-e", js], capture_output=True, env=env())
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual(["1.4.12", "1.1.1", "1.4.3", "2.4.11", "", ""], json.loads(proc.stdout))
+
+    def test_a_page_left_out_by_its_name_is_named(self):
+        """G8: `report.html` and `stats.html` were skipped without a word, so a
+        real page of that name was never weighed or scanned."""
+        page = "<!doctype html><html lang=\"en\"><title>t</title><p>hi</p></html>\n"
+        for rel in ("dist/index.html", "dist/report.html", "dist/docs/stats.html"):
+            self.write(rel, page)
+        proc = run_py("perf-budget-gate", "perf_audit", "dist", "--json", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        ledger = json.loads(proc.stdout)["ledger"]
+        self.assertEqual(["docs/stats.html", "report.html"], sorted(ledger["not_counted"]))
+        self.assertEqual(["index.html"], [a["path"] for a in ledger["assets"]])
+        self.assertIn("report.html", proc.stderr.decode("utf-8"))
+        both = run_py("perf-budget-gate", "perf_audit", "dist", "--json", "--include-maps", cwd=self.tmp)
+        self.assertEqual([], json.loads(both.stdout)["ledger"]["not_counted"])
+        self.assertEqual(3, len(json.loads(both.stdout)["ledger"]["assets"]))
+        # A baseline recorded without them says so too (Codex on #159).
+        base = run_py("perf-budget-gate", "perf_audit", "dist", "--write-baseline", "base.json", cwd=self.tmp)
+        self.assertEqual(0, base.returncode, output(base))
+        self.assertIn("report.html", base.stderr.decode("utf-8"))
+
+    def test_the_header_claims_only_the_checks_perf_audit_makes(self):
+        """G14 and G16: the header listed a missing-srcset check no rule makes,
+        and `audit_css` built a `families` set it never read (ruff F841)."""
+        src = (SKILLS / "perf-budget-gate" / "scripts" / "perf_audit.py").read_text(encoding="utf-8")
+        header = src.split("What it checks", 1)[1].split("Byte accounting", 1)[0]
+        rules = set(re.findall(r'"[A-Z]", "([a-z0-9-]+)"', src))
+        self.assertIn("oversized-image", rules)
+        self.assertEqual(any("srcset" in r for r in rules), "srcset" in header)
+        self.assertEqual([], assigned_never_read(src))
+        self.assertEqual(["f: unused"], assigned_never_read("def f():\n    unused = 1\n    used = 2\n"
+                                                             "    return used\n"))

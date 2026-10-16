@@ -25,7 +25,7 @@ What it checks
                     layout-affecting properties, banners injected at body start
   T  Main thread    scripts without defer/async, duplicated dependencies
   W  Weight         oversized images, legacy/unsubset fonts, poor formats,
-                    missing srcset, unused-looking CSS
+                    unused-looking CSS
 
 Byte accounting
 ---------------
@@ -279,6 +279,9 @@ def mark_alternates(assets: list[Asset]) -> None:
 @dataclass
 class Ledger:
     assets: list[Asset] = field(default_factory=list)
+    # The pages NOT_SHIPPED leaves out by their name, which are named rather
+    # than dropped: a real page called report.html is never weighed (G8).
+    not_counted: list[str] = field(default_factory=list)
 
     def shipped(self) -> list[Asset]:
         return [a for a in self.assets if a.counted]
@@ -854,7 +857,6 @@ def audit_css(path: Path, text: str
                 "found by the preload scanner in the first few kilobytes.")
 
     faces = parse_font_faces(clean)
-    families = {f.family.strip().strip("'\"").lower() for f in faces}
     for f in faces:
         if f.is_local_only:
             continue
@@ -1597,6 +1599,8 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
     for fp in iter_files(build_paths):
         rel = relative(fp).replace(os.sep, "/")
         if NOT_SHIPPED.search(rel) and not include_maps:
+            if rel.endswith(".html"):
+                ledger.not_counted.append(rel)
             continue
         try:
             data = fp.read_bytes()
@@ -1781,6 +1785,11 @@ def main(argv: list[str] | None = None) -> int:
         wanted = {c.upper() for c in args.category}
         findings = [f for f in findings if f.cat in wanted]
 
+    if ledger.not_counted:              # before --write-baseline's return too (Codex on #159)
+        print(f"perf_audit: not counted, as a bundle analyzer's report by its name: "
+              f"{', '.join(ledger.not_counted)}. If one is a page the site serves, "
+              f"rename it, or count it with --include-maps.", file=sys.stderr)
+
     if args.write_baseline:
         payload = {
             "$schema": "perf-budget-gate/baseline/1",
@@ -1817,6 +1826,7 @@ def main(argv: list[str] | None = None) -> int:
                             **({"width": a.width, "height": a.height}
                                if a.width else {})}
                            for a in sorted(ledger.assets, key=lambda x: -x.transfer)],
+                "not_counted": ledger.not_counted,
             },
             "budget": pb,
             "third_party_origins": sorted(facts.third_party_origins),

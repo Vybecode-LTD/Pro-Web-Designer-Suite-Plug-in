@@ -232,6 +232,7 @@ Notes that matter:
 - **`largest_asset` is not redundant with `bytes`.** A total can be met by a hundred small files or blown by one enormous one, and only the second is fixable in an afternoon. The per-asset ceiling is what turns "the page is too big" into "this file is too big".
 - **`growth` is percent-per-check against the committed baseline.** It is the check that catches the regression nobody meant to make. Absolute budgets tell you that you are over; growth tells you *which change* put you over.
 - **Alternate image encodings of the same stem are counted once, at the largest variant.** Shipping `hero.avif`, `hero.webp` and `hero.jpg` is correct and exactly one is ever fetched. A `srcset` *width* ladder is not collapsed, because the tool cannot know which rung a viewport picks.
+- **What a page view never fetches is left out:** sourcemaps, `.d.ts` files, licence texts, `robots.txt` and `sitemap.txt`, and a bundle analyzer's `stats.json`, `stats.html` and `report.html`. An HTML file left out by its name is listed on stderr (and in the JSON's `ledger.not_counted`), so a real page with that name is seen; `--include-maps` counts them all.
 
 ---
 

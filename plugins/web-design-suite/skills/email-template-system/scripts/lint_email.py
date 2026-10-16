@@ -1004,10 +1004,13 @@ class Linter:
             if node.kind != "element":
                 continue
             if node.tag == "style":
+                # Each rule on its own line, counted from where the text starts (E11).
+                text = next((c for c in node.children if c.kind == "text"), None)
+                first = text.line if text else node.line
                 for rule in parse_stylesheet(node.text_content()):
                     where = "`%s`" % ", ".join(rule.selectors) if rule.selectors else "an at-rule"
                     for d in rule.declarations:
-                        yield node.line, where, d.prop, d.value, True
+                        yield first + rule.line - 1, where, d.prop, d.value, True
                 continue
             for name in COLOUR_ATTRS:
                 if node.get(name):

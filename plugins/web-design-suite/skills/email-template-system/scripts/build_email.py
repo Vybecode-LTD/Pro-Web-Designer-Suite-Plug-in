@@ -423,18 +423,47 @@ class Declaration:
 
 
 class Rule:
-    __slots__ = ("selectors", "declarations", "order", "at_rule", "raw")
+    __slots__ = ("selectors", "declarations", "order", "at_rule", "raw", "line")
 
-    def __init__(self, selectors, declarations, order, at_rule, raw) -> None:
+    def __init__(self, selectors, declarations, order, at_rule, raw, line=1) -> None:
         self.selectors: list[str] = selectors
         self.declarations: list[Declaration] = declarations
         self.order: int = order
         self.at_rule: str | None = at_rule
         self.raw: str = raw
+        self.line: int = line          # the stylesheet's line its selector starts on (E11)
+
+
+CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
 
 
 def strip_css_comments(css: str) -> str:
-    return re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    return CSS_COMMENT_RE.sub("", css)
+
+
+def _strip_with_lines(css: str):
+    """strip_css_comments(css), and a function from an offset in it to the
+    original's line: a comment's newlines still count (E11)."""
+    parts: list[str] = []
+    marks: list[tuple[int, int]] = []     # (offset in the result, newlines removed before it)
+    kept = removed = last = 0
+    for m in CSS_COMMENT_RE.finditer(css):
+        parts.append(css[last:m.start()])
+        kept += m.start() - last
+        removed += m.group(0).count("\n")
+        marks.append((kept, removed))
+        last = m.end()
+    parts.append(css[last:])
+    stripped = "".join(parts)
+
+    def line_of(offset: int) -> int:
+        extra = 0
+        for at, count in marks:
+            if at > offset:
+                break
+            extra = count
+        return stripped.count("\n", 0, offset) + extra + 1
+    return stripped, line_of
 
 
 def parse_declarations(block: str) -> list[Declaration]:
@@ -471,13 +500,15 @@ def parse_declarations(block: str) -> list[Declaration]:
     return decls
 
 
-def parse_stylesheet(css: str) -> list[Rule]:
+def parse_stylesheet(css: str, _line_of=None, _base: int = 0) -> list[Rule]:
     """Parse into a flat rule list, carrying at-rule context as a string.
 
     Deliberately small. It understands rules, `@media`/`@supports` blocks one level
     deep, and passes anything else through untouched as a retained raw chunk.
+    Each rule carries the line of `css` its selector starts on.
     """
-    css = strip_css_comments(css)
+    if _line_of is None:
+        css, _line_of = _strip_with_lines(css)
     rules: list[Rule] = []
     order = 0
     i = 0
@@ -502,26 +533,27 @@ def parse_stylesheet(css: str) -> list[Rule]:
         if brace == -1:
             break
         prelude = css[i:brace].strip()
+        line = _line_of(_base + i + len(css[i:brace]) - len(css[i:brace].lstrip()))
         inner, i = read_block(brace)
 
         if prelude.startswith("@"):
             at_name = prelude.split(None, 1)[0].lower()
             if at_name in ("@media", "@supports"):
-                for sub in parse_stylesheet(inner):
+                for sub in parse_stylesheet(inner, _line_of, _base + brace + 1):
                     at = prelude if sub.at_rule is None else "%s %s" % (prelude, sub.at_rule)
-                    rules.append(Rule(sub.selectors, sub.declarations, order, at, sub.raw))
+                    rules.append(Rule(sub.selectors, sub.declarations, order, at, sub.raw, sub.line))
                     order += 1
             else:
                 # @font-face, @keyframes, @import-with-block, anything exotic:
                 # keep it verbatim, never inline it.
-                rules.append(Rule([], [], order, None, "%s{%s}" % (prelude, inner)))
+                rules.append(Rule([], [], order, None, "%s{%s}" % (prelude, inner), line))
                 order += 1
             continue
 
         selectors = [s.strip() for s in split_selector_list(prelude) if s.strip()]
         decls = parse_declarations(inner)
         if selectors and decls:
-            rules.append(Rule(selectors, decls, order, None, ""))
+            rules.append(Rule(selectors, decls, order, None, "", line))
             order += 1
 
     return rules
