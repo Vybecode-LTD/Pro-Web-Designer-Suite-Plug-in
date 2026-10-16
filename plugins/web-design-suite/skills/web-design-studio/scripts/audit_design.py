@@ -1396,7 +1396,7 @@ def audit_css(path: Path, text: str) -> list[Finding]:
         # ---- L5 !important -------------------------------------------------
         # The flag, not the words inside a string (`content: "!important"`),
         # as stylelint reads it; `! important` is the flag too (W9).
-        if re.search(r"!\s*important\b", SASS_STRING.sub('""', value), re.I):
+        if re.search(r"!\s*important(?![\w-])", SASS_STRING.sub('""', value), re.I):
             add(line, "L5", "important", "error",
                 f"`!important` on `{prop}`.",
                 "!important inverts layer order (an !important in an EARLIER "

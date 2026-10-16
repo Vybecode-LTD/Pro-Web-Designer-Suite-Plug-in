@@ -76,7 +76,8 @@ class AuditDesign(TempDirTest):
         """W9 (audit, 2026-10-14): `"!important" in value` flagged
         `content: "!important"`; stylelint reads the flag. `! important`,
         with a space, is the flag too."""
-        for css in ('.card::after { content: "!important"; }', ".card::after { content: '! important'; }"):
+        for css in ('.card::after { content: "!important"; }', ".card::after { content: '! important'; }",
+                    ".card { --note: a ! important-foo; }"):         # a longer word (CodeRabbit on #156)
             with self.subTest(css=css):
                 self.assertNotIn(("L5", "important"), self.rules(css))
         for css in (".card { display: block !important; }", ".card { display: block ! important; }",
