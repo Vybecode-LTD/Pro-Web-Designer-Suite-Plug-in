@@ -215,21 +215,27 @@ class RpcError extends Error {
   }
 }
 
-// A path's real form, through any link, for as much of it as exists: a path
-// that does not exist yet is the real folder it would be in, plus the rest.
+// A path's real form, walked a part at a time as the system walks it: a link
+// is followed before a later `..` climbs out of where it led, so
+// `link/../secret.css` is the folder above the link's target (Codex on #155).
+// A part that does not exist yet is kept as written.
 function real(p) {
-  let head = path.resolve(p);
-  const rest = [];
-  for (;;) {
+  const { root } = path.parse(p);
+  let at = root;
+  for (const part of p.slice(root.length).split(process.platform === 'win32' ? /[\\/]+/ : /\/+/)) {
+    if (part === '' || part === '.') continue;
+    if (part === '..') {
+      at = path.dirname(at);
+      continue;
+    }
+    const next = path.join(at, part);
     try {
-      return path.join(fs.realpathSync.native(head), ...rest);
+      at = fs.realpathSync.native(next);
     } catch {
-      const up = path.dirname(head);
-      if (up === head) return path.resolve(p);
-      rest.unshift(path.basename(head));
-      head = up;
+      at = next;
     }
   }
+  return at;
 }
 
 // A path the model passes stays in the project (the audit's S9): the scripts
@@ -238,7 +244,8 @@ function real(p) {
 // files .design-suite.json names are the project's own choice, and the
 // scripts read them wherever they are.
 function inProject(value) {
-  const rel = path.relative(real(project()), real(path.resolve(project(), value)));
+  const full = path.isAbsolute(value) ? value : `${project()}${path.sep}${value}`;   // `..` kept for real()
+  const rel = path.relative(real(project()), real(full));
   return !(rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel));
 }
 

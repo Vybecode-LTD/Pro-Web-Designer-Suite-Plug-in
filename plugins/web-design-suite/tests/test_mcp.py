@@ -212,18 +212,24 @@ class TheGates(ServerTest):
         self.write("project/.git/HEAD", "x\n")
         self.write("project/src/app.css", ".x { color: #123456; }\n")
         secret = self.write("secret/leak.css", ".leak { color: #abcdef; }\n")
-        link = project / "linked"
-        if os.name == "nt":
-            import _winapi
-            _winapi.CreateJunction(str(secret.parent), str(link))
-            self.addCleanup(os.rmdir, link)              # the junction, never its target
-        else:
-            link.symlink_to(secret.parent, target_is_directory=True)
-            self.addCleanup(link.unlink)
+        self.write("secret/deep/x.css", ".x {}\n")
+        for name, target in (("linked", secret.parent), ("deep", secret.parent / "deep")):
+            link = project / name
+            if os.name == "nt":
+                import _winapi
+                _winapi.CreateJunction(str(target), str(link))
+                self.addCleanup(os.rmdir, link)          # the junction, never its target
+            else:
+                link.symlink_to(target, target_is_directory=True)
+                self.addCleanup(link.unlink)
         here = {"CLAUDE_PROJECT_DIR": str(project)}
         for tool, arguments in (("audit_design", {"paths": ["src", "../secret/leak.css"]}),
                                 ("audit_design", {"paths": [str(secret)]}),
                                 ("audit_design", {"paths": ["linked/leak.css"]}),
+                                # Codex on #155: the link is followed before the `..`, as
+                                # POSIX opens it; `deep/..` is the secret folder, not the project.
+                                ("audit_design", {"paths": ["deep/../leak.css"]}),
+                                ("a11y_static", {"paths": ["deep/.."]}),
                                 ("a11y_static", {"paths": ["linked"]}),
                                 ("perf_audit", {"budget": str(secret)}),
                                 ("perf_audit", {"src": ["../secret"]}),
