@@ -22,7 +22,7 @@
  *
  *   ESLint 9 reached end of life on 2026-08-06. eslint-plugin-jsx-a11y
  *   6.10.2 declares a peer range that stops at ESLint 9, although its rules
- *   run under ESLint 10. The suite's fixtures run this config on 10.4.0.
+ *   run under ESLint 10. The suite's fixtures run this config on 10.11.0.
  *   Until a release widens the range, tell npm in package.json:
  *
  *     "overrides": { "eslint-plugin-jsx-a11y": { "eslint": "$eslint" } }

@@ -75,6 +75,23 @@ class CheckRoles(TempDirTest):
         self.assertEqual(proc.returncode, 0, output(proc))
         self.assertIn("every declared pair clears its minimum", output(proc))
 
+    def test_a_rule_with_a_nested_block_is_still_read(self):
+        """W8 (audit, 2026-10-14): a rule holding a nested block (native
+        nesting) was skipped whole, so the starter with one nested @media
+        said "--fg-default is not declared" (exit 2). The rule's own
+        declarations are read; the nested block, a condition, is not."""
+        nested = "\n    @media (prefers-contrast: more) { --fg-default: #ffffff; }\n"
+        css = re.sub(r"(--fg-default:[^;]*;)", lambda m: m.group(1) + nested, self.starter(), count=1)
+        self.assertIn("prefers-contrast", css)
+        proc = self.roles(css)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn("every declared pair clears its minimum", output(proc))
+        after = css.index(nested) + len(nested)                 # a declaration after it is read
+        css = css[:after] + re.sub(r"--fg-subtle:[^;]*;", "--fg-subtle: var(--neutral-0);", css[after:], count=1)
+        proc = self.roles(css)
+        self.assertEqual(proc.returncode, 1, output(proc))
+        self.assertIn("--fg-subtle", output(proc))
+
     def test_status_inks_and_the_invalid_border_are_held(self):
         """P7 (SS-B2, SB-B4): white on --bg-warning is 2.25:1, so a filled
         badge had no legal ink, and an invalid field had no border role."""
