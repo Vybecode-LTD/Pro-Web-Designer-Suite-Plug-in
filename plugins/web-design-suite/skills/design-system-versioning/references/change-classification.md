@@ -327,7 +327,7 @@ The script prints a `[kind]` on every change. This is the index from that string
 | `tier2-repointed` | major | 4 |
 | `tier2-repointed-equal` | patch | 1, 4 |
 | `theme-override-added` | major; patch if it resolves as before | 3 |
-| `theme-override-changed` · `theme-override-removed` | major | 3 |
+| `theme-override-changed` · `theme-override-removed` | major; patch if it resolves as before | 3 |
 | `theme-added` · `density-added` | minor | 9 |
 | `theme-removed` · `density-removed` | major | 9 |
 | `density-changed` | major; patch if nothing resolves differently | 9 |
@@ -337,7 +337,7 @@ The script prints a `[kind]` on every change. This is the index from that string
 | `socket-default-changed` | major | 5 |
 | `socket-default-equal` | patch | 5 |
 | `component-added` · `variant-added` · `size-added` · `state-added` | minor | 6 |
-| `component-removed` · `component-renamed` | major | 6 |
+| `component-removed` | major (a renamed component reads as removed and added: the diff cannot pair them) | 6 |
 | `variant-removed` · `size-removed` · `state-removed` | major | 6 |
 | `variant-changed` | major | 6, 10.2 |
 | `part-added` | minor | 7 |

@@ -192,6 +192,7 @@ The owner's audit of `main` at `9391774` (`dev plans/web-design-suite-audit-2026
 | P54 part 8, #152 | §3.7: the release job's actions pinned to SHAs with no kept credential, the tooling README on zlib-ng, the README's six Node scripts (audit D1, D2, D3) | N46 | `release.yml`, `tooling/README.md`, the plugin README, `tests/test_release_build.py` | S |
 | P54 part 7, #151 | §3.6: `aria-hidden` reads the whole subtree's tab stops, a control's name at any depth and through a component, the forced-colours survey anchored, the TBT control click after the task, the coverage table marks what this suite does not run (audit G1, G2, G5, G6, G7) | N46 | `a11y_static.py`, `a11y_runtime.mjs`, automation-coverage.md, a11y-audit-runner's SKILL.md, two test files | S |
 | P54 | The medium findings, one PR per §3 area | N46 | per area | L |
+| P55 part 3, #157 | §3.3 and §3.4: the census reads `@apply` and markup class expressions, the codemod keeps a file's mode, a duration by its type resolves, `diff_system` reads one docs schema, `--format all` needs its folder, the references name every flag and kind (audit M7, M8, V13 to V16; M9 and V12 were closed by #140) | N47 | `extract_literals.py`, `apply_codemod.py`, `figma_to_tokens.py`, `figma_audit.py`, `diff_system.py`, three references, a command, five test files | S |
 | P55 | The low findings and doc fixes, per area | N47 | per area | M |
 | R4 | Release 4.0.0 | — | — | M |
 

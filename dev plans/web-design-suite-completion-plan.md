@@ -160,7 +160,7 @@ This is the rest of 3.2.0's item 9, plus what running the real tools found in 3.
 
 **N46 · The audit's medium findings, by skill (its §3).** *Part 1 done for 4.0.0 (PR #143): §3.1, `test_hooks.TheRouter`, `test_dtcg.TheWriter`.* *Part 3 (PR #144): §3.3, `TheAuditsMigrationMediums`, `TheRoleTableIsTheCode`.* *Part 2 (PR #145): §3.2, `test_check_roles`, `test_tw_probe`, the spec's layers and `tailwind_arbitrary`.* *Part 4 (PR #147): §3.4's first half, `TheAuditsVersioningMediums`.* *Part 5 (PR #149): §3.4's second half, V2, V3, V10 and `extract_system --tokens` on JSON, the same class.* *Part 6 (PR #150): §3.5, `TheAuditsContentMediums`, `TheAuditsEmailMediums`, `TheHeadersPlaceholders`.* *Part 8 (PR #152): §3.7, `TheAuditsReleaseMediums`.* *Part 7 (PR #151): §3.6, `TheAuditsRuntimeMediums`, `TheForcedColoursSurvey`.* Each §3.x area is one PR: shared readers, hooks and MCP; web-design-studio; design-token-migration; versioning, docs and Figma; content, presentation and email; the runtime gates, the matrix and the critique; docs, CI and release; the test suite.
 
-**N47 · The audit's low findings and doc fixes (its §3).** Nits, dead code and doc claims, swept per area after N46.
+**N47 · The audit's low findings and doc fixes (its §3).** *Part 3 (PR #157): §3.3 and §3.4, `TheCensusReadsEveryStyleSource`, `TheCodemodRewritesOnlyWhatItMatched` (POSIX), `Dtcg2025`, `TheAuditsVersioningMediums`, `test_docs.TheScriptReferences`.* Nits, dead code and doc claims, swept per area after N46.
 
 **N3 · The references' CSS against the stylelint config.** *Done for 3.3.0.* 56 of the 170 CSS snippet files failed it at 3.2.1. The failures by rule:
 - 27 `selector-max-type`;

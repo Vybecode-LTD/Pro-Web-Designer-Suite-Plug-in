@@ -6,9 +6,10 @@ Every argument of `figma_audit.py` and `figma_to_tokens.py`. `SKILL.md` has the 
 
 ```
 figma_audit.py <file> [--styles FILE] [--format report|json|markdown]
-               [--shape rest|plugin|dtcg|records] [--collection NAME]
+               [--shape rest|plugin|dtcg|records|resolver] [--collection NAME]
                [--fail-on error|warn|info|never] [--tap-min PX]
                [--deadline TEXT] [--tokens FILE] [--plan PLAN] [--no-color]
+               [-o/--out FILE]
 ```
 
 | Flag | Does |
@@ -17,6 +18,7 @@ figma_audit.py <file> [--styles FILE] [--format report|json|markdown]
 | `--format report` | Terminal, grouped by finding type. The default |
 | `--format json` | `{summary, collections, findings[]}` for CI |
 | `--format markdown` | The document you send the designer |
+| `-o`, `--out` | Write the report to FILE instead of stdout |
 | `--fail-on` | Lowest severity that exits non-zero. Default `info` — any finding |
 | `--deadline` | The timed default's cutoff, printed into the markdown |
 | `--plan` | `starter`, `professional`, `organization` or `enterprise`: the Figma plan. A collection with more modes than it allows is `MODE_LIMIT`, and Starter is not asked for a dark mode. Without the flag, the `.design-suite.json`'s `figma.plan`; without either, no cap |
@@ -37,7 +39,7 @@ figma_to_tokens.py <file> [--format css|json|ts|dtcg|all|plugin-script] [--out F
 
 | Flag | Does |
 |---|---|
-| `--format all --out-dir` | Writes `tokens.css`, `tokens.json`, `tokens.ts` together |
+| `--format all --out-dir` | Writes `tokens.css`, `tokens.json`, `tokens.ts` together. It needs `--out-dir`, and refuses `--out` (exit 2) |
 | `--reverse` | Reads a `tokens.css`, a DTCG 2025.10 file or resolver, this script's `tokens.json`, or a flat `{name: value}` map, and emits a Figma `POST …/variables` body. Each theme (`[data-theme]`, or a resolver's `theme` contexts) is a mode of the semantic collection; a density or another condition is named and left out |
 | `--reverse --format plugin-script` | The same variables as Plugin API code, for any plan: run it with the Figma MCP server's `use_figma`, or in a development plugin. It finds collections, modes and variables by name, creates what is missing, updates what differs and deletes nothing |
 | `--flat` | With `--reverse`: one Figma collection instead of one per tier |

@@ -267,6 +267,13 @@ CLASSNAME_RE = re.compile(
 # their classes in ordinary strings, so sweep template/quoted strings that look
 # like class lists too.
 CLASSLIST_STRING_RE = re.compile(r"""(?:`([^`]*)`|"([^"]*)"|'([^']*)')""", re.DOTALL)
+# Markup's class expressions: Svelte's and Astro's `class={on ? "…" : ""}` and
+# Astro's `class:list={[…]}`, whose strings are class lists as a JSX
+# `className={…}`'s are (the audit's M7). A string straight after the brace
+# is CLASSNAME_RE's.
+CLASS_EXPR_RE = re.compile(r"""\b(?:className|class)(?::list)?\s*=\s*\{(?!\s*[`"'])""")
+# `@apply p-[13px]` in a stylesheet: classes, not a declaration (M7).
+APPLY_RE = re.compile(r"@apply\s+([^;{}]+)")
 
 STYLED_TAG_RE = re.compile(
     r"\b(?:styled\s*(?:\.\s*[\w$]+|\(\s*[\w$.]+\s*\))(?:\s*\.\s*(?:attrs|withConfig)\s*\([^)]*\))?"
@@ -995,7 +1002,22 @@ def extract_css(path: Path, text: str, *, suffix: str | None = None,
             file=fname, context=context, selector=d.selector,
             component=component, declaration=re.sub(r"\s+", " ", decl_text),
         ))
+    out.extend(tailwind_literals(APPLY_RE.finditer(blanked), text, fname, component))
     return out
+
+
+def class_expression_strings(template: str) -> Iterator[re.Match]:
+    """The strings inside each markup class expression, to its closing brace."""
+    for m in CLASS_EXPR_RE.finditer(template):
+        depth, i = 1, m.end()
+        while i < len(template) and depth:
+            s = CLASSLIST_STRING_RE.match(template, i)
+            if s:
+                i = s.end()
+                continue
+            depth += {"{": 1, "}": -1}.get(template[i], 0)
+            i += 1
+        yield from CLASSLIST_STRING_RE.finditer(template, m.end(), i)
 
 
 # ---------------------------------------------------------------------------
@@ -1084,6 +1106,7 @@ def extract_markup(path: Path, text: str, unread: list[str], tw: TwSpacing | Non
                 declaration=re.sub(r"\s+", " ", decl.group(0).strip()),
             ))
     out.extend(tailwind_literals(CLASSNAME_RE.finditer(template), text, fname, component, tw=tw))
+    out.extend(tailwind_literals(class_expression_strings(template), text, fname, component, tw=tw))
     return out
 
 

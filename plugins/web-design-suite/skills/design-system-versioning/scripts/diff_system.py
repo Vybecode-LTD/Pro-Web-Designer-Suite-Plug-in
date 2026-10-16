@@ -1034,10 +1034,10 @@ def load_snapshot(raw: str, label: str, *, no_upstream: bool = False) -> Snapsho
             return _snapshot_from_contract([p], label)
         if is_dtcg(data):
             return _snapshot_from_contract([p], label, "DTCG")
-        if schema.split("/")[0] != "design-system-docs":
+        if schema != DOCS_SCHEMA:                        # the one build_docs reads (V14)
             raise bail(
-                f"diff_system: {p} is not a design-system-docs snapshot "
-                f"(schema={schema!r}). Produce one with:\n"
+                f"diff_system: {p} is not a design-system-docs snapshot this version reads "
+                f"(schema={schema!r}, expected {DOCS_SCHEMA!r}). Produce one with:\n"
                 f"  python -m scripts.extract_system styles/ src/ --out system.json")
         snap = _normalize_docs_json(data, label, str(p))
         return snap
@@ -1215,9 +1215,6 @@ KINDS: Dict[str, Kind] = {k.id: k for k in [
     K("component-removed", "major", "Component removed",
       "An import that no longer resolves, or a class that no longer styles.",
       "auto", "manual", True),
-    K("component-renamed", "major", "Component renamed",
-      "Both the import and every descendant selector written against the old "
-      "class name.", "partial", "codemod", True),
     K("variant-added", "minor", "Variant added",
       "data-variant values nobody passes yet.", "auto", "none", False),
     K("variant-removed", "major", "Variant removed",
@@ -2267,7 +2264,7 @@ CHANGELOG_SECTIONS = [
                  # A rename removes the name a consumer greps for. Filing it
                  # under "Changed" is how someone scanning for what broke misses
                  # the one line that did.
-                 "tier1-renamed", "tier2-renamed", "component-renamed"}),
+                 "tier1-renamed", "tier2-renamed"}),
     ("Added", {"tier1-added", "tier2-added", "socket-added", "component-added",
                "variant-added", "size-added", "state-added", "part-added",
                "prop-added-optional", "prop-added-required", "theme-added",

@@ -53,6 +53,18 @@ DTCG_2025 = {
 }
 
 
+def iter_entries(node):
+    """Every entry of a tokens.json, at any depth: a dict with a `figmaName`."""
+    if isinstance(node, dict):
+        if "figmaName" in node:
+            yield node
+        for value in node.values():
+            yield from iter_entries(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from iter_entries(value)
+
+
 class Dtcg2025(TempDirTest):
     """LC-A1."""
 
@@ -61,6 +73,20 @@ class Dtcg2025(TempDirTest):
         proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--format", "css", *args,
                       cwd=self.tmp)
         return proc, proc.stdout.decode("utf-8")
+
+    def test_a_duration_by_its_type_is_resolved(self):
+        """V13 (audit, 2026-10-14): a `$type: duration` token not named
+        `dur-*` wrote the right CSS but `"unresolved": true` in tokens.json."""
+        src = self.write("export.tokens.json", json.dumps({
+            "motion": {"$type": "duration", "fade": {"$value": {"value": 220, "unit": "ms"}},
+                       "slow": {"$value": {"value": 0.4, "unit": "s"}}}}))
+        proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--format", "json", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))      # 1: not the contract's names
+        entries = {e["figmaName"]: e for e in iter_entries(json.loads(proc.stdout))}
+        for name, css in (("motion/fade", "220ms"), ("motion/slow", "400ms")):
+            with self.subTest(name=name):
+                self.assertEqual(css, entries[name]["value"])
+                self.assertNotIn("unresolved", entries[name])
 
     def test_object_values_and_references_become_real_css(self):
         clean = json.loads(json.dumps(DTCG_2025))

@@ -18,6 +18,7 @@ Every argument of `extract_system.py` and `build_docs.py`. `SKILL.md` has the wo
 | `--report` | a human summary to stderr |
 | `--strict` | exit 1 if any error-severity gap was found |
 | `--color-impl PATH` / `--check-color-impl` | bind to, or verify against, the studio's colour math |
+| `--no-color-impl` | use the vendored colour math even when the studio's script is present |
 
 Exit `0` extracted · `1` `--strict` with errors · `2` bad invocation, or a `.design-suite.json` it cannot read (the message names the key).
 

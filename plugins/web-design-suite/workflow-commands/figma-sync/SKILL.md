@@ -2,7 +2,7 @@
 name: figma-sync
 description: Bring a Figma variables export into the project - audit it against the token system, write the designer's questions when it fails, else generate the tokens and show what they would change.
 disable-model-invocation: true
-argument-hint: "EXPORT.json [--shape rest|plugin|dtcg|records] [--collection NAME]"
+argument-hint: "EXPORT.json [--shape rest|plugin|dtcg|records|resolver] [--collection NAME]"
 allowed-tools:
   - Bash(python "${CLAUDE_PLUGIN_ROOT}/skills/figma-variables-sync/scripts/figma_audit.py" *)
   - Bash(python3 "${CLAUDE_PLUGIN_ROOT}/skills/figma-variables-sync/scripts/figma_audit.py" *)
