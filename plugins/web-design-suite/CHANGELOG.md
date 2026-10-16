@@ -444,6 +444,30 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
   M1 (a duration counted at two rules) did not reproduce: #135 fixed it.
   `test_token_migration.TheAuditsMigrationMediums` and `TheRoleTableIsTheCode`.
+- **The migration, versioning and Figma tools missed six more things, and their
+  references fell behind the code** (the audit's M7, M8 and V13 to V16):
+  - the census did not read `@apply p-[13px]` in a stylesheet, or the strings of
+    Svelte's and Astro's `class={…}` and Astro's `class:list={[…]}`, which it reads
+    in a `.jsx`. It reads them, `@apply p-4` with the project's Tailwind 4 theme, and
+    files them as hand work: the codemod rewrites class attributes only (CodeRabbit
+    on #157);
+  - the codemod's rewrite went through `mkstemp`, so on Linux and macOS a 0644 file
+    came back 0600 and a 0755 one lost its execute bit. It keeps the file's mode;
+  - `figma_to_tokens` marked a `$type: duration` token not named `dur-*` unresolved
+    in `tokens.json`, though its CSS was right;
+  - `diff_system` read any design-system-docs schema; it reads the one `build_docs`
+    does, and names it when it refuses another (exit 2);
+  - `--format all` without `--out-dir` wrote three files into the working folder and
+    ignored `--out`. It needs `--out-dir` and refuses `--out` (exit 2);
+  - change-classification.md gave a theme override's change or removal as major (the
+    code gives patch when it resolves as before) and listed `component-renamed`, which
+    nothing emits: the kind is gone, and the table says a renamed component reads as
+    removed and added. `figma_audit` dropped a code title nothing emits; the scripts
+    references name figma_audit's `-o/--out` and `resolver` shape and extract_system's
+    `--no-color-impl`, and `/figma-sync`'s hint names the `resolver` shape.
+
+  M9 and V12 were closed by #140. `test_token_migration`, `test_figma_sync`,
+  `test_versioning.TheAuditsVersioningMediums`, `test_docs.TheScriptReferences`.
 - **web-design-studio's gates measured and ruled four things wrong** (the audit's W1 to
   W5):
   - `check_roles` read `--fg-default: #00000080` as solid black, 20:1 on the canvas,

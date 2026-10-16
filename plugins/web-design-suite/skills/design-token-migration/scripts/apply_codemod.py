@@ -65,6 +65,7 @@ import fnmatch
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1040,7 +1041,8 @@ def write_atomically(fp: Path, content: str, codec: str = "utf-8", bom: bytes = 
     """Temp file in the same directory, fsync, then os.replace.
 
     Same directory because os.replace is only atomic within a filesystem, and
-    /tmp is frequently a different one.
+    /tmp is frequently a different one. The file keeps its mode: mkstemp's
+    0600 replaced a 0644 file's (the audit's M8).
     """
     fd, tmp = tempfile.mkstemp(dir=str(fp.parent), prefix=f".{fp.name}.",
                                suffix=".codemod")
@@ -1049,6 +1051,7 @@ def write_atomically(fp: Path, content: str, codec: str = "utf-8", bom: bytes = 
             fh.write(bom + content.encode(codec))
             fh.flush()
             os.fsync(fh.fileno())
+        shutil.copymode(fp, tmp)
         os.replace(tmp, fp)
     except BaseException:
         try:

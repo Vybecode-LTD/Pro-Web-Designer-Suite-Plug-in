@@ -504,6 +504,39 @@ class TheAuditsVersioningMediums(TempDirTest):
         return run_py("design-system-versioning", "deprecate", "--ledger", self.tmp / "proj" / "deprecations.json",
                       *args, cwd=self.tmp)
 
+    def test_the_kinds_table_is_the_codes(self):
+        """V15 (audit, 2026-10-14): change-classification.md listed
+        `component-renamed`, which diff_system never emits, and gave a theme
+        override's change or removal as major where the code gives patch
+        when it resolves as before."""
+        code = (SKILLS / "design-system-versioning" / "scripts" / "diff_system.py").read_text(encoding="utf-8")
+        kinds = set(re.findall(r'^\s*K\("([\w-]+)"', code, re.M))
+        doc = (SKILLS / "design-system-versioning" / "references" / "change-classification.md").read_text(
+            encoding="utf-8")
+        rows = {}
+        for line in doc.splitlines():
+            if re.match(r"^\| `[\w-]+`", line):
+                cells = line.split("|")
+                rows.update((kind, cells[2]) for kind in re.findall(r"`([\w-]+)`", cells[1]))
+        self.assertGreater(len(kinds), 40)
+        self.assertEqual(kinds, set(rows))
+        self.assertNotIn("component-renamed", kinds)
+        for kind in ("theme-override-changed", "theme-override-removed"):
+            self.assertIn("patch if it resolves as before", rows[kind])
+
+    def test_another_docs_schema_version_is_refused(self):
+        """V14 (audit, 2026-10-14): diff_system read any design-system-docs
+        schema (`DOCS_SCHEMA` was unused) while build_docs takes one."""
+        good = self.write("good.json", json.dumps({"schema": "design-system-docs/system/1", "tokens": []}))
+        for schema in ("design-system-docs/system/2", "design-system-docs/other/1"):
+            with self.subTest(schema=schema):
+                other = self.write("other.json", json.dumps({"schema": schema, "tokens": []}))
+                proc = run_py("design-system-versioning", "diff_system", other, good, cwd=self.tmp)
+                self.assertEqual(2, proc.returncode, output(proc))
+                self.assertIn("expected 'design-system-docs/system/1'", output(proc))
+        proc = run_py("design-system-versioning", "diff_system", good, good, cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))                    # its own is read
+
     def test_the_scan_skips_the_suites_own_records(self):
         """V4: the mapping's rules hold `var(--fg-subtle)`, so the scan read it
         as a use, "NOT SAFE to remove", forever; the ledger and a scan report too."""

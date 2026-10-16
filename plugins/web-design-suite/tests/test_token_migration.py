@@ -44,10 +44,12 @@ Regressions covered:
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -754,6 +756,41 @@ class TheCensusReadsEveryStyleSource(TempDirTest):
         return [(l["line"], l["context"], l["prop"], l["raw"]) for l in data["literals"]
                 if l["file"].replace("\\", "/").endswith(name)]
 
+    def test_apply_and_markup_class_expressions_are_counted(self):
+        """M7 (audit, 2026-10-14): `@apply p-[13px]` in a stylesheet, and the
+        strings of Svelte's and Astro's `class={…}` and Astro's
+        `class:list={[…]}`, were not swept, while the same expression in a
+        .jsx was. A quoted `class="…"` beside them is counted once."""
+        self.write("src/app.css", ".x {\n  @apply p-[13px];\n}\n")
+        self.write("src/Card.svelte", '<script>let on = true;</script>\n'
+                   '<div class={on ? "mt-[7px]" : ""}>a</div>\n<i class:active={on} class="ml-[3px]">b</i>\n')
+        self.write("src/Page.astro", '---\nconst on = true;\n---\n'
+                   '<div class:list={["px-[11px]", { "py-[5px]": on }]}>a</div>\n')
+        _, data = self.extract("src")
+        self.assertEqual([(2, "p-[13px]")], [(ln, raw) for ln, _, _, raw in self.found(data, "app.css")])
+        self.assertEqual([(2, "mt-[7px]"), (3, "ml-[3px]")],
+                         [(ln, raw) for ln, _, _, raw in self.found(data, "Card.svelte")])
+        self.assertEqual([(4, "px-[11px]"), (4, "py-[5px]")],
+                         [(ln, raw) for ln, _, _, raw in self.found(data, "Page.astro")])
+        # CodeRabbit on #157: the codemod rewrites class attributes only, so
+        # these are hand work, never counted as mechanically replaceable.
+        contexts = {raw: c for name in ("app.css", "Card.svelte", "Page.astro")
+                    for _, c, _, raw in self.found(data, name)}
+        self.assertEqual({"p-[13px]": "tailwind-hand", "mt-[7px]": "tailwind-hand",
+                          "ml-[3px]": "tailwind-arbitrary", "px-[11px]": "tailwind-hand",
+                          "py-[5px]": "tailwind-hand"}, contexts)
+        mapping, _ = self.cluster(self.tmp / "literals.json")
+        hand = [u for u in mapping["unmapped"] if u["reason"].startswith("a Tailwind class in `@apply`")]
+        self.assertEqual(4, len(hand), mapping["unmapped"])
+
+    def test_a_numeric_apply_is_counted_with_the_theme(self):
+        """CodeRabbit on #157: `@apply p-4` holds a design value when a v4
+        entry keeps `--spacing`, and the stylesheet scan was not given it."""
+        self.write("src/app.css", '@import "tailwindcss";\n.x {\n  @apply p-4;\n}\n')
+        _, data = self.extract("src")
+        self.assertEqual([(3, "tailwind-hand", "p-4")],
+                         [(ln, c, raw) for ln, c, _, raw in self.found(data, "app.css")])
+
     def test_sass_module_colour_functions_are_counted(self):
         self.write("src/buttons.scss", "$brand: #e16037;\n"
                    ".a { color: darken($brand, 10%); background: color.adjust($brand, $lightness: -10%); }\n"
@@ -1055,6 +1092,18 @@ class TheCodemodRewritesOnlyWhatItMatched(TempDirTest):
         self.assertNotIn("two rules want the same text", output(proc))
         self.assertIn('className="p-well top-[16px] gap-grouped -p-[16px] sp-[16px] md:p-[16px] '
                       'min-w-[16px] w-icon -mt-[16px] mt-grouped"', card.read_text(encoding="utf-8"))
+
+    @unittest.skipIf(os.name == "nt", "a POSIX file mode")
+    def test_a_rewritten_file_keeps_its_mode(self):
+        """M8 (audit, 2026-10-14): the rewrite went through mkstemp, so a
+        0644 file came back 0600, and a 0755 one lost its execute bit."""
+        for mode in (0o644, 0o755):
+            with self.subTest(mode=oct(mode)):
+                css = self.write(f"src/{mode:o}/card.css", "@layer components {\n  .card { margin: 13px; }\n}\n")
+                os.chmod(css, mode)
+                proc = self.apply(VendorScopeAndScale.MAPPING["rules"], f"src/{mode:o}")
+                self.assertIn("var(--", css.read_text(encoding="utf-8"), output(proc))
+                self.assertEqual(mode, stat.S_IMODE(os.stat(css).st_mode))
 
     def test_untouched_lines_keep_their_crlf(self):
         lines = ["@layer components {", "  .card {", "    margin: 13px;", "    color: inherit;", "  }", "}", ""]

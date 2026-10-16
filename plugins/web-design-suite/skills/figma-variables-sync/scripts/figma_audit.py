@@ -270,7 +270,6 @@ CODE_TITLES = {
     "MISSING_STATE": "Interaction states that were never designed",
     "BROKEN_ALIAS": "Aliases that point at nothing",
     "ALIAS_CYCLE": "Aliases that point at each other",
-    "TIER_VIOLATION": "Semantic roles bound to raw values instead of primitives",
     "UNSUPPORTED_VALUE": "Values this audit cannot read, so could not check",
 }
 

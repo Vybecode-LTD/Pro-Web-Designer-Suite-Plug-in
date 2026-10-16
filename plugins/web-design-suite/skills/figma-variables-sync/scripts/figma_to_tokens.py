@@ -428,7 +428,9 @@ class Converter:
                 if token.startswith("tracking-"):
                     return (f"{n:g}em" if abs(n) <= 1 else f"{n / PX_PER_REM:g}em", True)
                 return (f"{n:g}", True)
-            if token.startswith("dur-"):
+            # A duration by its name, or by the type a DTCG source gives it:
+            # a `$type: duration` named otherwise was marked unresolved (V13).
+            if token.startswith("dur-") or var.dtcg_type.lower() == "duration":
                 n = as_px(raw)
                 return (f"{n:g}ms" if n is not None else str(raw), True)
             px = as_px(raw)
@@ -1597,6 +1599,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
     if args.format == "plugin-script" and not args.reverse:
         print("--format plugin-script writes a tokens.json into Figma: add --reverse.", file=sys.stderr)
+        return 2
+    # Three files need a folder: without one they went into the working
+    # folder, and --out was ignored in silence (the audit's V15).
+    if args.format == "all" and (args.out or not args.out_dir):
+        print("--format all writes tokens.css, tokens.json and tokens.ts: give --out-dir DIR"
+              + (", not --out." if args.out else "."), file=sys.stderr)
         return 2
     # The file converted is never a destination (the audit's V7). The project's
     # --tokens may be: regenerating tokens.css from Figma is the workflow, and

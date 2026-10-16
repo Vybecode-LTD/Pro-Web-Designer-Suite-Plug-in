@@ -1118,6 +1118,13 @@ HAND_WORK = {
 }
 
 
+HAND_WORK["tailwind-hand"] = (
+    "a Tailwind class in `@apply` or in a markup class expression (`class={…}`, "
+    "Astro's `class:list`) — the codemod rewrites class attributes only",
+    "Rewrite it by hand to the class of the role the proposal maps its value to, "
+    "then re-run extract_literals.")
+
+
 def route_inline_styles(idx: Dict[str, List[dict]], prop: Proposal) -> None:
     """Inline styles and CSS-in-JS style objects are hand work (Phase 4f):
     apply_codemod never rewrites them. Left in the pools they were counted as

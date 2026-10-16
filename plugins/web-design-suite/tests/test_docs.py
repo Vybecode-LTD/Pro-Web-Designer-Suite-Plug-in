@@ -36,7 +36,7 @@ import subprocess
 import sys
 import unittest
 
-from wds_support import NODE, OFF, PLUGIN, REPO, SKILLS, TOOLING, TempDirTest, env, output
+from wds_support import NODE, OFF, PLUGIN, REPO, SKILLS, TOOLING, TempDirTest, env, output, run_py
 
 GIT = shutil.which("git")
 GIT_ENV = {"GIT_AUTHOR_NAME": "wds-test", "GIT_AUTHOR_EMAIL": "wds-test@example.invalid",
@@ -125,6 +125,54 @@ def run_line(line: str, variables: dict, cwd) -> subprocess.CompletedProcess | N
         extra_env["PYTHONPATH"] = str(skill)
     return subprocess.run([sys.executable, *argv[1:]], cwd=cwd, capture_output=True,
                           timeout=300, env=env(**extra_env))
+
+
+class TheScriptReferences(TempDirTest):
+    """V15 and V16 (audit, 2026-10-14): a script's reference left out flags it
+    takes (figma_audit's `-o/--out` and `resolver` shape, extract_system's
+    `--no-color-impl`), figma_audit titled a code nothing emits, the
+    figma-sync command's hint left out a shape, and `--format all` wrote
+    into the working folder and ignored `--out`."""
+
+    SCRIPTS = (("figma-variables-sync", "figma_audit.py"), ("figma-variables-sync", "figma_to_tokens.py"),
+               ("design-system-docs", "extract_system.py"), ("design-system-docs", "build_docs.py"))
+
+    def test_each_reference_names_every_flag(self):
+        for skill, script in self.SCRIPTS:
+            source = (SKILLS / skill / "scripts" / script).read_text(encoding="utf-8")
+            reference = (SKILLS / skill / "references" / "scripts.md").read_text(encoding="utf-8")
+            flags = set(re.findall(r'add_argument\(\s*(?:"-\w",\s*)?"(--[\w-]+)"', source))
+            self.assertGreater(len(flags), 3, script)
+            for flag in sorted(flags):
+                with self.subTest(script=script, flag=flag):
+                    self.assertRegex(reference, rf"(?<![\w-]){re.escape(flag)}(?![\w-])")
+
+    def test_every_shape_is_named_where_it_is_offered(self):
+        source = (SKILLS / "figma-variables-sync" / "scripts" / "figma_audit.py").read_text(encoding="utf-8")
+        shapes = re.search(r'"--shape", choices=\(([^)]*)\)', source).group(1)
+        hint = (PLUGIN / "workflow-commands" / "figma-sync" / "SKILL.md").read_text(encoding="utf-8")
+        reference = (SKILLS / "figma-variables-sync" / "references" / "scripts.md").read_text(encoding="utf-8")
+        named = "|".join(re.findall(r'"(\w+)"', shapes))
+        self.assertIn(f"--shape {named}]", hint)
+        self.assertIn(f"--shape {named}]", reference)
+
+    def test_every_code_titled_is_one_the_audit_gives(self):
+        source = (SKILLS / "figma-variables-sync" / "scripts" / "figma_audit.py").read_text(encoding="utf-8")
+        block = re.search(r"^CODE_TITLES = \{(.*?)^\}", source, re.S | re.M).group(1)
+        titles = set(re.findall(r'^\s*"([A-Z_]+)":', block, re.M))
+        emitted = set(re.findall(r'"([A-Z][A-Z_]+)"', source.replace(block, "")))   # a table's names too
+        self.assertGreater(len(titles), 10)
+        self.assertEqual([], sorted(titles - emitted))
+
+    def test_format_all_needs_its_folder(self):
+        src = self.write("variables.json", json.dumps({"variables": {}, "variableCollections": {}}))
+        for args in ((), ("--out", "tokens.css"), ("--out", "x.css", "--out-dir", "out")):
+            with self.subTest(args=args):
+                proc = run_py("figma-variables-sync", "figma_to_tokens", src, "--format", "all", *args,
+                              cwd=self.tmp)
+                self.assertEqual(2, proc.returncode, output(proc))
+                self.assertIn("give --out-dir DIR", output(proc))
+        self.assertEqual([], sorted(p.name for p in self.tmp.glob("tokens.*")))
 
 
 class ReadmeQuickStart(TempDirTest):
