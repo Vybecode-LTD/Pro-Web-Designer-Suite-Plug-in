@@ -191,7 +191,7 @@ The owner's audit of `main` at `9391774` (`dev plans/web-design-suite-audit-2026
 | P54 part 6, #150 | §3.5: naive system timestamps read-only, table names refused in paths, odd column names escaped, casts and claims pin a column, `pgTable.withRLS(`, the minifier's word spaces, the style bytes, the templates lint clean, the header's placeholders (audit E1 to E8, E10) | N46 | `introspect_schema.py`, `scaffold_ui.py`, `build_email.py`, the email templates and tokens, `build_presentation.py`, three test files | M |
 | P54 part 8, #152 | §3.7: the release job's actions pinned to SHAs with no kept credential, the tooling README on zlib-ng, the README's six Node scripts (audit D1, D2, D3) | N46 | `release.yml`, `tooling/README.md`, the plugin README, `tests/test_release_build.py` | S |
 | P54 part 7, #151 | §3.6: `aria-hidden` reads the whole subtree's tab stops, a control's name at any depth and through a component, the forced-colours survey anchored, the TBT control click after the task, the coverage table marks what this suite does not run (audit G1, G2, G5, G6, G7) | N46 | `a11y_static.py`, `a11y_runtime.mjs`, automation-coverage.md, a11y-audit-runner's SKILL.md, two test files | S |
-| P54 | The medium findings, one PR per §3 area | N46 | per area | L |
+| P54 part 9, #154 | §3.8: the evidence register's entries live on the figure itself or a spelling of it, never a companion number, and the register is regrouped around what each doc quotes; the timing tests hold ratios and TTI, never seconds (audit T1, T2) | N46 | `test_evidence.py`, `fixtures/evidence.json`, `test_browser_runtime.py`, `test_content_and_a11y.py` | S |
 | P55 | The low findings and doc fixes, per area | N47 | per area | M |
 | R4 | Release 4.0.0 | — | — | M |
 

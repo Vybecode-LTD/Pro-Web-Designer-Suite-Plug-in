@@ -282,6 +282,12 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             pass
 
 
+def left_out_of_tbt(out) -> float:
+    """The blocking time of the long tasks TBT did not count: after TTI,
+    before FCP, or the page's answer to a scripted interaction."""
+    return out["longTasks"]["blockingTotal"] - out["stats"]["tbt"]["median"]
+
+
 @unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
 class VitalsMeasures(TempDirTest):
     """GT-A6: CDP adds its latency per request, and Navigation Timing's
@@ -326,21 +332,29 @@ class VitalsMeasures(TempDirTest):
                   ".addEventListener('click', () => { " + self.BUSY.format(ms=250) + " });</script>")
         out = self.vitals(button, "--throttle", "off", "--settle", "500", "--interact", "button")
         self.assertGreaterEqual(out["stats"]["inp"]["median"], 200)
-        self.assertLess(out["stats"]["tbt"]["median"], 50)
         # Codex on #45: the totals still count the handler's task.
         self.assertGreaterEqual(out["longTasks"]["count"], 1)
         self.assertGreaterEqual(out["longTasks"]["blockingTotal"], 150)
+        # T2 (audit, 2026-10-14): TBT under 50 ms failed whenever a slow
+        # runner's own loading made a long task. What TBT leaves out of
+        # the totals is the handler's 200 ms of blocking, however slow.
+        self.assertGreaterEqual(left_out_of_tbt(out), 150)
 
     def test_tbt_stops_at_tti(self):
         """A long task after five quiet seconds is after TTI; one before is not.
         A 9-second settle leaves a slow runner room for the quiet window
-        (CodeRabbit on #45)."""
+        (CodeRabbit on #45). T2 (audit, 2026-10-14): each run is read
+        against its TTI, not against TBT under 50 ms, which a slow runner's
+        own loading could pass. The busy loops' floors (150 ms of a 250 ms
+        task's blocking) only grow on a slow runner."""
         late = "<script>setTimeout(() => { " + self.BUSY.format(ms=250) + " }, {at});</script>"
         out = self.vitals(late.replace("{at}", "6000"), "--throttle", "off", "--settle", "9000")
-        self.assertLess(out["stats"]["tbt"]["median"], 50)
         self.assertIsNotNone(out["stats"]["tti"])
+        self.assertLess(out["stats"]["tti"]["median"], 6000)      # TTI came before the task
+        self.assertGreaterEqual(left_out_of_tbt(out), 150)         # so TBT left it out
         out = self.vitals(late.replace("{at}", "1000"), "--throttle", "off", "--settle", "9000")
-        self.assertGreaterEqual(out["stats"]["tbt"]["median"], 150)
+        self.assertGreaterEqual(out["stats"]["tti"]["median"], 1000)  # TTI waited for it
+        self.assertGreaterEqual(out["stats"]["tbt"]["median"], 150)   # so TBT counts it
 
     def test_requests_in_flight_keep_the_network_busy(self):
         """Codex on #45: three fetches still in flight when the run was read

@@ -67,6 +67,24 @@ def values(entry) -> list[str]:
     return [norm(v) for v in [entry["figure"], *entry.get("also", [])]]
 
 
+def numbers(value: str) -> list[str]:
+    return [n.replace(",", "") for n in re.findall(r"\d[\d,]*(?:\.\d+)?", value)]
+
+
+def quoted(value: str, text: str) -> bool:
+    """The value stands on its own in the text: "41%" is not quoted by
+    "37-41%", nor "143" by "1,143" or "143.5"."""
+    return re.search(rf"(?<![\w.,-]){re.escape(value)}(?!\w|[.,]\d)", text) is not None
+
+
+def spellings(entry) -> list[str]:
+    """The figure, and each `also` value that carries its numbers:
+    "16,384-byte" spells "16,384 bytes". A companion figure from the same
+    source ("19 categories" beside "143") is not a spelling of it."""
+    figure, *also = values(entry)
+    return [figure] + [v for v in also if numbers(v) == numbers(figure)]
+
+
 def registered_for(doc: str) -> set[str]:
     found = {norm(n["figure"]) for n in REGISTER["not_statistics"] if n["doc"] == doc}
     for entry in REGISTER["entries"]:
@@ -156,13 +174,45 @@ class EvidenceRegister(unittest.TestCase):
                     for number in re.findall(r"\d[\d,]*(?:\.\d+)?", value):
                         self.assertIn(number.replace(",", ""), quote)
 
+    def test_a_figure_is_quoted_only_on_its_own(self):
+        """The control for the two tests below: the old check, any value as
+        a substring, kept "19 categories" alive on a bare "143"."""
+        self.assertTrue(quoted("41%", norm("found **41%** of them")))
+        self.assertTrue(quoted("13,000", "across ~13,000 pages."))
+        for value, text in (("41%", "found 37–41% of them"), ("143", "1,143 issues"),
+                            ("143", "143.5 issues"), ("143", "1430 issues")):
+            self.assertFalse(quoted(value, norm(text)), text)
+        entry = {"figure": "16,384 bytes", "also": ["16,384-byte", "16384 bytes", "16 kB"]}
+        self.assertEqual(spellings(entry), ["16,384 bytes", "16,384-byte", "16384 bytes"])
+        old = {"figure": "19 categories", "also": ["143"]}
+        text = norm("the best single tool found 41% of 143 planted barriers")
+        self.assertTrue(any(v in text for v in values(old)))
+        self.assertFalse(any(quoted(v, text) for v in spellings(old)))
+
     def test_no_entry_outlives_its_figure(self):
+        """T1 (audit, 2026-10-14): a companion number kept an entry alive.
+        "19 categories" stayed listed for three docs that quote only "143",
+        "37–41%" for three that quote "41%" or the range's ends apart, and
+        "2,000+ audits" for a script that quotes only "13,000". Each doc
+        must quote the figure itself, or a spelling of it."""
         for entry in REGISTER["entries"]:
+            forms = spellings(entry)
             for doc in entry["docs"]:
                 with self.subTest(figure=entry["figure"], doc=doc):
                     text = norm((SKILLS / doc).read_text(encoding="utf-8"))
-                    self.assertTrue(any(v in text for v in values(entry)),
-                                    "the doc no longer quotes it; update the register")
+                    self.assertTrue(any(quoted(v, text) for v in forms),
+                                    "the doc no longer quotes the figure; take the doc "
+                                    "off its list, and register what it does quote")
+
+    def test_no_companion_outlives_its_figure(self):
+        """An `also` value is quoted, on its own, in at least one of its
+        entry's docs."""
+        for entry in REGISTER["entries"]:
+            texts = [norm((SKILLS / doc).read_text(encoding="utf-8")) for doc in entry["docs"]]
+            for value in values(entry)[1:]:
+                with self.subTest(figure=entry["figure"], also=value):
+                    self.assertTrue(any(quoted(value, text) for text in texts),
+                                    "no listed doc quotes it; drop it from also")
 
 
 if __name__ == "__main__":
