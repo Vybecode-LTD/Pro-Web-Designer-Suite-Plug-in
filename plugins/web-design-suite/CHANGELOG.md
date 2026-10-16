@@ -496,6 +496,34 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   E13, G11 and G15 were closed by #138, E14 and G13 by #142.
   `test_email.TheAuditsEmailLows`, `test_schema_sources.TheAuditsContentLows`,
   `test_content_and_a11y.TheAuditsRuntimeLows`.
+- **The docs, the pointer check and the suite let nine things slip** (the audit's D5 to
+  D9 and T3 to T10):
+  - the Core Web Vitals thresholds, the 75th percentile and the evals' "Claude Code
+    2.1.269 or later" had no entry in `tests/fixtures/evidence.json`. They are
+    registered, each re-read at web.dev and the evals page on 2026-10-16, so every doc
+    that quotes them is held to the register; LCP's poor threshold reads 4 s, as
+    web.dev gives 4000 ms;
+  - `tools/check_pointers.py` walked `skills/` only: it reads the agents and the
+    workflow commands too, and their seven pointers are registered;
+  - unused imports, f-strings with nothing to format, `raise` in an `except` without
+    `from` (13 sites, each `from None`: the message carries the cause) and eight
+    locals assigned and never read are gone from the scripts and the tests, none of
+    them a check left unwritten. `test_static_checks` keeps the five rules (ruff's
+    F401, F541, F841, B904 and SIM115's `open(…).read()`) with the standard library;
+  - 81 assertion loops in the tests stopped at their first failure; each case is a
+    `subTest` now, and the static checks keep it so;
+  - `NoFragileJsonReads` had no positive control and missed a named import's
+    `readFileSync`; `PythonFloor` left out the workflow commands' scripts and
+    `shared/`; the reduced-motion facts sat behind two `if`s; the manifest's strict
+    validation skips on every CI cell, so CI's `validate` job is held to it;
+    `wds_support` turns bytecode off for every run; the 2025.10 fixtures use the
+    colour object, and the legacy string reads the same; `test_versioning` closes its
+    files;
+  - CLAUDE.md maps all five tools and both kinds of eval, and a skill byte table in
+    the live docs is held to the bytes on disk.
+
+  `test_static_checks`, `test_evidence`, `test_pointers`, `test_docs.TheAuditsDocsLows`,
+  `test_powershell_json`, `test_facts`, `test_mcp`, `test_harness.NoBytecode`, `test_dtcg`.
 - **web-design-studio's gates measured and ruled four things wrong** (the audit's W1 to
   W5):
   - `check_roles` read `--fg-default: #00000080` as solid black, 20:1 on the canvas,
