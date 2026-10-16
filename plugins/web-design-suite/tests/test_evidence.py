@@ -15,14 +15,15 @@ Regressions covered:
 from __future__ import annotations
 
 import json
-import pathlib
 import re
 import unittest
 
-from wds_support import SKILLS
+from wds_support import PLUGIN, SKILLS
 
-REGISTER = json.loads((pathlib.Path(__file__).resolve().parent / "fixtures" / "evidence.json")
-                      .read_bytes())
+# The register of the plugin under test, beside the docs it describes, so a
+# run against another copy (fail_before.py's WDS_PLUGIN_ROOT) reads its own
+# (CodeRabbit on #154).
+REGISTER = json.loads((PLUGIN / "tests" / "fixtures" / "evidence.json").read_bytes())
 
 # A sentence attributes a figure when it names a source, links out, or says
 # where the number came from.
@@ -73,8 +74,9 @@ def numbers(value: str) -> list[str]:
 
 def quoted(value: str, text: str) -> bool:
     """The value stands on its own in the text: "41%" is not quoted by
-    "37-41%", nor "143" by "1,143" or "143.5"."""
-    return re.search(rf"(?<![\w.,-]){re.escape(value)}(?!\w|[.,]\d)", text) is not None
+    "37-41%", nor "143" by "1,143", "143.5", "143%", "143-200" or "1/143"
+    (Codex on #154)."""
+    return re.search(rf"(?<![\w.,/-]){re.escape(value)}(?!\w|[.,/-]\d|\s?%)", text) is not None
 
 
 def spellings(entry) -> list[str]:
@@ -180,7 +182,9 @@ class EvidenceRegister(unittest.TestCase):
         self.assertTrue(quoted("41%", norm("found **41%** of them")))
         self.assertTrue(quoted("13,000", "across ~13,000 pages."))
         for value, text in (("41%", "found 37–41% of them"), ("143", "1,143 issues"),
-                            ("143", "143.5 issues"), ("143", "1430 issues")):
+                            ("143", "143.5 issues"), ("143", "1430 issues"), ("143", "143% of it"),
+                            ("143", "143 % of it"), ("143", "143-200 failures"), ("143", "143/200"),
+                            ("143", "1/143 of it"), ("143", "a 2-143 range"), ("41%", "41%-43%")):
             self.assertFalse(quoted(value, norm(text)), text)
         entry = {"figure": "16,384 bytes", "also": ["16,384-byte", "16384 bytes", "16 kB"]}
         self.assertEqual(spellings(entry), ["16,384 bytes", "16,384-byte", "16384 bytes"])

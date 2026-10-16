@@ -282,10 +282,16 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             pass
 
 
-def left_out_of_tbt(out) -> float:
-    """The blocking time of the long tasks TBT did not count: after TTI,
-    before FCP, or the page's answer to a scripted interaction."""
-    return out["longTasks"]["blockingTotal"] - out["stats"]["tbt"]["median"]
+def the_task(out, after: float = 0) -> dict:
+    """The fixture's 250 ms busy loop, as the run reports it: the longest
+    task that starts at or after `after` ms on the page's clock. Codex on
+    #154: a total less TBT could not tell it from a slow runner's own
+    blocking before FCP; each task now says whether TBT counted it."""
+    [run] = out["perRun"]
+    found = [t for t in run["tasks"] if t["start"] >= after]
+    if not found:
+        raise AssertionError(f"no long task from {after} ms: {run['tasks']}")
+    return max(found, key=lambda t: t["duration"])
 
 
 @unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
@@ -336,25 +342,31 @@ class VitalsMeasures(TempDirTest):
         self.assertGreaterEqual(out["longTasks"]["count"], 1)
         self.assertGreaterEqual(out["longTasks"]["blockingTotal"], 150)
         # T2 (audit, 2026-10-14): TBT under 50 ms failed whenever a slow
-        # runner's own loading made a long task. What TBT leaves out of
-        # the totals is the handler's 200 ms of blocking, however slow.
-        self.assertGreaterEqual(left_out_of_tbt(out), 150)
+        # runner's own loading made a long task. The handler's own task is
+        # the one TBT leaves out, however slow the runner.
+        [run] = out["perRun"]
+        own = [t for t in run["tasks"] if t.get("leftOut") == "interaction"]
+        self.assertTrue(own, run["tasks"])
+        self.assertGreaterEqual(max(t["duration"] for t in own), 200)
 
     def test_tbt_stops_at_tti(self):
         """A long task after five quiet seconds is after TTI; one before is not.
         A 9-second settle leaves a slow runner room for the quiet window
         (CodeRabbit on #45). T2 (audit, 2026-10-14): each run is read
         against its TTI, not against TBT under 50 ms, which a slow runner's
-        own loading could pass. The busy loops' floors (150 ms of a 250 ms
-        task's blocking) only grow on a slow runner."""
+        own loading could pass: the fixture's task is found by its start,
+        and its place against TTI decides whether TBT counted it."""
         late = "<script>setTimeout(() => { " + self.BUSY.format(ms=250) + " }, {at});</script>"
         out = self.vitals(late.replace("{at}", "6000"), "--throttle", "off", "--settle", "9000")
         self.assertIsNotNone(out["stats"]["tti"])
-        self.assertLess(out["stats"]["tti"]["median"], 6000)      # TTI came before the task
-        self.assertGreaterEqual(left_out_of_tbt(out), 150)         # so TBT left it out
+        task = the_task(out, after=6000)
+        self.assertGreaterEqual(task["start"], out["stats"]["tti"]["median"])   # after TTI
+        self.assertEqual("after-tti", task.get("leftOut"), task)                 # so left out
         out = self.vitals(late.replace("{at}", "1000"), "--throttle", "off", "--settle", "9000")
-        self.assertGreaterEqual(out["stats"]["tti"]["median"], 1000)  # TTI waited for it
-        self.assertGreaterEqual(out["stats"]["tbt"]["median"], 150)   # so TBT counts it
+        task = the_task(out, after=1000)
+        self.assertLess(task["start"], out["stats"]["tti"]["median"])            # before TTI
+        self.assertTrue(task["inTbt"], task)                                     # so counted
+        self.assertGreaterEqual(out["stats"]["tbt"]["median"], task["duration"] - 50)
 
     def test_requests_in_flight_keep_the_network_busy(self):
         """Codex on #45: three fetches still in flight when the run was read
@@ -364,7 +376,7 @@ class VitalsMeasures(TempDirTest):
                 "setTimeout(() => { " + self.BUSY.format(ms=250) + " }, 6000);</script>")
         out = self.vitals(page, "--throttle", "off", "--settle", "7000")
         self.assertIsNone(out["stats"]["tti"])
-        self.assertGreaterEqual(out["stats"]["tbt"]["median"], 150)
+        self.assertTrue(the_task(out, after=6000)["inTbt"])
 
     def test_interact_at_clicks_while_the_page_hydrates(self):
         """The click lands during a 3-second task: its wait is INP's, and the

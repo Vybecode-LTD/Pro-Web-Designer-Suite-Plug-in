@@ -334,10 +334,13 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
     at its source on 2026-10-16; two spellings no doc used are gone;
   - three tests held a shared runner to an absolute time: the a11y audit's 4,000 rows
     under 20 seconds, and TBT under 50 ms for a page whose only long task TBT should
-    leave out, which a slow runner's own loading could break. The ratio bound stays;
-    the TBT tests read each run against its TTI (the late task starts after it, the
-    early one before) and assert that TBT leaves out the task's blocking time. Both
-    still fail when the handler or the late task is counted.
+    leave out, which a slow runner's own loading could break. The ratio bound stays.
+    `measure_vitals.mjs`' JSON now lists each run's long tasks (`perRun[].tasks`: the
+    start on the page's clock, the duration, `inTbt`, and `leftOut` as `interaction`,
+    `before-fcp` or `after-tti`), and the TBT tests find the fixture's own task there
+    and read it against TTI (Codex on #154: a total less TBT could not tell it from
+    a slow runner's blocking before FCP). Both still fail when the handler or the
+    late task is counted.
 
   `test_evidence.EvidenceRegister`, `test_browser_runtime.VitalsMeasures`.
 - **The schema reader, the scaffold, the email build and the deck misread nine things**
