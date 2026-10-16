@@ -539,11 +539,17 @@ async function runAxe(page, tags, context) {
 const AXE_SEVERITY = { critical: 'error', serious: 'error', moderate: 'warning',
                        minor: 'warning' };
 
+// The success criterion an axe rule's tags name: `wcag143` is 1.4.3, and the
+// third part can take two digits, `wcag1412` 1.4.12 (G12). '' when none does.
+function wcagCriterion(tags) {
+  const tag = tags.find((t) => /^wcag\d\d\d\d?$/.test(t)) || '';
+  return tag.replace(/^wcag(\d)(\d)(\d\d?)$/, '$1.$2.$3');
+}
+
 function axeFindings(res) {
   const out = [];
   for (const v of res.violations) {
-    const sc = (v.tags.find((t) => /^wcag\d{3}$/.test(t)) || '')
-      .replace(/^wcag(\d)(\d)(\d)$/, '$1.$2.$3');
+    const sc = wcagCriterion(v.tags);
     // A best-practice rule names no success criterion, so it is reported and
     // never fails the run, whatever axe rates its impact (GT-A8).
     const bestPractice = !sc && v.tags.includes('best-practice');

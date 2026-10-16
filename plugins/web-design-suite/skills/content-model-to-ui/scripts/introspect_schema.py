@@ -3038,7 +3038,7 @@ def parse_prisma(text: str) -> Model:
         table = Table(name=tables[name])
         fields[name] = {}
         for line in body.splitlines():
-            m = re.match(r"\s*(\w+)\s+(\w+(?:\.\w+)?(?:\([^)]*\))?)(\[\])?(\?)?\s*(.*)$", line)
+            m = re.match(r'\s*(\w+)\s+(\w+(?:\.\w+)?(?:\((?:"[^"]*"|[^)"])*\))?)(\[\])?(\?)?\s*(.*)$', line)
             if not m or line.strip().startswith("@@"):
                 continue
             field, ftype, is_list, optional, attrs = m.groups()
@@ -3058,6 +3058,10 @@ def parse_prisma(text: str) -> Model:
                 raw = PRISMA_NATIVE[native.group(1)] + (f"({args})" if args else "")
             elif ftype in enums:
                 raw = enums[ftype]
+            elif re.fullmatch(r'Unsupported\(\s*"[^"]+"\s*\)', ftype):
+                # The database's own type, which Prisma cannot map: read it as
+                # the DDL reader would (E12): `geometry` is a map picker.
+                raw = re.search(r'"([^"]+)"', ftype).group(1)
             else:
                 raw = PRISMA_SCALARS.get(ftype, ftype)
             ptype, length, precision, scale, _ = normalise_type(raw + ("[]" if is_list else ""))

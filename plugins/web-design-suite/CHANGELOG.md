@@ -468,6 +468,33 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
   M9 and V12 were closed by #140. `test_token_migration`, `test_figma_sync`,
   `test_versioning.TheAuditsVersioningMediums`, `test_docs.TheScriptReferences`.
+- **The content, email and runtime gates misreported eight things** (the audit's E11,
+  E12, G8 to G10, G12, G14 and G16):
+  - `lint_email --source` reported every rule of a `<style>` block on the element's
+    line. Each rule has its own line, a comment's newlines and an `@media` block's
+    rules counted;
+  - `introspect_schema` read Prisma's `Unsupported("geometry")` as a type named
+    `unsupported`, with a text input; it reads the type it names, as the SQL does (a
+    map picker), and `Unsupported("geography(Point, 4326)")` is no longer cut at its
+    first `)`;
+  - `perf_audit` skipped a `report.html` or `stats.html` without a word. It still
+    leaves a bundle analyzer's report out, and names each on stderr and in the JSON's
+    `ledger.not_counted`, so a real page of that name is seen;
+  - `a11y_static` quoted a bound attribute as `type="\x00expr\x00"`; it writes
+    `type={…}`, and names a field by its `id` when its `name` is bound. A bare
+    `title` no longer reads as a job title (the pattern `^title$&` never matched, and
+    a post's title is no `organization-title`), and a number input asks only for a
+    number's purposes, so `name="units"` is no address line;
+  - its `focus-ring-transition` flagged `transition: outline-color`, which its own
+    fix allows;
+  - `a11y_runtime` named no criterion for axe's two-digit tags (`wcag1412`,
+    avoid-inline-spacing's 1.4.12);
+  - `perf_audit`'s header listed a missing-`srcset` check no rule makes, and it built
+    a set of font families it never read.
+
+  E13, G11 and G15 were closed by #138, E14 and G13 by #142.
+  `test_email.TheAuditsEmailLows`, `test_schema_sources.TheAuditsContentLows`,
+  `test_content_and_a11y.TheAuditsRuntimeLows`.
 - **web-design-studio's gates measured and ruled four things wrong** (the audit's W1 to
   W5):
   - `check_roles` read `--fg-default: #00000080` as solid black, 20:1 on the canvas,

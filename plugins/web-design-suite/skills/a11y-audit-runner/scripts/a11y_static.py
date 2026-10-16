@@ -165,6 +165,10 @@ FOCUSABLE_SEL = {"a", "button", "input", "select", "textarea", "summary",
 INPUT_NO_LABEL_NEEDED = {"hidden", "submit", "reset", "button", "image"}
 INPUT_NOT_PERSONAL = {"hidden", "submit", "reset", "button", "image", "checkbox",
                       "radio", "file", "range", "color"}
+# The 1.3.5 purposes a number input can hold; a quantity named `units` is no
+# address line (G9).
+NUMBER_PURPOSES = {"bday", "cc-number", "cc-exp", "cc-csc", "postal-code", "tel",
+                   "one-time-code"}
 
 # Implicit ARIA roles, for the "you wrote the role it already had" check. Only
 # the ones people actually write redundantly are listed; a missing entry means
@@ -300,7 +304,9 @@ PERSONAL_FIELD_HINTS: tuple[tuple[str, str], ...] = (
     (r"last[_-]?name|family[_-]?name|surname|^lname$", "family-name"),
     (r"full[_-]?name|^name$|your[_-]?name|display[_-]?name", "name"),
     (r"organi[sz]ation|company|business[_-]?name|^employer$", "organization"),
-    (r"job[_-]?title|^title$&", "organization-title"),
+    # A bare "title" is a post's, a page's or an honorific as often as a job's,
+    # so only "job title" is a job title (G9).
+    (r"job[_-]?title", "organization-title"),
     (r"address[_-]?line[_-]?2|^addr2$|apartment|suite|unit", "address-line2"),
     (r"address[_-]?line[_-]?1|^addr1$|street", "address-line1"),
     (r"^address$|mailing[_-]?address", "street-address"),
@@ -395,6 +401,13 @@ ATTR_NAME = re.compile(r"[A-Za-z_@:$][\w:.$@-]*")
 # but not what it evaluates to. Rules must treat that as "cannot tell", never as
 # "empty" — a false positive on a dynamic value is how a team disables a linter.
 EXPR = "\x00EXPR\x00"
+
+
+def attr_text(name: str, value) -> str:
+    """An attribute as a message quotes it: a bound one is `name={…}`, never
+    the sentinel (G9)."""
+    return f"{name}={{…}}" if value == EXPR else f'{name}="{value}"'
+
 
 # Angular's bindings, which ATTR_NAME cannot start: `[alt]`, `[attr.aria-label]`,
 # `(click)` and the two-way `[(ngModel)]`.
@@ -1102,7 +1115,8 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                 if labelled is None and "\x00spread" not in a:
                     add(line, "F", "control-no-label", "3.3.2 / 4.1.2", "error",
                         f"<{name}"
-                        + (f" type=\"{itype}\"" if name == "input" else "")
+                        + (" " + attr_text("type", a.get("type", "text")).lower()
+                           if name == "input" else "")
                         + "> has no label by any of the four mechanisms.",
                         "The four, in order of preference: `<label for=\"id\">` "
                         "(explicit, survives DOM moves, clickable, works "
@@ -1140,8 +1154,12 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                 hint = _personal_field(a)
                 ac = a.get("autocomplete")
                 if ac in (None,) and hint:
+                    known = [k for k in ("name", "id") if a.get(k) not in (None, EXPR, "")]
+                    bound = [k for k in ("name", "id") if a.get(k) == EXPR]
+                    field_ = (attr_text(known[0], a[known[0]]) if known
+                              else attr_text(bound[0], EXPR) if bound else 'name="?"')
                     add(line, "F", "missing-autocomplete", "1.3.5", "error",
-                        f"<{name} name=\"{a.get('name') or a.get('id') or '?'}\"> "
+                        f"<{name} {field_}> "
                         f"collects the user's own data and has no "
                         f"`autocomplete` (expected `{hint}`).",
                         "1.3.5 is an AA criterion and it is the one teams "
@@ -1446,7 +1464,7 @@ def _personal_field(a: dict) -> str | None:
         if a.get(k) not in (None, EXPR)).lower()
     for pattern, token in PERSONAL_FIELD_HINTS:
         if re.search(pattern, haystack):
-            return token
+            return token if itype != "number" or token in NUMBER_PURPOSES else None
     if itype in direct:
         return direct[itype]
     return None
@@ -1688,7 +1706,10 @@ def audit_css(path: Path, text: str, origin: str | None = None,
                 "and nobody noticed — which is indistinguishable from source, "
                 "and is exactly why the runtime pass measures the ring in "
                 "pixels rather than reading the stylesheet.")
-        if "transition" in decls and re.search(r"\boutline\b", decls["transition"][0]):
+        # The outline or any of its parts but its colour, which the fix allows (G10).
+        if "transition" in decls and any(
+                m != "outline-color" for m in
+                re.findall(r"(?<![\w-])outline(?:-[\w-]+)?", decls["transition"][0])):
             add(decls["transition"][1], "K", "focus-ring-transition", "2.4.7",
                 "warning",
                 "The focus outline is transitioned.",

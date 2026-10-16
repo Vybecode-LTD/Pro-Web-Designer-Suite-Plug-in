@@ -544,3 +544,24 @@ class TheModelMakesItsFolder(SchemaSources):
         self.assertEqual(0, proc.returncode, output(proc))
         self.assertTrue(json.loads((self.tmp / "new" / "model.json").read_bytes())["tables"])
         self.assertTrue((self.tmp / "other" / "answers.json").is_file())
+
+
+class TheAuditsContentLows(SchemaSources):
+    """P55 part 4, the audit of 2026-10-14's §3.5: E12."""
+
+    def test_an_unsupported_prisma_type_reads_as_the_type_it_names(self):
+        """E12: `Unsupported("geometry")` became type `unsupported` and a text
+        input, where the same column in SQL is a map picker; and the field
+        pattern cut `geography(Point, 4326)` at its first `)`."""
+        self.write("place.sql", "create table place (\n  id integer primary key,\n  area geometry,\n"
+                                "  spot geography(Point, 4326),\n  tags tsvector not null\n);\n")
+        self.write("place.prisma", 'model place {\n  id   Int @id\n  area Unsupported("geometry")?\n'
+                                   '  spot Unsupported("geography(Point, 4326)")?\n'
+                                   '  tags Unsupported("tsvector")\n}\n')
+        ddl, prisma = columns(self.introspect("place.sql")), columns(self.introspect("place.prisma"))
+        self.assertEqual("geo-point", ddl["place.area"]["ui"]["control"])
+        for name in ("place.area", "place.spot", "place.tags"):
+            with self.subTest(column=name):
+                want, got = facts(ddl[name]), facts(prisma[name])
+                for key in ("type", "nullable", "control", "editable"):
+                    self.assertEqual(want[key], got[key], key)

@@ -569,7 +569,7 @@ class TheAuditsEmailMediums(EmailTest):
     """P54 part 6, the audit of 2026-10-14's §3.5: E6, E7 and E8."""
 
     def test_the_minifier_keeps_the_space_between_inline_siblings(self):
-        """E6: `>\s+<` became `><`, so `<strong>Hello</strong> <em>world</em>`
+        r"""E6: `>\s+<` became `><`, so `<strong>Hello</strong> <em>world</em>`
         rendered "Helloworld". Between block or table tags it still goes."""
         source = self.page("words.html", '<p class="x"><strong>Hello</strong> <em>world</em>\n'
                                          '  <a href="https://example.com/">read</a></p>\n'
@@ -601,3 +601,25 @@ class TheAuditsEmailMediums(EmailTest):
                             for m in re.finditer(r"<style[^>]*>(.*?)</style>", html, re.S)))
         doc = (EMAIL / "references" / "email-client-matrix.md").read_bytes().decode("utf-8")
         self.assertIn(f"the three templates in `assets/templates/` keep {min(kept)} to {max(kept)} bytes", doc)
+
+
+class TheAuditsEmailLows(EmailTest):
+    """P55 part 4, the audit of 2026-10-14's §3.5: E11."""
+
+    def test_each_style_rule_is_reported_on_its_own_line(self):
+        """E11: every rule of a `<style>` block was reported on the element's
+        line. A comment's newlines count, and so does a rule in `@media` and a
+        rule on the `<style>` tag's own line."""
+        source = self.write("lines.html", "<!doctype html>\n<html><head>\n<style>\n"
+                                          ".a { color: #ff0000; }\n\n/* a\n   comment */\n"
+                                          ".b { color: #00ff00; }\n@media (max-width: 600px) {\n"
+                                          "  .c { color: #0000ff; }\n}\n</style>\n"
+                                          "<style type=\"text/css\">.d { color: #ffff00; }</style>\n"
+                                          "</head><body><p>x</p></body></html>\n")
+        proc = run_py("email-template-system", "lint_email", source, "--source", "--format", "json",
+                      cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        findings = json.loads(proc.stdout.decode("utf-8"))["files"][str(source)]["findings"]
+        lines = {re.search(r"#[0-9a-f]{6}", f["message"]).group(0): f["line"]
+                 for f in findings if "hand-written colour" in f["message"]}
+        self.assertEqual({"#ff0000": 4, "#00ff00": 8, "#0000ff": 10, "#ffff00": 13}, lines)
