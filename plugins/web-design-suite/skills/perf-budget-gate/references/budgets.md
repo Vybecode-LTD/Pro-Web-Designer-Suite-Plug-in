@@ -276,7 +276,7 @@ This is the part people get wrong in both directions, so here it is plainly.
 
 | Metric | Good | Needs improvement | Poor | What it measures |
 |---|---|---|---|---|
-| **LCP** | ≤ 2.5 s | 2.5 – 4.0 s | > 4.0 s | Loading — when the largest element painted |
+| **LCP** | ≤ 2.5 s | 2.5 – 4 s | > 4 s | Loading — when the largest element painted |
 | **INP** | ≤ 200 ms | 200 – 500 ms | > 500 ms | Responsiveness — worst interaction, outliers trimmed |
 | **CLS** | ≤ 0.1 | 0.1 – 0.25 | > 0.25 | Visual stability — largest session window of shift |
 

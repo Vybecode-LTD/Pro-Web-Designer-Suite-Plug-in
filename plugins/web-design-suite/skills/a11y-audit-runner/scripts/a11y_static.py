@@ -667,7 +667,6 @@ def strip_tags(s: str) -> str:
         if c == "<":
             m = TAG_START.match(s, i)
             if m:
-                depth = 0
                 k = m.end()
                 while k < n:
                     if s[k] in "\"'":
@@ -815,7 +814,6 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
     control_names: dict[tuple[str, str], list[tuple[int, str]]] = {}
     saw_main = 0
     saw_html = False
-    saw_head = False
     has_title = False
     title_text = ""
     doc_like = False
@@ -865,7 +863,6 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
             saw_html = True
             doc_like = True
         if name == "head":
-            saw_head = True
             doc_like = True
         if name == "title":
             has_title = True
@@ -1036,7 +1033,7 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                     pass          # role handles it, or a spread may supply `alt`
                 else:
                     add(line, "N", "img-no-alt", "1.1.1", "error",
-                        f"<img> has no `alt` attribute"
+                        "<img> has no `alt` attribute"
                         + (f" (src={a['src']})" if a.get("src") not in (None, EXPR) else "") + ".",
                         "A MISSING alt and an EMPTY alt are different things. "
                         "With no attribute at all, screen readers fall back to "

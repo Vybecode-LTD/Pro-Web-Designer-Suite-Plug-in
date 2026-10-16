@@ -115,7 +115,7 @@ def skill_problems(folder: str, meta: dict[str, str]) -> list[str]:
         problems.append(f"the name {name!r} is not 1 to 64 lowercase letters, numbers and hyphens "
                         f"without 'anthropic' or 'claude'")
     if not description or len(description) > 1024 or re.search(r"<[^>]*>", description):
-        problems.append(f"the description is empty, longer than 1024 characters, or holds an XML tag")
+        problems.append("the description is empty, longer than 1024 characters, or holds an XML tag")
     return problems
 
 

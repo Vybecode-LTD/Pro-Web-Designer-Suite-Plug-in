@@ -48,13 +48,12 @@ from __future__ import annotations
 
 import argparse
 import html
-import itertools
 import json
 import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 
 # shared/project_config.py's refuse_overwrite(), verbatim: this skill has no

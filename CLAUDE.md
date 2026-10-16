@@ -87,10 +87,10 @@ plugins/web-design-suite/         the plugin (the only folder that ships)
   mcp/, .mcp.json                 the MCP server: the gates as tools (node design_gates.mjs)
   evals/                          claude plugin eval cases: routing/ (one per skill), boundaries/ (sibling pairs), and outcome cases in build/, systems/, gates/, lifecycle/, persuasion/, delivery/
   tests/                          the suite; fixtures/ holds the pointer and evidence registers
-  tools/                          check_pointers.py, sync_snippets.py
+  tools/                          check.py, check_pointers.py, fail_before.py, sync_rules.py, sync_snippets.py
   CHANGELOG.md, README.md, LICENSE
 tooling/                          pinned tools for the tests (main/, tailwind-v3/); release/build.py
-.github/workflows/                ci.yml (the suite on three platforms), release.yml (a v* tag makes the release), evals.yml (the routing evals)
+.github/workflows/                ci.yml (the suite on three platforms), release.yml (a v* tag makes the release), evals.yml (the routing and outcome evals, by hand)
 dev plans/                        the review, the phase plans and reports, the completion plan and inventory
 docs/HANDOFF.md                   the current state and the next steps, one page
 ```

@@ -1,5 +1,47 @@
 [
  {
+  "from": "../agents/supabase-security-reviewer.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "2",
+  "heading": "RLS is a UI concern"
+ },
+ {
+  "from": "../agents/supabase-security-reviewer.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "9",
+  "heading": "Who talks to the database"
+ },
+ {
+  "from": "../workflow-commands/email-build/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "5",
+  "heading": "Testing: what needs a rendering service"
+ },
+ {
+  "from": "../workflow-commands/email-build/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "8",
+  "heading": "ESP handoff"
+ },
+ {
+  "from": "../workflow-commands/schema-to-screens/SKILL.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "2",
+  "heading": "RLS is a UI concern"
+ },
+ {
+  "from": "../workflow-commands/schema-to-screens/SKILL.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "9",
+  "heading": "Who talks to the database"
+ },
+ {
+  "from": "../workflow-commands/tw-probe/SKILL.md",
+  "to": "web-design-studio/references/stack-tailwind.md",
+  "section": "2.3",
+  "heading": "What `--*: initial` takes with it"
+ },
+ {
   "from": "a11y-audit-runner/SKILL.md",
   "to": "a11y-audit-runner/references/automation-coverage.md",
   "section": "1",

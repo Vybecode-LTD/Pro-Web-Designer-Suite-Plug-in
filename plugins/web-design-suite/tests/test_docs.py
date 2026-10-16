@@ -1040,5 +1040,42 @@ class PythonFloor(unittest.TestCase):
         self.assertEqual(0, proc.returncode, output(proc))
 
 
+SIZE_ROW = re.compile(r"^[ \t]*\| ([a-z-]+) \| ([\d,]+) \|", re.M)
+
+
+class TheAuditsDocsLows(unittest.TestCase):
+    """P55 part 5, the audit of 2026-10-14's §3.7: D5 and D8. D6 is
+    test_evidence's, D7 test_pointers' and D9 test_static_checks'. The
+    tests' own repository: fail_before.py swaps the plugin, not these."""
+
+    def setUp(self):
+        if not (REPO and (REPO / "CLAUDE.md").is_file() and (REPO / "dev plans").is_dir()):
+            self.skipTest("no repository around the tests (a release's copy)")
+
+    def test_claude_md_maps_every_tool_and_both_kinds_of_eval(self):
+        """D5: the map listed two of tools/' five scripts, and called
+        evals.yml "the routing evals"; it runs the outcome cases too."""
+        lines = (REPO / "CLAUDE.md").read_text(encoding="utf-8").splitlines()
+        mapped = next(line for line in lines if line.strip().startswith("tools/"))
+        tools = sorted(p.name for p in (REPO / "plugins" / "web-design-suite" / "tools").glob("*.py"))
+        self.assertGreaterEqual(len(tools), 5)
+        self.assertEqual([], [name for name in tools if name not in mapped])
+        evals = next(line for line in lines if "evals.yml (" in line)
+        self.assertIn("routing and outcome", evals)
+
+    def test_a_byte_table_in_the_live_docs_is_the_disks(self):
+        """D8: the session prompt's SKILL.md sizes drifted from the files
+        (landing-page-conversion 20,497 against 20,496)."""
+        self.assertEqual([("demo-skill", "20,123")], SIZE_ROW.findall("| Skill | Bytes |\n|---|---|\n  | demo-skill | 20,123 |\n"))
+        sizes = {p.parent.name: p.stat().st_size
+                 for p in (REPO / "plugins" / "web-design-suite" / "skills").glob("*/SKILL.md")}
+        self.assertEqual(13, len(sizes))
+        for rel in LIVE_DOCS:
+            for name, size in SIZE_ROW.findall((REPO / rel).read_text(encoding="utf-8")):
+                if name in sizes:
+                    with self.subTest(doc=rel, skill=name):
+                        self.assertEqual(sizes[name], int(size.replace(",", "")))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -128,7 +128,7 @@ def parse(parser, where, argv):
     try:
         ns, extra = parser.parse_known_args(argv)
     except SystemExit:
-        raise AssertionError(f"{where}: the script's parser rejects {argv}")
+        raise AssertionError(f"{where}: the script's parser rejects {argv}") from None
     if extra:
         raise AssertionError(f"{where}: unknown arguments {extra}")
     return ns

@@ -505,6 +505,84 @@
       "docs": [
         "figma-variables-sync/references/figma-mapping.md"
       ]
+    },
+    {
+      "figure": "2.5 s",
+      "also": [
+        "2.5s",
+        "4 s"
+      ],
+      "claim": "Largest Contentful Paint's Core Web Vitals thresholds: good at 2.5 s or under, poor over 4 s",
+      "source": "web.dev, Web Vitals and Defining the Core Web Vitals metrics thresholds",
+      "url": "https://web.dev/articles/defining-core-web-vitals-thresholds",
+      "checked": "2026-10-16",
+      "quote": "To provide a good user experience, LCP should occur within 2.5 seconds of when the page first starts loading. ... Largest Contentful Paint ≤2500 ms >4000 ms 75",
+      "docs": [
+        "perf-budget-gate/SKILL.md",
+        "perf-budget-gate/references/budgets.md",
+        "landing-page-conversion/SKILL.md",
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "200 ms",
+      "also": [
+        "200ms",
+        "500 ms"
+      ],
+      "claim": "Interaction to Next Paint's Core Web Vitals thresholds: good at 200 ms or under, poor over 500 ms",
+      "source": "web.dev, Web Vitals and Defining the Core Web Vitals metrics thresholds",
+      "url": "https://web.dev/articles/defining-core-web-vitals-thresholds",
+      "checked": "2026-10-16",
+      "quote": "To provide a good user experience, pages should have a INP of 200 milliseconds or less. ... Interaction to Next Paint ≤200 ms >500 ms 75",
+      "docs": [
+        "perf-budget-gate/SKILL.md",
+        "perf-budget-gate/references/budgets.md",
+        "landing-page-conversion/SKILL.md",
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "≤ 0.1",
+      "also": [
+        "> 0.25"
+      ],
+      "claim": "Cumulative Layout Shift's Core Web Vitals thresholds: good at 0.1 or under, poor over 0.25",
+      "source": "web.dev, Web Vitals and Defining the Core Web Vitals metrics thresholds",
+      "url": "https://web.dev/articles/defining-core-web-vitals-thresholds",
+      "checked": "2026-10-16",
+      "quote": "To provide a good user experience, pages should maintain a CLS of 0.1. or less. ... Cumulative Layout Shift ≤0.1 >0.25 75",
+      "docs": [
+        "perf-budget-gate/SKILL.md",
+        "perf-budget-gate/references/budgets.md",
+        "landing-page-conversion/SKILL.md",
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "75th percentile",
+      "claim": "where the Core Web Vitals are assessed: the 75th percentile of page loads, mobile and desktop apart",
+      "source": "web.dev, Web Vitals",
+      "url": "https://web.dev/articles/vitals",
+      "checked": "2026-10-16",
+      "quote": "a good threshold to measure is the 75th percentile of page loads, segmented across mobile and desktop devices.",
+      "docs": [
+        "perf-budget-gate/SKILL.md",
+        "perf-budget-gate/references/budgets.md",
+        "landing-page-conversion/SKILL.md",
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "2.1.269",
+      "claim": "the oldest Claude Code that runs `claude plugin eval`",
+      "source": "Claude Code docs, Test plugins with evals (Requirements)",
+      "url": "https://code.claude.com/docs/en/plugin-evals#requirements",
+      "checked": "2026-10-16",
+      "quote": "Claude Code v2.1.269 or later.",
+      "docs": [
+        "../README.md"
+      ]
     }
   ],
   "not_statistics": [

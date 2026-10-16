@@ -70,7 +70,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 # A sibling import would otherwise leave __pycache__ inside the installed
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
@@ -1346,8 +1346,8 @@ def _no_role_recommendation(step: float, klass: str) -> str:
         return (f"Positioning offset, not proximity. Read {name} directly, or "
                 f"better, ask whether the element needs absolute positioning.")
     if klass == "size":
-        return (f"A width/height, not spacing. Use --width-content / "
-                f"--width-form / --measure-prose, or a relational unit.")
+        return ("A width/height, not spacing. Use --width-content / "
+                "--width-form / --measure-prose, or a relational unit.")
     return (f"{step:g}px is on the scale as {name} but has no Tier-2 role for "
             f"`{klass}`. Add one in tokens.css — Tier-2 roles are cheap; "
             f"components reading {name} directly is Law 6.")
@@ -1998,8 +1998,6 @@ def cluster_color_phase(lits: Sequence[dict], tol: float, prop: Proposal,
     if taken:
         prop.notes.append(f"Ramps from the project's tokens: {', '.join(taken)}. A step they do not "
                           f"declare is built as it would be without them.")
-
-    canvas_rgb = neutral.rgb(50)
 
     for idx, c in enumerate(clusters, start=1):
         rname, step, dist = nearest_ramp_step(c.centroid_lab, ramps)

@@ -44,9 +44,9 @@ import json
 import math
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 # A sibling import would otherwise leave __pycache__ inside the installed
 # plugin, which is read-only as far as a project is concerned.

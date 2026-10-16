@@ -1,4 +1,4 @@
-"""Check the § pointers in the skills.
+"""Check the § pointers in the skills, the agents and the workflow commands.
 
 Every pointer must land on a numbered heading. A cross-file pointer must also
 land on the SAME heading it was checked against, recorded in
@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import re
 import sys
@@ -35,7 +36,7 @@ FENCE = re.compile(r"^```.*?^```", re.S | re.M)
 
 @dataclass(frozen=True)
 class Pointer:
-    source: str      # relative to skills/
+    source: str      # relative to skills/: an agent's is ../agents/NAME.md
     line: int
     target: str      # relative to skills/
     section: str
@@ -83,8 +84,8 @@ def resolve(spelled: str, source: pathlib.Path, skills: pathlib.Path, index) -> 
         return skills / explicit.group(1) / "references" / f"{explicit.group(2)}.md"
     stem = re.sub(r"\.md$", "", spelled.rsplit("/", 1)[-1])
     candidates = index.get(stem, [])
-    skill = source.relative_to(skills).parts[0]
-    own = [p for p in candidates if p.relative_to(skills).parts[0] == skill]
+    skill = source.relative_to(skills).parts[0] if skills in source.parents else None
+    own =[p for p in candidates if p.relative_to(skills).parts[0] == skill]
     if len(own) == 1:
         return own[0]
     if len({p.read_bytes() for p in candidates}) == 1:          # unique, or identical copies
@@ -100,11 +101,13 @@ def pointers(skills: pathlib.Path = SKILLS) -> list[Pointer]:
     backward = re.compile(rf"§\s?{NUM}\s+of\s+{ref}")
     more = re.compile(rf"\s*(?:,|and|&|[–—]|to)\s*§?\s?{NUM}")
     found: list[Pointer] = []
-    for path in sorted(p for p in skills.rglob("*") if p.suffix in SOURCES and p.is_file()):
+    # The agents and the workflow commands point into the skills too (D7).
+    outside = [*(skills.parent / "agents").glob("*.md"), *(skills.parent / "workflow-commands").glob("*/SKILL.md")]
+    for path in sorted([*(p for p in skills.rglob("*") if p.suffix in SOURCES and p.is_file()), *outside]):
         text = path.read_text(encoding="utf-8")
         used: set[int] = set()
         line = lambda i: text.count("\n", 0, i) + 1
-        src = path.relative_to(skills).as_posix()
+        src = pathlib.Path(os.path.relpath(path, skills)).as_posix()
 
         def add(start: int, spelled: str, section: str, section_at: int) -> None:
             target = resolve(spelled, path, skills, index)

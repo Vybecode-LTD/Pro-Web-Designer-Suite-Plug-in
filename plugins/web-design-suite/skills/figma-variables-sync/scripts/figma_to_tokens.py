@@ -52,7 +52,7 @@ import math
 import os
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -596,7 +596,7 @@ def header(source: str, extra: Sequence[str] = ()) -> List[str]:
         "GENERATED FILE -- DO NOT EDIT BY HAND.",
         "",
         f"  source     {source}",
-        f"  generator  scripts/figma_to_tokens.py",
+        "  generator  scripts/figma_to_tokens.py",
         *([f"  generated  {stamp}"] if stamp else []),
         "",
         "Hand edits here are lost on the next sync, and worse, they make the",

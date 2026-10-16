@@ -50,6 +50,15 @@ class SectionPointers(unittest.TestCase):
     def test_the_tool_still_finds_the_pointers(self):
         self.assertGreater(len(self.tool.pointers(SKILLS)), 500)
 
+    def test_the_agents_and_the_commands_pointers_are_read(self):
+        """D7 (audit, 2026-10-14): the tool walked skills/ only, so the
+        pointers in agents/ and workflow-commands/ went unchecked."""
+        sources = {p.source for p in self.tool.pointers(SKILLS) if p.cross_file}
+        self.assertLessEqual({"../agents/supabase-security-reviewer.md",
+                              "../workflow-commands/email-build/SKILL.md",
+                              "../workflow-commands/schema-to-screens/SKILL.md",
+                              "../workflow-commands/tw-probe/SKILL.md"}, sources)
+
     def test_every_pointer_lands_on_a_numbered_heading(self):
         self.assertEqual([], self.unresolved)
 

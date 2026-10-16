@@ -815,7 +815,7 @@ def parse_steps(raw: Optional[str], neutral: bool) -> List[int]:
         except ValueError:
             raise ColorError(
                 f"--steps expects comma-separated integers like '50,100,500'; got {part!r}."
-            )
+            ) from None
         if not 0 <= value <= 1000:
             raise ColorError(f"--steps values must be between 0 and 1000; got {value}.")
         steps.append(value)

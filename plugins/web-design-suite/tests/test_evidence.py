@@ -214,6 +214,24 @@ class EvidenceRegister(unittest.TestCase):
                                     "the doc no longer quotes the figure; take the doc "
                                     "off its list, and register what it does quote")
 
+    def test_the_core_web_vitals_and_the_evals_floor_are_registered(self):
+        """D6 (audit, 2026-10-14): budgets.md quoted the thresholds "verified
+        against web.dev" and the README "Claude Code 2.1.269 or later" with no
+        entry, and FIGURE reads no duration. Each is registered with its quote,
+        so the entry tests above hold every doc that quotes it."""
+        wanted = {"2.5 s": "4 s", "200 ms": "500 ms", "≤ 0.1": "> 0.25", "75th percentile": None}
+        for figure, poor in wanted.items():
+            with self.subTest(figure=figure):
+                entry = next((e for e in REGISTER["entries"] if e["figure"] == figure), None)
+                self.assertIsNotNone(entry)
+                self.assertIn("perf-budget-gate/references/budgets.md", entry["docs"])
+                self.assertTrue(entry["url"].startswith("https://web.dev/"))
+                if poor:
+                    self.assertIn(poor, entry["also"])
+        floor = next((e for e in REGISTER["entries"] if e["figure"] == "2.1.269"), None)
+        self.assertIsNotNone(floor)
+        self.assertEqual(["../README.md"], floor["docs"])
+
     def test_no_companion_outlives_its_figure(self):
         """An `also` value is quoted, on its own, in at least one of its
         entry's docs."""

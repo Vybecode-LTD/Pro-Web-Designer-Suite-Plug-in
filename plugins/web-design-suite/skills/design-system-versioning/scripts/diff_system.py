@@ -73,7 +73,7 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 # A sibling import would otherwise leave __pycache__ inside the installed
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
@@ -907,7 +907,7 @@ def _snapshot_from_contract(paths: List[Path], label: str, source: str = "contra
         tokens = read_tokens(paths)
         deprecated = read_deprecations(paths)
     except ConfigError as exc:
-        raise bail(f"diff_system: {exc}")
+        raise bail(f"diff_system: {exc}") from None
     for problem in tokens.problems:                       # what a DTCG file could not give (S2)
         print(f"diff_system: warning: {problem}", file=sys.stderr)
     # Walk the files once, in order, as read_tokens does: a later file's
@@ -1028,7 +1028,7 @@ def load_snapshot(raw: str, label: str, *, no_upstream: bool = False) -> Snapsho
         try:
             data = json.loads(p.read_bytes())
         except (OSError, json.JSONDecodeError) as exc:
-            raise bail(f"diff_system: {p} is not readable JSON ({exc}).")
+            raise bail(f"diff_system: {p} is not readable JSON ({exc}).") from None
         schema = str(data.get("schema", "")) if isinstance(data, dict) else ""
         if schema == CONTRACT_SCHEMA:
             return _snapshot_from_contract([p], label)
@@ -1061,7 +1061,7 @@ def project_snapshot(label: str, *, no_upstream: bool = False) -> Snapshot:
     try:
         config = project_config()
     except ConfigError as exc:
-        raise bail(f"diff_system: {exc}")
+        raise bail(f"diff_system: {exc}") from None
     if not (config and config.tokens):
         raise bail("diff_system: name the candidate snapshot, or list the project's token files "
                    "in its .design-suite.json (\"tokens\").")
@@ -1080,7 +1080,7 @@ def published_snapshot(label: str, *, no_upstream: bool = False) -> Snapshot:
     try:
         config = project_config()
     except ConfigError as exc:
-        raise bail(f"diff_system: {exc}")
+        raise bail(f"diff_system: {exc}") from None
     published = config.baselines.get("system") if config else None
     if published is None:
         raise bail("diff_system: name the published snapshot, or name it in the project's "
@@ -2046,7 +2046,7 @@ def load_ledger(path: Optional[str]) -> Tuple[List[Dict[str, Any]], Optional[str
     try:
         data = json.loads(p.read_bytes())
     except (OSError, json.JSONDecodeError) as exc:
-        raise bail(f"diff_system: {p} is not readable JSON ({exc}).")
+        raise bail(f"diff_system: {p} is not readable JSON ({exc}).") from None
     schema = data.get("schema") if isinstance(data, dict) else None   # `[]` was a traceback (V8)
     if str(schema or "").split("@")[0] != LEDGER_SCHEMA.split("@")[0]:
         raise bail(
@@ -2250,8 +2250,8 @@ def render_report(res: Dict[str, Any], changes: Sequence[Change],
         for name in gate["failures"][:4]:
             out.append(f"    python -m scripts.deprecate add --name={name} "
                        f"--kind <kind> \\")
-            out.append(f"        --since <this version> --removal <target> "
-                       f"--replacement <new name> --reason '…'")
+            out.append("        --since <this version> --removal <target> "
+                       "--replacement <new name> --reason '…'")
     out.append("")
     return "\n".join(out)
 
@@ -2380,7 +2380,7 @@ def render_migration_guide(res: Dict[str, Any], changes: Sequence[Change],
         out.append("")
         out.append("```bash")
         out.append("git checkout -b upgrade/design-system-" + version)
-        out.append(f"# 1. pin the new version (never `latest`)")
+        out.append("# 1. pin the new version (never `latest`)")
         out.append(f"npm install @your-org/design-system@{version} --save-exact")
         out.append("# 2. the mechanical part")
         out.append(f"python -m scripts.apply_codemod ./src --mapping {mapping_path}")
