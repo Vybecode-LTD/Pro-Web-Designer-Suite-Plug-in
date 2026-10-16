@@ -563,3 +563,41 @@ class EmailDocClaims(EmailTest):
                        "reverse DNS", "TLS", "RFC 5322", "in summary",
                        "Google recommends rather than requires", "5,000 or more emails a day", "same `5322.From` domain"):
             self.assertIn(needle, workflow)
+
+
+class TheAuditsEmailMediums(EmailTest):
+    """P54 part 6, the audit of 2026-10-14's §3.5: E6, E7 and E8."""
+
+    def test_the_minifier_keeps_the_space_between_inline_siblings(self):
+        """E6: `>\s+<` became `><`, so `<strong>Hello</strong> <em>world</em>`
+        rendered "Helloworld". Between block or table tags it still goes."""
+        source = self.page("words.html", '<p class="x"><strong>Hello</strong> <em>world</em>\n'
+                                         '  <a href="https://example.com/">read</a></p>\n'
+                                         '<table role="presentation">\n  <tr>\n    <td>cell</td>\n  </tr>\n</table>')
+        out, _ = self.build(source, "--minify")
+        html = out.read_bytes().decode("utf-8")
+        self.assertIn("<strong>Hello</strong> <em>world</em> <a", html)
+        self.assertIn('<table role="presentation"><tr><td>cell</td></tr></table>', html)
+
+    def test_the_templates_lint_clean_as_source(self):
+        """E8: SKILL.md says the templates already compile clean, but their
+        mobile media queries, dividers, pull quote and columns held literals
+        (6, 6 and 1 warnings), so `--strict` failed the untouched template."""
+        self.assertEqual(3, len(TEMPLATES))
+        for template in TEMPLATES:
+            with self.subTest(template=template.name):
+                proc = run_py("email-template-system", "lint_email", template, "--source", "--strict",
+                              cwd=self.tmp)
+                self.assertEqual(0, proc.returncode, output(proc))
+
+    def test_the_retained_style_bytes_are_the_builds(self):
+        """E7: email-client-matrix.md said the templates keep "600–750 bytes"
+        of `<style>`; the build keeps 751, 919 and 830."""
+        kept = []
+        for template in TEMPLATES:
+            out, _ = self.build(template)
+            html = out.read_bytes().decode("utf-8").replace("\r\n", "\n")     # as the build counts it
+            kept.append(sum(len(m.group(1).encode("utf-8"))
+                            for m in re.finditer(r"<style[^>]*>(.*?)</style>", html, re.S)))
+        doc = (EMAIL / "references" / "email-client-matrix.md").read_bytes().decode("utf-8")
+        self.assertIn(f"the three templates in `assets/templates/` keep {min(kept)} to {max(kept)} bytes", doc)

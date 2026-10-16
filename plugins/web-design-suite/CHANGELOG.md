@@ -291,6 +291,38 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   `rgb(255, 0, 0, 0.5)` and `hsl(0, 100%, 50%, 0.5)`, the legacy form under the names
   CSS Color 4 made aliases of `rgba()` and `hsla()`, were left out of a DTCG document as
   unsupported; they are written with their alpha (`test_dtcg.TheWriter`).
+- **The schema reader, the scaffold, the email build and the deck misread nine things**
+  (the audit's E1 to E8 and E10):
+  - a naive `timestamp` named `created_at` or `updated_at` (every Prisma `DateTime
+    @default(now())`, every Drizzle `timestamp()` without `withTimezone`) became an
+    editable datetime-picker. It is a read-only timestamp, and the naive-timestamp
+    question is still asked;
+  - a table's name went into the scaffold's paths as it was, so `../evil` wrote above
+    `features/` and `../../evil` left `--out`. A name with a path separator, `..` or NUL
+    is refused (exit 2), and no file is written outside `--out`;
+  - a column `2fa` gave a TSX and a Python syntax error, and `it's` an unterminated
+    string. Names are written as escaped string literals, `errors['2fa']` where the name
+    is no identifier, and a pydantic attribute that would start with a digit takes
+    `col_`;
+  - a policy that pins a column through a cast (`auth.uid()::text = owner_id::text`), a
+    JWT claim (`(auth.jwt() ->> 'sub')::uuid = user_id`) or a quoted camelCase name
+    (`auth.uid() = "userId"`) was read as leaving it writable. A string is no call, and
+    `= any(...)` does not pin;
+  - a Drizzle schema of `pgTable.withRLS(` tables only was sent to the generated-types
+    reader;
+  - the email minifier removed the space between inline siblings
+    (`<strong>Hello</strong> <em>world</em>` read "Helloworld"); it is kept unless a
+    block or table tag is beside it;
+  - email-client-matrix.md said the templates keep 600 to 750 bytes of `<style>`; they
+    keep 751 to 919;
+  - the shipped templates did not lint clean as source (their mobile media queries,
+    dividers, pull quote and columns held literals). Seven `--email-*` tokens hold
+    them, and the builds are byte-identical;
+  - the deck put the log template's header placeholders (`<company>`, `<your name>`,
+    `<YYYY-MM-DD>`) on the cover with no gap. Each is a gap and stays off the deck.
+
+  `test_scaffold.TheAuditsContentMediums`, `test_email.TheAuditsEmailMediums`,
+  `test_presentation.TheHeadersPlaceholders`.
 - **Versioning and the docs site misread five things** (the audit's V4, V5, V6 and V9,
   and one found beside them):
   - `deprecate scan` read the suite's own JSON records as consumers: the mapping's

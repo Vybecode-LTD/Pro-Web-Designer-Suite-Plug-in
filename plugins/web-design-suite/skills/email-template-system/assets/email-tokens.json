@@ -216,6 +216,13 @@
     "--email-edge":        { "value": "1px solid var(--border-subtle)", "tier": 2, "status": "email-only", "from": "--elevation-card", "reason": "shadow-to-edge", "note": "one token for the whole shorthand, resolved at build time, so the client receives `1px solid #e7e5e2` and a change to --border-subtle reaches it." },
     "--email-tap-min":     { "value": "44px", "tier": 2, "status": "email-only", "from": "--tap-min 2.75rem", "reason": "rem-to-px" },
     "--email-button-pad":  { "value": "14px 28px", "tier": 2, "status": "email-only", "note": "tuned so the padded anchor's rendered box is 48px tall at --type-ui-size/line — above --email-tap-min with room for the Word engine's rounding." },
+    "--email-gutter-mobile": { "value": "20px", "tier": 2, "status": "email-only", "note": "--gutter-page on phones: the stacking media query's left and right padding." },
+    "--email-h1-size-mobile": { "value": "26px", "tier": 2, "status": "email-only", "note": "--type-h1-size on phones, set in the stacking media query: email has no clamp()." },
+    "--email-h1-line-mobile": { "value": "32px", "tier": 2, "status": "email-only", "note": "--type-h1-line on phones, beside --email-h1-size-mobile." },
+    "--email-h2-size-mobile": { "value": "22px", "tier": 2, "status": "email-only", "note": "--type-h2-size on phones, set in the stacking media query." },
+    "--email-h2-line-mobile": { "value": "28px", "tier": 2, "status": "email-only", "note": "--type-h2-line on phones, beside --email-h2-size-mobile." },
+    "--email-width-col":    { "value": "264px", "tier": 2, "status": "email-only", "note": "One column of a two-column row: --email-width-inner less one 24px gap, halved." },
+    "--email-pull-rule":    { "value": "3px", "tier": 2, "status": "email-only", "note": "The width of a pull quote's left rule." },
 
     "--email-dark-canvas":  { "value": "var(--neutral-950)", "tier": 2, "status": "email-only", "note": "Dark-treatment hints, honoured by Apple Mail and Thunderbird and ignored by most of the matrix. These are TOKENS for the same reason the light roles are: a hand-written #1a1a1a in a dark-mode block is exactly the drift the contract exists to stop." },
     "--email-dark-surface": { "value": "var(--neutral-900)", "tier": 2, "status": "email-only", "contrast": "--email-dark-fg on it is 16.17:1" },
