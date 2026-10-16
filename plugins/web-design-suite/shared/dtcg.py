@@ -1621,7 +1621,8 @@ def recorded(data: Any, base: Optional[Union[str, Path]]) -> Tuple[Dict[str, str
     """The record of a document or a resolver: each token document() left
     out, with its CSS value, and the `$deprecated` of each. A resolver's is in
     the sources its default contexts read, in its folder `base`; a later
-    source wins, as in the resolution, and takes an earlier one's mark off.
+    source wins, as in the resolution, whether it writes the token or
+    records it, and takes an earlier one's mark off.
     diff_system and project_config's read_deprecations both read it here
     (the audit's V2 and V3)."""
     docs = [data]
@@ -1638,6 +1639,9 @@ def recorded(data: Any, base: Optional[Union[str, Path]]) -> Tuple[Dict[str, str
     values: Dict[str, str] = {}
     marks: Dict[str, Union[bool, str]] = {}
     for doc in docs:
+        for path in token_paths(doc):            # a later source that writes it ends its record
+            values.pop(css_name(path), None)     # (Codex and CodeRabbit on #149)
+            marks.pop(css_name(path), None)
         got, got_marks = not_written(doc), not_written_marks(doc)
         for name, value in got.items():
             values[name] = value

@@ -656,6 +656,41 @@ class TheAuditsVersioningMediums(TempDirTest):
                 self.assertEqual(want, {t["name"]: t["raw"] for t in got})
                 self.assertEqual({0}, {t["line"] for t in got})
 
+    def test_a_later_source_that_writes_a_token_ends_its_record(self):
+        """Codex and CodeRabbit on #149: in a resolver, an earlier source's
+        record of a token outlived a later source that writes it, so the
+        record's value replaced the resolved one and its mark came back."""
+        hero = "clamp(2rem, 1rem + 4vw, 4rem)"
+        self.dtcg("pub/a.tokens.json", {"space": {"4": self.REM}}, {"--size-hero": hero},
+                  {"--size-hero": "Use {space.4} instead"})
+        self.dtcg("pub/b.tokens.json", {"size": {"hero": {"$type": "dimension", "$value": {"value": 2, "unit": "rem"}}}})
+        self.write("pub/tokens.resolver.json", json.dumps({"version": "2025.10", "resolutionOrder": [
+            {"type": "set", "name": "base", "sources": [{"$ref": "a.tokens.json"}, {"$ref": "b.tokens.json"}]}]}))
+        resolver = str(self.tmp / "pub" / "tokens.resolver.json")
+        proc = run_py("design-system-docs", "extract_system", "--tokens", resolver, "--out", "system.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        got = {t["name"]: t["raw"] for t in json.loads((self.tmp / "system.json").read_bytes())["tokens"]}
+        self.assertEqual("2rem", got["--size-hero"])
+        self.write("old.css", ":root {\n  --space-4: 1rem;\n  --size-hero: 2rem;\n}\n")
+        proc = run_py("design-system-versioning", "diff_system", "old.css", resolver, "--format", "json", cwd=self.tmp)
+        self.assertEqual([], json.loads(proc.stdout)["changes"], output(proc))
+        proc = run_py("design-system-versioning", "deprecate", "--ledger", self.tmp / "ledger.json", "import",
+                      resolver, "--since", "1.5.0", "--removal", "2.0.0", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertFalse((self.tmp / "ledger.json").exists(), "a mark the later source took off")
+
+    def test_a_contracts_literal_role_stays_tier_two(self):
+        """Codex on #149: flattened to CSS, a contract's `--surface: #ffffff`
+        role was Tier 1 by its value, and `--contract` moved it to constants."""
+        self.write("contract.json", json.dumps({"schema": "web-design-suite/contract/1",
+                                                "roles": {"--surface": "#ffffff"}}))
+        proc = run_py("design-system-docs", "extract_system", "--tokens", "contract.json", "--out", "system.json",
+                      "--contract", "round.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        tiers = {t["name"]: t["tier"] for t in json.loads((self.tmp / "system.json").read_bytes())["tokens"]}
+        self.assertEqual({"--surface": 2}, tiers)
+        self.assertEqual({"--surface": "#ffffff"}, json.loads((self.tmp / "round.json").read_bytes())["roles"])
+
     def test_each_copy_note_names_the_helpers(self):
         """V10: the note on copying a skill's scripts into a project's own
         `scripts/` named the commands only, not the project_config.py, dtcg.py
