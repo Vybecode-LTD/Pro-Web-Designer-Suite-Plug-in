@@ -1,23 +1,24 @@
 # Handoff
 
-**2026-10-16**, after P54 parts 5 to 8 of Phase 6c, the owner's audit. **Next: P54 part 9, §3.8 (T1, T2), then P55, the lows.** The owner placed all of Phase 6c (P50 to P55) before Phase 6b's remaining workstreams.
+**2026-10-16**, after P54 part 9 and P55 parts 1 to 3 of Phase 6c, the owner's audit. **Next: P55 part 4 (§3.5 and §3.6's lows), then part 5 (§3.7 and §3.8's lows).** The owner placed all of Phase 6c (P50 to P55) before Phase 6b's remaining workstreams.
 
 **The next session starts from `dev plans/next-session-prompt.md`**: orientation, then the work in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
 ## State
 
-- **#149, P54 part 5 (§3.4's second half: V2, V3, V10, `extract_system --tokens` on JSON)**, merged as `6b0900e`. `dtcg.recorded()` reads a document's or a resolver's record of the tokens it left out, in source order (a later source that writes a token ends its record); `read_deprecations` reads its marks; `extract_system` reads a contract.json or DTCG file through `read_tokens`, with the file's roles at Tier 2; every SKILL.md's copy note names its helpers.
-- **#150, P54 part 6 (§3.5: E1 to E8, E10)**, merged as `c236246`. Naive system timestamps read-only; table names refused in the scaffold's paths; odd column names escaped; casts, JWT claims and quoted names pin a column; `pgTable.withRLS(`; the email minifier's word spaces; the style bytes; the templates lint clean (seven `--email-*` tokens); the deck's header placeholders.
-- **#151, P54 part 7 (§3.6: G1, G2, G5, G6, G7)**, merged as `f6bcc1b`: `aria-hidden` reads the subtree's real tab stops, a control's name is read at any depth (a component is "cannot tell", a silent subtree names nothing), the forced-colours survey is anchored, the TBT control clicks a button the task reveals, the coverage table marks what this suite does not run.
-- **#152, P54 part 8 (§3.7: D1, D2, D3)**, merged as `cd4d1fe`. `release.yml` pins its actions to SHAs and keeps no credential; the tooling README explains zlib-ng; the README counts six `.mjs` scripts.
-- **Reviews:** 11 real findings (Codex 7, CodeRabbit 4, two of them the same issue), and CI 3, each fixed with a test failing on the head it reviewed. One correction to the audit: 3.3.8's missing `autocomplete` is checked.
-- **At the end:** the plan has 21 open items, all 21 scheduled; about 1,253 tests. This session used about 640 thousand tokens.
+- **#154, P54 part 9 (§3.8: T1, T2)**, merged as `15e40d6`. The evidence register's entries live on the figure itself or a spelling of it, never a companion number, and the register is read beside the docs it describes; the TBT tests read the fixture's own task (`measure_vitals`' new `perRun[].tasks`) against TTI. P54 and N46 are done.
+- **#155, P55 part 1 (§3.1: S5, S6, S7, S9)**, merged as `add2ced`. The Python and Node token readers agree on a spaced reference, non-ASCII digits and `components` given as an object; the MCP server refuses a path outside the project, through any link, and a folder holding a link that leads out.
+- **#156, P55 part 2 (§3.2: W8 to W13)**, merged as `91b43cb`. `check_roles` reads a rule with a nested block; the audit's `!important` is the flag; `tw_probe` reads an extensionless import; the hook's role stage takes every one-file token set that declares a role; two config comments corrected.
+- **#157, P55 part 3 (§3.3 and §3.4: M7, M8, V13 to V16)**, merged as `5fbb615`. The census reads `@apply` and markup class expressions; the codemod keeps a file's mode; a duration by its type resolves; `diff_system` reads one docs schema; `--format all` needs its folder; the references name every flag, kind and shape, held by tests; classes in `@apply` and class expressions are hand work.
+- **Reviews:** 12 real findings (Codex 6, CodeRabbit 6, two of them the same issue), each fixed with a test failing on the head it reviewed. Four corrections to the audit: W14's `noqa` are used under ruff's defaults, T2's third site holds a ratio only, and S8, S10, M9 and V12 were already closed by P53.
+- **At the end:** the plan has 20 open items, all 20 scheduled; about 1,270 tests. This session used about 680 thousand tokens.
 
 ## Next steps
 
-1. If this docs PR, #153, is still open, merge it once green.
-2. **P54 part 9, §3.8:** T1 (`test_evidence.test_no_entry_outlives_its_figure` passes on an `also` substring; require the figure itself, word-bound the `also` values, then fix the register, re-reading each figure at its source), T2 (wall-clock thresholds: keep the ratio bounds, drop the absolute ones). After part 9, remove the `P54` row and mark N46 done.
-3. **Then P55, the lows** (the audit's "low" findings and doc fixes, per area), then Phase 6b in the owner's order, then **R4**.
+1. If this docs PR, #158, is still open, merge it once green.
+2. **P55 part 4, §3.5 and §3.6:** E11, E12; G8, G9, G10, G12, G14, G16 (E13, G11, G15 closed by #138; E14, G13 by #142).
+3. **P55 part 5, §3.7 and §3.8:** D5 to D9; T3 to T10. Then remove the `P55` row and mark N47 done.
+4. Then Phase 6b in the owner's order, then **R4**.
 
 ## Open owner decisions
 
@@ -25,10 +26,9 @@
 
 ## Warnings
 
-- **A reader that merges two kinds of entry from ordered sources** (written tokens and a record of the left-out ones) must walk them in one pass, inline sources included (Codex on #149, twice).
-- **A written boolean attribute is on by presence** (`hidden="false"` hides); only a bound value (`EXPR`) is unknown (CodeRabbit and Codex on #151).
-- **`test_facts` holds every "N of the 55" to the table's Full count**: qualify a count, never change it.
-- **`fail_before.py` swaps the plugin only**: a test of `release.yml` or `tooling/` reads as a control. Test it against `main`'s copies by hand, with `MSYS_NO_PATHCONV=1` before `git show origin/main:PATH` in Git Bash (without it the path is mangled and the `>` truncates the target).
-- **Parallel PRs off `main` conflict on the CHANGELOG and both plans after every merge.** `keep_both.py` in this session's scratchpad resolves them (completion notes compared by part).
-- **`test_interact_at_clicks_while_the_page_hydrates` failed once in 11 local runs**, with no output kept. Watch it on CI.
-- **Still open from earlier:** Vue's `:style` (P55); the `VitalsUnderCsp` macOS flake; `perf_audit.py` and an unbundled `@import` chain; three tokens outside Display P3; don't grep `tooling/`; the repository is public; `Vybecode-LTD/wds-gate-scratch` is the owner's to delete.
+- **Codex reached its review usage limit** on #157 ("You have reached your Codex usage limits for code reviews"). Until it resets or the owner adds credit, PRs merge on CI green, threads resolved and clean, as they do when CodeRabbit is rate-limited.
+- **`git ls-files '*dtcg.py'` matches `tests/test_dtcg.py`**: copying the masters over every copy overwrote it once (restored). Leave `tests/` out.
+- **ruff writes a `.ruff_cache`** with machine paths, which `test_docs.NoMachinePaths` refuses: run it with `--no-cache`.
+- **`gh run watch` can lose its connection** ("error connecting to api.github.com"), and `wait_pr.sh` then reports `ci exit 1`. Read the run (`gh pr checks N`) before acting on it.
+- **The MCP server walks each folder a gate reads** for a link out of the project. A large tree without `node_modules` makes a call slower; a project with a link out is refused (`-32602` names it), and the CLI scripts are unchanged.
+- **Still open from earlier:** Vue's `:style` (P55); the `VitalsUnderCsp` macOS flake; `test_interact_at_clicks_while_the_page_hydrates` failed once in 11 local runs; `perf_audit.py` and an unbundled `@import` chain; three tokens outside Display P3; don't grep `tooling/`; the repository is public; `Vybecode-LTD/wds-gate-scratch` is the owner's to delete.
