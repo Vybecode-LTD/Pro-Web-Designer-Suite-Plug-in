@@ -1,10 +1,10 @@
 # Start here: the next session
 
-**Written 2026-10-16**, at the end of the third session that day: P55 parts 4 and 5, the last of **Phase 6c**, the owner's audit. Phase 6c is done (P50 to P55, N41 to N47). Two PRs, and this docs PR, #161, which merges once green (§3):
+**Written 2026-10-16**, at the end of the third session that day: P55 parts 4 and 5, of **Phase 6c**, the owner's audit. Phase 6c is done but one piece, D6's Baseline browser versions (P55, N47). Two PRs, and this docs PR, #161, which merges once green (§3):
 - **#159, P55 part 4 (§3.5 and §3.6: E11, E12, G8 to G10, G12, G14, G16)**, merged as `1401c4f`.
-- **#160, P55 part 5 (§3.7 and §3.8: D5 to D9, T3 to T10)**, merged as `2aa5fb4`. N47 is done.
+- **#160, P55 part 5 (§3.7 and §3.8: D5 to D9, T3 to T10)**, merged as `2aa5fb4`. N47 stays open for D6's rest (Codex on #161).
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **Phase 6b's workstreams, in the order the owner chooses** (§4), then R4.
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P55's last piece, then Phase 6b's workstreams in the order the owner chooses** (§4), then R4.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -270,7 +270,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `19 open items, 19 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `20 open items, 20 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
@@ -482,9 +482,11 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 - Remove any worktree left in this session's scratchpad (`ed3194bc-…\scratchpad`): `git worktree remove PATH`, then `git branch -d` each merged branch.
 - Then read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
 
-## 4. Phase 6b, 4.0.0: the remaining workstreams
+## 4. P55's last piece, then Phase 6b, 4.0.0
 
-**Phase 6c is done** (P50 to P55; N41 to N47). Phase 6b's P36 (Tailwind v4) merged by 2026-10-14. **Ask the owner which of the six comes first**, and give them the sizes below. Read the item's rows in the completion plan and its review findings before planning it, and split an L into PRs under 100 files each. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+**First, P55 (N47): D6's rest.** The audit's D6 names the Baseline browser versions the references quote, unregistered ("Chrome 111, Firefox 113, Safari 16.2" in color-system.md; motion-system.md, stack-vanilla-css.md, typography.md and more; `grep -rn "Chrome 1[0-9][0-9]"` over the skills' references finds them). Ask the owner: register each (re-read at its web-features YAML or MDN's compat data on the day, an `evidence.json` entry per figure, the docs held by the entry tests), or waive it for the web-features links. Either way, then remove the `P55` row and mark N47 done.
+
+**Then Phase 6b.** Phase 6c's other parts are done (P50 to P54; P55 parts 1 to 5). Phase 6b's P36 (Tailwind v4) merged by 2026-10-14. **Ask the owner which of the six comes first**, and give them the sizes below. Read the item's rows in the completion plan and its review findings before planning it, and split an L into PRs under 100 files each. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
@@ -496,7 +498,7 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 | P43 | More page types and audiences, a claims layer with `lint_claims.py`, routing between the persuasion skills, and MESSAGE_BRIEF to DECISION_LOG | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-**Also ask the owner** (HANDOFF's open decisions): whether the Baseline browser versions the references quote (the rest of the audit's D6) become an item, and whether Vue's `:style` binding, which the audit's `style=""` reader does not read, gets one.
+**Also ask the owner** (HANDOFF's open decisions) whether Vue's `:style` binding, which the audit's `style=""` reader does not read, gets an item.
 
 **Each PR:** fail before on `v3.6.0` (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES` (and `WDS_TAILWIND_MODULES` for `test_tw_probe`), both at `tooling/main/node_modules`; the CHANGELOG under 4.0.0; a done row `Pnn part N, #N` above the item's row, which goes when the item is done; a note in the completion plan. `test_static_checks` holds every new script and test to its five rules.
 

@@ -1,6 +1,6 @@
 # Handoff
 
-**2026-10-16**, after P55 parts 4 and 5, the last of Phase 6c, the owner's audit. **Phase 6c is done (P50 to P55, N41 to N47).** **Next: Phase 6b's workstreams (P34, P35, P37, P41, P42, P43), in the order the owner chooses, then R4.**
+**2026-10-16**, after P55 parts 4 and 5, the last of Phase 6c, the owner's audit. **Phase 6c is done but one piece: D6's Baseline browser versions (P55, N47), which the owner may waive.** **Next: that piece, then Phase 6b's workstreams (P34, P35, P37, P41, P42, P43) in the order the owner chooses, then R4.**
 
 **The next session starts from `dev plans/next-session-prompt.md`**: orientation, then the work in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
@@ -17,20 +17,21 @@
   - `check_pointers` reads the agents and the workflow commands.
   - Unused imports, empty f-strings, `raise` without `from` and unread locals are gone, and the new `test_static_checks` keeps them out without ruff.
   - 81 assertion loops are on `subTest`, the 2025.10 fixtures use the colour object, and the suite's guards are widened.
-  - N47 is done.
+  - N47 stays open for D6's rest, the Baseline browser versions (Codex on #161).
 - **Reviews:** 8 real findings (Codex 3, CodeRabbit 5), and the local `check.py` caught 2 more. Each was fixed with a test failing on the head it reviewed, or, for test code, a control the old code fails. The next prompt's §0 has the lessons.
-- **At the end:** the plan has 19 open items, all 19 scheduled; about 1,310 tests. This session used about 600 thousand tokens.
+- **At the end:** the plan has 20 open items, all 20 scheduled; about 1,310 tests. This session used about 600 thousand tokens.
 
 ## Next steps
 
 1. If this docs PR, #161, is still open, merge it once green.
-2. **Ask the owner which Phase 6b workstream comes first**: P34 (runtime coverage: SPAs, logged-in pages, shadow DOM, several URLs and viewports), P35 (the cheap automatable checks, other engines), P37 (SCSS in stylelint; Next.js App Router, Vue, Svelte, Astro), P41 (email: MJML or React Email, RTL, caniemail's matrix), P42 (persuasion: UK and EU consumer law, consent, price experiments), P43 (more page types, a claims layer). The next prompt's §4 has each one's scope and files.
-3. Then **R4**, release 4.0.0, in R3.6's order: a live check (the owner's OK and its estimate), the release PR, the evals (the owner's OK, about $11), the tag.
+2. **P55, D6's rest:** ask the owner whether to register the Baseline browser versions (each re-read at web-features, in `evidence.json`) or waive them for the web-features links. Register them, or remove the `P55` row and mark N47 done.
+3. **Ask the owner which Phase 6b workstream comes first**: P34 (runtime coverage: SPAs, logged-in pages, shadow DOM, several URLs and viewports), P35 (the cheap automatable checks, other engines), P37 (SCSS in stylelint; Next.js App Router, Vue, Svelte, Astro), P41 (email: MJML or React Email, RTL, caniemail's matrix), P42 (persuasion: UK and EU consumer law, consent, price experiments), P43 (more page types, a claims layer). The next prompt's §4 has each one's scope and files.
+4. Then **R4**, release 4.0.0, in R3.6's order: a live check (the owner's OK and its estimate), the release PR, the evals (the owner's OK, about $11), the tag.
 
 ## Open owner decisions
 
 - The order of Phase 6b's workstreams.
-- **The Baseline browser versions** (the rest of the audit's D6): about a dozen references quote versions such as "Chrome 111, Firefox 113, Safari 16.2", many linked to web-features. Registering each in `evidence.json` is a research task of its own: schedule it as an item, or leave the web-features links as the record?
+- **The Baseline browser versions** (the rest of the audit's D6, scheduled as P55): about a dozen references quote versions such as "Chrome 111, Firefox 113, Safari 16.2", many linked to web-features. Register each in `evidence.json`, or leave the web-features links as the record and close N47?
 
 ## Warnings
 
