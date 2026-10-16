@@ -369,11 +369,14 @@ class VitalsMeasures(TempDirTest):
         during = out["stats"]["inp"]["median"]
         self.assertGreaterEqual(during, 500)
         self.assertGreaterEqual(out["stats"]["tbt"]["median"], 1000)
-        # --interact clicks only when the page takes it, never inside the
-        # task: an event under 16 ms is not reported at all, so INP may be
-        # n/a. Held to half the hydrating click's, not a fixed ceiling: on a
-        # slow macOS runner a click just before the task waited 216 ms to paint.
-        out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "button")
+        # The control clicks after the task (it ends at 4.5 s): an event under
+        # 16 ms is not reported at all, so INP may be n/a. Held to half the
+        # hydrating click's. It clicked at load + 500 ms before, and on a slow
+        # macOS runner load came late enough to put that click inside the
+        # task: the TBT flake had that cause (the audit's G6).
+        out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "button",
+                          "--interact-at", "5000")
+        self.assertGreaterEqual(out["perRun"][0]["clickedAt"], 4500, "the control clicked inside the task")
         self.assertLess((out["stats"]["inp"] or {"median": 0})["median"], during / 2)
         self.assertNotIn("did not match", self.stderr)          # CodeRabbit on #45: it clicked
 
@@ -495,6 +498,30 @@ class MatrixSeesStateChanges(TempDirTest):
         proc = self.snapshot(self.sheet(hover="0.08"))          # hover twice as dark
         self.assertEqual(proc.returncode, 1, output(proc))
         self.assertIn("st_hover", output(proc))
+
+
+@unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at "
+                                       "playwright and axe-core")
+class TheForcedColoursSurvey(TempDirTest):
+    """P54 part 7, the audit of 2026-10-14's §3.6: G5. `/button|a|summary/`
+    was unanchored, so every filled `main`, `nav`, `span` or `table` counted
+    as a control distinguished by its fill alone."""
+
+    def test_only_controls_count_as_fill_only(self):
+        fill = "background:#dddddd;border:none"
+        page = self.write("page.html", (
+            "<!doctype html><html lang=\"en\"><title>t</title>"
+            f"<nav style=\"{fill}\"><span style=\"{fill}\">n</span></nav>"
+            f"<main style=\"{fill}\"><table style=\"{fill}\"><tr><td>x</td></tr></table>"
+            f"<label style=\"{fill}\">l</label>"
+            f"<button style=\"{fill}\">Buy</button></main></html>"))
+        proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", page, "--json",
+                        cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
+        if proc.returncode == 2 and b"browser" in proc.stderr.lower():
+            self.skipTest("no usable browser: " + output(proc)[-200:])
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        survey = json.loads(proc.stdout)["forcedSurvey"]
+        self.assertEqual(1, survey["fillOnly"], survey)
 
 
 if __name__ == "__main__":

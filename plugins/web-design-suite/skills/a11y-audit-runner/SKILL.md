@@ -46,7 +46,7 @@ The suite's own argument, from `perf-budget-gate`: **the thing that is measured 
 | Asks | "is this code legal?" | "is this page within budget?" | **"can a person who is not you operate this?"** |
 | Fails when | someone writes `margin: 24px` | someone adds a dependency | **someone writes `<div onclick>`** |
 | Blind to | a perfectly tokenized unlabelled input | a fast page nobody can use | a slow page everybody can use |
-| Catches | 100% of its rules | 100% of its rules | **7 of the 55 criteria outright, and it says so** |
+| Catches | 100% of its rules | 100% of its rules | **6 of the 55 criteria outright (a tool can decide 7), and it says so** |
 
 That last cell is the difference that matters. The design gate is complete over its own rules. This one is not complete over accessibility and cannot be. **A gate that is honest about its ceiling is usable; a gate that implies it is complete is worse than none**, because it ends the conversation.
 
