@@ -3,7 +3,7 @@
 **Written 2026-10-16**, at the end of the session that did P54 parts 5 to 8 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Four PRs, and this docs PR, #153, which merges once green (§3):
 - **#149, P54 part 5 (§3.4's second half: V2, V3, V10, `extract_system --tokens` on JSON)**, merged as `6b0900e`. `dtcg.recorded()` reads a document's or a resolver's record of the tokens it left out, in source order; `read_deprecations` reads its marks; `extract_system` reads a JSON token file through `read_tokens`; each SKILL.md's copy note names its helpers.
 - **#150, P54 part 6 (§3.5: E1 to E8, E10)**, merged as `c236246`.
-- **#151, P54 part 7 (§3.6: G1, G2, G5, G6, G7)**, the last to merge: check it in §3.
+- **#151, P54 part 7 (§3.6: G1, G2, G5, G6, G7)**, merged as `f6bcc1b`.
 - **#152, P54 part 8 (§3.7: D1, D2, D3)**, merged as `cd4d1fe`.
 - **Reviews:** 11 real findings (Codex 7 over two rounds on #149 and one each on #151 and #152, CodeRabbit 4) and CI 3, each fixed with a test failing on the head it reviewed.
 
@@ -449,7 +449,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 ## 3. First: the state of `main`
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then:
-- **#151 and the docs PR, #153**, may still be open: merge each once green (merge commit, `--match-head-commit` with the full SHA), #151 first; the docs PR then takes `main` (keep both sides).
+- **The docs PR, #153**, may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
 - Remove the session's worktrees if they are still there (`wt35`, `wt36`, `wt37` in `07bc2565-…\scratchpad`): `git worktree remove PATH`, then `git branch -d` each merged branch.
 - Then read `docs/HANDOFF.md`'s Warnings.
 
