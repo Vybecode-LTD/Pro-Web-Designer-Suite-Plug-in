@@ -311,6 +311,23 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
     six of the seven a tool decides outright.
 
   `test_content_and_a11y.TheAuditsRuntimeMediums`, `test_browser_runtime.TheForcedColoursSurvey`.
+- **Versioning, the docs site and the copy notes left out four things** (the audit's
+  V2, V3 and V10, and one found 2026-10-15):
+  - with several DTCG files, a later file's record of a token it could not hold lost to
+    an earlier file's written value, a false MAJOR. The files are read once, in order,
+    and the last wins either way;
+  - `deprecate import` read only the written tokens' `$deprecated`, so a deprecated
+    token a file could not hold never reached the ledger. `read_deprecations` reads the
+    record's marks too (`dtcg.recorded()`, which `diff_system` now reads as well);
+  - `extract_system --tokens tokens.json` read the JSON as CSS: no token, exit 0, and a
+    config that listed one was skipped. A contract.json or DTCG file is read through
+    `read_tokens`, as the gates read it;
+  - every SKILL.md's note on copying the scripts named the commands, not the helpers
+    they import (`project_config.py`, `dtcg.py`, `figma_common.py`,
+    `browser_common.mjs`), so a copied command failed with `ModuleNotFoundError`. Each
+    note names them, and a test runs each command copied with only what its note names.
+
+  `test_versioning.TheAuditsVersioningMediums`.
 - **Versioning and the docs site misread five things** (the audit's V4, V5, V6 and V9,
   and one found beside them):
   - `deprecate scan` read the suite's own JSON records as consumers: the mapping's

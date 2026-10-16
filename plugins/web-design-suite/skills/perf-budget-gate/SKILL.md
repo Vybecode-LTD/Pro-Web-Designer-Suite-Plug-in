@@ -15,8 +15,8 @@ description: Set web performance budgets and fail the build when they break, wit
 >
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
-> do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (crux_check.py, measure_vitals.mjs, perf_audit.py).
+> do; here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (crux_check.py, measure_vitals.mjs, perf_audit.py; copy their helpers too: browser_common.mjs, dtcg.py, project_config.mjs, project_config.py).
 
 The suite has a design gate and no performance gate. That asymmetry is exactly how a beautifully-tokenized site ships with a four-second LCP: **the thing that is measured is the thing that gets fixed.**
 
@@ -37,7 +37,7 @@ Run both. They fail for different reasons and both failures are actionable. Do n
 
 **A budget set after the fact is a negotiation. A budget set before is a constraint.**
 
-The difference is not rhetorical. Once a feature exists and works, "it adds 180 KB" is weighed against shipping a thing that is finished, and the feature wins every time — not because anyone is wrong, but because the cost is abstract and the benefit is on screen. Set the number first and the same conversation happens while the design is still cheap to change.
+Once a feature exists and works, "it adds 180 KB" is weighed against shipping a thing that is finished, and the feature wins every time — not because anyone is wrong, but because the cost is abstract and the benefit is on screen. Set the number first and the same conversation happens while the design is still cheap to change.
 
 Three rules follow, and they are the whole discipline:
 
@@ -64,7 +64,7 @@ Three rules follow, and they are the whole discipline:
 
 Most teams do the opposite: they put Lighthouse in CI on day one, get flaky results in the first week, add `continue-on-error: true`, and now own a job that measures nothing and blocks nothing. The static layer catches most real regressions, deterministically, for a second of CI time. Earn the trust there, then spend it.
 
-The runtime layer is still necessary. A build can sit inside every byte budget for a year and drift from a 1.9-second LCP to a 3.1-second one because a third-party tag got slower, a font started blocking, or the LCP element moved to something that loads late. No amount of byte counting sees that.
+The runtime layer is necessary. A build can sit inside every byte budget for a year and drift from a 1.9-second LCP to a 3.1-second one because a third-party tag got slower, a font started blocking, or the LCP element moved to something that loads late. No amount of byte counting sees that.
 
 ---
 
@@ -131,13 +131,13 @@ git add .perf-baseline.json
 
 The baseline records today's findings **and today's byte totals**. Existing debt is frozen; new violations fail immediately; growth past `budget.growth` fails even while the absolute budget is still blown.
 
-That last clause is what makes this usable on a legacy codebase. The gate can go on this afternoon on a site that is comprehensively over budget, be green on day one, and still catch a real regression on day two. A gate that fails on day one is a gate somebody deletes on day two.
+That last clause makes this usable on a legacy codebase. The gate can go on this afternoon on a site that is comprehensively over budget, be green on day one, and still catch a real regression on day two. A gate that fails on day one is a gate somebody deletes on day two.
 
 ### 5. Re-derive when the target changes
 
 A budget is downstream of a promise. When the promise changes — a new market on worse connections, a decision to support a cheaper device class, a product move from content site to application — **run the arithmetic again from the new target.** Do not adjust the numbers until they feel right; that is how a budget stops meaning anything.
 
-The trigger you will actually hit: **field p75 more than 1.5× your lab median.** That means the lab profile describes a page, device or network your users do not have. `scripts/crux_check.py` checks it; `references/ci-integration.md` §8.
+The trigger you will hit: **field p75 more than 1.5× your lab median.** That means the lab profile describes a page, device or network your users do not have. `scripts/crux_check.py` checks it; `references/ci-integration.md` §8.
 
 ---
 
@@ -160,7 +160,7 @@ Two supporting metrics, in the budget file because they diagnose, not because th
 | **TTFB** | ≤ 0.8 s | > 1.8 s | The floor under LCP. **Not a CWV** — you can miss it and still pass. |
 | **TBT** | ≤ 200 ms | > 600 ms | The lab proxy for INP. There is no field TBT. |
 
-**The honest statement, which everything here is downstream of:** p75 field data is the thing that actually matters. A CI number is a **regression detector against itself** on one machine with one throttle profile — enormously useful, and not a prediction of what your users experience. When lab and field disagree, the field is right. `references/budgets.md` §8.
+**The honest statement, which everything here is downstream of:** p75 field data is what matters. A CI number is a **regression detector against itself** on one machine with one throttle profile — enormously useful, and not a prediction of what your users experience. When lab and field disagree, the field is right. `references/budgets.md` §8.
 
 ---
 
@@ -240,7 +240,7 @@ Four things it does that most runtime checks do not:
 - **It names the LCP element's CSS selector.** Enormously useful, rarely done, and the first thing you need. The three surprises it produces: the LCP is a block of *text*, not the image you assumed; it changes between runs because two candidates are nearly the same size; or it is a skeleton box and the real content paints later still.
 - **It breaks LCP into the four sub-parts** — TTFB, resource load delay, resource load duration, element render delay — with the target share of each. The two phases that should be under 10% are where the bugs live: load duration is physics, load *delay* and render delay are latency you added.
 - **It names the nodes in the largest CLS session window**, with the timestamp of each shift.
-- **It refuses to invent an INP.** A page nobody touched has no interaction latency, so it prints `n/a` and says TBT is the proxy. It also reports total blocking time alongside TBT, because a long task that finishes before FCP contributes **zero** TBT while being the worst thing on the page.
+- **It refuses to invent an INP.** A page nobody touched has no interaction latency, so it prints `n/a` and says TBT is the proxy. It reports total blocking time beside TBT, because a long task that finishes before FCP contributes **zero** TBT while being the worst thing on the page.
 
 **The browser is never downloaded.** It launches with an explicit `executablePath` (`--browser`, else `$PERF_CHROMIUM`, else the first that starts of `/opt/pw-browsers/chromium`, Playwright's own Chromium, an installed Chrome or Edge) and fails with instructions if none of them starts. Install the module with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i -D -E playwright` to use the Chrome you have. CI pins the browser instead. It installs the Chromium that the locked Playwright was built for, which the script tries first (`references/ci-integration.md` §3).
 
@@ -271,7 +271,7 @@ A failing run of both scripts, and how to read it from the top: `references/diag
 | Building or restyling the system itself | `web-design-studio` |
 | An inherited codebase not yet on tokens | `design-token-migration` |
 | Design file and code have drifted apart | `figma-variables-sync` |
-| Every state × density × theme actually renders | `component-state-matrix` |
+| Every state × density × theme renders | `component-state-matrix` |
 | Copy, offer and persuasion on a landing page | `landing-page-conversion` |
 | Adversarial review before a client sees it | `design-critique-gate` |
 | **The page is beautiful and slow** | **here** |

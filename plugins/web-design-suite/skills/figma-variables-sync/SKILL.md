@@ -15,8 +15,8 @@ description: Keep Figma and code on one token vocabulary. Audits designs, genera
 >
 > The commands below are written `python scripts/NAME.py`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
-> do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (figma_audit.py, figma_to_tokens.py).
+> do; here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (figma_audit.py, figma_to_tokens.py; copy their helpers too: dtcg.py, figma_common.py, project_config.py).
 
 One vocabulary, two rendering surfaces.
 
@@ -96,7 +96,7 @@ The file key is the segment after `/design/` in the URL. `local` includes
 unpublished drafts, usually what you want: the thing argued about is rarely
 published yet. `…/styles` is different on both counts: it needs
 no Enterprise plan (scope `library_content:read`), and it returns **published**
-styles only, so on a file whose styles are still drafts it comes back empty and
+styles only, so on a file of draft styles it comes back empty and
 the style checks see nothing; export those with the plugin. It returns style
 metadata only; sizes need `…/nodes` (`references/figma-mapping.md` §7).
 
@@ -129,7 +129,7 @@ It checks every value against the closed scales and the ramps and reports:
   conversation is about whether anyone can see the difference rather than about
   taste
 - **contrast failures** for anything used as a text role, measured in both modes
-  against the surfaces it actually lands on
+  against the surfaces it lands on
 - tap targets under 44px
 - text styles with no `--type-*` role, effect styles with no `--elevation-*`
 - broken aliases, alias cycles, missing dark mode, missing interaction states
@@ -148,7 +148,7 @@ states the timed default. **Send it once, before estimating.** Not in dribs
 during the build — same information, completely different reception.
 
 Before running anything, check the three things the script cannot see: is the
-file built in auto-layout throughout, are fills and text sizes actually bound to
+file built in auto-layout throughout, are fills and text sizes bound to
 variables, and do focus/loading/error states exist? Those change the estimate
 more than every number the audit reports.
 Full procedure: `references/audit-and-reconcile.md`.
@@ -162,7 +162,7 @@ process, not a perfect system.
 | Outcome | When | Cost | Sign-off |
 |---|---|---|---|
 | **1. The design is right** — add a token | The system genuinely lacks something, and the need recurs | High; permanent, everyone inherits it | Design-system owner (Law 3) |
-| **2. The system is right** — designer adjusts | The value was incidental. Nobody chose 28 on purpose | Near zero | Nobody; the designer just does it |
+| **2. The system is right** — designer adjusts | The value was incidental. Nobody chose 28 on purpose | Near zero | Nobody; the designer does it |
 | **3. Both are defensible** — document the exception | A real reason that does not generalise | One hard-coded value and one paragraph, forever | Both of you, in `DESIGN_DECISIONS.md` |
 
 **The decision rule.** Three questions, stop at the first clear answer:

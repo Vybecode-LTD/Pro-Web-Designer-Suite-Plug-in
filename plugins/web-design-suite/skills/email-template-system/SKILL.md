@@ -15,8 +15,8 @@ description: Build HTML email that survives Outlook, Gmail and dark mode, compil
 >
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
-> do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_email.py, lint_email.py, render_email.mjs).
+> do; here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_email.py, lint_email.py, render_email.mjs; copy their helpers too: browser_common.mjs, dtcg.py, project_config.mjs, project_config.py).
 
 Every agency client eventually needs email, and email is the one place where **this suite's laws must be deliberately broken**. HTML email has no cascade layers, no custom properties you can rely on, no `gap`, no flexbox or grid in the client that matters most, and `<style>` blocks that several clients strip entirely.
 
@@ -41,7 +41,7 @@ This reframing is the whole skill. Without it, "email is different" becomes a li
 | **1. Tokens or nothing** | **Holds — at build time.** Source templates use `var(--token)`; the compiler resolves them. A literal hex in a source template is the same violation it has always been. | `assets/email-tokens.json`, `build_email.py`, `lint_email.py --source` |
 | **2. Parents own the gaps** | **Bends.** There is no `gap`, and child `margin` is unreliable in the Word engine and absent on `div`s in Samsung Mail. | The parent `<table>` owns the gap: `padding` on the content `<td>` for space *inside* a band, a **spacer `<tr>`** for space *between* bands. A content element still never sets its own outer spacing. |
 | **3. The scale is closed** | **Narrows.** 13 of the 18 spacing steps, in px; type has email's own steps. | — |
-| **4. One home** | **Inverted — on purpose, by a tool.** Everything ends up inlined, which is the maximum dispersal the web law exists to prevent. | The rule becomes: **no human hand-writes an inline style.** The *source* still has exactly one home per component, and a reviewer still predicts its appearance from one rule. The compiler does the dispersal, deterministically, and `lint_email.py` proves the result. |
+| **4. One home** | **Inverted — on purpose, by a tool.** Everything ends up inlined, the maximum dispersal the web law exists to prevent. | The rule becomes: **no human hand-writes an inline style.** The *source* has one home per component, and a reviewer predicts its appearance from one rule. The compiler does the dispersal, deterministically, and `lint_email.py` proves the result. |
 | **5. Layers, not specificity** | **Gone.** There is nothing to layer. | **Source order is the only layer order.** Utilities are declared last or they lose silently at equal specificity. `!important` becomes *correct* in the media query, because that block must beat the inline styles the compiler wrote — the thing layers existed to avoid is the thing email requires. |
 | **6. Semantic before primitive** | **Holds.** Templates read roles (`--fg-muted`), never ramp steps. | — |
 | **7. Density is a dial** | **Holds, resolved early.** No `calc()` at runtime, so the dial is turned at export. | A second token file for a compact variant — never a second set of styles. |
@@ -191,7 +191,7 @@ Law 2 is the law people quietly drop in email, and dropping it is why email spac
 
 All four parts are load-bearing: the height is the gap, `font-size:0` and `line-height:0` stop the `&nbsp;` contributing its own line box (or your 24px gap is 24px *plus a line of text*, differently per client), and the `&nbsp;` itself stops several clients — including the Word engine — collapsing an empty cell to zero.
 
-**Why not just `padding-bottom` on every content cell.** Same reason child margins fail on the web: the last row then carries a gap that should not exist, and email cannot express `:last-child`. A spacer row is inserted *between* things by construction, so there is never a trailing one.
+**Why not `padding-bottom` on every content cell.** Same reason child margins fail on the web: the last row carries a gap that should not exist, and email cannot express `:last-child`. A spacer row is inserted *between* things by construction, so there is never a trailing one.
 
 Full decision table and the `cellpadding` trap in `references/email-architecture.md` §3.
 
@@ -301,5 +301,5 @@ Within this skill:
 ## The three sentences to remember
 
 1. **The token file is the source of truth and email is a compile target** — the laws move from runtime to build time, they do not get suspended.
-2. **Law 2 changes mechanism, not principle**: there is no `gap`, so the parent table owns the space — cell padding inside a band, a spacer row between bands, and a content element still never sets its own outer spacing.
+2. **Law 2 changes mechanism, not principle**: there is no `gap`, so the parent table owns the space, and a content element still never sets its own outer spacing.
 3. **Inline styles are the only styles every client agrees to render**, which is why Law 4 is inverted by a tool and never by a person — the source keeps its one home, and the linter proves the output.
