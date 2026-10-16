@@ -582,8 +582,18 @@ def subtree(node: Node, skip=None):
 
 
 def _out_of_reach(node: Node) -> bool:
-    """`hidden` or `inert`: nothing in it takes focus."""
-    return "hidden" in node.tag.attrs or "inert" in node.tag.attrs
+    """`hidden` or `inert`, written as such: nothing in it takes focus. A
+    bound value (`hidden={open}`, `:inert="busy"`) may be false, so it is
+    read as reachable and stays audited (Codex on #151)."""
+    a = node.tag.attrs
+    return any(k in a and a[k] != EXPR and str(a[k]).strip().lower() != "false"
+               for k in ("hidden", "inert"))
+
+
+def _silent(node: Node) -> bool:
+    """Out of the accessibility tree as written: `hidden`, `inert` or
+    `aria-hidden="true"`. Nothing in it names a control (Codex on #151)."""
+    return _out_of_reach(node) or str(node.tag.attrs.get("aria-hidden", "")).strip().lower() == "true"
 
 
 def _tab_stop(node: Node) -> bool:
@@ -1412,7 +1422,7 @@ def _has_name(t: Tag, a: dict, inner: str, node) -> bool:
         if v == EXPR or (v is not None and str(v).strip()):
             return True
     if node:
-        for d in subtree(node):                     # at any depth (G2)
+        for d in subtree(node, _silent):            # at any depth (G2), not what is hidden
             if d.tag.name[:1].isupper():
                 return True                          # a component's name: cannot tell (G2)
             da = d.tag.attrs

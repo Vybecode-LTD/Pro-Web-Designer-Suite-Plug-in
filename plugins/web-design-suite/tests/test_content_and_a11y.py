@@ -1070,6 +1070,14 @@ class TheAuditsRuntimeMediums(TempDirTest):
             '<div aria-hidden="true" inert><a href="/x">x</a></div>': 0,
             '<div aria-hidden="true"><section inert><a href="/x">x</a></section></div>': 0,
         }
+        bound = {                                                # Codex on #151: a bound value may be false
+            '<div aria-hidden="true"><button hidden={open}>x</button></div>': 1,
+            '<div aria-hidden="true"><section inert={busy}><a href="/x">x</a></section></div>': 1,
+        }
+        for jsx, want in bound.items():
+            with self.subTest(jsx=jsx):
+                got = self.rules("Widget.tsx", f"export function W() {{ return {jsx}; }}\n")
+                self.assertEqual(want, got.count("aria-hidden-focusable"))
         for html, want in cases.items():
             with self.subTest(html=html):
                 got = self.rules("page.html", f"<!doctype html><html lang=\"en\"><title>t</title><main>{html}</main></html>")
@@ -1084,6 +1092,8 @@ class TheAuditsRuntimeMediums(TempDirTest):
             "<button><Icon name=\"close\" /></button>": False,
             "<button><span><span aria-label=\"Close\"></span></span></button>": False,
             "<button><span><img src=\"x.png\" alt=\"\" /></span></button>": True,   # the control
+            "<button><span aria-hidden=\"true\"><img src=\"x.png\" alt=\"Close\" /></span></button>": True,
+            "<button><span aria-hidden=\"true\"><Icon name=\"close\" /></span></button>": True,   # Codex on #151
         }
         for jsx, empty in cases.items():
             with self.subTest(jsx=jsx):
