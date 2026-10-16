@@ -448,7 +448,9 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   references fell behind the code** (the audit's M7, M8 and V13 to V16):
   - the census did not read `@apply p-[13px]` in a stylesheet, or the strings of
     Svelte's and Astro's `class={…}` and Astro's `class:list={[…]}`, which it reads
-    in a `.jsx`;
+    in a `.jsx`. It reads them, `@apply p-4` with the project's Tailwind 4 theme, and
+    files them as hand work: the codemod rewrites class attributes only (CodeRabbit
+    on #157);
   - the codemod's rewrite went through `mkstemp`, so on Linux and macOS a 0644 file
     came back 0600 and a 0755 one lost its execute bit. It keeps the file's mode;
   - `figma_to_tokens` marked a `$type: duration` token not named `dur-*` unresolved

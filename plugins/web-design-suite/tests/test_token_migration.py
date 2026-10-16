@@ -772,6 +772,24 @@ class TheCensusReadsEveryStyleSource(TempDirTest):
                          [(ln, raw) for ln, _, _, raw in self.found(data, "Card.svelte")])
         self.assertEqual([(4, "px-[11px]"), (4, "py-[5px]")],
                          [(ln, raw) for ln, _, _, raw in self.found(data, "Page.astro")])
+        # CodeRabbit on #157: the codemod rewrites class attributes only, so
+        # these are hand work, never counted as mechanically replaceable.
+        contexts = {raw: c for name in ("app.css", "Card.svelte", "Page.astro")
+                    for _, c, _, raw in self.found(data, name)}
+        self.assertEqual({"p-[13px]": "tailwind-hand", "mt-[7px]": "tailwind-hand",
+                          "ml-[3px]": "tailwind-arbitrary", "px-[11px]": "tailwind-hand",
+                          "py-[5px]": "tailwind-hand"}, contexts)
+        mapping, _ = self.cluster(self.tmp / "literals.json")
+        hand = [u for u in mapping["unmapped"] if u["reason"].startswith("a Tailwind class in `@apply`")]
+        self.assertEqual(4, len(hand), mapping["unmapped"])
+
+    def test_a_numeric_apply_is_counted_with_the_theme(self):
+        """CodeRabbit on #157: `@apply p-4` holds a design value when a v4
+        entry keeps `--spacing`, and the stylesheet scan was not given it."""
+        self.write("src/app.css", '@import "tailwindcss";\n.x {\n  @apply p-4;\n}\n')
+        _, data = self.extract("src")
+        self.assertEqual([(3, "tailwind-hand", "p-4")],
+                         [(ln, c, raw) for ln, c, _, raw in self.found(data, "app.css")])
 
     def test_sass_module_colour_functions_are_counted(self):
         self.write("src/buttons.scss", "$brand: #e16037;\n"
