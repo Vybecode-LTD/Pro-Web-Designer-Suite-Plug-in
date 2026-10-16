@@ -471,7 +471,7 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 - **T2.** Wall-clock thresholds on shared runners: `test_content_and_a11y` (`assertLess(large, 20)` seconds, near the scale test), `test_browser_runtime`'s TBT medians (`< 50`, then `>= 150` ms, the tests before `test_requests_in_flight…`), and `test_token_migration` (the timing assertion near its scale test). Keep the ratio bounds, drop the absolute ones; assert on timestamps relative to TTI where the test measures one.
 - After part 9: remove the `P54` row, mark N46 done in the completion plan, and close it in the inventory if it is listed there (it was not on 2026-10-16).
 
-**P55, the lows, per area** (N47). The audit's §3 lists each as "low": S5 to S8, S10; W8 to W14; M7 to M9; V12 to V16; E11 to E13; G8 to G12, G14 to G16; D5 to D9; T3 to T10. P53 already closed D4, G13 and E14. One PR per area or two areas, as the sizes allow; the HANDOFF's "Still open" list carries Vue's `:style`.
+**P55, the lows, per area** (N47). The audit's §3 lists each as "low": S5 to S10 (S9, MCP path containment, is written "low (policy)"); W8 to W14; M7 to M9; V12 to V16; E11 to E13; G8 to G12, G14 to G16; D5 to D9; T3 to T10. P53 already closed D4, G13 and E14. One PR per area or two areas, as the sizes allow; the HANDOFF's "Still open" list carries Vue's `:style`.
 
 **Each PR:** run each finding's fixture first; tests fail on `v3.6.0` first (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES`; the CHANGELOG under 4.0.0's Fixed; a row `P54 part 9, #N` (or `P55 part N, #N`) above the item's row, and a note in the completion plan.
 
