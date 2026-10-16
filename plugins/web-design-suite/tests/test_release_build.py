@@ -23,13 +23,14 @@ Regressions covered (3.2.1 review, and XC-C6 for 3.3.0):
 from __future__ import annotations
 
 import hashlib
+import re
 import shutil
 import subprocess
 import sys
 import unittest
 import zipfile
 
-from wds_support import TOOLING, TempDirTest, env, output
+from wds_support import REPO, SKILLS, TOOLING, TempDirTest, env, output
 
 GIT = shutil.which("git")
 BUILDER = TOOLING / "release" / "build.py" if TOOLING else None
@@ -262,6 +263,38 @@ class ReleaseBuild(TempDirTest):
         proc = self.compare("b", "c")
         self.assertEqual(1, proc.returncode, output(proc))
         self.assertIn("web-design-suite/README.md is unreadable", output(proc))
+
+
+class TheAuditsReleaseMediums(unittest.TestCase):
+    """P54 part 8, the audit of 2026-10-14's §3.7: D1, D2 and D3."""
+
+    def test_the_release_job_pins_its_actions_and_keeps_no_credential(self):
+        """D2: release.yml pinned checkout and setup-uv by tag while holding
+        `contents: write` and GH_TOKEN, and checkout kept its credential."""
+        text = (REPO / ".github" / "workflows" / "release.yml").read_bytes().decode("utf-8")
+        uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)", text, re.M)
+        self.assertEqual(2, len(uses))
+        for action in uses:
+            self.assertRegex(action, r"@[0-9a-f]{40}$")
+        checkout = text[text.index("actions/checkout@"):]
+        self.assertRegex(checkout[:400], r"persist-credentials:\s*false")
+
+    def test_the_tooling_readme_says_why_a_local_build_differs(self):
+        """D1: tooling/README.md said a build is "byte-identical on a rebuild",
+        though build.py says Windows' zlib-ng and the release's zlib differ."""
+        text = (TOOLING / "README.md").read_bytes().decode("utf-8")
+        self.assertNotIn("byte-identical on a rebuild", text)
+        for needle in ("zlib-ng", "compare.py"):
+            self.assertIn(needle, text)
+
+    def test_the_readme_counts_the_node_scripts(self):
+        """D3: the plugin README said "the three browser scripts need Node";
+        there are six entry scripts in `.mjs`."""
+        words = {5: "five", 6: "six", 7: "seven", 8: "eight"}
+        entries = [p for p in SKILLS.glob("*/scripts/*.mjs")
+                   if p.name not in ("project_config.mjs", "browser_common.mjs")]
+        readme = (SKILLS.parent / "README.md").read_bytes().decode("utf-8")
+        self.assertIn(f"the {words[len(entries)]} `.mjs`", " ".join(readme.split()))
 
 
 if __name__ == "__main__":
