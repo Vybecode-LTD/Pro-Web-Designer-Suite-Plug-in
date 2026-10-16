@@ -873,6 +873,22 @@ TOKEN_FILES = {
         "list": {"b": {"$type": ["color"], "$value": {"colorSpace": "srgb", "components": [0, 1, 0]}}},
         "flag": {"$type": True, "c": {"$value": {"value": 4, "unit": "px"}}},
         "brand": {"$type": "color", "500": {"$value": "#2563eb"}}}),
+    # S5, S6, S7: a reference with spaces round it, digits that are not ASCII,
+    # and `components` given as an object, read alike by both readers.
+    "lows.tokens.json": json.dumps({
+        "brand": {"$type": "color", "500": {"$value": "#2563eb"}},
+        "bg": {"$type": "color", "spaced": {"$value": " {brand.500} "},
+               "keys": {"$value": {"colorSpace": "srgb", "components": {"1": 0, "0": 0, "0.5": 0}}},
+               "alpha": {"$value": {"colorSpace": "srgb", "components": [1, 0, 0], "alpha": "٠.٥"}}},
+        "space": {"$type": "dimension", "arabic": {"$value": {"value": "٥", "unit": "px"}},
+                  "ascii": {"$value": {"value": " 5 ", "unit": "px"}}},
+    }, ensure_ascii=False).encode("utf-8"),
+    "lows-studio.json": json.dumps({
+        "global": {"space": {"base": {"value": "4", "type": "spacing"},
+                             "arabic": {"value": "٥", "type": "spacing"},
+                             "math": {"value": "{space.base} * ٢", "type": "spacing"},
+                             "ascii": {"value": "{space.base} * 2", "type": "spacing"}}},
+        "$themes": [], "$metadata": {"tokenSetOrder": ["global"]}}, ensure_ascii=False).encode("utf-8"),
     # S8: PowerShell 5.1's `>` writes UTF-16LE with its mark; without one, by its zero bytes
     "utf16.css": ":root {\n  --brand-500: #2563eb;\n  --bg-canvas: var(--brand-500);\n}\n".encode("utf-16"),
     "utf16be.css": ":root {\n  --brand-500: #2563eb;\n}\n".encode("utf-16-be"),
@@ -886,7 +902,8 @@ TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.
                ["deep.tokens.json"], ["names.tokens.json"], ["pointers.tokens.json"], ["chain.tokens.json"], ["fan.tokens.json"],
                ["studio-math.json"], ["pointer-fan.tokens.json"], ["studio-palettes.json"],
                ["app.resolver.json"], ["a.css", "app.resolver.json"], ["pointer.resolver.json"], ["fan.resolver.json"],
-               ["sources.resolver.json"], ["outside.resolver.json"], ["types.tokens.json"], ["utf16.css"], ["utf16be.css"]]
+               ["sources.resolver.json"], ["outside.resolver.json"], ["types.tokens.json"], ["utf16.css"], ["utf16be.css"],
+               ["lows.tokens.json"], ["lows-studio.json"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).
@@ -995,6 +1012,13 @@ class TheNodeReaderAgrees(TempDirTest):
                     self.assertEqual([list(s) for s in python(case)["ok"]["ramps"].values()],
                                      [list(s) for s in from_node["ok"]["ramps"].values()])
         self.assertIn("٥٠٠", python(cases[1])["ok"]["scales"]["brand"])           # not a ramp step
+        lows = python(cases[TOKEN_CASES.index(["lows.tokens.json"])])["ok"]
+        self.assertEqual("var(--brand-500)", lows["roles"]["--bg-spaced"])       # S5: a reference
+        self.assertNotIn("bg", lows["scales"])                   # S7: no colour from keys; S6: "٠.٥" no alpha
+        self.assertEqual({"ascii": "5px"}, lows["scales"]["space"])              # S6: "٥" is no number
+        studio = python(cases[TOKEN_CASES.index(["lows-studio.json"])])["ok"]
+        self.assertEqual({"base": "4px", "arabic": "٥", "ascii": "8px"}, studio["scales"]["space"])
+        self.assertEqual("var(--space-base) * ٢", studio["roles"]["--space-math"])   # left as written
         dtcg_case = python(cases[TOKEN_CASES.index(["dtcg.tokens.json"])])["ok"]   # a DTCG file holds values (CodeRabbit)
         self.assertEqual("var(--brand)", dtcg_case["roles"]["--bg-brand"])
         self.assertEqual("lab(50 40 59.5)", dtcg_case["ramps"]["brand"]["960"])
