@@ -488,7 +488,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   - its `focus-ring-transition` flagged `transition: outline-color`, which its own
     fix allows;
   - `a11y_runtime` named no criterion for axe's two-digit tags (`wcag1412`,
-    avoid-inline-spacing's 1.4.12);
+    avoid-inline-spacing's 1.4.12), and automation-coverage.md's 1.4.12 row now says
+    that rule runs;
   - `perf_audit`'s header listed a missing-`srcset` check no rule makes, and it built
     a set of font families it never read.
 
