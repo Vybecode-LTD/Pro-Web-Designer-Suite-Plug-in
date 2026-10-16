@@ -1,13 +1,10 @@
 # Start here: the next session
 
-**Written 2026-10-16**, at the end of the second session that day: P54 part 9 and P55 parts 1 to 3 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Four PRs, and this docs PR, #158, which merges once green (§3):
-- **#154, P54 part 9 (§3.8: T1, T2)**, merged as `15e40d6`. P54 and N46 are done.
-- **#155, P55 part 1 (§3.1: S5, S6, S7, S9)**, merged as `add2ced`.
-- **#156, P55 part 2 (§3.2: W8 to W13)**, merged as `91b43cb`.
-- **#157, P55 part 3 (§3.3 and §3.4: M7, M8, V13 to V16)**, merged as `5fbb615`.
-- **Reviews:** 12 real findings (Codex 6, CodeRabbit 6, two of them the same issue as Codex's), each fixed with a test failing on the head it reviewed. Codex then reached its review usage limit (on #157).
+**Written 2026-10-16**, at the end of the third session that day: P55 parts 4 and 5, the last of **Phase 6c**, the owner's audit. Phase 6c is done (P50 to P55, N41 to N47). Two PRs, and this docs PR, #161, which merges once green (§3):
+- **#159, P55 part 4 (§3.5 and §3.6: E11, E12, G8 to G10, G12, G14, G16)**, merged as `1401c4f`.
+- **#160, P55 part 5 (§3.7 and §3.8: D5 to D9, T3 to T10)**, merged as `2aa5fb4`. N47 is done.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P55 parts 4 and 5, the last lows** (§4), then Phase 6b in the owner's order.
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **Phase 6b's workstreams, in the order the owner chooses** (§4), then R4.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -35,7 +32,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
     - waits for CodeRabbit's check to leave `pending`;
     - prints the checks, `mergeStateStatus`, the open-thread count and the reviews by commit.
 
-    It is in the last sessions' scratchpads; copy the newest (`d446a5fc-…`, with `keep_both.py`, which resolves a merge from `main` in the CHANGELOG and both plans, and `plan_p55.py`, which writes a part's plan row and note), whose `gh run watch` has `--interval 30` and which waits for CodeRabbit 3 minutes at most. **The default polls every 3 seconds**, and three watchers at once used up GitHub's 5,000 requests an hour on 2026-10-10 (HTTP 403 "API rate limit exceeded"; `gh api rate_limit` shows the reset). Run one watcher at a time, and stop a superseded one with `TaskStop`.
+    It is in the last sessions' scratchpads; copy the newest (`ed3194bc-…`, with `keep_both.py`, which resolves a merge from `main` in the CHANGELOG and both plans, and `plan_p55.py`, which writes a part's plan row and note), whose `gh run watch` has `--interval 30` and which waits for CodeRabbit 3 minutes at most. **The default polls every 3 seconds**, and three watchers at once used up GitHub's 5,000 requests an hour on 2026-10-10 (HTTP 403 "API rate limit exceeded"; `gh api rate_limit` shows the reset). Run one watcher at a time, and stop a superseded one with `TaskStop`.
   - Never grep `tooling/`: its `node_modules` makes a search run for minutes. Reading one named file in it is fine.
   - **To wait** (for CodeRabbit's hourly limit, say), run `sleep N` with the Bash tool's `run_in_background`: a foreground `sleep` is blocked, and the notification wakes you.
   - **CodeRabbit is not a merge gate (the owner, 2026-10-12).** Its free tier gives one review an hour across all PRs, and waiting for it held PRs open for hours. Never wait for it or request a review to gate a merge.
@@ -214,6 +211,14 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Correct the audit when the code says otherwise:** W14's `noqa` directives are used under ruff's default rules (E402, E731); T2's third site holds a ratio only; S8, S10, M9 and V12 were closed by P53.
       - **`git ls-files '*dtcg.py'` matches `tests/test_dtcg.py`.** Copy the masters with `grep -v '^tests/'` (or name the copies), and read `git status` after.
       - **A tool run leaves files a test refuses:** ruff without `--no-cache` wrote `tests/.ruff_cache` (machine paths), which `test_docs.NoMachinePaths` caught.
+    - **The third 2026-10-16 session's reviews found 8 real issues:** #159 (Codex 2, CodeRabbit 1) and #160 (CodeRabbit 4, Codex 1); and the local `check.py` 2 (G7's coverage test on #159, `NoMachinePaths` on #160). Each was fixed with a test failing on the head it reviewed, or, for test code, a control the old code fails. The lessons:
+      - **A warning added before a return must cover every return** (Codex on #159): `perf_audit`'s `not_counted` note came after `--write-baseline`'s early return, so the baseline workflow stayed silent.
+      - **A parenthesised number is a length only for text and bits** (Codex on #159): `geography(Point, 4326)`'s SRID became a 4326-character `maxLength`, in the SQL reader too. A fix in one reader: check the other reader that shares the function.
+      - **A test that runs Node skips without it** (CodeRabbit on #159): `@unittest.skipUnless(NODE, "node is not installed")`.
+      - **A gate's source names what it covers**: G7's test greps the gates for each criterion the coverage table marks "Not in this suite", so a comment naming "1.4.12" failed it.
+      - **A register entry quotes the page its `url` names** (CodeRabbit on #160): the good thresholds are web.dev's Vitals article, the poor ones its thresholds table, each an entry of its own.
+      - **Scan parsed code, not lines** (CodeRabbit and Codex on #160): a `json.loads(` split over lines passed a line regex; a raise must be judged by its own handler, once, and a function a handler defines is not in it; an assertion beside a subTest in the same loop is unguarded; `noqa` is read on the parser's line (`\r\n|\r|\n`), not `splitlines()`'.
+      - **A test's own fixture can trip another test**: the SIM115 control's `as f:\n` read as an `F:\` path to `NoMachinePaths`.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -265,7 +270,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `21 open items, 21 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `19 open items, 19 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
@@ -367,7 +372,14 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 - **The readers agree (#155).** `dtcg._float()` takes ASCII digits only; `NUMBER` and `MATH_TOKEN` use `[0-9]`; a `components` that is no list is refused; Node's `convertValue()` reads a spaced `{…}` as a reference. `TheNodeReaderAgrees`' `lows.tokens.json` and `lows-studio.json`.
 - **web-design-studio (#156).** `check_roles.own_text()` reads a rule's own declarations past a nested block; the audit's L5 flag is `!\s*important(?![\w-])` with strings blanked; `tw_probe`'s relative `@import` adds `.css` when no file has the name; the hook's role stage takes `tokens.css`, `x-tokens.css` and `x.tokens.css` on a file that declares a `--fg-`, `--bg-` or `--border-` role.
 - **Migration and versioning (#157).** `extract_literals.APPLY_RE` and `CLASS_EXPR_RE`/`class_expression_strings()`, both `tailwind_literals(..., hand=True)` (context `tailwind-hand`, in `cluster_values.HAND_WORK`), and `extract_css(..., tw=)`; `apply_codemod.write_atomically()` copies the mode; `figma_to_tokens` resolves a duration by `dtcg_type`; `diff_system` reads `DOCS_SCHEMA` only; `--format all` needs `--out-dir`. `test_docs.TheScriptReferences` holds each script's flags to its reference, `figma_audit`'s titles to its codes and the `--shape` choices to the hint; `test_the_kinds_table_is_the_codes` holds change-classification.md to `diff_system`'s `K()` kinds.
-- **The plugin** is `plugins/web-design-suite/` (about 1,253 tests):
+- **Line numbers in a stylesheet (#159).** `build_email.parse_stylesheet()` gives each `Rule` a `line` (its selector's line in the text, a comment's newlines counted, `_strip_with_lines()`); `lint_email.source_declarations()` adds the `<style>` text node's own line. `test_email.TheAuditsEmailLows`.
+- **Types with parameters (#159).** `introspect_schema.normalise_type()` gives a length only to `LENGTH_TYPES` (text and bits): `geography(Point, 4326)`'s number is an SRID. `parse_prisma()` reads `Unsupported("…")` as the type it names. `test_schema_sources.TheAuditsContentLows`.
+- **The runtime gates' lows (#159).** `perf_audit`'s `Ledger.not_counted` (an HTML file `NOT_SHIPPED` leaves out, named on stderr before `--write-baseline`'s return and in the JSON); `a11y_static.attr_text()` (a bound value is `name={…}`), `NUMBER_PURPOSES`, and `focus-ring-transition` exempting `outline-color`; `a11y_runtime.wcagCriterion()` (a two-digit third part). `test_content_and_a11y.TheAuditsRuntimeLows`.
+- **The static checks (#160).** `tests/test_static_checks.py` keeps F401, F541, F841, B904 and SIM115's `open(…).read()` with `ast` over skills, commands, shared, hooks, tools, tests and `tooling/release/build.py`, and `TheTestsLoops` refuses an assertion loop in a test method with no `subTest`. `# noqa: CODE` on the line waives one.
+- **The pointers (#160).** `check_pointers.py` reads `agents/*.md` and `workflow-commands/*/SKILL.md` too, named relative to `skills/` (`../agents/…`).
+- **The register (#160).** `evidence.json` holds the Core Web Vitals thresholds (`2.5 s`, `200 ms`, `≤ 0.1`, each with its poor value), `75th percentile` and the README's `2.1.269` (doc `../README.md`). `test_docs.TheAuditsDocsLows` holds CLAUDE.md's map to `tools/` and this file's byte table to the disk.
+- **The test helpers (#160).** `wds_support` sets `sys.dont_write_bytecode` at import; `test_dtcg.srgb(hex)` writes a 2025.10 colour object (Tokens Studio fixtures keep their strings).
+- **The plugin** is `plugins/web-design-suite/` (about 1,310 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -448,7 +460,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   - **A push with no checks after a few minutes** is a lost `pull_request` event (a GitHub incident, 2026-10-12): `gh workflow run ci.yml --ref BRANCH`, and a later push fires the PR's own.
   - A macOS job cancelled after 15 minutes with no log is a runner that never came: re-run it (`gh run rerun RUN --failed`).
 - **Python 3.9 is the floor**: no `zip(strict=)`, no `match`, no `str.removeprefix`, no `X | Y` outside annotations. Annotations are fine with `from __future__ import annotations`.
-- **SKILL.md budgets are tight.** The limit is 20,500 bytes, so detail goes in the references. A row you lengthen needs a trim beside it.
+- **SKILL.md budgets are tight.** The limit is 20,500 bytes, so detail goes in the references. A row you lengthen needs a trim beside it. `test_docs.TheAuditsDocsLows` holds this table to the disk: update a row when a SKILL.md changes size.
 
   | Skill | Bytes |
   |---|---|
@@ -457,8 +469,8 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   | client-presentation-builder | 20,494 |
   | web-design-studio | 20,481 |
   | landing-page-conversion | 20,477 |
-  | perf-budget-gate | 20,470 |
   | email-template-system | 20,474 |
+  | perf-budget-gate | 20,470 |
   | design-system-versioning | 20,434 |
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.
@@ -466,45 +478,29 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 ## 3. First: the state of `main`
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then:
-- **The docs PR, #158**, may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
-- Remove any worktree left in this session's scratchpad (`d446a5fc-…\scratchpad`): `git worktree remove PATH`, then `git branch -d` each merged branch.
-- Then read `docs/HANDOFF.md`'s Warnings.
+- **The docs PR, #161**, may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
+- Remove any worktree left in this session's scratchpad (`ed3194bc-…\scratchpad`): `git worktree remove PATH`, then `git branch -d` each merged branch.
+- Then read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
 
-## 4. Phase 6c, 4.0.0: P55's last areas
+## 4. Phase 6b, 4.0.0: the remaining workstreams
 
-**The owner placed all of Phase 6c first (2026-10-14).** P50 to P54 are done. P55 (N47) has parts 1 to 3 merged (§3.1 #155, §3.2 #156, §3.3 and §3.4 #157). Two PRs remain, then Phase 6b's workstreams (ask the owner which comes first). Keep each PR under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+**Phase 6c is done** (P50 to P55; N41 to N47). Phase 6b's P36 (Tailwind v4) merged by 2026-10-14. **Ask the owner which of the six comes first**, and give them the sizes below. Read the item's rows in the completion plan and its review findings before planning it, and split an L into PRs under 100 files each. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P55 | The low findings: §3.5 to §3.8 left | N47 | per area | M |
-| P34, P35, P37, P41, P42, P43 | Phase 6b's workstreams, after Phase 6c | see §4 of the plan | | |
+| P34 | Runtime coverage: single-page apps (`--wait-for`, `--steps`), logged-in pages (`--storage-state`), shadow DOM, several URLs and viewports | GT-B1, GT-B2, GT-B3, GT-B4 | the three runtime gates | L |
+| P35 | The cheap automatable checks the coverage table lists, and engines other than Chromium | GT-B6, GT-B9 | a11y gates, `automation-coverage.md` | M-L |
+| P37 | SCSS in stylelint (D3), and Next.js App Router, Vue, Svelte and Astro | SB-B6, DL-B3 | configs, stack references, fixtures | L |
+| P41 | Email: MJML or React Email output, a right-to-left template, and a client matrix regenerated from caniemail's data | DL-B4, DL-B5, DL-C9 | email-template-system | L |
+| P42 | Persuasion: the UK and EU consumer law to flag for legal review, consent for tracking, price experiments, and persuasive patterns mapped to WCAG | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
+| P43 | More page types and audiences, a claims layer with `lint_claims.py`, routing between the persuasion skills, and MESSAGE_BRIEF to DECISION_LOG | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-**Run each finding's own fixture first**, and read the finding in the audit, not only here: the line numbers have drifted, and the audit was wrong four times (3.3.8's `autocomplete`, W14, T2's third site, and findings P53 had closed).
+**Also ask the owner** (HANDOFF's open decisions): whether the Baseline browser versions the references quote (the rest of the audit's D6) become an item, and whether Vue's `:style` binding, which the audit's `style=""` reader does not read, gets one.
 
-**P55 part 4, §3.5 and §3.6 (content, email, runtime gates).** Next.
-- **E11.** `lint_email.source_declarations` gives every rule the `<style>` element's line.
-- **E12.** `introspect_schema.parse_prisma`: `Unsupported("geometry")` becomes `unsupported` with a text input; unwrap it to `geometry`.
-- **G8.** `perf_audit`'s `NOT_SHIPPED` skips any `report.html` or `stats.html` silently.
-- **G9.** `a11y_static`: the `EXPR` sentinel leaks into messages and JSON; the `job[_-]?title|^title$&` pattern's `&`; `apartment|suite|unit` fires on a number input (`number` is missing from `INPUT_NOT_PERSONAL`). Read the audit's line for the rest.
-- **G10.** `focus-ring-transition` flags `transition: outline-color`, which its own fix allows.
-- **G12.** `a11y_runtime.mjs`' `/^wcag\d{3}$/` misses axe's four-digit `wcag1412`.
-- **G14.** `perf_audit`'s header claims a missing-srcset check no rule implements.
-- **G16.** `perf_audit`'s `families` is computed and never used (ruff F841): remove it, or write the font-family check it was for.
-- Already closed: E13, G11 and G15 (#138), E14 and G13 (#142). Say so in the PR.
+**Each PR:** fail before on `v3.6.0` (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES` (and `WDS_TAILWIND_MODULES` for `test_tw_probe`), both at `tooling/main/node_modules`; the CHANGELOG under 4.0.0; a done row `Pnn part N, #N` above the item's row, which goes when the item is done; a note in the completion plan. `test_static_checks` holds every new script and test to its five rules.
 
-**P55 part 5, §3.7 and §3.8 (docs, CI, the test suite).**
-- **D5.** CLAUDE.md calls `evals.yml` "the routing evals" (it runs both, by hand) and lists two of `tools/`' five files.
-- **D6.** budgets.md quotes the Core Web Vitals thresholds with no `evidence.json` entry, and `FIGURE` never matches "2.5 s"; the README's "Claude Code 2.1.269 or later" is unregistered too. Re-read each at its source on the day.
-- **D7.** `check_pointers.py` walks `skills/` only: four `§` pointers in `agents/` and `workflow-commands/` are unguarded.
-- **D8.** The byte table in this file drifts: hold it to the disk with a test, or drop the numbers.
-- **D9.** Unused imports and f-strings (ruff F401, F541), and B904 (`raise … from` at twelve `except` sites): run `python -m ruff check --no-cache --select F401,F541,B904` (ruff 0.6.9 is installed) and fix the plugin's own and `tooling/release/build.py`'s. The audit's B023 hits are not bugs (each closure runs in its own iteration).
-- **T3** (`NoFragileJsonReads` has no positive control), **T4** (`test_facts` asserts behind two conditionals), **T5** (`PythonFloor` leaves out `workflow-commands/*/scripts` and `shared/`), **T6** (`test_claude_plugin_validate_strict_passes` skips on every CI cell), **T7** (`sys.dont_write_bytecode` set once in `wds_support`), **T8** (66 assertion loops without `subTest`: the ones the audit names), **T9** (DTCG fixtures in the 2025.10 object form), **T10** (`ResourceWarning` at `test_versioning`'s `json.loads(open(...).read())`).
-- After part 5: remove the `P55` row, mark N47 done in the completion plan, and close it in the inventory if it is listed there.
-
-**Each PR:** run each finding's fixture first; tests fail on `v3.6.0` first (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES` (and `WDS_TAILWIND_MODULES` for `test_tw_probe`); the CHANGELOG under 4.0.0's Fixed; a row `P55 part N, #N` above the `P55` row (`plan_p55.py` in this session's scratchpad writes it and the note), and a note in the completion plan.
-
-**R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed (a Vue project's bound attributes, the index-mode hook), the migration's reconciliation on a real codebase (P52), the router (#143), and the MCP server's containment (#155).
+**R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed (a Vue project's bound attributes, the index-mode hook), the migration's reconciliation on a real codebase (P52), the router (#143), the MCP server's containment (#155), and P55's gates (the email lint's lines, Prisma's `Unsupported`, `perf_audit`'s left-out pages).
 
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 
