@@ -291,6 +291,22 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   `rgb(255, 0, 0, 0.5)` and `hsl(0, 100%, 50%, 0.5)`, the legacy form under the names
   CSS Color 4 made aliases of `rgba()` and `hsla()`, were left out of a DTCG document as
   unsupported; they are written with their alpha (`test_dtcg.TheWriter`).
+- **The Python and Node token readers disagreed on three forms, and the gate tools read
+  any path** (the audit's S5, S6, S7 and S9):
+  - a reference with spaces round it (`" {brand.500} "`) was a reference in Python and
+    a literal in Node. Node takes it as Python does;
+  - Python read digits that are not ASCII (`"٥"`) as numbers: in a dimension, a colour
+    component or alpha, a Tokens Studio number and its math. They are left out, or left
+    as written, as Node leaves them;
+  - Python read a colour's `components` given as an object by its keys (`{"1": 0, "0":
+    0, "0.5": 0}` became `#ff0080`). It is refused, as Node refuses it;
+  - the MCP server ran a gate on any path Claude passed, `..`, an absolute path or a
+    link out of the project included, and a finding's snippet returned the file's
+    lines. A path argument must now be inside the project, compared by real path (an
+    error `-32602` names it); the files `.design-suite.json` names are still read
+    wherever they are.
+
+  `test_project_config.TheNodeReaderAgrees`, `test_mcp.TheGates`.
 - **The accessibility gates misread four things, and the coverage table claimed more than
   they run** (the audit's G1, G2, G5, G6 and G7):
   - `aria-hidden-focusable` read only an element's direct children, and counted those

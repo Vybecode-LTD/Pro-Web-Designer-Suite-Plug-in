@@ -203,6 +203,41 @@ class TheGates(ServerTest):
         self.assertIn("no such path: --write-baseline=x.json", reply["result"]["content"][0]["text"])
         self.assertFalse((self.tmp / "x.json").exists())
 
+    def test_a_path_outside_the_project_is_refused(self):
+        """S9 (audit, 2026-10-14): `..`, an absolute path and a link out of
+        the project were read, and a finding's snippet returned their
+        lines. Each is refused before a script runs; inside, a path still
+        reaches the script, written either way."""
+        project = self.tmp / "project"
+        self.write("project/.git/HEAD", "x\n")
+        self.write("project/src/app.css", ".x { color: #123456; }\n")
+        secret = self.write("secret/leak.css", ".leak { color: #abcdef; }\n")
+        link = project / "linked"
+        if os.name == "nt":
+            import _winapi
+            _winapi.CreateJunction(str(secret.parent), str(link))
+            self.addCleanup(os.rmdir, link)              # the junction, never its target
+        else:
+            link.symlink_to(secret.parent, target_is_directory=True)
+            self.addCleanup(link.unlink)
+        here = {"CLAUDE_PROJECT_DIR": str(project)}
+        for tool, arguments in (("audit_design", {"paths": ["src", "../secret/leak.css"]}),
+                                ("audit_design", {"paths": [str(secret)]}),
+                                ("audit_design", {"paths": ["linked/leak.css"]}),
+                                ("a11y_static", {"paths": ["linked"]}),
+                                ("perf_audit", {"budget": str(secret)}),
+                                ("perf_audit", {"src": ["../secret"]}),
+                                ("check_roles", {"tokens": "../secret/leak.css"}),
+                                ("diff_system", {"old": str(secret), "new": "src/app.css"})):
+            with self.subTest(tool=tool, arguments=arguments):
+                reply = self.call(tool, arguments, **here)
+                self.assertEqual(-32602, reply.get("error", {}).get("code"), reply)
+                self.assertIn("must be inside the project", reply["error"]["message"])
+        for paths in (["src/app.css"], [str(project / "src" / "app.css")], ["src/../src/app.css"]):
+            with self.subTest(paths=paths):
+                payload = self.result("audit_design", {"paths": paths}, **here)
+                self.assertIn("#123456", json.dumps(payload["report"]))
+
     def test_a_long_report_is_cut_to_fit(self):
         """Claude Code warns past 10,000 tokens of tool output and stops at
         25,000, so a report keeps the head of its longest list within 60,000

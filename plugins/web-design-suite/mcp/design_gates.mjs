@@ -215,8 +215,35 @@ class RpcError extends Error {
   }
 }
 
+// A path's real form, through any link, for as much of it as exists: a path
+// that does not exist yet is the real folder it would be in, plus the rest.
+function real(p) {
+  let head = path.resolve(p);
+  const rest = [];
+  for (;;) {
+    try {
+      return path.join(fs.realpathSync.native(head), ...rest);
+    } catch {
+      const up = path.dirname(head);
+      if (up === head) return path.resolve(p);
+      rest.unshift(path.basename(head));
+      head = up;
+    }
+  }
+}
+
+// A path the model passes stays in the project (the audit's S9): the scripts
+// read a file anywhere and return its lines in a finding's snippet. The real
+// paths are compared, so a link inside the project cannot lead out. The
+// files .design-suite.json names are the project's own choice, and the
+// scripts read them wherever they are.
+function inProject(value) {
+  const rel = path.relative(real(project()), real(path.resolve(project(), value)));
+  return !(rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel));
+}
+
 // The arguments a tool takes, checked against its schema: only its names, of
-// their types, a path never empty.
+// their types, a path never empty and never outside the project.
 function checked(name, args) {
   const tool = TOOLS[name];
   const given = args ?? {};
@@ -228,6 +255,8 @@ function checked(name, args) {
       : want.type === 'string' ? typeof value === 'string' && value.trim() !== ''
         : Array.isArray(value) && value.every((v) => typeof v === 'string' && v.trim() !== '');
     if (!ok) throw new RpcError(-32602, `${name}: '${key}' must be ${want.type === 'array' ? 'a list of paths' : want.type === 'string' ? 'a path' : 'true or false'}`);
+    const out = want.type === 'boolean' ? undefined : [value].flat().find((v) => !inProject(v));
+    if (out !== undefined) throw new RpcError(-32602, `${name}: '${key}' must be inside the project (${project()}): ${out}`);
   }
   for (const key of tool.required ?? []) {
     if (!(key in given)) throw new RpcError(-32602, `${name}: '${key}' is required`);
