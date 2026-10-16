@@ -15,8 +15,8 @@ description: Migrate an existing codebase onto design tokens, from a census of h
 >
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
-> do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (apply_codemod.py, cluster_values.py, extract_literals.py).
+> do; here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (apply_codemod.py, cluster_values.py, extract_literals.py; copy their helpers too: dtcg.py, project_config.py).
 > From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
 
 Getting an inherited codebase onto the system in `references/token-contract.md`, without a rewrite and without a regression.

@@ -15,8 +15,8 @@ description: Render every component at every state, density and theme on one pro
 >
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
-> do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (generate_matrix.py, snapshot_matrix.mjs).
+> do; here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (generate_matrix.py, snapshot_matrix.mjs; copy their helpers too: browser_common.mjs, project_config.mjs).
 > From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
 
 `audit_design.py` proves the **code** is clean. This skill proves the **result** is.
@@ -46,7 +46,7 @@ That combinatorial render is, in practice, the fastest way to find:
 | Blind to | anything not written down | anything that renders correctly by accident |
 | Answers | "is this code legal?" | "does this system work?" |
 
-The distinction that matters: **a state that was never written produces no violation.** A missing `.button:focus-visible` reads exactly like a stylesheet that needs none; a focus row identical to the default row does not.
+The distinction that matters: **a state that was never written produces no violation.** A missing `.button:focus-visible` reads like a stylesheet that needs none; a focus row identical to the default row does not.
 
 Run both. They fail for different reasons and both failures are actionable.
 
@@ -115,7 +115,7 @@ In this order. The order is by yield, not by layout.
 | Step | Look at | Failure signature |
 |---|---|---|
 | 1 | the **`focus-visible` row**, dark theme, smallest size | identical to `default` → no ring. Present in light, absent in dark → the ring's inner colour resolved against the wrong canvas. Clipped on one side → a parent has `overflow: hidden`. |
-| 2 | the **`disabled` row**, primary variant | still reads as the brand accent → the most prominent thing on screen does nothing |
+| 2 | the **`disabled` row**, primary variant | reads as the brand accent → the most prominent thing on screen does nothing |
 | 3 | the **`hover` row**, across variants | all variants look the same → `:hover` overwrote each variant's fill socket instead of composing over it |
 | 4 | the **dark column** of every cell group | one element the same colour in both themes → a hardcoded colour. This is the single highest-yield sweep on the sheet. |
 | 5 | the **density pass**, compact vs spacious | the box did not change size → a hardcoded padding. Some parts changed and some did not → a partially-tokenised component, which is worse than an untokenised one because it looks fine at default. |
@@ -318,7 +318,7 @@ Comparison runs on a canvas **inside the browser**: no `pixelmatch`, `pngjs` or 
 | Building or restyling the system itself | `web-design-studio` |
 | An inherited codebase not yet on tokens | `design-token-migration` |
 | Design file and code have drifted apart | `figma-variables-sync` |
-| **Every state × density × theme actually renders** | **here** |
+| **Every state × density × theme renders** | **here** |
 | Copy, offer and persuasion on a landing page | `landing-page-conversion` |
 | Adversarial review before a client sees it | `design-critique-gate` |
 
