@@ -136,31 +136,35 @@ class TheChecksFindTheirCase(unittest.TestCase):
 
 
 def loops_without_subtest(tree: ast.Module) -> list[str]:
-    """T8 (audit, 2026-10-14): a loop in a test method that asserts with no
-    `subTest` stops at its first failure and hides the rest. A loop inside a
-    subTest, or holding one, is fine; so is one outside a method on `self`."""
+    """T8 (audit, 2026-10-14): an assertion in a test method's loop with no
+    `subTest` around it stops the loop at its first failure and hides the rest.
+    Each assertion is judged, not each loop: a loop that holds a subTest can
+    still assert outside it (Codex on #160). A subTest outside the loop covers
+    it too, and a function that is no method on `self` is not read."""
     def is_subtest(node):
         return isinstance(node, ast.With) and any(
             isinstance(i.context_expr, ast.Call) and isinstance(i.context_expr.func, ast.Attribute)
             and i.context_expr.func.attr == "subTest" for i in node.items)
 
-    def asserts(node):
-        return any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr.startswith("assert")
-                   and isinstance(n.func.value, ast.Name) and n.func.value.id == "self" for n in ast.walk(node))
-
     out = []
 
-    def visit(node, method, inside):
+    def visit(node, method, looped, covered):
         for child in ast.iter_child_nodes(node):
-            own = method
-            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                own = bool(child.args.args) and child.args.args[0].arg == "self"
-            if (isinstance(child, ast.For) and own and not inside and asserts(child)
-                    and not any(is_subtest(n) for n in ast.walk(child))):
+            own, loop, cover = method, looped, covered
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                own = (not isinstance(child, ast.Lambda) and bool(child.args.args)
+                       and child.args.args[0].arg == "self")
+                loop = cover = False
+            elif isinstance(child, (ast.For, ast.AsyncFor)):   # a case loop; a while follows a chain
+                loop = True
+            elif is_subtest(child):
+                cover = True
+            if (own and loop and not cover and isinstance(child, ast.Call)
+                    and isinstance(child.func, ast.Attribute) and child.func.attr.startswith("assert")
+                    and isinstance(child.func.value, ast.Name) and child.func.value.id == "self"):
                 out.append(str(child.lineno))
-                continue
-            visit(child, own, inside or is_subtest(child))
-    visit(tree, False, False)
+            visit(child, own, loop, cover)
+    visit(tree, False, False, False)
     return out
 
 
@@ -168,8 +172,13 @@ class TheTestsLoops(unittest.TestCase):
 
     def test_an_assertion_loop_reports_each_case(self):
         flagged = ("class T:\n    def test_x(self):\n        for v in (1, 2):\n            self.assertTrue(v)\n"
-                   "        for v in (1, 2):\n            with self.subTest(v=v):\n                self.assertTrue(v)\n")
-        self.assertEqual(["3"], loops_without_subtest(ast.parse(flagged)))
+                   "        for v in (1, 2):\n            with self.subTest(v=v):\n                self.assertTrue(v)\n"
+                   "        for v in (1, 2):\n            self.assertTrue(v)\n"                  # beside a subTest
+                   "            for w in (3, 4):\n                with self.subTest(w=w):\n"
+                   "                    self.assertTrue(w)\n"
+                   "        with self.subTest(case=1):\n            for v in (1, 2):\n"
+                   "                self.assertTrue(v)\n")
+        self.assertEqual(["4", "9"], loops_without_subtest(ast.parse(flagged)))
         tests = sorted((PLUGIN / "tests").glob("test_*.py"))
         self.assertGreater(len(tests), 40)
         for path in tests:

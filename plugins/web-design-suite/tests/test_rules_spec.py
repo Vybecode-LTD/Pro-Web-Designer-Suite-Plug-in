@@ -284,7 +284,8 @@ class StylelintFollowsTheSpec(unittest.TestCase):
                  "binding_files": self.override_files("theme.css"),
                  "component_files": self.override_files("components")}
         for kind, found in globs.items():
-            self.assertEqual(sorted(SPEC["file_classes"][kind]["globs"]), sorted(found), kind)
+            with self.subTest(kind=kind):
+                self.assertEqual(sorted(SPEC["file_classes"][kind]["globs"]), sorted(found), kind)
             for path in SPEC["file_classes"][kind]["examples"]:
                 with self.subTest(kind=kind, path=path):
                     self.assertTrue(matches_any(path, found))

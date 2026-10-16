@@ -142,7 +142,8 @@ class TheScriptReferences(TempDirTest):
             source = (SKILLS / skill / "scripts" / script).read_text(encoding="utf-8")
             reference = (SKILLS / skill / "references" / "scripts.md").read_text(encoding="utf-8")
             flags = set(re.findall(r'add_argument\(\s*(?:"-\w",\s*)?"(--[\w-]+)"', source))
-            self.assertGreater(len(flags), 3, script)
+            with self.subTest(script=script):
+                self.assertGreater(len(flags), 3, script)
             for flag in sorted(flags):
                 with self.subTest(script=script, flag=flag):
                     self.assertRegex(reference, rf"(?<![\w-]){re.escape(flag)}(?![\w-])")
@@ -559,7 +560,8 @@ class PasteableCommands(unittest.TestCase):
     def test_every_command_a_readme_shows_pastes_into_bash_powershell_and_cmd(self):
         for name, text in self.readmes():
             lines = list(pasted_lines(text))
-            self.assertTrue(lines, name)
+            with self.subTest(readme=name):
+                self.assertTrue(lines, name)
             for line in lines:
                 with self.subTest(readme=name, line=line):
                     self.assertEqual([], not_portable(line))

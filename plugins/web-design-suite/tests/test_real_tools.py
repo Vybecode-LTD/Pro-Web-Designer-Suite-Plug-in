@@ -843,7 +843,8 @@ class TheGatesReadTheNames(unittest.TestCase):
 
     def test_each_gate_reads_law_6_through_the_names(self):
         for key in ("names", "overlaps"):
-            self.assertTrue(self.files[key])
+            with self.subTest(spec=key):
+                self.assertTrue(self.files[key])
             for name, verdict in self.verdicts[key].items():
                 with self.subTest(spec=key, file=name, source=self.files[key][name]):
                     want = self.expected(name) if verdict == "refused" else set()
