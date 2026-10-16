@@ -266,8 +266,10 @@ class ReleaseBuild(TempDirTest):
 
 
 class TheAuditsReleaseMediums(unittest.TestCase):
-    """P54 part 8, the audit of 2026-10-14's §3.7: D1, D2 and D3."""
+    """P54 part 8, the audit of 2026-10-14's §3.7: D1, D2 and D3. The first two
+    read files outside the plugin, so they skip in an unpacked copy (Codex on #152)."""
 
+    @unittest.skipUnless(TOOLING, "needs the repository: release.yml and tooling/ sit outside the plugin")
     def test_the_release_job_pins_its_actions_and_keeps_no_credential(self):
         """D2: release.yml pinned checkout and setup-uv by tag while holding
         `contents: write` and GH_TOKEN, and checkout kept its credential."""
@@ -279,6 +281,7 @@ class TheAuditsReleaseMediums(unittest.TestCase):
         checkout = text[text.index("actions/checkout@"):]
         self.assertRegex(checkout[:400], r"persist-credentials:\s*false")
 
+    @unittest.skipUnless(TOOLING, "needs the repository: release.yml and tooling/ sit outside the plugin")
     def test_the_tooling_readme_says_why_a_local_build_differs(self):
         """D1: tooling/README.md said a build is "byte-identical on a rebuild",
         though build.py says Windows' zlib-ng and the release's zlib differ."""
