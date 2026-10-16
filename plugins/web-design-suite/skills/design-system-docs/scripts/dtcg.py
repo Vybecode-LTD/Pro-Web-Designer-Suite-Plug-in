@@ -1629,13 +1629,16 @@ def recorded(data: Any, base: Optional[Union[str, Path]]) -> Tuple[Dict[str, str
     if is_resolver(data):
         load = file_loader(base)
         docs = []
-        for ref in _file_refs(default_sources(data))[:64]:
-            if outside(ref):
-                continue
-            try:
-                docs.append(load(ref))
-            except (OSError, ValueError):
-                continue
+        for source in default_sources(data)[:64]:     # in order: a file, or a source written inline
+            for ref in _file_refs(source):            # (Codex on #149: an inline one writes too)
+                if outside(ref):
+                    continue
+                try:
+                    docs.append(load(ref))
+                except (OSError, ValueError):
+                    continue
+            if isinstance(source, dict) and "$ref" not in source:
+                docs.append(source)
     values: Dict[str, str] = {}
     marks: Dict[str, Union[bool, str]] = {}
     for doc in docs:

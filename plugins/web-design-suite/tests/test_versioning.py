@@ -679,6 +679,35 @@ class TheAuditsVersioningMediums(TempDirTest):
         self.assertEqual(0, proc.returncode, output(proc))
         self.assertFalse((self.tmp / "ledger.json").exists(), "a mark the later source took off")
 
+    def test_an_inline_source_that_writes_a_token_ends_its_record(self):
+        """Codex on #149, round 2: a source written inline in the resolver, after
+        a file that records the token, never cleared the record."""
+        hero = "clamp(2rem, 1rem + 4vw, 4rem)"
+        self.dtcg("pub/a.tokens.json", {"space": {"4": self.REM}}, {"--size-hero": hero})
+        self.write("pub/tokens.resolver.json", json.dumps({"version": "2025.10", "resolutionOrder": [
+            {"type": "set", "name": "base", "sources": [
+                {"$ref": "a.tokens.json"},
+                {"size": {"hero": {"$type": "dimension", "$value": {"value": 2, "unit": "rem"}}}}]}]}))
+        resolver = str(self.tmp / "pub" / "tokens.resolver.json")
+        proc = run_py("design-system-docs", "extract_system", "--tokens", resolver, "--out", "system.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        got = {t["name"]: t["raw"] for t in json.loads((self.tmp / "system.json").read_bytes())["tokens"]}
+        self.assertEqual("2rem", got["--size-hero"])
+
+    def test_a_later_files_section_decides_the_tier(self):
+        """Codex on #149, round 2: a later contract that files `--surface` as a
+        role left it Tier 1, as the earlier contract's constant was."""
+        schema = "web-design-suite/contract/1"
+        self.write("first.json", json.dumps({"schema": schema, "constants": {"--surface": "#eeeeee"}}))
+        self.write("second.json", json.dumps({"schema": schema, "roles": {"--surface": "#ffffff"}}))
+        for order, tier in ((("first.json", "second.json"), 2), (("second.json", "first.json"), 1)):
+            with self.subTest(order=order):
+                args = [a for name in order for a in ("--tokens", name)]
+                proc = run_py("design-system-docs", "extract_system", *args, "--out", "system.json", cwd=self.tmp)
+                self.assertEqual(0, proc.returncode, output(proc))
+                tiers = {t["name"]: t["tier"] for t in json.loads((self.tmp / "system.json").read_bytes())["tokens"]}
+                self.assertEqual({"--surface": tier}, tiers)
+
     def test_a_contracts_literal_role_stays_tier_two(self):
         """Codex on #149: flattened to CSS, a contract's `--surface: #ffffff`
         role was Tier 1 by its value, and `--contract` moved it to constants."""

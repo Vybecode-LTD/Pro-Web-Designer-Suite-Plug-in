@@ -1592,6 +1592,11 @@ class Extractor:
                                             "selector": " ".join(d.selectors),
                                             "value": d.value, "file": cf.path, "line": d.line})
                         t.raw = d.value
+                        if cf.path in self.json_roles:      # a later token file's section decides, as
+                            refs = sorted(set(VAR_REF.findall(d.value)))     # read_tokens files it
+                            t.tier, t.tier_why = ((2, "a role in the token file")    # (Codex on #149)
+                                                  if d.prop in self.json_roles[cf.path]
+                                                  else classify_tier(d.prop, d.value, refs))
                 else:
                     overrides.setdefault(d.prop, []).append({
                         "context": kind, "label": label,
