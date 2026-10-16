@@ -74,9 +74,12 @@ def numbers(value: str) -> list[str]:
 
 def quoted(value: str, text: str) -> bool:
     """The value stands on its own in the text: "41%" is not quoted by
-    "37-41%", nor "143" by "1,143", "143.5", "143%", "143-200" or "1/143"
-    (Codex on #154)."""
-    return re.search(rf"(?<![\w.,/-]){re.escape(value)}(?!\w|[.,/-]\d|\s?%)", text) is not None
+    "37-41%", nor "143" by "1,143", "143.5", "143%", "143-200" or "1/143",
+    with or without spaces round the `-` or `/` (Codex on #154, twice)."""
+    for m in re.finditer(rf"(?<![\w.,/-]){re.escape(value)}(?!\w|[.,]\d|\s?%|\s*[-/]\s*\d)", text):
+        if not re.search(r"\d\s*[-/]\s*$", text[max(0, m.start() - 16):m.start()]):
+            return True
+    return False
 
 
 def spellings(entry) -> list[str]:
@@ -181,10 +184,13 @@ class EvidenceRegister(unittest.TestCase):
         a substring, kept "19 categories" alive on a bare "143"."""
         self.assertTrue(quoted("41%", norm("found **41%** of them")))
         self.assertTrue(quoted("13,000", "across ~13,000 pages."))
+        self.assertTrue(quoted("143", norm("the page – 143 planted failures")))   # a dash, not a range
         for value, text in (("41%", "found 37–41% of them"), ("143", "1,143 issues"),
                             ("143", "143.5 issues"), ("143", "1430 issues"), ("143", "143% of it"),
                             ("143", "143 % of it"), ("143", "143-200 failures"), ("143", "143/200"),
-                            ("143", "1/143 of it"), ("143", "a 2-143 range"), ("41%", "41%-43%")):
+                            ("143", "1/143 of it"), ("143", "a 2-143 range"), ("41%", "41%-43%"),
+                            ("143", "143 - 200 failures"), ("143", "143 / 200"), ("143", "1 / 143"),
+                            ("143", "a 2 – 143 range"), ("41%", "41% – 43%")):
             self.assertFalse(quoted(value, norm(text)), text)
         entry = {"figure": "16,384 bytes", "also": ["16,384-byte", "16384 bytes", "16 kB"]}
         self.assertEqual(spellings(entry), ["16,384 bytes", "16,384-byte", "16384 bytes"])
