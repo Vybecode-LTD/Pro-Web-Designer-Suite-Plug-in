@@ -77,11 +77,19 @@ def _fmt(n: float) -> str:
     return f"{round(float(n), 6):g}"
 
 
+def _float(x: Any) -> float:
+    """float() for a JSON value, with ASCII digits only, as the Node reader
+    reads it: Python's own takes "٥" for 5 (the audit's S6)."""
+    if isinstance(x, str) and not x.strip().isascii():
+        raise ValueError(f"not a number: {x!r}")
+    return float(x)
+
+
 def _num(x: Any) -> float:
     """A colour component. The spec's "none" keyword is a missing component."""
     if x is None or (isinstance(x, str) and x.strip().lower() == "none"):
         return 0.0
-    return float(x)
+    return _float(x)
 
 
 def _srgb_encode(c: float) -> float:
@@ -115,9 +123,12 @@ def colour_to_css(v: dict, lossless: bool = False) -> Optional[str]:
     """A 2025.10 colour object as CSS. With `lossless`, a space with no sRGB
     form here and no `hex` fallback is written in its own CSS function."""
     space = str(v.get("colorSpace", "")).strip().lower()
+    raw = v.get("components")
+    if raw and not isinstance(raw, list):        # an object's keys are no components (S7)
+        return None
     try:
-        comps = [_num(x) for x in (v.get("components") or [])]
-        alpha = 1.0 if v.get("alpha") in (None, "none") else float(v.get("alpha"))
+        comps = [_num(x) for x in (raw or [])]
+        alpha = 1.0 if v.get("alpha") in (None, "none") else _float(v.get("alpha"))
     except (TypeError, ValueError):
         return None
     if len(comps) == 3:
@@ -163,7 +174,7 @@ def _dimension(v: Any, kind: str, lossless: bool = False) -> Any:
     if not (isinstance(v, dict) and "value" in v and "unit" in v):
         return UNSUPPORTED
     try:
-        n = float(v["value"])
+        n = _float(v["value"])
     except (TypeError, ValueError):
         return UNSUPPORTED                       # e.g. a reference inside
     unit = str(v["unit"]).strip().lower()
@@ -634,7 +645,7 @@ STUDIO_TYPES = {"spacing": "dimension", "sizing": "dimension", "borderradius": "
                 "typography": "typography", "border": "border", "duration": "duration",
                 "cubicbezier": "cubicBezier"}
 MATH_REF = re.compile(r"\{([^{}]+)\}")
-MATH_TOKEN = re.compile(r"\s*(?:(\d+\.?\d*|\.\d+)(px|rem|em|%)?|([-+*/()]))", re.I)
+MATH_TOKEN = re.compile(r"\s*(?:([0-9]+\.?[0-9]*|\.[0-9]+)(px|rem|em|%)?|([-+*/()]))", re.I)
 
 
 def is_studio(data: Any) -> bool:
@@ -1198,7 +1209,7 @@ def resolver(name: str, base_file: str, modifiers: Sequence[Tuple[str, str, Dict
 # Writing: CSS custom properties -> a 2025.10 document
 # ---------------------------------------------------------------------------
 
-NUMBER = r"[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?"
+NUMBER = r"[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:e[+-]?[0-9]+)?"
 VAR_ONLY = re.compile(r"^var\(\s*(--[A-Za-z0-9_\-\u0080-\U0010ffff]+)\s*\)$")   # `--café` too (Codex)
 DIMENSION = re.compile(rf"^({NUMBER})(px|rem)$", re.I)
 DURATION = re.compile(rf"^({NUMBER})(ms|s)$", re.I)

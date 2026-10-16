@@ -668,6 +668,11 @@ function convertValue(value, kind) {
     const alias = pointerAlias(value.$ref);
     return alias ? `{${alias}}` : UNSUPPORTED;
   }
+  // Spaces round a reference, as Python's reader takes them (the audit's S5).
+  if (typeof value === 'string' && value.trim().startsWith('{') && value.trim().endsWith('}')) {
+    const alias = pointerAlias(value);                // `{brand.$root}` is `{brand}` here
+    return alias ? `{${alias}}` : value;
+  }
   if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return value;
   const k = String(kind || '').toLowerCase();
   if (isObject(value)) {
