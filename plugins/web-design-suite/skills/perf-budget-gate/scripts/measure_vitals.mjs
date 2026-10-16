@@ -398,9 +398,8 @@ const HARVEST = ({ topN, ttfb: networkTtfb, requests: networkRequests }) => {
     tti = Math.max(fcp, ...tasks.filter((t) => ends(t) <= s).map(ends));
     break;
   }
-  const tbt = tasks
-    .filter((t) => ends(t) > fcp && (tti == null || t.start < tti))
-    .reduce((sum, t) => sum + Math.max(0, t.duration - 50), 0);
+  const inTbt = new Set(tasks.filter((t) => ends(t) > fcp && (tti == null || t.start < tti)));
+  const tbt = [...inTbt].reduce((sum, t) => sum + Math.max(0, t.duration - 50), 0);
   const blockingTotal = allTasks
     .reduce((sum, t) => sum + Math.max(0, t.duration - 50), 0);
   const longestTask = allTasks.reduce((m, t) => Math.max(m, t.duration), 0);
@@ -447,6 +446,13 @@ const HARVEST = ({ topN, ttfb: networkTtfb, requests: networkRequests }) => {
     blockingTotal: Math.round(blockingTotal),
     longestTask: Math.round(longestTask),
     longTaskCount: allTasks.length,
+    // Each long task on the page's clock, and whether TBT counted it; one it
+    // left out says why: an interaction's own, before FCP, or after TTI.
+    tasks: allTasks.map((t) => ({
+      start: Math.round(t.start), duration: Math.round(t.duration), inTbt: inTbt.has(t),
+      ...(inTbt.has(t) ? {} : { leftOut: !tasks.includes(t) ? 'interaction'
+        : ends(t) <= fcp ? 'before-fcp' : 'after-tti' }),
+    })),
     inp,
     interactions: v.interactions || [],
     resourceCount: resources.length,
@@ -969,7 +975,7 @@ async function main() {
     notes,
     perRun: runs.map((r) => ({
       lcp: r.lcp, cls: r.cls, tbt: r.tbt, ttfb: r.ttfb, fcp: r.fcp, tti: r.tti,
-      inp: r.inp, longTaskCount: r.longTaskCount, clickedAt: r.clickedAt,
+      inp: r.inp, longTaskCount: r.longTaskCount, clickedAt: r.clickedAt, tasks: r.tasks,
     })),
   };
 

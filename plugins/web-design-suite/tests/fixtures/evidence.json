@@ -2,34 +2,15 @@
   "about": "Every figure the docs quote from a study, survey, vendor or regulator: the value, what it measures, where it comes from, when it was last checked, and the source's own words. tests/test_evidence.py keeps the docs and this file in step. Re-check an entry at its URL before changing its figure.",
   "entries": [
     {
-      "figure": "19 categories",
+      "figure": "143",
       "also": [
-        "143"
+        "19 categories"
       ],
       "claim": "the size of the planted-failure test page",
       "source": "UK Government Digital Service, What we found when we tested tools on the world's least-accessible webpage (2017-02-24)",
       "url": "https://accessibility.blog.gov.uk/2017/02/24/what-we-found-when-we-tested-tools-on-the-worlds-least-accessible-webpage/",
-      "checked": "2026-09-25",
+      "checked": "2026-10-16",
       "quote": "At the moment it contains a total of 143 failures grouped into 19 categories.",
-      "docs": [
-        "a11y-audit-runner/SKILL.md",
-        "a11y-audit-runner/references/automation-coverage.md",
-        "client-presentation-builder/references/evidence.md",
-        "client-presentation-builder/scripts/build_presentation.py",
-        "web-design-studio/references/accessibility-testing.md"
-      ]
-    },
-    {
-      "figure": "37–41%",
-      "also": [
-        "37%",
-        "41%"
-      ],
-      "claim": "the share of the planted barriers found by the best single tool: 37% counting errors and warnings (Tenon), 41% counting manual-inspection prompts (Asqatasun)",
-      "source": "UK Government Digital Service (2017-02-24)",
-      "url": "https://accessibility.blog.gov.uk/2017/02/24/what-we-found-when-we-tested-tools-on-the-worlds-least-accessible-webpage/",
-      "checked": "2026-09-25",
-      "quote": "If we only count error messages and warnings, then Tenon picked up the most barriers – it found 37% of them. If we also count manual inspection prompts, then Asqatasun was the most effective – it found 41% of the barriers.",
       "docs": [
         "a11y-audit-runner/SKILL.md",
         "a11y-audit-runner/references/automation-coverage.md",
@@ -37,6 +18,45 @@
         "client-presentation-builder/references/evidence.md",
         "client-presentation-builder/scripts/build_presentation.py",
         "web-design-studio/references/accessibility-testing.md"
+      ]
+    },
+    {
+      "figure": "37–41%",
+      "claim": "the share of the planted barriers found by the best single tool: 37% counting errors and warnings (Tenon), 41% counting manual-inspection prompts (Asqatasun)",
+      "source": "UK Government Digital Service (2017-02-24)",
+      "url": "https://accessibility.blog.gov.uk/2017/02/24/what-we-found-when-we-tested-tools-on-the-worlds-least-accessible-webpage/",
+      "checked": "2026-10-16",
+      "quote": "If we only count error messages and warnings, then Tenon picked up the most barriers – it found 37% of them. If we also count manual inspection prompts, then Asqatasun was the most effective – it found 41% of the barriers.",
+      "docs": [
+        "a11y-audit-runner/references/automation-coverage.md",
+        "a11y-audit-runner/scripts/a11y_runtime.mjs",
+        "web-design-studio/references/accessibility-testing.md"
+      ]
+    },
+    {
+      "figure": "37%",
+      "claim": "the share of the planted barriers found by the best single tool counting errors and warnings (Tenon)",
+      "source": "UK Government Digital Service (2017-02-24)",
+      "url": "https://accessibility.blog.gov.uk/2017/02/24/what-we-found-when-we-tested-tools-on-the-worlds-least-accessible-webpage/",
+      "checked": "2026-10-16",
+      "quote": "If we only count error messages and warnings, then Tenon picked up the most barriers – it found 37% of them.",
+      "docs": [
+        "a11y-audit-runner/SKILL.md",
+        "a11y-audit-runner/references/automation-coverage.md"
+      ]
+    },
+    {
+      "figure": "41%",
+      "claim": "the share of the planted barriers found by the best single tool counting manual-inspection prompts (Asqatasun)",
+      "source": "UK Government Digital Service (2017-02-24)",
+      "url": "https://accessibility.blog.gov.uk/2017/02/24/what-we-found-when-we-tested-tools-on-the-worlds-least-accessible-webpage/",
+      "checked": "2026-10-16",
+      "quote": "If we also count manual inspection prompts, then Asqatasun was the most effective – it found 41% of the barriers.",
+      "docs": [
+        "a11y-audit-runner/SKILL.md",
+        "a11y-audit-runner/references/automation-coverage.md",
+        "client-presentation-builder/references/evidence.md",
+        "client-presentation-builder/scripts/build_presentation.py"
       ]
     },
     {
@@ -82,15 +102,15 @@
       ]
     },
     {
-      "figure": "2,000+ audits",
+      "figure": "13,000",
       "also": [
-        "13,000",
+        "2,000+ audits",
         "300,000 issues"
       ],
       "claim": "the size of Deque's data set",
       "source": "Deque (2021-03-10)",
       "url": "https://www.deque.com/blog/automated-testing-study-identifies-57-percent-of-digital-accessibility-issues/",
-      "checked": "2026-09-25",
+      "checked": "2026-10-16",
       "quote": "over 2,000 audits in various industries, spanning over 13,000 pages (all first-time page assessments) covering nearly 300,000 issues",
       "docs": [
         "a11y-audit-runner/SKILL.md",
@@ -365,9 +385,6 @@
     },
     {
       "figure": "102 KB",
-      "also": [
-        "102kb"
-      ],
       "claim": "the size of an email's HTML part past which Gmail clips it behind \"View entire message\", as the ESPs document it; Google publishes no figure, and the byte-exact 102,400 is from measurement, which the docs say",
       "source": "Mailmodo, Why are my emails getting clipped in Gmail? (last updated 2025-11-04); DailyStory, HTML email clipping limits across different mailbox providers (updated 2026-03-17) says the same",
       "url": "https://support.mailmodo.com/articles/339967-why-are-my-emails-getting-clipped-in-gmail",
@@ -383,7 +400,6 @@
     {
       "figure": "16,384 bytes",
       "also": [
-        "16384 bytes",
         "16,384-byte",
         "16 kB"
       ],

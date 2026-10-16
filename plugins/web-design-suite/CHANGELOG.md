@@ -341,6 +341,26 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   - the plugin README said three browser scripts need Node; six `.mjs` scripts do.
 
   `test_release_build.TheAuditsReleaseMediums`.
+- **Two kinds of test could pass or fail for the wrong reason** (the audit's T1 and T2):
+  - the evidence register kept an entry alive while its doc quoted any of the entry's
+    numbers as a substring: "19 categories" on a bare "143", "37–41%" on "41%", "2,000+
+    audits" on "13,000". A doc must now quote the figure itself, on its own, or a
+    spelling of it that carries the same numbers ("16,384-byte"), and every companion
+    value must be quoted on its own in one of the entry's docs. The register is
+    regrouped around what each doc quotes: "143" (with its 19 categories), the GDS
+    range, Tenon's 37% and Asqatasun's 41% apart, and Deque's 13,000 pages, each re-read
+    at its source on 2026-10-16; two spellings no doc used are gone;
+  - three tests held a shared runner to an absolute time: the a11y audit's 4,000 rows
+    under 20 seconds, and TBT under 50 ms for a page whose only long task TBT should
+    leave out, which a slow runner's own loading could break. The ratio bound stays.
+    `measure_vitals.mjs`' JSON now lists each run's long tasks (`perRun[].tasks`: the
+    start on the page's clock, the duration, `inTbt`, and `leftOut` as `interaction`,
+    `before-fcp` or `after-tti`), and the TBT tests find the fixture's own task there
+    and read it against TTI (Codex on #154: a total less TBT could not tell it from
+    a slow runner's blocking before FCP). Both still fail when the handler or the
+    late task is counted.
+
+  `test_evidence.EvidenceRegister`, `test_browser_runtime.VitalsMeasures`.
 - **The schema reader, the scaffold, the email build and the deck misread nine things**
   (the audit's E1 to E8 and E10):
   - a naive `timestamp` named `created_at` or `updated_at` (every Prisma `DateTime
