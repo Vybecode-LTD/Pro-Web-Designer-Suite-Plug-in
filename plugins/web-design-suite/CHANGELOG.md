@@ -469,6 +469,28 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   The spec has the layer examples and a `tailwind_arbitrary` section, which both gates
   run (`test_rules_spec`, `test_real_tools`); `test_check_roles` and `test_tw_probe` hold
   the rest.
+- **web-design-studio's tools missed four more things, and two config comments were
+  wrong** (the audit's W8 to W13):
+  - `check_roles` skipped a rule holding a nested block (native nesting): the starter
+    with one `@media` inside `:root` said "--fg-default is not declared" (exit 2). It
+    reads the rule's own declarations, and still not the condition's;
+  - the audit flagged `content: "!important"`, words in a string, as the flag, and
+    missed the flag written `! important`. It reads the flag as stylelint does;
+  - `tw_probe` stopped on `@import "./theme"` (ENOENT, exit 2). It reads `theme.css`,
+    as Tailwind and the census do;
+  - the pre-commit hook's role stage took `tokens.css` and `x-tokens.css` only, so
+    `design.tokens.css` went unchecked. It takes each one-file name design-rules.json's
+    `token_files` give a token set, on a file that declares a Tier-2 role; a file of
+    primitives alone is passed over, since check_roles needs the roles, and so is a
+    modular `tokens/` folder, whose roles read a sibling's primitives (Codex on #156);
+  - the ESLint config said the fixtures run ESLint 10.4.0 (they run 10.11.0), and the
+    stylelint config's token-file override restated `custom-property-pattern`
+    unchanged, under a comment that called it a relaxation.
+
+  W14's `noqa` directives stay: under ruff's default rules they suppress real E402
+  and E731 findings, and only a narrower rule set reads them as unused.
+  `test_check_roles`, `test_audit_design`, `test_tw_probe`, `test_precommit_hook`,
+  `test_recipes.DependencyFacts`.
 - **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
   became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
   too. It is a width and a height, so it is a size: reported when no `--width-*` role

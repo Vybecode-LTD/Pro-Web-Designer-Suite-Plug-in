@@ -12,7 +12,7 @@
 #   4. python -m scripts.a11y_static    (the accessibility floor — runs only
 #      when a11y-audit-runner's a11y_static.py is vendored into scripts/)
 #   5. python -m scripts.check_roles    (role-pair contrast per theme — runs
-#      only when a tokens.css is staged and check_roles.py is vendored into
+#      only when a token file that declares roles is staged and check_roles.py is vendored into
 #      scripts/, together with generate_color_ramp.py, which it imports)
 #
 #   Configs are found where handoff-conventions.md puts them, at the repo
@@ -430,8 +430,20 @@ fi
 # 5. Role-pair contrast — check_roles resolves the Tier-2 roles in every theme
 #    and checks the pairs components put together: text 4.5:1, control
 #    borders and the focus ring 3:1. Opt-in by presence, like stage 4, and
-#    only when a tokens file is part of this commit.
-grep -E '(^|/)([^/]*-)?tokens\.css$' "$STAGED" > "$TMP_DIR/tokens" 2>/dev/null || true
+#    only when a tokens file is part of this commit: a one-file token set by
+#    the names design-rules.json's token_files give it (tokens.css,
+#    x-tokens.css, x.tokens.css), on a file that declares a Tier-2 role, since
+#    check_roles needs the roles (the audit's W13). A file of primitives alone
+#    is passed over, and so is a modular tokens/ folder: check_roles reads one
+#    file, so roles.css beside its colour.css would read as undeclared (Codex
+#    on #156).
+grep -E '(^|/)([^/]*[-.])?tokens\.css$' "$STAGED" > "$TMP_DIR/tokens.named" 2>/dev/null || true
+: > "$TMP_DIR/tokens"
+while IFS= read -r f; do
+  if [ -n "$f" ] && grep -Eq '(^|[{;[:space:]])--(fg|bg|border)-[a-z0-9-]+[[:space:]]*:' "$AUDIT_ROOT/$f" 2>/dev/null; then
+    printf '%s\n' "$f" >> "$TMP_DIR/tokens"
+  fi
+done < "$TMP_DIR/tokens.named"
 if [ -n "$PYTHON" ] && command -v "$PYTHON" >/dev/null 2>&1 && [ -f "$ROLES_FILE" ] \
     && [ -s "$TMP_DIR/tokens" ]; then
   while IFS= read -r f; do

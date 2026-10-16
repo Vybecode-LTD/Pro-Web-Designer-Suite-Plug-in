@@ -102,6 +102,17 @@ class TheProbe(ProbeProject):
         self.assertIn({"variable": "--container-card", "class": "@card:block", "generates": True}, report["roles"])
         self.assertEqual([{"class": "@card:p-card", "generates": True}], report["probe"])
 
+    def test_an_import_without_its_extension_is_read(self):
+        """W10 (audit, 2026-10-14): `@import "./theme"` stopped the probe
+        (ENOENT, exit 2); Tailwind compiles it as theme.css."""
+        index = self.tmp / "src/styles/index.css"
+        text = index.read_bytes().decode("utf-8")
+        self.assertIn('@import "./theme.css";', text)
+        self.write("src/styles/index.css", text.replace('@import "./theme.css";', '@import "./theme";'))
+        proc = self.probe()
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertGreater(len(self.report()["roles"]), 50)
+
     def test_an_inline_source_does_not_hide_its_classes(self):
         """`@source inline()` put its classes in the first build, so asking
         for them added nothing: a role read as missing, and an inline `p-4`
