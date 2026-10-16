@@ -881,9 +881,10 @@ class A11yStaticScaleAndScope(TempDirTest):
 
     def test_a_large_page_is_audited_in_roughly_linear_time(self):
         small, large = self.timed(self.page(1000)), self.timed(self.page(4000))
-        # Four times the rows: linear work takes ~4x, quadratic ~16x.
+        # Four times the rows: linear work takes ~4x, quadratic ~16x. Only
+        # the ratio is held: a shared runner's speed is not (T2, audit
+        # 2026-10-14, dropped an absolute 20 seconds).
         self.assertLess(large / small, 8, f"1,000 rows {small:.1f}s, 4,000 rows {large:.1f}s")
-        self.assertLess(large, 20)
 
     def test_files_named_explicitly_that_are_not_markup_are_skipped(self):
         self.write("README.md", "Use <img src='x.png'> and <button></button>\n")
