@@ -244,6 +244,38 @@ class TheGates(ServerTest):
                 payload = self.result("audit_design", {"paths": paths}, **here)
                 self.assertIn("#123456", json.dumps(payload["report"]))
 
+    def link(self, target, link):
+        """A file link on POSIX; a junction to the target's folder on Windows,
+        where a file link needs a right a test cannot count on."""
+        if os.name == "nt":
+            import _winapi
+            _winapi.CreateJunction(str(target if target.is_dir() else target.parent), str(link))
+            self.addCleanup(os.rmdir, link)              # the junction, never its target
+        else:
+            link.symlink_to(target)
+            self.addCleanup(link.unlink)
+
+    def test_a_link_under_a_folder_is_refused(self):
+        """Codex on #155: a folder passed the check, and the scripts' walk
+        then opened a file link under it (on Windows, entered a junction)
+        that led out of the project. A link that stays inside still runs."""
+        project = self.tmp / "project"
+        self.write("project/.git/HEAD", "x\n")
+        self.write("project/src/app.css", ".x { color: #123456; }\n")
+        self.write("project/shared/base.css", ".y { color: #234567; }\n")
+        secret = self.write("secret/leak.css", ".leak { color: #abcdef; }\n")
+        here = {"CLAUDE_PROJECT_DIR": str(project)}
+        self.link(project / "shared" / "base.css", project / "src" / "inside")
+        payload = self.result("audit_design", {"paths": ["src"]}, **here)
+        self.assertIn("#123456", json.dumps(payload["report"]))
+        self.link(secret, project / "src" / "leak")
+        for tool, arguments in (("audit_design", {"paths": ["src"]}), ("audit_design", {}),
+                                ("a11y_static", {"paths": ["."]}), ("perf_audit", {"src": ["src"]})):
+            with self.subTest(tool=tool, arguments=arguments):
+                reply = self.call(tool, arguments, **here)
+                self.assertEqual(-32602, reply.get("error", {}).get("code"), reply)
+                self.assertIn("holds a link that leads out of the project", reply["error"]["message"])
+
     def test_a_long_report_is_cut_to_fit(self):
         """Claude Code warns past 10,000 tokens of tool output and stops at
         25,000, so a report keeps the head of its longest list within 60,000

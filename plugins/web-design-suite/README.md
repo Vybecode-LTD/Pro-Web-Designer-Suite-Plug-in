@@ -177,7 +177,8 @@ return the script's JSON, its exit code and a verdict: `audit_design`, `a11y_sta
 (`mcp__plugin_web-design-suite_gates__audit_design`), and so can a permission rule or
 a skill's `allowed-tools`. A report too long for Claude's context keeps the head of its
 longest lists, nested ones too, and says how many it left out. A path Claude passes
-must be inside the project, through any link; the token files `.design-suite.json`
+must be inside the project, through any link, and so must every link under a folder
+it passes (`node_modules` and `.git` aside); the token files `.design-suite.json`
 names are read wherever they are.
 
 The reports go in `design-reports/`, which a project usually leaves out of git.

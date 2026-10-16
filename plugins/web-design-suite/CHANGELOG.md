@@ -302,9 +302,11 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
     0, "0.5": 0}` became `#ff0080`). It is refused, as Node refuses it;
   - the MCP server ran a gate on any path Claude passed, `..`, an absolute path or a
     link out of the project included, and a finding's snippet returned the file's
-    lines. A path argument must now be inside the project, compared by real path (an
-    error `-32602` names it); the files `.design-suite.json` names are still read
-    wherever they are.
+    lines. A path argument must now be inside the project, compared by real path
+    walked a part at a time (a link is followed before a later `..`), and so must
+    every link under a folder the gate will walk, the project included when no path is
+    given (an error `-32602` names it); the files `.design-suite.json` names are still
+    read wherever they are.
 
   `test_project_config.TheNodeReaderAgrees`, `test_mcp.TheGates`.
 - **The accessibility gates misread four things, and the coverage table claimed more than

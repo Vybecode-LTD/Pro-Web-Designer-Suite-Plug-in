@@ -249,8 +249,43 @@ function inProject(value) {
   return !(rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel));
 }
 
+// A link under a folder a gate is given that leads out of the project, or
+// null: the scripts' os.walk opens a file link, and on Windows walks into a
+// junction, so a folder's links are checked as its name is (Codex on #155).
+// node_modules and .git are passed over, as every walker passes them over.
+function linkOut(dir) {
+  const stack = [dir];
+  while (stack.length) {
+    const at = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(at, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      const full = path.join(at, e.name);
+      if (e.isSymbolicLink()) {
+        if (!inProject(full)) return full;
+      } else if (e.isDirectory() && e.name !== 'node_modules' && e.name !== '.git') {
+        stack.push(full);
+      }
+    }
+  }
+  return null;
+}
+
+const isDir = (p) => {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+};
+
 // The arguments a tool takes, checked against its schema: only its names, of
-// their types, a path never empty and never outside the project.
+// their types, a path never empty and never outside the project, nor a
+// folder holding a link that leads out.
 function checked(name, args) {
   const tool = TOOLS[name];
   const given = args ?? {};
@@ -269,6 +304,15 @@ function checked(name, args) {
     if (!(key in given)) throw new RpcError(-32602, `${name}: '${key}' is required`);
   }
   if (name === 'diff_system' && given.new && !given.old) throw new RpcError(-32602, 'diff_system: \'new\' needs \'old\'');
+  // Each folder the gate will walk: those named, or the project when `paths`
+  // is left out.
+  const folders = Object.entries(given).filter(([key]) => tool.properties[key].type !== 'boolean')
+    .flatMap(([key, value]) => [value].flat().map((v) => [key, path.resolve(project(), v)]));
+  if ('paths' in tool.properties && !(given.paths ?? []).length) folders.push(['paths', project()]);
+  for (const [key, dir] of folders.filter(([, d]) => isDir(d))) {
+    const link = linkOut(dir);
+    if (link) throw new RpcError(-32602, `${name}: '${key}' holds a link that leads out of the project: ${link}`);
+  }
   return given;
 }
 
