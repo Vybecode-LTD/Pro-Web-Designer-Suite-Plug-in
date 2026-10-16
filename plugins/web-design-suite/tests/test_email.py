@@ -312,10 +312,10 @@ class LintTheSource(EmailTest):
                 self.assertIn("a hand-written colour", found[0][1])
 
     def test_a_literal_names_the_role_that_holds_it_or_says_it_is_off_the_scale(self):
-        found = self.source_findings("padding-left: 24px; font-size: 26px;")
+        found = self.source_findings("padding-left: 24px; font-size: 27px;")
         messages = {f[1]: f[2] for f in found}
         self.assertIn("--gutter-page", messages["padding-left: 24px is a literal"])
-        self.assertIn("font-size: 26px is off the scale", messages)
+        self.assertIn("font-size: 27px is off the scale", messages)      # 26px is --email-h1-size-mobile
         self.assertNotIn("--type-body-line", " ".join(messages.values()),
                          "a line height does not hold a font size")
 
