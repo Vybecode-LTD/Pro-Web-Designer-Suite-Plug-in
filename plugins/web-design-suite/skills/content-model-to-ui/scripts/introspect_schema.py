@@ -619,6 +619,9 @@ def bare_table_name(qualified: str) -> str:
     return parts[-1] if parts else qualified.strip()
 
 
+LENGTH_TYPES = {"varchar", "character varying", "char", "character", "bpchar", "bit", "bit varying", "varbit"}
+
+
 def normalise_type(raw: str) -> tuple[str, int | None, int | None, int | None, bool]:
     """-> (normalised type, max_length, precision, scale, is_array)"""
     t = raw.strip().lower().replace('"', "")
@@ -640,7 +643,9 @@ def normalise_type(raw: str) -> tuple[str, int | None, int | None, int | None, b
         if base in ("numeric", "decimal"):
             precision = int(nums[0]) if nums else None
             scale = int(nums[1]) if len(nums) > 1 else None
-        elif nums:
+        elif nums and base in LENGTH_TYPES:
+            # Only text and bits have a length: `geography(Point, 4326)`'s
+            # number is an SRID, `timestamp(6)`'s a precision (Codex on #159).
             length = int(nums[0])
         t = f"{base} {tail}".strip()
     t = re.sub(r"\s+", " ", t)

@@ -563,5 +563,8 @@ class TheAuditsContentLows(SchemaSources):
         for name in ("place.area", "place.spot", "place.tags"):
             with self.subTest(column=name):
                 want, got = facts(ddl[name]), facts(prisma[name])
-                for key in ("type", "nullable", "control", "editable"):
+                for key in ("type", "nullable", "control", "editable", "max_length", "rules"):
                     self.assertEqual(want[key], got[key], key)
+        # An SRID is no length, in either reader (Codex on #159).
+        self.assertIsNone(ddl["place.spot"]["max_length"])
+        self.assertNotIn("maxLength", [r for r, _ in facts(prisma["place.spot"])["rules"]])
