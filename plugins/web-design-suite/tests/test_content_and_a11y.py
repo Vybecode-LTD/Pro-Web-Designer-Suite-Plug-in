@@ -1103,7 +1103,7 @@ class TheAuditsRuntimeMediums(TempDirTest):
     def test_the_coverage_table_says_what_this_suite_runs(self):
         """G7: automation-coverage.md §3 read as this suite's coverage, but the
         mechanism of 1.3.4 (a "Full" row), 2.4.11, 3.3.8 and nine more is in
-        neither gate, and SKILL.md counted 7 decided outright. A Full row names
+        neither gate, though SKILL.md read as if it caught all 7. A Full row names
         a check one of the two gates runs, or says it is not in this suite; a
         marked row's criterion is in neither gate; the count is the table's."""
         skill = SKILLS / "a11y-audit-runner"
@@ -1123,7 +1123,7 @@ class TheAuditsRuntimeMediums(TempDirTest):
                 elif "Full" in auto:
                     self.assertTrue(in_a_gate, "a Full row this suite does not run")
                     decided += 1
-        self.assertIn(f"**{decided} of the 55 criteria outright", (skill / "SKILL.md").read_bytes().decode("utf-8"))
+        self.assertIn(f"(this suite runs {decided} of them)", (skill / "SKILL.md").read_bytes().decode("utf-8"))
 
 
 if __name__ == "__main__":

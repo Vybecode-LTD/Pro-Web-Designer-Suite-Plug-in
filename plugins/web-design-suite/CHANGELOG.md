@@ -307,8 +307,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
     the test asserts when it clicked;
   - automation-coverage.md §3 read as this suite's coverage. It now says the table is
     what a tool can decide, and marks the eleven rows whose mechanism neither gate
-    runs (1.3.4, one of the seven Full rows, among them). SKILL.md says six of the 55
-    outright, not seven.
+    runs (1.3.4, one of the seven Full rows, among them). SKILL.md says this suite runs
+    six of the seven a tool decides outright.
 
   `test_content_and_a11y.TheAuditsRuntimeMediums`, `test_browser_runtime.TheForcedColoursSurvey`.
 - **Versioning and the docs site misread five things** (the audit's V4, V5, V6 and V9,
