@@ -9,6 +9,7 @@ JSON — the error message even recommended the redirect that caused it.
 """
 from __future__ import annotations
 
+import ast
 import json
 import re
 import unittest
@@ -105,7 +106,26 @@ class JsonFromPowerShell(TempDirTest):
                 self.assertEqual(proc.returncode, 42, output(proc))
 
 
-FRAGILE_PY = re.compile(r"json\.loads?\(.*read_text\(|json\.load\(\s*open\(")
+def fragile_python_reads(src: str) -> list[int]:
+    """The line of each `json.load(s)` whose argument reads text: a
+    `read_text()`, or an `open()` not in binary mode. Parsed, so a call split
+    over lines is found too (CodeRabbit on #160)."""
+    def reads_text(call):
+        if isinstance(call.func, ast.Attribute) and call.func.attr == "read_text":
+            return True
+        if isinstance(call.func, ast.Name) and call.func.id == "open":
+            mode = call.args[1] if len(call.args) > 1 else next(
+                (k.value for k in call.keywords if k.arg == "mode"), None)
+            return not (isinstance(mode, ast.Constant) and "b" in str(mode.value))
+        return False
+
+    out = []
+    for node in ast.walk(ast.parse(src)):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in ("load", "loads")
+                and isinstance(node.func.value, ast.Name) and node.func.value.id == "json"
+                and any(isinstance(n, ast.Call) and reads_text(n) for arg in node.args for n in ast.walk(arg))):
+            out.append(node.lineno)
+    return out
 # `fs.readFileSync`, a named import's `readFileSync`, and the promise forms (T3).
 FRAGILE_NODE = re.compile(r"JSON\.parse\(\s*(?:await\s+)?(?:fs\.(?:promises\.)?)?readFile(?:Sync)?\(")
 
@@ -124,10 +144,15 @@ class NoFragileJsonReads(unittest.TestCase):
     def test_the_patterns_find_each_fragile_read(self):
         """T3 (audit, 2026-10-14): the scan had no positive control, and a
         named import's `JSON.parse(readFileSync(` passed it."""
-        for line in ('data = json.loads(path.read_text(encoding="utf-8"))', "data = json.load(open(p))"):
-            with self.subTest(line=line):
-                self.assertRegex(line, FRAGILE_PY)
-        self.assertNotRegex("data = json.loads(path.read_bytes())", FRAGILE_PY)
+        for src in ('data = json.loads(path.read_text(encoding="utf-8"))', "data = json.load(open(p))",
+                    'data = json.loads(\n    path.read_text(encoding="utf-8"))\n',
+                    "data = json.loads(open(p, encoding='utf-8').read())"):
+            with self.subTest(src=src):
+                self.assertEqual([1], fragile_python_reads(src))
+        for src in ("data = json.loads(path.read_bytes())", "data = json.loads(open(p, 'rb').read())",
+                    "data = json.load(open(p, mode='rb'))"):
+            with self.subTest(src=src):
+                self.assertEqual([], fragile_python_reads(src))
         for line in ("JSON.parse(fs.readFileSync(p, 'utf8'))", "JSON.parse(readFileSync(p, 'utf8'))",
                      "JSON.parse(await fs.promises.readFile(p, 'utf8'))", "JSON.parse(await readFile(p, 'utf8'))"):
             with self.subTest(line=line):
@@ -138,10 +163,9 @@ class NoFragileJsonReads(unittest.TestCase):
         scripts = readers(".py")
         self.assertGreater(len(scripts), 40)
         for script in scripts:
-            for n, line in enumerate(script.read_text(encoding="utf-8").splitlines(), 1):
-                with self.subTest(file=script.name, line=n):
-                    self.assertNotRegex(line, FRAGILE_PY,
-                                        "parse JSON from read_bytes(); json detects the encoding")
+            with self.subTest(file=script.name):
+                self.assertEqual([], fragile_python_reads(script.read_bytes().decode("utf-8")),
+                                 "parse JSON from read_bytes(); json detects the encoding")
 
     def test_node_json_is_read_through_the_bom_aware_helper(self):
         scripts = readers(".mjs")

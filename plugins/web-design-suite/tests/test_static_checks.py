@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import re
 import unittest
 
 from wds_support import PLUGIN, TOOLING
 
 FOLDERS = ("skills", "workflow-commands", "shared", "hooks", "tools", "tests")
+LINE_BREAK = re.compile(r"\r\n|\r|\n")
 
 
 def sources() -> list[pathlib.Path]:
@@ -72,14 +74,22 @@ def unread_locals(tree: ast.Module) -> list[str]:
 
 def raise_without_from(tree: ast.Module) -> list[str]:
     """B904: `raise X` in an `except` with no `from`; re-raising the caught
-    exception, or a bare `raise`, is fine."""
+    exception, or a bare `raise`, is fine. Each raise is judged by the handler
+    it is in, once, and a function or class a handler defines is not in it
+    (CodeRabbit on #160)."""
     out = []
-    for handler in ast.walk(tree):
-        if isinstance(handler, ast.ExceptHandler):
-            for node in ast.walk(ast.Module(body=handler.body, type_ignores=[])):
-                if (isinstance(node, ast.Raise) and node.exc is not None and node.cause is None
-                        and not (isinstance(node.exc, ast.Name) and node.exc.id == handler.name)):
-                    out.append(str(node.lineno))
+
+    def visit(node, handler):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
+                visit(child, None)
+                continue
+            if (handler is not None and isinstance(child, ast.Raise) and child.exc is not None
+                    and child.cause is None
+                    and not (isinstance(child.exc, ast.Name) and child.exc.id == handler.name)):
+                out.append(str(child.lineno))
+            visit(child, child if isinstance(child, ast.ExceptHandler) else handler)
+    visit(tree, None)
     return out
 
 
@@ -116,6 +126,12 @@ class TheChecksFindTheirCase(unittest.TestCase):
         self.assertEqual([], self.found("B904", "try:\n    pass\nexcept ValueError as exc:\n    raise\n"
                                                 "try:\n    pass\nexcept ValueError as exc:\n    raise exc\n"
                                                 "try:\n    pass\nexcept ValueError:\n    raise TypeError() from None\n"))
+        nested = ("try:\n    pass\nexcept ValueError as outer:\n    try:\n        pass\n"
+                  "    except KeyError as inner:\n        raise inner\n    def later():\n        raise TypeError()\n"
+                  "    try:\n        pass\n    except KeyError:\n        raise TypeError(outer)\n")
+        self.assertEqual(["13"], self.found("B904", nested))      # once, by its own handler (CodeRabbit on #160)
+        in_def = "def g():\n    try:\n        pass\n    except OSError:\n        raise SystemExit(2)\n"
+        self.assertEqual(["5"], self.found("B904", in_def))       # a handler inside a function still counts
         self.assertEqual(["1"], self.found("SIM115", "data = open('a').read()\nwith open('b') as fh:\n    fh.read()\n"))
 
 
@@ -168,7 +184,9 @@ class ThePluginsPython(unittest.TestCase):
         self.assertGreater(len(files), 100)
         for path in files:
             raw = path.read_bytes()
-            lines = raw.decode("utf-8").splitlines()
+            # The parser's own line breaks, not splitlines()' (a form feed is
+            # none to it), so a finding's line is the line (CodeRabbit on #160).
+            lines = LINE_BREAK.split(raw.decode("utf-8"))
             tree = ast.parse(raw)
             for code, check in CHECKS.items():
                 # `# noqa: F401` on the line waives it, as for ruff (an availability probe).

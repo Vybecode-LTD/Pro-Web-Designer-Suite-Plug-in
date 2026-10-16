@@ -223,15 +223,17 @@ class EvidenceRegister(unittest.TestCase):
         against web.dev" and the README "Claude Code 2.1.269 or later" with no
         entry, and FIGURE reads no duration. Each is registered with its quote,
         so the entry tests above hold every doc that quotes it."""
-        wanted = {"2.5 s": "4 s", "200 ms": "500 ms", "≤ 0.1": "> 0.25", "75th percentile": None}
-        for figure, poor in wanted.items():
+        # Each from the page its url names (CodeRabbit on #160): the good
+        # thresholds in the Web Vitals article's words, the poor in its table's.
+        vitals, table = "https://web.dev/articles/vitals", "https://web.dev/articles/defining-core-web-vitals-thresholds"
+        wanted = {"2.5 s": vitals, "200 ms": vitals, "≤ 0.1": vitals, "75th percentile": vitals,
+                  "4 s": table, "500 ms": table, "> 0.25": table}
+        for figure, url in wanted.items():
             with self.subTest(figure=figure):
                 entry = next((e for e in REGISTER["entries"] if e["figure"] == figure), None)
                 self.assertIsNotNone(entry)
                 self.assertIn("perf-budget-gate/references/budgets.md", entry["docs"])
-                self.assertTrue(entry["url"].startswith("https://web.dev/"))
-                if poor:
-                    self.assertIn(poor, entry["also"])
+                self.assertEqual(url, entry["url"])
         floor = next((e for e in REGISTER["entries"] if e["figure"] == "2.1.269"), None)
         self.assertIsNotNone(floor)
         self.assertEqual(["../README.md"], floor["docs"])
