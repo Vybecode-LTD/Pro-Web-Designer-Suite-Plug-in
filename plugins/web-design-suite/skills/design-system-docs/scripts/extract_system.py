@@ -12,7 +12,8 @@ the system claims and what the source contains.
 What it reads
 -------------
   token files      tokens.css / theme.css / any file passed with --tokens
-                   -> three tiers, theme re-points, references, resolved values
+                   -> three tiers, theme re-points, references, resolved values;
+                   a contract.json or DTCG file gives its default values only
   component CSS    the five-part component shape (socket block, structure,
                    variants, states, parts) -> the Tier-3 public API
   component TS/TSX props, defaults and the JSDoc that carries the WHY
@@ -56,7 +57,7 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Set, Tuple
 
 SCHEMA = "design-system-docs/system/1"
 
@@ -64,10 +65,12 @@ SCHEMA = "design-system-docs/system/1"
 # suite's scripts through one module, shared/project_config.py, of which this
 # is a copy.
 try:                                              # python -m scripts.extract_system
-    from .project_config import read_text, CONTRACT_SCHEMA, ConfigError, is_contract, refuse_overwrite, token_sources
+    from .project_config import (read_text, CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract, is_dtcg, refuse_overwrite,
+                                 token_sources, read_tokens as read_token_files)
 except ImportError:                               # python scripts/extract_system.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import read_text, CONTRACT_SCHEMA, ConfigError, is_contract, refuse_overwrite, token_sources  # type: ignore[no-redef]
+    from project_config import (read_text, CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract,  # type: ignore[no-redef]
+                                is_dtcg, refuse_overwrite, token_sources, read_tokens as read_token_files)
 
 # ===========================================================================
 # 1. COLOR MATH
@@ -1487,6 +1490,29 @@ CSS_EXT = {".css", ".scss", ".pcss"}
 SKIP_DIRS = {"node_modules", ".git", "dist", "build", "__pycache__", ".next", "out"}
 
 
+def json_token_css(path: Path) -> Tuple[str, Set[str]]:
+    """A contract.json or a DTCG file as the stylesheet it stands for: one
+    `:root` block of its default values, read by project_config's
+    read_tokens as the gates read it, with each token a DTCG file records as
+    left out (dtcg.recorded). A resolver gives its default contexts only.
+    Read as CSS, a DTCG file gave no token and exit 0 (found 2026-10-15).
+    With it, the names read_tokens files as roles: a contract's literal
+    role (`--surface: #ffffff`) is Tier 2 by its section, not by its value
+    (Codex on #149)."""
+    tokens = read_token_files([path])
+    for problem in tokens.problems:                    # what the file could not give (S2)
+        print(f"extract_system: warning: {problem}", file=sys.stderr)
+    values = tokens.values()
+    try:
+        data = json.loads(path.read_bytes())
+    except ValueError:
+        data = None                                    # read_tokens has read it, or said why
+    if is_dtcg(data):
+        values.update(_dtcg(path).recorded(data, path.parent)[0])
+    css = ":root {\n" + "".join(f"  {name}: {value};\n" for name, value in values.items()) + "}\n"
+    return css, set(tokens.roles)
+
+
 def iter_paths(patterns: Sequence[str]) -> Iterator[Path]:
     for pat in patterns:
         p = Path(pat)
@@ -1521,6 +1547,7 @@ class Extractor:
         self.resolvers: Dict[str, Resolver] = {}
         self.density_resolvers: Dict[str, Resolver] = {}
         self.envs: Dict[str, Dict[str, str]] = {}
+        self.json_roles: Dict[str, Set[str]] = {}       # a JSON token file's roles, by its path
 
     def rel(self, p: str | Path) -> str:
         try:
@@ -1531,7 +1558,14 @@ class Extractor:
     # -- tokens -----------------------------------------------------------
     def read_tokens(self, files: Sequence[Path]) -> None:
         for path in files:
-            cf = CssFile(self.rel(path), read_text(path))
+            if is_contract(path):
+                css, roles = json_token_css(path)
+                cf = CssFile(self.rel(path), css)
+                self.json_roles[cf.path] = roles
+                for d in cf.decls:
+                    d.line = 0                      # a line of the stand-in, not of the file
+            else:
+                cf = CssFile(self.rel(path), read_text(path))
             self.token_files.append(cf)
         base_env: Dict[str, str] = {}
         overrides: Dict[str, List[Dict[str, Any]]] = {}
@@ -1546,6 +1580,8 @@ class Extractor:
                     if d.prop not in self.tokens:
                         refs = sorted(set(VAR_REF.findall(d.value)))
                         tier, why = classify_tier(d.prop, d.value, refs)
+                        if d.prop in self.json_roles.get(cf.path, ()):
+                            tier, why = 2, "a role in the token file"
                         self.tokens[d.prop] = Token(
                             name=d.prop, tier=tier, tier_why=why, group=group_of(d.prop),
                             file=cf.path, line=d.line, raw=d.value, note=d.note,
@@ -1556,6 +1592,11 @@ class Extractor:
                                             "selector": " ".join(d.selectors),
                                             "value": d.value, "file": cf.path, "line": d.line})
                         t.raw = d.value
+                        if cf.path in self.json_roles:      # a later token file's section decides, as
+                            refs = sorted(set(VAR_REF.findall(d.value)))     # read_tokens files it
+                            t.tier, t.tier_why = ((2, "a role in the token file")    # (Codex on #149)
+                                                  if d.prop in self.json_roles[cf.path]
+                                                  else classify_tier(d.prop, d.value, refs))
                 else:
                     overrides.setdefault(d.prop, []).append({
                         "context": kind, "label": label,
@@ -2100,7 +2141,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         except ConfigError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
-        token_files = [p for p in listed if not is_contract(p)]
+        token_files = list(listed)
         if token_files:
             print(f"tokens from {config_path}: {', '.join(str(p) for p in token_files)}",
                   file=sys.stderr)
@@ -2118,7 +2159,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         ex.read_tokens(token_files)
         ex.compute_contrast()
         ex.read_components(css_files, prop_files)
-    except OSError as exc:
+    except (OSError, ConfigError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     ex.find_gaps(Path(args.prose) if args.prose else None)

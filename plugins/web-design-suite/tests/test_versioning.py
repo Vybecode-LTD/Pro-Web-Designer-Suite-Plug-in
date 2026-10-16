@@ -21,9 +21,11 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import subprocess
+import sys
 import unittest
 
-from wds_support import SKILLS, TempDirTest, output, run_py
+from wds_support import SKILLS, TempDirTest, env, output, run_py
 
 FIXTURES = pathlib.Path(__file__).resolve().parent / "fixtures"
 
@@ -494,9 +496,9 @@ class TheWorkedRelease(TempDirTest):
 
 
 class TheAuditsVersioningMediums(TempDirTest):
-    """P54 part 4, the audit of 2026-10-14's §3.4: V4, V5, V6, V9, and the
-    8-digit hex the 2026-10-15 session found. V2, V3, V10 and
-    `extract_system --tokens` on a JSON file are the next part's."""
+    """P54 parts 4 and 5, the audit of 2026-10-14's §3.4: V2 to V6, V9 and
+    V10, and what the 2026-10-15 session found: the 8-digit hex and
+    `extract_system --tokens` on a JSON file."""
 
     def deprecate(self, *args):
         return run_py("design-system-versioning", "deprecate", "--ledger", self.tmp / "proj" / "deprecations.json",
@@ -576,6 +578,177 @@ class TheAuditsVersioningMediums(TempDirTest):
                               "--format", "json", cwd=self.tmp)
                 notes = json.loads(proc.stdout)["notes"]
                 self.assertTrue(any("--fg-default on --bg-canvas [light]: translucent" in n for n in notes), notes)
+
+    EXT = "io.github.vybecode-ltd.web-design-suite"
+    REM = {"$type": "dimension", "$value": {"value": 1, "unit": "rem"}}
+
+    def dtcg(self, rel, tokens, record=None, marks=None):
+        """A DTCG file that writes `tokens` and records `record` as left out."""
+        doc = dict(tokens)
+        own = {"notWritten": record or {}}
+        if marks:
+            own["deprecated"] = marks
+        doc["$extensions"] = {self.EXT: own}
+        self.write(rel, json.dumps(doc))
+
+    def test_a_later_files_record_wins(self):
+        """V2: with several DTCG files, a later file's record of a token lost to
+        an earlier file's written value, a false MAJOR `tier1-value-changed`.
+        Read in order, the last file wins either way."""
+        hero = "clamp(2rem, 1rem + 4vw, 4rem)"
+        self.write("old.css", f":root {{\n  --space-4: 1rem;\n  --size-hero: {hero};\n}}\n")
+        self.dtcg("a.tokens.json", {"space": {"4": self.REM},
+                                    "size": {"hero": {"$type": "dimension", "$value": {"value": 2, "unit": "rem"}}}})
+        self.dtcg("b.tokens.json", {"space": {"4": self.REM}}, {"--size-hero": hero})
+        for order, changed in ((["a.tokens.json", "b.tokens.json"], []),
+                               (["b.tokens.json", "a.tokens.json"], ["--size-hero"])):     # the control
+            with self.subTest(order=order):
+                self.write(".design-suite.json", json.dumps({"schema": 1, "tokens": order}))
+                proc = run_py("design-system-versioning", "diff_system", "old.css", "--format", "json",
+                              cwd=self.tmp)
+                self.assertIn(proc.returncode, (0, 1), output(proc))
+                self.assertEqual(changed, sorted({c["subject"] for c in json.loads(proc.stdout)["changes"]}))
+
+    def test_import_reads_the_records_marks(self):
+        """V3: `deprecate.py import` read only the written tokens' marks, so a
+        deprecated token the file could not hold never reached the ledger,
+        though diff_system honoured its mark. A later file that records it
+        again without the mark takes it off, as for a written token."""
+        hero = "clamp(2rem, 1rem + 4vw, 4rem)"
+        self.dtcg("proj/v1.tokens.json", {"space": {"4": self.REM}}, {"--hero": hero},
+                  {"--hero": "Use {space.4} instead"})
+        self.dtcg("proj/v2.tokens.json", {"space": {"4": self.REM}}, {"--hero": hero})
+        window = ("--since", "1.5.0", "--removal", "2.0.0")
+        for files, want in ((["v1.tokens.json"], {"--hero": "--space-4"}),
+                            (["v1.tokens.json", "v2.tokens.json"], {})):                    # the control
+            with self.subTest(files=files):
+                ledger = self.tmp / "proj" / "deprecations.json"
+                if ledger.exists():
+                    ledger.unlink()
+                proc = run_py("design-system-versioning", "deprecate", "--ledger", ledger, "import",
+                              *files, *window, cwd=self.tmp / "proj")
+                self.assertEqual(0, proc.returncode, output(proc))
+                got = json.loads(ledger.read_bytes())["deprecations"] if ledger.exists() else []
+                self.assertEqual(want, {e["name"]: e["replacement"] for e in got})
+
+    def test_extract_system_reads_a_json_token_file(self):
+        """Found 2026-10-15: `extract_system --tokens tokens.json` read the JSON
+        as CSS, so a DTCG file gave no token and exit 0, and a config that
+        listed one was skipped. Read through read_tokens, as the gates do, with
+        the file's record of what it left out."""
+        hero = "clamp(2rem, 1rem + 4vw, 4rem)"
+        self.dtcg("tokens.json", {"space": {"4": self.REM},
+                                  "fg": {"default": {"$type": "color", "$value": "{space.4}"}}},
+                  {"--size-hero": hero})
+        self.write("contract.json", json.dumps({"schema": "web-design-suite/contract/1",
+                                                "roles": {"--fg-muted": "var(--space-4)"}}))
+        self.write(".git/HEAD", "x\n")
+        cases = (("--tokens", "tokens.json"), ("--tokens", "contract.json"), ())
+        wants = ({"--space-4": "1rem", "--fg-default": "var(--space-4)", "--size-hero": hero},
+                 {"--fg-muted": "var(--space-4)"},
+                 {"--space-4": "1rem", "--fg-default": "var(--space-4)", "--size-hero": hero})
+        self.write(".design-suite.json", json.dumps({"schema": 1, "tokens": ["tokens.json"]}))
+        for args, want in zip(cases, wants):
+            with self.subTest(args=args):
+                proc = run_py("design-system-docs", "extract_system", *args, "--out", "system.json", cwd=self.tmp)
+                self.assertEqual(0, proc.returncode, output(proc))
+                got = json.loads((self.tmp / "system.json").read_bytes())["tokens"]
+                self.assertEqual(want, {t["name"]: t["raw"] for t in got})
+                self.assertEqual({0}, {t["line"] for t in got})
+
+    def test_a_later_source_that_writes_a_token_ends_its_record(self):
+        """Codex and CodeRabbit on #149: in a resolver, an earlier source's
+        record of a token outlived a later source that writes it, so the
+        record's value replaced the resolved one and its mark came back."""
+        hero = "clamp(2rem, 1rem + 4vw, 4rem)"
+        self.dtcg("pub/a.tokens.json", {"space": {"4": self.REM}}, {"--size-hero": hero},
+                  {"--size-hero": "Use {space.4} instead"})
+        self.dtcg("pub/b.tokens.json", {"size": {"hero": {"$type": "dimension", "$value": {"value": 2, "unit": "rem"}}}})
+        self.write("pub/tokens.resolver.json", json.dumps({"version": "2025.10", "resolutionOrder": [
+            {"type": "set", "name": "base", "sources": [{"$ref": "a.tokens.json"}, {"$ref": "b.tokens.json"}]}]}))
+        resolver = str(self.tmp / "pub" / "tokens.resolver.json")
+        proc = run_py("design-system-docs", "extract_system", "--tokens", resolver, "--out", "system.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        got = {t["name"]: t["raw"] for t in json.loads((self.tmp / "system.json").read_bytes())["tokens"]}
+        self.assertEqual("2rem", got["--size-hero"])
+        self.write("old.css", ":root {\n  --space-4: 1rem;\n  --size-hero: 2rem;\n}\n")
+        proc = run_py("design-system-versioning", "diff_system", "old.css", resolver, "--format", "json", cwd=self.tmp)
+        self.assertEqual([], json.loads(proc.stdout)["changes"], output(proc))
+        proc = run_py("design-system-versioning", "deprecate", "--ledger", self.tmp / "ledger.json", "import",
+                      resolver, "--since", "1.5.0", "--removal", "2.0.0", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertFalse((self.tmp / "ledger.json").exists(), "a mark the later source took off")
+
+    def test_an_inline_source_that_writes_a_token_ends_its_record(self):
+        """Codex on #149, round 2: a source written inline in the resolver, after
+        a file that records the token, never cleared the record."""
+        hero = "clamp(2rem, 1rem + 4vw, 4rem)"
+        self.dtcg("pub/a.tokens.json", {"space": {"4": self.REM}}, {"--size-hero": hero})
+        self.write("pub/tokens.resolver.json", json.dumps({"version": "2025.10", "resolutionOrder": [
+            {"type": "set", "name": "base", "sources": [
+                {"$ref": "a.tokens.json"},
+                {"size": {"hero": {"$type": "dimension", "$value": {"value": 2, "unit": "rem"}}}}]}]}))
+        resolver = str(self.tmp / "pub" / "tokens.resolver.json")
+        proc = run_py("design-system-docs", "extract_system", "--tokens", resolver, "--out", "system.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        got = {t["name"]: t["raw"] for t in json.loads((self.tmp / "system.json").read_bytes())["tokens"]}
+        self.assertEqual("2rem", got["--size-hero"])
+
+    def test_a_later_files_section_decides_the_tier(self):
+        """Codex on #149, round 2: a later contract that files `--surface` as a
+        role left it Tier 1, as the earlier contract's constant was."""
+        schema = "web-design-suite/contract/1"
+        self.write("first.json", json.dumps({"schema": schema, "constants": {"--surface": "#eeeeee"}}))
+        self.write("second.json", json.dumps({"schema": schema, "roles": {"--surface": "#ffffff"}}))
+        for order, tier in ((("first.json", "second.json"), 2), (("second.json", "first.json"), 1)):
+            with self.subTest(order=order):
+                args = [a for name in order for a in ("--tokens", name)]
+                proc = run_py("design-system-docs", "extract_system", *args, "--out", "system.json", cwd=self.tmp)
+                self.assertEqual(0, proc.returncode, output(proc))
+                tiers = {t["name"]: t["tier"] for t in json.loads((self.tmp / "system.json").read_bytes())["tokens"]}
+                self.assertEqual({"--surface": tier}, tiers)
+
+    def test_a_contracts_literal_role_stays_tier_two(self):
+        """Codex on #149: flattened to CSS, a contract's `--surface: #ffffff`
+        role was Tier 1 by its value, and `--contract` moved it to constants."""
+        self.write("contract.json", json.dumps({"schema": "web-design-suite/contract/1",
+                                                "roles": {"--surface": "#ffffff"}}))
+        proc = run_py("design-system-docs", "extract_system", "--tokens", "contract.json", "--out", "system.json",
+                      "--contract", "round.json", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        tiers = {t["name"]: t["tier"] for t in json.loads((self.tmp / "system.json").read_bytes())["tokens"]}
+        self.assertEqual({"--surface": 2}, tiers)
+        self.assertEqual({"--surface": "#ffffff"}, json.loads((self.tmp / "round.json").read_bytes())["roles"])
+
+    def test_each_copy_note_names_the_helpers(self):
+        """V10: the note on copying a skill's scripts into a project's own
+        `scripts/` named the commands only, not the project_config.py, dtcg.py
+        or figma_common.py they import, so a copied command failed with
+        ModuleNotFoundError. Copy what each note names, then run each Python
+        command in the form its SKILL.md writes."""
+        line = re.compile(r"^> This skill's scripts are in `\$\{CLAUDE_SKILL_DIR\}/scripts/` \((.*)\)\.$", re.M)
+        seen = 0
+        for skill in sorted(p for p in SKILLS.iterdir() if (p / "scripts").is_dir()):
+            with self.subTest(skill=skill.name):
+                text = (skill / "SKILL.md").read_bytes().decode("utf-8")
+                m = line.search(text)
+                self.assertIsNotNone(m, "no note names the scripts")
+                named = set(re.findall(r"[\w.-]+\.(?:py|mjs)\b", m.group(1)))
+                here = {p.name for p in (skill / "scripts").iterdir() if p.suffix in (".py", ".mjs")}
+                self.assertEqual(here, named)
+                project = self.tmp / skill.name
+                (project / "scripts").mkdir(parents=True)
+                for name in named:
+                    (project / "scripts" / name).write_bytes((skill / "scripts" / name).read_bytes())
+                module = "python -m scripts.NAME" in text
+                for name in sorted(n for n in m.group(1).split(";")[0].replace(" ", "").split(",")
+                                   if n.endswith(".py")):
+                    form = ("-m", f"scripts.{name[:-3]}") if module else (f"scripts/{name}",)
+                    proc = subprocess.run([sys.executable, "-B", *form, "--help"], cwd=project,
+                                          env=env(PYTHONPATH=None), capture_output=True, timeout=120)
+                    self.assertEqual(0, proc.returncode, f"{name}: {output(proc)}")
+                seen += 1
+        self.assertEqual(12, seen)
 
 
 if __name__ == "__main__":

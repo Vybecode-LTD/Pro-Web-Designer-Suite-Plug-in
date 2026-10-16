@@ -15,8 +15,8 @@ description: Turn a Supabase or Postgres schema into an on-system UI spec and Re
 >
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
-> do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (introspect_schema.py, scaffold_ui.py).
+> do; here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (introspect_schema.py, scaffold_ui.py; copy their helpers too: dtcg.py, project_config.py).
 > From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
 
 A Postgres schema exists. Somebody now has to turn it into screens.

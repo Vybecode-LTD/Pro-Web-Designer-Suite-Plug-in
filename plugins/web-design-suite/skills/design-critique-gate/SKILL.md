@@ -15,8 +15,8 @@ description: Adversarial design review before a client sees the work, with ranke
 >
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
-> do; when you run one here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (critique_report.py, critique_snapshots.mjs).
+> do; here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (critique_report.py, critique_snapshots.mjs; copy their helpers too: browser_common.mjs, project_config.mjs).
 > From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
 
 The expensive failure is not a bug. It is standing in front of a senior designer or a
