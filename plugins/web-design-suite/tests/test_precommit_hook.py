@@ -159,10 +159,12 @@ class PreCommitHook(TempDirTest):
 
     def test_every_token_file_name_the_spec_gives_is_checked(self):
         """W13 (audit, 2026-10-14): the hook took `tokens.css` and
-        `x-tokens.css` only, so `design.tokens.css` and `tokens/roles.css`
-        (design-rules.json's token_files) went unchecked. A token file of
-        primitives alone is passed over: check_roles needs the roles."""
-        for rel in ("styles/design.tokens.css", "src/tokens/roles.css", "styles/brand-tokens.css"):
+        `x-tokens.css` only, so `design.tokens.css` (design-rules.json's
+        token_files) went unchecked. A token file of primitives alone is
+        passed over, since check_roles needs the roles, and so is a modular
+        tokens/ folder, whose roles read a sibling's primitives (Codex on
+        #156)."""
+        for rel in ("styles/design.tokens.css", "styles/brand-tokens.css"):
             with self.subTest(rel=rel):
                 self.stage(rel, self.lightened_tokens())
                 code, out = self.run_hook()
@@ -171,7 +173,9 @@ class PreCommitHook(TempDirTest):
                 self.assertIn("--fg-subtle on --bg-sunken", out)
                 subprocess.run([GIT, "-C", str(self.repo), "rm", "-q", "--cached", rel], check=True,
                                capture_output=True, env=env())
+        self.stage("styles/colour.tokens.css", "@layer tokens {\n  :root {\n    --brand-500: #2563eb;\n  }\n}\n")
         self.stage("src/tokens/colour.css", "@layer tokens {\n  :root {\n    --brand-500: #2563eb;\n  }\n}\n")
+        self.stage("src/tokens/roles.css", "@layer tokens {\n  :root {\n    --fg-default: var(--brand-500);\n  }\n}\n")
         code, out = self.run_hook()
         self.assertEqual(code, 0, out)
         self.assertNotIn("check_roles", out)

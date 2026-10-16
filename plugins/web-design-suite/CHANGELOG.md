@@ -461,10 +461,10 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   - `tw_probe` stopped on `@import "./theme"` (ENOENT, exit 2). It reads `theme.css`,
     as Tailwind and the census do;
   - the pre-commit hook's role stage took `tokens.css` and `x-tokens.css` only, so
-    `design.tokens.css` and `tokens/roles.css` went unchecked. It takes every name
-    design-rules.json's `token_files` give a token file, on a file that declares a
-    Tier-2 role; a file of primitives alone is passed over, since check_roles needs
-    the roles;
+    `design.tokens.css` went unchecked. It takes each one-file name design-rules.json's
+    `token_files` give a token set, on a file that declares a Tier-2 role; a file of
+    primitives alone is passed over, since check_roles needs the roles, and so is a
+    modular `tokens/` folder, whose roles read a sibling's primitives (Codex on #156);
   - the ESLint config said the fixtures run ESLint 10.4.0 (they run 10.11.0), and the
     stylelint config's token-file override restated `custom-property-pattern`
     unchanged, under a comment that called it a relaxation.

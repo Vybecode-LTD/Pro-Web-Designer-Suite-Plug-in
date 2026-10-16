@@ -430,11 +430,14 @@ fi
 # 5. Role-pair contrast — check_roles resolves the Tier-2 roles in every theme
 #    and checks the pairs components put together: text 4.5:1, control
 #    borders and the focus ring 3:1. Opt-in by presence, like stage 4, and
-#    only when a tokens file is part of this commit: a name design-rules.json's
-#    token_files give (tokens.css, x-tokens.css, x.tokens.css, tokens/*.css)
-#    on a file that declares a Tier-2 role, since check_roles needs the roles.
-#    A file of primitives alone is passed over (the audit's W13).
-grep -E '(^|/)(([^/]*[-.])?tokens\.css|tokens/[^/]+\.css)$' "$STAGED" > "$TMP_DIR/tokens.named" 2>/dev/null || true
+#    only when a tokens file is part of this commit: a one-file token set by
+#    the names design-rules.json's token_files give it (tokens.css,
+#    x-tokens.css, x.tokens.css), on a file that declares a Tier-2 role, since
+#    check_roles needs the roles (the audit's W13). A file of primitives alone
+#    is passed over, and so is a modular tokens/ folder: check_roles reads one
+#    file, so roles.css beside its colour.css would read as undeclared (Codex
+#    on #156).
+grep -E '(^|/)([^/]*[-.])?tokens\.css$' "$STAGED" > "$TMP_DIR/tokens.named" 2>/dev/null || true
 : > "$TMP_DIR/tokens"
 while IFS= read -r f; do
   if [ -n "$f" ] && grep -Eq '(^|[{;[:space:]])--(fg|bg|border)-[a-z0-9-]+[[:space:]]*:' "$AUDIT_ROOT/$f" 2>/dev/null; then
