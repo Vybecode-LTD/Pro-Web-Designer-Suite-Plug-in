@@ -115,7 +115,7 @@
      still stack correctly. See references/email-architecture.md §7. */
   .col {
     width: 100%;
-    max-width: 264px;
+    max-width: var(--email-width-col);
     display: inline-block;
     vertical-align: top;
     text-align: left;
@@ -129,7 +129,7 @@
     color: var(--fg-muted);
   }
 
-  .divider { height: 1px; background-color: var(--border-subtle); font-size: 0; line-height: 0; }
+  .divider { height: var(--stroke-hairline); background-color: var(--border-subtle); font-size: 0; line-height: 0; }
 
   .footer { background-color: var(--bg-sunken); }
 
@@ -144,9 +144,9 @@
   }
 
   @media only screen and (max-width: var(--email-bp-stack)) {
-    .pad { padding-left: 20px !important; padding-right: 20px !important; }
+    .pad { padding-left: var(--email-gutter-mobile) !important; padding-right: var(--email-gutter-mobile) !important; }
     .display { font-size: var(--type-h1-size) !important; line-height: var(--type-h1-line) !important; }
-    .h2 { font-size: 22px !important; line-height: 28px !important; }
+    .h2 { font-size: var(--email-h2-size-mobile) !important; line-height: var(--email-h2-line-mobile) !important; }
     .col { max-width: 100% !important; }
     .gutter { width: 0 !important; font-size: 0 !important; }
   }
@@ -253,7 +253,7 @@
         <![endif]-->
         <div class="col">
           <img src="https://cdn.example.com/northbeam/ochre-600.jpg" width="264" height="198"
-               alt="Ridgeline Jacket in Ochre, laid flat" style="width:100%;max-width:264px;height:auto;">
+               alt="Ridgeline Jacket in Ochre, laid flat" style="width:100%;max-width:var(--email-width-col);height:auto;">
           <h2 class="h3" style="padding-top:var(--gap-related);">Ochre</h2>
           <p class="body" style="padding-top:var(--gap-tight);">A warm mustard that reads as high-visibility in fog without looking like safety gear.</p>
         </div>
@@ -263,7 +263,7 @@
         <div class="gutter" style="width:var(--gutter-page);display:inline-block;font-size:0;line-height:0;" aria-hidden="true">&nbsp;</div>
         <div class="col">
           <img src="https://cdn.example.com/northbeam/pine-600.jpg" width="264" height="198"
-               alt="Ridgeline Jacket in Deep Pine, laid flat" style="width:100%;max-width:264px;height:auto;">
+               alt="Ridgeline Jacket in Deep Pine, laid flat" style="width:100%;max-width:var(--email-width-col);height:auto;">
           <h2 class="h3" style="padding-top:var(--gap-related);">Deep Pine</h2>
           <p class="body" style="padding-top:var(--gap-tight);">Nearly black in low light, unmistakably green in the sun. The one we wear.</p>
         </div>

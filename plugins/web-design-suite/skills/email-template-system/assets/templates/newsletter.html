@@ -84,7 +84,7 @@
     font-size: var(--type-lead-size);
     line-height: var(--type-lead-line);
     color: var(--fg-default);
-    border-left: 3px solid var(--border-accent);
+    border-left: var(--email-pull-rule) solid var(--border-accent);
     padding-left: var(--gap-grouped);
   }
 
@@ -98,7 +98,7 @@
 
   a { color: var(--fg-link); }
 
-  .divider { height: 1px; background-color: var(--border-subtle); font-size: 0; line-height: 0; }
+  .divider { height: var(--stroke-hairline); background-color: var(--border-subtle); font-size: 0; line-height: 0; }
 
   .footer { background-color: var(--bg-sunken); }
 
@@ -121,8 +121,8 @@
   }
 
   @media only screen and (max-width: var(--email-bp-stack)) {
-    .pad { padding-left: 20px !important; padding-right: 20px !important; }
-    .h1 { font-size: 26px !important; line-height: 32px !important; }
+    .pad { padding-left: var(--email-gutter-mobile) !important; padding-right: var(--email-gutter-mobile) !important; }
+    .h1 { font-size: var(--email-h1-size-mobile) !important; line-height: var(--email-h1-line-mobile) !important; }
   }
 
   @media (prefers-color-scheme: dark) {

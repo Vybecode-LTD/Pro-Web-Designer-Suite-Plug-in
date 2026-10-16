@@ -458,5 +458,104 @@ class TheGeneratedTypeScriptParses(Answered):
         self.assertEqual(proc.returncode, 0, output(proc))
 
 
+class TheAuditsContentMediums(TempDirTest):
+    """P54 part 6, the audit of 2026-10-14's §3.5: E1 to E5, the schema
+    reader and the scaffold."""
+
+    def introspect(self, name, text, *args):
+        self.write(name, text)
+        proc = run_py("content-model-to-ui", "introspect_schema", name, "-o", "model.json", *args, cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        return json.loads((self.tmp / "model.json").read_bytes())
+
+    def column(self, model, table, name):
+        return next(c for t in model["tables"] if t["name"] == table for c in t["columns"] if c["name"] == name)
+
+    def test_a_naive_system_timestamp_is_read_only(self):
+        """E1: `system` was read in the `date` and `timestamptz` branches only, so
+        a naive `created_at` (every Prisma `DateTime @default(now())`) became an
+        editable datetime-picker in the form."""
+        model = self.introspect("schema.sql", "CREATE TABLE notes (\n  id uuid PRIMARY KEY,\n"
+                                "  created_at timestamp NOT NULL DEFAULT now(),\n"
+                                "  remind_at timestamp,\n  seen_at timestamptz NOT NULL DEFAULT now()\n);\n")
+        created = self.column(model, "notes", "created_at")["ui"]
+        self.assertEqual(("readonly-timestamp", False, False),
+                         (created["control"], created["editable"], created["placement"]["form"]))
+        self.assertEqual("ambiguous", created["temporal"]["timezone"])          # the warning stays
+        self.assertIn("notes.created_at.naive_timestamp", {q["id"] for q in model["questions"]})
+        remind = self.column(model, "notes", "remind_at")["ui"]                  # the control: a user's own
+        self.assertEqual(("datetime-picker", True), (remind["control"], remind["placement"]["form"]))
+        prisma = self.introspect("schema.prisma", "model Note {\n  id String @id @default(uuid())\n"
+                                 "  createdAt DateTime @default(now())\n}\n")
+        self.assertEqual("readonly-timestamp", self.column(prisma, "Note", "createdAt")["ui"]["control"])
+
+    def test_a_table_name_cannot_leave_the_output_folder(self):
+        """E2: a table's name went into the output paths as it was, so `../evil`
+        wrote above `features/` and `../../evil` left `--out`."""
+        for name in ("../evil", "..\\evil", "../../evil", "a/b"):
+            with self.subTest(name=name):
+                model = self.introspect("schema.sql", f'CREATE TABLE "{name}" (\n  id uuid PRIMARY KEY,\n  title text\n);\n')
+                proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "out/src", cwd=self.tmp)
+                self.assertEqual(2, proc.returncode, output(proc))
+                self.assertIn("cannot name a file", output(proc))
+                self.assertFalse((self.tmp / "out").exists())
+                self.assertEqual(name, model["tables"][0]["name"])
+        self.introspect("schema.sql", "CREATE TABLE posts (\n  id uuid PRIMARY KEY,\n  title text\n);\n")   # the control
+        proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "out/src", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertTrue((self.tmp / "out" / "src" / "features" / "posts").is_dir())
+
+    def test_an_odd_column_name_is_still_valid_code(self):
+        """E3: a column `2fa` gave a TSX and a Python syntax error, and `it's`
+        an unterminated string in the types file. `class`, `default`, `from`,
+        `display-name` and `naïve` already worked: they are the controls."""
+        names = ["2fa", "it's", "class", "default", "from", "display-name", "naïve"]
+        ddl = ("CREATE TABLE odd (\n  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n"
+               + "".join(f'  "{n}" text NOT NULL,\n' for n in names) + "  title text\n);\n")
+        self.introspect("schema.sql", ddl)
+        proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "src", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        for py in (self.tmp / "src").rglob("*.py"):
+            compile(py.read_bytes(), str(py), "exec")
+        form = (self.tmp / "src" / "features" / "odd" / "OddForm.tsx").read_bytes().decode("utf-8")
+        self.assertIn("errors['2fa']", form)
+        self.assertIn("fieldId('it\\'s')", form)
+        root = tool_modules("WDS_NODE_MODULES", "typescript")
+        if root is None:
+            self.skipTest("typescript is not installed (tooling/main) or WDS_NODE_MODULES is off")
+        self.write("tscheck.js", TS_CHECK)
+        files = sorted(str(p.relative_to(self.tmp)) for p in (self.tmp / "src").rglob("*.ts*"))
+        self.assertGreater(len(files), 10)
+        proc = subprocess.run(["node", "tscheck.js", *files], cwd=self.tmp, capture_output=True,
+                              env=env(NODE_PATH=root))
+        self.assertEqual(0, proc.returncode, output(proc))
+
+    def test_casts_claims_and_quoted_names_pin_the_column(self):
+        """E4: `auth.uid()::text = owner_id::text`, `(auth.jwt() ->> 'sub')::uuid
+        = owner_id` and `auth.uid() = "ownerId"` pin the column, but were read as
+        leaving it writable. A string or an array is still no pin."""
+        table = ('CREATE TABLE posts (\n  id uuid PRIMARY KEY,\n  owner_id uuid NOT NULL,\n'
+                 '  "ownerId" uuid,\n  title text\n);\nALTER TABLE posts ENABLE ROW LEVEL SECURITY;\n')
+        cases = (("auth.uid()::text = owner_id::text AND auth.uid() = \"ownerId\"", False),
+                 ("(auth.jwt() ->> 'sub')::uuid = owner_id AND \"ownerId\"::text = (select auth.uid())::text", False),
+                 ("owner_id = 'auth.uid()' AND auth.uid() = \"ownerId\"", True),            # a string calls nothing
+                 ("auth.uid() = any(array[owner_id]) AND auth.uid() = \"ownerId\"", True))   # nor is it the column
+        for check, warned in cases:
+            with self.subTest(check=check):
+                model = self.introspect("schema.sql", table + "CREATE POLICY p ON posts FOR UPDATE TO "
+                                        f"authenticated USING ({check});\n")
+                codes = {f["code"] for f in model["security"]["findings"]}
+                self.assertEqual(warned, "authority-writable" in codes, model["security"]["findings"])
+
+    def test_a_with_rls_table_is_drizzle(self):
+        """E5: `detect_format` looked for `pgTable(` while the Drizzle reader
+        accepts `pgTable.withRLS(`, so such a schema went to the generated-types
+        reader and failed."""
+        model = self.introspect("schema.ts", 'import { pgTable, uuid, text } from "drizzle-orm/pg-core";\n'
+                                'export const posts = pgTable.withRLS("posts", {\n'
+                                '  id: uuid("id").primaryKey(),\n  title: text("title"),\n});\n')
+        self.assertEqual(["posts"], [t["name"] for t in model["tables"]])
+
+
 if __name__ == "__main__":
     unittest.main()

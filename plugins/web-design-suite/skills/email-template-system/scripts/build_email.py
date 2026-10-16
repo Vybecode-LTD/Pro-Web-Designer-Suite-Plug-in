@@ -1046,6 +1046,26 @@ def wrap(text: str, width: int) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+# Whitespace between two tags is dropped only where one of them is a block or
+# table tag (or the document's own); between inline siblings it is a word
+# space, so `<strong>Hello</strong> <em>world</em>` keeps it (the audit's E6).
+BLOCK_TAGS = frozenset("""
+    html head body title meta link style base table thead tbody tfoot tr td th
+    caption colgroup col div p h1 h2 h3 h4 h5 h6 ul ol li dl dt dd center
+    blockquote hr br pre form address article aside footer header main nav
+    section figure figcaption !doctype
+""".split())
+
+
+def _between_tags(match: "re.Match[str]") -> str:
+    left = re.match(r"</?\s*([^\s/>]+)", match.group(1))
+    right = match.group(2)
+    names = {(left.group(1) if left else "").lower(), right.lower()}
+    if names & BLOCK_TAGS or any(":" in n for n in names):      # VML and Office tags are not text
+        return match.group(1)
+    return match.group(1) + " "
+
+
 def minify_html(html: str) -> str:
     """Conservative. Never touches conditional comments, never joins two words."""
     placeholders: list[str] = []
@@ -1061,7 +1081,7 @@ def minify_html(html: str) -> str:
     html = re.sub(r"<pre\b.*?</pre>", stash, html, flags=re.S | re.I)
 
     html = re.sub(r"<!--(?!\[if|<!\[endif).*?-->", "", html, flags=re.S)
-    html = re.sub(r">\s+<", "><", html)
+    html = re.sub(r"(<[^<>]*>)\s+(?=</?\s*([A-Za-z!][^\s/>]*))", _between_tags, html)
     html = re.sub(r"[ \t]*\n[ \t]*", "\n", html)
     html = re.sub(r"\n{2,}", "\n", html)
 

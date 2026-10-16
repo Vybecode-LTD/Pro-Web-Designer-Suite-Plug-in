@@ -141,7 +141,18 @@ def singular(name: str) -> str:
 
 def prop_key(name: str) -> str:
     """A TS object key that does not need quoting, or one that does."""
-    return name if re.fullmatch(r"[A-Za-z_$][\w$]*", name) else f'"{name}"'
+    return name if re.fullmatch(r"[A-Za-z_$][\w$]*", name) else json.dumps(name, ensure_ascii=False)
+
+
+def js_string(name: str) -> str:
+    """`name` as a single-quoted JS string literal, escaped: a column called
+    `it's` was an unterminated string (the audit's E3)."""
+    return "'" + json.dumps(name, ensure_ascii=False)[1:-1].replace("'", "\\'") + "'"
+
+
+def member(obj: str, name: str) -> str:
+    """`obj.name`, or `obj['2fa']` for a name that is no identifier."""
+    return f"{obj}.{name}" if prop_key(name) == name else f"{obj}[{js_string(name)}]"
 
 
 # ---------------------------------------------------------------------------
@@ -1293,7 +1304,7 @@ def emit_types(table: dict[str, Any], model: dict[str, Any],
              f" *  the rest is what stops a form quietly PATCHing a column\n"
              f" *  the database owns. */\n"
              f"export type {Entity}Draft = Pick<\n  {Entity},\n"
-             + "".join(f"  | '{w}'\n" for w in writable) + ">;")
+             + "".join(f"  | {js_string(w)}\n" for w in writable) + ">;")
 
     state = Template("""
 /**
@@ -1985,14 +1996,16 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
     ctrl = spec["control"]
     name = spec["name"]
     key = prop_key(name)
+    q, err = js_string(name), member("errors", name)        # E3: `2fa`, `it's`
+    attr = f'"{name}"' if '"' not in name else "{" + q + "}"
     acc = f"values.{name}" if key == name else f"values[{json.dumps(name)}]"
     # The control itself carries the error's id and the invalid flag:
     # assistive tech reads `aria-describedby` and `aria-invalid` on the
     # control, not on a wrapper. The id is the one Field.tsx gives the error.
-    common = (f'id={{fieldId(\'{name}\')}}\n{indent}  name="{name}"\n'
+    common = (f'id={{fieldId({q})}}\n{indent}  name={attr}\n'
               f'{indent}  disabled={{disabled}}\n'
-              f'{indent}  aria-invalid={{Boolean(errors.{name}) || undefined}}\n'
-              f"{indent}  aria-describedby={{errors.{name} ? fieldId('{name}') + '-error' : undefined}}\n"
+              f'{indent}  aria-invalid={{Boolean({err}) || undefined}}\n'
+              f"{indent}  aria-describedby={{{err} ? fieldId({q}) + '-error' : undefined}}\n"
               f'{indent}  required={{{str(spec.get("required", False)).lower()}}}')
     if ctrl in STUB_REASON:
         reason = STUB_REASON[ctrl]
@@ -2003,7 +2016,7 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
     if ctrl in ("textarea", "rich-text"):
         return (f"{indent}<TextArea\n{indent}  {common}\n"
                 f"{indent}  value={{String({acc} ?? '')}}\n"
-                f"{indent}  onChange={{(e) => onChange('{name}', e.target.value)}}\n"
+                f"{indent}  onChange={{(e) => onChange({q}, e.target.value)}}\n"
                 f"{indent}/>")
     if ctrl in ("select", "multi-select"):
         multi = " multiple" if ctrl == "multi-select" else ""
@@ -2021,27 +2034,27 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
                        f"parent row, showing `{spec['labelColumn']}` */}}")
         return (f"{indent}<Select{multi}\n{indent}  {common}\n"
                 f"{indent}  value={{String({acc} ?? '')}}\n"
-                f"{indent}  onChange={{(e) => onChange('{name}', e.target.value)}}\n"
+                f"{indent}  onChange={{(e) => onChange({q}, e.target.value)}}\n"
                 f"{indent}>\n{blank}{options}\n{indent}</Select>")
     if ctrl == "radio-group":
         opts = json.dumps(spec.get("options") or [])
-        return (f"{indent}<RadioGroup\n{indent}  name=\"{name}\"\n"
+        return (f"{indent}<RadioGroup\n{indent}  name={attr}\n"
                 f"{indent}  value={{{acc} === null || {acc} === undefined ? null : String({acc})}}\n"
                 f"{indent}  options={{{opts}}}\n"
                 f"{indent}  disabled={{disabled}}\n"
-                f"{indent}  labelledBy={{fieldId('{name}') + '-label'}}\n"
-                f"{indent}  describedBy={{errors.{name} ? fieldId('{name}') + '-error' : undefined}}\n"
-                f"{indent}  invalid={{Boolean(errors.{name})}}\n"
-                f"{indent}  onValueChange={{(next) => onChange('{name}', next)}}\n"
+                f"{indent}  labelledBy={{fieldId({q}) + '-label'}}\n"
+                f"{indent}  describedBy={{{err} ? fieldId({q}) + '-error' : undefined}}\n"
+                f"{indent}  invalid={{Boolean({err})}}\n"
+                f"{indent}  onValueChange={{(next) => onChange({q}, next)}}\n"
                 f"{indent}/>")
     if ctrl in ("switch", "checkbox"):
-        return (f"{indent}<Toggle\n{indent}  id={{fieldId('{name}')}}\n"
+        return (f"{indent}<Toggle\n{indent}  id={{fieldId({q})}}\n"
                 f"{indent}  label=\"{spec['label']}\"\n"
                 f"{indent}  checked={{Boolean({acc})}}\n"
                 f"{indent}  disabled={{disabled}}\n"
-                f"{indent}  aria-invalid={{Boolean(errors.{name}) || undefined}}\n"
-                f"{indent}  aria-describedby={{errors.{name} ? fieldId('{name}') + '-error' : undefined}}\n"
-                f"{indent}  onChange={{(e) => onChange('{name}', e.target.checked)}}\n"
+                f"{indent}  aria-invalid={{Boolean({err}) || undefined}}\n"
+                f"{indent}  aria-describedby={{{err} ? fieldId({q}) + '-error' : undefined}}\n"
+                f"{indent}  onChange={{(e) => onChange({q}, e.target.checked)}}\n"
                 f"{indent}/>")
     if ctrl in ("number-input", "stepper", "percent-input", "currency-input"):
         extra = ""
@@ -2068,7 +2081,7 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
                         f"differ by the currency's scale on every read and write.")
         return (f"{indent}<NumberInput\n{indent}  {common}{extra}{note}\n"
                 f"{indent}  value={{{acc} ?? ''}}\n"
-                f"{indent}  onChange={{(e) => onChange('{name}', e.target.valueAsNumber)}}\n"
+                f"{indent}  onChange={{(e) => onChange({q}, e.target.valueAsNumber)}}\n"
                 f"{indent}/>")
     if ctrl in ("readonly-text", "readonly-timestamp"):
         return (f"{indent}<TextInput\n{indent}  {common}\n"
@@ -2095,7 +2108,7 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
     return (f'{indent}<TextInput\n{indent}  type="{input_type}"\n'
             f"{indent}  {common}{extra}\n"
             f"{indent}  value={{String({acc} ?? '')}}\n"
-            f"{indent}  onChange={{(e) => onChange('{name}', e.target.value)}}\n"
+            f"{indent}  onChange={{(e) => onChange({q}, e.target.value)}}\n"
             f"{indent}/>")
 
 
@@ -2136,28 +2149,29 @@ def emit_form(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str
             if s["control"] in ("switch", "checkbox"):
                 # A toggle is its own label; it gets the error below it, with
                 # the id the control's aria-describedby names.
+                err = member("errors", f)
                 body.append(
                     f"{review}\n        <div className={{styles.field}} "
-                    f"data-state={{errors.{f} ? 'error' : undefined}}>\n"
+                    f"data-state={{{err} ? 'error' : undefined}}>\n"
                     f"{control_jsx(s, '          ')}\n"
-                    f"          {{errors.{f} ? (\n"
-                    f"            <p className={{styles.fieldError}} id={{fieldId('{f}') + '-error'}}>\n"
-                    f"              {{errors.{f}}}\n"
+                    f"          {{{err} ? (\n"
+                    f"            <p className={{styles.fieldError}} id={{fieldId({js_string(f)}) + '-error'}}>\n"
+                    f"              {{{err}}}\n"
                     f"            </p>\n"
                     f"          ) : null}}\n"
                     f"        </div>")
                 continue
             body.append(Template("""$review
         <Field
-          id={fieldId('$name')}
+          id={fieldId($qname)}
           label="$label"
           required={$required}
-          error={errors.$name ?? null}
+          error={$err ?? null}
           disabled={disabled}$group
         >
 $control
         </Field>""").safe_substitute(
-                name=f, label=s["label"],
+                qname=js_string(f), err=member("errors", f), label=s["label"],
                 required=str(s.get("required", False)).lower(),
                 group="\n          group" if s["control"] == "radio-group" else "",
                 control=control_jsx(s), review=review))
@@ -3406,6 +3420,8 @@ def emit_schema_pydantic(table: dict[str, Any], model: dict[str, Any],
             # `class`, `from`, `order-id`: the attribute is renamed and the
             # alias keeps the column's own name on the wire.
             attr = re.sub(r"\W", "_", attr) + "_"
+            if attr[0].isdigit():                       # `2fa` (E3); `_2fa` would be private
+                attr = "col_" + attr
             args.append(f"alias={f['name']!r}")
         note = (f"  # invented: {', '.join(f['invented'])}"
                 if f["invented"] else "")
@@ -3413,6 +3429,18 @@ def emit_schema_pydantic(table: dict[str, Any], model: dict[str, Any],
     if not fields:
         lines.append("    pass")
     return "\n".join(lines) + "\n"
+
+
+def unsafe_name(name: Any) -> str:
+    """Why a table's name cannot be a folder or file name under `--out`, or
+    "": it goes into `features/<name>/`, `server/<name>.schema.ts` and
+    `db/policies/<name>…`, so `../evil` wrote above `features/` and
+    `../../evil` left `--out` (the audit's E2)."""
+    if not isinstance(name, str) or not name:
+        return "it is not a name"
+    if any(ch in name for ch in "/\\\x00") or ".." in name or name == ".":
+        return "a path separator, `..` or NUL would take the files outside --out"
+    return ""
 
 
 def build_files(model: dict[str, Any], ans: Answers, stack: str,
@@ -3577,6 +3605,13 @@ def main(argv: list[str] | None = None) -> int:
                   f"Known: {', '.join(sorted(known))}", file=sys.stderr)
             return 2
 
+    for table in model["tables"]:
+        why = unsafe_name(table.get("name"))
+        if why:
+            print(f"scaffold_ui: table {table.get('name')!r} cannot name a file: {why}. "
+                  f"Rename it in the model, or leave it out with --entity.", file=sys.stderr)
+            return 2
+
     files = build_files(model, ans, args.stack, entities)
     root = Path(args.out)
 
@@ -3612,8 +3647,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     written, skipped = 0, 0
+    inside = root.resolve()
     for rel, content in sorted(files.items()):
         dest = root / rel
+        if inside not in dest.resolve().parents:            # never past --out, whatever names it
+            print(f"scaffold_ui: refusing {rel}: it resolves outside {root}", file=sys.stderr)
+            return 2
         if dest.exists() and not args.force:
             skipped += 1
             continue

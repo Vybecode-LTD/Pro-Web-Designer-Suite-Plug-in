@@ -272,7 +272,7 @@ Three things people get wrong about it:
 
 ### Gmail `<style>` ceiling — 16,384 bytes
 
-Separate from the above, and it bites earlier than you would think on a template with a large dark-mode block. **Gmail removes every `<style>` element that crosses the ceiling, and every one after it**, so the failure mode is "my media queries vanished," not "my CSS looks half-applied." Past the ceiling, `build_email.py` splits the retained CSS into blocks of about 4 KB in authoring order, so Gmail keeps the first ones: write the retained CSS most important first. Since the compiler inlines nearly everything, a healthy retained block is under 1 KB — the three templates in `assets/templates/` produce 600–750 bytes.
+Separate from the above, and it bites earlier than you would think on a template with a large dark-mode block. **Gmail removes every `<style>` element that crosses the ceiling, and every one after it**, so the failure mode is "my media queries vanished," not "my CSS looks half-applied." Past the ceiling, `build_email.py` splits the retained CSS into blocks of about 4 KB in authoring order, so Gmail keeps the first ones: write the retained CSS most important first. Since the compiler inlines nearly everything, a healthy retained block is under 1 KB — the three templates in `assets/templates/` keep 751 to 919 bytes.
 
 ---
 
