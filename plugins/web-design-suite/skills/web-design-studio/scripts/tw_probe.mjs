@@ -285,7 +285,13 @@ async function main() {
       if (!path.extname(sub)) sub += '.css';
       return path.join(twDir, sub);
     }
-    if (id.startsWith('.') || path.isAbsolute(id)) return path.resolve(base, id);
+    if (id.startsWith('.') || path.isAbsolute(id)) {
+      // `@import "./theme"` is theme.css, as @tailwindcss/node resolves it
+      // (extensions: [".css"]), and as the census reads it (the audit's W10).
+      const file = path.resolve(base, id);
+      const isFile = (f) => { try { return fs.statSync(f).isFile(); } catch { return false; } };
+      return isFile(file) || path.extname(id) ? file : `${file}.css`;
+    }
     return packageStylesheet(id, base);
   };
   const read = (file, id) => {

@@ -1048,11 +1048,10 @@ export default {
         [hexRuleName]: null,
         [colourFnRuleName]: null,
         'color-named': null,
-        /* Tier 2 is defined here, from Tier 1. */
+        /* Tier 2 is defined here, from Tier 1. Tier-1 steps such as
+         * `--space-0-5` and `--text-2xs` already fit the kebab-case
+         * `custom-property-pattern` above, so it stays as it is. */
         [tierRuleName]: null,
-        /* Tier-1 steps are `--space-0-5`, `--text-2xs`, `--radius-2xl`:
-         * digits inside segments, which the strict pattern rejects. */
-        'custom-property-pattern': '^[a-z0-9]+(-[a-z0-9]+)*$',
         /* `no-duplicate-selectors` stays ON: a second `[data-theme="dark"]`
          * block that quietly redefines a token is the bug it catches. The
          * starter opens one `:root` block per tier (primitives, roles, …)

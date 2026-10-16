@@ -1128,7 +1128,7 @@ def allowed_value(value: str, allowed: tuple) -> bool:
     """Whether `value` is one a family allows (design-rules.json:
     values.families), as stylelint's allowlist reads it: a shape matches it,
     or a string equals it."""
-    value = re.sub(r"\s*!important\s*$", "", value.strip(), flags=re.I)
+    value = re.sub(r"\s*!\s*important\s*$", "", value.strip(), flags=re.I)
     return any(a.match(value) if hasattr(a, "match") else a == value for a in allowed)
 
 
@@ -1394,7 +1394,9 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     "query condition cannot read a custom property.")
 
         # ---- L5 !important -------------------------------------------------
-        if "!important" in value.lower():
+        # The flag, not the words inside a string (`content: "!important"`),
+        # as stylelint reads it; `! important` is the flag too (W9).
+        if re.search(r"!\s*important\b", SASS_STRING.sub('""', value), re.I):
             add(line, "L5", "important", "error",
                 f"`!important` on `{prop}`.",
                 "!important inverts layer order (an !important in an EARLIER "

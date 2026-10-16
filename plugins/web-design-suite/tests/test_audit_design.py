@@ -72,6 +72,18 @@ class AuditDesign(TempDirTest):
                 self.assertIn(("L2", "child-margin"),
                               self.rules(f".card {{ margin-top: var({token}); }}"))
 
+    def test_important_is_the_flag_not_the_words_in_a_string(self):
+        """W9 (audit, 2026-10-14): `"!important" in value` flagged
+        `content: "!important"`; stylelint reads the flag. `! important`,
+        with a space, is the flag too."""
+        for css in ('.card::after { content: "!important"; }', ".card::after { content: '! important'; }"):
+            with self.subTest(css=css):
+                self.assertNotIn(("L5", "important"), self.rules(css))
+        for css in (".card { display: block !important; }", ".card { display: block ! important; }",
+                    '.card::after { content: "x" !IMPORTANT; }'):
+            with self.subTest(css=css):
+                self.assertIn(("L5", "important"), self.rules(css))
+
     def test_law2_real_token_cancellation_stays_legal(self):
         for value in ("calc(var(--space-4) * -1)", "calc(var(--space-16)*-1)",
                       "calc(-1 * var(--space-4))"):

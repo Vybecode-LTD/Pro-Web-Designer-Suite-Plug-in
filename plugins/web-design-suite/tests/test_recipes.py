@@ -53,7 +53,8 @@ import sys
 import unittest
 
 from test_browser_scripts import STUB_PLAYWRIGHT
-from wds_support import NODE, SKILLS, TempDirTest, env, output, run_node, run_py, tailwind_part5, tool_modules
+from wds_support import (NODE, SKILLS, TOOLING, TempDirTest, env, output, run_node, run_py, tailwind_part5,
+                         tool_modules)
 
 SHELL_BREAK = {"&&", "||", "|", ";", ">", ">>", "2>&1", "&"}
 
@@ -523,6 +524,23 @@ class DependencyFacts(unittest.TestCase):
         # jsx-a11y 6.10.2's peer range stops at ^9.
         self.assertRegex(head, r'"overrides":\s*\{\s*"eslint-plugin-jsx-a11y":\s*'
                                r'\{\s*"eslint":\s*"\$eslint"\s*\}')
+
+    @unittest.skipUnless(TOOLING, "reads the repository's tooling/")
+    def test_the_eslint_the_header_names_is_the_one_the_fixtures_run(self):
+        """W11 (audit, 2026-10-14): the header said the fixtures run 10.4.0;
+        tooling/main pins 10.11.0."""
+        pinned = json.loads((TOOLING / "main" / "package.json").read_bytes())["devDependencies"]["eslint"]
+        self.assertIn(f"run this config on {pinned}.", " ".join(self.header("eslint.design.config.mjs").split()))
+
+    def test_the_token_files_do_not_restate_the_property_pattern(self):
+        """W12 (audit, 2026-10-14): the token files' override set the same
+        `custom-property-pattern` again, under a comment that called it a
+        relaxation; the starter's steps (`--space-0-5`) fit the one above."""
+        text = (CONFIG_DIR / "stylelint.config.mjs").read_text(encoding="utf-8")
+        self.assertEqual(1, len(re.findall(r"'custom-property-pattern':\s*'", text)))
+        pattern = re.search(r"'custom-property-pattern':\s*'([^']+)'", text).group(1)
+        for name in ("space-0-5", "text-2xs", "radius-2xl", "fg-on-warning"):
+            self.assertRegex(name, pattern)
 
     def test_the_tailwind_block_fits_the_plugin(self):
         text = (CONFIG_DIR / "eslint.design.config.mjs").read_text(encoding="utf-8")

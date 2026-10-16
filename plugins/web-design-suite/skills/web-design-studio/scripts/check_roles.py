@@ -107,6 +107,23 @@ class Unresolvable(Exception):
 LIGHT_DARK_QUERY = re.compile(r"@supports\s*\(\s*(?:background-)?color\s*:\s*light-dark\([^()]*\)\s*\)\s*$", re.I)
 
 
+def own_text(body: str) -> str:
+    """A block's text at its own depth: each nested block, its prelude
+    included, left out."""
+    out, depth = [], 0
+    for ch in body:
+        if ch == "{":
+            if depth == 0:
+                text = "".join(out)
+                out = [text[:text.rfind(";") + 1]]
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        elif depth == 0:
+            out.append(ch)
+    return "".join(out)
+
+
 def rules(css: str) -> list[tuple[list[str], dict[str, str]]]:
     """Innermost `selectors { declarations }` blocks outside any @media or
     @supports (a conditional block is not a theme). One @supports is read: a
@@ -116,14 +133,17 @@ def rules(css: str) -> list[tuple[list[str], dict[str, str]]]:
     out, stack, start = [], [], 0
     for i, ch in enumerate(css):
         if ch == "{":
-            stack.append(css[start:i].strip().rsplit(";", 1)[-1].strip())
+            stack.append((css[start:i].strip().rsplit(";", 1)[-1].strip(), i + 1))
             start = i + 1
         elif ch == "}":
-            prelude = stack.pop() if stack else ""
-            body = css[start:i]
-            if "{" not in body and not prelude.startswith("@") and not any(
+            prelude, opened = stack.pop() if stack else ("", start)
+            # A rule's own declarations, its nested blocks left out: native
+            # nesting (`:root { --x: …; @media (…) {…} }`) kept the whole
+            # rule unread (the audit's W8).
+            body = own_text(css[opened:i])
+            if not prelude.startswith("@") and not any(
                     p.startswith(("@media", "@container"))
-                    or (p.startswith("@supports") and not LIGHT_DARK_QUERY.match(p)) for p in stack):
+                    or (p.startswith("@supports") and not LIGHT_DARK_QUERY.match(p)) for p, _ in stack):
                 decls = dict(re.findall(r"(--[\w-]+)\s*:\s*([^;]+);?", body))
                 # Which branch of light-dark() the scope reads (P33).
                 decls.update(re.findall(r"(?<![\w-])(color-scheme)\s*:\s*([^;]+);?", body))
