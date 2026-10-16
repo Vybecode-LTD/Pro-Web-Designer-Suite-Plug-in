@@ -498,7 +498,7 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 - **D6.** budgets.md quotes the Core Web Vitals thresholds with no `evidence.json` entry, and `FIGURE` never matches "2.5 s"; the README's "Claude Code 2.1.269 or later" is unregistered too. Re-read each at its source on the day.
 - **D7.** `check_pointers.py` walks `skills/` only: four `§` pointers in `agents/` and `workflow-commands/` are unguarded.
 - **D8.** The byte table in this file drifts: hold it to the disk with a test, or drop the numbers.
-- **D9.** Unused imports and f-strings (ruff F401, F541): run `python -m ruff check --no-cache --select F401,F541` (ruff 0.6.9 is installed) and fix the plugin's own.
+- **D9.** Unused imports and f-strings (ruff F401, F541), and B904 (`raise … from` at twelve `except` sites): run `python -m ruff check --no-cache --select F401,F541,B904` (ruff 0.6.9 is installed) and fix the plugin's own and `tooling/release/build.py`'s. The audit's B023 hits are not bugs (each closure runs in its own iteration).
 - **T3** (`NoFragileJsonReads` has no positive control), **T4** (`test_facts` asserts behind two conditionals), **T5** (`PythonFloor` leaves out `workflow-commands/*/scripts` and `shared/`), **T6** (`test_claude_plugin_validate_strict_passes` skips on every CI cell), **T7** (`sys.dont_write_bytecode` set once in `wds_support`), **T8** (66 assertion loops without `subTest`: the ones the audit names), **T9** (DTCG fixtures in the 2025.10 object form), **T10** (`ResourceWarning` at `test_versioning`'s `json.loads(open(...).read())`).
 - After part 5: remove the `P55` row, mark N47 done in the completion plan, and close it in the inventory if it is listed there.
 
