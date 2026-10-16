@@ -116,7 +116,7 @@ class TheChecksFindTheirCase(unittest.TestCase):
         self.assertEqual([], self.found("B904", "try:\n    pass\nexcept ValueError as exc:\n    raise\n"
                                                 "try:\n    pass\nexcept ValueError as exc:\n    raise exc\n"
                                                 "try:\n    pass\nexcept ValueError:\n    raise TypeError() from None\n"))
-        self.assertEqual(["1"], self.found("SIM115", "data = open('a').read()\nwith open('b') as f:\n    f.read()\n"))
+        self.assertEqual(["1"], self.found("SIM115", "data = open('a').read()\nwith open('b') as fh:\n    fh.read()\n"))
 
 
 def loops_without_subtest(tree: ast.Module) -> list[str]:
