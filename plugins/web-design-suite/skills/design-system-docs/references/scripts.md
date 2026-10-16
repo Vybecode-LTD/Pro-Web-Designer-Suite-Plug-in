@@ -7,7 +7,7 @@ Every argument of `extract_system.py` and `build_docs.py`. `SKILL.md` has the wo
 | Flag | Does |
 |---|---|
 | `paths…` | files, directories or globs; classified by name and extension |
-| `--tokens PATH` | a token file, explicitly (repeatable). With none, from a flag or a path, the CSS token files the project's `.design-suite.json` lists |
+| `--tokens PATH` | a token file, explicitly (repeatable). With none, from a flag or a path, the token files the project's `.design-suite.json` lists. A contract.json or a DTCG file is read as the gates read it: its default values, with a DTCG file's record of what it left out, and no themes |
 | `--components PATH` | a component stylesheet, directory or glob (repeatable) |
 | `--props PATH` | a TS/TSX/JSX source for props and JSDoc (repeatable) |
 | `--prose DIR` | enables the `undocumented-component` and `orphan-doc` gaps |

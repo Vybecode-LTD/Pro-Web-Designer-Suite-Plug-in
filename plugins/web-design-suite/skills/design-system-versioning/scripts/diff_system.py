@@ -910,21 +910,19 @@ def _snapshot_from_contract(paths: List[Path], label: str, source: str = "contra
         raise bail(f"diff_system: {exc}")
     for problem in tokens.problems:                       # what a DTCG file could not give (S2)
         print(f"diff_system: warning: {problem}", file=sys.stderr)
-    values: Dict[str, str] = {}
-    marks: Dict[str, Any] = {}
-    for path in paths:                           # every file, in order: a later one wins (Codex on #119)
-        got, got_marks = recorded(path)
-        for name, value in got.items():
-            values[name] = value
-            marks.pop(name, None)
-            if name in got_marks:
-                marks[name] = got_marks[name]
-    held = tokens.values()
-    for name, value in values.items():
-        if name not in held:                     # filed as read_tokens files a tokens.css's
+    # Walk the files once, in order, as read_tokens does: a later file's
+    # value wins, whether it writes the token or records it as left out
+    # (the audit's V2). read_deprecations reads the record's marks (V3).
+    last: Dict[str, Optional[str]] = {}
+    for path in paths:
+        for name in read_tokens([path]).values():     # read whole above, so it reads
+            last[name] = None
+        for name, value in recorded(path)[0].items():
+            last[name] = value
+    for name, value in last.items():
+        if value is not None:                    # filed as read_tokens files a tokens.css's
+            tokens.discard(name)
             tokens.add(name, value, 2 if "var(" in value else 1)
-            if name in marks:
-                deprecated[name] = marks[name]
     snap = Snapshot(label=label, path=str(paths[0]), source=source,
                     impl="project contract" if source == "contract.json" else "DTCG token file",
                     layers_recorded=False, deprecated=deprecated, sources=[str(p) for p in paths])
@@ -1461,52 +1459,13 @@ def recorded(path: Path) -> Tuple[Dict[str, str], Dict[str, Any]]:
     removed the other way round; and a token's new `clamp()` went unseen
     (Codex on #119). Each one's `$deprecated` comes back with it. A
     resolver's record is in the sources its default contexts read, in its
-    folder; a later source wins, as in the resolution."""
+    folder; a later source wins, as in the resolution (dtcg.recorded)."""
     try:
         module = _dtcg(Path(__file__))
         data = json.loads(Path(path).read_bytes())
     except (ConfigError, OSError, ValueError):
         return {}, {}
-    docs = [data]
-    if module.is_resolver(data):
-        load = module.file_loader(Path(path).parent)
-        docs = []
-        for ref in _file_refs(module.default_sources(data))[:64]:
-            if module.outside(ref):
-                continue
-            try:
-                docs.append(load(ref))
-            except (OSError, ValueError):
-                continue
-    values: Dict[str, str] = {}
-    marks: Dict[str, Any] = {}
-    for doc in docs:
-        got, got_marks = module.not_written(doc), module.not_written_marks(doc)
-        for name, value in got.items():
-            values[name] = value
-            marks.pop(name, None)
-            if name in got_marks:
-                marks[name] = got_marks[name]
-    return values, marks
-
-
-def _file_refs(data: Any) -> List[str]:
-    """Each file a resolver's `$ref`s name (the part before `#`), in order."""
-    out: List[str] = []
-    stack: List[Tuple[Any, int]] = [(data, 0)]
-    while stack:
-        node, depth = stack.pop()
-        if depth > 32:
-            continue
-        if isinstance(node, dict):
-            ref = node.get("$ref")
-            name = ref.split("#", 1)[0] if isinstance(ref, str) else ""
-            if name and name not in out:
-                out.append(name)
-            stack.extend((v, depth + 1) for v in reversed(list(node.values())))
-        elif isinstance(node, list):
-            stack.extend((v, depth + 1) for v in reversed(node))
-    return out
+    return module.recorded(data, Path(path).parent)
 
 
 def align_spellings(old: Snapshot, new: Snapshot) -> None:
