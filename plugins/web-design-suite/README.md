@@ -191,8 +191,8 @@ helpers beside it, so it needs no `PYTHONPATH`.
 
 ## Running the scripts
 
-Every script is plain Python and needs **Python 3.9 or newer**; the three browser
-scripts need Node instead. The lint configs need a Node that stylelint 17 and
+Every script is plain Python and needs **Python 3.9 or newer**; the six `.mjs`
+scripts (the five browser gates and `tw_probe.mjs`) need Node instead. The lint configs need a Node that stylelint 17 and
 ESLint 10 both support: 20.19 or newer on the 20 line, 22.13 or newer on the 22
 line, or 24 and later. Run the scripts
 **by path, from your project's root**, so `src/` means your `src/` and every output
