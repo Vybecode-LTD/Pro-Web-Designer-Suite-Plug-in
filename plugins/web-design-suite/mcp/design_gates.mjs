@@ -215,8 +215,77 @@ class RpcError extends Error {
   }
 }
 
+// A path's real form, walked a part at a time as the system walks it: a link
+// is followed before a later `..` climbs out of where it led, so
+// `link/../secret.css` is the folder above the link's target (Codex on #155).
+// A part that does not exist yet is kept as written.
+function real(p) {
+  const { root } = path.parse(p);
+  let at = root;
+  for (const part of p.slice(root.length).split(process.platform === 'win32' ? /[\\/]+/ : /\/+/)) {
+    if (part === '' || part === '.') continue;
+    if (part === '..') {
+      at = path.dirname(at);
+      continue;
+    }
+    const next = path.join(at, part);
+    try {
+      at = fs.realpathSync.native(next);
+    } catch {
+      at = next;
+    }
+  }
+  return at;
+}
+
+// A path the model passes stays in the project (the audit's S9): the scripts
+// read a file anywhere and return its lines in a finding's snippet. The real
+// paths are compared, so a link inside the project cannot lead out. The
+// files .design-suite.json names are the project's own choice, and the
+// scripts read them wherever they are.
+function inProject(value) {
+  const full = path.isAbsolute(value) ? value : `${project()}${path.sep}${value}`;   // `..` kept for real()
+  const rel = path.relative(real(project()), real(full));
+  return !(rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel));
+}
+
+// A link under a folder a gate is given that leads out of the project, or
+// null: the scripts' os.walk opens a file link, and on Windows walks into a
+// junction, so a folder's links are checked as its name is (Codex on #155).
+// node_modules and .git are passed over, as every walker passes them over.
+function linkOut(dir) {
+  const stack = [dir];
+  while (stack.length) {
+    const at = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(at, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      const full = path.join(at, e.name);
+      if (e.isSymbolicLink()) {
+        if (!inProject(full)) return full;
+      } else if (e.isDirectory() && e.name !== 'node_modules' && e.name !== '.git') {
+        stack.push(full);
+      }
+    }
+  }
+  return null;
+}
+
+const isDir = (p) => {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+};
+
 // The arguments a tool takes, checked against its schema: only its names, of
-// their types, a path never empty.
+// their types, a path never empty and never outside the project, nor a
+// folder holding a link that leads out.
 function checked(name, args) {
   const tool = TOOLS[name];
   const given = args ?? {};
@@ -228,11 +297,22 @@ function checked(name, args) {
       : want.type === 'string' ? typeof value === 'string' && value.trim() !== ''
         : Array.isArray(value) && value.every((v) => typeof v === 'string' && v.trim() !== '');
     if (!ok) throw new RpcError(-32602, `${name}: '${key}' must be ${want.type === 'array' ? 'a list of paths' : want.type === 'string' ? 'a path' : 'true or false'}`);
+    const out = want.type === 'boolean' ? undefined : [value].flat().find((v) => !inProject(v));
+    if (out !== undefined) throw new RpcError(-32602, `${name}: '${key}' must be inside the project (${project()}): ${out}`);
   }
   for (const key of tool.required ?? []) {
     if (!(key in given)) throw new RpcError(-32602, `${name}: '${key}' is required`);
   }
   if (name === 'diff_system' && given.new && !given.old) throw new RpcError(-32602, 'diff_system: \'new\' needs \'old\'');
+  // Each folder the gate will walk: those named, or the project when `paths`
+  // is left out.
+  const folders = Object.entries(given).filter(([key]) => tool.properties[key].type !== 'boolean')
+    .flatMap(([key, value]) => [value].flat().map((v) => [key, path.resolve(project(), v)]));
+  if ('paths' in tool.properties && !(given.paths ?? []).length) folders.push(['paths', project()]);
+  for (const [key, dir] of folders.filter(([, d]) => isDir(d))) {
+    const link = linkOut(dir);
+    if (link) throw new RpcError(-32602, `${name}: '${key}' holds a link that leads out of the project: ${link}`);
+  }
   return given;
 }
 

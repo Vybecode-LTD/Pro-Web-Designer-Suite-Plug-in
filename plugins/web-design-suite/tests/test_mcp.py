@@ -203,6 +203,79 @@ class TheGates(ServerTest):
         self.assertIn("no such path: --write-baseline=x.json", reply["result"]["content"][0]["text"])
         self.assertFalse((self.tmp / "x.json").exists())
 
+    def test_a_path_outside_the_project_is_refused(self):
+        """S9 (audit, 2026-10-14): `..`, an absolute path and a link out of
+        the project were read, and a finding's snippet returned their
+        lines. Each is refused before a script runs; inside, a path still
+        reaches the script, written either way."""
+        project = self.tmp / "project"
+        self.write("project/.git/HEAD", "x\n")
+        self.write("project/src/app.css", ".x { color: #123456; }\n")
+        secret = self.write("secret/leak.css", ".leak { color: #abcdef; }\n")
+        self.write("secret/deep/x.css", ".x {}\n")
+        for name, target in (("linked", secret.parent), ("deep", secret.parent / "deep")):
+            link = project / name
+            if os.name == "nt":
+                import _winapi
+                _winapi.CreateJunction(str(target), str(link))
+                self.addCleanup(os.rmdir, link)          # the junction, never its target
+            else:
+                link.symlink_to(target, target_is_directory=True)
+                self.addCleanup(link.unlink)
+        here = {"CLAUDE_PROJECT_DIR": str(project)}
+        for tool, arguments in (("audit_design", {"paths": ["src", "../secret/leak.css"]}),
+                                ("audit_design", {"paths": [str(secret)]}),
+                                ("audit_design", {"paths": ["linked/leak.css"]}),
+                                # Codex on #155: the link is followed before the `..`, as
+                                # POSIX opens it; `deep/..` is the secret folder, not the project.
+                                ("audit_design", {"paths": ["deep/../leak.css"]}),
+                                ("a11y_static", {"paths": ["deep/.."]}),
+                                ("a11y_static", {"paths": ["linked"]}),
+                                ("perf_audit", {"budget": str(secret)}),
+                                ("perf_audit", {"src": ["../secret"]}),
+                                ("check_roles", {"tokens": "../secret/leak.css"}),
+                                ("diff_system", {"old": str(secret), "new": "src/app.css"})):
+            with self.subTest(tool=tool, arguments=arguments):
+                reply = self.call(tool, arguments, **here)
+                self.assertEqual(-32602, reply.get("error", {}).get("code"), reply)
+                self.assertIn("must be inside the project", reply["error"]["message"])
+        for paths in (["src/app.css"], [str(project / "src" / "app.css")], ["src/../src/app.css"]):
+            with self.subTest(paths=paths):
+                payload = self.result("audit_design", {"paths": paths}, **here)
+                self.assertIn("#123456", json.dumps(payload["report"]))
+
+    def link(self, target, link):
+        """A file link on POSIX; a junction to the target's folder on Windows,
+        where a file link needs a right a test cannot count on."""
+        if os.name == "nt":
+            import _winapi
+            _winapi.CreateJunction(str(target if target.is_dir() else target.parent), str(link))
+            self.addCleanup(os.rmdir, link)              # the junction, never its target
+        else:
+            link.symlink_to(target)
+            self.addCleanup(link.unlink)
+
+    def test_a_link_under_a_folder_is_refused(self):
+        """Codex on #155: a folder passed the check, and the scripts' walk
+        then opened a file link under it (on Windows, entered a junction)
+        that led out of the project. A link that stays inside still runs."""
+        project = self.tmp / "project"
+        self.write("project/.git/HEAD", "x\n")
+        self.write("project/src/app.css", ".x { color: #123456; }\n")
+        self.write("project/shared/base.css", ".y { color: #234567; }\n")
+        secret = self.write("secret/leak.css", ".leak { color: #abcdef; }\n")
+        here = {"CLAUDE_PROJECT_DIR": str(project)}
+        self.link(project / "shared" / "base.css", project / "src" / "inside")
+        payload = self.result("audit_design", {"paths": ["src"]}, **here)
+        self.assertIn("#123456", json.dumps(payload["report"]))
+        self.link(secret, project / "src" / "leak")
+        for tool, arguments in (("audit_design", {"paths": ["src"]}), ("audit_design", {}),
+                                ("a11y_static", {"paths": ["."]}), ("perf_audit", {"src": ["src"]})):
+            with self.subTest(tool=tool, arguments=arguments):
+                reply = self.call(tool, arguments, **here)
+                self.assertEqual(-32602, reply.get("error", {}).get("code"), reply)
+                self.assertIn("holds a link that leads out of the project", reply["error"]["message"])
+
     def test_a_long_report_is_cut_to_fit(self):
         """Claude Code warns past 10,000 tokens of tool output and stops at
         25,000, so a report keeps the head of its longest list within 60,000
