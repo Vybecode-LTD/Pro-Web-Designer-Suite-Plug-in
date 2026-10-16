@@ -109,7 +109,8 @@ class EvidenceRegister(unittest.TestCase):
                              ("limits <style> to 16 kB", "16 kB"),
                              ("adds 54 KB of HTML", "54 KB"),
                              ("more than 102kb, then Gmail", "102kb")):
-            self.assertEqual(FIGURE.findall(text), [figure], text)
+            with self.subTest(text=text, figure=figure):
+                self.assertEqual(FIGURE.findall(text), [figure], text)
         self.assertEqual(FIGURE.findall("a 48px-tall button, 100 × 1024, 4.5:1"), [])
         registered = {v for e in REGISTER["entries"] for v in values(e)}
         self.assertIn(norm("102 KB"), registered)
@@ -118,23 +119,25 @@ class EvidenceRegister(unittest.TestCase):
                     "email-template-system/references/email-client-matrix.md",
                     "email-template-system/references/email-architecture.md",
                     "email-template-system/references/email-workflow.md"):
-            self.assertIn(norm("16,384-byte"), registered_for(doc))
-            self.assertIn(norm("102 KB"), registered_for(doc))
-            # The docs call the threshold what the sources call it, 102 KB,
-            # and say the byte-exact figure is measured.
-            text = (SKILLS / doc).read_text(encoding="utf-8")
-            self.assertIn("102 KB", text, doc)
-            self.assertRegex(text, r"measured[:,]? ?(?:at )?102,400 bytes|102,400 bytes is the measured value|\(102,400 bytes, measured\)", doc)
+            with self.subTest(doc=doc):
+                self.assertIn(norm("16,384-byte"), registered_for(doc))
+                self.assertIn(norm("102 KB"), registered_for(doc))
+                # The docs call the threshold what the sources call it, 102 KB,
+                # and say the byte-exact figure is measured.
+                text = (SKILLS / doc).read_text(encoding="utf-8")
+                self.assertIn("102 KB", text, doc)
+                self.assertRegex(text, r"measured[:,]? ?(?:at )?102,400 bytes|102,400 bytes is the measured value|\(102,400 bytes, measured\)", doc)
         # The scripts enforce what the register records: the <style> ceiling
         # is the registered figure, and the clipping constant is the measured
         # 102,400 the docs name beside the ESPs' 102 KB.
         style_entry = next(e for e in REGISTER["entries"] if e["figure"] == "16,384 bytes")
         style_bytes = int(re.sub(r"\D", "", style_entry["figure"]))
         for script in ("build_email", "lint_email"):
-            source = (SKILLS / "email-template-system" / "scripts" / f"{script}.py").read_text(encoding="utf-8")
-            constants = dict(re.findall(r"^(GMAIL_\w+_BYTES) = ([\d_]+)", source, re.M))
-            self.assertEqual(int(constants["GMAIL_STYLE_BYTES"].replace("_", "")), style_bytes, script)
-            self.assertEqual(int(constants["GMAIL_CLIP_BYTES"].replace("_", "")), 102_400, script)
+            with self.subTest(script=script):
+                source = (SKILLS / "email-template-system" / "scripts" / f"{script}.py").read_text(encoding="utf-8")
+                constants = dict(re.findall(r"^(GMAIL_\w+_BYTES) = ([\d_]+)", source, re.M))
+                self.assertEqual(int(constants["GMAIL_STYLE_BYTES"].replace("_", "")), style_bytes, script)
+                self.assertEqual(int(constants["GMAIL_CLIP_BYTES"].replace("_", "")), 102_400, script)
 
     def test_every_attributed_figure_is_registered(self):
         seen = 0
@@ -191,7 +194,8 @@ class EvidenceRegister(unittest.TestCase):
                             ("143", "1/143 of it"), ("143", "a 2-143 range"), ("41%", "41%-43%"),
                             ("143", "143 - 200 failures"), ("143", "143 / 200"), ("143", "1 / 143"),
                             ("143", "a 2 – 143 range"), ("41%", "41% – 43%")):
-            self.assertFalse(quoted(value, norm(text)), text)
+            with self.subTest(value=value, text=text):
+                self.assertFalse(quoted(value, norm(text)), text)
         entry = {"figure": "16,384 bytes", "also": ["16,384-byte", "16384 bytes", "16 kB"]}
         self.assertEqual(spellings(entry), ["16,384 bytes", "16,384-byte", "16384 bytes"])
         old = {"figure": "19 categories", "also": ["143"]}
@@ -213,6 +217,26 @@ class EvidenceRegister(unittest.TestCase):
                     self.assertTrue(any(quoted(v, text) for v in forms),
                                     "the doc no longer quotes the figure; take the doc "
                                     "off its list, and register what it does quote")
+
+    def test_the_core_web_vitals_and_the_evals_floor_are_registered(self):
+        """D6 (audit, 2026-10-14): budgets.md quoted the thresholds "verified
+        against web.dev" and the README "Claude Code 2.1.269 or later" with no
+        entry, and FIGURE reads no duration. Each is registered with its quote,
+        so the entry tests above hold every doc that quotes it."""
+        # Each from the page its url names (CodeRabbit on #160): the good
+        # thresholds in the Web Vitals article's words, the poor in its table's.
+        vitals, table = "https://web.dev/articles/vitals", "https://web.dev/articles/defining-core-web-vitals-thresholds"
+        wanted = {"2.5 s": vitals, "200 ms": vitals, "≤ 0.1": vitals, "75th percentile": vitals,
+                  "4 s": table, "500 ms": table, "> 0.25": table}
+        for figure, url in wanted.items():
+            with self.subTest(figure=figure):
+                entry = next((e for e in REGISTER["entries"] if e["figure"] == figure), None)
+                self.assertIsNotNone(entry)
+                self.assertIn("perf-budget-gate/references/budgets.md", entry["docs"])
+                self.assertEqual(url, entry["url"])
+        floor = next((e for e in REGISTER["entries"] if e["figure"] == "2.1.269"), None)
+        self.assertIsNotNone(floor)
+        self.assertEqual(["../README.md"], floor["docs"])
 
     def test_no_companion_outlives_its_figure(self):
         """An `also` value is quoted, on its own, in at least one of its

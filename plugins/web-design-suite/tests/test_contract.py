@@ -211,7 +211,8 @@ class EveryConsumerKnowsEveryRole(unittest.TestCase):
     def test_the_contract_lists_the_roles_it_should(self):
         self.assertGreater(len(self.roles), 80)
         for role in ("--gap-related", "--pad-block-sm", "--bg-scrim", "--motion-instant", "--z-modal"):
-            self.assertIn(role, self.roles)
+            with self.subTest(role=role):
+                self.assertIn(role, self.roles)
 
     def test_the_starter_declares_every_role(self):
         self.assertEqual(set(), self.roles - declared(TOKENS.read_text(encoding="utf-8")))

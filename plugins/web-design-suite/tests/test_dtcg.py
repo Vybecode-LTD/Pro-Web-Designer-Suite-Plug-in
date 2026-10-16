@@ -40,6 +40,13 @@ def dtcg_module():
     return module
 
 
+def srgb(hex_: str) -> dict:
+    """A DTCG 2025.10 colour: the object form, with its hex (T9: the fixtures
+    used the pre-2025.10 string, which the reader passes through as text)."""
+    return {"colorSpace": "srgb", "components": [round(int(hex_[i:i + 2], 16) / 255, 4) for i in (1, 3, 5)],
+            "hex": hex_}
+
+
 class TheCopiesAreTheMaster(unittest.TestCase):
     """dtcg.py sits beside every project_config.py, which reads a DTCG token
     file through it, byte-identical to shared/dtcg.py."""
@@ -259,7 +266,8 @@ class FigmaToTokensWritesDtcg(TempDirTest):
         self.assertEqual("oklch", doc["brand"]["$root"]["$value"]["colorSpace"])   # --color-format's default
         self.assertEqual("use bg.brand", doc["old"]["accent"]["$deprecated"])
         for pattern in (r'"\$value"\s*:\s*"\{[\w.$-]+\}"', r'"colorSpace"\s*:', r'"\$type"\s*:\s*"color"'):
-            self.assertRegex(text, pattern)                     # what evals/lifecycle/dtcg-export grades
+            with self.subTest(pattern=pattern):
+                self.assertRegex(text, pattern)                     # what evals/lifecycle/dtcg-export grades
         self.assertNotIn("{'", text)
 
     def test_a_tokens_css_becomes_one_and_its_themes_are_named(self):
@@ -305,7 +313,8 @@ class TokensStudio(TempDirTest):
         self.assertIn("--bg-surface: var(--neutral-900);", blocks['[data-theme="dark"]'])
         self.assertIn("--space-6: 1.5rem;", blocks[":root"])
         for wrong in ("--light-", "--dark-", "--global-", "{space.base}"):
-            self.assertNotIn(wrong, text)
+            with self.subTest(wrong=wrong):
+                self.assertNotIn(wrong, text)
 
     def test_each_theme_group_is_a_collection(self):
         from test_project_config import STUDIO_GROUPS
@@ -321,10 +330,12 @@ class TokensStudio(TempDirTest):
         proc, text, blocks = self.css(STUDIO_LEGACY)
         self.assertEqual(1, proc.returncode, output(proc))
         for name in ("space/mixed", "space/zero", "space/lost"):
-            self.assertIn(f"`{name}` was left out: math this script cannot work out", output(proc))
+            with self.subTest(name=name):
+                self.assertIn(f"`{name}` was left out: math this script cannot work out", output(proc))
         for decl in ("--space-half: 0.09375rem;", "--space-neg: -0.3125rem;", "--font-bold: 700;",
                      "--opacity-hover: 0.16;", "--space-fluid: calc(1rem + 2vw);", "--bg-surface: var(--neutral-0);"):
-            self.assertIn(decl, blocks[":root"])
+            with self.subTest(decl=decl):
+                self.assertIn(decl, blocks[":root"])
         self.assertNotIn("{space", text)
 
     def test_a_themes_own_sets_beat_the_sets_it_only_reads(self):
@@ -402,10 +413,18 @@ class TheEdgesOfTheFormat(TempDirTest):
         return pc.read_tokens([self.write(name, json.dumps(data))])
 
     def test_a_key_with_a_space_is_a_css_name(self):
-        tokens = self.read({"Button background": {"$type": "color", "$value": "#ffffff"},
+        tokens = self.read({"Button background": {"$type": "color", "$value": srgb("#ffffff")},
                             "Card (raised)": {"$type": "color", "$value": "{Button background}"}})
         self.assertEqual({"--Card-raised-": "var(--Button-background)"}, tokens.roles)
         self.assertEqual("#ffffff", tokens.values()["--Button-background"])
+
+    def test_the_legacy_string_reads_as_the_object(self):
+        """T9: the fixtures above use 2025.10's object; the pre-2025.10 string
+        (and Tokens Studio's) stays readable, and reads the same."""
+        legacy = self.read({"ink": {"$type": "color", "$value": "#2f6df6"}}, "legacy.tokens.json")
+        current = self.read({"ink": {"$type": "color", "$value": srgb("#2f6df6")}}, "current.tokens.json")
+        self.assertEqual("#2f6df6", current.values()["--ink"])
+        self.assertEqual(legacy.values(), current.values())
 
     def test_alpha_just_below_one_is_kept(self):
         tokens = self.read({"veil": {"$type": "color", "$value": {
@@ -413,18 +432,18 @@ class TheEdgesOfTheFormat(TempDirTest):
         self.assertEqual("rgb(255 0 0 / 0.9995)", tokens.constants["--veil"])
 
     def test_an_extends_cycle_is_reported(self):
-        for doc in ({"a": {"$extends": "{a}", "x": {"$type": "color", "$value": "#000000"}}},
-                    {"a": {"$extends": "{b}", "x": {"$type": "color", "$value": "#000000"}},
-                     "b": {"$extends": "{a}", "y": {"$type": "color", "$value": "#ffffff"}}}):
+        for doc in ({"a": {"$extends": "{a}", "x": {"$type": "color", "$value": srgb("#000000")}}},
+                    {"a": {"$extends": "{b}", "x": {"$type": "color", "$value": srgb("#000000")}},
+                     "b": {"$extends": "{a}", "y": {"$type": "color", "$value": srgb("#ffffff")}}}):
             with self.subTest(doc=list(doc)):
                 _, problems = self.dtcg.normalise(doc)
                 self.assertTrue(any("cycle" in why for _, why in problems), problems)
 
     def test_a_document_nested_too_deep_is_refused_not_a_traceback(self):
-        deep = {"$type": "color", "$value": "#000000"}
+        deep = {"$type": "color", "$value": srgb("#000000")}
         for _ in range(300):
             deep = {"g": deep}
-        doc = {"top": {"$type": "color", "$value": "#ffffff"}, "deep": deep}
+        doc = {"top": {"$type": "color", "$value": srgb("#ffffff")}, "deep": deep}
         _, problems = self.dtcg.normalise(doc)
         self.assertIn("more than 64 levels", problems[0][1])
         self.assertEqual({}, self.read(doc).values())
@@ -855,7 +874,8 @@ class TheResolver(TempDirTest):
         self.assertGreater(len(refs), 20)
         for name, value in refs.items():
             # A dark value equal to the default is the default's: --full-themes keeps it.
-            self.assertEqual(value, after['[data-theme="dark"]'].get(name, after[":root"].get(name)), name)
+            with self.subTest(name=name, value=value):
+                self.assertEqual(value, after['[data-theme="dark"]'].get(name, after[":root"].get(name)), name)
         self.assertEqual("0.875", after['[data-density="compact"]']["--density"])
 
     def test_a_tokens_studio_export_writes_its_themes(self):
@@ -883,7 +903,8 @@ class TheResolver(TempDirTest):
         for why in ("`https://example.com/tokens.json` is a URL", "`gone.tokens.json` could not be read",
                     "`#/sets/base` is part of a cycle", "`#/modifiers/missing` names no set or modifier",
                     "names no default among its contexts: `small`"):
-            self.assertIn(why, output(proc))
+            with self.subTest(why=why):
+                self.assertIn(why, output(proc))
 
     def test_a_density_modifier_keeps_its_contexts_out_of_the_theme(self):
         data = {"version": "2025.10", "resolutionOrder": [

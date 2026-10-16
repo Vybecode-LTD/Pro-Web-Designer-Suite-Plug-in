@@ -9,11 +9,12 @@ JSON — the error message even recommended the redirect that caused it.
 """
 from __future__ import annotations
 
+import ast
 import json
 import re
 import unittest
 
-from wds_support import NODE, SKILLS, TempDirTest, output, run_node, run_py
+from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, output, run_node, run_py
 
 POWERSHELL_ENCODINGS = ("utf-8-sig", "utf-16")     # PS 7 / configured PS 5.1, stock PS 5.1
 DECISION_LOG = """# Test deck
@@ -105,21 +106,74 @@ class JsonFromPowerShell(TempDirTest):
                 self.assertEqual(proc.returncode, 42, output(proc))
 
 
+def fragile_python_reads(src: str) -> list[int]:
+    """The line of each `json.load(s)` whose argument reads text: a
+    `read_text()`, or an `open()` not in binary mode. Parsed, so a call split
+    over lines is found too (CodeRabbit on #160)."""
+    def reads_text(call):
+        if isinstance(call.func, ast.Attribute) and call.func.attr == "read_text":
+            return True
+        if isinstance(call.func, ast.Name) and call.func.id == "open":
+            mode = call.args[1] if len(call.args) > 1 else next(
+                (k.value for k in call.keywords if k.arg == "mode"), None)
+            return not (isinstance(mode, ast.Constant) and "b" in str(mode.value))
+        return False
+
+    out = []
+    for node in ast.walk(ast.parse(src)):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in ("load", "loads")
+                and isinstance(node.func.value, ast.Name) and node.func.value.id == "json"
+                and any(isinstance(n, ast.Call) and reads_text(n) for arg in node.args for n in ast.walk(arg))):
+            out.append(node.lineno)
+    return out
+# `fs.readFileSync`, a named import's `readFileSync`, and the promise forms (T3).
+FRAGILE_NODE = re.compile(r"JSON\.parse\(\s*(?:await\s+)?(?:fs\.(?:promises\.)?)?readFile(?:Sync)?\(")
+
+
+def readers(suffix):
+    """Every script that reads a user's JSON: the skills', the workflow
+    commands' runners and the shared readers (T3: only the skills' were read)."""
+    found = sorted([*SKILLS.glob(f"*/scripts/*{suffix}"), *PLUGIN.glob(f"workflow-commands/*/scripts/*{suffix}"),
+                    *PLUGIN.glob(f"shared/*{suffix}")])
+    return found
+
+
 class NoFragileJsonReads(unittest.TestCase):
     """Source scan, so a reader added later cannot reintroduce the bug."""
 
+    def test_the_patterns_find_each_fragile_read(self):
+        """T3 (audit, 2026-10-14): the scan had no positive control, and a
+        named import's `JSON.parse(readFileSync(` passed it."""
+        for src in ('data = json.loads(path.read_text(encoding="utf-8"))', "data = json.load(open(p))",
+                    'data = json.loads(\n    path.read_text(encoding="utf-8"))\n',
+                    "data = json.loads(open(p, encoding='utf-8').read())"):
+            with self.subTest(src=src):
+                self.assertEqual([1], fragile_python_reads(src))
+        for src in ("data = json.loads(path.read_bytes())", "data = json.loads(open(p, 'rb').read())",
+                    "data = json.load(open(p, mode='rb'))"):
+            with self.subTest(src=src):
+                self.assertEqual([], fragile_python_reads(src))
+        for line in ("JSON.parse(fs.readFileSync(p, 'utf8'))", "JSON.parse(readFileSync(p, 'utf8'))",
+                     "JSON.parse(await fs.promises.readFile(p, 'utf8'))", "JSON.parse(await readFile(p, 'utf8'))"):
+            with self.subTest(line=line):
+                self.assertRegex(line, FRAGILE_NODE)
+        self.assertNotRegex("readJsonFile(p)", FRAGILE_NODE)
+
     def test_python_json_is_parsed_from_bytes(self):
-        for script in SKILLS.glob("*/scripts/*.py"):
-            for n, line in enumerate(script.read_text(encoding="utf-8").splitlines(), 1):
-                with self.subTest(file=script.name, line=n):
-                    self.assertNotRegex(line, r"json\.loads?\(.*read_text\(",
-                                        "parse JSON from read_bytes(); json detects the encoding")
+        scripts = readers(".py")
+        self.assertGreater(len(scripts), 40)
+        for script in scripts:
+            with self.subTest(file=script.name):
+                self.assertEqual([], fragile_python_reads(script.read_bytes().decode("utf-8")),
+                                 "parse JSON from read_bytes(); json detects the encoding")
 
     def test_node_json_is_read_through_the_bom_aware_helper(self):
-        for script in SKILLS.glob("*/scripts/*.mjs"):
+        scripts = readers(".mjs")
+        self.assertGreater(len(scripts), 5)
+        for script in scripts:
             text = script.read_text(encoding="utf-8")
             with self.subTest(file=script.name):
-                self.assertIsNone(re.search(r"JSON\.parse\(\s*fs\.readFileSync", text))
+                self.assertIsNone(FRAGILE_NODE.search(text))
 
 
 if __name__ == "__main__":

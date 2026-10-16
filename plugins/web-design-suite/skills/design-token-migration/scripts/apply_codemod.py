@@ -71,7 +71,7 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 # The CSS scanner, the comment blanker and the normalizers live in
 # extract_literals.py. One implementation, or the codemod and the census
@@ -334,7 +334,7 @@ class Mapping:
                   f"Generate it with:\n"
                   f"  python -m scripts.cluster_values literals.json -o ./proposal",
                   file=sys.stderr)
-            raise SystemExit(2)
+            raise SystemExit(2) from None
         schema = payload.get("schema") if isinstance(payload, dict) else None
         if str(schema or "").split("@")[0] != "design-token-migration/mapping":
             print(f"apply_codemod: {path} is not a codemod mapping "
@@ -713,7 +713,6 @@ def plan_motion(masked: str, value: str, value_offset: int, base: int,
     result never half-rewrites a shorthand.
     """
     edits: List[Edit] = []
-    offset = 0
     layers = []
     depth, start = 0, 0
     for i, ch in enumerate(masked):
@@ -725,7 +724,6 @@ def plan_motion(masked: str, value: str, value_offset: int, base: int,
             layers.append((start, i))
             start = i + 1
     layers.append((start, len(masked)))
-    del offset
 
     all_converted = True
     for lo, hi in layers:

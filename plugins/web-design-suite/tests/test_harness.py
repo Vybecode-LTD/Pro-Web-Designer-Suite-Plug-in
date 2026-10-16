@@ -132,6 +132,20 @@ class Subprocesses(unittest.TestCase):
         self.assertEqual([], found)
 
 
+class NoBytecode(unittest.TestCase):
+
+    def test_importing_the_helpers_turns_bytecode_off(self):
+        """T7 (audit, 2026-10-14): only test_doc_snippets set the flag, part
+        way through a run, so a hand run without -B could write __pycache__
+        into the plugin through load_script, depending on module order."""
+        clean = env()
+        clean.pop("PYTHONDONTWRITEBYTECODE", None)
+        proc = subprocess.run([sys.executable, "-c", "import sys, wds_support; print(sys.dont_write_bytecode)"],
+                              cwd=pathlib.Path(__file__).parent, capture_output=True, env=clean, timeout=60)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual("True", proc.stdout.decode("utf-8").strip())
+
+
 class TempFolders(TempDirTest):
 
     def test_write_keeps_the_text_as_given(self):

@@ -67,7 +67,6 @@ from __future__ import annotations
 import argparse
 import glob
 import json
-import os
 import re
 import sys
 from dataclasses import dataclass, field, asdict
@@ -3477,7 +3476,7 @@ def main(argv: list[str] | None = None) -> int:
                            or "table" not in q]
         security_pass(model)
         if not model.tables:
-            print(f"introspect_schema: --only matched no tables.", file=sys.stderr)
+            print("introspect_schema: --only matched no tables.", file=sys.stderr)
             return 1
 
     doc = model_to_dict(model, {"path": ", ".join(str(each) for each in paths), "format": fmt,

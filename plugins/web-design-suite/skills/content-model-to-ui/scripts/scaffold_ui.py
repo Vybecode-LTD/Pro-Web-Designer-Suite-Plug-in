@@ -1469,7 +1469,6 @@ def cell_render(col: dict[str, Any], row: str = "row",
     """
     ui = col["ui"]
     ctrl = ui["control"]
-    nullable = col.get("nullable", True)
     ans = ans or Answers(None)
     table = table or {"name": "", "screens": {}}
     acc = (f"{row}.{col['name']}"
@@ -3073,14 +3072,14 @@ def emit_policies(table: dict[str, Any], model: dict[str, Any], ans: Answers) ->
             out.append("")
     elif kind == "tenant":
         col = sql_ident(own["column"])
-        out += [f"-- TODO(policy): a policy needs the caller's tenants, which this schema does",
-                f"-- not show. The usual shape is a security-definer helper in a schema the API",
-                f"-- does not expose. Until then RLS is on with no policy: nobody can read or write.",
+        out += ["-- TODO(policy): a policy needs the caller's tenants, which this schema does",
+                "-- not show. The usual shape is a security-definer helper in a schema the API",
+                "-- does not expose. Until then RLS is on with no policy: nobody can read or write.",
                 f"--   create function private.user_{own['column']}s() returns setof uuid",
-                f"--     language sql security definer set search_path = '' stable",
+                "--     language sql security definer set search_path = '' stable",
                 f"--     as $$ select {col} from {sql_ident(schema)}.memberships where user_id = {UID} $$;",
                 f"--   revoke execute on function private.user_{own['column']}s() from public;",
-                f"--   grant usage on schema private to authenticated;",
+                "--   grant usage on schema private to authenticated;",
                 f"--   grant execute on function private.user_{own['column']}s() to authenticated;",
                 f"--   create policy {sql_ident(policy_name(name, 'members read'))} on {q}",
                 f"--     for select to authenticated using ({col} in (select private.user_{own['column']}s()));",

@@ -105,7 +105,8 @@ class RuntimePromises(unittest.TestCase):
     def test_the_code_still_presses_what_the_test_says(self):
         code = read(RUNTIME)
         for key in set().union(*DRIVEN.values()):
-            self.assertRegex(code, rf"'{key}'")
+            with self.subTest(key=key):
+                self.assertRegex(code, rf"'{key}'")
 
     def test_the_keys_check_claims_only_the_keys_it_presses(self):
         row = next(line for line in a11y_skill_text().splitlines()
@@ -136,11 +137,14 @@ class RuntimePromises(unittest.TestCase):
         self.assertEqual(set(re.findall(r"`([a-z]+(?:_[a-z]+)+)`", row)), keys)
 
     def test_reduced_motion_is_not_listed_as_implemented(self):
-        if "reducedMotion: 'no-preference'" not in read(RUNTIME):
-            self.skipTest("the runtime now emulates reduced motion")
+        """T4 (audit, 2026-10-14): both assertions sat behind conditionals,
+        so rewording the intro or the context passed silently. The runtime
+        runs with reduced motion off, and the intro says §6 is by hand."""
+        self.assertIn("reducedMotion: 'no-preference'", read(RUNTIME))
+        self.assertNotIn("reducedMotion: 'reduce'", read(RUNTIME))
         intro = read(A11Y / "references" / "runtime-checks.md").split("\n\n", 2)[1]
-        if "Every technique here is implemented" in intro:
-            self.assertRegex(intro, r"except §6")
+        self.assertRegex(intro, r"except §6, reduced motion")
+        self.assertIn("by hand", intro)
 
 
 def a11y_modules():
@@ -332,7 +336,8 @@ class StudioFacts(unittest.TestCase):
         self.assertNotRegex(intro, r"(?i)2\.2[^.]*legal baseline|legal baseline[^.]*2\.2")
         for fact in ("EN 301 549 v3.2.1", "WCAG 2.1", "v4.1.1", "Section 508", "WCAG 2.0",
                      "2027-04-26", "2028-04-26"):
-            self.assertIn(fact, intro)
+            with self.subTest(fact=fact):
+                self.assertIn(fact, intro)
 
     def test_200_percent_zoom_is_never_labelled_reflow(self):
         """SB-A21 (c): reflow (1.4.10) is 320 CSS px, which is 400% zoom."""
@@ -696,7 +701,8 @@ class AxeTagAdvice(unittest.TestCase):
         named = {"autocomplete-valid": "wcag21aa", "avoid-inline-spacing": "wcag21aa",
                  "label-content-name-mismatch": "wcag21a", "css-orientation-lock": "wcag21aa"}
         for rule in named:
-            self.assertIn(f"`{rule}`", doc)
+            with self.subTest(rule=rule):
+                self.assertIn(f"`{rule}`", doc)
         modules = tool_modules("WDS_NODE_MODULES", "axe-core", node_path=True)
         proc = run_node_script(
             "const axe = require('axe-core'); process.stdout.write(JSON.stringify("

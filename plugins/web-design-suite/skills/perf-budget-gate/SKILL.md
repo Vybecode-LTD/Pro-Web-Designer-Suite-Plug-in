@@ -147,7 +147,7 @@ Verified against web.dev before writing. **These are field metrics, assessed at 
 
 | Metric | Good | Needs improvement | Poor | Measures |
 |---|---|---|---|---|
-| **LCP** | ≤ 2.5 s | 2.5 – 4.0 s | > 4.0 s | When the largest element painted |
+| **LCP** | ≤ 2.5 s | 2.5 – 4 s | > 4 s | When the largest element painted |
 | **INP** | ≤ 200 ms | 200 – 500 ms | > 500 ms | Worst interaction's full latency, outliers trimmed |
 | **CLS** | ≤ 0.1 | 0.1 – 0.25 | > 0.25 | Largest session window of unexpected layout shift |
 

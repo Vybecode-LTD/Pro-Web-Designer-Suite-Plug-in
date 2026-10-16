@@ -57,7 +57,7 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple
 
 SCHEMA = "design-system-docs/system/1"
 
@@ -740,7 +740,6 @@ class _Expr:
         if t.endswith("("):
             fn = self.next()[:-1].lower()
             args: List[Quantity] = []
-            cur_start = self.i
             depth = 1
             pieces: List[List[str]] = [[]]
             while self.i < len(self.toks):
@@ -1267,7 +1266,6 @@ def build_component(cf: CssFile, cls: str, root: Rule,
         "state": "default", "selector": root.selector, "line": root.line, "sets": {}}}
     parts: Dict[str, Dict[str, Any]] = {}
     reads: set = set()
-    tier1_reads: List[str] = []
 
     for r in own_rules:
         sel = r.selector

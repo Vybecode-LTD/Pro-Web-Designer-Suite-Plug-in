@@ -128,7 +128,7 @@ def parse(parser, where, argv):
     try:
         ns, extra = parser.parse_known_args(argv)
     except SystemExit:
-        raise AssertionError(f"{where}: the script's parser rejects {argv}")
+        raise AssertionError(f"{where}: the script's parser rejects {argv}") from None
     if extra:
         raise AssertionError(f"{where}: unknown arguments {extra}")
     return ns
@@ -205,8 +205,9 @@ class DriftGateRecipe(TempDirTest):
         self.assertIsNotNone(fresh, f"{check_at}: no documented command writes {check.system}")
         argv = dict(documented("extract_system"))
         for where in (base_at, fresh_at):
-            proc = run_py("design-system-docs", "extract_system", *argv[where], cwd=self.tmp)
-            self.assertEqual(proc.returncode, 0, f"{where}\n{output(proc)}")
+            with self.subTest(where=where):
+                proc = run_py("design-system-docs", "extract_system", *argv[where], cwd=self.tmp)
+                self.assertEqual(proc.returncode, 0, f"{where}\n{output(proc)}")
         proc = run_py("design-system-docs", "build_docs", *dict(documented("build_docs"))[check_at],
                       cwd=self.tmp)
         self.assertEqual(proc.returncode, 0, f"{check_at}\n{output(proc)}")
@@ -540,7 +541,8 @@ class DependencyFacts(unittest.TestCase):
         self.assertEqual(1, len(re.findall(r"'custom-property-pattern':\s*'", text)))
         pattern = re.search(r"'custom-property-pattern':\s*'([^']+)'", text).group(1)
         for name in ("space-0-5", "text-2xs", "radius-2xl", "fg-on-warning"):
-            self.assertRegex(name, pattern)
+            with self.subTest(name=name):
+                self.assertRegex(name, pattern)
 
     def test_the_tailwind_block_fits_the_plugin(self):
         text = (CONFIG_DIR / "eslint.design.config.mjs").read_text(encoding="utf-8")

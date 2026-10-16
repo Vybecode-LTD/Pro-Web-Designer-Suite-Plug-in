@@ -142,7 +142,8 @@ class TheScriptReferences(TempDirTest):
             source = (SKILLS / skill / "scripts" / script).read_text(encoding="utf-8")
             reference = (SKILLS / skill / "references" / "scripts.md").read_text(encoding="utf-8")
             flags = set(re.findall(r'add_argument\(\s*(?:"-\w",\s*)?"(--[\w-]+)"', source))
-            self.assertGreater(len(flags), 3, script)
+            with self.subTest(script=script):
+                self.assertGreater(len(flags), 3, script)
             for flag in sorted(flags):
                 with self.subTest(script=script, flag=flag):
                     self.assertRegex(reference, rf"(?<![\w-]){re.escape(flag)}(?![\w-])")
@@ -313,7 +314,8 @@ class SupabaseSamples(TempDirTest):
         self.assertEqual(proc.returncode, 0, output(proc))
         got = json.loads(proc.stdout)
         for case in got["hostile"]:
-            self.assertIn("threw", case)                   # never reaches .or()
+            with self.subTest(case=case):
+                self.assertIn("threw", case)                   # never reaches .or()
         self.assertEqual(len(got["valid"].get("or", [])), 1, got["valid"])
         self.assertEqual(got["hidden"], "rejected")        # RLS hid the row: 0 rows, no error
         self.assertEqual(got["denied"], "rejected")        # 42501
@@ -440,7 +442,8 @@ class Manifests(unittest.TestCase):
         entry = self.load(self.PLUGIN_MARKET)["plugins"][0]
         self.assertEqual(plugin["name"], entry["name"])
         for field in ("license", "homepage", "author"):
-            self.assertEqual(plugin[field], entry[field], field)
+            with self.subTest(field=field):
+                self.assertEqual(plugin[field], entry[field], field)
 
 
 # What bash, PowerShell 5.1 and cmd do not read alike (XC-B5). A command a
@@ -557,7 +560,8 @@ class PasteableCommands(unittest.TestCase):
     def test_every_command_a_readme_shows_pastes_into_bash_powershell_and_cmd(self):
         for name, text in self.readmes():
             lines = list(pasted_lines(text))
-            self.assertTrue(lines, name)
+            with self.subTest(readme=name):
+                self.assertTrue(lines, name)
             for line in lines:
                 with self.subTest(readme=name, line=line):
                     self.assertEqual([], not_portable(line))
@@ -971,7 +975,10 @@ class NoMachinePaths(unittest.TestCase):
 
 
 PYTHON_FLOOR = (3, 9)
-SCRIPTS = sorted(p for folder in ("skills", "tests", "tools") for p in (PLUGIN / folder).rglob("*.py"))
+# T5 (audit, 2026-10-14): the workflow commands' runners and the shared readers too.
+SCRIPTS = sorted(p for folder in ("skills", "workflow-commands", "shared", "tests", "tools")
+                 for p in (PLUGIN / folder).rglob("*.py"))
+RUNNERS = sorted([*SKILLS.glob("*/scripts/*.py"), *PLUGIN.glob("workflow-commands/*/scripts/*.py")])
 
 
 def floor_python() -> str | None:
@@ -1010,6 +1017,8 @@ class PythonFloor(unittest.TestCase):
 
     def test_every_script_parses_with_the_floors_grammar(self):
         self.assertGreater(len(SCRIPTS), 40)
+        folders = {p.relative_to(PLUGIN).parts[0] for p in SCRIPTS}
+        self.assertLessEqual({"skills", "workflow-commands", "shared", "tests", "tools"}, folders)
         for path in SCRIPTS:
             with self.subTest(script=path.relative_to(PLUGIN).as_posix()):
                 ast.parse(path.read_bytes(), feature_version=PYTHON_FLOOR)
@@ -1024,7 +1033,7 @@ class PythonFloor(unittest.TestCase):
                                    "    compile(open(p, 'rb').read(), p, 'exec')\n", *map(str, SCRIPTS)],
                                   capture_output=True, env=env(), timeout=120)
         self.assertEqual(0, compiled.returncode, output(compiled))
-        for script in sorted(SKILLS.glob("*/scripts/*.py")):
+        for script in RUNNERS:
             with self.subTest(script=script.relative_to(PLUGIN).as_posix()):
                 proc = subprocess.run([FLOOR_PYTHON, str(script), "--help"], capture_output=True,
                                       env=env(), timeout=60)
@@ -1038,6 +1047,43 @@ class PythonFloor(unittest.TestCase):
         proc = subprocess.run([FLOOR_PYTHON, "-B", "-m", "unittest", "test_harness"], cwd=PLUGIN / "tests",
                               capture_output=True, env=env(), timeout=120)
         self.assertEqual(0, proc.returncode, output(proc))
+
+
+SIZE_ROW = re.compile(r"^[ \t]*\| ([a-z-]+) \| ([\d,]+) \|", re.M)
+
+
+class TheAuditsDocsLows(unittest.TestCase):
+    """P55 part 5, the audit of 2026-10-14's §3.7: D5 and D8. D6 is
+    test_evidence's, D7 test_pointers' and D9 test_static_checks'. The
+    tests' own repository: fail_before.py swaps the plugin, not these."""
+
+    def setUp(self):
+        if not (REPO and (REPO / "CLAUDE.md").is_file() and (REPO / "dev plans").is_dir()):
+            self.skipTest("no repository around the tests (a release's copy)")
+
+    def test_claude_md_maps_every_tool_and_both_kinds_of_eval(self):
+        """D5: the map listed two of tools/' five scripts, and called
+        evals.yml "the routing evals"; it runs the outcome cases too."""
+        lines = (REPO / "CLAUDE.md").read_text(encoding="utf-8").splitlines()
+        mapped = next(line for line in lines if line.strip().startswith("tools/"))
+        tools = sorted(p.name for p in (REPO / "plugins" / "web-design-suite" / "tools").glob("*.py"))
+        self.assertGreaterEqual(len(tools), 5)
+        self.assertEqual([], [name for name in tools if name not in mapped])
+        evals = next(line for line in lines if "evals.yml (" in line)
+        self.assertIn("routing and outcome", evals)
+
+    def test_a_byte_table_in_the_live_docs_is_the_disks(self):
+        """D8: the session prompt's SKILL.md sizes drifted from the files
+        (landing-page-conversion 20,497 against 20,496)."""
+        self.assertEqual([("demo-skill", "20,123")], SIZE_ROW.findall("| Skill | Bytes |\n|---|---|\n  | demo-skill | 20,123 |\n"))
+        sizes = {p.parent.name: p.stat().st_size
+                 for p in (REPO / "plugins" / "web-design-suite" / "skills").glob("*/SKILL.md")}
+        self.assertEqual(13, len(sizes))
+        for rel in LIVE_DOCS:
+            for name, size in SIZE_ROW.findall((REPO / rel).read_text(encoding="utf-8")):
+                if name in sizes:
+                    with self.subTest(doc=rel, skill=name):
+                        self.assertEqual(sizes[name], int(size.replace(",", "")))
 
 
 if __name__ == "__main__":

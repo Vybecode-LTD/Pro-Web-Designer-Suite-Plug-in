@@ -237,7 +237,8 @@ class AuthoringCommentsAreDropped(EmailTest):
         body += "<!-- note: write the name as {{first_name}} --><p>Hi</p>"
         html = self.build(self.page("esp.html", body))[0].read_text(encoding="utf-8")
         for directive in kept:
-            self.assertIn(directive, html)
+            with self.subTest(directive=directive):
+                self.assertIn(directive, html)
         self.assertNotIn("note: write the name", html)
 
 
@@ -337,7 +338,8 @@ class LintTheSource(EmailTest):
         found = self.source_findings("letter-spacing: -0.015em; margin-left: -24px;")
         messages = [f[1] for f in found]
         for literal in ("letter-spacing: -0.015em", "margin-left: -24px"):
-            self.assertTrue(any(m.startswith(literal) for m in messages), messages)
+            with self.subTest(literal=literal):
+                self.assertTrue(any(m.startswith(literal) for m in messages), messages)
 
     def test_the_templates_hold_law_1(self):
         for template in TEMPLATES:
@@ -534,7 +536,8 @@ class EmailDocClaims(EmailTest):
 
     def test_the_heading_sizes_say_why_they_differ_from_the_web(self):
         for name in ("--type-h1-size", "--type-h2-size"):
-            self.assertIn("own heading scale", self.TOKENS["tokens"][name].get("note", ""), name)
+            with self.subTest(name=name):
+                self.assertIn("own heading scale", self.TOKENS["tokens"][name].get("note", ""), name)
 
     def test_the_edge_reads_the_border_role(self):
         self.assertEqual(self.TOKENS["tokens"]["--email-edge"]["value"], "1px solid var(--border-subtle)")
@@ -562,7 +565,8 @@ class EmailDocClaims(EmailTest):
                        "5 May 2025", "550; 5.7.515", "p=none", "not transactional",
                        "reverse DNS", "TLS", "RFC 5322", "in summary",
                        "Google recommends rather than requires", "5,000 or more emails a day", "same `5322.From` domain"):
-            self.assertIn(needle, workflow)
+            with self.subTest(needle=needle):
+                self.assertIn(needle, workflow)
 
 
 class TheAuditsEmailMediums(EmailTest):

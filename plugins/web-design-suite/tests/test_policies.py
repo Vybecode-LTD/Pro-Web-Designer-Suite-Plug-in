@@ -168,7 +168,8 @@ class PoliciesAreProposed(Scaffolded):
         self.assertEqual(draft, grants(text, "update"))
         self.assertEqual(draft + ["id"], grants(text, "insert"))
         for column in ("role", "is_admin", "credits", "org_id", "api_token", "id"):
-            self.assertNotIn(column, grants(text, "update"))
+            with self.subTest(column=column):
+                self.assertNotIn(column, grants(text, "update"))
         self.assertIn("revoke insert, update on public.profiles from authenticated;", text)
 
     def test_a_tenant_table_gets_a_template_and_no_policy(self):
@@ -302,8 +303,9 @@ class PoliciesRunOnPostgres(Scaffolded):
         proposals = sorted((src / "db" / "policies").glob("*.todo.sql"))
         self.assertGreaterEqual(len(proposals), 4)
         for path in proposals:
-            proc = self.psql(db, file=path)
-            self.assertEqual(0, proc.returncode, f"{path.name}: {output(proc)}")
+            with self.subTest(path=path):
+                proc = self.psql(db, file=path)
+                self.assertEqual(0, proc.returncode, f"{path.name}: {output(proc)}")
         return db, src
 
     def smoke(self, db, src, table):

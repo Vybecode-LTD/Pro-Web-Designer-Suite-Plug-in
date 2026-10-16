@@ -1213,13 +1213,11 @@ def parse_style_object(body: str) -> list[tuple[str, str, int]]:
                 while k >= 0 and body[k] != q:
                     k -= 1
                 key = body[k + 1:j]
-                key_start = k
             else:
                 k = j
                 while k >= 0 and (body[k].isalnum() or body[k] in "_$-"):
                     k -= 1
                 key = body[k + 1:j + 1]
-                key_start = k + 1
             # Walk forward for the value, to the next top-level comma.
             v = i + 1
             vdepth = 0
@@ -1245,7 +1243,6 @@ def parse_style_object(body: str) -> list[tuple[str, str, int]]:
             if key and (re.fullmatch(r"[-\w$]+", key) or raw_value.lstrip().startswith("{")):
                 out.append((key, raw_value, i + 1))
             i = v + 1
-            del key_start
             continue
         i += 1
     return out

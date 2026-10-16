@@ -63,7 +63,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 # A sibling import would otherwise leave __pycache__ inside the installed
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
@@ -143,7 +143,7 @@ def load_ledger(path: Path) -> Dict[str, Any]:
     except (OSError, json.JSONDecodeError) as exc:
         raise bail(f"deprecate: {path} is not readable JSON ({exc}). "
                          f"Fix it or move it aside; this script will not "
-                         f"overwrite a file it cannot read.")
+                         f"overwrite a file it cannot read.") from None
     schema = data.get("schema") if isinstance(data, dict) else None   # `[]` was a traceback (V8)
     if str(schema or "").split("@")[0] != LEDGER_SCHEMA.split("@")[0]:
         raise bail(f"deprecate: {path} is not a deprecation ledger "
@@ -702,8 +702,8 @@ def cmd_add(args: argparse.Namespace) -> int:
         where = f"{inj.path}:{inj.line}" if inj.line else inj.path
         print(f"  {verb:<26}{where}")
         if inj.action == "unreadable":
-            print(f"      the file is not text in an encoding this script reads. "
-                  f"Add the marker by hand:")
+            print("      the file is not text in an encoding this script reads. "
+                  "Add the marker by hand:")
             print(f"      /* {marker_text(entry)} */")
         if inj.action == "not-found":
             print(f"      could not find a declaration of {entry['name']} in "
@@ -733,7 +733,7 @@ def cmd_import(args: argparse.Namespace) -> int:
     try:
         marked = read_deprecations(args.files)
     except ConfigError as exc:
-        raise bail(f"deprecate: {exc}")
+        raise bail(f"deprecate: {exc}") from None
     ledger_path = Path(args.ledger)
     ledger = load_ledger(ledger_path)
     added, kept = [], []

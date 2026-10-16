@@ -66,7 +66,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sys
 from html.parser import HTMLParser
@@ -77,10 +76,10 @@ from typing import Iterable
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.build_email
-    from .project_config import read_text, refuse_overwrite, ConfigError, config_path, project_config
+    from .project_config import read_text, refuse_overwrite, ConfigError, project_config
 except ImportError:                               # python scripts/build_email.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import read_text, refuse_overwrite, ConfigError, config_path, project_config  # type: ignore[no-redef]
+    from project_config import read_text, refuse_overwrite, ConfigError, project_config  # type: ignore[no-redef]
 
 GMAIL_CLIP_BYTES = 102_400  # 100 KiB. Verified figure — see the matrix reference.
 GMAIL_STYLE_BYTES = 16_384  # Gmail's ceiling on all <style> content, counted together.
@@ -311,9 +310,9 @@ def load_tokens(path: Path) -> dict[str, str]:
     try:
         data = json.loads(path.read_bytes())
     except FileNotFoundError:
-        raise TokenError("token file not found: %s" % path)
+        raise TokenError("token file not found: %s" % path) from None
     except json.JSONDecodeError as exc:
-        raise TokenError("token file is not valid JSON (%s): %s" % (path, exc))
+        raise TokenError("token file is not valid JSON (%s): %s" % (path, exc)) from None
     if not isinstance(data, dict):
         raise TokenError("%s is not a JSON object" % path)
 

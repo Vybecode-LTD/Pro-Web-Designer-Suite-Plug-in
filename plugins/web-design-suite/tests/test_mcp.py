@@ -16,7 +16,7 @@ import subprocess
 import sys
 import unittest
 
-from wds_support import NODE, PLUGIN, TempDirTest, env, output
+from wds_support import NODE, PLUGIN, REPO, TempDirTest, env, output
 
 SERVER = PLUGIN / "mcp" / "design_gates.mjs"
 TOOLS = ["audit_design", "a11y_static", "perf_audit", "check_roles", "diff_system"]
@@ -58,6 +58,20 @@ class TheServerFile(unittest.TestCase):
                               env=env(), capture_output=True, timeout=120)
         self.assertEqual(0, proc.returncode, output(proc))
         self.assertIn("Validation passed", proc.stdout.decode("utf-8", "replace"))
+
+    def test_ci_validates_what_the_skipped_test_would(self):
+        """T6 (audit, 2026-10-14): the test above finds no CLI on any CI cell,
+        so CI's `validate` job is the guard. It must install the CLI and run
+        the same check on plugin.json, and on the marketplace and the folder."""
+        if not (REPO and (REPO / ".github" / "workflows" / "ci.yml").is_file()):
+            self.skipTest("no repository around the tests (a release's copy)")
+        ci = (REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        job = re.split(r"\n  [a-z][\w-]*:\n", "\n  validate:\n" + ci.split("\n  validate:\n", 1)[1])[1] \
+            if "\n  validate:\n" in ci else ""
+        self.assertIn("npm install --global @anthropic-ai/claude-code", job)
+        for target in (".", "plugins/web-design-suite", "plugins/web-design-suite/.claude-plugin/plugin.json"):
+            with self.subTest(target=target):
+                self.assertRegex(job, rf"(?m)^\s+claude plugin validate --strict {re.escape(target)}$")
 
     def test_every_tool_runs_a_script_the_plugin_has(self):
         scripts = re.findall(r"script: '([^']+)'", SERVER.read_text(encoding="utf-8"))

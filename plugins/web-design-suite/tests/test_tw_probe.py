@@ -323,7 +323,8 @@ class TheMigrationsMoveOne(ProbeProject):
         proc = self.probe(*self.command())
         self.assertEqual(1, proc.returncode, output(proc))
         for cls in self.NUMERIC:
-            self.assertIn(f"{cls}: refused, but generates", output(proc))
+            with self.subTest(cls=cls):
+                self.assertIn(f"{cls}: refused, but generates", output(proc))
 
     def test_the_cleared_theme_leaves_only_the_roles(self):
         self.write("src/styles/index.css", '@import "tailwindcss";\n' + migration_block("right"))

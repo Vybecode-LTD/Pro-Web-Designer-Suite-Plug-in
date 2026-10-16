@@ -388,14 +388,15 @@ class TheOutcomeCases(unittest.TestCase):
         flags, on what each must match and must not."""
         checks, names = [], []
         for case, (_, _, graders) in outcome_cases().items():
-            for name, grader in graders.items():
-                pattern = grader.get("pattern", grader.get("input_match"))
-                if pattern is None or (grader["type"] == "tool_used" and grader["tool"] == "Skill"):
-                    continue
-                self.assertIn(name, SAMPLES, f"{case}: {name} has no samples")
-                hits, misses = SAMPLES[name]
-                checks.append([pattern, grader.get("flags", ""), hits + misses])
-                names.append((case, name, len(hits)))
+            with self.subTest(case=(case, (_, _, graders))):
+                for name, grader in graders.items():
+                    pattern = grader.get("pattern", grader.get("input_match"))
+                    if pattern is None or (grader["type"] == "tool_used" and grader["tool"] == "Skill"):
+                        continue
+                    self.assertIn(name, SAMPLES, f"{case}: {name} has no samples")
+                    hits, misses = SAMPLES[name]
+                    checks.append([pattern, grader.get("flags", ""), hits + misses])
+                    names.append((case, name, len(hits)))
         self.assertTrue(checks)
         for (case, name, hits), verdicts in zip(names, node(TEST_FLAGGED, checks)):
             with self.subTest(case=case, grader=name):
@@ -504,7 +505,8 @@ class TheWorkflow(TempDirTest):
         text = WORKFLOW.read_text(encoding="utf-8")
         self.assertEqual(1, text.count("${{ secrets."))
         for step in self.steps.values():                  # inputs reach a script through env only
-            self.assertNotIn("${{", step.get("run", ""))
+            with self.subTest(step=step):
+                self.assertNotIn("${{", step.get("run", ""))
 
     def test_every_action_is_pinned_to_a_commit(self):
         """A moved tag would run new code in a job that holds the key

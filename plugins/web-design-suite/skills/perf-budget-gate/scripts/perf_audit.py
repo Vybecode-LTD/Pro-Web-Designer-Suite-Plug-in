@@ -1111,7 +1111,7 @@ def load_budget(path: str | None) -> tuple[dict, str]:
     try:
         data = read_jsonc(p.read_bytes())
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise SystemExit(f"perf_audit: cannot read budget {path}: {exc}")
+        raise SystemExit(f"perf_audit: cannot read budget {path}: {exc}") from None
     problem = budget_problem(data)
     if problem:
         raise SystemExit(f"perf_audit: {path}: {problem}")

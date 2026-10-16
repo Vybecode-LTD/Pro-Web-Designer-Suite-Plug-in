@@ -277,7 +277,8 @@ class TheAuditsReleaseMediums(unittest.TestCase):
         uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)", text, re.M)
         self.assertEqual(2, len(uses))
         for action in uses:
-            self.assertRegex(action, r"@[0-9a-f]{40}$")
+            with self.subTest(action=action):
+                self.assertRegex(action, r"@[0-9a-f]{40}$")
         checkout = text[text.index("actions/checkout@"):]
         self.assertRegex(checkout[:400], r"persist-credentials:\s*false")
 
@@ -288,7 +289,8 @@ class TheAuditsReleaseMediums(unittest.TestCase):
         text = (TOOLING / "README.md").read_bytes().decode("utf-8")
         self.assertNotIn("byte-identical on a rebuild", text)
         for needle in ("zlib-ng", "compare.py"):
-            self.assertIn(needle, text)
+            with self.subTest(needle=needle):
+                self.assertIn(needle, text)
 
     def test_the_readme_counts_the_node_scripts(self):
         """D3: the plugin README said "the three browser scripts need Node";

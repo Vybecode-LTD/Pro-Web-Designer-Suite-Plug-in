@@ -50,7 +50,6 @@ def load_audit():
         "wds_audit_design", SKILLS / "web-design-studio" / "scripts" / "audit_design.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module                    # dataclasses look the module up
-    sys.dont_write_bytecode = True
     spec.loader.exec_module(module)
     return module
 

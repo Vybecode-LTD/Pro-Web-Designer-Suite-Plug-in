@@ -137,7 +137,8 @@ class EveryWriterRefusesItsInput(TempDirTest):
         self.assertEqual(proc.returncode, 2, output(proc))
         self.assertIn("writing there would replace it", output(proc))
         for name, before in written.items():
-            self.assertEqual((self.tmp / name).read_bytes(), before, name)
+            with self.subTest(name=name, before=before):
+                self.assertEqual((self.tmp / name).read_bytes(), before, name)
 
     def test_a_python_writer_refuses(self):
         for case, (skill, script, files, args) in CASES.items():

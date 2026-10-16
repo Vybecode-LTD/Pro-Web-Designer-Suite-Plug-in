@@ -11,7 +11,6 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
-import pathlib
 import shutil
 import subprocess
 import sys
@@ -258,7 +257,8 @@ class SyncRules(TempDirTest):
         proc = self.sync("--check")
         self.assertEqual(1, proc.returncode, output(proc))
         for rel in self.GATES[:2]:                     # ESLint's block holds no nesting depth
-            self.assertIn(f"stale: {rel}", output(proc))
+            with self.subTest(rel=rel):
+                self.assertIn(f"stale: {rel}", output(proc))
         self.assertNotIn(f"stale: {self.GATES[2]}", output(proc))
         self.assertEqual(0, self.sync().returncode)
         audit, stylelint, _ = self.gates()

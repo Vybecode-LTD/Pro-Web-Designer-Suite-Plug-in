@@ -1047,7 +1047,7 @@ def decision_block(d: Decision, audience: str) -> tuple[str, list[str]]:
         if value:
             rows.append((label, quoted(value)))
 
-    parts = [f"<dl class='dlist'>" + "".join(
+    parts = ["<dl class='dlist'>" + "".join(
         f"<div class='dlist__row'><dt class='dlist__key'>{esc(k)}</dt>"
         f"<dd class='dlist__val'>{v}</dd></div>" for k, v in rows) + "</dl>"]
 

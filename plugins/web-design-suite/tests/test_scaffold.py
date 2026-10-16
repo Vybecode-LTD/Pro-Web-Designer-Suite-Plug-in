@@ -16,7 +16,6 @@ import ast
 import json
 import os
 import pathlib
-import re
 import subprocess
 import sys
 import unittest
@@ -116,14 +115,15 @@ class TheAnswersReachTheOutput(Answered):
 
     def test_money_is_formatted_in_the_answered_currency_at_its_own_scale(self):
         for src in (self.src, self.tw):
-            lst = self.orders(src, "OrdersList.tsx")
-            detail = self.orders(src, "OrderDetail.tsx")
-            self.assertIn('formatMinorUnits(row.total_cents, "JPY")', lst)
-            self.assertIn('formatMoney(row.deposit, "EUR")', lst)
-            self.assertIn('formatMinorUnits(record.total_cents, "JPY")', detail)
-            for text in (lst, detail):
-                self.assertNotIn("/ 100", text, "the scale is the currency's, never a literal 100")
-                self.assertNotIn("USD", text)
+            with self.subTest(src=src):
+                lst = self.orders(src, "OrdersList.tsx")
+                detail = self.orders(src, "OrderDetail.tsx")
+                self.assertIn('formatMinorUnits(row.total_cents, "JPY")', lst)
+                self.assertIn('formatMoney(row.deposit, "EUR")', lst)
+                self.assertIn('formatMinorUnits(record.total_cents, "JPY")', detail)
+                for text in (lst, detail):
+                    self.assertNotIn("/ 100", text, "the scale is the currency's, never a literal 100")
+                    self.assertNotIn("USD", text)
         fmt = read(self.src / "lib" / "format.ts")
         self.assertIn("export function minorUnitScale(currency: string)", fmt)
         self.assertIn("resolvedOptions().maximumFractionDigits", fmt)
@@ -215,15 +215,16 @@ class TheFormsAreWired(Answered):
 
     def test_the_control_carries_the_ids_the_field_gives_the_error(self):
         for src in (self.src, self.tw):
-            form = self.orders(src, "OrderForm.tsx")
-            field = read(src / "ui" / "Field" / "Field.tsx")
-            self.assertNotIn("data-describedby", field)
-            self.assertNotIn("data-describedby", form)
-            self.assertIn("const errorId = error ? `${id}-error` : undefined;", field)
-            for name in ("reference", "notes", "total_cents"):
-                self.assertIn(f"aria-describedby={{errors.{name} ? fieldId('{name}') + '-error' : undefined}}",
-                              form)
-                self.assertIn(f"aria-invalid={{Boolean(errors.{name}) || undefined}}", form)
+            with self.subTest(src=src):
+                form = self.orders(src, "OrderForm.tsx")
+                field = read(src / "ui" / "Field" / "Field.tsx")
+                self.assertNotIn("data-describedby", field)
+                self.assertNotIn("data-describedby", form)
+                self.assertIn("const errorId = error ? `${id}-error` : undefined;", field)
+                for name in ("reference", "notes", "total_cents"):
+                    self.assertIn(f"aria-describedby={{errors.{name} ? fieldId('{name}') + '-error' : undefined}}",
+                                  form)
+                    self.assertIn(f"aria-invalid={{Boolean(errors.{name}) || undefined}}", form)
         kit = read(self.src / "ui" / "index.ts")
         self.assertIn("export { Field, describedBy } from './Field/Field';", kit)
 
@@ -267,13 +268,14 @@ class TheFormsAreWired(Answered):
         and the common attributes, so a boolean field's error was neither
         shown nor referenced."""
         for src in (self.src, self.tw):
-            form = self.orders(src, "OrderForm.tsx")
-            self.assertRegex(form, r"<Toggle\s+id=\{fieldId\('is_rush'\)\}[\s\S]*?"
+            with self.subTest(src=src):
+                form = self.orders(src, "OrderForm.tsx")
+                self.assertRegex(form, r"<Toggle\s+id=\{fieldId\('is_rush'\)\}[\s\S]*?"
                                    r"aria-invalid=\{Boolean\(errors\.is_rush\) \|\| undefined\}\s+"
                                    r"aria-describedby=\{errors\.is_rush \? fieldId\('is_rush'\) \+ '-error' : undefined\}")
-            self.assertIn("id={fieldId('is_rush') + '-error'}", form)
-            self.assertIn("{errors.is_rush}", form)
-            self.assertIn("data-state={errors.is_rush ? 'error' : undefined}", form)
+                self.assertIn("id={fieldId('is_rush') + '-error'}", form)
+                self.assertIn("{errors.is_rush}", form)
+                self.assertIn("data-state={errors.is_rush ? 'error' : undefined}", form)
         self.assertIn(".fieldError {", read(self.src / "features" / "orders" / "OrderForm.module.css"))
         self.assertIn("text-danger-fg", self.orders(self.tw, "OrderForm.tsx"))
 
@@ -289,10 +291,11 @@ class TheFormsAreWired(Answered):
         proc = run_py("web-design-studio", "audit_design", "src", "tw", "plain", "--strict", cwd=self.tmp)
         self.assertEqual(proc.returncode, 0, output(proc))
         for src in ("src", "tw"):
-            proc = run_py("a11y-audit-runner", "a11y_static", f"{src}/ui", f"{src}/features", "--json",
-                          cwd=self.tmp)
-            report = json.loads(proc.stdout)
-            self.assertEqual(report["errors"], 0, f"{output(proc)}\n{json.dumps(report, indent=2)}")
+            with self.subTest(src=src):
+                proc = run_py("a11y-audit-runner", "a11y_static", f"{src}/ui", f"{src}/features", "--json",
+                              cwd=self.tmp)
+                report = json.loads(proc.stdout)
+                self.assertEqual(report["errors"], 0, f"{output(proc)}\n{json.dumps(report, indent=2)}")
 
 
 class TheServerSchemaMirrorsTheConstraints(Answered):
@@ -320,7 +323,8 @@ class TheServerSchemaMirrorsTheConstraints(Answered):
         self.assertIn("export type OrderDraftInput = z.infer<typeof orderDraftSchema>;", zod)
         self.assertIn("  supplier_id: z.string().uuid(),", zod)
         for absent in ("metadata", "  id:"):
-            self.assertNotIn(absent, zod, "machine-only columns and the key are not the draft's")
+            with self.subTest(absent=absent):
+                self.assertNotIn(absent, zod, "machine-only columns and the key are not the draft's")
 
     def test_the_check_makes_the_money_minimum_a_mirror_not_an_invention(self):
         self.assertNotIn("total_cents: z.number().int().min(0), //", self.zod())

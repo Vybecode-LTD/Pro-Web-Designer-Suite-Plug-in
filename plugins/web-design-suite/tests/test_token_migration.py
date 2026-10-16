@@ -120,7 +120,8 @@ class ApplyCodemodDirtyGuard(TempDirTest):
         (repo / "other.css").write_text(CSS, encoding="utf-8")
         proc = self.apply(repo, cwd=repo)
         for name in ("new.css", "other.css"):
-            self.assertEqual((repo / name).read_text(encoding="utf-8"), CSS, f"{name}: {output(proc)}")
+            with self.subTest(name=name):
+                self.assertEqual((repo / name).read_text(encoding="utf-8"), CSS, f"{name}: {output(proc)}")
 
     @unittest.skipUnless(GIT, "git is not installed")
     def test_the_rebase_recipe_migrates_the_teammates_version(self):
@@ -158,13 +159,14 @@ class ApplyCodemodDirtyGuard(TempDirTest):
         rebase = subprocess.run(git + ["rebase", "main"], capture_output=True, env=env())
         self.assertNotEqual(rebase.returncode, 0, "the fixture must conflict")
         for argv in recipe:
-            if argv[0] == "git":
-                run(*argv[1:])
-                continue
-            self.assertEqual(argv[:3], ["python", "-m", "scripts.apply_codemod"])
-            proc = subprocess.run([sys.executable, *argv[1:]], cwd=repo, capture_output=True,
-                                  env=env(PYTHONPATH=str(SKILLS / "design-token-migration")))
-            self.assertEqual(proc.returncode, 0, output(proc))
+            with self.subTest(argv=argv):
+                if argv[0] == "git":
+                    run(*argv[1:])
+                    continue
+                self.assertEqual(argv[:3], ["python", "-m", "scripts.apply_codemod"])
+                proc = subprocess.run([sys.executable, *argv[1:]], cwd=repo, capture_output=True,
+                                      env=env(PYTHONPATH=str(SKILLS / "design-token-migration")))
+                self.assertEqual(proc.returncode, 0, output(proc))
         self.assertEqual(css.read_bytes(), b".card {\n  margin: var(--space-3); gap: var(--space-3);\n}\n")
         self.assertFalse((repo / ".git" / "rebase-merge").exists(), "the rebase did not finish")
 
@@ -193,8 +195,9 @@ class MigrationPipeline(TempDirTest):
         tw = [r for r in mapping["rules"] if r.get("scope") == "tailwind"]
         self.assertTrue(any(r["match"][0].startswith("mt-") for r in tw), tw)
         for rule in tw:
-            if rule["match"][0].startswith(("max-w-", "min-w-", "max-h-", "min-h-")):
-                self.assertNotIn("gap", rule["prop_classes"], rule)
+            with self.subTest(rule=rule):
+                if rule["match"][0].startswith(("max-w-", "min-w-", "max-h-", "min-h-")):
+                    self.assertNotIn("gap", rule["prop_classes"], rule)
 
     def test_a_jsx_inline_colour_is_counted_once(self):
         self.write("src/Card.jsx", 'export const C = () => <p style={{ color: "#3a3a3a" }}>x</p>;\n')
@@ -697,7 +700,8 @@ class LifecycleDocClaims(unittest.TestCase):
                            r".*?`UPGRADE-([\d.]+)\.md`", text)
         self.assertTrue(found)
         for major, minor, patch, guide in found:
-            self.assertEqual((minor, patch, guide), ("0", "0", f"{major}.0.0"))
+            with self.subTest(major=major, minor=minor, patch=patch, guide=guide):
+                self.assertEqual((minor, patch, guide), ("0", "0", f"{major}.0.0"))
         procedure = text.split("## 3.", 1)[1].split("## 4.", 1)[0]
         self.assertNotIn("git commit -am", procedure)
         self.assertEqual(procedure.count("git commit"), 1)
@@ -727,7 +731,8 @@ class LifecycleDocClaims(unittest.TestCase):
         pairs = re.findall(r"(\d+)px --((?:pad|gap|space)-[\w-]+)", plan)
         self.assertTrue(pairs)
         for px, name in pairs:
-            self.assertEqual(size.get(name), int(px), name)
+            with self.subTest(px=px, name=name):
+                self.assertEqual(size.get(name), int(px), name)
 
 
 class TheCensusMakesItsFolder(TempDirTest):
@@ -979,7 +984,8 @@ class TheV4SpacingCensus(TempDirTest):
         rules = {r["match"][0]: r["replacement"] for r in mapping["rules"] if r["scope"] == "tailwind"}
         for match, replacement in (("p-4", "p-well"), ("px-3", "px-inline-sm"), ("-mt-4", "-mt-grouped"),
                                    ("p-6", "p-card"), ("gap-4", "gap-grouped")):
-            self.assertEqual(rules.get(match), replacement, rules)
+            with self.subTest(match=match, replacement=replacement):
+                self.assertEqual(rules.get(match), replacement, rules)
         self.assertNotIn("leading-6", rules)
         self.assertIn("Remove leading-6 once the element's text class reads a --type-* role", report)
         self.apply(self.tmp / "proposal" / "mapping.json")
