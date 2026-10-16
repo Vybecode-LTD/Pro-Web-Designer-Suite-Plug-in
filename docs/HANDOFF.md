@@ -1,28 +1,23 @@
 # Handoff
 
-**2026-10-15 (third session)**, after P53 part 5 and P54 parts 1 to 4 of Phase 6c, the owner's audit. **Next: P54 part 5, §3.4's second half (V2, V3, V10, `extract_system --tokens` on JSON), then §3.5 to §3.8, then P55.** The owner placed all of Phase 6c (P50 to P55) before Phase 6b's remaining workstreams.
+**2026-10-16**, after P54 parts 5 to 8 of Phase 6c, the owner's audit. **Next: P54 part 9, §3.8 (T1, T2), then P55, the lows.** The owner placed all of Phase 6c (P50 to P55) before Phase 6b's remaining workstreams.
 
 **The next session starts from `dev plans/next-session-prompt.md`**: orientation, then the work in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
 ## State
 
-- **#142, P53 part 5 (the cmd.exe placeholders: D4, G13, E14)**, merged as `8be665f`. **P53 is done (N45 closed).**
-- **#143, P54 part 1 (§3.1: S3, S4)**, merged as `6bb88c5`. The router's shared words need the skill's own beside them; `rgb()`/`hsl()` keep a fourth comma argument.
-- **#144, P54 part 3 (§3.3: M2 to M6)**, merged as `e55727f`. Tailwind variants and minus, `other-length`, a z-index's sign, the §6 role table, a preprocessor variable's length. M1 did not reproduce.
-- **#145, P54 part 2 (§3.2: W1 to W5)**, merged as `fb2280a`. Translucent colours, `worst_contrast`, `KEPT_UNDER`, inserted and dotted layers in both CSS gates, the `url()` exemption.
-- **#147, P54 part 4 (§3.4's first half: V4, V5, V6, V9, the 8-digit hex)**, merged as `cc0562b`. `deprecate scan` skips the suite's records, `deprecate add` checks `--replacement`, `build_docs` escapes its index, `diff_system` and `extract_system` read a hex's alpha, a folder holding a `contract.json` is a snapshot.
-- **#146 and #148**: the session's docs.
-- **Reviews:** 29 real findings over the session, each fixed with a test failing on the head it reviewed; one declined with reasons and withdrawn.
-- **At the end:**
-  - `main` is #148's merge (or `cc0562b` if #148 is still open), and no other PR is open.
-  - The plan: 21 open items, 21 scheduled. About 1,245 tests.
-  - This session used about 660 thousand tokens.
+- **#149, P54 part 5 (§3.4's second half: V2, V3, V10, `extract_system --tokens` on JSON)**, merged as `6b0900e`. `dtcg.recorded()` reads a document's or a resolver's record of the tokens it left out, in source order (a later source that writes a token ends its record); `read_deprecations` reads its marks; `extract_system` reads a contract.json or DTCG file through `read_tokens`, with the file's roles at Tier 2; every SKILL.md's copy note names its helpers.
+- **#150, P54 part 6 (§3.5: E1 to E8, E10)**, merged as `c236246`. Naive system timestamps read-only; table names refused in the scaffold's paths; odd column names escaped; casts, JWT claims and quoted names pin a column; `pgTable.withRLS(`; the email minifier's word spaces; the style bytes; the templates lint clean (seven `--email-*` tokens); the deck's header placeholders.
+- **#151, P54 part 7 (§3.6: G1, G2, G5, G6, G7)**, merged as `f6bcc1b`: `aria-hidden` reads the subtree's real tab stops, a control's name is read at any depth (a component is "cannot tell", a silent subtree names nothing), the forced-colours survey is anchored, the TBT control clicks a button the task reveals, the coverage table marks what this suite does not run.
+- **#152, P54 part 8 (§3.7: D1, D2, D3)**, merged as `cd4d1fe`. `release.yml` pins its actions to SHAs and keeps no credential; the tooling README explains zlib-ng; the README counts six `.mjs` scripts.
+- **Reviews:** 11 real findings (Codex 7, CodeRabbit 4, two of them the same issue), and CI 3, each fixed with a test failing on the head it reviewed. One correction to the audit: 3.3.8's missing `autocomplete` is checked.
+- **At the end:** the plan has 21 open items, all 21 scheduled; about 1,253 tests. This session used about 640 thousand tokens.
 
 ## Next steps
 
-1. If #148 is still open, merge it once green.
-2. **P54 part 5, §3.4's second half:** V2 (a later DTCG file's `notWritten` value loses to an earlier written one), V3 (`deprecate import` misses the `$extensions` marks), V10 (three SKILL.md notes name no helpers; mind the budgets), and `extract_system --tokens` reading a JSON file as CSS. Add the tests to `test_versioning.TheAuditsVersioningMediums`.
-3. **Then §3.5 (E1 to E8, E10), §3.6 (G1, G2, G5 to G7), §3.7 (D1 to D3), §3.8 (T1, T2)**, one PR each; the prompt's §4 lists each finding. Run each finding's fixture first. Then **P55, the lows**, then Phase 6b in the owner's order, then **R4**.
+1. If this docs PR, #153, is still open, merge it once green.
+2. **P54 part 9, §3.8:** T1 (`test_evidence.test_no_entry_outlives_its_figure` passes on an `also` substring; require the figure itself, word-bound the `also` values, then fix the register, re-reading each figure at its source), T2 (wall-clock thresholds: keep the ratio bounds, drop the absolute ones). After part 9, remove the `P54` row and mark N46 done.
+3. **Then P55, the lows** (the audit's "low" findings and doc fixes, per area), then Phase 6b in the owner's order, then **R4**.
 
 ## Open owner decisions
 
@@ -30,18 +25,10 @@
 
 ## Warnings
 
-- **A reader's fix must reach every path to it:** `diff_system` reads through `extract_system` unless `--no-upstream`; test both ways (Codex on #147).
-- **The tools decode escapes:** the Edit tool decoded a JSON unicode escape in a CHANGELOG line, and `sed` reads backslash-u as "uppercase". Write such text with Python and `chr(92)`; Bash heredocs eat backslashes too.
-- **Commit before running `check.py` after `git add -u`**, or the next commit takes the staged work under its own message (#145's `f761c84`).
-- **After a merge from `main`, drop the rows the earlier PR removed** and merge the completion plan's N46 notes into one line.
-- **Resolve only the threads you answered, by id.**
-- **The starter's accent-600 and accent-700 sit just outside sRGB**, so every ratio quoted for them is at the worse fallback.
-- **Still open from earlier:**
-  - Vue's `:style` binding is not read by the audit's `style=""` reader (P55);
-  - the `VitalsUnderCsp` flake on macOS, and the TBT flake (G6 has its cause);
-  - `perf_audit.py` and an unbundled `@import` chain;
-  - three tokens outside Display P3;
-  - a local build never matches the release's checksums (D1: zlib-ng);
-  - don't grep `tooling/`;
-  - the repository is public;
-  - `Vybecode-LTD/wds-gate-scratch` is the owner's to delete.
+- **A reader that merges two kinds of entry from ordered sources** (written tokens and a record of the left-out ones) must walk them in one pass, inline sources included (Codex on #149, twice).
+- **A written boolean attribute is on by presence** (`hidden="false"` hides); only a bound value (`EXPR`) is unknown (CodeRabbit and Codex on #151).
+- **`test_facts` holds every "N of the 55" to the table's Full count**: qualify a count, never change it.
+- **`fail_before.py` swaps the plugin only**: a test of `release.yml` or `tooling/` reads as a control. Test it against `main`'s copies by hand, with `MSYS_NO_PATHCONV=1` before `git show origin/main:PATH` in Git Bash (without it the path is mangled and the `>` truncates the target).
+- **Parallel PRs off `main` conflict on the CHANGELOG and both plans after every merge.** `keep_both.py` in this session's scratchpad resolves them (completion notes compared by part).
+- **`test_interact_at_clicks_while_the_page_hydrates` failed once in 11 local runs**, with no output kept. Watch it on CI.
+- **Still open from earlier:** Vue's `:style` (P55); the `VitalsUnderCsp` macOS flake; `perf_audit.py` and an unbundled `@import` chain; three tokens outside Display P3; don't grep `tooling/`; the repository is public; `Vybecode-LTD/wds-gate-scratch` is the owner's to delete.
