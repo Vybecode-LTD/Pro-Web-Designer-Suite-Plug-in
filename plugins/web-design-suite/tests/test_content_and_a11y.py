@@ -1069,6 +1069,8 @@ class TheAuditsRuntimeMediums(TempDirTest):
             '<div aria-hidden="true"><div hidden><button>x</button></div></div>': 0,
             '<div aria-hidden="true" inert><a href="/x">x</a></div>': 0,
             '<div aria-hidden="true"><section inert><a href="/x">x</a></section></div>': 0,
+            '<div aria-hidden="true"><div hidden="false"><button>x</button></div></div>': 0,   # boolean:
+            '<div aria-hidden="true"><div inert="false"><a href="/x">x</a></div></div>': 0,    # present is on
         }
         bound = {                                                # Codex on #151: a bound value may be false
             '<div aria-hidden="true"><button hidden={open}>x</button></div>': 1,
@@ -1111,12 +1113,15 @@ class TheAuditsRuntimeMediums(TempDirTest):
         table = doc[doc.index("## 3. The coverage table"):doc.index("## 4. ")]
         gates = "".join((skill / "scripts" / n).read_bytes().decode("utf-8")
                         for n in ("a11y_static.py", "a11y_runtime.mjs"))
-        rows = re.findall(r"^\| \*\*(\d\.\d+\.\d+)(?: / (\d\.\d+\.\d+))?\*\*[^|]*\|([^|]*)\|(.*)$", table, re.M)
+        rows = re.findall(r"^\| \*\*([^*]+)\*\*[^|]*\|([^|]*)\|(.*)$", table, re.M)
+        self.assertEqual(len([line for line in table.splitlines() if line.startswith("| **")]), len(rows))
         self.assertGreater(len(rows), 50)
         decided = 0
-        for first, second, auto, rest in rows:
-            with self.subTest(sc=first):
-                in_a_gate = any(re.search(rf"(?<![\d.]){re.escape(sc)}(?!\d)", gates) for sc in (first, second) if sc)
+        for named, auto, rest in rows:                  # `3.2.3 / 3.2.4 / 3.2.6` too (CodeRabbit on #151)
+            criteria = re.findall(r"\d\.\d+\.\d+", named)
+            with self.subTest(sc=named):
+                self.assertTrue(criteria)
+                in_a_gate = any(re.search(rf"(?<![\d.]){re.escape(sc)}(?!\d)", gates) for sc in criteria)
                 marked = "*Not in this suite.*" in rest
                 if marked:
                     self.assertFalse(in_a_gate, "marked, but a gate names it")

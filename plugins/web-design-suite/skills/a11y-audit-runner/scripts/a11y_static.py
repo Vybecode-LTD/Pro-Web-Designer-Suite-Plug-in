@@ -582,12 +582,12 @@ def subtree(node: Node, skip=None):
 
 
 def _out_of_reach(node: Node) -> bool:
-    """`hidden` or `inert`, written as such: nothing in it takes focus. A
-    bound value (`hidden={open}`, `:inert="busy"`) may be false, so it is
-    read as reachable and stays audited (Codex on #151)."""
+    """`hidden` or `inert`, written as such: nothing in it takes focus. Both
+    are boolean attributes, so `hidden="false"` hides too (CodeRabbit on
+    #151). A bound value (`hidden={open}`, `:inert="busy"`) may be false, so
+    it is read as reachable and stays audited (Codex on #151)."""
     a = node.tag.attrs
-    return any(k in a and a[k] != EXPR and str(a[k]).strip().lower() != "false"
-               for k in ("hidden", "inert"))
+    return any(k in a and a[k] != EXPR for k in ("hidden", "inert"))
 
 
 def _silent(node: Node) -> bool:

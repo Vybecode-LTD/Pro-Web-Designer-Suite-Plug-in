@@ -360,23 +360,25 @@ class VitalsMeasures(TempDirTest):
         The task is due at 1.5 s on the page's clock, as the click is, not
         1.5 s after the script parses: on a slow runner the two drifted
         apart, the click came first, and INP was empty (#54's main run)."""
-        page = ("<button>Buy</button><script>setTimeout(() => { " + self.BUSY.format(ms=3000)
-                + " }, Math.max(0, 1500 - performance.now()));</script>")
-        out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "button",
+        page = ('<button id="buy">Buy</button><button id="after" hidden>Again</button>'
+                "<script>setTimeout(() => { " + self.BUSY.format(ms=3000)
+                + "; document.getElementById('after').hidden = false; }, "
+                "Math.max(0, 1500 - performance.now()));</script>")
+        out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "#buy",
                           "--interact-at", "2500")
         self.assertLessEqual(out["perRun"][0]["clickedAt"], 2800, "the click came late")
         self.assertIsNotNone(out["stats"]["inp"], "no interaction entry: %s" % out["perRun"])
         during = out["stats"]["inp"]["median"]
         self.assertGreaterEqual(during, 500)
         self.assertGreaterEqual(out["stats"]["tbt"]["median"], 1000)
-        # The control clicks after the task (it ends at 4.5 s): an event under
-        # 16 ms is not reported at all, so INP may be n/a. Held to half the
-        # hydrating click's. It clicked at load + 500 ms before, and on a slow
-        # macOS runner load came late enough to put that click inside the
-        # task: the TBT flake had that cause (the audit's G6).
-        out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "button",
-                          "--interact-at", "5000")
-        self.assertGreaterEqual(out["perRun"][0]["clickedAt"], 4500, "the control clicked inside the task")
+        # The control clicks a button the task reveals as it ends, so the click
+        # comes after the task however late the task started (CodeRabbit on
+        # #151): an event under 16 ms is not reported at all, so INP may be
+        # n/a. Held to half the hydrating click's. It clicked the first button
+        # at load + 500 ms before, and on a slow macOS runner load came late
+        # enough to put that click inside the task: the TBT flake had that
+        # cause (the audit's G6).
+        out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "#after")
         self.assertLess((out["stats"]["inp"] or {"median": 0})["median"], during / 2)
         self.assertNotIn("did not match", self.stderr)          # CodeRabbit on #45: it clicked
 
