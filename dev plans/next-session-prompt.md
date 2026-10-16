@@ -1,15 +1,13 @@
 # Start here: the next session
 
-**Written 2026-10-15**, at the end of the third session that day, which finished P53 and did P54 parts 1 to 4 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Six PRs merged, and this docs PR, #148, merges once green (§3):
-- **#142, P53 part 5 (the cmd.exe placeholders: D4, G13, E14; §7 class 9)**, merged as `8be665f`. Every placeholder in a command is in capitals; the email quick start pastes into bash, PowerShell and cmd; `test_docs.PlaceholdersInCapitals` reads every shell fence and inline command in the plugin's docs and the repository's live docs. **P53 is done; N45 is closed.**
-- **#143, P54 part 1 (§3.1: S3, S4)**, merged as `6bb88c5`. The router hears a shared word (a token, a critique, a state, Lighthouse) only beside one of the skill's own (`about()`); `dtcg.css_colour()` reads the legacy comma form under `rgb()` and `hsl()`.
-- **#144, P54 part 3 (§3.3: M2 to M6; M1 did not reproduce)**, merged as `e55727f`. The census counts every Tailwind variant and a minus, files `other-length` apart, keeps a z-index's sign; the §6 role table is `role_for()`'s.
-- **#145, P54 part 2 (§3.2: W1 to W5)**, merged as `fb2280a`: translucent colours refused before parsing, `worst_contrast`, `tw_probe`'s `KEPT_UNDER`, inserted and dotted layers in both CSS gates, the `url()` exemption only when the url is the whole value.
-- **#147, P54 part 4 (§3.4's first half: V4, V5, V6, V9, the 8-digit hex)**, merged as `cc0562b`. `deprecate scan` skips the suite's own records, `deprecate add` refuses a dead or undeclared `--replacement`, `build_docs` escapes its inlined index, `diff_system` reads a contract folder and a hex's alpha.
-- **#146**, the session's first docs PR, merged; **#148**, these docs, open until §3 merges it.
-- **Reviews:** 17 real findings, each fixed with a test failing on the head it reviewed: #142 4 (Codex 1, CodeRabbit 3, one declined with reasons and withdrawn), #143 2 (Codex), #144 1 (Codex), #145 6 (Codex 2 over two rounds, CodeRabbit 2, and two more the audit shared).
+**Written 2026-10-16**, at the end of the session that did P54 parts 5 to 8 of **Phase 6c**, the owner's audit. The owner placed **all of Phase 6c (P50 to P55) first**, before Phase 6b's remaining workstreams (P34, P35, P37, P41, P42 and P43). Four PRs, and this docs PR, #153, which merges once green (§3):
+- **#149, P54 part 5 (§3.4's second half: V2, V3, V10, `extract_system --tokens` on JSON)**, merged as `6b0900e`. `dtcg.recorded()` reads a document's or a resolver's record of the tokens it left out, in source order; `read_deprecations` reads its marks; `extract_system` reads a JSON token file through `read_tokens`; each SKILL.md's copy note names its helpers.
+- **#150, P54 part 6 (§3.5: E1 to E8, E10)**, merged as `c236246`.
+- **#151, P54 part 7 (§3.6: G1, G2, G5, G6, G7)**, the last to merge: check it in §3.
+- **#152, P54 part 8 (§3.7: D1, D2, D3)**, merged as `cd4d1fe`.
+- **Reviews:** 11 real findings (Codex 7 over two rounds on #149 and one each on #151 and #152, CodeRabbit 4) and CI 3, each fixed with a test failing on the head it reviewed.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P54 part 5, §3.4's second half (V2, V3, V10, `extract_system --tokens` on JSON), then §3.5 to §3.8** (§4).
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P54 part 9, §3.8 (T1, T2), then P55, the lows** (§4).
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -37,7 +35,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
     - waits for CodeRabbit's check to leave `pending`;
     - prints the checks, `mergeStateStatus`, the open-thread count and the reviews by commit.
 
-    It is in the last sessions' scratchpads; copy the newest (`315825e6-…`), whose `gh run watch` has `--interval 30` and which waits for CodeRabbit 3 minutes at most. **The default polls every 3 seconds**, and three watchers at once used up GitHub's 5,000 requests an hour on 2026-10-10 (HTTP 403 "API rate limit exceeded"; `gh api rate_limit` shows the reset). Run one watcher at a time, and stop a superseded one with `TaskStop`.
+    It is in the last sessions' scratchpads; copy the newest (`07bc2565-…`, with `keep_both.py`, which resolves a merge from `main` in the CHANGELOG and both plans), whose `gh run watch` has `--interval 30` and which waits for CodeRabbit 3 minutes at most. **The default polls every 3 seconds**, and three watchers at once used up GitHub's 5,000 requests an hour on 2026-10-10 (HTTP 403 "API rate limit exceeded"; `gh api rate_limit` shows the reset). Run one watcher at a time, and stop a superseded one with `TaskStop`.
   - Never grep `tooling/`: its `node_modules` makes a search run for minutes. Reading one named file in it is fine.
   - **To wait** (for CodeRabbit's hourly limit, say), run `sleep N` with the Bash tool's `run_in_background`: a foreground `sleep` is blocked, and the notification wakes you.
   - **CodeRabbit is not a merge gate (the owner, 2026-10-12).** Its free tier gives one review an hour across all PRs, and waiting for it held PRs open for hours. Never wait for it or request a review to gate a merge.
@@ -197,6 +195,14 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **A fix in one reader must reach every path to it** (Codex on #147): `diff_system` reads snapshots through `extract_system`'s resolver unless `--no-upstream`, and the first test passed that flag, which hid the default path. Run a reader's test both ways.
       - **The tools decode escapes:** the Edit tool turned a JSON unicode escape written in a CHANGELOG line into the character itself, and GNU `sed` reads a backslash-u in a replacement as "uppercase the next". Write such text with Python and `chr(92)`, and read the line back.
       - **Declined, with reasons:** CodeRabbit asked the email quick start to use path-form commands; every skill's opening note sets the module form's convention, and the SKILL.md was 3 bytes under budget. It withdrew.
+    - **The 2026-10-16 session's reviews found 11 real issues:** #149 (Codex 4 over two rounds, CodeRabbit 1, the same as one of Codex's), #151 (Codex 2, CodeRabbit 3) and #152 (Codex 1); and CI 3 (`test_encodings` locally, `test_hooks` on #150, `test_facts` on #151). Each was fixed with a test failing on the head it reviewed. The lessons:
+      - **Merge two kinds of entry from ordered sources in one walk.** A resolver's record of left-out tokens was applied after the written ones, so an earlier record beat a later written value; then an inline source was skipped (Codex on #149, twice). `dtcg.recorded()` walks `default_sources()` once.
+      - **Flattening a format loses what its sections said.** A contract's literal role became Tier 1 once written as CSS, and a later file that moved a name kept the first tier (Codex on #149).
+      - **A boolean attribute is on by presence.** `hidden="false"` hides; only a bound value (`EXPR`) is unknown. And a name inside an `aria-hidden` subtree names nothing (Codex and CodeRabbit on #151).
+      - **A doc's count is held by a test elsewhere.** `test_facts` holds every "N of the 55" to the table's Full count: qualify it ("this suite runs 6 of them"), never change it (CI on #151).
+      - **A test that reads repository files must skip in an unpacked plugin** (`@unittest.skipUnless(TOOLING, …)`, Codex on #152), and `fail_before.py` reads it as a control: test it against `main`'s copies by hand.
+      - **A timing control clicks on a page signal, not at a fixed time**: a button the task reveals as it ends (CodeRabbit on #151).
+      - **Correct the audit when the code says otherwise.** 3.3.8's missing `autocomplete` is checked (1.3.5's rule); the row says so.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -340,7 +346,11 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 - **Tailwind's kept keys (#145).** `tw_probe.mjs`' `KEPT_UNDER` mirrors tailwindcss 4.3.3's `ignoredThemeKeyMap` (`--font` keeps `--font-weight` and `--font-size`, `--inset`, `--text`, `--grid-column`, `--grid-row`), and a namespace is cleared by `startsWith(ns)` as `clearNamespace()` does.
 - **Layers and arbitrary values (#145).** stylelint's `design/layer-order` and the audit order a statement's canonical parents (`components.skin` is `components` where it stands; a parent named again keeps its first place) and skip a project's own layers; a dotted name declares its parent for later blocks. ESLint's `ARBITRARY_VALUE` and the audit's `TW_ARBITRARY_OK` exempt `bg-[url(…)]`/`mask-[url(…)]` only when the url is the whole value, and `content-['…']`. The spec's `layers` and `tailwind_arbitrary` sections hold both gates.
 - **The migration (#144).** `extract_literals.TW_ARBITRARY_RE`'s group 1 is the variants (`[\w-]+(?:\[…\])?:`) and a minus; a negative z-index class is negated. `classify_length()` returns `other-length` outside the spacing and size sets (but `flex` and variables stay `length`); `cluster_values.route_other_lengths()` gives each a row with `OTHER_LENGTH_ADVICE`. `cluster_z()` puts negatives and Tailwind classes in rows; `cluster_spacing()` gives a preprocessor variable's length `held_colour`'s advice. `tw_utility_prefix()` splits at the last `-[`. `TheAuditsMigrationMediums`, `TheRoleTableIsTheCode` (reads extraction-and-clustering.md §6 through `role_for()`).
-- **The plugin** is `plugins/web-design-suite/` (about 1,240 tests):
+- **The record of left-out tokens (#149).** `dtcg.recorded(data, base)` returns `(values, marks)` for a document or a resolver: `default_sources()` in order, each source's files (`_file_refs`, in its folder, `outside()` refused) then an inline source itself; a source that writes a name (`token_paths()` through `css_name()`) ends its record. `project_config.read_deprecations` and `diff_system.recorded()` read it; `_snapshot_from_contract` walks the files once (`last`). `extract_system.json_token_css()` returns a JSON file's stylesheet and its roles (`Extractor.json_roles`; a later JSON file's section sets the tier). `test_versioning.TheAuditsVersioningMediums`, which also runs each SKILL.md's copy note (`test_each_copy_note_names_the_helpers`).
+- **The content mediums (#150).** `introspect_schema._temporal` (a naive system timestamp is `readonly-timestamp`), `_sides()`/`_side_end()` and `SQL_CAST`, `AUTH_CALL`, `COLUMN_REF` in `_pinned_to_caller`; `detect_format`'s `pgTable(?:\.withRLS)?\(`. `scaffold_ui.unsafe_name()` and the writer's `--out` check; `js_string()`, `member()`, a pydantic `col_` prefix. `build_email.BLOCK_TAGS` and `_between_tags()`. Seven `--email-*` tokens (`--email-gutter-mobile`, `--email-h1-size-mobile`…, `--email-width-col`, `--email-pull-rule`). `build_presentation.HEADER_PLACEHOLDER` and `DecisionLog.unfilled`. `test_scaffold.TheAuditsContentMediums`, `test_email.TheAuditsEmailMediums`, `test_presentation.TheHeadersPlaceholders`.
+- **The runtime mediums (#151).** `a11y_static.subtree(node, skip)` (`descendants` holds direct children only), `_tab_stop()`, `_out_of_reach()` (a written `hidden`/`inert`, by presence; `EXPR` is unknown) and `_silent()` (with `aria-hidden="true"`). automation-coverage.md §3 marks *Not in this suite.*; `test_content_and_a11y.TheAuditsRuntimeMediums`, `test_browser_runtime.TheForcedColoursSurvey`.
+- **The release mediums (#152).** `release.yml` pins checkout to `3d3c42e…` (v7.0.1) and setup-uv to `c18668a…` (v10.2.0), `persist-credentials: false`. `test_release_build.TheAuditsReleaseMediums`.
+- **The plugin** is `plugins/web-design-suite/` (about 1,253 tests):
   - `skills/`: 13 skills.
   - `tests/`: standard-library `unittest`. The helpers are in `tests/wds_support.py`: `PLUGIN`, `SKILLS`, `NODE`, `run_py`, `run_node`, `load_script`, `env`, `TempDirTest`.
   - `tools/`: `check_pointers.py`, `sync_snippets.py`, `sync_rules.py`, `fail_before.py`, `check.py`.
@@ -425,70 +435,45 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
   | Skill | Bytes |
   |---|---|
-  | client-presentation-builder | 20,497 |
-  | email-template-system | 20,497 |
-  | landing-page-conversion | 20,497 |
-  | perf-budget-gate | 20,494 |
-  | component-state-matrix | 20,472 |
-  | design-system-versioning | 20,401 |
-  | figma-variables-sync | 20,484 |
-  | web-design-studio | 20,450 |
+  | figma-variables-sync | 20,497 |
+  | client-presentation-builder | 20,494 |
+  | component-state-matrix | 20,494 |
+  | web-design-studio | 20,481 |
+  | landing-page-conversion | 20,477 |
+  | email-template-system | 20,474 |
+  | perf-budget-gate | 20,474 |
+  | design-system-versioning | 20,434 |
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.
 
 ## 3. First: the state of `main`
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then:
-- **The docs PR, #148**, may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
+- **#151 and the docs PR, #153**, may still be open: merge each once green (merge commit, `--match-head-commit` with the full SHA), #151 first; the docs PR then takes `main` (keep both sides).
+- Remove the session's worktrees if they are still there (`wt35`, `wt36`, `wt37` in `07bc2565-…\scratchpad`): `git worktree remove PATH`, then `git branch -d` each merged branch.
 - Then read `docs/HANDOFF.md`'s Warnings.
 
 ## 4. Phase 6c, 4.0.0: P54's remaining areas, then P55
 
-**The owner placed all of Phase 6c first (2026-10-14).** P53 is done (#136, #138, #139, #140, #142). P54 is one PR per audit §3 area: parts 1 to 4 merged (§3.1 #143, §3.2 #145, §3.3 #144, §3.4's first half #147). §3.4's second half and four areas remain, then P55 (the lows), then Phase 6b's workstreams (ask the owner which comes first then). Keep each PR under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+**The owner placed all of Phase 6c first (2026-10-14).** P53 is done. P54 is one PR per audit §3 area: parts 1 to 8 merged or merging (§3.1 #143, §3.2 #145, §3.3 #144, §3.4 #147 and #149, §3.5 #150, §3.6 #151, §3.7 #152). §3.8 remains, then P55 (the lows), then Phase 6b's workstreams (ask the owner which comes first then). Keep each PR under 100 files. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P54 | The medium findings, one PR per §3 area: §3.4 to §3.8 left | N46 | per area | L |
+| P54 | The medium findings: §3.8 left | N46 | `tests/` | S |
 | P55 | The low findings and doc fixes | N47 | per area | M |
 | P34, P35, P37, P41, P42, P43 | Phase 6b's workstreams, after Phase 6c | see §4 of the plan | | |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-**Run each finding's own fixture first.** Last session M1 did not reproduce (#135 had fixed it), and the audit's line numbers have drifted. The fixtures are in the audit's scratchpad (`3985bfd1-…\scratchpad\migration\fx1..fx7`, `studio\`, `shared\fx`, …), which Storage Sense can empty: rebuild a case from the audit's text if it is gone. **Already closed by P53, so skip them:** V7, V8, V11, E9, G3, G4, S1, S2, W6, W7.
+**Run each finding's own fixture first**, and read the finding in the audit, not only here: the line numbers have drifted, and the audit was wrong once (3.3.8's `autocomplete` is checked).
 
-**P54 part 5, §3.4's second half (design-system-versioning, design-system-docs, figma-variables-sync).** Next. #147 closed V4, V5, V6, V9 and the 8-digit hex (`TheAuditsVersioningMediums`); add the next tests to that class.
-- **V2.** `diff_system._snapshot_from_contract()`: with several DTCG files, a later file's `notWritten` value loses to an earlier file's written value (`if name not in held`); last wins elsewhere. Walk the files once, in order, as `read_tokens` does.
-- **V3.** `deprecate.py import` reads `read_deprecations()` only; the `$deprecated` marks in the root `$extensions` (`not_written_marks()`) that `diff_system` honours are never imported. Do it once, in the shared `read_deprecations`.
-- **V10.** The "copy the scripts into your own `scripts/`" notes in three SKILL.md files name only the command scripts, not the `project_config.py`, `dtcg.py` and `figma_common.py` they import, and `install_gate.py` vendors none of these three skills' commands, so a copied command fails with `ModuleNotFoundError`: each note must name its helpers. Mind the SKILL.md budgets (§2).
-- **Found 2026-10-15:** `extract_system --tokens` reads a JSON file as CSS, so a DTCG token file gives zero tokens with exit 0. Read it through `project_config.read_tokens`, as the gates do.
+**P54 part 9, §3.8 (the test suite).** Next.
+- **T1.** `test_evidence.test_no_entry_outlives_its_figure` passes when the figure **or** any `also` substring is in the doc: "19 categories" is kept alive by a bare "143", "37–41%" by "41%", "2,000+ audits" by "13,000", while their main figures are gone from the listed docs. Require the figure itself, word-bound the `also` values, then fix the register (`tests/fixtures/evidence.json`): a figure a doc no longer quotes leaves that doc's list, and a figure re-quoted is re-read at its source on the day.
+- **T2.** Wall-clock thresholds on shared runners: `test_content_and_a11y` (`assertLess(large, 20)` seconds, near the scale test), `test_browser_runtime`'s TBT medians (`< 50`, then `>= 150` ms, the tests before `test_requests_in_flight…`), and `test_token_migration` (the timing assertion near its scale test). Keep the ratio bounds, drop the absolute ones; assert on timestamps relative to TTI where the test measures one.
+- After part 9: remove the `P54` row, mark N46 done in the completion plan, and close it in the inventory if it is listed there (it was not on 2026-10-16).
 
-**P54 part 6, §3.5 (content-model-to-ui, client-presentation-builder, email-template-system).**
-- **E1.** `introspect_schema._temporal`: a naive `timestamp` `created_at`/`updated_at` (every Prisma `DateTime @default(now())`, Drizzle `timestamp()` without `withTimezone`) becomes an editable field; `system` is used in the `date` and `timestamptz` branches only.
-- **E2.** `scaffold_ui.py`: a table name goes into output paths unsanitised (`../evil` writes above `features/`). Refuse `/`, `\`, `..`, NUL, or slug it.
-- **E3.** `scaffold_ui.py`: a column `"2fa"` gives a TSX and a Python syntax error; `"it's"` an unterminated string. `class`, `default`, `from`, `display-name` and `naïve` already work: keep them as controls. The audit suggests `json.dumps` for names, `errors[…]` when the key differs, and a `_` prefix for a leading digit.
-- **E4.** `introspect_schema._pinned_to_caller` misses `auth.uid()::text = owner_id::text`, `(auth.jwt() ->> 'sub')::uuid = user_id` and `auth.uid() = "userId"`: false `authority-writable` warnings.
-- **E5.** `detect_format` tests `"pgTable("`, while `parse_drizzle` accepts `pgTable.withRLS(`.
-- **E6.** `build_email.minify_html` joins words across inline siblings (`<strong>Hello</strong> <em>world</em>`).
-- **E7.** `email-client-matrix.md` says the templates keep "600–750 bytes" of `<style>`; the build measures 751, 919 and 830.
-- **E8.** The three templates do not pass `lint_email --source` (6, 6 and 1 warnings), though SKILL.md says they compile clean. The SKILL.md is at its budget.
-- **E10.** `build_presentation`: header placeholders (`<company>`, `<your name>`, `<YYYY-MM-DD>`, `<stage>`) reach the cover and footer with no gap reported.
+**P55, the lows, per area** (N47). The audit's §3 lists each as "low": S5 to S8, S10; W8 to W14; M7 to M9; V12 to V16; E11 to E13; G8 to G12, G14 to G16; D5 to D9; T3 to T10. P53 already closed D4, G13 and E14. One PR per area or two areas, as the sizes allow; the HANDOFF's "Still open" list carries Vue's `:style`.
 
-**P54 part 7, §3.6 (a11y-audit-runner, perf-budget-gate, component-state-matrix, design-critique-gate).**
-- **G1.** `a11y_static`'s `aria-hidden-focusable` counts descendants that cannot take focus (`type="hidden"`, `hidden`, `inert`, `tabindex="-1"`), and only direct children.
-- **G2.** `a11y_static._has_name` looks one level deep and has no case for a capitalised component child: `<button><Icon/></button>` must be "cannot tell".
-- **G5.** `a11y_runtime.mjs`' `forcedColorsSurvey`: the unanchored `/button|a|summary/` matches `main`, `nav`, `span`…; anchor it.
-- **G6.** The macOS TBT flake has a cause: the control click lands at load + 500 ms, inside the fixture's 3-second task on a slow runner. Make it deterministic.
-- **G7.** `automation-coverage.md` §3 reads as this suite's coverage, but several mechanisms are in neither gate (1.3.4, 2.4.11, 3.3.8…).
-
-**P54 part 8, §3.7 (docs, CI, release).**
-- **D1.** HANDOFF lists "a local build never matches the release's checksums" as open, and `tooling/README.md` says byte-identical; `build.py` explains why (zlib-ng on Windows Python 3.14). Make the docs say it.
-- **D2.** `release.yml` pins `actions/checkout` and `setup-uv` by tag while holding `contents: write`; pin both to SHAs, `persist-credentials: false`, as `evals.yml` does.
-- **D3.** The plugin README says "the three browser scripts need Node"; there are six `.mjs` entry scripts.
-
-**P54 part 9, §3.8 (the test suite).**
-- **T1.** `test_evidence.test_no_entry_outlives_its_figure` passes when any `also` substring is in the doc; require the figure itself.
-- **T2.** Wall-clock thresholds on shared runners (`test_content_and_a11y` `assertLess(large, 20)`, the TBT medians, `test_token_migration`); keep the ratio bounds, drop the absolute ones.
-
-**Each PR:** run each finding's fixture first; tests fail on `v3.6.0` first (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES`; the CHANGELOG under 4.0.0's Fixed; a row `P54 part N, #N` above the `P54` row, and a note in the completion plan's N46. After part 9, remove the `P54` row and mark N46 done.
+**Each PR:** run each finding's fixture first; tests fail on `v3.6.0` first (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES`; the CHANGELOG under 4.0.0's Fixed; a row `P54 part 9, #N` (or `P55 part N, #N`) above the item's row, and a note in the completion plan.
 
 **R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed (a Vue project's bound attributes, the index-mode hook), the migration's reconciliation on a real codebase (P52), and the router (#143).
 
