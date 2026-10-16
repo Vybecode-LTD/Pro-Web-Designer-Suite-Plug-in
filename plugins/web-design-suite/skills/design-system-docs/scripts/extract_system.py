@@ -1501,7 +1501,7 @@ def json_token_css(path: Path) -> str:
         print(f"extract_system: warning: {problem}", file=sys.stderr)
     values = tokens.values()
     try:
-        data = json.loads(read_text(path))
+        data = json.loads(path.read_bytes())
     except ValueError:
         data = None                                    # read_tokens has read it, or said why
     if is_dtcg(data):
