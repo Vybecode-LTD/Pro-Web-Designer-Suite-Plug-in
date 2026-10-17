@@ -167,8 +167,8 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-A17 | low-medium | fixed in 3.4.0: `test_browser_runtime.VitalsMeasures` (PR #45) | `--interact` adds the interaction's own handler to TBT. |
 | GT-A18 | low-medium | fixed in 3.4.0: `test_content_and_a11y.StaticBestPractice` (PR #41) | `multiple-h1`, `heading-skip` and `no-main-landmark` are hard errors attributed to SCs 1.3.1, 2.4.6 and 2.4.1. |
 | GT-A19 | low | fixed in 3.2.0 | smaller errors in the docs. |
-| GT-B1 | — | W11 (3.6.0+) | SPA and dynamic states. |
-| GT-B2 | — | W11 (3.6.0+) | Authenticated pages. |
+| GT-B1 | — | fixed in 4.0.0: `--wait-for` and `--steps` in the gates that open a URL (`test_runtime_reach`, PR #163) | SPA and dynamic states. |
+| GT-B2 | — | fixed in 4.0.0: `--storage-state` and `--header`, the header for the page's own origin only (`test_runtime_reach`, PR #163) | Authenticated pages. |
 | GT-B3 | — | W11 (3.6.0+) | Shadow DOM. |
 | GT-B4 | — | W11 (3.6.0+) | Multiple URLs and viewports. |
 | GT-B5 | — | fixed in 3.4.0: `scripts/crux_check.py` (`test_crux_check`, PR #46) | The field-data loop. |

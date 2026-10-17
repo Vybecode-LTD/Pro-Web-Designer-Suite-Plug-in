@@ -68,9 +68,40 @@ node scripts/a11y_runtime.mjs --file dist/index.html --tags wcag2a,wcag2aa,wcag2
 | `--only SUBSTR` | with `--matrix`, narrow to matching cells (repeatable). It does not pick checks, so a page refuses it: use `--skip` |
 | `--densities LIST` | on a page, the `data-density` values to measure focus at as well, in normal and forced colours (default `auto`: each one the page's own stylesheets name; `none` turns it off) |
 | `--skip CHECK` | `axe names taborder focus forced contrast keys reflow` (repeatable) |
+| `--wait-for SEL` · `--steps FILE` · `--storage-state FILE` · `--header "Name: V"` | reach the page its users get: see *Reaching the page* below |
 | `--max-stops` · `--max-cells` · `--focus-threshold` · `--viewport` · `--dpr` · `--axe` · `--browser` · `--json` · `--quiet` | |
 
 Exit `0` no errors and inside budget · `1` violations or breach · `2` bad arguments, no browser, no axe, page failed to load, or the run failed: a crash is never a finding.
+
+### Reaching the page
+
+At `load` a client-rendered page is still an empty shell, and a signed-in page has gone to its sign-in. Audited as it stands, either passes, because there is almost nothing on it. Four flags reach the page its users get. design-critique-gate's `critique_snapshots.mjs` takes the same four, and perf-budget-gate's `measure_vitals.mjs` takes `--wait-for` and `--storage-state`.
+
+| Flag | Does |
+|---|---|
+| `--wait-for SEL` | waits up to 30 s for `SEL` to be visible, after any steps |
+| `--steps FILE` | runs a JSON list of steps once the page has loaded, 15 s for each |
+| `--storage-state FILE` | opens every context with a session: Playwright's `storageState`, the cookies and localStorage. `npx playwright codegen --save-storage=session.json URL` writes one after you sign in by hand |
+| `--header "Name: V"` | sends a header with every request to the page's own origin, never to a third party's. `V` may be `env:NAME`, read from the environment, which keeps a token off the command line (repeatable) |
+
+```bash
+node scripts/a11y_runtime.mjs --url http://127.0.0.1:3000/ --wait-for "main h1"
+node scripts/a11y_runtime.mjs --url http://127.0.0.1:3000/account --storage-state session.json
+node scripts/a11y_runtime.mjs --url https://staging.example.com/ --header "Authorization: env:STAGING_TOKEN"
+node scripts/a11y_runtime.mjs --url http://127.0.0.1:3000/search --steps search-steps.json
+```
+
+```json
+[
+  {"fill": "#email", "value": "qa@example.com"},
+  {"fill": "#password", "env": "QA_PASSWORD"},
+  {"click": "button[type=submit]"},
+  {"wait-for": "nav[aria-label=Account]"},
+  {"goto": "/settings"}
+]
+```
+
+Each step has one action: `click`, `fill` (a `value`, or `env` naming a variable, so a password stays out of the file), `press` (a key, with `on` for an element), `goto` (resolved against the page's URL) or `wait-for`. The steps, the session and the headers apply in every context the audit opens, the forced-colours pass included. A mistake in a file, a step that fails, a wait that never ends or an HTTP error status exits 2, naming it: a page never reached is not audited. A storage-state file is a live session, so keep it out of the repository.
 
 **axe is injected from `node_modules`, never a CDN, and the browser is never downloaded.** A gate that depends on a third-party CDN goes red when that CDN does, and a team taught that red means "re-run it" is a team with no gate.
 

@@ -2,7 +2,8 @@
  * browser_common.mjs — what the suite's browser scripts share:
  * resolving Playwright and a browser from disk, never from the network;
  * freezing animations before a measurement; reading a JSON file a person
- * may have saved from PowerShell or Notepad; and WCAG's contrast ratio.
+ * may have saved from PowerShell or Notepad; reaching a page that needs a
+ * wait, steps, a session or a header; and WCAG's contrast ratio.
  *
  * The master copy is shared/browser_common.mjs, at the plugin's root. The
  * scripts/ folders of a11y-audit-runner, component-state-matrix,
@@ -188,6 +189,169 @@ export function refuseOverwrite(out, ...inputs) {
     if (same) return `${out} is the input ${given}: writing there would replace it. Choose another output.`;
   }
   return null;
+}
+
+// Reaching the page (P34: GT-B1, GT-B2). At `load` a client-rendered page is
+// still an empty shell, a logged-in page has gone to its sign-in, and a
+// staging host may want a header. The gates that open a URL take the same
+// options:
+//   --wait-for SEL        wait until SEL is visible, after the steps
+//   --steps FILE          a JSON list of steps, run once the page has loaded
+//   --storage-state FILE  Playwright's storageState: cookies and localStorage
+//   --header "Name: V"    a request header, sent to the page's own origin
+//                         only, never to a third party; "env:NAME" reads V
+//                         from the environment, keeping a token off the
+//                         command line (repeatable)
+// A step is an object with one action:
+//   {"click": SEL}   {"fill": SEL, "value": TEXT}   {"fill": SEL, "env": NAME}
+//   {"press": KEY}   {"press": KEY, "on": SEL}   {"goto": URL}   {"wait-for": SEL}
+// A goto is resolved against the page's URL. A step that cannot run stops the
+// run with exit 2: a page never reached is not audited.
+export const NAV_OPTIONS = ['--wait-for', '--steps', '--storage-state', '--header'];
+export const STEP_TIMEOUT = 15000;
+export const WAIT_FOR_TIMEOUT = 30000;
+const STEP_FIELDS = { click: [], fill: ['value', 'env'], press: ['on'], goto: [], 'wait-for': [] };
+const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+export function newNav() {
+  return { waitFor: null, stepsFile: null, stateFile: null, headers: [] };
+}
+
+// Records one of NAV_OPTIONS. Returns the message to exit 2 on, or null.
+export function takeNavOption(nav, flag, value) {
+  const once = { '--wait-for': 'waitFor', '--steps': 'stepsFile', '--storage-state': 'stateFile' }[flag];
+  if (once) {
+    if (nav[once] !== null) return `${flag} is given twice`;
+    if (!value.trim()) return `${flag} needs a value`;
+    nav[once] = value;
+    return null;
+  }
+  if (flag !== '--header') return `${flag} is not one of ${NAV_OPTIONS.join(', ')}`;
+  const colon = value.indexOf(':');
+  const name = colon < 0 ? '' : value.slice(0, colon).trim();
+  if (!HEADER_NAME.test(name)) return `--header takes "Name: value", got "${value}"`;
+  if (nav.headers.some(([n]) => n.toLowerCase() === name.toLowerCase())) return `--header ${name} is given twice`;
+  nav.headers.push([name, value.slice(colon + 1).trim()]);
+  return null;
+}
+
+function stepProblem(step, n) {
+  if (!step || typeof step !== 'object' || Array.isArray(step)) return `step ${n} is not an object`;
+  const actions = Object.keys(step).filter((k) => Object.hasOwn(STEP_FIELDS, k));
+  if (actions.length !== 1) return `step ${n} needs exactly one of ${Object.keys(STEP_FIELDS).join(', ')}`;
+  const [action] = actions;
+  const extra = Object.keys(step).filter((k) => k !== action && !STEP_FIELDS[action].includes(k));
+  if (extra.length) return `step ${n} (${action}) does not take ${extra.join(', ')}`;
+  for (const [key, v] of Object.entries(step)) {
+    if (typeof v !== 'string' || (key !== 'value' && !v.trim())) return `step ${n}: ${key} must be a string, and not an empty one`;
+  }
+  if (action === 'fill' && Object.hasOwn(step, 'value') === Object.hasOwn(step, 'env')) {
+    return `step ${n} (fill) needs one of value and env`;
+  }
+  if (Object.hasOwn(step, 'env')) {
+    if (!ENV_NAME.test(step.env)) return `step ${n}: env names a variable, got "${step.env}"`;
+    if (process.env[step.env] === undefined) return `step ${n}: the environment has no ${step.env}`;
+  }
+  return null;
+}
+
+// Reads what the options name, before a browser starts: the steps, the
+// storage state and each header's value. Returns { nav, problem }; with a
+// problem, the script exits 2 on it.
+export function readNav(given, target) {
+  const nav = { waitFor: given.waitFor, steps: [], storageState: null, headers: [] };
+  if (given.headers.length && !/^https?:/i.test(target || '')) {
+    return { nav, problem: '--header needs an http(s) URL: a file has no server to send it to' };
+  }
+  for (const [name, raw] of given.headers) {
+    let value = raw;
+    const env = /^env:(.*)$/.exec(raw);
+    if (env) {
+      if (!ENV_NAME.test(env[1])) return { nav, problem: `--header ${name}: env: names a variable, got "${env[1]}"` };
+      value = process.env[env[1]];
+      if (value === undefined) return { nav, problem: `--header ${name}: the environment has no ${env[1]}` };
+    }
+    if (/[\r\n]/.test(value)) return { nav, problem: `--header ${name}: a header's value holds no line break` };
+    nav.headers.push([name, value]);
+  }
+  const read = (flag, file) => {
+    try { return { data: readJsonFile(file) }; } catch (err) { return { problem: `${flag} ${file}: ${err.message}` }; }
+  };
+  if (given.stepsFile) {
+    const { data, problem } = read('--steps', given.stepsFile);
+    if (problem) return { nav, problem };
+    if (!Array.isArray(data)) return { nav, problem: `--steps ${given.stepsFile} must hold a JSON list of steps` };
+    for (let i = 0; i < data.length; i++) {
+      const p = stepProblem(data[i], i + 1);
+      if (p) return { nav, problem: `--steps ${given.stepsFile}: ${p}` };
+    }
+    nav.steps = data;
+  }
+  if (given.stateFile) {
+    const { data, problem } = read('--storage-state', given.stateFile);
+    if (problem) return { nav, problem };
+    const list = (k) => data[k] === undefined || Array.isArray(data[k]);
+    if (!data || typeof data !== 'object' || Array.isArray(data) || !list('cookies') || !list('origins')) {
+      return { nav, problem: `--storage-state ${given.stateFile} is not Playwright's storageState: an object whose cookies and origins are lists` };
+    }
+    nav.storageState = { cookies: data.cookies ?? [], origins: data.origins ?? [] };
+  }
+  return { nav, problem: null };
+}
+
+// The browser context's options for a read nav.
+export function navContext(nav) {
+  return nav.storageState ? { storageState: nav.storageState } : {};
+}
+
+// Sends the headers with every request to `url`'s origin, from this page.
+export async function routeHeaders(page, url, nav) {
+  if (!nav.headers.length) return;
+  const origin = new URL(url).origin;
+  const extra = Object.fromEntries(nav.headers);
+  await page.route('**/*', (route) => {
+    const req = route.request();
+    let same = false;
+    try { same = new URL(req.url()).origin === origin; } catch { /* no origin: data:, blob: */ }
+    return same ? route.continue({ headers: { ...req.headers(), ...extra } }) : route.continue();
+  });
+}
+
+// Waits for --wait-for's selector. Throws with the selector named.
+export async function waitForNav(page, nav) {
+  if (!nav.waitFor) return;
+  try {
+    await page.waitForSelector(nav.waitFor, { state: 'visible', timeout: WAIT_FOR_TIMEOUT });
+  } catch (err) {
+    throw new Error(`--wait-for ${nav.waitFor} never appeared: ${err.message.split('\n')[0]}`);
+  }
+}
+
+// Opens `url` and does what the options ask: the headers, the steps, then the
+// wait. Returns the first navigation's response. A failed step throws, named.
+export async function arrive(page, url, nav, { waitUntil = 'load', timeout = 45000 } = {}) {
+  await routeHeaders(page, url, nav);
+  const resp = await page.goto(url, { waitUntil, timeout });
+  for (const [i, step] of nav.steps.entries()) {
+    const action = Object.keys(step).find((k) => Object.hasOwn(STEP_FIELDS, k));
+    try {
+      if (action === 'click') await page.click(step.click, { timeout: STEP_TIMEOUT });
+      else if (action === 'fill') {
+        await page.fill(step.fill, step.env ? process.env[step.env] : step.value, { timeout: STEP_TIMEOUT });
+      } else if (action === 'press') {
+        if (step.on) await page.press(step.on, step.press, { timeout: STEP_TIMEOUT });
+        else await page.keyboard.press(step.press);
+      } else if (action === 'goto') await page.goto(new URL(step.goto, page.url()).href, { waitUntil, timeout });
+      else await page.waitForSelector(step['wait-for'], { state: 'visible', timeout: STEP_TIMEOUT });
+    } catch (err) {
+      // A fill's value is never repeated: it may be a password.
+      throw new Error(`step ${i + 1} (${action} ${step[action]}) failed: ${err.message.split('\n')[0]}`);
+    }
+  }
+  if (nav.steps.length) await page.waitForLoadState('load', { timeout });
+  await waitForNav(page, nav);
+  return resp;
 }
 
 // The project contract (P24): a project's .design-suite.json, found and

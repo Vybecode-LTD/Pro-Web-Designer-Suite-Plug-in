@@ -38,6 +38,11 @@
  * USAGE
  *   node critique_snapshots.mjs http://localhost:3000/pricing
  *   node critique_snapshots.mjs build/index.html --out critique-shots --json
+ *   node critique_snapshots.mjs http://localhost:3000/account --storage-state session.json --wait-for main
+ *
+ * A page that needs a wait, steps, a session or a header takes the suite's
+ * --wait-for SEL, --steps FILE, --storage-state FILE and --header "Name: V"
+ * (browser_common.mjs), run in each of the six captures.
  *
  * Exit codes: 0 written, every measured pair meets its AA floor · 1 written,
  * and a measured pair is below its floor · 2 bad invocation, no browser, or a
@@ -47,7 +52,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { contrastRatio, launchBrowser, loadPlaywright } from './browser_common.mjs';
+import { NAV_OPTIONS, arrive, contrastRatio, launchBrowser, loadPlaywright, navContext, newNav, readNav, takeNavOption } from './browser_common.mjs';
 
 function die(message) {
   process.stderr.write(`critique_snapshots: ${message}\n`);
@@ -85,7 +90,7 @@ export const PROXIES = [
 
 function parseArgs(argv) {
   const opts = { page: null, out: 'critique-shots', browser: process.env.CRITIQUE_CHROMIUM || '',
-                 json: false, settle: 300 };
+                 json: false, settle: 300, nav: newNav(), reach: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const need = () => {
@@ -98,15 +103,22 @@ function parseArgs(argv) {
       opts.settle = Number(need());
       if (!Number.isInteger(opts.settle) || opts.settle < 0) die('--settle takes whole milliseconds, 0 or more');
     } else if (a === '--json') opts.json = true;
-    else if (a === '-h' || a === '--help') {
+    else if (NAV_OPTIONS.includes(a)) {
+      const problem = takeNavOption(opts.nav, a, need());
+      if (problem) die(problem);
+    } else if (a === '-h' || a === '--help') {
       process.stdout.write('usage: node critique_snapshots.mjs URL|FILE.html [--out DIR] [--settle MS] ' +
-                           '[--browser PATH] [--json]\n');
+                           '[--browser PATH] [--json] [--wait-for SEL] [--steps FILE] ' +
+                           '[--storage-state FILE] [--header "Name: V"]...\n');
       process.exit(0);
     } else if (a.startsWith('-')) die(`unknown option ${a}`);
     else if (opts.page) die('one page at a time');
     else opts.page = a;
   }
   if (!opts.page) die('give a page: node critique_snapshots.mjs http://localhost:3000/ or build/index.html');
+  const reached = readNav(opts.nav, opts.page);
+  if (reached.problem) die(reached.problem);
+  opts.reach = reached.nav;
   return opts;
 }
 
@@ -301,6 +313,7 @@ async function main() {
       for (const mode of MODES) {
         // Nothing is injected into the page, so its CSP stays in force.
         const context = await browser.newContext({
+          ...navContext(opts.reach),
           viewport: { width, height: width < 768 ? 844 : 900 }, deviceScaleFactor: 1,
           isMobile: width < 768, hasTouch: width < 768,
           colorScheme: mode.colorScheme, reducedMotion: mode.reducedMotion,
@@ -308,7 +321,11 @@ async function main() {
         });
         try {
           const page = await context.newPage();
-          await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+          // The page as its users reach it (P34), and never an error page's
+          // capture in its place.
+          const resp = await arrive(page, url, opts.reach, { waitUntil: 'load', timeout: 60000 })
+            .catch((err) => die(`could not load ${url}: ${err.message.split('\n')[0]}`));
+          if (resp && !resp.ok() && /^https?:/i.test(url)) die(`${url} returned HTTP ${resp.status()}`);
           await page.evaluate(async () => { if (document.fonts) await document.fonts.ready; });
           await page.waitForTimeout(opts.settle);
           const name = `${width}${mode.name ? `-${mode.name}` : ''}.png`;

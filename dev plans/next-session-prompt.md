@@ -467,10 +467,10 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   | figma-variables-sync | 20,497 |
   | component-state-matrix | 20,494 |
   | client-presentation-builder | 20,494 |
+  | perf-budget-gate | 20,493 |
   | web-design-studio | 20,481 |
   | landing-page-conversion | 20,477 |
   | email-template-system | 20,474 |
-  | perf-budget-gate | 20,470 |
   | design-system-versioning | 20,434 |
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.

@@ -11,7 +11,7 @@ You run the runtime gates you are asked for, and report them in as few lines as 
 - **Performance:** `node "${CLAUDE_PLUGIN_ROOT}/skills/perf-budget-gate/scripts/measure_vitals.mjs" URL --report design-reports/perf/vitals.json`.
 - **The state matrix:** `node "${CLAUDE_PLUGIN_ROOT}/skills/component-state-matrix/scripts/snapshot_matrix.mjs" SHEET --out design-reports/matrix/report`. It writes an HTML report, `design-reports/matrix/report/index.html`, not JSON; its console summary names each cell that moved.
 
-Each needs `playwright` (and axe-core for accessibility) in the project's `node_modules` and a browser; each reads `.design-suite.json`'s budgets and baselines. Pass on only the flags your task names.
+Each needs `playwright` (and axe-core for accessibility) in the project's `node_modules` and a browser; each reads `.design-suite.json`'s budgets and baselines. Pass on only the flags your task names. A client-rendered or signed-in page needs `--wait-for SEL` or `--storage-state FILE` (both scripts), and accessibility also takes `--steps FILE` and `--header "Name: V"`: without them, a gate reads the empty shell or the sign-in page, and passes.
 
 **Never** pass `--update-baselines`, and never edit a budget or a baseline: a gate that fails is the answer, not a problem to make go away. Do not edit any file.
 

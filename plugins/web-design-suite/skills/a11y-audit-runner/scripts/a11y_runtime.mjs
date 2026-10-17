@@ -79,6 +79,14 @@
  *   --max-stops N         how many tab stops to measure focus on   (default 40)
  *   --max-cells N         with --matrix, cap the cells measured    (default 120)
  *   --focus-threshold N   min fraction of pixels a ring must change (default 0.005)
+ *   --wait-for SEL        wait until SEL is visible before auditing: at `load`
+ *                         a client-rendered page is still an empty shell
+ *   --steps FILE          a JSON list of steps run once the page loads: click,
+ *                         fill (a value, or env NAME), press, goto, wait-for
+ *   --storage-state FILE  a signed-in session (Playwright's storageState)
+ *   --header "Name: V"    a request header, for the page's own origin only;
+ *                         V may be env:NAME (repeatable). The four run before
+ *                         every check, the forced-colours pass included
  *   --viewport WxH        viewport                            (default 1280x900)
  *   --dpr N               device pixel ratio                        (default 1)
  *   --axe PATH            axe.min.js to inject
@@ -115,7 +123,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { FREEZE_ANIMATIONS_CSS, contrastRatio, launchBrowser, loadPlaywright, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, refuseOverwrite } from './browser_common.mjs';
+import { FREEZE_ANIMATIONS_CSS, NAV_OPTIONS, arrive, contrastRatio, launchBrowser, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, refuseOverwrite, takeNavOption } from './browser_common.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TAGS = 'wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice';
@@ -152,6 +160,7 @@ function parseArgs(argv) {
     axe: null,
     browser: process.env.A11Y_CHROMIUM || '',
     json: false, quiet: false, report: null,
+    nav: newNav(), reach: null,
   };
   const need = (i, flag) => {
     if (i + 1 >= argv.length) die(`${flag} needs a value`);
@@ -207,7 +216,11 @@ function parseArgs(argv) {
         break;
       }
       default:
-        if (a.startsWith('-')) die(`unknown option ${a} (try --help)`);
+        if (NAV_OPTIONS.includes(a)) {
+          const problem = takeNavOption(opts.nav, a, need(i, a));
+          if (problem) die(problem);
+          i++;
+        } else if (a.startsWith('-')) die(`unknown option ${a} (try --help)`);
         // A bare argument is the target, so the common invocation works.
         else if (!opts.url && !opts.file && !opts.matrix) {
           if (/^https?:\/\//i.test(a)) opts.url = a; else opts.file = a;
@@ -231,8 +244,13 @@ function parseArgs(argv) {
     try { configured = projectConfig()?.budgets.a11y ?? null; } catch { /* reported where the budget is read */ }
   }
   const clash = refuseOverwrite(opts.report, opts.file, opts.url, opts.matrix, opts.keymap,
-                                opts.budget ?? configured, opts.axe);
+                                opts.budget ?? configured, opts.axe, opts.nav.stepsFile, opts.nav.stateFile);
   if (clash) die(clash);
+  // The steps, the session and the headers are read before axe or a browser
+  // is looked for, so a mistake in one is named first (P34).
+  const reached = readNav(opts.nav, opts.url || opts.file || opts.matrix);
+  if (reached.problem) die(reached.problem);
+  opts.reach = reached.nav;
   // Ignoring an option is how a run reports on less than its caller asked for:
   // `--only contrast` on a page used to run every check.
   if (opts.only.length && !opts.matrix) {
@@ -2000,6 +2018,7 @@ async function main() {
 
   const newPage = async (forcedColors) => {
     const ctx = await browser.newContext({
+      ...navContext(opts.reach),
       viewport: opts.viewport,
       deviceScaleFactor: opts.dpr,
       forcedColors: forcedColors || 'none',
@@ -2013,7 +2032,9 @@ async function main() {
     });
     await ctx.addInitScript(HELPERS);
     const page = await ctx.newPage();
-    const resp = await page.goto(target, { waitUntil: 'load', timeout: 45000 })
+    // The page as its users reach it: the session, the headers, the steps and
+    // the wait, in every context the run opens (P34).
+    const resp = await arrive(page, target, opts.reach, { waitUntil: 'load', timeout: 45000 })
       .catch((err) => { die(`could not load ${target}: ${err.message.split('\n')[0]}`); });
     if (resp && !resp.ok() && /^https?:/.test(target)) {
       die(`${target} returned HTTP ${resp.status()}. Audit a page that loads.`);

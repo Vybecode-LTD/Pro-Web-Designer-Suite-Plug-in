@@ -315,7 +315,12 @@ the template records each check as run, run with a proxy, or "not run — needs 
 ```bash
 node scripts/critique_snapshots.mjs http://localhost:3000/pricing --out shots
 node scripts/critique_snapshots.mjs build/index.html --json   # exit 1: a pair below its floor
+node scripts/critique_snapshots.mjs http://localhost:3000/account --storage-state session.json --wait-for main
 ```
+
+A page behind a sign-in, a form or a late render takes `--storage-state FILE`, `--steps FILE`,
+`--wait-for SEL` and `--header "Name: V"`, run in each capture; `browser_common.mjs` gives the
+steps' format. A step that fails, or an HTTP error status, exits 2: it never critiques an error page.
 
 ---
 

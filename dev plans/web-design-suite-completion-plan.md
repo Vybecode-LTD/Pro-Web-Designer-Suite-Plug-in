@@ -459,8 +459,8 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 ### W11 · Gate coverage
 
 - Runtime and matrix:
-  - single-page apps (`--wait-for`, `--steps`);
-  - logged-in pages (`--storage-state`);
+  - single-page apps (`--wait-for`, `--steps`); *done for 4.0.0 (PR #163, P34 part 1): `test_runtime_reach`*;
+  - logged-in pages (`--storage-state`, and `--header` for the page's own origin); *done for 4.0.0 (PR #163)*;
   - shadow DOM;
   - several URLs and viewports.
 - Accessibility: the cheap automatable checks the coverage table lists but nothing runs.

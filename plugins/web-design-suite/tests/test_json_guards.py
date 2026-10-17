@@ -39,7 +39,7 @@ TOP = ([], "x", 5)          # what every row is fed; a row adds the wrong shapes
 # The loaders that take a list, so `[]` is a valid file for them.
 LISTS = {"check_roles --pairs", "audit_design --baseline", "a11y_static --baseline", "perf_audit --baseline",
          "critique_report findings", "critique_report --audit", "build_presentation --a11y",
-         "build_presentation --audit"}
+         "build_presentation --audit", "a11y_runtime --steps"}
 CODE = 2                    # exit 2, a bad invocation; BASELINE rows audit everything instead,
                             # and introspect_schema exits 1, "nothing usable found in the input"
 BASELINE = (0, 1)
@@ -164,6 +164,17 @@ NODE_CASES = {
                               ["--url", "http://127.0.0.1:9/", "--axe", "axe.js", "--budget", "BAD"], CODE, [
         ({"defaults": {"contrast_failures": "0"}}, "`contrast_failures`"),
         ({"defaults": []}, "`defaults`")]),
+    # browser_common.readNav(), which each gate that opens a URL calls (P34).
+    "a11y_runtime --steps": ("a11y-audit-runner", "a11y_runtime.mjs",
+                             ["--url", "http://127.0.0.1:9/", "--axe", "axe.js", "--steps", "BAD"], CODE, [
+        ([{"click": 5}], "bad.json: step 1: click"),
+        ([{"fill": "#q", "value": []}], "bad.json: step 1: value"),
+        ([None], "bad.json: step 1 is not an object")]),
+    "a11y_runtime --storage-state": ("a11y-audit-runner", "a11y_runtime.mjs",
+                                     ["--url", "http://127.0.0.1:9/", "--axe", "axe.js", "--storage-state", "BAD"],
+                                     CODE, [
+        ({"cookies": {}}, "storageState"),
+        ({"origins": 5}, "storageState")]),
 }
 
 
