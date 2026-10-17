@@ -7,6 +7,26 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
 ### Added
 
+- **The gates that open a URL reach a client-rendered or signed-in page** (P34 part 1;
+  GT-B1, GT-B2). Each ran one `goto(…, 'load')`, so a client-rendered page was audited as
+  its empty shell, and a signed-in page as its sign-in: both passed, with almost nothing on
+  them. `browser_common.mjs` gives `a11y_runtime.mjs` and `critique_snapshots.mjs` four
+  options, run in every context they open (the forced-colours pass and all six captures
+  included):
+  - `--wait-for SEL`: wait up to 30 s for `SEL` to be visible;
+  - `--steps FILE`: a JSON list of `click`, `fill` (a `value`, or `env` naming a
+    variable, so a password stays out of the file), `press`, `goto` and `wait-for`;
+  - `--storage-state FILE`: a session, Playwright's `storageState`;
+  - `--header "Name: V"`: sent to the page's own origin only, never to a third party,
+    with `V` read from the environment when it is `env:NAME`.
+
+  `measure_vitals.mjs` takes `--wait-for` and `--storage-state`, and refuses `--steps`
+  and `--header`: steps would run in the load it measures, and a header needs request
+  routing, which turns off the HTTP cache. Every option is read before a browser starts,
+  each mistake named (exit 2). A step that fails, a wait that never ends, or an HTTP
+  error status exits 2 too: vitals and the critique used to measure and capture a 401
+  page as if it were the page. a11y-audit-runner's `references/scripts.md` gives the
+  steps' format. `test_runtime_reach`, `test_json_guards`.
 - **`tw_probe.mjs` and `/tw-probe`** (P36 part 2; SB-C3). web-design-studio's new
   script compiles a Tailwind v4 project's entry stylesheet with the project's own
   tailwindcss and checks what it generates. Tailwind writes no CSS for a class it does not

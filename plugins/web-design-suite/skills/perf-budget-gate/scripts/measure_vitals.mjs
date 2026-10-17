@@ -60,6 +60,12 @@
  *                      the page still loads and hydrates
  *   --warm             measure the SECOND load (warm cache) instead of a cold one
  *   --settle MS        quiet time after load before reading   (default 3000)
+ *   --storage-state FILE  measure signed in: Playwright's storageState, the
+ *                      cookies and localStorage of a session
+ *   --wait-for SEL     wait until SEL is visible after load, then settle: a
+ *                      client-rendered page's LCP element arrives late
+ *                      (--steps and --header are the other gates'; here they
+ *                      would change the load being measured, and are refused)
  *   --viewport WxH     viewport                             (default 412x915)
  *   --dpr N            device pixel ratio                        (default 2)
  *   --resources N      how many of the largest resources to print (default 10)
@@ -90,7 +96,7 @@ import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { launchBrowser, loadPlaywright, projectConfig, readJsonFile, refuseOverwrite } from './browser_common.mjs';
+import { NAV_OPTIONS, launchBrowser, loadPlaywright, navContext, newNav, projectConfig, readJsonFile, readNav, refuseOverwrite, takeNavOption, waitForNav } from './browser_common.mjs';
 
 // Lighthouse's mobile profile is 150 ms RTT, 1.6 Mbps down, 750 Kbps up and
 // 4x CPU. CDP adds its latency to each request once, where a round trip is
@@ -137,6 +143,8 @@ function parseArgs(argv) {
     json: false,
     report: null,
     browser: process.env.PERF_CHROMIUM || '',
+    nav: newNav(),
+    reach: null,
     quiet: false,
   };
   const need = (i, flag) => {
@@ -179,7 +187,11 @@ function parseArgs(argv) {
         break;
       }
       default:
-        if (a.startsWith('-')) die(`unknown option ${a} (try --help)`);
+        if (NAV_OPTIONS.includes(a)) {
+          const problem = takeNavOption(opts.nav, a, need(i, a));
+          if (problem) die(problem);
+          i++;
+        } else if (a.startsWith('-')) die(`unknown option ${a} (try --help)`);
         else if (opts.target) die(`more than one target: ${opts.target} and ${a}`);
         else opts.target = a;
     }
@@ -194,6 +206,18 @@ function parseArgs(argv) {
     if (!opts.interact) die('--interact-at MS needs --interact SELECTOR: it says when, not what');
     if (opts.interactAt < 0) die('--interact-at must be 0 or more milliseconds');
   }
+  // What would change the load being measured is refused, not run (P34).
+  if (opts.nav.stepsFile) {
+    die('--steps would run in the load being measured. Sign in with --storage-state, ' +
+        'and measure an interaction with --interact.');
+  }
+  if (opts.nav.headers.length) {
+    die('--header needs request routing, which turns off the HTTP cache and holds every ' +
+        'request, so the numbers would describe a page no user gets. Sign in with --storage-state.');
+  }
+  const reached = readNav(opts.nav, opts.target);
+  if (reached.problem) die(reached.problem);
+  opts.reach = reached.nav;
   return opts;
 }
 
@@ -526,6 +550,9 @@ async function clickDuringLoad(page, opts) {
 async function runOnce(browser, opts, url) {
   const t = THROTTLE[opts.throttle];
   const context = await browser.newContext({
+    // A signed-in session (P34): a cookie is no request routing, so the cache
+    // and the timings are the page's own.
+    ...navContext(opts.reach),
     viewport: opts.viewport,
     deviceScaleFactor: opts.dpr,
     locale: 'en-US',
@@ -588,15 +615,21 @@ async function runOnce(browser, opts, url) {
     }
 
     let clickedAt = null;
+    let resp;
     if (opts.interactAt != null) {
-      await page.goto(url, { waitUntil: 'commit', timeout: 60000 });
+      resp = await page.goto(url, { waitUntil: 'commit', timeout: 60000 });
       clickedAt = await clickDuringLoad(page, opts);
       await page.waitForLoadState('load', { timeout: 60000 });
-      await page.waitForTimeout(opts.settle);
     } else {
-      await page.goto(url, { waitUntil: 'load', timeout: 60000 });
-      await page.waitForTimeout(opts.settle);
+      resp = await page.goto(url, { waitUntil: 'load', timeout: 60000 });
     }
+    // An error page's numbers are not the page's (P34: a session that has
+    // expired answers 401, and a run measured that).
+    if (resp && !resp.ok() && /^https?:/i.test(url)) {
+      die(`${url} returned HTTP ${resp.status()}. Measure a page that loads.`);
+    }
+    try { await waitForNav(page, opts.reach); } catch (err) { die(err.message); }
+    await page.waitForTimeout(opts.settle);
 
     if (opts.interact && opts.interactAt == null) {
       try {
@@ -853,7 +886,7 @@ async function main() {
   // The report never replaces the page it measures (the owner's audit of
   // 2026-10-14, G4), a file:// URL's page and the configured budget included
   // (Codex on #136).
-  const clash = refuseOverwrite(opts.report, opts.target, opts.budget);
+  const clash = refuseOverwrite(opts.report, opts.target, opts.budget, opts.nav.stateFile);
   if (clash) die(clash);
   const lab = loadLabBudget(opts.budget, opts.pageType);
 
