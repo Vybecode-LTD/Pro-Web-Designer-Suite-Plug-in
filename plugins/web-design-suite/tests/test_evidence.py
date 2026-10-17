@@ -41,6 +41,12 @@ FIGURE = re.compile(
     r"fixations|home pages|form fields|categories|tools|errors|people|studies)"
     r"|\d[\d,]*(?:\.\d+)?\s?(?:bytes|KiB|KB|kB|kb|MB)\b"                 # a byte count: 102,400 bytes
     r"|\d[\d,]*-byte\b)")                                               # 16,384-byte
+# A browser version, as the references quote support (D6): "Chrome 111",
+# "Chrome/Edge 111+", "Chrome and Edge 117", "Safari on iOS 18.3",
+# "Firefox from 144".
+BROWSER_VERSION = re.compile(r"\b(?:Chrome|Chromium|Edge|Firefox|Safari|Opera|Samsung Internet)"
+                             r"(?:/Edge| and Edge| on iOS)?\s(?:from\s)?\d+(?:\.\d+)?\+?")
+WEB_FEATURES = "https://github.com/web-platform-dx/web-features/blob/main/features/"
 
 
 def norm(value: str) -> str:
@@ -237,6 +243,34 @@ class EvidenceRegister(unittest.TestCase):
         floor = next((e for e in REGISTER["entries"] if e["figure"] == "2.1.269"), None)
         self.assertIsNotNone(floor)
         self.assertEqual(["../README.md"], floor["docs"])
+
+    def test_every_browser_version_is_registered(self):
+        """D6's rest (audit, 2026-10-14): the references quoted Baseline
+        browser versions ("Chrome 111, Firefox 113, Safari 16.2") with no
+        entry, and FIGURE reads no version. Each version a doc quotes stands
+        inside a figure registered for that doc, re-read at web-features, or
+        one listed under not_statistics."""
+        self.assertEqual(BROWSER_VERSION.findall("Chrome/Edge 111+, Safari 15.4+, Firefox from 144, "
+                                                 "Safari on iOS 18.3, Chrome and Edge 117"),
+                         ["Chrome/Edge 111+", "Safari 15.4+", "Firefox from 144",
+                          "Safari on iOS 18.3", "Chrome and Edge 117"])
+        seen = 0
+        for doc, text in docs():
+            body = norm(prose(text))
+            spans = [m.span() for value in registered_for(doc) for m in re.finditer(re.escape(value), body)]
+            for m in BROWSER_VERSION.finditer(body):
+                seen += 1
+                with self.subTest(doc=doc, version=m.group()):
+                    self.assertTrue(any(a <= m.start() and m.end() <= b for a, b in spans),
+                                    "register the support line in tests/fixtures/evidence.json, re-read at "
+                                    "web-features, or list it under not_statistics: "
+                                    + body[max(0, m.start() - 80):m.end() + 40])
+        self.assertGreater(seen, 40)
+        # A support figure's source is web-features' own file for the feature.
+        for entry in REGISTER["entries"]:
+            if BROWSER_VERSION.search(entry["figure"]):
+                with self.subTest(figure=entry["figure"]):
+                    self.assertTrue(entry["url"].startswith(WEB_FEATURES), entry["url"])
 
     def test_no_companion_outlives_its_figure(self):
         """An `also` value is quoted, on its own, in at least one of its

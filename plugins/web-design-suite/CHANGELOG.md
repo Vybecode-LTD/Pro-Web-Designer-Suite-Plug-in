@@ -525,6 +525,23 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
   `test_static_checks`, `test_evidence`, `test_pointers`, `test_docs.TheAuditsDocsLows`,
   `test_powershell_json`, `test_facts`, `test_mcp`, `test_harness.NoBytecode`, `test_dtcg`.
+- **The references quoted Baseline browser versions with no entry, and two were wrong**
+  (the rest of the audit's D6). Twenty support lines across eight of web-design-studio's
+  references are registered in `evidence.json`, each re-read at web-features' own file for
+  the feature on 2026-10-16. Re-reading them found:
+  - the Popover API is Baseline from Chrome and Edge 116, not 114 (navigation-patterns.md);
+  - `@scope` is Baseline since 2026-03-24, with Firefox 146 and Safari 26.4, not "in
+    Firefox from 128" (stack-vanilla-css.md);
+  - `linear()` (since 2026-06-11) and subgrid (since 2026-03-15) are now widely
+    available, so motion-system.md and layout-composition.md say so;
+  - accessibility.md gave `@starting-style` and `transition-behavior` one list,
+    "Safari 17.5 and 17.4"; each now has its own.
+
+  `test_evidence` reads a browser version wherever a doc quotes one, and fails one that
+  stands in no registered figure or `not_statistics` row; a support figure's source must
+  be web-features. Our own observations ("checked in Chromium 153") and the drift examples
+  (Chromium 140 and 141) are listed as `not_statistics`.
+  `test_evidence.EvidenceRegister.test_every_browser_version_is_registered`.
 - **web-design-studio's gates measured and ruled four things wrong** (the audit's W1 to
   W5):
   - `check_roles` read `--fg-default: #00000080` as solid black, 20:1 on the canvas,

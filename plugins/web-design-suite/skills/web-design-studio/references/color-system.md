@@ -610,8 +610,9 @@ Banding comes from three causes, and all three have fixes.
 }
 ```
 
-`in oklch` shipped later than `oklch()` itself (Firefox 127 against 113, Safari 16.2
-against 15.4), and an engine without it draws the sRGB default. For hue-spanning gradients add
+`in oklch` shipped later than `oklch()` itself: Firefox 127 and Safari 16.2
+([web-features](https://github.com/web-platform-dx/web-features/blob/main/features/gradient-interpolation.yml)),
+against Firefox 113 and Safari 15.4 for `oklch()`, and an engine without it draws the sRGB default. For hue-spanning gradients add
 `in oklch longer hue` or `shorter hue` explicitly — the default arc is rarely what you
 meant when the endpoints are more than 180° apart.
 

@@ -691,7 +691,7 @@ Keep the depth-2 discipline: a block has elements; elements do not have elements
 
 Two things it buys that BEM cannot: the **donut** (`to (…)`) stops the scope at a nested component's root, which is the actual solution to "my card styles leaked into the card inside my card"; and proximity — when two scopes both match, the *closer* scope root wins regardless of specificity.
 
-Support notes as of 2026: shipped in Chromium and Safari, and in Firefox from 128. That is Baseline "newly available", not "widely available" — meaning a meaningful tail of business and locked-down enterprise browsers do not have it. Treat it as an *enhancement over* a correct BEM structure, not a replacement for one: name your classes as though `@scope` did not exist, then add it where a real nesting collision exists. Never let `@scope` be the only thing preventing a collision.
+Support: Baseline "newly available" since 2026-03-24 (Chrome 143, Firefox 146, Safari 26.4; Chrome had the rule itself from 118, and 143 adds `&` inside it; [web-features](https://github.com/web-platform-dx/web-features/blob/main/features/scope.yml)), not "widely available" — meaning a meaningful tail of business and locked-down enterprise browsers do not have it. Treat it as an *enhancement over* a correct BEM structure, not a replacement for one: name your classes as though `@scope` did not exist, then add it where a real nesting collision exists. Never let `@scope` be the only thing preventing a collision.
 
 ### The naming discipline that replaces build-time scoping
 

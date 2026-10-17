@@ -614,6 +614,262 @@
       "docs": [
         "../README.md"
       ]
+    },
+    {
+      "figure": "Chrome/Edge 111+, Safari 15.4+, Firefox 113+",
+      "also": [
+        "Firefox 113 and Safari 15.4"
+      ],
+      "claim": "the browser versions that support oklch() (web-features' oklab feature)",
+      "source": "web-features (web-platform-dx), features/oklab.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/oklab.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: high; baseline_low_date: 2023-05-09; baseline_high_date: 2025-11-09; chrome: \"111\"; chrome_android: \"111\"; edge: \"111\"; firefox: \"113\"; firefox_android: \"113\"; safari: \"15.4\"; safari_ios: \"15.4\"",
+      "docs": [
+        "web-design-studio/references/color-system.md"
+      ]
+    },
+    {
+      "figure": "Chrome 111, Firefox 113, Safari 16.2",
+      "claim": "the browser versions that make color-mix() Baseline widely available",
+      "source": "web-features (web-platform-dx), features/color-mix.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/color-mix.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: high; baseline_low_date: 2023-05-09; baseline_high_date: 2025-11-09; chrome: \"111\"; chrome_android: \"111\"; edge: \"111\"; firefox: \"113\"; firefox_android: \"113\"; safari: \"16.2\"; safari_ios: \"16.2\"",
+      "docs": [
+        "web-design-studio/references/color-system.md"
+      ]
+    },
+    {
+      "figure": "Chrome 125, Firefox 128, Safari 18",
+      "also": [
+        "2024-09-16"
+      ],
+      "claim": "the browser versions and date that made relative colour Baseline",
+      "source": "web-features (web-platform-dx), features/relative-color.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/relative-color.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: low; baseline_low_date: 2024-09-16; chrome: \"125\"; chrome_android: \"125\"; edge: \"125\"; firefox: \"128\"; firefox_android: \"128\"; safari: \"18\"; safari_ios: \"18\"",
+      "docs": [
+        "web-design-studio/references/color-system.md"
+      ]
+    },
+    {
+      "figure": "Firefox 127 and Safari 16.2",
+      "claim": "the Firefox and Safari versions that shipped a gradient's `in oklch`",
+      "source": "web-features (web-platform-dx), features/gradient-interpolation.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/gradient-interpolation.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: low; baseline_low_date: 2024-06-11; chrome: \"111\"; chrome_android: \"111\"; edge: \"111\"; firefox: \"127\"; firefox_android: \"127\"; safari: \"16.2\"; safari_ios: \"16.2\"",
+      "docs": [
+        "web-design-studio/references/color-system.md"
+      ]
+    },
+    {
+      "figure": "Chromium 113+, Firefox 112+, Safari 17.2+",
+      "also": [
+        "2026-06-11"
+      ],
+      "claim": "the browser versions and date that make linear() Baseline widely available",
+      "source": "web-features (web-platform-dx), features/linear-easing.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/linear-easing.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: high; baseline_low_date: 2023-12-11; baseline_high_date: 2026-06-11; chrome: \"113\"; chrome_android: \"113\"; edge: \"113\"; firefox: \"112\"; firefox_android: \"112\"; safari: \"17.2\"; safari_ios: \"17.2\"",
+      "docs": [
+        "web-design-studio/references/motion-system.md"
+      ]
+    },
+    {
+      "figure": "Chromium 111+, Safari 18+, Firefox from 144",
+      "also": [
+        "2025-10-14"
+      ],
+      "claim": "the browser versions and date that made same-document view transitions Baseline",
+      "source": "web-features (web-platform-dx), features/view-transitions.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/view-transitions.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: low; baseline_low_date: 2025-10-14; chrome: \"111\"; chrome_android: \"111\"; edge: \"111\"; firefox: \"144\"; firefox_android: \"144\"; safari: \"18\"; safari_ios: \"18\"",
+      "docs": [
+        "web-design-studio/references/motion-system.md"
+      ]
+    },
+    {
+      "figure": "Chromium 126+, Safari 18.2+",
+      "claim": "the browser versions with cross-document view transitions, not Baseline",
+      "source": "web-features (web-platform-dx), features/cross-document-view-transitions.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/cross-document-view-transitions.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: false; chrome: \"126\"; chrome_android: \"126\"; edge: \"126\"; safari: \"18.2\"; safari_ios: \"18.2\"",
+      "docs": [
+        "web-design-studio/references/motion-system.md"
+      ]
+    },
+    {
+      "figure": "Chromium 115+, Safari 26+",
+      "claim": "the browser versions with scroll-driven animations, not Baseline",
+      "source": "web-features (web-platform-dx), features/scroll-driven-animations.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/scroll-driven-animations.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: false; chrome: \"115\"; chrome_android: \"115\"; edge: \"115\"; safari: \"26\"; safari_ios: \"26\"",
+      "docs": [
+        "web-design-studio/references/motion-system.md"
+      ]
+    },
+    {
+      "figure": "Chrome and Edge 129",
+      "claim": "the only browser versions with interpolate-size, not Baseline",
+      "source": "web-features (web-platform-dx), features/interpolate-size.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/interpolate-size.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: false; chrome: \"129\"; chrome_android: \"129\"; edge: \"129\"",
+      "docs": [
+        "web-design-studio/references/motion-system.md"
+      ]
+    },
+    {
+      "figure": "Chrome/Edge 116+, Safari 17+, Firefox 125+",
+      "also": [
+        "January 2025"
+      ],
+      "claim": "the browser versions and month that made the Popover API Baseline",
+      "source": "web-features (web-platform-dx), features/popover.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/popover.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: low; baseline_low_date: 2025-01-27; chrome: \"116\"; chrome_android: \"116\"; edge: \"116\"; firefox: \"125\"; firefox_android: \"125\"; safari: \"17\"; safari_ios: \"18.3\"",
+      "docs": [
+        "web-design-studio/references/navigation-patterns.md"
+      ]
+    },
+    {
+      "figure": "Safari on iOS 18.3",
+      "also": [
+        "January 2025"
+      ],
+      "claim": "the last browser, and the month, that made the Popover API Baseline",
+      "source": "web-features (web-platform-dx), features/popover.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/popover.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: low; baseline_low_date: 2025-01-27; chrome: \"116\"; chrome_android: \"116\"; edge: \"116\"; firefox: \"125\"; firefox_android: \"125\"; safari: \"17\"; safari_ios: \"18.3\"",
+      "docs": [
+        "web-design-studio/references/accessibility.md"
+      ]
+    },
+    {
+      "figure": "Chrome 105, Firefox 110, Safari 16",
+      "also": [
+        "2025-08-14"
+      ],
+      "claim": "the browser versions and date that make container queries and their units Baseline widely available",
+      "source": "web-features (web-platform-dx), features/container-queries.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/container-queries.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: high; baseline_low_date: 2023-02-14; baseline_high_date: 2025-08-14; chrome: \"105\"; chrome_android: \"105\"; edge: \"105\"; firefox: \"110\"; firefox_android: \"110\"; safari: \"16\"; safari_ios: \"16\"",
+      "docs": [
+        "web-design-studio/references/stack-vanilla-css.md",
+        "web-design-studio/references/typography.md"
+      ]
+    },
+    {
+      "figure": "Chrome and Edge 123, Firefox 120, Safari 17.5",
+      "also": [
+        "13 May 2024"
+      ],
+      "claim": "the browser versions and date that made light-dark() Baseline",
+      "source": "web-features (web-platform-dx), features/light-dark.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/light-dark.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: low; baseline_low_date: 2024-05-13; chrome: \"123\"; chrome_android: \"123\"; edge: \"123\"; firefox: \"120\"; firefox_android: \"120\"; safari: \"17.5\"; safari_ios: \"17.5\"",
+      "docs": [
+        "web-design-studio/references/style-architecture.md"
+      ]
+    },
+    {
+      "figure": "Chrome 127, Firefox 118, Safari 17",
+      "also": [
+        "2024-07-25"
+      ],
+      "claim": "the browser versions and date that made font-size-adjust Baseline",
+      "source": "web-features (web-platform-dx), features/font-size-adjust.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/font-size-adjust.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: low; baseline_low_date: 2024-07-25; chrome: \"127\"; chrome_android: \"127\"; edge: \"127\"; firefox: \"118\"; firefox_android: \"118\"; safari: \"17\"; safari_ios: \"17\"",
+      "docs": [
+        "web-design-studio/references/typography.md"
+      ]
+    },
+    {
+      "figure": "Chrome and Edge 117, Firefox 129, Safari 17.5",
+      "claim": "the browser versions that made @starting-style Baseline 2024",
+      "source": "web-features (web-platform-dx), features/starting-style.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/starting-style.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: low; baseline_low_date: 2024-08-06; chrome: \"117\"; chrome_android: \"117\"; edge: \"117\"; firefox: \"129\"; firefox_android: \"129\"; safari: \"17.5\"; safari_ios: \"17.5\"",
+      "docs": [
+        "web-design-studio/references/accessibility.md"
+      ]
+    },
+    {
+      "figure": "Chrome and Edge 117, Firefox 129, Safari 17.4",
+      "claim": "the browser versions that made transition-behavior: allow-discrete Baseline 2024 (its status is frozen in the source file)",
+      "source": "web-features (web-platform-dx), features/transition-behavior.yml at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/transition-behavior.yml",
+      "checked": "2026-10-16",
+      "quote": "baseline: low; baseline_low_date: 2024-08-06; chrome: \"117\"; chrome_android: \"117\"; edge: \"117\"; firefox: \"129\"; firefox_android: \"129\"; safari: \"17.4\"; safari_ios: \"17.4\"",
+      "docs": [
+        "web-design-studio/references/accessibility.md"
+      ]
+    },
+    {
+      "figure": "Chrome and Edge 117",
+      "claim": "the only browser versions with the overlay property, not Baseline",
+      "source": "web-features (web-platform-dx), features/overlay.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/overlay.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: false; chrome: \"117\"; chrome_android: \"117\"; edge: \"117\"",
+      "docs": [
+        "web-design-studio/references/accessibility.md"
+      ]
+    },
+    {
+      "figure": "September 2024",
+      "claim": "the month <dialog> became Baseline widely available",
+      "source": "web-features (web-platform-dx), features/dialog.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/dialog.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: high; baseline_low_date: 2022-03-14; baseline_high_date: 2024-09-14; chrome: \"37\"; chrome_android: \"37\"; edge: \"79\"; firefox: \"98\"; firefox_android: \"98\"; safari: \"15.4\"; safari_ios: \"15.4\"",
+      "docs": [
+        "web-design-studio/references/accessibility.md"
+      ]
+    },
+    {
+      "figure": "Chrome 143, Firefox 146, Safari 26.4",
+      "also": [
+        "2026-03-24",
+        "118"
+      ],
+      "claim": "the browser versions and date that made @scope Baseline, and the Chrome version of the rule itself",
+      "source": "web-features (web-platform-dx), features/scope.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/scope.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: low; baseline_low_date: 2026-03-24; chrome: \"143\"; chrome_android: \"143\"; edge: \"143\"; firefox: \"146\"; firefox_android: \"146\"; safari: \"26.4\"; safari_ios: \"26.4\"; css.at-rules.scope: chrome: \"118\"",
+      "docs": [
+        "web-design-studio/references/stack-vanilla-css.md"
+      ]
+    },
+    {
+      "figure": "Chrome 117, Firefox 71, Safari 16",
+      "also": [
+        "2026-03-15",
+        "September 2023"
+      ],
+      "claim": "the browser versions and dates that make subgrid Baseline widely available",
+      "source": "web-features (web-platform-dx), features/subgrid.yml.dist at 97c5a95",
+      "url": "https://github.com/web-platform-dx/web-features/blob/main/features/subgrid.yml.dist",
+      "checked": "2026-10-16",
+      "quote": "baseline: high; baseline_low_date: 2023-09-15; baseline_high_date: 2026-03-15; chrome: \"117\"; chrome_android: \"117\"; edge: \"117\"; firefox: \"71\"; firefox_android: \"79\"; safari: \"16\"; safari_ios: \"16\"",
+      "docs": [
+        "web-design-studio/references/layout-composition.md"
+      ]
     }
   ],
   "not_statistics": [
@@ -651,6 +907,36 @@
       "doc": "email-template-system/references/email-client-matrix.md",
       "figure": "100 KB",
       "why": "a unit conversion of 102,400 bytes"
+    },
+    {
+      "doc": "a11y-audit-runner/references/manual-protocol.md",
+      "figure": "Chrome 153",
+      "why": "an example of what a report names, not a support claim"
+    },
+    {
+      "doc": "component-state-matrix/references/visual-regression.md",
+      "figure": "Chromium 140",
+      "why": "one of two builds that rasterise differently, an example of drift, not a support claim"
+    },
+    {
+      "doc": "component-state-matrix/references/visual-regression.md",
+      "figure": "Chromium 141",
+      "why": "one of two builds that rasterise differently, an example of drift, not a support claim"
+    },
+    {
+      "doc": "perf-budget-gate/references/ci-integration.md",
+      "figure": "Chromium 140",
+      "why": "one of two builds that schedule differently, an example of drift, not a support claim"
+    },
+    {
+      "doc": "web-design-studio/references/navigation-patterns.md",
+      "figure": "Chromium 153",
+      "why": "the build this suite checked the invoker's state in, not a support claim"
+    },
+    {
+      "doc": "web-design-studio/references/style-architecture.md",
+      "figure": "Chromium 153",
+      "why": "the build this suite checked the @property rule in, not a support claim"
     }
   ]
 }
