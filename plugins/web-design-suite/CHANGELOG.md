@@ -537,8 +537,9 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   - accessibility.md gave `@starting-style` and `transition-behavior` one list,
     "Safari 17.5 and 17.4"; each now has its own.
 
-  `test_evidence` reads a browser version wherever a doc quotes one, and fails one that
-  stands in no registered figure or `not_statistics` row; a support figure's source must
+  `test_evidence` reads a browser version wherever a doc quotes one, with each later
+  version of the same browser beside it ("Safari 17.5 and 17.4", Codex on #162), and
+  fails one that stands in no registered figure or `not_statistics` row; a support figure's source must
   be web-features. Our own observations ("checked in Chromium 153") and the drift examples
   (Chromium 140 and 141) are listed as `not_statistics`.
   `test_evidence.EvidenceRegister.test_every_browser_version_is_registered`.

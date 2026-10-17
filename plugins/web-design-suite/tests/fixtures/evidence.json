@@ -925,7 +925,7 @@
     },
     {
       "doc": "perf-budget-gate/references/ci-integration.md",
-      "figure": "Chromium 140",
+      "figure": "Chromium 140 and 141",
       "why": "one of two builds that schedule differently, an example of drift, not a support claim"
     },
     {

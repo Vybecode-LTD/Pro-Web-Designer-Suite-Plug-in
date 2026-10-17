@@ -43,10 +43,19 @@ FIGURE = re.compile(
     r"|\d[\d,]*-byte\b)")                                               # 16,384-byte
 # A browser version, as the references quote support (D6): "Chrome 111",
 # "Chrome/Edge 111+", "Chrome and Edge 117", "Safari on iOS 18.3",
-# "Firefox from 144".
+# "Firefox from 144", with every later version of the same browser that
+# follows it: "Safari 17.5 and 17.4", "Firefox 127 against 113" (Codex on #162).
 BROWSER_VERSION = re.compile(r"\b(?:Chrome|Chromium|Edge|Firefox|Safari|Opera|Samsung Internet)"
-                             r"(?:/Edge| and Edge| on iOS)?\s(?:from\s)?\d+(?:\.\d+)?\+?")
+                             r"(?:/Edge| and Edge| on iOS)?\s(?:from\s)?\d+(?:\.\d+)?\+?"
+                             r"(?:(?:,\s?|\s(?:and|or|to|against)\s)\d+(?:\.\d+)?\+?)*")
 WEB_FEATURES = "https://github.com/web-platform-dx/web-features/blob/main/features/"
+
+
+def unregistered(body: str, values) -> list[str]:
+    """The browser versions in `body` that stand inside none of `values`."""
+    spans = [m.span() for value in values for m in re.finditer(re.escape(value), body)]
+    return [m.group() for m in BROWSER_VERSION.finditer(body)
+            if not any(a <= m.start() and m.end() <= b for a, b in spans)]
 
 
 def norm(value: str) -> str:
@@ -254,17 +263,25 @@ class EvidenceRegister(unittest.TestCase):
                                                  "Safari on iOS 18.3, Chrome and Edge 117"),
                          ["Chrome/Edge 111+", "Safari 15.4+", "Firefox from 144",
                           "Safari on iOS 18.3", "Chrome and Edge 117"])
+        # A later version of the same browser is part of the claim (Codex on
+        # #162): with only "Safari 17.5" registered, the old wording's 17.4 passed.
+        for text, registered in (("Safari 17.5 and 17.4", {"Safari 17.5"}),
+                                 ("Firefox 127 against 113", {"Firefox 127"}),
+                                 ("Chromium 140 and 141 differ", {"Chromium 140"}),
+                                 ("Chrome 111, 112 and 113", {"Chrome 111"})):
+            with self.subTest(text=text):
+                self.assertEqual([text.replace(" differ", "")], unregistered(text, registered))
+                self.assertEqual([], unregistered(text, {text}))
+        self.assertEqual([], unregistered("Chrome 111, Firefox 113, Safari 16.2",
+                                          {"Chrome 111, Firefox 113, Safari 16.2"}))
         seen = 0
         for doc, text in docs():
             body = norm(prose(text))
-            spans = [m.span() for value in registered_for(doc) for m in re.finditer(re.escape(value), body)]
-            for m in BROWSER_VERSION.finditer(body):
-                seen += 1
-                with self.subTest(doc=doc, version=m.group()):
-                    self.assertTrue(any(a <= m.start() and m.end() <= b for a, b in spans),
-                                    "register the support line in tests/fixtures/evidence.json, re-read at "
-                                    "web-features, or list it under not_statistics: "
-                                    + body[max(0, m.start() - 80):m.end() + 40])
+            seen += len(BROWSER_VERSION.findall(body))
+            for version in unregistered(body, registered_for(doc)):
+                with self.subTest(doc=doc, version=version):
+                    self.fail("register the support line in tests/fixtures/evidence.json, re-read at "
+                              "web-features, or list it under not_statistics: " + version)
         self.assertGreater(seen, 40)
         # A support figure's source is web-features' own file for the feature.
         for entry in REGISTER["entries"]:
