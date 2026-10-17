@@ -1,10 +1,12 @@
 # Start here: the next session
 
-**Written 2026-10-16**, at the end of the third session that day: P55 parts 4 and 5, of **Phase 6c**, the owner's audit. Phase 6c is done but one piece, D6's Baseline browser versions (P55, N47). Two PRs, and this docs PR, #161, which merges once green (§3):
-- **#159, P55 part 4 (§3.5 and §3.6: E11, E12, G8 to G10, G12, G14, G16)**, merged as `1401c4f`.
-- **#160, P55 part 5 (§3.7 and §3.8: D5 to D9, T3 to T10)**, merged as `2aa5fb4`. N47 stays open for D6's rest (Codex on #161).
+**Written 2026-10-16**, at the end of the fourth session that day. **Phase 6c, the owner's audit, is done**, and Phase 6b's P34 has begun. Two PRs, and this docs PR, #164, which merges once green (§3):
+- **#162, P55 part 6 (D6's rest: the Baseline browser versions, registered)**, merged as `7b1126a`. N47 is done; N48 is new.
+- **#163, P34 part 1 (GT-B1, GT-B2: reaching a client-rendered or signed-in page)**, merged as `8505aa1`.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P55's last piece, then Phase 6b's workstreams in the order the owner chooses** (§4), then R4.
+The owner decided on 2026-10-16: register D6's versions (not waive them), give Vue's `:style` an item (N48, scheduled with P37), and do P34 first in Phase 6b.
+
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P34 parts 2 and 3, then Phase 6b's other workstreams in the order the owner chooses** (§4), then R4.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -219,6 +221,12 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **A register entry quotes the page its `url` names** (CodeRabbit on #160): the good thresholds are web.dev's Vitals article, the poor ones its thresholds table, each an entry of its own.
       - **Scan parsed code, not lines** (CodeRabbit and Codex on #160): a `json.loads(` split over lines passed a line regex; a raise must be judged by its own handler, once, and a function a handler defines is not in it; an assertion beside a subTest in the same loop is unguarded; `noqa` is read on the parser's line (`\r\n|\r|\n`), not `splitlines()`'.
       - **A test's own fixture can trip another test**: the SIM115 control's `as f:\n` read as an `F:\` path to `NoMachinePaths`.
+    - **The fourth 2026-10-16 session's reviews found 1 real issue** (Codex on #162). On #163 Codex hit its usage limit and CodeRabbit its hourly limit, so it merged with no review. The lessons:
+      - **A pattern that reads a claim must read all of it** (Codex on #162): `BROWSER_VERSION` stopped at "Safari 17.5", so "Safari 17.5 and 17.4" hid the 17.4 behind a shorter registered figure. A fix to a test pattern shows as a control in `fail_before.py`: prove it with a case the old pattern lets through (`scratchpad/old_regex.py`).
+      - **Re-reading a figure at its source finds the stale ones:** the Popover API is Baseline from Chrome 116, not 114, and `@scope` from Firefox 146, not 128. web-features' `features/ID.yml.dist` holds each feature's computed status, read with `gh api -H "Accept: application/vnd.github.raw" repos/web-platform-dx/web-features/contents/features/ID.yml.dist` (curl fails here; `gh` gets through the machine's TLS interception). A frozen status is in the source `ID.yml` (`transition-behavior`).
+      - **A gate that measured an error page reported on nothing:** vitals and the critique never read the HTTP status, so an expired session's 401 was measured as the page. Read the status wherever a gate navigates.
+      - **What a gate cannot honour, it refuses:** a request header needs Playwright routing, which turns off the HTTP cache, so `measure_vitals` refuses `--header` (and `--steps`, which would run in the measured load).
+      - **A known flake fails CI on its own:** `test_interact_at_clicks_while_the_page_hydrates` failed #163's Windows 3.9 cell (the click at 5,936 ms against 2,800); `gh run rerun RUN --failed` passed it. Check the failing test touches nothing the PR changed before re-running.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -378,6 +386,8 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 - **The static checks (#160).** `tests/test_static_checks.py` keeps F401, F541, F841, B904 and SIM115's `open(…).read()` with `ast` over skills, commands, shared, hooks, tools, tests and `tooling/release/build.py`, and `TheTestsLoops` refuses an assertion loop in a test method with no `subTest`. `# noqa: CODE` on the line waives one.
 - **The pointers (#160).** `check_pointers.py` reads `agents/*.md` and `workflow-commands/*/SKILL.md` too, named relative to `skills/` (`../agents/…`).
 - **The register (#160).** `evidence.json` holds the Core Web Vitals thresholds (`2.5 s`, `200 ms`, `≤ 0.1`, each with its poor value), `75th percentile` and the README's `2.1.269` (doc `../README.md`). `test_docs.TheAuditsDocsLows` holds CLAUDE.md's map to `tools/` and this file's byte table to the disk.
+- **The Baseline register (#162).** Twenty `evidence.json` entries, one per support line, each `url` web-features' `features/ID.yml.dist` (or `transition-behavior.yml`) and each `quote` that file's status block. `test_evidence.BROWSER_VERSION` reads "Chrome 111", "Chrome/Edge 111+", "Chrome and Edge 117", "Safari on iOS 18.3", "Firefox from 144", and each later version joined by a comma, and, or, to or against; `unregistered(body, values)` returns the versions no registered value covers. Our own observations (Chromium 153) and the drift examples are `not_statistics`. A new support line in a reference needs an entry, re-read on the day.
+- **Reaching the page (#163).** `shared/browser_common.mjs` (copy it over the five skills' `scripts/` copies after a change; `test_browser_scripts` holds them): `NAV_OPTIONS`, `newNav()`, `takeNavOption(nav, flag, value)` (a message or null; `--wait-for`, `--steps` and `--storage-state` once each, `--header` repeatable, a name once), `readNav(given, target)` (returns `{nav, problem}`: the steps' shapes, `env` variables present, the storage state an object of lists, headers only for http(s), `env:NAME` values, no line break), `navContext(nav)`, `routeHeaders(page, url, nav)` (`page.route`, same origin only), `waitForNav(page, nav)` (30 s) and `arrive(page, url, nav, {waitUntil, timeout})` (headers, `goto`, the steps at 15 s each, `waitForLoadState`, the wait; a failed step throws `step N (action selector) failed`). `a11y_runtime` reads them at the end of `parseArgs` (before `resolveAxe`) and calls `arrive()` in `newPage()`; `critique_snapshots` in each of its six contexts; `measure_vitals` takes `navContext()` and `waitForNav()` only, refusing `--steps` and `--header`. All three exit 2 on an HTTP error status. Tests: `tests/test_runtime_reach.py` (`Site` and `Recorder`, two origins); the `test_json_guards` rows `a11y_runtime --steps` and `--storage-state`.
 - **The test helpers (#160).** `wds_support` sets `sys.dont_write_bytecode` at import; `test_dtcg.srgb(hex)` writes a 2025.10 colour object (Tokens Studio fixtures keep their strings).
 - **The plugin** is `plugins/web-design-suite/` (about 1,310 tests):
   - `skills/`: 13 skills.
@@ -478,31 +488,39 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 ## 3. First: the state of `main`
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then:
-- **The docs PR, #161**, may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
-- Remove any worktree left in this session's scratchpad (`ed3194bc-…\scratchpad`): `git worktree remove PATH`, then `git branch -d` each merged branch.
+- **The docs PR, #164**, may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
+- Remove any worktree left in this session's scratchpad (`5635d694-…\scratchpad`): `git worktree remove PATH`, then `git branch -d` each merged branch. `wait_pr.sh`, `keep_both.py` and `old_regex.py` are there too.
 - Then read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
 
-## 4. P55's last piece, then Phase 6b, 4.0.0
+## 4. P34 parts 2 and 3, then the rest of Phase 6b, 4.0.0
 
-**First, P55 (N47): D6's rest.** The audit's D6 names the Baseline browser versions the references quote, unregistered ("Chrome 111, Firefox 113, Safari 16.2" in color-system.md; motion-system.md, stack-vanilla-css.md, typography.md and more; `grep -rn "Chrome 1[0-9][0-9]"` over the skills' references finds them). Ask the owner: register each (re-read at its web-features YAML or MDN's compat data on the day, an `evidence.json` entry per figure, the docs held by the entry tests), or waive it for the web-features links. Either way, then remove the `P55` row and mark N47 done.
+Phase 6c is done (P50 to P55). In Phase 6b, P36 (Tailwind v4) is done, and the owner put P34 next (2026-10-16). Part 1 (#163) gave the URL gates `--wait-for`, `--steps`, `--storage-state` and `--header`. Read GT-B3 and GT-B4 in `dev plans/web-design-suite-review/gates.md` (lines 121 and 122) before planning each part, and keep each PR under 100 files.
 
-**Then Phase 6b.** Phase 6c's other parts are done (P50 to P54; P55 parts 1 to 5). Phase 6b's P36 (Tailwind v4) merged by 2026-10-14. **Ask the owner which of the six comes first**, and give them the sizes below. Read the item's rows in the completion plan and its review findings before planning it, and split an L into PRs under 100 files each. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+**P34 part 2: shadow DOM (GT-B3).** The names, contrast, tab-stop and focus code uses `querySelectorAll`, which does not reach inside shadow roots, so a web-component library gets axe's coverage only (axe reads open shadow roots itself). The in-page call sites in `a11y_runtime.mjs` (`grep -n "querySelectorAll\|querySelector(\|activeElement\|createTreeWalker" a11y_runtime.mjs`):
+- in `HELPERS`: `:modal`, the focusables (`(root || document).querySelectorAll(FOCUSABLE)`), the document-order index (`querySelectorAll('*')`), and the focused element, which already follows a same-origin iframe's `contentDocument.activeElement` and must follow `shadowRoot.activeElement` the same way;
+- the names check (the scope's elements, then `FOCUSABLE`);
+- the densities (`[data-density]`), the contrast check (`querySelectorAll('*')` and a `TreeWalker` over `document.body`'s text, which must enter each shadow root), the keymap's container and trigger lookups, and reflow (`body *`);
+- `cssPath()`: a path written with `>` across a shadow boundary resolves to nothing. Playwright's CSS engine pierces open shadow roots, so `page.locator(path)` works for a path built per tree (host, then inside); `document.querySelector(path)` in the page does not, so in-page lookups need a resolver that walks host by host.
+- design-critique-gate's `SAMPLE_TEXT` (its contrast table) walks text and form controls the same way.
+
+Build one helper in `HELPERS` (all elements, through open roots, in document order) and use it at every site. A closed shadow root cannot be read: count the hosts that have one (`attachShadow` cannot be seen afterwards, but an element with no light children, a custom name and a size can be named as possibly closed) and say so in the report, never a silent pass. Tests: a fixture custom element with an open root holding an unnamed button, low-contrast text and a control with no focus ring; each check must report the shadow-hosted element, in Chromium and Chrome; a nested root (a component inside a component); and the closed-root note. Fail before on `v3.6.0`. Size M.
+
+**P34 part 3: several URLs and viewports (GT-B4).** Each run covers one URL, and a11y runs only at 1280x900, though target size (2.5.8) and mobile navigation need a phone width, and the report template assumes "all 14 templates". Scope: `--urls FILE` (one URL a line, or a JSON list of `{url, pageType}`) or a `sitemap.xml`; `--viewports LIST` for a11y (`390x844,1280x900`); a map from URL to perf page type for `measure_vitals`' budgets; one report with a row per URL and viewport, and the exit the worst of them. Reuse part 1's `arrive()` per URL. Size M.
+
+**Then the rest of Phase 6b. Ask the owner which comes next**, and give them the sizes. Read the item's rows in the completion plan and its review findings before planning it, and split an L into PRs under 100 files each. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P34 | Runtime coverage: single-page apps (`--wait-for`, `--steps`), logged-in pages (`--storage-state`), shadow DOM, several URLs and viewports | GT-B1, GT-B2, GT-B3, GT-B4 | the three runtime gates | L |
 | P35 | The cheap automatable checks the coverage table lists, and engines other than Chromium | GT-B6, GT-B9 | a11y gates, `automation-coverage.md` | M-L |
-| P37 | SCSS in stylelint (D3), and Next.js App Router, Vue, Svelte and Astro | SB-B6, DL-B3 | configs, stack references, fixtures | L |
+| P37 | SCSS in stylelint (D3), and Next.js App Router, Vue, Svelte and Astro, with the audit reading a bound inline style (`:style`, `v-bind:style`, Svelte's `style:`, Angular's `[style.x]`: N48, `TAG_STYLE_ATTR` wants whitespace before `style=`) | SB-B6, DL-B3, N48 | configs, stack references, fixtures, `audit_design.py` | L |
 | P41 | Email: MJML or React Email output, a right-to-left template, and a client matrix regenerated from caniemail's data | DL-B4, DL-B5, DL-C9 | email-template-system | L |
 | P42 | Persuasion: the UK and EU consumer law to flag for legal review, consent for tracking, price experiments, and persuasive patterns mapped to WCAG | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
 | P43 | More page types and audiences, a claims layer with `lint_claims.py`, routing between the persuasion skills, and MESSAGE_BRIEF to DECISION_LOG | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-**Also ask the owner** (HANDOFF's open decisions) whether Vue's `:style` binding, which the audit's `style=""` reader does not read, gets an item.
-
 **Each PR:** fail before on `v3.6.0` (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES` (and `WDS_TAILWIND_MODULES` for `test_tw_probe`), both at `tooling/main/node_modules`; the CHANGELOG under 4.0.0; a done row `Pnn part N, #N` above the item's row, which goes when the item is done; a note in the completion plan. `test_static_checks` holds every new script and test to its five rules.
 
-**R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed (a Vue project's bound attributes, the index-mode hook), the migration's reconciliation on a real codebase (P52), the router (#143), the MCP server's containment (#155), and P55's gates (the email lint's lines, Prisma's `Unsupported`, `perf_audit`'s left-out pages).
+**R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed (a Vue project's bound attributes, the index-mode hook), the migration's reconciliation on a real codebase (P52), the router (#143), the MCP server's containment (#155), P55's gates (the email lint's lines, Prisma's `Unsupported`, `perf_audit`'s left-out pages), and P34's options on a real client-rendered app and a real signed-in page (a `codegen --save-storage` session, a steps file, a staging header).
 
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 
