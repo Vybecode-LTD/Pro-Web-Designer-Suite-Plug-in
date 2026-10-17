@@ -461,7 +461,7 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 - Runtime and matrix:
   - single-page apps (`--wait-for`, `--steps`); *done for 4.0.0 (PR #163, P34 part 1): `test_runtime_reach`*;
   - logged-in pages (`--storage-state`, and `--header` for the page's own origin); *done for 4.0.0 (PR #163)*;
-  - shadow DOM;
+  - shadow DOM; *done for 4.0.0 (PR #165, P34 part 2): `test_runtime_shadow`*;
   - several URLs and viewports.
 - Accessibility: the cheap automatable checks the coverage table lists but nothing runs.
 - Performance: field data (`crux_check.py`).

@@ -112,6 +112,10 @@ Four things it does that most runtime checks do not:
 - **It composites overlays before judging contrast.** On the fixture, text declared at **5.33:1** renders at **1.46:1** under a 72% scrim. Every source-level contrast checker calls that a pass.
 - **It refuses to guess.** Text over a background image is reported as *unmeasurable*, not as a pass, because contrast against a photograph varies per pixel and the worst pixel is the one that matters.
 
+### Shadow roots
+
+Every check reads through shadow roots, open and closed (`runtime-checks.md` §1). A path names an element inside one host by host, with ` >> ` at each boundary: `main > x-card >> button.icon`, or `x-outer >> div.frame > x-inner >> button.deep` for a component inside a component. Playwright's `locator()` reads the same path through open roots. A keymap's selectors take the same form, and a plain selector is looked for in the document first, then through every root. The JSON's `shadowRoots` counts the roots read (`open`, `closed`) and `unread`, the closed roots no check could read: when it is not 0, or `null` because the browser offers no DevTools protocol, a `closed-shadow-roots-unread` warning says so. A root no check read is never a silent pass.
+
 ### The keymap file
 
 ```json

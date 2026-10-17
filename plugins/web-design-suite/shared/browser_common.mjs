@@ -3,7 +3,8 @@
  * resolving Playwright and a browser from disk, never from the network;
  * freezing animations before a measurement; reading a JSON file a person
  * may have saved from PowerShell or Notepad; reaching a page that needs a
- * wait, steps, a session or a header; and WCAG's contrast ratio.
+ * wait, steps, a session or a header; reading through shadow roots; and
+ * WCAG's contrast ratio.
  *
  * The master copy is shared/browser_common.mjs, at the plugin's root. The
  * scripts/ folders of a11y-audit-runner, component-state-matrix,
@@ -352,6 +353,222 @@ export async function arrive(page, url, nav, { waitUntil = 'load', timeout = 450
   if (nav.steps.length) await page.waitForLoadState('load', { timeout });
   await waitForNav(page, nav);
   return resp;
+}
+
+// ---------------------------------------------------------------------------
+// Shadow DOM (P34, GT-B3)
+// ---------------------------------------------------------------------------
+//
+// querySelectorAll stops at a shadow root, so a web-component library's
+// controls were never named, measured or tabbed to by the suite's own checks.
+// DEEP_DOM runs in the page and sets window.__wdsDeep: the elements and text
+// of the composed tree, through each open root and each closed one this page
+// kept, in the order the browser renders and tabs through them (a slot stands
+// for what is assigned to it). As an init script it runs before the page's
+// own, so its attachShadow keeps every root a script makes, closed ones
+// included; keepClosedRoots() hands it the closed roots the parser attached
+// before any script ran (<template shadowrootmode="closed">).
+export const DEEP_DOM = () => {
+  if (window.__wdsDeep) return;
+  const kept = new WeakMap();
+  const attach = Element.prototype.attachShadow;
+  if (attach) {
+    Element.prototype.attachShadow = function attachShadow(init) {
+      const root = attach.call(this, init);
+      kept.set(this, root);
+      return root;
+    };
+  }
+  const keep = (root) => {
+    if (!root || !root.host) return false;
+    kept.set(root.host, root);
+    return true;
+  };
+  // The root an element hosts: open, kept here, or kept by its own frame.
+  const shadowOf = (el) => {
+    if (!el || el.nodeType !== 1) return null;
+    if (el.shadowRoot) return el.shadowRoot;
+    const own = kept.get(el);
+    if (own) return own;
+    try {
+      const w = el.ownerDocument.defaultView;
+      return w && w !== window && w.__wdsDeep ? w.__wdsDeep.shadowOf(el) : null;
+    } catch { return null; }
+  };
+  // A node's children as the browser renders them: a host's are its root's,
+  // and a slot's are what is assigned to it, else its own fallback.
+  const flatChildren = (node) => {
+    if (node.nodeType === 1) {
+      const root = shadowOf(node);
+      if (root) return root.childNodes;
+      if (node.localName === 'slot' && typeof node.assignedNodes === 'function') {
+        const assigned = node.assignedNodes();
+        if (assigned.length) return assigned;
+      }
+    }
+    return node.childNodes;
+  };
+  // Calls visit(node, parent) on every node below `node`, in order, without
+  // recursing (a deep page would overflow the stack).
+  const walk = (node, visit) => {
+    const stack = [];
+    const push = (parent) => {
+      const kids = flatChildren(parent);
+      for (let i = kids.length - 1; i >= 0; i--) stack.push([kids[i], parent]);
+    };
+    push(node);
+    while (stack.length) {
+      const [n, parent] = stack.pop();
+      visit(n, parent);
+      if (n.nodeType === 1) push(n);
+    }
+  };
+  // Every element below `root`; for a document (the default), its root
+  // element too, as document.querySelectorAll('*') gives it.
+  const all = (root) => {
+    const out = [];
+    let from = root || document;
+    if (from.nodeType === 9) {
+      if (!from.documentElement) return out;
+      from = from.documentElement;
+      out.push(from);
+    }
+    walk(from, (n) => { if (n.nodeType === 1) out.push(n); });
+    return out;
+  };
+  const query = (root, selector) => all(root).filter((el) => el.matches(selector));
+  // Each text node below `root` (the body by default), with the element it
+  // renders in: a slot, for text assigned to one.
+  const texts = (root) => {
+    const out = [];
+    const from = root || document.body;
+    if (from) walk(from, (n, parent) => { if (n.nodeType === 3) out.push([n, parent]); });
+    return out;
+  };
+  // The slot a node is assigned to. assignedSlot is null in a closed root, so
+  // a kept closed root's slots are asked.
+  const slotOf = (n) => {
+    if (n.assignedSlot) return n.assignedSlot;
+    const host = n.parentElement;
+    const root = host && !host.shadowRoot ? kept.get(host) : null;
+    if (!root) return null;
+    for (const s of root.querySelectorAll('slot')) {
+      if (s.assignedNodes().includes(n)) return s;
+    }
+    return null;
+  };
+  // The element a node renders inside: its slot, its parent, or the host of
+  // the root it is at the top of.
+  const parentOf = (n) => {
+    if (!n) return null;
+    const slot = slotOf(n);
+    if (slot) return slot;
+    if (n.parentElement) return n.parentElement;
+    const p = n.parentNode;
+    return p && p.nodeType === 11 && p.host ? p.host : null;
+  };
+  const contains = (a, b) => {
+    for (let n = b; n; n = parentOf(n)) if (n === a) return true;
+    return false;
+  };
+  const closest = (el, selector) => {
+    for (let n = el; n; n = parentOf(n)) if (n.nodeType === 1 && n.matches(selector)) return n;
+    return null;
+  };
+  // A slot draws no box of its own; the element that does.
+  const boxOf = (el) => {
+    let n = el;
+    while (n && n.localName === 'slot') n = parentOf(n);
+    return n;
+  };
+  // The focused element itself, not the host that stands for it outside.
+  const active = (doc) => {
+    let el = (doc || document).activeElement;
+    for (let root = shadowOf(el); root && root.activeElement; root = shadowOf(el)) {
+      el = root.activeElement;
+    }
+    return el;
+  };
+  // Every shadow root in the composed tree, open and kept.
+  const roots = () => all(document).map(shadowOf).filter(Boolean);
+  // The element a path names: one selector per tree, joined by ' >> ' at each
+  // shadow boundary (as a11y_runtime's cssPath() writes them; Playwright
+  // chains them the same way through open roots). A selector with no
+  // boundary is looked for in the document first, then through every root. A
+  // bad selector throws, as querySelector does.
+  const resolve = (path) => {
+    if (!path) return null;
+    const parts = String(path).split(' >> ');
+    let el = document.querySelector(parts[0]);
+    if (!el && parts.length === 1) el = query(document, parts[0])[0] || null;
+    for (const part of parts.slice(1)) {
+      const root = shadowOf(el);
+      el = root ? root.querySelector(part) : null;
+      if (!el) return null;
+    }
+    return el;
+  };
+  window.__wdsDeep = { keep, shadowOf, flatChildren, all, query, texts, parentOf,
+                       contains, closest, boxOf, active, roots, resolve };
+};
+
+// Hands every closed shadow root in the page's document to DEEP_DOM, which
+// must already be in the page, through the DevTools protocol (Chromium):
+// DOM.getDocument with `pierce` lists them, the parser's among them, and
+// DOM.resolveNode gives each to the page. A frame's document is left to axe,
+// as the checks leave it. Returns { closed, kept }, or null where the
+// protocol is not available. A closed root not kept is one no check read.
+export async function keepClosedRoots(page) {
+  let cdp;
+  try { cdp = await page.context().newCDPSession(page); } catch { return null; }
+  try {
+    const { root } = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+    const closed = [];
+    const stack = [root];
+    while (stack.length) {
+      const n = stack.pop();
+      for (const s of n.shadowRoots || []) {
+        if (s.shadowRootType === 'closed') closed.push(s.backendNodeId);
+        stack.push(s);
+      }
+      for (const c of n.children || []) stack.push(c);
+    }
+    let kept = 0;
+    for (const backendNodeId of closed) {
+      try {
+        const { object } = await cdp.send('DOM.resolveNode', { backendNodeId });
+        const { result } = await cdp.send('Runtime.callFunctionOn', {
+          objectId: object.objectId, returnByValue: true,
+          functionDeclaration: 'function () { const d = this.ownerDocument.defaultView.__wdsDeep; ' +
+            'return !!(d && d.keep(this)); }',
+        });
+        if (result.value === true) kept++;
+      } catch { /* gone since it was listed */ }
+    }
+    return { closed: closed.length, kept };
+  } catch {
+    return null;
+  } finally {
+    await cdp.detach().catch(() => {});
+  }
+}
+
+// What a run says of the closed roots keepClosedRoots() did not keep, so a
+// root no check read is never passed in silence; null when it kept them all.
+export function unreadRoots(closed) {
+  if (closed && closed.closed === closed.kept) return null;
+  return closed ? `${closed.closed - closed.kept} closed shadow root(s) could not be read`
+    : 'The closed shadow roots in the page could not be listed: the browser offers no ' +
+      'DevTools protocol';
+}
+
+// The element a cssPath() path names in the page, through shadow roots
+// (DEEP_DOM's resolve), or null. A bad selector throws.
+export async function elementAt(page, path) {
+  const handle = await page.evaluateHandle((p) => window.__wdsDeep.resolve(p), path);
+  const el = handle.asElement();
+  if (!el) await handle.dispose();
+  return el;
 }
 
 // The project contract (P24): a project's .design-suite.json, found and

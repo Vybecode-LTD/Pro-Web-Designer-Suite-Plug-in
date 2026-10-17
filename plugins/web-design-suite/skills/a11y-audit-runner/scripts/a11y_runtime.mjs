@@ -123,7 +123,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { FREEZE_ANIMATIONS_CSS, NAV_OPTIONS, arrive, contrastRatio, launchBrowser, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, refuseOverwrite, takeNavOption } from './browser_common.mjs';
+import { DEEP_DOM, FREEZE_ANIMATIONS_CSS, NAV_OPTIONS, arrive, contrastRatio, elementAt, keepClosedRoots, launchBrowser, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, refuseOverwrite, takeNavOption, unreadRoots } from './browser_common.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TAGS = 'wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice';
@@ -331,14 +331,19 @@ function clip(text, max) {
 // In-page helpers, installed before any page script runs
 // ---------------------------------------------------------------------------
 
+// The checks read the composed tree through browser_common's DEEP_DOM (P34,
+// GT-B3), which runs first in the same init script.
 const HELPERS = () => {
+  const deep = window.__wdsDeep;
   const FOCUSABLE =
     'a[href],area[href],button,input,select,textarea,summary,iframe,object,' +
     'embed,audio[controls],video[controls],[tabindex],[contenteditable=""],' +
     '[contenteditable="true"]';
 
-  const cssPath = (el) => {
-    if (!el || el.nodeType !== 1) return null;
+  // A selector for one element, within its own tree; cssPath() joins one per
+  // tree with ' >> ' at each shadow boundary, host first. deep.resolve()
+  // reads it through every root; Playwright's chaining, through open ones.
+  const treePath = (el) => {
     const parts = [];
     let node = el;
     while (node && node.nodeType === 1 && parts.length < 6) {
@@ -359,8 +364,10 @@ const HELPERS = () => {
       const cls = (node.getAttribute('class') || '').trim()
         .split(/\s+/).filter((c) => /^[A-Za-z_-][\w-]*$/.test(c)).slice(0, 2);
       if (cls.length) part += '.' + cls.join('.');
-      const parent = node.parentElement;
-      if (parent) {
+      // The top of a shadow root has no parent element; its siblings are the
+      // root's children.
+      const parent = node.parentElement || node.parentNode;
+      if (parent && parent.children) {
         const sibs = Array.prototype.filter.call(
           parent.children, (c) => c.nodeName === node.nodeName);
         if (sibs.length > 1) {
@@ -372,6 +379,16 @@ const HELPERS = () => {
     }
     return parts.join(' > ');
   };
+  const cssPath = (el) => {
+    if (!el || el.nodeType !== 1) return null;
+    const trees = [];
+    for (let node = el; node;) {
+      trees.unshift(treePath(node));
+      const root = node.getRootNode();
+      node = root.nodeType === 11 && root.host ? root.host : null;
+    }
+    return trees.join(' >> ');
+  };
 
   const visible = (el) => {
     if (!el || !el.isConnected) return false;
@@ -382,12 +399,13 @@ const HELPERS = () => {
     return r.width > 0 && r.height > 0;
   };
 
+  // Up the composed tree: aria-hidden or inert on a host covers its root.
   const inertOrHidden = (el) => {
     let n = el;
     while (n && n.nodeType === 1) {
       if (n.hasAttribute('inert')) return true;
       if (n.getAttribute('aria-hidden') === 'true') return 'aria-hidden';
-      n = n.parentElement;
+      n = deep.parentOf(n);
     }
     return false;
   };
@@ -395,31 +413,35 @@ const HELPERS = () => {
   // An open modal (<dialog> via showModal()) makes everything outside it inert:
   // not focusable, not in the accessibility tree. The rest of the page is NOT
   // "unreachable" and its links have not lost their names — they are simply
-  // behind the modal, which is exactly what a modal is for.
+  // behind the modal, which is exactly what a modal is for. A modal can be
+  // inside a shadow root. A loop asks once and passes the answer on.
   const openModal = () => {
-    try { return document.querySelector(':modal'); } catch { return null; }
+    try {
+      const top = document.querySelector(':modal');
+      if (top) return top;
+      for (const root of deep.roots()) {
+        const m = root.querySelector(':modal');
+        if (m) return m;
+      }
+    } catch { /* no :modal in this browser */ }
+    return null;
   };
-  const behindModal = (el) => {
-    const m = openModal();
-    return !!m && !m.contains(el);
-  };
+  const behindModal = (el, m = openModal()) => !!m && !deep.contains(m, el);
 
   // Every element that SHOULD be a tab stop. The tab sequence is compared
   // against this: an element here that never receives focus is a skip.
   const expectedTabbables = (root) => {
     const out = [];
-    const all = (root || document).querySelectorAll(FOCUSABLE);
-    const order = Array.prototype.indexOf.bind(
-      Array.prototype.slice.call(document.querySelectorAll('*')));
     const index = new Map();
     let i = 0;
-    for (const e of document.querySelectorAll('*')) index.set(e, i++);
-    for (const el of all) {
+    for (const e of deep.all(document)) index.set(e, i++);
+    const modal = openModal();
+    for (const el of deep.query(root || document, FOCUSABLE)) {
       const ti = el.getAttribute('tabindex');
       if (ti !== null && Number(ti) < 0) continue;
       if (el.disabled) continue;
-      if (el.closest('[inert]')) continue;
-      if (behindModal(el)) continue;
+      if (deep.closest(el, '[inert]')) continue;
+      if (behindModal(el, modal)) continue;
       if (!visible(el)) continue;
       if (el.tagName === 'A' && !el.hasAttribute('href')) continue;
       out.push({
@@ -434,16 +456,13 @@ const HELPERS = () => {
   };
 
   const describeActive = () => {
-    let el = document.activeElement;
+    // Focus inside a shadow root leaves document.activeElement on its host:
+    // follow each root's own activeElement to the element itself.
+    let el = deep.active(document);
     if (!el || el === document.body || el === document.documentElement) {
       return { sel: '(document)', tag: 'body', docIndex: -1 };
     }
-    let i = 0;
-    let idx = -1;
-    for (const e of document.querySelectorAll('*')) {
-      if (e === el) { idx = i; break; }
-      i++;
-    }
+    const idx = deep.all(document).indexOf(el);
     // Focus inside a same-origin iframe leaves document.activeElement on the
     // <iframe> itself, so every Tab looked like "focus did not move". Follow it
     // into the frame; the frame's position in this document stands in for
@@ -451,7 +470,7 @@ const HELPERS = () => {
     let prefix = '';
     while (el && el.tagName === 'IFRAME') {
       let inner = null;
-      try { inner = el.contentDocument && el.contentDocument.activeElement; } catch { inner = null; }
+      try { inner = el.contentDocument && deep.active(el.contentDocument); } catch { inner = null; }
       if (!inner || inner === el.contentDocument.body ||
           inner === el.contentDocument.documentElement) break;
       prefix += cssPath(el) + ' >>> ';
@@ -470,7 +489,28 @@ const HELPERS = () => {
   };
 
   // Not in the accessibility tree at all: inert, aria-hidden, or behind a modal.
-  const hiddenFromAT = (el) => !!inertOrHidden(el) || behindModal(el);
+  const hiddenFromAT = (el, m) => !!inertOrHidden(el) || behindModal(el, m);
+
+  // axe builds its tree from each host's shadowRoot, which a closed root's
+  // host keeps null. For the length of one axe call each kept closed root is
+  // its host's shadowRoot, so axe reads it as it reads an open one; the call
+  // that exposes them restores them, in a finally.
+  const exposeClosed = () => {
+    const shown = deep.roots().filter((r) => r.mode === 'closed' && !r.host.shadowRoot);
+    for (const r of shown) {
+      Object.defineProperty(r.host, 'shadowRoot', { value: r, configurable: true });
+    }
+    return () => { for (const r of shown) delete r.host.shadowRoot; };
+  };
+
+  // How many shadow roots the checks read, by mode.
+  const rootCounts = () => {
+    const counts = { open: 0, closed: 0 };
+    for (const r of deep.roots()) counts[r.mode === 'closed' ? 'closed' : 'open']++;
+    return counts;
+  };
+
+  const activePath = () => cssPath(deep.active(document));
 
   // Whether the page cancelled the last Tab. Chrome wraps Tab from the last
   // stop to the first inside the page, so on a page with one stop a wrap and
@@ -488,8 +528,13 @@ const HELPERS = () => {
   };
 
   window.__a11y = { FOCUSABLE, cssPath, visible, expectedTabbables, describeActive,
-                    hiddenFromAT, openModal, takeTabCancelled };
+                    hiddenFromAT, openModal, takeTabCancelled, exposeClosed,
+                    rootCounts, activePath, deep };
 };
+
+// DEEP_DOM, then HELPERS, as one init script: Playwright does not promise the
+// order of two.
+const INIT_SCRIPT = `(${DEEP_DOM})();\n(${HELPERS})();`;
 
 // ---------------------------------------------------------------------------
 // axe
@@ -524,12 +569,23 @@ async function injectAxe(page, axePath) {
 
 async function runAxe(page, tags, context) {
   return page.evaluate(async ({ tags, context }) => {
-    const target = context ? document.querySelector(context) : document;
-    const res = await axe.run(target || document, {
-      runOnly: { type: 'tag', values: tags },
-      resultTypes: ['violations', 'incomplete'],
-      elementRef: false,
-    });
+    const deep = window.__wdsDeep;
+    const target = context ? deep.resolve(context) : document;
+    // axe reads open roots itself; a closed one is shown to it for the run.
+    const restore = window.__a11y.exposeClosed();
+    let res;
+    try {
+      res = await axe.run(target || document, {
+        runOnly: { type: 'tag', values: tags },
+        resultTypes: ['violations', 'incomplete'],
+        elementRef: false,
+      });
+    } finally {
+      restore();
+    }
+    // axe names an element in a shadow root as a list, one selector per
+    // tree: written with ' >> ', as cssPath() writes it.
+    const part = (t) => (Array.isArray(t) ? t.join(' >> ') : String(t));
     const pack = (arr) => arr.map((v) => ({
       id: v.id,
       impact: v.impact,
@@ -537,13 +593,12 @@ async function runAxe(page, tags, context) {
       helpUrl: v.helpUrl,
       tags: v.tags.filter((t) => /^wcag|^best-practice$/.test(t)),
       nodes: v.nodes.slice(0, 8).map((n) => ({
-        target: Array.isArray(n.target) ? n.target.join(' ') : String(n.target),
+        target: Array.isArray(n.target) ? n.target.map(part).join(' ') : String(n.target),
         summary: (n.failureSummary || '').replace(/\s+/g, ' ').trim(),
         cell: (() => {
           try {
-            const el = document.querySelector(
-              Array.isArray(n.target) ? n.target[0] : n.target);
-            const c = el && el.closest('[data-cell-id]');
+            const el = deep.resolve(part(Array.isArray(n.target) ? n.target[0] : n.target));
+            const c = el && deep.closest(el, '[data-cell-id]');
             return c ? c.getAttribute('data-cell-id') : null;
           } catch { return null; }
         })(),
@@ -606,13 +661,16 @@ function axeFindings(res) {
 async function collectNames(page, scope) {
   return page.evaluate(({ scope }) => {
     const out = [];
+    const deep = window.__wdsDeep;
+    // Synchronous from here to the teardown, so no page script runs while a
+    // closed root is shown to axe.
+    const restore = window.__a11y.exposeClosed();
     try { axe.setup(document); } catch { /* already set up */ }
-    const roots = scope
-      ? Array.prototype.slice.call(document.querySelectorAll(scope))
-      : [document.documentElement];
+    const roots = scope ? deep.query(document, scope) : [document.documentElement];
+    const modal = window.__a11y.openModal();
     for (const root of roots) {
       const cell = root.getAttribute && root.getAttribute('data-cell-id');
-      const els = root.querySelectorAll(window.__a11y.FOCUSABLE +
+      const els = deep.query(root, window.__a11y.FOCUSABLE +
         ',[role=button],[role=link],[role=menuitem],[role=tab],[role=option],' +
         '[role=checkbox],[role=radio],[role=switch],[role=slider],[role=combobox]');
       for (const el of els) {
@@ -620,7 +678,7 @@ async function collectNames(page, scope) {
         // A screen reader cannot reach it, so it has no name to announce — and
         // axe computes "" for it, which read as "missing name" on every link
         // behind an open cookie dialog.
-        if (window.__a11y.hiddenFromAT(el)) continue;
+        if (window.__a11y.hiddenFromAT(el, modal)) continue;
         if (el.tagName === 'A' && !el.hasAttribute('href') &&
             !el.hasAttribute('role')) continue;
         let name = null, role = null, roleType = null;
@@ -652,13 +710,14 @@ async function collectNames(page, scope) {
           visibleText: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60),
           hasAriaLabel: el.hasAttribute('aria-label'),
           disabled: !!el.disabled || el.getAttribute('aria-disabled') === 'true',
-          cell: cell || (el.closest('[data-cell-id]')
-            ? el.closest('[data-cell-id]').getAttribute('data-cell-id') : null),
+          cell: cell || (deep.closest(el, '[data-cell-id]')
+            ? deep.closest(el, '[data-cell-id]').getAttribute('data-cell-id') : null),
           fontSize: parseFloat(cs.fontSize) || 16,
         });
       }
     }
     try { axe.teardown(); } catch { /* fine */ }
+    restore();
     return out;
   }, { scope: scope || null });
 }
@@ -750,10 +809,11 @@ function nameFindings(controls) {
 // ---------------------------------------------------------------------------
 
 async function tabSequence(page, { steps, shift }) {
+  // blur() on a host leaves the element inside its root focused, so the
+  // element itself is blurred.
   await page.evaluate(() => {
-    if (document.activeElement && document.activeElement !== document.body) {
-      document.activeElement.blur();
-    }
+    const active = window.__wdsDeep.active(document);
+    if (active && active !== document.body && active.blur) active.blur();
     window.scrollTo(0, 0);
   });
   const seq = [];
@@ -989,7 +1049,7 @@ async function measureFocus(page, cmpPage, selectors, opts, label) {
   for (const sel of selectors) {
     let entry = { sel, label, ok: false };
     try {
-      const handle = await page.$(sel);
+      const handle = await elementAt(page, sel);
       if (!handle) { entry.error = 'not found'; results.push(entry); continue; }
       await handle.evaluate((el) => {
         el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
@@ -1030,9 +1090,8 @@ async function measureFocus(page, cmpPage, selectors, opts, label) {
         await handle.evaluate((el) => el.removeAttribute('data-force-state'));
       } else {
         await page.evaluate(() => {
-          if (document.activeElement && document.activeElement.blur) {
-            document.activeElement.blur();
-          }
+          const active = window.__wdsDeep.active(document);
+          if (active && active.blur) active.blur();
         });
       }
       await page.evaluate(() => new Promise((r) =>
@@ -1074,9 +1133,8 @@ async function measureFocus(page, cmpPage, selectors, opts, label) {
     results.push(entry);
   }
   await page.evaluate(() => {
-    if (document.activeElement && document.activeElement.blur) {
-      document.activeElement.blur();
-    }
+    const active = window.__wdsDeep.active(document);
+    if (active && active.blur) active.blur();
   });
   return results;
 }
@@ -1106,8 +1164,9 @@ const DENSITIES_FN = () => {
   // The dial's value, when every outermost marker shares one; with two top
   // regions at different densities there is none, and every value is measured
   // (CodeRabbit on #40).
-  const values = new Set([...document.querySelectorAll('[data-density]')]
-    .filter((el) => !el.parentElement || !el.parentElement.closest('[data-density]'))
+  const deep = window.__wdsDeep;
+  const values = new Set(deep.query(document, '[data-density]')
+    .filter((el) => !deep.parentOf(el) || !deep.closest(deep.parentOf(el), '[data-density]'))
     .map((el) => el.getAttribute('data-density')));
   return { found, current: values.size === 1 ? [...values][0] : null };
 };
@@ -1116,8 +1175,9 @@ const DENSITIES_FN = () => {
 async function setDensity(page, density) {
   await page.evaluate((d) => {
     if (!window.__a11yDensityHosts) {
-      const marked = [...document.querySelectorAll('[data-density]')]
-        .filter((el) => !el.parentElement || !el.parentElement.closest('[data-density]'));
+      const deep = window.__wdsDeep;
+      const marked = deep.query(document, '[data-density]')
+        .filter((el) => !deep.parentOf(el) || !deep.closest(deep.parentOf(el), '[data-density]'));
       window.__a11yDensityHosts = marked.length ? marked : [document.documentElement];
       window.__a11yDensityWas = window.__a11yDensityHosts
         .map((el) => el.getAttribute('data-density'));
@@ -1211,7 +1271,7 @@ async function forcedColorsSurvey(page) {
   return page.evaluate(() => {
     let shadowOnly = 0, bgImage = 0, fillOnly = 0, transparentBorder = 0;
     const examples = { shadowOnly: [], bgImage: [], fillOnly: [] };
-    for (const el of document.querySelectorAll('*')) {
+    for (const el of window.__wdsDeep.all(document)) {
       if (!window.__a11y.visible(el)) continue;
       const cs = getComputedStyle(el);
       if (cs.boxShadow && cs.boxShadow !== 'none') {
@@ -1293,33 +1353,49 @@ const CONTRAST_FN = () => {
   // The first legend of a disabled fieldset is not disabled (HTML), so what
   // it holds is measured, and so is a control that only looks disabled
   // (GT-A14).
+  // The composed tree throughout (P34): text in a shadow root, and the
+  // backgrounds of the hosts and slots it renders inside.
+  const deep = window.__wdsDeep;
   const inactive = (el) => {
-    if (el.closest('[aria-disabled="true"]')) return true;
-    for (let n = el; n; n = n.parentElement) {
+    if (deep.closest(el, '[aria-disabled="true"]')) return true;
+    for (let n = el; n; n = deep.parentOf(n)) {
       if (!n.matches(':disabled')) continue;
       if (n.tagName !== 'FIELDSET') return true;
       const legend = n.querySelector(':scope > legend');
-      if (!legend || !legend.contains(el)) return true;
+      if (!legend || !deep.contains(legend, el)) return true;
     }
-    const label = el.closest('label');
+    const label = deep.closest(el, 'label');
     return !!(label && label.control && label.control.matches(':disabled'));
   };
 
+  // A scrim built with pointer-events: none is missed by elementsFromPoint.
+  // Which elements could be one does not depend on the text, so it is asked
+  // once.
+  const scrims = [];
+  for (const cand of deep.all(document)) {
+    const cs2 = getComputedStyle(cand);
+    if (cs2.pointerEvents !== 'none') continue;
+    const cc = parse(cs2.backgroundColor);
+    if (cc && cc.a > 0) scrims.push([cand, cc]);
+  }
+
   const out = [];
   const seen = new Set();
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  let node;
-  while ((node = walker.nextNode())) {
+  for (const [node, paint] of deep.texts(document.body)) {
     const text = (node.nodeValue || '').trim();
     if (text.length < 2) continue;
-    const el = node.parentElement;
-    if (!el || seen.has(el)) continue;
-    if (/^(script|style|noscript|title)$/i.test(el.tagName)) continue;
+    // `paint` is the element the text renders in, a slot for slotted text,
+    // whose colour it inherits; `el` is the element that draws its box, and
+    // the path names the element that holds it in the markup.
+    const el = deep.boxOf(paint);
+    if (!el || seen.has(paint)) continue;
+    if (/^(script|style|noscript|title)$/i.test(paint.tagName)) continue;
     if (!window.__a11y.visible(el)) continue;
-    seen.add(el);
-    if (inactive(el)) continue;
+    seen.add(paint);
+    if (inactive(paint)) continue;
+    const named = node.parentElement || el;
 
-    const cs = getComputedStyle(el);
+    const cs = getComputedStyle(paint);
     const fg = parse(cs.color);
     if (!fg) continue;
     const size = parseFloat(cs.fontSize) || 16;
@@ -1342,10 +1418,10 @@ const CONTRAST_FN = () => {
         stack.push(c);
         if (c.a >= 1) break;
       }
-      n = n.parentElement;
+      n = deep.parentOf(n);
     }
     if (unmeasurable) {
-      out.push({ sel: window.__a11y.cssPath(el), text: text.slice(0, 50),
+      out.push({ sel: window.__a11y.cssPath(named), text: text.slice(0, 50),
                  unmeasurable, size, large });
       continue;
     }
@@ -1359,24 +1435,21 @@ const CONTRAST_FN = () => {
     const cx = Math.min(window.innerWidth - 1, Math.max(0, r.left + r.width / 2));
     const cy = Math.min(window.innerHeight - 1, Math.max(0, r.top + r.height / 2));
     const overlays = [];
+    // Asked of the text's own root, so a hit inside it is not its host.
     let hits = [];
-    try { hits = document.elementsFromPoint(cx, cy); } catch { hits = []; }
+    const scope = el.getRootNode().elementsFromPoint ? el.getRootNode() : document;
+    try { hits = scope.elementsFromPoint(cx, cy); } catch { hits = []; }
     for (const h of hits) {
       if (h === el) break;
-      if (h.contains(el)) continue;
+      if (deep.contains(h, el)) continue;
       const hs = getComputedStyle(h);
       const hc = parse(hs.backgroundColor);
       if (hc && hc.a > 0) overlays.push(hc);
     }
     // elementsFromPoint skips pointer-events:none, which is exactly how most
     // scrims are built, so they are found separately.
-    for (const cand of document.querySelectorAll('*')) {
-      if (cand === el || cand.contains(el) || el.contains(cand)) continue;
-      const cs2 = getComputedStyle(cand);
-      if (cs2.pointerEvents !== 'none' && cs2.position === 'static') continue;
-      if (cs2.pointerEvents !== 'none') continue;
-      const cc = parse(cs2.backgroundColor);
-      if (!cc || cc.a === 0) continue;
+    for (const [cand, cc] of scrims) {
+      if (cand === el || deep.contains(cand, el) || deep.contains(el, cand)) continue;
       const cr = cand.getBoundingClientRect();
       if (cx >= cr.left && cx <= cr.right && cy >= cr.top && cy <= cr.bottom) {
         overlays.push(cc);
@@ -1391,7 +1464,7 @@ const CONTRAST_FN = () => {
     }
 
     out.push({
-      sel: window.__a11y.cssPath(el),
+      sel: window.__a11y.cssPath(named),
       text: text.slice(0, 50),
       size, weight, large,
       fg: [efg.r, efg.g, efg.b],
@@ -1399,8 +1472,8 @@ const CONTRAST_FN = () => {
       rawFg: [fg.r, fg.g, fg.b],
       rawBg: [bg.r, bg.g, bg.b],
       overlays: overlays.length,
-      cell: el.closest('[data-cell-id]')
-        ? el.closest('[data-cell-id]').getAttribute('data-cell-id') : null,
+      cell: deep.closest(el, '[data-cell-id]')
+        ? deep.closest(el, '[data-cell-id]').getAttribute('data-cell-id') : null,
     });
   }
   return out;
@@ -1508,7 +1581,7 @@ async function runKeymap(page, config) {
 
     try {
       if (spec.trigger) {
-        const t = await page.$(spec.trigger);
+        const t = await elementAt(page, spec.trigger);
         if (!t) {
           out.push(finding('keys', 'trigger-not-found', '-', 'warning',
             `"${name}": no element matches trigger "${spec.trigger}".`,
@@ -1525,17 +1598,15 @@ async function runKeymap(page, config) {
         await page.waitForTimeout(120);
 
         const state = await page.evaluate(({ container, trigger }) => {
-          const c = container ? document.querySelector(container) : null;
-          const active = document.activeElement;
+          const deep = window.__wdsDeep;
+          const c = container ? deep.resolve(container) : null;
+          const active = deep.active(document);
+          const t = trigger ? deep.resolve(trigger) : null;
           return {
             containerExists: !!c,
             open: c ? (c.open === true || window.__a11y.visible(c)) : null,
-            focusInside: c ? c.contains(active) : null,
-            expanded: trigger
-              ? (document.querySelector(trigger) || {}).getAttribute
-                ? document.querySelector(trigger).getAttribute('aria-expanded')
-                : null
-              : null,
+            focusInside: c ? deep.contains(c, active) : null,
+            expanded: t ? t.getAttribute('aria-expanded') : null,
             activeSel: window.__a11y.cssPath(active),
           };
         }, { container: spec.container || null, trigger: spec.trigger || null });
@@ -1565,10 +1636,10 @@ async function runKeymap(page, config) {
         }
 
         if (pattern === 'menu' && spec.items) {
-          const first = await page.evaluate((s) => window.__a11y.cssPath(document.activeElement), spec.items);
+          const first = await page.evaluate(() => window.__a11y.activePath());
           await page.keyboard.press('ArrowDown');
           await page.waitForTimeout(60);
-          const second = await page.evaluate(() => window.__a11y.cssPath(document.activeElement));
+          const second = await page.evaluate(() => window.__a11y.activePath());
           if (first === second) {
             fail('arrow-does-not-move', '2.1.1',
                  'ArrowDown did not move focus between items. A menu is ONE ' +
@@ -1581,13 +1652,14 @@ async function runKeymap(page, config) {
           await page.keyboard.press('Escape');
           await page.waitForTimeout(150);
           const after = await page.evaluate(({ container, trigger }) => {
-            const c = container ? document.querySelector(container) : null;
+            const deep = window.__wdsDeep;
+            const c = container ? deep.resolve(container) : null;
             return {
               stillOpen: c ? (c.open === true || window.__a11y.visible(c)) : null,
               focusOnTrigger: trigger
-                ? document.activeElement === document.querySelector(trigger)
+                ? deep.active(document) === deep.resolve(trigger)
                 : null,
-              activeSel: window.__a11y.cssPath(document.activeElement),
+              activeSel: window.__a11y.activePath(),
             };
           }, { container: spec.container || null, trigger: spec.trigger || null });
           if (after.stillOpen) {
@@ -1607,13 +1679,13 @@ async function runKeymap(page, config) {
       }
 
       if (pattern === 'disclosure' && spec.trigger) {
-        const before = await page.$eval(spec.trigger, (el) =>
-          el.getAttribute('aria-expanded'));
+        const before = await page.evaluate((s) =>
+          window.__wdsDeep.resolve(s).getAttribute('aria-expanded'), spec.trigger);
         await page.keyboard.press('Enter');
         await page.waitForTimeout(120);
         const after = await page.evaluate((s) => ({
-          expanded: document.querySelector(s).getAttribute('aria-expanded'),
-          focusStayed: document.activeElement === document.querySelector(s),
+          expanded: window.__wdsDeep.resolve(s).getAttribute('aria-expanded'),
+          focusStayed: window.__wdsDeep.active(document) === window.__wdsDeep.resolve(s),
         }), spec.trigger);
         if (before === after.expanded) {
           fail('disclosure-does-not-toggle', '2.1.1 / 4.1.2',
@@ -1629,10 +1701,9 @@ async function runKeymap(page, config) {
 
       if (pattern === 'tabs' && spec.container) {
         const roving = await page.evaluate((sel) => {
-          const list = document.querySelector(sel);
+          const list = window.__wdsDeep.resolve(sel);
           if (!list) return null;
-          const tabs = Array.prototype.slice.call(
-            list.querySelectorAll('[role=tab]'));
+          const tabs = window.__wdsDeep.query(list, '[role=tab]');
           return {
             count: tabs.length,
             zeroes: tabs.filter((t) => (t.getAttribute('tabindex') || '0') === '0').length,
@@ -1651,13 +1722,16 @@ async function runKeymap(page, config) {
                  'keys move between them. A 40-item widget that is 40 tab ' +
                  'stops is a failure even though every item is reachable.');
           }
-          const firstTab = await page.$(`${spec.container} [role=tab]`);
-          if (firstTab) {
-            await firstTab.evaluate((el) => el.focus({ preventScroll: true }));
-            const a = await page.evaluate(() => window.__a11y.cssPath(document.activeElement));
+          const focused = await page.evaluate((sel) => {
+            const tab = window.__wdsDeep.query(window.__wdsDeep.resolve(sel), '[role=tab]')[0];
+            if (tab) tab.focus({ preventScroll: true });
+            return !!tab;
+          }, spec.container);
+          if (focused) {
+            const a = await page.evaluate(() => window.__a11y.activePath());
             await page.keyboard.press('ArrowRight');
             await page.waitForTimeout(80);
-            const b = await page.evaluate(() => window.__a11y.cssPath(document.activeElement));
+            const b = await page.evaluate(() => window.__a11y.activePath());
             if (a === b) {
               fail('arrow-does-not-move', '2.1.1',
                    'ArrowRight did not move between tabs.');
@@ -1694,7 +1768,7 @@ async function checkReflow(page, opts) {
     const res = await page.evaluate(() => {
       const doc = document.documentElement;
       const over = [];
-      for (const el of document.querySelectorAll('body *')) {
+      for (const el of window.__wdsDeep.all(document.body)) {
         if (!window.__a11y.visible(el)) continue;
         const r = el.getBoundingClientRect();
         if (r.width > window.innerWidth + 2 &&
@@ -1831,6 +1905,9 @@ function textReport(o, opts) {
   if (o.densities && o.densities.length) {
     L.push(`  focus also measured at data-density ${o.densities.join(', ')}`);
   }
+  if (o.shadowRoots && (o.shadowRoots.open || o.shadowRoots.closed)) {
+    L.push(`  shadow roots read: ${o.shadowRoots.open} open, ${o.shadowRoots.closed} closed`);
+  }
   L.push('');
 
   const byCheck = new Map();
@@ -1839,7 +1916,7 @@ function textReport(o, opts) {
     byCheck.get(f.check).push(f);
   }
   const order = ['axe', 'names', 'taborder', 'focus', 'forced', 'contrast',
-                 'keys', 'reflow'];
+                 'keys', 'reflow', 'shadow'];
   for (const check of order) {
     const items = byCheck.get(check);
     if (!items || !items.length) continue;
@@ -2015,6 +2092,7 @@ async function main() {
   let forcedSupported = false;
   let densities = [];
   let cellsTotal = 0, cellsMeasured = 0;
+  let shadowRoots = null;
 
   const newPage = async (forcedColors) => {
     const ctx = await browser.newContext({
@@ -2030,7 +2108,7 @@ async function main() {
       // this run injects; the audit is of the page, not of its CSP (GT-A5).
       bypassCSP: true,
     });
-    await ctx.addInitScript(HELPERS);
+    await ctx.addInitScript({ content: INIT_SCRIPT });
     const page = await ctx.newPage();
     // The page as its users reach it: the session, the headers, the steps and
     // the wait, in every context the run opens (P34).
@@ -2048,11 +2126,30 @@ async function main() {
     await page.addStyleTag({ content: FREEZE_ANIMATIONS_CSS });
     await page.evaluate(() => new Promise((r) =>
       requestAnimationFrame(() => requestAnimationFrame(r))));
-    return { ctx, page };
+    // The closed shadow roots the parser attached before the init script ran
+    // (P34): every one the checks are to read must be kept by now.
+    const closed = await keepClosedRoots(page);
+    return { ctx, page, closed };
   };
 
   try {
-    const { ctx, page } = await newPage('none');
+    const { ctx, page, closed } = await newPage('none');
+    // The shadow roots the checks read, and any closed one they could not: a
+    // root no check read is said, never passed in silence.
+    shadowRoots = { ...await page.evaluate(() => window.__a11y.rootCounts()),
+                    unread: closed ? closed.closed - closed.kept : null };
+    const unread = unreadRoots(closed);
+    if (unread) {
+      findings.push(finding(
+        'shadow', 'closed-shadow-roots-unread', '-', 'warning', `${unread}.`,
+        'Nothing inside a closed shadow root that no check read was named, ' +
+        'measured or tabbed to, so this run says nothing about it. A root a ' +
+        'script attaches is always read; one the parser attaches ' +
+        '(<template shadowrootmode="closed">) is read through Chromium\'s ' +
+        'DevTools protocol. Run in Chromium or Chrome, or audit the component ' +
+        'with an open root.',
+        {}));
+    }
     const cmpCtx = await browser.newContext({ bypassCSP: true });
     const cmpPage = await cmpCtx.newPage();
     await cmpPage.goto('about:blank');
@@ -2146,7 +2243,7 @@ async function main() {
         for (const id of ids) {
           const cell = document.querySelector(`[data-cell-id="${CSS.escape(id)}"]`);
           if (!cell) continue;
-          const els = cell.querySelectorAll(window.__a11y.FOCUSABLE);
+          const els = window.__wdsDeep.query(cell, window.__a11y.FOCUSABLE);
           for (const el of els) {
             if (!window.__a11y.visible(el)) continue;
             if (el.disabled) continue;
@@ -2319,6 +2416,7 @@ async function main() {
     tabOrder,
     focusTable,
     densities,
+    shadowRoots,
     forcedSurvey,
     ringStats,
   };

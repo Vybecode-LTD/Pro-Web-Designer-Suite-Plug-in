@@ -308,8 +308,8 @@ other browser scripts find it, never downloaded. It renders what stands in for t
 a person runs: the page at 390 and 1440px, the 1440 capture blurred 8px, in greyscale,
 mirrored and at 25%, dark and reduced-motion captures, and `contrast.md`, each text colour
 on its background from computed styles against its AA floor, at both widths, light and
-dark, form controls' text and opacity included. Nothing is injected into
-the page. Nothing stands in for a night's sleep, and a capture is not a phone in a hand:
+dark, form controls' text, opacity and shadow roots included. Nothing is
+injected before a capture. Nothing stands in for a night's sleep, and a capture is not a phone in a hand:
 the template records each check as run, run with a proxy, or "not run — needs a human".
 
 ```bash
