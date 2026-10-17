@@ -307,7 +307,7 @@ Being reachable is not being announced: `role="status"` makes the toast a live r
 @starting-style { .toast:popover-open { opacity: 0; translate: 0 var(--motion-travel-sm); } }
 ```
 
-`@starting-style` and `transition-behavior: allow-discrete` are Baseline 2024 (Chrome and Edge 117, Firefox 129, Safari 17.5 and 17.4), the Popover API since January 2025 (Safari on iOS 18.3), and `<dialog>` widely available since September 2024 ([web-features](https://github.com/web-platform-dx/web-features/tree/main/features): `starting-style`, `transition-behavior`, `popover`, `dialog`). `overlay` is Chromium's alone (Chrome and Edge 117, not Baseline): elsewhere the toast can leave the top layer before its fade ends, which costs only the exit's look. navigation-code.md's drawer is the same pattern on a `<dialog>`.
+`@starting-style` (Chrome and Edge 117, Firefox 129, Safari 17.5) and `transition-behavior: allow-discrete` (Chrome and Edge 117, Firefox 129, Safari 17.4) are Baseline 2024, the Popover API since January 2025 (Safari on iOS 18.3), and `<dialog>` widely available since September 2024 ([web-features](https://github.com/web-platform-dx/web-features/tree/main/features): `starting-style`, `transition-behavior`, `popover`, `dialog`). `overlay` is Chromium's alone (Chrome and Edge 117, not Baseline): elsewhere the toast can leave the top layer before its fade ends, which costs only the exit's look. navigation-code.md's drawer is the same pattern on a `<dialog>`.
 
 ### Skip links
 

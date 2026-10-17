@@ -577,7 +577,7 @@ Without subgrid, three cards in a row lay out independently: a two-line title in
 
 **Contract.** The card must have exactly `--card-rows` top-level children (default 3: header, body, footer). It takes the parent grid's `row-gap` as its internal gap unless it sets a `row-gap` of its own, which a subgrid may do. If the shared alignment itself is not what you want, do not fight it: use `.stack--fill` inside a normal grid and accept the misalignment, or wrap.
 
-**Support.** All current evergreen browsers. Firefox shipped it in 2019 and Safari in 2022 (16); Chrome was last, with 117 in September 2023. The `@supports` guard leaves older engines with independent cards, which degrades to "slightly uneven", never "broken" — the right shape for a progressive enhancement.
+**Support.** Baseline widely available since 2026-03-15 (Chrome 117, Firefox 71, Safari 16; [web-features](https://github.com/web-platform-dx/web-features/blob/main/features/subgrid.yml)): Chrome was last, in September 2023. The `@supports` guard leaves older engines with independent cards, which degrades to "slightly uneven", never "broken" — the right shape for a progressive enhancement.
 
 ---
 

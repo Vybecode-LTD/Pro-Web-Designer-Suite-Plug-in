@@ -179,7 +179,7 @@ For non-interruptible springs, CSS's `linear()` expresses a real spring curve na
 }
 ```
 
-**Support.** `linear()` is in Chromium 113+, Firefox 112+, Safari 17.2+ — safe as a progressive enhancement, and the two-declaration fallback above is the whole mitigation: an unsupported value makes the declaration invalid at parse time, so the previous one survives. Check current status before relying on it for anything load-bearing.
+**Support.** `linear()` is Baseline widely available since 2026-06-11 (Chromium 113+, Firefox 112+, Safari 17.2+; [web-features](https://github.com/web-platform-dx/web-features/blob/main/features/linear-easing.yml)). On an older floor the two-declaration fallback above is the whole mitigation: an unsupported value makes the declaration invalid at parse time, so the previous one survives.
 
 **Deriving the stops.** `progress(t) = 1 − e^(−ζωₙt)·(cos(ω_d t) + (ζωₙ/ω_d)·sin(ω_d t))` with `ωₙ = √(k/m)`, `ζ = c/(2√(km))`, `ω_d = ωₙ√(1−ζ²)`. Sample 16–24 points to the settle time. Keep ζ in 0.6–0.85 for UI: below 0.5 it wobbles visibly, above 0.9 you have paid for a spring and got an ease-out.
 
@@ -270,7 +270,7 @@ function navigate(render) {
 }
 ```
 
-**Support, honestly.** Same-document view transitions: Chromium 111+, Safari 18+, Firefox from 144. Cross-document (`@view-transition`): Chromium 126+, Safari 18.2+, Firefox still landing at the time of writing. **Verify on caniuse before you rely on it** — this is the fastest-moving area in this document.
+**Support, honestly.** Same-document view transitions are Baseline newly available since 2025-10-14: Chromium 111+, Safari 18+, Firefox from 144 ([web-features](https://github.com/web-platform-dx/web-features/blob/main/features/view-transitions.yml)). Cross-document (`@view-transition`): Chromium 126+, Safari 18.2+, not yet Firefox, so not Baseline ([web-features](https://github.com/web-platform-dx/web-features/blob/main/features/cross-document-view-transitions.yml)). **Verify on caniuse before you rely on it** — this is the fastest-moving area in this document.
 
 **Progressive enhancement framing, non-negotiable:** the navigation must be complete and correct with zero transition. `startViewTransition` wraps a DOM update you were going to do anyway; if the API is absent, the update still happens, instantly. Never put state changes, data fetches or focus management *inside* the callback and nowhere else — a browser without the API must still run them. And move focus explicitly after the transition resolves; the API snapshots pixels, not focus.
 
@@ -429,7 +429,7 @@ CSS can now drive an animation's progress from scroll position instead of from t
 - `view()` — progress across an **element's** pass through the scrollport. Paired with `animation-range` (`cover`, `contain`, `entry`, `exit`, `entry-crossing`, `exit-crossing`) this replaces essentially every "animate on scroll" library.
 - **What it replaces:** AOS, ScrollMagic, hand-rolled `IntersectionObserver` reveal code, and `scroll` listeners driving `style.transform`. Those all run on the main thread and stutter under load; this does not.
 
-**Support.** Chromium 115+, Safari 26+; Firefox has been implementing behind a flag. Treat it as progressive enhancement: everything must be visible and usable with the timeline ignored. The safe authoring shape is to put the *hidden* state inside the feature query, so an unsupporting browser simply never hides the content:
+**Support.** Chromium 115+, Safari 26+, not yet Firefox, so not Baseline ([web-features](https://github.com/web-platform-dx/web-features/blob/main/features/scroll-driven-animations.yml)); Firefox has been implementing behind a flag. Treat it as progressive enhancement: everything must be visible and usable with the timeline ignored. The safe authoring shape is to put the *hidden* state inside the feature query, so an unsupporting browser simply never hides the content:
 
 ```css
 @supports (animation-timeline: view()) {
