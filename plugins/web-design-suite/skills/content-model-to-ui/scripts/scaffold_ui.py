@@ -2,8 +2,8 @@
 """scaffold_ui.py — step 4 of the content-model-to-ui workflow.
 
 Take the `model.json` that `introspect_schema.py` produced, plus the answers to
-the questions it asked, and write a React 19 (or, with --framework vue, a Vue
-3.5) + TypeScript scaffold: one folder per entity with a list view, a detail
+the questions it asked, and write a React 19 (or, with --framework, a Vue 3.5
+or a Svelte 5) + TypeScript scaffold: one folder per entity with a list view, a detail
 view, a form, and the empty, loading and error states that generators normally
 leave to default.
 
@@ -49,8 +49,9 @@ USAGE
     # Tailwind instead of CSS Modules
     python -m scripts.scaffold_ui model.json --out src --stack tailwind
 
-    # Vue 3.5 single-file components instead of React
+    # Vue 3.5 single-file components, or Svelte 5 ones, instead of React
     python -m scripts.scaffold_ui model.json --out src --framework vue
+    python -m scripts.scaffold_ui model.json --out src --framework svelte
 
 Then, always:
 
@@ -3320,19 +3321,20 @@ def vue_root(sheet: str, root: str) -> str:
     return re.sub(r"\.root(?![\w-])", "." + root, sheet)
 
 
-def vue_tailwind(sfc: str, component: str, root: str, sheet: str) -> str:
-    """The Tailwind stack's single-file component: each class from the
-    component's sheet becomes its utilities (`tw_class`), the layout
-    primitives stay, and the `<style>` block goes, as the CSS Module does."""
+def sfc_tailwind(sfc: str, component: str, root: str, sheet: str) -> str:
+    """The Tailwind stack's single-file component (Vue or Svelte): each class
+    from the component's sheet becomes its utilities (`tw_class`), the
+    layout primitives stay, and the `<style>` block goes, as the CSS Module
+    does. Svelte's `class={['a b', className]}` is read like `class="a b"`."""
     own = set(re.findall(r"\.([A-Za-z][\w-]*)", sheet)) | {root}
 
-    def classes(m: re.Match) -> str:
-        names = [tw_class("root" if c == root else c, component) if c in own else c
-                 for c in m.group(1).split()]
-        return 'class="' + " ".join(n for n in names if n) + '"'
+    def names(text: str) -> str:
+        return " ".join(n for n in (tw_class("root" if c == root else c, component) if c in own else c
+                                    for c in text.split()) if n)
 
-    out = re.sub(r'(?<![\w:-])class="([^"]*)"', classes, sfc)
-    return re.sub(r'\n<style scoped(?: src="[^"]*")?>[\s\S]*?</style>\n', "", out)
+    out = re.sub(r'(?<![\w:-])class="([^"]*)"', lambda m: f'class="{names(m.group(1))}"', sfc)
+    out = re.sub(r"(?<![\w:-])class=\{\['([^']*)'", lambda m: "class={['" + names(m.group(1)) + "'", out)
+    return re.sub(r'\n<style(?: scoped)?(?: src="[^"]*")?>[\s\S]*?</style>\n', "", out)
 
 
 VUE_BUTTON = vue_sfc("""\
@@ -4251,7 +4253,7 @@ def build_vue_files(model: dict[str, Any], ans: Answers, stack: str,
     css = stack == "css-modules"
 
     def sfc(path: str, text: str, component: str, root: str, sheet: str) -> None:
-        files[path] = text if css else vue_tailwind(text, component, root, sheet)
+        files[path] = text if css else sfc_tailwind(text, component, root, sheet)
 
     files: dict[str, str] = {"lib/format.ts": FORMAT_TS, "ui/index.ts": VUE_INDEX_KIT,
                              "ui/Field/describedBy.ts": VUE_DESCRIBED_BY}
@@ -4286,6 +4288,1049 @@ def build_vue_files(model: dict[str, Any], ans: Answers, stack: str,
         for state, text in emit_vue_states(table, model, ans).items():
             sfc(f"{base}/{Entities}{state}.vue", text, "States", "", STATES_CSS)
         files[f"{base}/index.ts"] = emit_vue_index(table)
+        files[f"server/{name}.schema.ts"] = emit_schema_zod(table, model, ans)
+        files[f"server/{name}_schema.py"] = emit_schema_pydantic(table, model, ans)
+    return files
+
+
+# ---------------------------------------------------------------------------
+# Svelte 5 (--framework svelte)
+# ---------------------------------------------------------------------------
+# The same kit and the same screens as Svelte 5 components: runes (`$props()`,
+# `$state`, `$derived`, `$effect`), snippets for children (`{@render
+# children()}`), callbacks as props, as React's are, and each CSS Module's
+# rules in the component's `<style>` inside `@layer components`
+# (stack-frameworks.md §1, §4). Svelte scopes a style to the component's own
+# elements only, so the sheets keep `.root`; a rule that reaches a child
+# component's element says so with `:global(...)`. `style:` sets only the
+# skeleton's custom properties.
+
+def svelte_text(text: str) -> str:
+    """Literal text, or a quoted attribute's value: Svelte reads `{` in
+    either as an expression."""
+    return (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace("{", "&#123;").replace("}", "&#125;"))
+
+
+def svelte_static(value: str) -> str:
+    return svelte_text(value).replace('"', "&quot;")
+
+
+def svelte_sfc(script: str, markup: str, style: str = "") -> str:
+    body = "\n".join(("  " + line) if line else "" for line in script.strip().split("\n"))
+    out = f'<script lang="ts">\n{body}\n</script>\n\n{markup.rstrip()}\n'
+    if style:
+        out += f"\n<style>\n{style.rstrip()}\n</style>\n"
+    return out
+
+
+def css_rules(sheet: str, keep: set[str]) -> str:
+    """The rules of a sheet's `@layer components` block whose classes are all
+    in `keep`, each with the comments before it: Svelte drops, and warns
+    about, a selector nothing in the component can match."""
+    start = sheet.index("@layer components {") + len("@layer components {")
+    body = sheet[start:sheet.rindex("}")]
+    kept, pending, i = [], "", 0
+    while i < len(body):
+        if body.startswith("/*", i):
+            j = body.index("*/", i) + 2
+            pending, i = pending + body[i:j], j
+            continue
+        if body[i].isspace():
+            pending, i = pending + body[i], i + 1
+            continue
+        j = k = body.index("{", i)
+        depth = 0
+        while True:
+            depth += {"{": 1, "}": -1}.get(body[k], 0)
+            if depth == 0:
+                break
+            k += 1
+        classes = set(re.findall(r"\.([A-Za-z][\w-]*)", body[i:j]))
+        if classes and classes <= keep:
+            kept.append(pending + body[i:k + 1])
+        pending, i = "", k + 1
+    return "@layer components {" + "".join(kept) + "\n}\n"
+
+
+def svelte_sheet(markup: str, *sheets: str) -> str:
+    """The rules of the sheets whose classes the screen's markup uses:
+    Svelte drops, and warns about, the rest."""
+    used: set[str] = set()
+    for m in re.finditer(r"""class=(?:"([^"]*)"|\{\['([^']*)')""", markup):
+        used.update((m.group(1) or m.group(2)).split())
+    return "".join(css_rules(sheet, used) for sheet in sheets)
+
+
+# The list's rows and headers have rules for states its markup does not
+# render yet; Svelte compiles each in once the markup sets the attribute.
+SVELTE_STATE_RULES = """\
+<!-- The rules for a sorted column and a selected, loading, failed or disabled
+     row wait for the markup to set aria-sort, aria-selected, data-state or
+     data-disabled; Svelte compiles each one in when it does. -->
+<!-- svelte-ignore css_unused_selector -->
+"""
+
+
+SVELTE_BUTTON = svelte_sfc("""\
+import type { Snippet } from 'svelte';
+import type { HTMLButtonAttributes } from 'svelte/elements';
+
+/**
+ * Every attribute the caller passes (`type`, `onclick`, an aria attribute)
+ * comes after the defaults written here, so it wins, as React's `...rest`
+ * did; a `class` joins the component's own.
+ */
+type Props = HTMLButtonAttributes & {
+  variant?: 'default' | 'primary' | 'ghost' | 'danger';
+  size?: 'default' | 'sm';
+  /** Shows the busy affordance AND blocks the click. Both, or neither. */
+  loading?: boolean;
+  children?: Snippet;
+};
+
+let {
+  variant = 'default',
+  size = 'default',
+  loading = false,
+  disabled = false,
+  class: className = '',
+  children,
+  ...rest
+}: Props = $props();
+""", """\
+<button
+  type="button"
+  class={['root', className]}
+  data-variant={variant === 'default' ? undefined : variant}
+  data-size={size === 'default' ? undefined : size}
+  data-state={loading ? 'loading' : undefined}
+  aria-busy={loading || undefined}
+  disabled={disabled || loading}
+  {...rest}
+>
+  <span class="label">{@render children?.()}</span>
+  {#if loading}
+    <span class="spinner" aria-hidden="true"></span>
+  {/if}
+</button>
+""", BUTTON_CSS)
+
+SVELTE_FIELD = svelte_sfc("""\
+import type { Snippet } from 'svelte';
+
+/**
+ * The label / control / help / error quartet, wired so the accessible name
+ * and the visible name cannot drift apart.
+ *
+ * This component owns the structure and the ids: the help is `${id}-help`,
+ * the error `${id}-error`. The CONTROL in `children` carries
+ * `aria-describedby` (from `describedBy`) and `aria-invalid`, because
+ * assistive tech reads them on the control, not on a wrapper. The error is
+ * not a live region: the form's summary announces a failed submit once and
+ * takes focus.
+ */
+type Props = {
+  id: string;
+  label: string;
+  /** Marked visually AND with the `required` attribute, or neither. */
+  required?: boolean;
+  /** Guidance shown before the user gets it wrong. */
+  help?: string;
+  /** Set only AFTER first blur, or the form scolds people as they type. */
+  error?: string | null;
+  disabled?: boolean;
+  /**
+   * A group of controls (radios, a date range): the label becomes a
+   * `<legend>` with the id `${id}-label`, which the group's
+   * `aria-labelledby` names, since a `<label for>` can name only one
+   * control.
+   */
+  group?: boolean;
+  class?: string;
+  children: Snippet;
+};
+
+let {
+  id,
+  label,
+  required = false,
+  help,
+  error = null,
+  disabled = false,
+  group = false,
+  class: className = '',
+  children,
+}: Props = $props();
+""", """\
+<svelte:element
+  this={group ? 'fieldset' : 'div'}
+  class={['root stack stack--tight', className]}
+  data-state={error ? 'error' : undefined}
+  data-disabled={disabled || undefined}
+>
+  {#if group}
+    <legend class="label groupLabel" id={id + '-label'}>
+      {label}{#if required}<span class="required" aria-hidden="true">*</span>{/if}
+    </legend>
+  {:else}
+    <label class="label" for={id}>
+      {label}{#if required}<span class="required" aria-hidden="true">*</span>{/if}
+    </label>
+  {/if}
+
+  <div class="control">{@render children()}</div>
+
+  {#if help}
+    <p class="help" id={id + '-help'}>{help}</p>
+  {/if}
+
+  {#if error}
+    <p class="error" id={id + '-error'}>{error}</p>
+  {/if}
+</svelte:element>
+""", FIELD_CSS)
+
+SVELTE_CONTROL_DOC = """\
+/**
+ * One of the primitive input surfaces: one element, which every attribute
+ * the caller passes lands on, so a caller can attach whatever form library
+ * it likes. The value and its callback are the caller's, as in React.
+ */
+"""
+
+SVELTE_CONTROLS = {
+    "TextInput": svelte_sfc("""\
+import type { HTMLInputAttributes } from 'svelte/elements';
+
+""" + SVELTE_CONTROL_DOC + """\
+let { class: className = '', ...rest }: HTMLInputAttributes = $props();
+""", """\
+<input class={['root', className]} {...rest} />
+""", css_rules(CONTROL_CSS, {"root"})),
+    "NumberInput": svelte_sfc("""\
+import type { HTMLInputAttributes } from 'svelte/elements';
+
+""" + SVELTE_CONTROL_DOC + """\
+let { class: className = '', ...rest }: HTMLInputAttributes = $props();
+""", """\
+<input type="number" inputmode="decimal" class={['root numeric', className]} {...rest} />
+""", css_rules(CONTROL_CSS, {"root", "numeric"})),
+    "TextArea": svelte_sfc("""\
+import type { HTMLTextareaAttributes } from 'svelte/elements';
+
+""" + SVELTE_CONTROL_DOC + """\
+let { class: className = '', ...rest }: HTMLTextareaAttributes = $props();
+""", """\
+<textarea rows={4} class={['root textarea', className]} {...rest}></textarea>
+""", css_rules(CONTROL_CSS, {"root", "textarea"})),
+    "Select": svelte_sfc("""\
+import type { HTMLSelectAttributes } from 'svelte/elements';
+
+""" + SVELTE_CONTROL_DOC + """\
+let { class: className = '', children, ...rest }: HTMLSelectAttributes = $props();
+""", """\
+<select class={['root', className]} {...rest}>
+  {@render children?.()}
+</select>
+""", css_rules(CONTROL_CSS, {"root"})),
+    "Toggle": svelte_sfc("""\
+import type { HTMLInputAttributes } from 'svelte/elements';
+
+""" + SVELTE_CONTROL_DOC + """\
+type Props = HTMLInputAttributes & { id: string; label: string };
+
+let { id, label, class: className = '', ...rest }: Props = $props();
+""", """\
+<span class={['toggle', className]}>
+  <input {id} type="checkbox" class="toggleInput" {...rest} />
+  <label class="toggleLabel" for={id}>{label}</label>
+</span>
+""", css_rules(CONTROL_CSS, {"toggle", "toggleInput", "toggleLabel"})),
+    "RadioGroup": svelte_sfc("""\
+type Props = {
+  name: string;
+  value: string | null;
+  options: readonly string[];
+  disabled?: boolean;
+  onValueChange?: (next: string) => void;
+  /** The id of the group's name: a `<legend>`, from `<Field group>`. */
+  labelledBy?: string;
+  /** The ids of the help and the error, as `describedBy` builds them. */
+  describedBy?: string;
+  invalid?: boolean;
+  /** The group says so (`aria-required`) and so does each radio. */
+  required?: boolean;
+};
+
+let { name, value, options, disabled, onValueChange, labelledBy, describedBy, invalid, required }: Props =
+  $props();
+""", """\
+<div
+  class="options"
+  role="radiogroup"
+  aria-labelledby={labelledBy}
+  aria-describedby={describedBy}
+  aria-invalid={invalid || undefined}
+  aria-required={required || undefined}
+>
+  {#each options as option (option)}
+    <label class="option">
+      <input
+        type="radio"
+        {name}
+        value={option}
+        checked={value === option}
+        {disabled}
+        {required}
+        class="toggleInput"
+        onchange={() => onValueChange?.(option)}
+      />
+      {option}
+    </label>
+  {/each}
+</div>
+""", css_rules(CONTROL_CSS, {"options", "option", "toggleInput"})),
+    "ControlStub": svelte_sfc("""\
+/** A control this scaffold deliberately did not guess at. It renders as an
+ *  obvious placeholder so it cannot be mistaken for finished work. */
+let { control, reason }: { control: string; reason: string } = $props();
+""", """\
+<span class="stub" data-state="error">TODO({control}): {reason}</span>
+""", css_rules(CONTROL_CSS, {"stub"})),
+}
+
+SVELTE_BADGE = svelte_sfc("""\
+import type { Snippet } from 'svelte';
+import type { HTMLAttributes } from 'svelte/elements';
+
+/**
+ * A status pill. Tone is a PROP, not a lookup from the value — the mapping
+ * from `status` to tone is product knowledge and belongs at the call site,
+ * where someone can see it and argue with it.
+ */
+type Props = HTMLAttributes<HTMLSpanElement> & {
+  tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
+  children?: Snippet;
+};
+
+let { tone = 'neutral', class: className = '', children, ...rest }: Props = $props();
+""", """\
+<span class={['root', className]} data-tone={tone === 'neutral' ? undefined : tone} {...rest}>
+  {@render children?.()}
+</span>
+""", BADGE_CSS)
+
+SVELTE_SKELETON = svelte_sfc("""\
+import type { HTMLAttributes } from 'svelte/elements';
+
+/**
+ * A loading placeholder sized to the content it replaces: always pass the
+ * real line count, or the page jumps when the data arrives. The width and
+ * the lines are custom properties (`style:`), the one legal inline style
+ * (Law 4).
+ */
+type Props = HTMLAttributes<HTMLSpanElement> & {
+  /** Width as a fraction of the container, 0-1. */
+  width?: number;
+  lines?: number;
+};
+
+let { width = 1, lines = 1, class: className = '', ...rest }: Props = $props();
+""", """\
+<span
+  class={['root', className]}
+  style:--skeleton-width={String(width)}
+  style:--skeleton-lines={String(lines)}
+  aria-hidden="true"
+  {...rest}
+></span>
+""", SKELETON_CSS)
+
+SVELTE_STATE_BLOCK = svelte_sfc("""\
+import type { Snippet } from 'svelte';
+
+/**
+ * `kind` drives the tone. These are DIFFERENT screens, not one screen with
+ * different words — see screen-patterns.md section 12. `action` is the
+ * single action this state offers: two actions on an empty state is two
+ * people disagreeing about what the user should do next.
+ */
+type Props = {
+  kind: 'first-run' | 'filtered' | 'error' | 'forbidden' | 'stale';
+  headline: string;
+  body?: string;
+  action?: Snippet;
+  class?: string;
+};
+
+let { kind, headline, body, action, class: className = '' }: Props = $props();
+""", """\
+<div
+  class={['root stack stack--related', className]}
+  data-kind={kind}
+  role={kind === 'error' ? 'alert' : undefined}
+>
+  <h2 class="headline">{headline}</h2>
+  {#if body}
+    <p class="body">{body}</p>
+  {/if}
+  {#if action}
+    <div class="action">{@render action()}</div>
+  {/if}
+</div>
+""", STATE_BLOCK_CSS)
+
+SVELTE_INDEX_KIT = VUE_INDEX_KIT.replace(".vue';", ".svelte';")
+
+
+def svelte_tag(tag: str, attrs: list[str], indent: str, body: str | None = None) -> str:
+    inner = "".join(f"\n{indent}  {a}" for a in attrs)
+    if body is None:
+        return f"{indent}<{tag}{inner}\n{indent}/>"
+    return f"{indent}<{tag}{inner}\n{indent}>\n{body}\n{indent}</{tag}>"
+
+
+def svelte_control(spec: dict[str, Any], indent: str = "      ") -> str:
+    """One form control, as control_jsx writes it for React; Svelte's
+    expressions are JSX's, its attribute names HTML's."""
+    ctrl = spec["control"]
+    name = spec["name"]
+    q, err = js_string(name), member("errors", name)
+    acc = member("values", name)
+    fid = f"fieldId({q})"
+    error_id = f"{err} ? {fid} + '-error' : undefined"
+    common = [f"id={{{fid}}}", f'name="{svelte_static(name)}"', "disabled={disabled}",
+              f"aria-invalid={{Boolean({err}) || undefined}}", f"aria-describedby={{{error_id}}}",
+              f"required={{{str(spec.get('required', False)).lower()}}}"]
+    text_value = f"value={{String({acc} ?? '')}}"
+
+    def on(event: str, read: str = "e.currentTarget.value") -> str:
+        return f"on{event}={{(e) => onChange({q}, {read})}}"
+
+    if ctrl in STUB_REASON:
+        reason = STUB_REASON[ctrl]
+        if spec.get("labelColumn"):
+            reason += f"; it shows `{spec['labelColumn']}`"
+        return f'{indent}<ControlStub control="{ctrl}" reason="{svelte_static(reason)}" />'
+    if ctrl in ("textarea", "rich-text"):
+        return svelte_tag("TextArea", common + [text_value, on("input")], indent)
+    if ctrl in ("select", "multi-select"):
+        multi = ["multiple"] if ctrl == "multi-select" else []
+        opts = spec.get("options") or []
+        lines = []
+        if not spec.get("required") and not multi:
+            lines.append(f'{indent}  <option value="">Choose one</option>')
+        lines += [f"{indent}  <option value={{{json.dumps(o)}}}>{{{json.dumps(o)}}}</option>" for o in opts]
+        if not opts and spec.get("labelColumn"):
+            lines.append(vue_comment(f"TODO(options): one <option> per parent row, showing "
+                                     f"`{spec['labelColumn']}`", indent + "  "))
+        # A multiple select's value is the array, and so is what it sends (#176).
+        value = ([f"value={{{acc} ?? []}}",
+                  on("change", "Array.from(e.currentTarget.selectedOptions, (option) => option.value)")]
+                 if multi else [text_value, on("change")])
+        return svelte_tag("Select", multi + common + value, indent,
+                          "\n".join(lines) or vue_comment("TODO(options): the closed set", indent + "  "))
+    if ctrl == "radio-group":
+        return svelte_tag("RadioGroup", [
+            f'name="{svelte_static(name)}"',
+            f"value={{{acc} === null || {acc} === undefined ? null : String({acc})}}",
+            f"options={{{json.dumps(spec.get('options') or [])}}}", "disabled={disabled}",
+            f"labelledBy={{{fid} + '-label'}}", f"describedBy={{{error_id}}}",
+            f"invalid={{Boolean({err})}}", f"required={{{str(spec.get('required', False)).lower()}}}",
+            f"onValueChange={{(next) => onChange({q}, next)}}"], indent)
+    if ctrl in ("switch", "checkbox"):
+        return svelte_tag("Toggle", [
+            f"id={{{fid}}}", f'label="{svelte_static(spec["label"])}"',
+            f"checked={{Boolean({acc})}}", "disabled={disabled}",
+            f"aria-invalid={{Boolean({err}) || undefined}}", f"aria-describedby={{{error_id}}}",
+            on("change", "e.currentTarget.checked")], indent)
+    if ctrl in ("number-input", "stepper", "percent-input", "currency-input"):
+        extra = [f"{k}={{{spec[k]}}}" for k in ("min", "max") if k in spec]
+        note = ""
+        if ctrl == "currency-input":
+            money = spec.get("money") or {}
+            cur = money.get("currency") or "the currency"
+            if money.get("storage") == "minor-units":
+                scale = json.dumps(cur) if money.get("currency") else "currency"
+                note = (f"TODO(money): stored in minor units of {cur}. Divide by "
+                        f"minorUnitScale({scale}) on read, multiply on write, and keep the "
+                        f"float out of the middle.")
+            elif money.get("storage") == "decimal":
+                extra.append('step="any"')
+                note = (f"TODO(money): a decimal amount in {cur}; the database rounds to its "
+                        f"scale. Parse permissively, format on blur, never while typing.")
+            else:
+                note = ("TODO(money): minor units or a decimal? Answer the `.money` question; "
+                        "the two differ by the currency's scale on every read and write.")
+        tag = svelte_tag("NumberInput", common + extra + [
+            f"value={{{acc} ?? ''}}",
+            on("input", "Number.isNaN(e.currentTarget.valueAsNumber) ? null : e.currentTarget.valueAsNumber")],
+            indent)
+        return (vue_comment(note, indent) + "\n" + tag) if note else tag
+    if ctrl in ("readonly-text", "readonly-timestamp"):
+        return svelte_tag("TextInput", common + ["readonly", text_value], indent)
+    input_type = {
+        "email-input": "email", "url-input": "url", "tel-input": "tel",
+        "password-input": "password", "date-picker": "date",
+        "datetime-picker": "datetime-local", "time-picker": "time",
+        "color-picker": "color",
+    }.get(ctrl, "text")
+    extra = []
+    if "maxLength" in spec:
+        extra.append(f"maxlength={{{spec['maxLength']}}}")
+    if "pattern" in spec:
+        extra.append(f"pattern={{{json.dumps(spec['pattern'])}}}")
+    if ctrl == "password-input":
+        extra.append('autocomplete="new-password"')
+    note = ""
+    if ctrl == "slug-input":
+        extra.append('inputmode="url"')
+        note = vue_comment("TODO(slug): derive from the title until the user edits this field "
+                           "by hand, then stop — a slug that keeps changing breaks links.", indent) + "\n"
+    return note + svelte_tag("TextInput", [f'type="{input_type}"'] + common + extra
+                             + [text_value, on("input")], indent)
+
+
+def _svelte_form_sections(table: dict[str, Any], model: dict[str, Any],
+                          ans: Answers) -> tuple[str, set[str]]:
+    """The form's fieldsets, as _form_sections writes React's."""
+    specs = {s["name"]: s for s in
+             (field_spec(c, table, model, ans) for c in table["columns"]
+              if ans.in_form(table, c))}
+    groups = ans.groups(table, table["screens"].get("field_groups")
+                        or [{"legend": "Details", "fields": list(specs)}])
+    sections: list[str] = []
+    kit: set[str] = {"Button"}
+    for g in groups:
+        fields = [f for f in g.get("fields", []) if f in specs]
+        if not fields:
+            continue
+        body = []
+        for f in fields:
+            s = specs[f]
+            kit.add(VUE_CONTROL_IMPORT.get(s["control"], "TextInput")
+                    if s["control"] not in STUB_REASON else "ControlStub")
+            review = (vue_comment(f"review: {s['review']}", "    ") + "\n" if s.get("review") else "")
+            err = member("errors", f)
+            if s["control"] in ("switch", "checkbox"):
+                # A toggle is its own label; it gets the error below it, with
+                # the id the control's aria-describedby names.
+                body.append(
+                    f"{review}    <div class=\"field\" data-state={{{err} ? 'error' : undefined}}>\n"
+                    f"{svelte_control(s, '      ')}\n"
+                    f"      {{#if {err}}}\n"
+                    f"        <p class=\"fieldError\" id={{fieldId({js_string(f)}) + '-error'}}>{{{err}}}</p>\n"
+                    f"      {{/if}}\n"
+                    f"    </div>")
+                continue
+            kit.add("Field")
+            attrs = [f"id={{fieldId({js_string(f)})}}", f'label="{svelte_static(s["label"])}"',
+                     f"required={{{str(s.get('required', False)).lower()}}}",
+                     f"error={{{err} ?? null}}", "disabled={disabled}"]
+            if s["control"] == "radio-group":
+                attrs.append("group")
+            body.append(review + svelte_tag("Field", attrs, "    ", svelte_control(s, "      ")))
+        sections.append(
+            "  <fieldset class=\"group\" {disabled}>\n"
+            f"    <legend class=\"legend\">{svelte_text(g.get('legend', 'Details'))}</legend>\n"
+            + "\n".join(body) + "\n  </fieldset>")
+    return "\n\n".join(sections) or "  <!-- no writable fields -->", kit
+
+
+def emit_svelte_form(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    sections, kit = _svelte_form_sections(table, model, ans)
+    script = Template("""\
+import { $kit } from '../../ui';
+import type { ${Entity}Draft } from './$camel.types';
+
+/**
+ * The $lower_entity form.
+ *
+ * Three UX rules this markup encodes, all of which generators skip:
+ *
+ * 1. VALIDATION TIMING. `errors` is rendered whenever it is set; it is the
+ *    CALLER's job not to set it until a field has been blurred once.
+ * 2. THE ERROR SUMMARY comes first in the DOM and takes focus, once per
+ *    submit attempt, because on a long form the invalid field is usually
+ *    off-screen. Each entry links to its field.
+ * 3. REQUIRED IS MARKED BOTH WAYS. The asterisk is decorative and hidden from
+ *    assistive tech; the `required` attribute is what actually announces it.
+ *
+ * Still yours to do: the unsaved-changes guard (block the route change while
+ * `dirty`), and autosave if this form is long enough to deserve it. See
+ * screen-patterns.md section 13.
+ */
+type Props = {
+  values: Partial<${Entity}Draft>;
+  errors: Partial<Record<keyof ${Entity}Draft, string>>;
+  /** Blocks every control AND the submit button, together. */
+  disabled?: boolean;
+  submitting?: boolean;
+  /** Set when the user has changed something and not saved it. */
+  dirty?: boolean;
+  /** A form-level failure: the save was rejected as a whole. */
+  submitError?: string | null;
+  onChange: (name: keyof ${Entity}Draft, value: unknown) => void;
+  onSubmit: () => void;
+  onCancel?: () => void;
+};
+
+let {
+  values,
+  errors,
+  disabled = false,
+  submitting = false,
+  dirty = false,
+  submitError = null,
+  onChange,
+  onSubmit,
+  onCancel,
+}: Props = $props();
+
+const fieldId = (name: string) => '$camel-' + name;
+
+const invalid = $derived(Object.entries(errors).filter(([, message]) => Boolean(message)));
+let summary = $state<HTMLDivElement>();
+let attempt = $state(0);
+let focusedFor = 0;
+
+// After a submit attempt that failed validation, move focus to the summary:
+// once per attempt, whether or not the error count changed. The caller sets
+// `errors` in `onSubmit` or, validating asynchronously, sets `submitting`
+// while it runs. An effect runs after the DOM updates, with the summary bound.
+// A save that came back clean consumes the attempt, so an error that appears
+// later, from a blur, does not pull focus to the summary.
+$effect(() => {
+  if (attempt > focusedFor && invalid.length > 0) {
+    focusedFor = attempt;
+    summary?.focus();
+  } else if (!submitting && invalid.length === 0) {
+    focusedFor = attempt;
+  }
+});
+
+function submit(event: SubmitEvent) {
+  event.preventDefault();
+  attempt += 1;
+  onSubmit();
+}
+""").safe_substitute(Entity=Entity, camel=camel(name), kit=", ".join(sorted(kit)),
+                     lower_entity=singular(name.replace("_", " ")))
+    markup = """\
+<form class="stack stack--separate" novalidate onsubmit={submit}>
+  {#if invalid.length > 0}
+    <div class="summary" role="alert" tabindex="-1" bind:this={summary}>
+      <p class="summaryTitle">
+        {invalid.length === 1 ? 'One field needs attention' : String(invalid.length) + ' fields need attention'}
+      </p>
+      <ul class="summaryList">
+        {#each invalid as [name, message] (name)}
+          <li>
+            <a class="summaryLink" href={'#' + fieldId(name)}>{String(message)}</a>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
+
+  {#if submitError}
+    <p class="submitError" role="alert">{submitError}</p>
+  {/if}
+
+""" + sections + """
+
+  <div class="cluster cluster--tight">
+    <Button type="submit" variant="primary" loading={submitting} {disabled}>Save</Button>
+    <Button type="button" variant="ghost" onclick={onCancel} disabled={submitting}>
+      {dirty ? 'Discard changes' : 'Cancel'}
+    </Button>
+  </div>
+</form>
+"""
+    return svelte_sfc(script, markup, svelte_sheet(markup, FORM_CSS))
+
+
+def _svelte_imports(cells: list[dict[str, Any]], kit: list[str], Entities: str,
+                    states: tuple[str, ...]) -> str:
+    out = f"import {{ {', '.join(kit)} }} from '../../ui';\n" + _helper_imports(cells, set())
+    return out + "".join(f"import {Entities}{s} from './{Entities}{s}.svelte';\n" for s in states)
+
+
+def emit_svelte_list(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    Entities = pascal(name)
+    title = ans.title(table)
+    layout = ans.layout(table)
+    pk = table["primary_key"][0] if table["primary_key"] else "id"
+    human = name.replace("_", " ")
+    Title = human[:1].upper() + human[1:]
+    cols = [c for c in table["columns"] if c["name"] in ans.list_columns(table)] or table["columns"][:1]
+    cells = {c["name"]: cell_render(c, "row", table, ans) for c in cols}
+    href = f"{{{js_string('/' + name + '/')} + String({member('row', pk)})}}"
+    key = f"String({member('row', pk)})"
+
+    if layout == "table":
+        head = "\n".join(
+            f'          <th class="{"th sticky" if c["name"] == title else "th"}" scope="col">\n'
+            f"            {svelte_text(c['ui'].get('label', c['name']))}\n"
+            f"          </th>" for c in cols)
+        body = []
+        for c in cols:
+            cell = cells[c["name"]]
+            cls = " ".join(["td"] + ([cell["class"]] if cell["class"] else [])
+                           + (["sticky"] if c["name"] == title else []))
+            inner = (f'<a class="link" href={href}>{cell_expr(cell)}</a>'
+                     if c["name"] == title else cell_expr(cell))
+            body.append(f'            <td class="{cls}">{inner}</td>')
+        rows = Template("""\
+    <!-- A scrollable region must take focus, or a keyboard cannot scroll it
+         (WCAG 2.1.1): the tabindex is the point, not an accident. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="scroller" tabindex="0" role="region" aria-label="$Title, scrollable table">
+      <table class="root">
+        <thead class="head">
+          <tr>
+$head
+          </tr>
+        </thead>
+        <tbody>
+          {#each state.rows as row ($key)}
+            <tr class="row">
+$body
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>""").safe_substitute(Title=svelte_static(Title), head=head, key=key,
+                               body="\n".join("  " + b for b in body))
+    else:
+        grid = "grid grid--min-lg" if layout == "feed" else "grid grid--min-sm"
+        meta = "\n".join(
+            f"              <div>\n"
+            f'                <dt class="cardMeta">{svelte_text(c["ui"].get("label", c["name"]))}</dt>\n'
+            f"                <dd>{cell_expr(cells[c['name']])}</dd>\n"
+            f"              </div>" for c in cols if c["name"] != title)
+        title_expr = (cell_expr(cells[title]) if title in cells
+                      else "{String(" + member("row", pk) + ")}")
+        rows = Template("""\
+    <ul class="$grid">
+      {#each state.rows as row ($key)}
+        <li>
+          <article class="card">
+            <h2 class="cardTitle">
+              <a class="cardLink" href=$href>
+                $title_expr
+              </a>
+            </h2>
+            <dl class="stack stack--fused">
+$meta
+            </dl>
+          </article>
+        </li>
+      {/each}
+    </ul>""").safe_substitute(grid=grid, key=key, href=href, title_expr=title_expr, meta=meta)
+
+    kit = (["Badge"] if any(c["element"] for c in cells.values()) else []) + ["Button"]
+    script = Template("""\
+${imports}import type { ${Entity}ListState } from './$camel.types';
+
+/**
+ * $human, as a $layout.
+ *
+ * $layout_why
+ *
+ * This component takes its rows as a prop and knows nothing about fetching.
+ * That is deliberate: cache keys, realtime and optimistic writes are product
+ * decisions, and a scaffold has no business guessing at them.
+ */
+type Props = {
+  state: ${Entity}ListState;
+  /** The single primary action offered by the first-run empty state. */
+  onCreate?: () => void;
+  /** Clears whatever produced the filtered-empty state. */
+  onClearFilters?: () => void;
+};
+
+let { state, onCreate, onClearFilters }: Props = $props();
+""").safe_substitute(
+        imports=_svelte_imports(list(cells.values()), kit, Entities,
+                                ("Empty", "Error", "FilteredEmpty", "Forbidden", "Loading")),
+        Entity=Entity, camel=camel(name), human=human, layout=layout,
+        layout_why=table["screens"].get("index_layout_signal", ""))
+    markup = Template("""\
+{#if state.status === 'loading'}
+  <${Entities}Loading />
+{:else if state.status === 'error'}
+  <${Entities}Error error={state.error} onRetry={state.retry} />
+{:else if state.status === 'forbidden'}
+  <${Entities}Forbidden />
+{:else if state.rows.length === 0}
+  <!-- Two different screens, not one screen with two strings. "Nothing here
+       yet, make the first one" and "your filter matched nothing, clear it"
+       ask the user to do opposite things. -->
+  {#if state.filtered}
+    <${Entities}FilteredEmpty {onClearFilters} />
+  {:else}
+    <${Entities}Empty {onCreate} />
+  {/if}
+{:else}
+  <section class="stack stack--separate" aria-labelledby="$camel-heading">
+    <header class="cluster cluster--between">
+      <h1 class="heading" id="$camel-heading">
+        $Title
+      </h1>
+      <Button variant="primary" onclick={onCreate}>
+        New $lower_entity
+      </Button>
+    </header>
+
+    {#if state.stale}
+      <p class="stale" role="status">Showing the last known data while this refreshes.</p>
+    {/if}
+
+$rows
+  </section>
+{/if}
+""").safe_substitute(Entities=Entities, camel=camel(name), Title=svelte_text(Title),
+                     lower_entity=svelte_text(singular(human)), rows=rows)
+    sfc = svelte_sfc(script, markup, svelte_sheet(
+        markup, LIST_CSS, DATA_TABLE_CSS if layout == "table" else CARD_GRID_CSS))
+    return sfc.replace("\n<style>\n", "\n" + SVELTE_STATE_RULES + "<style>\n", 1)
+
+
+def emit_svelte_detail(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    Entities = pascal(name)
+    title = ans.title(table)
+    pk = table["primary_key"][0] if table["primary_key"] else "id"
+    rows, cells = [], []
+    for c in table["columns"]:
+        if not c["ui"].get("placement", {}).get("detail") or c["name"] == title:
+            continue
+        cell = cell_render(c, "state.record", table, ans)
+        cells.append(cell)
+        rows.append(
+            f'        <div class="pair">\n'
+            f'          <dt class="term">{svelte_text(c["ui"].get("label", c["name"]))}</dt>\n'
+            f'          <dd class="value">{cell_expr(cell)}</dd>\n'
+            f"        </div>")
+    related = [vue_comment(f"TODO({r['control']}): {r['kind']} to `{r['to']}`"
+                           + (f" via `{r['via']}`" if r.get("via") else "")
+                           + f". {r.get('signal', '')}", "      ")
+               for r in table.get("relationships", [])
+               if r["kind"] in ("one-to-many", "many-to-many")]
+    placeholder_note = ""
+    if table["screens"].get("title_is_placeholder"):
+        placeholder_note = (
+            "\n *\n * TODO(title): nothing in this table looks like a title, so the\n"
+            " * primary key is standing in. A uuid in an h1 is not a heading.\n"
+            " * Answer the `.title_column` question and come back.")
+    title_expr = ("{state.record." + title + "}"
+                  if title and re.fullmatch(r"[A-Za-z_$][\w$]*", title)
+                  else "{String(" + member("state.record", pk) + ")}")
+    kit = (["Badge"] if any(c["element"] for c in cells) else []) + ["Button"]
+    script = Template("""\
+${imports}import type { ${Entity}DetailState } from './$camel.types';
+
+/**
+ * One $lower_entity.
+ *
+ * The layout is `.with-sidebar`: the record's own fields in the main pane, its
+ * actions and metadata in the rail. The rail wraps underneath at a CONTENT
+ * threshold rather than a viewport breakpoint, so this page is correct inside
+ * a drawer and inside a 288px column without knowing it.$placeholder_note
+ */
+type Props = {
+  state: ${Entity}DetailState;
+  onEdit?: () => void;
+  onDelete?: () => void;
+};
+
+let { state, onEdit, onDelete }: Props = $props();
+""").safe_substitute(
+        imports=_svelte_imports(cells, kit, Entities, ("Error", "Forbidden", "Loading")),
+        Entity=Entity, camel=camel(name), placeholder_note=placeholder_note,
+        lower_entity=singular(name.replace("_", " ")))
+    markup = Template("""\
+{#if state.status === 'loading'}
+  <${Entities}Loading />
+{:else if state.status === 'error'}
+  <${Entities}Error error={state.error} onRetry={state.retry} />
+{:else if state.status === 'forbidden'}
+  <${Entities}Forbidden />
+{:else}
+  <article class="with-sidebar" aria-labelledby="$camel-detail-heading">
+    <div class="with-sidebar__main stack stack--separate">
+      <h1 class="title" id="$camel-detail-heading">
+        $title_expr
+      </h1>
+
+      <dl class="fields">
+$rows
+      </dl>
+$related
+    </div>
+
+    <aside class="with-sidebar__rail stack stack--related" aria-label="Actions">
+      <Button variant="primary" onclick={onEdit}>Edit</Button>
+      <Button variant="danger" onclick={onDelete}>Delete</Button>
+      <!-- TODO(copy): a delete confirmation must name the record and state
+           what else disappears with it. "Are you sure?" is not that. See
+           screen-patterns.md section 8. -->
+    </aside>
+  </article>
+{/if}
+""").safe_substitute(Entities=Entities, camel=camel(name), title_expr=title_expr,
+                     rows="\n".join(rows) or "        <!-- no detail fields -->",
+                     related=("\n" + "\n".join(related)) if related else "")
+    return svelte_sfc(script, markup, svelte_sheet(markup, DETAIL_CSS))
+
+
+def emit_svelte_states(table: dict[str, Any], model: dict[str, Any],
+                       ans: Answers) -> dict[str, str]:
+    """The six states, one component each."""
+    name = table["name"]
+    human = name.replace("_", " ")
+    empty = ans.empty(table)
+    cols = len(ans.list_columns(table)) or 3
+    forbidden_note = (
+        "Row-level security is on for this table, so this is a real state: the\n"
+        " * query succeeded and returned nothing because the policy filtered\n"
+        " * everything out. Rendering that as 'no records' tells the user their\n"
+        " * data is gone."
+        if ans.rls(table) else
+        "RLS was reported as off, so this should be unreachable today. It is\n"
+        " * generated anyway, because 'we will add RLS later' is always true and\n"
+        " * retrofitting this state means touching every list in the app.")
+
+    def block(doc: str, props: str, kind: str, headline: str, body: str, note: str | None,
+              action: tuple[str, str, str] | None, bound: str | None = None) -> str:
+        """`action` is (variant, callback, label). `body` is copy, so always
+        text; `bound` is an expression instead (as the Vue one, #176)."""
+        script = ("import { Button, StateBlock } from '../../ui';\n" if action
+                  else "import { StateBlock } from '../../ui';\n")
+        script += f"\n/**\n * {doc}\n */\n" + props
+        body_attr = f"body={{{bound}}}" if bound else f'body="{svelte_static(body)}"'
+        tag = f'<StateBlock kind="{kind}" headline="{svelte_static(headline)}" {body_attr}>\n'
+        if action:
+            variant, callback, label = action
+            tag += (f"  {{#snippet action()}}\n"
+                    f'    <Button variant="{variant}" onclick={{{callback}}}>{svelte_text(label)}</Button>\n'
+                    f"  {{/snippet}}\n")
+        tag += "</StateBlock>\n"
+        return svelte_sfc(script, (vue_comment(note, "") + "\n" if note else "") + tag)
+
+    return {
+        "Empty": block(f"No {human} have ever existed. The most-seen screen in the app on day one.",
+                       "let { onCreate }: { onCreate?: () => void } = $props();\n", "first-run",
+                       empty["headline"], empty["body"] or f"TODO(copy): what {human} are for.",
+                       "TODO(copy): say what this screen will hold and why it is worth filling "
+                       "in. One sentence. \"No data\" is the absence of copy, not copy.",
+                       ("primary", "onCreate", empty["action"])),
+        "FilteredEmpty": block(
+            "A filter or a search matched nothing. A DIFFERENT screen from the empty one:\n"
+            " * the records exist, this query just missed them, so the action is \"clear the\n"
+            " * filter\", never \"create a record\".",
+            "let { onClearFilters }: { onClearFilters?: () => void } = $props();\n", "filtered",
+            f"No {human} match those filters",
+            "Try a broader search, or clear the filters to see everything.",
+            "TODO(copy): name the filters that are on, so the user can see what to "
+            "relax without hunting for it.", ("ghost", "onClearFilters", "Clear filters")),
+        "Error": block(
+            "The request failed. Always offer the retry — an error with no way forward\n"
+            " * is a dead end, and users reload the whole app instead.",
+            "let { error, onRetry }: { error?: Error; onRetry?: () => void } = $props();\n", "error",
+            f"Something went wrong loading {human}", "",
+            f"TODO(copy): say what failed in the user's terms, not the transport's. "
+            f"\"We could not load your {human}\" beats \"Request failed\".",
+            ("primary", "onRetry", "Try again"), bound="error?.message"),
+        "Forbidden": block(
+            f"The user is not allowed to see these rows.\n *\n * {forbidden_note}",
+            "", "forbidden", f"You do not have access to {human}",
+            "Ask an administrator if you think this is a mistake.",
+            "TODO(copy): say who to ask. A permission wall with no route onward is a "
+            "support ticket. Do NOT reveal whether any records exist.", None),
+        "Stale": block(
+            "Data on screen is known to be out of date — a realtime event arrived, or a\n"
+            " * background revalidation failed. Shown ABOVE the stale rows rather than\n"
+            " * replacing them: taking correct-a-moment-ago data away is worse than\n"
+            " * labelling it.",
+            "let { onRefresh }: { onRefresh?: () => void } = $props();\n", "stale",
+            "This list has changed", f"Someone else updated these {human} while you were reading.",
+            None, ("ghost", "onRefresh", "Refresh")),
+        "Loading": svelte_sfc("""\
+import { Skeleton } from '../../ui';
+
+/**
+ * A skeleton shaped like the real table: same column count, same row height.
+ * A spinner would be less work and would also let the page jump when the data
+ * lands, moving whatever the user was about to click.
+ */
+let { rows = 5 }: { rows?: number } = $props();
+""", Template("""\
+<div class="loading" role="status" aria-live="polite">
+  <span class="visually-hidden">Loading $human</span>
+  {#each Array.from({ length: rows }, (_, index) => index) as index (index)}
+    <div class="loadingRow">
+      {#each Array.from({ length: $cols }, (_, cell) => cell) as cell (cell)}
+        <Skeleton width={cell === 0 ? 0.8 : 0.5} />
+      {/each}
+    </div>
+  {/each}
+</div>
+""").safe_substitute(human=svelte_text(human), cols=cols),
+            # The skeletons are Skeleton's elements, which this component's
+            # scope does not reach.
+            STATES_CSS.replace(".loadingRow > *", ".loadingRow > :global(*)")),
+    }
+
+
+def emit_svelte_index(table: dict[str, Any]) -> str:
+    return emit_vue_index(table).replace(".vue';", ".svelte';")
+
+
+def build_svelte_files(model: dict[str, Any], ans: Answers, stack: str,
+                       entities: set[str] | None) -> dict[str, str]:
+    """The kit and the screens as Svelte 5 components; everything that is not
+    a component is the React scaffold's own file."""
+    css = stack == "css-modules"
+
+    def comp(path: str, text: str, component: str, sheet: str) -> None:
+        files[path] = text if css else sfc_tailwind(text, component, "root", sheet)
+
+    files: dict[str, str] = {"lib/format.ts": FORMAT_TS, "ui/index.ts": SVELTE_INDEX_KIT,
+                             "ui/Field/describedBy.ts": VUE_DESCRIBED_BY.replace("Field.vue", "Field.svelte")}
+    if not css:
+        files["styles/scaffold.css"] = SCAFFOLD_CSS
+    for name, text, sheet in (("Button", SVELTE_BUTTON, BUTTON_CSS), ("Field", SVELTE_FIELD, FIELD_CSS),
+                              ("Badge", SVELTE_BADGE, BADGE_CSS), ("Skeleton", SVELTE_SKELETON, SKELETON_CSS),
+                              ("StateBlock", SVELTE_STATE_BLOCK, STATE_BLOCK_CSS)):
+        comp(f"ui/{name}/{name}.svelte", text, name, sheet)
+    for name, text in SVELTE_CONTROLS.items():
+        comp(f"ui/Control/{name}.svelte", text, "Control", CONTROL_CSS)
+
+    for table in model["tables"]:
+        if table["kind"] == "join" or (entities and table["name"] not in entities):
+            continue
+        name = table["name"]
+        Entity = pascal(singular(name))
+        Entities = pascal(name)
+        base = f"features/{name}"
+        files[f"{base}/{camel(name)}.types.ts"] = (emit_types(table, model, ans)
+                                                   + VUE_DETAIL_STATE.substitute(Entity=Entity))
+        files[f"{base}/{camel(name)}.fields.ts"] = emit_fields(table, model, ans)
+        list_sheet = LIST_CSS + (DATA_TABLE_CSS if ans.layout(table) == "table" else CARD_GRID_CSS)
+        comp(f"{base}/{Entities}List.svelte", emit_svelte_list(table, model, ans), "List", list_sheet)
+        comp(f"{base}/{Entity}Detail.svelte", emit_svelte_detail(table, model, ans), "Detail", DETAIL_CSS)
+        comp(f"{base}/{Entity}Form.svelte", emit_svelte_form(table, model, ans), "Form", FORM_CSS)
+        for state, text in emit_svelte_states(table, model, ans).items():
+            comp(f"{base}/{Entities}{state}.svelte", text, "States", STATES_CSS)
+        files[f"{base}/index.ts"] = emit_svelte_index(table)
         files[f"server/{name}.schema.ts"] = emit_schema_zod(table, model, ans)
         files[f"server/{name}_schema.py"] = emit_schema_pydantic(table, model, ans)
     return files
@@ -4866,8 +5911,8 @@ def unsafe_name(name: Any) -> str:
 def build_files(model: dict[str, Any], ans: Answers, stack: str,
                 entities: set[str] | None, server_actions: bool = False,
                 framework: str = "react") -> dict[str, str]:
-    if framework == "vue":
-        files = build_vue_files(model, ans, stack, entities)
+    if framework in ("vue", "svelte"):
+        files = (build_vue_files if framework == "vue" else build_svelte_files)(model, ans, stack, entities)
         files.update(build_database_files(model, ans, entities, server_actions))
         return files
     files = {}
@@ -4957,7 +6002,7 @@ def build_database_files(model: dict[str, Any], ans: Answers, entities: set[str]
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="python -m scripts.scaffold_ui",
-        description="Generate a React 19 or Vue 3.5 + TypeScript CRUD scaffold from a "
+        description="Generate a React 19, Vue 3.5 or Svelte 5 + TypeScript CRUD scaffold from a "
                     "model.json, composed from the suite's layout primitives "
                     "and role tokens.",
         epilog="The output is a starting point, not a product. Every TODO in "
@@ -4975,9 +6020,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="default: the project's .design-suite.json stack (tailwind-v3 and "
                          "tailwind-v4 scaffold Tailwind; css-modules scaffolds CSS Modules), "
                          "else css-modules")
-    ap.add_argument("--framework", choices=("react", "vue"), default="react",
+    ap.add_argument("--framework", choices=("react", "vue", "svelte"), default="react",
                     help="react (default): React 19 components (.tsx); vue: Vue 3.5 single-file "
-                         "components (.vue, <script setup lang=\"ts\">, <style scoped>)")
+                         "components (.vue, <script setup lang=\"ts\">, <style scoped>); svelte: "
+                         "Svelte 5 components (.svelte, runes and snippets)")
     ap.add_argument("--server-actions", action="store_true",
                     help="a Next.js App Router project: each form posts to a server action "
                          "(React 19's useActionState and useFormStatus), with the server's "
