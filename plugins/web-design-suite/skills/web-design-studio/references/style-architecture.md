@@ -105,6 +105,8 @@ Why this is different in kind: the inline declaration sets no visual property. I
 
 `assets/configs/eslint.design.config.mjs` implements exactly this. `style={{ marginTop: 12 }}` fails. `style={{ '--offset': `${n}px` }}` passes. A mixed object fails, because the mixed object is how the exception becomes the rule.
 
+A framework's bound style is the same `style` under another name, and `audit_design.py` holds it to the same rule: Vue's `:style` and `v-bind:style` (an object, an array of objects, or a string), Svelte's `style:color` directive, and Angular's `[style]`, `[ngStyle]`, `[attr.style]` and `[style.width.px]`. `:style="{ '--card-span': span }"` and `style:--card-span={span}` pass; `:style="{ color: '#fff' }"` and `[style.color]="'#fff'"` fail. ESLint parses none of these templates, so in a `.vue`, `.svelte` or Angular template the audit is the gate.
+
 ### The four cases people reach for inline style, and what to do instead
 
 | Reach | Instead |

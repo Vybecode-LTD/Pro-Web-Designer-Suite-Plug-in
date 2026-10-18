@@ -72,6 +72,12 @@ def jsx_component(jsx: str) -> str:
     return f"export const C = ({{ pct, span }}) => {jsx};\n"
 
 
+# N48: a bound style's examples, each in its framework's template file.
+TEMPLATES = {"vue": ("vue", lambda m: f"<template>\n  {m}\n</template>\n"),
+             "svelte": ("svelte", lambda m: f"{m}\n"),
+             "angular": ("component.html", lambda m: f"{m}\n")}
+
+
 def spec_examples() -> list[Example]:
     """Every `allowed` and `refused` example in the spec, each as a file of its
     own for the gates its section names: a rule in a component file, a rule in
@@ -89,7 +95,9 @@ def spec_examples() -> list[Example]:
                 else f"src/components/{stem}.{ext}")
         # stylelint reads stylesheets and ESLint reads JSX: a section both
         # enforce (tiers) gives each its own examples.
-        gates = tuple(g for g in SPEC[section.split(".")[0]]["gates"]
+        top, _, sub = section.partition(".")     # a subsection may name gates of its own
+        owner = SPEC[top][sub] if isinstance(SPEC[top].get(sub), dict) and "gates" in SPEC[top][sub] else SPEC[top]
+        gates = tuple(g for g in owner["gates"]
                       if not (g == "stylelint" and ext != "css") and not (g == "eslint" and ext == "css"))
         examples.append(Example(section, verdict, source, name, text, gates))
 
@@ -131,6 +139,10 @@ def spec_examples() -> list[Example]:
             add("bindings", verdict, declaration, f"@theme inline {{\n  {declaration};\n}}\n")
         for jsx in SPEC["inline_styles"][verdict]:
             add("inline_styles", verdict, jsx, jsx_component(jsx), ext="tsx")
+        for framework, markups in SPEC["inline_styles"]["bound"][verdict].items():
+            ext, template = TEMPLATES[framework]
+            for markup in markups:
+                add("inline_styles.bound", verdict, markup, template(markup), ext=ext)
         for jsx in SPEC["tailwind_arbitrary"][verdict]:     # the audit's W5
             add("tailwind_arbitrary", verdict, jsx, jsx_component(jsx), ext="tsx")
         for jsx in SPEC["tiers"][f"{verdict}_jsx"]:          # P45: Law 6 in a class or a style

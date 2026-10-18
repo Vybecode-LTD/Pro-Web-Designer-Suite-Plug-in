@@ -455,7 +455,32 @@
     "allowed": ["<div style={{ '--progress': pct }} />", "<div style={span ? { '--card-span': span } : undefined} />"],
     "refused": ["<div style={{ padding: 13 }} />", "<div style={{ '--gap': '12px' }} />",
                 "<div style={{ '--tint': 'hwb(20 10% 30%)' }} />",
-                "<div style={{ '--title': '4cqi' }} />"]
+                "<div style={{ '--title': '4cqi' }} />"],
+    "bound": {
+      "gates": ["audit"],
+      "rule": "A framework's bound style is the style prop under another name (N48), held to the same rule: Vue's :style and v-bind:style (with .prop, .attr or .camel) take an object, an array of objects or a string; Angular's [style] takes an object or a string, [ngStyle] an object whose keys may name a unit ('max-width.px'), [attr.style] a string, and [style.x] and [style.x.unit] one property; Svelte's style:x directive sets one property, to a value written out (\"#fff\"), an expression ({accent}) or the variable of its name (style:color), with or without |important. The audit reads each object the expression can evaluate to (either arm of a ternary, an array's items, a spread's), and each string as it reads style=\"\": a visual property is Law 4, and a custom property's written-out design literal, or a Tier-1 primitive it reads, is Law 1 or Law 6, as in JSX. ESLint parses no .vue, .svelte or Angular template, so the audit alone reads these (N49). The migration census counts each written-out value as an inline style, left to hand work.",
+      "allowed": {
+        "vue": ["<div :style=\"{ '--progress': pct }\"></div>",
+                "<div v-bind:style=\"span ? { '--card-span': span } : undefined\"></div>",
+                "<div :style=\"[base, { '--card-tint': 'var(--bg-accent)' }]\"></div>",
+                "<div :style=\"'--progress: 40%'\"></div>"],
+        "svelte": ["<div style:--progress={pct}></div>", "<div style:--progress=\"{pct}%\"></div>",
+                   "<div style:--card-tint=\"var(--bg-accent)\"></div>"],
+        "angular": ["<div [ngStyle]=\"{ '--progress': pct }\"></div>",
+                    "<div [style]=\"{ '--card-tint': 'var(--bg-accent)' }\"></div>"]
+      },
+      "refused": {
+        "vue": ["<div :style=\"{ color: '#fff' }\"></div>", "<div :style=\"{ color: 'var(--fg-strong)' }\"></div>",
+                "<div v-bind:style=\"{ '--gap': '12px' }\"></div>",
+                "<div v-bind:style.prop=\"[base, on && { padding: '12px' }]\"></div>",
+                "<div :style=\"'color: #fff'\"></div>", "<div :style=\"{ '--tint': 'var(--neutral-700)' }\"></div>"],
+        "svelte": ["<div style:color=\"#fff\"></div>", "<div style:color={accent}></div>", "<div style:color></div>",
+                   "<div style:color|important=\"#fff\"></div>", "<div style:--gap=\"12px\"></div>"],
+        "angular": ["<div [style.color]=\"'#fff'\"></div>", "<div [style.width.px]=\"13\"></div>",
+                    "<div [style]=\"'color: #fff'\"></div>", "<div [ngStyle]=\"{ 'max-width.px': 20 }\"></div>",
+                    "<div [attr.style]=\"'color: #fff'\"></div>", "<div [ngStyle]=\"{ '--gap': '12px' }\"></div>"]
+      }
+    }
   },
   "tailwind_arbitrary": {
     "gates": ["audit", "eslint"],

@@ -970,5 +970,114 @@ class TestFilesByThePathBelowTheRoot(TempDirTest):
         self.assertEqual(0, self.colours("app/src"))
 
 
+class TheAuditReadsBoundStyles(TempDirTest):
+    """N48: the template reader wanted whitespace before `style=`, so Vue's
+    `:style="{ color: '#fff' }"` passed unread, though Law 4 fails the same
+    declaration as style="" or JSX's style={{…}}; so did Svelte's `style:`
+    directive and Angular's `[style.x]`, `[style]` and `[ngStyle]`. The
+    spec's examples (inline_styles.bound) hold each form one by one; these
+    hold the lines, the messages and the reader's edges."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.audit = load_script("web-design-studio", "audit_design")
+
+    def found(self, rel: str, text: str) -> list[tuple[int, str, str]]:
+        path = self.write(rel, text)
+        found, _, _ = self.audit.audit_run([str(path)])
+        return sorted((f.line, f.law, f.rule) for f in found)
+
+    def test_each_framework_fails_a_literal_colour_and_passes_a_token(self):
+        cases = {
+            "src/components/Card.vue": (
+                "<template>\n  <div class=\"card\"\n       :style=\"{ color: '#fff' }\">a</div>\n"
+                "  <div :style=\"{ '--card-tint': '#fff' }\">b</div>\n"
+                "  <div :style=\"{ '--card-tint': 'var(--bg-accent)' }\">c</div>\n</template>\n"),
+            "src/components/Card.svelte": (
+                "<script>let on = true;</script>\n<div class=\"card\"\n     style:color=\"#fff\">a</div>\n<div style:--card-tint=\"#fff\">b</div>\n"
+                "<div style:--card-tint=\"var(--bg-accent)\">c</div>\n"),
+            "src/app/card.component.html": (
+                "<!-- the card -->\n<div class=\"card\"\n     [style.color]=\"'#fff'\">a</div>\n"
+                "<div [ngStyle]=\"{ '--card-tint': '#fff' }\">b</div>\n"
+                "<div [style]=\"{ '--card-tint': 'var(--bg-accent)' }\">c</div>\n"),
+        }
+        for rel, text in cases.items():
+            with self.subTest(file=rel):
+                # The line is the binding's own, not the tag's.
+                self.assertEqual([(3, "L4", "inline-style"), (4, "L1", "inline-literal")],
+                                 [f for f in self.found(rel, text) if f[0] < 5])
+                self.assertEqual([], [f for f in self.found(rel, text) if f[0] >= 5])
+
+    def test_the_message_names_the_binding_and_its_properties(self):
+        path = self.write("src/components/Box.vue", "<template>\n  <div v-bind:style.prop=\"[base, on && "
+                          "{ padding: '12px', fontSize: size }, { color: c }]\">a</div>\n</template>\n")
+        found, _, _ = self.audit.audit_run([str(path)])
+        self.assertEqual(["`v-bind:style.prop` sets visual properties: padding, fontSize, color."],
+                         [f.message for f in found if f.rule == "inline-style"])
+
+    def test_a_value_the_runtime_holds_is_still_a_visual_property(self):
+        # A name, an expression or Svelte's shorthand sets the property all the same.
+        for markup in ('<div style:color={accent}>a</div>', '<div style:color>a</div>',
+                       "<div [style.width.px]=\"w\">a</div>", '<div :style="{ color }">a</div>'):
+            with self.subTest(markup=markup):
+                self.assertEqual([(1, "L4", "inline-style")], self.found("src/components/X.svelte", markup + "\n"))
+
+    def test_what_is_not_a_bound_style_is_not_read(self):
+        # Text that spells a directive, an object passed to a call, an index,
+        # a `<` inside a value, a plain style="" read once, and commented-out
+        # markup, which the census blanks too (CodeRabbit on #168).
+        text = ("<template>\n  <p>Use style:color or [style.color] to bind it.</p>\n"
+                "  <!-- <div :style=\"{ color: '#fff' }\" style=\"padding: 13px\">old</div> -->\n"
+                "  <div :style=\"fn({ color: 'red' })\" v-if=\"a<b\">a</div>\n"
+                "  <div :style=\"styles['card']\">b</div>\n"
+                "  <div style=\"--progress: 40%\" :style=\"{ '--card-span': span }\">c</div>\n</template>\n")
+        self.assertEqual([], self.found("src/components/Y.vue", text))
+
+    def test_comments_and_interpolations_are_read_as_code_and_text(self):
+        """Codex on #168: a comment before a key hid the key, so L4 was
+        missed; and tag-shaped text inside `{{ … }}` read as a start tag. An
+        Angular control-flow block's braces hold real markup, still read."""
+        self.assertEqual([(2, "L4", "inline-style")], self.found("src/components/E.vue", (
+            "<template>\n  <div :style=\"{ /* runtime color */ color: tone }\">a</div>\n</template>\n")))
+        self.assertEqual([], self.found("src/components/F.vue", (
+            "<template>\n  <p>{{ `<div :style=\"{ color: '#fff' }\">` }}</p>\n"
+            "  <p>{{ label }}</p>\n</template>\n")))
+        self.assertEqual([(3, "L4", "inline-style")], self.found("src/app/g.component.html", (
+            "@if (on) {\n  <p>{{ `<i [style.color]=\"'red'\">` }}</p>\n"
+            "  <div [style.color]=\"'#fff'\">a</div>\n}\n")))
+
+    def test_a_literal_in_either_arm_of_a_condition_is_read(self):
+        """Codex on #168: `on ? '12px' : gap` read as one expression, so the
+        written-out arm escaped L1. A string that is compared is no value."""
+        for rel, markup in (("A.vue", "<template>\n  <div :style=\"{ '--gap': on ? '12px' : gap }\">a</div>\n</template>\n"),
+                            ("B.svelte", "<p></p>\n<div style:--gap={gap ?? '12px'}>a</div>\n"),
+                            ("c.component.html", "<p></p>\n<div [style.--gap]=\"on && '12px'\">a</div>\n")):
+            with self.subTest(file=rel):
+                self.assertEqual([(2, "L1", "inline-literal")], self.found(f"src/components/{rel}", markup))
+        self.assertEqual([], self.found("src/components/D.vue", (
+            "<template>\n  <div :style=\"{ '--tint': theme === 'dark' ? 'var(--bg-accent)' : 'var(--bg-muted)', "
+            "'--span': on ? span : 1 }\">a</div>\n</template>\n")))
+
+    def test_a_tier1_primitive_in_a_custom_property_is_law_6(self):
+        self.assertEqual([(1, "L6", "tier1-leak")],
+                         self.found("src/components/Z.svelte", '<div style:--tint="var(--neutral-700)">a</div>\n'))
+
+    def test_the_ignore_comment_reaches_a_bound_style(self):
+        text = ("<template>\n  <!-- design-audit-ignore-next-line: L4 -->\n"
+                "  <div :style=\"{ color: c }\">a</div>\n</template>\n")
+        self.assertEqual([], self.found("src/components/W.vue", text))
+
+    def test_the_census_reads_the_same_block(self):
+        """extract_literals.py carries the reader verbatim: the audit and the
+        census must find the same bound styles."""
+        def block(skill: str, script: str) -> str:
+            text = (SKILLS / skill / "scripts" / f"{script}.py").read_text(encoding="utf-8")
+            m = re.search(r"^# ---- BEGIN bound-styles.*?^# ---- END bound-styles$", text, re.S | re.M)
+            self.assertIsNotNone(m, script)
+            return m.group(0)
+        self.assertEqual(block("web-design-studio", "audit_design"),
+                         block("design-token-migration", "extract_literals"))
+
+
 if __name__ == "__main__":
     unittest.main()

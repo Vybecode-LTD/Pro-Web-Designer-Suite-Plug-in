@@ -1105,7 +1105,8 @@ UNMAPPED_KIND = {"length": "spacing", "font-size": "type", "border-width": "stro
 # or replaced by hand, so none is counted as mechanically replaceable.
 HAND_WORK = {
     "inline-style": (
-        "set in an inline style, JSX's style={{}} or an HTML style=\"\" (Law 4) "
+        "set in an inline style, JSX's style={{}}, an HTML style=\"\" or a bound style "
+        "(Vue's :style, Svelte's style:x, Angular's [style.x]) (Law 4) "
         "— the codemod does not rewrite these",
         "Phase 4f: move the declaration into the component's stylesheet under a "
         "class name, then re-run extract_literals so it is mapped with the rest."),
