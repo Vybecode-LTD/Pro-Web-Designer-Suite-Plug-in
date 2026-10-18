@@ -543,6 +543,22 @@ class DependencyFacts(unittest.TestCase):
             with self.subTest(package=name):
                 self.assertEqual("3.5.44", lock[f"node_modules/{name}"]["version"])
 
+    @unittest.skipUnless(TOOLING, "reads the repository's tooling/")
+    def test_the_svelte_and_the_dom_the_scaffold_runs_in_are_pinned(self):
+        """P37 part 6, read from registry.npmjs.org on 2026-10-18: svelte
+        5.57.2 (2026-10-06) needs node >=18; jsdom 29.1.1 (2026-04-30) needs
+        ^20.19.0 || ^22.13.0 || >=24.0.0, tooling/main's own range, where
+        jsdom 30 drops Node 20 (^22.22.2 || ^24.15.0 || >=26.0.0)."""
+        package = json.loads((TOOLING / "main" / "package.json").read_bytes())
+        self.assertEqual(("5.57.2", "29.1.1"), (package["devDependencies"]["svelte"],
+                                                package["devDependencies"]["jsdom"]))
+        lock = json.loads((TOOLING / "main" / "package-lock.json").read_bytes())["packages"]
+        def spelled(span):                     # `>=24.0.0` is `>=24`
+            return re.sub(r"(\d+)\.0\.0\b", r"\1", span)
+
+        self.assertEqual(spelled(package["engines"]["node"]),
+                         spelled(lock["node_modules/jsdom"]["engines"]["node"]))
+
     def test_eslint_is_a_supported_major_and_jsx_a11y_is_let_onto_it(self):
         head = self.header("eslint.design.config.mjs")
         self.assertGreaterEqual(major(head, "eslint") or 0, 10,

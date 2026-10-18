@@ -513,7 +513,7 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 
 | ID | Severity or size | What is wrong or missing |
 |---|---|---|
-| DL-B3 | medium | stacks the description implies but doesn't serve. |
+| DL-B3 | medium | stacks the description implies but doesn't serve. *Done for 4.0.0: Prisma and Drizzle (PR #117, 3.6.0), Next.js server actions (PR #173), and Vue and Svelte output (PRs #176, #177, P37 parts 5 and 6).* |
 | DL-B4 | medium | email frameworks. |
 | DL-B5 | medium | email translation and RTL. |
 | DL-C9 | M | Keep the email client matrix honest: regenerate its cells from caniemail's data, with test dates. |

@@ -1,6 +1,6 @@
 ---
 name: content-model-to-ui
-description: Turn a Supabase or Postgres schema into an on-system UI spec and React scaffold, with CRUD screens, forms, list and detail pages and admin panels. Not for dashboards or marketing pages.
+description: Turn a Supabase or Postgres schema into an on-system UI spec and React, Vue or Svelte scaffold, with CRUD screens, forms, list and detail pages and admin panels. Not for dashboards or marketing pages.
 ---
 
 # Content Model to UI
@@ -104,7 +104,7 @@ python -m scripts.scaffold_ui model.json --out src --answers answers.json
 
 One folder per entity: a list view, a detail view, a form, and the empty / filtered-empty / loading / error / forbidden / stale states as real components; in `server/`, the form's draft as a zod schema and a pydantic model, from the same constraints the form reads (`references/field-mapping.md` §9). A shared `ui/` kit underneath — Button, Field, the control primitives, Badge, Skeleton, StateBlock — each in the five-part component shape with Tier-3 sockets defaulting to Tier-2 roles.
 
-React 19 conventions throughout: `ref` is an ordinary prop, no `forwardRef`. In a Next.js App Router project, `--server-actions` posts each form to a server action through `useActionState` and `useFormStatus` (`references/supabase-integration.md` §9); `--framework vue` writes them as Vue 3.5 components (`references/scripts.md` §2). Components take their rows as props and know nothing about fetching, because cache keys, realtime and optimistic writes are product decisions and a scaffold has no business guessing at them.
+React 19 conventions throughout: `ref` is an ordinary prop, no `forwardRef`. In a Next.js App Router project, `--server-actions` posts each form to a server action through `useActionState` and `useFormStatus` (`references/supabase-integration.md` §9); `--framework vue` or `svelte` writes them as Vue 3.5 or Svelte 5 components (`references/scripts.md` §2). Components take their rows as props and know nothing about fetching, because cache keys, realtime and optimistic writes are product decisions and a scaffold has no business guessing at them.
 
 **Nothing it writes carries an `@generated` marker, deliberately.** `audit_design.py` skips generated files, and output that skips the gate proves nothing. Treat the scaffold as code you now own.
 

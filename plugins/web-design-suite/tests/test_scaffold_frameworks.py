@@ -390,5 +390,316 @@ class TheVueScaffold(VueOutput):
         self.assertIn("import.meta.env.VITE_SUPABASE_URL", read(self.src / "lib" / "supabase.ts"))
 
 
+# Svelte's side. A component compiles for the client and for the server; the
+# server renders the form, and jsdom runs the client so the real kit, the
+# summary's binding and the effect all take part in the focus.
+SVELTE_RUN = r"""
+const fs = require('fs');
+const path = require('path');
+const Module = require('module');
+const ts = require('typescript');
+const { compile } = require('svelte/compiler');
+
+const problems = [];
+const warnings = [];
+const generate = process.argv[2] === 'ssr' ? 'server' : 'client';
+
+function transpile(code, file) {
+  const out = ts.transpileModule(code, { reportDiagnostics: true, fileName: file + '.ts',
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
+  for (const d of out.diagnostics || []) problems.push(file + ': ' + ts.flattenDiagnosticMessageText(d.messageText, ' '));
+  return out.outputText;
+}
+
+function compileSvelte(file, mode) {
+  try {
+    const out = compile(fs.readFileSync(file, 'utf8'), { filename: file, generate: mode });
+    for (const w of out.warnings) warnings.push(path.basename(file) + ': ' + w.code);
+    return transpile(out.js.code, file);
+  } catch (e) {
+    problems.push(file + ': ' + e.message);
+    return '';
+  }
+}
+
+Module._extensions['.svelte'] = (module, file) => module._compile(compileSvelte(file, generate), file);
+Module._extensions['.ts'] = (module, file) => module._compile(transpile(fs.readFileSync(file, 'utf8'), file), file);
+
+async function focus(root) {
+  const { JSDOM } = require('jsdom');
+  const { window } = new JSDOM('<!doctype html><html><body></body></html>');
+  const names = ['window', 'document', 'Node', 'Element', 'Text', 'Comment', 'DocumentFragment',
+                 'MutationObserver', 'getComputedStyle', 'requestAnimationFrame'];
+  for (const name of Object.getOwnPropertyNames(window)) if (/^(HTML|SVG)\w*Element$/.test(name)) names.push(name);
+  for (const name of names) {
+    Object.defineProperty(globalThis, name, { value: name === 'window' ? window : window[name],
+                                              configurable: true, writable: true });
+  }
+  const focused = [];
+  const real = window.HTMLElement.prototype.focus;
+  window.HTMLElement.prototype.focus = function () { focused.push(this.className); return real.call(this); };
+  const svelte = path.dirname(require.resolve('svelte/package.json'));
+  const { mount } = require(path.join(svelte, 'src', 'index-client.js'));
+  const { flush } = require('svelte/internal/client');
+  const Harness = require(path.resolve('Harness.svelte')).default;
+  const api = {};
+  const target = window.document.body;
+  mount(Harness, { target, props: { api } });
+  flush();
+  const submit = (then) => {
+    api.then(then);
+    target.querySelector('form').dispatchEvent(new window.Event('submit', { cancelable: true, bubbles: true }));
+    flush();
+    return focused.length;
+  };
+  const steps = {};
+  steps.failed = submit(() => api.set({ reference: 'Required' }, false));
+  steps.again = submit(() => {});
+  steps.fixed = submit(() => api.set({}, false));
+  api.set({ notes: 'Too long' }, false);
+  flush();
+  steps.blur = focused.length;
+  steps.pending = submit(() => api.set({}, true));
+  api.set({ reference: 'Taken' }, false);
+  flush();
+  steps.async = focused.length;
+  return { steps, focused };
+}
+
+async function ssr(root) {
+  const { render } = require('svelte/server');
+  const Form = require(path.join(root, 'features/orders/OrderForm.svelte')).default;
+  const errors = { reference: 'Required', priority: 'Choose one', is_rush: 'Rush is closed' };
+  const out = render(Form, { props: { values: { reference: '' }, errors, onChange() {}, onSubmit() {} } });
+  return { html: out.body };
+}
+
+const [mode, ...rest] = process.argv.slice(2);
+(async () => {
+  let result = {};
+  if (mode === 'compile') rest.forEach((f) => { compileSvelte(f, 'client'); compileSvelte(f, 'server'); });
+  else result = await (mode === 'ssr' ? ssr : focus)(path.resolve(rest[0]));
+  console.log(JSON.stringify({ problems, warnings, ...result }));
+  process.exit(problems.length ? 1 : 0);
+})().catch((e) => { console.log(JSON.stringify({ problems: [String(e.stack || e)], warnings })); process.exit(1); });
+"""
+
+# The form's caller, for the focus run: it holds the errors and `submitting`
+# as state, as an app would, and hands the test a way to set them.
+SVELTE_HARNESS = """\
+<script lang="ts">
+  import OrderForm from './FORM';
+
+  let { api }: { api: Record<string, unknown> } = $props();
+  let errors = $state<Record<string, string>>({});
+  let submitting = $state(false);
+  let then: () => void = () => {};
+  api.set = (next: Record<string, string>, busy: boolean) => { errors = next; submitting = busy; };
+  api.then = (fn: () => void) => { then = fn; };
+</script>
+
+<OrderForm values={{}} {errors} {submitting} onChange={() => {}} onSubmit={() => then()} />
+"""
+
+
+class SvelteOutput(unittest.TestCase):
+    """The schema scaffolded as Svelte with the answers (css-modules and
+    tailwind) and without them, once for the class."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = class_temp_dir(cls, "wds-svelte-")
+        cls.src = scaffold(cls.tmp, "src", "--framework", "svelte", answers=ANSWERS)
+        cls.tw = scaffold(cls.tmp, "tw", "--framework", "svelte", "--stack", "tailwind", answers=ANSWERS)
+        cls.plain = scaffold(cls.tmp, "plain", "--framework", "svelte")
+
+    def orders(self, src: pathlib.Path, name: str) -> str:
+        return read(src / "features" / "orders" / name)
+
+    def node(self, *args: str, ok: bool = True) -> dict:
+        root = tool_modules("WDS_NODE_MODULES", "typescript", "svelte", "jsdom")
+        if root is None:
+            self.skipTest("svelte, jsdom and typescript are not installed (tooling/main) or WDS_NODE_MODULES is off")
+        (self.tmp / "svelte_run.cjs").write_bytes(SVELTE_RUN.encode())
+        proc = subprocess.run(["node", "svelte_run.cjs", *args], cwd=self.tmp, capture_output=True,
+                              env=env(NODE_PATH=root))
+        self.assertEqual(proc.returncode == 0, ok, output(proc))
+        return json.loads(proc.stdout)
+
+
+class TheSvelteScaffold(SvelteOutput):
+
+    def test_the_kit_and_the_screens_are_svelte_5_components(self):
+        kit = ["Button/Button", "Field/Field", "Badge/Badge", "Skeleton/Skeleton", "StateBlock/StateBlock"] + [
+            f"Control/{c}" for c in ("TextInput", "NumberInput", "TextArea", "Select", "Toggle",
+                                     "RadioGroup", "ControlStub")]
+        screens = ["OrdersList", "OrderDetail", "OrderForm"] + [
+            f"Orders{s}" for s in ("Empty", "FilteredEmpty", "Loading", "Error", "Forbidden", "Stale")]
+        for src in (self.src, self.tw):
+            with self.subTest(src=src.name):
+                self.assertEqual([], [p.name for p in src.rglob("*.tsx")] + [p.name for p in src.rglob("*.vue")])
+                for f in [src / "ui" / f"{k}.svelte" for k in kit] + [
+                        src / "features" / "orders" / f"{s}.svelte" for s in screens]:
+                    text = read(f)
+                    self.assertTrue(text.startswith('<script lang="ts">\n'), f)
+                    if not f.name.endswith("Forbidden.svelte"):     # the one with no props
+                        self.assertIn("$props()", text, f)
+                    self.assertNotIn("export let", text, f)          # Svelte 4's props
+        self.assertIn("export { default as OrderForm } from './OrderForm.svelte';",
+                      self.orders(self.src, "index.ts"))
+        self.assertIn("export { default as Select } from './Control/Select.svelte';",
+                      read(self.src / "ui" / "index.ts"))
+        self.assertFalse((self.src / "ui" / "Control" / "Control.css").exists())
+
+    def test_runes_snippets_and_callbacks(self):
+        button = read(self.src / "ui" / "Button" / "Button.svelte")
+        self.assertIn('<span class="label">{@render children?.()}</span>', button)
+        self.assertIn("  {...rest}\n>", button, "the caller's attributes come last, as React's ...rest")
+        block = read(self.src / "ui" / "StateBlock" / "StateBlock.svelte")
+        self.assertIn('<div class="action">{@render action()}</div>', block)
+        empty = self.orders(self.src, "OrdersEmpty.svelte")
+        self.assertIn("{#snippet action()}", empty)
+        self.assertIn('<Button variant="primary" onclick={onCreate}>', empty)
+        form = self.orders(self.src, "OrderForm.svelte")
+        self.assertIn("onChange: (name: keyof OrderDraft, value: unknown) => void;", form)
+        self.assertIn("oninput={(e) => onChange('reference', e.currentTarget.value)}", form)
+        self.assertIn("onchange={(e) => onChange('is_rush', e.currentTarget.checked)}", form)
+        self.assertIn('<form class="stack stack--separate" novalidate onsubmit={submit}>', form)
+        skeleton = read(self.src / "ui" / "Skeleton" / "Skeleton.svelte")
+        self.assertIn("style:--skeleton-width={String(width)}", skeleton)
+        for f in self.src.rglob("*.svelte"):
+            with self.subTest(file=f.name):
+                for directive in re.findall(r"\bstyle:([\w-]+)", read(f)):
+                    self.assertTrue(directive.startswith("--"), "style: sets only a custom property")
+                self.assertNotRegex(read(f), r"\son:[a-z]+=", "Svelte 4's event directive")
+
+    def test_each_style_is_inside_the_components_layer_and_matches_its_markup(self):
+        for f in self.src.rglob("*.svelte"):
+            with self.subTest(file=f.name):
+                for body in re.findall(r"<style>([\s\S]*?)</style>", read(f)):
+                    self.assertTrue(body.lstrip().startswith("@layer components {"), body[:80])
+        number = read(self.src / "ui" / "Control" / "NumberInput.svelte")
+        self.assertIn(".numeric {", number)
+        self.assertNotIn(".toggle", number, "each control holds the rules its markup uses")
+        self.assertIn(".loadingRow > :global(*)", self.orders(self.src, "OrdersLoading.svelte"))
+        for f in self.tw.rglob("*.svelte"):
+            with self.subTest(tailwind=f.name):
+                self.assertNotIn("<style", read(f))
+        self.assertIn("class={['scaffold-root inline-flex", read(self.tw / "ui" / "Button" / "Button.svelte"))
+
+    def test_the_form_carries_the_ids_the_field_gives_the_error(self):
+        for src in (self.src, self.tw):
+            with self.subTest(src=src.name):
+                form = self.orders(src, "OrderForm.svelte")
+                for name in ("reference", "notes", "total_cents"):
+                    self.assertIn(f"aria-describedby={{errors.{name} ? fieldId('{name}') + '-error' : undefined}}",
+                                  form)
+                    self.assertIn(f"aria-invalid={{Boolean(errors.{name}) || undefined}}", form)
+                self.assertRegex(form, r"<Field\s+id=\{fieldId\('priority'\)\}[\s\S]*?disabled=\{disabled\}\s+group\s*>")
+                self.assertIn("labelledBy={fieldId('priority') + '-label'}", form)
+                self.assertIn("{#if errors.is_rush}", form)
+                self.assertEqual(2, form.count('role="alert"'))
+        field = read(self.src / "ui" / "Field" / "Field.svelte")
+        self.assertIn("<legend class=\"label groupLabel\" id={id + '-label'}>", field)
+        self.assertNotIn('role="alert"', field)
+
+    def test_the_summary_focuses_once_per_attempt(self):
+        form = self.orders(self.src, "OrderForm.svelte")
+        self.assertIn('<div class="summary" role="alert" tabindex="-1" bind:this={summary}>', form)
+        self.assertIn("$effect(() => {", form)
+        harness = SVELTE_HARNESS.replace("./FORM", "./src/features/orders/OrderForm.svelte")
+        (self.tmp / "Harness.svelte").write_bytes(harness.encode())
+        got = self.node("focus", "src")
+        self.assertEqual({"failed": 1, "again": 2, "fixed": 2, "blur": 2, "pending": 2, "async": 3},
+                         got["steps"], "a failed attempt focuses once, a clean one and a blur never")
+        self.assertEqual(["summary"] * 3, [c.split()[0] for c in got["focused"]])
+        # The control: #64's first effect, which watched only the count, moves
+        # nothing on a second attempt and pulls focus on a blur.
+        naive = self.tmp / "naive"
+        if not naive.exists():
+            shutil.copytree(self.src, naive)
+            f = naive / "features" / "orders" / "OrderForm.svelte"
+            text = read(f)
+            effect = text[text.index("  $effect(() => {"):text.index("  function submit")]
+            f.write_bytes(text.replace(effect, "  $effect(() => {\n    if (invalid.length > 0) summary?.focus();\n"
+                                               "  });\n\n").encode())
+        (self.tmp / "Harness.svelte").write_bytes(
+            SVELTE_HARNESS.replace("./FORM", "./naive/features/orders/OrderForm.svelte").encode())
+        steps = self.node("focus", "naive")["steps"]
+        self.assertLess(steps["again"], got["steps"]["again"], steps)
+        self.assertGreater(steps["blur"], steps["fixed"], steps)
+
+    def test_the_rendered_form_holds_the_ids_it_names(self):
+        html = self.node("ssr", "src")["html"]
+        for name, message in (("reference", "Required"), ("priority", "Choose one"), ("is_rush", "Rush is closed")):
+            with self.subTest(name=name):
+                self.assertRegex(html, rf'<p class="(error|fieldError)[^"]*" id="orders-{name}-error">\s*{message}\s*</p>')
+                self.assertRegex(html, rf'<a class="summaryLink[^"]*" href="#orders-{name}"')
+        self.assertRegex(html, r'<input[^>]*id="orders-reference"[^>]*aria-invalid="true"'
+                               r'[^>]*aria-describedby="orders-reference-error"')
+        self.assertRegex(html, r'<label class="label[^"]*" for="orders-reference"')
+        self.assertRegex(html, r'<fieldset class="root stack stack--tight[^"]*"[^>]*>(\s|<!--[^>]*-->)*'
+                               r'<legend class="label groupLabel[^"]*" id="orders-priority-label"')
+        self.assertRegex(html, r'role="radiogroup" aria-labelledby="orders-priority-label" '
+                               r'aria-describedby="orders-priority-error" aria-invalid="true"')
+        self.assertRegex(html, r'<input id="orders-is_rush" type="checkbox"[^>]*aria-describedby="orders-is_rush-error"')
+        self.assertRegex(html, r'<div class="summary[^"]*" role="alert" tabindex="-1"')
+
+    def test_every_component_compiles_without_a_warning(self):
+        files = sorted(str(p.relative_to(self.tmp)) for out in (self.src, self.tw, self.plain)
+                       for p in out.rglob("*.svelte"))
+        self.assertGreater(len(files), 60)
+        got = self.node("compile", *files)
+        self.assertEqual([], got["problems"])
+        self.assertEqual([], got["warnings"], "an unused selector is dropped; an a11y warning is a finding")
+        (self.tmp / "broken.svelte").write_bytes(
+            b'<script lang="ts">\n  let n: = 1;\n</script>\n\n<div><p></div>\n')
+        self.assertGreaterEqual(len(self.node("compile", "broken.svelte", ok=False)["problems"]), 1)
+        (self.tmp / "unused.svelte").write_bytes(b"<p>x</p>\n\n<style>\n  .gone { color: red; }\n</style>\n")
+        self.assertIn("unused.svelte: css_unused_selector", self.node("compile", "unused.svelte")["warnings"])
+
+    def test_it_passes_the_audit_and_the_static_a11y_check(self):
+        for src in ("src", "tw", "plain"):
+            with self.subTest(src=src):
+                proc = run_py("web-design-studio", "audit_design", src, "--strict", cwd=self.tmp)
+                self.assertEqual(proc.returncode, 0, output(proc))
+                proc = run_py("a11y-audit-runner", "a11y_static", f"{src}/ui", f"{src}/features", "--json",
+                              cwd=self.tmp)
+                report = json.loads(proc.stdout)
+                self.assertEqual(report["errors"], 0, json.dumps(report, indent=2))
+
+    def test_server_actions_are_reacts_alone(self):
+        proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "sa", "--framework", "svelte",
+                      "--server-actions", cwd=self.tmp)
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertFalse((self.tmp / "sa").exists())
+
+    def test_an_odd_name_and_an_option_with_markup_still_compile(self):
+        mod = load_script("content-model-to-ui", "scaffold_ui")
+        select = mod.svelte_control({"name": 'say "hi"', "label": "Size {x}", "control": "select",
+                                     "required": True, "options": ['XL "tall"', "<S>", "{{x}}"]})
+        self.assertIn('<option value={"XL \\"tall\\""}>{"XL \\"tall\\""}</option>', select)
+        self.assertIn('<option value={"<S>"}>{"<S>"}</option>', select)
+        self.assertIn('name="say &quot;hi&quot;"', select)
+        self.assertEqual("Size &#123;x&#125;", mod.svelte_static("Size {x}"))
+        odd = self.tmp / "odd"
+        odd.mkdir(exist_ok=True)
+        (odd / "schema.sql").write_bytes(ODD_DDL.encode())
+        for args in (("introspect_schema", "schema.sql", "-o", "model.json"),
+                     ("scaffold_ui", "model.json", "--out", "src", "--framework", "svelte")):
+            with self.subTest(script=args[0]):
+                proc = run_py("content-model-to-ui", *args, cwd=odd)
+                self.assertEqual(0, proc.returncode, output(proc))
+        form = read(odd / "src" / "features" / "odd" / "OddForm.svelte")
+        self.assertIn("aria-invalid={Boolean(errors['2fa']) || undefined}", form)
+        (odd / "src" / "features" / "odd" / "Options.svelte").write_bytes(mod.svelte_sfc(
+            "import { Select } from '../../ui';\n\nconst values: Record<string, unknown> = {};\n"
+            "const errors: Record<string, string> = {};\nconst disabled = false;\n"
+            "const fieldId = (name: string) => name;\n"
+            "const onChange = (name: string, value: unknown) => [name, value];\n", select).encode())
+        files = sorted(str(p.relative_to(self.tmp)) for p in (odd / "src").rglob("*.svelte"))
+        self.assertEqual([], self.node("compile", *files)["problems"])
+
+
 if __name__ == "__main__":
     unittest.main()

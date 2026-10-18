@@ -7,6 +7,19 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
 ### Added
 
+- **The scaffold writes Svelte** (DL-B3, P37 part 6). `scaffold_ui.py --framework svelte` writes
+  the same kit and screens as Svelte 5 components: `<script lang="ts">` with `$props()`,
+  callbacks as props as React's are, snippets for children (`{@render children()}`, the state
+  block's `action`), and each CSS Module's rules in the component's `<style>` inside
+  `@layer components`. Each control and screen holds only the rules for the classes its markup
+  uses, since Svelte drops, with a warning, a rule nothing can match; the list's rules for the
+  states it does not render yet wait under one `svelte-ignore`, and the loading state reaches its
+  skeletons with `:global(*)`. `style:` sets only the skeleton's custom properties. The form's
+  summary takes focus once per failed attempt through an `$effect`. The tests compile every
+  component for the client and the server with `svelte` 5.57.2 with no warning, render the form on
+  the server to read its ids, and run it in jsdom 29.1.1 (both now pinned in `tooling/main`) to
+  drive the focus, with #64's count-only effect as the control that fails. content-model-to-ui's
+  description now says React, Vue or Svelte.
 - **The scaffold writes Vue** (DL-B3, P37 part 5). content-model-to-ui wrote React 19 only.
   `scaffold_ui.py --framework vue` writes the kit and each entity's list, detail, form and six
   states as Vue 3.5 single-file components: `<script setup lang="ts">`, React's props as
