@@ -451,7 +451,7 @@ python -B tools/check.py
 python -B -m unittest discover -s tests
 ```
 
-`tools/check.py` runs the pointer, snippet, rule and budget checks and the tests your change affects. The last line runs the whole suite, which CI runs on Windows, Linux and macOS at Python 3.9 and 3.14.
+`tools/check.py` runs the pointer, snippet and rule checks, the execution plan's check, the audit on the plugin's own skills, the size budgets, and the tests your change affects. The last line runs the whole suite, which CI runs on Windows, Linux and macOS at Python 3.9 and 3.14.
 
 <details>
 <summary><b>The house rules</b></summary>
