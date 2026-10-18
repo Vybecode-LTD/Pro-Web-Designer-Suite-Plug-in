@@ -169,8 +169,9 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   root layout (`<body>{children}</body>`), a Vite `index.html` (`<div id="app">`), SvelteKit's
   `app.html` (`%sveltekit.body%`) and an Astro layout (`<slot />`) each got `no-main-landmark`,
   and the first two `no-title`, though the page's `<main>` and title come through the outlet.
-  `shell_outlets()` leaves `<main>` to the pages when the body holds a slot, a component, an
-  expression, SvelteKit's placeholder or a module script's mount point, and the title when the
+  `shell_outlets()` leaves `<main>` to the pages when the body holds a slot, a component, the
+  children's expression (`{children}`, `{@render children()}`, not a page's own `{'hello'}`),
+  SvelteKit's placeholder or a module script's mount point (its `type` and `src` in either order), and the title when the
   head holds `%sveltekit.head%` or the file is a Next.js `layout` or exports `metadata` or
   `generateMetadata`. A document with none of these still needs both, an entity in its text
   included. `test_stacks.TheShellsRenderTheirPagesElsewhere`.

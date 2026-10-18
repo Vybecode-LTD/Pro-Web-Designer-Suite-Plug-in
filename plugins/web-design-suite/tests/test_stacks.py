@@ -168,6 +168,12 @@ class TheShellsRenderTheirPagesElsewhere(TempDirTest):
             "src/layouts/Base.astro": "---\nconst { title } = Astro.props;\n---\n"
                                       "<html lang=\"en\"><head><title>{title}</title></head>"
                                       "<body><slot /></body></html>\n",
+            # The attributes in either order, and the children through props (Codex on #172).
+            "vite/index.html": "<!doctype html><html lang=\"en\"><head><title>A</title>"
+                               "<script src=\"/src/main.ts\" type=\"module\"></script></head>"
+                               "<body><div id=\"root\"></div></body></html>\n",
+            "pages/layout.jsx": "export default function L(props) {\n"
+                                "  return (<html lang=\"en\"><body>{props.children}</body></html>);\n}\n",
         }
         for name, text in shells.items():
             with self.subTest(shell=name):
@@ -182,6 +188,10 @@ class TheShellsRenderTheirPagesElsewhere(TempDirTest):
                        "  return (<html lang=\"en\"><body><p>Hi</p></body></html>);\n}\n",
             "entity.html": "<!doctype html><html lang=\"en\"><head></head>"
                            "<body><p>Tom &amp; Jerry</p></body></html>\n",
+            # An expression of the page's own is no outlet (Codex on #172).
+            "Hello.tsx": "export default function H() {\n"
+                         "  return (<html lang=\"en\"><body><p>{'hello'}</p></body></html>);\n}\n",
+            "hello.astro": "<html lang=\"en\"><head></head><body><p>{'hello'}</p></body></html>\n",
         }
         for name, text in pages.items():
             with self.subTest(page=name):
