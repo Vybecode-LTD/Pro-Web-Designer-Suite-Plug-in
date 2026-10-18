@@ -3,8 +3,8 @@
  * resolving Playwright and a browser from disk, never from the network;
  * freezing animations before a measurement; reading a JSON file a person
  * may have saved from PowerShell or Notepad; reaching a page that needs a
- * wait, steps, a session or a header; reading through shadow roots; and
- * WCAG's contrast ratio.
+ * wait, steps, a session or a header; reading through shadow roots; running
+ * a gate once per page and viewport; and WCAG's contrast ratio.
  *
  * The master copy is shared/browser_common.mjs, at the plugin's root. The
  * scripts/ folders of a11y-audit-runner, component-state-matrix,
@@ -16,7 +16,7 @@
  * spinner beside a button with no focus ring counted as a ring.)
  */
 
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -571,6 +571,126 @@ export async function elementAt(page, path) {
   const el = handle.asElement();
   if (!el) await handle.dispose();
   return el;
+}
+
+// ---------------------------------------------------------------------------
+// Several pages and viewports (P34, GT-B4)
+// ---------------------------------------------------------------------------
+//
+// A run covers one page at one viewport, and a site is many templates, with
+// target size and mobile navigation to check at a phone's width. --urls
+// gives a gate a list, and runEach() runs the gate once per page (and per
+// viewport) as a child process of its own, so nothing one page leaves in
+// the browser reaches the next, then hands back every report for one
+// summary whose exit is the worst of them.
+
+export const MAX_URLS = 50;
+
+const XML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+function xmlText(s) {
+  return s.replace(/^<!\[CDATA\[([\s\S]*)\]\]>$/, '$1')
+    .replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (m, e) => (e[0] === '#'
+      ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1)))
+      : XML_ENTITIES[e.toLowerCase()]));
+}
+
+// The pages a --urls value lists: a file of one URL a line (a blank line,
+// and a line starting with #, skipped), a JSON list of URLs or of
+// {"url", "pageType"}, or a sitemap (<urlset> of <loc>), read from a file or
+// fetched from an http(s) URL. Each is an http(s) URL, listed once. Returns
+// { pages, leftOut, problem }: past `max`, the rest are left out and
+// counted, never dropped in silence.
+export async function readUrls(source, max = MAX_URLS) {
+  const fail = (why) => ({ pages: [], leftOut: 0, problem: `--urls ${source}: ${why}` });
+  let text;
+  if (/^https?:\/\//i.test(source)) {
+    let resp;
+    try { resp = await fetch(source); } catch (err) { return fail(err.message); }
+    if (!resp.ok) return fail(`HTTP ${resp.status}`);
+    text = await resp.text();
+  } else {
+    let buf;
+    try { buf = fs.readFileSync(source); } catch (err) { return fail(err.code === 'ENOENT' ? 'no such file' : err.message); }
+    const utf16 = buf[0] === 0xFF && buf[1] === 0xFE;
+    text = buf.toString(utf16 ? 'utf16le' : 'utf8');
+  }
+  text = text.replace(/^﻿/, '').trim();
+  let entries;
+  if (text.startsWith('[')) {
+    let data;
+    try { data = JSON.parse(text); } catch (err) { return fail(`not valid JSON: ${err.message}`); }
+    entries = [];
+    for (const [i, e] of data.entries()) {
+      const object = e && typeof e === 'object' && !Array.isArray(e);
+      if (typeof e === 'string') entries.push({ url: e, pageType: null });
+      else if (object && typeof e.url === 'string' && (e.pageType == null || typeof e.pageType === 'string')) {
+        entries.push({ url: e.url, pageType: e.pageType ?? null });
+      } else return fail(`entry ${i + 1} must be a URL or {"url": "...", "pageType": "..."}`);
+    }
+  } else if (/<sitemapindex[\s>]/i.test(text)) {
+    return fail('a sitemap index: give one of the sitemaps it lists');
+  } else if (/<urlset[\s>]/i.test(text)) {
+    entries = [...text.matchAll(/<loc>\s*([\s\S]*?)\s*<\/loc>/gi)]
+      .map((m) => ({ url: xmlText(m[1]).trim(), pageType: null }));
+  } else {
+    entries = text.split(/\r\n|\r|\n/).map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#')).map((url) => ({ url, pageType: null }));
+  }
+  const seen = new Set();
+  const pages = [];
+  for (const e of entries) {
+    if (!/^https?:\/\/[^\s]+$/i.test(e.url)) return fail(`"${e.url}" is not an http(s) URL`);
+    if (seen.has(e.url)) continue;
+    seen.add(e.url);
+    pages.push(e);
+  }
+  if (!pages.length) return fail('lists no URL');
+  return { pages: pages.slice(0, max), leftOut: Math.max(0, pages.length - max), problem: null };
+}
+
+// A --viewports list, "390x844,1280x900", as [{width, height}], or a
+// message naming what is wrong.
+export function readViewports(value) {
+  const out = [];
+  for (const part of String(value).split(',').map((s) => s.trim()).filter(Boolean)) {
+    const m = /^(\d+)x(\d+)$/.exec(part);
+    if (!m || !Number(m[1]) || !Number(m[2])) {
+      return { viewports: [], problem: `--viewports takes a list like 390x844,1280x900; got "${part}"` };
+    }
+    out.push({ width: Number(m[1]), height: Number(m[2]) });
+  }
+  if (!out.length) return { viewports: [], problem: '--viewports needs at least one size, like 390x844' };
+  return { viewports: out, problem: null };
+}
+
+// argv without the options that pick the pages (`valued` take a value), so
+// each child run gets everything else the run was given.
+export function withoutOptions(argv, valued, flags = []) {
+  const out = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (valued.includes(argv[i])) { i++; continue; }
+    if (!flags.includes(argv[i])) out.push(argv[i]);
+  }
+  return out;
+}
+
+// Runs `script` once for each of `runs` (each {args, ...}), one after
+// another, since a measurement must not share the machine with another,
+// with `base` and --json. Each comes back with its exit and report, or the
+// error that stopped it (exit 2). `progress(i, run)` is told before each.
+export function runEach(script, base, runs, progress = () => {}) {
+  return runs.map((run, i) => {
+    progress(i, run);
+    const proc = spawnSync(process.execPath, [script, ...base, ...run.args, '--json'],
+                           { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, env: process.env });
+    let report = null;
+    if (proc.status === 0 || proc.status === 1) {
+      try { report = JSON.parse(proc.stdout); } catch { report = null; }
+    }
+    const error = report ? null : proc.error ? proc.error.message
+      : (proc.stderr || '').trim().split('\n').slice(-2).join(' ') || `exit ${proc.status}`;
+    return { ...run, exit: report ? proc.status : 2, report, error };
+  });
 }
 
 // The project contract (P24): a project's .design-suite.json, found and

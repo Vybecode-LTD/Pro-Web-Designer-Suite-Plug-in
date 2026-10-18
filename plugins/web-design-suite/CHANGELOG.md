@@ -48,6 +48,20 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   read is a `closed-shadow-roots-unread` warning, never a silent pass.
   `critique_snapshots.mjs` samples text through the same roots, after its captures.
   `test_runtime_shadow`.
+- **Several pages and viewports in one run** (P34 part 3; GT-B4). Each run covered one
+  URL, and a11y ran only at 1280x900, where a phone's menu button and its target size
+  are hidden, while the report template spoke of "all 14 templates".
+  - `--urls FILE|URL` in `a11y_runtime.mjs` and `measure_vitals.mjs`: a file of URLs, one
+    a line; a JSON list of URLs, or of `{"url", "pageType"}`, each page measured against
+    its own type's perf budget; or a `sitemap.xml` (a sitemap index is refused), from a
+    file or an http(s) URL. `--max-urls N` (default 50) caps it, and the pages past the
+    cap are counted in the report.
+  - `--viewports 390x844,1280x900` in `a11y_runtime.mjs`, with `--urls` or one page.
+  - Each run is the script on one page at one size, in a process of its own
+    (`browser_common.mjs`' `runEach()`), one after another, so no state crosses pages and
+    no two loads share the machine. The report holds a row for each run, the errors or
+    breaches of each failing one and every run's whole report in `--json`; the exit is
+    the worst run's, so a page that does not load is never outweighed. `test_runtime_urls`.
 - **`tw_probe.mjs` and `/tw-probe`** (P36 part 2; SB-C3). web-design-studio's new
   script compiles a Tailwind v4 project's entry stylesheet with the project's own
   tailwindcss and checks what it generates. Tailwind writes no CSS for a class it does not

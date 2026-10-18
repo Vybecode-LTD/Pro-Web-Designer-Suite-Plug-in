@@ -88,6 +88,12 @@
  *                         V may be env:NAME (repeatable). The four run before
  *                         every check, the forced-colours pass included
  *   --viewport WxH        viewport                            (default 1280x900)
+ *   --viewports LIST      several sizes, like 390x844,1280x900: a run at each,
+ *                         one report (target size and a phone's navigation)
+ *   --urls FILE|URL       the pages to audit, a run each, one report: a URL a
+ *                         line, a JSON list of URLs or {url, pageType}, or a
+ *                         sitemap, from a file or an http(s) URL
+ *   --max-urls N          the most pages --urls runs                (default 50)
  *   --dpr N               device pixel ratio                        (default 1)
  *   --axe PATH            axe.min.js to inject
  *   --browser PATH        chromium executable   (default: A11Y_CHROMIUM, else the
@@ -123,7 +129,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { DEEP_DOM, FREEZE_ANIMATIONS_CSS, NAV_OPTIONS, arrive, contrastRatio, elementAt, keepClosedRoots, launchBrowser, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, refuseOverwrite, takeNavOption, unreadRoots } from './browser_common.mjs';
+import { DEEP_DOM, FREEZE_ANIMATIONS_CSS, MAX_URLS, NAV_OPTIONS, arrive, contrastRatio, elementAt, keepClosedRoots, launchBrowser, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, readUrls, readViewports, refuseOverwrite, runEach, takeNavOption, unreadRoots, withoutOptions } from './browser_common.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TAGS = 'wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice';
@@ -156,6 +162,7 @@ function parseArgs(argv) {
     focusThreshold: 0.005,
     densities: 'auto',
     viewport: { width: 1280, height: 900 },
+    viewports: null, urls: null, maxUrls: MAX_URLS,
     dpr: 1,
     axe: null,
     browser: process.env.A11Y_CHROMIUM || '',
@@ -181,6 +188,14 @@ function parseArgs(argv) {
         process.exit(0);
         break;
       case '--url': opts.url = need(i, a); i++; break;
+      case '--urls': opts.urls = need(i, a); i++; break;
+      case '--max-urls': opts.maxUrls = num(need(i, a), a); i++; break;
+      case '--viewports': {
+        const read = readViewports(need(i, a)); i++;
+        if (read.problem) die(read.problem);
+        opts.viewports = read.viewports;
+        break;
+      }
       case '--file': opts.file = need(i, a); i++; break;
       case '--matrix': opts.matrix = need(i, a); i++; break;
       case '--tags': opts.tags = need(i, a).split(',').map((s) => s.trim())
@@ -213,6 +228,7 @@ function parseArgs(argv) {
         const m = /^(\d+)x(\d+)$/.exec(v);
         if (!m) die(`--viewport must look like 1280x900, got "${v}"`);
         opts.viewport = { width: Number(m[1]), height: Number(m[2]) };
+        opts.oneViewport = true;
         break;
       }
       default:
@@ -228,7 +244,16 @@ function parseArgs(argv) {
     }
   }
   const targets = [opts.url, opts.file, opts.matrix].filter(Boolean);
-  if (targets.length === 0) {
+  // --urls lists the pages and --viewports the sizes; each run is this
+  // script on one page at one size (P34).
+  if (opts.urls && targets.length) {
+    die('--urls lists the pages to audit: give it instead of --url, --file or --matrix');
+  }
+  if (opts.viewports && opts.oneViewport) {
+    die('--viewport is one size and --viewports a list: give one of them');
+  }
+  if (!Number.isInteger(opts.maxUrls) || opts.maxUrls < 1) die('--max-urls must be a whole number, at least 1');
+  if (targets.length === 0 && !opts.urls) {
     die('needs a target: --url URL, --file PATH or --matrix PROOF-SHEET ' +
         '(try --help)');
   }
@@ -248,7 +273,8 @@ function parseArgs(argv) {
   if (clash) die(clash);
   // The steps, the session and the headers are read before axe or a browser
   // is looked for, so a mistake in one is named first (P34).
-  const reached = readNav(opts.nav, opts.url || opts.file || opts.matrix);
+  // Every page --urls lists is http(s), which is what a header needs.
+  const reached = readNav(opts.nav, opts.urls ? 'https:' : opts.url || opts.file || opts.matrix);
   if (reached.problem) die(reached.problem);
   opts.reach = reached.nav;
   // Ignoring an option is how a run reports on less than its caller asked for:
@@ -2047,6 +2073,7 @@ function textReport(o, opts) {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
+  if (opts.urls || opts.viewports) return several(opts);
   const axePath = resolveAxe(opts.axe);
 
   let target, mode;
@@ -2439,6 +2466,84 @@ async function main() {
 
   const errors = findings.filter((f) => f.severity === 'error').length;
   return (errors || breaches.length) ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Several pages and viewports (P34, GT-B4)
+// ---------------------------------------------------------------------------
+
+// One run of this script per page and viewport, each a child process with
+// the rest of the options, then one report: a row for each run, and the exit
+// the worst of them.
+async function several(opts) {
+  const clash = refuseOverwrite(opts.report, opts.urls);
+  if (clash) die(clash);
+  let pages = [{ url: opts.url || opts.file || opts.matrix, pageType: null, args: [] }];
+  let leftOut = 0;
+  if (opts.urls) {
+    const read = await readUrls(opts.urls, opts.maxUrls);
+    if (read.problem) die(read.problem);
+    leftOut = read.leftOut;
+    pages = read.pages.map((p) => ({ ...p, args: ['--url', p.url] }));
+  }
+  const size = (v) => `${v.width}x${v.height}`;
+  const runs = pages.flatMap((p) => (opts.viewports || [null]).map((v) => ({
+    url: p.url, pageType: p.pageType, viewport: size(v || opts.viewport),
+    args: [...p.args, ...(v ? ['--viewport', size(v)] : [])],
+  })));
+  const base = withoutOptions(process.argv.slice(2),
+                              ['--urls', '--viewports', '--max-urls', '--report'], ['--json']);
+  const log = (s) => { if (!opts.quiet && !opts.json) process.stderr.write(s + '\n'); };
+  const rows = runEach(fileURLToPath(import.meta.url), base, runs,
+                       (i, r) => log(`  [${i + 1}/${runs.length}] ${r.url} at ${r.viewport}…`))
+    .map((r) => {
+      const found = r.report ? r.report.findings : [];
+      return { url: r.url, pageType: r.pageType, viewport: r.viewport, exit: r.exit,
+               errors: found.filter((f) => f.severity === 'error').length,
+               warnings: found.filter((f) => f.severity !== 'error').length,
+               error: r.error, report: r.report };
+    });
+  const exit = Math.max(...rows.map((r) => r.exit));
+  const out = { tool: 'a11y_runtime', coverageNote: COVERAGE_NOTE, urls: opts.urls || null,
+                leftOut, exit, runs: rows };
+  if (opts.report) {
+    fs.mkdirSync(path.dirname(path.resolve(opts.report)), { recursive: true });
+    fs.writeFileSync(opts.report, JSON.stringify(out, null, 2) + '\n');
+  }
+  process.stdout.write(opts.json ? JSON.stringify(out, null, 2) + '\n' : severalReport(out));
+  return exit;
+}
+
+function severalReport(o) {
+  const L = [`a11y_runtime — ${o.runs.length} run(s)${o.urls ? ` of the pages in ${o.urls}` : ''}`, ''];
+  const w = Math.min(64, Math.max(4, ...o.runs.map((r) => r.url.length)));
+  L.push(`  ${'page'.padEnd(w)}  viewport    errors  warnings  exit`);
+  for (const r of o.runs) {
+    L.push(`  ${r.url.padEnd(w)}  ${r.viewport.padEnd(10)}  ${String(r.errors).padStart(6)}  ` +
+           `${String(r.warnings).padStart(8)}  ${r.exit}`);
+  }
+  for (const r of o.runs) {
+    if (r.error) {
+      L.push('', `${r.url} at ${r.viewport}: the run failed (exit 2): ${r.error}`);
+      continue;
+    }
+    // A run fails on its errors or on its budget, which warnings alone can
+    // break: both are named (Codex on #166).
+    const errors = r.report.findings.filter((f) => f.severity === 'error');
+    const breaches = r.report.breaches || [];
+    if (!errors.length && !breaches.length) continue;
+    L.push('', `${r.url} at ${r.viewport}`);
+    for (const f of errors.slice(0, 8)) {
+      L.push(`  error  ${f.rule.padEnd(32)} ${f.selector || (f.nodes || [])[0] || ''}`);
+    }
+    if (errors.length > 8) L.push(`  … ${errors.length - 8} more`);
+    for (const b of breaches) L.push(`  budget ${b.key}: ${b.actual} > ${b.limit}`);
+  }
+  if (o.leftOut) {
+    L.push('', `${o.leftOut} more URL(s) in ${o.urls} were left out: raise --max-urls to run them.`);
+  }
+  L.push('', 'Each run\'s whole report is in --json and --report.', '');
+  return L.join('\n');
 }
 
 // 1 means the page has violations, so a run that failed exits 2 (GT-A5).

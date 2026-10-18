@@ -62,6 +62,7 @@ node scripts/a11y_runtime.mjs --file dist/index.html --tags wcag2a,wcag2aa,wcag2
 | Flag | Does |
 |---|---|
 | `--url` · `--file` · `--matrix` | exactly one; they are three different jobs |
+| `--urls FILE\|URL` · `--viewports LIST` · `--max-urls N` | several pages, several sizes, one report: see *Several pages and viewports* below |
 | `--tags LIST` | axe tag set (default `wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice`). A best-practice rule names no success criterion, so its findings are warnings and never fail the run, whatever axe rates its impact |
 | `--keymap FILE` | expected keyboard behaviour per pattern |
 | `--budget FILE` | counter limits, as JSON `{"key": limit}`; non-zero exit on breach, and an unknown key exits 2. Keys (a best-practice violation counts in none of them; an incomplete result counts in `axe_incomplete`, whatever its tags): `axe_violations`, `axe_serious`, `axe_incomplete`, `unnamed_controls`, `duplicate_names`, `tab_traps`, `unreachable_controls`, `focus_invisible`, `focus_weak`, `forced_colors_lost`, `contrast_failures`, `reflow_failures`, `keymap_failures` Without it, the project's `.design-suite.json` `budgets.a11y` (web-design-studio's `references/project-contract.md`). |
@@ -115,6 +116,14 @@ Four things it does that most runtime checks do not:
 ### Shadow roots
 
 Every check reads through shadow roots, open and closed (`runtime-checks.md` §1). A path names an element inside one host by host, with ` >> ` at each boundary: `main > x-card >> button.icon`, or `x-outer >> div.frame > x-inner >> button.deep` for a component inside a component. Playwright's `locator()` reads the same path through open roots. A keymap's selectors take the same form, and a plain selector is looked for in the document first, then through every root. The JSON's `shadowRoots` counts the roots read (`open`, `closed`) and `unread`, the closed roots no check could read: when it is not 0, or `null` because the browser offers no DevTools protocol, a `closed-shadow-roots-unread` warning says so. A root no check read is never a silent pass.
+
+### Several pages and viewports
+
+A run audits one page at one size, and a site is many templates, with a phone's menu and its target sizes (2.5.8) hidden at 1280x900. `--urls` lists the pages: a file of URLs, one a line (blank lines and `#` lines skipped), a JSON list of URLs (or of `{"url", "pageType"}`), or a `sitemap.xml`, from a file or an http(s) URL; a sitemap index is refused, so name one of its sitemaps. `--viewports 390x844,1280x900` runs each page at each size, and works with one `--url` too. Each run is the script on one page at one size, in a process of its own, with every other option; the report holds a row for each (its errors, warnings and exit), the errors of each failing run, and every run's whole report in `--json` and `--report`. The exit is the worst run's, so a page that does not load (exit 2) is never outweighed by the ones that pass. `--max-urls N` (default 50) caps the pages, and those past it are counted in the report, never dropped in silence. The steps, the session and the headers apply on every page, so sign in with `--storage-state` rather than steps written for one page.
+
+```bash
+node scripts/a11y_runtime.mjs --urls http://127.0.0.1:3000/sitemap.xml --viewports 390x844,1280x900
+```
 
 ### The keymap file
 

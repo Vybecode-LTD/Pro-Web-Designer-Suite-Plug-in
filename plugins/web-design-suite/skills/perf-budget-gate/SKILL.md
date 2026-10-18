@@ -231,13 +231,13 @@ node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --interact "button.buy" -
 | `--interact SEL` | click it after load and measure **real INP** |
 | `--interact-at MS` | click it MS after navigation starts, while the page hydrates |
 | `--warm` | measure the second (warm) load |
-| `--storage-state FILE` · `--wait-for SEL` · `--settle MS` · `--viewport WxH` · `--dpr N` · `--resources N` · `--json` · `--browser PATH` · `--quiet` | |
+| `--urls FILE` · `--storage-state FILE` · `--wait-for SEL` · `--settle MS` · `--viewport WxH` · `--dpr N` · `--resources N` · `--json` · `--browser PATH` · `--quiet` | |
 
 Exit `0` inside budget · `1` breach or no LCP recorded · `2` bad arguments, no browser, or a run that failed.
 
 Four things it does that most runtime checks do not:
 
-- **It names the LCP element's CSS selector.** Enormously useful, rarely done, and the first thing you need. The three surprises it produces: the LCP is a block of *text*, not the image you assumed; it changes between runs because two candidates are nearly the same size; or it is a skeleton box and the real content paints later still.
+- **It names the LCP element's CSS selector.** Rarely done, and the first thing you need. The three surprises it produces: the LCP is a block of *text*, not the image you assumed; it changes between runs because two candidates are nearly the same size; or it is a skeleton box and the real content paints later still.
 - **It breaks LCP into the four sub-parts** — TTFB, resource load delay, resource load duration, element render delay — with the target share of each. The two phases that should be under 10% are where the bugs live: load duration is physics, load *delay* and render delay are latency you added.
 - **It names the nodes in the largest CLS session window**, with the timestamp of each shift.
 - **It refuses to invent an INP.** A page nobody touched has no interaction latency, so it prints `n/a` and says TBT is the proxy. It reports total blocking time beside TBT, because a long task that finishes before FCP contributes **zero** TBT while being the worst thing on the page.

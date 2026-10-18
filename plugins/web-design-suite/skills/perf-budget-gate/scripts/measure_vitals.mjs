@@ -55,6 +55,10 @@
  *   --budget FILE      perf-budget.json; compares defaults.lab
  *                      (default: the project's .design-suite.json budgets.perf)
  *   --page-type NAME   select a per-page-type budget from `pages`
+ *   --urls FILE|URL    the pages to measure, a run each, one report: a URL a
+ *                      line, a JSON list of URLs or {url, pageType} (each its
+ *                      page type's budget), or a sitemap, from a file or URL
+ *   --max-urls N       the most pages --urls measures            (default 50)
  *   --interact SEL     click this selector after load and measure INP
  *   --interact-at MS   click it MS after navigation starts instead, while
  *                      the page still loads and hydrates
@@ -92,11 +96,11 @@
  *      page did not load, or a crash): a crash is never a breach
  */
 
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { NAV_OPTIONS, launchBrowser, loadPlaywright, navContext, newNav, projectConfig, readJsonFile, readNav, refuseOverwrite, takeNavOption, waitForNav } from './browser_common.mjs';
+import { MAX_URLS, NAV_OPTIONS, launchBrowser, loadPlaywright, navContext, newNav, projectConfig, readJsonFile, readNav, readUrls, refuseOverwrite, runEach, takeNavOption, waitForNav, withoutOptions } from './browser_common.mjs';
 
 // Lighthouse's mobile profile is 150 ms RTT, 1.6 Mbps down, 750 Kbps up and
 // 4x CPU. CDP adds its latency to each request once, where a round trip is
@@ -133,6 +137,8 @@ function parseArgs(argv) {
     throttle: 'lighthouse',
     budget: null,
     pageType: null,
+    urls: null,
+    maxUrls: MAX_URLS,
     interact: null,
     interactAt: null,
     warm: false,
@@ -169,6 +175,8 @@ function parseArgs(argv) {
       case '--throttle': opts.throttle = need(i, a); i++; break;
       case '--budget': opts.budget = need(i, a); i++; break;
       case '--page-type': opts.pageType = need(i, a); i++; break;
+      case '--urls': opts.urls = need(i, a); i++; break;
+      case '--max-urls': opts.maxUrls = num(need(i, a), a); i++; break;
       case '--interact': opts.interact = need(i, a); i++; break;
       case '--interact-at': opts.interactAt = num(need(i, a), a); i++; break;
       case '--warm': opts.warm = true; break;
@@ -196,7 +204,9 @@ function parseArgs(argv) {
         else opts.target = a;
     }
   }
-  if (!opts.target) die('needs a URL or file to measure (try --help)');
+  if (opts.urls && opts.target) die('--urls lists the pages to measure: give it instead of a URL');
+  if (!opts.target && !opts.urls) die('needs a URL or file to measure (try --help)');
+  if (!Number.isInteger(opts.maxUrls) || opts.maxUrls < 1) die('--max-urls must be a whole number, at least 1');
   if (!THROTTLE[opts.throttle]) {
     die(`unknown --throttle "${opts.throttle}"; pick one of ` +
         Object.keys(THROTTLE).join(', '));
@@ -868,6 +878,7 @@ const ADVICE = {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
+  if (opts.urls) return several(opts);
   const { url, isFile } = resolveTarget(opts.target);
   const notes = [];
   if (isFile) {
@@ -1028,6 +1039,71 @@ async function main() {
     return 1;
   }
   return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Several pages (P34, GT-B4)
+// ---------------------------------------------------------------------------
+
+// One run of this script per page, one after another so no two loads share
+// the machine, each with its own page type's budget, then one report: a row
+// for each page, and the exit the worst of them.
+async function several(opts) {
+  // The configured budget too: the children read it, and the report written
+  // here must never replace it (Codex on #166).
+  if (opts.budget === null) {
+    try { opts.budget = projectConfig()?.budgets.perf ?? null; } catch (err) { die(err.message); }
+  }
+  const clash = refuseOverwrite(opts.report, opts.urls, opts.budget, opts.nav.stateFile);
+  if (clash) die(clash);
+  const read = await readUrls(opts.urls, opts.maxUrls);
+  if (read.problem) die(read.problem);
+  const runs = read.pages.map((p) => ({
+    url: p.url, pageType: p.pageType || opts.pageType,
+    // A page's own type comes after the rest, so it wins over --page-type.
+    args: [p.url, ...(p.pageType ? ['--page-type', p.pageType] : [])],
+  }));
+  const base = withoutOptions(process.argv.slice(2), ['--urls', '--max-urls', '--report'], ['--json']);
+  const log = (s) => { if (!opts.quiet && !opts.json) process.stderr.write(s + '\n'); };
+  const median = (r, k) => (r.report && r.report.stats && r.report.stats[k]
+    ? r.report.stats[k].median ?? null : null);
+  const rows = runEach(fileURLToPath(import.meta.url), base, runs,
+                       (i, r) => log(`  [${i + 1}/${runs.length}] ${r.url}…`))
+    .map((r) => ({ url: r.url, pageType: r.pageType || null, exit: r.exit,
+                   lcp: median(r, 'lcp'), cls: median(r, 'cls'), tbt: median(r, 'tbt'),
+                   breaches: r.report ? r.report.breaches : [], error: r.error, report: r.report }));
+  const exit = Math.max(...rows.map((r) => r.exit));
+  const out = { tool: 'measure_vitals', urls: opts.urls, leftOut: read.leftOut, exit, runs: rows };
+  if (opts.report) {
+    fs.mkdirSync(path.dirname(path.resolve(opts.report)), { recursive: true });
+    fs.writeFileSync(opts.report, JSON.stringify(out, null, 2) + '\n');
+  }
+  if (opts.json) {
+    process.stdout.write(JSON.stringify(out, null, 2) + '\n');
+    return exit;
+  }
+  const w = Math.min(64, Math.max(4, ...rows.map((r) => r.url.length)));
+  const ms = (v) => (v == null ? '—' : `${Math.round(v)}ms`);
+  const L = [`measure_vitals — ${rows.length} page(s) in ${opts.urls}`, '',
+             `  ${'page'.padEnd(w)}  ${'type'.padEnd(10)}  ${'LCP'.padStart(8)}  ${'CLS'.padStart(6)}  ` +
+             `${'TBT'.padStart(7)}  exit`];
+  for (const r of rows) {
+    L.push(`  ${r.url.padEnd(w)}  ${(r.pageType || '—').padEnd(10)}  ${ms(r.lcp).padStart(8)}  ` +
+           `${(r.cls == null ? '—' : r.cls.toFixed(3)).padStart(6)}  ${ms(r.tbt).padStart(7)}  ${r.exit}`);
+  }
+  for (const r of rows) {
+    if (r.error) L.push('', `${r.url}: the run failed (exit 2): ${r.error}`);
+    else if (r.breaches.length) {
+      L.push('', `${r.url}${r.pageType ? ` (${r.pageType})` : ''} breaks its budget:`);
+      for (const b of r.breaches) L.push(`  ${b.metric}: ${b.actual} > ${b.limit}`);
+    }
+  }
+  if (read.leftOut) {
+    L.push('', `${read.leftOut} more URL(s) in ${opts.urls} were left out: raise --max-urls to measure them.`);
+  }
+  L.push('', 'Each page\'s whole report is in --json and --report.', '');
+  process.stdout.write(L.join('\n'));
+  return exit;
 }
 
 // 1 means a budget was breached, so a run that failed exits 2 (GT-A5).
