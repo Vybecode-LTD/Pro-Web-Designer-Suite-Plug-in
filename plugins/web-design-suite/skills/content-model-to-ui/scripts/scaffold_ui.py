@@ -4559,9 +4559,12 @@ type Props = {
   /** The ids of the help and the error, as `describedBy` builds them. */
   describedBy?: string;
   invalid?: boolean;
+  /** The group says so (`aria-required`) and so does each radio. */
+  required?: boolean;
 };
 
-let { name, value, options, disabled, onValueChange, labelledBy, describedBy, invalid }: Props = $props();
+let { name, value, options, disabled, onValueChange, labelledBy, describedBy, invalid, required }: Props =
+  $props();
 """, """\
 <div
   class="options"
@@ -4569,6 +4572,7 @@ let { name, value, options, disabled, onValueChange, labelledBy, describedBy, in
   aria-labelledby={labelledBy}
   aria-describedby={describedBy}
   aria-invalid={invalid || undefined}
+  aria-required={required || undefined}
 >
   {#each options as option (option)}
     <label class="option">
@@ -4578,6 +4582,7 @@ let { name, value, options, disabled, onValueChange, labelledBy, describedBy, in
         value={option}
         checked={value === option}
         {disabled}
+        {required}
         class="toggleInput"
         onchange={() => onValueChange?.(option)}
       />
@@ -4720,7 +4725,11 @@ def svelte_control(spec: dict[str, Any], indent: str = "      ") -> str:
         if not opts and spec.get("labelColumn"):
             lines.append(vue_comment(f"TODO(options): one <option> per parent row, showing "
                                      f"`{spec['labelColumn']}`", indent + "  "))
-        return svelte_tag("Select", multi + common + [text_value, on("change")], indent,
+        # A multiple select's value is the array, and so is what it sends (#176).
+        value = ([f"value={{{acc} ?? []}}",
+                  on("change", "Array.from(e.currentTarget.selectedOptions, (option) => option.value)")]
+                 if multi else [text_value, on("change")])
+        return svelte_tag("Select", multi + common + value, indent,
                           "\n".join(lines) or vue_comment("TODO(options): the closed set", indent + "  "))
     if ctrl == "radio-group":
         return svelte_tag("RadioGroup", [
@@ -4728,7 +4737,8 @@ def svelte_control(spec: dict[str, Any], indent: str = "      ") -> str:
             f"value={{{acc} === null || {acc} === undefined ? null : String({acc})}}",
             f"options={{{json.dumps(spec.get('options') or [])}}}", "disabled={disabled}",
             f"labelledBy={{{fid} + '-label'}}", f"describedBy={{{error_id}}}",
-            f"invalid={{Boolean({err})}}", f"onValueChange={{(next) => onChange({q}, next)}}"], indent)
+            f"invalid={{Boolean({err})}}", f"required={{{str(spec.get('required', False)).lower()}}}",
+            f"onValueChange={{(next) => onChange({q}, next)}}"], indent)
     if ctrl in ("switch", "checkbox"):
         return svelte_tag("Toggle", [
             f"id={{{fid}}}", f'label="{svelte_static(spec["label"])}"',
@@ -4754,7 +4764,9 @@ def svelte_control(spec: dict[str, Any], indent: str = "      ") -> str:
                 note = ("TODO(money): minor units or a decimal? Answer the `.money` question; "
                         "the two differ by the currency's scale on every read and write.")
         tag = svelte_tag("NumberInput", common + extra + [
-            f"value={{{acc} ?? ''}}", on("input", "e.currentTarget.valueAsNumber")], indent)
+            f"value={{{acc} ?? ''}}",
+            on("input", "Number.isNaN(e.currentTarget.valueAsNumber) ? null : e.currentTarget.valueAsNumber")],
+            indent)
         return (vue_comment(note, indent) + "\n" + tag) if note else tag
     if ctrl in ("readonly-text", "readonly-timestamp"):
         return svelte_tag("TextInput", common + ["readonly", text_value], indent)
@@ -5197,13 +5209,13 @@ def emit_svelte_states(table: dict[str, Any], model: dict[str, Any],
         " * retrofitting this state means touching every list in the app.")
 
     def block(doc: str, props: str, kind: str, headline: str, body: str, note: str | None,
-              action: tuple[str, str, str] | None) -> str:
-        """`action` is (variant, callback, label); `body` is text, or an
-        expression in braces."""
+              action: tuple[str, str, str] | None, bound: str | None = None) -> str:
+        """`action` is (variant, callback, label). `body` is copy, so always
+        text; `bound` is an expression instead (as the Vue one, #176)."""
         script = ("import { Button, StateBlock } from '../../ui';\n" if action
                   else "import { StateBlock } from '../../ui';\n")
         script += f"\n/**\n * {doc}\n */\n" + props
-        body_attr = f"body={body}" if body.startswith("{") else f'body="{svelte_static(body)}"'
+        body_attr = f"body={{{bound}}}" if bound else f'body="{svelte_static(body)}"'
         tag = f'<StateBlock kind="{kind}" headline="{svelte_static(headline)}" {body_attr}>\n'
         if action:
             variant, callback, label = action
@@ -5233,10 +5245,10 @@ def emit_svelte_states(table: dict[str, Any], model: dict[str, Any],
             "The request failed. Always offer the retry — an error with no way forward\n"
             " * is a dead end, and users reload the whole app instead.",
             "let { error, onRetry }: { error?: Error; onRetry?: () => void } = $props();\n", "error",
-            f"Something went wrong loading {human}", "{error?.message}",
+            f"Something went wrong loading {human}", "",
             f"TODO(copy): say what failed in the user's terms, not the transport's. "
             f"\"We could not load your {human}\" beats \"Request failed\".",
-            ("primary", "onRetry", "Try again")),
+            ("primary", "onRetry", "Try again"), bound="error?.message"),
         "Forbidden": block(
             f"The user is not allowed to see these rows.\n *\n * {forbidden_note}",
             "", "forbidden", f"You do not have access to {human}",

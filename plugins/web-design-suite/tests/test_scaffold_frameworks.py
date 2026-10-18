@@ -520,6 +520,10 @@ async function focus(root) {
 
 async function ssr(root) {
   const { render } = require('svelte/server');
+  if (rest[1]) {                                       // one component, with its props
+    const Comp = require(path.join(root, rest[1])).default;
+    return { html: render(Comp, { props: JSON.parse(rest[2] || '{}') }).body };
+  }
   const Form = require(path.join(root, 'features/orders/OrderForm.svelte')).default;
   const errors = { reference: 'Required', priority: 'Choose one', is_rush: 'Rush is closed' };
   const out = render(Form, { props: { values: { reference: '' }, errors, onChange() {}, onSubmit() {} } });
@@ -719,6 +723,34 @@ class TheSvelteScaffold(SvelteOutput):
                               cwd=self.tmp)
                 report = json.loads(proc.stdout)
                 self.assertEqual(report["errors"], 0, json.dumps(report, indent=2))
+
+    def test_arrays_nulls_and_required_survive_the_controls(self):
+        """The review of #176, in Svelte: the multiple select's array, null
+        for an emptied number, the stubs, the required radio group, and copy
+        that is always text, a `{` in it included."""
+        mod = load_script("content-model-to-ui", "scaffold_ui")
+        multi = {"name": "tags", "label": "Tags", "control": "multi-select", "required": True,
+                 "options": ["red", "green", "blue"]}
+        select = mod.svelte_control(multi)
+        self.assertIn("value={values.tags ?? []}", select)
+        self.assertIn("Array.from(e.currentTarget.selectedOptions, (option) => option.value)", select)
+        self.assertIn("Number.isNaN(e.currentTarget.valueAsNumber) ? null : e.currentTarget.valueAsNumber",
+                      mod.svelte_control({"name": "qty", "label": "Qty", "control": "number-input"}))
+        for control in ("tag-input", "json-editor"):
+            with self.subTest(control=control):
+                self.assertIn(f'<ControlStub control="{control}"',
+                              mod.svelte_control({"name": "x", "label": "X", "control": control}))
+        self.assertIn("required={true}", mod.svelte_control({**multi, "control": "radio-group"}))
+        html = self.node("ssr", "src", "ui/Control/RadioGroup.svelte", json.dumps(
+            {"name": "p", "options": ["a", "b"], "value": None, "required": True}))["html"]
+        self.assertIn('aria-required="true"', html)
+        self.assertEqual(2, len(re.findall(r'<input[^>]* required[^>]*>', html)), html)
+        out = scaffold(self.tmp, "brace", "--framework", "svelte",
+                       answers={**ANSWERS, "orders.empty_state": {"body": "{soon} nothing yet"}})
+        self.assertIn('body="&#123;soon&#125; nothing yet"', read(out / "features" / "orders" / "OrdersEmpty.svelte"))
+        self.assertIn("body={error?.message}", read(out / "features" / "orders" / "OrdersError.svelte"))
+        html = self.node("ssr", "brace", "features/orders/OrdersEmpty.svelte")["html"]
+        self.assertIn("{soon} nothing yet", html)
 
     def test_server_actions_are_reacts_alone(self):
         proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "sa", "--framework", "svelte",
