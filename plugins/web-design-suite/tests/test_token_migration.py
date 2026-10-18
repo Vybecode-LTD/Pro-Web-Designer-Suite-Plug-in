@@ -850,9 +850,12 @@ class TheCensusReadsEveryStyleSource(TempDirTest):
         self.write("src/page.html", "<p style=\"margin-top: 13px; color: #123456\" class=\"p-[7px]\">x</p>\n"
                    "<p :style=\"{ color: c }\" style:color=\"red\">y</p>\n<style>p { margin: 13px; }</style>\n")
         literals, data = self.extract("src")
+        # N48: Svelte's `style:color="red"` writes its value out, so it is an
+        # inline style too; Vue's `{ color: c }` is a name, the runtime's.
         self.assertEqual(self.found(data, "page.html"), [
             (1, "inline-style", "margin-top", "13px"), (1, "inline-style", "color", "#123456"),
-            (1, "tailwind-arbitrary", "tw:p", "p-[7px]"), (3, "css-decl", "margin", "13px")])
+            (1, "tailwind-arbitrary", "tw:p", "p-[7px]"), (2, "inline-style", "color", "red"),
+            (3, "css-decl", "margin", "13px")])
         mapping, report = self.cluster(literals)
         mapped = sum(r["occurrences"] for r in mapping["rules"] if "13px" in r["match"])
         self.assertEqual(mapped, 1, mapping["rules"])                   # the <style> block's, not the attribute's
