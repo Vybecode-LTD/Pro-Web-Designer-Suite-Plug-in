@@ -13,7 +13,7 @@
   - Running the gates on the clean fixtures found three gaps, fixed: `a11y_static` read a framework's document shell as a whole page (`shell_outlets()`), and a `<slot>` as no content; the census counted the `)` of `box-shadow: var(--shadow-xs)` as a shadow.
 - **#173, P37 part 4 (DL-B3, in part)**, merged as `c0a6d62`. `scaffold_ui.py --server-actions` writes each form as a Client Component posting its FormData to `server/<table>.actions.ts` (`'use server'`, `create` and a bound `update`), with `useActionState` in `<Entity>ActionForm.tsx` and `useFormStatus` in the Save button; the action reads each field by its type, validates with the zod schema and writes through Supabase's `createServerClient`. `test_scaffold.TheServerActions` runs the generated action in Node against stand-ins.
 - **Reviews:** 5 real issues on #172, each fixed with a test failing on the head it reviewed: Codex 4 over two rounds (any `{…}` read as an outlet; `type` before `src` only; any empty element with an id as a mount point; any `layout.tsx` without a title), CodeRabbit 1 (a component beside the page read as an outlet). #173 had no review: Codex was out of usage and CodeRabbit at its hourly limit.
-- **At the end:** the plan has 14 open items, all scheduled (SB-B6 and N49 closed); about 1,385 tests. This session used about 550 thousand tokens.
+- **At the end:** the plan has 14 open items, all scheduled (SB-B6 and N49 closed); about 1,385 tests. This session used about 510 thousand tokens.
 
 ## Next steps
 
