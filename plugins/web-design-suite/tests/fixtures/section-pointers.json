@@ -607,6 +607,12 @@
  },
  {
   "from": "content-model-to-ui/SKILL.md",
+  "to": "content-model-to-ui/references/scripts.md",
+  "section": "2",
+  "heading": "`scripts/scaffold_ui.py`"
+ },
+ {
+  "from": "content-model-to-ui/SKILL.md",
   "to": "content-model-to-ui/references/supabase-integration.md",
   "section": "1",
   "heading": "Getting the schema out"
@@ -676,6 +682,18 @@
   "to": "content-model-to-ui/references/supabase-integration.md",
   "section": "9",
   "heading": "Who talks to the database"
+ },
+ {
+  "from": "content-model-to-ui/references/scripts.md",
+  "to": "web-design-studio/references/stack-frameworks.md",
+  "section": "1",
+  "heading": "What every stack shares"
+ },
+ {
+  "from": "content-model-to-ui/references/scripts.md",
+  "to": "web-design-studio/references/stack-frameworks.md",
+  "section": "3",
+  "heading": "Vue"
  },
  {
   "from": "content-model-to-ui/references/supabase-integration.md",
@@ -760,6 +778,18 @@
   "to": "content-model-to-ui/references/supabase-integration.md",
   "section": "9",
   "heading": "Who talks to the database"
+ },
+ {
+  "from": "content-model-to-ui/scripts/scaffold_ui.py",
+  "to": "web-design-studio/references/stack-frameworks.md",
+  "section": "1",
+  "heading": "What every stack shares"
+ },
+ {
+  "from": "content-model-to-ui/scripts/scaffold_ui.py",
+  "to": "web-design-studio/references/stack-frameworks.md",
+  "section": "3",
+  "heading": "Vue"
  },
  {
   "from": "design-critique-gate/SKILL.md",

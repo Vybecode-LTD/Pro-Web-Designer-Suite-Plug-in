@@ -2,7 +2,7 @@
 
 The stack-specific half: where the schema comes from, what RLS does to a UI, and the four data-layer decisions that change what the components have to render.
 
-Everything here assumes FastAPI + Supabase + React 19/Vite. The mapping rules in `field-mapping.md` are stack-agnostic; this file is not.
+Everything here assumes FastAPI + Supabase + React 19/Vite; a Vue 3 + Vite scaffold (`--framework vue`) reads the same `lib/supabase.ts`. The mapping rules in `field-mapping.md` are stack-agnostic; this file is not.
 
 **Read §9 before wiring anything.** It says which key each process holds, and every guarantee in §2 depends on it.
 
@@ -401,7 +401,7 @@ The older `anon` and `service_role` JWT keys are the same two authorities under 
 ### The browser holds the publishable key, and nothing else
 
 ```ts
-// src/lib/supabase.ts — the only client the React code imports.
+// src/lib/supabase.ts — the only client the browser code imports.
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
@@ -467,7 +467,7 @@ The generated forms validate in the browser. That is a courtesy to the user, and
 
 | Concern | Enforced by | Not by |
 |---|---|---|
-| Which rows a user may read or change | RLS policies (`USING`, `WITH CHECK`) | A filter in the React query |
+| Which rows a user may read or change | RLS policies (`USING`, `WITH CHECK`) | A filter in the browser's query |
 | Which columns a user may change | Column privileges, `WITH CHECK` or a trigger (§2) | The generated `Draft` type |
 | What a valid value is | Constraints in the schema (`NOT NULL`, `CHECK`, unique indexes), and the FastAPI model for anything they cannot express | The form's validation |
 | Who the user is | The token Supabase Auth signed; authorization data in `app_metadata` only | Anything the client sends in the body |

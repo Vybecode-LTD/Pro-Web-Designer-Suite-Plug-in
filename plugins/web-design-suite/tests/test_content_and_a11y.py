@@ -1045,6 +1045,17 @@ class A11yStaticReadsBoundAttributes(TempDirTest):
         self.assertEqual(["img-no-alt"], self.rules('<img [class.wide]="w" src="x.png">'))
         self.assertIn("empty-control", self.rules('<button :class="c"></button>'))
 
+    def test_an_object_binding_is_a_spread(self):
+        """P37 part 5: Vue's `v-bind="$attrs"` sets every attribute the object
+        holds, as JSX's `{...rest}` does, so the scaffold's Vue controls had
+        "no label" where the React ones had none to report."""
+        for body in ('<input v-bind="$attrs">', '<select v-bind="attrs"><slot /></select>',
+                     '<img v-bind="$attrs" src="x.png">', '<button v-bind="$attrs"></button>'):
+            with self.subTest(body=body):
+                self.assertEqual([], self.rules(body))
+        self.assertEqual(["control-no-label"], self.rules('<input v-model="m">'))      # the control
+        self.assertEqual(["control-no-label"], self.rules('<input v-bind:value="v">'))
+
     def test_an_event_binding_is_a_handler(self):
         for body in ('<div @click="go">x</div>', '<div v-on:click.prevent="go">x</div>',
                      '<div on:click={go}>x</div>', '<div (click)="go()">x</div>'):

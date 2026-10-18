@@ -554,6 +554,9 @@ def scan_tags(text: str) -> list[Tag]:
                     vm = re.match(r"[^\s>]+", text[k:])
                     value = vm.group(0) if vm else ""
                     k += len(value)
+            if raw_name.lower() == "v-bind":          # Vue's spread: v-bind="$attrs"
+                attrs["\x00spread"] = EXPR
+                continue
             key, bound = bound_attr(raw_name)
             if bound:
                 # A bound value is an expression: knowable only when it is a
