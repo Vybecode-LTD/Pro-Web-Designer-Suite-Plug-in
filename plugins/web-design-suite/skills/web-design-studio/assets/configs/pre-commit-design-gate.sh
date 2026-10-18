@@ -186,7 +186,7 @@ if [ ! -s "$STAGED" ]; then
   exit 0
 fi
 
-grep -E '\.css$'            "$STAGED" > "$TMP_DIR/css"  2>/dev/null || true
+grep -E '\.(css|scss)$'     "$STAGED" > "$TMP_DIR/css"  2>/dev/null || true   # SCSS too (P37)
 grep -E '\.(js|jsx|ts|tsx|mjs)$' "$STAGED" > "$TMP_DIR/js"   2>/dev/null || true
 
 # --- Warn about partially staged files ---------------------------------------

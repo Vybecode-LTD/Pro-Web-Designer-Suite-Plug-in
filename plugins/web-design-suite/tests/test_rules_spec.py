@@ -312,12 +312,16 @@ class StylelintFollowsTheSpec(unittest.TestCase):
                               capture_output=True, env=env())
         self.assertEqual(0, proc.returncode, output(proc))
 
-    def test_sass_is_left_to_the_audit(self):
-        """The spec says stylelint reads no Sass (`sass.gates`), so the Sass
-        rules live in the audit alone. The day this config takes a Sass syntax,
-        it has to follow those rules too, with a real-tool test."""
-        self.assertEqual(["audit"], SPEC["sass"]["gates"])
-        self.assertNotRegex(self.config, r"(?i)s[ac]ss")
+    def test_scss_is_read_through_postcss_scss(self):
+        """D3 (P37 part 2): the config read no Sass, so a .scss file had the
+        audit alone. It now reads SCSS through postcss-scss and follows the
+        spec's Sass variables (test_real_tools.StylelintConfig runs them);
+        unlayered Sass, which no stylelint rule reads, stays the audit's."""
+        self.assertEqual(["audit", "stylelint"], SPEC["sass"]["variables"]["gates"])
+        self.assertEqual(["audit"], SPEC["sass"]["definitions"]["gates"])
+        self.assertRegex(self.config, r"files: \['\*\*/\*\.scss'\],\n  customSyntax: 'postcss-scss',\n"
+                                      r"  extends: \['stylelint-config-standard-scss'\],")
+        self.assertIn("[sassRuleName]: true,", self.config)
 
 
 class TheTierListsAgree(TempDirTest):

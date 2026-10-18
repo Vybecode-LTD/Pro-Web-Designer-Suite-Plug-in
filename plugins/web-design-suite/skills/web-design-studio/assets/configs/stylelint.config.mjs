@@ -9,6 +9,12 @@
  *
  * PEER DEPENDENCIES
  *   npm i -D stylelint@^17 stylelint-config-standard@^40
+ *   npm i -D postcss-scss@^4 stylelint-config-standard-scss@^17   (SCSS only)
+ *
+ *   The second line is for a project with .scss files (Part 6): stylelint
+ *   loads those two only when it lints one, so a CSS-only project needs
+ *   neither. stylelint-config-standard-scss 17 peers stylelint ^17 and
+ *   extends stylelint-config-standard ^40.
  *
  *   stylelint-config-standard 40 requires stylelint ^17, so pairing it with
  *   stylelint 16 stops npm with ERESOLVE. Stylelint 17 needs Node 20.19+.
@@ -21,7 +27,7 @@
  *   starter's own stylesheets.)
  *
  *   package.json
- *     "lint:css": "stylelint \"src/**\/*.css\" \"packages/**\/*.css\""
+ *     "lint:css": "stylelint \"src/**\/*.{css,scss}\" \"packages/**\/*.{css,scss}\""
  *
  *   Copy project_config.mjs with this file: the config imports it from its
  *   own folder (both are in the plugin's assets/configs/).
@@ -753,6 +759,121 @@ tierRule.meta = { url: 'assets/rules/design-rules.json' };
 
 const tierPlugin = createPlugin(tierRuleName, tierRule);
 
+/* -------------------------------------------------------------------------
+ * design/sass-variable-literal — Law 1 in a .scss file (D3, P37 part 2)
+ *
+ * `$card-padding: 24px` is the literal Law 1 forbids, moved one line up: a
+ * Sass variable is fixed at compile time, so no theme re-points it,
+ * --density cannot reach it and DevTools does not show it. The audit's
+ * L1 sass-literal reads the same (design-rules.json: sass.variables): a
+ * length, a hex or literal colour function, a duration or an easing curve
+ * in a variable's value, a map's included; a quoted string is text. Left
+ * alone: a breakpoint ($bp, $bp-*, $breakpoint*), which must be a Sass
+ * value because a media query condition cannot read a custom property, and
+ * a variable inside a @function, a step in a computation. A token file
+ * turns the rule off (Part 5, block 2).
+ * ---------------------------------------------------------------------- */
+const sassRuleName = 'design/sass-variable-literal';
+const sassMessages = utils.ruleMessages(sassRuleName, {
+  rejected: (name, value) =>
+    `Sass variable "${name}" holds a literal: "${value}". A Sass variable is fixed at compile time: ` +
+    `no theme re-points it, --density cannot reach it and DevTools does not show it. Declare the ` +
+    `value as a token and read it with var(). Only a breakpoint ($bp-*) has to be a Sass value, ` +
+    `because a media query condition cannot read a custom property.`,
+});
+const SASS_VARIABLE = /^(?:[\w-]+\.)?\$[\w-]+$/;
+const SASS_BREAKPOINT = /\$(?:bp(?:[-_][\w-]*)?|breakpoint[\w-]*)$/i;
+const SASS_STRING = /(['"])(?:\\.|(?!\1)[^\\])*\1/gs;
+const SASS_LENGTH = /(?<![\w.#-])-?\d*\.?\d+(?:px|rem|em|pt|pc|in|cm|mm|q)\b/gi;
+const SASS_ZERO = /^-?0+(?:\.0+)?(?:px|rem|em)?$/i;
+const SASS_HEX = /#[0-9a-f]{3,8}\b/i;
+const SASS_TIME = /(?<![\w.-])\d*\.?\d+m?s\b/i;
+const SASS_EASING = /\bcubic-bezier\s*\(|\bsteps\s*\(/i;
+
+/* The value with each var(…), fallback and all, replaced by a marker. */
+const withoutVars = (value) => {
+  let out = '';
+  let i = 0;
+  for (;;) {
+    const j = value.toLowerCase().indexOf('var(', i);
+    if (j < 0) return out + value.slice(i);
+    if (j > 0 && /[\w-]/.test(value[j - 1])) {     // part of a longer name
+      out += value.slice(i, j + 4);
+      i = j + 4;
+      continue;
+    }
+    out += `${value.slice(i, j)} VAR `;
+    let depth = 0;
+    let k = j + 3;
+    for (; k < value.length; k += 1) {
+      if (value[k] === '(') depth += 1;
+      else if (value[k] === ')' && (depth -= 1) === 0) break;
+    }
+    i = k + 1;
+  }
+};
+
+/* The first literal a variable's value holds, as the audit's sass-literal
+ * finds it, else null. */
+const sassLiteral = (value) => {
+  const rest = withoutVars(value.replace(SASS_STRING, '""')).replace(/url\([^)]*\)/gi, ' url() ');
+  for (const m of rest.matchAll(SASS_LENGTH)) {
+    if (!SASS_ZERO.test(m[0])) return m[0];
+  }
+  const hex = rest.match(SASS_HEX);
+  if (hex) return hex[0];
+  for (const m of rest.matchAll(COLOUR_FUNCTION)) {
+    let depth = 0;
+    let k = m.index + m[0].length - 1;
+    for (; k < rest.length; k += 1) {
+      if (rest[k] === '(') depth += 1;
+      else if (rest[k] === ')' && (depth -= 1) === 0) break;
+    }
+    if (!rest.slice(m.index, k).includes(' VAR ')) return m[1];    // derives from no token
+  }
+  return (rest.match(SASS_TIME) || rest.match(SASS_EASING) || [null])[0];
+};
+
+const inSassFunction = (node) => {
+  for (let p = node.parent; p; p = p.parent) {
+    if (p.type === 'atrule' && p.name.toLowerCase() === 'function') return true;
+  }
+  return false;
+};
+
+const sassRule = (primary) => (root, result) => {
+  if (!primary) return;
+  root.walkDecls((decl) => {
+    if (!SASS_VARIABLE.test(decl.prop) || SASS_BREAKPOINT.test(decl.prop) || inSassFunction(decl)) return;
+    if (sassLiteral(decl.value)) {
+      utils.report({
+        ruleName: sassRuleName,
+        result,
+        node: decl,
+        message: sassMessages.rejected(decl.prop, decl.value.trim()),
+      });
+    }
+  });
+};
+sassRule.ruleName = sassRuleName;
+sassRule.messages = sassMessages;
+const sassPlugin = createPlugin(sassRuleName, sassRule);
+
+/* A Sass variable in a value is read as a token, as the audit reads it
+ * (design-rules.json: values): the audit cannot resolve `$space`, so
+ * `padding: $space` passes and `padding: $space 5%` is refused as
+ * `var(--x) 5%` would be. Each allowlist shape that takes a var() takes a
+ * variable too, `$space` or `tokens.$space`, in a .scss file only. */
+const SASS_TOKEN = String.raw`(?:var\(--[a-z0-9-]+\)|(?:[a-z][\w-]*\.)?\$[\w-]+)`;
+const SASS_VAR_ONE = String.raw`/^(?:var\(--[a-z0-9-]+(\s*,\s*.+)?\)|(?:[a-z][\w-]*\.)?\$[\w-]+)$/`;
+const sassAware = (allowlist) => Object.fromEntries(Object.entries(allowlist).map(([prop, values]) => [
+  prop,
+  values.map((v) => {
+    if (v === VAR_ONE) return SASS_VAR_ONE;
+    return v.startsWith('/') ? v.split(String.raw`var\(--[a-z0-9-]+\)`).join(SASS_TOKEN) : v;
+  }),
+]));
+
 /* =========================================================================
  * PART 3 — THE VALUE ALLOWLISTS (LAW 1, LAW 3, LAW 6)
  * =========================================================================
@@ -795,9 +916,9 @@ const tierPlugin = createPlugin(tierRuleName, tierRule);
  * PART 4 — THE CONFIG
  * ========================================================================= */
 
-export default {
+const config = {
   extends: ['stylelint-config-standard'],
-  plugins: [designPlugin, systemColorPlugin, hexPlugin, colourFnPlugin, marginPlugin, tierPlugin],
+  plugins: [designPlugin, systemColorPlugin, hexPlugin, colourFnPlugin, marginPlugin, tierPlugin, sassPlugin],
 
   rules: {
     /* ---- LAW 5: layers, not specificity ------------------------------ */
@@ -1013,6 +1134,9 @@ export default {
         '**/ui/**/*.css',
         '**/*.module.css',
         '**/components.css',
+        '**/components/**/*.scss',   // and their SCSS (Part 6)
+        '**/ui/**/*.scss',
+        '**/*.module.scss',
         ...PROJECT.componentGlobs,  // the project's `components` (N37)
       ],
       rules: {
@@ -1042,9 +1166,12 @@ export default {
      * ------------------------------------------------------------------ */
     {
       files: ['**/tokens.css', '**/*-tokens.css', '**/*.tokens.css', '**/tokens/*.css',
+              '**/tokens.scss', '**/*-tokens.scss', '**/*.tokens.scss', '**/tokens/*.scss',
+              '**/theme.scss', '**/*-theme.scss',  // SCSS token files (Part 6), as the audit reads them
               ...PROJECT.tokenGlobs],  // the project's `tokens` (N37)
       rules: {
         'declaration-property-value-allowed-list': null,
+        [sassRuleName]: null,       // a token file is where a Sass literal may live
         [hexRuleName]: null,
         [colourFnRuleName]: null,
         'color-named': null,
@@ -1132,3 +1259,40 @@ export default {
     },
   ],
 };
+
+/* =========================================================================
+ * PART 6 — SCSS (D3, P37 part 2)
+ * =========================================================================
+ * A .scss file gets every rule a .css file does, read through postcss-scss.
+ * stylelint-config-standard-scss brings Sass's at-rules (`@use`, `@mixin`,
+ * `@include`, `@each`) and its own checks; the base rules are restated over
+ * it, so the copy of stylelint-config-standard it extends cannot undo a
+ * decision above, and the four blocks of Part 5 still come after it (their
+ * globs name .scss files too). This is a syntax, not a fifth exemption:
+ * nothing here lets a literal through, and design/sass-variable-literal
+ * refuses the one a Sass variable would hide.
+ * ===================================================================== */
+config.overrides.unshift({
+  files: ['**/*.scss'],
+  customSyntax: 'postcss-scss',
+  extends: ['stylelint-config-standard-scss'],
+  rules: {
+    ...config.rules,
+    /* Sass's at-rules are Sass's to know: the same list, through stylelint-scss. */
+    'at-rule-no-unknown': null,
+    'scss/at-rule-no-unknown': config.rules['at-rule-no-unknown'],
+    'declaration-property-value-allowed-list': sassAware(VALUE_ALLOWLIST),
+    [sassRuleName]: true,
+    /* Spacing and names are not laws, as Part 1's housekeeping says: the
+     * starter's aligned `calc(var(--space-1)  * var(--density))` and a
+     * `font` shorthand's `/` are CSS, which Sass leaves alone, and a
+     * breakpoint may be `$breakpointSmall` (design-rules.json: sass). */
+    'scss/operator-no-unspaced': null,
+    'scss/dollar-variable-pattern': null,
+    /* An interpolated name (`@container #{$name}`) is one the pattern cannot read. */
+    'container-name-pattern': [String.raw`^(?:[a-z][a-z0-9]*(?:-[a-z0-9]+)*|.*#\{.*)$`],
+    'keyframes-name-pattern': [String.raw`^(?:[a-z][a-z0-9]*(?:-[a-z0-9]+)*|.*#\{.*)$`],
+  },
+});
+
+export default config;

@@ -424,6 +424,10 @@ $bp: (sm: 30rem, md: 48rem, lg: 64rem, xl: 80rem, xxl: 96rem);
 }
 ```
 
+### The gates read SCSS
+
+`assets/configs/stylelint.config.mjs` reads every `.scss` file through `postcss-scss` and `stylelint-config-standard-scss` (install both: the config's header has the line), so a `Button.module.scss` gets every rule a `.css` file does, and `audit_design.py` reads it too. A Sass variable in a value reads as a token in both (`padding: $gap` passes, `padding: $gap 5%` does not), and a Sass variable that holds a literal outside a token file (`$card-padding: 24px`) fails both: stylelint's `design/sass-variable-literal` and the audit's `sass-literal`. A breakpoint (`$bp-md: 48rem`) is the exception, for the reason in point 1.
+
 ### What SCSS must never be used for
 
 **Nesting depth.** Sass makes depth 5 effortless, which is exactly the problem. The depth-2 limit (Law 5) is unchanged, and it is *more* important here because the generated selector is invisible in the source. Set `max-nesting-depth: 2` in stylelint and let the linter hold the line.
