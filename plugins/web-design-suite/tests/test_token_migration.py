@@ -788,6 +788,30 @@ class TheCensusReadsEveryStyleSource(TempDirTest):
         hand = [u for u in mapping["unmapped"] if u["reason"].startswith("a Tailwind class in `@apply`")]
         self.assertEqual(4, len(hand), mapping["unmapped"])
 
+    def test_bound_styles_are_inline_styles(self):
+        """N48: Vue's `:style`, Svelte's `style:x` and Angular's `[style.x]`
+        and `[ngStyle]` were skipped as expressions, so a colour written out
+        in one never reached the census. A value written out is an inline
+        style (hand work); a name, an interpolation and a bare number with no
+        unit are the runtime's."""
+        self.write("src/Card.vue", "<template>\n"
+                   "  <div :style=\"{ color: '#ff0000', '--progress': pct, fontSize: 13 }\">a</div>\n"
+                   "  <p v-bind:style=\"[base, { paddingTop: '13px' }]\" :style=\"'margin: 7px'\">b</p>\n"
+                   "</template>\n")
+        self.write("src/Card.svelte", '<div style:color="#00ff00" style:width={w} style:--gap="{g}px">a</div>\n')
+        self.write("src/card.component.html",
+                   "<div [style.color]=\"'#0000ff'\" [style.width.px]=\"21\" [style.height]=\"h\">a</div>\n"
+                   "<div [ngStyle]=\"{ 'max-width.px': 300, border: b }\">b</div>\n")
+        _, data = self.extract("src")
+        self.assertEqual([(2, "inline-style", "color", "#ff0000"), (3, "inline-style", "padding-top", "13px"),
+                          (3, "inline-style", "margin", "7px")], self.found(data, "Card.vue"))
+        self.assertEqual([(1, "inline-style", "color", "#00ff00")], self.found(data, "Card.svelte"))
+        self.assertEqual([(1, "inline-style", "color", "#0000ff"), (1, "inline-style", "width", "21px"),
+                          (2, "inline-style", "max-width", "300px")], self.found(data, "card.component.html"))
+        mapping, _ = self.cluster(self.tmp / "literals.json")
+        hand = [u for u in mapping["unmapped"] if "a bound style" in u["reason"]]
+        self.assertTrue(hand, mapping["unmapped"])
+
     def test_a_numeric_apply_is_counted_with_the_theme(self):
         """CodeRabbit on #157: `@apply p-4` holds a design value when a v4
         entry keeps `--spacing`, and the stylesheet scan was not given it."""

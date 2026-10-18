@@ -15,7 +15,8 @@ What it checks
                                token file
   L2  Parents own the gaps     outer margins on children in component files
   L3  The scale is closed      values that are not on the spacing/type scale
-  L4  One home per component   JSX inline styles that set visual properties,
+  L4  One home per component   inline styles that set visual properties (JSX,
+                               style="", and a framework's bound style),
                                plus a CROSS-FILE pass: a class styled from
                                two files, or the same property owned twice
   L5  Layers, not specificity  !important, IDs, nesting depth, unlayered CSS,
@@ -35,7 +36,8 @@ What it reads
 -------------
     .css .scss .less .pcss              every declaration
     .js .jsx .ts .tsx .mjs .cjs         inline styles, class strings, colours
-    .html .htm .vue .svelte .astro      <style> blocks, style="" attributes,
+    .html .htm .vue .svelte .astro      <style> blocks, style="" attributes, bound
+                                        styles (:style, style:x, [style.x], [ngStyle]),
                                         class attributes (HTML email is left
                                         to email-template-system's lint_email)
 
@@ -2041,6 +2043,261 @@ def _blank(text: str, spans: Iterable[tuple[int, int]], keep: bool) -> str:
     return "".join(out)
 
 
+# ---- BEGIN bound-styles: audit_design.py and extract_literals.py carry this block verbatim
+# A framework's bound inline style is style="" under another name (N48): Vue's
+# `:style` and `v-bind:style` (an object, an array of them, or a string),
+# Angular's `[style]`, `[ngStyle]` and `[attr.style]`, and one property at a
+# time, Angular's `[style.width.px]` and Svelte's `style:color` directive.
+BOUND_STYLE_WHOLE = re.compile(r"(?::|v-bind:)style(?:\.(?:prop|attr|camel))*|\[(?:style|ngStyle|attr\.style)\]")
+BOUND_STYLE_ONE = re.compile(r"\[style\.(--[\w-]+|[A-Za-z][\w-]*)(?:\.([A-Za-z%]+))?\]"
+                             r"|style:(--[\w-]+|[A-Za-z][\w-]*)(?:\|important)?")
+BOUND_NUMBER = re.compile(r"-?\d*\.?\d+")
+BOUND_TAG = re.compile(r"<[A-Za-z][\w:.-]*")
+BOUND_UNIT_KEY = re.compile(r"(--[\w-]+|[A-Za-z][\w-]*)\.([A-Za-z%]+)")    # ngStyle's 'width.px'
+
+
+def _bound_skip(text: str, k: int) -> int:
+    """Index past the string, template literal or braced block opened at `k`."""
+    n, c = len(text), text[k]
+    if c in "\"'`":
+        k += 1
+        while k < n and text[k] != c:
+            if text[k] == "\\":
+                k += 1
+            elif c == "`" and text.startswith("${", k):
+                k = _bound_skip(text, k + 1) - 1
+            k += 1
+        return k + 1
+    depth = 0
+    while k < n:
+        if text[k] in "\"'`":
+            k = _bound_skip(text, k)
+            continue
+        if text[k] in "([{":
+            depth += 1
+        elif text[k] in ")]}":
+            depth -= 1
+            if depth == 0:
+                return k + 1
+        k += 1
+    return n
+
+
+def tag_attributes(markup: str) -> list[tuple[str, int, str | None, int, str]]:
+    """Each attribute of each start tag as (name, name_at, value, value_at,
+    delimiter): the delimiter is the value's quote, `{` for Svelte's and
+    Astro's braces, "" for a bare value, and the value None for none. A tag
+    is read to its own `>`, past quoted and braced values, so a `<` inside a
+    value (`v-if="a<b"`) opens no tag."""
+    found: list[tuple[str, int, str | None, int, str]] = []
+    n, pos = len(markup), 0
+    while True:
+        m = BOUND_TAG.search(markup, pos)
+        if not m:
+            return found
+        k = m.end()
+        while k < n and markup[k] != ">":
+            c = markup[k]
+            if c.isspace() or c == "/":
+                k += 1
+                continue
+            if c in "{\"'":                         # {...spread}, {shorthand}, a stray quote
+                k = _bound_skip(markup, k)
+                continue
+            start = k
+            while k < n and not markup[k].isspace() and markup[k] not in "=>/\"'{":
+                k += 1
+            name, value, value_at, delim = markup[start:k], None, k, ""
+            j = k
+            while j < n and markup[j].isspace():
+                j += 1
+            if j < n and markup[j] == "=":
+                j += 1
+                while j < n and markup[j].isspace():
+                    j += 1
+                if j < n and markup[j] in "\"'":
+                    end = markup.find(markup[j], j + 1)
+                    end = n if end < 0 else end
+                    value, value_at, delim, k = markup[j + 1:end], j + 1, markup[j], end + 1
+                elif j < n and markup[j] == "{":
+                    end = _bound_skip(markup, j)
+                    value, value_at, delim, k = markup[j + 1:end - 1], j + 1, "{", end
+                else:
+                    end = j
+                    while end < n and not markup[end].isspace() and markup[end] != ">":
+                        end += 1
+                    value, value_at, k = markup[j:end], j, end
+            found.append((name, start, value, value_at, delim))
+        pos = k + 1
+
+
+def bound_value(expr: str, at: int) -> tuple[str, str, int]:
+    """(kind, text, text_at) of a value: "text" for a string written out, its
+    quotes off; "number" for a bare number; "expr" for what only the runtime
+    knows (a name, a call, a template literal with `${}`)."""
+    lead = len(expr) - len(expr.lstrip())
+    v = expr.strip()
+    if len(v) >= 2 and v[0] in "\"'`" and _bound_skip(v, 0) == len(v) and \
+            not (v[0] == "`" and "${" in v):
+        return "text", v[1:-1], at + lead + 1
+    if BOUND_NUMBER.fullmatch(v):
+        return "number", v, at + lead
+    return "expr", v, at + lead
+
+
+def _bound_declarations(text: str, at: int, kind: str) -> list[tuple[str, str, str, int]]:
+    """A string's declarations, as style="" holds them: kind "css", or "expr"
+    for a value a template literal fills in."""
+    out = []
+    for decl in re.finditer(r"[^;]+", text):
+        prop, colon, value = decl.group(0).partition(":")
+        if colon and prop.strip():
+            out.append((prop.strip(), "expr" if kind == "expr" and "${" in value else "css",
+                        value.strip(), at + decl.start() + len(prop) + 1 + len(value) - len(value.lstrip())))
+    return out
+
+
+def _bound_entries(inner: str, at: int) -> list[tuple[str, str, str, int]]:
+    """An object literal's entries as (property, kind, value, value_at)."""
+    out: list[tuple[str, str, str, int]] = []
+    k, start, colon, n = 0, 0, -1, len(inner)
+
+    def entry(end: int) -> None:
+        text = inner[start:end]
+        if text.strip().startswith("..."):
+            dots = text.index("...") + 3
+            out.extend(bound_style_entries(text[dots:], at + start + dots))
+            return
+        key = inner[start:colon if colon >= 0 else end].strip()
+        if len(key) >= 2 and key[0] in "\"'" and key[-1] == key[0]:
+            key = key[1:-1]
+        elif not re.fullmatch(r"[A-Za-z_$][\w$]*", key):
+            return                                  # a computed key names nothing it can read
+        if colon < 0:                               # `{ color }`: a name
+            out.append((key, "expr", key, at + start))
+            return
+        kind, value, value_at = bound_value(inner[colon + 1:end], at + colon + 1)
+        unit = BOUND_UNIT_KEY.fullmatch(key)
+        if unit:
+            key = unit.group(1)
+            if kind == "number":
+                kind, value = "text", value + unit.group(2)
+        out.append((key, kind, value, value_at))
+
+    while k < n:
+        c = inner[k]
+        if c in "\"'`([{":
+            k = _bound_skip(inner, k)
+            continue
+        if c == ":" and colon < 0:
+            colon = k
+        elif c == ",":
+            entry(k)
+            start, colon = k + 1, -1
+        k += 1
+    if inner[start:].strip():
+        entry(n)
+    return out
+
+
+def bound_style_entries(expr: str, at: int) -> list[tuple[str, str, str, int]]:
+    """The declarations a bound style expression can set: each object literal
+    it can evaluate to (`{…}`, either arm of a ternary, `on && {…}`, the
+    items of an array, a spread's), and each string, read as style="" is.
+    An object or a string passed to a call, or indexed, is not the value."""
+    out: list[tuple[str, str, str, int]] = []
+    opaque: list[bool] = []
+    k, n = 0, len(expr)
+    while k < n:
+        c = expr[k]
+        before = expr[:k].rstrip()[-1:]
+        named = bool(before) and (before.isalnum() or before in "_$)]")
+        if c in "\"'`":
+            end = _bound_skip(expr, k)
+            if not any(opaque):
+                kind = "expr" if c == "`" and "${" in expr[k:end] else "css"
+                out.extend(_bound_declarations(expr[k + 1:end - 1], at + k + 1, kind))
+            k = end
+            continue
+        if c == "{":
+            end = _bound_skip(expr, k)
+            if not any(opaque):
+                out.extend(_bound_entries(expr[k + 1:end - 1], at + k + 1))
+            k = end
+            continue
+        if c in "([":
+            opaque.append(named)                    # a call's arguments, an index
+        elif c in ")]" and opaque:
+            opaque.pop()
+        k += 1
+    return out
+
+
+def bound_styles(markup: str) -> list[tuple[str, int, list[tuple[str, str, str, int]]]]:
+    """Each bound inline style in the markup, as (attribute, at, entries),
+    each entry (property, kind, value, value_at). A kind is "text" for a
+    value written out, "css" for one inside a declaration string (style=""'s
+    own form), "number" for a bare number, "expr" for one only the runtime
+    knows. An Angular unit (`[style.width.px]="13"`) joins its number."""
+    found = []
+    for name, at, value, value_at, delim in tag_attributes(markup):
+        one = BOUND_STYLE_ONE.fullmatch(name)
+        if BOUND_STYLE_WHOLE.fullmatch(name):
+            entries = bound_style_entries(value or "", value_at)
+        elif one and one.group(3):                  # Svelte: a value is text unless it holds {…}
+            prop = one.group(3)
+            if value is None:
+                entries = [(prop, "expr", prop, at)]
+            elif delim == "{":
+                entries = [(prop, *bound_value(value, value_at))]
+            else:
+                entries = [(prop, "expr" if "{" in value else "text", value, value_at)]
+        elif one:                                   # Angular: the value is an expression
+            prop, unit = one.group(1), one.group(2)
+            kind, text, text_at = bound_value(value or "", value_at)
+            if unit and kind in ("number", "text") and BOUND_NUMBER.fullmatch(text):
+                kind, text = "text", text + unit
+            entries = [(prop, kind, text, text_at)]
+        else:
+            continue
+        found.append((name, at, entries))
+    return found
+# ---- END bound-styles
+
+
+def _audit_bound_style(name: str, entries: list[tuple[str, str, str, int]], line: int, add) -> None:
+    """Law 4 for a bound style, as for JSX's style={{…}}: a visual property
+    is the failure, and a custom property's written-out value that is a
+    design literal (L1) or reads a Tier-1 primitive (L6) is Law 1 back
+    through the exception. A declaration string is read as style="" is."""
+    for prop, kind, value, _ in entries:
+        if not prop.startswith("--") or kind != "text":
+            continue
+        if DESIGN_LITERAL.match(value.strip()):
+            add(line, "L1", "inline-literal", "error",
+                f"`{name}` passes `{prop}: '{value}'`, a design literal.",
+                "The custom property carries a value only the runtime knows. Bind "
+                "a number and do the arithmetic in CSS with calc(), or point the "
+                "property at a token: var(--gap-related).",
+                snippet=f"{prop}: {value}")
+        for ref in VAR_REF.findall(value):
+            advice = tier1_advice(ref)
+            if advice:
+                add(line, "L6", "tier1-leak", "error",
+                    f"`{name}` passes `{prop}: '{value}'`, which reads the Tier-1 primitive `{ref}`.",
+                    f"Right value, wrong tier — use {advice}.",
+                    snippet=f"{prop}: {value}")
+    offenders = list(dict.fromkeys(p for p, *_ in entries if not p.startswith("--")))
+    if offenders:
+        add(line, "L4", "inline-style", "error",
+            f"`{name}` sets visual propert{'y' if len(offenders) == 1 else 'ies'}: "
+            f"{', '.join(offenders[:4])}.",
+            "A bound style is an inline style: it beats every stylesheet and layer "
+            "and is invisible to the theme. Give the element a class and style it "
+            "in the component's stylesheet; the one legal binding is a custom "
+            "property carrying a runtime value (--progress), which that stylesheet reads.")
+
+
 def audit_template(path: Path, text: str) -> list[Finding]:
     """.html / .htm / .vue / .svelte / .astro.
 
@@ -2090,6 +2347,8 @@ def audit_template(path: Path, text: str) -> list[Finding]:
                 "stylesheet; the one legal inline use is a custom property carrying "
                 "a runtime value (style=\"--progress: 40%\").")
 
+    for name, at, entries in bound_styles(markup):    # :style, style:x, [style.x], [ngStyle] (N48)
+        _audit_bound_style(name, entries, line_of(at), add)
     _audit_jsx_styles(markup, line_of, add)       # Astro accepts style={{…}}
     _audit_class_lists(markup, line_of, add)
 
