@@ -63,7 +63,8 @@ An interpolation that *holds* a literal — `` background: ${tones.error}; `` wi
 A single-file component is three sources in one file, and the census reads each as itself:
 - **`<style>` blocks are stylesheets**, in their `lang` (`scss`, `less`, `postcss`, or plain CSS), scanned at the block's offset so line numbers point at real lines. The codemod rewrites them as it rewrites a `.scss` file. A block in a language the scanner cannot follow (`lang="sass"`, Stylus) is named in the census's problems, never silently counted as clean.
 - **`<script>` blocks**, and an Astro component's frontmatter, are read as JavaScript.
-- **`style=""` attributes are inline styles**: counted, and left to Phase 4f like JSX's. Vue's `:style` and Svelte's `style:` directive are expressions, not literals, so they are skipped, as is a declaration that interpolates (`{…}`).
+- **`style=""` attributes are inline styles**: counted, and left to Phase 4f like JSX's, as is a declaration that interpolates (`{…}`), which is skipped.
+- **A bound style is one too** (N48): Vue's `:style` and `v-bind:style`, Angular's `[style]`, `[ngStyle]`, `[attr.style]` and `[style.x]`, and Svelte's `style:x` directive. A value written out (`'#fff'`, `style:color="#fff"`, `[style.width.px]="13"` as `13px`) is counted as an inline style; a name or an expression is the runtime's, and a bare number is counted only where the binding names its unit.
 - **Tailwind arbitrary values** in `class=""` (and Vue's `:class`) are counted and rewritten as in JSX.
 
 A `<style>` inside an HTML comment or a script's string is not a stylesheet, and is not read. Every literal in a `.vue`, `.svelte` or `.astro` file is a component's.

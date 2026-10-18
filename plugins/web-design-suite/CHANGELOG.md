@@ -129,6 +129,25 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
 ### Fixed
 
+- **The audit read no bound inline style** (N48, P37 part 1). Its template reader wanted
+  whitespace before `style=`, so Vue's `:style="{ color: '#fff' }"` passed, though Law 4
+  fails the same declaration as `style=""` or JSX's `style={{…}}`; so did `v-bind:style`,
+  Svelte's `style:color` directive, and Angular's `[style.color]`, `[style.width.px]`,
+  `[style]`, `[ngStyle]` and `[attr.style]`. `audit_design.py` now reads each start tag's
+  attributes (`tag_attributes()`, past quoted and braced values) and each bound style's
+  declarations (`bound_styles()`): every object the expression can evaluate to (either arm
+  of a ternary, an array's items, a spread's, not a call's argument), a string written out as
+  a whole arm of a condition (`on ? '12px' : gap`, `gap ?? '12px'`), each string as
+  `style=""`, and one property at a time, with Angular's unit joined to its number. A
+  visual property is L4, and a custom property's written-out design literal or Tier-1
+  primitive is L1 or L6, as in JSX. Commented-out markup is blanked first, as the census
+  blanks it, so neither reads an element that never renders. The migration census (`extract_literals.py`) skipped
+  these as expressions; it carries the same reader verbatim and counts each written-out
+  value as an inline style, left to hand work. The spec's `inline_styles.bound` holds
+  every form; ESLint parses no `.vue`, `.svelte` or Angular template (N49, scheduled).
+  `test_audit_design.TheAuditReadsBoundStyles`,
+  `test_token_migration.TheCensusReadsEveryStyleSource.test_bound_styles_are_inline_styles`.
+
 - **The migration matched a colour to a role by ΔE alone** (N40, from R3.6's live
   check). `cluster_values.py` sent the grey `#6b7280` to `--fg-warning`: its little
   chroma kept it off the neutral steps, and the nearest of the rest was a status colour of
