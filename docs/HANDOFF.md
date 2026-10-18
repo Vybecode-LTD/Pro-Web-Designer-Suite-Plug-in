@@ -10,7 +10,7 @@
   - `scaffold_ui.py --framework vue` writes the kit and each entity's list, detail, form and six states as Vue 3.5 single-file components: `<script setup lang="ts">`, `defineProps`, `defineEmits`, `defineModel`, slots, and each CSS Module's rules in `<style scoped>` inside `@layer components`. The seven controls share `ui/Control/Control.css` through `<style scoped src>`.
   - A root's class is named for its component (`.ui-button`), never `.root`: Vue puts a parent's scope on a child's root element.
   - `a11y_static` reads `v-bind="$attrs"` as a spread.
-- **#177, P37 part 6 (Svelte)**, merged as `MERGE177`. `--framework svelte` writes Svelte 5 components: `$props()`, callbacks as props, snippets, and each `<style>` holding only the rules its markup uses, since Svelte drops the others with a warning. The list's state rules wait under one `svelte-ignore`.
+- **#177, P37 part 6 (Svelte)**, merged as `8d8b6f8`. `--framework svelte` writes Svelte 5 components: `$props()`, callbacks as props, snippets, and each `<style>` holding only the rules its markup uses, since Svelte drops the others with a warning. The list's state rules wait under one `svelte-ignore`.
 - **The tests** (`tests/test_scaffold_frameworks.py`):
   - every component goes through the real compiler (`vue` 3.5.44; `svelte` 5.57.2 for the client and the server, with no warning);
   - the form is rendered on the server, and the ids its aria attributes name are checked;

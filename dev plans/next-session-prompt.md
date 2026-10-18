@@ -2,7 +2,7 @@
 
 **Written 2026-10-18**, at the end of the day's third session, which finished **P37**: two PRs, and the docs PR, which merges once green (§3):
 - **#176, P37 part 5 (Vue)**, merged as `b20f562`: `scaffold_ui.py --framework vue`.
-- **#177, P37 part 6 (Svelte)**, merged as `MERGE177`: `--framework svelte`. DL-B3 is closed.
+- **#177, P37 part 6 (Svelte)**, merged as `8d8b6f8`: `--framework svelte`. DL-B3 is closed.
 
 **The owner chose P35 next (2026-10-18).** The order of P41, P42 and P43 after it is still theirs.
 
