@@ -78,7 +78,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-A12 | medium | fixed in 3.1.0 | "Off-scale classes … the build errors on them" and "`p-7` is a build error" are false. |
 | SB-A13 | medium | fixed in 3.2.0 | `style-prop-custom-properties-only` rejects the legal pattern that the references document. |
 | SB-A14 | medium | fixed in 3.2.0 | the three gates disagree about the laws |
-| SB-A15 | medium | fixed in 3.3.0: every hole is examples in the spec, run through the audit and stylelint (`test_rules_spec.TheAuditFollowsTheSpec.test_every_example`, `test_real_tools.StylelintConfig.test_every_example_of_the_spec`, `test_theme_css_passes_the_override_that_guards_it`), PR #23. SCSS in stylelint is P37's (D3) | The stylelint allowlist has holes. |
+| SB-A15 | medium | fixed in 3.3.0: every hole is examples in the spec, run through the audit and stylelint (`test_rules_spec.TheAuditFollowsTheSpec.test_every_example`, `test_real_tools.StylelintConfig.test_every_example_of_the_spec`, `test_theme_css_passes_the_override_that_guards_it`), PR #23. SCSS in stylelint is done too, PR #169 (D3) | The stylelint allowlist has holes. |
 | SB-A16 | medium | fixed in 3.1.0 | Five hook failures, all run in a scratch repo. |
 | SB-A17 | medium | fixed in 3.2.0 | Several version facts are out of date (registry, 2026-09-23). |
 | SB-A18 | medium | fixed in 3.2.0 | The documented tailwind-merge config drops classes. |
@@ -94,7 +94,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | SB-B3 | — | fixed in 3.4.0: `test_browser_runtime.test_the_focus_ring_is_measured_at_each_density_the_page_declares` (PR #40) | focus, forced-colors and density aren't checked by any gate in the build flow. |
 | SB-B4 | — | fixed in 3.3.0: `--border-invalid` (`test_contract.InvalidFieldsLookInvalid`, `test_check_roles`); translucency needs no role, since the ESLint config refuses `/NN` and names the roles | the contract is missing roles the references need. |
 | SB-B5 | — | fixed in 4.0.0: `test_tw_probe.TheVariantsTheReferenceTeaches`, PR #127 | parts of Tailwind v4 aren't covered. |
-| SB-B6 | — | W12 (3.6.0+) | SCSS and other stacks. |
+| SB-B6 | — | in part in 4.0.0: SCSS in stylelint, PR #169 (D3); the stacks are P37's | SCSS and other stacks. |
 | SB-C1 | S-M | fixed: 3.1.0 did SB-A3, A4 and A10, and 3.3.0 did SB-A9 and A24 | Fix the audit's precision (SB-A3, A4, A9, A10, A24) before wiring the PostToolUse hook. |
 | SB-C2 | M · high | fixed in 3.3.0 (N2: PRs #18 and #19; `test_rules_spec`, `test_real_tools`, `test_tools.SyncRules`) | Write one machine-readable rule spec plus conformance fixtures, shared by audit_design, stylelint and ESLint. |
 | SB-C3 | S-M · high | fixed in 4.0.0: `test_tw_probe.TheProbe`, `test_commands.TheChains`, PR #126 | Ship a `tw_probe` script and a `/tw-probe` skill command. |
