@@ -17,12 +17,15 @@ them first found three gaps, fixed here:
 from __future__ import annotations
 
 import json
+import pathlib
 import shutil
 import unittest
 
-from wds_support import PLUGIN, SKILLS, TempDirTest, output, run_py
+from wds_support import SKILLS, TempDirTest, output, run_py
 
-STACKS = PLUGIN / "tests" / "fixtures" / "stacks"
+# The fixtures are the tests' inputs, read beside the tests, so fail_before.py
+# runs an older release's gates on them.
+STACKS = pathlib.Path(__file__).resolve().parent / "fixtures" / "stacks"
 STARTER = SKILLS / "web-design-studio" / "assets" / "starter" / "styles"
 
 # Each stack: the folder its config names for the starter's styles, then what
