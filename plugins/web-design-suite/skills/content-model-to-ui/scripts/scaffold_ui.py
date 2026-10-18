@@ -94,8 +94,7 @@ NATIVE_CONTROLS = {
     "password-input", "number-input", "currency-input", "percent-input",
     "stepper", "checkbox", "switch", "select", "radio-group", "multi-select",
     "date-picker", "datetime-picker", "time-picker", "slug-input",
-    "tag-input", "json-editor", "color-picker", "readonly-text",
-    "readonly-timestamp",
+    "color-picker", "readonly-text", "readonly-timestamp",
 }
 
 STUB_REASON = {
@@ -115,6 +114,13 @@ STUB_REASON = {
     "geo-point": "needs a map provider",
     "date-range": "two coupled date inputs that validate against each other",
     "key-value-editor": "needs the key whitelist from the .shape question",
+    # A text box bound to the array or the object corrupted it: `String()`
+    # made tags comma text and JSON `[object Object]` (Codex on #176). Each
+    # needs text of its own that is not yet a value.
+    "tag-input": "the tag being typed is not a tag yet, so it needs its own text, an add and a "
+                 "remove per tag, and a live region that announces each",
+    "json-editor": "JSON is invalid while it is typed, so it needs its own text, a parse on blur "
+                   "and the parse error shown; or fields, if the .shape question names the keys",
 }
 
 TS_KEYWORDS = {"default", "class", "function", "new", "delete", "case"}
@@ -843,6 +849,8 @@ export type RadioGroupProps = {
   /** The ids of the help and the error, as `describedBy` builds them. */
   describedBy?: string;
   invalid?: boolean;
+  /** The group says so (`aria-required`) and so does each radio. */
+  required?: boolean;
 };
 
 export function RadioGroup({
@@ -854,6 +862,7 @@ export function RadioGroup({
   labelledBy,
   describedBy,
   invalid,
+  required,
 }: RadioGroupProps) {
   return (
     <div
@@ -862,6 +871,7 @@ export function RadioGroup({
       aria-labelledby={labelledBy}
       aria-describedby={describedBy}
       aria-invalid={invalid || undefined}
+      aria-required={required || undefined}
     >
       {options.map((option) => (
         <label className={styles.option} key={option}>
@@ -871,6 +881,7 @@ export function RadioGroup({
             value={option}
             checked={value === option}
             disabled={disabled}
+            required={required}
             className={styles.toggleInput}
             onChange={() => onValueChange?.(option)}
           />
@@ -1536,7 +1547,9 @@ def cell_render(col: dict[str, Any], row: str = "row",
                 else f" /* TODO(join): show the {parent} label; answer "
                      f"`{table['name']}.{col['name']}.label_column` */")
         return out(f"{acc}{note}", cls="truncate")
-    if ctrl in ("textarea", "rich-text", "json-editor"):
+    if ctrl == "json-editor":                    # `String()` of an object is `[object Object]`
+        return out(f"JSON.stringify({acc} ?? null)", cls="truncate")
+    if ctrl in ("textarea", "rich-text"):
         return out(f"String({acc} ?? '')", cls="truncate")
     if ctrl == "tag-input":
         return out(f"({acc} ?? []).join(', ')", cls="truncate")
@@ -2036,9 +2049,13 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ",
             # parent table, and the option shows the answered label column.
             options = (f"{indent}    {{/* TODO(options): one <option> per "
                        f"parent row, showing `{spec['labelColumn']}` */}}")
+        # A multiple select's value is the array, and so is what it sends
+        # (Codex on #176): a string selected nothing and sent one option.
+        value, read = ((f"{acc} ?? []", "Array.from(e.target.selectedOptions, (option) => option.value)")
+                       if multi else (f"String({acc} ?? '')", "e.target.value"))
         return (f"{indent}<Select{multi}\n{indent}  {common}\n"
-                f"{indent}  value={{String({acc} ?? '')}}\n"
-                f"{indent}  onChange={{(e) => onChange({q}, e.target.value)}}\n"
+                f"{indent}  value={{{value}}}\n"
+                f"{indent}  onChange={{(e) => onChange({q}, {read})}}\n"
                 f"{indent}>\n{blank}{options}\n{indent}</Select>")
     if ctrl == "radio-group":
         opts = json.dumps(spec.get("options") or [])
@@ -2049,6 +2066,7 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ",
                 f"{indent}  labelledBy={{fieldId({q}) + '-label'}}\n"
                 f"{indent}  describedBy={{{err} ? fieldId({q}) + '-error' : undefined}}\n"
                 f"{indent}  invalid={{Boolean({err})}}\n"
+                f"{indent}  required={{{str(spec.get('required', False)).lower()}}}\n"
                 f"{indent}  onValueChange={{(next) => onChange({q}, next)}}\n"
                 f"{indent}/>")
     if ctrl in ("switch", "checkbox"):
@@ -2087,7 +2105,9 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ",
                         f"differ by the currency's scale on every read and write.")
         return (f"{indent}<NumberInput\n{indent}  {common}{extra}{note}\n"
                 f"{indent}  value={{{acc} ?? ''}}\n"
-                f"{indent}  onChange={{(e) => onChange({q}, e.target.valueAsNumber)}}\n"
+                # An emptied input reads NaN; the draft holds null (Codex on #176).
+                f"{indent}  onChange={{(e) => onChange({q}, Number.isNaN(e.target.valueAsNumber) "
+                f"? null : e.target.valueAsNumber)}}\n"
                 f"{indent}/>")
     if ctrl in ("readonly-text", "readonly-timestamp"):
         return (f"{indent}<TextInput\n{indent}  {common}\n"
@@ -3435,8 +3455,13 @@ const model = defineModel<string>();
   <input v-model="model" class="ui-control" v-bind="$attrs">
 """),
     "NumberInput": _vue_control("""\
-/** The number as the input reads it (`valueAsNumber`): NaN while empty. */
+/** The number the input reads (`valueAsNumber`), or null once it is emptied. */
 const model = defineModel<number | null>();
+
+function read(event: Event) {
+  const value = (event.target as HTMLInputElement).valueAsNumber;
+  model.value = Number.isNaN(value) ? null : value;
+}
 """, """\
   <input
     type="number"
@@ -3444,7 +3469,7 @@ const model = defineModel<number | null>();
     class="ui-control numeric"
     :value="model ?? ''"
     v-bind="$attrs"
-    @input="model = ($event.target as HTMLInputElement).valueAsNumber"
+    @input="read"
   >
 """),
     "TextArea": _vue_control("""\
@@ -3479,8 +3504,10 @@ withDefaults(
     /** The ids of the help and the error, as `describedBy` builds them. */
     describedBy?: string;
     invalid?: boolean;
+    /** The group says so (`aria-required`) and so does each radio. */
+    required?: boolean;
   }>(),
-  { disabled: false, labelledBy: undefined, describedBy: undefined, invalid: false },
+  { disabled: false, labelledBy: undefined, describedBy: undefined, invalid: false, required: false },
 );
 const model = defineModel<string | null>({ default: null });
 """, """\
@@ -3490,6 +3517,7 @@ const model = defineModel<string | null>({ default: null });
     :aria-labelledby="labelledBy"
     :aria-describedby="describedBy"
     :aria-invalid="invalid || undefined"
+    :aria-required="required || undefined"
     v-bind="$attrs"
   >
     <label v-for="option in options" :key="option" class="option">
@@ -3499,6 +3527,7 @@ const model = defineModel<string | null>({ default: null });
         :name="name"
         :value="option"
         :disabled="disabled"
+        :required="required"
         class="toggleInput"
       >
       {{ option }}
@@ -3641,7 +3670,9 @@ def vue_control(spec: dict[str, Any], indent: str = "        ") -> str:
         if not opts and spec.get("labelColumn"):
             lines.append(vue_comment(f"TODO(options): one <option> per parent row, showing "
                                      f"`{spec['labelColumn']}`", indent + "  "))
-        return vue_tag("Select", multi + common + [text_model, update()], indent,
+        # A multiple select's v-model is the array (Codex on #176).
+        model_value = f':model-value="{vue_attr(f"{acc} ?? []")}"' if multi else text_model
+        return vue_tag("Select", multi + common + [model_value, update()], indent,
                        "\n".join(lines) or vue_comment("TODO(options): the closed set", indent + "  "))
     if ctrl == "radio-group":
         opts = "[" + ", ".join(js_string(o) for o in spec.get("options") or []) + "]"
@@ -3651,7 +3682,8 @@ def vue_control(spec: dict[str, Any], indent: str = "        ") -> str:
             f':options="{vue_attr(opts)}"', ':disabled="disabled"',
             f':labelled-by="{vue_attr(fid + " + " + chr(39) + "-label" + chr(39))}"',
             f':described-by="{vue_attr(error_id)}"',
-            f':invalid="{vue_attr(f"Boolean({err})")}"', update("next")], indent)
+            f':invalid="{vue_attr(f"Boolean({err})")}"',
+            f':required="{str(spec.get("required", False)).lower()}"', update("next")], indent)
     if ctrl in ("switch", "checkbox"):
         return vue_tag("Toggle", [
             f':id="{vue_attr(fid)}"', f'label="{vue_static(spec["label"])}"',
@@ -4121,12 +4153,14 @@ def emit_vue_states(table: dict[str, Any], model: dict[str, Any],
         " * retrofitting this state means touching every list in the app.")
 
     def block(doc: str, emits: str, kind: str, headline: str, body: str, note: str | None,
-              action: tuple[str, str, str] | None, props: str = "") -> str:
-        """`action` is (variant, event, label)."""
+              action: tuple[str, str, str] | None, props: str = "", bound: str | None = None) -> str:
+        """`action` is (variant, event, label). `body` is copy, the answers'
+        among it, so it is always text; `bound` is an expression instead
+        (CodeRabbit on #176: copy that began with `:` became a directive)."""
         script = "import { Button, StateBlock } from '../../ui';\n" if action else \
                  "import { StateBlock } from '../../ui';\n"
         script += f"\n/**\n * {doc}\n */\n" + props + emits
-        body_attr = body if body.startswith(":") else f'body="{vue_static(body)}"'
+        body_attr = f':body="{vue_attr(bound)}"' if bound else f'body="{vue_static(body)}"'
         tag = (f'  <StateBlock\n    kind="{kind}"\n    headline="{vue_static(headline)}"\n'
                f"    {body_attr}\n  >\n")
         if action:
@@ -4157,10 +4191,11 @@ def emit_vue_states(table: dict[str, Any], model: dict[str, Any],
             "The request failed. Always offer the retry — an error with no way forward\n"
             " * is a dead end, and users reload the whole app instead.",
             "const emit = defineEmits<{ retry: [] }>();\n", "error",
-            f"Something went wrong loading {human}", ':body="error?.message"',
+            f"Something went wrong loading {human}", "",
             f"TODO(copy): say what failed in the user's terms, not the transport's. "
             f"\"We could not load your {human}\" beats \"Request failed\".",
-            ("primary", "retry", "Try again"), "defineProps<{ error?: Error }>();\n\n"),
+            ("primary", "retry", "Try again"), "defineProps<{ error?: Error }>();\n\n",
+            bound="error?.message"),
         "Forbidden": block(
             f"The user is not allowed to see these rows.\n *\n * {forbidden_note}",
             "", "forbidden", f"You do not have access to {human}",

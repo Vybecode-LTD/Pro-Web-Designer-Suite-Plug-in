@@ -147,7 +147,15 @@ const [mode, ...rest] = process.argv.slice(2);
 (async () => {
   let result = {};
   if (mode === 'compile') rest.forEach(compileVue);
-  else result = await render(path.resolve(rest[0]));
+  else if (mode === 'ssr') {
+    // One component, with its props.
+    const vue = require('vue');
+    const { renderToString } = require('vue/server-renderer');
+    const props = JSON.parse(rest[1]);
+    const Comp = require(path.resolve(rest[0])).default;
+
+    result = { html: await renderToString(vue.createSSRApp({ render: () => vue.h(Comp, props) })) };
+  } else result = await render(path.resolve(rest[0]));
   console.log(JSON.stringify({ problems, ...result }));
   process.exit(problems.length ? 1 : 0);
 })().catch((e) => { console.log(JSON.stringify({ problems: [String(e.stack || e)] })); process.exit(1); });
@@ -374,6 +382,50 @@ class TheVueScaffold(VueOutput):
                               cwd=self.tmp)
                 report = json.loads(proc.stdout)
                 self.assertEqual(report["errors"], 0, json.dumps(report, indent=2))
+
+    def test_arrays_nulls_and_required_survive_the_controls(self):
+        """Review of #176 (Codex, 4; CodeRabbit, 1), in React and Vue alike: a
+        multiple select bound a string, an emptied number sent NaN, tags and
+        JSON went through `String()`, a required radio group said so only
+        with its asterisk, and a state's copy that began with `:` became a
+        directive."""
+        mod = load_script("content-model-to-ui", "scaffold_ui")
+        multi = {"name": "tags", "label": "Tags", "control": "multi-select", "required": True,
+                 "options": ["red", "green", "blue"]}
+        self.assertIn("value={values.tags ?? []}", mod.control_jsx(multi))
+        self.assertIn("Array.from(e.target.selectedOptions, (option) => option.value)", mod.control_jsx(multi))
+        self.assertIn(':model-value="values.tags ?? []"', mod.vue_control(multi))
+        number = {"name": "qty", "label": "Qty", "control": "number-input", "required": False}
+        self.assertIn("Number.isNaN(e.target.valueAsNumber) ? null : e.target.valueAsNumber",
+                      mod.control_jsx(number))
+        self.assertIn("model.value = Number.isNaN(value) ? null : value;",
+                      read(self.src / "ui" / "Control" / "NumberInput.vue"))
+        for control in ("tag-input", "json-editor"):
+            spec = {"name": "x", "label": "X", "control": control, "required": False}
+            with self.subTest(control=control):
+                self.assertIn(f'<ControlStub control="{control}"', mod.control_jsx(spec))
+                self.assertIn(f'<ControlStub control="{control}"', mod.vue_control(spec))
+        json_col = {"name": "meta", "type": "jsonb", "ui": {"control": "json-editor"}}
+        self.assertEqual("JSON.stringify(row.meta ?? null)", mod.cell_render(json_col)["jsx"])
+        self.assertIn("required={true}", mod.control_jsx({**multi, "control": "radio-group"}))
+        self.assertIn("aria-required={required || undefined}", mod.CONTROL_TSX)
+        self.assertIn("required={required}", mod.CONTROL_TSX)
+        self.assertIn('    :required="true"\n', self.orders(self.src, "OrderForm.vue").split("<RadioGroup")[1])
+        # Rendered: the group and each radio are required. (A select's slotted
+        # options are selected by the runtime's v-model, which a server
+        # render does not run.)
+        ui = self.src / "ui" / "Control"
+        html = self.node("ssr", str(ui / "RadioGroup.vue"), json.dumps(
+            {"name": "p", "options": ["a", "b"], "modelValue": None, "required": True}))["html"]
+        self.assertIn('aria-required="true"', html)
+        self.assertEqual(2, len(re.findall(r'<input[^>]* required[^>]*>', html)), html)
+        # The answers' copy is text, whatever it begins with.
+        out = scaffold(self.tmp, "colon", "--framework", "vue",
+                       answers={**ANSWERS, "orders.empty_state": {"body": ": nothing yet"}})
+        empty = out / "features" / "orders" / "OrdersEmpty.vue"
+        self.assertIn('    body=": nothing yet"\n', read(empty))
+        self.assertIn(":body=\"error?.message\"", read(out / "features" / "orders" / "OrdersError.vue"))
+        self.assertIn(": nothing yet</p>", self.node("ssr", str(empty), "{}")["html"])
 
     def test_server_actions_are_reacts_alone(self):
         proc = run_py("content-model-to-ui", "scaffold_ui", "model.json", "--out", "sa", "--framework", "vue",

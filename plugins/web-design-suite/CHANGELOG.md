@@ -198,6 +198,14 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
 ### Fixed
 
+- **The scaffold's controls keep arrays, nulls and the required state** (review of #176, React and
+  Vue alike). A multiple select bound `String(value)` and sent one option; it binds the array and
+  sends the selected options. An emptied number input sent `NaN`; it sends `null`. `tag-input` and
+  `json-editor` went through a text box's `String()`, which made tags comma text and JSON
+  `[object Object]`: each is now a marked stub, since the text being typed is not yet a value, and
+  a JSON cell shows `JSON.stringify`. A required radio group said so only with its hidden
+  asterisk; the group carries `aria-required` and each radio `required`. And a Vue state's copy
+  from the answers that began with `:` was written as a directive.
 - **`a11y_static` read a framework's document shell as a whole page** (P37 part 3). A Next.js
   root layout (`<body>{children}</body>`), a Vite `index.html` (`<div id="app">`), SvelteKit's
   `app.html` (`%sveltekit.body%`) and an Astro layout (`<slot />`) each got `no-main-landmark`,
