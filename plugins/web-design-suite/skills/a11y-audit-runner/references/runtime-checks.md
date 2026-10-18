@@ -36,6 +36,7 @@ Four practical requirements before any of this is meaningful:
 - **Freeze animation.** A ring measured mid-transition is a false negative and a colour sampled mid-fade is a false positive. Before measuring, the runner pauses every animation and finishes every transition, with the same freeze `snapshot_matrix.mjs` uses (`scripts/browser_common.mjs`). Shortening an animation is not enough: a spinner that keeps turning changes pixels between the two screenshots, and counts as a ring that is not there.
 - **Wait for fonts.** `document.fonts.ready` before any geometry, or every rect is measured against the fallback face.
 - **Pin the viewport, DPR, locale, timezone and colour scheme.** Measurements you cannot reproduce cannot be regressed against.
+- **Read the composed tree.** `querySelectorAll` and a `TreeWalker` stop at a shadow root, so a web-component library's controls would be checked by axe alone. Every check here reads through each open root, and each closed one: a script's, kept by a wrapped `attachShadow` that runs before the page's own scripts, and the parser's (`<template shadowrootmode="closed">`), handed over through Chromium's DevTools protocol. A closed root is shown to axe for the length of its run. `scripts.md` §2 has the paths and the report's count.
 
 ---
 
@@ -129,7 +130,7 @@ The listing is the single highest-yield output in the whole runner and almost no
 
 ### What it still misses
 
-Shadow DOM (unless the selector engine pierces it), cross-origin iframes (focus enters and the content is opaque — which at least shows you *whether* it comes back), and the browser's own chrome, which a real user reaches with Tab and a headless run does not.
+Cross-origin iframes (focus enters and the content is opaque — which at least shows you *whether* it comes back), and the browser's own chrome, which a real user reaches with Tab and a headless run does not. Shadow roots are read (§1): focus inside one is followed to the element itself, and the sequence is compared in the order the browser tabs, with a slot standing for what is assigned to it.
 
 ---
 

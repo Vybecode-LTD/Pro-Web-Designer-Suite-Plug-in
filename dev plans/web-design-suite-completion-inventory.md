@@ -169,7 +169,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-A19 | low | fixed in 3.2.0 | smaller errors in the docs. |
 | GT-B1 | — | fixed in 4.0.0: `--wait-for` and `--steps` in the gates that open a URL (`test_runtime_reach`, PR #163) | SPA and dynamic states. |
 | GT-B2 | — | fixed in 4.0.0: `--storage-state` and `--header`, the header for the page's own origin only (`test_runtime_reach`, PR #163) | Authenticated pages. |
-| GT-B3 | — | W11 (3.6.0+) | Shadow DOM. |
+| GT-B3 | — | fixed in 4.0.0: the runtime checks and the critique's contrast read through open and closed shadow roots (`test_runtime_shadow`, PR #165) | Shadow DOM. |
 | GT-B4 | — | W11 (3.6.0+) | Multiple URLs and viewports. |
 | GT-B5 | — | fixed in 3.4.0: `scripts/crux_check.py` (`test_crux_check`, PR #46) | The field-data loop. |
 | GT-B6 | — | W11 (3.6.0+) | Checks the coverage table lists as automatable but that don't exist. |

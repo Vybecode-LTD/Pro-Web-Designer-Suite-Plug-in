@@ -223,6 +223,12 @@
  },
  {
   "from": "a11y-audit-runner/references/runtime-checks.md",
+  "to": "a11y-audit-runner/references/scripts.md",
+  "section": "2",
+  "heading": "`scripts/a11y_runtime.mjs` — Node + Playwright + axe-core"
+ },
+ {
+  "from": "a11y-audit-runner/references/runtime-checks.md",
   "to": "web-design-studio/references/accessibility-testing.md",
   "section": "3",
   "heading": "Forced colors / Windows High Contrast"
@@ -232,6 +238,12 @@
   "to": "web-design-studio/references/accessibility.md",
   "section": "4",
   "heading": "Keyboard"
+ },
+ {
+  "from": "a11y-audit-runner/references/scripts.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "1",
+  "heading": "What changes when you render it"
  },
  {
   "from": "a11y-audit-runner/references/scripts.md",

@@ -27,6 +27,27 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   error status exits 2 too: vitals and the critique used to measure and capture a 401
   page as if it were the page. a11y-audit-runner's `references/scripts.md` gives the
   steps' format. `test_runtime_reach`, `test_json_guards`.
+- **The runtime checks read through shadow roots** (P34 part 2; GT-B3). The names,
+  tab-order, focus, contrast, keymap and reflow checks used `querySelectorAll` and a
+  `TreeWalker`, which stop at a shadow root, so a web-component library's controls were
+  checked by axe alone. `browser_common.mjs`' `DEEP_DOM` walks the composed tree in the
+  order the browser renders and tabs through it, a slot standing for what is assigned to
+  it:
+  - every open root, and every closed one: a script's, kept by a wrapped `attachShadow`
+    that runs before the page's own scripts, and the parser's
+    (`<template shadowrootmode="closed">`), handed over by `keepClosedRoots()` through
+    Chromium's DevTools protocol; a closed root is shown to axe for the length of its run;
+  - focus inside a root is followed to the element itself, and `blur()` reaches it; a
+    host whose root delegates focus is not a stop of its own (Codex on #165);
+  - a background is composited up through slots and hosts, so white text slotted onto a
+    dark band the shadow tree paints is no longer measured on the white page;
+  - a path names an element host by host, `main > x-card >> button.icon`, which a
+    keymap's selectors take too (Playwright reads it through open roots).
+
+  The report's `shadowRoots` counts the roots read, and a closed root no check could
+  read is a `closed-shadow-roots-unread` warning, never a silent pass.
+  `critique_snapshots.mjs` samples text through the same roots, after its captures.
+  `test_runtime_shadow`.
 - **`tw_probe.mjs` and `/tw-probe`** (P36 part 2; SB-C3). web-design-studio's new
   script compiles a Tailwind v4 project's entry stylesheet with the project's own
   tailwindcss and checks what it generates. Tailwind writes no CSS for a class it does not

@@ -52,7 +52,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { NAV_OPTIONS, arrive, contrastRatio, launchBrowser, loadPlaywright, navContext, newNav, readNav, takeNavOption } from './browser_common.mjs';
+import { DEEP_DOM, NAV_OPTIONS, arrive, contrastRatio, keepClosedRoots, launchBrowser, loadPlaywright, navContext, newNav, readNav, takeNavOption, unreadRoots } from './browser_common.mjs';
 
 function die(message) {
   process.stderr.write(`critique_snapshots: ${message}\n`);
@@ -132,8 +132,10 @@ function pageUrl(page) {
 // paint, composited as the browser does, as sRGB triples; the ratio is worked
 // out in Node with the suite's one copy of the WCAG maths. Text is a text
 // node, or what a form control shows: its value, a button input's label, or
-// its placeholder (Codex on #71).
+// its placeholder (Codex on #71). The tree is the composed one, through each
+// shadow root (browser_common's DEEP_DOM, P34).
 const SAMPLE_TEXT = () => {
+  const deep = window.__wdsDeep;
   const pixel = document.createElement('canvas');
   pixel.width = 1;
   pixel.height = 1;
@@ -182,7 +184,7 @@ const SAMPLE_TEXT = () => {
     let back = { r: 0, g: 0, b: 0, a: 0 };
     let shown = 1;
     let painted = null;
-    for (let n = el; n; n = n.parentElement) {
+    for (let n = el; n; n = deep.parentOf(n)) {
       const ns = getComputedStyle(n);
       // An image only matters where nothing opaque already covers it.
       if (back.a < 1 && ns.backgroundImage && ns.backgroundImage !== 'none') {
@@ -211,18 +213,19 @@ const SAMPLE_TEXT = () => {
     out.push({ ...row, fg: round(under(text, canvasColour)), bg: round(under(back, canvasColour)) });
   };
 
+  // Slotted text takes its colour from its slot, which draws no box: the
+  // colour is the slot's, the box and the walk up are the element's that
+  // draws it.
   const seen = new Set();
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  let node;
-  while ((node = walker.nextNode())) {
-    const el = node.parentElement;
-    if (!el || seen.has(el) || (node.nodeValue || '').trim().length < 2) continue;
-    seen.add(el);
-    if (/^(script|style|noscript|template|textarea|select|option)$/i.test(el.tagName)) continue;
-    sample(el, getComputedStyle(el).color, where(el));
+  for (const [node, paint] of deep.texts(document.body)) {
+    const el = deep.boxOf(paint);
+    if (!el || seen.has(paint) || (node.nodeValue || '').trim().length < 2) continue;
+    seen.add(paint);
+    if (/^(script|style|noscript|template|textarea|select|option)$/i.test(paint.tagName)) continue;
+    sample(el, getComputedStyle(paint).color, where(node.parentElement || el));
   }
   const NO_TEXT = /^(hidden|checkbox|radio|range|color|file|image)$/;
-  for (const el of document.querySelectorAll('input, textarea, select')) {
+  for (const el of deep.query(document, 'input, textarea, select')) {
     if (el.tagName === 'INPUT' && NO_TEXT.test((el.type || '').toLowerCase())) continue;
     const value = el.tagName === 'SELECT'
       ? (el.selectedOptions[0] ? el.selectedOptions[0].text : '') : el.value;
@@ -307,6 +310,8 @@ async function main() {
   const shots = [];
   let contrast = [];
   let wide = null;
+  // What each view said of the closed shadow roots no sample read.
+  const unread = new Set();
   try {
     fs.mkdirSync(opts.out, { recursive: true });
     for (const width of WIDTHS) {
@@ -340,6 +345,10 @@ async function main() {
           // Both widths: a breakpoint can show text, or recolour it, at one
           // only (Codex on #71).
           if (mode.name !== 'reduced-motion') {
+            // Set after the capture, so nothing it adds can show in a PNG.
+            await page.evaluate(DEEP_DOM);
+            const note = unreadRoots(await keepClosedRoots(page));
+            if (note) unread.add(note);
             contrast = contrast.concat(contrastTable(await page.evaluate(SAMPLE_TEXT), mode.colorScheme, width));
           }
         } finally {
@@ -382,6 +391,9 @@ async function main() {
     warnings.push(`${overflow.join(', ')}: the page is wider than the viewport. With no ` +
                   '<meta name="viewport" content="width=device-width"> a phone lays it out 980px ' +
                   'wide and shows it zoomed out; otherwise something overflows.');
+  }
+  for (const note of unread) {
+    warnings.push(`${note}, so the contrast table says nothing about the text inside them.`);
   }
   if (opts.json) {
     process.stdout.write(JSON.stringify({ page: opts.page, browser: launched.label, out: opts.out,
