@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="title">
+<title id="title">Thirteen skills, one system: the usual chain on a client project</title>
+<desc>Start: design-token-migration, figma-variables-sync. Build: web-design-studio, content-model-to-ui, landing-page-conversion. Prove: component-state-matrix, perf-budget-gate, a11y-audit-runner, design-critique-gate. Hand over: design-system-docs, client-presentation-builder. Govern: design-system-versioning. Alongside: email-template-system.</desc><style>.sans{font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}.mono{font-family:ui-monospace,SFMono-Regular,'Cascadia Mono','Segoe UI Mono',Consolas,'Liberation Mono',Menlo,monospace}text{font-kerning:normal}</style>
+<rect x="0.5" y="0.5" width="1279" height="759" rx="28" fill="#090706" stroke="#2c2826"/>
+<text x="64.0" y="78.0" class="mono" font-size="15" font-weight="700" fill="#fe7553" text-anchor="start" letter-spacing="2.5">THE USUAL CHAIN ON A CLIENT PROJECT</text>
+<text x="62.0" y="128.0" class="sans" font-size="38" font-weight="800" fill="#fbf8f8" text-anchor="start" letter-spacing="-1">Thirteen skills, one system.</text>
+<text x="64.0" y="166.0" class="sans" font-size="20" font-weight="400" fill="#d6d1d0" text-anchor="start">Each loads when the work reaches it. web-design-studio holds the tokens and the gate the rest stand on.</text>
+<line x1="96" y1="236" x2="96" y2="604" stroke="#2c2826" stroke-width="2"/>
+<line x1="96" y1="604" x2="96" y2="696" stroke="#2c2826" stroke-width="2" stroke-dasharray="4 6"/>
+<circle cx="96" cy="236" r="19" fill="#171413" stroke="#e8440a" stroke-width="2"/>
+<text x="96.0" y="242.0" class="sans" font-size="16" font-weight="800" fill="#fe7553" text-anchor="middle">1</text>
+<text x="134.0" y="233.0" class="sans" font-size="21" font-weight="750" fill="#fbf8f8" text-anchor="start">Start</text>
+<text x="134.0" y="257.0" class="sans" font-size="15" font-weight="400" fill="#d6d1d0" text-anchor="start">inherited or handed over</text>
+<rect x="352.0" y="214" width="238.6" height="44" rx="22" fill="#171413" stroke="#2c2826"/>
+<text x="471.3" y="241.0" class="mono" font-size="15" font-weight="500" fill="#f4f1f0" text-anchor="middle">design-token-migration</text>
+<rect x="602.6" y="214" width="220.0" height="44" rx="22" fill="#171413" stroke="#2c2826"/>
+<text x="712.6" y="241.0" class="mono" font-size="15" font-weight="500" fill="#f4f1f0" text-anchor="middle">figma-variables-sync</text>
+<circle cx="96" cy="328" r="19" fill="#171413" stroke="#e8440a" stroke-width="2"/>
+<text x="96.0" y="334.0" class="sans" font-size="16" font-weight="800" fill="#fe7553" text-anchor="middle">2</text>
+<text x="134.0" y="325.0" class="sans" font-size="21" font-weight="750" fill="#fbf8f8" text-anchor="start">Build</text>
+<text x="134.0" y="349.0" class="sans" font-size="15" font-weight="400" fill="#d6d1d0" text-anchor="start">design and build it</text>
+<rect x="352.0" y="306" width="192.1" height="44" rx="22" fill="#2f0a00" stroke="#e8440a" stroke-width="1.6"/>
+<text x="448.1" y="333.0" class="mono" font-size="15" font-weight="700" fill="#fe7553" text-anchor="middle">web-design-studio</text>
+<rect x="556.1" y="306" width="210.7" height="44" rx="22" fill="#171413" stroke="#2c2826"/>
+<text x="661.5" y="333.0" class="mono" font-size="15" font-weight="500" fill="#f4f1f0" text-anchor="middle">content-model-to-ui</text>
+<rect x="778.8" y="306" width="247.9" height="44" rx="22" fill="#171413" stroke="#2c2826"/>
+<text x="902.8" y="333.0" class="mono" font-size="15" font-weight="500" fill="#f4f1f0" text-anchor="middle">landing-page-conversion</text>
+<circle cx="96" cy="420" r="19" fill="#171413" stroke="#e8440a" stroke-width="2"/>
+<text x="96.0" y="426.0" class="sans" font-size="16" font-weight="800" fill="#fe7553" text-anchor="middle">3</text>
+<text x="134.0" y="417.0" class="sans" font-size="21" font-weight="750" fill="#fbf8f8" text-anchor="start">Prove</text>
+<text x="134.0" y="441.0" class="sans" font-size="15" font-weight="400" fill="#d6d1d0" text-anchor="start">every state, fast, usable</text>
+<rect x="352.0" y="398" width="238.6" height="44" rx="22" fill="#171413" stroke="#2c2826"/>
+<text x="471.3" y="425.0" class="mono" font-size="15" font-weight="500" fill="#f4f1f0" text-anchor="middle">component-state-matrix</text>
+<rect x="602.6" y="398" width="182.8" height="44" rx="22" fill="#171413" stroke="#2c2826"/>
+<text x="694.0" y="425.0" class="mono" font-size="15" font-weight="500" fill="#f4f1f0" text-anchor="middle">perf-budget-gate</text>
+<rect x="797.4" y="398" width="192.1" height="44" rx="22" fill="#171413" stroke="#2c2826"/>
+<text x="893.5" y="425.0" class="mono" font-size="15" font-weight="500" fill="#f4f1f0" text-anchor="middle">a11y-audit-runner</text>
+<rect x="1001.5" y="398" width="220.0" height="44" rx="22" fill="#171413" stroke="#2c2826"/>
+<text x="1111.5" y="425.0" class="mono" font-size="15" font-weight="500" fill="#f4f1f0" text-anchor="middle">design-critique-gate</text>
+<circle cx="96" cy="512" r="19" fill="#171413" stroke="#e8440a" stroke-width="2"/>
+<text x="96.0" y="518.0" class="sans" font-size="16" font-weight="800" fill="#fe7553" text-anchor="middle">4</text>
+<text x="134.0" y="509.0" class="sans" font-size="21" font-weight="750" fill="#fbf8f8" text-anchor="start">Hand over</text>
+<text x="134.0" y="533.0" class="sans" font-size="15" font-weight="400" fill="#d6d1d0" text-anchor="start">docs and the client's case</text>
+<rect x="352.0" y="490" width="201.4" height="44" rx="22" fill="#171413" stroke="#2c2826"/>
+<text x="452.7" y="517.0" class="mono" font-size="15" font-weight="500" fill="#f4f1f0" text-anchor="middle">design-system-docs</text>
+<rect x="565.4" y="490" width="285.1" height="44" rx="22" fill="#171413" stroke="#2c2826"/>
+<text x="708.0" y="517.0" class="mono" font-size="15" font-weight="500" fill="#f4f1f0" text-anchor="middle">client-presentation-builder</text>
+<circle cx="96" cy="604" r="19" fill="#171413" stroke="#e8440a" stroke-width="2"/>
+<text x="96.0" y="610.0" class="sans" font-size="16" font-weight="800" fill="#fe7553" text-anchor="middle">5</text>
+<text x="134.0" y="601.0" class="sans" font-size="21" font-weight="750" fill="#fbf8f8" text-anchor="start">Govern</text>
+<text x="134.0" y="625.0" class="sans" font-size="15" font-weight="400" fill="#d6d1d0" text-anchor="start">every change after launch</text>
+<rect x="352.0" y="582" width="257.2" height="44" rx="22" fill="#171413" stroke="#2c2826"/>
+<text x="480.6" y="609.0" class="mono" font-size="15" font-weight="500" fill="#f4f1f0" text-anchor="middle">design-system-versioning</text>
+<circle cx="96" cy="696" r="19" fill="#171413" stroke="#2c2826" stroke-width="2" stroke-dasharray="4 4"/>
+<text x="96.0" y="702.0" class="sans" font-size="16" font-weight="800" fill="#fe7553" text-anchor="middle">+</text>
+<text x="134.0" y="693.0" class="sans" font-size="21" font-weight="750" fill="#fbf8f8" text-anchor="start">Alongside</text>
+<text x="134.0" y="717.0" class="sans" font-size="15" font-weight="400" fill="#d6d1d0" text-anchor="start">the same tokens, as email</text>
+<rect x="352.0" y="674" width="229.3" height="44" rx="22" fill="#171413" stroke="#2c2826" stroke-dasharray="5 4"/>
+<text x="466.6" y="701.0" class="mono" font-size="15" font-weight="500" fill="#f4f1f0" text-anchor="middle">email-template-system</text>
+</svg>

@@ -1,0 +1,6 @@
+.field label { color: #464646; margin-bottom: 5px; }
+.field input { border: 1px solid #ccc; padding: 7px 10px; color: #333333; }
+.field .hint { color: #888; margin-top: 3px; }
+.field .hint--muted { color: #999; }
+.button { padding: 10px 30px; color: #fff; }
+.button--ghost { color: #696969; border: 1px solid #9a9a9a; }

@@ -1,26 +1,39 @@
 <div align="center">
 
-# Pro Web Designer Suite
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/hero-dark.svg">
+  <img alt="Pro Web Designer Suite, a Claude Code plugin: a design system with a gate on it. 13 skills, 16 commands, 6 subagents and 5 gate tools." src=".github/assets/readme/hero-light.svg" width="100%">
+</picture>
 
-**`web-design-suite`, a Claude Code plugin: a design system with a gate on it.**
+<br><br>
 
-Thirteen skills for designing and building websites that stay coherent when more than one person, or more than one Claude session, touches them. Tokens, one home for each component's styles, cascade layers, contrast that is measured rather than assumed, and gates that fail the build on drift.
+[![Latest release](https://img.shields.io/github/v/release/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in?label=release&color=cc3c00&style=for-the-badge&labelColor=171413)](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/total?label=downloads&color=cc3c00&style=for-the-badge&labelColor=171413)](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/ci.yml?branch=main&label=CI&style=for-the-badge&labelColor=171413)](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-cc3c00?style=for-the-badge&labelColor=171413)](LICENSE)
 
-[![Latest release](https://img.shields.io/github/v/release/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in?label=release)](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/releases/latest)
-[![CI](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-
-[Install](#install) · [Quick start](#quick-start-in-60-seconds) · [What's inside](#whats-inside) · [What the gates check](#what-the-gates-check) · [FAQ](#faq) · [Full reference](plugins/web-design-suite/README.md)
+**[Install](#install)** &nbsp;·&nbsp; **[Quick start](#quick-start-in-60-seconds)** &nbsp;·&nbsp; **[What's inside](#whats-inside)** &nbsp;·&nbsp; **[The gates](#what-the-gates-check)** &nbsp;·&nbsp; **[FAQ](#faq)** &nbsp;·&nbsp; **[Full reference](plugins/web-design-suite/README.md)**
 
 </div>
+
+<br>
+
+**`web-design-suite`** is a Claude Code plugin for building websites that stay coherent when more than one person, or more than one Claude session, touches them. Thirteen skills share one design system: tokens, one home for each component's styles, cascade layers, contrast that is measured rather than assumed, and gates that fail the build on drift.
 
 ---
 
 ## Why
 
-Most design-system advice is a style guide: a document everyone agrees with and nobody enforces. Six months and three developers later, the site has fourteen greys, five spacing values that are nearly 16px, and a button styled from two files.
+Most design-system advice is a style guide: a document everyone agrees with and nobody enforces. Six months and three developers later, the site has seventeen greys, five spacing values that are nearly 16px, and a button styled from two files.
 
 This suite turns every rule into a script that can fail. The scripts run after each edit Claude makes (when you turn the hooks on), in a pre-commit hook, and in CI, so drift is caught where it starts instead of in a redesign.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/census-dark.svg">
+  <img alt="The census: 17 distinct greys found in a three-file sample, clustered onto seven roles on one neutral ramp: fg-default, fg-muted, fg-subtle, fg-disabled, border-strong, border-default and border-subtle." src=".github/assets/readme/census-light.svg" width="100%">
+</picture>
+
+<sub>A real run of <code>/web-design-suite:migrate</code> on a three-file sample: 42 literals, 17 distinct greys among them, each mapped onto the role it was trying to be.</sub>
 
 **It's for you if you:**
 
@@ -117,6 +130,11 @@ The first runs the static halves of the design, accessibility and performance ga
 You get every hard-coded design value, clustered into the decisions it was trying to be, with a token mapping proposed. Then ask Claude to migrate onto those tokens: it applies the codemod one kind of value at a time, each batch reviewed and committed on its own, and freezes what's left as a baseline, so the gate goes on today and the old debt can only shrink.
 
 ## What's inside
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/skill-map-dark.svg">
+  <img alt="Thirteen skills, one system. Start: design-token-migration, figma-variables-sync. Build: web-design-studio, content-model-to-ui, landing-page-conversion. Prove: component-state-matrix, perf-budget-gate, a11y-audit-runner, design-critique-gate. Hand over: design-system-docs, client-presentation-builder. Govern: design-system-versioning. Alongside: email-template-system." src=".github/assets/readme/skill-map-light.svg" width="100%">
+</picture>
 
 ### Thirteen skills
 
@@ -234,6 +252,36 @@ It never overwrites a file it didn't write, and it prints the exact `npm i -D -E
 
 Each gate has a static half, fast enough for every commit, and most have a browser half that runs on a served build.
 
+<img alt="The design gate on a drifting card.css: raw spacing, a raw colour, a raw radius, a child margin, an off-scale font size, an ID selector, compound specificity, !important and a raw z-index. 10 errors across Laws 1, 2 and 5, exit 1. After the fix, on tokens: clean, exit 0." src=".github/assets/readme/gate-report.svg" width="100%">
+
+<sub>A real run of <code>audit_design.py --strict</code>, each finding cut to its first line. The same card on tokens passes.</sub>
+
+<details>
+<summary><b>The same card, on tokens</b></summary>
+
+```css
+@layer components {
+  .card {
+    display: grid;
+    gap: var(--gap-related);
+    padding: var(--pad-card);
+    background: var(--bg-surface);
+    color: var(--fg-muted);
+    border-radius: var(--radius-md);
+  }
+  .card__title {
+    font: var(--type-h3);
+  }
+  .promo .card {
+    z-index: var(--z-raised);
+  }
+}
+```
+
+The title's margin is gone: the card owns the gap between its children (Law 2). The ID became a class, and `!important` went with it (Law 5).
+
+</details>
+
 | Gate | Static | In a browser |
 |---|---|---|
 | **Tokens and style architecture** | Raw lengths, colours, shadows, durations, radii and z-indexes outside the token file; child margins; off-scale and arbitrary values; inline styles; a class styled from two files; `!important`, IDs, nesting depth, unlayered styles and layer order; primitives read from components. | |
@@ -243,6 +291,11 @@ Each gate has a static half, fast enough for every commit, and most have a brows
 | **State matrix** | Every component's states, densities and themes generated on one proof sheet, with any state that has no rule flagged. | Each cell screenshotted and compared with its baseline. |
 | **System changes** | Each change to the tokens classed as major, minor or patch, with unannounced removals gated. | |
 | **Docs and email** | The docs diffed against the code they describe; email linted before and after the build. | The email rendered light, dark and without styles. |
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/pipeline-dark.svg">
+  <img alt="Where drift gets caught. 1, Claude edits a file: the opt-in hooks. 2, you commit: the pre-commit hook. 3, a pull request or a push to main: design-gates.yml, on Linux and Windows. 4, you release: release-check." src=".github/assets/readme/pipeline-light.svg" width="100%">
+</picture>
 
 **Where each one runs.** The pre-commit hook runs stylelint, ESLint, the design audit, the static accessibility check and, when a token file is staged, the contrast check. The CI workflow from `/web-design-suite:install-gate` runs the design audit and both halves of the accessibility and performance gates. The state matrix, the system diff, the docs check and the email build run from the `gate-matrix`, `release-check`, `docs-check` and `email-build` commands, and the state-matrix and docs skills give the CI job to add for theirs.
 
@@ -479,9 +532,12 @@ python -B -m unittest discover -s tests
 | [`tooling`](tooling) | The pinned tools the tests run the shipped configs through, and the release build. |
 | [`.github/workflows`](.github/workflows) | `ci.yml` runs the suite on three platforms; a `v*` tag makes `release.yml` build the release. |
 | [`dev plans`](dev%20plans) | The reviews, the phase plans and the reports. |
+| [`.github/assets/readme`](.github/assets/readme) | This page's pictures, which [`dev plans/readme-art/build_readme_art.py`](dev%20plans/readme-art/build_readme_art.py) draws. |
 | [`CLAUDE.md`](CLAUDE.md) and [`docs/HANDOFF.md`](docs/HANDOFF.md) | For whoever works on it next: the project map, and the current state with the next steps. |
 
 </details>
+
+<sub>Every picture on this page is the suite's own output. The palette is what <code>/web-design-suite:new-system "#e8440a"</code> generates, the census and the gate report are real runs on the samples in <a href="dev%20plans/readme-art"><code>dev plans/readme-art</code></a>, and its <code>build_readme_art.py</code> redraws them all, refusing to write a picture whose text falls below its WCAG floor.</sub>
 
 ## License
 
