@@ -139,7 +139,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   of a ternary, an array's items, a spread's, not a call's argument), each string as
   `style=""`, and one property at a time, with Angular's unit joined to its number. A
   visual property is L4, and a custom property's written-out design literal or Tier-1
-  primitive is L1 or L6, as in JSX. The migration census (`extract_literals.py`) skipped
+  primitive is L1 or L6, as in JSX. Commented-out markup is blanked first, as the census
+  blanks it, so neither reads an element that never renders. The migration census (`extract_literals.py`) skipped
   these as expressions; it carries the same reader verbatim and counts each written-out
   value as an inline style, left to hand work. The spec's `inline_styles.bound` holds
   every form; ESLint parses no `.vue`, `.svelte` or Angular template (N49, scheduled).

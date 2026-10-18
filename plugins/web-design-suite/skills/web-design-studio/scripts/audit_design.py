@@ -484,6 +484,8 @@ TAG_STYLE_ATTR = re.compile(r"""<[a-zA-Z][\w:-]*\b[^>]*?\sstyle\s*=\s*(["'])(.*?
 # HTML email cannot use custom properties or layers, so this script's laws do
 # not fit it; email-template-system's lint_email is its gate.
 EMAIL_MARKERS = ("<!--[if mso", "<!--[if gte mso", "urn:schemas-microsoft-com")
+# Commented-out markup never renders: the census blanks it too (template_of).
+HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
 
 IGNORE_LINE = re.compile(r"design-audit-ignore-next-line\s*:?\s*([\w,\s]*)")
 IGNORE_FILE = re.compile(r"design-audit-ignore-file\s*:?\s*([\w,\s]*)")
@@ -2325,6 +2327,10 @@ def audit_template(path: Path, text: str) -> list[Finding]:
 
     markup = _blank(text, style_spans + [m.span(1) for m in SCRIPT_BLOCK.finditer(text)],
                     keep=False)
+    # Commented-out markup is no element: blanked, as the census blanks it, so the
+    # two read the same bound styles (CodeRabbit on #168). The ignore pragmas are
+    # read from the raw lines above.
+    markup = _blank(markup, [m.span() for m in HTML_COMMENT.finditer(markup)], keep=False)
     line_of = _line_finder(text)
 
     def add(line: int, law: str, rule: str, sev: str, msg: str, fix: str, snippet: str = "") -> None:

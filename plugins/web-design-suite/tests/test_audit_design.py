@@ -1024,8 +1024,10 @@ class TheAuditReadsBoundStyles(TempDirTest):
 
     def test_what_is_not_a_bound_style_is_not_read(self):
         # Text that spells a directive, an object passed to a call, an index,
-        # a `<` inside a value, and a plain style="" read once.
+        # a `<` inside a value, a plain style="" read once, and commented-out
+        # markup, which the census blanks too (CodeRabbit on #168).
         text = ("<template>\n  <p>Use style:color or [style.color] to bind it.</p>\n"
+                "  <!-- <div :style=\"{ color: '#fff' }\" style=\"padding: 13px\">old</div> -->\n"
                 "  <div :style=\"fn({ color: 'red' })\" v-if=\"a<b\">a</div>\n"
                 "  <div :style=\"styles['card']\">b</div>\n"
                 "  <div style=\"--progress: 40%\" :style=\"{ '--card-span': span }\">c</div>\n</template>\n")
