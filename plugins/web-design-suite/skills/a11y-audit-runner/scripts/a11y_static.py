@@ -766,35 +766,49 @@ def blank_comments(text: str) -> str:
 # written by the framework.
 METADATA_EXPORT = re.compile(
     r"^\s*export\s+(?:const\s+metadata\b|(?:async\s+)?function\s+generateMetadata\b)", re.M)
-MODULE_SCRIPT = re.compile(r"<script\b[^>]*\btype\s*=\s*[\"']?module\b[^>]*\bsrc\s*=", re.I)
+# A module script with a src, its attributes in any order (Codex on #172).
+MODULE_SCRIPT = re.compile(r"<script\b(?=[^>]*\btype\s*=\s*[\"']?module\b)(?=[^>]*\bsrc\s*=)", re.I)
+# The expressions that render a page into its shell: `{children}`,
+# `{props.children}`, Svelte's `{@render children()}`. Any other expression is
+# the page's own content (Codex on #172: `{'hello'}` is no outlet).
+CHILDREN_OUTLET = re.compile(r"\{\s*(?:@render\s|(?:[\w$]+\.)*children\s*\})")
 
 
 def shell_outlets(path: Path, clean: str, nodes: list[Node], is_jsx: bool) -> tuple[bool, bool]:
     """Does this document render its body, and its head, from elsewhere?
 
-    The body: a `<slot>` (Astro, a web component), a component or an
-    expression (`{children}`, `{@render children()}`), SvelteKit's
-    `%sveltekit.body%`, or an empty element with an id in a page that loads
-    a module script (the mount point of a Vite app: `<div id="app">`). The
-    head: SvelteKit's `%sveltekit.head%`, Next.js's Metadata API, or a
-    Next.js `layout` file, whose pages each give their own title."""
+    The body: a `<slot>` (Astro, a web component), a component, the
+    children's expression (`{children}`, `{@render children()}`), SvelteKit's
+    `%sveltekit.body%`, or, in a page that loads a module script, a body
+    that is one empty element with an id beside its scripts (the mount point
+    of a Vite app: `<div id="app">`). The head: SvelteKit's
+    `%sveltekit.head%`, Next.js's Metadata API, or a `layout` file in an
+    `app/` folder (Next.js's App Router), whose pages each give their own
+    title."""
     body = next((n for n in nodes if n.tag.name == "body"), None)
     head = next((n for n in nodes if n.tag.name == "head"), None)
     raw_body = clean[body.inner_start:body.inner_end] if body else clean
     raw_head = clean[head.inner_start:head.inner_end] if head else ""
     within = list(subtree(body)) if body else nodes
     expressions = is_jsx or path.suffix.lower() in {".astro", ".svelte"}
-    mount_point = MODULE_SCRIPT.search(clean) is not None and any(
-        "id" in d.tag.attrs and not d.descendants and not d.text.strip()
-        and not (d.tag.self_closing or d.tag.name in VOID) for d in within)
+    # The body is the mount point alone, not a static page that also has an
+    # empty `<div id="modal">` (Codex on #172).
+    content = [d for d in (body.descendants if body else [])
+               if d.tag.name not in {"script", "noscript", "template", "style", "link"}]
+    mount_point = (MODULE_SCRIPT.search(clean) is not None and len(content) == 1
+                   and "id" in content[0].tag.attrs and not content[0].descendants
+                   and not content[0].text.strip()
+                   and not (content[0].tag.self_closing or content[0].tag.name in VOID))
     body_outlet = (
         any(d.tag.name == "slot" or d.tag.name[:1].isupper() for d in within)
         or "%sveltekit.body%" in raw_body
-        or (expressions and re.search(r"\{(?!\s*/\*)", raw_body) is not None)
+        or (expressions and CHILDREN_OUTLET.search(raw_body) is not None)
         or mount_point)
+    # A `layout` names a Next.js layout only in the App Router's `app/` folder
+    # (Codex on #172: `src/layout.tsx` is any SSR component).
+    next_layout = path.stem == "layout" and "app" in path.parts[:-1]
     head_outlet = ("%sveltekit.head%" in raw_head
-                   or (is_jsx and (METADATA_EXPORT.search(clean) is not None
-                                   or path.stem == "layout")))
+                   or (is_jsx and (METADATA_EXPORT.search(clean) is not None or next_layout)))
     return body_outlet, head_outlet
 
 

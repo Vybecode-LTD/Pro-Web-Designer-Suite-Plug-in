@@ -168,6 +168,12 @@ class TheShellsRenderTheirPagesElsewhere(TempDirTest):
             "src/layouts/Base.astro": "---\nconst { title } = Astro.props;\n---\n"
                                       "<html lang=\"en\"><head><title>{title}</title></head>"
                                       "<body><slot /></body></html>\n",
+            # The attributes in either order, and the children through props (Codex on #172).
+            "vite/index.html": "<!doctype html><html lang=\"en\"><head><title>A</title>"
+                               "<script src=\"/src/main.ts\" type=\"module\"></script></head>"
+                               "<body><div id=\"root\"></div></body></html>\n",
+            "app/blog/layout.jsx": "export default function L(props) {\n"
+                                "  return (<html lang=\"en\"><body>{props.children}</body></html>);\n}\n",
         }
         for name, text in shells.items():
             with self.subTest(shell=name):
@@ -182,10 +188,24 @@ class TheShellsRenderTheirPagesElsewhere(TempDirTest):
                        "  return (<html lang=\"en\"><body><p>Hi</p></body></html>);\n}\n",
             "entity.html": "<!doctype html><html lang=\"en\"><head></head>"
                            "<body><p>Tom &amp; Jerry</p></body></html>\n",
+            # An expression of the page's own is no outlet (Codex on #172).
+            "Hello.tsx": "export default function H() {\n"
+                         "  return (<html lang=\"en\"><body><p>{'hello'}</p></body></html>);\n}\n",
+            "hello.astro": "<html lang=\"en\"><head></head><body><p>{'hello'}</p></body></html>\n",
+            # A static page with a module script and an empty element is no mount point (Codex on #172).
+            "modal.html": "<!doctype html><html lang=\"en\"><head><script type=\"module\" src=\"/a.js\">"
+                          "</script></head><body><p>Hi</p><div id=\"modal\"></div></body></html>\n",
         }
         for name, text in pages.items():
             with self.subTest(page=name):
                 self.assertEqual(self.rules(name, text), ["no-main-landmark", "no-title"])
+
+    def test_a_layout_outside_app_needs_its_title(self):
+        # Only the App Router's `app/` makes `layout` a Next.js layout (Codex on #172).
+        text = ("export default function L() {\n"
+                "  return (<html lang=\"en\"><head></head><body><main><h1>A</h1></main></body></html>);\n}\n")
+        self.assertEqual(self.rules("src/layout.tsx", text), ["no-title"])
+        self.assertEqual(self.rules("app/layout.tsx", text), [])
 
     def test_the_metadata_api_writes_the_title(self):
         text = ("export const metadata = { title: 'A' };\n"
