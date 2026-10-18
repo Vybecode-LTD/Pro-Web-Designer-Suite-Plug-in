@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "tokens": ["src/styles/tokens.css"],
+  "components": ["src/lib/components/**/*.svelte"]
+}

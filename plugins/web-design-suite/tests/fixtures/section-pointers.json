@@ -288,6 +288,12 @@
   "heading": "Content"
  },
  {
+  "from": "a11y-audit-runner/scripts/a11y_static.py",
+  "to": "web-design-studio/references/stack-frameworks.md",
+  "section": "1",
+  "heading": "What every stack shares"
+ },
+ {
   "from": "client-presentation-builder/SKILL.md",
   "to": "client-presentation-builder/references/evidence.md",
   "section": "1",
@@ -2044,6 +2050,30 @@
   "to": "web-design-studio/assets/starter/styles/reset.css",
   "section": "7",
   "heading": "FOCUS"
+ },
+ {
+  "from": "web-design-studio/references/stack-frameworks.md",
+  "to": "web-design-studio/references/project-contract.md",
+  "section": "1",
+  "heading": "`.design-suite.json`"
+ },
+ {
+  "from": "web-design-studio/references/stack-frameworks.md",
+  "to": "web-design-studio/references/stack-css-modules.md",
+  "section": "6",
+  "heading": "Layers, and the Vite ordering gotcha"
+ },
+ {
+  "from": "web-design-studio/references/stack-frameworks.md",
+  "to": "web-design-studio/references/stack-css-modules.md",
+  "section": "8",
+  "heading": "Passing runtime values (Law 4's only exception)"
+ },
+ {
+  "from": "web-design-studio/references/stack-frameworks.md",
+  "to": "web-design-studio/references/stack-vanilla-css.md",
+  "section": "4",
+  "heading": "`index.css` and the import order"
  },
  {
   "from": "web-design-studio/references/stack-tailwind.md",

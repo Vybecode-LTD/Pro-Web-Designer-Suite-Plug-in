@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The order, before SvelteKit's head: a component's styles must not be
+         the first to name `components`. -->
+    <style>@layer reset, vendor, tokens, base, layout, components, utilities, overrides;</style>
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div class="app-shell">%sveltekit.body%</div>
+  </body>
+</html>

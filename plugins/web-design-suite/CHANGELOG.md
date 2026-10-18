@@ -7,6 +7,22 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
 ### Added
 
+- **Next.js App Router, Vue, Svelte and Astro** (SB-B6, P37 part 3). The triggers are generic
+  ("build me a site"), but the references taught plain CSS, CSS Modules and Tailwind only.
+  web-design-studio's `stack-frameworks.md` gives each stack its global entry (the root layout,
+  `main.ts`, `+layout.svelte`, a layout's frontmatter), where the layer order is stated so a
+  component's styles cannot name `components` first (inlined in Vite's `index.html` and
+  SvelteKit's `app.html`), how each compiler's scoping meets the layer order (Vue's
+  `[data-v-…]`, Svelte's `.svelte-…` then `:where()`, Astro's three `scopedStyleStrategy`
+  values, each compiled from the fixtures), Vue's `v-bind()` and Astro's `define:vars` as Law
+  4's exception, SvelteKit's starter `style="display: contents"` moved to a class, the
+  `components` globs per stack, and which gate reads which file. Every framework fact is quoted
+  from its source with the URL. N49 is decided: a template is the audit's, since the ESLint
+  config's rules are written against JSX and a Vue or Svelte template is a syntax tree they
+  never visit. `tests/fixtures/stacks` holds a project per stack, on which the audit,
+  `a11y_static` and the census run clean and find what is planted in each stack's own place
+  (`test_stacks`).
+
 - **stylelint reads SCSS** (D3, P37 part 2). The config linted `.css` files only, so a `.scss`
   file had the audit alone. An override (Part 6) now reads every `.scss` file through
   `postcss-scss` with `stylelint-config-standard-scss` 17, restates the config's own rules over
@@ -149,6 +165,26 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
 ### Fixed
 
+- **`a11y_static` read a framework's document shell as a whole page** (P37 part 3). A Next.js
+  root layout (`<body>{children}</body>`), a Vite `index.html` (`<div id="app">`), SvelteKit's
+  `app.html` (`%sveltekit.body%`) and an Astro layout (`<slot />`) each got `no-main-landmark`,
+  and the first two `no-title`, though the page's `<main>` and title come through the outlet.
+  `shell_outlets()` leaves `<main>` to the pages when the body holds a slot, a component, an
+  expression, SvelteKit's placeholder or a module script's mount point, and the title when the
+  head holds `%sveltekit.head%` or the file is a Next.js `layout` or exports `metadata` or
+  `generateMetadata`. A document with none of these still needs both, an entity in its text
+  included. `test_stacks.TheShellsRenderTheirPagesElsewhere`.
+
+- **`a11y_static` read a `<slot>` as no content** (P37 part 3). `<a href="/x"><slot /></a>` in a
+  Vue or Astro component had no accessible name, where a component's content is already "cannot
+  tell". A `<slot>` now counts as content it cannot see. `test_stacks.TheShellsRenderTheirPagesElsewhere.test_a_slot_names_the_link_it_fills`.
+
+- **The census counted a shadow token as a shadow** (P37 part 3). It blanks `var(--name` before
+  its whole-value shadow check, so `box-shadow: var(--shadow-xs)` left `)` as a shadow literal,
+  three of them in the starter's own `base.css` and `layout.css`; a fallback became `, 0 1px 2px
+  #000)`. A reference alone is no literal now, and a fallback's or a second layer's values are
+  read part by part. `test_stacks.TheCensusReadsAShadowToken`.
+
 - **The audit read no bound inline style** (N48, P37 part 1). Its template reader wanted
   whitespace before `style=`, so Vue's `:style="{ color: '#fff' }"` passed, though Law 4
   fails the same declaration as `style=""` or JSX's `style={{…}}`; so did `v-bind:style`,
@@ -164,7 +200,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   blanks it, so neither reads an element that never renders. The migration census (`extract_literals.py`) skipped
   these as expressions; it carries the same reader verbatim and counts each written-out
   value as an inline style, left to hand work. The spec's `inline_styles.bound` holds
-  every form; ESLint parses no `.vue`, `.svelte` or Angular template (N49, scheduled).
+  every form; ESLint parses no `.vue`, `.svelte` or Angular template (N49, decided in P37 part 3:
+  the templates are the audit's).
   `test_audit_design.TheAuditReadsBoundStyles`,
   `test_token_migration.TheCensusReadsEveryStyleSource.test_bound_styles_are_inline_styles`.
 

@@ -872,6 +872,13 @@ def literals_from_value(
     # ---- whole-value kinds first, so their parts are not double-counted -----
     if is_shadow_prop and prop_l in {"box-shadow", "text-shadow"}:
         body = masked.strip()
+        # The caller blanks `var(--name`, which leaves its `)`, and a fallback's
+        # `, …)`: a reference alone is a token, not the shadow `)`, and a
+        # fallback's literals are read part by part below.
+        if not re.sub(r"[\s,()]", "", body):
+            return out
+        if body.count("(") != body.count(")"):
+            body = ""
         if body and body.lower() not in {"none", "inherit", "initial", "unset"} \
                 and "var(--" not in body:
             record("shadow", value.strip(), re.sub(r"\s+", " ", body.lower()),

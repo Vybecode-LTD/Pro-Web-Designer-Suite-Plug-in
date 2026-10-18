@@ -163,11 +163,12 @@ Read the file when you hit the decision it covers. Do not read them all up front
 | `references/accessibility-testing.md` | Before declaring anything done: the keyboard, zoom, forced-colors and screen-reader passes, and what scanners miss |
 | `references/handoff-conventions.md` | Repo structure, naming, Figma mapping, multi-dev rules, Claude Code handoff |
 | `references/review-checklist.md` | The final gate, every time |
-| `references/token-contract.md` | The shared vocabulary — identical across all thirteen suite skills |
+| `references/token-contract.md` | The shared vocabulary, identical in all thirteen skills |
 | `references/project-contract.md` | A project names its own tokens, components, budgets or baselines (`.design-suite.json`) |
-| `references/stack-tailwind.md` | The project uses Tailwind |
-| `references/stack-vanilla-css.md` | The project uses plain CSS + custom properties |
-| `references/stack-css-modules.md` | The project uses CSS Modules or SCSS Modules |
+| `references/stack-tailwind.md` | Tailwind |
+| `references/stack-vanilla-css.md` | Plain CSS and custom properties |
+| `references/stack-css-modules.md` | CSS Modules or SCSS Modules |
+| `references/stack-frameworks.md` | Next.js, Vue, Svelte or Astro |
 
 ---
 
