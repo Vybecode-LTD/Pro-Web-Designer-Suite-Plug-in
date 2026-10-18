@@ -812,6 +812,13 @@ class TheCensusReadsEveryStyleSource(TempDirTest):
         hand = [u for u in mapping["unmapped"] if "a bound style" in u["reason"]]
         self.assertTrue(hand, mapping["unmapped"])
 
+    def test_a_literal_in_either_arm_of_a_bound_condition_is_counted(self):
+        """Codex on #168: `on ? '9px' : p` was skipped whole as an expression."""
+        self.write("src/Arm.vue", "<template>\n  <div :style=\"{ paddingTop: on ? '9px' : p, "
+                   "color: theme === 'dark' ? c : d }\">a</div>\n</template>\n")
+        _, data = self.extract("src")
+        self.assertEqual([(2, "inline-style", "padding-top", "9px")], self.found(data, "Arm.vue"))
+
     def test_a_numeric_apply_is_counted_with_the_theme(self):
         """CodeRabbit on #157: `@apply p-4` holds a design value when a v4
         entry keeps `--spacing`, and the stylesheet scan was not given it."""

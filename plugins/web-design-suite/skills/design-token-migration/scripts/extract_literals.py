@@ -1176,6 +1176,36 @@ def bound_value(expr: str, at: int) -> tuple[str, str, int]:
     return "expr", v, at + lead
 
 
+def bound_branches(expr: str, at: int) -> list[tuple[str, int]]:
+    """The strings written out as a whole operand of an expression the value
+    may take: either arm of a ternary, either side of `||`, `??` or `&&`
+    (`on ? '12px' : gap`, Codex on #168). A string that is compared
+    (`t === 'dark'`) or passed to a call is no value."""
+    out: list[tuple[str, int]] = []
+    k, start, n = 0, 0, len(expr)
+
+    def piece(end: int) -> None:
+        kind, text, text_at = bound_value(expr[start:end], at + start)
+        if kind == "text":
+            out.append((text, text_at))
+
+    while k < n:
+        c = expr[k]
+        if c in "\"'`([{":
+            k = _bound_skip(expr, k)
+            continue
+        step = 2 if expr[k:k + 2] in ("||", "??", "&&") else \
+            1 if c == ":" or (c == "?" and expr[k + 1:k + 2] != ".") else 0
+        if step:
+            piece(k)
+            k += step
+            start = k
+            continue
+        k += 1
+    piece(n)
+    return out
+
+
 def _bound_declarations(text: str, at: int, kind: str) -> list[tuple[str, str, str, int]]:
     """A string's declarations, as style="" holds them: kind "css", or "expr"
     for a value a template literal fills in."""
@@ -1214,6 +1244,8 @@ def _bound_entries(inner: str, at: int) -> list[tuple[str, str, str, int]]:
             if kind == "number":
                 kind, value = "text", value + unit.group(2)
         out.append((key, kind, value, value_at))
+        if kind == "expr":
+            out.extend((key, "text", text, text_at) for text, text_at in bound_branches(value, value_at))
 
     while k < n:
         c = inner[k]
@@ -1291,6 +1323,9 @@ def bound_styles(markup: str) -> list[tuple[str, int, list[tuple[str, str, str, 
             entries = [(prop, kind, text, text_at)]
         else:
             continue
+        for prop, kind, text, text_at in list(entries):
+            if one and kind == "expr" and (delim == "{" or one.group(1)):   # `on ? '12px' : gap`
+                entries.extend((prop, "text", t, t_at) for t, t_at in bound_branches(text, text_at))
         found.append((name, at, entries))
     return found
 # ---- END bound-styles

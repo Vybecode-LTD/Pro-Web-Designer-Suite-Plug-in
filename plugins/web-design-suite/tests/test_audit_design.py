@@ -1033,6 +1033,18 @@ class TheAuditReadsBoundStyles(TempDirTest):
                 "  <div style=\"--progress: 40%\" :style=\"{ '--card-span': span }\">c</div>\n</template>\n")
         self.assertEqual([], self.found("src/components/Y.vue", text))
 
+    def test_a_literal_in_either_arm_of_a_condition_is_read(self):
+        """Codex on #168: `on ? '12px' : gap` read as one expression, so the
+        written-out arm escaped L1. A string that is compared is no value."""
+        for rel, markup in (("A.vue", "<template>\n  <div :style=\"{ '--gap': on ? '12px' : gap }\">a</div>\n</template>\n"),
+                            ("B.svelte", "<p></p>\n<div style:--gap={gap ?? '12px'}>a</div>\n"),
+                            ("c.component.html", "<p></p>\n<div [style.--gap]=\"on && '12px'\">a</div>\n")):
+            with self.subTest(file=rel):
+                self.assertEqual([(2, "L1", "inline-literal")], self.found(f"src/components/{rel}", markup))
+        self.assertEqual([], self.found("src/components/D.vue", (
+            "<template>\n  <div :style=\"{ '--tint': theme === 'dark' ? 'var(--bg-accent)' : 'var(--bg-muted)', "
+            "'--span': on ? span : 1 }\">a</div>\n</template>\n")))
+
     def test_a_tier1_primitive_in_a_custom_property_is_law_6(self):
         self.assertEqual([(1, "L6", "tier1-leak")],
                          self.found("src/components/Z.svelte", '<div style:--tint="var(--neutral-700)">a</div>\n'))
