@@ -498,6 +498,13 @@ async function focus(root) {
   const target = window.document.body;
   mount(Harness, { target, props: { api } });
   flush();
+  if (process.argv[2] === 'select') {               // a harness that renders a multiple select
+    const picked = () => Array.from(target.querySelectorAll('option')).filter((o) => o.selected).map((o) => o.value);
+    const first = picked();
+    api.set(['green']);
+    flush();
+    return { picked: [first, picked()] };
+  }
   const submit = (then) => {
     api.then(then);
     target.querySelector('form').dispatchEvent(new window.Event('submit', { cancelable: true, bubbles: true }));
@@ -734,6 +741,25 @@ class TheSvelteScaffold(SvelteOutput):
         select = mod.svelte_control(multi)
         self.assertIn("value={values.tags ?? []}", select)
         self.assertIn("Array.from(e.currentTarget.selectedOptions, (option) => option.value)", select)
+        # Codex on #177: does the spread's array reach a native multiple
+        # select? Svelte's attribute effect calls `select_option`, which
+        # selects each option in the array; mounted, and then updated:
+        (self.tmp / "Harness.svelte").write_bytes(b"""\
+<script lang="ts">
+  import Select from './src/ui/Control/Select.svelte';
+
+  let { api }: { api: Record<string, unknown> } = $props();
+  let value = $state(['red', 'blue']);
+  api.set = (next: string[]) => { value = next; };
+</script>
+
+<Select multiple {value}>
+  <option value="red">red</option>
+  <option value="green">green</option>
+  <option value="blue">blue</option>
+</Select>
+""")
+        self.assertEqual([["red", "blue"], ["green"]], self.node("select", "src")["picked"])
         self.assertIn("Number.isNaN(e.currentTarget.valueAsNumber) ? null : e.currentTarget.valueAsNumber",
                       mod.svelte_control({"name": "qty", "label": "Qty", "control": "number-input"}))
         for control in ("tag-input", "json-editor"):
