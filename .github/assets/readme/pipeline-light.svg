@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="580" viewBox="0 0 1280 580" role="img" aria-labelledby="title">
 <title id="title">Where drift gets caught: Claude's edit, the commit, the pull request, the release</title>
-<desc>1, Claude edits a file: the opt-in hooks run the design audit, the static accessibility check, the token diff, the email build and the generated-file guard. 2, you commit: the pre-commit hook runs stylelint, ESLint, the design audit, the static accessibility check and role contrast. 3, a pull request or a push to main: design-gates.yml runs the design audit and the accessibility and performance gates, static and in a browser, on Linux and Windows. 4, you release: release-check diffs the system, classes the change, gates removals, and writes the changelog and migration guide.</desc><style>.sans{font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}.mono{font-family:ui-monospace,SFMono-Regular,'Cascadia Mono','Segoe UI Mono',Consolas,'Liberation Mono',Menlo,monospace}text{font-kerning:normal}</style>
+<desc>1, Claude edits a file: the opt-in hooks run the design audit, the static accessibility check, the token diff, the email build and the generated-file guard. 2, you commit: the pre-commit hook runs stylelint, ESLint, the design audit, the static accessibility check and role contrast. 3, a pull request or a push to main: design-gates.yml runs the design audit and the accessibility and performance gates, static and in a browser, on Linux, and the static gates on Windows. 4, you release: release-check diffs the system, classes the change, gates removals, and writes the changelog and migration guide.</desc><style>.sans{font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}.mono{font-family:ui-monospace,SFMono-Regular,'Cascadia Mono','Segoe UI Mono',Consolas,'Liberation Mono',Menlo,monospace}text{font-kerning:normal}</style>
 <rect x="0.5" y="0.5" width="1279" height="579" rx="28" fill="#fbf8f8" stroke="#d6d1d0"/>
 <text x="64.0" y="78.0" class="mono" font-size="15" font-weight="700" fill="#9e2f00" text-anchor="start" letter-spacing="2.5">WHERE DRIFT GETS CAUGHT</text>
 <text x="62.0" y="128.0" class="sans" font-size="38" font-weight="800" fill="#090706" text-anchor="start" letter-spacing="-1">Caught where it starts.</text>
@@ -46,11 +46,13 @@
 <path d="M684.0 378.3 l4.5 4.5 l8.4 -9.2" fill="none" stroke="#006731" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="708.0" y="384.0" class="sans" font-size="16" font-weight="400" fill="#171413" text-anchor="start">design audit</text>
 <path d="M684.0 410.3 l4.5 4.5 l8.4 -9.2" fill="none" stroke="#006731" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="708.0" y="416.0" class="sans" font-size="16" font-weight="400" fill="#171413" text-anchor="start">a11y: static + browser</text>
+<text x="708.0" y="416.0" class="sans" font-size="16" font-weight="400" fill="#171413" text-anchor="start">a11y + perf, static</text>
 <path d="M684.0 442.3 l4.5 4.5 l8.4 -9.2" fill="none" stroke="#006731" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="708.0" y="448.0" class="sans" font-size="16" font-weight="400" fill="#171413" text-anchor="start">perf: static + browser</text>
+<text x="708.0" y="448.0" class="sans" font-size="16" font-weight="400" fill="#171413" text-anchor="start">a11y + perf, browser</text>
 <path d="M684.0 474.3 l4.5 4.5 l8.4 -9.2" fill="none" stroke="#006731" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="708.0" y="480.0" class="sans" font-size="16" font-weight="400" fill="#171413" text-anchor="start">on Linux and Windows</text>
+<text x="708.0" y="480.0" class="sans" font-size="16" font-weight="400" fill="#171413" text-anchor="start">Linux: all of it</text>
+<path d="M684.0 506.3 l4.5 4.5 l8.4 -9.2" fill="none" stroke="#006731" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="708.0" y="512.0" class="sans" font-size="16" font-weight="400" fill="#171413" text-anchor="start">Windows: static only</text>
 <path d="M938 375 h20 m-8 -8 l8 8 l-8 8" fill="none" stroke="#9e2f00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 <rect x="966" y="206" width="272" height="338" rx="20" fill="#ffffff" stroke="#d6d1d0"/>
 <circle cx="1006" cy="248" r="18" fill="#cc3c00"/>

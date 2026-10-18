@@ -294,7 +294,7 @@ The title's margin is gone: the card owns the gap between its children (Law 2). 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/pipeline-dark.svg">
-  <img alt="Where drift gets caught. 1, Claude edits a file: the opt-in hooks. 2, you commit: the pre-commit hook. 3, a pull request or a push to main: design-gates.yml, on Linux and Windows. 4, you release: release-check." src=".github/assets/readme/pipeline-light.svg" width="100%">
+  <img alt="Where drift gets caught. 1, Claude edits a file: the opt-in hooks. 2, you commit: the pre-commit hook. 3, a pull request or a push to main: design-gates.yml, every gate on Linux and the static ones on Windows. 4, you release: release-check." src=".github/assets/readme/pipeline-light.svg" width="100%">
 </picture>
 
 **Where each one runs.** The pre-commit hook runs stylelint, ESLint, the design audit, the static accessibility check and, when a token file is staged, the contrast check. The CI workflow from `/web-design-suite:install-gate` runs the design audit and both halves of the accessibility and performance gates. The state matrix, the system diff, the docs check and the email build run from the `gate-matrix`, `release-check`, `docs-check` and `email-build` commands, and the state-matrix and docs skills give the CI job to add for theirs.

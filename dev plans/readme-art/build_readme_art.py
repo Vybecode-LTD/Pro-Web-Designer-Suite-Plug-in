@@ -351,8 +351,8 @@ STAGES = [
     ("Claude edits a file", "opt-in hooks", ["design audit", "static a11y check", "token diff", "email build",
                                               "generated-file guard"]),
     ("You commit", "pre-commit hook", ["stylelint + ESLint", "design audit", "static a11y check", "role contrast"]),
-    ("PR or push to main", "design-gates.yml", ["design audit", "a11y: static + browser", "perf: static + browser",
-                                                 "on Linux and Windows"]),
+    ("PR or push to main", "design-gates.yml", ["design audit", "a11y + perf, static", "a11y + perf, browser",
+                                                 "Linux: all of it", "Windows: static only"]),
     ("You release", "/…:release-check", ["system diff", "major · minor · patch", "removals gated", "changelog",
                                           "migration guide"]),
 ]
@@ -389,7 +389,7 @@ def pipeline(p) -> str:
                "diff, the email build and the generated-file guard. 2, you commit: the pre-commit hook runs stylelint, "
                "ESLint, the design audit, the static accessibility check and role contrast. 3, a pull request or a push "
                "to main: design-gates.yml runs the design audit and the accessibility and performance gates, static and "
-               "in a browser, on Linux and Windows. 4, you release: release-check diffs the system, classes the change, "
+               "in a browser, on Linux, and the static gates on Windows. 4, you release: release-check diffs the system, classes the change, "
                "gates removals, and writes the changelog and migration guide.")
 
 
