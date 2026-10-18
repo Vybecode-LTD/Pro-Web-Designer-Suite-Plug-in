@@ -1,0 +1,4 @@
+.header { color: #333; padding: 13px 22px; border-bottom: 1px solid #ddd; }
+.header__nav a { color: #666; margin-right: 15px; }
+.header__nav a:hover { color: #343434; }
+.logo { margin-right: 26px; color: #353535; }

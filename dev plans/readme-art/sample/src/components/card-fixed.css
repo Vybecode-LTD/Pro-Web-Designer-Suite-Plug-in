@@ -1,0 +1,16 @@
+@layer components {
+  .card {
+    display: grid;
+    gap: var(--gap-related);
+    padding: var(--pad-card);
+    background: var(--bg-surface);
+    color: var(--fg-muted);
+    border-radius: var(--radius-md);
+  }
+  .card__title {
+    font: var(--type-h3);
+  }
+  .promo .card {
+    z-index: var(--z-raised);
+  }
+}

@@ -1,0 +1,15 @@
+@layer components {
+  .card {
+    padding: 13px 20px;
+    background: var(--bg-surface);
+    color: #333;
+    border-radius: 6px;
+  }
+  .card__title {
+    margin-bottom: 10px;
+    font-size: 17px;
+  }
+  #promo .card {
+    z-index: 999 !important;
+  }
+}

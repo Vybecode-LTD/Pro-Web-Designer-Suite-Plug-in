@@ -1,0 +1,4 @@
+.card { color: #3a3a3a; padding: 15px; border: 1px solid #dedede; margin-bottom: 22px; }
+.card__meta { color: #777; font-size: 13px; margin-top: 7px; }
+.card__body { color: #444; line-height: 1.5; padding: 10px 17px; }
+.card__footer { color: #787878; border-top: 1px solid #e0e0e0; padding-top: 10px; }
