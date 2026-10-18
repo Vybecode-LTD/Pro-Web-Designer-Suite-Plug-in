@@ -530,6 +530,19 @@ class DependencyFacts(unittest.TestCase):
             pinned = json.loads((TOOLING / "main" / "package.json").read_bytes())["devDependencies"]
             self.assertEqual(("17.0.0", "4.0.9"), (pinned["stylelint-config-standard-scss"], pinned["postcss-scss"]))
 
+    @unittest.skipUnless(TOOLING, "reads the repository's tooling/")
+    def test_the_vue_the_scaffold_is_compiled_with_is_pinned(self):
+        """P37 part 5, read from registry.npmjs.org on 2026-10-18: vue 3.5.44
+        (published 2026-10-13) depends on @vue/compiler-sfc and
+        @vue/server-renderer 3.5.44 exactly. The scaffold's form needs 3.5's
+        `useTemplateRef`."""
+        pinned = json.loads((TOOLING / "main" / "package.json").read_bytes())["devDependencies"]
+        self.assertEqual("3.5.44", pinned["vue"])
+        lock = json.loads((TOOLING / "main" / "package-lock.json").read_bytes())["packages"]
+        for name in ("@vue/compiler-sfc", "@vue/server-renderer"):
+            with self.subTest(package=name):
+                self.assertEqual("3.5.44", lock[f"node_modules/{name}"]["version"])
+
     def test_eslint_is_a_supported_major_and_jsx_a11y_is_let_onto_it(self):
         head = self.header("eslint.design.config.mjs")
         self.assertGreaterEqual(major(head, "eslint") or 0, 10,

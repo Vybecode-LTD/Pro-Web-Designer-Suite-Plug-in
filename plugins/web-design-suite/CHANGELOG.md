@@ -7,6 +7,23 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
 ### Added
 
+- **The scaffold writes Vue** (DL-B3, P37 part 5). content-model-to-ui wrote React 19 only.
+  `scaffold_ui.py --framework vue` writes the kit and each entity's list, detail, form and six
+  states as Vue 3.5 single-file components: `<script setup lang="ts">`, React's props as
+  `defineProps`, its callbacks as `defineEmits`, a `v-model` on each control, `<slot />` for
+  `children`, and each CSS Module's rules in a `<style scoped>` block inside `@layer components`
+  (the seven controls share `ui/Control/Control.css` through `<style scoped src>`). A root's class
+  is the component's name, never `.root`, because Vue puts a parent's scope on a child's root
+  element too. The form keeps React's three rules: its summary takes focus once per failed
+  attempt (a `flush: 'post'` watcher on a `useTemplateRef`) and never for a later blur. The types,
+  the fields, `lib/`, `server/` and `db/` are the React scaffold's files; the Tailwind stack works
+  as it does for React; `--server-actions` stays React's (exit 2 with Vue). The tests compile every
+  component with the real compiler (`vue` 3.5.44, now pinned in `tooling/main`), render the form
+  on the server to read the ids its aria attributes name, and drive its focus through the runtime,
+  each with a control that fails; the output passes the audit (`--strict`) and `a11y_static`.
+- **`a11y_static.py` reads Vue's `v-bind="$attrs"` as a spread** (P37 part 5), as it reads JSX's
+  `{...rest}`: the object may supply the label, the `alt` or the name, so a control with one is no
+  longer "unlabelled".
 - **The scaffold's forms post to Next.js server actions** (DL-B3, P37 part 4). content-model-to-ui
   wrote client-side React forms only. `scaffold_ui.py --server-actions` writes each form as a
   Client Component whose `<form action>` posts its FormData to `server/<table>.actions.ts`, a

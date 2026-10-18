@@ -2,9 +2,10 @@
 """scaffold_ui.py — step 4 of the content-model-to-ui workflow.
 
 Take the `model.json` that `introspect_schema.py` produced, plus the answers to
-the questions it asked, and write a React 19 + TypeScript scaffold: one folder
-per entity with a list view, a detail view, a form, and the empty, loading and
-error states that generators normally leave to default.
+the questions it asked, and write a React 19 (or, with --framework vue, a Vue
+3.5) + TypeScript scaffold: one folder per entity with a list view, a detail
+view, a form, and the empty, loading and error states that generators normally
+leave to default.
 
 WHAT THIS IS AND IS NOT
 -----------------------
@@ -47,6 +48,9 @@ USAGE
 
     # Tailwind instead of CSS Modules
     python -m scripts.scaffold_ui model.json --out src --stack tailwind
+
+    # Vue 3.5 single-file components instead of React
+    python -m scripts.scaffold_ui model.json --out src --framework vue
 
 Then, always:
 
@@ -1477,7 +1481,7 @@ def cell_render(col: dict[str, Any], row: str = "row",
 
     def out(jsx: str, *, element: bool = False, cls: str = "",
             helper: str | None = None) -> dict[str, Any]:
-        return {"jsx": jsx, "element": element, "class": cls, "helper": helper}
+        return {"jsx": jsx, "element": element, "class": cls, "helper": helper, "acc": acc}
 
     if ctrl == "currency-input":
         money = ans.money(table, col)
@@ -3203,6 +3207,19 @@ TW_ROOT_UTILITIES = {
 }
 
 
+def tw_class(name: str, component: str) -> str:
+    """One CSS Module class as the Tailwind stack writes it: its utilities,
+    and the `styles/scaffold.css` class for a state they cannot express."""
+    if name == "root":
+        return f"{TW_SCAFFOLD_CLASS['root']} {TW_ROOT_UTILITIES.get(component, '')}".strip()
+    parts = []
+    if name in TW_SCAFFOLD_CLASS:
+        parts.append(TW_SCAFFOLD_CLASS[name])
+    if name in TW_UTILITIES:
+        parts.append(TW_UTILITIES[name])
+    return " ".join(parts)
+
+
 def tailwindify(tsx: str, component: str) -> str:
     """Rewrite a CSS-Modules component as a Tailwind one.
 
@@ -3211,22 +3228,10 @@ def tailwindify(tsx: str, component: str) -> str:
     because a utility system has nothing to say about a state machine and
     faking one with arbitrary values would break Law 3.
     """
-    root_utils = TW_ROOT_UTILITIES.get(component, "")
-
-    def resolve(name: str) -> str:
-        if name == "root":
-            return f"{TW_SCAFFOLD_CLASS['root']} {root_utils}".strip()
-        parts = []
-        if name in TW_SCAFFOLD_CLASS:
-            parts.append(TW_SCAFFOLD_CLASS[name])
-        if name in TW_UTILITIES:
-            parts.append(TW_UTILITIES[name])
-        return " ".join(parts)
-
     out = re.sub(r"^import styles from '[^']*';\n", "", tsx, flags=re.M)
     # `styles.foo` becomes a string literal, leaving every cn() composition
     # intact so a caller's own `className` still reaches the element.
-    out = re.sub(r"styles\.(\w+)", lambda m: f"'{resolve(m.group(1))}'", out)
+    out = re.sub(r"styles\.(\w+)", lambda m: f"'{tw_class(m.group(1), component)}'", out)
     # cn('x') with nothing to compose is just 'x'.
     out = re.sub(r"cn\('([^']*)'\)", lambda m: f"'{m.group(1)}'", out)
     # Having collapsed those, cn may now be unreferenced — and an unused
@@ -3241,6 +3246,1014 @@ def tailwindify(tsx: str, component: str) -> str:
         out = re.sub(r"^(import \{ [^}]*?), cn(,? )",
                      lambda m: m.group(1) + m.group(2), out, flags=re.M)
     return out
+
+
+# ---------------------------------------------------------------------------
+# Vue 3 (--framework vue)
+# ---------------------------------------------------------------------------
+# The same kit and the same screens as single-file components: `<script
+# setup lang="ts">`, the React props as `defineProps`, its callbacks as
+# `defineEmits`, `v-model` (`defineModel`) where the React control takes a
+# value, `<slot />` where it takes children. Each CSS Module's rules go in a
+# `<style scoped>` block inside `@layer components`, unchanged but for the
+# root's class (stack-frameworks.md §1, §3). Vue 3.5 or newer: the form's
+# summary is a `useTemplateRef`.
+
+def vue_attr(expr: str) -> str:
+    """An expression in a double-quoted directive. Vue decodes the entities
+    before it parses the expression, so `row["2fa"]` survives the quotes."""
+    return expr.replace("&", "&amp;").replace('"', "&quot;")
+
+
+def vue_text(text: str) -> str:
+    """Literal text in a template: markup, and a `{{`, stay text."""
+    return (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace("{{", "&#123;&#123;"))
+
+
+def vue_static(value: str) -> str:
+    """A static attribute's value."""
+    return vue_text(value).replace('"', "&quot;")
+
+
+def vue_comment(text: str, indent: str) -> str:
+    return f"{indent}<!-- {text.replace('-->', '-- >')} -->"
+
+
+def kebab(name: str) -> str:
+    return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "-", name).lower()
+
+
+def vue_sfc(script: str, template: str, style: str = "") -> str:
+    out = (f'<script setup lang="ts">\n{script.strip()}\n</script>\n\n'
+           f"<template>\n{template.rstrip()}\n</template>\n")
+    if style:
+        out += f"\n<style scoped>\n{style.rstrip()}\n</style>\n"
+    return out
+
+
+def vue_root(sheet: str, root: str) -> str:
+    """A CSS Module's sheet with `.root` renamed. Vue puts a parent's scope
+    attribute on a child component's root element as well ("by design",
+    stack-frameworks.md §3), so a parent's `.root` would style every child
+    whose root is a `.root` too."""
+    return re.sub(r"\.root(?![\w-])", "." + root, sheet)
+
+
+def vue_tailwind(sfc: str, component: str, root: str, sheet: str) -> str:
+    """The Tailwind stack's single-file component: each class from the
+    component's sheet becomes its utilities (`tw_class`), the layout
+    primitives stay, and the `<style>` block goes, as the CSS Module does."""
+    own = set(re.findall(r"\.([A-Za-z][\w-]*)", sheet)) | {root}
+
+    def classes(m: re.Match) -> str:
+        names = [tw_class("root" if c == root else c, component) if c in own else c
+                 for c in m.group(1).split()]
+        return 'class="' + " ".join(n for n in names if n) + '"'
+
+    out = re.sub(r'(?<![\w:-])class="([^"]*)"', classes, sfc)
+    return re.sub(r'\n<style scoped(?: src="[^"]*")?>[\s\S]*?</style>\n', "", out)
+
+
+VUE_BUTTON = vue_sfc("""\
+/**
+ * Every attribute the caller passes (`type`, `@click`, an aria attribute)
+ * falls through to the <button> and wins over the defaults written here, as
+ * React's `...rest` did; a `class` is merged.
+ */
+withDefaults(
+  defineProps<{
+    variant?: 'default' | 'primary' | 'ghost' | 'danger';
+    size?: 'default' | 'sm';
+    /** Shows the busy affordance AND blocks the click. Both, or neither. */
+    loading?: boolean;
+    disabled?: boolean;
+  }>(),
+  { variant: 'default', size: 'default', loading: false, disabled: false },
+);
+""", """\
+  <button
+    type="button"
+    class="ui-button"
+    :data-variant="variant === 'default' ? undefined : variant"
+    :data-size="size === 'default' ? undefined : size"
+    :data-state="loading ? 'loading' : undefined"
+    :aria-busy="loading || undefined"
+    :disabled="disabled || loading"
+  >
+    <span class="label"><slot /></span>
+    <span v-if="loading" class="spinner" aria-hidden="true" />
+  </button>
+""", vue_root(BUTTON_CSS, "ui-button"))
+
+VUE_FIELD = vue_sfc("""\
+/**
+ * The label / control / help / error quartet, wired so the accessible name
+ * and the visible name cannot drift apart.
+ *
+ * This component owns the structure and the ids: the help is `${id}-help`,
+ * the error `${id}-error`. The CONTROL in the slot carries `aria-describedby`
+ * (from `describedBy`) and `aria-invalid`, because assistive tech reads them
+ * on the control, not on a wrapper. The error is not a live region: the
+ * form's summary announces a failed submit once and takes focus.
+ */
+withDefaults(
+  defineProps<{
+    id: string;
+    label: string;
+    /** Marked visually AND with the `required` attribute, or neither. */
+    required?: boolean;
+    /** Guidance shown before the user gets it wrong. */
+    help?: string;
+    /** Set only AFTER first blur, or the form scolds people as they type. */
+    error?: string | null;
+    disabled?: boolean;
+    /**
+     * A group of controls (radios, a date range): the label becomes a
+     * `<legend>` with the id `${id}-label`, which the group's
+     * `aria-labelledby` names, since a `<label for>` can name only one
+     * control.
+     */
+    group?: boolean;
+  }>(),
+  { required: false, error: null, disabled: false, group: false },
+);
+""", """\
+  <component
+    :is="group ? 'fieldset' : 'div'"
+    class="ui-field stack stack--tight"
+    :data-state="error ? 'error' : undefined"
+    :data-disabled="disabled || undefined"
+  >
+    <legend v-if="group" :id="id + '-label'" class="label groupLabel">
+      {{ label }}<span v-if="required" class="required" aria-hidden="true">*</span>
+    </legend>
+    <label v-else :for="id" class="label">
+      {{ label }}<span v-if="required" class="required" aria-hidden="true">*</span>
+    </label>
+
+    <div class="control"><slot /></div>
+
+    <p v-if="help" :id="id + '-help'" class="help">{{ help }}</p>
+
+    <p v-if="error" :id="id + '-error'" class="error">{{ error }}</p>
+  </component>
+""", vue_root(FIELD_CSS, "ui-field"))
+
+VUE_DESCRIBED_BY = """\
+/** The ids a control puts in its `aria-describedby`: help first, then the
+ *  error, so a screen reader hears the guidance before the complaint. They
+ *  are the ids Field.vue gives the two. */
+export function describedBy(id: string, help?: string, error?: string | null): string | undefined {
+  const ids = [help ? `${id}-help` : null, error ? `${id}-error` : null].filter(Boolean);
+  return ids.length > 0 ? ids.join(' ') : undefined;
+}
+"""
+
+# Each control is one element that every attribute the caller passes lands
+# on (`v-bind="$attrs"`, last, so the caller's win), with `inheritAttrs: false`
+# so they land there once. The seven share Control.css, scoped in each.
+VUE_CONTROL_DOC = """\
+/**
+ * The primitive input surfaces: one element each, which every attribute the
+ * caller passes lands on, so a caller can attach whatever form library it
+ * likes. `v-model` is the value.
+ */
+defineOptions({ inheritAttrs: false });
+"""
+VUE_CONTROL_STYLE = '\n<style scoped src="./Control.css"></style>\n'
+
+
+def _vue_control(script: str, template: str) -> str:
+    return vue_sfc(VUE_CONTROL_DOC + script, template) + VUE_CONTROL_STYLE
+
+
+VUE_CONTROLS = {
+    "TextInput": _vue_control("""\
+const model = defineModel<string>();
+""", """\
+  <input v-model="model" class="ui-control" v-bind="$attrs">
+"""),
+    "NumberInput": _vue_control("""\
+/** The number as the input reads it (`valueAsNumber`): NaN while empty. */
+const model = defineModel<number | null>();
+""", """\
+  <input
+    type="number"
+    inputmode="decimal"
+    class="ui-control numeric"
+    :value="model ?? ''"
+    v-bind="$attrs"
+    @input="model = ($event.target as HTMLInputElement).valueAsNumber"
+  >
+"""),
+    "TextArea": _vue_control("""\
+const model = defineModel<string>();
+""", """\
+  <textarea v-model="model" rows="4" class="ui-control textarea" v-bind="$attrs" />
+"""),
+    "Select": _vue_control("""\
+const model = defineModel<string | string[]>();
+""", """\
+  <select v-model="model" class="ui-control" v-bind="$attrs">
+    <slot />
+  </select>
+"""),
+    "Toggle": _vue_control("""\
+defineProps<{ id: string; label: string }>();
+const model = defineModel<boolean>();
+""", """\
+  <span class="toggle">
+    <input :id="id" v-model="model" type="checkbox" class="toggleInput" v-bind="$attrs">
+    <label class="toggleLabel" :for="id">{{ label }}</label>
+  </span>
+"""),
+    "RadioGroup": _vue_control("""\
+withDefaults(
+  defineProps<{
+    name: string;
+    options: readonly string[];
+    disabled?: boolean;
+    /** The id of the group's name: a `<legend>`, from `<Field group>`. */
+    labelledBy?: string;
+    /** The ids of the help and the error, as `describedBy` builds them. */
+    describedBy?: string;
+    invalid?: boolean;
+  }>(),
+  { disabled: false, labelledBy: undefined, describedBy: undefined, invalid: false },
+);
+const model = defineModel<string | null>({ default: null });
+""", """\
+  <div
+    class="options"
+    role="radiogroup"
+    :aria-labelledby="labelledBy"
+    :aria-describedby="describedBy"
+    :aria-invalid="invalid || undefined"
+    v-bind="$attrs"
+  >
+    <label v-for="option in options" :key="option" class="option">
+      <input
+        v-model="model"
+        type="radio"
+        :name="name"
+        :value="option"
+        :disabled="disabled"
+        class="toggleInput"
+      >
+      {{ option }}
+    </label>
+  </div>
+"""),
+    "ControlStub": _vue_control("""\
+/** A control this scaffold deliberately did not guess at. It renders as an
+ *  obvious placeholder so it cannot be mistaken for finished work. */
+defineProps<{ control: string; reason: string }>();
+""", """\
+  <span class="stub" data-state="error" v-bind="$attrs">TODO({{ control }}): {{ reason }}</span>
+"""),
+}
+
+VUE_BADGE = vue_sfc("""\
+/**
+ * A status pill. Tone is a PROP, not a lookup from the value — the mapping
+ * from `status` to tone is product knowledge and belongs at the call site,
+ * where someone can see it and argue with it.
+ */
+withDefaults(
+  defineProps<{ tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' }>(),
+  { tone: 'neutral' },
+);
+""", """\
+  <span class="ui-badge" :data-tone="tone === 'neutral' ? undefined : tone"><slot /></span>
+""", vue_root(BADGE_CSS, "ui-badge"))
+
+VUE_SKELETON = vue_sfc("""\
+/**
+ * A loading placeholder sized to the content it replaces: always pass the
+ * real line count, or the page jumps when the data arrives. The width and
+ * the lines are custom properties, the one legal inline style (Law 4).
+ */
+withDefaults(
+  defineProps<{
+    /** Width as a fraction of the container, 0-1. */
+    width?: number;
+    lines?: number;
+  }>(),
+  { width: 1, lines: 1 },
+);
+""", """\
+  <span
+    class="ui-skeleton"
+    :style="{ '--skeleton-width': String(width), '--skeleton-lines': String(lines) }"
+    aria-hidden="true"
+  />
+""", vue_root(SKELETON_CSS, "ui-skeleton"))
+
+VUE_STATE_BLOCK = vue_sfc("""\
+/**
+ * `kind` drives the tone. These are DIFFERENT screens, not one screen with
+ * different words — see screen-patterns.md section 12. The `action` slot is
+ * the single action this state offers: two actions on an empty state is two
+ * people disagreeing about what the user should do next.
+ */
+defineProps<{
+  kind: 'first-run' | 'filtered' | 'error' | 'forbidden' | 'stale';
+  headline: string;
+  body?: string;
+}>();
+""", """\
+  <div
+    class="ui-state-block stack stack--related"
+    :data-kind="kind"
+    :role="kind === 'error' ? 'alert' : undefined"
+  >
+    <h2 class="headline">{{ headline }}</h2>
+    <p v-if="body" class="body">{{ body }}</p>
+    <div v-if="$slots.action" class="action"><slot name="action" /></div>
+  </div>
+""", vue_root(STATE_BLOCK_CSS, "ui-state-block"))
+
+VUE_INDEX_KIT = """\
+export { default as Button } from './Button/Button.vue';
+export { default as Field } from './Field/Field.vue';
+export { describedBy } from './Field/describedBy';
+export { default as TextInput } from './Control/TextInput.vue';
+export { default as NumberInput } from './Control/NumberInput.vue';
+export { default as TextArea } from './Control/TextArea.vue';
+export { default as Select } from './Control/Select.vue';
+export { default as Toggle } from './Control/Toggle.vue';
+export { default as RadioGroup } from './Control/RadioGroup.vue';
+export { default as ControlStub } from './Control/ControlStub.vue';
+export { default as Badge } from './Badge/Badge.vue';
+export { default as Skeleton } from './Skeleton/Skeleton.vue';
+export { default as StateBlock } from './StateBlock/StateBlock.vue';
+"""
+
+
+def vue_tag(tag: str, attrs: list[str], indent: str, body: str | None = None) -> str:
+    inner = "".join(f"\n{indent}  {a}" for a in attrs)
+    if body is None:
+        return f"{indent}<{tag}{inner}\n{indent}/>"
+    return f"{indent}<{tag}{inner}\n{indent}>\n{body}\n{indent}</{tag}>"
+
+
+def vue_cell(cell: dict[str, Any]) -> str:
+    """A list cell or a detail value: the Badge, or an interpolation."""
+    if cell["element"]:
+        tone = vue_attr(f"toneFor({cell['acc']})")
+        return f'<Badge :tone="{tone}">{{{{ {cell["acc"]} }}}}</Badge>'
+    return "{{ " + cell["jsx"] + " }}"
+
+
+def vue_control(spec: dict[str, Any], indent: str = "        ") -> str:
+    """One form control, as control_jsx writes it for React: the same ids,
+    the same aria wiring, the same TODOs, in Vue's attribute syntax."""
+    ctrl = spec["control"]
+    name = spec["name"]
+    q, err = js_string(name), member("errors", name)
+    acc = member("values", name)
+    fid = f"fieldId({q})"
+    error_id = f"{err} ? {fid} + '-error' : undefined"
+    common = [f':id="{vue_attr(fid)}"', f'name="{vue_static(name)}"', ':disabled="disabled"',
+              f':aria-invalid="{vue_attr(f"Boolean({err}) || undefined")}"',
+              f':aria-describedby="{vue_attr(error_id)}"',
+              f':required="{str(spec.get("required", False)).lower()}"']
+
+    def update(value: str = "value") -> str:
+        return f'@update:model-value="{vue_attr(f"({value}) => emit({chr(39)}change{chr(39)}, {q}, {value})")}"'
+
+    if ctrl in STUB_REASON:
+        reason = STUB_REASON[ctrl]
+        if spec.get("labelColumn"):
+            reason += f"; it shows `{spec['labelColumn']}`"
+        return f'{indent}<ControlStub control="{ctrl}" reason="{vue_static(reason)}" />'
+    text_model = f':model-value="{vue_attr(f"String({acc} ?? {chr(39)}{chr(39)})")}"'
+    if ctrl in ("textarea", "rich-text"):
+        return vue_tag("TextArea", common + [text_model, update()], indent)
+    if ctrl in ("select", "multi-select"):
+        multi = ["multiple"] if ctrl == "multi-select" else []
+        opts = spec.get("options") or []
+        lines = []
+        if not spec.get("required") and not multi:
+            lines.append(f'{indent}  <option value="">Choose one</option>')
+        lines += [f'{indent}  <option value="{vue_static(o)}">{vue_text(o)}</option>' for o in opts]
+        if not opts and spec.get("labelColumn"):
+            lines.append(vue_comment(f"TODO(options): one <option> per parent row, showing "
+                                     f"`{spec['labelColumn']}`", indent + "  "))
+        return vue_tag("Select", multi + common + [text_model, update()], indent,
+                       "\n".join(lines) or vue_comment("TODO(options): the closed set", indent + "  "))
+    if ctrl == "radio-group":
+        opts = "[" + ", ".join(js_string(o) for o in spec.get("options") or []) + "]"
+        value = f"{acc} === null || {acc} === undefined ? null : String({acc})"
+        return vue_tag("RadioGroup", [
+            f'name="{vue_static(name)}"', f':model-value="{vue_attr(value)}"',
+            f':options="{vue_attr(opts)}"', ':disabled="disabled"',
+            f':labelled-by="{vue_attr(fid + " + " + chr(39) + "-label" + chr(39))}"',
+            f':described-by="{vue_attr(error_id)}"',
+            f':invalid="{vue_attr(f"Boolean({err})")}"', update("next")], indent)
+    if ctrl in ("switch", "checkbox"):
+        return vue_tag("Toggle", [
+            f':id="{vue_attr(fid)}"', f'label="{vue_static(spec["label"])}"',
+            f':model-value="{vue_attr(f"Boolean({acc})")}"', ':disabled="disabled"',
+            f':aria-invalid="{vue_attr(f"Boolean({err}) || undefined")}"',
+            f':aria-describedby="{vue_attr(error_id)}"', update()], indent)
+    if ctrl in ("number-input", "stepper", "percent-input", "currency-input"):
+        extra = [f':{k}="{spec[k]}"' for k in ("min", "max") if k in spec]
+        note = ""
+        if ctrl == "currency-input":
+            money = spec.get("money") or {}
+            cur = money.get("currency") or "the currency"
+            if money.get("storage") == "minor-units":
+                scale = json.dumps(cur) if money.get("currency") else "currency"
+                note = (f"TODO(money): stored in minor units of {cur}. Divide by "
+                        f"minorUnitScale({scale}) on read, multiply on write, and keep the "
+                        f"float out of the middle.")
+            elif money.get("storage") == "decimal":
+                extra.append('step="any"')
+                note = (f"TODO(money): a decimal amount in {cur}; the database rounds to its "
+                        f"scale. Parse permissively, format on blur, never while typing.")
+            else:
+                note = ("TODO(money): minor units or a decimal? Answer the `.money` question; "
+                        "the two differ by the currency's scale on every read and write.")
+        tag = vue_tag("NumberInput", common + extra + [
+            f':model-value="{vue_attr(f"{acc} ?? null")}"', update()], indent)
+        return (vue_comment(note, indent) + "\n" + tag) if note else tag
+    if ctrl in ("readonly-text", "readonly-timestamp"):
+        return vue_tag("TextInput", common + ["readonly", text_model], indent)
+    input_type = {
+        "email-input": "email", "url-input": "url", "tel-input": "tel",
+        "password-input": "password", "date-picker": "date",
+        "datetime-picker": "datetime-local", "time-picker": "time",
+        "color-picker": "color",
+    }.get(ctrl, "text")
+    extra = []
+    if "maxLength" in spec:
+        extra.append(f':maxlength="{spec["maxLength"]}"')
+    if "pattern" in spec:
+        extra.append(f'pattern="{vue_static(spec["pattern"])}"')
+    if ctrl == "password-input":
+        extra.append('autocomplete="new-password"')
+    note = ""
+    if ctrl == "slug-input":
+        extra.append('inputmode="url"')
+        note = vue_comment("TODO(slug): derive from the title until the user edits this field "
+                           "by hand, then stop — a slug that keeps changing breaks links.", indent) + "\n"
+    return note + vue_tag("TextInput", [f'type="{input_type}"'] + common + extra
+                          + [text_model, update()], indent)
+
+
+VUE_CONTROL_IMPORT = {
+    "textarea": "TextArea", "rich-text": "TextArea",
+    "select": "Select", "multi-select": "Select",
+    "radio-group": "RadioGroup",
+    "switch": "Toggle", "checkbox": "Toggle",
+    "number-input": "NumberInput", "stepper": "NumberInput",
+    "percent-input": "NumberInput", "currency-input": "NumberInput",
+}
+
+
+def _vue_form_sections(table: dict[str, Any], model: dict[str, Any],
+                       ans: Answers) -> tuple[str, set[str]]:
+    """The form's fieldsets, as _form_sections writes React's."""
+    specs = {s["name"]: s for s in
+             (field_spec(c, table, model, ans) for c in table["columns"]
+              if ans.in_form(table, c))}
+    groups = ans.groups(table, table["screens"].get("field_groups")
+                        or [{"legend": "Details", "fields": list(specs)}])
+    sections: list[str] = []
+    kit: set[str] = {"Button"}
+    for g in groups:
+        fields = [f for f in g.get("fields", []) if f in specs]
+        if not fields:
+            continue
+        body = []
+        for f in fields:
+            s = specs[f]
+            kit.add(VUE_CONTROL_IMPORT.get(s["control"], "TextInput")
+                    if s["control"] not in STUB_REASON else "ControlStub")
+            review = (vue_comment(f"review: {s['review']}", "        ") + "\n"
+                      if s.get("review") else "")
+            err = member("errors", f)
+            if s["control"] in ("switch", "checkbox"):
+                # A toggle is its own label; it gets the error below it, with
+                # the id the control's aria-describedby names.
+                error_id = vue_attr(f"fieldId({js_string(f)}) + '-error'")
+                body.append(
+                    f'{review}        <div class="field" :data-state="{vue_attr(f"{err} ? {chr(39)}error{chr(39)} : undefined")}">\n'
+                    f"{vue_control(s, '          ')}\n"
+                    f'          <p v-if="{vue_attr(err)}" :id="{error_id}" class="fieldError">\n'
+                    f"            {{{{ {err} }}}}\n"
+                    f"          </p>\n"
+                    f"        </div>")
+                continue
+            kit.add("Field")
+            attrs = [f':id="{vue_attr(f"fieldId({js_string(f)})")}"',
+                     f'label="{vue_static(s["label"])}"',
+                     f':required="{str(s.get("required", False)).lower()}"',
+                     f':error="{vue_attr(f"{err} ?? null")}"', ':disabled="disabled"']
+            if s["control"] == "radio-group":
+                attrs.append("group")
+            body.append(review + vue_tag("Field", attrs, "        ", vue_control(s, "          ")))
+        sections.append(
+            f'      <fieldset class="group" :disabled="disabled">\n'
+            f'        <legend class="legend">{vue_text(g.get("legend", "Details"))}</legend>\n'
+            + "\n".join(body) + "\n      </fieldset>")
+    return "\n\n".join(sections) or "      <!-- no writable fields -->", kit
+
+
+def emit_vue_form(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    sections, kit = _vue_form_sections(table, model, ans)
+    script = Template("""\
+import { computed, ref, useTemplateRef, watch } from 'vue';
+import { $kit } from '../../ui';
+import type { ${Entity}Draft } from './$camel.types';
+
+/**
+ * The $lower_entity form.
+ *
+ * Three UX rules this markup encodes, all of which generators skip:
+ *
+ * 1. VALIDATION TIMING. `errors` is rendered whenever it is set; it is the
+ *    CALLER's job not to set it until a field has been blurred once.
+ * 2. THE ERROR SUMMARY comes first in the DOM and takes focus, once per
+ *    submit attempt, because on a long form the invalid field is usually
+ *    off-screen. Each entry links to its field.
+ * 3. REQUIRED IS MARKED BOTH WAYS. The asterisk is decorative and hidden from
+ *    assistive tech; the `required` attribute is what actually announces it.
+ *
+ * Still yours to do: the unsaved-changes guard (block the route change while
+ * `dirty`), and autosave if this form is long enough to deserve it. See
+ * screen-patterns.md section 13.
+ */
+const props = withDefaults(
+  defineProps<{
+    values: Partial<${Entity}Draft>;
+    errors: Partial<Record<keyof ${Entity}Draft, string>>;
+    /** Blocks every control AND the submit button, together. */
+    disabled?: boolean;
+    submitting?: boolean;
+    /** Set when the user has changed something and not saved it. */
+    dirty?: boolean;
+    /** A form-level failure: the save was rejected as a whole. */
+    submitError?: string | null;
+  }>(),
+  { disabled: false, submitting: false, dirty: false, submitError: null },
+);
+
+const emit = defineEmits<{
+  change: [name: keyof ${Entity}Draft, value: unknown];
+  submit: [];
+  cancel: [];
+}>();
+
+const fieldId = (name: string) => '$camel-' + name;
+
+const invalid = computed(() => Object.entries(props.errors).filter(([, message]) => Boolean(message)));
+const summary = useTemplateRef<HTMLDivElement>('summary');
+const attempt = ref(0);
+let focusedFor = 0;
+
+// After a submit attempt that failed validation, move focus to the summary:
+// once per attempt, whether or not the error count changed. The caller sets
+// `errors` in its `submit` handler or, validating asynchronously, sets
+// `submitting` while it runs. `flush: 'post'` runs this after the update that
+// renders them, so the summary exists. A save that came back clean consumes
+// the attempt, so an error that appears later, from a blur, does not pull
+// focus to the summary.
+watch(
+  [attempt, () => invalid.value.length, () => props.submitting],
+  ([tries, count, busy]) => {
+    if (tries > focusedFor && count > 0) {
+      focusedFor = tries;
+      summary.value?.focus();
+    } else if (!busy && count === 0) {
+      focusedFor = tries;
+    }
+  },
+  { flush: 'post' },
+);
+
+function submit() {
+  attempt.value += 1;
+  emit('submit');
+}
+""").safe_substitute(Entity=Entity, camel=camel(name), kit=", ".join(sorted(kit)),
+                     lower_entity=singular(name.replace("_", " ")))
+    template = """\
+  <form class="stack stack--separate" novalidate @submit.prevent="submit">
+    <div v-if="invalid.length > 0" ref="summary" class="summary" role="alert" tabindex="-1">
+      <p class="summaryTitle">
+        {{ invalid.length === 1 ? 'One field needs attention' : String(invalid.length) + ' fields need attention' }}
+      </p>
+      <ul class="summaryList">
+        <li v-for="[name, message] in invalid" :key="name">
+          <a class="summaryLink" :href="'#' + fieldId(name)">{{ String(message) }}</a>
+        </li>
+      </ul>
+    </div>
+
+    <p v-if="submitError" class="submitError" role="alert">
+      {{ submitError }}
+    </p>
+
+""" + "\n".join(line[2:] for line in sections.split("\n")) + """
+
+    <div class="cluster cluster--tight">
+      <Button type="submit" variant="primary" :loading="submitting" :disabled="disabled">
+        Save
+      </Button>
+      <Button type="button" variant="ghost" :disabled="submitting" @click="emit('cancel')">
+        {{ dirty ? 'Discard changes' : 'Cancel' }}
+      </Button>
+    </div>
+  </form>
+"""
+    return vue_sfc(script, template, vue_root(FORM_CSS, kebab(f"{Entity}Form")))
+
+
+def _vue_imports(cells: list[dict[str, Any]], kit: list[str], Entities: str,
+                 states: tuple[str, ...]) -> str:
+    out = f"import {{ {', '.join(kit)} }} from '../../ui';\n" + _helper_imports(cells, set())
+    return out + "".join(f"import {Entities}{s} from './{Entities}{s}.vue';\n" for s in states)
+
+
+def emit_vue_list(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    Entities = pascal(name)
+    title = ans.title(table)
+    layout = ans.layout(table)
+    pk = table["primary_key"][0] if table["primary_key"] else "id"
+    human = name.replace("_", " ")
+    Title = human[:1].upper() + human[1:]
+    root = kebab(f"{Entities}List")
+    cols = [c for c in table["columns"] if c["name"] in ans.list_columns(table)] or table["columns"][:1]
+    cells = {c["name"]: cell_render(c, "row", table, ans) for c in cols}
+    href = vue_attr(f"{js_string('/' + name + '/')} + String({member('row', pk)})")
+    key = vue_attr(f"String({member('row', pk)})")
+
+    if layout == "table":
+        head = "\n".join(
+            f'            <th class="{"th sticky" if c["name"] == title else "th"}" scope="col">\n'
+            f"              {vue_text(c['ui'].get('label', c['name']))}\n"
+            f"            </th>" for c in cols)
+        body = []
+        for c in cols:
+            cell = cells[c["name"]]
+            cls = " ".join(["td"] + ([cell["class"]] if cell["class"] else [])
+                           + (["sticky"] if c["name"] == title else []))
+            inner = (f'<a class="link" :href="{href}">{vue_cell(cell)}</a>'
+                     if c["name"] == title else vue_cell(cell))
+            body.append(f'            <td class="{cls}">{inner}</td>')
+        rows = Template("""\
+    <div class="scroller" tabindex="0" role="region" aria-label="$Title, scrollable table">
+      <table class="$root">
+        <thead class="head">
+          <tr>
+$head
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in state.rows" :key="$key" class="row">
+$body
+          </tr>
+        </tbody>
+      </table>
+    </div>""").safe_substitute(Title=vue_static(Title), root=root, head=head, key=key,
+                               body="\n".join(body))
+    else:
+        grid = "grid grid--min-lg" if layout == "feed" else "grid grid--min-sm"
+        meta = "\n".join(
+            f"            <div>\n"
+            f'              <dt class="cardMeta">{vue_text(c["ui"].get("label", c["name"]))}</dt>\n'
+            f"              <dd>{vue_cell(cells[c['name']])}</dd>\n"
+            f"            </div>" for c in cols if c["name"] != title)
+        title_expr = (vue_cell(cells[title]) if title in cells
+                      else "{{ String(" + member("row", pk) + ") }}")
+        rows = Template("""\
+    <ul class="$grid">
+      <li v-for="row in state.rows" :key="$key">
+        <article class="card">
+          <h2 class="cardTitle">
+            <a class="cardLink" :href="$href">
+              $title_expr
+            </a>
+          </h2>
+          <dl class="stack stack--fused">
+$meta
+          </dl>
+        </article>
+      </li>
+    </ul>""").safe_substitute(grid=grid, key=key, href=href, title_expr=title_expr, meta=meta)
+
+    kit = (["Badge"] if any(c["element"] for c in cells.values()) else []) + ["Button"]
+    script = Template("""\
+${imports}import type { ${Entity}ListState } from './$camel.types';
+
+/**
+ * $human, as a $layout.
+ *
+ * $layout_why
+ *
+ * This component takes its rows as a prop and knows nothing about fetching.
+ * That is deliberate: cache keys, realtime and optimistic writes are product
+ * decisions, and a scaffold has no business guessing at them.
+ */
+defineProps<{ state: ${Entity}ListState }>();
+
+const emit = defineEmits<{
+  /** The single primary action offered by the first-run empty state. */
+  create: [];
+  /** Clears whatever produced the filtered-empty state. */
+  clearFilters: [];
+}>();
+""").safe_substitute(
+        imports=_vue_imports(list(cells.values()), kit, Entities,
+                             ("Empty", "Error", "FilteredEmpty", "Forbidden", "Loading")),
+        Entity=Entity, camel=camel(name), human=human, layout=layout,
+        layout_why=table["screens"].get("index_layout_signal", ""))
+    template = Template("""\
+  <${Entities}Loading v-if="state.status === 'loading'" />
+  <${Entities}Error v-else-if="state.status === 'error'" :error="state.error" @retry="state.retry()" />
+  <${Entities}Forbidden v-else-if="state.status === 'forbidden'" />
+  <!-- Two different screens, not one screen with two strings. "Nothing here
+       yet, make the first one" and "your filter matched nothing, clear it"
+       ask the user to do opposite things. -->
+  <${Entities}FilteredEmpty
+    v-else-if="state.rows.length === 0 && state.filtered"
+    @clear-filters="emit('clearFilters')"
+  />
+  <${Entities}Empty v-else-if="state.rows.length === 0" @create="emit('create')" />
+  <section v-else class="stack stack--separate" aria-labelledby="$camel-heading">
+    <header class="cluster cluster--between">
+      <h1 id="$camel-heading" class="heading">
+        $Title
+      </h1>
+      <Button variant="primary" @click="emit('create')">
+        New $lower_entity
+      </Button>
+    </header>
+
+    <p v-if="state.stale" class="stale" role="status">
+      Showing the last known data while this refreshes.
+    </p>
+
+$rows
+  </section>
+""").safe_substitute(Entities=Entities, camel=camel(name), Title=vue_text(Title),
+                     lower_entity=vue_text(singular(human)), rows=rows)
+    sheet = LIST_CSS + (DATA_TABLE_CSS if layout == "table" else CARD_GRID_CSS)
+    return vue_sfc(script, template, vue_root(sheet, root))
+
+
+def emit_vue_detail(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    Entities = pascal(name)
+    title = ans.title(table)
+    pk = table["primary_key"][0] if table["primary_key"] else "id"
+    rows, cells = [], []
+    for c in table["columns"]:
+        if not c["ui"].get("placement", {}).get("detail") or c["name"] == title:
+            continue
+        cell = cell_render(c, "state.record", table, ans)
+        cells.append(cell)
+        rows.append(
+            f'        <div class="pair">\n'
+            f'          <dt class="term">{vue_text(c["ui"].get("label", c["name"]))}</dt>\n'
+            f'          <dd class="value">{vue_cell(cell)}</dd>\n'
+            f"        </div>")
+    related = [vue_comment(f"TODO({r['control']}): {r['kind']} to `{r['to']}`"
+                           + (f" via `{r['via']}`" if r.get("via") else "")
+                           + f". {r.get('signal', '')}", "      ")
+               for r in table.get("relationships", [])
+               if r["kind"] in ("one-to-many", "many-to-many")]
+    placeholder_note = ""
+    if table["screens"].get("title_is_placeholder"):
+        placeholder_note = (
+            "\n *\n * TODO(title): nothing in this table looks like a title, so the\n"
+            " * primary key is standing in. A uuid in an h1 is not a heading.\n"
+            " * Answer the `.title_column` question and come back.")
+    title_expr = ("{{ state.record." + title + " }}"
+                  if title and re.fullmatch(r"[A-Za-z_$][\w$]*", title)
+                  else "{{ String(" + member("state.record", pk) + ") }}")
+    kit = (["Badge"] if any(c["element"] for c in cells) else []) + ["Button"]
+    script = Template("""\
+${imports}import type { ${Entity}DetailState } from './$camel.types';
+
+/**
+ * One $lower_entity.
+ *
+ * The layout is `.with-sidebar`: the record's own fields in the main pane, its
+ * actions and metadata in the rail. The rail wraps underneath at a CONTENT
+ * threshold rather than a viewport breakpoint, so this page is correct inside
+ * a drawer and inside a 288px column without knowing it.$placeholder_note
+ */
+defineProps<{ state: ${Entity}DetailState }>();
+
+const emit = defineEmits<{ edit: []; delete: [] }>();
+""").safe_substitute(
+        imports=_vue_imports(cells, kit, Entities, ("Error", "Forbidden", "Loading")),
+        Entity=Entity, camel=camel(name), placeholder_note=placeholder_note,
+        lower_entity=singular(name.replace("_", " ")))
+    template = Template("""\
+  <${Entities}Loading v-if="state.status === 'loading'" />
+  <${Entities}Error v-else-if="state.status === 'error'" :error="state.error" @retry="state.retry()" />
+  <${Entities}Forbidden v-else-if="state.status === 'forbidden'" />
+  <article v-else class="with-sidebar" aria-labelledby="$camel-detail-heading">
+    <div class="with-sidebar__main stack stack--separate">
+      <h1 id="$camel-detail-heading" class="title">
+        $title_expr
+      </h1>
+
+      <dl class="fields">
+$rows
+      </dl>
+$related
+    </div>
+
+    <aside class="with-sidebar__rail stack stack--related" aria-label="Actions">
+      <Button variant="primary" @click="emit('edit')">
+        Edit
+      </Button>
+      <Button variant="danger" @click="emit('delete')">
+        Delete
+      </Button>
+      <!-- TODO(copy): a delete confirmation must name the record and state
+           what else disappears with it. "Are you sure?" is not that. See
+           screen-patterns.md section 8. -->
+    </aside>
+  </article>
+""").safe_substitute(Entities=Entities, camel=camel(name), title_expr=title_expr,
+                     rows="\n".join(rows) or "        <!-- no detail fields -->",
+                     related=("\n" + "\n".join(related)) if related else "")
+    return vue_sfc(script, template, vue_root(DETAIL_CSS, kebab(f"{Entity}Detail")))
+
+
+VUE_DETAIL_STATE = Template("""
+/** The detail view's state: the list's, with one record. */
+export type ${Entity}DetailState =
+  | { status: 'loading' }
+  | { status: 'error'; error: Error; retry: () => void }
+  | { status: 'forbidden' }
+  | { status: 'ready'; record: $Entity };
+""")
+
+
+def emit_vue_states(table: dict[str, Any], model: dict[str, Any],
+                    ans: Answers) -> dict[str, str]:
+    """The six states, one component each: Vue's is one per file."""
+    name = table["name"]
+    human = name.replace("_", " ")
+    empty = ans.empty(table)
+    cols = len(ans.list_columns(table)) or 3
+    forbidden_note = (
+        "Row-level security is on for this table, so this is a real state: the\n"
+        " * query succeeded and returned nothing because the policy filtered\n"
+        " * everything out. Rendering that as 'no records' tells the user their\n"
+        " * data is gone."
+        if ans.rls(table) else
+        "RLS was reported as off, so this should be unreachable today. It is\n"
+        " * generated anyway, because 'we will add RLS later' is always true and\n"
+        " * retrofitting this state means touching every list in the app.")
+
+    def block(doc: str, emits: str, kind: str, headline: str, body: str, note: str | None,
+              action: tuple[str, str, str] | None, props: str = "") -> str:
+        """`action` is (variant, event, label)."""
+        script = "import { Button, StateBlock } from '../../ui';\n" if action else \
+                 "import { StateBlock } from '../../ui';\n"
+        script += f"\n/**\n * {doc}\n */\n" + props + emits
+        body_attr = body if body.startswith(":") else f'body="{vue_static(body)}"'
+        tag = (f'  <StateBlock\n    kind="{kind}"\n    headline="{vue_static(headline)}"\n'
+               f"    {body_attr}\n  >\n")
+        if action:
+            variant, event, label = action
+            tag += (f"    <template #action>\n"
+                    f'      <Button variant="{variant}" @click="emit({js_string(event)})">\n'
+                    f"        {vue_text(label)}\n      </Button>\n    </template>\n")
+        tag += "  </StateBlock>\n"
+        return vue_sfc(script, (vue_comment(note, "  ") + "\n" if note else "") + tag)
+
+    return {
+        "Empty": block(f"No {human} have ever existed. The most-seen screen in the app on day one.",
+                       "const emit = defineEmits<{ create: [] }>();\n", "first-run",
+                       empty["headline"], empty["body"] or f"TODO(copy): what {human} are for.",
+                       "TODO(copy): say what this screen will hold and why it is worth filling "
+                       "in. One sentence. \"No data\" is the absence of copy, not copy.",
+                       ("primary", "create", empty["action"])),
+        "FilteredEmpty": block(
+            "A filter or a search matched nothing. A DIFFERENT screen from the empty one:\n"
+            " * the records exist, this query just missed them, so the action is \"clear the\n"
+            " * filter\", never \"create a record\".",
+            "const emit = defineEmits<{ clearFilters: [] }>();\n", "filtered",
+            f"No {human} match those filters",
+            "Try a broader search, or clear the filters to see everything.",
+            "TODO(copy): name the filters that are on, so the user can see what to "
+            "relax without hunting for it.", ("ghost", "clearFilters", "Clear filters")),
+        "Error": block(
+            "The request failed. Always offer the retry — an error with no way forward\n"
+            " * is a dead end, and users reload the whole app instead.",
+            "const emit = defineEmits<{ retry: [] }>();\n", "error",
+            f"Something went wrong loading {human}", ':body="error?.message"',
+            f"TODO(copy): say what failed in the user's terms, not the transport's. "
+            f"\"We could not load your {human}\" beats \"Request failed\".",
+            ("primary", "retry", "Try again"), "defineProps<{ error?: Error }>();\n\n"),
+        "Forbidden": block(
+            f"The user is not allowed to see these rows.\n *\n * {forbidden_note}",
+            "", "forbidden", f"You do not have access to {human}",
+            "Ask an administrator if you think this is a mistake.",
+            "TODO(copy): say who to ask. A permission wall with no route onward is a "
+            "support ticket. Do NOT reveal whether any records exist.", None),
+        "Stale": block(
+            "Data on screen is known to be out of date — a realtime event arrived, or a\n"
+            " * background revalidation failed. Shown ABOVE the stale rows rather than\n"
+            " * replacing them: taking correct-a-moment-ago data away is worse than\n"
+            " * labelling it.",
+            "const emit = defineEmits<{ refresh: [] }>();\n", "stale", "This list has changed",
+            f"Someone else updated these {human} while you were reading.", None,
+            ("ghost", "refresh", "Refresh")),
+        "Loading": vue_sfc("""\
+import { Skeleton } from '../../ui';
+
+/**
+ * A skeleton shaped like the real table: same column count, same row height.
+ * A spinner would be less work and would also let the page jump when the data
+ * lands, moving whatever the user was about to click.
+ */
+withDefaults(defineProps<{ rows?: number }>(), { rows: 5 });
+""", Template("""\
+  <div class="loading" role="status" aria-live="polite">
+    <span class="visually-hidden">Loading $human</span>
+    <div v-for="index in rows" :key="index" class="loadingRow">
+      <Skeleton v-for="cell in $cols" :key="cell" :width="cell === 1 ? 0.8 : 0.5" />
+    </div>
+  </div>
+""").safe_substitute(human=vue_text(human), cols=cols), STATES_CSS),
+    }
+
+
+def emit_vue_index(table: dict[str, Any]) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    Entities = pascal(name)
+    parts = [f"{Entities}List", f"{Entity}Detail", f"{Entity}Form"] + [
+        f"{Entities}{s}" for s in ("Empty", "FilteredEmpty", "Loading", "Error", "Forbidden", "Stale")]
+    return ("".join(f"export {{ default as {p} }} from './{p}.vue';\n" for p in parts)
+            + f"export type {{ {Entity}, {Entity}Draft, {Entity}ListState, {Entity}DetailState }} "
+              f"from './{camel(name)}.types';\n"
+            + f"export {{ {camel(name)}Fields, {camel(name)}Groups, {camel(name)}ListColumns }} "
+              f"from './{camel(name)}.fields';\n")
+
+
+def build_vue_files(model: dict[str, Any], ans: Answers, stack: str,
+                    entities: set[str] | None) -> dict[str, str]:
+    """The kit and the screens as Vue single-file components; everything
+    that is not a component (types, fields, format, the server's schemas)
+    is the React scaffold's own file."""
+    css = stack == "css-modules"
+
+    def sfc(path: str, text: str, component: str, root: str, sheet: str) -> None:
+        files[path] = text if css else vue_tailwind(text, component, root, sheet)
+
+    files: dict[str, str] = {"lib/format.ts": FORMAT_TS, "ui/index.ts": VUE_INDEX_KIT,
+                             "ui/Field/describedBy.ts": VUE_DESCRIBED_BY}
+    if not css:
+        files["styles/scaffold.css"] = SCAFFOLD_CSS
+    for comp, text, sheet in (("Button", VUE_BUTTON, BUTTON_CSS), ("Field", VUE_FIELD, FIELD_CSS),
+                              ("Badge", VUE_BADGE, BADGE_CSS), ("Skeleton", VUE_SKELETON, SKELETON_CSS),
+                              ("StateBlock", VUE_STATE_BLOCK, STATE_BLOCK_CSS)):
+        sfc(f"ui/{comp}/{comp}.vue", text, comp, f"ui-{kebab(comp)}", sheet)
+    if css:
+        files["ui/Control/Control.css"] = vue_root(CONTROL_CSS, "ui-control")
+    for comp, text in VUE_CONTROLS.items():
+        sfc(f"ui/Control/{comp}.vue", text, "Control", "ui-control", CONTROL_CSS)
+
+    for table in model["tables"]:
+        if table["kind"] == "join" or (entities and table["name"] not in entities):
+            continue
+        name = table["name"]
+        Entity = pascal(singular(name))
+        Entities = pascal(name)
+        base = f"features/{name}"
+        files[f"{base}/{camel(name)}.types.ts"] = (emit_types(table, model, ans)
+                                                   + VUE_DETAIL_STATE.substitute(Entity=Entity))
+        files[f"{base}/{camel(name)}.fields.ts"] = emit_fields(table, model, ans)
+        list_sheet = LIST_CSS + (DATA_TABLE_CSS if ans.layout(table) == "table" else CARD_GRID_CSS)
+        sfc(f"{base}/{Entities}List.vue", emit_vue_list(table, model, ans), "List",
+            kebab(f"{Entities}List"), list_sheet)
+        sfc(f"{base}/{Entity}Detail.vue", emit_vue_detail(table, model, ans), "Detail",
+            kebab(f"{Entity}Detail"), DETAIL_CSS)
+        sfc(f"{base}/{Entity}Form.vue", emit_vue_form(table, model, ans), "Form",
+            kebab(f"{Entity}Form"), FORM_CSS)
+        for state, text in emit_vue_states(table, model, ans).items():
+            sfc(f"{base}/{Entities}{state}.vue", text, "States", "", STATES_CSS)
+        files[f"{base}/index.ts"] = emit_vue_index(table)
+        files[f"server/{name}.schema.ts"] = emit_schema_zod(table, model, ans)
+        files[f"server/{name}_schema.py"] = emit_schema_pydantic(table, model, ans)
+    return files
 
 
 # ---------------------------------------------------------------------------
@@ -3816,8 +4829,13 @@ def unsafe_name(name: Any) -> str:
 
 
 def build_files(model: dict[str, Any], ans: Answers, stack: str,
-                entities: set[str] | None, server_actions: bool = False) -> dict[str, str]:
-    files: dict[str, str] = {}
+                entities: set[str] | None, server_actions: bool = False,
+                framework: str = "react") -> dict[str, str]:
+    if framework == "vue":
+        files = build_vue_files(model, ans, stack, entities)
+        files.update(build_database_files(model, ans, entities, server_actions))
+        return files
+    files = {}
     css = stack == "css-modules"
 
     files["lib/format.ts"] = FORMAT_TS
@@ -3879,9 +4897,15 @@ def build_files(model: dict[str, Any], ans: Answers, stack: str,
         files[f"server/{name}.schema.ts"] = emit_schema_zod(table, model, ans)
         files[f"server/{name}_schema.py"] = emit_schema_pydantic(table, model, ans)
 
-    # The database side. A join table needs its policies too: the
-    # many-to-many control reads and writes it.
-    files["lib/supabase.ts"] = SUPABASE_NEXT_TS if server_actions else SUPABASE_TS
+    files.update(build_database_files(model, ans, entities, server_actions))
+    return files
+
+
+def build_database_files(model: dict[str, Any], ans: Answers, entities: set[str] | None,
+                         server_actions: bool) -> dict[str, str]:
+    """The database side, whatever renders the screens. A join table needs
+    its policies too: the many-to-many control reads and writes it."""
+    files = {"lib/supabase.ts": SUPABASE_NEXT_TS if server_actions else SUPABASE_TS}
     if server_actions:
         files["lib/supabase.server.ts"] = SUPABASE_SERVER_TS
     for table in model["tables"]:
@@ -3898,7 +4922,7 @@ def build_files(model: dict[str, Any], ans: Answers, stack: str,
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="python -m scripts.scaffold_ui",
-        description="Generate a React 19 + TypeScript CRUD scaffold from a "
+        description="Generate a React 19 or Vue 3.5 + TypeScript CRUD scaffold from a "
                     "model.json, composed from the suite's layout primitives "
                     "and role tokens.",
         epilog="The output is a starting point, not a product. Every TODO in "
@@ -3916,6 +4940,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="default: the project's .design-suite.json stack (tailwind-v3 and "
                          "tailwind-v4 scaffold Tailwind; css-modules scaffolds CSS Modules), "
                          "else css-modules")
+    ap.add_argument("--framework", choices=("react", "vue"), default="react",
+                    help="react (default): React 19 components (.tsx); vue: Vue 3.5 single-file "
+                         "components (.vue, <script setup lang=\"ts\">, <style scoped>)")
     ap.add_argument("--server-actions", action="store_true",
                     help="a Next.js App Router project: each form posts to a server action "
                          "(React 19's useActionState and useFormStatus), with the server's "
@@ -3928,6 +4955,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="write nothing and exit 1 when the schema has a blocking "
                          "security finding (for CI)")
     args = ap.parse_args(argv)
+    if args.server_actions and args.framework != "react":
+        print("scaffold_ui: --server-actions is Next.js's (React 19's useActionState); "
+              f"--framework {args.framework} has no server actions.", file=sys.stderr)
+        return 2
     # A flag beats the project's .design-suite.json, which beats the default (P24).
     # The scaffold writes CSS Modules or Tailwind; a vanilla-css project gets
     # CSS Modules, the nearer of the two.
@@ -3997,7 +5028,7 @@ def main(argv: list[str] | None = None) -> int:
                   f"Rename it in the model, or leave it out with --entity.", file=sys.stderr)
             return 2
 
-    files = build_files(model, ans, args.stack, entities, args.server_actions)
+    files = build_files(model, ans, args.stack, entities, args.server_actions, args.framework)
     root = Path(args.out)
 
     # The screens are only as safe as the tables behind them: say so here,
