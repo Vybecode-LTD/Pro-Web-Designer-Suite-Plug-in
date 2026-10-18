@@ -1,12 +1,12 @@
 # Start here: the next session
 
-**Written 2026-10-18**, at the end of the day's second session, which did **P37 parts 3 and 4**: two PRs, and the docs PR, which merges once green (§3):
-- **#172, P37 part 3 (SB-B6, N49: Next.js App Router, Vue, Svelte and Astro, with a fixture project per stack)**, merged as `6c0dfcb`.
-- **#173, P37 part 4 (DL-B3 in part: the scaffold's forms post to Next.js server actions)**, merged as `c0a6d62`.
+**Written 2026-10-18**, at the end of the day's third session, which finished **P37**: two PRs, and the docs PR, which merges once green (§3):
+- **#176, P37 part 5 (Vue)**, merged as `b20f562`: `scaffold_ui.py --framework vue`.
+- **#177, P37 part 6 (Svelte)**, merged as `MERGE177`: `--framework svelte`. DL-B3 is closed.
 
-The owner chose P37, with N48, on 2026-10-18. The order of P35, P41, P42 and P43 after it is still theirs.
+**The owner chose P35 next (2026-10-18).** The order of P41, P42 and P43 after it is still theirs.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P37's last part, the scaffold's Vue and Svelte output** (§4), then the rest of Phase 6b in the order the owner chooses, then R4.
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P35, the a11y gates' missing checks and engines** (§4), then the rest of Phase 6b in the order the owner chooses, then R4.
 
 You are working on **web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -249,6 +249,13 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
       - **Attributes come in any order.** `<script src=… type="module">` is the same tag; use one lookahead per attribute.
       - **Run the gates on a clean project of the stack before writing about it.** The fixtures found the three gaps the PR fixed (a shell read as a page, a slot as no content, a shadow token as a shadow) before any reviewer did.
       - **Compile the doc's own claim.** §1's table of scoped selectors came from `@vue/compiler-sfc`, `svelte` and `@astrojs/compiler` run on the fixtures in a scratch folder (not pinned); Astro's compiler defaults to `where` while Astro's config defaults to `attribute`.
+    - **The third 2026-10-18 session's reviews found 5 real issues on #176** (Codex 4, CodeRabbit 1), each fixed in React too with a test failing on `fd84910`; on #177 Codex's one claim was checked and declined, with a test. The lessons, for any generator of another framework's code:
+      - **A port inherits the original's bugs: fix both.** A multiple select bound `String(value)`, an emptied number sent `NaN`, tags and JSON went through `String()`, a required radio group lacked `required`. Each was in the React scaffold too, and the audit's class-2 rule (grep for the construct) applied.
+      - **A controlled text box cannot hold a value that is not one yet.** The tag being typed, or JSON while it is invalid, needs state of its own; the scaffold's answer is a marked stub, not a round trip through `String()`.
+      - **Never tell copy from code by its first character.** A body starting with `:` (Vue) or `{` (Svelte) was a binding; the answers' copy can start with either. Pass the binding as its own argument.
+      - **Check a reviewer's runtime claim in the runtime.** Codex said Svelte's spread put an array on a native select's scalar `value`; Svelte's attribute effect calls `select_option`, and a jsdom test proved it.
+      - **A server render cannot show everything.** Vue's SSR selects a `v-model`'s options only when they share its template; slotted ones are the runtime's. Pick the harness that runs the code path.
+      - **A control that does not fail proves nothing.** Svelte's first control (no wait for `bind:this`) gave the same steps: the guard was dead code, and went; #64's count-only effect is the control now.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -301,7 +308,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `16 open items, 16 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `13 open items, 13 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
@@ -515,28 +522,37 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.
 
+- **The scaffold's frameworks (P37 parts 5 and 6).**
+  - `--framework react|vue|svelte`; `--server-actions` is React's alone (exit 2 otherwise). The types, the fields, `lib/`, `server/` and `db/` are shared.
+  - Vue: a root's class is the component's name, since Vue scopes a child's root with the parent's attribute; the controls share `Control.css` through `<style scoped src>`. Svelte: the sheets keep `.root`, but each component holds only the rules its markup uses (`css_rules`, `svelte_sheet`), or Svelte drops them with a warning.
+  - `tests/test_scaffold_frameworks.py` compiles with the real compilers, renders the form on the server, and drives its focus: Vue through a custom renderer with the kit stubbed, Svelte in jsdom with the real kit. Its Node harnesses are strings in the test, with modes (`compile`, `ssr`, `render`, `focus`, `select`).
+
 ## 3. First: the state of `main`
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then:
-- **The docs PR** of 2026-10-18's second session (#175) may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
-- Remove any worktree left in a scratchpad (`git worktree list`): `git worktree remove PATH`, then `git branch -d` each merged branch. The newest `wait_pr.sh` is in `4d6c2acf-…\scratchpad`. A worktree in `551b611b-…\scratchpad` belongs to the README session (#174, `docs/readme-visuals`): leave it to that session.
+- **The docs PR** of 2026-10-18's third session (#178) may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
+- Remove any worktree left in a scratchpad (`git worktree list`): `git worktree remove PATH`, then `git branch -d` each merged branch. The newest `wait_pr.sh` is in `4d6c2acf-…\scratchpad`.
 - Then read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
 
-## 4. P37's last part, then the rest of Phase 6b, 4.0.0
+## 4. P35, then the rest of Phase 6b, 4.0.0
 
-Phase 6c is done (P50 to P55). In Phase 6b, P36 (Tailwind v4) and P34 (runtime coverage) are done, and so are P37's first four parts: #168 (N48, bound inline styles), #169 (D3, SCSS in stylelint), #172 (the stacks, N49) and #173 (server actions). Read DL-B3 in `dev plans/web-design-suite-review/delivery.md` (line 79), P37's row in the execution plan, and `stack-frameworks.md` §1 and §3 to §4 before planning, and keep each PR under 100 files.
+Phase 6c is done (P50 to P55). In Phase 6b, P36, P34 and P37 are done. **The owner chose P35 next (2026-10-18).** Read GT-B6 and GT-B9 in `dev plans/web-design-suite-review/gates.md` (lines 124 and 127), P35's row in the execution plan, `a11y-audit-runner/references/automation-coverage.md` §1 (the table: 1.4.4, 1.4.10, 1.4.12, 1.4.13, 2.3.3, 2.4.11), `runtime-checks.md`, and `a11y_runtime.mjs`'s option parsing and browser launch (`launchBrowser`, line about 2106) before planning, and keep each PR under 100 files.
 
-**P37's last part: the scaffold's Vue and Svelte output (DL-B3's rest, size L).** `scaffold_ui.py` writes React 19 only: the kit (`ui/`: Button, Field, Control with TextInput, TextArea, Select, RadioGroup, Toggle, NumberInput and ControlStub, Badge, Skeleton, StateBlock), and per entity `features/<table>/` (types, fields, `<Entities>List`, `<Entity>Detail`, `<Entity>Form`, `<Entities>States`, index), each `.tsx` with a `.module.css`, or Tailwind classes through `tailwindify()`. Split it in two PRs:
-- **Part 5, Vue 3** (`--framework vue`, beside `--stack`): `.vue` single-file components with `<script setup lang="ts">`, the same props as the React components (`defineProps`, `defineEmits` for `onChange`/`onSubmit`/`onCancel`, `v-model` only where the React one is controlled), the CSS Module's rules in `<style scoped>` inside `@layer components` (stack-frameworks.md §1; the kit's sockets unchanged), bound attributes the audit reads (`:aria-invalid`, `:aria-describedby`), `<slot />` where React takes `children`. The form keeps the three UX rules (validation timing, the summary first and focused once per attempt, required both ways); the types and fields files stay `.ts`, shared.
-- **Part 6, Svelte 5** (`--framework svelte`): runes (`$props()`, `$state`), snippets for children (`{@render children()}`), callbacks as props, `<style>` inside `@layer components`, `style:` only for a custom property.
-- **Tests, each part:** every file compiles with the real compiler (pin `@vue/compiler-sfc` and `svelte` in `tooling/main`, as `typescript` is, and `test_recipes.DependencyFacts` holds the pins; read each package's version on the day), the output passes the audit (`--strict`) and `a11y_static` (zero errors, as `TheFormsAreWired` asks of React), and the form's accessibility wiring is held as `TheFormsAreWired` holds React's (ids, `aria-describedby`, the summary's focus). Fail before on `v3.6.0`.
-- Docs: content-model-to-ui's SKILL.md (20,262 bytes) one sentence, `scripts.md` the flag, `screen-patterns.md` where React-only advice needs a Vue or Svelte line; the CHANGELOG under 4.0.0; the P37 row goes when part 6 lands, and DL-B3's inventory status becomes done.
+**P35 (GT-B6, GT-B9, size M-L): two PRs.**
+- **Part 1, the cheap automatable checks (GT-B6).** Each is a check in `a11y_runtime.mjs`, with an option or a default in `runtime-checks.md`, a fixture page in `tests/fixtures` that fails it and one that passes, and its row in `automation-coverage.md` moved from "*Not in this suite*" to the check that runs:
+  - **1.4.12 Text Spacing:** inject WCAG's spacing (line height 1.5, paragraph spacing 2, letter spacing 0.12, word spacing 0.16, all `!important`) and report each text container whose content is clipped (`scrollHeight > clientHeight` with `overflow: hidden`, or text past its box) after the injection and not before.
+  - **2.4.11 Focus Not Obscured (Minimum):** at each tab stop, compare the focused element's rect with every `position: sticky` or `fixed` element's; AA fails only when it is entirely hidden.
+  - **1.4.13 Content on Hover or Focus:** hover and focus each element with a tooltip pattern (`aria-describedby` to a hidden node, `title` excluded), check that Esc dismisses what appeared, and that it stays while the pointer moves onto it.
+  - **2.3.3 and motion:** run once with `prefers-reduced-motion: reduce` and once without, and report the animations (`document.getAnimations()`, durations) that still run under reduce.
+  - **1.4.4 and 1.4.10 at 200% and 320 px:** clipping and horizontal scroll at a 200% zoom (a 640 px viewport at device scale 2, or CSS zoom) and at 320 CSS px.
+- **Part 2, other engines (GT-B9).** `--engine chromium|firefox|webkit` for axe, the names and the tab order, through Playwright's `firefox` and `webkit`; `browser_common.mjs`'s discovery learns each engine's pinned build, and the tests skip an engine that is not installed. Focus-visible heuristics and forced colours differ by engine: say which checks are Chromium's alone. **Ask the owner before CI installs Firefox or WebKit** (`npx playwright install firefox webkit`, tens of megabytes each), with the estimate.
+- **Tests, each part:** a fixture that fails each check and one that passes, run in the real browser (`tool_modules`, skipped without one); fail before on `v3.6.0`.
+- Docs: a11y-audit-runner's SKILL.md (its budget), `runtime-checks.md`, `automation-coverage.md`'s rows, `scripts.md`; the CHANGELOG under 4.0.0; P35's row goes when part 2 lands, and GT-B6 and GT-B9 become done in the inventory.
 
 **Then the rest of Phase 6b. Ask the owner which comes next**, and give them the sizes. Read the item's rows in the completion plan and its review findings before planning it, and split an L into PRs under 100 files each. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P35 | The cheap automatable checks the coverage table lists, and engines other than Chromium | GT-B6, GT-B9 | a11y gates, `automation-coverage.md` | M-L |
 | P41 | Email: MJML or React Email output, a right-to-left template, and a client matrix regenerated from caniemail's data | DL-B4, DL-B5, DL-C9 | email-template-system | L |
 | P42 | Persuasion: the UK and EU consumer law to flag for legal review, consent for tracking, price experiments, and persuasive patterns mapped to WCAG | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
 | P43 | More page types and audiences, a claims layer with `lint_claims.py`, routing between the persuasion skills, and MESSAGE_BRIEF to DECISION_LOG | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
@@ -544,7 +560,7 @@ Phase 6c is done (P50 to P55). In Phase 6b, P36 (Tailwind v4) and P34 (runtime c
 
 **Each PR:** fail before on `v3.6.0` (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES` (and `WDS_TAILWIND_MODULES` for `test_tw_probe`), both at `tooling/main/node_modules`; the CHANGELOG under 4.0.0; a done row `Pnn part N, #N` above the item's row, which goes when the item is done; a note in the completion plan. `test_static_checks` holds every new script and test to its five rules.
 
-**R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed (a Vue project's bound attributes, the index-mode hook), the migration's reconciliation on a real codebase (P52), the router (#143), the MCP server's containment (#155), P55's gates (the email lint's lines, Prisma's `Unsupported`, `perf_audit`'s left-out pages), P34's options on a real client-rendered app and a real signed-in page (a `codegen --save-storage` session, a steps file, a staging header), a real web-component library (Shoelace or Lit, open and closed roots), a site's sitemap through `--urls` at two viewports, and P37's stacks.
+**R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed (a Vue project's bound attributes, the index-mode hook), the migration's reconciliation on a real codebase (P52), the router (#143), the MCP server's containment (#155), P55's gates (the email lint's lines, Prisma's `Unsupported`, `perf_audit`'s left-out pages), P34's options on a real client-rendered app and a real signed-in page (a `codegen --save-storage` session, a steps file, a staging header), a real web-component library (Shoelace or Lit, open and closed roots), a site's sitemap through `--urls` at two viewports, P37's stacks, **the scaffold's Vue and Svelte output in a real Vite and a real SvelteKit project** (it builds, its pages pass the runtime gate), P35's checks, and **the routing evals on content-model-to-ui's new description** (React, Vue or Svelte).
 
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 
