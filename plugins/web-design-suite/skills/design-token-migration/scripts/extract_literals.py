@@ -1085,6 +1085,33 @@ BOUND_STYLE_ONE = re.compile(r"\[style\.(--[\w-]+|[A-Za-z][\w-]*)(?:\.([A-Za-z%]
 BOUND_NUMBER = re.compile(r"-?\d*\.?\d+")
 BOUND_TAG = re.compile(r"<[A-Za-z][\w:.-]*")
 BOUND_UNIT_KEY = re.compile(r"(--[\w-]+|[A-Za-z][\w-]*)\.([A-Za-z%]+)")    # ngStyle's 'width.px'
+# An Angular control-flow block (`@if (on) { <div …> }`) holds markup; any other
+# brace in text opens an expression (`{{ … }}`, Svelte's `{…}`), which renders none.
+BOUND_BLOCK = re.compile(r"@(?:if|else|for|switch|case|default|defer|placeholder|loading|error|empty)"
+                         r"\b[^{}<>]*\Z")
+
+
+def _bound_code(expr: str) -> str:
+    """The expression with its comments blanked, every offset kept (Codex on #168)."""
+    out, k, n = list(expr), 0, len(expr)
+    while k < n:
+        if expr[k] in "\"'`":
+            k = _bound_skip(expr, k)
+            continue
+        if expr.startswith("/*", k):
+            end = expr.find("*/", k + 2)
+            end = n if end < 0 else end + 2
+        elif expr.startswith("//", k):
+            end = expr.find("\n", k)
+            end = n if end < 0 else end
+        else:
+            k += 1
+            continue
+        for j in range(k, end):
+            if out[j] != "\n":
+                out[j] = " "
+        k = end
+    return "".join(out)
 
 
 def _bound_skip(text: str, k: int) -> int:
@@ -1126,6 +1153,12 @@ def tag_attributes(markup: str) -> list[tuple[str, int, str | None, int, str]]:
         m = BOUND_TAG.search(markup, pos)
         if not m:
             return found
+        brace = markup.find("{", pos, m.start())
+        if brace >= 0:                              # text before the tag holds an expression
+            end = _bound_skip(markup, brace)
+            closed = markup[end - 1:end] == "}"
+            pos = end if closed and not BOUND_BLOCK.search(markup, max(0, brace - 300), brace) else brace + 1
+            continue
         k = m.end()
         while k < n and markup[k] != ">":
             c = markup[k]
@@ -1306,18 +1339,18 @@ def bound_styles(markup: str) -> list[tuple[str, int, list[tuple[str, str, str, 
     for name, at, value, value_at, delim in tag_attributes(markup):
         one = BOUND_STYLE_ONE.fullmatch(name)
         if BOUND_STYLE_WHOLE.fullmatch(name):
-            entries = bound_style_entries(value or "", value_at)
+            entries = bound_style_entries(_bound_code(value or ""), value_at)
         elif one and one.group(3):                  # Svelte: a value is text unless it holds {…}
             prop = one.group(3)
             if value is None:
                 entries = [(prop, "expr", prop, at)]
             elif delim == "{":
-                entries = [(prop, *bound_value(value, value_at))]
+                entries = [(prop, *bound_value(_bound_code(value), value_at))]
             else:
                 entries = [(prop, "expr" if "{" in value else "text", value, value_at)]
         elif one:                                   # Angular: the value is an expression
             prop, unit = one.group(1), one.group(2)
-            kind, text, text_at = bound_value(value or "", value_at)
+            kind, text, text_at = bound_value(_bound_code(value or ""), value_at)
             if unit and kind in ("number", "text") and BOUND_NUMBER.fullmatch(text):
                 kind, text = "text", text + unit
             entries = [(prop, kind, text, text_at)]

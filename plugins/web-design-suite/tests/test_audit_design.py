@@ -1033,6 +1033,19 @@ class TheAuditReadsBoundStyles(TempDirTest):
                 "  <div style=\"--progress: 40%\" :style=\"{ '--card-span': span }\">c</div>\n</template>\n")
         self.assertEqual([], self.found("src/components/Y.vue", text))
 
+    def test_comments_and_interpolations_are_read_as_code_and_text(self):
+        """Codex on #168: a comment before a key hid the key, so L4 was
+        missed; and tag-shaped text inside `{{ … }}` read as a start tag. An
+        Angular control-flow block's braces hold real markup, still read."""
+        self.assertEqual([(2, "L4", "inline-style")], self.found("src/components/E.vue", (
+            "<template>\n  <div :style=\"{ /* runtime color */ color: tone }\">a</div>\n</template>\n")))
+        self.assertEqual([], self.found("src/components/F.vue", (
+            "<template>\n  <p>{{ `<div :style=\"{ color: '#fff' }\">` }}</p>\n"
+            "  <p>{{ label }}</p>\n</template>\n")))
+        self.assertEqual([(3, "L4", "inline-style")], self.found("src/app/g.component.html", (
+            "@if (on) {\n  <p>{{ `<i [style.color]=\"'red'\">` }}</p>\n"
+            "  <div [style.color]=\"'#fff'\">a</div>\n}\n")))
+
     def test_a_literal_in_either_arm_of_a_condition_is_read(self):
         """Codex on #168: `on ? '12px' : gap` read as one expression, so the
         written-out arm escaped L1. A string that is compared is no value."""
