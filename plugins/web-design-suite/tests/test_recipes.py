@@ -518,6 +518,18 @@ class DependencyFacts(unittest.TestCase):
                          "stylelint-config-standard 40 needs stylelint ^17: npm stops with ERESOLVE")
         self.assertEqual(major(head, "stylelint-config-standard"), 40)
 
+    def test_the_scss_packages_are_the_majors_stylelint_17_takes(self):
+        """D3 (P37 part 2), read from registry.npmjs.org on 2026-10-18:
+        stylelint-config-standard-scss 17.0.0 peers stylelint ^17.0.0 and
+        postcss ^8.3.3, and depends on stylelint-config-standard ^40.0.0;
+        postcss-scss 4.0.9 peers postcss ^8.4.29."""
+        head = self.header("stylelint.config.mjs")
+        self.assertEqual(major(head, "stylelint-config-standard-scss"), 17)
+        self.assertEqual(major(head, "postcss-scss"), 4)
+        if TOOLING:
+            pinned = json.loads((TOOLING / "main" / "package.json").read_bytes())["devDependencies"]
+            self.assertEqual(("17.0.0", "4.0.9"), (pinned["stylelint-config-standard-scss"], pinned["postcss-scss"]))
+
     def test_eslint_is_a_supported_major_and_jsx_a11y_is_let_onto_it(self):
         head = self.header("eslint.design.config.mjs")
         self.assertGreaterEqual(major(head, "eslint") or 0, 10,

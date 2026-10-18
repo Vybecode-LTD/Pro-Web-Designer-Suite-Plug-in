@@ -14,8 +14,9 @@ variable set to `off` switches its tests off (wds_support.tool_roots):
                            Part 5 runs on Tailwind v4 too
   WDS_TAILWIND_MODULES     a node_modules with tailwindcss 4 and @tailwindcss/node
                            (tailwind-merge too, for the merge config)
-  WDS_STYLELINT_MODULES    a node_modules with stylelint 17 and
-                           stylelint-config-standard 40
+  WDS_STYLELINT_MODULES    a node_modules with stylelint 17,
+                           stylelint-config-standard 40, and for SCSS
+                           stylelint-config-standard-scss 17 and postcss-scss 4
   WDS_TAILWIND_V3_MODULES  a node_modules with eslint, eslint-plugin-better-tailwindcss
                            and tailwindcss 3, for Part 5 on Tailwind v3
 
@@ -73,7 +74,8 @@ ESLINT_ROOTS = tool_roots("WDS_ESLINT_MODULES", TOOLING_MAIN)
 ESLINT_MODULES = next((r for r in ESLINT_ROOTS
                        if (pathlib.Path(r) / "eslint" / "bin" / "eslint.js").is_file()), None)
 TAILWIND_MODULES = tool_modules("WDS_TAILWIND_MODULES", "tailwindcss", "@tailwindcss/node")
-STYLELINT_MODULES = tool_modules("WDS_STYLELINT_MODULES", "stylelint", "stylelint-config-standard")
+STYLELINT_MODULES = tool_modules("WDS_STYLELINT_MODULES", "stylelint", "stylelint-config-standard",
+                                 "stylelint-config-standard-scss", "postcss-scss")
 STYLE_RULE = "design-laws/style-prop-custom-properties-only"
 STARTER_STYLES = SKILLS / "web-design-studio" / "assets" / "starter" / "styles"
 # The spec comes from this suite's own plugin, as in test_rules_spec.
@@ -482,6 +484,72 @@ ALLOWED_CSS = {
 }
 
 
+# D3 (P37 part 2): an SCSS component with nesting, `@use`, a map, a mixin and
+# `@each`, on tokens; then the same file with one literal each, which both
+# stylelint and the audit refuse.
+SCSS_CARD = """@use 'sass:map';
+@use '../styles/mq' as mq;
+
+$tones: (
+  accent: var(--bg-accent),
+  muted: var(--bg-muted),
+);
+$bp-wide: 48rem;
+
+@mixin focus-ring {
+  &:focus-visible {
+    outline: var(--stroke-focus) solid var(--border-focus);
+  }
+}
+
+@layer components {
+  .card {
+    padding: var(--pad-card);
+    color: var(--fg-strong);
+    background: map.get($tones, muted);
+
+    @include focus-ring;
+
+    @media (width >= $bp-wide) {
+      padding: var(--pad-card-lg);
+    }
+
+    @each $name, $tone in $tones {
+      &--#{$name} {
+        background: $tone;
+      }
+    }
+  }
+}
+"""
+SCSS_REFUSED = {
+    "src/components/scss/Literal.scss": (SCSS_CARD.replace("padding: var(--pad-card);", "padding: 13px;"),
+                                         ALLOWED_LIST),
+    "src/components/scss/Hex.scss": (SCSS_CARD.replace("color: var(--fg-strong);", "color: #fff;"),
+                                     "design/color-no-hex"),
+    "src/components/scss/Variable.scss": (SCSS_CARD.replace("$bp-wide: 48rem;", "$bp-wide: 48rem;\n$card-gap: 12px;"),
+                                          "design/sass-variable-literal"),
+    "src/components/scss/Map.scss": (SCSS_CARD.replace("muted: var(--bg-muted),", "muted: #f4f4f5,"),
+                                     "design/sass-variable-literal"),
+    "src/components/scss/BesideAVariable.scss": (
+        SCSS_CARD.replace("padding: var(--pad-card-lg);", "padding: $gap 5%;"), ALLOWED_LIST),
+    "src/components/scss/Motion.scss": (SCSS_CARD.replace("color: var(--fg-strong);",
+                                                          "color: var(--fg-strong);\n    transition: color 200ms;"),
+                                        ALLOWED_LIST),
+    # Codex on #169: components.scss is a component file, as components.css is.
+    "src/styles/components.scss": (in_layer("components", ".card { margin-block-start: var(--gap-related); }"),
+                                   MARGIN_RULE),
+}
+
+
+def scss_copies() -> dict[str, tuple[str, str]]:
+    """Each stylelint example of the spec as a .scss file beside its .css one,
+    {scss name: (css name, text)}. A theme file's bindings are left out: Tailwind
+    reads a CSS theme file, so `theme.scss` is a token file and nothing more."""
+    return {ex.name[:-4] + ".scss": (ex.name, ex.text) for ex in spec_examples()
+            if "stylelint" in ex.gates and ex.name.endswith(".css") and ex.section != "bindings"}
+
+
 @unittest.skipUnless(NODE and STYLELINT_MODULES, "set WDS_STYLELINT_MODULES to run the stylelint fixtures")
 class StylelintConfig(unittest.TestCase):
     """stylelint.config.mjs as shipped, run by the real stylelint over the
@@ -501,7 +569,16 @@ class StylelintConfig(unittest.TestCase):
                  "src/tailwind/theme.css": (CONFIGS / "theme.css").read_text(encoding="utf-8"),
                  **{name: css for name, (css, _) in REFUSED_CSS.items()},
                  **ALLOWED_CSS,
-                 **{ex.name: ex.text for ex in spec_examples() if "stylelint" in ex.gates}}
+                 **{ex.name: ex.text for ex in spec_examples() if "stylelint" in ex.gates},
+                 # D3: SCSS, read through postcss-scss.
+                 **{name: text for name, (_, text) in scss_copies().items()},
+                 **{f"src/styles/{css.stem}.scss": css.read_text(encoding="utf-8")
+                    for css in sorted(STARTER_STYLES.glob("*.css"))},
+                 **{f"src/sass/variables-{verdict}-{n}.scss": scss + "\n"
+                    for verdict in ("allowed", "refused")
+                    for n, scss in enumerate(SPEC["sass"]["variables"][verdict])},
+                 "src/components/scss/Card.scss": SCSS_CARD,
+                 **{name: scss for name, (scss, _) in SCSS_REFUSED.items()}}
         # N3: each CSS block of the references, in the files the audit puts it in
         # (test_doc_snippets.as_files): its tokens, its layer's file, a component.
         cls.snippet_files = {}
@@ -511,7 +588,7 @@ class StylelintConfig(unittest.TestCase):
                 files.update(parts)
                 cls.snippet_files[f"{doc.relative_to(SKILLS).as_posix()}:{line}"] = list(parts)
         write_files(tmp, files)
-        linted = [name for name in files if name.endswith(".css")]
+        linted = [name for name in files if name.endswith((".css", ".scss"))]
         proc = subprocess.run([NODE, str(pathlib.Path(STYLELINT_MODULES) / "stylelint" / "bin" / "stylelint.mjs"),
                                *linted, "--config", "stylelint.config.mjs", "--formatter", "json"],
                               cwd=tmp, capture_output=True, timeout=300, env=env())
@@ -562,6 +639,51 @@ class StylelintConfig(unittest.TestCase):
             problems = self.problems(ex.name)
             return problems, problems
         hold_to_the_spec(self, "stylelint", problems_of)
+
+    def rules(self, name: str) -> set[str]:
+        return {p.split(" ", 1)[1] for p in self.problems(name)}
+
+    def test_an_scss_file_gets_the_rules_a_css_file_does(self):
+        """D3 (P37 part 2): the config linted .css files only, so a .scss file
+        had the audit alone. Each stylelint example of the spec, and each
+        starter stylesheet, read as SCSS draws the rules it draws as CSS."""
+        copies = scss_copies()
+        self.assertGreater(len(copies), 100)
+        for scss, (css, _) in copies.items():
+            with self.subTest(file=scss):
+                self.assertEqual(self.rules(css), self.rules(scss))
+        for css in sorted(STARTER_STYLES.glob("*.css")):
+            with self.subTest(starter=css.name):
+                self.assertEqual([], self.problems(f"src/styles/{css.stem}.scss"))
+
+    def test_the_specs_sass_variables(self):
+        """sass.variables, which the audit's L1 sass-literal and
+        design/sass-variable-literal both read."""
+        for verdict in ("allowed", "refused"):
+            for n, scss in enumerate(SPEC["sass"]["variables"][verdict]):
+                with self.subTest(**{verdict: scss}):
+                    found = self.rules(f"src/sass/variables-{verdict}-{n}.scss")
+                    if verdict == "allowed":
+                        self.assertEqual(set(), found)
+                    else:
+                        self.assertIn("design/sass-variable-literal", found)
+
+    def test_an_scss_component_passes_on_tokens_and_fails_on_each_literal(self):
+        audit = load_script("web-design-studio", "audit_design")
+        tmp = class_temp_dir(self, "wds-scss-audit-")
+        for name, (text, rule) in {"src/components/scss/Card.scss": (SCSS_CARD, None), **SCSS_REFUSED}.items():
+            with self.subTest(file=name):
+                path = tmp / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(text.encode("utf-8"))
+                found, _, _ = audit.audit_run([str(path)])
+                errors = [f"{f.law} {f.rule}" for f in found if f.severity == "error"]
+                if rule is None:
+                    self.assertEqual([], self.problems(name))
+                    self.assertEqual([], [f"{f.law} {f.rule}" for f in found])
+                else:
+                    self.assertIn(rule, self.rules(name))
+                    self.assertTrue(errors, f"the audit passed {name}")
 
     def test_the_references_css_snippets_pass_the_config(self):
         """N3: what a reference offers for copying passes stylelint too, not only

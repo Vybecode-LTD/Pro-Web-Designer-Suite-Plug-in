@@ -211,6 +211,16 @@ class PreCommitHook(TempDirTest):
         self.assertEqual(code, 0, out)
         self.assertIn("SKIPPED", out)
 
+    def test_a_staged_scss_file_reaches_stylelint(self):
+        """P37 part 2 (Codex on #167): the hook built stylelint's list with
+        `grep -E '\\.css$'`, so a staged .scss file skipped stylelint even
+        once the config reads SCSS. With no config, it now stops the commit
+        as a .css file does."""
+        self.stage("components/card.scss", "@layer components {\n  .card { padding: var(--pad-card); }\n}\n")
+        code, out = self.run_hook(DESIGN_GATE_ALLOW_SKIP=None)
+        self.assertEqual(code, 1, out)
+        self.assertIn("stylelint config", out)
+
     def test_a_missing_audit_fails_unless_skipping_is_allowed(self):
         (self.repo / "scripts" / "audit_design.py").unlink()
         self.stage("site/index.html", '<!doctype html><html lang="en"><title>t</title>'

@@ -7,6 +7,26 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
 ### Added
 
+- **stylelint reads SCSS** (D3, P37 part 2). The config linted `.css` files only, so a `.scss`
+  file had the audit alone. An override (Part 6) now reads every `.scss` file through
+  `postcss-scss` with `stylelint-config-standard-scss` 17, restates the config's own rules over
+  it, and reads a Sass variable in a value as a token, as the audit does (`padding: $gap` passes,
+  `padding: $gap 5%` does not). The component and token file classes name their `.scss` files
+  (`**/components/**/*.scss`, `**/*.module.scss`, `**/components.scss`, `**/tokens.scss`…), in
+  the spec and in both gates (the audit and the census took `components.css` only); a theme file's bindings stay CSS, which Tailwind reads. A new rule,
+  `design/sass-variable-literal`, refuses what the audit's `sass-literal` refuses: a Sass
+  variable that holds a length, a colour, a duration or an easing curve outside a token file,
+  a map's included, with a breakpoint and a `@function`'s local left alone. The spec's
+  `sass.variables` names both gates; `sass.definitions` (unlayered Sass) stays the audit's,
+  since no stylelint rule reads unlayered CSS. A CSS-only project installs nothing new:
+  stylelint loads the two packages only for a `.scss` file. The pre-commit hook's stylelint
+  list took `\.css$` only, so a staged `.scss` file skipped it (Codex on #167); it takes
+  `.scss` too. `test_real_tools.StylelintConfig` (every stylelint example of the spec and every
+  starter stylesheet as SCSS draws the rules it draws as CSS; an SCSS component with nesting,
+  `@use`, a map, a mixin and `@each` passes both gates, and fails both on each literal),
+  `test_precommit_hook.PreCommitHook.test_a_staged_scss_file_reaches_stylelint`,
+  `test_recipes.DependencyFacts.test_the_scss_packages_are_the_majors_stylelint_17_takes`.
+
 - **The gates that open a URL reach a client-rendered or signed-in page** (P34 part 1;
   GT-B1, GT-B2). Each ran one `goto(…, 'load')`, so a client-rendered page was audited as
   its empty shell, and a signed-in page as its sign-in: both passed, with almost nothing on
