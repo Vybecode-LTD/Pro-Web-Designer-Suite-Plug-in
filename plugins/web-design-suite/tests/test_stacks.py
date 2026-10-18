@@ -200,6 +200,19 @@ class TheShellsRenderTheirPagesElsewhere(TempDirTest):
             with self.subTest(page=name):
                 self.assertEqual(self.rules(name, text), ["no-main-landmark", "no-title"])
 
+    def test_a_component_or_a_named_slot_beside_the_page_is_no_outlet(self):
+        # Part of the page, not the page (CodeRabbit on #172).
+        pages = {
+            "Shell.tsx": "export default function S() {\n"
+                         "  return (<html lang=\"en\"><head><title>A</title></head>"
+                         "<body><SiteHeader /><p>Welcome</p></body></html>);\n}\n",
+            "named.astro": "<html lang=\"en\"><head><title>A</title></head>"
+                           "<body><p>Hi</p><slot name=\"footer\" /></body></html>\n",
+        }
+        for name, text in pages.items():
+            with self.subTest(page=name):
+                self.assertEqual(self.rules(name, text), ["no-main-landmark"])
+
     def test_a_layout_outside_app_needs_its_title(self):
         # Only the App Router's `app/` makes `layout` a Next.js layout (Codex on #172).
         text = ("export default function L() {\n"

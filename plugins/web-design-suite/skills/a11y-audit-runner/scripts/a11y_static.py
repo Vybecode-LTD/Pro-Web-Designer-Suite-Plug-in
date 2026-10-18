@@ -777,7 +777,7 @@ CHILDREN_OUTLET = re.compile(r"\{\s*(?:@render\s|(?:[\w$]+\.)*children\s*\})")
 def shell_outlets(path: Path, clean: str, nodes: list[Node], is_jsx: bool) -> tuple[bool, bool]:
     """Does this document render its body, and its head, from elsewhere?
 
-    The body: a `<slot>` (Astro, a web component), a component, the
+    The body: a default `<slot>` (Astro, a web component), the
     children's expression (`{children}`, `{@render children()}`), SvelteKit's
     `%sveltekit.body%`, or, in a page that loads a module script, a body
     that is one empty element with an id beside its scripts (the mount point
@@ -799,8 +799,10 @@ def shell_outlets(path: Path, clean: str, nodes: list[Node], is_jsx: bool) -> tu
                    and "id" in content[0].tag.attrs and not content[0].descendants
                    and not content[0].text.strip()
                    and not (content[0].tag.self_closing or content[0].tag.name in VOID))
+    # The default slot is the page's; a named one, or a component beside the
+    # page's own content, is part of the page (CodeRabbit on #172).
     body_outlet = (
-        any(d.tag.name == "slot" or d.tag.name[:1].isupper() for d in within)
+        any(d.tag.name == "slot" and d.tag.attrs.get("name") in (None, "default") for d in within)
         or "%sveltekit.body%" in raw_body
         or (expressions and CHILDREN_OUTLET.search(raw_body) is not None)
         or mount_point)
