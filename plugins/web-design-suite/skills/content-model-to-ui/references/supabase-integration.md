@@ -415,6 +415,24 @@ export const supabase = createClient<Database>(
 
 The publishable key is not a secret and gives no protection. With it, anyone can send any query the policies allow. The policies are the protection: a table in an exposed schema with RLS off answers to anyone who holds that key.
 
+### A Next.js server action runs as the user
+
+With `--server-actions`, each form posts its FormData to a server action in `server/<table>.actions.ts`: `create<Entity>`, and `update<Entity>` with the row's key bound to it. The action is the server, so it is where the draft is validated, and it must not run as the service:
+
+> Always verify authentication and authorization inside each Server Action, even if the form is only rendered on an authenticated page.
+> (https://nextjs.org/docs/app/guides/forms)
+
+The action writes through `lib/supabase.server.ts`, Supabase's own server client for Next.js (`createServerClient` from `@supabase/ssr`, from the example at https://github.com/supabase/supabase/tree/master/examples/auth/nextjs). It reads the signed-in user's session from the request's cookies and holds the publishable key, so the query reaches Postgres as that user and every policy in §2 applies: the policies are the action's authorization, and `db/policies/` must be applied before it ships. Its `setAll` is wrapped in a `try`, since "In Server Components, the headers cannot be set" (https://supabase.com/docs/guides/auth/server-side/creating-a-client); a proxy that refreshes the session sets them.
+
+Each action reads the FormData by the column's type (a number with `Number()`, a toggle as `on`, an array with `getAll()`, an empty field left out or set to null where the column takes null), validates it with the generated `server/<table>.schema.ts`, and returns the values it read with the schema's first message for each field, which `<Entity>ActionForm.tsx` hands back to the form through `useActionState`. Two values cannot be read from the form alone, and the action marks each with a TODO: a `datetime-local` input posts no offset, and a JSON field posts text.
+
+The browser's client is `createBrowserClient` with Next.js's public variables. As with Vite's, every one is public:
+
+> It will be inlined into any JavaScript sent to the browser.
+> (`NEXT_PUBLIC_` variables, https://nextjs.org/docs/app/guides/environment-variables)
+
+A secret key never goes in a `NEXT_PUBLIC_` variable, and the generated client refuses one.
+
 ### FastAPI has two authorities, and must choose per request
 
 Whichever authority a write runs under, it validates the body first with the generated `server/<table>_schema.py` (pydantic) or `server/<table>.schema.ts` (zod): the same constraints the form shows, enforced where the browser cannot edit them (field-mapping.md §9). RLS decides *whose* row; the schema decides *what* a row may hold.

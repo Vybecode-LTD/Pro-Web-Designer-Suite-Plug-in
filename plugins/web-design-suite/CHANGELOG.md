@@ -7,6 +7,22 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
 ### Added
 
+- **The scaffold's forms post to Next.js server actions** (DL-B3, P37 part 4). content-model-to-ui
+  wrote client-side React forms only. `scaffold_ui.py --server-actions` writes each form as a
+  Client Component whose `<form action>` posts its FormData to `server/<table>.actions.ts`, a
+  `'use server'` module with `create<Entity>` and `update<Entity>` (the row's key bound, as
+  Next.js's forms guide shows); `<Entity>ActionForm.tsx` holds each result in React 19's
+  `useActionState`, and the Save button takes its pending state from `useFormStatus`. Each
+  action reads the FormData by the column's type (a number, a toggle's `on`, an array's
+  `getAll()`, an empty field left out or null), validates it with the generated zod schema,
+  returns the schema's first message per field, and writes through `lib/supabase.server.ts`,
+  Supabase's own `createServerClient` for Next.js, so it runs as the signed-in user and the
+  policies apply; `lib/supabase.ts` reads `NEXT_PUBLIC_` variables. Every control is named,
+  the toggles too, since an unnamed control is not posted. Without the flag the scaffold is
+  unchanged. `test_scaffold.TheServerActions` runs the generated action in Node against
+  stand-ins for Next.js, Supabase and the schema; both stacks parse and pass the audit and
+  `a11y_static`.
+
 - **Next.js App Router, Vue, Svelte and Astro** (SB-B6, P37 part 3). The triggers are generic
   ("build me a site"), but the references taught plain CSS, CSS Modules and Tailwind only.
   web-design-studio's `stack-frameworks.md` gives each stack its global entry (the root layout,

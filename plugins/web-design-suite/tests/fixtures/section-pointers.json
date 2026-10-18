@@ -672,6 +672,12 @@
   "heading": "Validation"
  },
  {
+  "from": "content-model-to-ui/references/scripts.md",
+  "to": "content-model-to-ui/references/supabase-integration.md",
+  "section": "9",
+  "heading": "Who talks to the database"
+ },
+ {
   "from": "content-model-to-ui/references/supabase-integration.md",
   "to": "content-model-to-ui/references/field-mapping.md",
   "section": "9",

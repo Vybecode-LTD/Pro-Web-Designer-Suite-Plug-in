@@ -561,5 +561,143 @@ class TheAuditsContentMediums(TempDirTest):
         self.assertEqual(["posts"], [t["name"] for t in model["tables"]])
 
 
+# The generated actions, run in Node against stand-ins for Next.js, the
+# server's Supabase client and the zod schema: the schema accepts a draft with a
+# reference and refuses one without, as the real one does for that column.
+ACTION_RUN = r"""
+const ts = require('typescript');
+const fs = require('fs');
+const calls = [];
+const source = fs.readFileSync(process.argv[2], 'utf8');
+const js = ts.transpileModule(source, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+const stubs = {
+  'next/cache': { revalidatePath: (path) => calls.push(['revalidate', path]) },
+  '../lib/supabase.server': {
+    createClient: async () => ({
+      from: (table) => ({
+        insert: async (row) => (calls.push(['insert', table, row]), { error: null }),
+        update: (row) => ({
+          eq: async (column, key) => (calls.push(['update', table, row, column, key]), { error: null }),
+        }),
+      }),
+    }),
+  },
+  './orders.schema': {
+    orderDraftSchema: {
+      safeParse: (v) => v.reference
+        ? { success: true, data: v }
+        : { success: false, error: { issues: [{ path: ['reference'], message: 'Required' }] } },
+    },
+  },
+};
+const mod = { exports: {} };
+new Function('require', 'module', 'exports', js)((name) => stubs[name], mod, mod.exports);
+const { createOrder, updateOrder } = mod.exports;
+const initial = { values: {}, errors: {}, submitError: null };
+(async () => {
+  const form = new FormData();
+  form.set('supplier_id', 's-1');
+  form.set('reference', 'PO-7');
+  form.set('total_cents', '1250');
+  form.set('deposit', '');
+  form.set('is_rush', 'on');
+  form.set('notes', '');
+  const created = await createOrder(initial, form);
+  const refused = await createOrder(initial, new FormData());
+  const updated = await updateOrder('o-1', initial, form);
+  console.log(JSON.stringify({ created, refused, updated, calls }));
+})();
+"""
+
+
+class TheServerActions(unittest.TestCase):
+    """--server-actions (P37 part 4, DL-B3): the form posts its FormData to a
+    'use server' function through React 19's <form action>, useActionState
+    holds the result and useFormStatus the button's pending state."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = class_temp_dir(cls, "wds-actions-")
+        cls.src = scaffold(cls.tmp, "src", "--server-actions", answers=ANSWERS)
+        cls.tw = scaffold(cls.tmp, "tw", "--server-actions", "--stack", "tailwind", answers=ANSWERS)
+        cls.plain = scaffold(cls.tmp, "plain", answers=ANSWERS)
+
+    def test_the_flag_writes_the_actions_and_the_next_clients(self):
+        for name in ("features/orders/OrderActionForm.tsx", "server/orders.actions.ts",
+                     "server/suppliers.actions.ts", "lib/supabase.server.ts"):
+            with self.subTest(file=name):
+                self.assertTrue((self.src / name).is_file())
+                self.assertFalse((self.plain / name).exists())
+        self.assertIn("export { OrderActionForm } from './OrderActionForm';",
+                      read(self.src / "features" / "orders" / "index.ts"))
+        browser = read(self.src / "lib" / "supabase.ts")
+        self.assertIn("createBrowserClient<Database>(url, publishableKey)", browser)
+        self.assertIn("process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", browser)
+        self.assertNotIn("import.meta.env", browser)
+        server = read(self.src / "lib" / "supabase.server.ts")
+        self.assertIn("createServerClient<Database>(", server)
+        self.assertIn("const cookieStore = await cookies();", server)
+        self.assertIn("import.meta.env.VITE_SUPABASE_URL", read(self.plain / "lib" / "supabase.ts"))
+
+    def test_the_form_posts_to_the_action(self):
+        for src in (self.src, self.tw):
+            with self.subTest(src=src.name):
+                form = read(src / "features" / "orders" / "OrderForm.tsx")
+                self.assertTrue(form.startswith("'use client';\n"))
+                self.assertIn("import { useFormStatus } from 'react-dom';", form)
+                self.assertIn("const { pending } = useFormStatus();", form)
+                self.assertIn("noValidate action={action}>", form)
+                self.assertNotIn("onSubmit", form)
+                # A control with no name is not posted: the toggle has one too.
+                self.assertIn('id={fieldId(\'is_rush\')}\n            name="is_rush"', form)
+        wrapper = read(self.src / "features" / "orders" / "OrderActionForm.tsx")
+        self.assertIn("import { useActionState, useEffect, useState } from 'react';", wrapper)
+        self.assertIn("const save = row ? updateOrder.bind(null, row.id) : createOrder;", wrapper)
+        self.assertIn("useActionState(save, initial)", wrapper)
+
+    def test_without_the_flag_the_form_is_unchanged(self):
+        form = read(self.plain / "features" / "orders" / "OrderForm.tsx")
+        self.assertTrue(form.startswith("import { useEffect, useRef, useState } from 'react';"))
+        self.assertIn("onSubmit();", form)
+        self.assertNotIn("useFormStatus", form)
+        self.assertNotIn('name="is_rush"', form)
+
+    def test_the_action_reads_each_field_by_its_type_validates_and_writes(self):
+        root = tool_modules("WDS_NODE_MODULES", "typescript")
+        if root is None:
+            self.skipTest("typescript is not installed (tooling/main) or WDS_NODE_MODULES is off")
+        (self.tmp / "action_run.cjs").write_bytes(ACTION_RUN.encode())
+        proc = subprocess.run(["node", "action_run.cjs", str(self.src / "server" / "orders.actions.ts")],
+                              cwd=self.tmp, capture_output=True, env=env(NODE_PATH=root))
+        self.assertEqual(proc.returncode, 0, output(proc))
+        got = json.loads(proc.stdout)
+        draft = {"supplier_id": "s-1", "reference": "PO-7", "total_cents": 1250, "deposit": None,
+                 "discount": None, "is_rush": True, "notes": None, "ships_at": None}
+        self.assertEqual(got["created"], {"values": {}, "errors": {}, "submitError": None})
+        self.assertEqual(got["refused"]["errors"], {"reference": "Required"})
+        self.assertEqual(got["updated"]["values"], draft)
+        self.assertEqual(got["calls"], [["insert", "orders", draft], ["revalidate", "/orders"],
+                                        ["update", "orders", draft, "id", "o-1"], ["revalidate", "/orders"]])
+
+    def test_the_output_parses_and_passes_the_gates(self):
+        root = tool_modules("WDS_NODE_MODULES", "typescript")
+        if root is not None:
+            (self.tmp / "tscheck.js").write_bytes(TS_CHECK.encode())
+            files = sorted(str(p.relative_to(self.tmp)) for out in ("src", "tw")
+                           for p in (self.tmp / out).rglob("*.ts*"))
+            proc = subprocess.run(["node", "tscheck.js", *files], cwd=self.tmp, capture_output=True,
+                                  env=env(NODE_PATH=root))
+            self.assertEqual(proc.returncode, 0, output(proc))
+        proc = run_py("web-design-studio", "audit_design", "src", "tw", "--strict", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        for src in ("src", "tw"):
+            with self.subTest(src=src):
+                proc = run_py("a11y-audit-runner", "a11y_static", f"{src}/ui", f"{src}/features", "--json",
+                              cwd=self.tmp)
+                self.assertEqual(json.loads(proc.stdout)["errors"], 0, output(proc))
+
+
 if __name__ == "__main__":
     unittest.main()
