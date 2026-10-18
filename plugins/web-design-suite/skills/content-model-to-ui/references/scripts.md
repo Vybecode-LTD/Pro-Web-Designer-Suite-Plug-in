@@ -34,12 +34,13 @@ Turn a model plus answers into components.
 | `--answers FILE` | the interview, answered; without it every question falls back to the proposal |
 | `--entity TABLE` | one entity (repeatable or comma-separated) |
 | `--stack css-modules\|tailwind` | default: the project's `.design-suite.json` `stack` (`tailwind-v3` and `tailwind-v4` scaffold Tailwind), else `css-modules` |
+| `--server-actions` | a Next.js App Router project: each form posts its FormData to a `'use server'` action, through React 19's `useActionState` and `useFormStatus` (supabase-integration.md §9) |
 | `--dry-run` | print the tree, the sizes and the TODO count; write nothing |
 | `--force` | overwrite files that already exist (the default is to skip them) |
 | `--strict` | write nothing and exit `1` when the schema has a blocking security finding (RLS off, a policy that lets anyone write). For CI; the default prints the findings and still writes |
 
 Exit `0` written · `1` the model is unusable, or `--strict` met a blocking security finding · `2` bad invocation.
 
-It writes, per entity, `features/<table>/` (types, fields, list, detail, form, states), `db/policies/<table>.policies.todo.sql` with its `.test.sql`, and `server/<table>.schema.ts` and `server/<table>_schema.py`, the draft's constraints for the server (field-mapping.md §9); plus `ui/`, `lib/format.ts` and `lib/supabase.ts` once.
+It writes, per entity, `features/<table>/` (types, fields, list, detail, form, states), `db/policies/<table>.policies.todo.sql` with its `.test.sql`, and `server/<table>.schema.ts` and `server/<table>_schema.py`, the draft's constraints for the server (field-mapping.md §9); plus `ui/`, `lib/format.ts` and `lib/supabase.ts` once. With `--server-actions` it also writes `features/<table>/<Entity>ActionForm.tsx` and `server/<table>.actions.ts` per entity and `lib/supabase.server.ts` once, and `lib/supabase.ts` reads Next.js's `NEXT_PUBLIC_` variables instead of Vite's.
 
 **On the Tailwind stack.** Layout, spacing, colour and type become utility classes from the suite's theme — with no arbitrary values, because if a utility does not exist then neither does the token. Variant and state tables cannot be expressed that way, so they live in one emitted `styles/scaffold.css` under `@layer components`. That boundary is real and is stated rather than hidden: a utility system is excellent at layout and has nothing to say about a component's state machine.

@@ -1991,7 +1991,8 @@ DETAIL_CSS = """\
 """
 
 
-def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
+def control_jsx(spec: dict[str, Any], indent: str = "          ",
+                named_toggle: bool = False) -> str:
     ctrl = spec["control"]
     name = spec["name"]
     key = prop_key(name)
@@ -2047,7 +2048,9 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
                 f"{indent}  onValueChange={{(next) => onChange({q}, next)}}\n"
                 f"{indent}/>")
     if ctrl in ("switch", "checkbox"):
-        return (f"{indent}<Toggle\n{indent}  id={{fieldId({q})}}\n"
+        # A posted form sends a checked box as `name=on`; it needs the name.
+        named = f"{indent}  name={attr}\n" if named_toggle else ""
+        return (f"{indent}<Toggle\n{indent}  id={{fieldId({q})}}\n{named}"
                 f"{indent}  label=\"{spec['label']}\"\n"
                 f"{indent}  checked={{Boolean({acc})}}\n"
                 f"{indent}  disabled={{disabled}}\n"
@@ -2111,10 +2114,10 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ") -> str:
             f"{indent}/>")
 
 
-def emit_form(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str:
-    name = table["name"]
-    Entity = pascal(singular(name))
-    Entities = pascal(name)
+def _form_sections(table: dict[str, Any], model: dict[str, Any], ans: Answers,
+                   posted: bool = False) -> tuple[str, set[str]]:
+    """The form's fieldsets, and the kit components they use. A form that
+    posts its FormData (`posted`) names every control, the toggles too."""
     specs = {s["name"]: s for s in
              (field_spec(c, table, model, ans) for c in table["columns"]
               if ans.in_form(table, c))}
@@ -2152,7 +2155,7 @@ def emit_form(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str
                 body.append(
                     f"{review}\n        <div className={{styles.field}} "
                     f"data-state={{{err} ? 'error' : undefined}}>\n"
-                    f"{control_jsx(s, '          ')}\n"
+                    f"{control_jsx(s, '          ', posted)}\n"
                     f"          {{{err} ? (\n"
                     f"            <p className={{styles.fieldError}} id={{fieldId({js_string(f)}) + '-error'}}>\n"
                     f"              {{{err}}}\n"
@@ -2179,6 +2182,17 @@ $control
             f"        <legend className={{styles.legend}}>"
             f"{g.get('legend', 'Details')}</legend>\n"
             + "\n".join(body) + "\n      </fieldset>")
+    return "\n\n".join(sections) or "      {/* no writable fields */}", kit
+
+
+def emit_form(table: dict[str, Any], model: dict[str, Any], ans: Answers,
+              action: bool = False) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    Entities = pascal(name)
+    sections, kit = _form_sections(table, model, ans, posted=action)
+    if action:
+        return emit_posted_form(table, sections, kit)
 
     return Template("""\
 import { useEffect, useRef, useState } from 'react';
@@ -2303,9 +2317,368 @@ $sections
 }
 """).safe_substitute(
         Entity=Entity, Entities=Entities, camel=camel(name),
-        kit=", ".join(sorted(kit)),
-        sections="\n\n".join(sections) or "      {/* no writable fields */}",
+        kit=", ".join(sorted(kit)), sections=sections,
         lower_entity=singular(name.replace("_", " ")))
+
+
+# ---------------------------------------------------------------------------
+# Next.js server actions (--server-actions)
+# ---------------------------------------------------------------------------
+# The form posts its FormData to a 'use server' function through React 19's
+# <form action>, useActionState holds the result, and useFormStatus gives the
+# button its pending state (nextjs.org/docs/app/guides/forms).
+
+def emit_posted_form(table: dict[str, Any], sections: str, kit: set[str]) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    return Template("""\
+'use client';
+
+import { useEffect, useRef } from 'react';
+import { useFormStatus } from 'react-dom';
+import { $kit } from '../../ui';
+import type { ${Entity}Draft } from './$camel.types';
+import styles from './${Entity}Form.module.css';
+
+export type ${Entity}FormProps = {
+  values: Partial<${Entity}Draft>;
+  errors: Partial<Record<keyof ${Entity}Draft, string>>;
+  /** The server action the form posts its FormData to (React 19's `<form action>`). */
+  action: (formData: FormData) => void;
+  /** Blocks every control AND the submit button, together. */
+  disabled?: boolean;
+  /** Set when the user has changed something and not saved it. */
+  dirty?: boolean;
+  /** A form-level failure: the save was rejected as a whole. */
+  submitError?: string | null;
+  onChange: (name: keyof ${Entity}Draft, value: unknown) => void;
+  onCancel?: () => void;
+};
+
+const fieldId = (name: string) => '$camel-' + name;
+
+/** The submit button reads the form it is rendered in: pending while the action runs. */
+function SaveButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="primary" loading={pending} disabled={disabled}>
+      Save
+    </Button>
+  );
+}
+
+/**
+ * The $lower_entity form, posted to a server action.
+ *
+ * The client-side form's markup and rules, with the save on the server: the
+ * browser posts the FormData, the action validates it against the server's
+ * schema and returns the errors, and the summary takes focus each time a
+ * result comes back with errors. Every control has its `name`, since a control
+ * without one is not posted. ${Entity}ActionForm.tsx wires it to the actions.
+ */
+export function ${Entity}Form({
+  values,
+  errors,
+  action,
+  disabled = false,
+  dirty = false,
+  submitError = null,
+  onChange,
+  onCancel,
+}: ${Entity}FormProps) {
+  const invalid = Object.entries(errors).filter(([, message]) => Boolean(message));
+  const summaryRef = useRef<HTMLDivElement>(null);
+
+  // The action returns a new errors object with each result, so focus moves to
+  // the summary once per failed submit, and never while the user types.
+  useEffect(() => {
+    if (Object.values(errors).some(Boolean)) summaryRef.current?.focus();
+  }, [errors]);
+
+  return (
+    <form className="stack stack--separate" noValidate action={action}>
+      {invalid.length > 0 ? (
+        <div className={styles.summary} role="alert" tabIndex={-1} ref={summaryRef}>
+          <p className={styles.summaryTitle}>
+            {invalid.length === 1 ? 'One field needs attention' : String(invalid.length) + ' fields need attention'}
+          </p>
+          <ul className={styles.summaryList}>
+            {invalid.map(([name, message]) => (
+              <li key={name}>
+                <a className={styles.summaryLink} href={'#' + fieldId(name)}>
+                  {String(message)}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {submitError ? (
+        <p className={styles.submitError} role="alert">
+          {submitError}
+        </p>
+      ) : null}
+
+$sections
+
+      <div className="cluster cluster--tight">
+        <SaveButton disabled={disabled} />
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          {dirty ? 'Discard changes' : 'Cancel'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+""").safe_substitute(
+        Entity=Entity, camel=camel(name), kit=", ".join(sorted(kit)),
+        sections=sections, lower_entity=singular(name.replace("_", " ")))
+
+
+def emit_action_form(table: dict[str, Any]) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    pk = table["primary_key"][0] if table["primary_key"] else "id"
+    return Template("""\
+'use client';
+
+import { useActionState, useEffect, useState } from 'react';
+import { ${Entity}Form } from './${Entity}Form';
+import type { $Entity, ${Entity}Draft } from './$camel.types';
+import { create$Entity, update$Entity } from '../../server/$name.actions';
+import type { ${Entity}ActionState } from '../../server/$name.actions';
+
+export type ${Entity}ActionFormProps = {
+  /** The row to edit; without one the form creates a row. */
+  row?: $Entity;
+  onCancel?: () => void;
+};
+
+/**
+ * ${Entity}Form on the server's actions: useActionState holds what the last
+ * submit returned (the values the server read, its errors, a form-level
+ * failure), and the draft between submits is local state.
+ */
+export function ${Entity}ActionForm({ row, onCancel }: ${Entity}ActionFormProps) {
+  const initial: ${Entity}ActionState = { values: row ?? {}, errors: {}, submitError: null };
+  // The key travels outside the form's fields, bound to the action.
+  const save = row ? update$Entity.bind(null, $key) : create$Entity;
+  const [state, formAction] = useActionState(save, initial);
+  const [values, setValues] = useState<Partial<${Entity}Draft>>(state.values);
+  const [dirty, setDirty] = useState(false);
+
+  // Each result replaces the draft with the values the server read.
+  useEffect(() => {
+    setValues(state.values);
+    setDirty(false);
+  }, [state]);
+
+  return (
+    <${Entity}Form
+      values={values}
+      errors={state.errors}
+      submitError={state.submitError}
+      action={formAction}
+      dirty={dirty}
+      onChange={(field, value) => {
+        setValues((draft) => ({ ...draft, [field]: value }));
+        setDirty(true);
+      }}
+      onCancel={onCancel}
+    />
+  );
+}
+""").safe_substitute(Entity=Entity, camel=camel(name), name=name, key=member("row", pk))
+
+
+def _form_read(f: dict[str, Any]) -> str:
+    """How the action reads one field from the FormData, by the schema's type."""
+    key = js_string(f["name"])
+    empty = " ?? null" if f["nullable"] else ""
+    if f["array"]:
+        each = "Number" if f["type"] in NUMBER_TYPES else "String"
+        return f"form.getAll({key}).map({each})"
+    if f["type"] == "boolean":
+        return f"form.get({key}) === 'on'"
+    if f["type"] in NUMBER_TYPES and not (f["enum"] or f["options"]):
+        return f"number({key}){empty}"
+    return f"text({key}){empty}"
+
+
+def emit_actions(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str:
+    name = table["name"]
+    Entity = pascal(singular(name))
+    pk = table["primary_key"][0] if table["primary_key"] else "id"
+    fields = schema_fields(table, model, ans)
+    reads = []
+    for f in fields:
+        note = ""
+        if f["temporal"] == "instant" and f["aware"]:
+            note = ("    // TODO(time zone): a datetime-local value has no offset, and the schema\n"
+                    "    // wants one. Send the browser's with it (a hidden input), never the server's.\n")
+        elif f["type"] in ("jsonb", "json"):
+            note = "    // TODO(json): the field posts text; parse it into the value it stands for.\n"
+        reads.append(f"{note}    {prop_key(f['name'])}: {_form_read(f)},")
+    return Template("""\
+'use server';
+
+/**
+ * The server actions for $lower: the form posts here, and this is the
+ * control, as the form's own validation is a courtesy. Each action reads the
+ * FormData by the column's type, validates it against the server's schema and
+ * writes through the server's Supabase client, which carries the signed-in
+ * user's session, so row-level security decides what it may write. Next.js
+ * asks each action to check who is calling: the policies in db/policies/ are
+ * that check, so apply them before this ships.
+ */
+import { revalidatePath } from 'next/cache';
+import { createClient } from '../lib/supabase.server';
+import { ${schema}DraftSchema } from './$name.schema';
+import type { $Entity, ${Entity}Draft } from '../features/$name/$camel.types';
+
+export type ${Entity}ActionState = {
+  values: Partial<${Entity}Draft>;
+  errors: Partial<Record<keyof ${Entity}Draft, string>>;
+  submitError: string | null;
+};
+
+/** FormData holds strings. Each field is read as the schema's type; an empty
+ *  one is left out, or null where the column takes null. */
+function draftFrom(form: FormData): Partial<${Entity}Draft> {
+  const text = (key: string) => {
+    const value = form.get(key);
+    return typeof value === 'string' && value !== '' ? value : undefined;
+  };
+  const number = (key: string) => {
+    const value = text(key);
+    return value === undefined ? undefined : Number(value);
+  };
+  return {
+$reads
+  } as Partial<${Entity}Draft>;
+}
+
+/** The schema's first message for each field, under the field's name. */
+function errorsFrom(issues: { path: PropertyKey[]; message: string }[]) {
+  const errors: Partial<Record<keyof ${Entity}Draft, string>> = {};
+  for (const issue of issues) {
+    const field = issue.path[0] as keyof ${Entity}Draft | undefined;
+    if (field !== undefined && !errors[field]) errors[field] = issue.message;
+  }
+  return errors;
+}
+
+export async function create$Entity(
+  _previous: ${Entity}ActionState,
+  form: FormData,
+): Promise<${Entity}ActionState> {
+  const values = draftFrom(form);
+  const parsed = ${schema}DraftSchema.safeParse(values);
+  if (!parsed.success) {
+    return { values, errors: errorsFrom(parsed.error.issues), submitError: null };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.from($table).insert(parsed.data);
+  if (error) return { values, errors: {}, submitError: 'The save failed: ' + error.message };
+  revalidatePath('/$name'); // TODO(route): the path the list renders at.
+  return { values: {}, errors: {}, submitError: null };
+}
+
+export async function update$Entity(
+  key: $Entity[$pkq],
+  _previous: ${Entity}ActionState,
+  form: FormData,
+): Promise<${Entity}ActionState> {
+  const values = draftFrom(form);
+  const parsed = ${schema}DraftSchema.safeParse(values);
+  if (!parsed.success) {
+    return { values, errors: errorsFrom(parsed.error.issues), submitError: null };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.from($table).update(parsed.data).eq($pkq, key);
+  if (error) return { values, errors: {}, submitError: 'The save failed: ' + error.message };
+  revalidatePath('/$name'); // TODO(route): the path the list renders at.
+  return { values: parsed.data, errors: {}, submitError: null };
+}
+""").safe_substitute(
+        Entity=Entity, camel=camel(name), name=name, schema=camel(singular(name)),
+        table=js_string(name), pkq=js_string(pk), reads="\n".join(reads),
+        lower=name.replace("_", " "))
+
+
+# The server's client: Supabase's own Next.js example
+# (github.com/supabase/supabase, examples/auth/nextjs/lib/supabase/server.ts),
+# typed with the generated Database.
+SUPABASE_SERVER_TS = """\
+// The server's Supabase client, for server actions, route handlers and Server
+// Components (supabase-integration.md §9). It reads the signed-in user's
+// session from the request's cookies, so row-level security applies to every
+// query it makes. It holds the publishable key, never a secret one.
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import type { Database } from './database.types';
+
+export async function createClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+          } catch {
+            // Called from a Server Component, which cannot set cookies: a proxy
+            // that refreshes the session (Supabase's middleware) does it instead.
+          }
+        },
+      },
+    },
+  );
+}
+"""
+
+# The browser's client in a Next.js app: NEXT_PUBLIC_ variables, which Next.js
+# writes into the bundle, in place of Vite's.
+SUPABASE_NEXT_TS = """\
+// The browser's only Supabase client (supabase-integration.md §9). It holds the
+// publishable key, which is safe in a bundle because row-level security decides
+// what it may do. Every NEXT_PUBLIC_ variable is public: a secret key never goes in one.
+//
+// database.types.ts comes from the database itself:
+//   supabase gen types typescript --project-id <project-ref> > src/lib/database.types.ts
+import { createBrowserClient } from '@supabase/ssr';
+import type { Database } from './database.types';
+
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+if (!url || !publishableKey) {
+  throw new Error('Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (sb_publishable_…) in .env.local.');
+}
+if (publishableKey.startsWith('sb_secret_') || legacyRole(publishableKey) === 'service_role') {
+  // That key bypasses row-level security, and this file ships to every browser.
+  throw new Error('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY holds a secret key. Keep it on the server.');
+}
+
+/** The role inside a legacy JWT key (`anon` or `service_role`), if it is one. */
+function legacyRole(key: string): string | undefined {
+  try {
+    const payload = key.split('.')[1] ?? '';
+    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))).role;
+  } catch {
+    return undefined;
+  }
+}
+
+export const supabase = createBrowserClient<Database>(url, publishableKey);
+"""
 
 
 FORM_CSS = """\
@@ -3443,7 +3816,7 @@ def unsafe_name(name: Any) -> str:
 
 
 def build_files(model: dict[str, Any], ans: Answers, stack: str,
-                entities: set[str] | None) -> dict[str, str]:
+                entities: set[str] | None, server_actions: bool = False) -> dict[str, str]:
     files: dict[str, str] = {}
     css = stack == "css-modules"
 
@@ -3482,7 +3855,7 @@ def build_files(model: dict[str, Any], ans: Answers, stack: str,
              LIST_CSS + DATA_TABLE_CSS if ans.layout(table) == "table"
              else LIST_CSS + CARD_GRID_CSS),
             (f"{Entity}Detail", emit_detail(table, model, ans), DETAIL_CSS),
-            (f"{Entity}Form", emit_form(table, model, ans), FORM_CSS),
+            (f"{Entity}Form", emit_form(table, model, ans, action=server_actions), FORM_CSS),
             (f"{Entities}States", emit_states(table, model, ans), STATES_CSS),
         ]
         for comp, tsx, sheet in pairs:
@@ -3493,7 +3866,14 @@ def build_files(model: dict[str, Any], ans: Answers, stack: str,
                                            else tailwindify(tsx, kind))
             if css:
                 files[f"{base}/{comp}.module.css"] = sheet
-        files[f"{base}/index.ts"] = emit_index(table, ans)
+        index = emit_index(table, ans)
+        if server_actions:
+            files[f"{base}/{Entity}ActionForm.tsx"] = emit_action_form(table)
+            files[f"server/{name}.actions.ts"] = emit_actions(table, model, ans)
+            form_line = f"export {{ {Entity}Form }} from './{Entity}Form';\n"
+            index = index.replace(form_line, form_line + f"export {{ {Entity}ActionForm }} "
+                                                         f"from './{Entity}ActionForm';\n")
+        files[f"{base}/index.ts"] = index
         # The server's copy of the constraints, in both languages a Supabase
         # server is written in; delete the one the project does not use.
         files[f"server/{name}.schema.ts"] = emit_schema_zod(table, model, ans)
@@ -3501,7 +3881,9 @@ def build_files(model: dict[str, Any], ans: Answers, stack: str,
 
     # The database side. A join table needs its policies too: the
     # many-to-many control reads and writes it.
-    files["lib/supabase.ts"] = SUPABASE_TS
+    files["lib/supabase.ts"] = SUPABASE_NEXT_TS if server_actions else SUPABASE_TS
+    if server_actions:
+        files["lib/supabase.server.ts"] = SUPABASE_SERVER_TS
     for table in model["tables"]:
         linked = {c["foreign_key"]["table"] for c in table["columns"] if c.get("foreign_key")}
         if entities and table["name"] not in entities and not (
@@ -3534,6 +3916,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="default: the project's .design-suite.json stack (tailwind-v3 and "
                          "tailwind-v4 scaffold Tailwind; css-modules scaffolds CSS Modules), "
                          "else css-modules")
+    ap.add_argument("--server-actions", action="store_true",
+                    help="a Next.js App Router project: each form posts to a server action "
+                         "(React 19's useActionState and useFormStatus), with the server's "
+                         "Supabase client")
     ap.add_argument("--dry-run", action="store_true",
                     help="print the tree and sizes, write nothing")
     ap.add_argument("--force", action="store_true",
@@ -3611,7 +3997,7 @@ def main(argv: list[str] | None = None) -> int:
                   f"Rename it in the model, or leave it out with --entity.", file=sys.stderr)
             return 2
 
-    files = build_files(model, ans, args.stack, entities)
+    files = build_files(model, ans, args.stack, entities, args.server_actions)
     root = Path(args.out)
 
     # The screens are only as safe as the tables behind them: say so here,
