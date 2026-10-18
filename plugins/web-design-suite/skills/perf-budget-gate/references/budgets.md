@@ -153,6 +153,8 @@ In `perf-budget.json`, `pages` is a map of glob patterns over a page-type name y
 }
 ```
 
+To measure each template against its own type in one run, give `measure_vitals.mjs` `--urls` a JSON list of `{"url": "…", "pageType": "checkout"}`: each page is measured in turn, one at a time, with its type's budget, and the report holds a row for each, its exit the worst (a page with no `pageType` takes `--page-type`). `--urls` also takes a file of URLs, one a line, or a `sitemap.xml`, from a file or a URL; `--max-urls N` (default 50) caps it, and the pages past the cap are counted in the report.
+
 **Three page types is usually right. Ten is a spreadsheet nobody maintains.** If a page needs its own budget because it is genuinely unlike everything else, that is a signal worth reading on its own.
 
 ---

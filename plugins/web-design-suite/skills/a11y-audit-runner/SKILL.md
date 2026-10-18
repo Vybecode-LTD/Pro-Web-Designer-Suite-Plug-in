@@ -136,7 +136,7 @@ Never write "accessible" because CI is green. `references/automation-coverage.md
 
 > *"Automated checks (axe-core 4.13, its WCAG 2.0, 2.1 and 2.2 A and AA rules) pass with zero violations on all 14 templates. Automated testing covers an estimated third of WCAG success criteria; the manual evaluation recorded in Appendix B covers the remainder. Two criteria are Partially Supported — see the exceptions table."*
 
-That paragraph survives scrutiny. "Our site is WCAG 2.2 AA compliant, verified by automated testing" does not, and in the EU under the European Accessibility Act it is a statement someone can act on.
+`a11y_runtime.mjs --urls` (a URL list or a sitemap) runs every template in one report, and `--viewports 390x844,1280x900` each at a phone's width too. That paragraph survives scrutiny. "Our site is WCAG 2.2 AA compliant, verified by automated testing" does not, and in the EU under the European Accessibility Act it is a statement someone can act on.
 
 ---
 

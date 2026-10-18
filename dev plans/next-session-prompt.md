@@ -477,7 +477,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   | figma-variables-sync | 20,497 |
   | component-state-matrix | 20,494 |
   | client-presentation-builder | 20,494 |
-  | perf-budget-gate | 20,493 |
+  | perf-budget-gate | 20,491 |
   | web-design-studio | 20,481 |
   | landing-page-conversion | 20,477 |
   | email-template-system | 20,474 |
