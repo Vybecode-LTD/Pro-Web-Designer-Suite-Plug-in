@@ -137,7 +137,7 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   attributes (`tag_attributes()`, past quoted and braced values) and each bound style's
   declarations (`bound_styles()`): every object the expression can evaluate to (either arm
   of a ternary, an array's items, a spread's, not a call's argument), a string written out as
-  a whole arm of a condition (, ), each string as
+  a whole arm of a condition (`on ? '12px' : gap`, `gap ?? '12px'`), each string as
   `style=""`, and one property at a time, with Angular's unit joined to its number. A
   visual property is L4, and a custom property's written-out design literal or Tier-1
   primitive is L1 or L6, as in JSX. Commented-out markup is blanked first, as the census
