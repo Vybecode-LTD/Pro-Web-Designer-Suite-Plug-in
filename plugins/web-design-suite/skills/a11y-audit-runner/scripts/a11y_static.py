@@ -762,6 +762,58 @@ def blank_comments(text: str) -> str:
 # Markup audit
 # ---------------------------------------------------------------------------
 
+# Next.js's Metadata API: a layout or page that exports one has its <title>
+# written by the framework.
+METADATA_EXPORT = re.compile(
+    r"^\s*export\s+(?:const\s+metadata\b|(?:async\s+)?function\s+generateMetadata\b)", re.M)
+# A module script with a src, its attributes in any order (Codex on #172).
+MODULE_SCRIPT = re.compile(r"<script\b(?=[^>]*\btype\s*=\s*[\"']?module\b)(?=[^>]*\bsrc\s*=)", re.I)
+# The expressions that render a page into its shell: `{children}`,
+# `{props.children}`, Svelte's `{@render children()}`. Any other expression is
+# the page's own content (Codex on #172: `{'hello'}` is no outlet).
+CHILDREN_OUTLET = re.compile(r"\{\s*(?:@render\s|(?:[\w$]+\.)*children\s*\})")
+
+
+def shell_outlets(path: Path, clean: str, nodes: list[Node], is_jsx: bool) -> tuple[bool, bool]:
+    """Does this document render its body, and its head, from elsewhere?
+
+    The body: a default `<slot>` (Astro, a web component), the
+    children's expression (`{children}`, `{@render children()}`), SvelteKit's
+    `%sveltekit.body%`, or, in a page that loads a module script, a body
+    that is one empty element with an id beside its scripts (the mount point
+    of a Vite app: `<div id="app">`). The head: SvelteKit's
+    `%sveltekit.head%`, Next.js's Metadata API, or a `layout` file in an
+    `app/` folder (Next.js's App Router), whose pages each give their own
+    title."""
+    body = next((n for n in nodes if n.tag.name == "body"), None)
+    head = next((n for n in nodes if n.tag.name == "head"), None)
+    raw_body = clean[body.inner_start:body.inner_end] if body else clean
+    raw_head = clean[head.inner_start:head.inner_end] if head else ""
+    within = list(subtree(body)) if body else nodes
+    expressions = is_jsx or path.suffix.lower() in {".astro", ".svelte"}
+    # The body is the mount point alone, not a static page that also has an
+    # empty `<div id="modal">` (Codex on #172).
+    content = [d for d in (body.descendants if body else [])
+               if d.tag.name not in {"script", "noscript", "template", "style", "link"}]
+    mount_point = (MODULE_SCRIPT.search(clean) is not None and len(content) == 1
+                   and "id" in content[0].tag.attrs and not content[0].descendants
+                   and not content[0].text.strip()
+                   and not (content[0].tag.self_closing or content[0].tag.name in VOID))
+    # The default slot is the page's; a named one, or a component beside the
+    # page's own content, is part of the page (CodeRabbit on #172).
+    body_outlet = (
+        any(d.tag.name == "slot" and d.tag.attrs.get("name") in (None, "default") for d in within)
+        or "%sveltekit.body%" in raw_body
+        or (expressions and CHILDREN_OUTLET.search(raw_body) is not None)
+        or mount_point)
+    # A `layout` names a Next.js layout only in the App Router's `app/` folder
+    # (Codex on #172: `src/layout.tsx` is any SSR component).
+    next_layout = path.stem == "layout" and "app" in path.parts[:-1]
+    head_outlet = ("%sveltekit.head%" in raw_head
+                   or (is_jsx and (METADATA_EXPORT.search(clean) is not None or next_layout)))
+    return body_outlet, head_outlet
+
+
 def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
     findings: list[Finding] = []
     lines = text.splitlines()
@@ -1285,8 +1337,14 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                 "are the two that appear; the correct forms are `en` and "
                 "`en-US`.")
 
+    # A framework's document shell renders its pages through an outlet, so the
+    # page's <main> (and with Next.js's layouts or SvelteKit's head, the
+    # title) is in another file: cannot tell (stack-frameworks.md §1).
+    body_outlet, head_outlet = shell_outlets(path, clean, nodes, is_jsx)
     if doc_like:
-        if not has_title:
+        if not has_title and head_outlet:
+            pass
+        elif not has_title:
             add(1, "S", "no-title", "2.4.2", "error",
                 "The document has no <title>.",
                 "The title is the first thing a screen reader announces on "
@@ -1302,7 +1360,9 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                 "and the user hears a path. Give every route its own title, and "
                 "update it on client-side navigation — a SPA that never changes "
                 "the title tells a screen reader user nothing happened.")
-        if saw_main == 0:
+        if saw_main == 0 and body_outlet:
+            pass
+        elif saw_main == 0:
             add(1, "S", "no-main-landmark", "best practice", "warning",
                 "The document has no <main> landmark.",
                 "Best practice, not a WCAG failure (axe's `landmark-one-main` "
@@ -1438,8 +1498,8 @@ def _has_name(t: Tag, a: dict, inner: str, node) -> bool:
             return True
     if node:
         for d in subtree(node, _silent):            # at any depth (G2), not what is hidden
-            if d.tag.name[:1].isupper():
-                return True                          # a component's name: cannot tell (G2)
+            if d.tag.name[:1].isupper() or d.tag.name == "slot":
+                return True                          # a component's or a slot's content: cannot tell (G2)
             da = d.tag.attrs
             if d.tag.name == "img" and str(da.get("alt", "")).strip():
                 return True

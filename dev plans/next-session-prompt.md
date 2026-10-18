@@ -499,7 +499,7 @@ You are working on **web-design-suite**, a Claude Code plugin of 13 skills for d
   | component-state-matrix | 20,494 |
   | client-presentation-builder | 20,494 |
   | perf-budget-gate | 20,491 |
-  | web-design-studio | 20,481 |
+  | web-design-studio | 20,488 |
   | landing-page-conversion | 20,477 |
   | email-template-system | 20,474 |
   | design-system-versioning | 20,434 |

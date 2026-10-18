@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Stacks: Vue</title>
+    <!-- The order, before any script: a component's style block that arrives
+         first would otherwise name `components` first (stack-css-modules §6). -->
+    <style>@layer reset, vendor, tokens, base, layout, components, utilities, overrides;</style>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>

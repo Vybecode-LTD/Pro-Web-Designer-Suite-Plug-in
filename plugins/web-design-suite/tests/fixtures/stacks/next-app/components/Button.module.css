@@ -1,0 +1,19 @@
+@layer components {
+  .root {
+    --btn-bg: var(--bg-accent);
+    --btn-fg: var(--fg-on-accent);
+
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gap-fused);
+    min-block-size: var(--tap-min);
+    padding-inline: var(--pad-inline-md);
+    padding-block: var(--pad-block-md);
+    border: var(--stroke-default) solid transparent;
+    border-radius: var(--radius-lg);
+    background-color: var(--btn-bg);
+    color: var(--btn-fg);
+    font: var(--type-ui);
+    text-decoration: none;
+  }
+}

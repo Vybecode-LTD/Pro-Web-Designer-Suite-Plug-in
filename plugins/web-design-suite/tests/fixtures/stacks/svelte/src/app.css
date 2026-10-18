@@ -1,0 +1,8 @@
+/* SvelteKit's starter writes style="display: contents" on the element that
+   holds %sveltekit.body%: an inline style the audit refuses (L4). The same
+   rule, in the layout layer. */
+@layer layout {
+  .app-shell {
+    display: contents;
+  }
+}
