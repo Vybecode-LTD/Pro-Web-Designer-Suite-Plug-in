@@ -670,60 +670,63 @@ async function collectNames(page, scope) {
     // Synchronous from here to the teardown, so no page script runs while a
     // closed root is shown to axe.
     const restore = window.__a11y.exposeClosed();
-    try { axe.setup(document); } catch { /* already set up */ }
-    const roots = scope ? deep.query(document, scope) : [document.documentElement];
-    const modal = window.__a11y.openModal();
-    for (const root of roots) {
-      const cell = root.getAttribute && root.getAttribute('data-cell-id');
-      const els = deep.query(root, window.__a11y.FOCUSABLE +
-        ',[role=button],[role=link],[role=menuitem],[role=tab],[role=option],' +
-        '[role=checkbox],[role=radio],[role=switch],[role=slider],[role=combobox]');
-      for (const el of els) {
-        if (!window.__a11y.visible(el)) continue;
-        // A screen reader cannot reach it, so it has no name to announce — and
-        // axe computes "" for it, which read as "missing name" on every link
-        // behind an open cookie dialog.
-        if (window.__a11y.hiddenFromAT(el, modal)) continue;
-        if (el.tagName === 'A' && !el.hasAttribute('href') &&
-            !el.hasAttribute('role')) continue;
-        let name = null, role = null, roleType = null;
-        try { name = axe.commons.text.accessibleTextVirtual(axe.utils.getNodeFromTree(el)); }
-        catch { try { name = axe.commons.text.accessibleText(el); } catch { name = null; } }
-        try { role = axe.commons.aria.getRole(el); } catch { role = null; }
-        try { roleType = role ? axe.commons.aria.getRoleType(role) : null; }
-        catch { roleType = null; }
+    try {
+      try { axe.setup(document); } catch { /* already set up */ }
+      const roots = scope ? deep.query(document, scope) : [document.documentElement];
+      const modal = window.__a11y.openModal();
+      for (const root of roots) {
+        const cell = root.getAttribute && root.getAttribute('data-cell-id');
+        const els = deep.query(root, window.__a11y.FOCUSABLE +
+          ',[role=button],[role=link],[role=menuitem],[role=tab],[role=option],' +
+          '[role=checkbox],[role=radio],[role=switch],[role=slider],[role=combobox]');
+        for (const el of els) {
+          if (!window.__a11y.visible(el)) continue;
+          // A screen reader cannot reach it, so it has no name to announce — and
+          // axe computes "" for it, which read as "missing name" on every link
+          // behind an open cookie dialog.
+          if (window.__a11y.hiddenFromAT(el, modal)) continue;
+          if (el.tagName === 'A' && !el.hasAttribute('href') &&
+              !el.hasAttribute('role')) continue;
+          let name = null, role = null, roleType = null;
+          try { name = axe.commons.text.accessibleTextVirtual(axe.utils.getNodeFromTree(el)); }
+          catch { try { name = axe.commons.text.accessibleText(el); } catch { name = null; } }
+          try { role = axe.commons.aria.getRole(el); } catch { role = null; }
+          try { roleType = role ? axe.commons.aria.getRoleType(role) : null; }
+          catch { roleType = null; }
 
-        // Only WIDGETS are required to have a name. `<main tabindex="-1">`,
-        // `<h1 tabindex="-1">` and a dialog container with tabindex="-1" are
-        // focus TARGETS, not controls: they are in this list because they
-        // match [tabindex], and a "missing name" finding on them would be
-        // noise — and noise is how a check gets switched off.
-        const nativeControl = /^(a|button|input|select|textarea|summary|iframe)$/
-          .test(el.tagName.toLowerCase());
-        const ti = el.getAttribute('tabindex');
-        const programmaticOnly = ti !== null && Number(ti) < 0;
-        if (!nativeControl && roleType !== 'widget') continue;
-        if (programmaticOnly && !nativeControl && roleType !== 'widget') continue;
-        if (programmaticOnly && roleType && roleType !== 'widget') continue;
-        const cs = getComputedStyle(el);
-        out.push({
-          sel: window.__a11y.cssPath(el),
-          tag: el.tagName.toLowerCase(),
-          type: el.getAttribute('type') || null,
-          role,
-          name: (name || '').trim(),
-          visibleText: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60),
-          hasAriaLabel: el.hasAttribute('aria-label'),
-          disabled: !!el.disabled || el.getAttribute('aria-disabled') === 'true',
-          cell: cell || (deep.closest(el, '[data-cell-id]')
-            ? deep.closest(el, '[data-cell-id]').getAttribute('data-cell-id') : null),
-          fontSize: parseFloat(cs.fontSize) || 16,
-        });
+          // Only WIDGETS are required to have a name. `<main tabindex="-1">`,
+          // `<h1 tabindex="-1">` and a dialog container with tabindex="-1" are
+          // focus TARGETS, not controls: they are in this list because they
+          // match [tabindex], and a "missing name" finding on them would be
+          // noise — and noise is how a check gets switched off.
+          const nativeControl = /^(a|button|input|select|textarea|summary|iframe)$/
+            .test(el.tagName.toLowerCase());
+          const ti = el.getAttribute('tabindex');
+          const programmaticOnly = ti !== null && Number(ti) < 0;
+          if (!nativeControl && roleType !== 'widget') continue;
+          if (programmaticOnly && !nativeControl && roleType !== 'widget') continue;
+          if (programmaticOnly && roleType && roleType !== 'widget') continue;
+          const cs = getComputedStyle(el);
+          out.push({
+            sel: window.__a11y.cssPath(el),
+            tag: el.tagName.toLowerCase(),
+            type: el.getAttribute('type') || null,
+            role,
+            name: (name || '').trim(),
+            visibleText: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60),
+            hasAriaLabel: el.hasAttribute('aria-label'),
+            disabled: !!el.disabled || el.getAttribute('aria-disabled') === 'true',
+            cell: cell || (deep.closest(el, '[data-cell-id]')
+              ? deep.closest(el, '[data-cell-id]').getAttribute('data-cell-id') : null),
+            fontSize: parseFloat(cs.fontSize) || 16,
+          });
+        }
       }
+      return out;
+    } finally {
+      try { axe.teardown(); } catch { /* fine */ }
+      restore();
     }
-    try { axe.teardown(); } catch { /* fine */ }
-    restore();
-    return out;
   }, { scope: scope || null });
 }
 
