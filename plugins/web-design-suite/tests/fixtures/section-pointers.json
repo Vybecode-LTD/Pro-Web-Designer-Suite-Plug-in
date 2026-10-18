@@ -696,6 +696,12 @@
   "heading": "Vue"
  },
  {
+  "from": "content-model-to-ui/references/scripts.md",
+  "to": "web-design-studio/references/stack-frameworks.md",
+  "section": "4",
+  "heading": "Svelte and SvelteKit"
+ },
+ {
   "from": "content-model-to-ui/references/supabase-integration.md",
   "to": "content-model-to-ui/references/field-mapping.md",
   "section": "9",
@@ -790,6 +796,12 @@
   "to": "web-design-studio/references/stack-frameworks.md",
   "section": "3",
   "heading": "Vue"
+ },
+ {
+  "from": "content-model-to-ui/scripts/scaffold_ui.py",
+  "to": "web-design-studio/references/stack-frameworks.md",
+  "section": "4",
+  "heading": "Svelte and SvelteKit"
  },
  {
   "from": "design-critique-gate/SKILL.md",

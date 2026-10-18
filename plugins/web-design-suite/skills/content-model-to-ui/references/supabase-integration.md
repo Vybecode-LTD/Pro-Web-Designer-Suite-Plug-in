@@ -2,7 +2,7 @@
 
 The stack-specific half: where the schema comes from, what RLS does to a UI, and the four data-layer decisions that change what the components have to render.
 
-Everything here assumes FastAPI + Supabase + React 19/Vite; a Vue 3 + Vite scaffold (`--framework vue`) reads the same `lib/supabase.ts`. The mapping rules in `field-mapping.md` are stack-agnostic; this file is not.
+Everything here assumes FastAPI + Supabase + React 19/Vite; a Vue 3 or SvelteKit scaffold (`--framework vue` or `svelte`) reads the same `lib/supabase.ts`, since Vite exposes `VITE_` variables to both. The mapping rules in `field-mapping.md` are stack-agnostic; this file is not.
 
 **Read §9 before wiring anything.** It says which key each process holds, and every guarantee in §2 depends on it.
 
