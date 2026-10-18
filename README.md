@@ -106,7 +106,7 @@ That writes the accent and neutral ramps, a type scale and the starter styles to
 /web-design-suite:install-gate
 ```
 
-The first runs the static halves of the design, accessibility and performance gates, with one verdict. The second puts the gates in your repository and writes the CI workflow that runs them on every push. It shows you what it would write before it writes anything.
+The first runs the static halves of the design, accessibility and performance gates, with one verdict. The second puts the gates in your repository and writes the CI workflow that runs them on every pull request and every push to `main`. It shows you what it would write before it writes anything.
 
 **An inherited codebase.** Take a census first. It changes nothing:
 
@@ -222,9 +222,9 @@ The plugin's `design_hooks` option, set to false in `/config`, turns them all of
 
 ### The CI gate
 
-`/web-design-suite:install-gate` copies the gate scripts into your `scripts/` (with a manifest of their hashes), so a clean checkout runs them with no plugin installed. It writes `.github/workflows/design-gates.yml` with three jobs:
+`/web-design-suite:install-gate` copies the gate scripts into your `scripts/` (with a manifest of their hashes), so a clean checkout runs them with no plugin installed. It writes `.github/workflows/design-gates.yml`, which runs on every pull request and every push to `main`, with three jobs:
 
-- **gates:** builds the site, serves it, and runs the three gates on Linux, in the Playwright image built for your project's own `playwright` version, so the browser is the one your lockfile expects;
+- **gates:** builds the site, serves it, and runs the design gate and both halves of the accessibility and performance gates on Linux, in the Playwright image built for your project's own `playwright` version, so the browser is the one your lockfile expects;
 - **windows:** the static gates on a Windows runner;
 - **baselines:** run by hand; records each gate's baseline where the gates run, for you to review and commit.
 
@@ -232,9 +232,9 @@ It never overwrites a file it didn't write, and it prints the exact `npm i -D -E
 
 ## What the gates check
 
-Each gate has a static half, fast enough for every commit, and most have a browser half that runs on a served build for each PR.
+Each gate has a static half, fast enough for every commit, and most have a browser half that runs on a served build.
 
-| Gate | Static (every commit) | In a browser (each PR) |
+| Gate | Static | In a browser |
 |---|---|---|
 | **Tokens and style architecture** | Raw lengths, colours, shadows, durations, radii and z-indexes outside the token file; child margins; off-scale and arbitrary values; inline styles; a class styled from two files; `!important`, IDs, nesting depth, unlayered styles and layer order; primitives read from components. | |
 | **Contrast** | Every role pair the components use, resolved in light, dark and `.inverse`, against 4.5:1 for text and 3:1 for large text and UI. | The contrast of text as composited on the page. |
@@ -243,6 +243,8 @@ Each gate has a static half, fast enough for every commit, and most have a brows
 | **State matrix** | Every component's states, densities and themes generated on one proof sheet, with any state that has no rule flagged. | Each cell screenshotted and compared with its baseline. |
 | **System changes** | Each change to the tokens classed as major, minor or patch, with unannounced removals gated. | |
 | **Docs and email** | The docs diffed against the code they describe; email linted before and after the build. | The email rendered light, dark and without styles. |
+
+**Where each one runs.** The pre-commit hook runs stylelint, ESLint, the design audit, the static accessibility check and, when a token file is staged, the contrast check. The CI workflow from `/web-design-suite:install-gate` runs the design audit and both halves of the accessibility and performance gates. The state matrix, the system diff, the docs check and the email build run from the `gate-matrix`, `release-check`, `docs-check` and `email-build` commands, and the state-matrix and docs skills give the CI job to add for theirs.
 
 A finding you decide to keep goes into the gate's baseline (`--write-baseline`), never into a quiet edit to the rule. Every exception in the code is a comment pragma, so it's visible in review. The [full reference](plugins/web-design-suite/README.md#what-the-gate-actually-catches) lists the audit's rules one by one.
 
