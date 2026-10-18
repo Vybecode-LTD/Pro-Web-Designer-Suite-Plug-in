@@ -498,11 +498,11 @@
     },
     "component_files": {
       "globs": ["**/components/**/*.css", "**/ui/**/*.css", "**/*.module.css", "**/components.css",
-                "**/components/**/*.scss", "**/ui/**/*.scss", "**/*.module.scss"],
+                "**/components/**/*.scss", "**/ui/**/*.scss", "**/*.module.scss", "**/components.scss"],
       "examples": ["src/components/card.css", "packages/ui/button.css", "Card.module.css", "styles/components.css",
                    "src/components/layout/header.css", "packages/ui/layout.css", "components/card.css", "ui/button.css",
-                   "src/components/card.scss", "Button.module.scss", "packages/ui/_button.scss"],
-      "not": ["src/styles/layout.css", "src/styles/base.css", "mycomponents.css", "src/styles/_mixins.scss"]
+                   "src/components/card.scss", "Button.module.scss", "packages/ui/_button.scss", "styles/components.scss"],
+      "not": ["src/styles/layout.css", "src/styles/base.css", "mycomponents.css", "src/styles/_mixins.scss", "mycomponents.scss"]
     }
   }
 }

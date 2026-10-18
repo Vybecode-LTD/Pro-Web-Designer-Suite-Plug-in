@@ -132,7 +132,7 @@ TOKEN_FILE_PAT = re.compile(
     r"|(^|[/\\])tokens[/\\][\w.-]+\.(css|scss)$"
     r"|(^|[/\\])([\w.-]*[-.])?theme\.(css|scss)$"
 )
-COMPONENT_FILE_PAT = re.compile(r"\.module\.|(^|/)(components|ui)/|(^|/)components\.css$")
+COMPONENT_FILE_PAT = re.compile(r"\.module\.|(^|/)(components|ui)/|(^|/)components\.s?css$")
 
 GENERATED_MARKERS = ("@generated", "DO NOT EDIT", "AUTO-GENERATED", "Auto-generated")
 

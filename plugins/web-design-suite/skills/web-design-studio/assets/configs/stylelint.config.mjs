@@ -1137,6 +1137,7 @@ const config = {
         '**/components/**/*.scss',   // and their SCSS (Part 6)
         '**/ui/**/*.scss',
         '**/*.module.scss',
+        '**/components.scss',
         ...PROJECT.componentGlobs,  // the project's `components` (N37)
       ],
       rules: {

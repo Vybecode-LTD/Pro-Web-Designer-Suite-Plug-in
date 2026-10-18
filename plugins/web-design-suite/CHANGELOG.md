@@ -12,8 +12,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   `postcss-scss` with `stylelint-config-standard-scss` 17, restates the config's own rules over
   it, and reads a Sass variable in a value as a token, as the audit does (`padding: $gap` passes,
   `padding: $gap 5%` does not). The component and token file classes name their `.scss` files
-  (`**/components/**/*.scss`, `**/*.module.scss`, `**/tokens.scss`…), in the spec and in both
-  gates; a theme file's bindings stay CSS, which Tailwind reads. A new rule,
+  (`**/components/**/*.scss`, `**/*.module.scss`, `**/components.scss`, `**/tokens.scss`…), in
+  the spec and in both gates (the audit and the census took `components.css` only); a theme file's bindings stay CSS, which Tailwind reads. A new rule,
   `design/sass-variable-literal`, refuses what the audit's `sass-literal` refuses: a Sass
   variable that holds a length, a colour, a duration or an easing curve outside a token file,
   a map's included, with a breakpoint and a `@function`'s local left alone. The spec's

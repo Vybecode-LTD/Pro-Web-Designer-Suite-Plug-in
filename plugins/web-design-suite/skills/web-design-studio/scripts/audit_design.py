@@ -309,7 +309,7 @@ COMPONENT_FILE_PAT = re.compile(
     # common Next.js layout, SB-A9), a CSS module, and components.css itself,
     # not mycomponents.css: the component file class in design-rules.json.
     # Matched against a lower-case path with forward slashes.
-    r"\.module\.|(^|/)(components|ui)/|(^|/)components\.css$"
+    r"\.module\.|(^|/)(components|ui)/|(^|/)components\.s?css$"
 )
 
 

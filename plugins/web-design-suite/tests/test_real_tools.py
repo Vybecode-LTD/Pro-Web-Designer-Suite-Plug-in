@@ -536,6 +536,9 @@ SCSS_REFUSED = {
     "src/components/scss/Motion.scss": (SCSS_CARD.replace("color: var(--fg-strong);",
                                                           "color: var(--fg-strong);\n    transition: color 200ms;"),
                                         ALLOWED_LIST),
+    # Codex on #169: components.scss is a component file, as components.css is.
+    "src/styles/components.scss": (in_layer("components", ".card { margin-block-start: var(--gap-related); }"),
+                                   MARGIN_RULE),
 }
 
 
