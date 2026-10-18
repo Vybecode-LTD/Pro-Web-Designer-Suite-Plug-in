@@ -446,12 +446,14 @@ export const DEEP_DOM = () => {
     return out;
   };
   // The slot a node is assigned to. assignedSlot is null in a closed root, so
-  // a kept closed root's slots are asked.
+  // a kept closed root's slots are asked, by the root's own mode: while
+  // a11y_runtime shows a closed root to axe its host's shadowRoot is set
+  // (CodeRabbit on #165).
   const slotOf = (n) => {
     if (n.assignedSlot) return n.assignedSlot;
     const host = n.parentElement;
-    const root = host && !host.shadowRoot ? kept.get(host) : null;
-    if (!root) return null;
+    const root = host ? kept.get(host) : null;
+    if (!root || root.mode !== 'closed') return null;
     for (const s of root.querySelectorAll('slot')) {
       if (s.assignedNodes().includes(n)) return s;
     }

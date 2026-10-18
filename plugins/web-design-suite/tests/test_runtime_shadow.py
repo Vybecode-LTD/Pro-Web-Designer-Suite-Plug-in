@@ -105,6 +105,40 @@ class TheChecksReadThroughShadowRoots(TempDirTest):
                 self.assertTrue(any(s.endswith(path) for s in stops), stops)
         self.assertEqual([], self.where(report, "focus-order-jump"))
 
+    def test_a_host_that_delegates_focus_is_not_a_stop_of_its_own(self):
+        """Codex on #165: a tabindex="0" host whose root delegates focus was
+        an expected stop that Tab never lands on, so the reachable button
+        inside it read as an unreachable control."""
+        page = self.write("delegates.html", (
+            "<!doctype html><html lang=en><head><title>Delegates</title></head><body><main>"
+            "<h1>Delegates</h1><x-field tabindex=0></x-field><a href='#after'>After</a>"
+            "<script>document.querySelector('x-field').attachShadow({mode: 'open', delegatesFocus: true})"
+            ".innerHTML = '<button>Choose a date</button>';</script></main></body></html>"))
+        proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", page, "--json",
+                        *only("taborder"), cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        report = json.loads(proc.stdout)
+        self.assertEqual([], [f for f in report["findings"] if f["severity"] == "error"])
+        stops = [s["sel"] for s in report["tabOrder"]]
+        self.assertTrue(any(s.endswith("x-field >> button") for s in stops), stops)
+
+    def test_a_control_slotted_under_aria_hidden_in_a_closed_root_is_hidden(self):
+        """CodeRabbit on #165: while a closed root was shown to axe, its host's
+        shadowRoot was set, so the slot was not found and the wrapper's
+        aria-hidden above it was not read: an unnamed control no screen
+        reader can reach was reported as unnamed."""
+        page = self.write("hidden.html", (
+            "<!doctype html><html lang=en><head><title>Hidden</title></head><body><main>"
+            f"<h1>Hidden</h1><x-hide><button>{ICON}</button></x-hide>"
+            "<script>document.querySelector('x-hide').attachShadow({mode: 'closed'})"
+            ".innerHTML = '<div aria-hidden=\"true\"><slot></slot></div>';</script></main></body></html>"))
+        proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", page, "--json",
+                        *only("names"), cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        report = json.loads(proc.stdout)
+        self.assertEqual([], [f["rule"] for f in report["findings"]])
+        self.assertEqual({"open": 0, "closed": 1, "unread": 0}, report["shadowRoots"])
+
     def test_a_keymap_names_a_control_through_the_boundary(self):
         keymap = self.write("keymap.json", json.dumps({"patterns": [
             {"name": "More", "pattern": "disclosure", "trigger": "x-disc >> button"}]}))

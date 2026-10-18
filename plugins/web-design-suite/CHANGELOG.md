@@ -37,7 +37,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
     that runs before the page's own scripts, and the parser's
     (`<template shadowrootmode="closed">`), handed over by `keepClosedRoots()` through
     Chromium's DevTools protocol; a closed root is shown to axe for the length of its run;
-  - focus inside a root is followed to the element itself, and `blur()` reaches it;
+  - focus inside a root is followed to the element itself, and `blur()` reaches it; a
+    host whose root delegates focus is not a stop of its own (Codex on #165);
   - a background is composited up through slots and hosts, so white text slotted onto a
     dark band the shadow tree paints is no longer measured on the white page;
   - a path names an element host by host, `main > x-card >> button.icon`, which a
