@@ -440,6 +440,11 @@ const HELPERS = () => {
       const ti = el.getAttribute('tabindex');
       if (ti !== null && Number(ti) < 0) continue;
       if (el.disabled) continue;
+      // A host whose root delegates focus is never a stop itself: Tab goes
+      // to the first focusable element inside, which is listed in its own
+      // right (Codex on #165).
+      const root = deep.shadowOf(el);
+      if (root && root.delegatesFocus) continue;
       if (deep.closest(el, '[inert]')) continue;
       if (behindModal(el, modal)) continue;
       if (!visible(el)) continue;

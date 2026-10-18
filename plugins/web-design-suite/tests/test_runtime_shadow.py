@@ -105,6 +105,23 @@ class TheChecksReadThroughShadowRoots(TempDirTest):
                 self.assertTrue(any(s.endswith(path) for s in stops), stops)
         self.assertEqual([], self.where(report, "focus-order-jump"))
 
+    def test_a_host_that_delegates_focus_is_not_a_stop_of_its_own(self):
+        """Codex on #165: a tabindex="0" host whose root delegates focus was
+        an expected stop that Tab never lands on, so the reachable button
+        inside it read as an unreachable control."""
+        page = self.write("delegates.html", (
+            "<!doctype html><html lang=en><head><title>Delegates</title></head><body><main>"
+            "<h1>Delegates</h1><x-field tabindex=0></x-field><a href='#after'>After</a>"
+            "<script>document.querySelector('x-field').attachShadow({mode: 'open', delegatesFocus: true})"
+            ".innerHTML = '<button>Choose a date</button>';</script></main></body></html>"))
+        proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", page, "--json",
+                        *only("taborder"), cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        report = json.loads(proc.stdout)
+        self.assertEqual([], [f for f in report["findings"] if f["severity"] == "error"])
+        stops = [s["sel"] for s in report["tabOrder"]]
+        self.assertTrue(any(s.endswith("x-field >> button") for s in stops), stops)
+
     def test_a_keymap_names_a_control_through_the_boundary(self):
         keymap = self.write("keymap.json", json.dumps({"patterns": [
             {"name": "More", "pattern": "disclosure", "trigger": "x-disc >> button"}]}))
