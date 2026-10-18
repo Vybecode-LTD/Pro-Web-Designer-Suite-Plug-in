@@ -206,7 +206,7 @@ function parseArgs(argv) {
   }
   if (opts.urls && opts.target) die('--urls lists the pages to measure: give it instead of a URL');
   if (!opts.target && !opts.urls) die('needs a URL or file to measure (try --help)');
-  if (!(opts.maxUrls >= 1)) die('--max-urls must be at least 1');
+  if (!Number.isInteger(opts.maxUrls) || opts.maxUrls < 1) die('--max-urls must be a whole number, at least 1');
   if (!THROTTLE[opts.throttle]) {
     die(`unknown --throttle "${opts.throttle}"; pick one of ` +
         Object.keys(THROTTLE).join(', '));
@@ -1049,6 +1049,11 @@ async function main() {
 // the machine, each with its own page type's budget, then one report: a row
 // for each page, and the exit the worst of them.
 async function several(opts) {
+  // The configured budget too: the children read it, and the report written
+  // here must never replace it (Codex on #166).
+  if (opts.budget === null) {
+    try { opts.budget = projectConfig()?.budgets.perf ?? null; } catch (err) { die(err.message); }
+  }
   const clash = refuseOverwrite(opts.report, opts.urls, opts.budget, opts.nav.stateFile);
   if (clash) die(clash);
   const read = await readUrls(opts.urls, opts.maxUrls);

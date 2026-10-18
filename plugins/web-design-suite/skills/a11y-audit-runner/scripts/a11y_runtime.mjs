@@ -252,7 +252,7 @@ function parseArgs(argv) {
   if (opts.viewports && opts.oneViewport) {
     die('--viewport is one size and --viewports a list: give one of them');
   }
-  if (!(opts.maxUrls >= 1)) die('--max-urls must be at least 1');
+  if (!Number.isInteger(opts.maxUrls) || opts.maxUrls < 1) die('--max-urls must be a whole number, at least 1');
   if (targets.length === 0 && !opts.urls) {
     die('needs a target: --url URL, --file PATH or --matrix PROOF-SHEET ' +
         '(try --help)');
@@ -2527,13 +2527,17 @@ function severalReport(o) {
       L.push('', `${r.url} at ${r.viewport}: the run failed (exit 2): ${r.error}`);
       continue;
     }
+    // A run fails on its errors or on its budget, which warnings alone can
+    // break: both are named (Codex on #166).
     const errors = r.report.findings.filter((f) => f.severity === 'error');
-    if (!errors.length) continue;
+    const breaches = r.report.breaches || [];
+    if (!errors.length && !breaches.length) continue;
     L.push('', `${r.url} at ${r.viewport}`);
     for (const f of errors.slice(0, 8)) {
       L.push(`  error  ${f.rule.padEnd(32)} ${f.selector || (f.nodes || [])[0] || ''}`);
     }
     if (errors.length > 8) L.push(`  … ${errors.length - 8} more`);
+    for (const b of breaches) L.push(`  budget ${b.key}: ${b.actual} > ${b.limit}`);
   }
   if (o.leftOut) {
     L.push('', `${o.leftOut} more URL(s) in ${o.urls} were left out: raise --max-urls to run them.`);

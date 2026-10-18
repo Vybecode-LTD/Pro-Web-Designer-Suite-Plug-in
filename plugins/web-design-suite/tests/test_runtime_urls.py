@@ -54,6 +54,9 @@ class Site(http.server.BaseHTTPRequestHandler):
                 "<img src='data:image/gif;base64,R0lGODlhAQABAAAAACw=' width=40 height=40>")))
         if path == "/nav.html":
             return self.send(200, PAGE.format(title="Nav", body=NAV))
+        if path == "/twice.html":
+            return self.send(200, PAGE.format(title="Twice", body=(
+                "<p><a href='/a'>Read the pricing notes</a></p><p><a href='/b'>Read the pricing notes</a></p>")))
         if path == "/sitemap.xml":
             return self.send(200, "<?xml version='1.0' encoding='UTF-8'?>"
                                   "<urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>"
@@ -136,6 +139,15 @@ class TheAuditRunsEveryPage(Served):
         self.assertIn("HTTP 404", out["runs"][1]["error"])
         self.assertEqual(2, out["exit"])
 
+    def test_a_run_that_fails_on_its_budget_alone_says_why(self):
+        """Codex on #166: a run that broke its budget with warnings alone
+        exited 1 and printed nothing under its row."""
+        budget = self.write("a11y-budget.json", json.dumps({"duplicate_names": 0}))
+        proc = self.node("a11y-audit-runner", "a11y_runtime.mjs", "--url", self.url("/twice.html"),
+                         "--viewports", "1280x900", "--budget", str(budget), *only("names"))
+        self.assertEqual(1, proc.returncode)
+        self.assertIn("budget duplicate_names: 1 > 0", proc.stdout.decode("utf-8"))
+
     def test_pages_past_the_cap_are_counted_not_dropped(self):
         listed = self.write("urls.txt", f"{self.url('/clean.html')}\n{self.url('/nav.html')}\n")
         proc = self.node("a11y-audit-runner", "a11y_runtime.mjs", "--urls", str(listed), "--max-urls", "1",
@@ -157,10 +169,14 @@ class EachPageHasItsTypesBudget(Served):
             {"url": self.url("/clean.html"), "pageType": "home"},
             {"url": self.url("/nav.html"), "pageType": "strict"}]))
         proc = self.node("perf-budget-gate", "measure_vitals.mjs", "--urls", str(listed), "--budget",
-                         str(budget), "--runs", "1", "--settle", "200", "--throttle", "off", "--json")
+                         str(budget), "--runs", "1", "--settle", "500", "--throttle", "off", "--json")
         out = json.loads(proc.stdout)
-        self.assertEqual([("home", 0), ("strict", 1)], [(r["pageType"], r["exit"]) for r in out["runs"]])
-        self.assertEqual(["lcp"], [b["metric"] for b in out["runs"][1]["breaches"]])
+        # Each page against its own type: the strict one breaks its LCP limit,
+        # the home page none. (A run with no LCP recorded also exits 1, as
+        # macOS's headless shell did once in CI, so the breaches decide.)
+        self.assertEqual([("home", []), ("strict", ["lcp"])],
+                         [(r["pageType"], [b["metric"] for b in r["breaches"]]) for r in out["runs"]])
+        self.assertEqual(1, out["runs"][1]["exit"])
         self.assertEqual(1, proc.returncode)
 
 
@@ -183,13 +199,29 @@ class TheListsAreReadFirst(TempDirTest):
              "give one of them"),
             (a11y, ("--urls", str(urls)), '"not a url" is not an http(s) URL'),
             (a11y, ("--urls", str(self.tmp / "none.txt")), "no such file"),
-            (a11y, ("--urls", str(good), "--max-urls", "0"), "--max-urls must be at least 1"),
+            (a11y, ("--urls", str(good), "--max-urls", "0"), "--max-urls must be a whole number, at least 1"),
+            (a11y, ("--urls", str(good), "--max-urls", "1.5"), "--max-urls must be a whole number, at least 1"),
+            (("perf-budget-gate", "measure_vitals.mjs"), ("--urls", str(good), "--max-urls", "1.5"),
+             "--max-urls must be a whole number, at least 1"),
             (("perf-budget-gate", "measure_vitals.mjs"), ("--urls", str(good), "http://127.0.0.1:9/"),
              "instead of a URL"),
         ]
         for (skill, script), args, said in cases:
             with self.subTest(args=args):
                 self.assertIn(said, self.refused(skill, script, *args))
+
+    def test_the_report_never_replaces_the_configured_budget(self):
+        """Codex on #166: with no --budget, vitals' --urls checked its report
+        against no budget, so a --report naming .design-suite.json's budget
+        file overwrote it."""
+        text = json.dumps({"$schema": "perf-budget-gate/1", "defaults": {"lab": {"lcp_ms": 2500}}})
+        budget = self.write("perf-budget.json", text)
+        self.write(".design-suite.json", json.dumps({"schema": 1, "budgets": {"perf": "perf-budget.json"}}))
+        good = self.write("good.txt", "http://127.0.0.1:9/a.html\n")
+        said = self.refused("perf-budget-gate", "measure_vitals.mjs", "--urls", str(good),
+                            "--report", str(budget))
+        self.assertIn("perf-budget.json", said)
+        self.assertEqual(text, budget.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
