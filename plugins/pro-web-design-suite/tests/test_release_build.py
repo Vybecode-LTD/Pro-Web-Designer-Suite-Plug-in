@@ -490,8 +490,14 @@ class TheAuditsReleaseMediums(unittest.TestCase):
         self.assertIn('git ls-remote --exit-code --tags origin "refs/tags/$GITHUB_REF_NAME"', job)
         self.assertIn("--tree", job)
         self.assertNotIn("GH_TOKEN", job)
+        # Codex on #181: main and the tag move together or not at all; every
+        # release waits its turn; an older release never replaces a newer one.
         pushes = re.findall(r"git push[^\n]*", job)
-        self.assertEqual(['git push --quiet origin main "refs/tags/$GITHUB_REF_NAME"'], pushes)
+        self.assertEqual(['git push --quiet --atomic origin main "refs/tags/$GITHUB_REF_NAME"'], pushes)
+        self.assertRegex(job, r"concurrency:\s*\n\s*group: distribute\s*\n\s*queue: max")
+        self.assertNotIn("cancel-in-progress", job)
+        self.assertIn("sort -V", job)
+        self.assertIn("an older release never replaces it", job)
         self.assertNotRegex(job, r"--force|\+refs/|\+main")
 
     @unittest.skipUnless(TOOLING, "needs the repository: release.yml and tooling/ sit outside the plugin")
