@@ -165,7 +165,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               "it unquoted, so it must be a path inside the project of letters, digits, '.', '_', '-' and '/', not starting with '-'.",
               file=sys.stderr)
         return 2
+    # The role pairs: check_roles.py reads a tokens.css, each one the config
+    # names, else the starter's default. It was vendored and never run (N50, F7).
+    if config and config.tokens:
+        roles = [posix(p, root) for p in config.tokens if p.suffix.lower() == ".css"]
+    else:
+        default = Path(args.src) / "styles" / "tokens.css"
+        roles = [default.as_posix()] if (root / default).is_file() else []
+    unsafe_roles = next((path for path in roles if not SAFE_PATH.fullmatch(path)), None)
+    if unsafe_roles:
+        print(f"install_gate: the token file {unsafe_roles!r} in .design-suite.json is not a path the workflow can "
+              "run unquoted: letters, digits, '.', '_', '-' and '/', not starting with '-'.", file=sys.stderr)
+        return 2
     text = TEMPLATE.read_text(encoding="utf-8")
+    for marker, python in (("@ROLES_LINUX@\n", "python3"), ("@ROLES_WINDOWS@\n", "python")):
+        text = text.replace(marker, roles_step(python, args.dest.strip("/"), roles))
     for key, value in {"VERSION": plugin_version(), "PLAYWRIGHT": playwright, "DEST": args.dest.strip("/"),
                        "SRC": args.src, "DIST": args.dist, "BUILD": args.build,
                        "AUDIT_BASELINE": baselines["audit"], "A11Y_BASELINE": baselines["a11y"],
@@ -209,8 +223,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if missing:
         print("The browser gates need these in package.json, and it does not list them: "
               f"{', '.join(m.split('@')[0] for m in missing)}. Add them:\n  npm i -D -E {' '.join(missing)}")
+    if not roles:
+        print("No tokens.css was found (.design-suite.json's `tokens`, or " + f"{args.src}/styles/tokens.css), so the "
+              "role pairs are not checked in CI. Name the file in `tokens` and run this again.")
     print("Commit both, then run the workflow by hand with update-baselines ticked to record the baselines in CI.")
     return 0
+
+
+def roles_step(python: str, dest: str, files: List[str]) -> str:
+    """The workflow step that checks each tokens.css's role pairs, or nothing."""
+    if not files:
+        return ""
+    lines = "".join(f"          {python} {dest}/check_roles.py {path}\n" for path in files)
+    return f"      - name: role-pair contrast\n        run: |\n{lines}"
 
 
 if __name__ == "__main__":

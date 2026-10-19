@@ -236,6 +236,30 @@ class TheInstallGate(CommandTest):
         self.write("src/components/card.css", LEAK)
         self.assertEqual(1, self.run_py("scripts/audit_design.py", "--strict").returncode)
 
+    def test_the_workflow_checks_the_role_pairs(self):
+        """N50, F7 (P56 part 3): check_roles.py was vendored and never run, so a
+        role pair that lost its contrast passed CI. Each tokens.css the config
+        names is checked in both static jobs; a JSON token file is not its to read."""
+        self.write(".design-suite.json", json.dumps({"schema": 1, "tokens": ["styles/tokens.css", "tokens.json"]}))
+        self.write("styles/tokens.css", ":root { --neutral-0: #fff; }\n")
+        self.write("tokens.json", "{}\n")
+        proc = self.install()
+        workflow = self.workflow()
+        self.assertIn("python3 scripts/check_roles.py styles/tokens.css", workflow)   # Linux
+        self.assertIn("python scripts/check_roles.py styles/tokens.css", workflow)    # Windows
+        self.assertNotIn("check_roles.py tokens.json", workflow)
+        self.assertNotIn("role pairs are not checked", proc.stdout.decode("utf-8"))
+
+    def test_the_role_pairs_default_to_the_starters_tokens(self):
+        self.write("src/styles/tokens.css", ":root { --neutral-0: #fff; }\n")
+        self.install()
+        self.assertIn("python3 scripts/check_roles.py src/styles/tokens.css", self.workflow())
+
+    def test_with_no_tokens_css_the_command_says_the_pairs_go_unchecked(self):
+        proc = self.install()
+        self.assertNotIn("check_roles.py", self.workflow().split("jobs:")[1])
+        self.assertIn("role pairs are not checked", proc.stdout.decode("utf-8"))
+
     @unittest.skipUnless(NODE, "node is not installed")
     def test_the_browser_gates_find_their_helpers(self):
         self.install()
