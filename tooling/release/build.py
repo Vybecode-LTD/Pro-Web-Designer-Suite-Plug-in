@@ -63,7 +63,8 @@ import time
 import zipfile
 
 PLUGIN = "plugins/pro-web-design-suite"
-TOP = "pro-web-design-suite/"
+# Where the plugin was before 4.0.0 renamed it, so --rev can rebuild an older release.
+FORMER_PLUGINS = ("plugins/web-design-suite",)
 FILE_MODES = {"100644", "100755"}          # git's modes for a file; 120000 is a link, 160000 a submodule
 SKILL_EXCLUDED_PARTS = {"__pycache__", "node_modules"}
 SKILL_EXCLUDED_NAMES = {".DS_Store"}
@@ -151,14 +152,15 @@ def main(argv: list[str] | None = None) -> int:
         run = functools.partial(git, env=env, cwd=top)
         commit = run("rev-parse", "--verify", args.rev + "^{commit}").decode().strip()
         stamp = int(run("log", "-1", "--format=%ct", commit).decode().strip())
-        tree = run("ls-tree", "-r", "-z", commit, "--", PLUGIN)
-        archive = run("archive", "--format=tar", commit, PLUGIN)
+        plugin = next((p for p in (PLUGIN, *FORMER_PLUGINS) if run("ls-tree", "-d", commit, "--", p)), PLUGIN)
+        tree = run("ls-tree", "-r", "-z", commit, "--", plugin)
+        archive = run("archive", "--format=tar", commit, plugin)
     except (OSError, subprocess.CalledProcessError) as exc:
         detail = getattr(exc, "stderr", b"") or b""
         parser.error(f"cannot read {args.rev!r} from git: {detail.decode(errors='replace').strip() or exc}")
     try:
         previous = run("describe", "--tags", "--abbrev=0", "--match", "v*", commit + "^").decode().strip()
-        removed = run("diff", "--name-only", "--diff-filter=D", "-z", previous, commit, "--", PLUGIN)
+        removed = run("diff", "--name-only", "--diff-filter=D", "-z", previous, commit, "--", plugin)
     except subprocess.CalledProcessError:
         previous, removed = None, b""
 
@@ -172,9 +174,9 @@ def main(argv: list[str] | None = None) -> int:
     folders: set[str] = set()
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
         for member in tar.getmembers():
-            if not member.name.startswith(PLUGIN):
+            if not member.name.startswith(plugin):
                 continue
-            rel = member.name[len(PLUGIN):].strip("/")
+            rel = member.name[len(plugin):].strip("/")
             if member.isdir():
                 folders.add(rel)
             elif member.isfile():
@@ -186,11 +188,12 @@ def main(argv: list[str] | None = None) -> int:
                for path, mode in sorted(tracked.items()) if mode not in FILE_MODES]
     refused += [f"{path} is tracked, but git archive left it out (export-ignore?)"
                 for path, mode in sorted(tracked.items())
-                if mode in FILE_MODES and path[len(PLUGIN) + 1:] not in files]
+                if mode in FILE_MODES and path[len(plugin) + 1:] not in files]
     try:
-        version = json.loads(files[".claude-plugin/plugin.json"][1])["version"]
+        manifest = json.loads(files[".claude-plugin/plugin.json"][1])
+        version, name = manifest["version"], manifest.get("name") or PLUGIN.rsplit("/", 1)[1]
     except (KeyError, ValueError, TypeError):
-        version = None
+        version = name = None
         refused.append(".claude-plugin/plugin.json has no version")
 
     skills = sorted({rel.split("/")[1] for rel in files if rel.startswith("skills/") and rel.count("/") >= 2})
@@ -212,9 +215,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     date_time = time.gmtime(stamp)[:6]
-    names = sorted({TOP} | {TOP + f + "/" for f in folders if f} | {TOP + f for f in files})
-    archives = {f"pro-web-design-suite-{version}.zip": zip_bytes(
-        [(n, stat.S_IFDIR | 0o755, b"") if n.endswith("/") else (n, *files[n[len(TOP):]]) for n in names],
+    top_dir = name + "/"                                  # the zip's folder, named as plugin.json names it at REV
+    names = sorted({top_dir} | {top_dir + f + "/" for f in folders if f} | {top_dir + f for f in files})
+    archives = {f"{name}-{version}.zip": zip_bytes(
+        [(n, stat.S_IFDIR | 0o755, b"") if n.endswith("/") else (n, *files[n[len(top_dir):]]) for n in names],
         date_time)}
     license_file = files.get("LICENSE")
     for skill in skills:
@@ -242,13 +246,13 @@ def main(argv: list[str] | None = None) -> int:
     (out / "SHA256SUMS").write_bytes(sums.encode("ascii"))
 
     plugin_zip = next(iter(archives))
-    executable = sum(1 for n in names if not n.endswith("/") and files[n[len(TOP):]][0] & 0o111)
+    executable = sum(1 for n in names if not n.endswith("/") and files[n[len(top_dir):]][0] & 0o111)
     print(f"wrote {out} from {commit[:12]}: {plugin_zip} ({len(names)} entries, {len(files)} files, "
           f"{executable} executable), {len(skills)} .skill files, SHA256SUMS; testzip: "
           f"{', '.join(bad) or 'OK'}")
     for path in removed.decode("utf-8", "surrogateescape").split("\0"):
         if path:
-            print(f"  removed since {previous}: {path[len(PLUGIN) + 1:]}")
+            print(f"  removed since {previous}: {path[len(plugin) + 1:]}")
     for warning in warnings:
         print(f"  warning: {warning}")
     return 1 if bad else 0

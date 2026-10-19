@@ -157,6 +157,31 @@ class FailBefore(FakeRepository):
         self.assertIn("cannot read 'no-such-rev' from git", output(proc))
 
 
+class FailBeforeAcrossTheRename(FailBefore):
+    """Codex on #180: 4.0.0 moved the plugin to plugins/pro-web-design-suite,
+    and 3.6.0, the release a fix is shown failing on, holds only
+    plugins/web-design-suite, so `git archive` of the new path failed before
+    either run. Every FailBefore test runs again, with the tag before the move."""
+
+    def setUp(self):
+        TempDirTest.setUp(self)
+        old, new = "plugins/web-design-suite", "plugins/pro-web-design-suite"
+        self.git("init", "-q")
+        self.git("config", "core.autocrlf", "false")
+        self.write(f"{old}/value.txt", "1\n")
+        self.write(f"{old}/old.txt", "old\n")
+        self.write(f"{old}/tests/test_fake.py", FAKE_TESTS)
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "one, before the rename")
+        self.git("tag", "v0.1.0")
+        self.first = self.git("rev-parse", "HEAD")
+        self.git("mv", old, new)
+        self.write(f"{new}/value.txt", "2\n")
+        self.git("rm", "-q", "--cached", f"{new}/old.txt")
+        (self.tmp / new / "old.txt").unlink()
+        self.git("commit", "-q", "-am", "two, renamed")
+
+
 class CheckChoosesTheTests(unittest.TestCase):
 
     SOURCES = {
