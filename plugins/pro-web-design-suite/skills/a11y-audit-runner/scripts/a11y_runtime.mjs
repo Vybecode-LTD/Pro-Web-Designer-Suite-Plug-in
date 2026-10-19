@@ -111,8 +111,12 @@
  *   --browser PATH        chromium executable   (default: A11Y_CHROMIUM, else the
  *                         first that starts of /opt/pw-browsers/chromium,
  *                         Playwright's own Chromium, Chrome or Edge)
+ *   --engine NAME         chromium (default), firefox or webkit: the others run
+ *                         axe, names and taborder, in the build the locked
+ *                         Playwright pins (npx playwright install firefox
+ *                         webkit), or --browser PATH; the rest are Chromium's
  *   --json                machine-readable output
- *   --report FILE         also write the --json output to FILE; the text report
+ *   --report FILE        also write the --json output to FILE; the text report
  *                         still prints, so a CI log has something a person reads
  *   --quiet
  *
@@ -141,12 +145,17 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { DEEP_DOM, FREEZE_ANIMATIONS_CSS, MAX_URLS, NAV_OPTIONS, arrive, contrastRatio, elementAt, keepClosedRoots, launchBrowser, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, readUrls, readViewports, refuseOverwrite, runEach, takeNavOption, unreadRoots, withoutOptions } from './browser_common.mjs';
+import { DEEP_DOM, ENGINES, FREEZE_ANIMATIONS_CSS, MAX_URLS, NAV_OPTIONS, arrive, contrastRatio, elementAt, keepClosedRoots, launchEngine, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, readUrls, readViewports, refuseOverwrite, runEach, takeNavOption, unreadRoots, withoutOptions } from './browser_common.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TAGS = 'wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice';
 const ALL_CHECKS = ['axe', 'names', 'taborder', 'focus', 'forced', 'contrast',
                     'keys', 'reflow', 'spacing', 'obscured', 'hover', 'motion'];
+// What runs in Firefox and WebKit (GT-B9): axe, the computed names and the
+// real tab order. The rest measure pixels, emulate forced colours, read
+// closed shadow roots through Chromium's DevTools protocol, or were
+// calibrated in Chromium alone, so they stay Chromium's.
+const EVERY_ENGINE = ['axe', 'names', 'taborder'];
 
 const COVERAGE_NOTE =
   'Automated testing finds well under half of the barriers (GDS 2017: the ' +
@@ -178,6 +187,7 @@ function parseArgs(argv) {
     dpr: 1,
     axe: null,
     browser: process.env.A11Y_CHROMIUM || '',
+    engine: 'chromium',
     json: false, quiet: false, report: null,
     nav: newNav(), reach: null,
   };
@@ -232,6 +242,7 @@ function parseArgs(argv) {
       case '--dpr': opts.dpr = num(need(i, a), a); i++; break;
       case '--axe': opts.axe = need(i, a); i++; break;
       case '--browser': opts.browser = need(i, a); i++; break;
+      case '--engine': opts.engine = need(i, a).toLowerCase(); i++; break;
       case '--json': opts.json = true; break;
       case '--report': opts.report = need(i, a); i++; break;
       case '--quiet': opts.quiet = true; break;
@@ -302,6 +313,13 @@ function parseArgs(argv) {
     if (!ALL_CHECKS.includes(s)) {
       die(`--skip "${s}" is not a check. Known: ${ALL_CHECKS.join(', ')}`);
     }
+  }
+  if (!ENGINES.includes(opts.engine)) {
+    die(`--engine "${opts.engine}" is not one: ${ENGINES.join(', ')}`);
+  }
+  // A11Y_CHROMIUM is a Chromium; another engine takes Playwright's own build.
+  if (opts.engine !== 'chromium' && opts.browser === (process.env.A11Y_CHROMIUM || '')) {
+    opts.browser = '';
   }
   if (!(opts.maxStops >= 1)) die('--max-stops must be at least 1');
   if (!(opts.focusThreshold >= 0 && opts.focusThreshold <= 1)) {
@@ -491,6 +509,7 @@ const HELPERS = () => {
         sel: cssPath(el),
         tag: el.tagName.toLowerCase(),
         tabindex: ti === null ? 0 : Number(ti),
+        explicit: ti !== null,
         docIndex: index.get(el) ?? -1,
         ariaHidden: inertOrHidden(el) === 'aria-hidden',
       });
@@ -2677,7 +2696,8 @@ function textReport(o, opts) {
     byCheck.get(f.check).push(f);
   }
   const order = ['axe', 'names', 'taborder', 'focus', 'forced', 'contrast',
-                 'keys', 'reflow', 'spacing', 'obscured', 'hover', 'motion', 'shadow'];
+                 'keys', 'reflow', 'spacing', 'obscured', 'hover', 'motion', 'shadow',
+                 'engine'];
   for (const check of order) {
     const items = byCheck.get(check);
     if (!items || !items.length) continue;
@@ -2827,15 +2847,22 @@ async function main() {
   }
   const budget = loadBudget(opts.budget);
 
-  const ran = ALL_CHECKS.filter((c) => !opts.skip.has(c));
+  const elsewhere = opts.engine === 'chromium' ? []
+    : ALL_CHECKS.filter((c) => !EVERY_ENGINE.includes(c) && !opts.skip.has(c));
+  const ran = ALL_CHECKS.filter((c) => !opts.skip.has(c) && !elsewhere.includes(c));
   const log = (s) => { if (!opts.quiet && !opts.json) process.stderr.write(s + '\n'); };
 
-  const { chromium } = await loadPlaywright(die, 'node a11y_runtime.mjs --url ...');
-  const launched = await launchBrowser(chromium, opts.browser, {
+  const playwright = await loadPlaywright(die, 'node a11y_runtime.mjs --url ...');
+  const launched = await launchEngine(playwright, opts.engine, opts.browser, {
     args: ['--force-color-profile=srgb', '--disable-lcd-text',
            '--font-render-hinting=none', '--no-sandbox',
            '--disable-dev-shm-usage'],
   });
+  if (!launched.browser && opts.engine !== 'chromium') {
+    die(`no usable ${opts.engine}. Tried:\n    ${launched.tried.join('\n    ')}\n` +
+        `  Install the build the locked Playwright pins (npx playwright install ${opts.engine}), ` +
+        'or pass --browser PATH.');
+  }
   if (!launched.browser) {
     die('no usable chromium. Tried:\n    ' + launched.tried.join('\n    ') + '\n' +
         '  Pass --browser PATH, set A11Y_CHROMIUM, or install Chrome or Edge.\n' +
@@ -2846,6 +2873,16 @@ async function main() {
   const browser = launched.browser;
 
   const findings = [];
+  if (elsewhere.length) {
+    findings.push(finding(
+      'engine', 'checks-run-in-chromium-only', '-', 'warning',
+      `In ${opts.engine} these checks did not run: ${elsewhere.join(', ')}.`,
+      'They measure pixels, emulate forced colours, or were calibrated in ' +
+      'Chromium, whose behaviour they assert. A run in another engine is a ' +
+      'second pass for what differs by engine (the names and the tab order), ' +
+      'not a replacement for the Chromium run.',
+      { engine: opts.engine, checks: elsewhere }));
+  }
   let axeVersion = '?';
   let tabOrder = null;
   let focusTable = [];
@@ -2985,10 +3022,29 @@ async function main() {
     let stopSelectors = [];
     if (mode === 'page' && ran.includes('taborder')) {
       log('  tab order…');
-      const expected = await page.evaluate(() => window.__a11y.expectedTabbables());
+      let expected = await page.evaluate(() => window.__a11y.expectedTabbables());
       const steps = Math.min(400, expected.length * 2 + 20);
       const forward = await tabSequence(page, { steps, shift: false });
       const reverse = await tabSequence(page, { steps, shift: true });
+      // Outside Chromium, Tab may pass over every link with no tabindex: as
+      // Safari does, and Firefox on macOS, unless the reader turns links on.
+      // WebKit's Windows and macOS builds do; its Linux build does not (CI on
+      // #183). What the engine does is read from the run, never assumed: a
+      // stop it never takes is not one it missed (GT-B9).
+      const bare = (e) => (e.tag === 'a' || e.tag === 'area') && !e.explicit;
+      const reached = new Set(forward.map((s) => s.sel));
+      if (opts.engine !== 'chromium' && expected.some(bare) &&
+          !expected.some((e) => bare(e) && reached.has(e.sel))) {
+        expected = expected.filter((e) => !bare(e));
+        findings.push(finding(
+          'engine', 'engine-skips-links', '-', 'warning',
+          `In ${opts.engine} on this platform, Tab passed over every link with no ` +
+          'tabindex, so the tab order expects none.',
+          'This is the engine\'s default (Safari\'s "Press Tab to highlight each ' +
+          'item" is off), not the page\'s doing. Its readers reach links with ' +
+          'Option+Tab or by turning the setting on; the Chromium run checks them.',
+          { engine: opts.engine }));
+      }
       findings.push(...analyseTabOrder(forward, reverse, expected, opts));
       tabOrder = forward.filter((s) => s.sel !== '(document)');
       const seen = new Set();
@@ -3187,6 +3243,7 @@ async function main() {
     tool: 'a11y_runtime',
     coverageNote: COVERAGE_NOTE,
     target, mode,
+    engine: opts.engine,
     axeVersion,
     tags: opts.tags,
     viewport: `${opts.viewport.width}x${opts.viewport.height}@${opts.dpr}x`,

@@ -24,6 +24,15 @@ renames the plugin.
 
 ### Added
 
+- **The runtime gate runs in Firefox and WebKit** (GT-B9, P35 part 2). `a11y_runtime.mjs --engine
+  firefox|webkit` runs axe, the computed names and the real tab order in the build the locked
+  Playwright pins (`npx playwright install firefox webkit`), or `--browser PATH`; the checks that
+  difference screenshots, emulate forced colours, read closed shadow roots through the DevTools
+  protocol or were calibrated in Chromium stay Chromium's, and the run names them
+  (`checks-run-in-chromium-only`, a warning). Tab may pass over every link with no `tabindex` (WebKit's
+  Windows and macOS builds, as Safari by default; not its Linux build): the run reads it from the
+  sequence it drove, expects no such stop, and says so (`engine-skips-links`). `browser_common.mjs` gains
+  `launchEngine()`. CI installs Firefox and WebKit on Linux (`test_runtime_engines`).
 - **The runtime gate drives the checks the coverage table called drivable** (GT-B6, P35 part 1).
   `a11y_runtime.mjs` has four new checks, each skippable by name and counted by a budget key, and
   `reflow` reads clipped text:

@@ -191,7 +191,7 @@ jobs:
 ```
 
 Two details in that file:
-- **The browser comes from the lockfile.** `npx playwright install chromium` installs the Chromium that the locked Playwright was built for, and `a11y_runtime.mjs` tries it first. The runner image's own Chrome changes with each image release. The cache keeps the download to one per lockfile change.
+- **The browser comes from the lockfile.** `npx playwright install chromium` installs the Chromium that the locked Playwright was built for, and `a11y_runtime.mjs` tries it first. The runner image's own Chrome changes with each image release. The cache keeps the download to one per lockfile change. `--engine firefox` and `--engine webkit` take the builds `npx playwright install firefox webkit` installs, for a second pass of axe, the names and the tab order (`references/scripts.md` §2).
 - **The server starts, is waited for and is used in one step.** A process backgrounded in an earlier step may not outlive it on every runner. `--report` writes the JSON for the artifact and still prints the findings in the log.
 
 Three rules that keep it alive:
