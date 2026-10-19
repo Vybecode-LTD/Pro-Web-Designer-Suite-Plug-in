@@ -202,6 +202,19 @@ class FocusNotObscured(RuntimeCase):
         self.assertIn(FIRST, [f["selector"] for f in self.found(report, "focus-obscured")],
                       report["findings"])
 
+    def test_a_black_or_red_bar_paints(self):
+        """CodeRabbit on #179: `rgb(0, 0, 0)` ends in `, 0)`, and was read as
+        a transparent colour, so a black bar hid nothing. So was any colour
+        with no blue; a fully transparent one still hides nothing."""
+        for colour, hides in (("#000", True), ("#f00", True), ("rgba(0, 0, 0, 0)", False)):
+            with self.subTest(colour=colour):
+                report = self.runtime(page(STOPS_CSS.format(
+                    "", f".bar{{background:{colour}}}.bar a{{color:transparent}}"), STOPS),
+                    "obscured")
+                self.assertEqual(hides, FIRST in [
+                    f["selector"] for f in self.found(report, "focus-obscured")],
+                    report["findings"])
+
     def test_a_cover_drawn_by_its_border_hides(self):
         """Codex on #179: a transparent bar drawn by a border 160px thick still
         covers the link under it."""

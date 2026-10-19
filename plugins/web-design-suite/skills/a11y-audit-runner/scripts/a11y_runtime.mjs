@@ -2085,7 +2085,10 @@ const OBSCURED_FN = () => {
     visit(document);
     return out;
   };
-  const clear = (c) => c === 'transparent' || /(?:,\s*|\/\s*)0(?:\.0+)?\)$/.test(c);
+  // Alpha from an alpha component only: an opaque colour computes as
+  // `rgb(r, g, b)`, and black's last channel is no alpha (CodeRabbit on #179).
+  const clear = (c) => c === 'transparent' ||
+    /^rgba\([^)]*,\s*0(?:\.0+)?\)$/.test(c) || /\/\s*0(?:\.0+)?%?\)$/.test(c);
   // Whether an element inside a cover paints at the point: a layer a portal
   // or a toast region spreads over the page is hit, and draws nothing (Codex
   // on #179). A background, an image or a control, or its own text there.
