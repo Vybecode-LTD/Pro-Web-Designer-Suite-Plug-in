@@ -192,6 +192,21 @@ class ReleaseBuild(TempDirTest):
         self.git("commit", "-q", "-am", "a bad name")
         self.assert_refused("skills/beta: its name is 'Beta-Claude', and its folder 'beta'")
 
+    def test_a_release_from_before_the_rename_builds_under_its_own_name(self):
+        """Codex on #180: --rev at 3.6.0 or earlier found no
+        plugins/pro-web-design-suite there, and the builder stopped. It takes
+        the folder from the revision, and names the zip as its plugin.json does."""
+        self.git("mv", P, "plugins/web-design-suite")
+        self.write("plugins/web-design-suite/.claude-plugin/plugin.json",
+                   '{"name": "web-design-suite", "version": "3.6.0"}\n')
+        self.git("commit", "-q", "-am", "as it was before the rename")
+        proc = self.build()
+        self.assertEqual(0, proc.returncode, output(proc))
+        names = list(self.infos("web-design-suite-3.6.0.zip"))
+        self.assertIn("web-design-suite/scripts/tool.py", names)
+        self.assertEqual(0o100755, self.infos("web-design-suite-3.6.0.zip")["web-design-suite/scripts/tool.py"]
+                         .external_attr >> 16)
+
     def test_a_description_longer_than_an_upload_takes_is_a_warning(self):
         self.write(f"{P}/skills/beta/SKILL.md", skill_md("beta", "Builds betas. " * 15))
         self.git("commit", "-q", "-am", "a long description")

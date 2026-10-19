@@ -42,6 +42,9 @@ import tarfile
 import tempfile
 
 PLUGIN = "plugins/pro-web-design-suite"
+# Where the plugin was before 4.0.0 renamed it: 3.6.0 and earlier hold only this
+# folder, and they are what a fix is shown failing on (Codex on #180).
+FORMER_PLUGINS = ("plugins/web-design-suite",)
 
 # Runs in the tests folder, under the interpreter being tested, and writes one
 # row per test id: whether it passed, how many of its parts failed, and why it
@@ -111,14 +114,14 @@ def own_repository() -> tuple[dict[str, str], str]:
     return env, git("rev-parse", "--show-toplevel", env=env, cwd=os.getcwd()).decode().strip()
 
 
-def unpack(archive: bytes, dest: pathlib.Path) -> pathlib.Path:
-    """The plugin from a `git archive` tar, as dest/pro-web-design-suite."""
+def unpack(archive: bytes, dest: pathlib.Path, source: str = PLUGIN) -> pathlib.Path:
+    """The plugin from a `git archive` tar of `source`, as dest/pro-web-design-suite."""
     root = dest / "pro-web-design-suite"
     root.mkdir(parents=True)
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
         for member in tar.getmembers():
-            rel = member.name[len(PLUGIN):].strip("/")
-            if not member.name.startswith(PLUGIN) or not rel:
+            rel = member.name[len(source):].strip("/")
+            if not member.name.startswith(source) or not rel:
                 continue
             target = root.joinpath(*rel.split("/"))
             if root.resolve() not in target.resolve().parents:
@@ -175,7 +178,9 @@ def main(argv: list[str] | None = None) -> int:
         rev = args.rev or git("describe", "--tags", "--abbrev=0", "--match", "v*",
                               env=env, cwd=top).decode().strip()
         commit = git("rev-parse", "--verify", rev + "^{commit}", env=env, cwd=top).decode().strip()
-        archive = git("archive", "--format=tar", commit, PLUGIN, env=env, cwd=top)
+        source = next((p for p in (PLUGIN, *FORMER_PLUGINS)
+                       if git("ls-tree", "-d", commit, "--", p, env=env, cwd=top)), PLUGIN)
+        archive = git("archive", "--format=tar", commit, source, env=env, cwd=top)
     except (OSError, subprocess.CalledProcessError) as exc:
         detail = (getattr(exc, "stderr", b"") or b"").decode(errors="replace").strip()
         parser.error(f"cannot read {repr(args.rev) if args.rev else 'the latest v* tag'} from git: {detail or exc}")
@@ -185,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
     base["PYTHONDONTWRITEBYTECODE"] = "1"
     scratch = pathlib.Path(tempfile.mkdtemp(prefix="wds-fail-before-"))
     try:
-        root = unpack(archive, scratch)
+        root = unpack(archive, scratch, source)
         before = run(args.python, tests, ids, {**base, "WDS_PLUGIN_ROOT": str(root), "WDS_PLUGIN_REV": commit},
                      scratch / "before.json")
         now = run(args.python, tests, ids, base, scratch / "now.json")
