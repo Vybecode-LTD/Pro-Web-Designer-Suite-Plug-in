@@ -112,3 +112,10 @@ jobs:
           claude plugin validate --strict .
           claude plugin validate --strict plugins/pro-web-design-suite
           claude plugin validate --strict plugins/pro-web-design-suite/.claude-plugin/plugin.json
+      # The distribution repository's contents, built as release.yml builds them,
+      # validated as the plugin at a repository's root: what the directory reads.
+      - name: Build and validate the distribution tree
+        run: |
+          python3 -B tooling/release/build.py "$RUNNER_TEMP/dist" --tree "$RUNNER_TEMP/tree"
+          claude plugin validate --strict "$RUNNER_TEMP/tree"
+          claude plugin validate --strict "$RUNNER_TEMP/tree/.claude-plugin/marketplace.json"

@@ -9,7 +9,7 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
   - The scripts and tests are Python 3.9 or newer, standard library only.
   - Node 20.19+, 22.13+ or 24+ (ESLint 10's range) is needed for the browser scripts and the real-tool tests.
   - The skills and references are Markdown.
-- **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in. It is public (since 2026-09-28), and MIT-licensed like the plugin.
+- **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in, where the plugin is developed. It is public (since 2026-09-28), and MIT-licensed like the plugin. From 4.0.0, users install from the **distribution repository**, https://github.com/Vybecode-LTD/pro-web-design-suite, which holds the built plugin at its root (no `tests/`, `evals/` or `tools/`). Only `release.yml`'s `distribute` job writes it, with the `DIST_DEPLOY_KEY` deploy key; nobody commits to it by hand. Anthropic's directory reads it.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.
 
 ## Current state (2026-10-19)
@@ -19,6 +19,7 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Tests:** about 1,440. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force: locally, `tools/check.py`.
 - **Evals:** 23 routing cases and 11 outcome cases. `evals.yml` runs both only by hand (`tag=all`), under one $14 ceiling; the dispatch before a release's tag gates it, and a tag starts no run (the owner, 2026-10-11). The outcome cases grant Write, Edit and the gate MCP tools, never Bash. In `claude-code-capabilities.md`, §1 is the evals page, §10 P29's choices, and §11 the sandboxing page and P30's choices.
 - **Active work:** 4.0.0. **Phase 6c, the owner's audit of 2026-10-14** (`dev plans/web-design-suite-audit-2026-10-14.md`, 114 findings, N41 to N47), **is done**: #130 to #160, and #162 for D6's Baseline browser versions, registered in `evidence.json` at web-features (the owner chose to register them, 2026-10-16). **Phase 6b:** P36 (Tailwind v4) is done (#125 to #127, #129). P34 is done: #163 (reaching the page, GT-B1 and GT-B2), #165 (the runtime checks read through shadow roots, GT-B3) and #166 (`--urls` and `--viewports`, one report a run, GT-B4). P37 is done: #168 (the audit and the census read a bound inline style, N48), #169 (stylelint reads SCSS, D3), #172 (Next.js App Router, Vue, Svelte and Astro in `stack-frameworks.md`; N49 decided: a template is the audit's), #173 (the scaffold's forms post to Next.js server actions), #176 and #177 (`scaffold_ui.py --framework vue` and `svelte`; DL-B3 closed). P35 is done: #179 (`spacing`, `obscured`, `hover`, `motion` and clipped text in the runtime gate, GT-B6) and #183 (`--engine firefox|webkit`, GT-B9; CI installs both on Linux, the owner's OK, 2026-10-19). The plugin was renamed Pro Web Design Suite in #180. **Next: P41, P42 and P43 in the order the owner chooses (ask), then R4.** Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
+- **Renamed and redistributed (2026-10-19, #180 to #182):** Pro Web Design Suite, `pro-web-design-suite`. From 4.0.0, releases go to the distribution repository through `release.yml`'s `distribute` job; the owner creates that repository and its deploy key before R4 (`docs/HANDOFF.md`).
 - **Open:** 11 items, every one scheduled in the execution plan (`check_execution_plan.py`).
 
 ## Commands
@@ -36,7 +37,7 @@ python tools/check_pointers.py        # § pointers; --write-register after edit
 python tools/sync_snippets.py --check # starter code quoted in the references
 python tools/sync_rules.py --check    # the spec's data in the gates; without --check it rewrites the blocks
 python skills/web-design-studio/scripts/audit_design.py skills --strict
-cd ../.. && python -B tooling/release/build.py EMPTY_FOLDER [--rev REV]   # the zip, the .skill files, SHA256SUMS
+cd ../.. && python -B tooling/release/build.py EMPTY_FOLDER [--rev REV] [--tree EMPTY_FOLDER]   # the zip, the .skill files, SHA256SUMS; --tree: the distribution repository's files
 ```
 
 CI (`.github/workflows/ci.yml`) runs the whole suite on Windows, Linux and macOS at Python 3.9 and 3.14 for every PR, so locally `check.py` is enough (decision D1). A pushed `v*` tag makes `release.yml` build and create the GitHub release; nothing else creates one.
@@ -78,7 +79,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 
 ```
 .claude-plugin/marketplace.json   the repository as a marketplace; the plugin is at ./plugins/pro-web-design-suite
-plugins/pro-web-design-suite/     the plugin (the only folder that ships)
+plugins/pro-web-design-suite/     the plugin; it ships without its tests/, evals/ and tools/ (build.py's DEV_ONLY)
   skills/<13 skills>/             SKILL.md, references/, scripts/, assets/
   shared/token-contract.md        the master copy of the contract (13 copies must match it)
   shared/dtcg.py                  DTCG 2025.10 and Tokens Studio, read and write (a copy beside each project_config.py)
@@ -91,7 +92,7 @@ plugins/pro-web-design-suite/     the plugin (the only folder that ships)
   tools/                          check.py, check_pointers.py, fail_before.py, sync_rules.py, sync_snippets.py
   CHANGELOG.md, README.md, LICENSE
 tooling/                          pinned tools for the tests (main/, tailwind-v3/); release/build.py
-.github/workflows/                ci.yml (the suite on three platforms), release.yml (a v* tag makes the release), evals.yml (the routing and outcome evals, by hand)
+.github/workflows/                ci.yml (the suite on three platforms), release.yml (a v* tag makes the release, then `distribute` writes the distribution repository), evals.yml (the routing and outcome evals, by hand)
 dev plans/                        the review, the phase plans and reports, the completion plan and inventory
 docs/HANDOFF.md                   the current state and the next steps, one page
 ```

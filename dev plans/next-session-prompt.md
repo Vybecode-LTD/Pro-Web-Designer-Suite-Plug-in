@@ -4,7 +4,7 @@
 - **#179, P35 part 1 (GT-B6)**, merged as `8a99f60`: `spacing`, `obscured`, `hover` and `motion` in the runtime gate, and clipped text in `reflow`.
 - **#183, P35 part 2 (GT-B9)**, merged as `1a37335`: `--engine firefox|webkit`.
 
-**The owner renamed the plugin Pro Web Design Suite** in another session (#180, merged): it lives in `plugins/pro-web-design-suite`. That session's #181 and #182 are open and are not yours.
+**The owner renamed the plugin Pro Web Design Suite** in another session (#180, merged): it lives in `plugins/pro-web-design-suite`. That session's #181 (the distribution repository) and #182 (ready for Anthropic's directory) are merged too; `docs/HANDOFF.md` has what the owner must do before R4.
 
 **Next: P41, P42 and P43, in the order the owner chooses.** Ask before you start (§4).
 
@@ -545,7 +545,6 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then:
 - **The docs PR** of 2026-10-19 may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
-- **#181 and #182** are the owner's other session's (the distribution repository; Anthropic's directory). Leave them alone; a branch you cut may need `main` merged in after they land.
 - Remove any worktree left in a scratchpad (`git worktree list`): `git worktree remove PATH`, then `git branch -d` each merged branch. The newest `wait_pr.sh` is in `478e774c-…\scratchpad`.
 - Then read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
 
@@ -567,6 +566,12 @@ Every outside figure in P42 (a law's date, a fine's ceiling) is re-read at its s
 **R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. The rename (#180) changes the install path: read its PR, and check the `renames` entry moves an existing install. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed, the migration's reconciliation on a real codebase (P52), the router (#143), the MCP server's containment (#155), P55's gates, P34's options on a real client-rendered app and a real signed-in page, a real web-component library, a site's sitemap through `--urls` at two viewports, P37's stacks, the scaffold's Vue and Svelte output in a real Vite and a real SvelteKit project, **P35's checks on a real site** (a sticky header, a cookie banner, tooltips, reduced motion; `--engine webkit` and, on Linux or macOS, `--engine firefox`), and **the routing evals on the renamed plugin**.
 
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
+
+**R4 also ships the rename and the distribution repository** (#180, #181 and #182, 2026-10-19). Read `dev plans/web-design-suite-distribution-and-promotion.md`'s "Rename and distribution plan" first.
+- **Before the tag**, confirm with the owner that `Vybecode-LTD/pro-web-design-suite` exists, empty and public, and that the `DIST_DEPLOY_KEY` secret is set (`gh secret list`), or `release.yml`'s `distribute` job fails.
+- R4's live check adds: installing 3.6.0 under its old name and updating, so the `renames` map moves it to `pro-web-design-suite`; `/pro-web-design-suite:gate` and the MCP tools under their new names; `build.py --tree` validated with `claude plugin validate --strict`.
+- **After the tag:** the `distribute` job's log; the distribution repository's `main` and `v4.0.0`, with 222 files and no `tests/`; then `/plugin marketplace add Vybecode-LTD/pro-web-design-suite` and an install from it on a clean machine.
+- **Then the owner submits** the distribution repository at claude.ai/directory/manage. Validate first, from the plan's Part A. Ask before anything is submitted.
 
 ## 5. End of session (never skip)
 
