@@ -152,6 +152,12 @@
  {
   "from": "a11y-audit-runner/SKILL.md",
   "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "6",
+  "heading": "Reduced motion"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
   "section": "7",
   "heading": "Contrast, with overlays composited"
  },
@@ -248,6 +254,12 @@
  {
   "from": "a11y-audit-runner/references/scripts.md",
   "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "6",
+  "heading": "Reduced motion"
+ },
+ {
+  "from": "a11y-audit-runner/references/scripts.md",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
   "section": "8",
   "heading": "Driving the key map"
  },
@@ -262,6 +274,12 @@
   "to": "a11y-audit-runner/references/manual-protocol.md",
   "section": "2",
   "heading": "Keyboard-only walkthrough — 20 minutes"
+ },
+ {
+  "from": "a11y-audit-runner/scripts/a11y_runtime.mjs",
+  "to": "a11y-audit-runner/references/runtime-checks.md",
+  "section": "6",
+  "heading": "Reduced motion"
  },
  {
   "from": "a11y-audit-runner/scripts/a11y_runtime.mjs",
