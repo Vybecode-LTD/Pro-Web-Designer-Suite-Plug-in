@@ -81,11 +81,11 @@ compile target, and the one place the laws deliberately bend.
 marketplace, then install the plugin by its full id:
 
 ```
-/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in
+/plugin marketplace add Vybecode-LTD/pro-web-design-suite
 /plugin install pro-web-design-suite@pro-web-design-suite
 ```
 
-The repository is public, so this works for anyone. To install from a release zip
+The repository is public, so this works for anyone. It holds the plugin as released, one commit per version. The development repository, `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, holds the tests, the evals and the issues, and works as a marketplace too. To install from a release zip
 instead, unpack it and add the unpacked `pro-web-design-suite` folder, the one that holds
 `.claude-plugin/marketplace.json`, in place of the repository's name.
 
@@ -274,7 +274,7 @@ Adopt it on a legacy repo with `--write-baseline`: the gate goes on today and th
 
 ## Regression tests
 
-The suite's own tests live in `tests/` and need Python 3.9 or newer (they run on 3.9 to 3.14); git and a POSIX `sh` for the hook and recipe tests; Node for the browser-script and real-tool tests. From the plugin root:
+The suite's own tests live in the development repository's `plugins/pro-web-design-suite/tests/`: a release leaves out `tests/`, `evals/` and `tools/`. They need Python 3.9 or newer (they run on 3.9 to 3.14); git and a POSIX `sh` for the hook and recipe tests; Node for the browser-script and real-tool tests. From the plugin root:
 
 ```bash
 python -B -m unittest discover -s tests -v
@@ -288,7 +288,7 @@ In the plugin's repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3`
 
 ## Evals
 
-`evals/` holds cases for `claude plugin eval` (Claude Code 2.1.269 or later). For each skill there is a request phrased as a user would type it, which should load that skill. For five pairs of sibling skills there is a request for one that must never load the other. Every run is a real model call on your account. From the plugin root:
+`evals/`, in the development repository, holds cases for `claude plugin eval` (Claude Code 2.1.269 or later). For each skill there is a request phrased as a user would type it, which should load that skill. For five pairs of sibling skills there is a request for one that must never load the other. Every run is a real model call on your account. From the plugin root:
 
 ```bash
 claude plugin eval . --tag routing --ablation none --runs 1 --no-publish

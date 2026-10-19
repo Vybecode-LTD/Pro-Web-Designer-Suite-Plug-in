@@ -23,6 +23,7 @@ Regressions covered (3.2.1 review, and XC-C6 for 3.3.0):
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import re
 import shutil
 import subprocess
@@ -30,7 +31,7 @@ import sys
 import unittest
 import zipfile
 
-from wds_support import REPO, SKILLS, TOOLING, TempDirTest, env, output
+from wds_support import PLUGIN, REPO, SKILLS, TOOLING, TempDirTest, env, output
 
 GIT = shutil.which("git")
 BUILDER = TOOLING / "release" / "build.py" if TOOLING else None
@@ -39,6 +40,13 @@ GIT_ENV = {"GIT_AUTHOR_NAME": "wds-test", "GIT_AUTHOR_EMAIL": "wds-test@example.
            "GIT_COMMITTER_NAME": "wds-test", "GIT_COMMITTER_EMAIL": "wds-test@example.invalid",
            "GIT_AUTHOR_DATE": "2026-09-25T12:00:00Z", "GIT_COMMITTER_DATE": "2026-09-25T12:00:00Z"}
 P = "plugins/pro-web-design-suite"
+DEV_FILES = ("tests/test_x.py", "evals/routing/alpha/prompt.md", "tools/check.py")
+
+
+# Anthropic's directory blocks a README of fewer than 40 words outside code blocks.
+README_BODY = ("This plugin exists for the release builder's tests. It holds two skills, alpha and beta, "
+               "a script that git marks executable, and a license, which is what a small plugin needs before "
+               "the directory lists it. Nothing here runs outside the tests.\n")
 
 
 def skill_md(name: str, description: str = "Builds alphas. Use when an alpha is needed.") -> str:
@@ -57,7 +65,7 @@ class ReleaseBuild(TempDirTest):
         super().setUp()
         self.git("init", "-q")
         self.git("config", "core.autocrlf", "false")
-        self.write(f"{P}/README.md", "# plugin\n")
+        self.write(f"{P}/README.md", "# plugin\n\n" + README_BODY)
         self.write(f"{P}/LICENSE", "MIT\n")
         self.write(f"{P}/.claude-plugin/plugin.json", '{"name": "pro-web-design-suite", "version": "9.8.7"}\n')
         tool = self.write(f"{P}/scripts/tool.py", "#!/usr/bin/env python3\nprint(1)\n")
@@ -69,6 +77,8 @@ class ReleaseBuild(TempDirTest):
         self.write(f"{P}/skills/alpha/evals/case.yaml", "prompt: x\n")
         self.write(f"{P}/skills/alpha/references/evals/notes.md", "kept: only a top-level evals/ is left out\n")
         self.write(f"{P}/skills/beta/SKILL.md", skill_md("beta", "Builds betas."))
+        for dev in DEV_FILES:
+            self.write(f"{P}/{dev}", "development only\n")              # tracked, never shipped
         self.git("add", ".")
         for path in ("scripts/tool.py", "skills/alpha/scripts/run.py"):
             self.git("update-index", "--chmod=+x", f"{P}/{path}")                  # ... and where not
@@ -190,6 +200,68 @@ class ReleaseBuild(TempDirTest):
         self.assertIn("warning: beta: its description has 209 characters; claude.ai's help center gives 200",
                       output(proc))
 
+    def test_the_development_folders_never_ship(self):
+        """4.0.0: the plugin's tests/, evals/ and tools/ stay in the development
+        repository. A skill's own evals/ still ships, as before."""
+        self.assertEqual(0, self.build().returncode)
+        names = list(self.infos("pro-web-design-suite-9.8.7.zip"))
+        for dev in DEV_FILES:
+            with self.subTest(file=dev):
+                self.assertNotIn(f"pro-web-design-suite/{dev}", names)
+                self.assertNotIn(f"pro-web-design-suite/{dev.split('/')[0]}/", names)
+        self.assertIn("pro-web-design-suite/skills/alpha/evals/case.yaml", names)
+
+    def tree_build(self, tree: str = "tree") -> subprocess.CompletedProcess:
+        return subprocess.run([sys.executable, "-B", str(BUILDER), "dist", "--tree", tree], cwd=self.tmp,
+                              capture_output=True, env=env(**GIT_ENV), timeout=120)
+
+    def test_the_tree_holds_what_the_zip_holds(self):
+        """The distribution repository's contents: the zip's files, at the root."""
+        proc = self.tree_build()
+        self.assertEqual(0, proc.returncode, output(proc))
+        tree = self.tmp / "tree"
+        on_disk = sorted(p.relative_to(tree).as_posix() for p in tree.rglob("*") if p.is_file())
+        with zipfile.ZipFile(self.tmp / "dist" / "pro-web-design-suite-9.8.7.zip") as z:
+            zipped = {i.filename[len("pro-web-design-suite/"):]: z.read(i) for i in z.infolist()
+                      if not i.filename.endswith("/")}
+        self.assertEqual(sorted(zipped), on_disk)
+        for rel, data in zipped.items():
+            with self.subTest(file=rel):
+                self.assertEqual(data, (tree / rel).read_bytes())
+        if sys.platform != "win32":
+            self.assertTrue((tree / "scripts" / "tool.py").stat().st_mode & 0o111)
+            self.assertFalse((tree / "scripts" / "new.py").stat().st_mode & 0o111)
+        self.assertIn("tree: tree (", output(proc))
+
+    def test_the_tree_never_overwrites_a_folder(self):
+        self.write("tree/kept.txt", "x\n")
+        proc = self.tree_build()
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("tree is not an empty folder", output(proc))
+        self.assertFalse((self.tmp / "dist").exists())
+
+    def test_what_the_directory_blocks_is_refused(self):
+        self.write(f"{P}/README.md", "# plugin\n\nToo short.\n")
+        self.git("commit", "-q", "-am", "a short README")
+        self.assert_refused("Anthropic's directory would block it: the README has 4 words outside code blocks")
+
+    def test_what_the_directory_holds_is_a_warning(self):
+        self.write(f"{P}/assets/big.md", "x" * (256 * 1024 + 1))
+        self.git("add", f"{P}/assets/big.md")
+        self.git("commit", "-q", "-m", "a big file")
+        proc = self.build()
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("directory hold: assets/big.md is 262145 bytes; over 262144 is held for a reviewer",
+                      output(proc))
+
+    def test_a_held_file_in_a_development_folder_is_not_a_hold(self):
+        self.write(f"{P}/tests/fixtures/big.md", "x" * (256 * 1024 + 1))
+        self.git("add", f"{P}/tests/fixtures/big.md")
+        self.git("commit", "-q", "-m", "a big fixture")
+        proc = self.build()
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertNotIn("directory hold", output(proc))
+
     def compare(self, a: str, b: str) -> subprocess.CompletedProcess:
         return subprocess.run([sys.executable, "-B", str(COMPARE), a, b], cwd=self.tmp,
                               capture_output=True, env=env())
@@ -265,6 +337,110 @@ class ReleaseBuild(TempDirTest):
         self.assertIn("pro-web-design-suite/README.md is unreadable", output(proc))
 
 
+def builder_module():
+    spec = importlib.util.spec_from_file_location("wds_release_build", BUILDER)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@unittest.skipUnless(BUILDER and BUILDER.is_file(), "needs the repository's tooling/release")
+class TheDirectoryChecks(unittest.TestCase):
+    """4.0.0: what Anthropic's directory blocks on or holds for a reviewer
+    (claude.com/docs/plugins/pre-submission-checklist, read 2026-10-19), found
+    before a release reaches the distribution repository. Each check has a
+    clean plugin as its control."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.build = builder_module()
+
+    def plugin(self, **extra: bytes) -> dict:
+        files = {".claude-plugin/plugin.json": b'{"name": "x", "version": "1.0.0", "license": "MIT"}',
+                 "README.md": ("word " * 40).encode(), "skills/a/SKILL.md": b"---\nname: a\n---\n"}
+        files.update(extra)
+        return {path: (0o100644, data) for path, data in files.items()}
+
+    def findings(self, **extra: bytes) -> tuple:
+        return self.build.directory_findings(self.plugin(**extra))
+
+    def test_a_clean_plugin_has_no_findings(self):
+        self.assertEqual(([], []), self.findings())
+
+    def test_the_shipped_plugin_has_no_findings(self):
+        files = {p.relative_to(PLUGIN).as_posix(): (0o100644, p.read_bytes()) for p in PLUGIN.rglob("*")
+                 if p.is_file() and p.relative_to(PLUGIN).parts[0] not in self.build.DEV_ONLY
+                 and "__pycache__" not in p.parts and "node_modules" not in p.parts}
+        self.assertEqual(([], []), self.build.directory_findings(files))
+        self.assertLess(len(files), self.build.DIRECTORY_MAX_FILES)
+
+    def test_what_blocks(self):
+        cases = {
+            "README.md": ({"README.md": b"# x\n\n```\n" + b"word " * 50 + b"\n```\n"}, "the README has 2 words"),
+            "plugin.json": ({".claude-plugin/plugin.json": b"{"}, "no readable .claude-plugin/plugin.json"),
+            "a system file": ({"skills/.DS_Store": b"x"}, "skills/.DS_Store is an operating system's file"),
+            "a device name": ({"docs/con.md": b"x"}, "docs/con.md is not a valid file name on Windows"),
+            "a colon": ({"docs/a:b.md": b"x"}, "docs/a:b.md is not a valid file name on Windows"),
+            "a trailing dot": ({"docs./a.md": b"x"}, "docs. is not a valid file name on Windows"),
+            "two cases": ({"Skills/b/SKILL.md": b"x"}, "differ only by capitalization"),
+            "unpinned npx": ({".mcp.json": b'{"mcpServers": {"s": {"command": "npx", "args": ["-y", "pkg"]}}}'},
+                             ".mcp.json runs npx pkg: pin it"),
+            "unpinned uvx": ({"hooks/hooks.json": b'{"hooks": {"Stop": [{"hooks": [{"type": "command", '
+                                                  b'"command": "uvx tool"}]}]}}'}, "hooks/hooks.json runs uvx tool"),
+            "uv run unlocked": ({".mcp.json": b'{"mcpServers": {"s": {"command": "uv", "args": ["run", "s.py"]}}}'},
+                                "uv run (without --locked or --frozen)"),
+            "bad hooks.json": ({"hooks/hooks.json": b"{"}, "hooks/hooks.json is not valid JSON"),
+        }
+        for name, (extra, needle) in cases.items():
+            with self.subTest(case=name):
+                blocks, _ = self.build.directory_findings(self.plugin_with(extra))
+                self.assertTrue(any(needle in b for b in blocks), blocks)
+
+    def plugin_with(self, extra: dict) -> dict:
+        files = self.plugin()
+        files.update({path: (0o100644, data) for path, data in extra.items()})
+        return files
+
+    def test_a_license_in_plugin_json_is_enough(self):
+        self.assertEqual([], self.findings()[0])
+        blocks, _ = self.build.directory_findings(self.plugin_with(
+            {".claude-plugin/plugin.json": b'{"name": "x", "version": "1.0.0"}'}))
+        self.assertIn("there is no LICENSE file and no license in plugin.json", blocks)
+        self.assertEqual(([], []), self.build.directory_findings(self.plugin_with(
+            {".claude-plugin/plugin.json": b'{"name": "x", "version": "1.0.0"}', "LICENSE": b"MIT"})))
+
+    def test_pinned_launchers_pass(self):
+        for command in ('"npx", "args": ["-y", "pkg@1.2.3"]', '"npx", "args": ["@scope/pkg@1.2.3"]',
+                        '"uvx", "args": ["tool==1.2.3"]', '"uv", "args": ["run", "--locked", "s.py"]',
+                        '"node", "args": ["${CLAUDE_PLUGIN_ROOT}/s.mjs"]'):
+            with self.subTest(command=command):
+                config = ('{"mcpServers": {"s": {"command": %s}}}' % command).encode()
+                self.assertEqual([], self.build.directory_findings(self.plugin_with({".mcp.json": config}))[0])
+        blocks, _ = self.build.directory_findings(self.plugin_with(
+            {".mcp.json": b'{"mcpServers": {"s": {"command": "npx", "args": ["@scope/pkg"]}}}'}))
+        self.assertTrue(any("npx @scope/pkg" in b for b in blocks), blocks)
+
+    def test_what_holds(self):
+        many = {f"skills/a/references/{i}.md": b"x" for i in range(self.build.DIRECTORY_MAX_FILES)}
+        cases = {
+            "too many files": (many, "files; over 512"),
+            "a large file": ({"skills/a/big.md": b"x" * (256 * 1024 + 1)}, "skills/a/big.md is 262145 bytes"),
+            "a binary file": ({"skills/a/doc.pdf": b"%PDF\0"}, "skills/a/doc.pdf is a binary file"),
+            "an MCP bundle": ({"mcp/server.mcpb": b"x"}, "a bundled MCP server"),
+            "a lockfile install": ({"package.json": b"{}", "package-lock.json": b"{}"}, "package.json beside a lockfile"),
+        }
+        for name, (extra, needle) in cases.items():
+            with self.subTest(case=name):
+                blocks, holds = self.build.directory_findings(self.plugin_with(extra))
+                self.assertEqual([], blocks)
+                self.assertTrue(any(needle in h for h in holds), holds)
+
+    def test_images_and_fonts_are_not_held_by_size(self):
+        big = b"\0" * (256 * 1024 + 1)
+        self.assertEqual(([], []), self.build.directory_findings(self.plugin_with(
+            {"assets/hero.png": big, "assets/font.woff2": big})))
+
+
 class TheAuditsReleaseMediums(unittest.TestCase):
     """P54 part 8, the audit of 2026-10-14's §3.7: D1, D2 and D3. The first two
     read files outside the plugin, so they skip in an unpacked copy (Codex on #152)."""
@@ -275,12 +451,33 @@ class TheAuditsReleaseMediums(unittest.TestCase):
         `contents: write` and GH_TOKEN, and checkout kept its credential."""
         text = (REPO / ".github" / "workflows" / "release.yml").read_bytes().decode("utf-8")
         uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)", text, re.M)
-        self.assertEqual(2, len(uses))
+        self.assertEqual(4, len(uses))                      # two in `release`, two in `distribute`
         for action in uses:
             with self.subTest(action=action):
                 self.assertRegex(action, r"@[0-9a-f]{40}$")
-        checkout = text[text.index("actions/checkout@"):]
-        self.assertRegex(checkout[:400], r"persist-credentials:\s*false")
+        checkouts = [m.start() for m in re.finditer(r"actions/checkout@", text)]
+        self.assertEqual(2, len(checkouts))
+        for start in checkouts:
+            with self.subTest(checkout_at=start):
+                self.assertRegex(text[start:start + 400], r"persist-credentials:\s*false")
+
+    @unittest.skipUnless(TOOLING, "needs the repository: release.yml sits outside the plugin")
+    def test_the_distribution_is_written_only_forward(self):
+        """4.0.0: the `distribute` job writes the distribution repository with
+        a deploy key, after the release, never forcing a push or rewriting a
+        release's tag, and holds no token for this repository."""
+        text = (REPO / ".github" / "workflows" / "release.yml").read_bytes().decode("utf-8")
+        job = text[text.index("\n  distribute:"):]
+        self.assertIn("needs: release", job)
+        self.assertRegex(job, r"permissions:\s*\n\s*contents: read")
+        self.assertIn("secrets.DIST_DEPLOY_KEY", job)
+        self.assertIn("StrictHostKeyChecking=yes", job)
+        self.assertIn('git ls-remote --exit-code --tags origin "refs/tags/$GITHUB_REF_NAME"', job)
+        self.assertIn("--tree", job)
+        self.assertNotIn("GH_TOKEN", job)
+        pushes = re.findall(r"git push[^\n]*", job)
+        self.assertEqual(['git push --quiet origin main "refs/tags/$GITHUB_REF_NAME"'], pushes)
+        self.assertNotRegex(job, r"--force|\+refs/|\+main")
 
     @unittest.skipUnless(TOOLING, "needs the repository: release.yml and tooling/ sit outside the plugin")
     def test_the_tooling_readme_says_why_a_local_build_differs(self):

@@ -1,6 +1,7 @@
 # A pushed v* tag releases the plugin. This workflow is the only thing that
 # creates a GitHub release: it builds the zip and the .skill files from the
-# tagged commit, with their SHA-256 sums, and attaches them.
+# tagged commit, with their SHA-256 sums, and attaches them. It is also the only
+# thing that writes the distribution repository (the `distribute` job).
 name: Release
 
 on:
@@ -61,4 +62,74 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" dist/* --verify-tag \
-            --title "pro-web-design-suite ${{ steps.version.outputs.version }}" --notes-file notes.md
+            --title "Pro Web Design Suite ${{ steps.version.outputs.version }}" --notes-file notes.md
+
+  # The distribution repository holds the built plugin at its root: what users
+  # install and what Anthropic's directory reads. Only this job writes it, one
+  # commit and one tag per release, fast-forward only, never forced. It builds
+  # the tree again from the tag (build.py is deterministic), so a failed push can
+  # be rerun on its own. Its one credential is a deploy key with write access to
+  # the distribution repository only.
+  distribute:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    concurrency:
+      group: distribute
+      cancel-in-progress: false
+    env:
+      DIST_REPO: Vybecode-LTD/pro-web-design-suite
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7   # v10.2.0
+        with:
+          enable-cache: false
+
+      - name: Build the plugin's tree
+        run: uv run --no-project --python 3.14 python -B tooling/release/build.py "$RUNNER_TEMP/dist" --rev "$GITHUB_REF_NAME" --tree "$RUNNER_TEMP/tree"
+
+      - name: Commit it to the distribution repository, and tag it
+        env:
+          DIST_DEPLOY_KEY: ${{ secrets.DIST_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DIST_DEPLOY_KEY" ]; then
+            echo "::error::the DIST_DEPLOY_KEY secret is not set: a deploy key with write access to $DIST_REPO"
+            exit 1
+          fi
+          key="$RUNNER_TEMP/dist_key"
+          known="$RUNNER_TEMP/known_hosts"
+          install -m 600 /dev/null "$key"
+          printf '%s\n' "$DIST_DEPLOY_KEY" > "$key"
+          # GitHub's published host key (api.github.com/meta), so no host is trusted on first use.
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > "$known"
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known"
+          version="${GITHUB_REF_NAME#v}"
+          git clone --quiet "git@github.com:$DIST_REPO.git" "$RUNNER_TEMP/repo"
+          cd "$RUNNER_TEMP/repo"
+          if git ls-remote --exit-code --tags origin "refs/tags/$GITHUB_REF_NAME" > /dev/null; then
+            echo "::error::$DIST_REPO already has $GITHUB_REF_NAME; a release is never rewritten"
+            exit 1
+          fi
+          if git rev-parse --quiet --verify HEAD > /dev/null; then
+            git checkout --quiet main
+          else
+            git symbolic-ref HEAD refs/heads/main            # the first release, into an empty repository
+          fi
+          git rm -r --quiet --ignore-unmatch .
+          cp -a "$RUNNER_TEMP/tree/." .
+          git add --all
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet -m "Pro Web Design Suite $version" \
+            -m "Built by release.yml from $GITHUB_REPOSITORY@$GITHUB_SHA ($GITHUB_REF_NAME)."
+          git tag -a "$GITHUB_REF_NAME" -m "Pro Web Design Suite $version"
+          git push --quiet origin main "refs/tags/$GITHUB_REF_NAME"
+          rm -f "$key"
+          echo "$DIST_REPO: main and $GITHUB_REF_NAME at $(git rev-parse --short HEAD)"

@@ -8,7 +8,7 @@
     "url": "https://vybecod.ing"
   },
   "homepage": "https://vybecod.ing",
-  "repository": "https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in",
+  "repository": "https://github.com/Vybecode-LTD/pro-web-design-suite",
   "license": "MIT",
   "skills": ["./workflow-commands/"],
   "userConfig": {
