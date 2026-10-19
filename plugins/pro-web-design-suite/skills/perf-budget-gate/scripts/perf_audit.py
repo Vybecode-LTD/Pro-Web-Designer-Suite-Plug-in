@@ -1353,17 +1353,23 @@ def growth_summary(ledger: Ledger, totals: dict) -> list[str]:
 
 # A bundler's content hash before the extension: `name.BgDaEnEv.woff2` (Vite,
 # webpack) or `name-1a2b3c4d.woff2` (Rollup). The dotted form takes eight or
-# more characters with a digit or both cases; the dashed one needs a digit, so
-# `Inter-SemiBold.woff2` keeps its weight.
+# more characters with a digit, or both cases and not only a font's style
+# words; the dashed one needs a digit. So `Inter-SemiBold.woff2`,
+# `Inter.SemiBold.woff2` and `Inter.BoldItalic.woff2` keep their weight (Codex on #185).
 DOTTED_HASH = re.compile(r"\.([A-Za-z0-9_-]{8,})(?=\.[A-Za-z0-9]+$)")
 DASHED_HASH = re.compile(r"-([A-Za-z0-9_]{8,})(?=\.[A-Za-z0-9]+$)")
+STYLE_WORDS = re.compile(
+    r"(?:thin|hairline|extra|ultra|semi|demi|light|regular|normal|book|medium|bold|black|heavy|"
+    r"italic|oblique|condensed|expanded|narrow|wide|variable|var|wght|latin|ext|mono|display|text)+",
+    re.I)
 
 
 def unhashed(name: str) -> str:
     """The file name a bundler hashed, as the source wrote it."""
     m = DOTTED_HASH.search(name)
     if m and (any(c.isdigit() for c in m.group(1))
-              or (any(c.isupper() for c in m.group(1)) and any(c.islower() for c in m.group(1)))):
+              or (any(c.isupper() for c in m.group(1)) and any(c.islower() for c in m.group(1))
+                  and not STYLE_WORDS.fullmatch(m.group(1)))):
         return name[:m.start()] + name[m.end():]
     m = DASHED_HASH.search(name)
     if m and any(c.isdigit() for c in m.group(1)):
