@@ -1900,36 +1900,59 @@ async function checkReflow(page, opts) {
 const OVERFLOW_FN = () => {
   const a = window.__a11y;
   const deep = a.deep;
-  const holds = new Set();
+  const blocky = (el) => {
+    const d = getComputedStyle(el).display;
+    return d !== 'inline' && d !== 'contents';
+  };
+  // The text itself, not the box's scroll size: an oversized decoration or
+  // image inside a box that holds text is no lost text (Codex on #179). Each
+  // text node's rectangles are measured against, on each axis, the nearest
+  // box whose overflow is not visible there, which governs it: clipped where
+  // that box hides it, nothing where the reader can scroll to it. Text past
+  // every box up to that one spills, from the innermost box it leaves.
+  const found = new Map();
+  const note = (el, axis, px, clips) => {
+    if (px <= 2) return;
+    const e = found.get(el) || { el };
+    if (!e[axis] || px > e[axis].px) e[axis] = { px: Math.round(px), clips };
+    found.set(el, e);
+  };
+  const boxOf = (el) => {
+    const r = el.getBoundingClientRect();
+    const left = r.left + el.clientLeft;
+    const top = r.top + el.clientTop;
+    return { left, top, right: left + el.clientWidth, bottom: top + el.clientHeight };
+  };
+  const past = (q, b, axis) => (axis === 'x'
+    ? Math.max(q.right - b.right, b.left - q.left, 0)
+    : Math.max(q.bottom - b.bottom, b.top - q.top, 0));
   for (const [n, parent] of deep.texts(document.body)) {
-    if (!n.data.trim()) continue;
-    for (let el = parent; el && el !== document.body; el = deep.parentOf(el)) {
-      if (holds.has(el)) break;
-      holds.add(el);
-    }
-  }
-  const found = [];
-  for (const el of holds) {
-    if (el.nodeType !== 1 || !a.visible(el)) continue;
-    const cs = getComputedStyle(el);
-    if (cs.display === 'inline' || cs.display === 'contents') continue;
-    if (el.clientWidth <= 2 || el.clientHeight <= 2) continue;
-    const entry = { el };
-    for (const [axis, over, flow] of [
-      ['x', el.scrollWidth - el.clientWidth, cs.overflowX],
-      ['y', el.scrollHeight - el.clientHeight, cs.overflowY]]) {
-      if (over > 2 && flow !== 'auto' && flow !== 'scroll') {
-        entry[axis] = { px: over, clips: flow === 'hidden' || flow === 'clip' };
+    if (!n.data.trim() || !a.visible(parent)) continue;
+    const range = document.createRange();
+    range.selectNodeContents(n);
+    const rects = [...range.getClientRects()].filter((q) => q.width > 0 && q.height > 0);
+    if (!rects.length) continue;
+    for (const axis of ['x', 'y']) {
+      let spilt = false;
+      for (let el = parent; el && el !== document.body && el !== document.documentElement;
+        el = deep.parentOf(el)) {
+        if (el.nodeType !== 1 || !blocky(el)) continue;
+        const flow = getComputedStyle(el)[axis === 'x' ? 'overflowX' : 'overflowY'];
+        const b = boxOf(el);
+        const over = Math.max(...rects.map((q) => past(q, b, axis)));
+        if (flow !== 'visible') {
+          // A visually hidden label (a pixel, clipped) is meant to overflow.
+          if ((flow === 'hidden' || flow === 'clip') && el.clientWidth > 2 && el.clientHeight > 2) {
+            note(el, axis, over, true);
+          }
+          break;
+        }
+        if (!spilt && over > 2) { note(el, axis, over, false); spilt = true; }
       }
     }
-    if (entry.x || entry.y) found.push(entry);
   }
-  // Text that spills from a box spills from each box around it too: the
-  // innermost one is named.
   const out = {};
-  for (const e of found) {
-    const spills = !(e.x && e.x.clips) && !(e.y && e.y.clips);
-    if (spills && found.some((o) => o !== e && deep.contains(e.el, o.el))) continue;
+  for (const e of found.values()) {
     const text = (e.el.innerText || e.el.textContent || '').trim().replace(/\s+/g, ' ');
     out[a.cssPath(e.el)] = { x: e.x || null, y: e.y || null, text: text.slice(0, 80) };
   }
@@ -2075,6 +2098,14 @@ const OBSCURED_FN = () => {
     if (/^(img|picture|video|canvas|svg|iframe|object|embed|input|select|textarea|button)$/
       .test(e.localName)) return true;
     if (!clear(cs.backgroundColor) || cs.backgroundImage !== 'none') return true;
+    // A surface its ::before or ::after draws: hit testing returns the
+    // element the pseudo-element belongs to (Codex on #179).
+    for (const pseudo of ['::before', '::after']) {
+      const ps = getComputedStyle(e, pseudo);
+      if (ps.content === 'none' || ps.content === 'normal' || ps.display === 'none' ||
+          Number(ps.opacity) === 0) continue;
+      if (!clear(ps.backgroundColor) || ps.backgroundImage !== 'none') return true;
+    }
     for (const n of e.childNodes) {
       if (n.nodeType !== 3 || !n.data.trim()) continue;
       const range = document.createRange();
@@ -2335,6 +2366,17 @@ const MOTION_LOG = () => {
                scale: Math.hypot(m.m11, m.m12) };
     } catch { return null; }
   };
+  // A positional value as pixels (`left: 200px`, a background position's
+  // two): null where a part is not a length in px.
+  const pixels = (v) => {
+    const out = [];
+    for (const part of String(v).trim().split(/\s+/)) {
+      const m = /^(-?[\d.]+)(px)?$/.exec(part);
+      if (!m || (!m[2] && Number(m[1]) !== 0)) return null;
+      out.push(Number(m[1]));
+    }
+    return out;
+  };
   // The most any two keyframes are apart: translateX(-200px) to (200px) is
   // 400px of travel, not the 0 between their distances from the origin
   // (Codex on #179).
@@ -2351,25 +2393,36 @@ const MOTION_LOG = () => {
     if (seen.has(`${sel}|${name}`)) return;
     const props = new Set();
     const poses = { transform: [], translate: [], rotate: [], scale: [] };
+    const places = {};
     for (const frame of eff.getKeyframes()) {
       for (const [k, v] of Object.entries(frame)) {
         if (['offset', 'computedOffset', 'easing', 'composite'].includes(k)) continue;
         props.add(k);
         if (k in poses) poses[k].push(pose(k, v));
+        else if (MOVES.test(k)) (places[k] = places[k] || []).push(pixels(v));
       }
     }
     const read = Object.values(poses).flat();
     const known = read.filter(Boolean);
-    const measured = known.length && known.length === read.length;
+    const posed = known.length === read.length;
+    // `left: 0` to `200px`, a margin or a background position travels too
+    // (Codex on #179): the most any two keyframes' pixels are apart.
+    const travels = Object.values(places).map((list) => (
+      list.every((p) => p && p.length === list[0].length)
+        ? spread(list, (p, q) => Math.hypot(...p.map((v, i) => v - q[i]))) : null));
+    const placed = travels.every((t) => t !== null);
     const timing = eff.getComputedTiming();
     seen.set(`${sel}|${name}`, {
       sel, name,
       duration: typeof timing.duration === 'number' ? Math.round(timing.duration) : 0,
       loops: !Number.isFinite(timing.iterations),
       moves: [...props].filter((p) => MOVES.test(p)),
-      distance: measured ? Math.round(spread(known, (p, q) => Math.hypot(p.x - q.x, p.y - q.y))) : null,
-      turn: measured ? spread(known, (p, q) => Math.abs(p.deg - q.deg)) : null,
-      zoom: measured ? spread(known, (p, q) => Math.abs(p.scale - q.scale)) : null,
+      distance: (read.length || travels.length) && posed && placed
+        ? Math.round(Math.max(known.length
+          ? spread(known, (p, q) => Math.hypot(p.x - q.x, p.y - q.y)) : 0, ...travels))
+        : null,
+      turn: known.length && posed ? spread(known, (p, q) => Math.abs(p.deg - q.deg)) : null,
+      zoom: known.length && posed ? spread(known, (p, q) => Math.abs(p.scale - q.scale)) : null,
       busy: Boolean(window.__wdsDeep.closest(
         eff.target, '[aria-busy="true"], [role="progressbar"], [role="status"]')),
     });
@@ -2396,12 +2449,18 @@ const EXERCISE_FN = async () => {
   const pause = (ms) => new Promise((r) => setTimeout(r, ms));
   m.look();
   const step = Math.max(200, Math.round(innerHeight * 0.8));
-  for (let y = 0, i = 0; y <= document.documentElement.scrollHeight && i < 20; y += step, i++) {
+  for (let y = 0, i = 0; y <= document.documentElement.scrollHeight && i < 30; y += step, i++) {
     window.scrollTo({ top: y, behavior: 'instant' });
     await frame();
     await pause(120);
     m.look();
   }
+  // The end of a page longer than thirty viewports, which the steps stop
+  // short of, is still reached (Codex on #179).
+  window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
+  await frame();
+  await pause(120);
+  m.look();
   window.scrollTo({ top: 0, behavior: 'instant' });
   await frame();
   const finite = document.getAnimations().filter((an) =>
@@ -2467,7 +2526,9 @@ function motionFindings(normal, reduced) {
       '(web-design-studio/references/motion-system.md).',
       { selector: r.sel, animation: r.name, durationMs: r.duration }));
   }
-  const runningNow = new Set(reduced.animations.map((r) => r.sel));
+  // A loop still running: a one-off pulse in its place ends, and the
+  // indicator then reads as hung all the same (Codex on #179).
+  const runningNow = new Set(reduced.animations.filter((r) => r.loops).map((r) => r.sel));
   for (const n of normal.animations.filter((x) => x.busy && x.loops &&
     !runningNow.has(x.sel)).slice(0, CAP)) {
     out.push(finding(

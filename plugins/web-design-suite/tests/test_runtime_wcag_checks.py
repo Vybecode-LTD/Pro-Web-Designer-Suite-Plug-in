@@ -121,6 +121,17 @@ class ClippedAtZoom(RuntimeCase):
                          [f["selector"] for f in self.found(report, "text-clipped-at-200-percent")],
                          report["findings"])
 
+    def test_a_decoration_wider_than_the_box_is_no_clipped_text(self):
+        """Codex on #179: the box's scroll size counts a decoration 900px wide
+        that a narrow layout cuts off, and no text is lost. The text is
+        measured, not the box."""
+        report = self.runtime(page(
+            ".hero{position:relative;overflow:hidden}"
+            ".deco{position:absolute;top:0;left:0;width:900px;height:8px;background:#ccc}",
+            "<div class=hero><p>Short words</p><div class=deco></div></div>"), "reflow")
+        self.assertEqual([], [f for f in report["findings"] if "clipped" in f["rule"]],
+                         report["findings"])
+
     def test_a_row_that_grows_passes(self):
         report = self.runtime(page(NAV_CSS.format("min-height:1.4em;overflow:hidden"), NAV),
                               "reflow")
@@ -181,6 +192,15 @@ class FocusNotObscured(RuntimeCase):
             "obscured")
         covers = {c for f in self.found(over, "focus-obscured") for c in f["covers"]}
         self.assertTrue(covers and all("div.portal" in c for c in covers), over["findings"])
+
+    def test_a_cover_painted_by_its_pseudo_element_hides(self):
+        """Codex on #179: a transparent bar whose ::before draws its backdrop
+        still covers the link under it."""
+        report = self.runtime(page(STOPS_CSS.format(
+            "", ".bar{background:none}.bar::before{content:'';position:absolute;inset:0;"
+                "background:#222;z-index:-1}"), STOPS), "obscured")
+        self.assertIn(FIRST, [f["selector"] for f in self.found(report, "focus-obscured")],
+                      report["findings"])
 
     def test_padding_and_scroll_padding_as_tall_as_the_bars_pass(self):
         report = self.runtime(page(STOPS_CSS.format(
@@ -296,6 +316,46 @@ class ReducedMotion(RuntimeCase):
         self.assertEqual(["motion-not-reduced"],
                          [f["rule"] for f in same["findings"] if f["check"] == "motion"],
                          same["findings"])
+
+    def test_travel_by_left_is_measured(self):
+        """Codex on #179: `left` is motion, so its travel is measured too: 0 to
+        20px in place of 0 to 200px is reduced; 0 to 200px again is not."""
+        css = ("@keyframes drift{{from{{left:0}}to{{left:200px}}}}"
+               "@keyframes {name}{{from{{left:0}}to{{left:{px}px}}}}"
+               ".drift{{position:relative;animation:drift 2s infinite alternate}}"
+               "@media (prefers-reduced-motion: reduce){{.drift{{animation-name:{name}}}}}")
+        body = "<div class=drift>Drifting banner</div>"
+        small = self.runtime(page(css.format(name="edge", px=20), body), "motion")
+        self.assertEqual([], [f for f in small["findings"] if f["check"] == "motion"])
+        same = self.runtime(page(css.format(name="drift2", px=200), body), "motion")
+        self.assertEqual(["motion-not-reduced"],
+                         [f["rule"] for f in same["findings"] if f["check"] == "motion"])
+
+    def test_a_one_off_pulse_in_place_of_the_spinner_stops_it(self):
+        """Codex on #179: a finite pulse on the spinner ends, and the status
+        reads as hung all the same."""
+        report = self.runtime(page(MOTION_CSS.format(
+            ".slider{animation:none}.reveal{animation:none;opacity:1}"
+            ".spinner{animation:fade 1s 1}"), MOTION_BODY), "motion")
+        self.assertEqual(["busy-indicator-stopped"],
+                         [f["rule"] for f in report["findings"] if f["check"] == "motion"],
+                         report["findings"])
+
+    def test_the_end_of_a_long_page_is_reached(self):
+        """Codex on #179: a reveal thirty viewports down, started on scroll,
+        was never reached, so the text it leaves hidden went unreported."""
+        css = (".late{opacity:0}.late.in{animation:show .3s forwards}"
+               "@keyframes show{from{opacity:0}to{opacity:1}}"
+               "@media (prefers-reduced-motion: reduce){.late.in{animation:none}}")
+        body = ("<div style='height:30000px'></div><p class=late>Late words</p>"
+                "<script>new IntersectionObserver((es) => es.forEach((e) => "
+                "e.isIntersecting && e.target.classList.add('in')))"
+                ".observe(document.querySelector('.late'));</script>")
+        report = self.runtime(page(css, body), "motion")
+        self.assertEqual(["html > body > main > p.late.in"],
+                         [f["selector"] for f in self.found(
+                             report, "content-hidden-under-reduced-motion")],
+                         report["findings"])
 
     def test_a_shorter_slide_counts_as_reduced(self):
         report = self.runtime(page(MOTION_CSS.format(
