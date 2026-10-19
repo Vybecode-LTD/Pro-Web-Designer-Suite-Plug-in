@@ -1,0 +1,1676 @@
+#!/usr/bin/env python3
+"""Convert Figma variables into tokens.css / tokens.json / tokens.ts -- and back.
+
+Dependency-free (Python 3.9+, stdlib only). Forward, it turns an export into
+generated token files whose names match the contract exactly. Reverse, it turns
+a tokens.json into a body for `POST /v1/files/:file_key/variables`, so code can
+be the source of truth and Figma the mirror.
+
+Names are the whole job. Figma's `/` grouping and the `--category-role-variant`
+grammar are the same grammar with a different separator, so `Semantic/bg/surface`
+and `--bg-surface` are the same token and a round trip has to prove it. Anything
+this script cannot place against a known token name is emitted with its slug and
+flagged loudly, never silently renamed.
+
+INPUT SHAPES (auto-detected by figma_common.py, as for figma_audit.py)
+  rest | plugin | dtcg | records | resolver   -- see figma_audit.py's docstring
+
+USAGE
+-----
+  # Figma -> code
+  python scripts/figma_to_tokens.py variables.json --out src/styles/tokens.css
+  python scripts/figma_to_tokens.py variables.json --format json --out design/tokens.json
+  python scripts/figma_to_tokens.py variables.json --format ts   --out src/lib/tokens.ts
+  python scripts/figma_to_tokens.py variables.json --format all  --out-dir build/tokens
+  python scripts/figma_to_tokens.py variables.json --format dtcg --out-dir design/tokens
+  #   tokens.json, theme-dark.json (each theme's overrides) and tokens.resolver.json,
+  #   the DTCG 2025.10 resolver Terrazzo reads; a tokens.css converts the same way
+
+  # Code -> Figma (a POST /v1/files/:key/variables body; Enterprise-only endpoint),
+  #   from a tokens.css, a DTCG file or resolver, or this script's tokens.json;
+  #   each theme is a mode
+  python scripts/figma_to_tokens.py design/tokens.json --reverse --out figma-payload.json
+  # ...or the same variables as Plugin API code, on any plan: run it with the
+  #   Figma MCP server's use_figma, or in a development plugin (P32)
+  python scripts/figma_to_tokens.py design/tokens.json --reverse --format plugin-script \
+    --out figma-variables.js
+
+  # Drift check in CI: regenerate and compare, no writes
+  python scripts/figma_to_tokens.py variables.json --format css | diff -u src/styles/tokens.css -
+
+EXIT CODES
+  0  wrote (or would write) cleanly
+  1  wrote, but with unresolved aliases / unmapped names / skipped composites
+  2  could not read the input
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import os
+import re
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+# A sibling import would otherwise leave __pycache__ inside the installed
+# plugin, which is read-only as far as a project is concerned.
+sys.dont_write_bytecode = True
+# The reader the audit uses too (LC-C3): the colour maths, as_color, as_px and
+# as_alias, FVar, FCollection, FDoc, slugify and load_document.
+try:                                              # python -m scripts.figma_to_tokens
+    from .figma_common import *                   # type: ignore[import-not-found]  # noqa: F403
+    from .project_config import (refuse_overwrite, ROOT_SELECTOR, THEME_OR_DENSITY, ConfigError, ProjectTokens,
+                                 _css_blocks, project_config, read_tokens, token_sources)
+except ImportError:                               # python scripts/figma_to_tokens.py
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from figma_common import *                    # type: ignore[no-redef]  # noqa: F403
+    from project_config import (refuse_overwrite, ROOT_SELECTOR, THEME_OR_DENSITY,  # type: ignore[no-redef]
+                                ConfigError, ProjectTokens, _css_blocks, project_config, read_tokens,
+                                token_sources)
+
+# ===========================================================================
+# The contract's token names. This list is what makes the round trip lossless:
+# a Figma variable called `Primitive/Space/6` has to come back as `--space-6`
+# and not `--primitive-space-6`, and the only reliable way to know that is to
+# hold the real vocabulary. Keep in step with tokens.css.
+# ===========================================================================
+
+TIER1 = [
+    "space-0", "space-px", "space-0-5", "space-1", "space-2", "space-3", "space-4",
+    "space-5", "space-6", "space-8", "space-10", "space-12", "space-16", "space-20",
+    "space-24", "space-32", "space-40", "space-48",
+    "space-fluid-sm", "space-fluid-md", "space-fluid-lg", "space-fluid-xl", "density",
+    "font-sans", "font-mono",
+    "text-2xs", "text-xs", "text-sm", "text-base", "text-lg", "text-xl",
+    "text-2xl", "text-3xl", "text-4xl", "text-5xl", "text-6xl",
+    "leading-none", "leading-tight", "leading-snug", "leading-normal", "leading-relaxed",
+    "tracking-tighter", "tracking-tight", "tracking-normal", "tracking-wide", "tracking-caps",
+    "weight-regular", "weight-medium", "weight-semibold", "weight-bold",
+    "radius-none", "radius-xs", "radius-sm", "radius-md", "radius-lg", "radius-xl",
+    "radius-2xl", "radius-full",
+    "stroke-hairline", "stroke-default", "stroke-thick", "stroke-focus",
+    "shadow-none", "shadow-xs", "shadow-sm", "shadow-md", "shadow-lg", "shadow-xl",
+    "shadow-focus",
+    "dur-instant", "dur-fast", "dur-base", "dur-slow", "dur-slower",
+    "ease-out", "ease-in", "ease-in-out", "ease-spring", "ease-linear",
+    "bp-sm", "bp-md", "bp-lg", "bp-xl", "bp-2xl",
+    "tap-min", "grid-columns",
+    "measure-prose", "measure-narrow", "width-content", "width-wide", "width-form",
+]
+for _ramp, _steps in (
+    ("neutral", ("0", "50", "100", "200", "300", "400", "500", "600", "700", "800",
+                 "900", "950", "1000")),
+    ("accent", ("50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950")),
+    ("success", ("100", "500", "700")), ("warning", ("100", "500", "700")),
+    ("danger", ("100", "500", "700")), ("info", ("100", "500", "700")),
+):
+    TIER1 += [f"{_ramp}-{s}" for s in _steps]
+
+TIER2 = [
+    "gap-fused", "gap-tight", "gap-related", "gap-grouped", "gap-separate", "gap-distinct",
+    "pad-inline-xs", "pad-inline-sm", "pad-inline-md",
+    "pad-block-xs", "pad-block-sm", "pad-block-md",
+    "pad-card", "pad-card-lg", "pad-well",
+    "space-section", "space-subsection", "space-block", "gutter-page",
+    "bg-canvas", "bg-surface", "bg-raised", "bg-sunken", "bg-inverse", "bg-scrim",
+    "bg-hover", "bg-active", "bg-selected", "bg-disabled",
+    "fg-default", "fg-strong", "fg-muted", "fg-subtle", "fg-disabled",
+    "fg-on-accent", "fg-on-inverse", "fg-on-success", "fg-on-warning", "fg-on-danger",
+    "fg-accent", "fg-link",
+    "border-subtle", "border-default", "border-strong", "border-accent", "border-focus",
+    "border-invalid",
+    "bg-accent", "bg-accent-hover", "bg-success", "bg-warning", "bg-danger",
+    "fg-success", "fg-warning", "fg-danger",
+    "type-display", "type-h1", "type-h2", "type-h3", "type-h4",
+    "type-lead", "type-body", "type-ui", "type-label", "type-code",
+    "elevation-flat", "elevation-card", "elevation-raised", "elevation-overlay",
+    "elevation-modal", "elevation-focus",
+    "motion-hover", "motion-enter", "motion-exit", "motion-expand", "motion-emphasis",
+    "motion-instant", "motion-loop",
+    "motion-travel-xs", "motion-travel-sm", "motion-travel-md",
+    "z-base", "z-raised", "z-sticky", "z-dropdown", "z-overlay", "z-modal",
+    "z-toast", "z-tooltip",
+]
+KNOWN: Dict[str, str] = {}
+for _n in TIER1:
+    KNOWN[_n] = "primitive"
+for _n in TIER2:
+    KNOWN[_n] = "semantic"
+
+# Tokens whose value is a composite CSS shorthand (`font` shorthand, a shadow
+# pair, a duration+easing pair) or a clamp(). Figma variables are single scalars,
+# so these cannot cross the boundary in either direction. Naming them here is
+# what turns silent data loss into a printed warning.
+COMPOSITE_ONLY = {n for n in TIER2 if n.startswith(("type-", "motion-", "elevation-"))
+                  and not n.startswith("motion-travel-")}   # a distance, one FLOAT
+COMPOSITE_ONLY |= {n for n in TIER1 if n.startswith(("shadow-", "ease-", "space-fluid-"))}
+COMPOSITE_ONLY |= {"text-5xl", "text-6xl"}
+
+# Category words a designer puts in front of everything. Stripping them is only
+# safe when what remains is a token we recognise, which is why they are tried
+# one at a time and always checked against KNOWN.
+CATEGORY_PREFIXES = {
+    "color", "colour", "colors", "colours", "size", "sizing", "dimension", "dimensions",
+    "number", "numbers", "typography", "spacing", "space", "effect", "effects",
+    "string", "boolean", "float", "value", "values", "scale",
+}
+
+
+# ===========================================================================
+# Colour out -- figma_common.py's matrices, the same as
+# web-design-studio/scripts/generate_color_ramp.py.
+# ===========================================================================
+
+
+def rgb_to_oklch(r: float, g: float, b: float) -> Tuple[float, float, float]:
+    L, a, bb = linear_srgb_to_oklab(srgb_to_linear(r), srgb_to_linear(g), srgb_to_linear(b))
+    return (L * 100.0, math.hypot(a, bb), math.degrees(math.atan2(bb, a)) % 360.0)
+
+
+def _trim(x: float, places: int) -> str:
+    s = f"{x:.{places}f}".rstrip("0").rstrip(".")
+    return s if s not in ("", "-0") else "0"
+
+
+# The canonical ramps, so a colour that IS a ramp step comes back as the exact
+# OKLCH tokens.css holds rather than the hex round trip's drift. Near-zero
+# chroma makes hue numerically unstable -- #faf9f7 reconstructs as hue 84.6 when
+# the source said 75 -- and a generated file that differs from the canonical one
+# by a hue digit produces a diff in every CI run forever.
+RAMP_OKLCH: Dict[str, Dict[str, Tuple[float, float, float]]] = {
+    "neutral": {"0": (100.0, 0.0, 0.0), "50": (98.2, 0.003, 75), "100": (96.0, 0.004, 75),
+                "200": (92.2, 0.005, 75), "300": (86.5, 0.006, 75), "400": (71.5, 0.008, 75),
+                "500": (53.5, 0.009, 75), "600": (47.5, 0.009, 75), "700": (38.5, 0.008, 75),
+                "800": (28.0, 0.007, 75), "900": (19.5, 0.006, 75), "950": (13.0, 0.005, 75),
+                "1000": (8.0, 0.004, 75)},
+    "accent": {"50": (97.0, 0.020, 42), "100": (93.5, 0.042, 42), "200": (88.0, 0.078, 42),
+               "300": (80.5, 0.118, 42), "400": (72.0, 0.158, 42), "500": (64.5, 0.188, 42),
+               "600": (56.5, 0.176, 42), "700": (47.0, 0.148, 42), "800": (38.0, 0.118, 42),
+               "900": (30.0, 0.090, 42), "950": (21.0, 0.062, 42)},
+    "success": {"100": (94.0, 0.050, 152), "500": (62.0, 0.150, 152), "700": (45.0, 0.120, 152)},
+    "warning": {"100": (95.5, 0.055, 85), "500": (75.0, 0.155, 85), "700": (52.0, 0.125, 85)},
+    "danger": {"100": (94.5, 0.038, 25), "400": (64.0, 0.190, 25), "500": (58.0, 0.205, 25),
+               "700": (45.0, 0.170, 25)},
+    "info": {"100": (94.5, 0.035, 250), "500": (58.0, 0.160, 250), "700": (45.0, 0.140, 250)},
+}
+_CANONICAL: Dict[str, Tuple[float, float, float]] = {}
+
+
+def canonical_oklch(hex_value: str) -> Optional[Tuple[float, float, float]]:
+    if not _CANONICAL:
+        for _rows in RAMP_OKLCH.values():
+            for _oklch in _rows.values():
+                _CANONICAL[rgb_to_hex(*oklch_to_rgb(*_oklch))] = _oklch
+    return _CANONICAL.get(hex_value)
+
+
+OKLCH_LITERAL = re.compile(r"oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)(?:deg)?\s*\)", re.I)
+
+
+def use_project_names(tokens: ProjectTokens) -> List[str]:
+    """The project's own token names join the vocabulary (P24: LC-B3), so a
+    variable named for one comes back as that token, recognised, in its tier;
+    the starter's names keep theirs. A ramp step its token file writes in
+    OKLCH comes back as that exact value. Returns the names added."""
+    added = []
+    for name, tier in tokens.tiers().items():
+        if name[2:] not in KNOWN:
+            KNOWN[name[2:]] = "primitive" if tier == 1 else "semantic"
+            added.append(name[2:])
+    for ramp, steps in tokens.ramps.items():
+        for step, value in steps.items():
+            m = OKLCH_LITERAL.fullmatch(value.strip())
+            if m:
+                L = float(m.group(1)) * (1.0 if m.group(2) else 100.0)
+                RAMP_OKLCH.setdefault(ramp, {})[step] = (L, float(m.group(3)), float(m.group(4)))
+    _CANONICAL.clear()
+    return added
+
+
+def format_oklch(r: float, g: float, b: float, a: float = 1.0) -> str:
+    canon = canonical_oklch(rgb_to_hex(r, g, b))
+    if canon is not None:
+        L, C, H = canon
+    else:
+        L, C, H = rgb_to_oklch(r, g, b)
+    if C < 0.0005:
+        body = f"{_trim(L, 1)}% 0 0"
+    else:
+        body = f"{_trim(L, 1)}% {_trim(C, 3)} {_trim(H, 1)}"
+    return f"oklch({body})" if a >= 0.999 else f"oklch({body} / {_trim(a, 3)})"
+
+
+# ===========================================================================
+# Names. Parsing is figma_common.py's, shared with figma_audit.py: the two
+# scripts must agree about what a file says, or the audit passes and the build
+# is wrong.
+# ===========================================================================
+
+
+def natural_key(token: str) -> Tuple:
+    """`neutral-50` before `neutral-300` before `neutral-1000`. Ramp steps are
+    numbers; sorting them as text puts 1000 next to 100 and reads as a bug."""
+    return tuple(
+        (1, int(p)) if p.isdigit() else (0, p)
+        for p in re.split(r"(\d+)", token) if p != "")
+
+
+def to_token_name(figma_name: str) -> Tuple[str, bool]:
+    """Return (token name without `--`, recognised?).
+
+    Tries the slug, then the slug with one leading category word removed at a
+    time. Only a hit in KNOWN counts as recognised; everything else is emitted
+    verbatim and reported, because a generator that guesses at names is how two
+    vocabularies quietly become three."""
+    slug = slugify(figma_name)
+    if slug in KNOWN:
+        return slug, True
+    parts = slug.split("-")
+    for i in range(1, min(len(parts), 4)):
+        if parts[i - 1] not in CATEGORY_PREFIXES:
+            break
+        cand = "-".join(parts[i:])
+        if cand in KNOWN:
+            return cand, True
+    # A ramp written as `accent/500` under a `color` group, or `gray` for
+    # `neutral` -- the two aliases that show up in every file.
+    swapped = re.sub(r"^(gray|grey)-", "neutral-", slug)
+    if swapped in KNOWN:
+        return swapped, True
+    return slug, False
+
+
+# ===========================================================================
+# Mode -> selector. A Figma COLLECTION is a tier; a Figma MODE is a theme.
+# That one sentence is the whole mapping, and this function is where it lands.
+# ===========================================================================
+
+DENSITY_MODES = {"compact": 0.875, "comfortable": 1.0, "cosy": 1.0, "cozy": 1.0,
+                 "spacious": 1.125, "default": 1.0}
+
+
+def mode_selector(mode: str, is_default: bool, kind: str = "") -> Tuple[str, str]:
+    """Return (css selector, kind). `kind` is 'root' | 'theme' | 'density'; a
+    collection that says its kind (a resolver's modifier) is held to it."""
+    m = mode.strip().lower()
+    if is_default:
+        return ":root", "root"
+    if kind in ("theme", "density"):             # a resolver's context is the value itself (Codex on #105)
+        return f'[data-{kind}="{css_escape(mode.strip())}"]', kind
+    if kind == "density" or (m in DENSITY_MODES and kind != "theme"):
+        return f'[data-density="{re.sub(r"[^a-z0-9]+", "-", m).strip("-")}"]', "density"
+    if re.fullmatch(r"(dark|night|dark mode|dark theme)", m):
+        return '[data-theme="dark"]', "theme"
+    if re.fullmatch(r"(light|day|light mode|light theme)", m):
+        return '[data-theme="light"]', "theme"
+    return f'[data-theme="{re.sub(r"[^a-z0-9]+", "-", m).strip("-")}"]', "theme"
+
+
+# ===========================================================================
+# Resolution
+# ===========================================================================
+
+
+@dataclass
+class Problem:
+    kind: str
+    name: str
+    message: str
+
+
+class Converter:
+    def __init__(self, doc: FDoc, *, color_format: str = "oklch",
+                 unit: str = "rem", theme_diff_only: bool = True) -> None:
+        self.doc = doc
+        self.color_format = color_format
+        self.unit = unit
+        self.theme_diff_only = theme_diff_only
+        self.problems: List[Problem] = []
+        self.by_id: Dict[str, FVar] = dict(doc.by_id)
+        self.by_slug: Dict[str, FVar] = {}
+        for v in doc.variables:
+            self.by_slug.setdefault(slugify(v.name), v)
+        self.token_of: Dict[str, str] = {}
+        for v in doc.variables:
+            name, ok = to_token_name(v.name)
+            self.token_of[v.var_id or v.name] = name
+            if not ok:
+                self.problems.append(Problem(
+                    "unmapped-name", v.name,
+                    f"`{v.name}` is not a name in the contract; emitted as `--{name}`. "
+                    "Rename it in Figma or add it to the contract -- do not let both exist."))
+        for where, why in doc.unread:
+            self.problems.append(Problem("unread-source", where, f"`{where}`: {why}."))
+        for path, why in doc.unsupported:
+            self.problems.append(Problem(
+                "unsupported-value", path,
+                f"`{path}` was left out: {why}. Writing it anyway would put a value "
+                "CSS cannot read into tokens.css; split a typography token into "
+                "--type-* roles, or give the colour an sRGB `hex` fallback."))
+
+    # -- lookups ------------------------------------------------------------
+
+    def target(self, alias: str) -> Optional[FVar]:
+        if alias in self.by_id:
+            return self.by_id[alias]
+        return self.by_slug.get(slugify(alias.replace(".", "/")))
+
+    def token_name(self, var: FVar) -> str:
+        return self.token_of.get(var.var_id or var.name, slugify(var.name))
+
+    # -- value rendering ----------------------------------------------------
+
+    def css_value(self, var: FVar, mode: str, raw: Any,
+                  chain: Optional[List[str]] = None) -> Tuple[str, bool]:
+        """Return (css text, resolved?). Aliases become `var(--other)` -- the
+        reference is the point; flattening it would throw away the tiering."""
+        chain = chain or []
+        alias = as_alias(raw)
+        if alias is not None:
+            key = var.var_id or var.name
+            if key in chain:
+                self.problems.append(Problem(
+                    "alias-cycle", var.name,
+                    f"`{var.name}` is in an alias cycle ({' -> '.join(chain + [key])}). "
+                    "Emitted as an unresolvable reference; CSS will treat it as invalid at "
+                    "computed-value time, which is loud and therefore correct."))
+                return (f"/* alias cycle */ var(--{self.token_name(var)})", False)
+            tgt = self.target(alias)
+            if tgt is None:
+                self.problems.append(Problem(
+                    "broken-alias", var.name,
+                    f"`{var.name}` aliases `{alias}`, which is not in this export. "
+                    "Emitted as a comment so the build fails visibly rather than silently "
+                    "inheriting."))
+                return (f"/* unresolved alias: {alias} */", False)
+            # Guard the cycle by walking the target's own value with this in the chain.
+            tmode = mode if mode in tgt.values else (
+                next(iter(tgt.values)) if tgt.values else mode)
+            nxt = tgt.values.get(tmode)
+            if as_alias(nxt) is not None:
+                _, ok = self.css_value(tgt, tmode, nxt, chain + [var.var_id or var.name])
+                if not ok:
+                    return (f"var(--{self.token_name(tgt)})", False)
+            return (f"var(--{self.token_name(tgt)})", True)
+
+        if var.resolved_type == "COLOR":
+            if isinstance(raw, dict) and "color" in raw and (
+                    as_alias(raw["color"]) is not None or as_alias(raw.get("opacity")) is not None):
+                return self.composed_css(var, mode, raw, chain)
+            rgba = as_color(raw)
+            if rgba is None:
+                if isinstance(raw, str):
+                    return (raw, False)      # a keyword: transparent, currentColor
+                # Never str() an object into tokens.css: a Python dict repr is
+                # CSS nobody can read, and it used to exit 0.
+                self.problems.append(Problem(
+                    "unreadable-color", var.name,
+                    f"`{var.name}` ({mode}) is not a colour this script can read: "
+                    f"{str(raw)[:60]}. Emitted commented out."))
+                return ("/* unreadable colour */", False)
+            if self.color_format == "hex" and rgba[3] >= 0.999:
+                return (rgb_to_hex(*rgba[:3]), True)
+            return (format_oklch(*rgba), True)
+
+        if var.resolved_type == "FLOAT":
+            token = self.token_name(var)
+            unitless = var.dtcg_type.lower() in ("number", "fontweight")      # as a DTCG source says
+            if unitless or token.startswith(("z-", "grid-", "weight-", "density")):
+                px = as_px(raw)
+                return (f"{px:g}" if px is not None else str(raw), True)
+            if token.startswith("leading-") or token.startswith("tracking-"):
+                n = float(raw) if isinstance(raw, (int, float)) else (as_px(raw) or 0.0)
+                if token.startswith("tracking-"):
+                    return (f"{n:g}em" if abs(n) <= 1 else f"{n / PX_PER_REM:g}em", True)
+                return (f"{n:g}", True)
+            # A duration by its name, or by the type a DTCG source gives it:
+            # a `$type: duration` named otherwise was marked unresolved (V13).
+            if token.startswith("dur-") or var.dtcg_type.lower() == "duration":
+                n = as_px(raw)
+                return (f"{n:g}ms" if n is not None else str(raw), True)
+            px = as_px(raw)
+            if px is None:
+                return (str(raw), False)
+            if self.unit == "px" or token in ("space-px", "stroke-hairline", "stroke-default",
+                                              "stroke-thick", "stroke-focus"):
+                return (f"{px:g}px", True)
+            if px == 0:
+                return ("0", True)
+            return (f"{px / PX_PER_REM:g}rem", True)
+
+        if var.resolved_type == "BOOLEAN":
+            return ("1" if raw else "0", True)
+        return (str(raw), True)
+
+    def composed_css(self, var: FVar, mode: str, raw: dict,
+                     chain: Optional[List[str]] = None) -> Tuple[str, bool]:
+        """A VariableComposedColor with an alias in either channel. The link is
+        the point, so it survives as `color-mix(in oklch, var(--x) 8%,
+        transparent)`: the percentage is Figma's opacity, 0-100, unchanged."""
+        opacity = raw.get("opacity", 100)
+        op_alias = as_alias(opacity)
+        if op_alias is not None:
+            tgt = self.target(op_alias)
+            if tgt is None:
+                self.problems.append(Problem(
+                    "broken-alias", var.name,
+                    f"`{var.name}`'s opacity aliases `{op_alias}`, which is not in this export."))
+                return (f"/* unresolved alias: {op_alias} */", False)
+            pct, pct_css = None, f"calc(var(--{self.token_name(tgt)}) * 1%)"
+        else:
+            try:
+                pct = float(opacity)
+            except (TypeError, ValueError):
+                self.problems.append(Problem(
+                    "unreadable-color", var.name,
+                    f"`{var.name}`'s opacity {opacity!r} is not a number."))
+                return ("/* unreadable opacity */", False)
+            pct_css = f"{pct:g}%"
+        colour = raw["color"]
+        if as_alias(colour) is not None:
+            base, ok = self.css_value(var, mode, colour, chain)
+        else:
+            rgba = as_color(colour)
+            if rgba is None:
+                return ("/* unreadable colour */", False)
+            base, ok = format_oklch(*rgba), True
+        if not ok:
+            return (base, False)
+        if pct is not None and pct >= 100:
+            return (base, True)
+        return (f"color-mix(in oklch, {base} {pct_css}, transparent)", True)
+
+    def json_value(self, var: FVar, mode: str, raw: Any) -> dict:
+        css, ok = self.css_value(var, mode, raw)
+        entry: Dict[str, Any] = {"value": css, "type": var.resolved_type.lower()}
+        alias = as_alias(raw)
+        composed = raw.get("color") if isinstance(raw, dict) and "color" in raw else None
+        if alias is not None:
+            tgt = self.target(alias)
+            entry["alias"] = self.token_name(tgt) if tgt else alias
+        elif composed is not None and as_alias(composed) is not None:
+            tgt = self.target(as_alias(composed))
+            entry["alias"] = self.token_name(tgt) if tgt else as_alias(composed)
+            if isinstance(raw.get("opacity"), (int, float)):
+                entry["alpha"] = round(float(raw["opacity"]) / 100.0, 6)
+        elif var.resolved_type == "COLOR":
+            rgba = as_color(raw)
+            if rgba:
+                entry["hex"] = rgb_to_hex(*rgba[:3])
+                if rgba[3] < 0.999:
+                    # Alpha stays a float. Folding it into an 8-digit hex would
+                    # quantise a 4%-black overlay to 3.9%, which is a diff in
+                    # every CI run and eventually a re-tuned overlay nobody asked for.
+                    entry["alpha"] = round(rgba[3], 6)
+        elif var.resolved_type == "FLOAT":
+            px = as_px(raw)
+            if px is not None:
+                entry["px"] = px
+        if var.described:
+            entry["description"] = var.described
+        if var.scopes:
+            entry["figmaScopes"] = var.scopes
+        entry["figmaName"] = var.name
+        if not ok:
+            entry["unresolved"] = True
+        return entry
+
+    # -- grouping -----------------------------------------------------------
+
+    def tier_of(self, var: FVar) -> str:
+        name = self.token_name(var)
+        if name in KNOWN:
+            return KNOWN[name]
+        c = var.collection.strip().lower()
+        for word, tier in (("primitive", "primitive"), ("core", "primitive"),
+                           ("global", "primitive"), ("foundation", "primitive"),
+                           ("semantic", "semantic"), ("alias", "semantic"),
+                           ("theme", "semantic"), ("role", "semantic"),
+                           ("component", "component")):
+            if word in c:
+                return tier
+        return "semantic"
+
+    def blocks(self) -> "Dict[str, List[Tuple[str, str, FVar, str, Any]]]":
+        """selector -> [(tier, token, var, mode, raw)], tier-first and stable."""
+        out: Dict[str, List[Tuple[str, str, FVar, str, Any]]] = {}
+        order = {"primitive": 0, "semantic": 1, "component": 2}
+        for var in self.doc.variables:
+            col = self.doc.collections.get(var.collection)
+            default = col.default_mode if col else next(iter(var.values), "Value")
+            if default not in var.values and var.values and not var.partial:
+                default = next(iter(var.values))
+            for mode, raw in var.values.items():
+                sel, _ = mode_selector(mode, mode == default, col.kind if col else "")
+                out.setdefault(sel, []).append(
+                    (self.tier_of(var), self.token_name(var), var, mode, raw))
+        for sel in out:
+            out[sel].sort(key=lambda t: (order.get(t[0], 9), natural_key(t[1])))
+        # `:root` first, then themes, then density.
+        ordered = dict(sorted(out.items(), key=lambda kv: (kv[0] != ":root", kv[0])))
+        if not self.theme_diff_only:
+            return ordered
+        # A theme block re-points Tier 2 and nothing else. Emitting tokens whose
+        # value is identical to `:root` makes a theme look like it owns values it
+        # merely inherits -- and the next person edits the wrong one.
+        root = {}
+        for tier, token, var, mode, raw in ordered.get(":root", []):
+            root[token] = self.css_value(var, mode, raw)[0]
+        trimmed: Dict[str, List[Tuple[str, str, FVar, str, Any]]] = {}
+        for sel, rows in ordered.items():
+            if sel == ":root":
+                trimmed[sel] = rows
+                continue
+            keep = [r for r in rows if self.css_value(r[2], r[3], r[4])[0] != root.get(r[1])]
+            if keep:
+                trimmed[sel] = keep
+        return trimmed
+
+
+# ===========================================================================
+# Emitters
+# ===========================================================================
+
+
+def build_date() -> Optional[str]:
+    """The date to stamp, or None. Only SOURCE_DATE_EPOCH (the reproducible-
+    builds convention) sets one: a clock time made two runs on an unchanged
+    export differ, so the documented CI drift check failed every time."""
+    epoch = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if not epoch:
+        return None
+    try:
+        return datetime.fromtimestamp(int(epoch), timezone.utc).strftime("%Y-%m-%d")
+    except (ValueError, OverflowError, OSError):
+        return None
+
+
+def header(source: str, extra: Sequence[str] = ()) -> List[str]:
+    stamp = build_date()
+    lines = [
+        "GENERATED FILE -- DO NOT EDIT BY HAND.",
+        "",
+        f"  source     {source}",
+        "  generator  scripts/figma_to_tokens.py",
+        *([f"  generated  {stamp}"] if stamp else []),
+        "",
+        "Hand edits here are lost on the next sync, and worse, they make the",
+        "design file and the code disagree while both look authoritative. Change",
+        "the source, re-run the generator, commit both in one commit.",
+    ]
+    lines += list(extra)
+    return lines
+
+
+def emit_css(conv: Converter, source: str) -> str:
+    out = ["/* " + "=" * 71, *[f"   {l}".rstrip() for l in header(source)],
+           "   " + "=" * 71 + " */", "", "@layer tokens {", ""]
+    for sel, rows in conv.blocks().items():
+        out.append(f"  {sel} {{")
+        last_tier = None
+        for tier, token, var, mode, raw in rows:
+            if tier != last_tier:
+                if last_tier is not None:
+                    out.append("")
+                label = {"primitive": "TIER 1 -- primitives",
+                         "semantic": "TIER 2 -- roles (components read these)",
+                         "component": "TIER 3 -- component tokens"}.get(tier, tier)
+                out.append(f"    /* {label} */")
+                last_tier = tier
+            css, ok = conv.css_value(var, mode, raw)
+            # A `*/` in a description or a deprecation reason would end the
+            # comment and make the rest live CSS (CodeRabbit on #101).
+            comment = f"  /* {var.described.replace('*/', '* /')} */" if var.described else ""
+            if not ok and css.startswith("/*"):
+                # Comment the whole declaration out rather than emit a property
+                # with a comment for a value, which is invalid CSS and would take
+                # the rest of the block down with it.
+                out.append(f"    /* --{token}: {css.strip('/* ').strip()} */")
+            else:
+                out.append(f"    --{token}: {css};{comment}")
+        out.append("  }")
+        out.append("")
+    out.append("}")
+    return "\n".join(out) + "\n"
+
+
+def emit_json(conv: Converter, source: str) -> str:
+    payload: Dict[str, Any] = {
+        "$generated": {
+            "generator": "scripts/figma_to_tokens.py",
+            "source": source,
+            **({"generated": build_date()} if build_date() else {}),
+            "warning": "GENERATED FILE -- edit the source, not this.",
+            "note": ("For COLOR entries, `hex` is the exact value and `value` is the "
+                     "human-readable OKLCH rounded for display. --reverse reads `hex`. "
+                     "If you hand-edit one, edit both or delete `hex`."),
+        },
+        "primitive": {}, "semantic": {}, "component": {}, "themes": {},
+    }
+    for sel, rows in conv.blocks().items():
+        for tier, token, var, mode, raw in rows:
+            entry = conv.json_value(var, mode, raw)
+            if sel == ":root":
+                payload[tier][token] = entry
+            else:
+                theme = re.sub(r'^\[data-(theme|density)="(.*)"\]$', r"\2", sel)
+                payload["themes"].setdefault(theme, {})[token] = entry
+    for key in ("primitive", "semantic", "component"):
+        payload[key] = dict(sorted(payload[key].items()))
+    return json.dumps(payload, indent=2) + "\n"
+
+
+def emit_dtcg(conv: Converter, source: str) -> str:
+    """--format dtcg (P31): the default mode as a DTCG 2025.10 document, with
+    the contract's names split into groups (`--bg-surface` is `bg.surface`).
+    A DTCG file holds one mode, so each other mode is a problem, as is every
+    value dtcg.py cannot type."""
+    blocks = conv.blocks()
+    values, descriptions, deprecated = [], {}, {}
+    for _tier, token, var, mode, raw in blocks.get(":root", []):
+        css, ok = conv.css_value(var, mode, raw)
+        if not ok and css.lstrip().startswith("/*"):
+            continue                     # already a problem: unresolved, or no CSS form
+        # Anything else (a keyword such as `transparent`, a reference to an
+        # unresolved token) goes to dtcg.document, which types it or names it
+        # as left out: nothing is dropped silently (CodeRabbit on #101).
+        values.append((f"--{token}", css))
+        descriptions[f"--{token}"] = var.description
+        deprecated[f"--{token}"] = var.deprecated
+    for sel, rows in blocks.items():
+        if sel != ":root":
+            conv.problems.append(Problem("not written to DTCG", sel,
+                                         f"{sel}: {len(rows)} token(s) left out; a DTCG file holds one mode "
+                                         "(--out-dir writes each theme through a resolver)"))
+    return dtcg_text(values, descriptions, deprecated, source, conv.problems)
+
+
+# A theme or density block, `[data-theme="dark"]` (or `:root[...]`, `html[...]`):
+# the modes a resolver can hold. Any other rule is a condition it cannot.
+MODE_SELECTOR = re.compile(r"""^(?::root|html)?\[\s*data-(theme|density)\s*=\s*"""
+                           r"""(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([\w-]+))\s*\]$""", re.S)
+CSS_ESCAPE = re.compile(r"\\(?:([0-9a-fA-F]{1,6})\s?|(.))", re.S)
+
+
+def css_escape(value: str) -> str:
+    """A string's text inside `"..."` in CSS: a backslash and a quote escaped."""
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def css_unescape(text: str) -> str:
+    """What a quoted CSS string holds: `\\"` is `"`, `\\22 ` is `"` too (Codex
+    on #105). A code point past Unicode's is U+FFFD, as CSS reads it."""
+    def one(m: "re.Match[str]") -> str:
+        if m.group(2) is not None:
+            return m.group(2)
+        n = int(m.group(1), 16)
+        return chr(n) if 0 < n <= 0x10FFFF and not 0xD800 <= n <= 0xDFFF else "\ufffd"
+    return CSS_ESCAPE.sub(one, text)
+
+
+def mode_context(m: "re.Match[str]") -> str:
+    """The context a MODE_SELECTOR match names: its value, unescaped."""
+    quoted = m.group(2) if m.group(2) is not None else m.group(3)
+    return css_unescape(quoted) if quoted is not None else m.group(4)
+
+Row = Tuple[str, str, str, Any]                  # (--name, CSS value, description, $deprecated)
+
+
+def dtcg_files(blocks: Dict[str, List[Row]], source: str, problems: List[Problem]) -> Dict[str, str]:
+    """--format dtcg --out-dir (P31 part 3): the default values as tokens.json,
+    each theme's or density's overrides as a file of its own, and
+    tokens.resolver.json, the DTCG resolver that puts them together: one
+    modifier per kind, its first context the default (`:root`), named `light`
+    for a theme when no theme is, else `default`."""
+    name = Path(source).name
+    base = blocks.get(":root", [])
+    values = [(n, v) for n, v, _, _ in base]
+    descriptions = {n: d for n, _, d, _ in base}
+    deprecated = {n: x for n, _, _, x in base}
+    doc, left_out = dtcg.document(values, descriptions, deprecated,
+                                  note=f"Generated by pro-web-design-suite's figma_to_tokens.py from {name}: "
+                                       "the default values; tokens.resolver.json adds each theme. "
+                                       "Edit the source, not this.")
+    problems.extend(Problem("not written to DTCG", n, f"{n}: {why}") for n, why in left_out)
+    out = {"tokens.json": doc}
+    modifiers: Dict[str, Dict[str, Optional[str]]] = {}
+    for sel, rows in blocks.items():
+        m = MODE_SELECTOR.match(sel)
+        if sel == ":root" or not rows:
+            continue
+        if not m:
+            problems.append(Problem("not written to DTCG", sel,
+                                    f"{sel}: {len(rows)} token(s) left out; a resolver holds themes and "
+                                    "densities (`[data-theme]`, `[data-density]`), not other conditions"))
+            continue
+        kind, context = m.group(1), mode_context(m)
+        merged = dict(values)
+        merged.update((n, v) for n, v, _, _ in rows)
+        mode, left_out = dtcg.document(list(merged.items()), {n: d for n, _, d, _ in rows},
+                                       {n: x for n, _, _, x in rows},
+                                       note=f"Generated by pro-web-design-suite's figma_to_tokens.py from {name}: "
+                                            f"what {sel} changes, read through tokens.resolver.json. "
+                                            "Edit the source, not this.",
+                                       only=[n for n, _, _, _ in rows])
+        problems.extend(Problem("not written to DTCG", f"{sel} {n}", f"{sel} {n}: {why}") for n, why in left_out)
+        if len(mode) > 1:                        # more than its $description
+            slug = re.sub(r"[^a-z0-9]+", "-", context.lower()).strip("-") or "mode"
+            file = f"{kind}-{slug}.json"
+            while file in out:
+                file = file[:-5] + "-2.json"
+            out[file] = mode
+            modifiers.setdefault(kind, {})[context] = file
+    listed = []
+    for kind, contexts in modifiers.items():
+        default = "light" if kind == "theme" and "light" not in contexts else "default"
+        while default in contexts:
+            default += "-base"
+        listed.append((kind, default, {default: None, **contexts}))
+    out["tokens.resolver.json"] = dtcg.resolver(
+        "tokens", "tokens.json", listed,
+        description=f"Generated by pro-web-design-suite's figma_to_tokens.py from {name}. Edit the source, not this.")
+    return {f: json.dumps(d, indent=2, ensure_ascii=False) + "\n" for f, d in out.items()}
+
+
+def figma_blocks(conv: Converter) -> Dict[str, List[Row]]:
+    """conv.blocks() as rows, leaving out what already has a problem."""
+    out: Dict[str, List[Row]] = {}
+    for sel, rows in conv.blocks().items():
+        for _tier, token, var, mode, raw in rows:
+            css, ok = conv.css_value(var, mode, raw)
+            if not ok and css.lstrip().startswith("/*"):
+                continue                     # unresolved, or no CSS form: already a problem
+            out.setdefault(sel, []).append((f"--{token}", css, var.description, var.deprecated))
+    return out
+
+
+def css_blocks(path: Path) -> Dict[str, List[Row]]:
+    """A tokens.css's custom properties by the rule that sets them: `:root`
+    as read_tokens() reads it, a theme or density block under its
+    `[data-...="..."]` selector, and any other rule under its own preludes."""
+    out: Dict[str, Dict[str, str]] = {":root": dict(read_tokens([path]).values())}
+    text = path.read_bytes().decode("utf-8-sig", errors="replace")
+    for preludes, declaration in _css_blocks(text):
+        name, colon, value = declaration.partition(":")
+        name, value = name.strip(), " ".join(value.split())
+        if not (colon and name.startswith("--") and value and preludes):
+            continue
+        rule, outer = preludes[-1], preludes[:-1]
+        layered = all(p.lower().startswith("@layer") for p in outer)
+        if layered and ROOT_SELECTOR.match(rule) and not THEME_OR_DENSITY.search(rule):
+            continue                         # a default: read above
+        m = MODE_SELECTOR.match(rule.strip()) if layered else None   # a quoted value keeps its spaces (Codex)
+        if m:
+            where = f'[data-{m.group(1)}="{css_escape(mode_context(m))}"]'
+        else:
+            where = " ".join(p for p in preludes if not p.lower().startswith("@layer"))
+        out.setdefault(where, {})[name] = value      # the cascade: the last one wins
+    return {sel: [(n, v, "", False) for n, v in rows.items()] for sel, rows in out.items()}
+
+
+def dtcg_text(values: Sequence[Tuple[str, str]], descriptions: Dict[str, str],
+              deprecated: Dict[str, Any], source: str, problems: List[Problem]) -> str:
+    doc, left_out = dtcg.document(values, descriptions, deprecated,
+                                  note=f"Generated by pro-web-design-suite's figma_to_tokens.py from {Path(source).name}. "
+                                       "Edit the source, not this.")
+    problems.extend(Problem("not written to DTCG", name, f"{name}: {why}") for name, why in left_out)
+    return json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
+
+
+def css_to_dtcg(path: Path, problems: List[Problem]) -> str:
+    """A tokens.css's default values as a DTCG document, read as read_tokens()
+    reads them. A rule that sets tokens for a theme, a density or a condition
+    is reported: a DTCG file holds one mode."""
+    values = read_tokens([path]).values()
+    text = path.read_bytes().decode("utf-8-sig", errors="replace")
+    others: Dict[str, int] = {}
+    for preludes, declaration in _css_blocks(text):
+        if not declaration.startswith("--") or not preludes:
+            continue
+        rule, outer = preludes[-1], preludes[:-1]
+        default = (all(p.lower().startswith("@layer") for p in outer) and ROOT_SELECTOR.match(rule)
+                   and not THEME_OR_DENSITY.search(rule))
+        if not default:
+            where = " ".join(p for p in preludes if not p.lower().startswith("@layer"))
+            others[where] = others.get(where, 0) + 1
+    for where, count in others.items():
+        problems.append(Problem("not written to DTCG", where,
+                                f"{where}: {count} token(s) left out; a DTCG file holds one mode "
+                                "(--out-dir writes each theme through a resolver)"))
+    return dtcg_text(list(values.items()), {}, {}, str(path), problems)
+
+
+def emit_ts(conv: Converter, source: str) -> str:
+    blocks = conv.blocks()
+    out = ["/**", *[f" * {l}".rstrip() for l in header(source)], " */", ""]
+    root = blocks.get(":root", [])
+    out.append("export const tokens = {")
+    for _tier, token, var, mode, raw in root:
+        css, _ = conv.css_value(var, mode, raw)
+        out.append(f"  {json.dumps(token)}: {json.dumps(css)},")
+    out.append("} as const;")
+    out.append("")
+    out.append("export type TokenName = keyof typeof tokens;")
+    out.append("")
+    out.append("/** `var(--token)`, typed. Use this rather than writing the string. */")
+    out.append("export const cssVar = (name: TokenName): string => `var(--${name})`;")
+    out.append("")
+    themes = {sel: rows for sel, rows in blocks.items() if sel != ":root"}
+    if themes:
+        out.append("export const themes = {")
+        for sel, rows in themes.items():
+            theme = re.sub(r'^\[data-(theme|density)="(.*)"\]$', r"\2", sel)
+            out.append(f"  {json.dumps(theme)}: {{")
+            for _tier, token, var, mode, raw in rows:
+                css, _ = conv.css_value(var, mode, raw)
+                out.append(f"    {json.dumps(token)}: {json.dumps(css)},")
+            out.append("  },")
+        out.append("} as const;")
+        out.append("")
+        out.append("export type ThemeName = keyof typeof themes;")
+    return "\n".join(out) + "\n"
+
+
+# ===========================================================================
+# Reverse: tokens.json -> a POST /v1/files/:file_key/variables body
+#
+# Verified against Figma's Variables REST docs (Sept 2026): the body takes four
+# optional arrays -- variableCollections, variableModes, variables,
+# variableModeValues -- each entry carrying action CREATE | UPDATE | DELETE.
+# Temporary ids are scoped to one request body and may be used in `id` and in a
+# collection's `initialModeId`. Colours are {r,g,b,a} in 0..1. Aliases are
+# {"type":"VARIABLE_ALIAS","id":...}. The endpoint is Enterprise-only and needs
+# the `file_variables:write` scope; this script only builds the body, it never
+# calls the API.
+# ===========================================================================
+
+SCOPES_FOR = [
+    (re.compile(r"^space-|^gap-|^pad-|^gutter-"), ["GAP", "WIDTH_HEIGHT"]),
+    (re.compile(r"^radius-"), ["CORNER_RADIUS"]),
+    (re.compile(r"^text-"), ["FONT_SIZE"]),
+    (re.compile(r"^leading-"), ["LINE_HEIGHT"]),
+    (re.compile(r"^tracking-"), ["LETTER_SPACING"]),
+    (re.compile(r"^weight-"), ["FONT_WEIGHT"]),
+    (re.compile(r"^stroke-"), ["STROKE_FLOAT"]),
+    (re.compile(r"^bg-"), ["FRAME_FILL", "SHAPE_FILL"]),
+    (re.compile(r"^fg-"), ["TEXT_FILL"]),
+    (re.compile(r"^border-"), ["STROKE_COLOR"]),
+    (re.compile(r"^(neutral|accent|success|warning|danger|info)-"), ["ALL_FILLS", "STROKE_COLOR"]),
+    (re.compile(r"^font-"), ["FONT_FAMILY"]),
+]
+
+
+def figma_scopes(token: str) -> List[str]:
+    for regex, scopes in SCOPES_FOR:
+        if regex.match(token):
+            return scopes
+    return ["ALL_SCOPES"]
+
+
+def figma_name(token: str) -> str:
+    """`bg-surface` -> `bg/surface`; `space-6` -> `space/6`; `accent-500` ->
+    `accent/500`. One `/` after the category word is what makes the Figma
+    variables panel group the way the CSS namespace already does."""
+    parts = token.split("-")
+    if len(parts) == 1:
+        return token
+    head = parts[0]
+    if head in ("space", "text", "leading", "tracking", "weight", "radius", "stroke",
+                "shadow", "dur", "ease", "bp", "z", "gap", "pad", "bg", "fg", "border",
+                "type", "elevation", "motion", "neutral", "accent", "success", "warning",
+                "danger", "info", "measure", "width", "font", "tap", "grid", "gutter"):
+        return f"{head}/{'-'.join(parts[1:])}"
+    return token
+
+
+VAR_REF = re.compile(r"^var\(\s*--([a-z0-9-]+)\s*\)$", re.I)
+
+
+def alias_of(entry: dict) -> Optional[str]:
+    alias = entry.get("alias")
+    if alias:
+        return str(alias)
+    raw = entry.get("value")
+    if isinstance(raw, str):
+        m = VAR_REF.match(raw.strip())
+        if m:
+            return m.group(1)
+    return None
+
+
+def token_type(entry: dict, token: str,
+               table: Optional[Dict[str, dict]] = None, _depth: int = 0) -> str:
+    """Figma needs a resolvedType up front. A token whose value is only
+    `var(--other)` has no type of its own, so follow the alias -- typing it
+    STRING because the text starts with `var(` is the classic way a whole colour
+    tier lands in Figma as unusable strings."""
+    t = str(entry.get("type", "")).upper()
+    if t in ("COLOR", "FLOAT", "STRING", "BOOLEAN"):
+        return t
+    alias = alias_of(entry)
+    if alias and table is not None and _depth < 16:
+        tgt = table.get(alias)
+        if tgt is not None:
+            return token_type(tgt, alias, table, _depth + 1)
+    val = entry.get("value")
+    if as_color(val) is not None:
+        return "COLOR"
+    if as_px(val) is not None:
+        return "FLOAT"
+    return "STRING"
+
+
+def read_tokens_json(data: Any) -> Tuple[Dict[str, dict], Dict[str, Dict[str, dict]]]:
+    """Accept this script's own tokens.json, or a flat {name: value} map."""
+    base: Dict[str, dict] = {}
+    themes: Dict[str, Dict[str, dict]] = {}
+    if not isinstance(data, dict):
+        raise ValueError("tokens.json must be an object")
+    tiered = any(k in data for k in ("primitive", "semantic", "component"))
+    if tiered:
+        for tier in ("primitive", "semantic", "component"):
+            for name, entry in (data.get(tier) or {}).items():
+                base[name] = entry if isinstance(entry, dict) else {"value": entry}
+                base[name].setdefault("tier", tier)
+        for theme, rows in (data.get("themes") or {}).items():
+            themes[theme] = {n: (e if isinstance(e, dict) else {"value": e})
+                             for n, e in rows.items()}
+    else:
+        for name, entry in data.items():
+            if name.startswith("$"):
+                continue
+            base[name.lstrip("-")] = entry if isinstance(entry, dict) else {"value": entry}
+    return base, themes
+
+
+# A DTCG type's Figma type, where the CSS text alone would read as a string.
+REVERSE_TYPES = {"color": "COLOR", "dimension": "FLOAT", "number": "FLOAT", "duration": "FLOAT"}
+
+
+def reverse_data(path: Path, data: Any) -> Tuple[Any, List[Problem]]:
+    """What --reverse reads, in read_tokens_json()'s shape. This script's own
+    tokens.json and a flat map pass as they are. A tokens.css (`data` None), a
+    DTCG 2025.10 document or a resolver becomes {tier: {name: entry},
+    "themes": {theme: {name: entry}}}, each theme a Figma mode: before, a DTCG
+    file was read as a flat map, its groups made variables (`sets`,
+    `resolutionOrder`), and a tokens.css had no route into Figma at all (the
+    3.6.0 live check). What a mode cannot carry, a density or another
+    condition, is named."""
+    problems: List[Problem] = []
+    base: Dict[str, dict] = {}
+    themes: Dict[str, Dict[str, dict]] = {}
+
+    def entry(value: Any, dtcg_type: Optional[str] = None) -> dict:
+        """A value as reverse_body() reads it, its Figma type kept: a
+        DTCG duration or a CSS `150ms` is a FLOAT, not a string, and a
+        boolean is a BOOLEAN (Codex on #120)."""
+        if isinstance(value, bool):
+            return {"value": value, "type": "BOOLEAN"}
+        kind = REVERSE_TYPES.get(dtcg_type or "")
+        if kind is None and as_px(value) is None and as_ms(value) is not None:
+            kind = "FLOAT"
+        return {"value": value, "type": kind} if kind else {"value": value}
+
+    def noted(notes: Any, where: str) -> None:
+        # A source missing, malformed or outside the folder is said, never a
+        # clean conversion of whatever was left (Codex on #120).
+        problems.extend(Problem("not read", f"{where}{n}", f"{where}{n}: {why}") for n, why in notes)
+
+    def entries(doc: Any, where: str) -> Dict[str, dict]:
+        found, notes = dtcg.tokens(doc, path.parent)
+        noted(notes, where)
+        out: Dict[str, dict] = {}
+        for t in found:
+            if isinstance(t.value, bool) or t.css() is not None:
+                out[t.name] = entry(t.value if isinstance(t.value, bool) else t.css(), t.type)
+            else:                                    # a typography composite, say (CodeRabbit on #120)
+                problems.append(Problem("not carried to Figma", f"{where}{t.name}",
+                                        f"{where}{t.name}: a {t.type or 'value'} with no CSS form, "
+                                        "so no Figma variable"))
+        return out
+
+    def resolved(inputs: Optional[Dict[str, str]], where: str) -> Dict[str, dict]:
+        doc, notes = dtcg.resolver_document(data, path.parent, inputs)
+        noted(notes, where)
+        return entries(doc, where)
+
+    if data is None:                                         # a tokens.css
+        for sel, rows in css_blocks(path).items():
+            m = MODE_SELECTOR.match(sel)
+            values = {n: entry(v) for n, v, _, _ in rows}
+            if sel == ":root":
+                base = values
+            elif m and m.group(1) == "theme":
+                themes[mode_context(m)] = values
+            elif values:
+                problems.append(Problem("not carried to Figma", sel,
+                                        f"{sel}: {len(values)} token(s) left out; a Figma mode carries a "
+                                        "theme (`[data-theme]`), not a density or another condition"))
+    elif dtcg.is_resolver(data):
+        base = resolved(None, "")
+        for mod in dtcg.resolver_modifiers(data):
+            if not re.search(r"theme|scheme|mode", mod.name, re.I):
+                problems.append(Problem("not carried to Figma", mod.name,
+                                        f"modifier `{mod.name}` left out; a Figma mode carries a theme, "
+                                        "not a density or another condition"))
+                continue
+            default = mod.default or mod.contexts[0]
+            for ctx in mod.contexts:
+                if ctx != default:
+                    got = resolved({mod.name: ctx}, f"{mod.name}={ctx}: ")
+                    themes[ctx] = {n: e for n, e in got.items() if base.get(n) != e}
+    elif dtcg.is_document(data):
+        base = entries(data, "")
+    else:
+        return data, problems
+    if not base:
+        problems.append(Problem("not read", str(path), f"{path}: no token read, so nothing goes into Figma"))
+    # A token a theme sets goes where the modes are: a project's own
+    # `--surface: #fff` re-pointed by its dark theme lost its Dark value as a
+    # primitive, which has one mode (Codex on #120).
+    themed = {n for rows in themes.values() for n in rows}
+    out: Dict[str, Any] = {"primitive": {}, "semantic": {}, "themes": {}}
+    for name, item in base.items():
+        short = name[2:]
+        by_value = "semantic" if "var(" in str(item["value"]) else "primitive"
+        tier = "semantic" if name in themed else KNOWN.get(short) or by_value
+        out.setdefault(tier, {})[short] = item
+    for theme, rows in themes.items():
+        out["themes"][theme] = {n[2:]: e for n, e in rows.items()}
+    return out, problems
+
+
+def reverse_main(path: Path, args: argparse.Namespace, data: Any) -> int:
+    """--reverse: the REST body, or with --format plugin-script the same
+    variables as Plugin API code, from any input reverse_data() reads."""
+    data, read = reverse_data(path, data)
+    if args.format == "plugin-script":
+        config = project_config() if args.plan is None else None
+        plan = args.plan or (config.figma_plan if config else None)
+        text, problems = emit_plugin_script(data, str(path), collection_split=not args.flat, plan=plan)
+    else:
+        text, problems = emit_reverse(data, collection_split=not args.flat)
+        if any(p.kind == "mode-limit" for p in problems):
+            # Figma refuses the whole POST, so a body past the cap is a
+            # trap: write nothing (CodeRabbit on #111).
+            report_problems(read + problems, args.quiet)
+            print("No body written: Figma refuses a POST with a collection past its mode cap. "
+                  "Split the modes across collections, or use --format plugin-script.",
+                  file=sys.stderr)
+            return 2
+    write_out(text, args.out)
+    report_problems(read + problems, args.quiet)
+    return 1 if read or problems else 0
+
+
+def emit_reverse(data: Any, collection_split: bool = True) -> Tuple[str, List[Problem]]:
+    body, problems = reverse_body(data, collection_split)
+    # The endpoint is Enterprise's, so its own cap applies whatever the plan.
+    problems += mode_limits(body, REST_MODES, f"the REST API allows {REST_MODES} per collection.")
+    return json.dumps(body, indent=2) + "\n", problems
+
+
+def reverse_body(data: Any, collection_split: bool = True) -> Tuple[dict, List[Problem]]:
+    base, themes = read_tokens_json(data)
+    problems: List[Problem] = []
+
+    tiers: Dict[str, Dict[str, dict]] = {"primitive": {}, "semantic": {}, "component": {}}
+    for name, entry in base.items():
+        tier = entry.get("tier") or KNOWN.get(name) or "semantic"
+        tiers.setdefault(tier, {})[name] = entry
+    # Primitives get no scopes, so no picker offers them: a designer binds
+    # `bg/surface`, never the `neutral/0` it aliases (Law 6). Scopes only hide;
+    # the semantic tier still aliases them.
+    primitives = set(tiers["primitive"])
+    if not collection_split:
+        merged = {}
+        for rows in tiers.values():
+            merged.update(rows)
+        tiers = {"tokens": merged}
+
+    collections: List[dict] = []
+    modes: List[dict] = []
+    variables: List[dict] = []
+    mode_values: List[dict] = []
+    var_id_of: Dict[str, str] = {}
+    mode_id_of: Dict[Tuple[str, str], str] = {}
+
+    theme_names = sorted(themes.keys())
+    tier_of: Dict[str, str] = {t: tier for tier, rows in tiers.items() for t in rows}
+
+    def default_mode_for(tier: str) -> str:
+        if tier == "primitive" or not theme_names:
+            return "Value"
+        # `:root` takes a name no theme has (a `light` theme means `:root` was
+        # another one): two modes of one name, or one temporary id, in a
+        # collection is a body Figma refuses.
+        taken = {re.sub(r"[^a-z0-9]+", "_", t.lower()) for t in theme_names}
+        for name in ("Light", "Default", "Base"):
+            if name.lower() not in taken:
+                return name
+        n = 1
+        while f"root_{n}" in taken:
+            n += 1
+        return f"Root {n}"
+
+    def to_figma_value(token: str, entry: dict,
+                       vtype: str) -> Tuple[Any, Optional[str]]:
+        raw = entry.get("value")
+        alias = alias_of(entry)
+        if alias:
+            tgt = var_id_of.get(alias)
+            if tgt is None:
+                why = ("is a composite that cannot cross into Figma"
+                       if alias in COMPOSITE_ONLY else "is not in this tokens.json")
+                return None, (f"`--{token}` aliases `--{alias}`, which {why}. Dropped from the "
+                              "payload -- a variable with a wrong value is worse than a "
+                              "variable that is visibly missing.")
+            return {"type": "VARIABLE_ALIAS", "id": tgt}, None
+        if vtype == "COLOR":
+            # `hex` wins over `value` when both are present. `value` is rounded for
+            # human reading (one decimal of L); `hex` is the exact 8-bit colour, and
+            # Figma is an 8-bit sRGB surface anyway. Using `value` costs ~0.1% L on
+            # every round trip, which shows up as a diff in CI forever.
+            exact = as_color(entry.get("hex"))
+            parsed = as_color(raw)
+            rgba = exact or parsed
+            if rgba is None:
+                return None, f"`--{token}` is typed COLOR but `{raw}` does not parse as one."
+            if exact is None and out_of_srgb(raw):        # Figma holds sRGB: say so (V11)
+                problems.append(Problem("clamped", token, (
+                    f"`--{token}` = `{raw}` lies outside sRGB, so Figma gets it clamped to "
+                    f"{rgb_to_hex(*rgba[:3])}. Give the token a `hex`, or bring it into sRGB.")))
+            alpha = entry.get("alpha")
+            if alpha is None:
+                alpha = parsed[3] if parsed is not None else rgba[3]
+            return {"r": round(rgba[0], 6), "g": round(rgba[1], 6),
+                    "b": round(rgba[2], 6), "a": round(float(alpha), 6)}, None
+        if vtype == "FLOAT":
+            px = entry.get("px")
+            if px is None:
+                px = as_px(raw)
+            if px is None:          # a duration, `220ms` or `0.22s`: Figma holds 220
+                px = as_ms(raw)
+            if px is None:
+                return None, f"`--{token}` is typed FLOAT but `{raw}` has no numeric value."
+            return (round(px, 4) if px % 1 else int(px)), None
+        if vtype == "BOOLEAN":
+            return bool(raw), None
+        return str(raw), None
+
+    # Pass 1 -- which tokens can exist as Figma variables at all.
+    for tier, rows in tiers.items():
+        for token in rows:
+            if token in COMPOSITE_ONLY:
+                problems.append(Problem(
+                    "composite", token,
+                    f"`--{token}` is a composite (a CSS shorthand, a shadow pair or a clamp). "
+                    "A Figma variable holds one scalar, so this cannot cross. Ship it as a "
+                    "text or effect STYLE in Figma instead, named for the same role."))
+                continue
+            var_id_of[token] = f"tmp_var_{re.sub(r'[^a-z0-9]+', '_', token)}"
+
+    # Pass 2 -- drop anything whose value cannot be produced, then re-check,
+    # because dropping a token orphans everything aliased to it. Converges in a
+    # couple of rounds on any real token file; the bound stops a pathological one.
+    for _round in range(8):
+        dropped: List[str] = []
+        for token, tier in tier_of.items():
+            if token not in var_id_of:
+                continue
+            entry = tiers[tier][token]
+            vtype = token_type(entry, token, base)
+            _, err = to_figma_value(token, entry, vtype)
+            if err:
+                problems.append(Problem("dropped", token, err))
+                dropped.append(token)
+        for token in dropped:
+            var_id_of.pop(token, None)
+        if not dropped:
+            break
+
+    # Pass 3 -- emit.
+    for tier, rows in tiers.items():
+        live = [t for t in sorted(rows) if t in var_id_of]
+        if not live:
+            continue
+        col_id = f"tmp_collection_{tier}"
+        default_mode = default_mode_for(tier)
+        default_mode_id = f"tmp_mode_{tier}_{re.sub(r'[^a-z0-9]+', '_', default_mode.lower())}"
+        collections.append({"action": "CREATE", "id": col_id, "name": tier,
+                            "initialModeId": default_mode_id})
+        # The initial mode comes into being with the collection, under Figma's
+        # own name; `initialModeId` only gives it an id. An UPDATE names it, as
+        # Figma's REST example does. Only the extra modes get a CREATE of their
+        # own, or Figma is asked to make the first one twice.
+        modes.append({"action": "UPDATE", "id": default_mode_id, "name": default_mode,
+                      "variableCollectionId": col_id})
+        mode_id_of[(tier, default_mode)] = default_mode_id
+        if tier != "primitive":
+            for theme in theme_names:
+                mid = f"tmp_mode_{tier}_{re.sub(r'[^a-z0-9]+', '_', theme.lower())}"
+                mode_id_of[(tier, theme)] = mid
+                modes.append({"action": "CREATE", "id": mid, "name": theme.title(),
+                              "variableCollectionId": col_id})
+        for token in live:
+            entry = rows[token]
+            vtype = token_type(entry, token, base)
+            variables.append({
+                "action": "CREATE", "id": var_id_of[token], "name": figma_name(token),
+                "variableCollectionId": col_id, "resolvedType": vtype,
+                "scopes": [] if token in primitives else figma_scopes(token),
+                "codeSyntax": {"WEB": f"var(--{token})"},
+                **({"description": entry["description"]} if entry.get("description") else {}),
+            })
+            value, _ = to_figma_value(token, entry, vtype)
+            mode_values.append({"variableId": var_id_of[token],
+                                "modeId": default_mode_id, "value": value})
+            if tier == "primitive":
+                continue
+            for theme in theme_names:
+                tmid = mode_id_of.get((tier, theme))
+                if tmid is None:
+                    continue
+                src = themes[theme].get(token) or entry
+                tvalue, terr = to_figma_value(token, src, token_type(src, token, base))
+                if terr:
+                    # Pass 2 reads the default values only, so a theme's own
+                    # value that cannot cross was dropped without a word, and
+                    # Figma showed the default in that mode (audit H2).
+                    why = terr.split(" Dropped from the payload")[0]
+                    problems.append(Problem(
+                        "dropped", f"{token} [{theme.title()}]",
+                        f"In the {theme.title()} mode, {why} That mode's value is left out, so "
+                        "Figma shows the default mode's value there until it is corrected."))
+                    continue
+                mode_values.append({"variableId": var_id_of[token], "modeId": tmid,
+                                    "value": tvalue})
+
+    # Only the four arrays the endpoint takes, so the file is POSTed as it is.
+    body = {
+        "variableCollections": collections,
+        "variableModes": modes,
+        "variables": variables,
+        "variableModeValues": mode_values,
+    }
+    return body, problems
+
+
+# The Plugin API reads and writes variables on every plan (LC-B1, LC-C7). The
+# script applies the REST body above through it, so both routes carry the same
+# variables. Figma's guide to `use_figma` says its code "is automatically
+# wrapped in an async context": top-level `await` and `return`, no
+# `figma.closePlugin()`, no `figma.notify()` (it throws there).
+PLUGIN_SCRIPT = """\
+// Plugin API code from figma_to_tokens.py --reverse --format plugin-script.
+// GENERATED -- DO NOT EDIT. Change the tokens, re-run the generator.
+//   source  @SOURCE@
+// Run it with the Figma MCP server's use_figma, which wraps it in an async
+// function, or in a development plugin, inside an async function whose
+// result goes to figma.closePlugin(). It finds collections, modes and
+// variables by name, creates what is missing and updates what differs, and it
+// deletes nothing, so a second run changes nothing.
+
+const BODY = @BODY@;
+
+const LIMIT = 20;  // errors listed in the result: use_figma's response is small
+
+function same(a, b) {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length
+      && a.every((x, i) => same(x, b[i]));
+  }
+  if (typeof a === "number" && typeof b === "number") return Math.abs(a - b) < 1e-4;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return a === b;
+  if (a.type === "VARIABLE_ALIAS" || b.type === "VARIABLE_ALIAS") {
+    return a.type === b.type && a.id === b.id;
+  }
+  return Object.keys(b).every((k) => same(a[k], b[k]));
+}
+
+const result = {
+  collections: { created: 0, found: 0 },
+  modes: { created: 0, renamed: 0, found: 0 },
+  variables: { created: 0, updated: 0, unchanged: 0 },
+  errorCount: 0,
+  errors: [],
+};
+function fail(what, err) {
+  result.errorCount += 1;
+  if (result.errors.length < LIMIT) result.errors.push(`${what}: ${err && err.message ? err.message : err}`);
+}
+
+const local = await figma.variables.getLocalVariableCollectionsAsync();
+const existing = await figma.variables.getLocalVariablesAsync();
+
+const collectionOf = {};
+for (const c of BODY.variableCollections) {
+  let collection = local.find((x) => x.name === c.name);
+  if (collection) {
+    result.collections.found += 1;
+  } else {
+    collection = figma.variables.createVariableCollection(c.name);
+    result.collections.created += 1;
+  }
+  collectionOf[c.id] = collection;
+}
+
+// The REST body's UPDATE names a collection's first mode, which Figma creates
+// as "Mode 1"; each CREATE is a theme. The default values always go to the
+// default mode and a theme's never do, whatever the names say: a theme set
+// that changed leaves a mode named like the new default (Codex on #109). The
+// plan caps the modes, and addMode throws past the cap: Starter has only the
+// first.
+const modeOf = {};
+for (const m of BODY.variableModes) {
+  const collection = collectionOf[m.variableCollectionId];
+  const first = collection.defaultModeId;
+  try {
+    if (m.action === "UPDATE") {
+      modeOf[m.id] = first;
+      const name = collection.modes.find((x) => x.modeId === first).name;
+      if (name === m.name) {
+        result.modes.found += 1;
+      } else if (collection.modes.some((x) => x.name === m.name)) {
+        fail(`mode "${m.name}" in "${collection.name}"`, `another mode has the name, so the default mode keeps "${name}" and holds the default values; remove or rename the other by hand`);
+      } else {
+        collection.renameMode(first, m.name);
+        result.modes.renamed += 1;
+      }
+      continue;
+    }
+    const have = collection.modes.find((x) => x.name === m.name && x.modeId !== first);
+    if (have) {
+      modeOf[m.id] = have.modeId;
+      result.modes.found += 1;
+    } else {
+      modeOf[m.id] = collection.addMode(m.name);
+      result.modes.created += 1;
+    }
+  } catch (err) {
+    fail(`mode "${m.name}" in "${collection.name}"`, err);
+  }
+}
+
+const variableOf = {};
+for (const v of BODY.variables) {
+  const collection = collectionOf[v.variableCollectionId];
+  let variable = existing.find((x) => x.variableCollectionId === collection.id && x.name === v.name);
+  try {
+    if (variable && variable.resolvedType !== v.resolvedType) {
+      fail(`variable "${v.name}"`, `it is ${variable.resolvedType} in Figma and ${v.resolvedType} in the tokens; left as it is`);
+      continue;
+    }
+    const entry = { variable, created: !variable, changed: false };
+    if (!variable) {
+      variable = figma.variables.createVariable(v.name, collection, v.resolvedType);
+      entry.variable = variable;
+    }
+    // Primitives carry no scopes, so no picker offers them (Law 6).
+    if (!same([...variable.scopes].sort(), [...v.scopes].sort())) {
+      variable.scopes = v.scopes;
+      entry.changed = true;
+    }
+    if ((variable.codeSyntax || {}).WEB !== v.codeSyntax.WEB) {
+      variable.setVariableCodeSyntax("WEB", v.codeSyntax.WEB);
+      entry.changed = true;
+    }
+    if (v.description !== undefined && variable.description !== v.description) {
+      variable.description = v.description;
+      entry.changed = true;
+    }
+    variableOf[v.id] = entry;
+  } catch (err) {
+    fail(`variable "${v.name}"`, err);
+  }
+}
+
+for (const mv of BODY.variableModeValues) {
+  const entry = variableOf[mv.variableId];
+  const modeId = modeOf[mv.modeId];
+  if (!entry || modeId === undefined) continue;  // its variable or its mode failed, and says so
+  let value = mv.value;
+  if (value && value.type === "VARIABLE_ALIAS") {
+    const target = variableOf[value.id];
+    if (!target) {
+      fail(`variable "${entry.variable.name}"`, "its alias's target was not written");
+      continue;
+    }
+    value = figma.variables.createVariableAlias(target.variable);
+  }
+  if (!entry.created && same(entry.variable.valuesByMode[modeId], value)) continue;
+  try {
+    entry.variable.setValueForMode(modeId, value);
+    entry.changed = true;
+  } catch (err) {
+    fail(`variable "${entry.variable.name}"`, err);
+  }
+}
+
+for (const entry of Object.values(variableOf)) {
+  if (entry.created) result.variables.created += 1;
+  else if (entry.changed) result.variables.updated += 1;
+  else result.variables.unchanged += 1;
+}
+return result;
+"""
+
+
+def mode_limits(body: dict, cap: int, why: str) -> List[Problem]:
+    """P32 (LC-B6): a collection with more modes than Figma will make."""
+    names = {c["id"]: c["name"] for c in body["variableCollections"]}
+    count: Dict[str, int] = {}
+    for mode in body["variableModes"]:
+        count[mode["variableCollectionId"]] = count.get(mode["variableCollectionId"], 0) + 1
+    return [Problem("mode-limit", names[cid],
+                    f"`{names[cid]}` needs {n} modes, and {why} Figma refuses each one past "
+                    f"the cap: give theme, density and brand a collection each, or keep the "
+                    f"extra themes in code.")
+            for cid, n in count.items() if n > cap]
+
+
+def emit_plugin_script(data: Any, source: str, collection_split: bool = True,
+                       plan: Optional[str] = None) -> Tuple[str, List[Problem]]:
+    """`--reverse --format plugin-script` (P32): the REST body, applied
+    through the Plugin API, which needs no Enterprise plan. With the plan
+    known, a collection it cannot hold is reported here, before the run."""
+    body, problems = reverse_body(data, collection_split)
+    if plan:
+        problems += mode_limits(body, PLAN_MODES[plan], plan_limit(plan))
+    head, _, tail = PLUGIN_SCRIPT.partition("@BODY@")    # a description holding `@SOURCE@` stays as it is
+    head = head.replace("@SOURCE@", " ".join(source.split()))
+    return head + json.dumps(body, separators=(",", ":")) + tail, problems
+
+
+# ===========================================================================
+# CLI
+# ===========================================================================
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="figma_to_tokens.py",
+        description="Figma variables -> tokens.css/json/ts, and tokens.json -> Figma.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Exit 0 clean, 1 written with warnings, 2 unreadable input.")
+    p.add_argument("path")
+    p.add_argument("--format", choices=("css", "json", "ts", "dtcg", "all", "plugin-script"), default="css",
+                   help="dtcg: a DTCG 2025.10 tokens.json of the default mode; the only "
+                        "format for a tokens.css input. all: tokens.{css,json,ts}. "
+                        "plugin-script, with --reverse: Plugin API code for use_figma or a plugin")
+    p.add_argument("--out", help="write here instead of stdout")
+    p.add_argument("--out-dir", help="with --format all: write tokens.{css,json,ts} here; with --format "
+                                     "dtcg: tokens.json, each theme's file and tokens.resolver.json")
+    p.add_argument("--reverse", action="store_true",
+                   help="read a tokens.json and emit a Figma variables POST body, or with "
+                        "--format plugin-script the same variables as Plugin API code")
+    p.add_argument("--shape", choices=("rest", "plugin", "dtcg", "records", "resolver"))
+    p.add_argument("--collection", default="tokens")
+    p.add_argument("--color-format", choices=("oklch", "hex"), default="oklch")
+    p.add_argument("--unit", choices=("rem", "px"), default="rem")
+    p.add_argument("--full-themes", action="store_true",
+                   help="emit every token in each theme block, not only the re-points")
+    p.add_argument("--flat", action="store_true",
+                   help="--reverse: one Figma collection instead of one per tier")
+    p.add_argument("--plan", choices=tuple(PLAN_MODES),
+                   help="--reverse --format plugin-script: the Figma plan, whose modes per collection "
+                        "are capped; default: the .design-suite.json's figma.plan")
+    p.add_argument("--quiet", action="store_true", help="do not print warnings")
+    p.add_argument("--tokens", action="append", default=[], metavar="FILE",
+                   help="the project's token file, a tokens.css or a contract.json (repeatable), "
+                        "whose names join the vocabulary; default: the token files the "
+                        "project's .design-suite.json lists")
+    return p
+
+
+def write_out(text: str, dest: Optional[str]) -> None:
+    if dest:
+        path = Path(dest)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        print(f"wrote {path}", file=sys.stderr)
+    else:
+        sys.stdout.write(text)
+
+
+def report_problems(problems: Sequence[Problem], quiet: bool) -> None:
+    if quiet or not problems:
+        return
+    by_kind: Dict[str, List[Problem]] = {}
+    seen = set()
+    for p in problems:
+        if (p.kind, p.name, p.message) in seen:
+            continue                     # --format all runs the converter per file
+        seen.add((p.kind, p.name, p.message))
+        by_kind.setdefault(p.kind, []).append(p)
+    print("", file=sys.stderr)
+    for kind, rows in by_kind.items():
+        print(f"{kind} ({len(rows)}):", file=sys.stderr)
+        for r in rows:
+            print(f"  - {r.message}", file=sys.stderr)
+
+
+def css_main(path: Path, args: argparse.Namespace) -> int:
+    """A tokens.css converts to --format dtcg, or goes into Figma with
+    --reverse (the REST body, or --format plugin-script)."""
+    if args.reverse:
+        if args.format not in ("css", "json", "plugin-script"):
+            print(f"{path}: --reverse writes the REST body or, with --format plugin-script, "
+                  "Plugin API code.", file=sys.stderr)
+            return 2
+        try:
+            return reverse_main(path, args, None)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"could not read {path}: {exc}", file=sys.stderr)
+            return 2
+    if args.format != "dtcg":
+        print(f"{path} is CSS: it converts to --format dtcg, or into Figma with --reverse.",
+              file=sys.stderr)
+        return 2
+    problems: List[Problem] = []
+    try:
+        if args.out_dir:
+            write_files(dtcg_files(css_blocks(path), str(path), problems), args.out_dir)
+        else:
+            write_out(css_to_dtcg(path, problems), args.out)
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    report_problems(problems, args.quiet)
+    return 1 if problems else 0
+
+
+def write_files(files: Dict[str, str], out_dir: str) -> None:
+    for name, text in files.items():
+        write_out(text, str(Path(out_dir) / name))
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = build_parser().parse_args(argv)
+    path = Path(args.path)
+    if args.format == "dtcg" and args.out and args.out_dir:
+        print("--format dtcg takes --out (the default values) or --out-dir (every theme, "
+              "through a resolver), not both.", file=sys.stderr)
+        return 2
+    if args.format == "plugin-script" and not args.reverse:
+        print("--format plugin-script writes a tokens.json into Figma: add --reverse.", file=sys.stderr)
+        return 2
+    # Three files need a folder: without one they went into the working
+    # folder, and --out was ignored in silence (the audit's V15).
+    if args.format == "all" and (args.out or not args.out_dir):
+        print("--format all writes tokens.css, tokens.json and tokens.ts: give --out-dir DIR"
+              + (", not --out." if args.out else "."), file=sys.stderr)
+        return 2
+    # The file converted is never a destination (the audit's V7). The project's
+    # --tokens may be: regenerating tokens.css from Figma is the workflow, and
+    # its names are read before anything is written.
+    clash = refuse_overwrite(args.out, args.path)
+    if not clash and (args.out_dir or args.format == "all") and re.fullmatch(
+            r"tokens\.(?:css|json|ts)|tokens\.resolver\.json|(?:theme|density)-.+\.json", path.name):
+        clash = refuse_overwrite(Path(args.out_dir or ".") / path.name, args.path)
+    if clash:
+        print(f"figma_to_tokens: {clash}", file=sys.stderr)
+        return 2
+    if path.suffix.lower() == ".css":    # reads none of the project's token names (CodeRabbit on #101)
+        return css_main(path, args)
+    # A flag beats the config: the project's token files only without --tokens (P24).
+    try:
+        sources, config_path = token_sources(args.tokens)
+        if sources:
+            project = read_tokens(sources)
+            for problem in [] if args.quiet else project.problems:   # S2; --quiet: no warnings (Codex on #140)
+                print(f"figma_to_tokens: warning: {problem}", file=sys.stderr)
+            added = use_project_names(project)
+            origin = ", ".join(str(s) for s in sources) + (f" (from {config_path})" if config_path else "")
+            if not args.quiet:
+                print(f"token names from {origin}: {len(added)} beyond the starter's", file=sys.stderr)
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    try:
+        if args.reverse:
+            return reverse_main(path, args, json.loads(path.read_bytes()))
+        doc = load_document(path, args.shape, args.collection)
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except (OSError, ValueError, json.JSONDecodeError, KeyError) as exc:
+        print(f"could not read {path}: {exc}", file=sys.stderr)
+        return 2
+
+    if not doc.variables:
+        print(f"{path} parsed as `{doc.shape}` but contains no variables. Emitting an empty "
+              "token file would quietly wipe a real one; pass --shape to force a shape."
+              + left_out(doc), file=sys.stderr)
+        return 2
+
+    conv = Converter(doc, color_format=args.color_format, unit=args.unit,
+                     theme_diff_only=not args.full_themes)
+    emitters = {"css": emit_css, "json": emit_json, "ts": emit_ts}
+    if args.format == "dtcg" and args.out_dir:
+        write_files(dtcg_files(figma_blocks(conv), str(path), conv.problems), args.out_dir)
+    elif args.format == "dtcg":
+        write_out(emit_dtcg(conv, str(path)), args.out)
+    elif args.format == "all":
+        out_dir = Path(args.out_dir or ".")
+        for ext, fn in emitters.items():
+            write_out(fn(conv, str(path)), str(out_dir / f"tokens.{ext}"))
+    else:
+        write_out(emitters[args.format](conv, str(path)), args.out)
+    report_problems(conv.problems, args.quiet)
+    return 1 if conv.problems else 0
+
+
+if __name__ == "__main__":
+    # A Windows pipe (git hook, CI, `> file`) defaults to the ANSI code page,
+    # where printing →, Δ or ✓ raises UnicodeEncodeError. Consoles and
+    # Claude Code already use UTF-8 and are left alone.
+    for _stream in (sys.stdout, sys.stderr):
+        if getattr(_stream, "encoding", "utf-8").lower() not in ("utf-8", "utf8"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+    sys.exit(main())

@@ -1,4 +1,4 @@
-# The plugin's eval suite (P29, P30): `claude plugin eval` on plugins/web-design-suite/evals/.
+# The plugin's eval suite (P29, P30): `claude plugin eval` on plugins/pro-web-design-suite/evals/.
 # Every run is a real model call, billed to the ANTHROPIC_API_KEY secret, so the
 # job runs only when a maintainer starts it, never on a pull request: the
 # repository is public, and a fork's pull request must not spend the key. Nor on
@@ -66,7 +66,7 @@ jobs:
       # plugin's real MCP server for the gates, and run their scaffold
       # scripts, which are this repository's own (claude-code-capabilities.md §11).
       - name: Run the suite
-        working-directory: plugins/web-design-suite
+        working-directory: plugins/pro-web-design-suite
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TAG: ${{ inputs.tag }}
@@ -110,7 +110,7 @@ jobs:
           if [ "$TAG" != routing ]; then
             if python3 -c 'import sys; sys.exit(float(sys.argv[1]) < 1)' "$ceiling"; then
               suite outcome with-without --scaffold --allow-real-servers \
-                --allow-tools Write Edit "mcp__plugin_web-design-suite_gates__*"
+                --allow-tools Write Edit "mcp__plugin_pro-web-design-suite_gates__*"
             else
               echo "::error::Routing left \$$ceiling of the ceiling, too little for the outcome cases."
               status=1

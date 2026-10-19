@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/hero-dark.svg">
-  <img alt="Pro Web Designer Suite, a Claude Code plugin: a design system with a gate on it. 13 skills, 16 commands, 6 subagents and 5 gate tools." src=".github/assets/readme/hero-light.svg" width="100%">
+  <img alt="Pro Web Design Suite, a Claude Code plugin: a design system with a gate on it. 13 skills, 16 commands, 6 subagents and 5 gate tools." src=".github/assets/readme/hero-light.svg" width="100%">
 </picture>
 
 <br><br>
@@ -12,13 +12,13 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/ci.yml?branch=main&label=CI&style=for-the-badge&labelColor=171413)](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-cc3c00?style=for-the-badge&labelColor=171413)](LICENSE)
 
-**[Install](#install)** &nbsp;·&nbsp; **[Quick start](#quick-start-in-60-seconds)** &nbsp;·&nbsp; **[What's inside](#whats-inside)** &nbsp;·&nbsp; **[The gates](#what-the-gates-check)** &nbsp;·&nbsp; **[FAQ](#faq)** &nbsp;·&nbsp; **[Full reference](plugins/web-design-suite/README.md)**
+**[Install](#install)** &nbsp;·&nbsp; **[Quick start](#quick-start-in-60-seconds)** &nbsp;·&nbsp; **[What's inside](#whats-inside)** &nbsp;·&nbsp; **[The gates](#what-the-gates-check)** &nbsp;·&nbsp; **[FAQ](#faq)** &nbsp;·&nbsp; **[Full reference](plugins/pro-web-design-suite/README.md)**
 
 </div>
 
 <br>
 
-**`web-design-suite`** is a Claude Code plugin for building websites that stay coherent when more than one person, or more than one Claude session, touches them. Thirteen skills share one design system: tokens, one home for each component's styles, cascade layers, contrast that is measured rather than assumed, and gates that fail the build on drift.
+**`pro-web-design-suite`** is a Claude Code plugin for building websites that stay coherent when more than one person, or more than one Claude session, touches them. Thirteen skills share one design system: tokens, one home for each component's styles, cascade layers, contrast that is measured rather than assumed, and gates that fail the build on drift.
 
 ---
 
@@ -33,7 +33,7 @@ This suite turns every rule into a script that can fail. The scripts run after e
   <img alt="The census: 17 distinct greys found in a three-file sample, clustered onto seven roles on one neutral ramp: fg-default, fg-muted, fg-subtle, fg-disabled, border-strong, border-default and border-subtle." src=".github/assets/readme/census-light.svg" width="100%">
 </picture>
 
-<sub>A real run of <code>/web-design-suite:migrate</code> on a three-file sample: 42 literals, 17 distinct greys among them, each mapped onto the role it was trying to be.</sub>
+<sub>A real run of <code>/pro-web-design-suite:migrate</code> on a three-file sample: 42 literals, 17 distinct greys among them, each mapped onto the role it was trying to be.</sub>
 
 **It's for you if you:**
 
@@ -60,20 +60,20 @@ In Claude Code:
 
 ```text
 /plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in
-/plugin install web-design-suite@web-design-suite
+/plugin install pro-web-design-suite@pro-web-design-suite
 ```
 
 Then start a new session, so the skills, hooks and MCP server load. The repository is public, so this works for anyone.
 
 ### From a release zip
 
-1. Download `web-design-suite-VERSION.zip` from the [latest release](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/releases/latest). `SHA256SUMS` beside it lists every asset's hash.
-2. Unpack it. The `web-design-suite` folder inside holds `.claude-plugin/marketplace.json`, so it is a marketplace of its own.
+1. Download `pro-web-design-suite-VERSION.zip` from the [latest release](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/releases/latest). `SHA256SUMS` beside it lists every asset's hash.
+2. Unpack it. The `pro-web-design-suite` folder inside holds `.claude-plugin/marketplace.json`, so it is a marketplace of its own.
 3. Add that folder in place of the repository's name, then install:
 
 ```text
 /plugin marketplace add UNPACKED_FOLDER
-/plugin install web-design-suite@web-design-suite
+/plugin install pro-web-design-suite@pro-web-design-suite
 ```
 
 <details>
@@ -99,24 +99,24 @@ Python must be 3.9 or newer. Where `python` is not Python 3 (some macOS installs
 Then in Claude Code:
 
 ```text
-/web-design-suite:contrast "#767676" "#ffffff"
+/pro-web-design-suite:contrast "#767676" "#ffffff"
 ```
 
-You should get a ratio of **4.54:1**: a pass for body text at AA, a fail at AAA's 7:1. That proves the plugin loaded and Python runs. Then run `/mcp`: `plugin:web-design-suite:gates` should be connected, with five tools, which proves Node runs.
+You should get a ratio of **4.54:1**: a pass for body text at AA, a fail at AAA's 7:1. That proves the plugin loaded and Python runs. Then run `/mcp`: `plugin:pro-web-design-suite:gates` should be connected, with five tools, which proves Node runs.
 
 ## Quick start in 60 seconds
 
 **A new site.** Start the system from your brand colour:
 
 ```text
-/web-design-suite:new-system "#e8440a"
+/pro-web-design-suite:new-system "#e8440a"
 ```
 
 That writes the accent and neutral ramps, a type scale and the starter styles to `src/styles`, and checks the contrast of every role pair in light, dark and `.inverse`. Now ask Claude for what you want built, in plain words ("build the pricing page on this system"). The right skills load by themselves. When it's built:
 
 ```text
-/web-design-suite:gate
-/web-design-suite:install-gate
+/pro-web-design-suite:gate
+/pro-web-design-suite:install-gate
 ```
 
 The first runs the static halves of the design, accessibility and performance gates, with one verdict. The second puts the gates in your repository and writes the CI workflow that runs them on every pull request and every push to `main`. It shows you what it would write before it writes anything.
@@ -124,7 +124,7 @@ The first runs the static halves of the design, accessibility and performance ga
 **An inherited codebase.** Take a census first. It changes nothing:
 
 ```text
-/web-design-suite:migrate src
+/pro-web-design-suite:migrate src
 ```
 
 You get every hard-coded design value, clustered into the decisions it was trying to be, with a token mapping proposed. Then ask Claude to migrate onto those tokens: it applies the codemod one kind of value at a time, each batch reviewed and committed on its own, and freezes what's left as a baseline, so the gate goes on today and the old debt can only shrink.
@@ -177,9 +177,9 @@ Each skill carries the laws in its `references/token-contract.md`, byte-identica
 
 ### Sixteen commands
 
-Commands are skills only you invoke, so they stay out of Claude's skill listing. Each is typed after the plugin's name, as in `/web-design-suite:gate`, and typing `/web-design-suite:` lists them all.
+Commands are skills only you invoke, so they stay out of Claude's skill listing. Each is typed after the plugin's name, as in `/pro-web-design-suite:gate`, and typing `/pro-web-design-suite:` lists them all.
 
-| `/web-design-suite:` | What it does |
+| `/pro-web-design-suite:` | What it does |
 |---|---|
 | `gate` | Runs the design, accessibility and performance gates on the project in one pass, with one verdict. |
 | `install-gate` | Vendors the gate scripts into `scripts/` and writes `.github/workflows/design-gates.yml`. |
@@ -200,7 +200,7 @@ Commands are skills only you invoke, so they stay out of Claude's skill listing.
 
 ### Six subagents
 
-They work in their own context and return only their findings. None has the Edit or Write tool. Claude hands work to them when it fits, or you can ask for one by name (`web-design-suite:design-critic`).
+They work in their own context and return only their findings. None has the Edit or Write tool. Claude hands work to them when it fits, or you can ask for one by name (`pro-web-design-suite:design-critic`).
 
 | Subagent | What it returns |
 |---|---|
@@ -213,7 +213,7 @@ They work in their own context and return only their findings. None has the Edit
 
 ### Five gate tools (MCP)
 
-An MCP server, `gates`, starts with the plugin. Each tool runs a gate in the project's folder and returns the script's JSON, its exit code and a verdict. Permission rules and a skill's `allowed-tools` can name them, as `mcp__plugin_web-design-suite_gates__audit_design` and so on.
+An MCP server, `gates`, starts with the plugin. Each tool runs a gate in the project's folder and returns the script's JSON, its exit code and a verdict. Permission rules and a skill's `allowed-tools` can name them, as `mcp__plugin_pro-web-design-suite_gates__audit_design` and so on.
 
 | Tool | What it checks |
 |---|---|
@@ -240,7 +240,7 @@ The plugin's `design_hooks` option, set to false in `/config`, turns them all of
 
 ### The CI gate
 
-`/web-design-suite:install-gate` copies the gate scripts into your `scripts/` (with a manifest of their hashes), so a clean checkout runs them with no plugin installed. It writes `.github/workflows/design-gates.yml`, which runs on every pull request and every push to `main`, with three jobs:
+`/pro-web-design-suite:install-gate` copies the gate scripts into your `scripts/` (with a manifest of their hashes), so a clean checkout runs them with no plugin installed. It writes `.github/workflows/design-gates.yml`, which runs on every pull request and every push to `main`, with three jobs:
 
 - **gates:** builds the site, serves it, and runs the design gate and both halves of the accessibility and performance gates on Linux, in the Playwright image built for your project's own `playwright` version, so the browser is the one your lockfile expects;
 - **windows:** the static gates on a Windows runner;
@@ -297,9 +297,9 @@ The title's margin is gone: the card owns the gap between its children (Law 2). 
   <img alt="Where drift gets caught. 1, Claude edits a file: the opt-in hooks. 2, you commit: the pre-commit hook. 3, a pull request or a push to main: design-gates.yml, every gate on Linux and the static ones on Windows. 4, you release: release-check." src=".github/assets/readme/pipeline-light.svg" width="100%">
 </picture>
 
-**Where each one runs.** The pre-commit hook runs stylelint, ESLint, the design audit, the static accessibility check and, when a token file is staged, the contrast check. The CI workflow from `/web-design-suite:install-gate` runs the design audit and both halves of the accessibility and performance gates. The state matrix, the system diff, the docs check and the email build run from the `gate-matrix`, `release-check`, `docs-check` and `email-build` commands, and the state-matrix and docs skills give the CI job to add for theirs.
+**Where each one runs.** The pre-commit hook runs stylelint, ESLint, the design audit, the static accessibility check and, when a token file is staged, the contrast check. The CI workflow from `/pro-web-design-suite:install-gate` runs the design audit and both halves of the accessibility and performance gates. The state matrix, the system diff, the docs check and the email build run from the `gate-matrix`, `release-check`, `docs-check` and `email-build` commands, and the state-matrix and docs skills give the CI job to add for theirs.
 
-A finding you decide to keep goes into the gate's baseline (`--write-baseline`), never into a quiet edit to the rule. Every exception in the code is a comment pragma, so it's visible in review. The [full reference](plugins/web-design-suite/README.md#what-the-gate-actually-catches) lists the audit's rules one by one.
+A finding you decide to keep goes into the gate's baseline (`--write-baseline`), never into a quiet edit to the rule. Every exception in the code is a comment pragma, so it's visible in review. The [full reference](plugins/pro-web-design-suite/README.md#what-the-gate-actually-catches) lists the audit's rules one by one.
 
 ## Fit it to your project
 
@@ -354,7 +354,7 @@ Paths are relative to the file.
 | **Email** | Outlook, Gmail and dark mode. |
 | **Platforms** | Windows, macOS and Linux. The plugin's own suite runs on all three in CI. |
 
-*(4.0.0)* marks what's on `main` but not yet in a release zip: see the [CHANGELOG](plugins/web-design-suite/CHANGELOG.md).
+*(4.0.0)* marks what's on `main` but not yet in a release zip: see the [CHANGELOG](plugins/pro-web-design-suite/CHANGELOG.md).
 
 ## FAQ
 
@@ -417,7 +417,7 @@ No. The automated checks are the floor a machine can test. a11y-audit-runner als
 
 <br>
 
-Yes. They're plain Python and Node scripts. After `/web-design-suite:install-gate`, CI runs them from your `scripts/` with no plugin installed, and the [full reference](plugins/web-design-suite/README.md#running-the-scripts) shows how to run any script by path from a terminal.
+Yes. They're plain Python and Node scripts. After `/pro-web-design-suite:install-gate`, CI runs them from your `scripts/` with no plugin installed, and the [full reference](plugins/pro-web-design-suite/README.md#running-the-scripts) shows how to run any script by path from a terminal.
 
 </details>
 
@@ -479,7 +479,7 @@ That's the existing debt. Freeze it with `--write-baseline`, then migrate it dow
 
 <br>
 
-Claude Code keeps each installed version in its own folder under `~/.claude/plugins/cache`. Update the marketplace with `/plugin marketplace update web-design-suite`, update the plugin from `/plugin`, then start a new session.
+Claude Code keeps each installed version in its own folder under `~/.claude/plugins/cache`. Update the marketplace with `/plugin marketplace update pro-web-design-suite`, update the plugin from `/plugin`, then start a new session.
 
 </details>
 
@@ -487,9 +487,9 @@ Claude Code keeps each installed version in its own folder under `~/.claude/plug
 
 | Read | For |
 |---|---|
-| [The plugin's README](plugins/web-design-suite/README.md) | The full reference: the usual chain of skills on a project, running every script by path in any shell, both quick starts as commands, every rule the audit catches, the tests and the evals. |
-| [CHANGELOG](plugins/web-design-suite/CHANGELOG.md) | What changed in each release, and how to upgrade. |
-| [The skills](plugins/web-design-suite/skills) | Each skill's `SKILL.md`, with its references, scripts and assets beside it. |
+| [The plugin's README](plugins/pro-web-design-suite/README.md) | The full reference: the usual chain of skills on a project, running every script by path in any shell, both quick starts as commands, every rule the audit catches, the tests and the evals. |
+| [CHANGELOG](plugins/pro-web-design-suite/CHANGELOG.md) | What changed in each release, and how to upgrade. |
+| [The skills](plugins/pro-web-design-suite/skills) | Each skill's `SKILL.md`, with its references, scripts and assets beside it. |
 | [Releases](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/releases) | The zip, the `.skill` files and `SHA256SUMS` for each version. |
 
 ## Contributing
@@ -499,7 +499,7 @@ Issues and pull requests are welcome on [GitHub](https://github.com/Vybecode-LTD
 ```shell
 npm ci --prefix tooling/main
 npm ci --prefix tooling/tailwind-v3
-cd plugins/web-design-suite
+cd plugins/pro-web-design-suite
 python -B tools/check.py
 python -B -m unittest discover -s tests
 ```
@@ -527,7 +527,7 @@ python -B -m unittest discover -s tests
 
 | Where | What |
 |---|---|
-| [`plugins/web-design-suite`](plugins/web-design-suite) | The plugin, and the only folder that ships. |
+| [`plugins/pro-web-design-suite`](plugins/pro-web-design-suite) | The plugin, and the only folder that ships. |
 | [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) | Makes this repository a plugin marketplace. |
 | [`tooling`](tooling) | The pinned tools the tests run the shipped configs through, and the release build. |
 | [`.github/workflows`](.github/workflows) | `ci.yml` runs the suite on three platforms; a `v*` tag makes `release.yml` build the release. |
@@ -537,7 +537,7 @@ python -B -m unittest discover -s tests
 
 </details>
 
-<sub>Every picture on this page is the suite's own output. The palette is what <code>/web-design-suite:new-system "#e8440a"</code> generates, the census and the gate report are real runs on the samples in <a href="dev%20plans/readme-art"><code>dev plans/readme-art</code></a>, and its <code>build_readme_art.py</code> redraws them all, refusing to write a picture whose text falls below its WCAG floor.</sub>
+<sub>Every picture on this page is the suite's own output. The palette is what <code>/pro-web-design-suite:new-system "#e8440a"</code> generates, the census and the gate report are real runs on the samples in <a href="dev%20plans/readme-art"><code>dev plans/readme-art</code></a>, and its <code>build_readme_art.py</code> redraws them all, refusing to write a picture whose text falls below its WCAG floor.</sub>
 
 ## License
 
