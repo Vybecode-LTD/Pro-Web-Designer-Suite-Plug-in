@@ -3,7 +3,7 @@
 <desc>The migration's census of a three-file sample found 17 distinct greys; the proposal maps them onto seven roles: fg-default, fg-muted, fg-subtle, fg-disabled, border-strong, border-default and border-subtle.</desc><style>.sans{font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}.mono{font-family:ui-monospace,SFMono-Regular,'Cascadia Mono','Segoe UI Mono',Consolas,'Liberation Mono',Menlo,monospace}text{font-kerning:normal}</style>
 <rect x="0.5" y="0.5" width="1279" height="659" rx="28" fill="#fbf8f8" stroke="#d6d1d0"/>
 <text x="64.0" y="78.0" class="mono" font-size="15" font-weight="700" fill="#9e2f00" text-anchor="start" letter-spacing="2.5">THE CENSUS</text>
-<text x="1216.0" y="78.0" class="mono" font-size="15" font-weight="400" fill="#726b6a" text-anchor="end">/web-design-suite:migrate · 3 files · 42 literals</text>
+<text x="1216.0" y="78.0" class="mono" font-size="15" font-weight="400" fill="#726b6a" text-anchor="end">/pro-web-design-suite:migrate · 3 files · 42 literals</text>
 <text x="62.0" y="128.0" class="sans" font-size="38" font-weight="800" fill="#090706" text-anchor="start" letter-spacing="-1">17 greys in. 7 roles out.</text>
 <text x="64.0" y="166.0" class="sans" font-size="20" font-weight="400" fill="#615b59" text-anchor="start">Every hard-coded value, found and clustered into the role it was trying to be.</text>
 <text x="64.0" y="222.0" class="mono" font-size="14" font-weight="700" fill="#726b6a" text-anchor="start" letter-spacing="2">BEFORE  ·  17 DISTINCT GREYS</text>

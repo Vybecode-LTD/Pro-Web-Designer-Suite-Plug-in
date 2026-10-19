@@ -35,7 +35,7 @@ jobs:
       - name: The tag is plugin.json's version
         id: version
         run: |
-          version=$(uv run --no-project --python 3.14 python -c "import json; print(json.load(open('plugins/web-design-suite/.claude-plugin/plugin.json', encoding='utf-8'))['version'])")
+          version=$(uv run --no-project --python 3.14 python -c "import json; print(json.load(open('plugins/pro-web-design-suite/.claude-plugin/plugin.json', encoding='utf-8'))['version'])")
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
             echo "::error::the tag is $GITHUB_REF_NAME, but plugin.json says $version"
             exit 1
@@ -49,7 +49,7 @@ jobs:
         run: |
           uv run --no-project --python 3.14 python - "${{ steps.version.outputs.version }}" > notes.md <<'EOF'
           import re, sys
-          text = open("plugins/web-design-suite/CHANGELOG.md", encoding="utf-8").read()
+          text = open("plugins/pro-web-design-suite/CHANGELOG.md", encoding="utf-8").read()
           m = re.search(r"^## " + re.escape(sys.argv[1]) + r"\b.*?$(.*?)(?=^## |\Z)", text, re.M | re.S)
           if not m:
               sys.exit("the CHANGELOG has no section for " + sys.argv[1])
@@ -61,4 +61,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" dist/* --verify-tag \
-            --title "web-design-suite ${{ steps.version.outputs.version }}" --notes-file notes.md
+            --title "pro-web-design-suite ${{ steps.version.outputs.version }}" --notes-file notes.md

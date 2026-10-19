@@ -1,4 +1,4 @@
-"""Build a release of plugins/web-design-suite from git: the plugin's zip, one
+"""Build a release of plugins/pro-web-design-suite from git: the plugin's zip, one
 .skill file per skill, and their SHA-256 sums.
 
 usage: python tooling/release/build.py <out dir> [--rev REV]
@@ -22,7 +22,7 @@ numbers and hyphens, without "anthropic" or "claude"; a description of at
 most 1024 characters, without XML tags).
 
 Into <out dir>, which must be empty or not exist yet:
-  web-design-suite-<version>.zip  the plugin, under web-design-suite/: folders
+  pro-web-design-suite-<version>.zip  the plugin, under pro-web-design-suite/: folders
                                   stored and files deflated, with Unix modes
   <skill>.skill                   each skill as Anthropic's skill-creator
                                   packages one (skills/skill-creator/scripts/
@@ -62,8 +62,8 @@ import tarfile
 import time
 import zipfile
 
-PLUGIN = "plugins/web-design-suite"
-TOP = "web-design-suite/"
+PLUGIN = "plugins/pro-web-design-suite"
+TOP = "pro-web-design-suite/"
 FILE_MODES = {"100644", "100755"}          # git's modes for a file; 120000 is a link, 160000 a submodule
 SKILL_EXCLUDED_PARTS = {"__pycache__", "node_modules"}
 SKILL_EXCLUDED_NAMES = {".DS_Store"}
@@ -213,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
 
     date_time = time.gmtime(stamp)[:6]
     names = sorted({TOP} | {TOP + f + "/" for f in folders if f} | {TOP + f for f in files})
-    archives = {f"web-design-suite-{version}.zip": zip_bytes(
+    archives = {f"pro-web-design-suite-{version}.zip": zip_bytes(
         [(n, stat.S_IFDIR | 0o755, b"") if n.endswith("/") else (n, *files[n[len(TOP):]]) for n in names],
         date_time)}
     license_file = files.get("LICENSE")

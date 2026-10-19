@@ -1,10 +1,10 @@
-# CLAUDE.md: Pro Web Designer Suite (web-design-suite)
+# CLAUDE.md: Pro Web Design Suite (pro-web-design-suite)
 
 The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, which Claude Code loads for every folder under `C:\DEV`. This file is the project map. Where the two differ, this file wins.
 
 ## Project
 
-- **What:** web-design-suite, a Claude Code plugin. Thirteen skills for designing and building websites that stay coherent under multiple developers: tokens, style architecture, measured contrast, and gates that fail the build on drift.
+- **What:** Pro Web Design Suite (`pro-web-design-suite`; `web-design-suite` until 4.0.0), a Claude Code plugin. Thirteen skills for designing and building websites that stay coherent under multiple developers: tokens, style architecture, measured contrast, and gates that fail the build on drift.
 - **Stack:**
   - The scripts and tests are Python 3.9 or newer, standard library only.
   - Node 20.19+, 22.13+ or 24+ (ESLint 10's range) is needed for the browser scripts and the real-tool tests.
@@ -28,7 +28,7 @@ For the Bash tool (Git Bash), from the repository root:
 ```bash
 npm ci --prefix tooling/main          # once; it downloads no browser (tooling/README.md)
 npm ci --prefix tooling/tailwind-v3   # once
-cd plugins/web-design-suite
+cd plugins/pro-web-design-suite
 python -B tools/check.py              # every PR: pointers, snippets, the plan, the audit, budgets, the affected tests
 python -B tools/fail_before.py TEST_IDS [--rev REV]      # the fail-before table; REV defaults to the latest v* tag
 python -B -m unittest discover -s tests                     # the whole suite; -B keeps bytecode out of the plugin
@@ -62,6 +62,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 - **Commands you give the user** to run must work in cmd.exe. (The Commands block above is for the Bash tool.)
 - **Never run `npm ci` in a worktree whose `tooling/*/node_modules` is a junction**: it deletes the real toolchain through the link.
 - **The reader's copies.** `shared/project_config.py` and `shared/dtcg.py` have ten copies each, `shared/project_config.mjs` seven (`hooks/` among them). After a merge from a branch below, copy the three masters over every copy: git merges each copy on its own.
+- **The old id stays in four formats** that users' projects hold: the contract schema `web-design-suite/contract/1`, the DTCG `$extensions` key `io.github.vybecode-ltd.web-design-suite`, the install-gate stamp's `"plugin": "web-design-suite"`, and `.design-suite.json`. The 4.0.0 rename to `pro-web-design-suite` left them alone on purpose; never "fix" them.
 - **A DTCG resolver** (`*.resolver.json`) reads its sources only from its own folder or below, by name and by real path, in both readers (#105).
 
 ## Conventions
@@ -76,8 +77,8 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 ## Map
 
 ```
-.claude-plugin/marketplace.json   the repository as a marketplace; the plugin is at ./plugins/web-design-suite
-plugins/web-design-suite/         the plugin (the only folder that ships)
+.claude-plugin/marketplace.json   the repository as a marketplace; the plugin is at ./plugins/pro-web-design-suite
+plugins/pro-web-design-suite/     the plugin (the only folder that ships)
   skills/<13 skills>/             SKILL.md, references/, scripts/, assets/
   shared/token-contract.md        the master copy of the contract (13 copies must match it)
   shared/dtcg.py                  DTCG 2025.10 and Tokens Studio, read and write (a copy beside each project_config.py)

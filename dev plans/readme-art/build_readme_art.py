@@ -4,7 +4,7 @@
     python -B "dev plans/readme-art/build_readme_art.py"
 
 Every colour is the suite's own output. The palette is what
-`/web-design-suite:new-system "#e8440a"` writes (the quick start's brand
+`/pro-web-design-suite:new-system "#e8440a"` writes (the quick start's brand
 colour), each role read from its light or dark theme. The gate report is
 audit_design.py --strict's real output on sample/src/components/card.css (and
 card-fixed.css beside it for the clean run), in a project new-system wrote;
@@ -238,7 +238,7 @@ def hero(p) -> str:
     i5 = ACCENT_RAMP.index("#e8440a")
     o.append(f'<rect x="{X + 28 + i5 * sw - 3:.1f}" y="{Y + CH - 55}" width="{sw + 3:.1f}" height="30" rx="7" '
              f'fill="none" stroke="{p["strong"]}" stroke-width="2"/>')
-    return svg(W, H, "Pro Web Designer Suite: a design system with a gate on it",
+    return svg(W, H, "Pro Web Design Suite: a design system with a gate on it",
                o, "A Claude Code plugin. A button's spec at 200%: padding, radius and colour as tokens, "
                   f"its label's contrast measured at {p['ratio']}, and the accent ramp from 50 to 950.")
 
@@ -262,7 +262,7 @@ def census(p) -> str:
     c = p["canvas"]
     o = [card(W, H, p)]
     o.append(eyebrow(64, 78, "THE CENSUS", p, c))
-    o.append(text(W - 64, 78, "/web-design-suite:migrate · 3 files · 42 literals", 15,
+    o.append(text(W - 64, 78, "/pro-web-design-suite:migrate · 3 files · 42 literals", 15,
                   pair("census note", p["subtle"], c), mono=True, anchor="end"))
     o.append(text(62, 128, "17 greys in. 7 roles out.", 38, pair("census title", p["strong"], c, 3), weight=800, spacing=-1))
     o.append(text(64, 166, "Every hard-coded value, found and clustered into the role it was trying to be.", 20,
