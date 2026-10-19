@@ -110,6 +110,17 @@ class ClippedAtZoom(RuntimeCase):
         self.assertEqual(["html > body > main > ul.nav"], [f["selector"] for f in at320])
         self.assertEqual("1.4.10", at320[0]["sc"])
 
+    def test_a_box_that_spilt_and_now_hides_its_overflow_is_clipped(self):
+        """Codex on #179: a box that let two lines spill at full width and
+        hides its overflow in a narrow layout has lost the line it showed."""
+        report = self.runtime(page(
+            ".promo{height:1.3em;width:12em}"
+            "@media (max-width:700px){.promo{overflow:hidden}}",
+            "<p class=promo>First line<br>Second line</p>"), "reflow")
+        self.assertEqual(["html > body > main > p.promo"],
+                         [f["selector"] for f in self.found(report, "text-clipped-at-200-percent")],
+                         report["findings"])
+
     def test_a_row_that_grows_passes(self):
         report = self.runtime(page(NAV_CSS.format("min-height:1.4em;overflow:hidden"), NAV),
                               "reflow")
@@ -152,6 +163,24 @@ class FocusNotObscured(RuntimeCase):
         self.assertIn(FIRST,
                       [f["selector"] for f in self.found(report, "focus-obscured")],
                       report["findings"])
+
+    def test_a_transparent_layer_over_the_page_hides_nothing(self):
+        """Codex on #179: a toast region spread over the whole viewport is hit
+        at every point and paints only its toast. What a cover paints counts,
+        not what it is hit for; a toast that is over a link still hides it."""
+        portal = ("<div class=portal><div class=toast>Saved</div></div>")
+        css = ("html{scroll-padding:160px 0 120px}"
+               ".portal{position:fixed;inset:0;pointer-events:none}"
+               ".toast{position:absolute;right:0;top:0;background:#222;color:#fff;"
+               "padding:8px 16px}")
+        clear = self.runtime(page(STOPS_CSS.format("padding:160px 0 120px", css),
+                                  STOPS + portal), "obscured")
+        self.assertEqual([], [f for f in clear["findings"] if f["check"] == "obscured"])
+        over = self.runtime(page(STOPS_CSS.format(
+            "padding:160px 0 120px", css + ".toast{left:0;bottom:0}"), STOPS + portal),
+            "obscured")
+        covers = {c for f in self.found(over, "focus-obscured") for c in f["covers"]}
+        self.assertTrue(covers and all("div.portal" in c for c in covers), over["findings"])
 
     def test_padding_and_scroll_padding_as_tall_as_the_bars_pass(self):
         report = self.runtime(page(STOPS_CSS.format(
@@ -250,6 +279,23 @@ class ReducedMotion(RuntimeCase):
         report = self.runtime(page(MOTION_CSS.format(
             ".slider{animation:none}.reveal{animation:none;opacity:1}"), MOTION_BODY), "motion")
         self.assertEqual([], [f for f in report["findings"] if f["check"] == "motion"])
+
+    def test_travel_is_measured_between_keyframes_and_by_element(self):
+        """Codex on #179: -200px to 200px is 400px of travel, not the 0
+        between two equal distances from the origin, so a variant of -20px to
+        20px, under keyframes of its own name, is reduced. The same travel
+        under a new name is not."""
+        css = ("@keyframes sway{{from{{transform:translateX(-200px)}}to{{transform:translateX(200px)}}}}"
+               "@keyframes {name}{{from{{transform:translateX(-{px}px)}}to{{transform:translateX({px}px)}}}}"
+               ".sway{{animation:sway 2s ease-in-out infinite alternate}}"
+               "@media (prefers-reduced-motion: reduce){{.sway{{animation-name:{name}}}}}")
+        body = "<div class=sway>Swaying banner</div>"
+        small = self.runtime(page(css.format(name="nudge", px=20), body), "motion")
+        self.assertEqual([], [f for f in small["findings"] if f["check"] == "motion"])
+        same = self.runtime(page(css.format(name="sway2", px=200), body), "motion")
+        self.assertEqual(["motion-not-reduced"],
+                         [f["rule"] for f in same["findings"] if f["check"] == "motion"],
+                         same["findings"])
 
     def test_a_shorter_slide_counts_as_reduced(self):
         report = self.runtime(page(MOTION_CSS.format(

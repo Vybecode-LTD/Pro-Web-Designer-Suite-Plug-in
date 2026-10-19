@@ -1943,8 +1943,11 @@ function clipFindings(before, after, o) {
   const lost = [];
   const spilt = [];
   for (const [sel, now] of Object.entries(after)) {
+    // New on an axis, or clipped where it only spilt before: a box that a
+    // narrow layout switches to `overflow: hidden` loses what it showed
+    // (Codex on #179).
     const was = before[sel] || {};
-    const axes = ['x', 'y'].filter((k) => now[k] && !was[k]);
+    const axes = ['x', 'y'].filter((k) => now[k] && (!was[k] || (now[k].clips && !was[k].clips)));
     if (!axes.length) continue;
     const hit = {
       sel, text: now.text,
@@ -2044,24 +2047,60 @@ const OBSCURED_FN = () => {
     return q.right > L && q.left < R && q.bottom > T && q.top < B;
   });
   if (!covers.length) return { sel, hidden: 0, by: [] };
-  // The topmost element at a point, through every shadow root.
-  const topAt = (x, y) => {
-    let hit = document.elementFromPoint(x, y);
-    for (let root = deep.shadowOf(hit); root && root.elementFromPoint;
-      root = deep.shadowOf(hit)) {
-      const inner = root.elementFromPoint(x, y);
-      if (!inner || inner === hit) break;
-      hit = inner;
+  // Every element at a point, topmost first, through every shadow root: a
+  // host's own insides come before it.
+  const stackAt = (x, y) => {
+    const out = [];
+    const visit = (root) => {
+      for (const e of root.elementsFromPoint(x, y)) {
+        if (e.getRootNode() !== root || out.includes(e)) continue;
+        const inner = deep.shadowOf(e);
+        if (inner && inner.elementsFromPoint) visit(inner);
+        out.push(e);
+      }
+    };
+    visit(document);
+    return out;
+  };
+  const clear = (c) => c === 'transparent' || /(?:,\s*|\/\s*)0(?:\.0+)?\)$/.test(c);
+  // Whether an element inside a cover paints at the point: a layer a portal
+  // or a toast region spreads over the page is hit, and draws nothing (Codex
+  // on #179). A background, an image or a control, or its own text there.
+  const paints = (e, cover, x, y) => {
+    for (let n = e; n; n = deep.parentOf(n)) {
+      if (n.nodeType === 1 && Number(getComputedStyle(n).opacity) === 0) return false;
+      if (n === cover) break;
     }
-    return hit;
+    const cs = getComputedStyle(e);
+    if (/^(img|picture|video|canvas|svg|iframe|object|embed|input|select|textarea|button)$/
+      .test(e.localName)) return true;
+    if (!clear(cs.backgroundColor) || cs.backgroundImage !== 'none') return true;
+    for (const n of e.childNodes) {
+      if (n.nodeType !== 3 || !n.data.trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      for (const q of range.getClientRects()) {
+        if (x >= q.left && x <= q.right && y >= q.top && y <= q.bottom) return true;
+      }
+    }
+    return false;
+  };
+  // What paints over the focused element at a point, down to the element
+  // itself or what holds it.
+  const coverAt = (x, y) => {
+    for (const e of stackAt(x, y)) {
+      if (deep.contains(el, e) || deep.contains(e, el)) return null;
+      const c = covers.find((k) => deep.contains(k, e));
+      if (c && paints(e, c, x, y)) return c;
+    }
+    return null;
   };
   const N = 5;
   let hid = 0;
   const by = new Set();
   for (let i = 0; i < N; i++) {
     for (let j = 0; j < N; j++) {
-      const hit = topAt(L + (R - L) * (i + 0.5) / N, T + (B - T) * (j + 0.5) / N);
-      const over = hit && !deep.contains(el, hit) && covers.find((c) => deep.contains(c, hit));
+      const over = coverAt(L + (R - L) * (i + 0.5) / N, T + (B - T) * (j + 0.5) / N);
       if (over) { hid++; by.add(a.cssPath(over)); }
     }
   }
@@ -2278,11 +2317,31 @@ async function checkHover(page) {
 const MOTION_LOG = () => {
   const seen = new Map();
   const MOVES = /^(transform|translate|rotate|scale|left|top|right|bottom|inset|margin|offset|backgroundPosition)/;
-  const shift = (v) => {
+  const UNIT = { deg: 1, grad: 0.9, rad: 180 / Math.PI, turn: 360 };
+  // Where a keyframe puts the element: its translation, its turn in degrees
+  // (read from the text, since a matrix cannot tell 360deg from 0) and its
+  // scale. null where a value cannot be read here (a percentage).
+  const pose = (k, v) => {
+    const s = String(v).trim();
+    const turn = (/rotate[^(]*\(\s*(-?[\d.]+)(deg|grad|rad|turn)/.exec(s) ||
+                  /^(-?[\d.]+)(deg|grad|rad|turn)$/.exec(s));
+    let text = s;
+    if (k === 'translate') text = `translate(${s.split(/\s+/).join(',')})`;
+    if (k === 'rotate') text = turn ? `rotate(${turn[1]}${turn[2]})` : 'none';
+    if (k === 'scale') text = `scale(${s.split(/\s+/).join(',')})`;
     try {
-      const m = v === 'none' ? new DOMMatrixReadOnly() : new DOMMatrixReadOnly(v);
-      return Math.hypot(m.m41, m.m42);
+      const m = text === 'none' ? new DOMMatrixReadOnly() : new DOMMatrixReadOnly(text);
+      return { x: m.m41, y: m.m42, deg: turn ? Number(turn[1]) * UNIT[turn[2]] : 0,
+               scale: Math.hypot(m.m11, m.m12) };
     } catch { return null; }
+  };
+  // The most any two keyframes are apart: translateX(-200px) to (200px) is
+  // 400px of travel, not the 0 between their distances from the origin
+  // (Codex on #179).
+  const spread = (poses, f) => {
+    let most = 0;
+    for (const p of poses) for (const q of poses) most = Math.max(most, f(p, q));
+    return Math.round(most * 100) / 100;
   };
   const describe = (an) => {
     const eff = an.effect;
@@ -2291,23 +2350,26 @@ const MOTION_LOG = () => {
     const name = an.animationName || an.transitionProperty || an.id || 'script';
     if (seen.has(`${sel}|${name}`)) return;
     const props = new Set();
-    const shifts = [];
+    const poses = { transform: [], translate: [], rotate: [], scale: [] };
     for (const frame of eff.getKeyframes()) {
       for (const [k, v] of Object.entries(frame)) {
         if (['offset', 'computedOffset', 'easing', 'composite'].includes(k)) continue;
         props.add(k);
-        if (k === 'transform') shifts.push(shift(String(v)));
-        if (k === 'translate') shifts.push(shift(`translate(${String(v).trim().split(/\s+/).join(',')})`));
+        if (k in poses) poses[k].push(pose(k, v));
       }
     }
+    const read = Object.values(poses).flat();
+    const known = read.filter(Boolean);
+    const measured = known.length && known.length === read.length;
     const timing = eff.getComputedTiming();
-    const known = shifts.filter((d) => d !== null);
     seen.set(`${sel}|${name}`, {
       sel, name,
       duration: typeof timing.duration === 'number' ? Math.round(timing.duration) : 0,
       loops: !Number.isFinite(timing.iterations),
       moves: [...props].filter((p) => MOVES.test(p)),
-      distance: known.length ? Math.round(Math.max(...known) - Math.min(...known)) : null,
+      distance: measured ? Math.round(spread(known, (p, q) => Math.hypot(p.x - q.x, p.y - q.y))) : null,
+      turn: measured ? spread(known, (p, q) => Math.abs(p.deg - q.deg)) : null,
+      zoom: measured ? spread(known, (p, q) => Math.abs(p.scale - q.scale)) : null,
       busy: Boolean(window.__wdsDeep.closest(
         eff.target, '[aria-busy="true"], [role="progressbar"], [role="status"]')),
     });
@@ -2378,13 +2440,18 @@ function motionFindings(normal, reduced) {
   const key = (x) => `${x.sel}|${x.name}`;
   const was = new Map(normal.animations.map((x) => [key(x), x]));
   const CAP = 8;
+  // A reduced variant may be keyframes of another name on the same element.
+  const before = (r) => was.get(key(r)) ||
+    normal.animations.find((x) => x.sel === r.sel && x.moves.length);
   const kept = reduced.animations.filter((r) => {
     if (!r.moves.length || r.busy) return false;
     if (!r.loops && r.duration < 100) return false;
-    const n = was.get(key(r));
+    const n = before(r);
     if (!n) return true;
     if (r.duration <= n.duration / 2) return false;
-    return !(n.distance && r.distance !== null && r.distance <= n.distance / 2);
+    // Travel, turn and scale: each the original had, at most half of it.
+    const amounts = ['distance', 'turn', 'zoom'].filter((m) => n[m]);
+    return !(amounts.length && amounts.every((m) => r[m] !== null && r[m] <= n[m] / 2));
   });
   for (const r of kept.slice(0, CAP)) {
     out.push(finding(
