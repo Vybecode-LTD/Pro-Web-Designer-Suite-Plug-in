@@ -1,12 +1,14 @@
 # Start here: the next session
 
-**Written 2026-10-18**, at the end of the day's third session, which finished **P37**: two PRs, and the docs PR, which merges once green (§3):
-- **#176, P37 part 5 (Vue)**, merged as `b20f562`: `scaffold_ui.py --framework vue`.
-- **#177, P37 part 6 (Svelte)**, merged as `8d8b6f8`: `--framework svelte`. DL-B3 is closed.
+**Written 2026-10-19**, at the end of the session that finished **P35**: two PRs, and the docs PR, which merges once green (§3):
+- **#179, P35 part 1 (GT-B6)**, merged as `8a99f60`: `spacing`, `obscured`, `hover` and `motion` in the runtime gate, and clipped text in `reflow`.
+- **#183, P35 part 2 (GT-B9)**, merged as `1a37335`: `--engine firefox|webkit`.
 
-**The owner chose P35 next (2026-10-18).** The order of P41, P42 and P43 after it is still theirs.
+**The owner renamed the plugin Pro Web Design Suite** in another session (#180, merged): it lives in `plugins/pro-web-design-suite`. That session's #181 and #182 are open and are not yours.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **P35, the a11y gates' missing checks and engines** (§4), then the rest of Phase 6b in the order the owner chooses, then R4.
+**Next: P41, P42 and P43, in the order the owner chooses.** Ask before you start (§4).
+
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **the rest of Phase 6b in the order the owner chooses** (§4), then R4.
 
 You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -34,7 +36,7 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
     - waits for CodeRabbit's check to leave `pending`;
     - prints the checks, `mergeStateStatus`, the open-thread count and the reviews by commit.
 
-    It is in the last sessions' scratchpads; copy the newest (`ed3194bc-…`, with `keep_both.py`, which resolves a merge from `main` in the CHANGELOG and both plans, and `plan_p55.py`, which writes a part's plan row and note), whose `gh run watch` has `--interval 30` and which waits for CodeRabbit 3 minutes at most. **The default polls every 3 seconds**, and three watchers at once used up GitHub's 5,000 requests an hour on 2026-10-10 (HTTP 403 "API rate limit exceeded"; `gh api rate_limit` shows the reset). Run one watcher at a time, and stop a superseded one with `TaskStop`.
+    It is in the last sessions' scratchpads; copy the newest (`478e774c-…`; `ed3194bc-…` also has `keep_both.py`, which resolves a merge from `main` in the CHANGELOG and both plans, and `plan_p55.py`, which writes a part's plan row and note), whose `gh run watch` has `--interval 30` and which waits for CodeRabbit 3 minutes at most. **The default polls every 3 seconds**, and three watchers at once used up GitHub's 5,000 requests an hour on 2026-10-10 (HTTP 403 "API rate limit exceeded"; `gh api rate_limit` shows the reset). Run one watcher at a time, and stop a superseded one with `TaskStop`.
   - Never grep `tooling/`: its `node_modules` makes a search run for minutes. Reading one named file in it is fine.
   - **To wait** (for CodeRabbit's hourly limit, say), run `sleep N` with the Bash tool's `run_in_background`: a foreground `sleep` is blocked, and the notification wakes you.
   - **CodeRabbit is not a merge gate (the owner, 2026-10-12).** Its free tier gives one review an hour across all PRs, and waiting for it held PRs open for hours. Never wait for it or request a review to gate a merge.
@@ -256,6 +258,16 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
       - **Check a reviewer's runtime claim in the runtime.** Codex said Svelte's spread put an array on a native select's scalar `value`; Svelte's attribute effect calls `select_option`, and a jsdom test proved it.
       - **A server render cannot show everything.** Vue's SSR selects a `v-model`'s options only when they share its template; slotted ones are the runtime's. Pick the harness that runs the code path.
       - **A control that does not fail proves nothing.** Svelte's first control (no wait for `bind:this`) gave the same steps: the guard was dead code, and went; #64's count-only effect is the control now.
+    - **The 2026-10-19 session's reviews found 20 real issues:** #179 (Codex 13 over four rounds, CodeRabbit 3) and #183 (CodeRabbit 2, Codex 1, the same as one of CodeRabbit's; and CI 1). Each was fixed with a test failing on the head it reviewed. The lessons, for any check that reads what a browser paints:
+      - **Hit-testing is not painting.** `elementFromPoint` returns a transparent portal or toast region spread over the page. Count a point as covered only where something paints there: a background, an image or a control, a border the point falls on, a `::before` or `::after` with a background, or the element's own text.
+      - **Read alpha only from an alpha component.** `rgb(0, 0, 0)` ends in `, 0)`, and a regex for `, 0)` read black (and any colour with no blue) as transparent.
+      - **Measure the text, not the box.** A box's scroll size counts a decoration or image wider than it. Clipping is each text node's rectangles against the box that governs its overflow on that axis. A box that spilt and now hides its overflow has clipped.
+      - **Travel is the distance between keyframes**, not the range of their distances from the origin (`-200px` to `200px` is 400px). Positional properties (`left`, margins, background positions) travel too. A renamed reduced animation pairs one-to-one, with the original that moves the same property.
+      - **A loop's replacement must loop**, and a page longer than the scroll cap still gets a jump to its end.
+      - **Read an engine's behaviour from the run, never assume it.** WebKit's Windows and macOS builds skip bare links on Tab, as Safari does; its Linux build does not, which CI showed. A test that holds for one platform must hold for both, or name the platform.
+      - **A skip must not hide a broken install.** Where CI installs a browser, set a `WDS_REQUIRE_*` variable that turns the test's skip into a failure.
+      - **A budget counts every finding a team may want to hold at zero** (`motion_busy_stopped`). An upgrade note says what goes red, and that an error fails whatever the budget allows: `--skip` is the rollout.
+      - **`check.py` does not select `test_doc_snippets` or stylelint's snippet test** when a reference changes, so a new css fence reached CI. Run them yourself, and mark an illustration `/* example: illustration */`.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -308,7 +320,7 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `13 open items, 13 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `11 open items, 11 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
@@ -527,40 +539,32 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
   - Vue: a root's class is the component's name, since Vue scopes a child's root with the parent's attribute; the controls share `Control.css` through `<style scoped src>`. Svelte: the sheets keep `.root`, but each component holds only the rules its markup uses (`css_rules`, `svelte_sheet`), or Svelte drops them with a warning.
   - `tests/test_scaffold_frameworks.py` compiles with the real compilers, renders the form on the server, and drives its focus: Vue through a custom renderer with the kit stubbed, Svelte in jsdom with the real kit. Its Node harnesses are strings in the test, with modes (`compile`, `ssr`, `render`, `focus`, `select`).
 
+- **The runtime gate's checks (P35).** `ALL_CHECKS` holds 12; `EVERY_ENGINE` the three that run outside Chromium (axe, names, taborder). `OVERFLOW_FN` and `clipFindings()` serve `reflow` and `spacing`; `OBSCURED_FN` (`stackAt`, `paints`, `clear`), `TRIGGERS_FN`, `TIP_FN`, `TIP_COVERS_FN`, `MOTION_LOG` (an init script, only in the motion contexts), `EXERCISE_FN` and `motionFindings()`. `newPage(forced, motion)` opens a motion context without the freeze. `launchEngine()` and `ENGINES` are in `shared/browser_common.mjs` (five byte-identical copies). Playwright 1.63's builds: Firefox 1543, WebKit 2359. The tests are `test_runtime_wcag_checks` (36) and `test_runtime_engines`.
+
 ## 3. First: the state of `main`
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then:
-- **The docs PR** of 2026-10-18's third session (#178) may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
-- Remove any worktree left in a scratchpad (`git worktree list`): `git worktree remove PATH`, then `git branch -d` each merged branch. The newest `wait_pr.sh` is in `4d6c2acf-…\scratchpad`.
+- **The docs PR** of 2026-10-19 may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
+- **#181 and #182** are the owner's other session's (the distribution repository; Anthropic's directory). Leave them alone; a branch you cut may need `main` merged in after they land.
+- Remove any worktree left in a scratchpad (`git worktree list`): `git worktree remove PATH`, then `git branch -d` each merged branch. The newest `wait_pr.sh` is in `478e774c-…\scratchpad`.
 - Then read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
 
-## 4. P35, then the rest of Phase 6b, 4.0.0
+## 4. The rest of Phase 6b, then 4.0.0
 
-Phase 6c is done (P50 to P55). In Phase 6b, P36, P34 and P37 are done. **The owner chose P35 next (2026-10-18).** Read GT-B6 and GT-B9 in `dev plans/web-design-suite-review/gates.md` (lines 124 and 127), P35's row in the execution plan, `a11y-audit-runner/references/automation-coverage.md` §1 (the table: 1.4.4, 1.4.10, 1.4.12, 1.4.13, 2.4.11), `runtime-checks.md` (§6 is the reduced-motion policy), and `a11y_runtime.mjs`'s option parsing and browser launch (`launchBrowser`, line about 2106) before planning, and keep each PR under 100 files.
-
-**P35 (GT-B6, GT-B9, size M-L): two PRs.**
-- **Part 1, the cheap automatable checks (GT-B6).** Each is a check in `a11y_runtime.mjs`, with an option or a default in `runtime-checks.md`, a fixture page in `tests/fixtures` that fails it and one that passes, and its row in `automation-coverage.md` moved from "*Not in this suite*" to the check that runs:
-  - **1.4.12 Text Spacing:** inject WCAG's spacing (line height 1.5, paragraph spacing 2, letter spacing 0.12, word spacing 0.16, all `!important`) and report each text container whose content is clipped (`scrollHeight > clientHeight` with `overflow: hidden`, or text past its box) after the injection and not before.
-  - **2.4.11 Focus Not Obscured (Minimum):** at each tab stop, compare the focused element's rect with every `position: sticky` or `fixed` element's, leaving out the focused element and its ancestors (a control inside a sticky header is the header's own surface), and confirm by hit-testing (`elementsFromPoint` across the rect) that the other element is painted above it; AA fails only when it is entirely hidden (Codex on #178).
-  - **1.4.13 Content on Hover or Focus:** hover and focus each element with a tooltip pattern (`aria-describedby` to a hidden node, `title` excluded), check that Esc dismisses what appeared, and that it stays while the pointer moves onto it.
-  - **Reduced motion (a policy check, not 2.3.3, which is AAA and about motion an interaction triggers):** run once with `prefers-reduced-motion: reduce` and once without; compare the non-essential motion between the two (`document.getAnimations()`, their durations and distances), exempt a loop `runtime-checks.md` §6 requires to keep running (a busy spinner), and exercise the page in reduced mode, since the failure that matters is a transition removed with its content left hidden or inoperable (Codex on #178).
-  - **1.4.4 and 1.4.10 at 200% and 320 px:** clipping and horizontal scroll at a 200% zoom (a 640 px viewport at device scale 2, or CSS zoom) and at 320 CSS px.
-- **Part 2, other engines (GT-B9).** `--engine chromium|firefox|webkit` for axe, the names and the tab order, through Playwright's `firefox` and `webkit`; `browser_common.mjs`'s discovery learns each engine's pinned build, and the tests skip an engine that is not installed. Focus-visible heuristics and forced colours differ by engine: say which checks are Chromium's alone. **Ask the owner before CI installs Firefox or WebKit** (`npx playwright install firefox webkit`, tens of megabytes each), with the estimate.
-- **Tests, each part:** a fixture that fails each check and one that passes, run in the real browser (`tool_modules`, skipped without one); fail before on `v3.6.0`.
-- Docs: a11y-audit-runner's SKILL.md (its budget), `runtime-checks.md`, `automation-coverage.md`'s rows, `scripts.md`; the CHANGELOG under 4.0.0; P35's row goes when part 2 lands, and GT-B6 and GT-B9 become done in the inventory.
-
-**Then the rest of Phase 6b. Ask the owner which comes next**, and give them the sizes. Read the item's rows in the completion plan and its review findings before planning it, and split an L into PRs under 100 files each. Rows are from `dev plans/web-design-suite-execution-plan.md` §4:
+Phase 6c is done (P50 to P55). In Phase 6b, P34, P35, P36 and P37 are done. **Ask the owner which of P41, P42 and P43 comes first**, and give them the sizes below. Read each item's rows in the completion plan and its review finding (`dev plans/web-design-suite-review/delivery.md` for DL-, `persuasion.md` for PS-) before planning, and split an L into PRs under 100 files each.
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P41 | Email: MJML or React Email output, a right-to-left template, and a client matrix regenerated from caniemail's data | DL-B4, DL-B5, DL-C9 | email-template-system | L |
-| P42 | Persuasion: the UK and EU consumer law to flag for legal review, consent for tracking, price experiments, and persuasive patterns mapped to WCAG | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
-| P43 | More page types and audiences, a claims layer with `lint_claims.py`, routing between the persuasion skills, and MESSAGE_BRIEF to DECISION_LOG | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
+| P41 | Email: MJML or React Email output (DL-B4: `mj-attributes`/`mj-class` or a React Email theme from `email-tokens.json`, or route away explicitly); a right-to-left template (DL-B5: `dir="rtl"` on tables so ghost-table order flips, mirrored `align`, padding and VML, per-locale `lang` and `<title>`, text expansion against fixed VML widths); a client matrix regenerated from caniemail's data, with test dates (DL-C9) | DL-B4, DL-B5, DL-C9 | email-template-system | L |
+| P42 | Persuasion: persuasive patterns mapped to the WCAG 2.2 criteria they touch (PS-B1: sticky bars, deadlines, carousels, modals, consent banners, multi-step forms); UK and EU consumer law to flag for legal review (PS-B2: the DMCC Act, in force since 6 April 2025, fake reviews and drip pricing); price experiments (PS-B3: disclosure, the lowest price shown, revenue per visitor's noise); consent for tracking (PS-B8: GDPR, ePrivacy, PECR, masking in session recordings) | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
+| P43 | Page types and audiences (PS-B4: B2B demo pages, gated lead magnets, booking and donation pages, regulated claims, localisation); a claims layer and `lint_claims.py` (PS-B6, PS-C6: load-time countdowns, "only N left", pre-checked opt-ins, unsourced percentages, struck-through prices); routing between the persuasion skills and to perf-budget-gate and a11y-audit-runner; MESSAGE_BRIEF to DECISION_LOG (PS-C12) | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
+
+Every outside figure in P42 (a law's date, a fine's ceiling) is re-read at its source on the day and registered in `tests/fixtures/evidence.json` with its quote. A legal point is flagged for review, never stated as advice.
 
 **Each PR:** fail before on `v3.6.0` (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES` (and `WDS_TAILWIND_MODULES` for `test_tw_probe`), both at `tooling/main/node_modules`; the CHANGELOG under 4.0.0; a done row `Pnn part N, #N` above the item's row, which goes when the item is done; a note in the completion plan. `test_static_checks` holds every new script and test to its five rules.
 
-**R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed (a Vue project's bound attributes, the index-mode hook), the migration's reconciliation on a real codebase (P52), the router (#143), the MCP server's containment (#155), P55's gates (the email lint's lines, Prisma's `Unsupported`, `perf_audit`'s left-out pages), P34's options on a real client-rendered app and a real signed-in page (a `codegen --save-storage` session, a steps file, a staging header), a real web-component library (Shoelace or Lit, open and closed roots), a site's sitemap through `--urls` at two viewports, P37's stacks, **the scaffold's Vue and Svelte output in a real Vite and a real SvelteKit project** (it builds, its pages pass the runtime gate), P35's checks, and **the routing evals on content-model-to-ui's new description** (React, Vue or Svelte).
+**R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. The rename (#180) changes the install path: read its PR, and check the `renames` entry moves an existing install. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed, the migration's reconciliation on a real codebase (P52), the router (#143), the MCP server's containment (#155), P55's gates, P34's options on a real client-rendered app and a real signed-in page, a real web-component library, a site's sitemap through `--urls` at two viewports, P37's stacks, the scaffold's Vue and Svelte output in a real Vite and a real SvelteKit project, **P35's checks on a real site** (a sticky header, a cookie banner, tooltips, reduced motion; `--engine webkit` and, on Linux or macOS, `--engine firefox`), and **the routing evals on the renamed plugin**.
 
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 
