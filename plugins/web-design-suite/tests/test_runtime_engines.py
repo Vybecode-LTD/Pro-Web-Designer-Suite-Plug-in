@@ -44,20 +44,24 @@ class EachEngine(TempDirTest):
     def rules(self, report):
         return {f["rule"] for f in report["findings"]}
 
-    def test_firefox_and_webkit_run_the_three_shared_checks(self):
-        for engine in ("firefox", "webkit"):
-            with self.subTest(engine=engine):
-                report = self.runtime("--engine", engine)
-                self.assertEqual(engine, report["engine"])
-                self.assertEqual(SHARED, report["ran"])
-                rules = self.rules(report)
-                self.assertTrue({"button-name", "no-accessible-name",
-                                 "positive-tabindex-order"} <= rules, report["findings"])
-                note = [f for f in report["findings"] if f["rule"] == "checks-run-in-chromium-only"]
-                self.assertEqual(1, len(note))
-                self.assertEqual("warning", note[0]["severity"])
-                self.assertIn("focus", note[0]["checks"])
-                self.assertNotIn("axe", note[0]["checks"])
+    def shared_checks(self, engine):
+        report = self.runtime("--engine", engine)
+        self.assertEqual(engine, report["engine"])
+        self.assertEqual(SHARED, report["ran"])
+        rules = self.rules(report)
+        self.assertTrue({"button-name", "no-accessible-name",
+                         "positive-tabindex-order"} <= rules, report["findings"])
+        note = [f for f in report["findings"] if f["rule"] == "checks-run-in-chromium-only"]
+        self.assertEqual(1, len(note))
+        self.assertEqual("warning", note[0]["severity"])
+        self.assertIn("focus", note[0]["checks"])
+        self.assertNotIn("axe", note[0]["checks"])
+
+    def test_firefox_runs_the_three_shared_checks(self):
+        self.shared_checks("firefox")
+
+    def test_webkit_runs_the_three_shared_checks(self):
+        self.shared_checks("webkit")
 
     def test_webkit_expects_no_tab_stop_on_a_bare_link(self):
         """WebKit's Tab, like Safari's by default, passes over a link with no
