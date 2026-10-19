@@ -87,7 +87,8 @@ class TheGateOnABundledSite(TempDirTest):
         # A weight or style is not a hash, dashed or dotted (Codex on #185): preloading
         # Inter-SemiBold, Inter.SemiBold or Inter.BoldItalic leaves Inter unpreloaded.
         self.write("src/styles/fonts.css", FACE_SRC.replace("geist-latin-wght-normal", "Inter"))
-        for other in ("Inter-SemiBold", "Inter.SemiBold", "Inter.BoldItalic", "Inter.ExtraLight"):
+        for other in ("Inter-SemiBold", "Inter.SemiBold", "Inter.BoldItalic", "Inter.ExtraLight",
+                      "Inter.SemiBold-Italic", "Inter.Bold_Italic"):
             with self.subTest(preload=other):
                 self.write("dist/index.html", page(f'<link rel="preload" href="/f/{other}.woff2" '
                                                    'as="font" type="font/woff2" crossorigin>'))
