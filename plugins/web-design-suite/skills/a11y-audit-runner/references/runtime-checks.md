@@ -410,6 +410,7 @@ What this cannot decide: whether content or *functionality* was lost rather than
 The `spacing` check is the same diff around 1.4.12's own values, injected as a stylesheet into the document and every shadow root, each `!important` so the author's spacing gives way, and taken out again before the next check:
 
 ```css
+/* example: illustration. The stylesheet the check injects, not one to ship. */
 *, *::before, *::after { line-height: 1.5 !important; letter-spacing: 0.12em !important;
   word-spacing: 0.16em !important; }
 p { margin-bottom: 2em !important; }
