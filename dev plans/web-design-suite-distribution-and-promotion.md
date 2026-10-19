@@ -82,8 +82,12 @@ runs per skill and error rates. Updates need no resubmission: merge or move the 
 2. **Credentials read from the environment.** `figma-variables-sync/SKILL.md` uses `FIGMA_TOKEN`, and
    `perf-budget-gate/scripts/crux_check.py` reads `CRUX_API_KEY` and sends it to Google. The checklist holds
    any plugin that reads an env credential and sends it to a server, "even in a README example", and asks for
-   a `userConfig` entry with `sensitive: true` instead. **Fix before submitting:** add `figma_token` and `crux_api_key`
-   to `userConfig`, and have the docs and scripts take them from there (an env fallback is fine for CI).
+   a `userConfig` entry with `sensitive: true` instead. **Corrected 2026-10-19: this can't be fixed that way.**
+   Claude Code gives a sensitive `userConfig` value only to hooks and MCP servers. Skill content gets a placeholder
+   and the Bash tool gets nothing (manifest reference, "Reference a saved value"). `crux_check.py` is a CLI for the
+   user's own CI, where a secret arrives as an environment variable, and the Figma `curl` is a step the user runs.
+   So both keep their environment variables, the README discloses them (PR 3, "What it runs, sends and stores"),
+   and this hold stays: a reviewer reads it.
 3. **The name may be read as generic.** Names "made only of generic words" are held as possibly confusable.
    `web-design-suite` is three generic words. See *Owner decisions*.
 
@@ -236,8 +240,8 @@ files to about 220, well under the 512 line.
 
 ### PR 3: directory readiness (development repository)
 
-This is the earlier task card's work: the `figma_token` and `crux_api_key` `userConfig` entries, the README's
-disclosure section, three example prompts, the support line, what each surface gets, and `SECURITY.md`. The README is
+The README's
+disclosure section (the two keys stay environment variables; see the correction under the holds above), three example prompts, the support line, what each surface gets, and `SECURITY.md`. The README is
 the one users see in the directory, so write it for them. Development notes go to the development repository's root README.
 
 ### The owner's steps (no agent does these)
@@ -248,6 +252,8 @@ the one users see in the directory, so write it for them. Development notes go t
    Plugin bundle → `Vybecode-LTD/pro-web-design-suite`, with the path empty and the branch `main`. **Validate** first, then submit, set up the push webhook, and turn auto-publish on if offered.
 4. Give the distribution repository its About description, homepage, topics and social preview (Part B1). It's the
    public front door: the directory links to it, so stars and issues gather there. The development repository's README points to it.
+5. Turn on **private vulnerability reporting** for the development repository (Settings → Code security). `SECURITY.md`
+   sends reports there, and it was off on 2026-10-19.
 
 ### Open owner decisions
 
@@ -266,7 +272,8 @@ the one users see in the directory, so write it for them. Development notes go t
 5. **The 512-file line.** The plugin folder holds 477 files, `tests/` and `evals/` included. Past 512 every version is
    held for a reviewer. Move `tests/` (and perhaps `evals/` and `tools/`) out of the shipped folder, or accept the holds.
    Moving them touches CI, `fail_before.py` and `WDS_PLUGIN_ROOT`, so it needs its own PR.
-6. **Is the Figma/CrUX `userConfig` change worth doing before submitting?** It's the one fix that clears a hold for certain.
+6. ~~Is the Figma/CrUX `userConfig` change worth doing?~~ Moot: a sensitive `userConfig` value can't reach a skill's
+   script (see the correction under the holds). The keys stay environment variables, and the README discloses them.
 
 ## Suggested order
 

@@ -4,6 +4,28 @@
 
 **The next session starts from `dev plans/next-session-prompt.md`**: orientation, then the work in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
+## 2026-10-19: the rename and the distribution repository (another session)
+
+A second session, beside P35's, did the owner's distribution plan (`dev plans/web-design-suite-distribution-and-promotion.md`):
+- **#180, merged as `b2648f8`.** The plugin is now **Pro Web Design Suite, `pro-web-design-suite`**, in `plugins/pro-web-design-suite`. Both marketplace files carry `renames`. Four formats keep the old id, because users' projects hold them; CLAUDE.md's Gotchas lists them. A Codex fix lets `build.py` and `fail_before.py` read a pre-rename `--rev`, such as `v3.6.0`.
+- **#181, merged as `24774d0`.** Releases ship without `tests/`, `evals/` and `tools/` (222 files). `build.py --tree` writes the **distribution repository**'s contents, and the build refuses what Anthropic's directory blocks. `release.yml`'s `distribute` job pushes each release to `Vybecode-LTD/pro-web-design-suite`: forward only, atomic, queued, never an older tag over a newer one. CI validates the tree on every PR.
+- **#182, which carries this section.** The README now has *Try it*, *Where it works* and *What it runs, sends and stores*. Add to that `SECURITY.md` and `plugin.json`'s `documentationUrl`, `supportUrl` and `privacyPolicyUrl`.
+
+**Before R4's tag, the owner must:**
+1. create the empty public repository `Vybecode-LTD/pro-web-design-suite`;
+2. add a write deploy key to it, with the private half in this repository's secret `DIST_DEPLOY_KEY`;
+3. turn on private vulnerability reporting here, which `SECURITY.md` sends reports to.
+
+Without 1 and 2, `distribute` fails, though the GitHub release still happens. **After R4:**
+- check that the distribution repository holds 4.0.0 at its root;
+- `/plugin marketplace add Vybecode-LTD/pro-web-design-suite` installs it;
+- the owner validates it at claude.ai/directory/manage and submits it (Part A of the distribution plan).
+
+**Its warnings:**
+- **Never run the rename script again.** It belongs to a one-time PR. A path in a skip list moves with the rename, and a second run renamed the `renames` key and the CHANGELOG's history before it was caught.
+- **The vitals timing tests flake in CI** (`test_runtime_urls...test_a_page_type_picks_the_budget_its_page_is_held_to`, `test_runtime_reach...test_vitals_measure_the_signed_in_page_and_the_late_content`). macOS's headless shell sometimes records no LCP, which the first test's comment notes. On #181 they failed on macOS / Python 3.9 twice and on Windows / Python 3.14 once, then passed on a fresh run.
+- **A sensitive `userConfig` value never reaches a skill's script.** Claude Code gives it to hooks and MCP servers only, so `CRUX_API_KEY` and `FIGMA_TOKEN` stay environment variables.
+
 ## State
 
 - **#176, P37 part 5 (Vue)**, merged as `b20f562`.
@@ -38,6 +60,7 @@
 
 ## Open owner decisions
 
+- **Before R4:** create `Vybecode-LTD/pro-web-design-suite` and its `DIST_DEPLOY_KEY` deploy key, and turn on private vulnerability reporting (the 2026-10-19 section above). Also decide whether issues live in the distribution repository or here; `supportUrl` points here for now.
 - The order of P41, P42 and P43 after P35.
 - Whether CI may install Playwright's Firefox and WebKit for P35 part 2. Each build is a download of tens of megabytes on every run that is not cached.
 
