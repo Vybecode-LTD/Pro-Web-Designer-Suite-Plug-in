@@ -208,7 +208,7 @@ The containment techniques — facades, `async` with a deferred bootstrap, movin
 {
   "$schema": "perf-budget-gate/1",     // required, exact
   "measure": "gzip",                   // "gzip" (default) or "raw"
-  "first_party_origins": ["cdn.acme.com"],   // NOT counted as third-party
+  "first_party_origins": ["cdn.acme.com"],   // NOT counted as third-party; nor is the canonical URL's host
 
   "defaults": {
     "bytes":         { "total": 600000, "html": 25000, "css": 60000,

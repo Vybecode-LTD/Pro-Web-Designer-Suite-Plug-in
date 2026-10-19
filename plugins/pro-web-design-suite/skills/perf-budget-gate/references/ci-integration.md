@@ -44,6 +44,12 @@ Two things to get right:
 - **Never put the runtime layer in a pre-commit hook.** A minute of browser time per commit is how a team discovers `--no-verify`.
 - **Guard on `dist/` existing.** A hook that fails because somebody has not built yet is a hook that gets bypassed, and a bypassed hook protects nothing.
 
+What `dist/` and `--src src/` each mean to the gate: `dist/` is what ships, so it is weighed and every rule reads it. `src/` is what a bundler compiles, so it is read for problems the build keeps (a font with no `font-display`, an image with no size) but not weighed. Three rules follow from that (N50, found building webdesignersuite.com):
+
+- **`css-import` fires on a shipped stylesheet only.** Vite, webpack and the rest inline a source `@import`, so web-design-studio's `index.css` passes under `--src`. If the built CSS keeps an `@import`, the copy in `dist/` fails. A site served straight from its source has no `--src`: its folder is the build, and its `@import`s fail.
+- **A preload of the hashed file counts for the source's font.** A source `@font-face` names `geist.woff2`; the built page preloads `geist.BgDaEnEv.woff2` (Vite, webpack) or `geist-1a2b3c4d.woff2` (Rollup). A dashed hash must hold a digit, so `Inter-SemiBold.woff2` is a weight, not a hash.
+- **The page's own origin is first-party.** The host of `<link rel="canonical">` is never a third party, and only a `<link>` that fetches something (a stylesheet, an icon, a preload, a manifest) adds an origin; `alternate`, `me` and the like load nothing.
+
 ---
 
 ## 3. The PR job

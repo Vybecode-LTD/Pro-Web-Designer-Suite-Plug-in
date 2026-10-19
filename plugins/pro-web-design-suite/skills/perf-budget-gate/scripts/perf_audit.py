@@ -157,6 +157,9 @@ GENERATED_MARKERS = ("@generated", "DO NOT EDIT", "AUTO-GENERATED")
 
 URL_FUNC = re.compile(r"url\(\s*['\"]?([^'\")]+)['\"]?\s*\)", re.I)
 ABS_URL = re.compile(r"^(?:https?:)?//([^/?#]+)", re.I)
+# The <link> relations whose URL the browser fetches while loading the page.
+FETCHING_RELS = {"stylesheet", "icon", "apple-touch-icon", "mask-icon", "preload",
+                 "modulepreload", "prefetch", "manifest"}
 NODE_MODULES_PKG = re.compile(r"node_modules/((?:@[\w.-]+/)?[\w.-]+)")
 PKG_AT_VERSION = re.compile(r"((?:@[\w.-]+/)?[\w.-]+)@(\d+\.\d+\.\d+)")
 CSS_CLASS_SEL = re.compile(r"\.(-?[_a-zA-Z][\w-]*)")
@@ -509,6 +512,9 @@ class MarkupScanner(HTMLParser):
         self.first_img_reported = False
         self.first_party = set(budget.get("first_party_origins") or [])
         self.blocking_css: list[tuple[int, str]] = []
+        # Every fetched URL, sorted into origins only once the whole page is
+        # read: a canonical after an asset still makes its host first-party.
+        self.urls: list[tuple[str, bool]] = []
 
     def finish(self) -> None:
         """Checks that need the whole document.
@@ -547,13 +553,19 @@ class MarkupScanner(HTMLParser):
         return host
 
     def _note_url(self, url: str, is_script: bool = False) -> None:
-        if not url:
-            return
-        origin = self._origin(url)
-        if origin:
-            self.facts.third_party_origins.add(origin)
-            if is_script:
-                self.facts.third_party_scripts += 1
+        if url:
+            self.urls.append((url, is_script))
+
+    def fold_origins(self) -> None:
+        """The page's third-party origins and scripts, its own origin aside.
+        Each URL is counted once, however often this runs."""
+        urls, self.urls = self.urls, []
+        for url, is_script in urls:
+            origin = self._origin(url)
+            if origin:
+                self.facts.third_party_origins.add(origin)
+                if is_script:
+                    self.facts.third_party_scripts += 1
 
     # -- tags -------------------------------------------------------------
     def handle_starttag(self, tag: str, attrs_list) -> None:
@@ -581,7 +593,16 @@ class MarkupScanner(HTMLParser):
     def _tag_link(self, a: dict, line: int) -> None:
         rel = a.get("rel", "").lower()
         href = a.get("href", "")
-        self._note_url(href)
+        rels = set(rel.split())
+        # The canonical URL names the page's own origin (N50, F4: it was counted
+        # as a third party that wanted a preconnect).
+        own = ABS_URL.match(href.strip()) if "canonical" in rels else None
+        if own:
+            self.first_party.add(own.group(1).lower().split("@")[-1])
+        # Only a link that fetches something has an origin on the page's path:
+        # canonical, alternate, me and the like name a URL and load nothing.
+        if rels & FETCHING_RELS:
+            self._note_url(href)
         if "preconnect" in rel or "dns-prefetch" in rel:
             o = ABS_URL.match(href.strip())
             if o:
@@ -741,12 +762,14 @@ def audit_html(path: Path, text: str, budget: dict) -> tuple[list[Finding], DocF
     try:
         scanner.feed(text)
         scanner.close()
+        scanner.fold_origins()
         scanner.finish()
     except Exception as exc:
         rep.add(1, "--", "internal-error", "warning",
                 f"perf_audit could not fully parse this file: {exc}",
                 "Please report this file shape; the rest of the audit completed "
                 "normally.")
+        scanner.fold_origins()     # what was read before the failure still counts
 
     # Inline styles carrying a background image are invisible to the preload
     # scanner in exactly the same way `data-src` is.
@@ -838,14 +861,18 @@ def parse_font_faces(clean: str) -> list[FontFace]:
     return faces
 
 
-def audit_css(path: Path, text: str
+def audit_css(path: Path, text: str, shipped: bool = True
               ) -> tuple[list[Finding], list[FontFace], set[str], dict[str, int]]:
+    """`shipped` is False for a `--src` file: a bundler compiles it, so an
+    @import there is the bundler's to inline. A built file that kept one is
+    shipped, and fails (N50, F2: the starter's own index.css failed here)."""
     rep = Reporter(str(path), text)
     if any(m in text[:800] for m in GENERATED_MARKERS):
         return [], [], set(), {}
     clean = strip_css_comments(text)
 
-    for m in re.finditer(r"@import\b[^;]*;", clean):
+    imports = re.finditer(r"@import\b[^;]*;", clean) if shipped else iter(())
+    for m in imports:
         line = clean.count("\n", 0, m.start()) + 1
         rep.add(line, "L", "css-import", "error",
                 "`@import` in a stylesheet.",
@@ -1324,6 +1351,33 @@ def growth_summary(ledger: Ledger, totals: dict) -> list[str]:
 # Cross-file analysis
 # ---------------------------------------------------------------------------
 
+# A bundler's content hash before the extension: `name.BgDaEnEv.woff2` (Vite,
+# webpack) or `name-1a2b3c4d.woff2` (Rollup). The dotted form takes eight or
+# more characters with a digit or both cases; the dashed one needs a digit, so
+# `Inter-SemiBold.woff2` keeps its weight.
+DOTTED_HASH = re.compile(r"\.([A-Za-z0-9_-]{8,})(?=\.[A-Za-z0-9]+$)")
+DASHED_HASH = re.compile(r"-([A-Za-z0-9_]{8,})(?=\.[A-Za-z0-9]+$)")
+
+
+def unhashed(name: str) -> str:
+    """The file name a bundler hashed, as the source wrote it."""
+    m = DOTTED_HASH.search(name)
+    if m and (any(c.isdigit() for c in m.group(1))
+              or (any(c.isupper() for c in m.group(1)) and any(c.islower() for c in m.group(1)))):
+        return name[:m.start()] + name[m.end():]
+    m = DASHED_HASH.search(name)
+    if m and any(c.isdigit() for c in m.group(1)):
+        return name[:m.start()] + name[m.end():]
+    return name
+
+
+def preloaded(file: str, preloads: set[str]) -> bool:
+    """A face's file is preloaded under its own name, or as the bundler's hashed
+    copy of it: a source @font-face names the file, the built page preloads the
+    hash (N50, F3). Only the preload's name is unhashed, so two weights never match."""
+    return file in preloads or any(unhashed(p) == file for p in preloads)
+
+
 def audit_cross_file(ledger: Ledger, facts: DocFacts, faces: list[FontFace],
                      css_classes: set[str], source_tokens: set[str],
                      pkg_by_file: dict[str, dict[str, set[str]]],
@@ -1341,7 +1395,7 @@ def audit_cross_file(ledger: Ledger, facts: DocFacts, faces: list[FontFace],
         for f in faces:
             if f.is_local_only or not f.src_files:
                 continue
-            if not any(name in facts.preloaded_fonts for name in f.src_files):
+            if not any(preloaded(name, facts.preloaded_fonts) for name in f.src_files):
                 rep.add(1, "L", "font-not-preloaded", "warning",
                         f"`{f.family}` is never preloaded ({', '.join(f.src_files)}).",
                         "A font referenced from CSS is discovered only after the "
@@ -1555,7 +1609,7 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
                 continue
         return str(fp)
 
-    def scan_source(fp: Path) -> None:
+    def scan_source(fp: Path, shipped: bool = True) -> None:
         nonlocal faces, css_classes, source_tokens, any_html, class_widths
         ext = fp.suffix.lower()
         if ext not in SRC_EXT:
@@ -1577,7 +1631,7 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
                 facts.img_uses.extend(doc.img_uses)
                 source_tokens |= doc.class_tokens
             elif ext in CSS_EXT:
-                f, ff, cls, widths = audit_css(fp, text)
+                f, ff, cls, widths = audit_css(fp, text, shipped)
                 findings.extend(f)
                 faces.extend(ff)
                 css_classes |= cls
@@ -1618,7 +1672,7 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
     mark_alternates(ledger.assets)
 
     for fp in iter_files(src_paths):
-        scan_source(fp)
+        scan_source(fp, shipped=False)
 
     pb = resolve_page_budget(budget, page_type)
     findings.extend(check_budget(ledger, pb, facts))
