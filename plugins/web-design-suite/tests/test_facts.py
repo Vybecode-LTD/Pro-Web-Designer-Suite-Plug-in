@@ -131,20 +131,22 @@ class RuntimePromises(unittest.TestCase):
     def test_the_budget_keys_are_documented(self):
         code = read(RUNTIME).split("const BUDGET_KEYS = {", 1)[1].split("\n};", 1)[0]
         keys = set(re.findall(r"^  (\w+): \(f\)", code, re.M))
-        self.assertEqual(len(keys), 13)
+        self.assertEqual(len(keys), 19)
         row = next(line for line in a11y_skill_text().splitlines()
                    if line.startswith("| `--budget FILE` |"))
         self.assertEqual(set(re.findall(r"`([a-z]+(?:_[a-z]+)+)`", row)), keys)
 
-    def test_reduced_motion_is_not_listed_as_implemented(self):
-        """T4 (audit, 2026-10-14): both assertions sat behind conditionals,
-        so rewording the intro or the context passed silently. The runtime
-        runs with reduced motion off, and the intro says §6 is by hand."""
-        self.assertIn("reducedMotion: 'no-preference'", read(RUNTIME))
-        self.assertNotIn("reducedMotion: 'reduce'", read(RUNTIME))
+    def test_reduced_motion_runs_in_contexts_of_its_own(self):
+        """T4 (audit, 2026-10-14) pinned §6 as a procedure by hand. P35 part 1
+        (GT-B6) runs it: every check's page keeps the preference off, and the
+        motion check alone opens the page under each preference. The intro
+        says §6 is implemented, and no longer that it is by hand."""
+        code = read(RUNTIME)
+        self.assertIn("reducedMotion: motion || 'no-preference'", code)
+        self.assertIn("for (const pref of ['no-preference', 'reduce'])", code)
         intro = read(A11Y / "references" / "runtime-checks.md").split("\n\n", 2)[1]
-        self.assertRegex(intro, r"except §6, reduced motion")
-        self.assertIn("by hand", intro)
+        self.assertNotIn("by hand", intro)
+        self.assertRegex(intro, r"Every technique here is implemented")
 
 
 def a11y_modules():

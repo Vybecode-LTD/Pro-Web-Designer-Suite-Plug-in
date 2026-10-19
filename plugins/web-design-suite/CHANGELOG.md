@@ -7,6 +7,28 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
 ### Added
 
+- **The runtime gate drives the checks the coverage table called drivable** (GT-B6, P35 part 1).
+  `a11y_runtime.mjs` has four new checks, each skippable by name and counted by a budget key, and
+  `reflow` reads clipped text:
+  - `spacing` (1.4.12) injects WCAG's text spacing, `!important` and into every shadow root, and
+    reports each box that now clips its text (an error) or lets it spill (a warning);
+  - `obscured` (2.4.11) presses Tab from the top and Shift+Tab from the bottom and hit-tests each
+    stop against the fixed and sticky elements over it, its own ancestors left out: entirely
+    hidden is an error, partly hidden a warning (2.4.12 is AAA);
+  - `hover` (1.4.13) takes each control whose `aria-describedby` names a node hidden at rest,
+    hovers it (else focuses it), and asserts that the content persists, survives the pointer
+    moving onto it, and closes on Esc where it covers other text and reports no input error;
+  - `motion` opens the page with and without `prefers-reduced-motion: reduce`, logs every
+    animation as it starts, scrolls to the end, and reports motion the preference did not reduce,
+    text it left hidden, and a busy loop it stopped: warnings, since this is the suite's policy
+    (runtime-checks.md §6, no longer a procedure by hand) and 2.3.3 is AAA;
+  - `reflow` reports text a box clips at 200% (1.4.4) or at 320px (1.4.10) that it did not clip at
+    the page's own width.
+
+  The budget keys are `text_spacing_failures`, `focus_obscured`, `hover_content_failures`,
+  `motion_not_reduced`, `motion_content_hidden` and `motion_busy_stopped`. In automation-coverage.md §3, 1.4.12, 1.4.13
+  and 2.4.11 now name the check that runs them. Every check has a page that fails it and one that
+  passes, run in the browser (`test_runtime_wcag_checks`).
 - **The scaffold writes Svelte** (DL-B3, P37 part 6). `scaffold_ui.py --framework svelte` writes
   the same kit and screens as Svelte 5 components: `<script lang="ts">` with `$props()`,
   callbacks as props as React's are, snippets for children (`{@render children()}`, the state
@@ -830,6 +852,16 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   classes and conflicts, in about the same time once warm. The tests run the new block
   through the real plugin on Tailwind 4.3 and 3.4 (`test_real_tools.TailwindPluginV4`
   and `TailwindPluginV3`).
+
+- **`a11y_runtime.mjs` runs four more checks by default** (P35 part 1): `spacing`,
+  `obscured`, `hover` and `motion`. Their errors (`spacing`, `obscured`, `hover`) fail a run
+  that passed on 3.6.0, and `reflow_failures` now also counts text a box clips at 200% or
+  320px. A CI command and a budget that were green may go red with no change of your own.
+  Read the new findings first. An error fails the run whatever the budget allows, so to
+  roll the checks out one at a time, leave the rest out with `--skip CHECK` and take each
+  `--skip` away once its findings are fixed. The `motion` findings are warnings, and fail a
+  run only through a budget: `motion_not_reduced`, `motion_content_hidden` or
+  `motion_busy_stopped`.
 
 ## 3.6.0 — 2026-10-13
 
