@@ -274,6 +274,16 @@ renames the plugin.
 
 ### Fixed
 
+- **`perf_audit` on a bundled site** (P56 part 1, N50, found building webdesignersuite.com with
+  `/new-system` and `/install-gate`). `css-import` failed the starter's own `index.css` under
+  `--src`, though Vite inlines its `@import`s, so a project fresh from the two commands failed its
+  first CI run with seven errors: the rule now reads shipped stylesheets only, and a built file
+  that keeps an `@import` still fails. `font-not-preloaded` matched a preload by the source's file
+  name, so preloading the bundler's hashed copy (`name.HASH.woff2`, `name-HASH.woff2`) never
+  counted; it does now, and a weight's name (`Inter-SemiBold`) is never read as a hash. And
+  `missing-preconnect` took the page's own canonical URL for a third-party origin: the canonical's
+  host is first-party, and only a `<link>` that fetches something adds an origin (`alternate` and
+  `me` load nothing). A budget's `third_party.origins` count can drop by those links.
 - **The scaffold's controls keep arrays, nulls and the required state** (review of #176, React and
   Vue alike). A multiple select bound `String(value)` and sent one option; it binds the array and
   sends the selected options. An emptied number input sent `NaN`; it sends `null`. `tag-input` and
