@@ -1,0 +1,3339 @@
+# Changelog
+
+## 4.0.0 — unreleased
+
+Phase 6b. 4.0.0 is a major release because Part 5 of the ESLint config moves to another
+Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it again. It also
+renames the plugin.
+
+### Renamed
+
+- **The plugin is Pro Web Design Suite, `pro-web-design-suite`** (the owner, 2026-10-19). It was
+  `web-design-suite`, a name made only of generic words, which Anthropic's directory holds for
+  review and which is hard to search for. The id is the prefix of every command
+  (`/pro-web-design-suite:gate`, `/pro-web-design-suite:new-system`...), of the MCP tools
+  (`mcp__plugin_pro-web-design-suite_gates__*`) and of the subagents
+  (`pro-web-design-suite:design-critic`); `displayName` is "Pro Web Design Suite". Both
+  marketplace files carry `"renames": {"web-design-suite": "pro-web-design-suite"}`, so Claude Code
+  moves an existing install to the new name. If it then reports the plugin as not cached, run
+  `/plugin install pro-web-design-suite@pro-web-design-suite` once. A permission rule, hook or
+  script that names an old command or tool must be edited. **What keeps the old id:** the files
+  in your projects. `contract.json`'s schema `web-design-suite/contract/1`, the DTCG `$extensions` key
+  `io.github.vybecode-ltd.web-design-suite`, `/install-gate`'s stamp and `.design-suite.json` read
+  and write as before, so no project needs a change.
+
+### Added
+
+- **The runtime gate runs in Firefox and WebKit** (GT-B9, P35 part 2). `a11y_runtime.mjs --engine
+  firefox|webkit` runs axe, the computed names and the real tab order in the build the locked
+  Playwright pins (`npx playwright install firefox webkit`), or `--browser PATH`; the checks that
+  difference screenshots, emulate forced colours, read closed shadow roots through the DevTools
+  protocol or were calibrated in Chromium stay Chromium's, and the run names them
+  (`checks-run-in-chromium-only`, a warning). Tab may pass over every link with no `tabindex` (WebKit's
+  Windows and macOS builds, as Safari by default; not its Linux build): the run reads it from the
+  sequence it drove, expects no such stop, and says so (`engine-skips-links`). `browser_common.mjs` gains
+  `launchEngine()`. CI installs Firefox and WebKit on Linux (`test_runtime_engines`).
+- **The runtime gate drives the checks the coverage table called drivable** (GT-B6, P35 part 1).
+  `a11y_runtime.mjs` has four new checks, each skippable by name and counted by a budget key, and
+  `reflow` reads clipped text:
+  - `spacing` (1.4.12) injects WCAG's text spacing, `!important` and into every shadow root, and
+    reports each box that now clips its text (an error) or lets it spill (a warning);
+  - `obscured` (2.4.11) presses Tab from the top and Shift+Tab from the bottom and hit-tests each
+    stop against the fixed and sticky elements over it, its own ancestors left out: entirely
+    hidden is an error, partly hidden a warning (2.4.12 is AAA);
+  - `hover` (1.4.13) takes each control whose `aria-describedby` names a node hidden at rest,
+    hovers it (else focuses it), and asserts that the content persists, survives the pointer
+    moving onto it, and closes on Esc where it covers other text and reports no input error;
+  - `motion` opens the page with and without `prefers-reduced-motion: reduce`, logs every
+    animation as it starts, scrolls to the end, and reports motion the preference did not reduce,
+    text it left hidden, and a busy loop it stopped: warnings, since this is the suite's policy
+    (runtime-checks.md §6, no longer a procedure by hand) and 2.3.3 is AAA;
+  - `reflow` reports text a box clips at 200% (1.4.4) or at 320px (1.4.10) that it did not clip at
+    the page's own width.
+
+  The budget keys are `text_spacing_failures`, `focus_obscured`, `hover_content_failures`,
+  `motion_not_reduced`, `motion_content_hidden` and `motion_busy_stopped`. In automation-coverage.md §3, 1.4.12, 1.4.13
+  and 2.4.11 now name the check that runs them. Every check has a page that fails it and one that
+  passes, run in the browser (`test_runtime_wcag_checks`).
+- **The scaffold writes Svelte** (DL-B3, P37 part 6). `scaffold_ui.py --framework svelte` writes
+  the same kit and screens as Svelte 5 components: `<script lang="ts">` with `$props()`,
+  callbacks as props as React's are, snippets for children (`{@render children()}`, the state
+  block's `action`), and each CSS Module's rules in the component's `<style>` inside
+  `@layer components`. Each control and screen holds only the rules for the classes its markup
+  uses, since Svelte drops, with a warning, a rule nothing can match; the list's rules for the
+  states it does not render yet wait under one `svelte-ignore`, and the loading state reaches its
+  skeletons with `:global(*)`. `style:` sets only the skeleton's custom properties. The form's
+  summary takes focus once per failed attempt through an `$effect`. The tests compile every
+  component for the client and the server with `svelte` 5.57.2 with no warning, render the form on
+  the server to read its ids, and run it in jsdom 29.1.1 (both now pinned in `tooling/main`) to
+  drive the focus, with #64's count-only effect as the control that fails. content-model-to-ui's
+  description now says React, Vue or Svelte.
+- **The scaffold writes Vue** (DL-B3, P37 part 5). content-model-to-ui wrote React 19 only.
+  `scaffold_ui.py --framework vue` writes the kit and each entity's list, detail, form and six
+  states as Vue 3.5 single-file components: `<script setup lang="ts">`, React's props as
+  `defineProps`, its callbacks as `defineEmits`, a `v-model` on each control, `<slot />` for
+  `children`, and each CSS Module's rules in a `<style scoped>` block inside `@layer components`
+  (the seven controls share `ui/Control/Control.css` through `<style scoped src>`). A root's class
+  is the component's name, never `.root`, because Vue puts a parent's scope on a child's root
+  element too. The form keeps React's three rules: its summary takes focus once per failed
+  attempt (a `flush: 'post'` watcher on a `useTemplateRef`) and never for a later blur. The types,
+  the fields, `lib/`, `server/` and `db/` are the React scaffold's files; the Tailwind stack works
+  as it does for React; `--server-actions` stays React's (exit 2 with Vue). The tests compile every
+  component with the real compiler (`vue` 3.5.44, now pinned in `tooling/main`), render the form
+  on the server to read the ids its aria attributes name, and drive its focus through the runtime,
+  each with a control that fails; the output passes the audit (`--strict`) and `a11y_static`.
+- **`a11y_static.py` reads Vue's `v-bind="$attrs"` as a spread** (P37 part 5), as it reads JSX's
+  `{...rest}`: the object may supply the label, the `alt` or the name, so a control with one is no
+  longer "unlabelled".
+- **The scaffold's forms post to Next.js server actions** (DL-B3, P37 part 4). content-model-to-ui
+  wrote client-side React forms only. `scaffold_ui.py --server-actions` writes each form as a
+  Client Component whose `<form action>` posts its FormData to `server/<table>.actions.ts`, a
+  `'use server'` module with `create<Entity>` and `update<Entity>` (the row's key bound, as
+  Next.js's forms guide shows); `<Entity>ActionForm.tsx` holds each result in React 19's
+  `useActionState`, and the Save button takes its pending state from `useFormStatus`. Each
+  action reads the FormData by the column's type (a number, a toggle's `on`, an array's
+  `getAll()`, an empty field left out or null), validates it with the generated zod schema,
+  returns the schema's first message per field, and writes through `lib/supabase.server.ts`,
+  Supabase's own `createServerClient` for Next.js, so it runs as the signed-in user and the
+  policies apply; `lib/supabase.ts` reads `NEXT_PUBLIC_` variables. Every control is named,
+  the toggles too, since an unnamed control is not posted. Without the flag the scaffold is
+  unchanged. `test_scaffold.TheServerActions` runs the generated action in Node against
+  stand-ins for Next.js, Supabase and the schema; both stacks parse and pass the audit and
+  `a11y_static`.
+
+- **Next.js App Router, Vue, Svelte and Astro** (SB-B6, P37 part 3). The triggers are generic
+  ("build me a site"), but the references taught plain CSS, CSS Modules and Tailwind only.
+  web-design-studio's `stack-frameworks.md` gives each stack its global entry (the root layout,
+  `main.ts`, `+layout.svelte`, a layout's frontmatter), where the layer order is stated so a
+  component's styles cannot name `components` first (inlined in Vite's `index.html` and
+  SvelteKit's `app.html`), how each compiler's scoping meets the layer order (Vue's
+  `[data-v-…]`, Svelte's `.svelte-…` then `:where()`, Astro's three `scopedStyleStrategy`
+  values, each compiled from the fixtures), Vue's `v-bind()` and Astro's `define:vars` as Law
+  4's exception, SvelteKit's starter `style="display: contents"` moved to a class, the
+  `components` globs per stack, and which gate reads which file. Every framework fact is quoted
+  from its source with the URL. N49 is decided: a template is the audit's, since the ESLint
+  config's rules are written against JSX and a Vue or Svelte template is a syntax tree they
+  never visit. `tests/fixtures/stacks` holds a project per stack, on which the audit,
+  `a11y_static` and the census run clean and find what is planted in each stack's own place
+  (`test_stacks`).
+
+- **stylelint reads SCSS** (D3, P37 part 2). The config linted `.css` files only, so a `.scss`
+  file had the audit alone. An override (Part 6) now reads every `.scss` file through
+  `postcss-scss` with `stylelint-config-standard-scss` 17, restates the config's own rules over
+  it, and reads a Sass variable in a value as a token, as the audit does (`padding: $gap` passes,
+  `padding: $gap 5%` does not). The component and token file classes name their `.scss` files
+  (`**/components/**/*.scss`, `**/*.module.scss`, `**/components.scss`, `**/tokens.scss`…), in
+  the spec and in both gates (the audit and the census took `components.css` only); a theme file's bindings stay CSS, which Tailwind reads. A new rule,
+  `design/sass-variable-literal`, refuses what the audit's `sass-literal` refuses: a Sass
+  variable that holds a length, a colour, a duration or an easing curve outside a token file,
+  a map's included, with a breakpoint and a `@function`'s local left alone. The spec's
+  `sass.variables` names both gates; `sass.definitions` (unlayered Sass) stays the audit's,
+  since no stylelint rule reads unlayered CSS. A CSS-only project installs nothing new:
+  stylelint loads the two packages only for a `.scss` file. The pre-commit hook's stylelint
+  list took `\.css$` only, so a staged `.scss` file skipped it (Codex on #167); it takes
+  `.scss` too. `test_real_tools.StylelintConfig` (every stylelint example of the spec and every
+  starter stylesheet as SCSS draws the rules it draws as CSS; an SCSS component with nesting,
+  `@use`, a map, a mixin and `@each` passes both gates, and fails both on each literal),
+  `test_precommit_hook.PreCommitHook.test_a_staged_scss_file_reaches_stylelint`,
+  `test_recipes.DependencyFacts.test_the_scss_packages_are_the_majors_stylelint_17_takes`.
+
+- **The gates that open a URL reach a client-rendered or signed-in page** (P34 part 1;
+  GT-B1, GT-B2). Each ran one `goto(…, 'load')`, so a client-rendered page was audited as
+  its empty shell, and a signed-in page as its sign-in: both passed, with almost nothing on
+  them. `browser_common.mjs` gives `a11y_runtime.mjs` and `critique_snapshots.mjs` four
+  options, run in every context they open (the forced-colours pass and all six captures
+  included):
+  - `--wait-for SEL`: wait up to 30 s for `SEL` to be visible;
+  - `--steps FILE`: a JSON list of `click`, `fill` (a `value`, or `env` naming a
+    variable, so a password stays out of the file), `press`, `goto` and `wait-for`;
+  - `--storage-state FILE`: a session, Playwright's `storageState`;
+  - `--header "Name: V"`: sent to the page's own origin only, never to a third party,
+    with `V` read from the environment when it is `env:NAME`.
+
+  `measure_vitals.mjs` takes `--wait-for` and `--storage-state`, and refuses `--steps`
+  and `--header`: steps would run in the load it measures, and a header needs request
+  routing, which turns off the HTTP cache. Every option is read before a browser starts,
+  each mistake named (exit 2). A step that fails, a wait that never ends, or an HTTP
+  error status exits 2 too: vitals and the critique used to measure and capture a 401
+  page as if it were the page. a11y-audit-runner's `references/scripts.md` gives the
+  steps' format. `test_runtime_reach`, `test_json_guards`.
+- **The runtime checks read through shadow roots** (P34 part 2; GT-B3). The names,
+  tab-order, focus, contrast, keymap and reflow checks used `querySelectorAll` and a
+  `TreeWalker`, which stop at a shadow root, so a web-component library's controls were
+  checked by axe alone. `browser_common.mjs`' `DEEP_DOM` walks the composed tree in the
+  order the browser renders and tabs through it, a slot standing for what is assigned to
+  it:
+  - every open root, and every closed one: a script's, kept by a wrapped `attachShadow`
+    that runs before the page's own scripts, and the parser's
+    (`<template shadowrootmode="closed">`), handed over by `keepClosedRoots()` through
+    Chromium's DevTools protocol; a closed root is shown to axe for the length of its run;
+  - focus inside a root is followed to the element itself, and `blur()` reaches it; a
+    host whose root delegates focus is not a stop of its own (Codex on #165);
+  - a background is composited up through slots and hosts, so white text slotted onto a
+    dark band the shadow tree paints is no longer measured on the white page;
+  - a path names an element host by host, `main > x-card >> button.icon`, which a
+    keymap's selectors take too (Playwright reads it through open roots).
+
+  The report's `shadowRoots` counts the roots read, and a closed root no check could
+  read is a `closed-shadow-roots-unread` warning, never a silent pass.
+  `critique_snapshots.mjs` samples text through the same roots, after its captures.
+  `test_runtime_shadow`.
+- **Several pages and viewports in one run** (P34 part 3; GT-B4). Each run covered one
+  URL, and a11y ran only at 1280x900, where a phone's menu button and its target size
+  are hidden, while the report template spoke of "all 14 templates".
+  - `--urls FILE|URL` in `a11y_runtime.mjs` and `measure_vitals.mjs`: a file of URLs, one
+    a line; a JSON list of URLs, or of `{"url", "pageType"}`, each page measured against
+    its own type's perf budget; or a `sitemap.xml` (a sitemap index is refused), from a
+    file or an http(s) URL. `--max-urls N` (default 50) caps it, and the pages past the
+    cap are counted in the report.
+  - `--viewports 390x844,1280x900` in `a11y_runtime.mjs`, with `--urls` or one page.
+  - Each run is the script on one page at one size, in a process of its own
+    (`browser_common.mjs`' `runEach()`), one after another, so no state crosses pages and
+    no two loads share the machine. The report holds a row for each run, the errors or
+    breaches of each failing one and every run's whole report in `--json`; the exit is
+    the worst run's, so a page that does not load is never outweighed. `test_runtime_urls`.
+- **`tw_probe.mjs` and `/tw-probe`** (P36 part 2; SB-C3). web-design-studio's new
+  script compiles a Tailwind v4 project's entry stylesheet with the project's own
+  tailwindcss and checks what it generates. Tailwind writes no CSS for a class it does not
+  know, and says nothing, so "`--*: initial` removed `p-4`" was a claim nobody saw fail.
+  - **Roles:** every variable an `@theme` block declares in one of Tailwind's utility
+    namespaces (tailwindcss.com's table: `--color-*`, `--spacing-*`, `--breakpoint-*`,
+    `--container-*` and the rest) must give its class.
+  - **Stock:** none of a sample of Tailwind's defaults may generate, unless the theme
+    declares that name itself. A failure names what survived: a kept `--spacing` alone
+    brings `p-4`, `w-4` and `leading-7` back.
+  - **Classes you name** are reported, and `--expect` and `--refuse` hold them.
+  - It exits 1 on a failure and 2 when it cannot run. The stylesheets are read in cascade
+    order, each after its imports; Tailwind's own files are left out, and a class the
+    stylesheet defines itself (`.stack`) is not counted as Tailwind's. On Tailwind 3 it
+    exits 2 and points at Part 5's `tailwindConfig` line.
+  - `/pro-web-design-suite:tw-probe` runs it from the project's root and explains each
+    failure: the sixteenth command. stack-tailwind.md §2.9 teaches it.
+  - Tests: `test_tw_probe.TheProbe` runs it on the starter's own Tailwind wiring and on
+    the ways a project breaks it; `test_commands.TheChains` runs the command's step.
+
+- **Tailwind v4's variants after `--*: initial`** (P36 part 3; SB-B5), in
+  stack-tailwind.md §2.10, each compiled with Tailwind 4.3.3 against the starter's wiring:
+  - **Container queries:** `@md:` reads `--container-*`, which §2.5 keeps out, so it
+    generates nothing. A container query is a `@custom-variant` with a literal condition,
+    named by its role (`cq-wide`, and `cq-card-wide` for a named `@container/card`), which
+    also adds no `max-w-*` class. theme.css's note says so.
+  - **`motion-reduce:`** is for what the motion tokens cannot stop, a transform at rest or
+    an autoplaying animation: the `motion-*` classes already go to 1ms.
+  - **`forced-colors:`, `starting:` (`@starting-style`) and `not-*`**, with what each is
+    for; `not-[…]` stays refused as an arbitrary selector.
+  - **`@reference`** in a CSS module or a Vue, Svelte or Astro `<style>`: without it,
+    `@variant dark` compiles with no error against Tailwind's own
+    `prefers-color-scheme`, not the project's `[data-theme="dark"]`; `@import` copies the
+    whole entry (about 36 KB of the starter's CSS) into each module.
+  - **`@source inline()`** for classes no source names (a CMS field), and
+    **`@source not inline()`** for classes that must never generate.
+  - `test_tw_probe.TheVariantsTheReferenceTeaches` compiles the section's marked block as
+    written and checks each claim.
+
+- **The migration counts Tailwind v4's numeric classes** (P36 part 4; LC-B5). In v4,
+  `p-4` is `calc(var(--spacing) * 4)`, so while the theme keeps `--spacing` every multiple
+  is a class, and the census counted none: a migration sized from it came in short.
+  - **The census** reads `--spacing` from each entry that imports `tailwindcss`, through
+    its imports in order, as Tailwind builds the theme. The stock value comes from the
+    installed `theme.css`, else `0.25rem`. `--*: initial`, `--spacing-*: initial` and
+    `--spacing: initial` clear it, and a `default` block never overrides the project's.
+  - **The classes:** padding, margin, gap, `space-*`, inset, width, height, `size-*` and
+    `leading-*`, each counted at N × `--spacing` with its variants, `!`, its negative
+    where Tailwind has one (`-mt-4`, never `-p-4`) and the project's `prefix(tw)`. A
+    number counts only as Tailwind 4.3.3 takes it: `p-2.25` yes, `p-2.50` and `p-0.3` no.
+    Entries that disagree, a `--spacing` that is no length, or an import it cannot read
+    (a package not installed: its theme can set `--spacing`) count none and say why.
+  - **The proposal** maps each to its role as it maps `p-[13px]` (`p-4` to `p-well`,
+    `-mt-4` to `-mt-grouped`), and reports `leading-6` for its `--type-*` role. **The
+    codemod** rewrites only the utility, matched whole: `md:p-4` becomes `md:p-well`, and
+    `p-4.5`, `-p-4` and `sp-4` are never read as `p-4`. In a script, both read a numeric
+    class only where classes go: a class attribute, a `className={…}` expression and a
+    class helper's arguments (`cn()`, `clsx()`, `cva()`…), since a bare `"p-4"` may be
+    any data (Codex on #129).
+  - framework-migrations.md §5 gives **Move 1 in v4's form**: named `--spacing-*` keys
+    beside `--spacing` replace nothing, `--*: initial` does, the census runs before it, and
+    `tw_probe --refuse p-4` checks it.
+  - Tests: `test_token_migration.TheV4SpacingCensus`; `test_tw_probe.TheMigrationsMoveOne`
+    compiles §5's two blocks and runs its command.
+
+### Fixed
+
+- **The scaffold's controls keep arrays, nulls and the required state** (review of #176, React and
+  Vue alike). A multiple select bound `String(value)` and sent one option; it binds the array and
+  sends the selected options. An emptied number input sent `NaN`; it sends `null`. `tag-input` and
+  `json-editor` went through a text box's `String()`, which made tags comma text and JSON
+  `[object Object]`: each is now a marked stub, since the text being typed is not yet a value, and
+  a JSON cell shows `JSON.stringify`. A required radio group said so only with its hidden
+  asterisk; the group carries `aria-required` and each radio `required`. And a Vue state's copy
+  from the answers that began with `:` was written as a directive.
+- **`a11y_static` read a framework's document shell as a whole page** (P37 part 3). A Next.js
+  root layout (`<body>{children}</body>`), a Vite `index.html` (`<div id="app">`), SvelteKit's
+  `app.html` (`%sveltekit.body%`) and an Astro layout (`<slot />`) each got `no-main-landmark`,
+  and the first two `no-title`, though the page's `<main>` and title come through the outlet.
+  `shell_outlets()` leaves `<main>` to the pages when the body holds a default slot, the
+  children's expression (`{children}`, `{@render children()}`, not a page's own `{'hello'}`),
+  SvelteKit's placeholder or a module script's mount point (its `type` and `src` in either order), and the title when the
+  head holds `%sveltekit.head%` or the file is a Next.js `layout` or exports `metadata` or
+  `generateMetadata`. A document with none of these still needs both, an entity in its text
+  included. `test_stacks.TheShellsRenderTheirPagesElsewhere`.
+
+- **`a11y_static` read a `<slot>` as no content** (P37 part 3). `<a href="/x"><slot /></a>` in a
+  Vue or Astro component had no accessible name, where a component's content is already "cannot
+  tell". A `<slot>` now counts as content it cannot see. `test_stacks.TheShellsRenderTheirPagesElsewhere.test_a_slot_names_the_link_it_fills`.
+
+- **The census counted a shadow token as a shadow** (P37 part 3). It blanks `var(--name` before
+  its whole-value shadow check, so `box-shadow: var(--shadow-xs)` left `)` as a shadow literal,
+  three of them in the starter's own `base.css` and `layout.css`; a fallback became `, 0 1px 2px
+  #000)`. A reference alone is no literal now, and a fallback's or a second layer's values are
+  read part by part. `test_stacks.TheCensusReadsAShadowToken`.
+
+- **The audit read no bound inline style** (N48, P37 part 1). Its template reader wanted
+  whitespace before `style=`, so Vue's `:style="{ color: '#fff' }"` passed, though Law 4
+  fails the same declaration as `style=""` or JSX's `style={{…}}`; so did `v-bind:style`,
+  Svelte's `style:color` directive, and Angular's `[style.color]`, `[style.width.px]`,
+  `[style]`, `[ngStyle]` and `[attr.style]`. `audit_design.py` now reads each start tag's
+  attributes (`tag_attributes()`, past quoted and braced values) and each bound style's
+  declarations (`bound_styles()`): every object the expression can evaluate to (either arm
+  of a ternary, an array's items, a spread's, not a call's argument), a string written out as
+  a whole arm of a condition (`on ? '12px' : gap`, `gap ?? '12px'`), each string as
+  `style=""`, and one property at a time, with Angular's unit joined to its number. A
+  visual property is L4, and a custom property's written-out design literal or Tier-1
+  primitive is L1 or L6, as in JSX. Commented-out markup is blanked first, as the census
+  blanks it, so neither reads an element that never renders. The migration census (`extract_literals.py`) skipped
+  these as expressions; it carries the same reader verbatim and counts each written-out
+  value as an inline style, left to hand work. The spec's `inline_styles.bound` holds
+  every form; ESLint parses no `.vue`, `.svelte` or Angular template (N49, decided in P37 part 3:
+  the templates are the audit's).
+  `test_audit_design.TheAuditReadsBoundStyles`,
+  `test_token_migration.TheCensusReadsEveryStyleSource.test_bound_styles_are_inline_styles`.
+
+- **The migration matched a colour to a role by ΔE alone** (N40, from R3.6's live
+  check). `cluster_values.py` sent the grey `#6b7280` to `--fg-warning`: its little
+  chroma kept it off the neutral steps, and the nearest of the rest was a status colour of
+  the opposite hue. Slate greys landed on the accent and info ramps, and green and amber
+  tints on `--accent-50`. A colour's family now comes first:
+  - a neutral (chroma under half of what sRGB holds at its lightness and hue) lands only
+    on the neutral ramp;
+  - any other colour lands only on a step within 30° of its hue, so a status hue lands on
+    its status;
+  - ΔE ranks within the family;
+  - the ramps are built by the same reading: a muted grey (`#5f8890`, C 0.047) seeds no
+    accent and gives the neutrals their hue (Codex on #129).
+
+  `test_token_migration.ColoursKeepTheirFamily` holds 23 greys, tints and status colours
+  to their families.
+- **The codemod rewrote classes inside longer ones** (C1, the 2026-10-14 audit). An
+  arbitrary value's rule had a right boundary only, so `p-[16px]` matched in
+  `top-[16px]`, `-p-[16px]` and `sp-[16px]`, and `w-[16px]` in `min-w-[16px]`; when
+  `gap-[16px]` had its own rule the two edits overlapped and the whole file was skipped.
+  The match now has the census's left boundary too
+  (`test_token_migration.TheCodemodRewritesOnlyWhatItMatched`).
+- **The codemod and `deprecate` turned a file's line endings** (C2 and H1, the
+  2026-10-14 audit). `apply_codemod --apply` read with universal newlines, so a CRLF file
+  came back LF on every line, which the dry run never showed; `deprecate add --source`
+  wrote the token file in the platform's newline, LF to CRLF on Windows and CRLF to LF
+  elsewhere, and its ledger the same way. Each now reads and writes the bytes' own endings,
+  and a marker takes the file's (`test_versioning.TheMarkerKeepsTheFilesLineEndings`). The
+  dry run's diff is written as its bytes are, where Windows' stdout doubled a CRLF line's
+  `\r` (Codex on #130).
+- **The accessibility gate never read a rule inside `@layer`, `@media` or `@supports`**
+  (H4, the 2026-10-14 audit). `a11y_static` split CSS at depth 0 only, so an at-rule's
+  rules were pooled: any `box-shadow` beside an `outline: none` counted as its ring, and
+  the focus test read the at-rule's prelude. The starter's `base.css` is all `@layer
+  base`, so a reset planted there passed. Each rule is now read on its own at any depth,
+  a nested `&` rule against its parent (a comma inside `:is()` is not the list's,
+  CodeRabbit on #132), and a condition nested in a rule is read with the rule's own
+  declarations (Codex on #132). Reading them found two more: a comment's newlines
+  were blanked, so every line after a multi-line comment was misnumbered and its ignore
+  comment missed; and a focus rule that moves a skip link on-screen (`translate: 0 0`)
+  was called invisible (`test_content_and_a11y.A11yStaticReadsNestedRules`).
+- **The state matrix called a state covered that it never rendered** (H5). Only a
+  pseudo-class at depth 0 got a mirror rule, so `.btn:is(:hover, :focus-visible)` got
+  none, and `.chip { &:hover {…} }` mirrored as `&[data-force-state~="hover"]`, which
+  matches nothing; the summary still said every state had a rule. States inside `:is()`
+  and `:where()` are mirrored, an arm with no state made never to match
+  (`.danger:not(*)`, Codex on #132), a nested rule is read with its parent, and a forced state
+  is covered only when a mirror was written; a `:focus-within` ring covers the
+  focus-visible cell, which carries it (CodeRabbit on #132)
+  (`test_content_and_a11y.MatrixStates`,
+  `test_browser_runtime.MatrixSeesStateChanges`).
+- **The accessibility gate did not know Vue's or Angular's bindings** (H6). `<img
+  :alt="d">` had no alt and a bound `aria-label` no label, so a Vue project with the hook
+  was blocked on every bound attribute. `:x`, `v-bind:x`, `[x]` and `[attr.x]` are the
+  attribute `x`, a string literal read as its text; `@click`, `v-on:click`, Svelte's
+  `on:click` and `(click)` are click handlers, which a `<div>` must not carry alone
+  (`test_content_and_a11y.A11yStaticReadsBoundAttributes`).
+- **The hook's index mode ran without the project's config** (H7). `DESIGN_GATE_INDEX=1`
+  audited a scratch tree of the staged files alone, so the audit read no token files and
+  no baseline: a baselined finding refused the commit, and a project ramp's primitive
+  passed. The tree now holds `.design-suite.json`, its baselines at their own paths (their
+  keys are relative to them) and the default baselines; a token file the config names
+  that is not staged is read from the working tree. A staged symlink is replaced in the
+  scratch tree, never written through (CodeRabbit on #132)
+  (`test_precommit_hook.PreCommitHook`).
+- **The audit read a ternary in an inline custom property as a property** (H8). In
+  `style={{ '--progress': open ? '1' : '0' }}`, the one inline style the spec allows, the
+  quoted `'1' :` was taken for a key and refused. A style object's keys are its depth-0
+  entries' now, in `{{ … } as CSSProperties}` a shorthand `{{ zIndex }}`, and a spread's own object literals
+  (`...(on ? { zIndex: 3 } : {})`, Codex on #132) too, and a comment before a key in
+  markup hides it no longer (CodeRabbit on #132)
+  (`test_audit_design.JsxClassesAndCssInJs`).
+- **`--reverse` left out a theme's value without a word** (H2, the 2026-10-14 audit). A
+  `[data-theme="dark"]` alias to a token the file does not declare was dropped from the
+  body with exit 0 and nothing said, so Figma showed the Light alias in Dark. It is
+  reported now, the mode named, and the exit is 1
+  (`test_figma_sync.ReverseReadsEveryTokenFormat`).
+- **A UTF-8 BOM on `tokens.css` emptied the system** (H3). `extract_system`, `build_docs`
+  and `diff_system` read it as plain UTF-8, so the first selector was `﻿:root`:
+  every token was theme-only, the contract empty, and `diff_system` called the whole
+  system removed and added (218 majors on the starter). They read the BOM now
+  (`test_project_config.ABomOnTheTokenFile`).
+- **The schema reader missed a migration's enum values** (H9). Only `CREATE TYPE` fed the
+  enums, so a value `ALTER TYPE … ADD VALUE` added was refused by the scaffold's server
+  draft and missing from the form. `ADD VALUE` (with `IF NOT EXISTS`, `BEFORE` and
+  `AFTER`) and `RENAME VALUE` are replayed on an enum the files created, and a label's
+  `''` is one apostrophe there and in `CREATE TYPE`, and its spaces are kept (Codex on
+  #133)
+  (`test_schema_sources.MigrationsThatDumpsRewrite`).
+- **A table's tail ran into its last column** (H10). The column list ended at the
+  statement's last `)`, so `PARTITION BY RANGE (created_at)`, `WITH (…)` or `INHERITS
+  (…)` became part of the last column's default, and a trailing table CHECK was lost. The
+  list ends at its own closing paren now, a paren inside a string or a `$$…$$` body
+  skipped (Codex on #133)
+  (`test_schema_sources.MigrationsThatDumpsRewrite`).
+- **The migration's estimate left literals out, and counted rules that never fire** (H11,
+  H12). `cluster_values.py` put a colour it could not parse (`oklch()`, `lab()`, `lch()`,
+  `hwb()`, `color()`, `hsl(0.5turn …)`) and a `letter-spacing` in `px` in neither a rule
+  nor a row, so the reconciliation no longer added up to the census. Each is a row to map
+  by hand now. And `color: white` got a rule the codemod never applied, since a named
+  colour was no colour slot to it, and a hex inside `color-mix()` was counted with a rule
+  it could not apply. The codemod takes the census's named colours, and a `color-mix()`
+  with a colour written out is one colour function, mapped by hand. A duration in a
+  whole `transition` shorthand was counted at both its `--motion-*` pair and its Tier-1
+  step; it counts at the one rule that rewrites it, and the codemod no longer refuses a
+  mapping whose duration rules are all pairs (CodeRabbit on #135). What the
+  reconciliation counts as mechanically replaceable is what `--apply` rewrites
+  (`test_token_migration.TheProposalAccountsForTheCensus`).
+- **A width never reached its width step** (H13). The proposal snapped a length to the 4px
+  scale, which ends at 192px, before trying `--width-form`, `--width-content` and
+  `--width-wide`, so `max-width: 1152px` was unmapped and every length past 195px read
+  "Decide between 192px and 192px". A width meets the width steps first, and past the scale
+  the advice says so. A height never does: a width rule's class is `width`, which the
+  codemod gives only `width`, `min-width` and `max-width`, so a height added later keeps
+  its value (Codex on #135)
+  (`TheProposalAccountsForTheCensus.test_a_width_reaches_its_width_step`).
+- **A project's ramp step the proposal could not read was rebuilt without a word** (found
+  beside H11). A step in `hwb()`, or a translucent one, was built as if the project had
+  not declared it. The report names each such step now
+  (`test_project_config.ClusterValuesLandsOnTheProjectsRamps`).
+- **Six scripts wrote to a Windows pipe in the ANSI code page** (H15). `check_roles.py`
+  sent its verdict's dash as cp1252, and the five workflow commands' scripts had no UTF-8
+  reconfigure either. The test that ran every script's `--help` could not see it, since no
+  help holds a non-ASCII byte. Every entry script's `__main__` block is read for the
+  reconfigure now, with a control that proves the scan fires, and the workflow commands
+  are covered (`test_utf8_output`).
+- **The Pydantic test skipped on every CI cell** (H15). The suite runs under `uv run
+  --no-project`, which has no pydantic, so the scaffold's model never met Pydantic in CI.
+  A step of its own runs that test with `pydantic>=2,<3`, and `WDS_REQUIRE_PYDANTIC` fails
+  it there rather than skipping (`test_scaffold.TheServerSchemaMirrorsTheConstraints`).
+- **An output could replace its own input** (the audit's V7, E9 and G4, and its class 5).
+  `--out` equal to the input replaced a Figma export with its audit report, a published
+  snapshot with its diff, an email's source with its build or its lint report, the
+  findings with their critique, and an audited page with its JSON report, each with exit
+  0. `build_presentation --emit-css DIR` wrote `DIR/tokens.css` over the project's own,
+  and `cluster_values -o` could land its proposal on it too. One helper decides now,
+  `refuse_overwrite()` in `project_config.py` and `refuseOverwrite()` in
+  `browser_common.mjs`, and every writer whose output can be one of its inputs calls it
+  before it writes anything: exit 2, the input untouched. It compares with the files read,
+  not their spelling: a glob's matches, a folder's files, every file of a snapshot, the
+  token files and budgets the config names, the screenshots, and a `file://` URL's page
+  (Codex on #136). `figma_to_tokens` still writes
+  over the project's `--tokens`, which is the Figma-to-code workflow
+  (`test_out_guard`).
+- **A JSON file of the wrong shape was a traceback, or was read as something else**
+  (the audit's S1, S10, V8, G3, G11, G15, E13 and W6, and its class 6). A traceback
+  exits 1, the gates' "it fired" code; worse, `check_roles` read a string `scopes` as
+  letters, `critique_report` read `"is_taste": "false"` as true and made a major finding
+  taste, and `measure_vitals.mjs` and `a11y_runtime.mjs` passed every page against a
+  limit written as a string. Every loader checks the shape where it reads the file now,
+  and exits 2 naming the file and the key (`defaults.bytes.css`, `rules[0].match`,
+  `pair 0: min`):
+  - the token readers leave out a token or group whose `$type` is not a string, and
+    name it; Node's reader leaves out the same ones. A `$deprecated` that is neither a
+    string nor a boolean is named, and the token keeps its group's;
+  - the deprecation ledger (`diff_system --deprecations`, `deprecate --ledger`), a
+    `system.json` and the docs baseline (`build_docs`), a perf budget (`perf_audit`,
+    `measure_vitals.mjs`, the same check in both), an a11y budget, the pairs file,
+    the findings, the deck's perf and a11y evidence, the codemod's mapping, the census,
+    the content model and its answers, a Figma styles file and the CrUX lab file;
+  - `introspect_schema` names a JSON dump's `tables`, `columns`, `foreign_keys` or
+    `enums` of the wrong type, with exit 1, its code for an input it cannot use;
+  - a baseline of the wrong shape (`audit_design`, `a11y_static`, `perf_audit`) is read
+    as an unreadable one, as before: named on stderr, and everything audited.
+
+  `test_json_guards` feeds every loader `[]`, a string, a number and its own wrong keys,
+  and fails when a script that reads JSON has no row.
+- **A UTF-16 file read as garbage** (the audit's S8 and W7, and its class 4). PowerShell
+  5.1's `>` writes UTF-16LE. The token readers decoded CSS as UTF-8 only, so such a
+  `tokens.css` read as no tokens and every `var(--x)` was "unknown", in Python and in
+  Node; `check_roles` gave a traceback. Every script now reads a project's text through
+  `project_config.read_text()`, which finds the encoding as `json.detect_encoding()`
+  does (a byte-order mark, else the zero bytes), or through a copy of it in the scripts
+  that run on their own (`audit_design`, `a11y_static`, `check_roles`,
+  `generate_matrix`). The codemod and `deprecate add --source` write a file back in the
+  encoding they read it in, its mark and byte order included (`text_encoding()`); a
+  UTF-16 file was skipped as unreadable by the one and a traceback in the other
+  (`test_encodings`, which also fails on a script that reads with `encoding="utf-8"`).
+- **What a script could not use was dropped without a word** (the audit's S2, V11, V12
+  and M9, and its class 7):
+  - `read_tokens()` and `read_deprecations()` threw away every problem `dtcg.tokens()`
+    reported, so a resolver with sixteen of them read silently. `ProjectTokens` carries
+    them as `problems`, and the five gates that read a project's tokens (`audit_design`,
+    `diff_system`, `cluster_values`, `figma_audit`, `figma_to_tokens`) print each as a
+    warning;
+  - `figma_to_tokens --reverse` clamped a colour outside sRGB (`oklch(70% 0.3 150)`)
+    with exit 0; it is now a `clamped` problem with the hex Figma gets, exit 1;
+  - an input whose only tokens are unsupported said "contains no variables … pass
+    `--shape`"; the message now lists what it held and could not give;
+  - the codemod dropped a generated file with no skip row; it has one;
+  - `diff_system` skipped a pair whose contrast it could not measure (a colour it
+    cannot resolve or parse); a pair a changed token reaches is now a note.
+
+  `test_diagnostics`, which also fails on a `_problems` or a `[0]` on `tokens()` or
+  `normalise()` anywhere in the scripts.
+- **A placeholder in angle brackets broke the command it sat in** (the audit's D4, G13
+  and E14, and its class 9). `python -m scripts.audit_design <path> --json > audit.json`
+  reads `<path>` as a redirection, in cmd.exe and in bash alike, and 45 commands in the
+  skills, the references and the README were written so. A placeholder is now in
+  capitals (`PATH`, `RUN_ID`, a colour quoted as `"FOCUS"`); a11y-audit-runner's hook
+  recipe copies from `${CLAUDE_PLUGIN_ROOT}` instead of `<web-design-studio>`; and the
+  email quick start, which was `mkdir -p`, `cp` and `cat` with a `\` continuation, is a
+  copy step for Claude and three commands that paste into bash, PowerShell and cmd
+  (`test_docs.PlaceholdersInCapitals`, which reads every shell fence and inline command
+  in the skills, the references, the agents and the workflow commands, and the
+  repository's live docs).
+- **The router heard another domain's words as design work** (the audit's S3). "Deprecate
+  the old JWT tokens" was sent to design-system-versioning, "migrate the session tokens
+  to Redis" to design-token-migration, "token reference docs for the OAuth API" to
+  design-system-docs, "critique my essay" to design-critique-gate, "every state in the
+  US" to component-state-matrix and "the lighthouse keeper" to perf-budget-gate. Each
+  shared word now routes only beside one of the skill's own (a colour, `tokens.css`, a
+  page, a component, a score), as "a patch release?" has since #97
+  (`test_hooks.TheRouter`).
+- **`rgb()` and `hsl()` lost a fourth comma argument** (the audit's S4).
+  `rgb(255, 0, 0, 0.5)` and `hsl(0, 100%, 50%, 0.5)`, the legacy form under the names
+  CSS Color 4 made aliases of `rgba()` and `hsla()`, were left out of a DTCG document as
+  unsupported; they are written with their alpha (`test_dtcg.TheWriter`).
+- **The Python and Node token readers disagreed on three forms, and the gate tools read
+  any path** (the audit's S5, S6, S7 and S9):
+  - a reference with spaces round it (`" {brand.500} "`) was a reference in Python and
+    a literal in Node. Node takes it as Python does;
+  - Python read digits that are not ASCII (`"٥"`) as numbers: in a dimension, a colour
+    component or alpha, a Tokens Studio number and its math. They are left out, or left
+    as written, as Node leaves them;
+  - Python read a colour's `components` given as an object by its keys (`{"1": 0, "0":
+    0, "0.5": 0}` became `#ff0080`). It is refused, as Node refuses it;
+  - the MCP server ran a gate on any path Claude passed, `..`, an absolute path or a
+    link out of the project included, and a finding's snippet returned the file's
+    lines. A path argument must now be inside the project, compared by real path
+    walked a part at a time (a link is followed before a later `..`), and so must
+    every link under a folder the gate will walk, the project included when no path is
+    given (an error `-32602` names it); the files `.design-suite.json` names are still
+    read wherever they are.
+
+  `test_project_config.TheNodeReaderAgrees`, `test_mcp.TheGates`.
+- **The accessibility gates misread four things, and the coverage table claimed more than
+  they run** (the audit's G1, G2, G5, G6 and G7):
+  - `aria-hidden-focusable` read only an element's direct children, and counted those
+    that take no focus. It reads the whole subtree now, skips a `hidden` or `inert` one,
+    and counts a link with its `href`, a control not disabled, no `type="hidden"`, and
+    any element with a non-negative `tabindex`;
+  - `empty-control` looked one level deep for a name, and read a component child
+    (`<button><Icon/></button>`) as nothing. It looks at any depth, and a component is
+    "cannot tell";
+  - the runtime's forced-colours survey matched `button|a|summary` anywhere in a tag's
+    name, so a filled `main`, `nav`, `span` or `table` counted as a fill-only control;
+  - the macOS TBT flake had a cause: the control click came at load + 500 ms, inside
+    the fixture's 3-second task on a slow runner. It clicks at 5 s, after the task, and
+    the test asserts when it clicked;
+  - automation-coverage.md §3 read as this suite's coverage. It now says the table is
+    what a tool can decide, and marks the eleven rows whose mechanism neither gate
+    runs (1.3.4, one of the seven Full rows, among them). SKILL.md says this suite runs
+    six of the seven a tool decides outright.
+
+  `test_content_and_a11y.TheAuditsRuntimeMediums`, `test_browser_runtime.TheForcedColoursSurvey`.
+- **The release job, the tooling README and the plugin README were wrong on three
+  counts** (the audit's D1, D2 and D3):
+  - `release.yml` pinned `actions/checkout` and `astral-sh/setup-uv` by tag while the
+    job holds `contents: write` and `GH_TOKEN`, and checkout kept its credential. Both
+    are pinned to commit SHAs and checkout sets `persist-credentials: false`, as
+    `evals.yml` does;
+  - `tooling/README.md` said a build is byte-identical on a rebuild. It is with the
+    same zlib; Windows' Python 3.14 deflates with zlib-ng, so a local build's bytes and
+    `SHA256SUMS` differ from the release's, and `compare.py` compares by content;
+  - the plugin README said three browser scripts need Node; six `.mjs` scripts do.
+
+  `test_release_build.TheAuditsReleaseMediums`.
+- **Two kinds of test could pass or fail for the wrong reason** (the audit's T1 and T2):
+  - the evidence register kept an entry alive while its doc quoted any of the entry's
+    numbers as a substring: "19 categories" on a bare "143", "37–41%" on "41%", "2,000+
+    audits" on "13,000". A doc must now quote the figure itself, on its own, or a
+    spelling of it that carries the same numbers ("16,384-byte"), and every companion
+    value must be quoted on its own in one of the entry's docs. The register is
+    regrouped around what each doc quotes: "143" (with its 19 categories), the GDS
+    range, Tenon's 37% and Asqatasun's 41% apart, and Deque's 13,000 pages, each re-read
+    at its source on 2026-10-16; two spellings no doc used are gone;
+  - three tests held a shared runner to an absolute time: the a11y audit's 4,000 rows
+    under 20 seconds, and TBT under 50 ms for a page whose only long task TBT should
+    leave out, which a slow runner's own loading could break. The ratio bound stays.
+    `measure_vitals.mjs`' JSON now lists each run's long tasks (`perRun[].tasks`: the
+    start on the page's clock, the duration, `inTbt`, and `leftOut` as `interaction`,
+    `before-fcp` or `after-tti`), and the TBT tests find the fixture's own task there
+    and read it against TTI (Codex on #154: a total less TBT could not tell it from
+    a slow runner's blocking before FCP). Both still fail when the handler or the
+    late task is counted.
+
+  `test_evidence.EvidenceRegister`, `test_browser_runtime.VitalsMeasures`.
+- **The schema reader, the scaffold, the email build and the deck misread nine things**
+  (the audit's E1 to E8 and E10):
+  - a naive `timestamp` named `created_at` or `updated_at` (every Prisma `DateTime
+    @default(now())`, every Drizzle `timestamp()` without `withTimezone`) became an
+    editable datetime-picker. It is a read-only timestamp, and the naive-timestamp
+    question is still asked;
+  - a table's name went into the scaffold's paths as it was, so `../evil` wrote above
+    `features/` and `../../evil` left `--out`. A name with a path separator, `..` or NUL
+    is refused (exit 2), and no file is written outside `--out`;
+  - a column `2fa` gave a TSX and a Python syntax error, and `it's` an unterminated
+    string. Names are written as escaped string literals, `errors['2fa']` where the name
+    is no identifier, and a pydantic attribute that would start with a digit takes
+    `col_`;
+  - a policy that pins a column through a cast (`auth.uid()::text = owner_id::text`), a
+    JWT claim (`(auth.jwt() ->> 'sub')::uuid = user_id`) or a quoted camelCase name
+    (`auth.uid() = "userId"`) was read as leaving it writable. A string is no call, and
+    `= any(...)` does not pin;
+  - a Drizzle schema of `pgTable.withRLS(` tables only was sent to the generated-types
+    reader;
+  - the email minifier removed the space between inline siblings
+    (`<strong>Hello</strong> <em>world</em>` read "Helloworld"); it is kept unless a
+    block or table tag is beside it;
+  - email-client-matrix.md said the templates keep 600 to 750 bytes of `<style>`; they
+    keep 751 to 919;
+  - the shipped templates did not lint clean as source (their mobile media queries,
+    dividers, pull quote and columns held literals). Seven `--email-*` tokens hold
+    them, and the builds are byte-identical;
+  - the deck put the log template's header placeholders (`<company>`, `<your name>`,
+    `<YYYY-MM-DD>`) on the cover with no gap. Each is a gap and stays off the deck.
+
+  `test_scaffold.TheAuditsContentMediums`, `test_email.TheAuditsEmailMediums`,
+  `test_presentation.TheHeadersPlaceholders`.
+- **Versioning, the docs site and the copy notes left out four things** (the audit's
+  V2, V3 and V10, and one found 2026-10-15):
+  - with several DTCG files, a later file's record of a token it could not hold lost to
+    an earlier file's written value, a false MAJOR. The files are read once, in order,
+    and the last wins either way;
+  - `deprecate import` read only the written tokens' `$deprecated`, so a deprecated
+    token a file could not hold never reached the ledger. `read_deprecations` reads the
+    record's marks too (`dtcg.recorded()`, which `diff_system` now reads as well);
+  - `extract_system --tokens tokens.json` read the JSON as CSS: no token, exit 0, and a
+    config that listed one was skipped. A contract.json or DTCG file is read through
+    `read_tokens`, as the gates read it;
+  - every SKILL.md's note on copying the scripts named the commands, not the helpers
+    they import (`project_config.py`, `dtcg.py`, `figma_common.py`,
+    `browser_common.mjs`), so a copied command failed with `ModuleNotFoundError`. Each
+    note names them, and a test runs each command copied with only what its note names.
+
+  `test_versioning.TheAuditsVersioningMediums`.
+- **Versioning and the docs site misread five things** (the audit's V4, V5, V6 and V9,
+  and one found beside them):
+  - `deprecate scan` read the suite's own JSON records as consumers: the mapping's
+    rules hold `var(--fg-subtle)`, so the token was "NOT SAFE to remove" forever. A
+    ledger, a mapping, a scan report and a docs snapshot are skipped;
+  - `deprecate add --replacement` was never looked up. It is refused (exit 2, unless
+    `--force`) when it is the token itself, is deprecated or removed, or is declared in
+    none of the `--source` files;
+  - `build_docs` inlined the search index into a `<script>`, so a `</script>` in a
+    token's note ended it; every `<` is written as `\u003c`;
+  - `diff_system` searched a folder for `system.json` and `tokens.css` only, though the
+    docs promise a folder holding a `contract.json` too;
+  - `diff_system` read `#2563eb80` as solid and measured its contrast; an 8-digit or
+    4-digit hex now carries its alpha, and the pair is a translucent note.
+
+  `test_versioning.TheAuditsVersioningMediums`.
+- **The migration's census and proposal misread five things** (the audit's M2 to M6):
+  - a Tailwind class with a variant of digits, hyphens or brackets (`2xl:`,
+    `group-hover:`, `data-[state=open]:`) or a minus (`-mt-[13px]`) was never counted,
+    so never rewritten; and a rule for `data-[state=open]:p-[16px]` would have rewritten
+    it to `data-well`;
+  - a length in a property outside the spacing and size sets (the size in a `font`
+    shorthand, `transform`, `filter`, a grid track) was filed as spacing and counted
+    among the distinct spacing values. It is `other-length` now, a row to look at by
+    hand, with advice by property;
+  - `z-index: -1` was ranked onto the first rung and rewritten to `var(--z-raised)`,
+    its sign flipped. A negative z-index is a row of its own;
+  - extraction-and-clustering.md §6's role table disagreed with `role_for()` in nine
+    cells; it is rewritten from the code, and a test reads every cell back through it;
+  - `$gutter: 24px` was told to add a Tier-2 role, where `$brand: #2f6df6` was told to
+    delete the variable. A length a preprocessor variable holds gets the same advice.
+
+  M1 (a duration counted at two rules) did not reproduce: #135 fixed it.
+  `test_token_migration.TheAuditsMigrationMediums` and `TheRoleTableIsTheCode`.
+- **The migration, versioning and Figma tools missed six more things, and their
+  references fell behind the code** (the audit's M7, M8 and V13 to V16):
+  - the census did not read `@apply p-[13px]` in a stylesheet, or the strings of
+    Svelte's and Astro's `class={…}` and Astro's `class:list={[…]}`, which it reads
+    in a `.jsx`. It reads them, `@apply p-4` with the project's Tailwind 4 theme, and
+    files them as hand work: the codemod rewrites class attributes only (CodeRabbit
+    on #157);
+  - the codemod's rewrite went through `mkstemp`, so on Linux and macOS a 0644 file
+    came back 0600 and a 0755 one lost its execute bit. It keeps the file's mode;
+  - `figma_to_tokens` marked a `$type: duration` token not named `dur-*` unresolved
+    in `tokens.json`, though its CSS was right;
+  - `diff_system` read any design-system-docs schema; it reads the one `build_docs`
+    does, and names it when it refuses another (exit 2);
+  - `--format all` without `--out-dir` wrote three files into the working folder and
+    ignored `--out`. It needs `--out-dir` and refuses `--out` (exit 2);
+  - change-classification.md gave a theme override's change or removal as major (the
+    code gives patch when it resolves as before) and listed `component-renamed`, which
+    nothing emits: the kind is gone, and the table says a renamed component reads as
+    removed and added. `figma_audit` dropped a code title nothing emits; the scripts
+    references name figma_audit's `-o/--out` and `resolver` shape and extract_system's
+    `--no-color-impl`, and `/figma-sync`'s hint names the `resolver` shape.
+
+  M9 and V12 were closed by #140. `test_token_migration`, `test_figma_sync`,
+  `test_versioning.TheAuditsVersioningMediums`, `test_docs.TheScriptReferences`.
+- **The content, email and runtime gates misreported eight things** (the audit's E11,
+  E12, G8 to G10, G12, G14 and G16):
+  - `lint_email --source` reported every rule of a `<style>` block on the element's
+    line. Each rule has its own line, a comment's newlines and an `@media` block's
+    rules counted;
+  - `introspect_schema` read Prisma's `Unsupported("geometry")` as a type named
+    `unsupported`, with a text input; it reads the type it names, as the SQL does (a
+    map picker), and `Unsupported("geography(Point, 4326)")` is no longer cut at its
+    first `)`. Neither reader takes a PostGIS SRID for a length any more: only text
+    and bit types have one (Codex on #159);
+  - `perf_audit` skipped a `report.html` or `stats.html` without a word. It still
+    leaves a bundle analyzer's report out, and names each on stderr and in the JSON's
+    `ledger.not_counted`, so a real page of that name is seen;
+  - `a11y_static` quoted a bound attribute as `type="\x00expr\x00"`; it writes
+    `type={…}`, and names a field by its `id` when its `name` is bound. A bare
+    `title` no longer reads as a job title (the pattern `^title$&` never matched, and
+    a post's title is no `organization-title`), and a number input asks only for a
+    number's purposes, so `name="units"` is no address line;
+  - its `focus-ring-transition` flagged `transition: outline-color`, which its own
+    fix allows;
+  - `a11y_runtime` named no criterion for axe's two-digit tags (`wcag1412`,
+    avoid-inline-spacing's 1.4.12), and automation-coverage.md's 1.4.12 row now says
+    that rule runs;
+  - `perf_audit`'s header listed a missing-`srcset` check no rule makes, and it built
+    a set of font families it never read.
+
+  E13, G11 and G15 were closed by #138, E14 and G13 by #142.
+  `test_email.TheAuditsEmailLows`, `test_schema_sources.TheAuditsContentLows`,
+  `test_content_and_a11y.TheAuditsRuntimeLows`.
+- **The docs, the pointer check and the suite let nine things slip** (the audit's D5 to
+  D9 and T3 to T10):
+  - the Core Web Vitals thresholds, the 75th percentile and the evals' "Claude Code
+    2.1.269 or later" had no entry in `tests/fixtures/evidence.json`. They are
+    registered, each re-read at web.dev and the evals page on 2026-10-16, so every doc
+    that quotes them is held to the register; LCP's poor threshold reads 4 s, as
+    web.dev gives 4000 ms;
+  - `tools/check_pointers.py` walked `skills/` only: it reads the agents and the
+    workflow commands too, and their seven pointers are registered;
+  - unused imports, f-strings with nothing to format, `raise` in an `except` without
+    `from` (13 sites, each `from None`: the message carries the cause) and eight
+    locals assigned and never read are gone from the scripts and the tests, none of
+    them a check left unwritten. `test_static_checks` keeps the five rules (ruff's
+    F401, F541, F841, B904 and SIM115's `open(…).read()`) with the standard library;
+  - 81 assertion loops in the tests stopped at their first failure; each case is a
+    `subTest` now, and the static checks keep it so;
+  - `NoFragileJsonReads` had no positive control and missed a named import's
+    `readFileSync`; `PythonFloor` left out the workflow commands' scripts and
+    `shared/`; the reduced-motion facts sat behind two `if`s; the manifest's strict
+    validation skips on every CI cell, so CI's `validate` job is held to it;
+    `wds_support` turns bytecode off for every run; the 2025.10 fixtures use the
+    colour object, and the legacy string reads the same; `test_versioning` closes its
+    files;
+  - CLAUDE.md maps all five tools and both kinds of eval, and a skill byte table in
+    the live docs is held to the bytes on disk.
+
+  `test_static_checks`, `test_evidence`, `test_pointers`, `test_docs.TheAuditsDocsLows`,
+  `test_powershell_json`, `test_facts`, `test_mcp`, `test_harness.NoBytecode`, `test_dtcg`.
+- **The references quoted Baseline browser versions with no entry, and two were wrong**
+  (the rest of the audit's D6). Twenty support lines across eight of web-design-studio's
+  references are registered in `evidence.json`, each re-read at web-features' own file for
+  the feature on 2026-10-16. Re-reading them found:
+  - the Popover API is Baseline from Chrome and Edge 116, not 114 (navigation-patterns.md);
+  - `@scope` is Baseline since 2026-03-24, with Firefox 146 and Safari 26.4, not "in
+    Firefox from 128" (stack-vanilla-css.md);
+  - `linear()` (since 2026-06-11) and subgrid (since 2026-03-15) are now widely
+    available, so motion-system.md and layout-composition.md say so;
+  - accessibility.md gave `@starting-style` and `transition-behavior` one list,
+    "Safari 17.5 and 17.4"; each now has its own.
+
+  `test_evidence` reads a browser version wherever a doc quotes one, with each later
+  version of the same browser beside it ("Safari 17.5 and 17.4", Codex on #162), and
+  fails one that stands in no registered figure or `not_statistics` row; a support figure's source must
+  be web-features. Our own observations ("checked in Chromium 153") and the drift examples
+  (Chromium 140 and 141) are listed as `not_statistics`.
+  `test_evidence.EvidenceRegister.test_every_browser_version_is_registered`.
+- **web-design-studio's gates measured and ruled four things wrong** (the audit's W1 to
+  W5):
+  - `check_roles` read `--fg-default: #00000080` as solid black, 20:1 on the canvas,
+    and called `oklch(… / 0.5)` "not a colour": its translucency check ran after a
+    parser that drops a hex's alpha and refuses a function's. It runs first now, and
+    `generate_color_ramp.py --check` and its seed refuse a translucent colour too
+    (`alpha_of()`, `opaque_color()`);
+  - both measured a colour outside sRGB with its channels clipped, under which
+    `oklch(59% 0.35 273)` is 6.49:1 on white; chroma-mapped, as a browser may show it,
+    it is 4.40:1. They take the worse of the two (`worst_contrast`), as the ramp's own
+    table did, and `--check` says so;
+  - `tw_probe` cleared every key under `--font-*: initial`, where Tailwind keeps the
+    weights and sizes (and four other namespaces' keys), so a theme's own `font-bold`
+    read as a stock class that survived (`KEPT_UNDER`, from tailwindcss 4.3.3);
+  - stylelint refused a layer statement with a layer of the project's own between the
+    canonical ones (`…, overrides, print`), which the spec and the audit allow. Both
+    gates read a sub-layer in a statement as its parent where it stands, so
+    `reset, components.skin, base` is out of order (Codex on #145);
+  - ESLint refused `bg-[url(…)]`, `mask-[url(…)]` and `content-['…']`, which the audit
+    exempts: neither can be a token. Both exempt a `url()` only when it is the whole
+    value, so `bg-[url(…),linear-gradient(13deg,…)]` is refused (Codex on #145).
+
+  The spec has the layer examples and a `tailwind_arbitrary` section, which both gates
+  run (`test_rules_spec`, `test_real_tools`); `test_check_roles` and `test_tw_probe` hold
+  the rest.
+- **web-design-studio's tools missed four more things, and two config comments were
+  wrong** (the audit's W8 to W13):
+  - `check_roles` skipped a rule holding a nested block (native nesting): the starter
+    with one `@media` inside `:root` said "--fg-default is not declared" (exit 2). It
+    reads the rule's own declarations, and still not the condition's;
+  - the audit flagged `content: "!important"`, words in a string, as the flag, and
+    missed the flag written `! important`. It reads the flag as stylelint does;
+  - `tw_probe` stopped on `@import "./theme"` (ENOENT, exit 2). It reads `theme.css`,
+    as Tailwind and the census do;
+  - the pre-commit hook's role stage took `tokens.css` and `x-tokens.css` only, so
+    `design.tokens.css` went unchecked. It takes each one-file name design-rules.json's
+    `token_files` give a token set, on a file that declares a Tier-2 role; a file of
+    primitives alone is passed over, since check_roles needs the roles, and so is a
+    modular `tokens/` folder, whose roles read a sibling's primitives (Codex on #156);
+  - the ESLint config said the fixtures run ESLint 10.4.0 (they run 10.11.0), and the
+    stylelint config's token-file override restated `custom-property-pattern`
+    unchanged, under a comment that called it a relaxation.
+
+  W14's `noqa` directives stay: under ruff's default rules they suppress real E402
+  and E731 findings, and only a narrower rule set reads them as unused.
+  `test_check_roles`, `test_audit_design`, `test_tw_probe`, `test_precommit_hook`,
+  `test_recipes.DependencyFacts`.
+- **A Tailwind `size-*` was proposed a padding role** (CodeRabbit on #129). `size-[16px]`
+  became `size-well`, sizing an icon by `--pad-well`, and v4's counted `size-4` would have
+  too. It is a width and a height, so it is a size: reported when no `--width-*` role
+  fits (`test_token_migration.TheV4SpacingCensus.test_a_size_is_no_padding`).
+
+- **`tw_probe` read an `@source inline()` class as missing** (found by SB-B5's doc
+  test). Its classes are in the first build, so asking for one added no rule, and a role
+  it named failed the check. Those lines are set aside when compiling; `@source not
+  inline()` stays (`test_tw_probe.TheProbe.test_an_inline_source_does_not_hide_its_classes`).
+- **The audit read a file name as a CSS-in-JS template** (found by the audit of
+  `tw_probe.mjs`). Its emotion pattern took the `css` of `` `${file}.css` `` for a `css`
+  tag, so the rest of the file was audited as unlayered CSS with long selectors. A tag is
+  now a name of its own, with no `.`, `$` or word character before it; a real
+  `` css` `` template is still audited (`test_audit_design.JsxClassesAndCssInJs`).
+
+### Upgrading
+
+- **Part 5 of `eslint.design.config.mjs` uses eslint-plugin-better-tailwindcss** (P36;
+  SB-C4, decision D4), one plugin for both Tailwind majors, in place of
+  eslint-plugin-tailwindcss 4.x for v4 and a pinned 3.x for v3. If you copied Part 5:
+  1. `npm uninstall eslint-plugin-tailwindcss`, then
+     `npm i -D eslint-plugin-better-tailwindcss` (4.9.0 peers ESLint 7 to 10, and
+     Tailwind 3.3 or later or 4.1.17 or later).
+  2. Copy the new block. On Tailwind v4 it reads your entry CSS (`entryPoint`, which
+     replaces `cssConfigPath`); on v3 its `tailwindConfig` line takes `entryPoint`'s
+     place (it replaces `config`). The block sets the plugin's `cwd` to the project and
+     anchors both paths there, because the plugin resolves `tailwindcss` and reads its
+     paths from ESLint's working directory otherwise: from a monorepo root, the root's
+     Tailwind, perhaps the other major.
+  3. Rename the rules you configured yourself: `no-custom-classname` is
+     `no-unknown-classes` (its `whitelist` is `ignore`), `no-contradicting-classname` is
+     `no-conflicting-classes`, `enforces-shorthand` is `enforce-shorthand-classes`, each
+     under the `better-tailwindcss/` prefix.
+  4. **Anchor your own `ownClasses` entries** (`'^card(?:__[a-z0-9-]+)?$'`): the new rule
+     tests each entry unanchored, so `card` would also pass `cardd`. On v4 you can drop
+     the entries for classes your `@layer components` defines: `detectComponentClasses`
+     learns them from the entry. The layout primitives and `u-*` utilities still need
+     theirs.
+
+  What changes in what it reports:
+  - **New:** a duplicate class (`p-card p-card`) and, on v4, a class v4 keeps only for
+    compatibility (`flex-grow` is `grow`).
+  - **`classNames()` and `classnames()`** are read, as Part 2 reads them: the block adds
+    them to the plugin's default helpers.
+  - **Lost on v3:** the conflicting-class check. The plugin's rule compares the CSS v4
+    generates and reports nothing on v3.
+  - **Dropped:** the old v3 block's `no-arbitrary-value`. Part 1 already refuses an
+    arbitrary value on every stack, with no plugin.
+
+  The spike that decided it ran both plugins over the same project and fixtures
+  (`dev plans/web-design-suite-d4-spike.md`): they found the same typos, off-scale
+  classes and conflicts, in about the same time once warm. The tests run the new block
+  through the real plugin on Tailwind 4.3 and 3.4 (`test_real_tools.TailwindPluginV4`
+  and `TailwindPluginV3`).
+
+- **`a11y_runtime.mjs` runs four more checks by default** (P35 part 1): `spacing`,
+  `obscured`, `hover` and `motion`. Their errors (`spacing`, `obscured`, `hover`) fail a run
+  that passed on 3.6.0, and `reflow_failures` now also counts text a box clips at 200% or
+  320px. A CI command and a budget that were green may go red with no change of your own.
+  Read the new findings first. An error fails the run whatever the budget allows, so to
+  roll the checks out one at a time, leave the rest out with `--skip CHECK` and take each
+  `--skip` away once its findings are fixed. The `motion` findings are warnings, and fail a
+  run only through a budget: `motion_not_reduced`, `motion_content_hidden` or
+  `motion_busy_stopped`.
+
+## 3.6.0 — 2026-10-13
+
+### Added
+
+- **DTCG 2025.10, read and write: part 1** (P31; LC-C2, LC-B2 in part). One module,
+  `shared/dtcg.py`, reads and writes the Design Tokens format's first stable version,
+  copied beside every `project_config.py` and held to the master by a test. It replaces
+  figma-variables-sync's `dtcg_values.py`, whose reading it keeps.
+  - **A DTCG file is a token file.** `read_tokens()` reads a `*.json` or `*.tokens` file
+    with no `"schema"` that holds a token, so `.design-suite.json`'s `tokens`, every
+    `--tokens` flag, the audit and the lint configs take one. A token's name is its path
+    joined by `-` (`color.bg.surface` is `--color-bg-surface`), and its tier comes from
+    its value. `project_config.mjs` reads it the same way, held to the Python reader on
+    every value form.
+  - **Writing.** `figma_to_tokens.py --format dtcg` writes a 2025.10 document from any
+    Figma export or from a `tokens.css`: names split on `-` into groups, a name that is
+    also a group's prefix as its `$root`, `var()` as references, every token typed, and
+    colours as objects in their own space, with an sRGB `hex` fallback where one can be
+    computed (none for `lab()`, `lch()` or a `color()` space other than sRGB). A value DTCG has
+    no type for (`clamp()`, `calc()`, `em`, `ch`), a token that refers to one, and each
+    theme or density block are named and left out (exit 1).
+  - **`diff_system.py`** takes a DTCG file as either snapshot, compared as a contract is:
+    default values and tiers.
+  - **The migration proposal.** `cluster_values.py` writes `tokens.json` in DTCG beside
+    `tokens.css`.
+  - `/install-gate` vendors `dtcg.py` with the audit's `project_config.py`.
+- **Tokens Studio: part 2** (P31; LC-B2 in part). A Tokens Studio export is read as
+  Tokens Studio reads it: the sets a theme uses merged, its source sets and then its enabled
+  ones, each in `tokenSetOrder`, each theme
+  group a collection whose modes are its themes, and each set no theme enables a
+  collection of its own. A Light/Dark export becomes `:root` and `[data-theme="dark"]`,
+  where it was `--light-bg-surface` and `--dark-bg-surface`. The legacy `{value, type}`
+  keys and Studio's types read as 2025.10's, a bare number on a size is px, and math
+  (`{space.base} * 6`) is worked out, where it was written into the CSS; math it cannot
+  work out is named and left out. `read_tokens()` and the Node reader read such a file as
+  its default theme. A DTCG `number` or `fontWeight` token is written unitless, where an
+  opacity became `0.01rem`.
+- **Themes through the DTCG resolver: part 3** (P31; LC-C2, LC-B2 in part).
+  `figma_to_tokens.py --format dtcg --out-dir DIR` writes every theme with the
+  resolver module (2025.10): `tokens.json` holds the default values, one file each
+  theme or density block changes (`theme-dark.json`, its overrides only, typed against
+  the whole set), and `tokens.resolver.json`, a set and one modifier per kind whose
+  default context is `:root`. It works from a Figma export, a Tokens Studio export or a
+  `tokens.css`; a rule that is no theme or density (`.inverse`, a media query) is named
+  and left out. Where `--out` wrote the default mode alone, a `tokens.css` with
+  `[data-theme="dark"]` now goes to DTCG and back to the same blocks.
+  - **Reading a resolver.** `figma_to_tokens.py` and `figma_audit.py` read a
+    `*.resolver.json` as modes: each modifier a collection of its contexts, a `theme`
+    modifier's as `[data-theme]` blocks and a `density` one's as `[data-density]`.
+    `read_tokens()`, and so `.design-suite.json`'s `tokens`, the audit and the lint
+    configs, read its default. A source is a file beside it, a pointer into one, inline
+    tokens, a set or one of a set's sources (`#/sets/base/sources/0`); a context keeps the
+    spaces in its value (`[data-theme="high contrast"]`); a URL, an unreadable file, a cycle of sets and a modifier with no
+    default are named, and a fan-out of sets is refused.
+- **`$deprecated` reaches the release gate: part 4** (P31; LC-C2). A token the old DTCG
+  snapshot marks `$deprecated` (itself, or through its group) counts as recorded in
+  `diff_system.py`: the file announced it a release ago, so removing it now passes the
+  gate, and the report says `deprecation  marked: $deprecated in OLD`. A ledger record
+  for the same name wins. `deprecate.py import FILE --since X --removal Y` writes the marks
+  into the ledger, so `status`, `scan` and `mapping` see them; the replacement is the
+  token the reason names (`"Please use {bg.brand} instead"` is `--bg-brand`). A later
+  file that sets the token again without the mark, a `tokens.css` or a `contract.json`
+  among them, takes it off.
+- **Style Dictionary's and Terrazzo's names: part 5** (P31; LC-B2). Both tools join a
+  token's path with `-`, so `color.neutral.500` is `--color-neutral-500` and a component
+  reading it skipped a tier unseen: no gate knew the name. `.design-suite.json` takes
+  `names`: `prefixes` (each ending in `-`) taken off a name that starts with one, and a
+  `rename` table, read first. The audit, stylelint and ESLint read Law 6 through it, in a
+  stylesheet, a `(--name)` class and an inline custom property, and a page-rhythm role or
+  a null-out under a prefix still passes. The project's own ramp steps are read through
+  the map as well: a step renamed to a role passes, and one the tokens file spells with a
+  prefix is still a primitive. The spec's `tiers.names` holds the examples,
+  and `project_config.py` and `.mjs` check the key alike.
+- **Figma on every plan: the Plugin API route** (P32 part 1; LC-B1, LC-C7). The only way
+  into Figma was `--reverse`'s REST body, and `POST /v1/files/:key/variables` needs an
+  Enterprise plan. `figma_to_tokens.py --reverse --format plugin-script` writes the same
+  variables as Plugin API code, which the Figma MCP server's `use_figma` runs (or a
+  development plugin), on any plan. It finds collections, modes and variables by name,
+  renames a new collection's "Mode 1", keeps primitives out of the pickers (`scopes: []`),
+  sets `codeSyntax.WEB` to `var(--token)`, keeps aliases as aliases, updates what differs
+  in place and deletes nothing, so a second run changes nothing. A mode the plan does not
+  allow is reported with Figma's message and the rest is written. It returns counts and
+  the first errors, which is what `use_figma` hands back. SKILL.md routes a connected MCP
+  server: `get_variable_defs` reads a selection, audited as records, and `use_figma` runs
+  the script. The facts are re-read at Figma's Plugin API, MCP and FAQ pages
+  (`references/figma-mapping.md` §14).
+- **Each Figma plan's limits** (P32 part 2; LC-B6). A collection's modes are capped by the
+  plan: Starter keeps the first only, Professional allows 10 modes per collection and
+  Organization 20 modes per collection, and the REST API a maximum of 40 modes, each figure
+  re-read at Figma's pages and registered. `figma_audit.py --plan PLAN`, or
+  `.design-suite.json`'s new `figma.plan`, reports `MODE_LIMIT` (error) on a collection past
+  the cap, as a theme, a density and a brand in one collection soon are, and stops asking
+  Starter for a dark mode it cannot hold. `--reverse --format plugin-script --plan` reports
+  the same before the run, and a REST body past the endpoint's own cap is not
+  written (exit 2): Figma refuses the whole request. Both config
+  readers check the key alike. `figma-mapping.md` §14 adds the plans' table, branch keys
+  (`local` and the POST take one, `published` does not) and the MCP server's Starter
+  allowance.
+- **Theming without JavaScript: `light-dark()`** (P33; SS-B3). style-architecture.md §10
+  teaches roles that hold both values, `light-dark(LIGHT, DARK)`, picked by the element's
+  used `color-scheme`: the OS decides from the first paint with no script, form fields
+  follow, and `[data-theme]` stays as the override, one `color-scheme` declaration long.
+  Because the colour is resolved where it is used, a `<section data-theme="dark">` is dark
+  inside a light page, derived tokens such as `--elevation-card` included, which a
+  re-pointing block cannot reach. Support is Baseline 2024 (13 May 2024), widely available
+  from November 2026; for older browsers, concrete roles with the `light-dark()` ones inside
+  `@supports (color: light-dark(#000, #fff))`. `check_roles.py` holds a `light-dark()` role
+  in every scheme the visitor can be in: the one a scope's `color-scheme` names alone
+  (`.inverse { color-scheme: dark; }` reads the dark branch), both under `light dark`, light
+  under none, reading `color-scheme` through `var()` and that one `@supports`. The starter
+  rewritten that way measures, scheme for scheme, as its blocks do, and the example runs in
+  a browser in the tests.
+- **The top layer and the error state: modern CSS, part 1** (P38; SS-B4 in part).
+  accessibility.md gave a modal dialog `z-index: var(--z-modal)`, as if the `--z-*` ladder
+  reached the top layer. It does not: a toast at `--z-toast` sits under an open modal, and
+  a z-index on a top-layer element orders nothing ("the last element in the top layer is
+  rendered on top of everything else"). A new section says so and puts the message about
+  what a dialog did inside it, as a `popover="manual"` with `role="status"`: a popover shown from elsewhere
+  renders over the dialog too, but the modal has made it inert, so clicks pass through it
+  and a screen reader does not reach it. The toast fades in from `@starting-style` and out
+  with `transition-behavior: allow-discrete`, each feature's support stated. The field's
+  error state adds `:user-invalid`, which waits until the user has touched the field, with
+  `:has()` for its hint. A new `test_modern_css` runs each snippet in Chromium on the
+  starter's tokens, reading the hit test and Chromium's accessibility tree.
+- **Container type, fallback x-height, alpha variants and `height: auto`: modern CSS,
+  part 2** (P38; closes SS-B4). Each snippet runs in Chromium in `test_modern_css`, as
+  written, on the starter's tokens.
+  - **`cqi`** (typography.md §10): type sized to its container, as a fluid token whose
+    role a card's headline reads, worked from two anchors as the viewport steps are. The
+    `rem` intercept keeps it growing with zoom; a pure-`cqi` size does not grow at all.
+    stack-vanilla-css.md no longer keeps the units out of tokens: they are Baseline widely
+    available. `inline_styles.literal_units` in the spec takes the six container units,
+    so an inline `'4cqi'` is a literal for the audit and ESLint.
+  - **`font-size-adjust`** (typography.md §8): one number matches every fallback's
+    x-height to the web font's, and narrows the shift without removing it. Checked in
+    Chromium: `from-font` reads the fallback itself during a swap and changes nothing, a
+    face's `size-adjust` has no effect beside it, and every `font:` shorthand resets it,
+    so it is declared after each role's `font:`, on a stack of its own without the
+    re-metricked face.
+  - **`color-mix()` and relative colour** (color-system.md §9): a role's alpha variants
+    derived in the token file, declared on every themed element, since a derived token on
+    `:root` alone keeps the light theme's tint inside a dark band.
+  - **`interpolate-size`** (motion-system.md §7): a disclosure animating to `auto`, in
+    Chromium only and a jump elsewhere, with `visibility` keeping a closed panel's links
+    out of the tab order and the accessibility tree, and `inert`, which its toggle sets
+    with `aria-expanded`, keeping them out while it closes. §5's table pointed to an accordion
+    §7 did not have.
+- **The migration census reads every style source, and the rollout recipes** (P39; LC-B5
+  in part, LC-B7).
+  extract_literals counted 1 of a Sass file's 4 module colour functions, never opened a
+  Vue, Svelte, Astro or HTML file, and read no CSS-in-JS object but JSX's `style={{}}`, so
+  a migration sized from it came in short.
+  - **Sass:** `color.adjust()`, `color.scale()`, `color.change()` and `color.mix()`, and
+    their global names, are colour functions, as `darken()` is. CSS's `color()` no longer
+    matches inside `adjust-color()`.
+  - **Vue, Svelte, Astro and HTML:** each `<style>` block is a stylesheet in its `lang`,
+    rewritten by the codemod too; a `lang` the scanner cannot follow (`sass`, Stylus) is
+    named among the problems. Scripts and Astro's frontmatter are read as JavaScript,
+    `style=""` attributes as inline styles, and `class=""` for Tailwind's arbitrary values.
+    A `<style>` in a comment or a script's string is not read.
+  - **Style objects:** MUI's `sx`, Emotion's `css`, `styled.div({})`, vanilla-extract and
+    Panda, every nested level, with MUI's and Panda's shorthands read as their properties.
+    A number in `sx` or Panda may be a theme step, so only strings count there.
+  - **cluster_values** sets style objects aside as hand work beside inline styles, each
+    with its own reason, so neither is counted as mechanically replaceable.
+  - **The rollout** (design-system-versioning's rollout.md): §3's upgrade takes its
+    baselines on the version it leaves, before the install, which would otherwise approve
+    whatever the new version renders; §6 deprecates a bad release with `npm deprecate`; §2
+    has Renovate (`rangeStrategy: "pin"`, `minimumReleaseAge`) and Dependabot
+    (`versioning-strategy: increase`, `cooldown`) recipes that open the upgrade and leave
+    the visual diff and the merge to a person.
+- **Prisma and Drizzle schemas in** (P40; DL-B3 in part). content-model-to-ui read SQL,
+  Supabase's generated types and a JSON dump, while its description promised Postgres.
+  `introspect_schema.py` now reads a `schema.prisma` and a Drizzle `pgTable` schema too,
+  found by themselves (`--format prisma|drizzle` to say so). The shop of `shop.sql`,
+  written in each, reads to the same screens: Drizzle's in full, Prisma's less what it
+  cannot say (CHECK constraints, the key to `auth.users`), each loss in the model's
+  `fidelity`. Neither carries row-level security, so the SECURITY block says unknown.
+  Names spelt the JavaScript way (`createdAt`, `authorId`, `priceCents`) now meet the same
+  signals as their snake_case spelling, so a timestamp stays out of the form and an
+  owner key stays read-only.
+
+### Changed
+
+- **`evals.yml` runs only by hand.** A `v*` tag no longer starts it: the dispatch
+  before the tag gates the release, and the tag's own run re-tested the same commit
+  for about $9 (the owner, 2026-10-11).
+
+### Fixed
+
+- **A reference to a group's own token** (`{brand.$root}`, `#/brand/$root`), the
+  spelling 2025.10 gives it, was left unresolved (P31).
+- **A group's `$deprecated`** did not reach its tokens; now each one that does not say
+  otherwise carries it, and the description notes it (P31).
+- **A value spelt another way was a change** in `diff_system.py`: `oklch(88% …)` for
+  `oklch(88.0% …)`, `0px 1px 2px 0px …` for `0 1px 2px …`, `cubic-bezier(0, 0, 1, 1)`
+  for `linear`. Two values are now the same when they parse to the same DTCG type and
+  value, part by part for a value with no type of its own. Against the stylesheet it
+  was written from, a published DTCG file read 27 primitives as edited, and the 53
+  tokens it cannot hold (`clamp()`, `ch`, `em`, and what reads them) as added: a major
+  release for an unchanged system. The DTCG writer now keeps each token it leaves out,
+  with its value, in the file's `$extensions` (`io.github.vybecode-ltd.web-design-suite`,
+  `notWritten`), and diff_system reads them back into whichever snapshot is the DTCG
+  file: a `clamp()` added since, or changed, is still a change, either way round. A
+  quoted keyword (`"serif"`) stays another family than the keyword (the 3.6.0 live
+  check; Codex on #119).
+- **`--reverse` had no route from a project's tokens into Figma.** It refused a
+  `tokens.css`, and given a DTCG file it read the document as a flat map, so its groups,
+  or a resolver's own keys (`sets`, `resolutionOrder`), became variables, with exit 0
+  and no Dark mode. It now reads a `tokens.css`, a DTCG 2025.10 file and a resolver:
+  each theme (`[data-theme]`, or a resolver's `theme` contexts) is a mode of the
+  semantic collection, and a density or another condition is named and left out (the
+- **A Tokens Studio export never reached figma-variables-sync.** A prompt about one
+  that did not say "Figma" heard no skill, and the session wrote its own converter.
+  The router now hears "Tokens Studio", and the skill's description names it (the
+  3.6.0 live check).
+- **A declined dark pattern could go unexplained.** In one of three runs of the
+  `no-fake-countdown` eval, the reply built only the honest countdown and never said why
+  the resetting one deceives, and its judges failed it. landing-page-conversion's
+  ethics boundary now opens by asking for the why in the reply: the pattern, that it
+  deceives, and a law only where it applies (3.6.0's evals).
+
+## 3.5.0 — 2026-10-10
+
+### Added
+
+- **The project contract, part 1** (XC-C8, LC-C1, LC-B3). A project can now name its
+  token files, component globs, stack, budgets and baselines once, in a
+  `.design-suite.json` at its root, instead of flag by flag. A script finds it by walking
+  up from the working directory to the repository root, a flag beats it, and an unknown
+  key or a wrong shape stops the run with the key named.
+  - **One reader.** `shared/project_config.py` reads the config, and a byte-identical
+    copy sits beside the scripts that use it, so a skill installed alone has one.
+  - **`contract.json`.** `extract_system.py --contract FILE` writes the token system's
+    default values by tier: ramps, scales, breakpoints, constants and roles. A token
+    declared only in a theme or under a condition has no default and is left out.
+  - **The scripts that read them.** `figma_audit.py --tokens` takes a `contract.json` as
+    well as a `tokens.css`. With no flag, it and `extract_system.py` read the token files
+    the config lists.
+  - Part 2 brings the config to the other scripts, the budgets and baselines among them.
+- **The project contract, part 2: the project's tokens everywhere** (LC-C1, LC-B3). Every
+  script that compared against the starter's token system now reads the project's: a
+  `tokens.css` or a `contract.json`, from `--tokens` or the config's token files.
+  - **One view of the tokens.** `read_tokens()` gives the scripts a project's token files
+    in the contract's sections. A `tokens.css` is read by its defaults, as extract_system
+    reads them; web-design-studio's new `references/project-contract.md` says how its
+    tiers can differ from a contract's, and what each script takes.
+  - **`audit_design.py`.** A token file the project names is a token file wherever it
+    sits, so `src/design/system.css` may hold literals. The ramps it declares
+    (`--brand-500`) are Tier-1 colours, so a component reading one is a Law 6 leak. The
+    config's `components` globs add to the component files, and `baselines.audit` is the
+    baseline without `--baseline`.
+  - **`figma_audit.py`.** A scale the project declares (spacing, radius, type, stroke, z,
+    duration, leading, tracking, weight, breakpoints) replaces the studio's, as its ramps
+    already did. The starter's own tokens change nothing.
+  - **`figma_to_tokens.py --tokens`.** The project's names join the vocabulary:
+    `color/brand/500` comes back as `--brand-500`, recognised and in its tier.
+  - **`diff_system.py`.** A `contract.json` is a snapshot, and without a `new` snapshot the
+    candidate is the project's token files. Against a contract, the other side is cut down
+    to default values and tiers, so a contract diffed against its own `tokens.css` has no
+    changes.
+  - **`cluster_values.py --tokens`.** A migration lands on the project's ramps: its steps
+    of the contract's six ramps replace the derived ones, and a step it lacks is built
+    from its own accent. `--accent` still beats it.
+- **The project contract, part 3: every key has its readers** (XC-C8). A flag still beats
+  each, and each falls back to the script's own default.
+  - **Budgets:** `perf_audit.py` and `measure_vitals.mjs` read `budgets.perf`;
+    `a11y_runtime.mjs` reads `budgets.a11y`.
+  - **Baselines:** `a11y_static.py` reads `baselines.a11y`, `perf_audit.py`
+    `baselines.perf`, `build_docs.py --check` `baselines.docs`, and
+    `snapshot_matrix.mjs` `baselines.snapshots`.
+  - **The email build** (`build_email.py`, `lint_email.py --source`) reads `emailTokens`,
+    never the site's `tokens`. **The deck** builds on the config's CSS token files.
+    **`scaffold_ui.py`** takes its stack from `stack`.
+  - **A Node reader.** `browser_common.mjs` gains `projectConfig()`, which finds and
+    checks the file by the Python reader's rules, with the same messages; a test runs
+    both on the same files. Python now refuses `"schema": true` and normalises `..` in
+    a path, as Node does.
+  - **Vendored alone.** `a11y_static.py` copied into a project's `scripts/` without its
+    reader runs as it did, like `audit_design.py`.
+- **The project contract, part 4: the lint configs read it too** (N37). The audit read a
+  project's `.design-suite.json` and stylelint and the ESLint config did not, so a
+  component under `src/widgets/` that read `--brand-500` failed one gate and passed two.
+  Both configs now read the config from the working directory, as the audit does.
+  - **stylelint:** a token file the config names is a token file, so its literals are
+    allowed, and the `components` globs join the component files.
+  - **ESLint:** a JSX or TSX file the globs match is a component file.
+  - **Both:** a step of a ramp the project declares is a Tier-1 colour with a role. Its
+    advice comes from the rule spec (`tiers.project_ramps`) through `sync_rules.py`, as
+    the audit's now does.
+  - **One Node reader.** The config reader moves from `browser_common.mjs`, which
+    re-exports it, to `shared/project_config.mjs`. That file also ports `read_tokens()`.
+    A copy sits beside each importer, and the two lint configs import it from
+    `assets/configs/`, so copy it with them. A test holds both readers to the same
+    tokens, refusals and component globs. Both readers now take a config or contract in
+    every encoding Python's `json` finds: UTF-8, UTF-16 and UTF-32, with or without a
+    byte-order mark.
+  - **Globs in stylelint.** stylelint's overrides match with micromatch, whose `**` is
+    not the config's, so each glob is translated. Run through stylelint's own matcher, the
+    translation matches exactly the files `is_component()` does. micromatch compares a
+    path as the tool spelt it, so each glob is written for every spelling of the
+    project's folder: resolved, through a link or a subst drive, and on Windows with
+    either case of drive letter.
+  - **One fix.** A `tokens.css` ramp step must be ASCII digits, as a contract's is:
+    `--brand-٥٠٠` was a ramp step to Python and a scale to Node.
+- **Hooks, part 1** (XC-C2, LC-C8 and SS-C6 in part, XC-C8's hook part). The plugin
+  now ships `hooks/hooks.json`. Each hook runs `hooks/design_hooks.mjs` under `node`, in
+  exec form, so Windows spawns it with no shell.
+  - **The design gate** (PostToolUse on Edit and Write). After each edit Claude makes to
+    a file the audit reads, `audit_design.py` runs on that file, in the config's folder,
+    so the project's own components and ramps count. Its findings reach Claude as
+    context, capped below Claude Code's 10,000 characters.
+  - **The generated-file guard** (PreToolUse on Edit and Write). An edit to a file
+    that says it is generated in its first 800 characters is refused, with the reason:
+    change its source and regenerate. The markers are the audit's.
+  - **The router** (UserPromptSubmit). A prompt that names one skill's work, such as
+    WCAG, Figma variables or an HTML email, hears that skill's name, up to two. A crowded
+    skill listing drops the descriptions, and then the names are all Claude sees.
+  - **Opt-in.** The gate and the guard act only in a project whose `.design-suite.json`
+    turns them on, with the new `hooks` key: `{"designGate": true, "generatedFiles":
+    true}`. Both readers check the key, with the same messages. The plugin's
+    `design_hooks` option (`userConfig`), set to false, turns all three hooks off.
+  - **Python, found.** The gate alone needs Python, and looks for it as the pre-commit
+    hook does: `WDS_PYTHON`, else `python3`, `python` or `py -3`. Each candidate must
+    report major version 3, so the Store placeholder on Windows is passed over. A hook
+    that cannot act tells Claude why, or stays silent. It never blocks a tool call
+    because of its own failure.
+- **Hooks, part 2: the token diff** (LC-C8). After Claude edits one of the project's
+  token files, the gate's hook runs `diff_system.py` against the published snapshot, and
+  Claude hears the release the edit makes, each breaking change, and each contrast pair
+  that crossed a WCAG floor, while it can still undo it. An edit that is only additive,
+  or changes nothing, is silent.
+  - **Opt-in:** `"hooks": {"tokenDiff": true}`, with the project's `tokens` and the new
+    `baselines.system`, the published snapshot. Until that snapshot exists, the hook
+    stays silent. Both readers check the new keys. A token file outside the project
+    (`../shared/tokens.css`) is found through the session's project, and a config that
+    fails its checks is reported for a token file it names, a `contract.json` too.
+  - **`diff_system.py`** without `old` compares against `baselines.system`, as it
+    already took the config's token files without `new`. It now compares components only
+    when both snapshots carry them, as its note always said: a published `system.json`
+    against the token files read every component as removed, a major release.
+  - The gate's hook now has 180 seconds, for the audit and the diff in one process.
+- **Workflow commands, part 1: `/gate` and `/install-gate`** (XC-C3 in part, GT-C12,
+  LC-B4, XC-C8). The plugin's first commands are skills only the user invokes
+  (`disable-model-invocation: true`), so they stay out of the skill listing. They live in
+  `workflow-commands/`, which `plugin.json`'s `skills` key adds to the scan, so the 13
+  skills and their `.skill` files are unchanged. Each pre-approves the one script it runs.
+  - **`/web-design-suite:gate`** runs `audit_design.py`, `a11y_static.py` and
+    `perf_audit.py` on the project, from its root, and gives one verdict per gate. The
+    performance gate is skipped, and says so, without a build.
+  - **`/web-design-suite:install-gate`** vendors the gate scripts into the project's
+    `scripts/`, where every CI recipe and the pre-commit hook expect them, with their
+    SHA-256 in `scripts/design-gates.json`. A clean checkout then runs them with no plugin
+    and no `PYTHONPATH`. It also writes `.github/workflows/design-gates.yml`:
+    - the three gates on Linux, in the Playwright image built for the project's own
+      `playwright` (`mcr.microsoft.com/playwright:vX.Y.Z-noble`), with Python installed,
+      the build served and waited for, and the browser gates' reports uploaded;
+    - the static gates on Windows, where the tests run the job's commands on a fixture;
+    - a job run by hand that records the baselines in CI and uploads them to commit,
+      dot files included (`include-hidden-files`). The build command sits in a block
+      scalar, so YAML reads any command line as itself.
+
+    It reads the baselines' paths from `.design-suite.json`, refuses a `playwright`
+    range, and never overwrites a file it did not write, its stamp included. It refuses
+    a path the workflow could not run unquoted (a space, `;`, `$()`, a leading `-`), names any package
+    the browser gates need that `package.json` lacks (`axe-core`, `serve`, `wait-on`),
+    and checks out with `persist-credentials: false`, since `npm ci` runs install
+    scripts. A `--dist` named for `/gate` that does not exist is "could not run", not
+    skipped.
+  - **In CI**, the README says how to run another skill's script: by path, from the
+    plugin checked out at a release tag.
+- **Workflow commands, part 2: the systems and the lifecycle** (XC-C3, SS-C6 and LC-C9's
+  commands; their agents come with the subagents). Six more commands, each pre-approving
+  exactly the scripts it runs. Two have a runner, where a step decides the next; the
+  others are chains whose body runs the skills' own scripts through
+  `${CLAUDE_PLUGIN_ROOT}`. Each writes its reports under `design-reports/` and edits
+  nothing it was not asked to.
+  - **`/web-design-suite:new-system BRAND`** turns a brand colour into the starter's
+    system: the accent ramp with the brand exact at its nearest step, the neutral ramp on
+    its hue, the starter's type scale or one from `--ratio`, `--dual-ratio` and `--fluid`,
+    and the starter styles in `src/styles/`. Then `check_roles.py` checks every role pair
+    in each theme, and a failing pair is named. It never overwrites a file without
+    `--force`.
+  - **`/web-design-suite:contrast`** checks every role pair in the project's tokens, or
+    one foreground on one background. This is SS-C6's `/wds:contrast`; its `/wds:tokens`
+    is `/new-system`, and its `/wds:audit` is `/gate`.
+  - **`/web-design-suite:migrate`** takes a token migration's census: the literals, the
+    clusters and the proposed mapping, with the questions that need a designer. It
+    applies nothing.
+  - **`/web-design-suite:release-check`** extracts the system, diffs it against the
+    published snapshot (`baselines.system`), stops at the gate when a name vanished with
+    no deprecation record, and writes the changelog entry and, for a breaking change, the
+    migration guide.
+  - **`/web-design-suite:figma-sync EXPORT`** audits a Figma export against the token
+    system and stops on an error, with the designer's questions; on a clean audit it
+    generates the tokens and diffs them against the project's. `figma_audit.py` gains
+    `--out FILE`, which writes the questions, creating the folder.
+  - **`/web-design-suite:docs-check`** extracts the system and checks the docs' snapshot
+    (`baselines.docs`) and every hand-written claim against it.
+- **Workflow commands, part 3: delivery, persuasion and the runtime gates** (PS-C11;
+  DL-C7's and GT-C9's commands, their agents and hooks to come). Six more:
+  - **`/web-design-suite:schema-to-screens SCHEMA`** introspects the schema, puts the
+    questions only a person can answer to the user, scaffolds the UI with `--strict` (a
+    blocking security finding, such as row-level security off, stops it with nothing
+    written), audits the result, and checks it against supabase-integration.md's
+    security sections.
+  - **`/web-design-suite:email-build TEMPLATE`** lints the source, compiles it with the
+    email tokens, lints the result and renders it light, dark and without styles.
+  - **`/web-design-suite:deck`** runs the audits, the critique report on the critique's
+    findings (stopping on a blocking one), the defence sheet and the deck, from the
+    decision log. It has a runner, since the audits' JSON feeds the next steps.
+  - **`/web-design-suite:gate-a11y`**, **`gate-perf`** and **`gate-matrix`** run the
+    browser halves of the gates by hand: `a11y_runtime.mjs` on a page or a file; the static
+    performance audit, then `measure_vitals.mjs` on the served build; the proof sheet,
+    then `snapshot_matrix.mjs` against the baselines, which it records only when the
+    user has looked at the sheet.
+- **Subagents, and `/critique`** (PS-C4, XC-C4, XC-C3, SS-C6 and LC-C9; GT-C9's and
+  DL-C7's agents). Six agents in `agents/`, each working in its own context and
+  returning only what the conversation needs. None has a tool that edits files.
+  - **`design-critic`** critiques with design-critique-gate preloaded and the project's
+    CLAUDE.md left out, so the builder's familiarity does not come with it, and returns
+    its findings as one JSON block. **`/web-design-suite:critique`** hands it the work,
+    and nothing about how it was made, saves the block unedited to
+    `design-reports/critique/findings.json`, and reports it; `/deck` takes that file.
+  - **`gate-runner`** runs the browser gates and returns only the verdicts, the failing
+    findings and the JSON paths. It never updates a baseline.
+  - **`a11y-auditor`** and **`design-auditor`** audit with a11y-audit-runner and
+    web-design-studio preloaded: by WCAG criterion with the manual checks left, and by
+    Law with the drift no script sees.
+  - **`supabase-security-reviewer`** reviews a scaffold's row-level security, write
+    policies, unprotectable columns and keys, after `/schema-to-screens`.
+  - **`codemod-batch-reviewer`** checks one codemod batch against the reconciliation and
+    the known traps, with a verdict per file.
+- **Hooks, part 3: the a11y gate and the email build** (GT-C9, DL-C7). Two more checks
+  in the gate's hook, each behind its own key in `.design-suite.json`'s `hooks`.
+  - **`a11yGate`:** after each edit Claude makes to a file `a11y_static.py` reads
+    (markup, JSX, CSS, and templates such as `.php` and `.liquid`), it runs on that file
+    in the config's folder, with the project's a11y baseline, and Claude hears its
+    findings with the audit's. The two share the hook's 9,000 characters, each counting
+    what it left out.
+  - **`emailBuild`:** after each edit Claude makes to an email template, `lint_email.py`
+    checks the source, `build_email.py` builds it into a temporary folder, and
+    `lint_email.py` checks the build. Claude hears the errors; the warnings are counted,
+    for `/email-build` to show.
+  - **`emails`:** a new top-level key, the globs of the email templates, read as
+    `components` is. Left out, it is `emails/**/*.html`. `ProjectConfig.is_email()` and
+    `isEmail()` answer for a file, and both readers check the new keys.
+  - The scripts one edit starts share 160 seconds, inside the hook's 180.
+- **The gates as MCP tools** (XC-B1 in part). An MCP server, `gates`, in `.mcp.json`:
+  `node mcp/design_gates.mjs`, MCP over stdio, standard library only, with Python found
+  as the hooks find it.
+  - **Five tools:** `audit_design`, `a11y_static`, `perf_audit`, `check_roles` and
+    `diff_system`, named `mcp__plugin_web-design-suite_gates__<tool>`. Each runs the
+    skill's script in the project's folder (`CLAUDE_PROJECT_DIR`), so the project's
+    `.design-suite.json` counts, and returns its JSON with the exit code and a verdict:
+    `pass`, `fail`, or an error when the script could not run.
+  - **Safe arguments.** Each tool takes only its schema's arguments, checked; a path
+    reaches the script after `--`, so a path never becomes an option.
+  - **Sized for the context.** A report past 60,000 characters keeps the head of its
+    longest lists, nested ones such as perf_audit's `ledger.assets` too, with
+    `truncated` saying how many each left out: Claude Code warns past
+    10,000 tokens of tool output and stops at 25,000.
+- **An eval suite, and the routing cases** (XC-C1, XC-B2). `evals/` holds cases for
+  `claude plugin eval` (Claude Code 2.1.269 or later), each a `prompt.md` with
+  `graders/*.md`, the layout `claude plugin eval init` writes.
+  - **Routing:** a case for each of the 13 skills, a request phrased as a user would type
+    it, which passes when Claude loads that skill (`tool_used` on `Skill`).
+  - **Boundaries:** five pairs of sibling skills, each way: a request for one that must
+    load it and never the other (`min: 0`, `max: 0`, `arm: both`). The pairs are the
+    accessibility audit and the critique, the docs and versioning, the migration and the
+    Figma sync, the studio and landing pages, and the state matrix and the accessibility
+    audit.
+  - **Run them** from the plugin folder with
+    `claude plugin eval . --tag routing --ablation none`. Every run is a real model call
+    on your account. A routing case cannot pass without the plugin, so the no-plugin arm
+    is skipped. The cases grant no shell, so they run on native Windows.
+  - **The router, corrected.** The prompt router runs in every eval session too. It
+    pointed a critique of a pricing page ("does this look professional") at
+    landing-page-conversion alone, and a design system's documentation site at
+    web-design-studio alone. It now hears "looks professional" for design-critique-gate,
+    and a token reference, or docs or prop tables for a design system, for
+    design-system-docs. `test_evals` runs it on every case's prompt. The first full run
+    found a third: a review of a signup form for "screen-reader labels" loaded no skill
+    in 3 runs, since the router heard "screen reader" only with a space. It hears the
+    hyphen now, and the case passes 3 of 3.
+  - **The first run:** 22 of 23 cases passed, then 23 of 23 after that fix, for about
+    $6 at list price, with Claude Code 2.1.293 and `claude-sonnet-5-5`; in CI on Linux, 23 of
+    23 for $4.11.
+  - **In CI:** the repository's `evals.yml` runs the routing cases on a release tag or
+    when started by hand, never on a pull request, with the CLI and both models pinned
+    and a ceiling under the $15 a full run may cost.
+- **Outcome cases, scored against a no-plugin baseline** (SS-C7, SB-C6, GT-C10, LC-C10,
+  PS-C7, DL-C7). Eleven cases in `evals/<area>/`, each tagged `outcome` and its area:
+  - **build:** XC-C1's pricing section, a Tailwind button with a loading state, a card
+    whose title link covers the card, and a vendor datepicker's stylesheet;
+  - **systems:** colour tokens from the brand colour #e8440a, in two themes;
+  - **gates:** a clean axe run is not a WCAG 2.2 AA claim;
+  - **lifecycle:** a DTCG export of a project's tokens, and a re-pointed role token is
+    not a patch release;
+  - **persuasion:** a countdown that restarts for every visitor is refused;
+  - **delivery:** a profile form from a Supabase schema, and a receipt email for Outlook
+    and dark mode.
+
+  Each case grades what the run wrote, in both arms, so Δ measures the plugin: no raw
+  colour or Tier-1 token in a component, the vendor CSS in `layer(vendor)`, a visible
+  focus outline, colour objects in the DTCG file, and a judge for the answers. Its
+  other graders check, with the plugin only, that its skill fired and that the gate it
+  ran passed. A case that needs a project copies one in with a scaffold script.
+  - **No shell.** The cases grant `Write`, `Edit` and the plugin's gate tools, and run
+    the design audit and the contrast check through the plugin's MCP server, which
+    runs outside the sandbox. So they run on native Windows, with no WSL2.
+  - **Run them** from the plugin folder with `claude plugin eval . --tag outcome
+    --scaffold --allow-real-servers --allow-tools Write Edit` and the two gate tools
+    the cases use, as the README shows. Every run is a real model call on your account.
+  - **The first run** (one run each way, Claude Code 2.1.293, `claude-sonnet-5-5`): 11
+    of 11 passed for $2.21 at list price, with a mean Δ of 0.22. Without the plugin,
+    Claude said a re-pointed `--bg-accent` could ship as a patch, built the restarting
+    countdown, used `var(--space-4)` in a component and literal `ring-2` and
+    `duration-150` classes. With it, the audit caught a Tier-1 leak and Claude fixed it
+    before finishing.
+  - **In CI:** `evals.yml` runs the routing cases, then the outcome cases in both arms,
+    under one ceiling: the outcome set gets what routing left of the $15 a full run may
+    cost. A release tag runs both.
+
+### Fixed
+
+- **Email templates are the email lint's** (N39). `/gate` failed a project on the
+  plugin's own receipt template: `a11y_static.py` read it as a page, and reported no
+  `<main>` landmark and the email reset's `outline: none` on `img`. The a11y hook said
+  the same after each edit to a template. A folder's email templates, the files the
+  config's `emails` names, are now left to `lint_email.py`, which checks their alt text,
+  language and contrast, and `a11y_static.py` lists them as skipped; a template named on
+  its own is still read. The hook leaves a template to the email build when that
+  runs, and checks it as before when it does not, so no edit goes unchecked.
+- **The router and a release question** (P30). "Can we ship this as a patch release?"
+  about a change to tokens.css named web-design-studio, not design-system-versioning:
+  the versioning route heard only "semver", "breaking change" or "deprecate" in the
+  same sentence as tokens, and a file name's dot ends a sentence. It now hears "a
+  patch, minor or major release or version" when design tokens, a tokens.css or
+  tokens.json, a design system or a CSS custom property are named anywhere in the
+  prompt; an API's auth token is not enough.
+- **a11y_static's and perf_audit's baselines across platforms** (N38). Both keyed a
+  finding by its path with the platform's separator, so a baseline recorded on Linux
+  CI suppressed nothing on Windows, and the reverse: the CI template `/install-gate`
+  writes records its baselines on Linux and runs the static gates on Windows too. Keys
+  now use `/` and drop `./`, as audit_design's do, and a baseline's keys are read the
+  same way, so one recorded before keeps matching.
+- **A baseline in a folder that does not exist yet** (GT-C12). `audit_design.py`,
+  `a11y_static.py` and `perf_audit.py` stopped with a traceback when `--write-baseline`
+  named a file in a missing folder, as a config's `ci/audit-baseline.json` is on a fresh
+  checkout. Each now creates the folder.
+- **`extract_literals.py -o` into a new folder** (P26). It stopped with "cannot write"
+  where `cluster_values.py`, `extract_system.py` and `diff_system.py` create the folder.
+  `/migrate` writes its census to `design-reports/migration/`.
+- **`introspect_schema.py -o` and `--answers-template` into a new folder** (P26). Both
+  ended in a traceback; `/schema-to-screens` writes them to `design-reports/screens/`.
+
+## 3.4.0 — 2026-10-07
+
+Phase 4 of the plan: the runtime gates, the lifecycle tools, email and persuasion do
+what their docs say. The browser gates share one copy of their helpers. a11y_runtime
+survives a strict CSP and probes focus, forced colours and density; the snapshot matrix
+renders RTL, forced colours and interaction states, with a baseline lifecycle;
+measure_vitals throttles as Lighthouse does, and `crux_check.py` brings field data.
+diff_system classifies density, themes, conditions and layers, the Figma scripts share
+one reader, and the email build and lint hold dark mode, Outlook and Law 1, with
+`render_email.mjs` to look at the result. The scaffold reads every interview answer and
+writes a server schema that mirrors the form; the deck is honest by construction, with a
+presenter window; the critique labels fixed findings, and `critique_snapshots.mjs` runs
+the checks a person runs. Law 6 reaches stylelint and ESLint. Every fix has a regression
+test that fails on 3.3.0, or on the head a review found it on
+(`python -B -m unittest discover -s tests`: 755 tests).
+
+### Added
+
+- **`critique_snapshots.mjs`: the checks a person runs, as files to look at** (PS-C5,
+  PS-B5). design-critique-gate's five-second test, squint, flip, greyscale and phone pass
+  had no tool behind them, and CRITIQUE_TEMPLATE.md offered only yes or no, so a check
+  nobody ran was ticked or read as failed. The script renders the page at 390 and 1440px,
+  the 1440 capture blurred 8px, in greyscale, mirrored and at 25%, dark and
+  reduced-motion captures, and `contrast.md`: each text colour on the background its
+  ancestors paint, from computed styles, against its AA floor (3:1 for large text), at
+  both widths, light and dark; a form control's value or placeholder counts as text, and
+  an ancestor's opacity is composited as the browser does. Text over an image or gradient
+  is listed as not measured. Nothing is injected into the
+  page, so its CSP stands. A 390 capture wider than 390px is named (no `width=device-width`
+  viewport). Exit 1 when a pair is below its floor. The template's new "Checks a person
+  runs" table records each as run, run with a proxy (which file), or "not run — needs a
+  human", and nothing stands in for leaving it overnight. WCAG's contrast ratio moved into
+  `browser_common.mjs`, so a11y_runtime and the new script share one copy.
+- **The server's schema, from the same constraints the form reads** (DL-B2, its last
+  part). `scaffold_ui.py` writes `server/<table>.schema.ts` (zod, `.strict()`) and
+  `server/<table>_schema.py` (pydantic 2, `extra='forbid'`) for each entity: the draft's
+  columns only, with the `required`, lengths, bounds, patterns and option sets the form
+  mirrors, a uuid as a uuid, a `timestamptz` as a datetime with its offset, minor units
+  as an integer, and a reserved column name aliased. A rule no constraint states (the
+  mapper's email format, "money is non-negative") is marked `invented` in both files; a
+  CHECK that states it makes it a mirror. The per-table policies, grants and smoke test
+  shipped in 3.3.0; this closes the item. field-mapping.md §9, scripts.md and
+  supabase-integration.md §9 say where each runs.
+- **A presenter window, and the iteration review in the log** (PS-B7, PS-A13, closing
+  PS-C1). `P` opens the same deck in a presenter window (`#s3-presenter`) that shows the
+  notes and the gaps, kept in step with the shared window over a `BroadcastChannel`; the
+  handout has none of it. `## Since last time` in the log (You asked | What we did | If not,
+  why not) is read back on the "What changed since last time" slide, with the reversals; a
+  request not done with no reason is a gap. `Stage: iteration review` in the log's header
+  opens the deck on that slide and `Stage: sign-off` brings the ask up to the second slide;
+  narrative-structure.md §3 says which of its five structures the script builds and how.
+  objection-handling.md §10 is the playbook for a client who rejects the whole direction.
+
+- **The handout, and the suite's own accessibility JSON as the deck's input** (PS-A6,
+  PS-A5, part of PS-C1). `--handout FILE` writes the deck the client keeps: the same
+  slides in document flow, one per printed page, with no presenter notes, gap markers,
+  appendix, provenance or script anywhere in the file. `--a11y` reads
+  `a11y_runtime.mjs --json` and `a11y_static.py --json` (`{tool, findings}`: a finding is
+  a violation when it names a success criterion or is an error; a best-practice warning
+  and an `incomplete` axe result are the tool's, not claims; the static audit counts its
+  files as pages) as well as axe results, and a file with neither key is refused naming
+  all three. `--manual FILE` takes the manual test record from outside the log's
+  `## Tested by hand`. SKILL.md's input table names the commands that produce `a11y.json`.
+- **Reversed decisions are shown as reversed** (PS-A7). A decision with
+  `Status: reversed`, a `**Reversed to:**` line, or a row in `## Reversals` never ranks
+  as current: it goes on a "What changed since last time" slide (was, now, who asked,
+  what it cost), before the headline decisions, and a reversal with no replacement is a
+  gap. The appendix still lists it with its status.
+
+- **The focus ring is measured at every density** (SB-B3). On a page, a11y_runtime
+  measures the ring again at each `data-density` value the page's own stylesheets name,
+  in normal colours and under forced colours, since the density dial rescales the
+  padding that keeps a ring clear of an `overflow: hidden` toolbar. It turns the dial
+  where the page keeps it: on the root, or on the outermost `data-density` below it, such
+  as `<body>`; a region marked inside another keeps its own. A finding names its
+  density; `--densities LIST` names them by hand, and `none` turns it off. web-design-
+  studio's Phase 5 runs it on the built page, and review-checklist 8.2 and 8.9 say what
+  it measures and what is still by eye.
+
+- **Custom states and combinations in the matrix** (GT-A13). A component declares a state
+  of its own (selected, readonly, current, open) in `custom_states`, by the attributes
+  that put a cell in it, and joins two with `+` (`"selected+hover"`). Only the seven
+  were allowed, so state-coverage.md's own procedure for adding a state, its
+  per-archetype rows and its "selected + hover" row could not be rendered.
+- **Right-to-left fixtures, and a forced-colours pass** (GT-B7). A content fixture may be
+  `{"html": "…", "dir": "rtl", "lang": "ar"}`: the direction and language go on the
+  cell's stage, so the whole component mirrors. Fixtures were inner HTML only, so the RTL
+  fixture state-coverage.md asks for could not be rendered. `snapshot_matrix.mjs
+  --forced-colors` shoots every cell under `forced-colors: active`, with its own baselines
+  and report in `forced-colors/` folders, and fails a focus-visible cell that computes the
+  same style as its default cell there: a ring drawn with `box-shadow` vanishes under
+  forced colours. state-coverage.md says which interaction states an attribute renders
+  (open menus, `<details>`, tooltips on hover or focus) and which need an interaction
+  test (a native select's list, the top layer, `:user-invalid`).
+- **Baselines recorded where the gate runs, and Git LFS past the line** (GT-B8). The
+  workflow recorded baselines on the developer's machine, whose fonts never match a Linux
+  runner's. visual-regression.md §7 adds a `workflow_dispatch` job that records them in
+  the gate's runner and uploads them, and the gate's LFS checkout with a cache. §6 starts
+  the baselines in Git LFS past about 2,000, which the pruned sheet reaches at 19
+  components, or 10 with the forced-colours pass; `generate_matrix.py` prints the count
+  once a sheet passes 1,000 cells. GitHub's LFS quota and size advice are registered in
+  `evidence.json`.
+- **`--interact-at MS`: an interaction during hydration** (GT-C11). measure_vitals'
+  `--interact` clicks once the page has settled, the one moment hydration cannot delay,
+  though diagnosis.md §8 names hydration as the biggest INP source. `--interact-at MS`
+  clicks MS after navigation starts, by the page's own clock, through the browser's input
+  pipeline, so the click queues behind the task that holds the main thread, as a user's
+  does.
+- **`crux_check.py`: the field against the lab** (GT-B5, GT-C11). perf-budget-gate's
+  trigger for re-deriving a profile, a field p75 more than 1.5× the lab median, had no
+  tool behind it. `crux_check.py` reads the p75 for an origin or a URL from the Chrome UX
+  Report API and holds it against the median in a `measure_vitals.mjs --report` file:
+  LCP, CLS, FCP, TTFB, and INP when the lab drove one. It exits 1 above the ratio and 2
+  when CrUX holds no data. The key comes from `CRUX_API_KEY`, never an argument: `--key`
+  is refused without echoing it, and the key is never printed. `--response FILE` reads a
+  saved response.
+- **system.json records the layer order** (LC-C5). `extract_system.py` writes each
+  `@layer a, b, c;` statement it reads to a new `layers` list, from the entry stylesheet
+  as well as the token files; the schema stays `design-system-docs/system/1`, since the
+  key is additive. `diff_system.py` compares two snapshots' orders, where it could compare
+  only two CSS inputs before, and says so when a snapshot predates 3.4.0.
+
+### Fixed
+
+- **The critique says what is fixed, and every format says what it merged** (PS-C2).
+  `status: fixed` (3.1.0) reached `--summary`, `--fail-on` and the defence sheet's known
+  flaws, but a fixed finding still led "Fix these three first", sat unmarked in triage,
+  and a fixed blocker stayed under the defence sheet's "Do not present", so the deck
+  refused to build for a defect already fixed. A fixed finding is now labelled fixed in
+  the critique and counted in its tally, listed last in triage as `FIXED`, and gone from
+  "Do not present"; with `defend: true` the sheet carries it as "major, fixed". Triage and
+  the defence sheet print the merge notes the critique already printed (stderr still has
+  them), and the docstring gives exit 2 for bad input.
+- **A blocking item stops the deck, as SKILL.md says** (PS-A21). The deck was written
+  anyway (exit 1) and `--dry-run` exited 0. Now nothing is written, both exit 1, and
+  stderr names the blockers. A pipe in a flaw's title, which critique_report writes as
+  `\|`, split the deck's flaws table into the wrong columns; `_md_table` reads the
+  escape. The size warning fired above 12,000,000 bytes but said "about 10 MB"; it fires
+  above 10,000,000 (`EMAIL_SIZE_WARNING`).
+- **The critique gate's docs match its files** (PS-A17, PS-A20). Only a blocking finding
+  in layers 1 to 3 stops the run; from layer 4 on, a blocker is reported and the review
+  goes on, because a contrast failure does not make the keyboard checks moot.
+  failure-catalog.md has its Layer 5 and 6 headings, names its retired ids (L4-2, L5-2,
+  L6-3, L8-2, L8-3) and says "Eleven further failures" for its eleven rows. It and
+  SKILL.md said 92 checklist rows where review-checklist.md has 91, and the conformance
+  layer is timed "2 min + 30 min", with the protocol's half-hour for the checklist.
+- **One rule for a risky client request** (PS-A8). evidence.md §7.3 said to build a
+  contrast failure the client asked for ("It is their site"), objection-handling.md §4
+  said "I'll build it either way" while §5 held the line on accessibility, and
+  landing-page-conversion declined deceptive patterns. objection-handling.md §5 now has
+  the one rule, and evidence.md and the landing SKILL point to it: a lawful choice that
+  only costs them is noted and built; an accessibility failure is held (the compliant
+  version is built, the failing one is not, and the risk goes in writing); anything deceptive or unlawful is declined with the honest version offered;
+  a question of law goes to their lawyer.
+- **The persuasion references' law and figures, re-read at the source on 2026-10-07**
+  (PS-A9, PS-A14, PS-A15). conversion-audit.md §11: DSA Art. 25 binds only online
+  platforms and, by its paragraph 2, does not apply to practices the UCPD or the GDPR
+  cover, so it adds nothing to the UCPD for a company's own site; the Digital Fairness
+  Act is announced, not proposed (the Parliament's tracker: "Announced", indicative Q4
+  2026); the paragraph is dated. §2: a five-second test with five people catches a gross
+  failure and measures nothing; NN/g's five-user rule (85% of problems when each user
+  finds 31%) is for iterative qualitative testing, and NN/g recommends 20 users for a
+  quantitative study, so comparing two headlines needs about that many per variant.
+  failure-catalog.md: about 1 in 12 men have a colour vision deficiency (NEI), not "4%".
+  All three figures are in `evidence.json`, and test_evidence reads "1 in 12 men" as a
+  figure and the NEI as a source.
+- **Advice that failed on its own terms** (PS-A16, PS-A18). critique-method.md §3.5's
+  focus-ring fix, `box-shadow: var(--shadow-focus)`, failed the suite's own audit (a
+  tier-1 leak); it is now the contract's outline in `--border-focus` with
+  `box-shadow: var(--elevation-focus)` beside it, and the test runs it through
+  `audit_design --strict`. §3.1's `rg … | sort | uniq -c` counted every value once (rg
+  prefixes each line with the file when it searches several); it takes `-I`. Type roles
+  do not carry tracking (each is a `font` shorthand): critique-method §3.4 and
+  copy-patterns.md say base.css binds it to the headings and `.text-display`.
+  page-architecture.md's media advice: captions (1.2.2, A) and audio description (1.2.5,
+  AA) for video, since a transcript meets 1.2.3 at A but not 1.2.5 at AA, and a text
+  alternative for an audio-only demo (1.2.1, A).
+- **page-sections.css says what it does** (PS-A22). "Seven" shells for a list of eight;
+  the avatar-to-name gap is `--gap-fused` in the code, as its comment and
+  page-architecture.md say; the `.feature-card--media` comment describes the media
+  variant; the CTA note's raw `opacity: 0.85` is gone (smaller, not fainter); the avatar is
+  sized through a `--testimonial-avatar` socket, not as a tap target.
+- **Gmail's limits are registered figures** (N36, CodeRabbit on #59). The email docs quoted a 102,400-byte clipping threshold and a 16,384-byte `<style>` ceiling that no entry in `evidence.json` backed, and `test_evidence` did not recognise a byte count as a figure. Re-read 2026-10-07: Google publishes no clipping figure; the ESPs document 102 KB (Mailmodo, DailyStory), and the byte-exact 102,400 is from measurement, which the docs now say; the `<style>` ceiling is email-bugs #90's 16,384 bytes. Both are registered for every email doc that quotes them, and `FIGURE` reads byte counts (`102,400 bytes`, `16,384-byte`, `16 kB`, `102kb`).
+- **The scaffold reads every interview answer** (DL-A8). `.money` set the currency and
+  the storage unit and nothing read them: every cell was `formatMoney(x / 100)` in a
+  hard-coded USD, wrong by the currency's own scale for JPY (1) and KWD (1000), and
+  `.cardinality`, `.label_column`, `.default_sort`, `.options`, `.zone` and `.shape`
+  were asked and ignored. Now `formatMinorUnits(minor, currency)` divides by
+  `minorUnitScale(currency)` from `Intl`, a decimal amount goes through
+  `formatMoney(amount, currency)`, and an unanswered currency is `'USD'` with a
+  `TODO(answers)` naming the question. The row count picks select, combobox or picker;
+  the label column is named where the join goes and in the select's `TODO(options)`;
+  the `.options` answer is the closed set (and the list's badge); `fixed-utc` passes
+  `'UTC'` to `formatInstant` and `record` leaves a `TODO(zone)`; a machine-only jsonb
+  column leaves the form and the Draft; the default sort is a constant with the
+  `.order()` call the query applies. SKILL.md names the two answers that stay advisory.
+- **The forms carry the wiring screen-patterns.md promises** (DL-A9). The help and error
+  ids went to a `data-describedby` on a wrapper, which assistive tech ignores; the radio
+  group's `aria-labelledby` named a label with no id; every field error and the summary
+  were `role="alert"`, so a failed submit was announced once per field and once more;
+  and nothing focused the summary. The control now carries `aria-describedby` (the id
+  Field gives the error) and `aria-invalid`, a radio group is `<Field group>`: a
+  `<fieldset>` whose `<legend>` has the id the group names, and RadioGroup takes
+  `describedBy` and `invalid`; an inline error is plain text; the summary is the one live
+  region and takes focus after the render that shows the errors (`focusSummary`,
+  `summaryRef`). Field exports `describedBy(id, help, error)` for a caller with help
+  text. Both stacks pass the audit and the static a11y check, and the real compiler
+  parses every generated file (`test_scaffold`).
+- **The flaws come before the visuals** (PS-A13). The client order put "What we are not
+  happy with yet" seventh of ten, after the screens and the evidence, against the rule the
+  slide's own note states; it now follows the decisions and precedes the comparisons and
+  screens in every order.
+- **The meeting record claims no legal effect** (PS-A19). "The sentence that turns a
+  document into an agreement" is now "makes the record hard to dispute later": a
+  contemporaneous record, not an agreement and not legal advice; silence is not acceptance,
+  and price, scope and date changes go through the contract's change control.
+- **The landing page's painted bands bleed** (PS-A12). Five of the worked example's six
+  painted sections sat in the content column without `.bleed-full` and a nested
+  `.page-grid`, so each would have rendered as a content-width tinted box with the copy
+  flush against the tint; every painted band now has the pair, and the example's notes say
+  why.
+- **Print never sends the notes by accident** (PS-A6). The print stylesheet showed every
+  presenter note whatever the toggle; now notes print only while they are showing
+  (`data-notes="on"`), and the client's copy is `--handout`.
+- **The "Say this" lines carry only what the inputs give** (PS-A10). evidence.md turned
+  a byte budget into "under two seconds on 4G" (a time only `measure_vitals.mjs` can
+  give), called the dark theme "eleven lines" (the block is 31 declarations), quoted
+  `--fg-muted` at 4.6:1 (that is `--fg-subtle` on `--bg-sunken`) and gave the coverage
+  of automated tools with no source. The lines now carry placeholders filled from the
+  measured files, the "faster" line keeps the bytes and leaves the seconds to the
+  vitals median, and the coverage is cited as a range from the register: 41% of 143
+  planted barriers for the best single tool (GDS, 2017) and 57% of issues by volume
+  (Deque, 2021), on the slide and in §3.
+- **TTFB never saw the emulated latency, and no preset was Lighthouse's** (GT-A6). CDP
+  adds its latency once per request, and Navigation Timing's `responseStart` comes before
+  it: `--throttle slow4g` reported a TTFB of 5 ms, which also skewed the LCP sub-parts.
+  TTFB is now the network stack's (`receiveHeadersEnd` from CDP). A `lighthouse` preset
+  applies what Lighthouse's own DevTools throttling does: 562.5 ms per request (150 ms ×
+  3.75), 1.44 Mbps down, 675 Kbps up, 4× CPU. The comment that called `slow4g`
+  "Lighthouse's mobile defaults" is gone; its 150 ms per request is a lighter load.
+- **`--interact` counted the click's own work in TBT, and TBT had no TTI bound** (GT-A17).
+  On the review's slow page, a click took TBT from 0 to 107 ms with INP at 168 ms, the
+  same work counted twice. A long task that starts after an input and runs into its handlers is now left
+  out; the task the input waited behind stays, since it is the page's. TBT also ends at
+  TTI, the end of the last long task before five quiet seconds (no long task, two
+  requests in flight at most), when such a window fits in the run.
+- **A loading spinner counted as a focus ring** (GT-A14 (a)). a11y_runtime shortened
+  animations before measuring the ring but did not pause them, so a spinner inside a
+  button with `outline: none` kept turning between the two screenshots, and the button
+  passed. It now uses the matrix's freeze, which pauses them.
+- **a11y_runtime reads a JSONC budget or keymap**, with comments and trailing commas, as
+  measure_vitals and perf_audit already did.
+- **A page with a strict Content-Security-Policy crashed the run** (GT-A5). Under
+  `default-src 'self'` the page refused the freeze stylesheet that a11y_runtime and
+  snapshot_matrix inject, and the error left as exit 1, which means violations. Their
+  contexts now bypass the page's CSP, and a run of any of the three browser scripts that
+  fails exits 2: a crash is never a finding, a regression or a breach. measure_vitals
+  keeps the page's CSP: it injects only an init script, which CSP does not govern, and a
+  bypass would run what the CSP blocks, so it would measure a page no user gets.
+- **Disabled controls were held to contrast** (GT-A14 (b)). SC 1.4.3 exempts the text of
+  an inactive component, and axe skips it; a11y_runtime reported `<button disabled>` as
+  `contrast-too-low`. It now skips a disabled control or fieldset and what it holds,
+  anything inside `aria-disabled="true"`, and the label of a disabled control. What sits
+  in the first legend of a disabled fieldset is still measured, since HTML leaves it
+  enabled, and so is a control that only looks disabled. With GT-A5, this finishes GT-C2: 3.1.0
+  did the colours, modals, iframes and inert content, and P9 the pausing.
+- **A page with one tab stop was a keyboard trap in Chrome.** Chrome (not the headless
+  shell) wraps Tab from the last stop to the first inside the page, so on a page with one
+  stop, focus stayed put, and a11y_runtime reported `focus-stuck` (2.1.2) as an error.
+  There, focus that stays put is a trap only if the page cancelled the key.
+- **`--only` on a page was ignored.** It narrows a proof sheet's cells and never picked
+  checks, so `a11y_runtime.mjs --file page.html --only contrast` ran every check. A page
+  now refuses it, with exit 2 and a pointer to `--skip`.
+
+- **The axe tag advice dropped WCAG 2.1, and best practice failed the run** (GT-A8). The
+  docs recommended `--tags wcag2a,wcag2aa,wcag22aa`, which leaves out every 2.1 rule: in
+  axe 4.13, `autocomplete-valid` (1.3.5) and `avoid-inline-spacing` (1.4.12), and two
+  experimental ones. Every example now keeps `wcag21a,wcag21aa`. And the default set's
+  best-practice rules (`tabindex`, `aria-dialog-name` and others axe rates serious)
+  failed the run as errors, though they name no success criterion: a11y_runtime now
+  reports them as warnings, labelled best practice, and no budget counts them. The report wording names the 2.0,
+  2.1 and 2.2 A and AA rules.
+- **a11y_static's outline and landmark checks are best practice** (GT-A18).
+  `multiple-h1`, `heading-skip` and `no-main-landmark` were errors under 1.3.1, 2.4.6
+  and 2.4.1; axe tags the same checks best-practice only. They are warnings now, labelled
+  best practice; `--strict` still fails on them.
+- **Two rows of perf-budget-gate's "same method" table did not follow the method**
+  (GT-A16). Fast 4G gives 1.9 MB of critical path, not 1.5 (total 4.6 MB), and 3G
+  12.5 KB, not 40 (total 30 KB); desktop cable is 1.1 MB, not 1.2. The table states its
+  method and the Slow 4G profile, and budgets.md no longer says the 800 ms TTFB matches
+  web.dev's 0.8 s "not by coincidence": web.dev calls that threshold a rough guide. With
+  GT-A8, this finishes GT-C5's correction pass.
+
+- **A `:focus` ring never rendered in the matrix** (GT-A12). Rules written with `:focus`
+  or `:focus-within` were mirrored to their own `data-force-state` token, but the
+  focus-visible cell carried `focus-visible` alone, so the ring never showed, the
+  coverage line called the state covered, and a11y_runtime reported a ring users do see
+  as missing. The cell now carries all three tokens.
+- **The matrix's error state stamped `aria-invalid` on buttons and spans** (GT-A13).
+  ARIA 1.2 deprecated it as a global attribute; an input, select or textarea gets it, and
+  everything gets `data-state="error"`. Whether the cell is a form control is now read
+  from the element that carries `{attrs}`, not the whole template, so a `<div>` wrapping
+  an `<input>` no longer gets `disabled` or `aria-invalid`. With GT-A12 and GT-A13, this
+  finishes GT-C3.
+- **The audit dropped its JS colour check for a whole project in a folder named `test`.**
+  It leaves test, story, mock and fixture files to the test tools, but matched the words
+  anywhere in the absolute path, so a project inside a folder named `test` or `fixtures`, or a
+  temporary `wds-test-*` folder, lost `js-raw-color` for every file. It reads the path below
+  the folder being audited now, and plurals and `__mocks__` count, which they never did.
+- **diff_system missed density, media-condition and root-element changes** (LC-A8).
+  change-classification.md calls all three major and detected, and system.json records
+  them, but the diff compared none: a release that changed only `--density` at compact,
+  the reduced-motion duration and `<div>` to `<section>` was a patch "because nothing
+  changed". They are `density-changed` (with the roles each moves, `--pad-card 21px ->
+  19.2px`), `condition-changed` and `element-changed`, all major, and a density added or
+  removed is minor or major, as a theme is. A re-point that resolves the same in the
+  default theme but not in another theme or at a density was a patch; it is major.
+- **An added theme override was minor** (LC-A9). It moves the role in that theme, which
+  change-classification.md §11 calls major (Q2): a new dark `--fg-muted` that crossed 3:1
+  downward recommended a minor bump. It is major now, and a patch when it resolves as
+  before.
+- **A class renamed under CSS Modules was a removed part** (LC-A9). The rendered class is
+  hashed, so the doc calls the rename a patch, but the diff reported `part-removed`, major,
+  and failed the gate. In a `.module.css` file, a part that went and one that came with the
+  same declarations are `part-renamed-local`, a patch; in global CSS they stay major.
+  change-classification.md §11 now says what an added part is: new surface (Q4), unless it
+  wraps existing children (Q3).
+- **A negative cancel pointed at a different token from its padding** (LC-A11). In the
+  reference's own example, `.card { padding: 16px }` became `var(--pad-well)` while
+  `.card__media { margin: -16px }` became `calc(var(--gap-grouped) * -1)`, since 16px in a
+  margin clusters to a gap: the bleed breaks the day the padding changes. apply_codemod
+  pairs each negative margin with the padding of its parent rule (the rule it is nested
+  in, the left side of a descendant or child selector, or a BEM element's block) and
+  reads that padding's token, when that padding is set in one block of the file; set in
+  two (another `@media`, an `@layer`, the rule written twice), which one applies is not
+  certain, and the margin keeps its gap token. extraction-and-clustering.md's example
+  named `--pad-card`, 24px, for the 16px padding.
+- **A type tie snapped down when the smaller size was commoner** (LC-A12). The docs promise
+  "15px becomes 16, text does not shrink", but frequency settled the tie first, so with
+  14px commoner 15px became `--type-ui`, with a note saying "snapped UP to 14px" and a
+  delta of -1. Type ties now always snap up, and the note follows the real direction.
+- **The audit and extract_system disagreed about Law 6** (LC-A19). extraction.md says the
+  two agree by construction, but each kept its own lists: in a `.module.css` file the
+  audit refused `var(--space-0)` and `var(--shadow-none)`, which extract_system exempts as
+  null-outs, and extract_system flagged `--weight-*`, which the audit allows. The lists
+  are now the rule spec's `tiers` section (prefixes with a role, the role exceptions, the
+  null-outs), written into both by `tools/sync_rules.py`; the audit exempts the null-outs.
+- **Law 6 is in stylelint and the ESLint config, not only the audit** (N35). A project
+  that gated with the two configs let `var(--accent-600)` into a component. The spec's
+  `tiers` lists now reach both through `tools/sync_rules.py`. stylelint's new
+  `design/tier1-primitive` refuses a `var()` naming a primitive that has a role in the
+  `components` layer or a sub-layer of it, and anywhere in a component file, fallbacks
+  and sockets included, with the audit's advice; token and theme files are exempt, as in
+  the audit, in a component folder too. The layer is read by its full name in both
+  gates: the audit took `@layer base.components`, a layer inside `base`, for one. ESLint's
+  `TIER1_SHORTHAND` is built from the same lists, so `p-(--space-section)` and
+  `shadow-(--shadow-none)` pass and a type hint (`text-(length:--text-lg)`) no longer
+  hides a primitive, and `style-prop-custom-properties-only` refuses an inline socket
+  filled from one (`'--gap': 'var(--space-4)'`), which the audit now refuses too. The
+  audit's Tailwind check reads the spec's lists instead of its own pattern. Primitives
+  with no role, and a motion longhand's `--dur-*` or `--ease-*`, stay allowed in all
+  three.
+- **A colour rename beside a `font-weight` was refused** (LC-A14). apply_codemod's font
+  guard, which stops a `font-size` rewrite into the `font` shorthand from resetting the
+  weight beside it, refused every declaration-scope rewrite in such a rule: deprecate.py's
+  `color: var(--fg-subtle)` to `--fg-faint` beside `font-weight: 600` came back as "`font:
+  var(--fg-faint)` would reset font-weight". The guard applies only to a rewrite into
+  `font:` from another property now.
+- **deprecate.py's scan labelled a one-line rule `manual`** (LC-A14). It read a line as one
+  declaration, so `.meta { color: var(--fg-subtle); }` was "not a plain declaration" and the
+  review's client read "0 codemod · 9 manual" where the codemod rewrites 7; the same rules
+  on several lines were labelled right. It reads each declaration on a line, and no longer
+  predicts the font-guard skip, which a colour rename never meets.
+- **A re-point listed every density and condition** when its default value moved, a side
+  effect of P14's equality check, which needs them only when the default does not move.
+- **figma_audit split a records export's modes** (LC-C3). A flat export lists one row per
+  variable and mode. figma_to_tokens merged the rows into one variable with a value per
+  mode; the audit's copy of the reader made each row a variable of its own, in a
+  collection whose default mode, `Value`, no variable had. Both scripts now read through
+  one module (Changed, below), so the audit merges them too. And a flat plugin export,
+  whose `valuesByMode` is keyed by mode id while its modes are listed by name, kept the
+  ids: in both scripts, a `Dark` mode came out as a theme named `1:1`. Both are read
+  as the mode's name now.
+- **`--reverse` wrote a body Figma would not take as written** (LC-A22). It carried a
+  `_comment` key, though the body's own comment said Figma rejects unknown top-level keys,
+  and SKILL.md never said to strip it. It never named a collection's first mode, which
+  Figma creates under its own name; Figma's REST example names it with an `UPDATE` on the
+  temporary id, which `--reverse` now sends (`Value`, or `Light` unless a theme has that
+  name, then `Default` or `Base`, so two modes never share a name or a temporary id).
+  And primitives were scoped to the pickers (`ALL_FILLS`, `GAP`), inviting a designer to
+  bind Tier 1, the Law 6 failure: they get `scopes: []` now. Every duration was dropped
+  too, `--dur-base: 220ms` having no pixel value, with exit 1: a duration crosses as
+  milliseconds now, 220.
+- **The model announcement shipped a breaking change as a minor** (LC-A17). rollout.md's
+  example read "Design system 2.1.0. One breaking change: `--bg-accent` moved", a re-point
+  released as a minor, the failure the skill exists to prevent. It is 3.0.0 now, with
+  `UPGRADE-3.0.0.md`, and so is the upgrade procedure, whose step 3 committed the codemod
+  on its own (`git commit -am`) against §6's one-commit rollback: the upgrade is one
+  commit now, after step 6.
+- **deprecate.py took a removal outside a major** (LC-A23). deprecation.md puts a removal
+  in X+1.0.0, but `--since 2.1.0 --removal 2.2.0` was accepted; only a patch-apart window
+  was refused. A removal that is not a later major is refused now, unless `--force`.
+- **The reconciliation report's smaller errors** (LC-A23). A duration's delta printed as
+  "-30px"; it is in milliseconds, and a colour's row shows its ΔE, not "+0px", under a
+  heading that no longer says "more than 2px". A
+  colour held in a `$`-variable was to be re-pointed (`$brand: var(--fg-default)`), where
+  framework-migrations.md says to delete such variables at their call sites. The report
+  says so now for a `$` or `@` variable; a custom property is pointed at a role (a Tier-3
+  socket), and a colour in a property with no role, such as `scrollbar-color`, is
+  replaced in place. One colour in two holders gets an entry for each, by kind of holder
+  and, for plain properties, by property.
+- **The lifecycle docs' smaller errors** (LC-A23, LC-B8). deprecation.md said `tsc`
+  surfaces `@deprecated`; it does not, and the gate is `@typescript-eslint/no-deprecated`.
+  framework-migrations.md said the script reports a `darken()` call's distance to the
+  ramp; it cannot compile Sass, so it lists the calls. MIGRATION_PLAN.md offered "20px
+  `--pad-inline-sm`", which is 12px; migration SKILL.md said "four" algorithms and listed
+  six; and figma-variables-sync called `tokens.css` "`git`-enforced read-only", where the
+  CI drift check is what refuses a hand edit.
+- **`--interact-at` times the click on the page's clock.** It waited until
+  `Date.now()` reached `performance.timeOrigin` plus MS, comparing Node's wall clock with
+  the browser's. It now maps the page's `performance.now()` onto Node's monotonic clock
+  as NTP does, from the narrowest of three round trips, so a stalled request or reply
+  costs at most half that trip (Codex and CodeRabbit on #56), and `clickedAt` is page time.
+- **Email dark mode no longer breaks the call to action** (DL-A10). The dark block's
+  `a { color: var(--email-dark-link) !important }` beat the button's inline white label:
+  #ffa582 on the #c64600 fill, 2.56:1, wherever `prefers-color-scheme` is honoured. Each
+  template's dark block now ends with `.button { color: var(--fg-on-accent) !important }`,
+  the announcement's call to action has `class="button"`, and its "Back in stock" eyebrow,
+  left at the light accent on the dark surface (2.50:1), is re-pointed to the dark link
+  colour.
+- **`lint_email` measures dark mode** (DL-B6, DL-C3). A new `dark` check applies the
+  retained `prefers-color-scheme: dark` rules with build_email's own selector matcher and
+  cascade (one source order across `<style>` blocks), as a client that honours them renders
+  the email, and measures the text whose colour or background they change, inherited
+  colours included. It found both of DL-A10's failures, at the review's figures.
+- **The Outlook font rule is in the build** (DL-A11). email-architecture.md §2 said the
+  compiler adds an `[if mso]` block that gives the Word engine Arial, without which a stack
+  starting with `-apple-system` lands on its default serif; the block never had it. It
+  does now, a hand-written PixelsPerInch block gets the font rule beside it, and the lint
+  warns when no broad `[if mso]` font rule (on `*`, `body`, `table` or `td`) is in the head and a stack starts with a family Windows
+  lacks.
+- **The receipt is fluid** (DL-A12). Its container was `width:600px` inline, so with
+  `<style>` stripped (Gmail's app with a non-Google account) it was 600px wide on a 375px
+  phone. It is `width:100%` with the 600px cap, like the other two templates.
+- **Authoring notes stay out of the email** (DL-A20). The build kept any comment holding
+  `{{` as an ESP directive, so the receipt's header comment shipped in every build while
+  the build reported it dropped. A comment is kept for real ESP syntax only: a Handlebars
+  block (`{{#`, `{{/`, `{{^`, `{{else`), a Liquid tag (`{%`), a Mailchimp merge tag
+  (`*|IF:X|*`), ERB (`<%`), and conditional comments as before.
+- **A dropped token fails the build by name** (DL-A13). SKILL.md said `var(--elevation-card)`
+  fails and says to use `--email-edge`; the error was generic, and with a fallback,
+  `var(--elevation-card, #000)`, the build shipped `#000000` and exited 0. Any `var()` of a
+  token in `email-tokens.json`'s `dropped` map now stops the build with its reason and its
+  `use`, fallback or not, and every fallback that stood in for a missing token is noted.
+- **`lint_email --source`: Law 1 before the build** (DL-C5, DL-A13). Nothing read a source
+  template, where a literal can still be told from a token. `--source` reports a `var()` of
+  a dropped token (an error naming the token to use), of no token, or with a fallback; a
+  hand-written colour (an error); and each length or weight literal, with the Tier-2 role
+  of the same family that holds the value, or "off the scale". The templates' literals with
+  a role (the email widths, the h3 weight, the column gutter, the stack gap, the display's
+  phone step to the h1 size and line) are tokens now; what is left is the phone type and
+  gutter step-downs, the hairlines and the 264px column, which no role holds.
+- **`lint_email`'s `nostyle` check** (DL-B6). An inline width wider than a 375px phone, not
+  capped by a max-width that fits, is an error: it is all a client that strips `<style>`
+  has. It finds the v3.3.0 receipt's 600px container.
+- **`render_email.mjs`** (DL-C3). A built email at a phone's width in light, dark (the
+  retained dark block applied) and with every `<style>` removed, as full-page PNGs, with
+  the page width of each against the screen: exit 1 when one is wider. Nothing is fetched.
+  It finds its browser with the suite's `browser_common.mjs`, now copied into the email
+  skill too, and never downloads one.
+- **The inliner writes declarations in the cascade's order** (DL-A14). A later winner kept
+  its key's first position, so `td{padding:0}`, `.pad{padding-left:24px}` and
+  `style="padding:8px"` came out as `padding:8px;padding-left:24px`, a left of 24px where
+  the cascade says 8px. A winner now moves to the end.
+- **The `<style>` blocks are one stylesheet.** build_email inlined each block on its own, so
+  the first block's results became the element's authored inline style: a later block's rule
+  lost the tie it wins, and a stylesheet rule beat an authored inline colour. Every block's
+  rules are now inlined in one pass, with one running source order.
+- **The email docs agree with the files** (DL-A21). SKILL.md's Law 3 row said "Same 18
+  steps"; email keeps 13 of the 18 spacing steps and has its own heading scale, which the
+  h1 and h2 sizes' notes now say. The weight notes said websafe stacks have no 500 or 600;
+  SF and Segoe UI lead the stack and have a semibold, and only Arial, classic Outlook's
+  font, lacks it. The newsletter set `padding-bottom` on every paragraph and `0` on the
+  last, the `:last-child` workaround SKILL.md rules out; its bands own the gaps now. The
+  announcement's colour names were `<p class="h3">`, invisible to a screen reader's heading
+  list; they are `<h2>`s. `--email-edge` restated `#e7e5e2`; it reads `--border-subtle`, and
+  the build sends the same `1px solid #e7e5e2`.
+- **Deliverability names today's rules** (DL-B7). email-workflow.md named only Gmail and
+  Yahoo's unsubscribe headers. It now gives Google's bulk-sender requirements (since
+  February 2024, among others: SPF, DKIM, DMARC, an aligned From domain, reverse DNS, TLS,
+  and on promotional mail the RFC 8058 header pair with unsubscribes fulfilled within
+  48 hours, a spam rate below 0.10% and never 0.30%) and Microsoft's for Outlook.com (since
+  5 May 2025, for senders of 5,000 or more a day from one `5322.From` domain, as its 5.7.515 help
+  page puts it: SPF and DKIM passing, DMARC at
+  `p=none` or stricter and aligned, and the `550; 5.7.515` rejection), each re-read at its
+  source on 2026-10-06; the percentages and the 48 hours are in `evidence.json`.
+
+### Changed
+
+- **measure_vitals' default throttle is `lighthouse`** (GT-A6). budgets.md derives every
+  budget from Lighthouse's Slow 4G profile, and the old default, `slow4g`, applied a
+  quarter of its latency. Lab numbers rise with the upgrade: pass `--throttle slow4g` to
+  compare with numbers from 3.3.0, then re-baseline on `lighthouse`.
+- **One copy of the browser scripts' shared helpers** (GT-C13). a11y_runtime,
+  snapshot_matrix and measure_vitals each carried their own browser resolution, freeze
+  CSS and JSON reader, and the copies had drifted. They now import
+  `scripts/browser_common.mjs`, a byte-identical copy of `shared/browser_common.mjs` in
+  each of the three skills, so each skill still runs on its own.
+- **The two worked examples are the tools' own output** (LC-C12). design-token-migration's
+  worked run (references/worked-run.md) and design-system-versioning's worked release
+  (SKILL.md) quoted numbers from fixtures that never shipped. They are now
+  `tests/fixtures/worked-run`, eight files, and `tests/fixtures/worked-release.json`, five
+  edits to the starter's tokens.css, and both pages quote what the tools print for them
+  today: 120 literals in 7 files (the vendor sheet is excluded), 68 rules, 91 replacements,
+  119 audit errors before and 37 after; a 3-major, 1-minor, 1-patch release whose re-point
+  crosses 4.5:1 (4.92 to 3.56). The worked release said "four edits" and listed five.
+- **Release builds compare by content** (N34). `tooling/release/compare.py` compares two
+  build folders entry by entry: names, and each entry's bytes (read, hashed and checked
+  against its CRC), size, date and mode. A build
+  is byte-identical to another only with the same zlib: Windows' Python 3.14 uses
+  zlib-ng, the CI's zlib, so 3.3.0's release matched no local build's checksums.
+- **One reader for both Figma scripts** (LC-C3). figma_to_tokens and figma_audit each
+  carried a copy of the same reader (the shape detector, the four parsers, the value and
+  colour helpers and the document model), and the docs said they shared it. It is
+  `scripts/figma_common.py` now, beside `dtcg_values.py`, taking the better of the two
+  copies where they had drifted; each script lost about 400 lines.
+
+### Tests
+
+- The hydration-click flake: `test_browser_runtime.VitalsMeasures.test_interact_at_clicks_while_the_page_hydrates`
+  found no interaction entry on Windows CI twice (#49's first run, #54's merge to `main`),
+  and failed with a `TypeError`. Its page started the 3-second task 1.5 s after its script
+  parsed, while the click is due 2.5 s after navigation starts, so a late parse put the
+  click before the task. The task is now due at 1.5 s on the page's clock, and a missing
+  entry fails with the run's numbers. It never failed locally (5 runs before the fix, 4
+  after), so there is no fail-before count; the test change is a control.
+  `test_browser_scripts.VitalsTiming.test_the_page_clock_survives_a_stalled_request_or_reply`
+  runs the clock mapping on fake clocks with stalls; it fails on the PR's first head.
+- P18 part 1 (DL-A10, DL-A11, DL-A12, DL-A20): `test_email`, a new module.
+  `TemplatesInDarkMode` builds and lints each template and checks every filled link is a
+  `.button` the dark block re-points; `LintHasADarkPass` holds the `dark` check to the
+  review's 2.56:1 and 2.50:1 and leaves untouched pairs to `contrast`; `OutlookFontRule`,
+  `ContainersAreFluid` and `AuthoringCommentsAreDropped` hold the rest. Against `v3.3.0`,
+  10 fail. Four are controls: the templates linted clean before (the lint had no dark
+  pass), a class rule that wins back the label, a page with no dark block, and a pair the
+  dark rules leave alone.
+  Codex's review of #57 added four, each failing on its head: text that inherits its colour
+  onto a background a dark rule changes, a later `<style>` block winning a tie, a VML
+  button's or a component's `[if mso]` font standing in for the scaffold in the lint, and
+  a component's override stopping the build from adding it.
+- P18 part 2 (DL-A13, DL-B6, DL-C3, DL-C5): `test_email.DroppedTokensFailTheBuild`,
+  `LintTheSource` (the templates hold Law 1 with no errors), `NoStyleWidth` and
+  `RenderEmail` (in a browser: the receipt fits in every mode and dark differs from light;
+  a fixed-width email overflows only without `<style>`). Against `v3.3.0`, 10 fail; one is
+  a control (a fluid container and a capped image). `test_browser_scripts` holds
+  `render_email.mjs` to the browser scripts' contract (resolution, exit codes, no CSP
+  bypass) and the fourth `browser_common.mjs` copy to the master.
+  Codex's review of #58 added three, each failing on its head: a `max-width` over 100%
+  taken as a cap, a named colour, a `bgcolor` or a VML `fillcolor` passing `--source`,
+  and a negative literal unmatched.
+  CodeRabbit's added two: a token file that is not a JSON object crashed with a traceback,
+  and `render_email.mjs` ran the email's scripts; it renders with JavaScript off.
+  `render_email.mjs` retries a full-page screenshot Chromium's headless shell refused
+  ("Unable to capture screenshot", once on #60's Linux CI). `RenderEmailRetries` holds it
+  with a stub browser that refuses the first capture; it fails on #60's earlier head.
+- P19 (DL-A14, DL-A21, DL-B7): `test_email.InlinerWritesTheCascadesOrder` and
+  `EmailDocClaims` (the Law 3 count read from the token file, the weight and size notes,
+  the edge built from the border role, no `:last-child` workaround, headings in order in
+  every template, the deliverability rules). Against `v3.3.0`, all 8 fail.
+- The `<style>` blocks as one stylesheet: `test_email.InlinerWritesTheCascadesOrder.test_the_style_blocks_are_one_stylesheet`
+  fails on `v3.3.0` and on `main` before the fix (`37a7128`).
+- P17 (LC-A17, LC-A23, LC-B8, LC-C6): `test_versioning.DeprecateKeepsRemovalsInAMajor`
+  refuses `--removal` 2.2.0, 2.1.1 and 3.1.0 for `--since 2.1.0` and takes 3.0.0 and 4.0.0;
+  `test_token_migration.MigrationPipeline` checks the report's millisecond delta and its
+  advice for a held colour; `test_figma_sync.DeterministicOutput` runs the drift check on a
+  generated `tokens.css` and on a hand edit. Against `v3.3.0`, 3 fail. Two are controls: a
+  removal in a later major was always taken, and the drift check already worked; it had no
+  test behind the claim. Codex and CodeRabbit on #54 found two more, failing on its head:
+  the delete advice reached plain properties (`scrollbar-color`), and durations sat under
+  "more than 2px" (`test_the_review_table_names_its_units`). Its next review found two
+  more, failing on `79bd76b`: a colour's review row read "+0px", and one colour held by a
+  `$` variable and a custom property got the first holder's advice for both
+  (`test_one_colour_in_two_kinds_of_holder_gets_both_kinds_of_advice`); and on `090ded4`,
+  two plain properties holding one colour were named as the first.
+  `test_token_migration.LifecycleDocClaims` holds the doc fixes: a breaking announcement
+  names a major and its guide, and the upgrade commits once; the algorithm count matches
+  its table; MIGRATION_PLAN's tokens are the sizes it gives them; and deprecation.md names
+  the lint rule, not `tsc`, as the gate for `@deprecated`. Against `v3.3.0`, all 4 fail.
+- P16 (LC-C3, LC-A22): `test_figma_sync.FigmaCommon` reads a REST export (one with a
+  variable whose collection is missing), a plugin export, a two-mode records export and a
+  DTCG file through both scripts and holds them to one result, and checks that neither
+  script defines a name `figma_common.py` does, so the copies cannot come back.
+  `test_figma_sync.ReverseBody` holds the `--reverse` body to the four arrays, an `UPDATE`
+  naming each collection's first mode, distinct mode names beside a `light` theme, and no
+  scopes on primitives. Against `v3.3.0`, all 6 fail. The reviews of #53 found two more,
+  failing on its head (`559cce2`): a flat plugin export's values by mode id
+  (`test_a_flat_plugin_export_reads_its_values_by_mode_name`), and a `default` theme
+  beside a `light` one, which took the first mode's name and id
+  (`test_the_first_mode_takes_a_name_no_theme_has`). Its next review found the dropped
+  duration, failing on `v3.3.0` and on `260df86` (`test_a_duration_crosses_as_milliseconds`).
+- The test-file exemption: `test_audit_design.TestFilesByThePathBelowTheRoot` audits one JSX
+  colour under `neutral/` and under `fixtures/test/`, and a `.test.jsx` and a `__mocks__` file as
+  the control. Against `v3.3.0`, 1 fails; the control passes there only because this test's
+  own `wds-test-*` folder exempted everything.
+- P9 (GT-C13, GT-A14 (a), N34): `test_browser_scripts.SharedHelpers` holds the three
+  copies to the master, keeps the moved helpers out of the scripts, and holds both
+  freezes to pausing; `test_browser_runtime.test_a_spinner_is_not_a_focus_ring` runs
+  the spinner in a real browser. Against `v3.3.0`, all 4 fail.
+  `test_release_build` adds two: builds stored instead of deflated compare the same,
+  and a changed or missing file is a difference. Codex's review of #38 added a third: a
+  payload damaged under an intact directory passed, since only the recorded CRCs were
+  compared (the old tool reports such a pair the same). CodeRabbit's added a fourth: an
+  entry damaged alike in both builds read as the same error on both sides, so two
+  damaged builds compared the same; an unreadable entry is now always a difference.
+- P10 part 1 (GT-A5, GT-A14 (b)): `test_browser_scripts` runs the three scripts against
+  a stub browser that records each context's options and then fails, and holds every
+  `newContext(` call in their source to the bypass where the script injects;
+  `test_browser_runtime` audits a page and captures a sheet under `default-src 'self'`,
+  and checks disabled controls against a lookalike that is not. Against `v3.3.0`, all 5
+  fail. The reviews of #39 added three, each failing on its first head:
+  - CI found the Chrome wrap: `test_a_page_with_one_tab_stop_is_not_a_trap` runs a
+    one-button page in the default browser and in an installed Chrome or Edge, with a
+    page that cancels Tab as the guard (it fails against `v3.3.0` too).
+  - Codex found the first-legend exception, now in the disabled-controls test.
+  - CodeRabbit found that a bypass in measure_vitals would run a script the CSP blocks:
+    `VitalsUnderCsp` measures such a script's layout shift as none.
+- P10 part 2 (SB-B3): `test_browser_runtime.test_the_focus_ring_is_measured_at_each_density_the_page_declares`
+  runs a toolbar whose ring is clipped at compact and is a box-shadow at spacious, then
+  again with `--densities none`; `test_browser_scripts.RuntimeArguments` refuses `--only`
+  on a page and a bad `--densities`. Against `v3.3.0`, 2 fail; the `--densities` test is
+  a control, since 3.3.0 refused the unknown option. The runtime tests that passed
+  `--only CHECK` to a page now leave the other checks out with `--skip`. Codex's review
+  of #40 found the dial set on the root alone, which a `<body data-density>` masks: the
+  density test runs both, and fails on the PR's first head. CodeRabbit's found that two
+  top regions at different densities skipped one value: a third case, failing on the head
+  before it. `VitalsUnderCsp`'s control
+  page now shifts after its first paint, since a shift before it is not counted (it
+  failed on a slow macOS runner).
+- P11 (GT-A8, GT-A16, GT-A18): `test_facts.AxeTagAdvice` holds every `--tags` list that
+  names `wcag2a` to naming `wcag21a` and `wcag21aa`, and reads the pinned axe-core's tags
+  for the rules the docs name; `test_browser_runtime.test_a_best_practice_rule_is_a_warning`
+  runs `tabindex` beside `image-alt`; `test_content_and_a11y.StaticBestPractice` and
+  `test_numbers.ByteBudgets` recompute the rest. Against `v3.3.0`, all 6 fail. The
+  web.dev quote is registered in `evidence.json`. Codex's review of #41 found the `axe_violations`
+  budget still counting best-practice warnings, so a budget of 0 failed on one:
+  `test_a_best_practice_finding_does_not_breach_a_violation_budget` fails on its head.
+- P12 part 1 (GT-A12, GT-A13): `test_content_and_a11y.MatrixStates` generates a sheet
+  with a `:focus` ring, a custom state and a combination, an undeclared state, and the
+  error state on a span and an input. Against `v3.3.0`, all 4 fail. Codex's review of #42
+  added three, each failing on its first head: a wrapper and a button keep `aria-invalid`
+  and `disabled` off where they do not belong, `loading+error` (both set `data-state`) is
+  refused, and the coverage grid has a column per state. CodeRabbit's added three, failing on
+  the head before them: a quoted `<` before `{attrs}`, a conflict judged on the element
+  that renders it (`error+valid` on an input, not a span), and `form_control: true`
+  keeping `aria-invalid` off a `<div>`.
+- P12 part 2 (GT-B7, GT-B8): `test_content_and_a11y.MatrixModel` renders an RTL fixture,
+  refuses a bad `dir`, `lang` or key, and reads the LFS line in the summary;
+  `test_browser_runtime.MatrixSeesStateChanges` runs a `box-shadow` focus ring and a
+  `box-shadow` hover under forced colours (the ring fails, the hover does not, an outline
+  ring passes) and keeps the forced-colours baselines apart. Against `v3.3.0`, all 5
+  fail. Both browser tests pass in Playwright's Chromium and in an installed Chrome.
+- P13 part 1 (GT-A6, GT-A17, GT-C11): `test_browser_runtime.VitalsMeasures` serves pages
+  over HTTP and measures TTFB under `slow4g` and the default, a 250 ms click handler
+  against TBT, a long task after five quiet seconds and one before, and a click during a
+  2-second task with `--interact-at` (its wait is INP's, the task stays in TBT) and
+  without it; `test_browser_scripts.RuntimeArguments` refuses `--interact-at` without a
+  target or below 0. Against `v3.3.0`, all 5 fail. They pass in Playwright's Chromium and
+  in an installed Chrome; a click timed from Node's clock missed the task in Chrome, whose
+  cold start delays the request, so `--interact-at` counts from the page's time origin.
+  Codex's review of #45 found two, each failing on its head: a request still in flight
+  has no Resource Timing entry, so three hanging fetches looked like a quiet network and
+  TTI came early (`test_requests_in_flight_keep_the_network_busy`; the requests now come
+  from CDP); and the long-task totals dropped the click's task with TBT (they keep it).
+  CodeRabbit's made the `--interact` control assert that the click happened, gave the TTI
+  test a 9-second settle, and found CDP's unset `receiveHeadersEnd` (-1) added to TTFB:
+  `test_browser_scripts.VitalsTiming` runs `networkTtfb()` on its own, and fails with the
+  guard deleted.
+- P13 part 2 (GT-B5, GT-C11): `test_crux_check` reads a response in the shape the CrUX API
+  documents, from a file and from a local server standing in for the API, which records
+  the query: the key in the query string and nowhere in the output, a ratio above and
+  within, a refusal and no data (exit 2), and a key passed as an argument refused. They
+  never touch the network. Against `v3.3.0`, all 5 fail (there was no script). Codex's
+  review of #46 found a lab median of 0 left unjudged, so a field CLS of 0.05 against a
+  lab CLS of 0 passed: `test_a_lab_median_of_zero_is_exceeded_by_any_field_value` fails
+  on its head.
+  CodeRabbit's found five, each failing on its head: a non-finite or boolean lab median,
+  an invalid p75, a malformed `metrics` container (a traceback), `--ratio inf`, and a
+  saved response for another page or device class were compared or crashed; and a plain
+  `http://` `CRUX_API_URL` off this machine would carry the key in clear. They exit 2 now.
+  Its second round found two more: a page's trailing slash was ignored, so a saved
+  `/offers/` passed for `/offers`, and a list for `urlNormalizationDetails` crashed.
+- P14 (LC-A8, LC-A9, LC-C5): `test_versioning` builds the review's `fx/ver` system (a
+  token file, an entry stylesheet with the layer order, a CSS Modules card and its props),
+  extracts each version with `extract_system.py` and diffs it: a density, a reduced-motion
+  and a root-element change, the three together, a re-point that moves only at a density,
+  densities added and removed, a dark override that crosses 3:1, a local class renamed
+  under CSS Modules (with the gate binding), a layer reorder, a system.json from before
+  3.4.0, and the vendored token parser. Against `v3.3.0`, 12 fail; 2 are controls (a dark
+  override that resolves as before, and the same rename in global CSS). Codex's review of
+  #48 found three more, each failing on its head: a re-point equal by default but not
+  under reduced motion was a patch, a root that became a fragment went unreported, and a
+  local rename that also changed a value was paired as a pure rename. system.json's parts
+  now record their declarations (`declares`) so the pairing can compare values.
+  CodeRabbit's found three more, each failing on its head: `declares` came from a part's
+  first rule only; a component whose file exports its styles object had its keys paired
+  as local (`exports_styles` now records it); and `element` was the first JSX root after
+  the props interface, so a helper above the component lent it its `<span>`. The root is
+  read from the component's own body now.
+- P15 part 1 (LC-A11, LC-A12, LC-A19): `test_token_migration.MigrationPipeline` runs the
+  review's `fx/mig2` card through extract, cluster and the codemod, with a child selector
+  and a nested rule beside it, and a type tie against a commoner 14px;
+  `test_rules_spec.TheTierListsAgree` runs the review's `fx/l6` card through the audit and
+  extract_system and holds both to the spec's lists. Against `v3.3.0`, 4 fail. Two are
+  controls: a negative margin with no padding to cancel keeps its gap token, and the spec's
+  new `tiers` examples, which `fail_before.py` swaps out with the rest of the plugin.
+  Codex's review of #49 found two more, failing on its head: a cancel matched the padding
+  by size alone, so `margin-inline: -8px` read an 8px block padding's token, and a padding
+  declared for `.a, .panel` was not `.panel`'s. The pairing keeps to the axis and splits
+  selector lists. CodeRabbit's found three more, failing on that fix: the axis did not
+  tell left from right, a later `padding-inline` did not replace `padding`, and a grouped
+  margin selector found no parent. The pairing works by side, in cascade order, for each
+  member of either list.
+  Its next review found one more: a padding inside one `@media` decided a margin's cancel
+  in another. Each declaration records its at-rule context, and a margin reads its own.
+  The review after that found two more, failing on its head (`edf441f`): a print padding
+  was read in print though a later base padding wins there, and a layered padding
+  replaced an unlayered one that wins the cascade. Rather than model the cascade, the
+  pairing now reads only a padding set in one block of the file; set in two, the margin
+  keeps its gap token (`test_a_padding_set_in_two_blocks_is_not_cancelled`). The next
+  found one more, failing on that fix (`1f141b5`): `!important` was read as a slot of the
+  padding, in the extractor and the pairing alike, so `padding: 16px !important` was
+  block padding only, and a later plain declaration beat it. It is one value now, and an
+  `!important` one wins its block (`test_an_important_padding_is_one_value_and_wins_its_block`).
+  Its review on `73e7e62` found two more. `padding-inline-start` was the left padding,
+  which it is only left to right: an inline side is read both ways now, and pairs only
+  when the two agree (`test_a_logical_side_pairs_only_when_both_directions_agree`, failing
+  on that head). And the spec's `tiers` examples never ran through the audit, the gate
+  their section names; `test_rules_spec` runs them now (a control: the audit already
+  agreed).
+- P15 part 2 (LC-A14, LC-C4, LC-C12): `test_versioning.DeprecateRewritesAndCountsAColourRename`
+  runs the review's `fx/dep/client` rules through deprecate.py's mapping, the codemod and
+  the scan, one rule per line and the same rules on several lines;
+  `test_token_migration.TheWorkedRun` reruns worked-run.md against its fixture and
+  `test_versioning.TheWorkedRelease` reruns the worked release, each holding every number
+  the page quotes to the output. Against `v3.3.0`, all 4 fail.
+  Codex's review of #50 found one more, failing on its head: a declaration-scope rewrite
+  replaced through `!important` and dropped it, which the font guard had hidden beside a
+  `font-weight`. The rewrite ends where the value does now. CodeRabbit's found two more in
+  the scan, failing on `28d5b99`: an `!important` declaration, which the codemod rewrites,
+  was labelled manual, and a token named inside a quoted `content` string was split at the
+  string's `;` (or past an escaped `\"` in it, its next review found) and counted as a
+  codemod hit
+  (`test_the_scan_reads_important_and_quoted_text_as_the_codemod_does`).
+
+## 3.3.0 — 2026-10-04
+
+Phase 3 of the plan: safe defaults and one set of rules. The audit, stylelint and ESLint
+read one spec, `design-rules.json`: a tool writes its data into each gate, and the three
+agree on every example in it. CI runs the suite on Windows, Linux and macOS at Python
+3.9 and 3.14, and a pushed tag builds the release, which attaches the plugin's zip and
+one `.skill` file per skill for the first time. The generators reproduce the starter's
+type scale and colour ramps, the contract has the roles its references needed, and the
+README's commands paste into bash, PowerShell and cmd. Every fix has a regression test
+that fails on 3.2.1, or on the head a review found it on
+(`python -B -m unittest discover -s tests`: 513 tests).
+
+### Fixed
+
+- **The audit passed three kinds of file as clean** (SB-A9):
+  - It read `//` as a comment in plain CSS, so `url(https://cdn…/hero.svg)` hid every
+    declaration after it, and a custom property holding an address (`--terms:
+    https://…`) hid the rest of its line. `//` is now a comment only in Sass, Less,
+    styled templates and single-file components, and never inside an unquoted address
+    in `url()`, where an escaped `\)` does not end it. A Sass `url()` that holds an
+    expression instead (`url($asset)`) is read as code, so its comments still count.
+  - A rule after a closed `@layer` block was never reported as unlayered. The finding
+    now points at the first unlayered rule. A `@keyframes` block outside a layer, as
+    the references and the scaffold write it, is not unlayered CSS: a keyframe is not
+    a style rule. 3.2.1 flagged a file that held only keyframes.
+  - A root-level `components/` or `ui/` folder, the common Next.js layout, was not a
+    component file, so Law 2 was skipped there. `mycomponents.css` no longer counts
+    as `components.css`. The spec's file-class examples now include both cases.
+- **The token migration tool's file classes** had drifted from the audit's (N11): it
+  missed `brand-tokens.css`, `design.tokens.css`, files in `tokens/` and
+  `dark-theme.css` as token files, so its inventory listed their literals and the
+  codemod did not skip them, and it shared the `components/` bug above. It now uses
+  the audit's patterns, and the spec test holds both copies.
+- **The token migration tool had the same `//` bug** (N12). After `url(https://…)` in
+  plain CSS its census filed every literal to the end of the file under `background`,
+  so clustering saw the wrong property, and the codemod rewrote none of them. It now
+  reads comments as the audit does.
+- **A singular `token.css` or `brand-token.css` was a token file** to the audit, so it
+  was never checked; the spec's globs and stylelint name only `tokens`. Both copies of
+  the test now follow the spec, and its examples include the two names.
+- **The audit misread Sass** (SB-A24). The rules are in `design-rules.json` under
+  `sass`; the audit is the only gate that reads Sass.
+  - A partial holding only mixins, such as the references' own `_mq.scss`, failed as
+    unlayered, because a mixin holds rules. A `@mixin` or `@function` body emits
+    nothing where it is written, so the layer is now checked where it is included.
+    A mixin that holds a whole rule and is included at the root of its own file,
+    directly or through another mixin, is unlayered there; a mixin defined in another
+    file is not followed.
+  - A Sass variable holding a literal passed (`$card-padding: 24px`, then
+    `padding: $card-padding`). Outside a token file, a variable that holds a length,
+    a hex or functional colour, a duration or an easing curve now fails as
+    `sass-literal`, in a map as in a single value. A breakpoint (`$bp`, `$bp-*`,
+    `$breakpoint*`) and a variable local to a `@function` are left alone, and a
+    quoted string is text whatever it spells.
+  - The braces of an interpolation closed the layer around them, so after
+    `.card-#{$name} { … }` the next rule was unlayered, and a declaration whose value
+    was an interpolation (`margin-inline: #{$gutter}`) was never read. A brace inside
+    a string in an interpolation is text too.
+  - Indented Sass (`.sass`) was reported clean whatever it held: the audit follows
+    braces and that syntax has none. A `.sass` file is now listed as skipped, and a
+    folder holding nothing else is the "0 files audited" error.
+- **A zero with a unit hid the length after it.** The audit looked at the first
+  length in a value only, so `padding: 0px 13px` passed, in CSS as in Sass. It now
+  reads every length (CodeRabbit on PR #7).
+- **Two more scripts passed indented Sass** (N13). On a `.sass` file full of literals
+  the migration census reported "no hardcoded design values found", and
+  `a11y_static` reported clean for `outline: none`. Both now say which `.sass` files
+  they did not read. The census prints its notes when it finds nothing, too; they
+  used to appear only beside a result.
+- **The Supabase reference had no access boundary** (DL-B1, DL-A5, DL-C4), the first
+  of the two high-severity gaps. `supabase-integration.md` now says which key each
+  process holds (§9): the publishable key in the browser, and FastAPI either as the
+  user, forwarding the caller's token so row-level security applies, or as the
+  service, where no policy runs and the endpoint must do the policy's job. It says
+  that every `VITE_` variable is public, and where validation and authorization are
+  enforced. Three pieces of guidance were unsafe or wrong and are corrected:
+  - The permission RPC was a `security definer` function in the exposed schema with
+    no `search_path`. The template now keeps it in a private schema, pins
+    `search_path = ''` and revokes `execute` from `public`.
+  - "The JWT's claims" were trusted whole. Authorization data comes from
+    `app_metadata` only, and a claim is as old as the token.
+  - Realtime `DELETE` events are not policy-filtered, and `REPLICA IDENTITY FULL`
+    does not return the old row on a table with RLS, so the fix the reference offered
+    did not work in the case it was for.
+  It also says that a public Storage bucket is world-readable whatever the policies
+  say. Every Supabase fact was re-read at supabase.com on 2026-10-01.
+- **The schema tool could not see row-level security** (DL-A6, DL-C1). It skipped
+  `ENABLE ROW LEVEL SECURITY` and `CREATE POLICY`, listed "RLS policies" as missing
+  from DDL that held them, and assumed RLS was on everywhere. `introspect_schema` now
+  reads both statements and column revokes, records them per table, and opens
+  `--summary` with a SECURITY block:
+  - `BLOCK`: a table with RLS off, or a policy that lets a signed-in user write every
+    row because its condition is `true`.
+  - `warn`: RLS on with no policy for a signed-in user, or authority columns (`role`,
+    `is_admin`, `org_id`) that a user who may update a row can change, with the
+    revoke and grant that close it. A column counts as safe only when the user has no
+    UPDATE privilege on it, or a policy pins it to the caller (`owner_id = auth.uid()`).
+  Policies are replayed as the migrations state them: a dropped policy is gone, and a
+  restrictive policy narrows the permissive ones and grants nothing.
+  The findings are in the model (`security`), the "Is RLS on?" question defaults from
+  the DDL, and `scaffold_ui` repeats the blocking findings and writes each table's
+  forbidden-state notes from that table's own RLS. It still writes the screens by
+  default; `scaffold_ui --strict` writes nothing and exits 1, for CI. From generated types or a JSON dump the block says "unknown".
+- **The reference's column revoke did nothing** (N15, from CodeRabbit on PR #9). It
+  told readers to protect `is_admin` with `revoke update (role, is_admin, …) on
+  profiles from authenticated`, and secrets with a column-level `revoke select`.
+  Postgres ignores a column-level revoke while a table-level grant stands, and
+  Supabase grants table-level privileges by default. The reference and the security
+  pass now give the form that works: revoke on the table, grant the columns back.
+- **The skill's own command failed on two migration files** (N14).
+  `introspect_schema supabase/migrations/*.sql` was an argparse error as soon as the
+  folder held more than one file. Several DDL files are now read as one schema, in
+  the order given, which is also how a later migration's policies reach the table.
+  A pattern is expanded by the tool itself, because cmd.exe passes it as written.
+- **The schema tool misread what Supabase writes** (DL-A7, DL-C2).
+  - `supabase db pull` is `pg_dump --quote-all-identifier`, which quotes types too:
+    `"text"` and `"date"` were unknown types, so a title fell back to the id and a
+    date became a text input, and `"public"."order_status"` lost its values. An
+    identity added by `ALTER TABLE … ADD GENERATED`, and a `serial` default set by
+    `ALTER COLUMN`, were missed, so each id was a required number in the form.
+  - A function's `$$` body was split at its own `;`, so an `alter table … disable
+    row level security` inside a function turned RLS off for the table.
+  - In generated types, prettier puts each member of a long union on its own line:
+    an enum kept only its first value, and a Row column whose type wrapped was dropped.
+  - Migrations: `generated by default as identity` read as an editable id,
+    `ALTER TABLE … ADD COLUMN`, `DROP COLUMN`, `ALTER COLUMN` and `RENAME` were ignored, a quoted
+    name with a space was not a name, and `CHECK (x between 1 and 99)` gave no bounds.
+- **The worked example quoted a fixture nobody had** (DL-B8). It ships now, as
+  `tests/fixtures/supabase/`, and the claims in supabase-integration.md §1 are
+  measured on it. Two of them were wrong: generated types lose 12 rules across 9
+  columns, not 14 across 13, and they lose a key into `auth.users`. The claim that a
+  JSON dump gives the same model is gone: that depends on its query. The reference's
+  `pg_dump` command keeps the privileges now, because the security pass reads them.
+
+- **Vendor CSS beat every layer** (SB-A8). The canonical `index.css` in
+  stack-vanilla-css §4 left `vendor` out of its statement and then imported into it,
+  and a layer first named by its import is appended after `overrides`. Three references
+  put `vendor` in three different places. The order is now in `design-rules.json`
+  (`layers`): `reset, vendor, tokens, base, layout, components, utilities, overrides`,
+  plus `theme` in a Tailwind entry. Every statement in the plugin names `vendor`, the
+  contract's included. The audit and stylelint refuse a statement out of that order,
+  and an `@import … layer(x)` whose `x` the statement does not name.
+- **Self-wrapped files were imported with `layer()`** (SB-A23). Starter files open
+  their own `@layer` block, so `layer(base)` around `base.css` made `base.base`, which
+  stack-vanilla-css itself forbids. handoff-conventions and stack-tailwind did it, and
+  style-architecture called it deliberate. handoff §7.1's pre-commit hook audited the
+  whole tree on every commit; it takes the staged files now, as the hook does.
+- **Two claims about a vendor's `!important` were wrong.** style-architecture §11 said
+  a layer makes it lose to your components. stack-vanilla-css §5 said three `!important`s
+  in `overrides` beat it. Important declarations reverse the layer order, so the
+  vendor's win in both cases. The references now say to strip them at build time, or
+  patch a vendored copy.
+- **The schema parser misread four kinds of statement** (N16 to N19, from the reviews of #12):
+  - A quoted name with a `$` (`"amount$usd"`, which every dump quotes) lost its quotes,
+    and the column parser, which reads a bare name as word characters, then dropped the
+    column without a word. Such a name keeps its quotes now.
+  - `DROP COLUMN` left the column in the primary key, in unique indexes, and in other
+    tables' foreign keys. Postgres drops every index and constraint that uses the
+    column, the whole primary key with it, and needs `CASCADE` for the foreign keys
+    into it, which it then drops. The model does the same, CHECKs included.
+  - `RENAME COLUMN` left other tables' foreign keys and the CHECKs on the old name.
+    Postgres retargets both, and so does the model; string literals stay as they are.
+  - Postgres 18 names a not-null constraint: `add constraint t_name_nn not null name`.
+    The parser read it as `ADD COLUMN` and made a column named `constraint`. It now
+    makes the column not-null, in `ALTER TABLE` and `CREATE TABLE`, and an
+    `ADD CONSTRAINT` it does not know is skipped, never read as a column.
+- **The scaffold's policies failed on four kinds of schema** (N20 to N23, from the reviews of #13):
+  - A model introspected with `--schema app` got every policy, grant and smoke test on
+    `public`. They use the model's schema now.
+  - `sql_ident` quoted nine reserved words, so a table named `select` or a column named
+    `where` gave invalid SQL. It quotes every word Postgres reserves now, from a copy of
+    the parser's list.
+  - Postgres cuts a name at 63 bytes, so a table name of 55 bytes or more gave its four
+    policies one name, and the second `CREATE POLICY` failed. A name that would be cut
+    now shortens the table part, which ends in a hash of the whole name.
+  - The smoke test's "no write policy" check counted a policy for `service_role`, which
+    the browser never holds. It counts only policies for `public`, `anon` or
+    `authenticated` now.
+- **The layer statement** (N24 and N25 from the reviews of #14, and N29):
+  - The canonical `index.css` stopped after `layout.css`, so a project that copied it
+    never imported `utilities.css` or `overrides.css`. It names both now, imported last
+    once the project has them, and the four references that quote it follow.
+  - An `@import … layer(vendor)` above the `@layer` statement names `vendor` first,
+    whatever the statement then says. The spec refuses it now, and so do the audit
+    (`layer-statement-position`) and stylelint (`design/layer-order`).
+  - stylelint never checked where the statement stands, so a rule above it passed,
+    though the audit refused it. `design/layer-order` refuses it now, from a second
+    refused example in the spec.
+- **On Linux and macOS, `snapshot_matrix` missed a state with no style** (found by the
+  first CI run). It called a hover, active or focus-visible cell unstyled only when it
+  was pixel-identical to its default cell. The cells sit side by side at different
+  subpixel offsets, and there text is antialiased by where it sits, so twin cells never
+  matched and the check never fired. It now compares computed styles: a state is
+  unstyled when every element of its cell, `::before` and `::after` included, computes
+  the same style as in the default cell, leaving out what never changes a pixel (the
+  cursor, pointer events, selection, motion timing).
+
+- **The three gates agree on every example in the spec** (N1, N30). The conformance
+  tests' list of known disagreements is empty:
+  - The audit refuses a factor on a token in spacing and radius,
+    `calc(var(--pad-card) * 1.5)` or `/ 2` (L3 `token-factor`), as stylelint did;
+    `* -1`, which cancels a token, is still allowed. Positioning is geometry and may
+    divide.
+  - The audit's type check skipped every length ending in "em", and `rem` ends in "em",
+    so `font-size: 1.125rem` passed. It now refuses both, except `font-size: 1em`, which
+    sizes an icon to its text and which stylelint now allows too.
+  - The audit reads the spec's sizing family, so `max-inline-size: 65ch` and
+    `max-width: 600px` are refused (L1 `raw-size`), as stylelint refused them.
+  - In a component file the audit refuses an element selector (`.card p`,
+    `.card > svg`, `:is(h2, h3)`) and a `*` after a space (`.card *`), as stylelint's
+    `selector-max-type` and `selector-max-universal` do (L2 `foreign-selector`). The owl
+    is still allowed.
+  - A system colour outside `@media (forced-colors: active)` is refused by the audit
+    too (L1 `system-color`), in the properties the spec now lists for both gates.
+  - `transition-duration: 0s` is no longer a literal duration to the audit, a named
+    colour is an error rather than a warning, and a design literal in an inline custom
+    property (`style={{ '--gap': '12px' }}`) is refused (L1 `inline-literal`), with the
+    units ESLint uses; both gates read them from the spec.
+  - stylelint allows a hex in a `var()` fallback, which the spec leaves unchecked:
+    `design/color-no-hex` replaces `color-no-hex`. It also allows a margin in an owl rule
+    in a component file: `design/component-margins` replaces the component override's
+    margin allowlist, and knows the owl.
+  - Thirteen reference snippets broke these rules and now follow them: element selectors
+    became classes (`.megamenu__link`, `.toc__link`, `.drawer__link`,
+    `.work-card__link`, `.table__cell`, `.check-input`, `.field__control`), base and
+    layout CSS sits in its layer, and the hero's `18ch` measure is a Tier-3 socket. The
+    starter's `sub`/`sup` at `0.75em` and the `cqi` fallback example keep their literal,
+    with the audit's pragma beside stylelint's.
+  - From #20's review: the factor check now skips a `var()` fallback, as the spec does
+    (`var(--pad-card, calc(1rem / 2))`); the owl is the whole `> * + *` in both gates,
+    so `.card + *` can no longer space a component's next sibling; stylelint finds the
+    owl through an `@media` around the margin, as the audit did; and the header recipe
+    keeps the page's reservation for the fixed header, as a `base` rule of its own.
+  - From CodeRabbit's review of #20: each `inline-literal` finding names its property
+    and value as its snippet, which is its baseline key's text. With the style's line
+    there, a key kept only its first 120 characters, so a baselined literal hid a new
+    one added further along a long line
+    (`test_a_baselined_inline_literal_does_not_hide_a_new_one_beside_it`, which fails on
+    `bc911b4`).
+
+- **The holes in the stylelint allowlist are closed, and the gates agree on them**
+  (SB-A15, N31). Each hole is now examples in the spec, which the conformance tests run
+  through the audit and stylelint:
+  - A colour function of literals is refused in every property: a `background` or
+    `border` shorthand, a gradient, a filter. `design/no-literal-colour-function`
+    replaces `function-disallowed-list`, which named only `rgb`, `rgba`, `hsl`, `hsla`
+    and `hwb`. It reads the spec's colour functions, which now include `color-mix()` and
+    `light-dark()`, and allows a colour derived from a token, a function with a `var()`
+    among its arguments (`oklch(from var(--bg-accent) l c h / 0.5)`), as the audit does.
+  - Line weights are a family, `stroke`. `border-width`, the side and logical widths,
+    `outline-width` and `outline-offset` take a `--stroke-*` token or `0`, and the
+    `border*` and `outline` shorthands take tokens, a style keyword, `currentColor` or
+    `transparent`. The audit refuses a literal width too (L1 `raw-stroke`); it read only
+    the colour there.
+  - A margin outside a component takes the spacing scale: the spacing family lists the
+    margin properties. In a component, Law 2 still holds it to alignment, a cancelled
+    token, the owl, and now the component's own `::before` and `::after`.
+  - Sizing covers every width and height. The maxima and minima, `inline-size`,
+    `block-size`, `width` and `height` take a token, `100%`, `auto`, an intrinsic keyword
+    or `1em`. A size derived from tokens goes in a socket.
+  - The `transition` and `animation` shorthands take the motion tokens: a list of
+    properties or keyframe names, tokens, keywords such as `allow-discrete`, `0s` and an
+    iteration count. A time, a curve or an easing keyword (`ease-in`, `linear`, in any
+    case: names are lowercase kebab-case) is refused there and in the timing-function longhands, by both gates; the audit missed
+    the keywords.
+  - theme.css's custom properties take a token, a colour word or a keyword, and the
+    literals its §0 documents: a breakpoint in rem, never a `var()`, which a media query
+    cannot read, and an aspect ratio. A breakpoint may be a CSS-wide keyword too, so
+    `--breakpoint-*: initial` still clears Tailwind's own, and a prefix with a rule of
+    its own answers to it alone (`--aspect-video: currentColor` is refused). The
+    override switched the
+    allowlist off, so
+    `--spacing-card: 28px` passed. The audit checks them too (L1 `binding-literal`), and
+    theme.css's `--animate-spin` and `--animate-pulse` read `--dur-loop`, not `1s` and
+    `2s`.
+  - Positions (`top`, `left`, `inset*`) are geometry, which the spec gives to the audit
+    alone. The audit took `1rem` there for an em, and read only the first length, so
+    `inset: -0.4em 12px` passed.
+  - N31: `0` among tokens is allowed (`padding: 0 var(--pad-card)`), as the zero rule
+    says, and `0px` is refused, as stylelint's `length-zero-no-unit` refused it. A share
+    of the container in a spacing property (`calc(100% - var(--gutter-page))`, `5%`) is
+    refused by the audit too. The audit no longer exempts a component's margin in a rule
+    whose selector names `prose`, or any margin that holds an `auto`:
+    `var(--gap-related) auto` sets the component's own block margin.
+  - The audit's spacing, stroke, motion and sizing checks read the spec's allowlists, so
+    they refuse what stylelint refuses. A value that holds a Sass variable or an
+    interpolation is judged with each variable read as a token and each interpolation
+    as the expression it emits, so `padding: $space 13px`, `$space 5%` and `#{5%}` are
+    refused as their CSS forms are, and the variable is `sass-literal`'s (from the
+    reviews of #23).
+  - Seven reference blocks, two starter rules and two generated stylesheets broke the new
+    rules and now follow them. Three inset focus rings used `* -2`, against the starter's
+    `* -1`. The scroll-driven progress bar names its easing token. The table of contents'
+    and the progress bar's derived sizes, the imposter's contained height and the
+    scaffold's skeleton sizes are sockets. The reading column and the presentation deck's
+    slides are `100%` up to the measure. The visually-hidden utility's 1px box carries
+    both tools' pragma.
+
+- **The docs promised checks that nobody ran** (SB-A11, SB-A25). Each one now exists,
+  or its sentence says what does run:
+  - The audit diffs a theme file's `--breakpoint-*` against the token file's `--bp-*`
+    when both are in its run, and fails on drift (L1 `breakpoint-drift`), both ways: a
+    token no theme copies is drift too, unless a theme drops it with `initial`. Every
+    copy is checked, and a token's value is its last declaration. A Tailwind theme
+    with no copies still counts, since Tailwind then keeps its own widths, and themes
+    split across files mirror the tokens together. A generated theme is skipped, and
+    a theme's ignore pragmas apply. A theme pairs only with a token file of its own
+    project, the nearest folder above it with a `package.json`, and among those with
+    the nearest that declares breakpoints. theme.css and
+    stack-tailwind.md said it did; it never had. The v3 `tailwind.config.ts`, which
+    the audit does not read, now says its `screens` are kept in step by hand.
+  - Nothing compares theme.css's type bindings with the `--type-*` roles, no gate
+    tells an ink from a fill by its class name (`text-danger`), the audit does not
+    grep `tailwind.config.ts` for literals, and contrast is `check_roles.py`'s, not
+    the audit's: the sentences that said otherwise say so. The `/<number>` modifiers
+    are the audit's (`tw-opacity-modifier`), not stylelint's, which never sees a class.
+  - `:where(.a .b .c .d)` has no specificity, so it no longer draws a
+    `compound-specificity` warning (it is still four compound selectors, which N32
+    refuses). The v3 config's `spin` and `pulse` read
+    `--dur-loop`, as theme.css's do. The checklist has 91 checks, not 92, in three
+    docs. The `@apply` "specificity returns" argument holds for v3 only: under this
+    suite's layer order the utilities layer still wins. Two ESLint comments named the
+    wrong criterion: `anchor-is-valid` does not read link text, and
+    `media-has-caption` is WCAG 1.2.2. handoff-conventions.md now asks for
+    `camelCaseOnly`, as stack-css-modules.md does, and quotes react.dev: `forwardRef`
+    "will be deprecated in a future release".
+- **The references' CSS passes the stylelint config too (N3).** The audit already
+  held every block meant for copying; stylelint refused 28 of 159, and 56 of 170 at
+  3.2.1. Each kind was settled by the spec:
+  - Where the spec refuses what a block showed, the block changed. A box-shadow bar
+    and a radius formula go through a socket, as the starter's geometry does. An
+    `@property`'s `0px` and a `#ffffff` are gone. A view transition's pseudo-elements
+    are styled in `base`, not in a component. Rules that broke
+    `no-descending-specificity` were reordered, a selector over the cap uses `:where()`,
+    side-by-side alternatives are blocks of their own, and the anti-examples say
+    `example: wrong`.
+  - Escape hatches that named only the audit now name stylelint too, in the one
+    comment both read.
+  - Where the spec allows what the config refused, the config changed. Sub-layers
+    inside a canonical layer, `@layer components { @layer base, skin; }` as
+    stack-vanilla-css teaches, are now a spec example: the rule read the nested
+    statement as the file's own order and refused `skin`. CSS Modules' `composes` and
+    `:global`, which stack-css-modules teaches, are known words.
+- **The Tailwind v3 entry is a file (SB-C9).** `assets/configs/index.tailwind-v3.css`
+  joins the vanilla and v4 entries, with the vendor layer, and stack-tailwind §11.6
+  quotes it instead of writing its own. Preflight goes in `reset`, as in v4. The v3
+  `tailwind.config.ts` set a project up with the `@tailwind` directives under a native
+  layer statement, the unlayered output its own footer warns about, and without the
+  `postcss-import` that `layer()` needs; it now points at the entry.
+- **The selector limits are the spec's (N32).** `design-rules.json: selectors` holds
+  the specificity cap, 0,3,1, and three compound selectors, with examples both gates
+  are held to; `tools/sync_rules.py` writes the limits into each.
+  - The audit weighed a selector by counting four chained classes. It now weighs it as
+    Selectors 4 and stylelint do: `:where()` scores zero, `:is()`, `:not()` and `:has()`
+    their heaviest argument, and a nested rule's `&` its parent's. So `.card:is(.a.b.c)`
+    and `.a.b.c p span`, which passed, are over the cap.
+  - The audit did not count compounds at all; `compound-selectors` does, as stylelint
+    17 counts them, inside a functional pseudo-class too. stylelint refused
+    `:where(.a .b .c .d)` and the audit allowed it: `:where()` takes away the weight,
+    not the knowledge of four levels of DOM, so the spec refuses it.
+    `:where(.a.b.c.d)` is allowed.
+  - stylelint also reads the `+` of an An+B (`:nth-last-child(n + 5)`) as a
+    combinator. The audit does not, and the spec says so: a quantity query keeps its
+    stylelint disable comment.
+  - stack-vanilla-css quoted a stylelint config with a 0,3,0 cap and every heading let
+    into components. It now points at the shipped config. The landing-page sections'
+    FAQ marker weighed 0,4,0, which both gates refuse; its path is in `:where()` now.
+- **The type generator reproduces the starter** (SS-A9, SS-C5). Its docstring said a
+  command reproduced `tokens.css` "approximately": it printed 9/11/13/16/20/25/31/39/49
+  and fluid 49→61 and 61→76.5, against the starter's 11/12/14/16/18/22/28/35/44, 44→72
+  and 56→110. SKILL.md's Phase 1 command printed 9.26, 11.11 and 13.33px steps.
+  `--preset studio` now prints the starter's `--text-*` exactly. The scale is
+  hand-tuned, so the preset is a table, and the docstring says where it departs from
+  the math. SKILL.md's Phase 1 runs the preset and says how to depart from it, and
+  every type command in the docs runs clean.
+- **Fluid type and zoom were half taught** (SS-B5). typography.md §10 called a `rem`
+  intercept sufficient for SC 1.4.4. It now adds Barvian's bound, a maximum at most 2.5
+  times the minimum, and what zoom does to the starter's hero: in a 1440px window,
+  `--text-6xl` grows only 1.33× at 200% and first reaches 2× at 400%. §15 checks both.
+  The generator refuses a `--fluid-min-ratio` over 2.5, and any fluid step that
+  `--snap-px` rounding leaves over 2.5 times its minimum.
+- **The colour generator reproduces the starter** (SS-A9, SS-B7). SKILL.md's Phase 1
+  seeded both ramps from `#e8440a`. The accent drifted in hue and lost chroma to sRGB,
+  where the starter's holds hue 42 and keeps its P3 tints and shades. The neutral took
+  the seed's hue, 36, which reads pink, where the starter's is 75. And the generator
+  put the neutral's 500 at L 58%, which regenerates the 4.08:1 `--fg-subtle` failure
+  `tokens.css` fixed by hand: it is 53.5% now, 4.60:1 on `--bg-sunken`. Phase 1's two
+  commands, and color-system.md's, print the starter's 24 ramp steps exactly.
+- **A brand's exact colour was lost** (SS-B6). The ramp replaced the seed's lightness,
+  so `#e8440a` became `--accent-500: #f14d1a` and was in no step, without a word.
+  `--anchor-seed` makes the seed itself the step nearest it in lightness, written
+  precisely enough to name the same hex. Without it, the report gives step 500's
+  distance from the seed and points at the flag.
+- **An invalid field looked focused** (SB-B4). accessibility.md drew `aria-invalid` in
+  `--border-focus`, and content-model-to-ui's scaffold drew it in `--border-accent`. Both
+  read `--border-invalid` now. The Figma audit measured an on-status ink on the canvas,
+  not on its fill, and the docs and versioning tools now measure each ink on its fill.
+- **The starter referred to files it did not ship, and its comments contradicted it**
+  (SS-B2, SS-C9, SS-A17, SS-A18).
+  - `utilities.css` (one `.visually-hidden`; pattern-invention.md, the stack
+    references and the scaffold said `.u-visually-hidden`), `overrides.css` (the empty
+    last layer, with its convention) and `theme-init.js` (the no-flash theme script,
+    which now survives blocked storage) ship, and index.css imports both stylesheets.
+    `[hidden]` stays in reset, the first layer, where its `!important` beats every later
+    one.
+  - tokens.css named `--gray-800` and `--btn-pad-x`, said components never read Tier 1
+    and themes re-point "Tier 2 ONLY", and counted four leadings above five. Law 3
+    counted five durations; there are six. motion-system.md never named `--dur-loop`,
+    spacing-system.md asked 1.5× between levels the ladder spaces 1.33×, and
+    style-architecture.md re-pointed one step of a white-label's ramp.
+  - reset.css: `html:has(:target)` smoothed every later scroll once any fragment was
+    targeted, so the rule is gone (smooth an in-page link from its click handler), and
+    `body` uses `100svh`, not `100dvh`, as layout-composition.md says.
+- **The vanilla stack's naming rule 4 named classes the starter does not have.** It
+  prefixed the layout primitives (`.l-stack`, `.l-grid`, `.l-center`), and the
+  starter's layout.css defines `.stack`, `.grid` and `.center`. The rule now keeps the
+  starter's names.
+- **The README's commands work in PowerShell and cmd** (XC-A2, N8, XC-B5, XC-C9). The
+  install section had a placeholder, and gives the GitHub route now:
+  `/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`. `WDS`, the
+  plugin's `skills` folder, has a form for bash, PowerShell and cmd, at the path Claude
+  Code installs to. Each command is one line whose only expansion is `"$WDS/…"`: no
+  assignment, no trailing comment.
+- **`python3` and `/tmp/`.** The accessibility and performance skills started their
+  local server with `python3`, which on many Windows machines is the Microsoft Store
+  placeholder, and so did `measure_vitals.mjs`'s note on `file://` URLs. The state
+  matrix wrote its narrowed preview to `/tmp/b.html`. They use `python` and
+  `matrix-button.html`.
+- **TypeScript is pinned beside typescript-eslint** (N7). The ESLint config composes
+  typescript-eslint, whose 8.71.0 accepts TypeScript below 6.1.0, and npm's latest
+  TypeScript is 7.0.2, so an unpinned install is a peer conflict. The config's install
+  line pins `typescript@~6.0`.
+
+### Added
+
+- **Roles the references needed** (SB-B4, SS-B2). Seven, in the contract (all 14 copies),
+  the starter and the deck, both Tailwind configs, the Figma importer, the email map and
+  the migration proposal:
+  - `--fg-on-success`, `--fg-on-warning` and `--fg-on-danger`, the ink on a filled status
+    badge. White measures 3.41:1 on the success fill and 2.25:1 on the warning fill, so
+    a filled badge had no legal text colour; the inks are near-black, near-black and
+    white (6.10, 9.24 and 4.75:1).
+  - `--border-invalid`, an invalid field's boundary: `--danger-500`, and `--danger-400` in
+    dark.
+  - `--motion-travel-xs/-sm/-md`, travel distance as steps of the spacing scale, which
+    motion-system.md told readers to add themselves.
+
+  `check_roles.py` holds each fill to its ink at 4.5:1, and the invalid border to 3:1 on
+  every surface (100 pairs, from 88). Translucency needed no role: the ESLint config
+  already refuses a `/NN` opacity modifier and points to `--bg-hover`, `--bg-active` and
+  `--bg-scrim`.
+- **The generators' options for the starter** (SS-C5). `generate_color_ramp.py` gains
+  `--gamut p3` (reduce chroma into Display P3, not sRGB; the contrast matrix measures a
+  step outside sRGB on the worse of its two sRGB fallbacks), `--neutral-hue` and
+  `--anchor-seed`. `generate_type_scale.py --fluid-space` prints the starter's four
+  `--space-fluid-*` steps, solved for the type's viewport anchors, which `tokens.css`
+  already told readers to regenerate there.
+- **The audit in CI** (SB-C10). `--files-from FILE` audits the paths a file or stdin
+  (`-`) lists, one per line or NUL-separated, such as
+  `git diff --name-only -z origin/main... | python -m scripts.audit_design --files-from -`;
+  a listed path that no longer exists, a deleted file, is skipped. `--sarif` writes
+  the findings as SARIF, the format GitHub code scanning reads (checked 2026-10-03 at
+  docs.github.com: "Code scanning only supports SARIF version `2.1.0`"), with a
+  rule per law and id, and paths relative to the working directory under a
+  `%SRCROOT%` the run defines. It sets no fingerprint: code scanning reads only its
+  own, which `upload-sarif` computes from the source (from the reviews of #24). A
+  NUL-separated list keeps each name exactly, even a Linux name that is not UTF-8.
+  The line lookup SB-C10 asked for was
+  already a bisect.
+
+- **One canonical entry stylesheet per stack** (SB-C9, SS-C9 in part). The starter
+  ships `index.css`, and the configs ship `index.tailwind.css` for Tailwind v4. Five
+  references quote them through `tools/sync_snippets.py` instead of writing their own.
+- **The scaffold proposes each table's row-level security** (DL-B2). It used to
+  decide which columns a form writes and emit client validation, with nothing on the
+  database side. Now `db/policies/<table>.policies.todo.sql`, join tables included,
+  turns RLS on and guesses whose a row is from the keys: the user's own row, an owner
+  column, a child of an owned row, a tenant (a commented template) or nobody (read
+  only). It revokes the table-level insert and update and grants back the form's
+  columns, so the database and the `Draft` type agree. No write policy it proposes
+  has a `true` condition, and the schema tool finds no hole in the result.
+- **A smoke test per table**, `<table>.policies.test.sql`: plain SQL in a transaction
+  that rolls back. It checks that RLS is on, that `anon` sees nothing, that a signed-in
+  user sees only their rows, and that the columns outside the form refuse a write.
+- **`lib/supabase.ts`** (the rest of DL-B1): the browser's one client, with the
+  publishable key. It refuses to start on an `sb_secret_` key or a legacy
+  `service_role` JWT.
+
+### Changed
+
+- **The type generator's default is the starter's scale** (SS-C5). With no scale flag
+  (`--base`, `--ratio`, `--dual-ratio`, `--steps-up`, `--steps-down`, `--snap-px`,
+  `--fluid`, `--fluid-steps`, `--fluid-min-ratio`), `generate_type_scale.py` prints
+  `--preset studio`. Any scale flag gives a ratio run, the pure math, as before. The
+  default ratio run, 1.2 with three steps down, reached 9.26px, so a plain refusal of
+  small steps would have broken every run without flags.
+- **Every skill's description fits a claude.ai upload.** The 13 descriptions were 301 to
+  368 characters; claude.ai's help center gives 200 for an uploaded skill, and the
+  platform 1,024. Each now says what the skill does and what it is not for in 185 to
+  200 characters, and `test_skill_budget` holds every one to 200.
+- **Python 3.9 or newer**, down from 3.10. The scripts already ran on 3.9, the Python
+  macOS still ships; now the tests do too. The harness no longer uses
+  `TemporaryDirectory(ignore_cleanup_errors=)`, `write_text(newline=)` or a slice of
+  `Path.parents`, all 3.10+, and the README states the new floor.
+- **CI** (XC-B3). `.github/workflows/ci.yml` runs the suite and the static checks on
+  Windows, Linux and macOS, at Python 3.9 and 3.14, with the pinned Node tools, and
+  `claude plugin validate --strict` on the marketplace, the plugin and `plugin.json`.
+  Linux adds Playwright's headless shell and Postgres, so the browser and policy tests
+  run there too.
+- **The release build** (XC-C6). `tooling/release/build.py` replaces `build_zip.py`. It
+  makes the plugin's zip, one `.skill` file per skill, packaged as Anthropic's
+  skill-creator packages one and carrying the plugin's LICENSE, and `SHA256SUMS`, all
+  from git and byte-identical on a rebuild. A pushed `v*` tag makes
+  `.github/workflows/release.yml` build them and create the GitHub release, with the
+  CHANGELOG's section as its notes; nothing else creates a release.
+- **The 17 scripts with a shebang are executable** (N5), as the nine from 3.0.0 were.
+- **The spec writes its data into the gates** (N2, SB-C2). `tools/sync_rules.py` writes
+  `design-rules.json` into a marked block in each of the three gates, and `--check`
+  fails CI when a gate drifts from the spec:
+  - the audit: the layer order and statement, the nesting depth, and the colour
+    functions it reads as a colour written by hand;
+  - the stylelint config: the layer order, the nesting depth, the system colours, and
+    the value allowlists, which were hand-written: the four value shapes (`VAR_SEQ`,
+    `VAR_ONE`, `VAR_CALC`, `CANCEL`), the keywords, the colour words, the 43 properties
+    of eight families (spacing, type, radius, elevation, colour, stacking, motion,
+    sizing) and the component margins;
+  - the ESLint config: the colour functions, for its raw-colour rule and its
+    inline-style rule. The inline-style rule missed `hwb()` and `color()`; the
+    raw-colour rule already refused both there, so no verdict changes.
+
+  Why each family takes what it takes moved from the stylelint config's comments into
+  the spec, beside the data. Each section of the spec now names the gates that
+  enforce it (`gates`). A spec entry the tool cannot write, such as an unknown shape,
+  is an error, and nothing is written.
+- **Two tools for each PR.** `tools/fail_before.py` runs named tests against an earlier
+  revision and this tree, and prints fixed, control, still failing or regression for
+  each. `tools/check.py` runs the static checks and the tests a change affects. Its
+  report prints on any console: with its output redirected on Windows (cp1252), a
+  failing check's `§` reached it as an invalid byte and the report crashed printing it,
+  so no report came. The checks now write UTF-8, and a character the console cannot
+  encode prints as `?` (`test_tools.CheckReportsOnAnyConsole`, which fails on `9053727`).
+- **accessibility.md's testing procedure is a reference of its own** (N4).
+  `accessibility-testing.md` has the keyboard, zoom, forced-colors and screen-reader
+  passes, the automated tools and what they miss, and regression tests. accessibility.md
+  was 60,400 bytes against the 60,500 limit and is 52,963 now; its §10 points to the
+  new file, and SKILL.md's reference table lists it.
+- **The token contract names its master copy** (XC-A5): `shared/token-contract.md`,
+  which each skill's copy matches byte for byte. All 14 copies say so.
+
+### Upgrading
+
+- **A theme file's breakpoints must match the tokens** (SB-A11): when one audit run reads
+  a theme file and a token file, each `--breakpoint-*` that differs from its `--bp-*`,
+  or has none, is an error (`breakpoint-drift`). So is a `--bp-*` no theme copies, which
+  a Tailwind theme with no copies leaves at Tailwind's own width; drop one on purpose
+  with `initial`. Audit the folder that holds both.
+- **The audit is stricter** (N1, N30): a `rem` or `em` font size, a literal size in
+  `max-inline-size`, `max-width`, `min-block-size` or `min-inline-size`, an element
+  selector in a component file, a named colour, a system colour outside forced-colors
+  mode, and a design literal in an inline custom property are errors now. Each is what
+  stylelint or ESLint already refused.
+- **Both gates are stricter** (SB-A15, N31). The audit and stylelint now refuse a colour
+  function of literals in any property, a literal border or outline width, a literal
+  margin outside a component, a literal width or height, a time, curve or easing keyword
+  in a `transition` or `animation`, a zero with a unit (`0px`), and a literal in a theme
+  file's custom properties. Run both over your project before upgrading: each finding
+  names the token to use, and a size derived from tokens moves into a socket. A disable
+  comment that names `function-disallowed-list` needs `design/no-literal-colour-function`
+  instead. theme.css's `animate-spin` now turns in `--dur-loop` (900ms, was 1s), and
+  `animate-pulse` breathes in it too (was 2s).
+- **The audit holds the selector limits** (N32): a selector over 0,3,1, or of more than
+  three compound selectors, is an error (`compound-specificity`, which warned only on
+  four chained classes, and the new `compound-selectors`). Both are what stylelint
+  already refused. Wrap the context in `:where()`, which weighs nothing, or give the
+  element a class of its own.
+- **Two stylelint rules were renamed.** A disable comment for `color-no-hex` names
+  `design/color-no-hex` now, and one for a component's margin names
+  `design/component-margins` instead of `declaration-property-value-allowed-list`.
+- **The type generator refuses a step under 11px** (SS-C5). A ratio run that puts any
+  step, or a fluid step's minimum, under 11px exits 2 and names the ways out: fewer
+  `--steps-down`, a smaller `--ratio` (1.125 keeps three steps down, at 11.24px), or
+  `--allow-small` to emit it with a warning. `--snap-px` is not one: it rounds 9.26px
+  to 9. A run with no scale flags now prints the starter's scale instead of the 1.2
+  ratio run, and `--preset` cannot be combined with a scale flag.
+- **A regenerated neutral's 500 is darker** (SS-A9): L 53.5%, not 58%, as in the
+  starter. A neutral generated before 3.3.0 and used for placeholder text measures
+  4.08:1 on `--bg-sunken`; regenerate it.
+- **`check_roles.py` needs the new roles** (SB-B4, SS-B2). Its built-in pairs read
+  `--fg-on-success`, `--fg-on-warning`, `--fg-on-danger` and `--border-invalid`; a
+  `tokens.css` without them exits 2 ("not declared"). Declare them (the starter's
+  bindings are a start), or pass your own list with `--pairs FILE`.
+
+### Tests
+
+- SB-A9 and N11: six `AuditPrecision` tests and `test_rules_spec`'s file classes.
+  Against 3.2.1 all seven fail; a quoted `url("https://…")` passes on both, as the
+  control.
+- N12: `test_token_migration.AddressesAreNotComments`, the census and the codemod.
+  Against 3.2.1 both fail, in five subtests.
+- SB-A24: seven `AuditPrecision` tests and `test_rules_spec.test_sass`, which runs the
+  spec's Sass examples through the audit. Against 3.2.1 seven fail, `test_sass` in
+  eleven subtests; the eighth, a brace in a string inside an interpolation, guards a bug
+  that existed only while this fix was in review. Its example of an interpolation inside a layer passes there, because
+  3.2.1 never reported a rule after a closed block; it fails on `5fd068e`, the commit
+  before this fix. `test_sass_is_left_to_the_audit` holds the spec's statement that
+  the stylelint config reads no Sass, and passes on both.
+- N13: `test_token_migration` and `test_content_and_a11y` each hold a `.sass` file.
+  Against 3.2.1 both fail; a `.scss` file with the same rule is the control.
+- DL-B1, DL-A5 and DL-C4: `test_docs.SupabaseGuidance.test_the_access_boundary_is_stated`
+  holds what the reference must say and must no longer say. Against 3.2.1 it fails
+  in 16 subtests. The two dated figures it quotes are in the evidence register.
+- DL-A6, DL-C1, N14 and N15: twelve tests in `test_content_and_a11y.SchemaSecurityPass`. Against
+  3.2.1 all twelve fail. Controls inside them: a public read policy, a policy for the
+  service role and an owner check are not findings.
+- DL-A7, DL-C2 and DL-B8: `test_schema_sources`, fifteen tests on real output. The
+  worked example in three forms: the migration, a `pg_dump` of it from Postgres 18,
+  and the same schema as `gen types` writes it. Also `gen types` for a real 25-table
+  project. Against 3.2.1, thirteen fail. The real project's types and the `db pull`
+  form pass there, as controls: the parser already read both.
+- DL-B2 and DL-B1: `test_policies`, eleven tests. Three run the generated SQL on a
+  scratch Postgres when one is on PATH, and skip otherwise. Every proposal applies and
+  every smoke test passes. Then four breakages each make their test fail with its
+  reason: an open read policy, a re-granted owner column, RLS turned off, and a write
+  policy on a read-only table. Against 3.2.1 all eleven fail.
+- SB-A8, SB-A23 and SB-C9:
+  - `test_rules_spec`: the spec's layer examples through the audit, the stylelint
+    config's copy of the order, and every layer statement in the docs, configs and
+    starter. Against 3.2.1 all three fail.
+  - `test_real_tools.StylelintConfig` runs the examples through the real stylelint,
+    and lints the two canonical entries. On 3.2.1 it cannot set up, because the
+    entries do not exist there.
+- `test_docs` runs `test_harness` on the floor interpreter, and `test_harness` checks
+  the temporary folders and `TempDirTest.write` there. On 3.9, 3.2.1's harness errored
+  in 181 tests.
+- `tools/check_pointers.py --write-register` and `tools/sync_snippets.py` (without
+  `--check`) are tested writing a file: UTF-8, LF, byte for byte. With 3.2.1's tools
+  both tests error on 3.9, where `write_text` has no `newline`.
+- The budget test passes `maxsplit` to `re.split` by keyword, as Python 3.13 asks.
+- N16 to N25 and N29, against `8ed2e84`, the `main` before the fix, since none of this
+  code is in 3.2.1. Fifteen tests fail there, in 26 failures and 2 errors:
+  - `test_schema_sources`: one test per parser fix, four in all.
+  - `test_policies`: eight tests. Four run on the scratch Postgres: a schema of its own,
+    and reserved words with a 60-byte table name, each apply and pass their smoke tests;
+    every word `pg_get_keywords()` reserves is on the list; and a write policy for
+    `service_role` passes the smoke test while one for every role fails it.
+  - `test_rules_spec`: the entry names a file for every layer (N24), and `test_layers`
+    on the new refused example (N25).
+  - `test_real_tools.StylelintConfig` on the two new refused examples (N25, N29).
+  - The 20 tests in the same classes that pass on both are the controls. Among them is
+    the N29 example through the audit, which refused it already.
+- `load_script` moves into `wds_support`, for the test that holds the scaffold's copy
+  of the reserved words equal to the parser's.
+- What the reviews of #16 found, against its first commit (`0a0c249`): five tests fail
+  there, and twelve controls pass on both.
+  - A rename or a drop no longer reaches into a call (`lower(note)` is not a column
+    `lower`) or into a quoted name (`"old.part"` is not `old`).
+  - A table constraint listed before its column now applies.
+  - The smoke test quotes every name it puts in a string (a table named `it's`).
+  - The no-write check counts a role that `anon` or `authenticated` inherits.
+  - A second review: a rename or a drop leaves dollar-quoted literals alone; the smoke
+    test picks a `do` delimiter no name contains (a table named `cash$$flow`); and the
+    no-write check counts inherited privileges (`USAGE`), so a membership granted
+    `WITH INHERIT FALSE` is not the browser's. Four tests fail on `81b50f9`.
+- N5, the PR tools and the build, from `tools/fail_before.py` against 3.2.1: nine
+  fixed and eleven controls.
+  - `test_file_modes` reads git's modes (the index, or the commit `WDS_PLUGIN_REV`
+    names) and fails on 3.2.1, where 17 scripts with a shebang were 100644.
+  - `test_tools`, eight tests, all fixed. `fail_before.py` runs on a fake repository of
+    two commits with a fix, a control, a test that still fails, a regression, failing
+    subtests, a skip and a failing `setUpClass`. `check.py`'s choice of tests is checked
+    on its own, and its list of changed files keeps a path with a space whole.
+  - `test_release_build` ports the zip builder's seven tests to `build.py` and adds four:
+    each `.skill` file, the sums, a skill the platform refuses, and a long description
+    as a warning. The builder lives in `tooling/`, outside the plugin, so all eleven run
+    the same builder in both runs: they are controls.
+- `test_policies` keeps the scratch cluster's socket in its own folder: Debian's and
+  Ubuntu's Postgres put it in `/var/run/postgresql`, which only `postgres` may write.
+- N2, part 1: `test_tools.SyncRules`, three tests on a copy of the spec and the two
+  gates (a spec change is stale until rewritten, a rewrite of a tree in step changes
+  nothing, a gate without its block is an error), and
+  `test_rules_spec.test_the_specs_data_is_written_into_the_gates`, which replaces two
+  tests that read the stylelint config's layout as text. All four fail on 3.2.1. A fifth,
+  from #18's review: the audit's nesting fix said "past depth 2" whatever the spec's
+  limit; it now names the generated limit (`test_the_audit_explains_the_limit_the_spec_sets`,
+  which fails on `eb4cccc`, with the other three `SyncRules` tests as controls).
+- N2, part 2: the conformance tests. One builder turns every `allowed` and `refused`
+  example in the spec into a file, and each gate its section names must give the
+  spec's verdict: the audit in `test_rules_spec.TheAuditFollowsTheSpec.test_every_example`,
+  stylelint and ESLint in `test_real_tools`'s `test_every_example_of_the_spec`. They
+  replace five tests that read the stylelint config as text. Where a gate still
+  disagrees, `KNOWN_DISAGREEMENTS` names the item that fixes it, and the test fails
+  once the gate agrees: three are stylelint's (N1 rows 6 and 7), ten the audit's (N1
+  rows 5 and 8, and seven new ones, N30, for P3). Against `9053727`, PR #18's head:
+  three new `SyncRules` tests fail (the allowlists, the colour functions, and an
+  unknown name that writes nothing), and 25 tests are controls, the conformance tests
+  among them, so the generated blocks change no gate's verdict on any example.
+  From #19's review: a shape the spec added and a family used was named in the
+  stylelint allowlist but never declared, so the config could not load while `--check`
+  passed. The block now writes every shape in the spec, and an allowlist that reads a
+  name the block has not written first is an error
+  (`test_a_new_shape_is_written_before_the_allowlist_that_reads_it`, which fails on
+  `a7157c2`).
+- The first CI run, on Linux and macOS: `test_browser_runtime.MatrixSeesStateChanges`
+  failed there and passes now, which holds the `snapshot_matrix` fix; on Windows it
+  passes on both. Two tests assumed Windows: `test_harness` took a relative path across
+  drives (the runner's checkout is on `D:`), and `test_release_build` set a mode git
+  re-read from the disk on POSIX. On a loaded macOS runner, the mega-menu scenario in
+  `test_recipes.NavigationCodeInABrowser` dwelt over a trigger past the recipe's
+  switching delay, because it timed the pointer with real waits. Its page now runs on
+  Playwright's fake clock, which only the scenario advances. Its diagonal also went two
+  thirds of a pixel down per step, so some steps rounded to straight sideways, which
+  is not heading into the panel; each step now goes a whole pixel down.
+- P3 part 1 (N1, N30): the spec's examples now hold every row of N1 and every case of
+  N30, and `KNOWN_DISAGREEMENTS` is empty, so the conformance tests hold all three gates
+  to every example; new allowed selectors (`:nth-child(2n + 1)`, `:lang(en)`, `:where()`
+  and attributes) guard the audit's selector check against false positives. The
+  snippet test files a block written in `@layer base` or `layout` in that layer's file,
+  not a component's.
+  Against `a7157c2`, #19's head: the audit's and stylelint's conformance legs and the
+  renamed-rule fixtures fail (3 tests, 26 subtests), and 29 tests are controls.
+- The mega-menu's safe-triangle test failed once more on macOS with 3.14 (#19's CI),
+  under the fake clock: the clock does not decide when Chromium delivers a move, so
+  a move could land after the hover-intent look had run. Each step of the scenario
+  now waits, in real time, until the page has seen its move. Its markup carries the
+  reference's new classes.
+  It failed again on macOS with 3.9: `page.clock.install()` alone lets the fake clock flow
+  in real time, so a slow runner overran the menu's 300 ms cap. A real 60 ms delay per
+  step reproduced it locally. The scenario now pauses the clock once the page has
+  loaded, and keeps that delay as a guard: it passes with the pause, and fails without.
+- P3 part 2 (SB-A15, N31): the spec's examples hold every hole: the colour functions in
+  any property, the `stroke` family, margins in a layout file (a family's `layout`
+  examples), the wider sizing family, the motion shorthands, the theme bindings (files of
+  their own, `*-theme.css`), the audit-only `geometry`, and N31's zeros, shares and
+  margins. stylelint also lints theme.css as shipped
+  (`test_theme_css_passes_the_override_that_guards_it`), and the spec's binding file class
+  is held against the audit and the config's override. Against `cde5e05` (`main`): the
+  audit's conformance leg fails 31 subtests and stylelint's 36, the file classes one,
+  and the two unit tests that let a zero with a unit pass one each (5 tests); 6 are
+  controls, among them the references' snippets, the starter's own stylelint run and
+  ESLint's leg. Against `v3.2.1`, 8 fail and 3 are controls.
+- P4 (SB-A11, SB-A25, SB-C10): `test_audit_design.ThePromisedChecks` and `TheAuditInCi`.
+  Against `fc92cf7`, #23's head: the breakpoint diff, the CLI's list and SARIF, and
+  `:where()` fail (6 tests), and so do the doc promises (14 subtests) and the stated
+  checklist count (3); the shipped theme's breakpoints, which mirror the starter's
+  tokens, are the control. The reviews of #24 added nine, each failing on the head it
+  reviewed: the breakpoint diff's other direction and pragmas, and the NUL list,
+  against `c3b154e` (2); a repeated declaration, a generated theme, an empty side and
+  a theme split across files, against `6c64c24` (4); another project's tokens,
+  against `98cf7b8` (1); a nested package's, against `b71ed10` (1); and a listed name
+  that is not UTF-8, against `5a7fbae` on Linux (1). Windows and macOS skip that
+  one: their file names are always Unicode.
+- P5 (N3, SB-C9, N32): `StylelintConfig.test_the_references_css_snippets_pass_the_config`
+  lints every CSS block of the references in the files the audit puts it in, and the
+  canonical entries' test lints the v3 entry. The spec's `selectors` examples and its
+  sub-layer example run through the audit and the real stylelint, and `TheAuditInCi`
+  holds `:where()` and a nested rule's weight. Against `a5a54e7` (`main`): the
+  references fail 24 subtests, the audit's conformance leg 6, stylelint's 1, the
+  allowed fixtures 2 and the canonical entries 1, and the two audit tests fail
+  (7 tests); the starter's own runs, the references through the audit and the
+  quotes are the controls (5). Against `v3.2.1`, 9 fail and 3 are controls. The
+  reviews of #26 added four, each failing on the head it reviewed: a `:hover` rule,
+  which adds no nesting depth, was weighed without the rule it sits in, and
+  `::slotted()` without its argument (against `5ac2223`); a quoted `)` closed a
+  `:where()` early, and a quoted `&` read as nesting (against `781e4ea`). stylelint's
+  leg, which already read all four, is the control.
+- P6 part 1 (SS-B5, and the type halves of SS-A9, SS-B7 and SS-C5): `test_numbers`
+  gains `TypeScale` (11 tests) and `FluidTypeZoom` (2). The preset and the default
+  print `tokens.css`'s `--text-*`, SKILL.md's Phase 1 command does too, every type
+  command in the docs exits 0 with nothing on stderr, a step or a fluid minimum under
+  11px is refused with its ways out unless `--allow-small`, the preset refuses scale
+  flags, and a fluid span over 2.5 is refused. Each fluid `--text-*` in `tokens.css` is
+  within 2.5 times its minimum, and the figures typography.md §10 quotes recompute from
+  it. Against `v3.2.1` and against `ca4f206` (`main`), 10 fail; the 2.5 bound on
+  `tokens.css` and a 1.125 run, the refusal's own way out, are the controls (2).
+  Codex's review of #28 added one: `--snap-px` rounds a fluid step's two ends apart,
+  so a 2.485 shrink emitted 16→40.5px, a 2.53× span
+  (`test_a_snapped_fluid_span_over_2_5_times_is_refused`, failing on `38d11cc`).
+- P6 part 2 (SS-B6, and the colour halves of SS-A9, SS-B7 and SS-C5): `test_numbers`
+  gains `ColourRamps` (10 tests) and two `TypeScale` tests. SKILL.md's and
+  color-system.md's colour commands print the starter's 24 ramp steps, every colour
+  command in the docs runs, the generated neutral's 500 clears 4.5:1 on `--bg-sunken`,
+  `--neutral-hue` sets the hue, `--anchor-seed` keeps `#e8440a` exactly at its nearest
+  step, the report gives step 500's distance from the seed, color-system.md quotes
+  that report, and `--fluid-space` prints the starter's fluid spacing. Against
+  `v3.2.1` and against `38d11cc` (#28's head), 11 fail; every documented colour
+  command running is the control (1).
+  Codex's review of #29 added one: a P3 step was measured with its channels clipped
+  to sRGB, so a hot pink's `--accent-400` read 3.00:1 and UI-safe; with its chroma
+  reduced, as a browser may show it, it is 2.58:1. The matrix now takes the worse of
+  the two (`test_a_p3_step_is_measured_on_its_worse_srgb_fallback`, failing on
+  `9db30d0`).
+  CodeRabbit's added another: chroma under 0.0005 was written as none, so the
+  anchored step of `oklch(33.9% 0.0003 140)` read `oklch(33.9% 0 0)`, not the `#373837`
+  the report named. The anchored step keeps its chroma now, and a seed no `oklch()` of
+  six decimals can name is refused
+  (`test_an_anchored_near_grey_keeps_its_hex_in_its_css`, failing on `bcca304`).
+- P7 part 1 (SB-B4, and SS-B2's roles): `test_check_roles` holds the status inks and the
+  invalid border (`test_status_inks_and_the_invalid_border_are_held`),
+  `test_contract.InvalidFieldsLookInvalid` reads every `aria-invalid` border rule, and
+  `test_figma_sync.StatusInks` measures an ink on its fill. Against `v3.2.1` and against
+  `80108ae` (`main`), all 3 fail; `EveryConsumerKnowsEveryRole`, which passes on both
+  contracts, is the control (5).
+  Codex's review of #31 added two:
+  - the filled danger and success variants kept `--fg-on-accent`, near-black in dark
+    and 4.38:1 on `--bg-danger`, and the state matrix put `--fg-on-inverse` on the
+    warning fill. The scaffold, the stack references and the matrix now use each fill's
+    ink (`StatusFillsCarryTheirInk`, 7 subtests failing on `590ab8e`);
+  - the Figma export dropped the travel roles as composites, and the versioning report
+    did not measure the invalid border on the sunken input.
+  CodeRabbit's added two, in the Figma audit: an `on-*` ink whose fill is not in the file
+  was not measured at all (it is measured on the system's fill now), and
+  `motion-travel-sm = 8` was read as 8ms (`StatusInks`, 2 tests failing on `654034c`).
+- P7 part 2 (SS-B2, SS-C9, SS-A17, SS-A18): `test_contract.TheStarterKeepsItsWord`
+  recomputes Law 3's counts from tokens.css, reads the comments' names and leading
+  count, checks the shipped files and their imports and that no `u-visually-hidden`
+  remains, and holds reset.css to no smooth scrolling and `svh`. Against `v3.2.1` and
+  against `3cb09cc` (#31's head), all 4 fail. The starter's own audit now reads 7 files.
+  CodeRabbit's review of #32 added one: SKILL.md still counted five durations; the Law 3
+  test now reads it too (failing on `fc02def`). The contract's "Tier 2 only" now names
+  the two Tier-1 moves tokens.css allows.
+- P8 part 1 (XC-A5, N9, rule 4): `test_contract.ContractCopies` compares each skill's
+  copy with the master and names the ones that differ, and holds the header to naming
+  the master. `TheStarterKeepsItsWord.test_the_vanilla_stack_names_the_starters_primitives`
+  holds rule 4 to layout.css. `test_docs.Manifests` holds the repository's marketplace
+  to the plugin's in every field but `source`, with a planted difference as its positive
+  control. Against `v3.2.1`, 2 fail; the other 5 are controls (the copies, the deck's
+  tokens and the two manifests agree today).
+  Codex's review of #34 added one: under `WDS_PLUGIN_ROOT`, the manifest test compared
+  another copy's marketplace with this checkout's, so an older release's legitimate
+  drift failed it. It now compares only this repository's own plugin
+  (`test_a_copy_elsewhere_is_not_held_to_this_repository`; the old test fails on a
+  copy with another description).
+  CodeRabbit's added one: the comparison read a missing field and a `null` one alike
+  (`test_an_absent_field_differs_from_a_null_one`, which fails on `e97785c`).
+- P8 part 2 (XC-A2, N8, XC-B5, XC-C9, N7): `test_docs.PasteableCommands` reads every
+  shell line of both READMEs for what bash, PowerShell 5.1 and cmd read differently
+  (continuations, comments, `&`, `;`, substitutions, assignments, any variable but
+  `"$WDS/…"`, `/tmp/`, `python3`, `~`, single quotes, globs), with broken lines as its
+  positive control. It holds the README's three `WDS` forms to plugin.json's version and
+  its install to plugin.json's repository, finds no `python3` or `/tmp/` in the skills'
+  shell fences or the browser scripts, and holds every typescript-eslint install to a
+  TypeScript 6.0 pin, as the repository's toolchain has. Against `v3.2.1`, 5 fail (24
+  subtests); the control and the inherited quick start pass on both.
+  CodeRabbit's review of #35 added two: the fence reader closed a fence on any ``` line
+  and did not read `~~~` fences (`test_fences_pair_as_commonmark_pairs_them`), and an
+  install continued over lines was never checked for its pin
+  (`test_an_install_split_over_lines_is_still_read`). Both fail on `3121d61`.
+
+## 3.2.1 — 2026-09-25
+
+Ready to distribute. The stylelint config and both Tailwind blocks of the ESLint config
+now run through the real tools in the tests, and what that found is fixed. A review of
+this release before it shipped found more, and that is fixed too. Every fix has a
+regression test that fails on 3.2.0, or on the release candidate for what the review
+found (`python -B -m unittest discover -s tests`: 339 tests).
+
+### Upgrading
+
+- **Tailwind v3 with Part 5 of the ESLint config:** give `settings.tailwindcss.config` an
+  absolute path anchored at your project, not at the folder ESLint runs in. Copy the v3
+  block as it stands now: it looks up from the config file (`import.meta.dirname`) to
+  the nearest `package.json`. eslint-plugin-tailwindcss 3.18 stops ESLint with "Could
+  not resolve tailwindcss" when the path is relative, and ESLint 10 loads a config from
+  whichever folder it lints, so a path resolved from the working folder broke a run from
+  a monorepo root.
+- **Tailwind, both lines:** Part 5 now whitelists the starter's own classes (`stack`,
+  `cluster--tight`, `u-*`) in `ownClasses`; add your components' blocks there before
+  you make `no-custom-classname` an error, or it reports every one of them.
+- **stylelint:** the config now accepts the starter as shipped; it used to refuse it 32
+  times. If you copied the starter, take its new comments with it: the
+  `stylelint-disable` comments in reset.css, base.css, tokens.css and layout.css, and
+  layout.css's sockets (`--center-box`, `--imposter-max`, `--reel-bleed-pad`) and
+  `.imposter--bottom` shorthand.
+- **Node:** the lint configs need a Node both stylelint 17 and ESLint 10 support: 20.19+,
+  22.13+ or 24+.
+
+### Fixed
+
+- The stylelint config, run on stylelint 17.15 with stylelint-config-standard 40.0:
+  - The CSS system colours (`Canvas`, `ButtonText`, `Highlight`…) are allowed only inside
+    `@media (forced-colors: active)`, in any case; a new rule,
+    `design/system-colors-in-forced-colors`, refuses them anywhere else, shorthands
+    included.
+  - `100svb`, `100svh` and `100dvb` are allowed for `min-block-size`.
+  - `import-notation` is off. The references spell imports both ways, and the
+    standard config's `url()` notation refused the documented Tailwind entry.
+  - The single-line-declarations rule is off: formatting is Prettier's job, as the
+    config already said.
+  - The file-class overrides are still the documented four. A fifth, for layout
+    primitives, was tried and removed: placed after the component block, it took Law 2
+    from any component in a `layout/` folder, and its regex hung on a long number.
+- The starter:
+  - It marks its documented one-offs with a `stylelint-disable` comment and a reason: the
+    `[hidden]` override, iOS text-size-adjust, the second `html` rule, the sub/sup
+    ratio, the focus ring's gap, the two repeated `:root` blocks in tokens.css, and in
+    layout.css the switcher's quantity queries and the file's `> *` child rules.
+  - layout.css derives its three computed boxes through sockets, as it already did
+    elsewhere, and `.imposter--bottom` uses the `inset-block` shorthand. Nothing renders
+    differently.
+- The ESLint config's Part 5:
+  - The v3 block anchors its config path at the project.
+  - Both blocks whitelist the starter's own classes; the v3 block no longer whitelists
+    the utilities the plugin already learns from the config, which hid their typos.
+  - Both blocks and the header give `p-card p-card-lg` as the contradiction.
+    `p-card px-inline-md` is not one: the longhand always follows the shorthand, in
+    v4 and in v3.
+- The 3.0.1 entry below named a report by a path on the maintainer's machine.
+- The README states the floors: Python 3.10 or newer (the suite runs on 3.10 to 3.14),
+  and Node 20.19+, 22.13+ or 24+ for the lint configs.
+- The rule spec, `design-rules.json`, records the system-colour rule, and that a
+  component in a `layout/` folder is a component.
+
+### Tests
+
+- `test_real_tools` runs stylelint over the starter, the documented entries and fixtures
+  for each law and for everything the review found. It runs both Part 5 blocks through
+  the real plugin (4.4 with Tailwind 4.3, 3.18 with Tailwind 3.4) from the folder above
+  the project, over role classes, the starter's own classes and typos of both; the
+  contradiction fixtures are the examples the blocks' own comments give.
+- `test_docs` checks that no shipped file names a folder on the author's machine
+  (including as JSON escapes it and WSL paths), that the README states the Python
+  floor, and that every script compiles, and every shipped script's `--help` runs, on
+  the floor interpreter itself (`WDS_FLOOR_PYTHON`, else uv's).
+- Inside the plugin's repository, `npm ci` in `tooling/main` and `tooling/tailwind-v3`
+  installs every tool the tests use but the browser, at pinned versions, and the tests
+  find them without any variable set; `off` switches a group of tests off.
+- Every subprocess the tests start gets the harness's environment, without the variables
+  that tie git to one repository (`GIT_DIR`, `GIT_INDEX_FILE` and the rest), and a test
+  holds every call to it. Run from a git hook, the hook tests staged their fixtures into
+  the hook's repository.
+
+## 3.2.0 — 2026-09-25
+
+Phase 2 of the 3.0.1 review: the docs are tied to the code. Tests now read the
+commands, configs, code blocks, figures and pointers out of the docs and check them
+against the scripts, a real browser and the real tools, and the fixes followed from
+what they found. Every fix has a regression test that fails on 3.1.0 and passes here
+(`python -m unittest discover -s tests`: 296 tests).
+
+### Upgrading
+
+- **The pre-commit hook fails when a stage cannot run.** A missing stylelint config,
+  audit script or Python used to print SKIPPED and let the commit through. Set
+  `DESIGN_GATE_ALLOW_SKIP=1` while a stage is being adopted. Configs are now found at
+  the repo root first (`stylelint.config.*`, `.stylelintrc*`, a `stylelint` object in
+  package.json), then in `assets/configs/`.
+- **Install the hook twice**, as `pre-commit` and as `commit-msg`: a bypass
+  (`DESIGN_GATE_BYPASS=1 DESIGN_GATE_BYPASS_REASON="why"`) now leaves a
+  `Design-Gate-Bypass:` trailer in the commit as well as a line in the log.
+- **Re-baseline the design audit.** It now reads class strings inside `cn()`, `clsx()`,
+  `cva()` and the other class helpers, refuses every Tailwind arbitrary value except
+  arbitrary variants, image URLs and pseudo-element content, flags arbitrary properties
+  (`[padding:13px]`) and the v4 `!` suffix, and audits styled-components and emotion
+  template bodies as CSS.
+- **Renames and moves.** Tailwind's width utility `border-default` is now
+  `border-stroke` (it also painted the border colour). `.prose` moved from base.css to
+  layout.css. The navigation code moved from `navigation-patterns.md` §6 to
+  `navigation-code.md`.
+- **New roles** in all 14 contracts, the starter, both Tailwind configs, the migration
+  template, the Figma importer and the email map: `--motion-instant` (press, toggle,
+  check) and `--bg-scrim`. Components may read `--weight-*` directly.
+- **design-system-docs.** The drift baseline is `docs/system.json`, extracted from
+  `styles/ src/components/` in every step. `build_docs --check --baseline FILE` exits 2
+  when FILE does not exist; it used to check prose only and pass.
+- **Versions.** stylelint `^17` with stylelint-config-standard `^40`; ESLint `^10` with
+  a package.json `overrides` entry for eslint-plugin-jsx-a11y; eslint-plugin-tailwindcss
+  4.x for Tailwind v4 (`cssConfigPath`), pinned to 3.x on v3. CI actions on their
+  Node 24 majors (checkout@v5, setup-node@v5, setup-python@v6, cache@v5,
+  upload-artifact@v6).
+
+### Tests on the gap between docs and code
+
+- Every CSS, TSX and JSX block in the references passes the audit; deliberate bad
+  examples say so with `example: wrong | before | illustration`.
+- Quoted starter code is kept identical to its region in the starter
+  (`tools/sync_snippets.py --check`).
+- Every "Verified n:1" is recomputed and every `clamp()` anchor solved.
+- Every documented flag is one the script's own parser accepts.
+- Every § pointer resolves, and each cross-file pointer lands on the heading it was
+  checked against (`tools/check_pointers.py`, 300 registered).
+- Real tools where they are installed: ESLint (on 9 and 10), a Tailwind v4 compile of
+  theme.css, tailwind-merge with the documented config, and Chromium for the focus-ring
+  caveat, the navigation code, container queries, subgrid, layer order and more.
+- `check_roles.py` checks role pairs in light, dark, `.inverse` and dark `.inverse`, as
+  an opt-in hook stage, and generates color-system.md §6.
+- One rule spec, `assets/rules/design-rules.json`, that the audit, the stylelint config
+  and the docs are tested against.
+
+### Recipes that run as written
+
+- The drift gate: one baseline, one set of inputs.
+- Performance budgets are JSONC, and `measure_vitals` reads the budget before it starts
+  a browser.
+- The CI workflows: `shell: bash`, the server waited for in the step that uses it, the
+  lockfile's Chromium installed and cached, nothing installed ad hoc, a readable report
+  in the log (`--report FILE`, new in `measure_vitals` and `a11y_runtime`), and a PR
+  comment with its number, token and permission.
+- Navigation code: the safe triangle holds, a click keeps a hovered panel open, the
+  drawer's light dismiss ignores its own padding, and `--nav-offset` is registered as a
+  `<length>`.
+- The `@property` recipe uses a px initial value and a socket only the root reads.
+
+### Docs that are true
+
+- The accessibility skill's runtime promises (keys, reduced motion, budget keys, 200%
+  zoom as a warning), its coverage figures (a tool fully decides 7 of the 55 A and AA
+  criteria and part of 31 more), and "Not Evaluated" for AAA only.
+- Container queries, subgrid, SC levels, legal baselines (EU EN 301 549 v3.2.1, ADA
+  Title II WCAG 2.1 AA, Section 508), colour-science numbers, email-client support per
+  caniemail, Gmail's style ceiling (and the build now splits retained CSS over it),
+  classic Outlook's support dates, Figma plans and styles, Bootstrap's !important
+  utilities, MUI native colour, and the README's standalone claim.
+- An evidence register, `tests/fixtures/evidence.json`: each quoted figure with its
+  source, date checked and the source's own words. Baymard's checkout figures were
+  corrected on the way.
+
+### Leaner skills
+
+- Every SKILL.md fits in what Claude Code keeps after compaction (about 5,000 tokens);
+  large sections moved verbatim into references. Landing-page-conversion's ethics and
+  evidence rules come first.
+- Descriptions are 301–368 characters, lead with a sentence that stands alone, and say
+  what each skill is not for.
+
+### Not verified by execution
+
+stylelint 17 and eslint-plugin-tailwindcss 4.x are not installed here, so their config
+text is checked against the registry and their READMEs, not run.
+
+## 3.1.0 — 2026-09-24
+
+Phase 1 of the 3.0.1 review: the gates stop passing things they never checked, the
+unsafe defaults go, and every documented command runs as written. Each fix has a
+regression test that fails on 3.0.1 and passes here (`python -m unittest discover -s tests`).
+
+### Upgrading: re-baseline
+
+The design audit now finds things it used to miss, so a gate that was green may go red
+on code that was always wrong:
+
+- a literal beside a `var()` (`padding: var(--pad-sm) 13px`);
+- spacing inside `@media` / `@container` / `@supports`;
+- HTML, Vue, Svelte and Astro files: `<style>` blocks, `style=""`, class lists;
+- literal Tailwind utilities (`duration-300`, `z-50`, `border-2`, `bg-accent/37`,
+  `p-(--space-6)`, `space-y-related`).
+
+Existing debt: `audit_design.py src/ --write-baseline .design-baseline.json`, as before.
+Baseline keys are now relative to the baseline file, so a 3.0.1 baseline written from
+the folder that holds it keeps matching.
+
+### The gates
+
+- **audit_design**:
+  - A `var()` no longer hides a literal written beside it.
+  - Spacing inside media, container and supports queries is checked.
+  - HTML and single-file components are audited; HTML email is skipped and routed to `lint_email`.
+  - A file named explicitly that is not CSS, JS or HTML is skipped and listed, not read as JavaScript.
+  - A folder with nothing auditable in it exits 2 instead of reporting "clean".
+  - Files saved with a UTF-8 BOM no longer fail as "unlayered".
+  - The baseline matches however the path is spelled.
+  - The clean message names the laws it checks (L1–L6).
+- **a11y_runtime**:
+  - Contrast is measured for colours in any syntax, including the suite's own OKLCH.
+  - A modal `<dialog>` is no longer a "keyboard trap", and what sits behind it is not "unreachable" or "unnamed".
+  - Focus inside a same-origin iframe is followed.
+  - axe runs in every frame.
+- **snapshot_matrix**:
+  - The default per-pixel tolerance is 0.03 (was 0.10, coarser than the suite's own hover and pressed overlays).
+  - Every hover, active and focus-visible cell must differ from its default cell, with no baseline needed.
+- **a11y_static**:
+  - Linear time on large pages: 4,000 rows took 46 s and now take 0.7 s.
+  - Files it cannot audit are skipped, not parsed.
+- **The pre-commit hook** runs `a11y_static` on staged files when `scripts/a11y_static.py` is vendored. The inline hook snippets in the docs are replaced by the shipped hook.
+
+### Unsafe defaults
+
+- **content-model-to-ui**:
+  - Credential columns are matched by the documented patterns (`*_token`, `*_hash`, `*_secret`, `*_key`, …) and never displayed or editable.
+  - Columns that carry authority (`role`, `is_admin`, `owner_id`, `org_id`, `plan`, `credits`, a profile id that references `auth.users`, …) are read-only by default, with their own question.
+  - The Supabase guidance now describes how writes really fail under row-level security, and how to protect columns.
+- **Starter CSS**:
+  - Density and theme work on a subtree, not only on `<html>`.
+  - Themes set `color-scheme`, so native fields stay readable.
+  - `[hidden]` beats every layer.
+  - Dark error text, `.inverse` sections and control borders meet WCAG AA.
+  - Dialogs keep their viewport limit.
+  - The focus ring is an outline, which no component `box-shadow` can remove. The same applies to the Tailwind `focus-ring` utility, which had `outline: none`.
+
+### Honest output
+
+- **The client deck**:
+  - Claims "passes" only when the accessibility results say so, and "keyboard-tested" only when the decision log records it (`## Tested by hand`).
+  - The performance slide's title follows the budget.
+  - The audit is credited with the laws it checks.
+- **The critique report**:
+  - The defence sheet carries open confirmed defects and labels suspicions.
+  - An audit rule is folded into a hand finding only when the finding claims it (`covers`, or the id in backticks).
+  - Every merge is reported.
+
+### Pipelines
+
+- **Figma sync**:
+  - Reads DTCG 2025.10: colour objects, `{value, unit}`, `$ref`, `$extends`, `$root` and group `$type`. Values it cannot express are reported, never written as Python.
+  - Composed-colour opacity is a percentage.
+  - `figma_audit --tokens` checks against the project's own ramps.
+  - Output carries no clock time (`SOURCE_DATE_EPOCH` to stamp one).
+- **Token migration**:
+  - Focus rings map to `--elevation-focus` at review confidence.
+  - `src/lib` is no longer treated as vendor code.
+  - The codemod has `--include-vendor` and rewrites files named explicitly.
+  - Minified CSS is extracted in linear time.
+
+### Docs
+
+- Every SKILL.md says how its scripts are run: by path, from the project root, via `${CLAUDE_SKILL_DIR}` and `${CLAUDE_PLUGIN_ROOT}`.
+- The README quick start runs as written.
+- The rebase recipe keeps the teammate's change; the before/after audit strands nothing in the stash.
+- The handoff guide no longer describes a `build-tokens.mjs` that does not ship.
+- The Tailwind v3 layer guidance matches what v3 emits.
+- The Tailwind v4 "build error" claims are corrected.
+
+### Also fixed
+
+- **The migration's proposed `tokens.css`** now includes the starter's fixes: roles are declared where density and theme are set, the dark theme sets `color-scheme`, and there are `.inverse` roles, dark error text and control borders that meet AA.
+- **The Supabase samples**:
+  - The optimistic update throws on a rejected write (`throwOnError()`, and zero rows written), so the rollback and the message run.
+  - The keyset sample validates the cursor before it goes into `.or()`.
+- **The audit**: `url(icons.svg#add)` is no longer reported as a hardcoded colour.
+- **Scripts run by path** no longer write `__pycache__` into the plugin.
+- **The email quick start** copies a template into the project, not into the plugin.
+- **The studio** writes into the repository when there is one, and makes a ZIP only when there is not.
+- **The pattern examples** draw focus with an outline, not with `outline: none` and a box-shadow.
+
+## 3.0.1 — 2026-09-21
+
+38 bug fixes and the first regression suite (72 tests). The report is
+`dev plans/web-design-suite-bugfix-report.md` in the project repository.

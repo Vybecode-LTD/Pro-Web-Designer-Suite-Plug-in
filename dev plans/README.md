@@ -1,6 +1,6 @@
 # dev plans
 
-The review, plans and reports behind web-design-suite. The plugin itself is in `plugins/web-design-suite`.
+The review, plans and reports behind pro-web-design-suite. The plugin itself is in `plugins/pro-web-design-suite`.
 
 **Start with the [execution plan](web-design-suite-execution-plan.md).** It schedules everything left, PR by PR. The [completion plan](web-design-suite-completion-plan.md) says what each item needs.
 
@@ -28,6 +28,7 @@ Every release is also a tagged commit, from `v3.0.0` on. So `git diff v3.1.0 v3.
 | `web-design-suite-3.5.0-live-check.md` | R3's live check (2026-10-10): every hook, the fifteen commands, the six agents and the five MCP tools run in 22 headless sessions ($3.01), and `/install-gate`'s CI template run on GitHub; it found N39. |
 | `web-design-suite-3.6.0-live-check.md` | R3.6's live check (2026-10-13): each route 3.6.0 changed, run in 8 headless sessions and 3 reruns ($2.92). It found three defects, each fixed before the release: diff_system against a DTCG file (#119), `--reverse` from a tokens.css, a DTCG file or a resolver (#120), and Tokens Studio's route (#121). |
 | `web-design-suite-d4-spike.md` | Decision D4's spike (2026-10-13): eslint-plugin-tailwindcss and eslint-plugin-better-tailwindcss over the same project and fixtures, on Tailwind 4.3 and 3.4, with warm and cold timings. The owner chose better-tailwindcss for both majors; 4.0.0's Part 5 (P36 part 1, #125). |
+| `web-design-suite-distribution-and-promotion.md` | **Getting listed and getting used** (2026-10-19): how Anthropic's directory takes a plugin, how this one does against its checks, the promotion plan, and the owner's decisions. Those are the rename to Pro Web Design Suite and a distribution repository that release.yml fills (the plan for 4.0.0). |
 | `w1-supabase-facts.md` | Facts for phase 3's W1, the Supabase access boundary (DL-B1, DL-B2): Supabase's key types and what each may reach, quoted from its docs on 2026-09-25. |
 
 The reports name files on the maintainer's machine: the installed plugin, the release zips, the `.patch` files, and before 3.2.1 the node_modules the browser tests borrowed. Those paths are records of what was run, not setup instructions.

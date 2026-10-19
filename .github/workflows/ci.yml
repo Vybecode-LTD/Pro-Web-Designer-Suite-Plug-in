@@ -69,7 +69,7 @@ jobs:
       # On Linux, Firefox and WebKit are installed above: an engine that will
       # not start fails test_runtime_engines there instead of skipping it.
       - name: The suite
-        working-directory: plugins/web-design-suite
+        working-directory: plugins/pro-web-design-suite
         env:
           WDS_REQUIRE_ENGINES: ${{ runner.os == 'Linux' && '1' || '' }}
         run: uv run --no-project --python ${{ matrix.python }} python -B -m unittest discover -s tests
@@ -78,13 +78,13 @@ jobs:
       # here, with the major it is written for (H15). WDS_REQUIRE_PYDANTIC turns
       # the test's skip into a failure.
       - name: Pydantic runs the scaffold's model
-        working-directory: plugins/web-design-suite/tests
+        working-directory: plugins/pro-web-design-suite/tests
         env:
           WDS_REQUIRE_PYDANTIC: "1"
         run: uv run --no-project --python ${{ matrix.python }} --with "pydantic>=2,<3" python -B -m unittest test_scaffold.TheServerSchemaMirrorsTheConstraints.test_pydantic_itself_accepts_a_draft_the_database_would
 
       - name: Pointers, quoted starter code, the spec's data in the gates, and the audit on the plugin's own skills
-        working-directory: plugins/web-design-suite
+        working-directory: plugins/pro-web-design-suite
         run: |
           uv run --no-project --python ${{ matrix.python }} python -B tools/check_pointers.py
           uv run --no-project --python ${{ matrix.python }} python -B tools/sync_snippets.py --check
@@ -110,5 +110,5 @@ jobs:
         run: |
           claude --version
           claude plugin validate --strict .
-          claude plugin validate --strict plugins/web-design-suite
-          claude plugin validate --strict plugins/web-design-suite/.claude-plugin/plugin.json
+          claude plugin validate --strict plugins/pro-web-design-suite
+          claude plugin validate --strict plugins/pro-web-design-suite/.claude-plugin/plugin.json

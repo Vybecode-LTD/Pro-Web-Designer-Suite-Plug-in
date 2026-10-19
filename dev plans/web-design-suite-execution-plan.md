@@ -1,4 +1,4 @@
-# web-design-suite: the execution plan
+# pro-web-design-suite: the execution plan
 
 **Written 2026-10-02, after PRs #12 to #14.** It covers every open item in the [inventory](web-design-suite-completion-inventory.md) and every open N-item in the [completion plan](web-design-suite-completion-plan.md): 145 review items, two of them partly done, and nineteen N-items, ten of them from the reviews of PRs #12 to #15.
 
