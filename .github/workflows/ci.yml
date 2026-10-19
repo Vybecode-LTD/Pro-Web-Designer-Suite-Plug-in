@@ -63,12 +63,15 @@ jobs:
       - name: Install the browsers, and put Postgres on PATH
         if: runner.os == 'Linux'
         run: |
-          (cd tooling/main && npx playwright install --only-shell --with-deps chromium)
-          (cd tooling/main && npx playwright install --with-deps firefox webkit)
+          (cd tooling/main && npx playwright install --only-shell --with-deps chromium firefox webkit)
           ls -d /usr/lib/postgresql/*/bin | sort -V | tail -n 1 >> "$GITHUB_PATH"
 
+      # On Linux, Firefox and WebKit are installed above: an engine that will
+      # not start fails test_runtime_engines there instead of skipping it.
       - name: The suite
         working-directory: plugins/web-design-suite
+        env:
+          WDS_REQUIRE_ENGINES: ${{ runner.os == 'Linux' && '1' || '' }}
         run: uv run --no-project --python ${{ matrix.python }} python -B -m unittest discover -s tests
 
       # The suite's run has no pydantic, so the scaffold's Pydantic model is run

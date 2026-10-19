@@ -13,6 +13,7 @@ whose unsigned build the system will not start) is skipped.
 from __future__ import annotations
 
 import json
+import os
 import unittest
 
 from test_browser_runtime import MODULES
@@ -37,6 +38,11 @@ class EachEngine(TempDirTest):
         proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", page, "--json", *args,
                         cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"no usable" in proc.stderr:
+            # CI installs the engines on Linux and sets WDS_REQUIRE_ENGINES, so a
+            # broken install fails there instead of passing as a skip.
+            if os.environ.get("WDS_REQUIRE_ENGINES"):
+                self.fail("WDS_REQUIRE_ENGINES is set and the engine did not start: " +
+                          output(proc)[-400:])
             self.skipTest("engine not installed or not startable here: " + output(proc)[-240:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
         return json.loads(proc.stdout)
