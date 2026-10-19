@@ -76,9 +76,12 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    # Every release waits its turn: the default queue keeps one pending run and
+    # cancels the one before it (Codex on #181). The order isn't guaranteed, so
+    # the step below also refuses a release older than the newest one there.
     concurrency:
       group: distribute
-      cancel-in-progress: false
+      queue: max
     env:
       DIST_REPO: Vybecode-LTD/pro-web-design-suite
     steps:
@@ -117,6 +120,11 @@ jobs:
             echo "::error::$DIST_REPO already has $GITHUB_REF_NAME; a release is never rewritten"
             exit 1
           fi
+          newest=$(git ls-remote --tags --refs origin "v*" | sed 's|.*refs/tags/||' | sort -V | tail -n 1)
+          if [ -n "$newest" ] && [ "$(printf '%s\n%s\n' "$newest" "$GITHUB_REF_NAME" | sort -V | tail -n 1)" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::$DIST_REPO is at $newest, newer than $GITHUB_REF_NAME; an older release never replaces it"
+            exit 1
+          fi
           if git rev-parse --quiet --verify HEAD > /dev/null; then
             git checkout --quiet main
           else
@@ -130,6 +138,6 @@ jobs:
           git commit --quiet -m "Pro Web Design Suite $version" \
             -m "Built by release.yml from $GITHUB_REPOSITORY@$GITHUB_SHA ($GITHUB_REF_NAME)."
           git tag -a "$GITHUB_REF_NAME" -m "Pro Web Design Suite $version"
-          git push --quiet origin main "refs/tags/$GITHUB_REF_NAME"
+          git push --quiet --atomic origin main "refs/tags/$GITHUB_REF_NAME"
           rm -f "$key"
           echo "$DIST_REPO: main and $GITHUB_REF_NAME at $(git rev-parse --short HEAD)"
