@@ -564,6 +564,12 @@ Phase 6c is done (P50 to P55). In Phase 6b, P36, P34 and P37 are done. **The own
 
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 
+**R4 also ships the rename and the distribution repository** (#180, #181 and #182, 2026-10-19). Read `dev plans/web-design-suite-distribution-and-promotion.md`'s "Rename and distribution plan" first.
+- **Before the tag**, confirm with the owner that `Vybecode-LTD/pro-web-design-suite` exists, empty and public, and that the `DIST_DEPLOY_KEY` secret is set (`gh secret list`), or `release.yml`'s `distribute` job fails.
+- R4's live check adds: installing 3.6.0 under its old name and updating, so the `renames` map moves it to `pro-web-design-suite`; `/pro-web-design-suite:gate` and the MCP tools under their new names; `build.py --tree` validated with `claude plugin validate --strict`.
+- **After the tag:** the `distribute` job's log; the distribution repository's `main` and `v4.0.0`, with 222 files and no `tests/`; then `/plugin marketplace add Vybecode-LTD/pro-web-design-suite` and an install from it on a clean machine.
+- **Then the owner submits** the distribution repository at claude.ai/directory/manage. Validate first, from the plan's Part A. Ask before anything is submitted.
+
 ## 5. End of session (never skip)
 
 1. Rewrite `docs/HANDOFF.md`: one page, with the state, next steps, blockers and warnings.
