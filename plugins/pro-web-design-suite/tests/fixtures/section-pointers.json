@@ -175,6 +175,12 @@
  },
  {
   "from": "a11y-audit-runner/SKILL.md",
+  "to": "a11y-audit-runner/references/scripts.md",
+  "section": "2",
+  "heading": "`scripts/a11y_runtime.mjs` — Node + Playwright + axe-core"
+ },
+ {
+  "from": "a11y-audit-runner/SKILL.md",
   "to": "web-design-studio/references/color-system.md",
   "section": "7",
   "heading": "WCAG 2.2 contrast"
