@@ -279,5 +279,71 @@ await browser.close();
 """
 
 
+# A page laid out as the starter's shell is, read at 320 CSS px (400% zoom).
+CODE_PROBE = r"""
+const page = await browser.newPage({ viewport: { width: 320, height: 640 } });
+await page.goto(pathToFileURL(process.argv[2]).href);
+const out = await page.evaluate(() => {
+  const pre = document.getElementById('cmd');
+  const code = pre.querySelector('code');
+  const p = getComputedStyle(pre), canvas = getComputedStyle(document.body).backgroundColor;
+  return {
+    pageWidth: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+    preScrolls: pre.scrollWidth > pre.clientWidth,
+    codeFont: getComputedStyle(code).fontFamily,
+    monoToken: getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim(),
+    // a box shows when its fill differs from the canvas or it draws an edge
+    preBox: p.backgroundColor !== canvas || (parseFloat(p.borderTopWidth) > 0 && p.borderTopStyle !== 'none'),
+  };
+});
+console.log(JSON.stringify(out));
+await browser.close();
+"""
+
+
+@unittest.skipUnless(NODE and PLAYWRIGHT,
+                     "needs node plus WDS_NODE_MODULES pointing at playwright")
+class StarterCodeBlocks(TempDirTest):
+    """N50 (P56 part 2), found building webdesignersuite.com on the starter:
+    F1, a `pre > code` kept the UA's `monospace` (Courier) instead of
+    --font-mono; F5, on the dark canvas a `pre` drew no box (--bg-sunken is the
+    canvas there); F6, a .page-grid item holding a long `pre` set the page's
+    width, 721px at 320px, a 1.4.10 failure."""
+
+    def probe(self, theme: str) -> dict:
+        links = "".join(f'<link rel="stylesheet" href="{(STYLES / f).as_uri()}">'
+                        for f in ("reset.css", "tokens.css", "base.css", "layout.css"))
+        command = "/plugin install pro-web-design-suite --marketplace Vybecode-LTD/pro-web-design-suite"
+        page = self.write(f"code-{theme}.html", f"""<!doctype html><html lang="en" data-theme="{theme}"><head>
+<title>t</title><style>@layer reset, tokens, base, layout, components;</style>{links}</head>
+<body class="page-shell"><header class="page-grid"><p>Site</p></header>
+<main><section class="page-grid"><div class="stack"><h1>Install</h1>
+<pre id="cmd" tabindex="0"><code>{command}</code></pre></div></section></main>
+<footer class="page-grid"><p>Footer</p></footer></body></html>""")
+        probe = self.write("code.mjs", PROBE.split("const page =")[0] + CODE_PROBE)
+        proc = subprocess.run([NODE, str(probe), str(page)], capture_output=True, timeout=180,
+                              env=env(NODE_PATH=PLAYWRIGHT))
+        if proc.returncode == 3:
+            self.skipTest(output(proc))
+        self.assertEqual(proc.returncode, 0, output(proc))
+        return json.loads(proc.stdout.decode("utf-8").strip().splitlines()[-1])
+
+    def test_a_long_code_line_scrolls_in_its_box_not_the_page(self):
+        got = self.probe("light")
+        self.assertLessEqual(got["pageWidth"], got["viewport"], got)
+        self.assertTrue(got["preScrolls"], got)     # the control: the line is too long for 320px
+
+    def test_code_is_set_in_the_mono_token(self):
+        got = self.probe("light")
+        first = got["monoToken"].split(",")[0].strip()
+        self.assertTrue(got["codeFont"].startswith(first), got)
+
+    def test_a_code_block_shows_its_box_in_both_themes(self):
+        for theme in ("light", "dark"):
+            with self.subTest(theme=theme):
+                self.assertTrue(self.probe(theme)["preBox"], theme)
+
+
 if __name__ == "__main__":
     unittest.main()

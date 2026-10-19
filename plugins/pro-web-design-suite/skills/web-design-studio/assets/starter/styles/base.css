@@ -367,6 +367,9 @@
     background-color: var(--bg-sunken);
     padding: var(--pad-well);
     border-radius: var(--radius-md);
+    /* The edge is what draws the box on the dark canvas, where --bg-sunken
+       is the canvas itself (N50, F5: a code block there had no box). */
+    border: var(--stroke-hairline) solid var(--border-subtle);
 
     /* Code must not reflow — a wrapped line changes what the code MEANS in
        whitespace-significant languages, and hides the line-length problem
@@ -385,6 +388,13 @@
     &:focus-visible {
       box-shadow: var(--shadow-focus);
     }
+  }
+
+  /* The code inside a block takes the block's font. Without this the UA's
+     `code { font-family: monospace }` beats inheritance, and every block is
+     set in the browser's default monospace, Courier, not --font-mono (N50, F1). */
+  :where(pre) > :where(code) {
+    font: inherit;
   }
 
   /* Inline code only. `pre > code` must stay transparent and un-padded or
