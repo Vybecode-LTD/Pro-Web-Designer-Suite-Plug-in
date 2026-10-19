@@ -45,7 +45,8 @@ MODULES = node_modules()
 # What a server's `Content-Security-Policy: default-src 'self'` header does,
 # in a file: no inline style or script, so no injected one either.
 CSP_META = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'\">"
-CHECKS = ("axe", "names", "taborder", "focus", "forced", "contrast", "keys", "reflow")
+CHECKS = ("axe", "names", "taborder", "focus", "forced", "contrast", "keys", "reflow",
+          "spacing", "obscured", "hover", "motion")
 
 
 def only(*checks):
@@ -139,8 +140,7 @@ class RuntimeInABrowser(TempDirTest):
         """Chrome wraps Tab from the last stop to the first inside the page, so
         on a page with one stop, focus stays put: it was reported as
         `focus-stuck` (CI on #39). A page that cancels Tab still is one."""
-        skips = [arg for check in ("axe", "names", "focus", "forced", "contrast", "keys", "reflow")
-                 for arg in ("--skip", check)]
+        skips = only("taborder")
         trap = "<script>addEventListener('keydown', e => e.key === 'Tab' && e.target.matches('button') && e.preventDefault())</script>"
         for browser in [None] + installed_browsers()[:1]:
             extra = ["--browser", browser] if browser else []
