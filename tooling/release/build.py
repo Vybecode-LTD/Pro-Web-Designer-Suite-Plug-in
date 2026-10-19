@@ -1,7 +1,14 @@
 """Build a release of plugins/pro-web-design-suite from git: the plugin's zip, one
-.skill file per skill, and their SHA-256 sums.
+.skill file per skill, and their SHA-256 sums; with --tree, the plugin's files
+as the distribution repository holds them.
 
-usage: python tooling/release/build.py <out dir> [--rev REV]
+usage: python tooling/release/build.py <out dir> [--rev REV] [--tree DIR]
+
+What ships is the plugin folder without its top-level tests/, evals/ and tools/,
+which stay in the development repository (DEV_ONLY). The zip and the tree hold
+the same files. Before writing anything, the builder checks them against
+Anthropic's directory (DIRECTORY_SOURCE): a finding the directory blocks on
+refuses the build, and one it holds for a reviewer is printed as a warning.
 
 Everything comes from what git holds at REV (default HEAD), and nothing else:
 - only tracked files, so a local node_modules, .DS_Store or editor backup never ships;
@@ -70,6 +77,20 @@ SKILL_EXCLUDED_PARTS = {"__pycache__", "node_modules"}
 SKILL_EXCLUDED_NAMES = {".DS_Store"}
 NAME = re.compile(r"[a-z0-9-]{1,64}")
 UPLOAD_DESCRIPTION = 200
+DEV_ONLY = {"tests", "evals", "tools"}       # the plugin's top-level folders that never ship
+
+# Anthropic's directory reads the plugin folder and checks it before listing it
+# ("Plugin pre-submission checklist", read 2026-10-19).
+DIRECTORY_SOURCE = "https://claude.com/docs/plugins/pre-submission-checklist"
+DIRECTORY_MAX_FILES = 512                    # more is held for a reviewer
+DIRECTORY_MAX_FILE = 256 * 1024              # a larger file that isn't an image or a font is held
+DIRECTORY_IMAGES_AND_FONTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".woff", ".woff2", ".ttf", ".otf"}
+DIRECTORY_README_WORDS = 40                  # outside code blocks; fewer blocks
+OS_FILES = {".DS_Store", "Thumbs.db", "desktop.ini", "__MACOSX"}
+WINDOWS_DEVICES = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)), *(f"lpt{i}" for i in range(1, 10))}
+LOCKFILES = {"package-lock.json", "npm-shrinkwrap.json", "bun.lock", "bun.lockb"}
+LAUNCHERS = {("npx",): "@", ("bunx",): "@", ("pnpm", "dlx"): "@", ("yarn", "dlx"): "@",
+             ("uvx",): "==", ("pipx", "run"): "=="}
 
 
 def git(*args: str, env: dict[str, str] | None = None, cwd: str | None = None) -> bytes:
@@ -120,6 +141,86 @@ def skill_problems(folder: str, meta: dict[str, str]) -> list[str]:
     return problems
 
 
+def commands(config: object) -> list[list[str]]:
+    """Every command a hooks.json or .mcp.json runs, as argv: each object's
+    `command` split on spaces, then its `args`."""
+    found: list[list[str]] = []
+    if isinstance(config, dict):
+        if isinstance(config.get("command"), str):
+            args = config.get("args")
+            found.append(config["command"].split() + [a for a in args if isinstance(a, str)]
+                         if isinstance(args, list) else config["command"].split())
+        for value in config.values():
+            found += commands(value)
+    elif isinstance(config, list):
+        for value in config:
+            found += commands(value)
+    return found
+
+
+def unpinned(argv: list[str]) -> str | None:
+    """The package a launcher runs without an exact version, if it does."""
+    if argv[:2] == ["uv", "run"]:
+        return None if {"--locked", "--frozen"} & set(argv) else "uv run (without --locked or --frozen)"
+    for launcher, separator in LAUNCHERS.items():
+        if tuple(argv[:len(launcher)]) == launcher:
+            package = next((a for a in argv[len(launcher):] if not a.startswith("-")), "")
+            pinned = re.search(r".@\d" if separator == "@" else r"==\d", package)
+            return None if pinned else f"{' '.join(launcher)} {package}".strip()
+    return None
+
+
+def directory_findings(files: dict[str, tuple[int, bytes]]) -> tuple[list[str], list[str]]:
+    """What Anthropic's directory would block on, and what it would hold for a
+    reviewer, in the files that ship (DIRECTORY_SOURCE)."""
+    blocks: list[str] = []
+    holds: list[str] = []
+    manifest: dict = {}
+    try:
+        manifest = json.loads(files[".claude-plugin/plugin.json"][1])
+    except (KeyError, ValueError):
+        blocks.append("there is no readable .claude-plugin/plugin.json at the plugin's root")
+    readme = next((files[n][1] for n in ("README.md", "README") if n in files), b"")
+    words = len(re.sub(r"```.*?```", " ", readme.decode("utf-8", "replace"), flags=re.S).split())
+    if words < DIRECTORY_README_WORDS:
+        blocks.append(f"the README has {words} words outside code blocks; the directory needs {DIRECTORY_README_WORDS}")
+    if "LICENSE" not in files and not (isinstance(manifest, dict) and manifest.get("license")):
+        blocks.append("there is no LICENSE file and no license in plugin.json")
+    if len(files) > DIRECTORY_MAX_FILES:
+        holds.append(f"{len(files)} files; over {DIRECTORY_MAX_FILES} is held for a reviewer")
+    seen: dict[str, str] = {}
+    for path in sorted(files):
+        parts = path.split("/")
+        for depth, part in enumerate(parts, 1):
+            prefix = "/".join(parts[:depth])
+            if seen.setdefault(prefix.lower(), prefix) != prefix:
+                blocks.append(f"{prefix} and {seen[prefix.lower()]} differ only by capitalization")
+            if part in OS_FILES:
+                blocks.append(f"{prefix} is an operating system's file")
+            if ":" in part or part.endswith((".", " ")) or part.split(".")[0].lower() in WINDOWS_DEVICES:
+                blocks.append(f"{prefix} is not a valid file name on Windows")
+        suffix = pathlib.PurePosixPath(path).suffix.lower()
+        data = files[path][1]
+        if suffix in {".mcpb", ".dxt"}:
+            holds.append(f"{path} is a bundled MCP server, which the directory doesn't inspect")
+        elif suffix not in DIRECTORY_IMAGES_AND_FONTS:
+            if b"\0" in data:
+                holds.append(f"{path} is a binary file, which the directory doesn't inspect")
+            elif len(data) > DIRECTORY_MAX_FILE:
+                holds.append(f"{path} is {len(data)} bytes; over {DIRECTORY_MAX_FILE} is held for a reviewer")
+    for config in ("hooks/hooks.json", ".mcp.json"):
+        if config in files:
+            try:
+                runs = commands(json.loads(files[config][1]))
+            except ValueError:
+                blocks.append(f"{config} is not valid JSON")
+                continue
+            blocks += [f"{config} runs {what}: pin it to an exact version" for what in map(unpinned, runs) if what]
+    if "package.json" in files and LOCKFILES & set(files):
+        holds.append("package.json beside a lockfile: Claude Code installs its packages, which a reviewer reads")
+    return sorted(set(blocks)), holds
+
+
 def zip_bytes(entries: list[tuple[str, int, bytes]], date_time: tuple[int, ...]) -> bytes:
     """A zip of (name, mode, data), in the order given: folders stored, files
     deflated, with Unix modes."""
@@ -142,11 +243,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("out", help="the folder to write into; it must be empty or not exist yet")
     parser.add_argument("--rev", default="HEAD", help="the commit to build (default: HEAD)")
+    parser.add_argument("--tree", help="also write the plugin's files into this folder, which must be empty or "
+                                       "not exist yet: what the distribution repository holds")
     args = parser.parse_args(argv)
 
     out = pathlib.Path(args.out)
-    if out.exists() and (not out.is_dir() or any(out.iterdir())):
-        parser.error(f"{out} is not an empty folder; this tool never overwrites a release")
+    tree_out = pathlib.Path(args.tree) if args.tree else None
+    for folder in filter(None, (out, tree_out)):
+        if folder.exists() and (not folder.is_dir() or any(folder.iterdir())):
+            parser.error(f"{folder} is not an empty folder; this tool never overwrites a release")
     try:
         env, top = own_repository()
         run = functools.partial(git, env=env, cwd=top)
@@ -189,6 +294,10 @@ def main(argv: list[str] | None = None) -> int:
     refused += [f"{path} is tracked, but git archive left it out (export-ignore?)"
                 for path, mode in sorted(tracked.items())
                 if mode in FILE_MODES and path[len(plugin) + 1:] not in files]
+    files = {rel: v for rel, v in files.items() if rel.split("/", 1)[0] not in DEV_ONLY}
+    folders = {rel for rel in folders if rel.split("/", 1)[0] not in DEV_ONLY}
+    blocks, holds = directory_findings(files)
+    refused += [f"Anthropic's directory would block it: {b}" for b in blocks]
     try:
         manifest = json.loads(files[".claude-plugin/plugin.json"][1])
         version, name = manifest["version"], manifest.get("name") or PLUGIN.rsplit("/", 1)[1]
@@ -244,6 +353,12 @@ def main(argv: list[str] | None = None) -> int:
                 bad.append(name)
     sums = "".join(f"{hashlib.sha256(data).hexdigest()}  {name}\n" for name, data in sorted(archives.items()))
     (out / "SHA256SUMS").write_bytes(sums.encode("ascii"))
+    if tree_out:
+        for rel, (mode, data) in sorted(files.items()):
+            target = tree_out.joinpath(*rel.split("/"))
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            target.chmod(mode & 0o777)
 
     plugin_zip = next(iter(archives))
     executable = sum(1 for n in names if not n.endswith("/") and files[n[len(top_dir):]][0] & 0o111)
@@ -253,8 +368,12 @@ def main(argv: list[str] | None = None) -> int:
     for path in removed.decode("utf-8", "surrogateescape").split("\0"):
         if path:
             print(f"  removed since {previous}: {path[len(plugin) + 1:]}")
+    if tree_out:
+        print(f"  tree: {tree_out} ({len(files)} files)")
     for warning in warnings:
         print(f"  warning: {warning}")
+    for hold in holds:
+        print(f"  directory hold: {hold} ({DIRECTORY_SOURCE})")
     return 1 if bad else 0
 
 

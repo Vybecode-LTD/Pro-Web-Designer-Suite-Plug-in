@@ -59,11 +59,11 @@ This suite turns every rule into a script that can fail. The scripts run after e
 In Claude Code:
 
 ```text
-/plugin marketplace add Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in
+/plugin marketplace add Vybecode-LTD/pro-web-design-suite
 /plugin install pro-web-design-suite@pro-web-design-suite
 ```
 
-Then start a new session, so the skills, hooks and MCP server load. The repository is public, so this works for anyone.
+Then start a new session, so the skills, hooks and MCP server load. [`Vybecode-LTD/pro-web-design-suite`](https://github.com/Vybecode-LTD/pro-web-design-suite) holds the plugin as released, one commit per version, from 4.0.0 on; this repository is where it is developed, and works as a marketplace too. Both are public, so this works for anyone.
 
 ### From a release zip
 

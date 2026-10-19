@@ -21,6 +21,14 @@ renames the plugin.
   in your projects. `contract.json`'s schema `web-design-suite/contract/1`, the DTCG `$extensions` key
   `io.github.vybecode-ltd.web-design-suite`, `/install-gate`'s stamp and `.design-suite.json` read
   and write as before, so no project needs a change.
+- **Install from the distribution repository**, `Vybecode-LTD/pro-web-design-suite`:
+  `/plugin marketplace add Vybecode-LTD/pro-web-design-suite`, then
+  `/plugin install pro-web-design-suite@pro-web-design-suite`. It holds the plugin at its root, as
+  released, one commit and one tag per version, and Anthropic's directory reads it. The release
+  zip and the distribution repository leave out the plugin's `tests/`, `evals/` and `tools/`
+  (221 files where there were 477). They stay in the development repository,
+  `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, which still works as a marketplace. The plugin
+  folder now has a `.gitattributes`, so a clone on Windows checks every file out with LF.
 
 ### Added
 
