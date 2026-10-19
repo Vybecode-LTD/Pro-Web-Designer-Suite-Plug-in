@@ -75,6 +75,7 @@ The last four, like `reflow`, run on a page and not on a proof sheet.
 | `--only SUBSTR` | with `--matrix`, narrow to matching cells (repeatable). It does not pick checks, so a page refuses it: use `--skip` |
 | `--densities LIST` | on a page, the `data-density` values to measure focus at as well, in normal and forced colours (default `auto`: each one the page's own stylesheets name; `none` turns it off) |
 | `--skip CHECK` | `axe names taborder focus forced contrast keys reflow spacing obscured hover motion` (repeatable) |
+| `--engine NAME` | `chromium` (the default), `firefox` or `webkit`: see *Other engines* below |
 | `--wait-for SEL` · `--steps FILE` · `--storage-state FILE` · `--header "Name: V"` | reach the page its users get: see *Reaching the page* below |
 | `--max-stops` · `--max-cells` · `--focus-threshold` · `--viewport` · `--dpr` · `--axe` · `--browser` · `--json` · `--quiet` | |
 
@@ -118,6 +119,12 @@ Four things it does that most runtime checks do not:
 - **It measures the ring instead of reading the stylesheet.** `:focus-visible` existing in CSS is not evidence. A row reading `19.52% → 0.00%` between normal and forced-colors is.
 - **It composites overlays before judging contrast.** On the fixture, text declared at **5.33:1** renders at **1.46:1** under a 72% scrim. Every source-level contrast checker calls that a pass.
 - **It refuses to guess.** Text over a background image is reported as *unmeasurable*, not as a pass, because contrast against a photograph varies per pixel and the worst pixel is the one that matters.
+
+### Other engines
+
+Focus heuristics, the accessibility tree and the tab order differ between Chromium, Firefox and WebKit, and a page tested in Chromium alone ships those differences unseen. `--engine firefox` or `--engine webkit` runs `axe`, `names` and `taborder` in the build the locked Playwright was built for (`npx playwright install firefox webkit`), or in `--browser PATH`. The other checks are **Chromium's**: `focus` and `forced` difference screenshots and emulate forced colours, `contrast` and the clipping checks were calibrated in Chromium's rendering, and closed shadow roots are read through Chromium's DevTools protocol (so another engine always reports `closed-shadow-roots-unread`). A run in another engine says which checks it left out (`checks-run-in-chromium-only`, a warning), and its JSON names the `engine`. It is a second pass, never a replacement for the Chromium run.
+
+Tab may pass over every link with no `tabindex`: Safari does unless its reader turns on *Press Tab to highlight each item*, and so do WebKit's Windows and macOS builds and Firefox on macOS; WebKit's Linux build does not. The run reads which from the sequence it drove, never assumes it: outside Chromium, when Tab reached none of those links, the tab order expects none and `engine-skips-links` (a warning) says so. A link with `tabindex="0"` is a stop either way. Playwright's Firefox build is unsigned, and a Windows machine with Smart App Control may refuse to start it: run that engine in CI on Linux.
 
 ### Shadow roots
 
