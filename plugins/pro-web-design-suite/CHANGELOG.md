@@ -31,9 +31,9 @@ renames the plugin.
   folder now has a `.gitattributes`, so a clone on Windows checks every file out with LF.
 - **Ready for Anthropic's directory.** The README opens with three prompts to try, which surfaces
   load which components (chat loads the skills only), and **what the plugin runs, sends and
-  stores**. Everything runs locally and nothing is collected. The one third-party call is
-  `crux_check.py` to Google's CrUX API, which runs only when asked and uses your `CRUX_API_KEY`. The
-  Figma REST pull is a `curl` you run. `SECURITY.md` says how to report a security problem
+  stores**. Everything runs locally and nothing is collected. The plugin connects only to addresses
+  you give it: the browser gates load the pages and sitemaps you name, `crux_check.py` calls
+  Google's CrUX API with your `CRUX_API_KEY`, and the Figma REST pull is a `curl` you run. `SECURITY.md` says how to report a security problem
   privately, and `plugin.json` has the directory's `documentationUrl`, `supportUrl` and
   `privacyPolicyUrl`.
 

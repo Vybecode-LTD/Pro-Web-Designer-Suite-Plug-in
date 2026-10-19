@@ -102,8 +102,12 @@ Everything runs on your machine, and the plugin collects nothing.
 
 - **The hooks** run `node hooks/design_hooks.mjs`. The router reads each prompt locally, to name the skill it needs. The design gate, the a11y gate, the token diff, the email build and the generated-file guard act only in a project whose `.design-suite.json` turns them on. The gates run the plugin's Python scripts on the file Claude just edited; the guard reads that file's first lines. The plugin's `design_hooks` option turns them all off.
 - **The MCP server**, `gates`, is `node mcp/design_gates.mjs`, over stdio. Its five tools run the same scripts on your project.
-- **The scripts** read and write files in your project only: reports, tokens, scaffolds and builds. The browser gates open the pages you name, through your own Playwright install. They download no browser and send no page anywhere.
-- **The network:** the plugin makes one call to a third party, and only when you ask for it. `crux_check.py` sends a URL or origin to Google's Chrome UX Report API, with the key you set in `CRUX_API_KEY`. figma-variables-sync shows a `curl` to Figma's REST API, with the token you set in `FIGMA_TOKEN`, for you to run. Neither key is stored by the plugin, and nothing else leaves your machine.
+- **The scripts** read the files and folders you give them, and write their reports, tokens, scaffolds and builds where you tell them: usually inside the project, or at an output path you choose. Some work in a temporary folder that they remove, such as the email hook's build (`wds-email-*` under the system's temp folder).
+- **The network:** the plugin connects only to addresses you give it, and only when you run the step that needs them.
+  - **The browser gates** (accessibility, performance, the state matrix, the critique's screenshots) load the pages you name, through your own Playwright install, which they never download. A page can be on your machine or anywhere on the web, and `--urls` can name a sitemap, which they fetch to read its pages. The page then loads whatever it loads. For a signed-in audit, the `--storage-state` file's cookies and each `--header` go to the page's own origin. Nothing the gates measure is sent anywhere: the reports stay on disk.
+  - **`crux_check.py`** sends a URL or origin to Google's Chrome UX Report API, with the key you set in `CRUX_API_KEY`.
+  - **figma-variables-sync** shows a `curl` to Figma's REST API, with the token you set in `FIGMA_TOKEN`, for you to run.
+  - The plugin stores neither key, and it has no server, telemetry or analytics of its own.
 - **`/install-gate`** writes a CI workflow into your repository. That workflow runs in your CI, in Microsoft's Playwright image.
 
 ---
