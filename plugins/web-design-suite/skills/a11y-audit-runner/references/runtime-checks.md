@@ -1,6 +1,6 @@
 # Runtime Checks
 
-What a browser lets you check that source analysis cannot, and how to check it. Every technique here is implemented in `scripts/a11y_runtime.mjs` except §6, reduced motion: the script runs with reduced motion off, so §6 is a procedure to run by hand. This file is why each one works the way it does, and what it costs.
+What a browser lets you check that source analysis cannot, and how to check it. Every technique here is implemented in `scripts/a11y_runtime.mjs`. Every check runs with reduced motion off, but §6's, which opens the page under each preference in contexts of its own. This file is why each one works the way it does, and what it costs.
 
 The premise, stated once: **source describes intent, and a browser produces the result.** Every gap between them is somewhere an accessibility bug lives. `outline: none` is intent. Whether a ring is visible is a result. `aria-labelledby="x"` is intent. Whether the control has a name is a result, and it depends on whether `#x` exists, is unique, is not itself hidden, and contains text.
 
@@ -9,12 +9,12 @@ The premise, stated once: **source describes intent, and a browser produces the 
 1. [What changes when you render it](#1-what-changes-when-you-render-it)
 2. [Accessible names and roles, computed](#2-accessible-names-and-roles-computed)
 3. [Tab order: trap, skip, jump](#3-tab-order-trap-skip-jump)
-4. [Focus visibility, measured in pixels](#4-focus-visibility-measured-in-pixels)
+4. [Focus visibility, measured in pixels](#4-focus-visibility-measured-in-pixels), and not hidden under a fixed bar
 5. [Forced colors](#5-forced-colors)
 6. [Reduced motion](#6-reduced-motion)
 7. [Contrast, with overlays composited](#7-contrast-with-overlays-composited)
-8. [Driving the key map](#8-driving-the-key-map)
-9. [Zoom and reflow](#9-zoom-and-reflow)
+8. [Driving the key map](#8-driving-the-key-map), and content on hover or focus
+9. [Zoom and reflow](#9-zoom-and-reflow), clipped text and text spacing
 10. [What a browser still cannot tell you](#10-what-a-browser-still-cannot-tell-you)
 
 ---
@@ -187,6 +187,12 @@ A row where the normal column is healthy and the forced column is zero is a `box
 
 **Density.** The starter's density dial (`data-density` on the root) rescales every gap and padding, so a ring that fits at comfortable can be clipped at compact by a toolbar's `overflow: hidden`. On a page, the run measures the ring again at each density the page's own stylesheets name, in normal colours and under forced colours, turning the dial where the page keeps it (the root, or the outermost `data-density` below it, such as `<body>`; a region marked inside another keeps its own), and a finding names the density it was found at. What the default density already reported is not repeated. `--densities compact,spacious` names them when the stylesheet is on another origin (its rules cannot be read), and `--densities none` turns it off. A proof sheet has a cell per density, so the matrix pass covers it already.
 
+### Not hidden under a fixed bar (2.4.11)
+
+A ring nobody can see because a sticky header sits over it fails 2.4.11: "the component is not entirely hidden due to author-created content" ([Understanding 2.4.11](https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html)). The `obscured` check presses Tab from the top of the page and Shift+Tab from the bottom, since the browser brings a stop into view at the edge it comes in from: a fixed footer or cookie banner hides the stops met going down, a fixed header the ones met coming back up. At each stop it lists the `position: fixed` and `sticky` elements whose box meets the focused element's, leaving out its ancestors (a control in a sticky header is the header's own surface), then hit-tests a 5×5 grid over the part of the element in the viewport, through every shadow root, with every element taking pointer events for the length of the check (`pointer-events: none` still paints). All 25 points under a cover is `focus-obscured`, an error; some of them is `focus-partly-obscured`, a warning, since AA allows it and 2.4.12 (AAA) does not.
+
+The fix WCAG lists is technique C43, `scroll-padding` on the scrolling element as tall as the bar, which stops the browser bringing a focused element in under it; the first and last controls on a page also need padding as tall, since the page cannot scroll past its ends. A translucent cover counts as hiding what it paints over.
+
 ---
 
 ## 5. Forced colors
@@ -268,17 +274,19 @@ One integration detail worth knowing if you write your own: the proof sheet rend
 
 ## 6. Reduced motion
 
-Not in `a11y_runtime.mjs`, which runs with `reducedMotion: 'no-preference'`. Run this one by hand, in a context of its own:
+The `motion` check. Every other check runs with `reducedMotion: 'no-preference'` and its animations frozen; this one opens the page twice more, in contexts of its own, once with `reducedMotion: 'reduce'` and once without, with the animations running:
 
 ```js
 const ctx = await browser.newContext({ reducedMotion: 'reduce' });
 ```
 
-What to assert:
+In each, it logs every animation and transition as it starts (`animationstart`, `transitionrun`, and `document.getAnimations()` at each step), scrolls to the end a viewport at a time so what is revealed on scroll is revealed, lets every finite animation end (four seconds at most), and reads the text that shows. Then it compares:
 
-- **Motion actually reduced.** Record two short screenshot sequences of the same element, one in each mode, and compare the amount of change over time. A page that ignores the preference looks identical.
-- **Nothing became inoperable.** The most common reduced-motion bug is not too much motion — it is a transition-driven reveal whose `opacity: 0` never animates to 1 because the transition was disabled globally, leaving the content permanently invisible. `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; … } }` is the standard nuclear reset and it causes this every time somebody uses a transition to *show* something rather than to soften a change.
-- **Loops still loop.** `--dur-loop` is the one duration reduced-motion does not collapse, because a spinner that stops spinning reads as a hung page. If your reset caught it, you have made a loading state worse.
+- **Motion actually reduced** (`motion-not-reduced`). An animation that moves something (a transform, `translate`, a position, a margin, a background position) and still runs under the preference, at more than half its duration and more than half its distance, was not reduced. Under 0.1s counts as gone. A fade is not motion.
+- **Nothing became inoperable** (`content-hidden-under-reduced-motion`). The most common reduced-motion bug is not too much motion — it is a reveal whose `opacity: 0` never reaches 1 because the animation was switched off and the hidden state it started from was not, leaving the content permanently invisible. `@media (prefers-reduced-motion: reduce) { .reveal { animation: none } }` does it every time somebody uses an animation to *show* something rather than to soften a change. Text that shows without the preference and not with it is reported.
+- **Loops still loop** (`busy-indicator-stopped`). `--dur-loop` is the one duration reduced-motion does not collapse, because a spinner that stops spinning reads as a hung page. A loop inside `[aria-busy="true"]`, `role="progressbar"` or `role="status"` is exempt from the first rule and must keep running under the preference. If your reset caught it, you have made a loading state worse.
+
+All three are **warnings**: this is the suite's policy, not an AA criterion (2.3.3, Animation from Interactions, is AAA). A team that holds to it sets `motion_not_reduced` and `motion_content_hidden` to 0 in its budget. What it cannot see: motion a click or a hover starts (it drives scrolling only), and a carousel the preference rightly stops on its first slide, whose later slides then read as hidden.
 
 Deliberately measure performance with reduced motion **off** (that is `perf-budget-gate`'s choice, and it is the right one — the animations users see are the ones whose cost matters) and measure accessibility with it **on**. Different questions.
 
@@ -359,6 +367,20 @@ If no key map is supplied, **say so loudly**. Without one, every dialog, menu, t
 
 Anything whose correctness is a judgement: whether a roving `tabindex` lands on the *right* item after a deletion, whether typeahead should reset after 500ms or 1000ms, whether Esc should close one layer or two. Automate the contract; leave the taste to the manual pass.
 
+### Content on hover or focus (1.4.13)
+
+No key map is needed for the tooltip pattern: a control whose `aria-describedby` names a node hidden at rest declares it. The `hover` check takes each one (twelve at most), moves the pointer onto the control, and, if nothing showed, focuses it instead. Then it asserts the criterion's three conditions ([Understanding 1.4.13](https://www.w3.org/WAI/WCAG22/Understanding/content-on-hover-or-focus.html)):
+
+| Condition | Driven | Rule |
+|---|---|---|
+| **Persistent** | on hover, the content is still showing a second later, the pointer unmoved | `hover-content-not-persistent` |
+| **Hoverable** | on hover, the pointer moves in 12 steps to the nearest point just inside the content, as a reader would, and the content is still showing | `hover-content-not-hoverable` |
+| **Dismissible** | Esc, with the pointer and focus where they were, hides it | `hover-content-not-dismissible` |
+
+Dismissible is asserted only where the content covers other text (the control's own included) and the control is not `aria-invalid`: the criterion exempts content that "communicates an input error or does not obscure or replace other content". A `title` is the browser's own, and exempt. The usual fix is one rule: show the content while the pointer is over the control *or* the content (`:hover` on a wrapper holding both), with no gap between them, and a document-level Esc handler that hides it until the pointer leaves or focus moves on.
+
+What it cannot see: content not tied to its control by `aria-describedby` (a mega-menu, a custom popover), and a path a person takes that is not the straight one.
+
 ---
 
 ## 9. Zoom and reflow
@@ -367,8 +389,8 @@ Two viewport changes, two assertions:
 
 | Check | How | SC |
 |---|---|---|
-| **200% zoom** | viewport 640×512 (half of 1280×1024); horizontal scroll is reported as a **warning**. It does not fail 1.4.4, which asks only that text resize without loss of content or function. Clipped or overlapping text is not measured: check it by eye | 1.4.4 (manual) |
-| **400% zoom / 320px reflow** | viewport 320×256 — 1280 CSS px at 400% is a 320px viewport, which is how the criterion is specified and tested | 1.4.10 |
+| **200% zoom** | viewport 640×512 (half of 1280×1024); horizontal scroll is reported as a **warning**. It does not fail 1.4.4, which asks only that text resize without loss of content or function. Text a box **clips** at this width and did not clip at the page's own width is an error (`text-clipped-at-200-percent`); text that runs past a box it did not before is a warning | 1.4.4 |
+| **400% zoom / 320px reflow** | viewport 320×256 — 1280 CSS px at 400% is a 320px viewport, which is how the criterion is specified and tested. Clipped text is an error here too (`text-clipped-at-320px`) | 1.4.10 |
 
 The assertion for 1.4.10 is `document.scrollingElement.scrollWidth > innerWidth`: two-dimensional scrolling, which means reading every line requires a horizontal scroll and back. **Name the widest offending element**, because the answer is nearly always one element:
 
@@ -380,6 +402,22 @@ The assertion for 1.4.10 is `document.scrollingElement.scrollWidth > innerWidth`
 Restore the viewport afterwards. Anything measured after a resize and before a settle is measuring a reflow in progress.
 
 What this cannot decide: whether content or *functionality* was lost rather than merely rearranged. A nav that collapses to a hamburger at 320px is correct; a nav that disappears is a failure; both look the same to `scrollWidth`.
+
+### Clipped text, and text spacing (1.4.12)
+
+**Clipped** means a box that holds text holds more than it shows, on an axis the reader cannot scroll: `scrollHeight > clientHeight` (or the width) by more than 2px, with `overflow` `hidden` or `clip`. The same box with `overflow: visible` lets the text **spill** past it, over whatever comes next: reported as a warning, naming the innermost box, since the text may only sit over a margin. Only what is new is reported: a box that clipped at the page's own width (a visually hidden label, a carousel's track) is not the zoom's doing, and a box of 2px or less is a visually hidden label by design.
+
+The `spacing` check is the same diff around 1.4.12's own values, injected as a stylesheet into the document and every shadow root, each `!important` so the author's spacing gives way, and taken out again before the next check:
+
+```css
+*, *::before, *::after { line-height: 1.5 !important; letter-spacing: 0.12em !important;
+  word-spacing: 0.16em !important; }
+p { margin-bottom: 2em !important; }
+```
+
+The criterion sets line height to "at least 1.5 times the font size", spacing after paragraphs to 2 times, letter spacing to 0.12 times and word spacing to 0.16 times ([Understanding 1.4.12](https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html)). Text a box clips once they apply (`text-clipped-by-spacing`) fails it. The fix is nearly always a box sized for the author's text: `min-height` instead of `height`, a size in `em` or `lh` instead of pixels, and no `white-space: nowrap` on prose.
+
+What it cannot see: text that overlaps other text while both stay inside their boxes, and spacing a reader sets only on some elements.
 
 ---
 

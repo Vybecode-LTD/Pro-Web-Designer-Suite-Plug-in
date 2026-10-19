@@ -61,7 +61,7 @@ That last cell is the difference that matters. The design gate is complete over 
 | Runtime | ~1 second | ~30–90 seconds | 45–90 minutes per template |
 | Needs | Python 3 stdlib | Chromium, axe-core, a served build | a keyboard, a screen reader, attention |
 | Runs on | **every commit** | PR, and main after merge | **every release, and every new pattern** |
-| Catches | missing `alt`, unlabelled input, positive `tabindex`, dangling `aria-*`, `outline:none` | axe violations, **computed** accessible names, the real tab order, focus rings measured in pixels, forced-colors loss, composited contrast | whether any of it makes sense |
+| Catches | missing `alt`, unlabelled input, positive `tabindex`, dangling `aria-*`, `outline:none` | axe violations, **computed** accessible names, the real tab order, focus rings measured in pixels, forced-colors loss, composited contrast, text clipped by spacing or zoom, focus under a fixed bar, tooltips that cannot be hovered or dismissed, motion the reduced-motion preference left | whether any of it makes sense |
 | Misses | anything that depends on rendering | anything that depends on meaning | nothing, and that is why it is expensive |
 
 **Install them in order and do not skip the third.** The static layer is deterministic and costs a second, so it earns trust. The runtime layer needs a browser and care, so it spends that trust. The human layer is the only one that can find the two thirds — and the only one a team stops doing the moment layers 1 and 2 go green.
@@ -226,11 +226,12 @@ Within this skill:
 | **how to word an accessibility claim in a client report** | `references/automation-coverage.md` §7 |
 | computing accessible names and roles for real | `references/runtime-checks.md` §2 |
 | tab order: trap, skip, jump | `references/runtime-checks.md` §3 |
-| measuring focus visibility in pixels | `references/runtime-checks.md` §4 |
+| measuring focus visibility in pixels, and focus under a fixed bar (2.4.11) | `references/runtime-checks.md` §4 |
 | forced-colors, and what predictably breaks in a token system | `references/runtime-checks.md` §5 |
+| reduced motion: reduced, nothing hidden, loops still looping | `references/runtime-checks.md` §6 |
 | contrast with overlays composited | `references/runtime-checks.md` §7 |
-| automating the 12-pattern key map | `references/runtime-checks.md` §8 |
-| zoom and reflow | `references/runtime-checks.md` §9 |
+| automating the 12-pattern key map, and content on hover or focus (1.4.13) | `references/runtime-checks.md` §8 |
+| zoom and reflow, clipped text, text spacing (1.4.12) | `references/runtime-checks.md` §9 |
 | what a browser still cannot tell you | `references/runtime-checks.md` §10 |
 | the keyboard-only walkthrough | `references/manual-protocol.md` §2 |
 | the screen-reader smoke test and its five tasks | `references/manual-protocol.md` §3 |

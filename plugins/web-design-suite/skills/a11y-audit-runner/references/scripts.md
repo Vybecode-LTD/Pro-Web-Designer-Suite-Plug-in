@@ -57,7 +57,13 @@ node scripts/a11y_runtime.mjs --file dist/index.html --tags wcag2a,wcag2aa,wcag2
 | `forced` | repeats that measurement under `forced-colors: active` and reports every ring that **vanished** rather than degraded |
 | `contrast` | text contrast from computed styles, compositing ancestor backgrounds **and any translucent overlay painted on top** — the case static analysis reports as a pass |
 | `keys` | drives Enter, Down arrow, Right arrow and Esc through the dialogs, menus, tabs, disclosures and comboboxes in the key map (`references/runtime-checks.md` §8 lists each assertion); Space, Home and End, arrow wrap, Tab leaving a menu, Esc on a combobox and Tab staying inside a dialog are manual checks |
-| `reflow` | 320px-equivalent 400% zoom (1.4.10, an error), naming the widest offender, plus horizontal scroll at 200% zoom as a warning. Clipped or overlapping text at 200% (1.4.4) is a manual check |
+| `reflow` | 320px-equivalent 400% zoom (1.4.10, an error), naming the widest offender, plus horizontal scroll at 200% zoom as a warning; and text a box clips at 200% (1.4.4) or 320px (1.4.10) that it did not clip at the page's own width, an error (text that runs past its box is a warning). Overlapping text is a manual check |
+| `spacing` | WCAG's text spacing (line height 1.5, paragraph spacing 2, letter spacing 0.12, word spacing 0.16, each `!important`, in every shadow root too), then the text a box newly clips (1.4.12, an error) or spills (a warning) |
+| `obscured` | Tab from the top, Shift+Tab from the bottom: at each stop, a 5×5 hit test against the fixed and sticky elements over it. Entirely hidden is `focus-obscured` (2.4.11, an error); partly, a warning (2.4.12 is AAA) |
+| `hover` | each control whose `aria-describedby` names a node hidden at rest (twelve at most), hovered, else focused: the content persists a second, survives the pointer moving onto it, and closes on Esc where it covers other text (1.4.13, errors) |
+| `motion` | the page opened with and without `prefers-reduced-motion: reduce`, animations running, scrolled to the end: motion the preference did not reduce, text it left hidden, and a busy loop it stopped. The suite's policy, so warnings (`runtime-checks.md` §6) |
+
+The last four, like `reflow`, run on a page and not on a proof sheet.
 
 | Flag | Does |
 |---|---|
@@ -65,10 +71,10 @@ node scripts/a11y_runtime.mjs --file dist/index.html --tags wcag2a,wcag2aa,wcag2
 | `--urls FILE\|URL` · `--viewports LIST` · `--max-urls N` | several pages, several sizes, one report: see *Several pages and viewports* below |
 | `--tags LIST` | axe tag set (default `wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice`). A best-practice rule names no success criterion, so its findings are warnings and never fail the run, whatever axe rates its impact |
 | `--keymap FILE` | expected keyboard behaviour per pattern |
-| `--budget FILE` | counter limits, as JSON `{"key": limit}`; non-zero exit on breach, and an unknown key exits 2. Keys (a best-practice violation counts in none of them; an incomplete result counts in `axe_incomplete`, whatever its tags): `axe_violations`, `axe_serious`, `axe_incomplete`, `unnamed_controls`, `duplicate_names`, `tab_traps`, `unreachable_controls`, `focus_invisible`, `focus_weak`, `forced_colors_lost`, `contrast_failures`, `reflow_failures`, `keymap_failures` Without it, the project's `.design-suite.json` `budgets.a11y` (web-design-studio's `references/project-contract.md`). |
+| `--budget FILE` | counter limits, as JSON `{"key": limit}`; non-zero exit on breach, and an unknown key exits 2. Keys (a best-practice violation counts in none of them; an incomplete result counts in `axe_incomplete`, whatever its tags): `axe_violations`, `axe_serious`, `axe_incomplete`, `unnamed_controls`, `duplicate_names`, `tab_traps`, `unreachable_controls`, `focus_invisible`, `focus_weak`, `forced_colors_lost`, `contrast_failures`, `reflow_failures`, `keymap_failures`, `text_spacing_failures`, `focus_obscured`, `hover_content_failures`, `motion_not_reduced`, `motion_content_hidden`. Without it, the project's `.design-suite.json` `budgets.a11y` (web-design-studio's `references/project-contract.md`). |
 | `--only SUBSTR` | with `--matrix`, narrow to matching cells (repeatable). It does not pick checks, so a page refuses it: use `--skip` |
 | `--densities LIST` | on a page, the `data-density` values to measure focus at as well, in normal and forced colours (default `auto`: each one the page's own stylesheets name; `none` turns it off) |
-| `--skip CHECK` | `axe names taborder focus forced contrast keys reflow` (repeatable) |
+| `--skip CHECK` | `axe names taborder focus forced contrast keys reflow spacing obscured hover motion` (repeatable) |
 | `--wait-for SEL` · `--steps FILE` · `--storage-state FILE` · `--header "Name: V"` | reach the page its users get: see *Reaching the page* below |
 | `--max-stops` · `--max-cells` · `--focus-threshold` · `--viewport` · `--dpr` · `--axe` · `--browser` · `--json` · `--quiet` | |
 

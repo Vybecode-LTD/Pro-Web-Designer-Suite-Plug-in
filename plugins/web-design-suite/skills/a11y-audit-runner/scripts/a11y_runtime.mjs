@@ -41,7 +41,18 @@
  *              that static analysis gets wrong
  *   keys       keyboard traversal against an expected key map from a config file
  *   reflow     400% zoom, a 320px viewport (1.4.10); horizontal scroll at 200%
- *              is a warning, since it does not fail 1.4.4
+ *              is a warning, since it does not fail 1.4.4; text a box clips
+ *              at 200% (1.4.4) or 320px (1.4.10) that it did not clip before
+ *   spacing    WCAG's text spacing applied, and the text a box now clips
+ *              (1.4.12)
+ *   obscured   Tab down the page and Shift+Tab back up: a stop a fixed or
+ *              sticky element hides entirely (2.4.11)
+ *   hover      each control whose description shows on hover or focus: it
+ *              stays, the pointer can move onto it, Esc dismisses it (1.4.13)
+ *   motion     the page with and without prefers-reduced-motion: motion the
+ *              preference left alone, a busy loop it stopped, and text it left
+ *              hidden (a policy check; 2.3.3 is AAA)
+ *   (the last four, and reflow, run on a page, not a proof sheet)
  *
  * Usage
  * -----
@@ -75,7 +86,8 @@
  *                         at as well (default auto: each one the page's own
  *                         stylesheets name; none turns it off)
  *   --skip CHECK          skip a check: axe names taborder focus forced
- *                         contrast keys reflow  (repeatable)
+ *                         contrast keys reflow spacing obscured hover
+ *                         motion  (repeatable)
  *   --max-stops N         how many tab stops to measure focus on   (default 40)
  *   --max-cells N         with --matrix, cap the cells measured    (default 120)
  *   --focus-threshold N   min fraction of pixels a ring must change (default 0.005)
@@ -134,7 +146,7 @@ import { DEEP_DOM, FREEZE_ANIMATIONS_CSS, MAX_URLS, NAV_OPTIONS, arrive, contras
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TAGS = 'wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice';
 const ALL_CHECKS = ['axe', 'names', 'taborder', 'focus', 'forced', 'contrast',
-                    'keys', 'reflow'];
+                    'keys', 'reflow', 'spacing', 'obscured', 'hover', 'motion'];
 
 const COVERAGE_NOTE =
   'Automated testing finds well under half of the barriers (GDS 2017: the ' +
@@ -1796,6 +1808,10 @@ async function checkReflow(page, opts) {
     { label: '200% zoom', width: 640, height: 512, sc: '1.4.4' },
     { label: '400% zoom / 320px reflow (1.4.10)', width: 320, height: 256, sc: '1.4.10' },
   ];
+  // What every box held beyond its size at the page's own width, so a box
+  // that clips at 200% or 320px and did not before is the zoom's doing
+  // (GT-B6): text cut off is the loss of content both criteria forbid.
+  const before = await page.evaluate(OVERFLOW_FN);
   for (const s of steps) {
     await page.setViewportSize({ width: s.width, height: s.height });
     await page.waitForTimeout(220);
@@ -1850,9 +1866,564 @@ async function checkReflow(page, opts) {
         'maps are the specified exceptions; a marketing page is not.',
         {}));
     }
+    const at = s.sc === '1.4.4' ? '200-percent' : '320px';
+    out.push(...clipFindings(before, await page.evaluate(OVERFLOW_FN), {
+      check: 'reflow', sc: s.sc, when: `At ${s.label}`,
+      clipRule: `text-clipped-at-${at}`, spillRule: `text-overflows-at-${at}`,
+      clipFix: 'A box with a fixed height or width and `overflow: hidden` ' +
+        'cut off text the wider page showed. Let it grow: `min-height` ' +
+        'instead of `height`, `min-inline-size: 0` and wrapping instead ' +
+        'of `white-space: nowrap`, and a line clamp only where the whole ' +
+        'text is one activation away.',
+      spillFix: 'The text runs past its box. Nothing is cut off, but it ' +
+        'may now sit over the content below: look at the box at this ' +
+        'width, and let it grow (`min-height` instead of `height`).',
+    }));
   }
   await page.setViewportSize(original);
   await page.waitForTimeout(150);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Text that no longer fits: spacing (1.4.12), and zoom (1.4.4, 1.4.10)
+// ---------------------------------------------------------------------------
+//
+// The four checks below are the ones automation-coverage.md §3 lists as
+// drivable that this suite did not drive (GT-B6), with reflow's clipping.
+
+// What each box that holds text holds beyond its own size, by its path, on
+// each axis it does not let the reader scroll: clipped when its overflow is
+// hidden or clip, spilt over what follows when it is visible. A visually
+// hidden label (a pixel, clipped) is meant to overflow, and the document's own
+// scroll is reflow's question.
+const OVERFLOW_FN = () => {
+  const a = window.__a11y;
+  const deep = a.deep;
+  const holds = new Set();
+  for (const [n, parent] of deep.texts(document.body)) {
+    if (!n.data.trim()) continue;
+    for (let el = parent; el && el !== document.body; el = deep.parentOf(el)) {
+      if (holds.has(el)) break;
+      holds.add(el);
+    }
+  }
+  const found = [];
+  for (const el of holds) {
+    if (el.nodeType !== 1 || !a.visible(el)) continue;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'inline' || cs.display === 'contents') continue;
+    if (el.clientWidth <= 2 || el.clientHeight <= 2) continue;
+    const entry = { el };
+    for (const [axis, over, flow] of [
+      ['x', el.scrollWidth - el.clientWidth, cs.overflowX],
+      ['y', el.scrollHeight - el.clientHeight, cs.overflowY]]) {
+      if (over > 2 && flow !== 'auto' && flow !== 'scroll') {
+        entry[axis] = { px: over, clips: flow === 'hidden' || flow === 'clip' };
+      }
+    }
+    if (entry.x || entry.y) found.push(entry);
+  }
+  // Text that spills from a box spills from each box around it too: the
+  // innermost one is named.
+  const out = {};
+  for (const e of found) {
+    const spills = !(e.x && e.x.clips) && !(e.y && e.y.clips);
+    if (spills && found.some((o) => o !== e && deep.contains(e.el, o.el))) continue;
+    const text = (e.el.innerText || e.el.textContent || '').trim().replace(/\s+/g, ' ');
+    out[a.cssPath(e.el)] = { x: e.x || null, y: e.y || null, text: text.slice(0, 80) };
+  }
+  return out;
+};
+
+// One finding for each box that overflows now on an axis it did not before:
+// an error where its overflow is hidden, since that text is gone, and a
+// warning where it spills, since it may only sit over a margin.
+function clipFindings(before, after, o) {
+  const lost = [];
+  const spilt = [];
+  for (const [sel, now] of Object.entries(after)) {
+    const was = before[sel] || {};
+    const axes = ['x', 'y'].filter((k) => now[k] && !was[k]);
+    if (!axes.length) continue;
+    const hit = {
+      sel, text: now.text,
+      px: Math.max(...axes.map((k) => now[k].px)),
+      way: axes.map((k) => (k === 'x' ? 'across' : 'down')).join(' and '),
+    };
+    (axes.some((k) => now[k].clips) ? lost : spilt).push(hit);
+  }
+  const CAP = 10;
+  const more = (list) => (list.length > CAP ? ` (and ${list.length - CAP} more)` : '');
+  const say = (h) => `${h.sel} ("${clip(h.text, 40)}") holds ${h.px}px more ` +
+    `than it shows, ${h.way}`;
+  return [
+    ...lost.slice(0, CAP).map((h, i) => finding(
+      o.check, o.clipRule, o.sc, 'error',
+      `${o.when}, ${say(h)}, and its overflow is hidden: that text is cut ` +
+      `off${i === 0 ? more(lost) : ''}.`,
+      o.clipFix, { selector: h.sel, overflowPx: h.px })),
+    ...spilt.slice(0, CAP).map((h, i) => finding(
+      o.check, o.spillRule, o.sc, 'warning',
+      `${o.when}, ${say(h)}: the text runs past its box${i === 0 ? more(spilt) : ''}.`,
+      o.spillFix, { selector: h.sel, overflowPx: h.px })),
+  ];
+}
+
+// A stylesheet in the document and in every shadow root, since a document's
+// rules stop at a root's boundary; `css: null` takes it out again.
+const STYLE_EVERYWHERE_FN = ({ id, css }) => {
+  const places = [document.head || document.documentElement,
+                  ...window.__wdsDeep.roots()];
+  for (const place of places) {
+    for (const old of place.querySelectorAll(`style[data-wds-style="${id}"]`)) old.remove();
+    if (css === null) continue;
+    const s = document.createElement('style');
+    s.setAttribute('data-wds-style', id);
+    s.textContent = css;
+    place.appendChild(s);
+  }
+  return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+};
+
+// 1.4.12's four values, as its Understanding document sets them, on every
+// element and `!important`, so the author's spacing gives way: line height
+// 1.5 times the font size, paragraph spacing 2, letter spacing 0.12, word
+// spacing 0.16.
+const TEXT_SPACING_CSS =
+  '*, *::before, *::after { line-height: 1.5 !important; ' +
+  'letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } ' +
+  'p { margin-bottom: 2em !important; }';
+
+async function checkSpacing(page) {
+  const before = await page.evaluate(OVERFLOW_FN);
+  await page.evaluate(STYLE_EVERYWHERE_FN, { id: 'text-spacing', css: TEXT_SPACING_CSS });
+  try {
+    return clipFindings(before, await page.evaluate(OVERFLOW_FN), {
+      check: 'spacing', sc: '1.4.12', when: 'With WCAG\'s text spacing',
+      clipRule: 'text-clipped-by-spacing', spillRule: 'text-overflows-with-spacing',
+      clipFix: 'A reader who sets wider spacing (a dyslexia stylesheet, a ' +
+        'browser extension) loses this text. The box has a fixed height or ' +
+        'width and hides its overflow: let it grow with the text ' +
+        '(`min-height`, not `height`; no `white-space: nowrap` on prose), ' +
+        'and size it in `em` or `lh` rather than pixels.',
+      spillFix: 'Nothing is cut off, but the text now runs past its box and ' +
+        'may sit over what follows. Let the box grow with the text ' +
+        '(`min-height`, not `height`).',
+    });
+  } finally {
+    await page.evaluate(STYLE_EVERYWHERE_FN, { id: 'text-spacing', css: null });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Focus not obscured (2.4.11)
+// ---------------------------------------------------------------------------
+
+// The focused element against every fixed or sticky element over it: hit
+// tests across a 5x5 grid of the part of it in the viewport say which points
+// one of them paints over. A control inside a sticky header is the header's
+// own surface, so an ancestor of the focused element is never a cover.
+const OBSCURED_FN = () => {
+  const a = window.__a11y;
+  const deep = a.deep;
+  const el = deep.active(document);
+  if (!el || el === document.body || el === document.documentElement) return null;
+  const r = el.getBoundingClientRect();
+  const L = Math.max(r.left, 0);
+  const T = Math.max(r.top, 0);
+  const R = Math.min(r.right, innerWidth);
+  const B = Math.min(r.bottom, innerHeight);
+  if (R - L < 1 || B - T < 1) return null;
+  const sel = a.cssPath(el);
+  const covers = deep.all(document.body).filter((c) => {
+    const pos = getComputedStyle(c).position;
+    if (pos !== 'fixed' && pos !== 'sticky') return false;
+    if (deep.contains(c, el) || deep.contains(el, c) || !a.visible(c)) return false;
+    const q = c.getBoundingClientRect();
+    return q.right > L && q.left < R && q.bottom > T && q.top < B;
+  });
+  if (!covers.length) return { sel, hidden: 0, by: [] };
+  // The topmost element at a point, through every shadow root.
+  const topAt = (x, y) => {
+    let hit = document.elementFromPoint(x, y);
+    for (let root = deep.shadowOf(hit); root && root.elementFromPoint;
+      root = deep.shadowOf(hit)) {
+      const inner = root.elementFromPoint(x, y);
+      if (!inner || inner === hit) break;
+      hit = inner;
+    }
+    return hit;
+  };
+  const N = 5;
+  let hid = 0;
+  const by = new Set();
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const hit = topAt(L + (R - L) * (i + 0.5) / N, T + (B - T) * (j + 0.5) / N);
+      const over = hit && !deep.contains(el, hit) && covers.find((c) => deep.contains(c, hit));
+      if (over) { hid++; by.add(a.cssPath(over)); }
+    }
+  }
+  return { sel, hidden: hid / (N * N), by: [...by] };
+};
+
+// The browser scrolls a stop into view from the edge it comes in at, so a
+// fixed footer hides the stops met going down and a fixed header the ones met
+// coming back up: Tab runs from the top, then Shift+Tab from the bottom.
+// Hit testing skips an element with `pointer-events: none`, which still
+// paints, so every element takes pointer events while it runs.
+async function checkObscured(page, opts) {
+  const worst = new Map();
+  await page.evaluate(STYLE_EVERYWHERE_FN,
+    { id: 'hit-test', css: '*, *::before, *::after { pointer-events: auto !important; }' });
+  try {
+    for (const back of [false, true]) {
+      await page.evaluate((up) => {
+        const active = window.__wdsDeep.active(document);
+        if (active && active !== document.body && active.blur) active.blur();
+        window.scrollTo({ top: up ? document.documentElement.scrollHeight : 0, behavior: 'instant' });
+      }, back);
+      let first = null;
+      for (let i = 0; i < opts.maxStops; i++) {
+        await page.keyboard.press(back ? 'Shift+Tab' : 'Tab');
+        const stop = await page.evaluate(OBSCURED_FN);
+        if (!stop) continue;
+        if (stop.sel === first) break;
+        if (first === null) first = stop.sel;
+        const had = worst.get(stop.sel);
+        if (!had || stop.hidden > had.hidden) worst.set(stop.sel, stop);
+      }
+    }
+  } finally {
+    await page.evaluate(STYLE_EVERYWHERE_FN, { id: 'hit-test', css: null });
+  }
+  const out = [];
+  for (const s of worst.values()) {
+    if (s.hidden >= 1) {
+      out.push(finding(
+        'obscured', 'focus-obscured', '2.4.11', 'error',
+        `${s.sel} is entirely hidden when it takes focus: ${s.by.join(', ')} ` +
+        'paints over all of it.',
+        'A keyboard user cannot see where they are. The cover is a fixed or ' +
+        'sticky bar, a cookie banner or a chat launcher. Give the page room ' +
+        'for it: `scroll-padding-top` (or `-bottom`) on the scrolling ' +
+        'element as tall as the bar, so the browser stops a focused control ' +
+        'clear of it, and padding as tall at the top or bottom of the page, ' +
+        'for the first and last controls it cannot scroll past.',
+        { selector: s.sel, covers: s.by, hidden: s.hidden }));
+    } else if (s.hidden > 0) {
+      out.push(finding(
+        'obscured', 'focus-partly-obscured', '2.4.12 (AAA)', 'warning',
+        `${s.sel} is ${Math.round(s.hidden * 100)}% hidden when it takes ` +
+        `focus, under ${s.by.join(', ')}.`,
+        'AA (2.4.11) allows a focused control to be partly covered; AAA ' +
+        '(2.4.12) does not. The same fix clears it: `scroll-padding` as ' +
+        'tall as the bar.',
+        { selector: s.sel, covers: s.by, hidden: s.hidden }));
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Content on hover or focus (1.4.13)
+// ---------------------------------------------------------------------------
+
+// The tooltip pattern: a control described (aria-describedby) by a node
+// hidden at rest. A `title` is the browser's own and exempt.
+const TRIGGERS_FN = () => {
+  const a = window.__a11y;
+  const out = [];
+  for (const el of a.deep.all(document.body)) {
+    if (out.length >= 12) break;
+    const ids = (el.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+    if (!ids.length || !a.visible(el)) continue;
+    const root = el.getRootNode();
+    for (const id of ids) {
+      const tip = root.getElementById ? root.getElementById(id) : null;
+      if (tip && !a.visible(tip)) {
+        out.push({ sel: a.cssPath(el), tip: a.cssPath(tip) });
+        break;
+      }
+    }
+  }
+  return out;
+};
+
+// Where the description is, when it shows.
+const TIP_FN = (sel) => {
+  const a = window.__a11y;
+  const tip = a.deep.resolve(sel);
+  if (!tip || !a.visible(tip)) return null;
+  for (let n = tip; n; n = a.deep.parentOf(n)) {
+    if (n.nodeType === 1 && Number(getComputedStyle(n).opacity) === 0) return null;
+  }
+  const r = tip.getBoundingClientRect();
+  return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+};
+
+// Whether the description lies over any other text, the control's own
+// included. One that covers nothing need not be dismissible.
+const TIP_COVERS_FN = (sel) => {
+  const a = window.__a11y;
+  const deep = a.deep;
+  const tip = deep.resolve(sel);
+  const r = tip.getBoundingClientRect();
+  for (const [n, parent] of deep.texts(document.body)) {
+    if (!n.data.trim() || deep.contains(tip, parent) || !a.visible(parent)) continue;
+    const range = document.createRange();
+    range.selectNodeContents(n);
+    for (const q of range.getClientRects()) {
+      if (q.right > r.left && q.left < r.right && q.bottom > r.top && q.top < r.bottom) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+async function checkHover(page) {
+  const out = [];
+  const away = async () => {
+    await page.mouse.move(0, 0);
+    await page.evaluate(() => {
+      const active = window.__wdsDeep.active(document);
+      if (active && active !== document.body && active.blur) active.blur();
+    });
+    await page.waitForTimeout(150);
+  };
+  const shownNow = (t) => page.evaluate(TIP_FN, t.tip);
+  const fail = (t, how, rule, message, fix) => out.push(finding(
+    'hover', rule, '1.4.13', 'error', `${t.sel} (on ${how}): ${message}`, fix,
+    { selector: t.sel, content: t.tip, trigger: how }));
+  for (const t of await page.evaluate(TRIGGERS_FN)) {
+    const handle = await elementAt(page, t.sel);
+    if (!handle) continue;
+    try {
+      await away();
+      await handle.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      const box = await handle.boundingBox();
+      if (!box) continue;
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
+      await page.mouse.move(cx, cy);
+      await page.waitForTimeout(300);
+      let shown = await shownNow(t);
+      const how = shown ? 'hover' : 'focus';
+      if (!shown) {
+        await page.mouse.move(0, 0);
+        await handle.focus();
+        await page.waitForTimeout(300);
+        shown = await shownNow(t);
+      }
+      if (!shown) continue;
+      if (how === 'hover') {
+        await page.waitForTimeout(1000);
+        if (!await shownNow(t)) {
+          fail(t, how, 'hover-content-not-persistent',
+            `${t.tip} went away within a second, with the pointer still on the control.`,
+            'Content shown on hover stays until the pointer leaves, the user ' +
+            'dismisses it, or it stops being true. Remove the timer.');
+          continue;
+        }
+        // The way a reader goes: from the control to the nearest point of
+        // what appeared, just inside its edge.
+        const near = (v, lo, hi) => Math.min(Math.max(v, lo + 2), hi - 2);
+        await page.mouse.move(near(cx, shown.left, shown.right),
+                              near(cy, shown.top, shown.bottom), { steps: 12 });
+        await page.waitForTimeout(250);
+        if (!await shownNow(t)) {
+          fail(t, how, 'hover-content-not-hoverable',
+            `${t.tip} went away as the pointer moved from the control onto it.`,
+            'A reader who magnifies the screen must be able to move the ' +
+            'pointer onto what appeared without it vanishing. Show it while ' +
+            'the pointer is over the control OR the content (`:hover` on a ' +
+            'wrapper holding both, or `:has()`), and leave no gap between ' +
+            'them, or delay the hiding.');
+        }
+        await page.mouse.move(cx, cy);
+        await page.waitForTimeout(250);
+        shown = await shownNow(t);
+        if (!shown) continue;
+      }
+      const covers = await page.evaluate(TIP_COVERS_FN, t.tip);
+      const invalid = await handle.evaluate((el) => el.getAttribute('aria-invalid') === 'true');
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(250);
+      if (covers && !invalid && await shownNow(t)) {
+        fail(t, how, 'hover-content-not-dismissible',
+          `${t.tip} covers other text and stayed after Esc.`,
+          'Content that appears on hover or focus and covers something must ' +
+          'close without moving the pointer or the focus: Esc is the ' +
+          'expected key. Listen for it on the document, hide the content ' +
+          'until the pointer leaves or focus moves, and keep the control ' +
+          'focused.');
+      }
+    } finally {
+      await handle.dispose();
+    }
+  }
+  await away();
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Reduced motion (a policy check: runtime-checks.md §6)
+// ---------------------------------------------------------------------------
+
+// Installed with the helpers in the two contexts the motion check opens:
+// each animation and transition is described as it starts, so one that a
+// scroll starts and ends between two looks is still seen.
+const MOTION_LOG = () => {
+  const seen = new Map();
+  const MOVES = /^(transform|translate|rotate|scale|left|top|right|bottom|inset|margin|offset|backgroundPosition)/;
+  const shift = (v) => {
+    try {
+      const m = v === 'none' ? new DOMMatrixReadOnly() : new DOMMatrixReadOnly(v);
+      return Math.hypot(m.m41, m.m42);
+    } catch { return null; }
+  };
+  const describe = (an) => {
+    const eff = an.effect;
+    if (!eff || !eff.target || !window.__a11y) return;
+    const sel = window.__a11y.cssPath(eff.target) + (eff.pseudoElement || '');
+    const name = an.animationName || an.transitionProperty || an.id || 'script';
+    if (seen.has(`${sel}|${name}`)) return;
+    const props = new Set();
+    const shifts = [];
+    for (const frame of eff.getKeyframes()) {
+      for (const [k, v] of Object.entries(frame)) {
+        if (['offset', 'computedOffset', 'easing', 'composite'].includes(k)) continue;
+        props.add(k);
+        if (k === 'transform') shifts.push(shift(String(v)));
+        if (k === 'translate') shifts.push(shift(`translate(${String(v).trim().split(/\s+/).join(',')})`));
+      }
+    }
+    const timing = eff.getComputedTiming();
+    const known = shifts.filter((d) => d !== null);
+    seen.set(`${sel}|${name}`, {
+      sel, name,
+      duration: typeof timing.duration === 'number' ? Math.round(timing.duration) : 0,
+      loops: !Number.isFinite(timing.iterations),
+      moves: [...props].filter((p) => MOVES.test(p)),
+      distance: known.length ? Math.round(Math.max(...known) - Math.min(...known)) : null,
+      busy: Boolean(window.__wdsDeep.closest(
+        eff.target, '[aria-busy="true"], [role="progressbar"], [role="status"]')),
+    });
+  };
+  const look = () => {
+    for (const an of document.getAnimations()) describe(an);
+    for (const root of window.__wdsDeep ? window.__wdsDeep.roots() : []) {
+      if (root.getAnimations) for (const an of root.getAnimations()) describe(an);
+    }
+  };
+  for (const type of ['animationstart', 'transitionrun']) {
+    window.addEventListener(type, look, true);
+  }
+  window.__wdsMotion = { look, seen: () => [...seen.values()] };
+};
+
+// Exercise the page as a reader would at load: scroll to the end, a viewport
+// at a time, so what is revealed on scroll is revealed, then back; let every
+// finite animation end (four seconds at most). Then the text that shows.
+const EXERCISE_FN = async () => {
+  const a = window.__a11y;
+  const m = window.__wdsMotion;
+  const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  m.look();
+  const step = Math.max(200, Math.round(innerHeight * 0.8));
+  for (let y = 0, i = 0; y <= document.documentElement.scrollHeight && i < 20; y += step, i++) {
+    window.scrollTo({ top: y, behavior: 'instant' });
+    await frame();
+    await pause(120);
+    m.look();
+  }
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  await frame();
+  const finite = document.getAnimations().filter((an) =>
+    an.effect && Number.isFinite(an.effect.getComputedTiming().endTime));
+  await Promise.race([Promise.all(finite.map((an) => an.finished.catch(() => {}))), pause(4000)]);
+  await frame();
+  const shown = {};
+  for (const [n, parent] of a.deep.texts(document.body)) {
+    if (!n.data.trim() || !a.visible(parent)) continue;
+    let seen = true;
+    for (let p = parent; seen && p; p = a.deep.parentOf(p)) {
+      if (p.nodeType === 1 && Number(getComputedStyle(p).opacity) === 0) seen = false;
+    }
+    if (seen) shown[a.cssPath(parent)] = n.data.trim().replace(/\s+/g, ' ').slice(0, 60);
+  }
+  return { animations: m.seen(), shown };
+};
+
+// `open(forcedColors, reducedMotion)` is main()'s page loader.
+async function checkMotion(open) {
+  const runs = {};
+  for (const pref of ['no-preference', 'reduce']) {
+    const { ctx, page } = await open('none', pref);
+    try { runs[pref] = await page.evaluate(EXERCISE_FN); }
+    finally { await ctx.close().catch(() => {}); }
+  }
+  return motionFindings(runs['no-preference'], runs.reduce);
+}
+
+// Motion is reduced when, under the preference, it is gone, under 0.1s, or
+// at most half its duration or half its distance. A loop that marks the page
+// busy is exempt, and must keep running: a spinner that stops reads as a page
+// that hung (runtime-checks.md §6).
+function motionFindings(normal, reduced) {
+  const out = [];
+  const key = (x) => `${x.sel}|${x.name}`;
+  const was = new Map(normal.animations.map((x) => [key(x), x]));
+  const CAP = 8;
+  const kept = reduced.animations.filter((r) => {
+    if (!r.moves.length || r.busy) return false;
+    if (!r.loops && r.duration < 100) return false;
+    const n = was.get(key(r));
+    if (!n) return true;
+    if (r.duration <= n.duration / 2) return false;
+    return !(n.distance && r.distance !== null && r.distance <= n.distance / 2);
+  });
+  for (const r of kept.slice(0, CAP)) {
+    out.push(finding(
+      'motion', 'motion-not-reduced', '2.3.3 (AAA)', 'warning',
+      `${r.sel}: "${r.name}" moves (${r.moves.join(', ')}` +
+      `${r.distance ? `, ${r.distance}px` : ''}) for ${r.duration}ms` +
+      `${r.loops ? ', in a loop,' : ''} with prefers-reduced-motion: reduce, ` +
+      'as it does without it.',
+      'Motion triggers nausea and vertigo in vestibular disorders, and the ' +
+      'reader asked for less. Under `@media (prefers-reduced-motion: ' +
+      'reduce)` drop the movement and keep the change: a cross-fade, or the ' +
+      'end state at once. The suite\'s motion tokens collapse there already ' +
+      '(web-design-studio/references/motion-system.md).',
+      { selector: r.sel, animation: r.name, durationMs: r.duration }));
+  }
+  const runningNow = new Set(reduced.animations.map((r) => r.sel));
+  for (const n of normal.animations.filter((x) => x.busy && x.loops &&
+    !runningNow.has(x.sel)).slice(0, CAP)) {
+    out.push(finding(
+      'motion', 'busy-indicator-stopped', '-', 'warning',
+      `${n.sel}: the busy indicator's "${n.name}" loop stops under ` +
+      'prefers-reduced-motion: reduce.',
+      'A spinner that stops reads as a page that hung. Keep the loop ' +
+      '(`--dur-loop` is the one duration the reduction does not collapse), ' +
+      'or replace it with one that does not travel, a pulse of opacity.',
+      { selector: n.sel, animation: n.name }));
+  }
+  const hidden = Object.entries(normal.shown).filter(([sel]) => !(sel in reduced.shown));
+  hidden.slice(0, CAP).forEach(([sel, text], i) => out.push(finding(
+    'motion', 'content-hidden-under-reduced-motion', '-', 'warning',
+    `${sel} ("${clip(text, 40)}") shows without the preference and stays ` +
+    'hidden with prefers-reduced-motion: reduce' +
+    `${i === 0 && hidden.length > CAP ? ` (and ${hidden.length - CAP} more)` : ''}.`,
+    'The animation that revealed it was switched off, and the hidden state ' +
+    'it started from was not: an `opacity: 0` that only a keyframe or a ' +
+    '`transitionend` handler lifts. Under the preference, set the end ' +
+    'state itself (`opacity: 1`), not only `animation: none`. A reader ' +
+    'who asked for less motion has lost the content.',
+    { selector: sel })));
   return out;
 }
 
@@ -1880,6 +2451,14 @@ const BUDGET_KEYS = {
     x.severity === 'error').length,
   keymap_failures: (f) => f.filter((x) => x.check === 'keys' &&
     x.severity === 'error').length,
+  text_spacing_failures: (f) => f.filter((x) => x.check === 'spacing' &&
+    x.severity === 'error').length,
+  focus_obscured: (f) => f.filter((x) => x.rule === 'focus-obscured').length,
+  hover_content_failures: (f) => f.filter((x) => x.check === 'hover' &&
+    x.severity === 'error').length,
+  motion_not_reduced: (f) => f.filter((x) => x.rule === 'motion-not-reduced').length,
+  motion_content_hidden: (f) => f.filter((x) =>
+    x.rule === 'content-hidden-under-reduced-motion').length,
 };
 
 function loadBudget(file) {
@@ -1950,7 +2529,7 @@ function textReport(o, opts) {
     byCheck.get(f.check).push(f);
   }
   const order = ['axe', 'names', 'taborder', 'focus', 'forced', 'contrast',
-                 'keys', 'reflow', 'shadow'];
+                 'keys', 'reflow', 'spacing', 'obscured', 'hover', 'motion', 'shadow'];
   for (const check of order) {
     const items = byCheck.get(check);
     if (!items || !items.length) continue;
@@ -2129,7 +2708,9 @@ async function main() {
   let cellsTotal = 0, cellsMeasured = 0;
   let shadowRoots = null;
 
-  const newPage = async (forcedColors) => {
+  // `motion` opens the page for the motion check, under that reduced-motion
+  // preference, with its animations running and logged.
+  const newPage = async (forcedColors, motion = null) => {
     const ctx = await browser.newContext({
       ...navContext(opts.reach),
       viewport: opts.viewport,
@@ -2138,12 +2719,13 @@ async function main() {
       colorScheme: 'light',
       locale: 'en-US',
       timezoneId: 'UTC',
-      reducedMotion: 'no-preference',
+      reducedMotion: motion || 'no-preference',
       // A strict Content-Security-Policy refuses the stylesheet and scripts
       // this run injects; the audit is of the page, not of its CSP (GT-A5).
       bypassCSP: true,
     });
-    await ctx.addInitScript({ content: INIT_SCRIPT });
+    await ctx.addInitScript({
+      content: motion ? `${INIT_SCRIPT}\n(${MOTION_LOG})();` : INIT_SCRIPT });
     const page = await ctx.newPage();
     // The page as its users reach it: the session, the headers, the steps and
     // the wait, in every context the run opens (P34).
@@ -2158,6 +2740,8 @@ async function main() {
     });
     // Animations stop and transitions finish: a ring measured mid-transition is
     // a false negative, and a spinner still turning a false positive (GT-A14).
+    // The motion check measures the animations themselves.
+    if (motion) return { ctx, page, closed: null };
     await page.addStyleTag({ content: FREEZE_ANIMATIONS_CSS });
     await page.evaluate(() => new Promise((r) =>
       requestAnimationFrame(() => requestAnimationFrame(r))));
@@ -2332,6 +2916,22 @@ async function main() {
     if (ran.includes('reflow') && mode === 'page') {
       log('  zoom and reflow…');
       findings.push(...await checkReflow(page, opts));
+    }
+    if (ran.includes('spacing') && mode === 'page') {
+      log('  text spacing…');
+      findings.push(...await checkSpacing(page));
+    }
+    if (ran.includes('obscured') && mode === 'page') {
+      log('  focus not obscured…');
+      findings.push(...await checkObscured(page, opts));
+    }
+    if (ran.includes('hover') && mode === 'page') {
+      log('  content on hover or focus…');
+      findings.push(...await checkHover(page));
+    }
+    if (ran.includes('motion') && mode === 'page') {
+      log('  reduced motion…');
+      findings.push(...await checkMotion(newPage));
     }
 
     // ---- forced colors ----------------------------------------------------
