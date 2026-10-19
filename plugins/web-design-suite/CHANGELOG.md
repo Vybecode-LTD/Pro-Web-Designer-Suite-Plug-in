@@ -853,6 +853,15 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   through the real plugin on Tailwind 4.3 and 3.4 (`test_real_tools.TailwindPluginV4`
   and `TailwindPluginV3`).
 
+- **`a11y_runtime.mjs` runs four more checks by default** (P35 part 1): `spacing`,
+  `obscured`, `hover` and `motion`. Their errors (`spacing`, `obscured`, `hover`) fail a run
+  that passed on 3.6.0, and `reflow_failures` now also counts text a box clips at 200% or
+  320px. A CI command and a budget that were green may go red with no change of your own.
+  Read the new findings first. An error fails the run whatever the budget allows, so to
+  roll the checks out one at a time, leave the rest out with `--skip CHECK` and take each
+  `--skip` away once its findings are fixed. The `motion` findings are warnings, and fail a
+  run only through a budget: `motion_not_reduced` or `motion_content_hidden`.
+
 ## 3.6.0 — 2026-10-13
 
 ### Added
