@@ -192,7 +192,7 @@ class ContentOnHoverOrFocus(RuntimeCase):
     def test_a_tip_that_times_out_is_not_persistent(self):
         timer = ("<script>const b = document.querySelector('button'), t = "
                  "document.getElementById('tip'); b.addEventListener('mouseenter', () => { "
-                 "t.style.display = 'block'; setTimeout(() => { t.style.display = ''; }, 700); "
+                 "t.style.display = 'block'; setTimeout(() => { t.style.display = ''; }, 1000); "
                  "});</script>")
         report = self.runtime(page(TIP_CSS.format("100%", ""), TIP_BODY.format(timer)), "hover")
         self.assertEqual(["hover-content-not-persistent"],
