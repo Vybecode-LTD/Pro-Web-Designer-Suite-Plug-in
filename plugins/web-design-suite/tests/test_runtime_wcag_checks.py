@@ -31,10 +31,10 @@ def page(css: str, body: str) -> str:
                                        "playwright and axe-core")
 class RuntimeCase(TempDirTest):
 
-    def runtime(self, html: str, *checks: str) -> dict:
+    def runtime(self, html: str, *checks: str, extra: tuple = ()) -> dict:
         path = self.write("page.html", html)
         proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", path, "--json",
-                        *only(*checks), cwd=self.tmp, env_changes={"NODE_PATH": MODULES},
+                        *only(*checks), *extra, cwd=self.tmp, env_changes={"NODE_PATH": MODULES},
                         timeout=300)
         if proc.returncode == 2 and b"browser" in proc.stderr.lower():
             self.skipTest("no usable browser: " + output(proc)[-200:])
@@ -202,6 +202,15 @@ class FocusNotObscured(RuntimeCase):
         self.assertIn(FIRST, [f["selector"] for f in self.found(report, "focus-obscured")],
                       report["findings"])
 
+    def test_a_cover_drawn_by_its_border_hides(self):
+        """Codex on #179: a transparent bar drawn by a border 160px thick still
+        covers the link under it."""
+        report = self.runtime(page(STOPS_CSS.format(
+            "", ".bar{background:none;height:0;border-top:160px solid #222}"), STOPS),
+            "obscured")
+        self.assertIn(FIRST, [f["selector"] for f in self.found(report, "focus-obscured")],
+                      report["findings"])
+
     def test_padding_and_scroll_padding_as_tall_as_the_bars_pass(self):
         report = self.runtime(page(STOPS_CSS.format(
             "padding:160px 0 120px", "html{scroll-padding:160px 0 120px}"), STOPS), "obscured")
@@ -331,6 +340,28 @@ class ReducedMotion(RuntimeCase):
         self.assertEqual(["motion-not-reduced"],
                          [f["rule"] for f in same["findings"] if f["check"] == "motion"])
 
+    def test_a_stopped_busy_loop_breaks_its_budget(self):
+        """Codex on #179: no counter held `busy-indicator-stopped`, so a budget
+        of zero on every motion key let it pass."""
+        budget = self.write("budget.json", json.dumps({"motion_busy_stopped": 0}))
+        report = self.runtime(page(MOTION_CSS.format(
+            ".slider{animation:none}.reveal{animation:none;opacity:1}.spinner{animation:none}"),
+            MOTION_BODY), "motion", extra=("--budget", budget))
+        self.assertEqual([("motion_busy_stopped", 1, 0)],
+                         [(b["key"], b["actual"], b["limit"]) for b in report["breaches"]])
+
+    def test_a_renamed_animation_is_paired_with_what_it_replaced(self):
+        """Codex on #179: a renamed translation on an element that also turns
+        was measured against the turn, and its zero turn read as reduced."""
+        css = ("@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}"
+               "@keyframes sway{from{transform:translateX(-200px)}to{transform:translateX(200px)}}"
+               "@keyframes sway2{from{transform:translateX(-200px)}to{transform:translateX(200px)}}"
+               ".both{animation:spin 3s linear infinite,sway 2s ease-in-out infinite alternate}"
+               "@media (prefers-reduced-motion: reduce){.both{animation-name:spin,sway2}}")
+        report = self.runtime(page(css, "<div class=both>Busy banner</div>"), "motion")
+        self.assertIn("sway2", [f["animation"] for f in self.found(report, "motion-not-reduced")],
+                      report["findings"])
+
     def test_a_one_off_pulse_in_place_of_the_spinner_stops_it(self):
         """Codex on #179: a finite pulse on the spinner ends, and the status
         reads as hung all the same."""
@@ -378,7 +409,7 @@ class TheChecksAreNamedAndCounted(TempDirTest):
                 self.assertIn(f"'{check}'", script.split("const ALL_CHECKS", 1)[1].split(";")[0])
                 self.assertIn(f"`{check}`", scripts_md)
         for key in ("text_spacing_failures", "focus_obscured", "hover_content_failures",
-                    "motion_not_reduced", "motion_content_hidden"):
+                    "motion_not_reduced", "motion_content_hidden", "motion_busy_stopped"):
             with self.subTest(key=key):
                 self.assertIn(f"  {key}: ", script)
                 self.assertIn(f"`{key}`", scripts_md)

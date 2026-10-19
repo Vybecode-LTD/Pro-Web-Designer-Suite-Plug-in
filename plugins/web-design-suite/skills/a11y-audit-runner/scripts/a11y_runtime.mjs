@@ -2098,13 +2098,24 @@ const OBSCURED_FN = () => {
     if (/^(img|picture|video|canvas|svg|iframe|object|embed|input|select|textarea|button)$/
       .test(e.localName)) return true;
     if (!clear(cs.backgroundColor) || cs.backgroundImage !== 'none') return true;
+    // A border the point falls on (Codex on #179): each side that is drawn,
+    // between the box's edge and its padding box.
+    const side = (s, st) => parseFloat(st[`border${s}Width`]) > 0 &&
+      !/^(none|hidden)$/.test(st[`border${s}Style`]) && !clear(st[`border${s}Color`]);
+    const r = e.getBoundingClientRect();
+    if ((side('Top', cs) && y < r.top + parseFloat(cs.borderTopWidth)) ||
+        (side('Bottom', cs) && y > r.bottom - parseFloat(cs.borderBottomWidth)) ||
+        (side('Left', cs) && x < r.left + parseFloat(cs.borderLeftWidth)) ||
+        (side('Right', cs) && x > r.right - parseFloat(cs.borderRightWidth))) return true;
     // A surface its ::before or ::after draws: hit testing returns the
-    // element the pseudo-element belongs to (Codex on #179).
+    // element the pseudo-element belongs to (Codex on #179). Its box cannot
+    // be read, so a background or a border on it counts anywhere.
     for (const pseudo of ['::before', '::after']) {
       const ps = getComputedStyle(e, pseudo);
       if (ps.content === 'none' || ps.content === 'normal' || ps.display === 'none' ||
           Number(ps.opacity) === 0) continue;
       if (!clear(ps.backgroundColor) || ps.backgroundImage !== 'none') return true;
+      if (['Top', 'Right', 'Bottom', 'Left'].some((s) => side(s, ps))) return true;
     }
     for (const n of e.childNodes) {
       if (n.nodeType !== 3 || !n.data.trim()) continue;
@@ -2499,9 +2510,14 @@ function motionFindings(normal, reduced) {
   const key = (x) => `${x.sel}|${x.name}`;
   const was = new Map(normal.animations.map((x) => [key(x), x]));
   const CAP = 8;
-  // A reduced variant may be keyframes of another name on the same element.
+  // A reduced variant may be keyframes of another name on the same element:
+  // the original it stands for moves a property it moves, and is not one a
+  // reduced animation already answers to by name (Codex on #179), so a
+  // renamed translation is never measured against the element's rotation.
+  const named = new Set(reduced.animations.map(key));
   const before = (r) => was.get(key(r)) ||
-    normal.animations.find((x) => x.sel === r.sel && x.moves.length);
+    normal.animations.find((x) => x.sel === r.sel && !named.has(key(x)) &&
+      x.moves.some((p) => r.moves.includes(p)));
   const kept = reduced.animations.filter((r) => {
     if (!r.moves.length || r.busy) return false;
     if (!r.loops && r.duration < 100) return false;
@@ -2587,6 +2603,7 @@ const BUDGET_KEYS = {
   motion_not_reduced: (f) => f.filter((x) => x.rule === 'motion-not-reduced').length,
   motion_content_hidden: (f) => f.filter((x) =>
     x.rule === 'content-hidden-under-reduced-motion').length,
+  motion_busy_stopped: (f) => f.filter((x) => x.rule === 'busy-indicator-stopped').length,
 };
 
 function loadBudget(file) {

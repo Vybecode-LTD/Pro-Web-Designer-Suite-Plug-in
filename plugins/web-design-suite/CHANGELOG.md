@@ -26,7 +26,7 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
     the page's own width.
 
   The budget keys are `text_spacing_failures`, `focus_obscured`, `hover_content_failures`,
-  `motion_not_reduced` and `motion_content_hidden`. In automation-coverage.md §3, 1.4.12, 1.4.13
+  `motion_not_reduced`, `motion_content_hidden` and `motion_busy_stopped`. In automation-coverage.md §3, 1.4.12, 1.4.13
   and 2.4.11 now name the check that runs them. Every check has a page that fails it and one that
   passes, run in the browser (`test_runtime_wcag_checks`).
 - **The scaffold writes Svelte** (DL-B3, P37 part 6). `scaffold_ui.py --framework svelte` writes
@@ -860,7 +860,8 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   Read the new findings first. An error fails the run whatever the budget allows, so to
   roll the checks out one at a time, leave the rest out with `--skip CHECK` and take each
   `--skip` away once its findings are fixed. The `motion` findings are warnings, and fail a
-  run only through a budget: `motion_not_reduced` or `motion_content_hidden`.
+  run only through a budget: `motion_not_reduced`, `motion_content_hidden` or
+  `motion_busy_stopped`.
 
 ## 3.6.0 — 2026-10-13
 
