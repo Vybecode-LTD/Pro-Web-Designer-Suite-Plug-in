@@ -75,6 +75,39 @@ compile target, and the one place the laws deliberately bend.
 
 ---
 
+## Try it
+
+Three prompts to start with, in a project folder:
+
+1. *"Set up a design system for this site: brand colour #e8440a, a type scale and a spacing scale, and check every text colour against WCAG AA."* web-design-studio writes `tokens.css` with the scales and the roles, and the contrast check measures each pair.
+2. *"Audit the styles in `src/` for hard-coded values and anything off the spacing scale."* The audit (`audit_design.py`) reports each finding by its law, with file and line.
+3. *"We inherited this codebase. Move its colours and spacing onto tokens."* design-token-migration takes a census of every literal, proposes the tokens, and writes a codemod that a reviewer checks batch by batch.
+
+Then `/pro-web-design-suite:gate` runs the design, accessibility and performance gates in one pass.
+
+## Where it works
+
+| | Claude Code | Cowork | Claude chat |
+|---|---|---|---|
+| The thirteen skills and the sixteen commands | Yes | Yes | Yes, as skills |
+| The six subagents | Yes | Yes | No |
+| The hooks (the gates after each edit, the router) | Yes | Yes | No |
+| The `gates` MCP server | Yes | When the session runs on your computer | No |
+
+The skills' scripts need Python 3.9 or newer, and the browser gates need Node and Playwright, wherever Claude runs them.
+
+## What it runs, sends and stores
+
+Everything runs on your machine, and the plugin collects nothing.
+
+- **The hooks** run `node hooks/design_hooks.mjs`. The router reads each prompt locally, to name the skill it needs. The design gate, the a11y gate, the token diff, the email build and the generated-file guard act only in a project whose `.design-suite.json` turns them on. The gates run the plugin's Python scripts on the file Claude just edited; the guard reads that file's first lines. The plugin's `design_hooks` option turns them all off.
+- **The MCP server**, `gates`, is `node mcp/design_gates.mjs`, over stdio. Its five tools run the same scripts on your project.
+- **The scripts** read and write files in your project only: reports, tokens, scaffolds and builds. The browser gates open the pages you name, through your own Playwright install. They download no browser and send no page anywhere.
+- **The network:** the plugin makes one call to a third party, and only when you ask for it. `crux_check.py` sends a URL or origin to Google's Chrome UX Report API, with the key you set in `CRUX_API_KEY`. figma-variables-sync shows a `curl` to Figma's REST API, with the token you set in `FIGMA_TOKEN`, for you to run. Neither key is stored by the plugin, and nothing else leaves your machine.
+- **`/install-gate`** writes a CI workflow into your repository. That workflow runs in your CI, in Microsoft's Playwright image.
+
+---
+
 ## Install
 
 **As a plugin** — everything at once. In Claude Code, add this repository as a
@@ -305,6 +338,10 @@ claude plugin eval . --tag outcome --runs 1 --scaffold --allow-real-servers --no
 They grant no shell either, since the MCP server runs outside the sandbox. A full run of both sets, three runs each, costs about $11 at list price.
 
 What changed in each release is in `CHANGELOG.md`.
+
+## Support
+
+Report a bug or ask a question in [the development repository's issues](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/issues). Report a security problem privately, as `SECURITY.md` says.
 
 ---
 

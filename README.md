@@ -494,7 +494,7 @@ Claude Code keeps each installed version in its own folder under `~/.claude/plug
 
 ## Contributing
 
-Issues and pull requests are welcome on [GitHub](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/issues). To run the checks, from the repository's root (the two `npm ci` lines are needed once, and download no browser):
+Issues and pull requests are welcome on [GitHub](https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/issues). Report a security problem privately, as [SECURITY.md](plugins/pro-web-design-suite/SECURITY.md) says. To run the checks, from the repository's root (the two `npm ci` lines are needed once, and download no browser):
 
 ```shell
 npm ci --prefix tooling/main
