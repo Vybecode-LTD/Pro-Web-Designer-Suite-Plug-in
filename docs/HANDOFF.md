@@ -18,8 +18,8 @@
 - **#180, the rename** (the owner's other session), merged before #183. The plugin is **Pro Web Design Suite**, in `plugins/pro-web-design-suite`. #183 merged `main` across it.
 - **Open, not this session's:** #181 (the distribution repository) and #182 (ready for Anthropic's directory), the owner's other session's.
 - **Reviews:**
-  - **#179, 16 real issues** over four rounds (Codex 13, CodeRabbit 3), each fixed with a test failing on the head it reviewed.
-  - **#183, 4** (CI 1: WebKit's Linux build tabs to links; CodeRabbit 2; Codex 1, the same as one of CodeRabbit's).
+  - **#179, 14 distinct real issues** (Codex 11 over three rounds; CodeRabbit 3, one the same as Codex's; CI 1), each fixed with a test failing on the head it reviewed.
+  - **#183, 3 distinct** (CI 1: WebKit's Linux build tabs to links; CodeRabbit 2; Codex 1, the same as one of CodeRabbit's).
 - **At the end:** 11 open items, all scheduled; about 1,440 tests. This session used about 570 thousand tokens.
 
 ## Next steps
