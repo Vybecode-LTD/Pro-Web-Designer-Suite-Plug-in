@@ -476,7 +476,7 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 | GT-B3 | — | Shadow DOM. |
 | GT-B4 | — | Multiple URLs and viewports. |
 | GT-B5 | — | The field-data loop. |
-| GT-B6 | — | Checks the coverage table lists as automatable but that don't exist. |
+| GT-B6 | — | Checks the coverage table lists as automatable but that don't exist. *Done for 4.0.0: `spacing`, `obscured`, `hover`, `motion` and clipped text in `reflow` (PR #179, P35 part 1).* |
 | GT-B7 | — | The matrix model. |
 | GT-B8 | — | The baseline lifecycle. |
 | GT-B9 | — | Chromium only. |
