@@ -63,15 +63,18 @@ class EachEngine(TempDirTest):
     def test_webkit_runs_the_three_shared_checks(self):
         self.shared_checks("webkit")
 
-    def test_webkit_expects_no_tab_stop_on_a_bare_link(self):
-        """WebKit's Tab, like Safari's by default, passes over a link with no
-        tabindex: not unreachable. A link with tabindex=0 is a stop there, and
-        is reached."""
+    def test_an_engine_that_skips_bare_links_is_read_not_assumed(self):
+        """WebKit's Windows and macOS builds pass over a link with no tabindex,
+        as Safari does by default; its Linux build does not (CI on #183). The
+        run reads which: links all reached and no note, or none reached and
+        `engine-skips-links`. Never `unreachable-control` either way, and a
+        link with tabindex=0 is a stop on both."""
         report = self.runtime("--engine", "webkit")
         self.assertNotIn("unreachable-control", self.rules(report), report["findings"])
         stops = {s["sel"] for s in report["tabOrder"]}
         self.assertIn("html > body > main > a:nth-of-type(2)", stops)
-        self.assertNotIn("html > body > main > a:nth-of-type(1)", stops)
+        bare = "html > body > main > a:nth-of-type(1)" in stops
+        self.assertEqual(not bare, "engine-skips-links" in self.rules(report), report["findings"])
 
     def test_chromium_is_the_default_and_says_nothing_of_engines(self):
         report = self.runtime("--skip", "forced", "--skip", "motion", "--skip", "hover")

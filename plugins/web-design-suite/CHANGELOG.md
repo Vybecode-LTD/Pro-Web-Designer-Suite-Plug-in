@@ -12,8 +12,9 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
   Playwright pins (`npx playwright install firefox webkit`), or `--browser PATH`; the checks that
   difference screenshots, emulate forced colours, read closed shadow roots through the DevTools
   protocol or were calibrated in Chromium stay Chromium's, and the run names them
-  (`checks-run-in-chromium-only`, a warning). WebKit's Tab passes over a link with no `tabindex`,
-  as Safari does by default, so its tab order expects none. `browser_common.mjs` gains
+  (`checks-run-in-chromium-only`, a warning). Tab may pass over every link with no `tabindex` (WebKit's
+  Windows and macOS builds, as Safari by default; not its Linux build): the run reads it from the
+  sequence it drove, expects no such stop, and says so (`engine-skips-links`). `browser_common.mjs` gains
   `launchEngine()`. CI installs Firefox and WebKit on Linux (`test_runtime_engines`).
 - **The runtime gate drives the checks the coverage table called drivable** (GT-B6, P35 part 1).
   `a11y_runtime.mjs` has four new checks, each skippable by name and counted by a budget key, and

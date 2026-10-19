@@ -2876,9 +2876,7 @@ async function main() {
   if (elsewhere.length) {
     findings.push(finding(
       'engine', 'checks-run-in-chromium-only', '-', 'warning',
-      `In ${opts.engine} these checks did not run: ${elsewhere.join(', ')}.` +
-      (opts.engine === 'webkit' ? ' Tab skips a link with no tabindex here, as it does ' +
-        'in Safari by default, so the tab order expects none.' : ''),
+      `In ${opts.engine} these checks did not run: ${elsewhere.join(', ')}.`,
       'They measure pixels, emulate forced colours, or were calibrated in ' +
       'Chromium, whose behaviour they assert. A run in another engine is a ' +
       'second pass for what differs by engine (the names and the tab order), ' +
@@ -3025,15 +3023,28 @@ async function main() {
     if (mode === 'page' && ran.includes('taborder')) {
       log('  tab order…');
       let expected = await page.evaluate(() => window.__a11y.expectedTabbables());
-      // WebKit's Tab skips a link with no tabindex, as Safari does unless its
-      // reader turns on "Press Tab to highlight each item": a stop it never
-      // expects is not one it missed (GT-B9).
-      if (opts.engine === 'webkit') {
-        expected = expected.filter((e) => !((e.tag === 'a' || e.tag === 'area') && !e.explicit));
-      }
       const steps = Math.min(400, expected.length * 2 + 20);
       const forward = await tabSequence(page, { steps, shift: false });
       const reverse = await tabSequence(page, { steps, shift: true });
+      // Outside Chromium, Tab may pass over every link with no tabindex: as
+      // Safari does, and Firefox on macOS, unless the reader turns links on.
+      // WebKit's Windows and macOS builds do; its Linux build does not (CI on
+      // #183). What the engine does is read from the run, never assumed: a
+      // stop it never takes is not one it missed (GT-B9).
+      const bare = (e) => (e.tag === 'a' || e.tag === 'area') && !e.explicit;
+      const reached = new Set(forward.map((s) => s.sel));
+      if (opts.engine !== 'chromium' && expected.some(bare) &&
+          !expected.some((e) => bare(e) && reached.has(e.sel))) {
+        expected = expected.filter((e) => !bare(e));
+        findings.push(finding(
+          'engine', 'engine-skips-links', '-', 'warning',
+          `In ${opts.engine} on this platform, Tab passed over every link with no ` +
+          'tabindex, so the tab order expects none.',
+          'This is the engine\'s default (Safari\'s "Press Tab to highlight each ' +
+          'item" is off), not the page\'s doing. Its readers reach links with ' +
+          'Option+Tab or by turning the setting on; the Chromium run checks them.',
+          { engine: opts.engine }));
+      }
       findings.push(...analyseTabOrder(forward, reverse, expected, opts));
       tabOrder = forward.filter((s) => s.sel !== '(document)');
       const seen = new Set();
