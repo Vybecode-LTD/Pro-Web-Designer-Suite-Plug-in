@@ -479,7 +479,7 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 | GT-B6 | — | Checks the coverage table lists as automatable but that don't exist. *Done for 4.0.0: `spacing`, `obscured`, `hover`, `motion` and clipped text in `reflow` (PR #179, P35 part 1).* |
 | GT-B7 | — | The matrix model. |
 | GT-B8 | — | The baseline lifecycle. |
-| GT-B9 | — | Chromium only. |
+| GT-B9 | — | Chromium only. *Done for 4.0.0: `--engine firefox` or `webkit` for axe, the names and the tab order (PR #182, P35 part 2).* |
 | GT-C11 | M · P2 | A `lighthouse` throttle preset, TTFB from CDP, `--interact-at MS`, and `crux_check.py`. |
 
 ### W12 · Build coverage

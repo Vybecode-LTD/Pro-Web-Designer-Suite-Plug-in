@@ -7,6 +7,14 @@ Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it ag
 
 ### Added
 
+- **The runtime gate runs in Firefox and WebKit** (GT-B9, P35 part 2). `a11y_runtime.mjs --engine
+  firefox|webkit` runs axe, the computed names and the real tab order in the build the locked
+  Playwright pins (`npx playwright install firefox webkit`), or `--browser PATH`; the checks that
+  difference screenshots, emulate forced colours, read closed shadow roots through the DevTools
+  protocol or were calibrated in Chromium stay Chromium's, and the run names them
+  (`checks-run-in-chromium-only`, a warning). WebKit's Tab passes over a link with no `tabindex`,
+  as Safari does by default, so its tab order expects none. `browser_common.mjs` gains
+  `launchEngine()`. CI installs Firefox and WebKit on Linux (`test_runtime_engines`).
 - **The runtime gate drives the checks the coverage table called drivable** (GT-B6, P35 part 1).
   `a11y_runtime.mjs` has four new checks, each skippable by name and counted by a budget key, and
   `reflow` reads clipped text:

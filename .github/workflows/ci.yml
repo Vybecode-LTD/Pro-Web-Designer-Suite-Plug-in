@@ -56,12 +56,15 @@ jobs:
           npm ci --prefix tooling/main
           npm ci --prefix tooling/tailwind-v3
 
-      # Linux only: the headless shell the browser tests use, and the
-      # preinstalled Postgres for test_policies.PoliciesRunOnPostgres.
-      - name: Install the headless shell, and put Postgres on PATH
+      # Linux only: the headless shell the browser tests use, Firefox and
+      # WebKit for the runtime gate's other engines (P35, GT-B9; the owner's
+      # OK, 2026-10-19), and the preinstalled Postgres for
+      # test_policies.PoliciesRunOnPostgres.
+      - name: Install the browsers, and put Postgres on PATH
         if: runner.os == 'Linux'
         run: |
           (cd tooling/main && npx playwright install --only-shell --with-deps chromium)
+          (cd tooling/main && npx playwright install --with-deps firefox webkit)
           ls -d /usr/lib/postgresql/*/bin | sort -V | tail -n 1 >> "$GITHUB_PATH"
 
       - name: The suite

@@ -116,6 +116,29 @@ export async function launchBrowser(chromium, explicit, options) {
   return { tried };
 }
 
+// The engines a gate can run in (GT-B9). Chromium is found as launchBrowser
+// finds it. Firefox and WebKit are Playwright's own builds, the ones the
+// locked Playwright was built for (`npx playwright install firefox webkit`),
+// unless a path is given; `options` (Chromium's switches) are Chromium's.
+export const ENGINES = ['chromium', 'firefox', 'webkit'];
+
+export async function launchEngine(playwright, engine, explicit, options) {
+  if (engine === 'chromium') return launchBrowser(playwright.chromium, explicit, options);
+  const type = playwright[engine];
+  let pinned = null;
+  try { pinned = type.executablePath(); } catch { /* not resolvable here */ }
+  const label = explicit || `Playwright's own ${engine}`;
+  if (!explicit && !(pinned && fs.existsSync(pinned))) {
+    return { tried: [`${label}: not installed (npx playwright install ${engine})`] };
+  }
+  try {
+    return { browser: await type.launch({ executablePath: explicit || undefined }),
+             label, auto: !explicit };
+  } catch (err) {
+    return { tried: [`${label}: ${String(err.message || err).split('\n')[0]}`] };
+  }
+}
+
 export function installedBrowsers() {
   if (process.platform === 'win32') {
     const env = process.env;
