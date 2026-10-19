@@ -175,7 +175,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | GT-B6 | — | done in 4.0.0: `test_runtime_wcag_checks`, PR #179 (P35 part 1) | Checks the coverage table lists as automatable but that don't exist. |
 | GT-B7 | — | fixed in 3.4.0: custom states and combinations in PR #42; a fixture's `dir` and `lang`, the `--forced-colors` pass, and what interaction states need, in PR #44 (`test_content_and_a11y.MatrixModel`, `test_browser_runtime.MatrixSeesStateChanges`) | The matrix model. |
 | GT-B8 | — | fixed in 3.4.0: the `workflow_dispatch` recording job and Git LFS past the line, in visual-regression.md §6 and §7; the generator says when a sheet nears it (`test_content_and_a11y.MatrixModel`, PR #44) | The baseline lifecycle. |
-| GT-B9 | — | done in 4.0.0: `test_runtime_engines`, PR #182 (P35 part 2) | Chromium only. |
+| GT-B9 | — | done in 4.0.0: `test_runtime_engines`, PR #183 (P35 part 2) | Chromium only. |
 | GT-C1 | M · P0 | fixed in 3.1.0 and 3.2.0 (browser tests) | A test suite that uses a real browser, skipped when none is available. |
 | GT-C2 | S–M · P0 | fixed in 3.4.0: colours, modals, iframes and inert content in 3.1.0 (GT-A1, GT-A2), pausing in PR #38 (GT-A14 (a)), `bypassCSP` and the disabled-control exemption in PR #39 (GT-A5, GT-A14 (b)) | Fix colour parsing, modals, iframes, inert content, `bypassCSP`, animation pausing and the disabled-control exemption. |
 | GT-C3 | M · P0 | fixed in 3.4.0: the differs-from-default gate and the tolerance in 3.1.0, focus mirroring, custom states and the error attributes in PR #42 | Matrix: the within-run "differs from default" gate, a tuned tolerance, focus mirroring, custom states, `data-state="error"` on non-form templates. |
