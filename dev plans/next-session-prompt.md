@@ -12,7 +12,7 @@
 - **#187, F7** (`bc7a478`): `/install-gate`'s workflow runs `check_roles.py` on the configured token files, read together as one system; the command runs the check once first (a missing configured file stops the install; a system it cannot read gets no step and a reason; failing pairs get the step and a warning).
 - **N51, scheduled as P57 (small), open:** `check_roles` resolves a scope's declarations by selector, not by source order, in one file as in several (CodeRabbit on #187; reproduced on `v3.6.0`). The owner places it with P41 to P43.
 
-**Next: P41, P42 and P43, in the order the owner chooses** (P57 is small and can go first). Ask before you start (§4).
+**Next: P41, P42, P43 and P57, in the order the owner chooses; all four come before R4** (P57 is small). Ask before you start (§4).
 
 Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **the rest of Phase 6b in the order the owner chooses** (§4), then R4.
 
@@ -556,13 +556,14 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 ## 4. The rest of Phase 6b, then 4.0.0
 
-Phase 6c is done (P50 to P55), and so is P56 (N50). In Phase 6b, P34, P35, P36 and P37 are done. **Ask the owner which of P41, P42 and P43 comes first** (P57, a small `check_roles` fix, N51, is also open), and give them the sizes below. Read each item's rows in the completion plan and its review finding (`dev plans/web-design-suite-review/delivery.md` for DL-, `persuasion.md` for PS-) before planning, and split an L into PRs under 100 files each.
+Phase 6c is done (P50 to P55), and so is P56 (N50). In Phase 6b, P34, P35, P36 and P37 are done. **Ask the owner in what order to do P41, P42, P43 and P57** (P57 is a small `check_roles` fix, N51; the execution plan schedules it before R4, so 4.0.0 does not ship it unfixed), and give them the sizes below. Read each item's rows in the completion plan and its review finding (`dev plans/web-design-suite-review/delivery.md` for DL-, `persuasion.md` for PS-) before planning, and split an L into PRs under 100 files each.
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
 | P41 | Email: MJML or React Email output (DL-B4: `mj-attributes`/`mj-class` or a React Email theme from `email-tokens.json`, or route away explicitly); a right-to-left template (DL-B5: `dir="rtl"` on tables so ghost-table order flips, mirrored `align`, padding and VML, per-locale `lang` and `<title>`, text expansion against fixed VML widths); a client matrix regenerated from caniemail's data, with test dates (DL-C9) | DL-B4, DL-B5, DL-C9 | email-template-system | L |
 | P42 | Persuasion: persuasive patterns mapped to the WCAG 2.2 criteria they touch (PS-B1: sticky bars, deadlines, carousels, modals, consent banners, multi-step forms); UK and EU consumer law to flag for legal review (PS-B2: the DMCC Act, in force since 6 April 2025, fake reviews and drip pricing); price experiments (PS-B3: disclosure, the lowest price shown, revenue per visitor's noise); consent for tracking (PS-B8: GDPR, ePrivacy, PECR, masking in session recordings) | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
 | P43 | Page types and audiences (PS-B4: B2B demo pages, gated lead magnets, booking and donation pages, regulated claims, localisation); a claims layer and `lint_claims.py` (PS-B6, PS-C6: load-time countdowns, "only N left", pre-checked opt-ins, unsourced percentages, struck-through prices); routing between the persuasion skills and to perf-budget-gate and a11y-audit-runner; MESSAGE_BRIEF to DECISION_LOG (PS-C12) | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
+| P57 | `check_roles` reads each scope's declarations in source order, then by specificity, one file or several; a two-file case with a dark block before a `:root` block (CodeRabbit on #187; reproduced on `v3.6.0` in one file) | N51 | `check_roles.py`, `tests/test_check_roles.py` | S |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
 Every outside figure in P42 (a law's date, a fine's ceiling) is re-read at its source on the day and registered in `tests/fixtures/evidence.json` with its quote. A legal point is flagged for review, never stated as advice.
