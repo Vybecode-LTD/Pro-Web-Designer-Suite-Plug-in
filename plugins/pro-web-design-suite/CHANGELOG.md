@@ -295,7 +295,7 @@ renames the plugin.
   `check_roles.py` and never ran it, so a role pair that lost its contrast passed CI. The `gates`
   and `windows` jobs run it on the `tokens.css` files the config's `tokens` names, or on
   `src/styles/tokens.css`; with neither, the command says the pairs go unchecked. `check_roles.py`
-  takes several files, read in order as one system, as the config reader merges them (Codex on #187). Run
+  takes several files, read in order as one system, as the config reader merges them (Codex on #187). The command runs the check once before it writes the step (CodeRabbit on #187): a configured file that does not exist stops the install, a system `check_roles.py` cannot read as the role vocabulary gets no step and the reason, and pairs that fail now get the step and a warning. Run
   `/install-gate` again to upgrade a project's workflow.
 - **The scaffold's controls keep arrays, nulls and the required state** (review of #176, React and
   Vue alike). A multiple select bound `String(value)` and sent one option; it binds the array and

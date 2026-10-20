@@ -33,6 +33,7 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
@@ -177,6 +178,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"install_gate: the token file {unsafe_roles!r} in .design-suite.json is not a path the workflow can "
               "run unquoted: letters, digits, '.', '_', '-' and '/', not starting with '-'.", file=sys.stderr)
         return 2
+    absent = next((path for path in roles if not (root / path).is_file()), None)
+    if absent:      # both jobs would exit 2 on it, so nothing is written (CodeRabbit on #187)
+        print(f"install_gate: .design-suite.json names the token file {absent!r}, which does not exist. Nothing "
+              "was written: the role-pair step would fail in CI.", file=sys.stderr)
+        return 2
+    # Run the check once now, as CI will: a step that cannot pass is not written.
+    roles_note = ""
+    if roles:
+        verdict, why = roles_preflight(roles, root)
+        if verdict == "unreadable":
+            roles_note = (f"The role pairs are not checked in CI: check_roles.py cannot read {', '.join(roles)} as a "
+                          f"system ({why}). It checks the role vocabulary of token-contract.md. Name the files that hold "
+                          "it in `tokens`, and run this again.")
+            roles = []
+        elif verdict == "failing":
+            roles_note = (f"{why} The workflow will fail on them until they are fixed: "
+                          f"python {args.dest.strip('/')}/check_roles.py {' '.join(roles)}")
     text = TEMPLATE.read_text(encoding="utf-8")
     for marker, python in (("@ROLES_LINUX@\n", "python3"), ("@ROLES_WINDOWS@\n", "python")):
         text = text.replace(marker, roles_step(python, args.dest.strip("/"), roles))
@@ -223,11 +241,28 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if missing:
         print("The browser gates need these in package.json, and it does not list them: "
               f"{', '.join(m.split('@')[0] for m in missing)}. Add them:\n  npm i -D -E {' '.join(missing)}")
-    if not roles:
+    if roles_note:
+        print(roles_note)
+    elif not roles:
         print("No tokens.css was found (.design-suite.json's `tokens`, or " + f"{args.src}/styles/tokens.css), so the "
               "role pairs are not checked in CI. Name the file in `tokens` and run this again.")
     print("Commit both, then run the workflow by hand with update-baselines ticked to record the baselines in CI.")
     return 0
+
+
+def roles_preflight(files: List[str], root: Path):
+    """What check_roles.py makes of these token files, as the workflow will run it:
+    ("passing" | "failing" | "unreadable", a line saying why). Its exit codes are
+    0 every pair passes, 1 some fail, 2 it cannot resolve the roles at all."""
+    script = SKILLS / "web-design-studio" / "scripts" / "check_roles.py"
+    proc = subprocess.run([sys.executable, "-B", str(script), *files], cwd=root, capture_output=True, timeout=120)
+    out = (proc.stdout + proc.stderr).decode("utf-8", "replace").strip().splitlines()
+    if proc.returncode == 0:
+        return "passing", ""
+    if proc.returncode == 1:
+        failing = sum(1 for line in out if line.startswith("FAIL  "))      # check_roles' own line for one
+        return "failing", f"{failing} role pair(s) fail their contrast now."
+    return "unreadable", (out[-1] if out else "it exited 2").removeprefix("check_roles: ")
 
 
 def roles_step(python: str, dest: str, files: List[str]) -> str:

@@ -53,6 +53,7 @@ LEAK = "@layer components {\n  .card {\n    color: var(--neutral-700);\n  }\n}\n
 CLEAN = "@layer components {\n  .card {\n    color: var(--fg-default);\n  }\n}\n"
 PAGE = ('<!doctype html>\n<html lang="en">\n<head><title>Home</title></head>\n'
         '<body><main><h1>Home</h1></main></body>\n</html>\n')
+STARTER_TOKENS = PLUGIN / "skills" / "web-design-studio" / "assets" / "starter" / "styles" / "tokens.css"
 needs_yaml = unittest.skipUnless(NODE and YAML_MODULES, "node and js-yaml (tooling/main) are not installed")
 NAMES = ["contrast", "critique", "deck", "docs-check", "email-build", "figma-sync", "gate", "gate-a11y", "gate-matrix",
          "gate-perf", "install-gate", "migrate", "new-system", "release-check", "schema-to-screens", "tw-probe"]
@@ -236,25 +237,31 @@ class TheInstallGate(CommandTest):
         self.write("src/components/card.css", LEAK)
         self.assertEqual(1, self.run_py("scripts/audit_design.py", "--strict").returncode)
 
+    def starter(self, rel: str, edit=None) -> None:
+        """The starter's real tokens.css in the project: the install runs check_roles on it."""
+        text = STARTER_TOKENS.read_text(encoding="utf-8")
+        self.write(rel, edit(text) if edit else text)
+
     def test_the_workflow_checks_the_role_pairs(self):
         """N50, F7 (P56 part 3): check_roles.py was vendored and never run, so a
-        role pair that lost its contrast passed CI. Each tokens.css the config
-        names is checked in both static jobs; a JSON token file is not its to read."""
+        role pair that lost its contrast passed CI. The token files the config
+        names are checked together, in order, in both static jobs; a JSON token
+        file is not check_roles' to read."""
         self.write(".design-suite.json", json.dumps(
-            {"schema": 1, "tokens": ["styles/ramps.css", "tokens.json", "styles/roles.css"]}))
-        self.write("styles/ramps.css", ":root { --neutral-0: #fff; }\n")
-        self.write("styles/roles.css", ":root { --bg-surface: var(--neutral-0); }\n")
+            {"schema": 1, "tokens": ["styles/tokens.css", "tokens.json", "styles/overrides.css"]}))
+        self.starter("styles/tokens.css")
+        self.write("styles/overrides.css", ":root { --fg-strong: var(--neutral-950); }\n")
         self.write("tokens.json", "{}\n")
         proc = self.install()
         workflow = self.workflow()
         # one system, read together and in order (Codex on #187)
-        self.assertIn("python3 scripts/check_roles.py styles/ramps.css styles/roles.css\n", workflow)   # Linux
-        self.assertIn("python scripts/check_roles.py styles/ramps.css styles/roles.css\n", workflow)    # Windows
+        self.assertIn("python3 scripts/check_roles.py styles/tokens.css styles/overrides.css\n", workflow)   # Linux
+        self.assertIn("python scripts/check_roles.py styles/tokens.css styles/overrides.css\n", workflow)    # Windows
         self.assertNotIn("tokens.json", workflow)
-        self.assertNotIn("role pairs are not checked", proc.stdout.decode("utf-8"))
+        self.assertNotIn("not checked", proc.stdout.decode("utf-8"))
 
     def test_the_role_pairs_default_to_the_starters_tokens(self):
-        self.write("src/styles/tokens.css", ":root { --neutral-0: #fff; }\n")
+        self.starter("src/styles/tokens.css")
         self.install()
         self.assertIn("python3 scripts/check_roles.py src/styles/tokens.css", self.workflow())
 
@@ -262,6 +269,35 @@ class TheInstallGate(CommandTest):
         proc = self.install()
         self.assertNotIn("check_roles.py", self.workflow().split("jobs:")[1])
         self.assertIn("role pairs are not checked", proc.stdout.decode("utf-8"))
+
+    def test_a_configured_token_file_that_is_missing_stops_the_install(self):
+        """CodeRabbit on #187: both jobs would exit 2 on it, so nothing is written."""
+        self.write(".design-suite.json", json.dumps({"schema": 1, "tokens": ["styles/missing.css"]}))
+        proc = self.install(code=2)
+        self.assertIn("styles/missing.css", proc.stderr.decode("utf-8"))
+        self.assertFalse((self.tmp / ".github").exists())
+        self.assertFalse((self.tmp / "scripts").exists())
+
+    def test_a_system_check_roles_cannot_read_gets_no_step_and_a_reason(self):
+        """CodeRabbit on #187: check_roles checks token-contract.md's role vocabulary. A
+        project whose files lack it would exit 2 in both jobs, so the step is not written."""
+        self.write("src/styles/tokens.css", ":root { --neutral-0: #fff; --brand: #e8440a; }\n")
+        proc = self.install()
+        said = proc.stdout.decode("utf-8")
+        self.assertNotIn("check_roles.py", self.workflow().split("jobs:")[1])
+        self.assertIn("role pairs are not checked in CI", said)
+        self.assertIn("src/styles/tokens.css", said)
+
+    def test_pairs_that_fail_now_are_written_with_a_warning(self):
+        """A real contrast failure is the gate's finding, so the step is written, and the
+        command says it fails until fixed instead of letting the first CI run say so."""
+        self.starter("src/styles/tokens.css", lambda css: css.replace(
+            "--fg-muted:       var(--neutral-600);", "--fg-muted:       var(--neutral-200);", 1))
+        proc = self.install()
+        self.assertIn("python3 scripts/check_roles.py src/styles/tokens.css", self.workflow())
+        said = proc.stdout.decode("utf-8")
+        self.assertIn("4 role pair(s) fail their contrast now", said)
+        self.assertIn("will fail on them until they are fixed", said)
 
     @unittest.skipUnless(NODE, "node is not installed")
     def test_the_browser_gates_find_their_helpers(self):
