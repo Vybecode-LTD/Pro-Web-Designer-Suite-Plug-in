@@ -284,6 +284,13 @@ renames the plugin.
   `missing-preconnect` took the page's own canonical URL for a third-party origin: the canonical's
   host is first-party, and only a `<link>` that fetches something adds an origin (`alternate` and
   `me` load nothing). A budget's `third_party.origins` count can drop by those links.
+- **The starter's code blocks and reflow** (P56 part 2, N50, found on the same site). A
+  `.page-grid` item holding a long `<pre>` set the whole page's width, 721px at 320px (a WCAG
+  1.4.10 failure): `.page-grid > *` takes `min-inline-size: 0`, so the line scrolls in its own box.
+  Every code block was set in Courier, because the UA's `code { font-family: monospace }` beat
+  inheritance inside `<pre>`: `pre > code` inherits the block's font, `--font-mono`. And on the
+  dark canvas a `<pre>` drew no box, `--bg-sunken` being the canvas there: it has a hairline
+  `--border-subtle` edge. A project made from the starter before 4.0.0 can copy the three rules.
 - **The scaffold's controls keep arrays, nulls and the required state** (review of #176, React and
   Vue alike). A multiple select bound `String(value)` and sent one option; it binds the array and
   sends the selected options. An emptied number input sent `NaN`; it sends `null`. `tag-input` and

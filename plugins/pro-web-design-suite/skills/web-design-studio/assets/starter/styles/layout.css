@@ -139,8 +139,12 @@
       minmax(var(--page-gutter), 1fr) [full-end];
   }
 
-  /* Default: everything sits in the content column. Opt out explicitly. */
-  .page-grid > * { grid-column: content; }
+  /* Default: everything sits in the content column. Opt out explicitly.
+     `min-inline-size: 0` lets a column shrink below its content's widest line:
+     a grid item's automatic minimum is that line, so one long `pre` set the
+     whole page's width (721px at 320px, a 1.4.10 failure; N50, F6). The line
+     scrolls in its own box instead. */
+  .page-grid > * { grid-column: content; min-inline-size: 0; }
   .page-grid > .bleed-wide { grid-column: wide; }
   .page-grid > .bleed-full { grid-column: full; }
   /* @end-snippet */
