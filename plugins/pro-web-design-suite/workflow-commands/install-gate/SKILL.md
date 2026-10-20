@@ -27,6 +27,7 @@ What it writes:
 - **`.github/workflows/design-gates.yml`:** three jobs.
   - `gates`: the three gates on Linux, in the Playwright image built for the project's own `playwright`, so the browser is the one the lockfile expects. It builds, serves the build, waits for it, and uploads the browser gates' reports.
   - `windows`: the static gates on a Windows runner.
+  - Both run `check_roles.py` on the `tokens.css` files that `.design-suite.json`'s `tokens` names, read together in order as one system, else on `src/styles/tokens.css` (`--src`) if there is one. The command runs that check once itself before it writes the step: a configured file that does not exist stops the install (exit 2); files `check_roles.py` cannot read as the role vocabulary of `token-contract.md` get no step, with the reason; pairs that fail their contrast now get the step and a warning that CI fails on them until they are fixed. With no `tokens.css`, the command says the role pairs go unchecked.
   - `baselines`: run by hand with `update-baselines` ticked. It records each gate's baseline where the gates run, and uploads them to review and commit.
 
 It takes the baselines' paths from `.design-suite.json`. It never overwrites a file it did not write, or one changed since it wrote it, unless `--force`: tell the user which files are in the way and let them decide. It refuses a `playwright` version range in `package.json`, since the image's browsers fit one version.

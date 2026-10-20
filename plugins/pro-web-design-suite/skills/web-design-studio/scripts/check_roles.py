@@ -359,17 +359,21 @@ def table(css: str) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Role-pair contrast gate: resolve Tier-2 roles per theme and check the pairs components use.")
-    ap.add_argument("tokens", help="the project's tokens.css")
+    ap.add_argument("tokens", nargs="+",
+                    help="the project's tokens.css; several files are one system, read in order, the last winning")
     ap.add_argument("--pairs", metavar="FILE", help="JSON pair list, replacing the built-in one")
     ap.add_argument("--table", action="store_true", help="print the role table (markdown) and exit")
     ap.add_argument("--json", action="store_true", help="machine-readable results")
     args = ap.parse_args()
 
-    path = pathlib.Path(args.tokens)
-    if not path.is_file():
-        print(f"check_roles: no such file: {path}", file=sys.stderr)
+    paths = [pathlib.Path(t) for t in args.tokens]
+    missing = next((p for p in paths if not p.is_file()), None)
+    if missing:
+        print(f"check_roles: no such file: {missing}", file=sys.stderr)
         return 2
-    css = _read_text(path)
+    # A project may keep its ramps in one file and its roles in another; the
+    # config reader merges them in order, and so does this (Codex on #187).
+    css = "\n".join(_read_text(p) for p in paths)
     if args.table:
         sys.stdout.write(table(css))
         return 0

@@ -47,6 +47,7 @@ jobs:
         run: python3 @DEST@/audit_design.py --strict
       - name: accessibility, static
         run: python3 @DEST@/a11y_static.py @SRC@ --strict
+@ROLES_LINUX@
       - name: performance, static
         run: python3 @DEST@/perf_audit.py @DIST@ --src @SRC@
       # The server starts, is waited for and is used in one step: a process
@@ -91,6 +92,7 @@ jobs:
         run: python @DEST@/audit_design.py --strict
       - name: accessibility, static
         run: python @DEST@/a11y_static.py @SRC@ --strict
+@ROLES_WINDOWS@
       - name: performance, static
         run: python @DEST@/perf_audit.py @DIST@ --src @SRC@
 

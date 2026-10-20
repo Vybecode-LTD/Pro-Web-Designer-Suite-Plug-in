@@ -202,6 +202,20 @@ class CheckRoles(TempDirTest):
                 if extra == ".inverse { color-scheme: dark; }":
                     self.assertIn("--fg-default on --bg-inverse (dark, light preference)", output(proc))
 
+    def test_a_system_split_across_files_is_read_as_one(self):
+        """Codex on #187: the config reader merges a project's token files in
+        order, so one system may keep its ramps in one file and its roles in
+        another. check_roles reads them together; each alone stays unresolvable."""
+        self.write("ramps.css", ":root { --neutral-0: #ffffff; --neutral-900: #1a1a1a; }\n")
+        self.write("roles.css", ":root { --bg-surface: var(--neutral-0); --fg-default: var(--neutral-900); }\n")
+        pairs = self.write("pairs.json", json.dumps([{"fg": "--fg-default", "bg": "--bg-surface", "min": 4.5}]))
+        both = run_py("web-design-studio", "check_roles", "ramps.css", "roles.css", "--pairs", pairs, cwd=self.tmp)
+        self.assertEqual(0, both.returncode, output(both))
+        for alone in ("ramps.css", "roles.css"):
+            with self.subTest(alone=alone):
+                proc = run_py("web-design-studio", "check_roles", alone, "--pairs", pairs, cwd=self.tmp)
+                self.assertEqual(2, proc.returncode, output(proc))
+
     def test_a_color_scheme_through_var_is_read_where_it_is_declared(self):
         """Codex on #112: `color-scheme: var(--scheme)` is the value of
         `--scheme` where it is declared, then inherited: an inverse band that
