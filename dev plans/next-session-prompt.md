@@ -6,7 +6,13 @@
 
 **The owner renamed the plugin Pro Web Design Suite** in another session (#180, merged): it lives in `plugins/pro-web-design-suite`. That session's #181 (the distribution repository) and #182 (ready for Anthropic's directory) are merged too; `docs/HANDOFF.md` has what the owner must do before R4.
 
-**Next: P41, P42 and P43, in the order the owner chooses.** Ask before you start (§4).
+**Update 2026-10-20: P56 is done.** A third session built webdesignersuite.com (the plugin's site, `C:\DEV\webdesignersuite.com`) from `/new-system` and `/install-gate`, which found seven problems (N50, its record is `dev plans/plugin-findings.md` there). All are fixed on `main` for 4.0.0, each with a test that failed on `v3.6.0`:
+- **#185, F2 to F4** (`dd83683`): `perf_audit`'s `css-import` reads shipped stylesheets only (the starter's own `@import`s no longer fail a fresh project's first CI run); a preload of the bundler's hashed font counts; the canonical's host is first-party.
+- **#186, F1, F5 and F6** (`7a75151`): `pre > code` inherits `--font-mono`, `.page-grid > *` may shrink (a long `pre` no longer widens the page at 320px), a `pre` has an edge on the dark canvas. **F5 is fixed in part:** dark `--bg-sunken` still equals the canvas, a look for the owner to choose.
+- **#187, F7** (`bc7a478`): `/install-gate`'s workflow runs `check_roles.py` on the configured token files, read together as one system; the command runs the check once first (a missing configured file stops the install; a system it cannot read gets no step and a reason; failing pairs get the step and a warning).
+- **N51, scheduled as P57 (small), open:** `check_roles` resolves a scope's declarations by selector, not by source order, in one file as in several (CodeRabbit on #187; reproduced on `v3.6.0`). The owner places it with P41 to P43.
+
+**Next: P41, P42 and P43, in the order the owner chooses** (P57 is small and can go first). Ask before you start (§4).
 
 Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **the rest of Phase 6b in the order the owner chooses** (§4), then R4.
 
@@ -550,7 +556,7 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 ## 4. The rest of Phase 6b, then 4.0.0
 
-Phase 6c is done (P50 to P55). In Phase 6b, P34, P35, P36 and P37 are done. **Ask the owner which of P41, P42 and P43 comes first**, and give them the sizes below. Read each item's rows in the completion plan and its review finding (`dev plans/web-design-suite-review/delivery.md` for DL-, `persuasion.md` for PS-) before planning, and split an L into PRs under 100 files each.
+Phase 6c is done (P50 to P55), and so is P56 (N50). In Phase 6b, P34, P35, P36 and P37 are done. **Ask the owner which of P41, P42 and P43 comes first** (P57, a small `check_roles` fix, N51, is also open), and give them the sizes below. Read each item's rows in the completion plan and its review finding (`dev plans/web-design-suite-review/delivery.md` for DL-, `persuasion.md` for PS-) before planning, and split an L into PRs under 100 files each.
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
