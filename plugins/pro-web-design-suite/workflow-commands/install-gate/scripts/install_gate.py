@@ -231,11 +231,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 def roles_step(python: str, dest: str, files: List[str]) -> str:
-    """The workflow step that checks each tokens.css's role pairs, or nothing."""
+    """The workflow step that checks the role pairs, or nothing. The files are
+    one system, read together in the config's order (Codex on #187)."""
     if not files:
         return ""
-    lines = "".join(f"          {python} {dest}/check_roles.py {path}\n" for path in files)
-    return f"      - name: role-pair contrast\n        run: |\n{lines}"
+    return f"      - name: role-pair contrast\n        run: {python} {dest}/check_roles.py {' '.join(files)}\n"
 
 
 if __name__ == "__main__":

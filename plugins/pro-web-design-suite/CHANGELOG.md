@@ -293,8 +293,9 @@ renames the plugin.
   `--border-subtle` edge. A project made from the starter before 4.0.0 can copy the three rules.
 - **`/install-gate`'s workflow checks the role pairs** (P56 part 3, N50). It vendored
   `check_roles.py` and never ran it, so a role pair that lost its contrast passed CI. The `gates`
-  and `windows` jobs run it on each `tokens.css` the config's `tokens` names, or on
-  `src/styles/tokens.css`; with neither, the command says the pairs go unchecked. Run
+  and `windows` jobs run it on the `tokens.css` files the config's `tokens` names, or on
+  `src/styles/tokens.css`; with neither, the command says the pairs go unchecked. `check_roles.py`
+  takes several files, read in order as one system, as the config reader merges them (Codex on #187). Run
   `/install-gate` again to upgrade a project's workflow.
 - **The scaffold's controls keep arrays, nulls and the required state** (review of #176, React and
   Vue alike). A multiple select bound `String(value)` and sent one option; it binds the array and

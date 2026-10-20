@@ -240,14 +240,17 @@ class TheInstallGate(CommandTest):
         """N50, F7 (P56 part 3): check_roles.py was vendored and never run, so a
         role pair that lost its contrast passed CI. Each tokens.css the config
         names is checked in both static jobs; a JSON token file is not its to read."""
-        self.write(".design-suite.json", json.dumps({"schema": 1, "tokens": ["styles/tokens.css", "tokens.json"]}))
-        self.write("styles/tokens.css", ":root { --neutral-0: #fff; }\n")
+        self.write(".design-suite.json", json.dumps(
+            {"schema": 1, "tokens": ["styles/ramps.css", "tokens.json", "styles/roles.css"]}))
+        self.write("styles/ramps.css", ":root { --neutral-0: #fff; }\n")
+        self.write("styles/roles.css", ":root { --bg-surface: var(--neutral-0); }\n")
         self.write("tokens.json", "{}\n")
         proc = self.install()
         workflow = self.workflow()
-        self.assertIn("python3 scripts/check_roles.py styles/tokens.css", workflow)   # Linux
-        self.assertIn("python scripts/check_roles.py styles/tokens.css", workflow)    # Windows
-        self.assertNotIn("check_roles.py tokens.json", workflow)
+        # one system, read together and in order (Codex on #187)
+        self.assertIn("python3 scripts/check_roles.py styles/ramps.css styles/roles.css\n", workflow)   # Linux
+        self.assertIn("python scripts/check_roles.py styles/ramps.css styles/roles.css\n", workflow)    # Windows
+        self.assertNotIn("tokens.json", workflow)
         self.assertNotIn("role pairs are not checked", proc.stdout.decode("utf-8"))
 
     def test_the_role_pairs_default_to_the_starters_tokens(self):
