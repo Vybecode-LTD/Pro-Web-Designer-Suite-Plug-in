@@ -211,7 +211,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-A20 | low | fixed in 3.4.0: the Layer 5 and 6 headings, the retired ids named, eleven rows, 91 checks, the checklist's 30 minutes (PR #69; `test_presentation.CritiqueDocs`, `test_audit_design.ThePromisedChecks`) | Counts and structure in design-critique-gate are wrong. |
 | PS-A21 | low | fixed in 3.4.0: a blocker stops the build and `--dry-run`, `\|` read, the 10 MB warning, exit 2 documented (PR #69; `test_presentation.DeckFromTheDefenceSheet`) | Smaller mismatches between docs and behaviour. |
 | PS-A22 | low | fixed in 3.4.0 (PR #70; `test_persuasion_docs`.PageSectionsSaysWhatItDoes) | The header says "SEVEN SECTION SHELLS" but lists eight (:7-13). |
-| PS-B1 | — | W14 (3.6.0+) | Accessibility of persuasive patterns. |
+| PS-B1 | — | done in 4.0.0: `test_persuasion_docs.PersuasiveDevicesAgainstWcag`, PR #190 (P42 part 1) | Accessibility of persuasive patterns. |
 | PS-B2 | — | W14 (3.6.0+) | Consumer law beyond the EU/US basics. |
 | PS-B3 | — | W14 (3.6.0+) | Price experiments. |
 | PS-B4 | — | W14 (3.6.0+) | Page types and audiences. |

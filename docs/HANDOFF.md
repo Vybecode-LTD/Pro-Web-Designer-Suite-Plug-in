@@ -14,12 +14,12 @@ A second session, beside P35's, did the owner's distribution plan (`dev plans/we
 - **#181, merged as `24774d0`.** Releases ship without `tests/`, `evals/` and `tools/` (222 files). `build.py --tree` writes the **distribution repository**'s contents, and the build refuses what Anthropic's directory blocks. `release.yml`'s `distribute` job pushes each release to `Vybecode-LTD/pro-web-design-suite`: forward only, atomic, queued, never an older tag over a newer one. CI validates the tree on every PR.
 - **#182, which carries this section.** The README now has *Try it*, *Where it works* and *What it runs, sends and stores*. Add to that `SECURITY.md` and `plugin.json`'s `documentationUrl`, `supportUrl` and `privacyPolicyUrl`.
 
-**Before R4's tag, the owner must:**
-1. create the empty public repository `Vybecode-LTD/pro-web-design-suite`;
-2. add a write deploy key to it, with the private half in this repository's secret `DIST_DEPLOY_KEY`;
-3. turn on private vulnerability reporting here, which `SECURITY.md` sends reports to.
+**The owner's three steps before R4 are done** (verified 2026-10-21):
+1. `Vybecode-LTD/pro-web-design-suite` exists, public and empty;
+2. its write deploy key (id 166961999) pairs with this repository's secret `DIST_DEPLOY_KEY`;
+3. private vulnerability reporting is on here, which `SECURITY.md` sends reports to.
 
-Without 1 and 2, `distribute` fails, though the GitHub release still happens. **After R4:**
+R4's `distribute` job is the first real push with the key; if it fails, the GitHub release still happens. **After R4:**
 - check that the distribution repository holds 4.0.0 at its root;
 - `/plugin marketplace add Vybecode-LTD/pro-web-design-suite` installs it;
 - the owner validates it at claude.ai/directory/manage and submits it (Part A of the distribution plan).
@@ -49,14 +49,13 @@ Without 1 and 2, `distribute` fails, though the GitHub release still happens. **
 
 ## Next steps
 
-1. **Ask the owner which of P41, P42 and P43 comes first.** Sizes and scope are in the next-session prompt's §4.
-2. Do them in that order, each split into PRs of under 100 files.
+1. **P42, then P43, then P41**, the owner's order (2026-10-21). P42 part 1 (#190, PS-B1) is done; parts 2 (consumer law and price tests) and 3 (consent for tracking) are next. Sizes and scope are in the next-session prompt's §4.
+2. Each split into PRs of under 100 files.
 3. Then **R4**, the 4.0.0 release, with its live check (the owner's OK and an estimate first).
 
 ## Open owner decisions
 
-- **Before R4:** create `Vybecode-LTD/pro-web-design-suite` and its `DIST_DEPLOY_KEY` deploy key, and turn on private vulnerability reporting (the 2026-10-19 section above). Also decide whether issues live in the distribution repository or here; `supportUrl` points here for now.
-- The order of P41 (email), P42 (persuasion law, consent, price tests, WCAG mapping) and P43 (page types, claims layer, routing).
+- Whether issues live in the distribution repository or here; `supportUrl` points here for now.
 - Whether to start the proposed follow-up: `check.py` should select `test_doc_snippets` and stylelint's snippet test when a reference changes. It missed the snippet that failed #179's CI.
 
 ## Warnings

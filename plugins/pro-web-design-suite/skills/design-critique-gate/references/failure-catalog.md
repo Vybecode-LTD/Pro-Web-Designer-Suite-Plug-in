@@ -304,6 +304,20 @@ whether or not it is.
 **Fix.** Interactive treatments are reserved to interactive components; a clickable card makes the whole
 card the control with one accessible name.
 
+### L8-6 · A persuasive device that fails its criterion
+**Seen as.** A countdown that ticks on with no way to stop it, a carousel that never pauses, a sticky bar
+that hides a button reached by Tab, a modal that Esc does not close, a grey "No thanks" link too small to
+hit.
+**Mechanism.** Each device is built for the visitor who looks at it, and each meets a WCAG 2.2 criterion
+in its usual form: 2.2.1 and 2.2.2 for timers and movement, 2.4.11 for what sits over the page, 2.1.2 for
+the modal, 2.5.8 and 1.4.3 for the decline, 4.1.3 for the toast.
+**Confirm.** Hold every device on the page to its row in `landing-page-conversion`'s
+`references/conversion-audit.md` §7.1, then run `a11y_runtime` (`obscured`, `taborder`, `hover` and axe)
+for the rows a tool decides.
+**Fix.** The device's accessible form is a property of the component: a pause control on movement that
+starts on its own and runs past five seconds beside other content (2.2.2's case), the dialog element for the
+modal, the status region in the toast, `--tap-min` on every decline.
+
 ---
 
 ## Layer 9 — Conformance

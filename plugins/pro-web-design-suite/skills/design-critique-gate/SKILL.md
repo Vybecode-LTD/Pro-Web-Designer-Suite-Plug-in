@@ -201,6 +201,8 @@ The work is judged on the default state and used in the others.
 - Hover must not change layout. A border-width or padding change on hover shifts the
   element and its neighbours; the page twitches under the cursor and reads as broken.
 - `prefers-reduced-motion: reduce` honoured without breaking transition-end handlers.
+- Every timer, carousel, sticky bar, modal and toast held to its WCAG 2.2 criterion
+  (`references/failure-catalog.md` L8-6).
 
 ### 9 — Conformance
 

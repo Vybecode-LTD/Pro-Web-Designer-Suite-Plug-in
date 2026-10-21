@@ -12,9 +12,9 @@
 - **#187, F7** (`bc7a478`): `/install-gate`'s workflow runs `check_roles.py` on the configured token files, read together as one system; the command runs the check once first (a missing configured file stops the install; a system it cannot read gets no step and a reason; failing pairs get the step and a warning).
 - **#189, N51 as P57:** `check_roles` applies a scope's blocks as the cascade does (the heavier selector, then the block written later), in one file or across the files in the order listed. Before, it applied every `:root` block before every `[data-theme="dark"]` block, so a `:root` written below the dark block passed on the dark value while the page showed `:root`'s (CodeRabbit on #187; reproduced on `v3.6.0`). A system that keeps `:root` first, as the starter does, reads as before. Cascade layers are still read as one, which the script's docstring says.
 
-**Next: P41, P42 and P43, in the order the owner chooses; all three come before R4.** Ask before you start (§4).
+**Next: P42 (part 1 done, #190), then P43, then P41: the owner's order (2026-10-21). All three come before R4** (§4).
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **the rest of Phase 6b in the order the owner chooses** (§4), then R4.
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **the rest of Phase 6b in the owner's order** (§4), then R4.
 
 You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -556,13 +556,13 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 ## 4. The rest of Phase 6b, then 4.0.0
 
-Phase 6c is done (P50 to P55), and so are P56 (N50) and P57 (N51). In Phase 6b, P34, P35, P36 and P37 are done. **Ask the owner in what order to do P41, P42 and P43**, and give them the sizes below. Read each item's rows in the completion plan and its review finding (`dev plans/web-design-suite-review/delivery.md` for DL-, `persuasion.md` for PS-) before planning, and split an L into PRs under 100 files each.
+Phase 6c is done (P50 to P55), and so are P56 (N50) and P57 (N51). In Phase 6b, P34, P35, P36 and P37 are done. **The owner chose the order on 2026-10-21: P42, then P43, then P41.** P42 is split in three: part 1 (#190, PS-B1, the persuasive devices against WCAG 2.2) is done; part 2 is the UK and EU consumer law with price experiments (PS-B2, PS-B3), part 3 consent for tracking (PS-B8). Read each item's rows in the completion plan and its review finding (`dev plans/web-design-suite-review/delivery.md` for DL-, `persuasion.md` for PS-) before planning, and split an L into PRs under 100 files each.
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P41 | Email: MJML or React Email output (DL-B4: `mj-attributes`/`mj-class` or a React Email theme from `email-tokens.json`, or route away explicitly); a right-to-left template (DL-B5: `dir="rtl"` on tables so ghost-table order flips, mirrored `align`, padding and VML, per-locale `lang` and `<title>`, text expansion against fixed VML widths); a client matrix regenerated from caniemail's data, with test dates (DL-C9) | DL-B4, DL-B5, DL-C9 | email-template-system | L |
 | P42 | Persuasion: persuasive patterns mapped to the WCAG 2.2 criteria they touch (PS-B1: sticky bars, deadlines, carousels, modals, consent banners, multi-step forms); UK and EU consumer law to flag for legal review (PS-B2: the DMCC Act, in force since 6 April 2025, fake reviews and drip pricing); price experiments (PS-B3: disclosure, the lowest price shown, revenue per visitor's noise); consent for tracking (PS-B8: GDPR, ePrivacy, PECR, masking in session recordings) | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
 | P43 | Page types and audiences (PS-B4: B2B demo pages, gated lead magnets, booking and donation pages, regulated claims, localisation); a claims layer and `lint_claims.py` (PS-B6, PS-C6: load-time countdowns, "only N left", pre-checked opt-ins, unsourced percentages, struck-through prices); routing between the persuasion skills and to perf-budget-gate and a11y-audit-runner; MESSAGE_BRIEF to DECISION_LOG (PS-C12) | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
+| P41 | Email: MJML or React Email output (DL-B4: `mj-attributes`/`mj-class` or a React Email theme from `email-tokens.json`, or route away explicitly); a right-to-left template (DL-B5: `dir="rtl"` on tables so ghost-table order flips, mirrored `align`, padding and VML, per-locale `lang` and `<title>`, text expansion against fixed VML widths); a client matrix regenerated from caniemail's data, with test dates (DL-C9) | DL-B4, DL-B5, DL-C9 | email-template-system | L |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
 Every outside figure in P42 (a law's date, a fine's ceiling) is re-read at its source on the day and registered in `tests/fixtures/evidence.json` with its quote. A legal point is flagged for review, never stated as advice.
@@ -574,7 +574,7 @@ Every outside figure in P42 (a law's date, a fine's ceiling) is re-read at its s
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 
 **R4 also ships the rename and the distribution repository** (#180, #181 and #182, 2026-10-19). Read `dev plans/web-design-suite-distribution-and-promotion.md`'s "Rename and distribution plan" first.
-- **Before the tag**, confirm with the owner that `Vybecode-LTD/pro-web-design-suite` exists, empty and public, and that the `DIST_DEPLOY_KEY` secret is set (`gh secret list`), or `release.yml`'s `distribute` job fails.
+- **Before the tag**, check that `Vybecode-LTD/pro-web-design-suite` is still empty and public (`gh repo view`), that its write deploy key is there (`gh api repos/Vybecode-LTD/pro-web-design-suite/keys`) and that the `DIST_DEPLOY_KEY` secret is set (`gh secret list`), or `release.yml`'s `distribute` job fails. All three held on 2026-10-21.
 - R4's live check adds: installing 3.6.0 under its old name and updating, so the `renames` map moves it to `pro-web-design-suite`; `/pro-web-design-suite:gate` and the MCP tools under their new names; `build.py --tree` validated with `claude plugin validate --strict`.
 - **After the tag:** the `distribute` job's log; the distribution repository's `main` and `v4.0.0`, with 222 files and no `tests/`; then `/plugin marketplace add Vybecode-LTD/pro-web-design-suite` and an install from it on a clean machine.
 - **Then the owner submits** the distribution repository at claude.ai/directory/manage. Validate first, from the plan's Part A. Ask before anything is submitted.

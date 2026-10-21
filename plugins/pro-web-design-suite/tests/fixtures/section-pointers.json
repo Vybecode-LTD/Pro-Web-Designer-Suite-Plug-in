@@ -931,6 +931,12 @@
  },
  {
   "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "landing-page-conversion/references/conversion-audit.md",
+  "section": "7.1",
+  "heading": "The persuasive devices, against WCAG 2.2"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
   "to": "web-design-studio/references/spacing-system.md",
   "section": "13",
   "heading": "Debugging a layout that \"feels off\""
@@ -1534,6 +1540,12 @@
   "to": "landing-page-conversion/references/page-architecture.md",
   "section": "8",
   "heading": "Wiring sections to the design system"
+ },
+ {
+  "from": "landing-page-conversion/references/conversion-audit.md",
+  "to": "a11y-audit-runner/references/automation-coverage.md",
+  "section": "3",
+  "heading": "The coverage table"
  },
  {
   "from": "landing-page-conversion/references/conversion-audit.md",

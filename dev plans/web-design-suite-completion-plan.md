@@ -533,7 +533,7 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 
 | ID | Severity or size | What is wrong or missing |
 |---|---|---|
-| PS-B1 | — | Accessibility of persuasive patterns. |
+| PS-B1 | — | Accessibility of persuasive patterns. *Done for 4.0.0: conversion-audit.md §7.1 holds thirteen devices to their WCAG 2.2 criteria, with the check that decides each or a person, and the critique gate's layer 8 points to it as failure-catalog L8-6 (PR #190, P42 part 1).* |
 | PS-B2 | — | Consumer law beyond the EU/US basics. |
 | PS-B3 | — | Price experiments. |
 | PS-B4 | — | Page types and audiences. |

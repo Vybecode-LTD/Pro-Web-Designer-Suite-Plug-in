@@ -870,6 +870,57 @@
       "docs": [
         "web-design-studio/references/layout-composition.md"
       ]
+    },
+    {
+      "figure": "24 by 24 CSS pixels",
+      "also": [
+        "24px circle"
+      ],
+      "claim": "the smallest pointer target WCAG 2.2 AA allows, and the circle its spacing exception draws",
+      "source": "W3C, Web Content Accessibility Guidelines (WCAG) 2.2, Recommendation (12 December 2024), 2.5.8 Target Size (Minimum)",
+      "url": "https://www.w3.org/TR/WCAG22/#target-size-minimum",
+      "checked": "2026-10-21",
+      "quote": "The size of the target for pointer inputs is at least 24 by 24 CSS pixels, except when: Spacing Undersized targets (those less than 24 by 24 CSS pixels) are positioned so that if a 24 CSS pixel diameter circle is centered on the bounding box of each, the circles do not intersect another target or the circle for another undersized target",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "20 seconds",
+      "also": [
+        "ten times",
+        "20 hours"
+      ],
+      "claim": "how a time limit meets 2.2.1: adjustable to ten times its length, or extendable with 20 seconds' warning at least ten times; a limit over 20 hours is exempt",
+      "source": "W3C, Web Content Accessibility Guidelines (WCAG) 2.2, Recommendation (12 December 2024), 2.2.1 Timing Adjustable",
+      "url": "https://www.w3.org/TR/WCAG22/#timing-adjustable",
+      "checked": "2026-10-21",
+      "quote": "Adjust The user is allowed to adjust the time limit before encountering it over a wide range that is at least ten times the length of the default setting; or Extend The user is warned before time expires and given at least 20 seconds to extend the time limit with a simple action (for example, \"press the space bar\"), and the user is allowed to extend the time limit at least ten times; ... 20 Hour Exception The time limit is longer than 20 hours.",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "five seconds",
+      "claim": "how long moving, blinking or scrolling content may run before 2.2.2 asks for a way to pause, stop or hide it",
+      "source": "W3C, Web Content Accessibility Guidelines (WCAG) 2.2, Recommendation (12 December 2024), 2.2.2 Pause, Stop, Hide",
+      "url": "https://www.w3.org/TR/WCAG22/#pause-stop-hide",
+      "checked": "2026-10-21",
+      "quote": "For any moving, blinking or scrolling information that (1) starts automatically, (2) lasts more than five seconds, and (3) is presented in parallel with other content, there is a mechanism for the user to pause, stop, or hide it unless the movement, blinking, or scrolling is part of an activity where it is essential",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "3 seconds",
+      "claim": "how long audio may play on its own before 1.4.2 asks for a way to stop it or set its volume",
+      "source": "W3C, Web Content Accessibility Guidelines (WCAG) 2.2, Recommendation (12 December 2024), 1.4.2 Audio Control",
+      "url": "https://www.w3.org/TR/WCAG22/#audio-control",
+      "checked": "2026-10-21",
+      "quote": "If any audio on a web page plays automatically for more than 3 seconds, either a mechanism is available to pause or stop the audio, or a mechanism is available to control audio volume independently from the overall system volume level.",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
     }
   ],
   "not_statistics": [

@@ -159,7 +159,7 @@ The right `type` and `inputmode` change the mobile keyboard, which changes the n
 
 **Multi-step vs single.** A long form split into steps with a visible stepper usually feels shorter and completes better, because each screen is a small commitment and progress is legible. But every step boundary is a place to leave. Split when the sections are genuinely different kinds of information (contact / project / budget); never split a five-field form to look modern.
 
-**Tap targets.** Every input, button and checkbox at `min-block-size: var(--tap-min)` (44px). Check it at `data-density="compact"`, which is where floors get breached.
+**Tap targets.** Every input, button and checkbox at `min-block-size: var(--tap-min)` (44px). Check it at `data-density="compact"`, which is where floors get breached. The 44px is the suite's policy; WCAG 2.2 AA asks less (§7.1, 2.5.8), so a page that meets AA can still miss the floor.
 
 ---
 
@@ -193,6 +193,28 @@ Also: never inject a banner, cookie notice or promo bar *above* existing content
 **Mobile specifics.** Tap targets ≥ 44px with real spacing between them. No horizontal scroll — check by setting the viewport to 320px, and remember that a full-bleed element built with negative margins will produce horizontal scroll when a scrollbar appears, which is why `.page-grid`'s named-line breakout exists. Respect `prefers-reduced-motion`; the tokens already collapse durations to 1ms. Check the page with the OS at 200% text size.
 
 **Accessibility is part of this pass, not a separate one.** Contrast measured rather than assumed, a visible focus ring on every interactive element, a working skip link, headings in order, real landmarks, and every form control labelled. Route to `web-design-studio`'s `references/accessibility.md`. A page that a keyboard user cannot complete has a conversion rate of zero for that user, which is the most literal conversion problem there is.
+
+### 7.1 The persuasive devices, against WCAG 2.2
+
+Every device this skill writes for meets a WCAG 2.2 criterion ([W3C](https://www.w3.org/TR/WCAG22/), the Recommendation of 12 December 2024), and its usual form fails it. Hold each one to its criterion when you build it and again in this pass. Whether a tool can decide a criterion, and whether this suite's gates do, is in `a11y-audit-runner`'s `references/automation-coverage.md` §3. The last column names the check that runs, or a person where none does.
+
+| Device | Criterion (level) | What it asks of the device | Checked by |
+|---|---|---|---|
+| A countdown or an "offer ends in" timer that ticks | 2.2.2 Pause, Stop, Hide (A) | Information that updates on its own beside other content can be paused, stopped or hidden, or its updates slowed, unless the updating is essential. Never put the ticking text in a live region: a screen reader would read out every second | A person |
+| A held basket, a reserved seat, a session that expires | 2.2.1 Timing Adjustable (A) | The visitor can turn the limit off or set it to at least ten times its length, or is warned and given at least 20 seconds to extend it with a simple action, at least ten times. A real-time event such as an auction, a limit that is essential, and one longer than 20 hours are exempt | A person: no tool knows a limit exists |
+| A carousel, a rotating testimonial, a ticker, an animated badge | 2.2.2 Pause, Stop, Hide (A) | Movement that starts on its own, lasts more than five seconds and sits beside other content has a pause, stop or hide control, unless the movement is essential | A person |
+| An audio demo that plays on load | 1.4.2 Audio Control (A) | Sound that plays on its own for more than 3 seconds can be paused or stopped, or its volume set apart from the system's. Better: the demo starts when the visitor presses play | axe's `no-autoplay-audio`, in `a11y_runtime` |
+| A sticky header or CTA bar; a cookie or promo banner on an edge | 2.4.11 Focus Not Obscured (Minimum) (AA) | A control that takes keyboard focus is never entirely hidden by content the page lays over it | `a11y_runtime`'s `obscured`, down the page and back up |
+| An exit-intent, newsletter or discount modal | 2.1.2 No Keyboard Trap (A); 2.4.3 Focus Order (A) | Focus moves into the dialog when it opens, can leave it by keyboard (Esc, or a visible close), and lands back where it was | `a11y_runtime`'s `taborder` for focus caught outside a modal dialog; Esc, the close control and whether the order makes sense, a person: `taborder` presses only Tab, and lets a modal hold focus |
+| A price detail or the terms shown on hover | 1.4.13 Content on Hover or Focus (AA) | Esc dismisses it without moving the pointer, the pointer can move onto it, and it stays until dismissed or until its trigger goes | `a11y_runtime`'s `hover`, for a node `aria-describedby` ties to its control |
+| A small "No thanks", a close ×, an unsubscribe link | 2.5.8 Target Size (Minimum) (AA) | At least 24 by 24 CSS pixels, or spaced so that a 24px circle centred on each small target crosses no other target and no other such circle. A link inside a sentence, a control with an equivalent elsewhere on the page, a browser's own control and an essential presentation are exempt. The suite's `--tap-min` (44px) is its own policy, stricter than AA | axe's `target-size`, in `a11y_runtime` |
+| A pale decline link | 1.4.3 Contrast (Minimum) (AA) | Text at 4.5:1, or 3:1 when large. A decline made hard to read is confirmshaming and a contrast failure at once | axe's `color-contrast`, in `a11y_runtime`; `check_roles.py` for the roles |
+| A multi-step signup or checkout | 3.3.7 Redundant Entry (A) | What the visitor gave earlier in the same process is filled in or offered to pick, unless entering it again is essential, is for security, or the earlier value no longer holds | A person |
+| A sign-in, or a code or CAPTCHA that proves who the visitor is; the fields a signup asks for | 3.3.8 Accessible Authentication (Minimum) (AA); 1.3.5 Identify Input Purpose (AA) | 3.3.8 holds the steps that authenticate, not account creation: none needs a password remembered, a code transcribed or a puzzle solved unless it offers another way or help (paste and password managers work; a CAPTCHA has a path without a puzzle). Personal fields, at signup and anywhere else, carry `autocomplete` (1.3.5) | `a11y_static`'s `missing-autocomplete` (1.3.5); the rest, a person |
+| A toast, "added to basket", a stock count that updates, a success message | 4.1.3 Status Messages (AA) | A message that reports a result without taking focus sits in a live region (`role="status"`, or `role="alert"` for an error) that exists before its text changes | A person |
+| A consent banner | 2.1.1 Keyboard (A); 2.4.11 Focus Not Obscured (Minimum) (AA); 1.4.3 Contrast (Minimum) (AA) | It is reachable by keyboard, never hides the focused control, and its reject choice reads as clearly as its accept | `a11y_runtime`'s `taborder` and `obscured`; axe's `color-contrast` |
+
+The critique gate holds the same devices in its layer 8 (`design-critique-gate`'s `references/failure-catalog.md` L8-6), so a page reviewed there and audited here gets one answer.
 
 ---
 

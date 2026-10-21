@@ -20,19 +20,29 @@ Regressions covered (3.4.0):
   not meet 1.2.5, and nothing for an audio-only demo (1.2.1).
 - PS-A22: page-sections.css's comments against its code.
 
+Gaps closed (4.0.0, P42):
+- PS-B1: the skill prescribed countdowns, carousels, sticky bars, modals,
+  consent banners, multi-step signup and toasts, and never held one to the
+  WCAG 2.2 criterion it meets; the critique gate's layer 8 did not either.
+
 The docs are read through SKILLS, which honours WDS_PLUGIN_ROOT, so
 tools/fail_before.py runs these against the previous release's docs.
 """
 from __future__ import annotations
 
+import json
 import re
+import subprocess
 import unittest
 
-from wds_support import SKILLS, TempDirTest, output, run_py
+from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, output, run_py, tool_modules
 
 LANDING = SKILLS / "landing-page-conversion"
 DECK = SKILLS / "client-presentation-builder"
 GATE = SKILLS / "design-critique-gate"
+A11Y = SKILLS / "a11y-audit-runner"
+REGISTER = json.loads((PLUGIN / "tests" / "fixtures" / "evidence.json").read_bytes())
+AXE = tool_modules("WDS_NODE_MODULES", "axe-core")
 
 
 def read(path) -> str:
@@ -170,6 +180,175 @@ class PageSectionsSaysWhatItDoes(unittest.TestCase):
         comment = self.css.split(".feature-card--media { padding: 0; }", 1)[0].rsplit("/*", 1)[1]
         self.assertNotIn("Bordered variant", comment)
         self.assertIn("Media variant", comment)
+
+
+# The level WCAG 2.2 gives each criterion the devices meet (the W3C
+# Recommendation of 12 December 2024, re-read 2026-10-21).
+LEVELS = {"1.3.5": "AA", "1.4.2": "A", "1.4.3": "AA", "1.4.13": "AA", "2.1.1": "A", "2.1.2": "A",
+          "2.2.1": "A", "2.2.2": "A", "2.4.3": "A", "2.4.11": "AA", "2.5.8": "AA", "3.3.7": "A",
+          "3.3.8": "AA", "4.1.3": "AA"}
+# The devices PS-B1 names, and a criterion each must be held to.
+DEVICES = {"countdown": "2.2.2", "held basket": "2.2.1", "carousel": "2.2.2", "audio demo": "1.4.2",
+           "sticky": "2.4.11", "modal": "2.1.2", "on hover": "1.4.13", '"No thanks"': "2.5.8",
+           "decline link": "1.4.3", "multi-step": "3.3.7", "sign-in": "3.3.8", "toast": "4.1.3",
+           "consent banner": "2.4.11"}
+
+
+def device_rows() -> list[list[str]]:
+    """conversion-audit.md §7.1's rows: device, criteria, requirement, checked by."""
+    text = (LANDING / "references" / "conversion-audit.md").read_text(encoding="utf-8")
+    table = section(text, "### 7.1 The persuasive devices, against WCAG 2.2", "\n---")
+    return [[c.strip() for c in line.strip().strip("|").split("|")]
+            for line in table.splitlines() if line.startswith("| ") and not line.startswith("| Device")]
+
+
+def criteria(cell: str) -> dict[str, str]:
+    return dict(re.findall(r"(\d\.\d+\.\d+) [^;]*?\((A{1,3})\)", cell))
+
+
+def no_gate_decides() -> set[str]:
+    """The criteria a11y-audit-runner's coverage table leaves to a person: no
+    tool decides them, or none in this suite does."""
+    found = set()
+    for line in (A11Y / "references" / "automation-coverage.md").read_text(encoding="utf-8").splitlines():
+        m = re.match(r"\| \*\*(\d\.\d+\.\d+)\*\* [^|]+\| ([^|]+) \| ([^|]+) \|", line)
+        if m and ("None" in m.group(2) or "*Not in this suite.*" in m.group(3)):
+            found.add(m.group(1))
+    return found
+
+
+class PersuasiveDevicesAgainstWcag(unittest.TestCase):
+    """PS-B1: each device the skill writes for, held to its WCAG 2.2
+    criterion, with the check that decides it or a person where none does."""
+
+    def test_each_device_is_held_to_its_criteria_at_their_levels(self):
+        rows = device_rows()
+        self.assertGreaterEqual(len(rows), len(set(DEVICES.values())))
+        for row in rows:
+            with self.subTest(device=row[0]):
+                held = criteria(row[1])
+                self.assertTrue(held, row[1])
+                for sc, level in held.items():
+                    self.assertEqual(LEVELS.get(sc), level, sc)
+        for device, sc in DEVICES.items():
+            with self.subTest(device=device):
+                row = next((r for r in rows if device in r[0]), None)
+                self.assertIsNotNone(row, f"no row for {device}")
+                self.assertIn(sc, criteria(row[1]))
+
+    def test_a_check_the_table_names_runs_and_reports_that_criterion(self):
+        runtime = (A11Y / "scripts" / "a11y_runtime.mjs").read_text(encoding="utf-8")
+        reports: dict[str, set] = {}
+        for check, sc in re.findall(r"'(\w+)',\s*(?:'[\w-]+'|\w+),\s*'(\d\.\d+\.\d+)'", runtime):
+            reports.setdefault(check, set()).add(sc)
+        static = (A11Y / "scripts" / "a11y_static.py").read_text(encoding="utf-8")
+        named = 0
+        for row in device_rows():
+            held = set(criteria(row[1]))
+            for check in re.findall(r"`a11y_runtime`'s `(\w+)`(?: and `(\w+)`)?", row[3]):
+                for name in filter(None, check):
+                    named += 1
+                    with self.subTest(device=row[0], check=name):
+                        self.assertTrue(reports.get(name, set()) & held, (name, reports.get(name)))
+            for rule in re.findall(r"`a11y_static`'s `([\w-]+)` \((\d\.\d+\.\d+)\)", row[3]):
+                with self.subTest(device=row[0], rule=rule[0]):
+                    self.assertRegex(static, rf'"{rule[0]}", "{re.escape(rule[1])}"')
+                    self.assertIn(rule[1], held)
+        self.assertGreaterEqual(named, 4)
+
+    @unittest.skipUnless(NODE and AXE, "needs node plus WDS_NODE_MODULES holding axe-core")
+    def test_an_axe_rule_the_table_names_carries_that_criterions_tag(self):
+        wanted = [(rule, sorted(criteria(row[1]))) for row in device_rows()
+                  for rule in re.findall(r"axe's `([\w-]+)`", row[3])]
+        self.assertGreaterEqual(len(wanted), 3)
+        proc = subprocess.run([NODE, "-e", "const a=require('axe-core');console.log(JSON.stringify("
+                               "Object.fromEntries(a.getRules().map(r=>[r.ruleId,r.tags]))))"],
+                              env=env(NODE_PATH=AXE), capture_output=True, timeout=60)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        tags = json.loads(proc.stdout)
+        for rule, held in wanted:
+            with self.subTest(rule=rule):
+                self.assertIn(rule, tags)
+                self.assertTrue({"wcag" + sc.replace(".", "") for sc in held} & set(tags[rule]), tags[rule])
+
+    def test_a_criterion_no_gate_decides_is_left_to_a_person(self):
+        """automation-coverage.md §3 and this table agree: a device whose
+        criteria no tool decides, or none in this suite, names no check."""
+        manual = no_gate_decides()
+        self.assertTrue({"2.2.1", "3.3.7", "4.1.3", "2.2.2"} <= manual, manual)
+        for row in device_rows():
+            held = set(criteria(row[1]))
+            with self.subTest(device=row[0]):
+                if held <= manual:
+                    self.assertTrue(row[3].startswith("A person"), row[3])
+                    self.assertNotIn("`", row[3])
+                else:
+                    self.assertIn("`", row[3])
+
+    def test_the_aa_minimum_and_the_suites_floor_are_told_apart(self):
+        audit = " ".join((LANDING / "references" / "conversion-audit.md").read_text(encoding="utf-8").split())
+        self.assertIn("The 44px is the suite's policy; WCAG 2.2 AA asks less", audit)
+        row = next(r for r in device_rows() if "2.5.8" in r[1])
+        self.assertIn("24 by 24 CSS pixels", row[2])
+        self.assertIn("`--tap-min` (44px) is its own policy, stricter than AA", row[2])
+
+    def test_the_target_size_row_keeps_every_exception(self):
+        """Codex and CodeRabbit on #190: 24px or spacing is not all of 2.5.8.
+        A link inside a sentence, an equivalent control, a browser's own
+        control and an essential presentation are exempt."""
+        row = next(r for r in device_rows() if "2.5.8" in r[1])
+        for exception in ("A link inside a sentence", "a control with an equivalent elsewhere on the page",
+                          "a browser's own control", "an essential presentation are exempt"):
+            with self.subTest(exception=exception):
+                self.assertIn(exception, row[2])
+
+    def test_authentication_is_not_account_creation(self):
+        """CodeRabbit on #190: 3.3.8 holds the steps that authenticate; WCAG's
+        Understanding puts its focus on logging in, not on creating an account."""
+        row = next(r for r in device_rows() if "3.3.8" in r[1])
+        self.assertIn("3.3.8 holds the steps that authenticate, not account creation", row[2])
+        self.assertNotIn("A signup or sign-in step", row[0])
+        self.assertIn("1.3.5", criteria(row[1]))
+
+    def test_a_modals_way_out_is_left_to_a_person(self):
+        """Codex on #190: `taborder` presses only Tab, and an open modal may
+        hold focus, so a modal with no keyboard way out passes it."""
+        runtime = (A11Y / "scripts" / "a11y_runtime.mjs").read_text(encoding="utf-8")
+        self.assertIn("const behindModal", runtime)                  # a modal may hold focus
+        row = next(r for r in device_rows() if "modal" in r[0])
+        self.assertIn("Esc, the close control and whether the order makes sense, a person", row[3])
+        self.assertIn("`taborder` presses only Tab, and lets a modal hold focus", row[3])
+
+    def test_the_catalogs_fix_keeps_two_point_two_points_conditions(self):
+        """CodeRabbit on #190: a pause control is owed to movement that starts
+        on its own and runs past five seconds beside other content, not to
+        every movement."""
+        catalog = (GATE / "references" / "failure-catalog.md").read_text(encoding="utf-8")
+        entry = " ".join(section(catalog.split("## Layer 8", 1)[1], "### L8-6 ·", "\n---").split())
+        self.assertNotIn("a pause control on every movement", entry)
+        self.assertIn("a pause control on movement that starts on its own and runs past five seconds beside "
+                      "other content (2.2.2's case)", entry)
+        self.assertIn("a sticky bar that hides a button reached by Tab", entry)
+
+    def test_the_critique_gate_holds_the_same_devices(self):
+        skill = (GATE / "SKILL.md").read_text(encoding="utf-8")
+        layer = " ".join(section(skill, "### 8 — Interaction and motion", "\n### ").split())
+        self.assertIn("`references/failure-catalog.md` L8-6", layer)
+        catalog = (GATE / "references" / "failure-catalog.md").read_text(encoding="utf-8")
+        entry = " ".join(section(catalog.split("## Layer 8", 1)[1], "### L8-6 ·", "\n---").split())
+        self.assertIn("`references/conversion-audit.md` §7.1", entry)
+        self.assertIn("failure-catalog.md` L8-6", " ".join(
+            (LANDING / "references" / "conversion-audit.md").read_text(encoding="utf-8").split()))
+
+    def test_the_criteria_figures_are_registered_at_the_w3c(self):
+        doc = "landing-page-conversion/references/conversion-audit.md"
+        for figure, anchor in (("24 by 24 CSS pixels", "target-size-minimum"), ("20 seconds", "timing-adjustable"),
+                               ("five seconds", "pause-stop-hide"), ("3 seconds", "audio-control")):
+            with self.subTest(figure=figure):
+                entry = next((e for e in REGISTER["entries"] if e["figure"] == figure), None)
+                self.assertIsNotNone(entry)
+                self.assertEqual(f"https://www.w3.org/TR/WCAG22/#{anchor}", entry["url"])
+                self.assertIn(doc, entry["docs"])
 
 
 if __name__ == "__main__":
