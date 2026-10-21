@@ -425,6 +425,24 @@ class TheLawToFlagForReview(unittest.TestCase):
         tests = " ".join(section(audit_text(), "### 9.1 Price tests", "\n---").split())
         self.assertIn('An EU "was" price on goods must be the lowest', tests)
 
+    def test_a_price_not_yet_knowable_and_a_sale_with_no_withdrawal_right(self):
+        """CodeRabbit on #191: s. 230(2)(c) and (5) let a part of the price
+        that cannot be calculated in advance be given as how it will be, as
+        prominently; and Art. 11a's button is owed only where the sale
+        carries a right of withdrawal, which Art. 16 takes from some, among
+        them digital content once supplied with the buyer's consent."""
+        rows = law_rows()
+        fees = next(cells for what, cells in rows.items() if "fees" in what)
+        self.assertIn("cannot reasonably be calculated in advance, it says how that part will be, "
+                      "as prominently as the price (s. 230(2)(c) and (5))", fees[0])
+        self.assertIn("how the rest will be calculated beside it as prominently", fees[2])
+        withdrawal = next(cells for what, cells in rows.items() if "EU consumers" in what)
+        self.assertIn("Where the sale carries a right of withdrawal (Art. 9; Art. 16 lists the exceptions", withdrawal[1])
+        self.assertIn("digital content once supplied with their express consent", withdrawal[1])
+        self.assertIn("Whether the sale carries a right of withdrawal", withdrawal[2])
+        skill = (LANDING / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("a charge not yet knowable, as prominent, with how it is worked out", skill)
+
     def test_the_uk_subscription_rules_are_not_called_in_force(self):
         uk = next(cells for what, cells in law_rows().items() if "subscription" in what)[0]
         self.assertNotRegex(uk, r"(?<!not )in force")

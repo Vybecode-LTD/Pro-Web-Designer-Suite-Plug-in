@@ -51,7 +51,7 @@ Honest persuasion is: making a true claim clearly, in the order a reader can abs
 | Ads or affiliate blocks styled as editorial content | Disguised advertising | Label it. A visible "Sponsored" costs less than the trust it protects |
 | Cancellation buried, phone-only, or behind a retention maze | Obstruction / roach motel | Cancel in the account page, in the same number of clicks it took to subscribe |
 | Pre-ticked upsells, sneaking items into a cart, hidden auto-renew | Sneaking | Opt-in, unticked, with the renewal terms next to the button |
-| Fees, delivery or tax added at checkout | Drip pricing | The total price, fees and VAT in it, from the first price shown |
+| Fees, delivery or tax added at checkout | Drip pricing | The total price, VAT in, from the first price shown; a charge not yet knowable, as prominent, with how it is worked out |
 | "Free" that is a trial with stored card and no reminder | Bait / hidden cost | Say "14-day trial, card required, we email you 3 days before it bills" |
 
 The UK, EU and US law behind each, to flag for legal review, is in `references/conversion-audit.md` §11. A client who asks for one in a review gets the same answer, and an accessibility risk is held, not built (client-presentation-builder's objection-handling.md §5).
