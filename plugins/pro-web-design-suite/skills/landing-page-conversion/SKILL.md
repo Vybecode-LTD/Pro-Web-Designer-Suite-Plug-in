@@ -57,7 +57,7 @@ Honest persuasion is: making a true claim clearly, in the order a reader can abs
 
 The UK, EU and US law behind each, to flag for legal review, is in `references/conversion-audit.md` §11. A client who asks for one in a review gets the same answer, and an accessibility risk is held, not built (client-presentation-builder's objection-handling.md §5).
 
-**The practical argument, which matters more for a small company than the legal one.** A dark pattern converts someone who did not want the thing. You now own a refund, a chargeback, a support ticket, a public review, and one person who tells their peers. For a plugin company selling to a few thousand producers, or an agency whose pipeline is referrals, the audience is small enough that reputations are single-threaded. A burned prospect costs more than a converted one is worth, and the arithmetic does not improve at scale — it just takes longer to show up.
+**The practical argument, which matters more for a small company than the legal one.** A dark pattern converts someone who did not want the thing. You now own a refund, a chargeback, a support ticket, a public review, and one person who tells their peers. For a plugin company or an agency fed by referrals, the audience is small enough that reputations are single-threaded. A burned prospect costs more than a converted one is worth, and the arithmetic does not improve at scale — it just takes longer to show up.
 
 If a user asks for one of these directly, do not lecture. Name what it is in one line, produce the honest alternative that serves the same goal, and move on.
 
@@ -169,7 +169,7 @@ CLAIM     Match your mix to a reference track's tonal balance in one pass.
     P        VST3 / AU / AAX, macOS 12+ and Windows 10+, Apple silicon native.
 ```
 
-Note what every proof has in common: a sceptic can check it without trusting you. That is the test.
+Every proof here can be checked by a sceptic without trusting you. That is the test.
 
 Write this before any layout exists. It is the page's outline, and the section order in Phase 3 is derived from it rather than invented. If a section you want does not carry a support or a proof, it is decoration — cut it or demote it to the footer.
 

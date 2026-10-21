@@ -518,6 +518,7 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
   | design-system-versioning | `deprecate.py`, `diff_system.py` |
   | design-token-migration | `apply_codemod.py`, `cluster_values.py`, `extract_literals.py` |
   | email-template-system | `build_email.py`, `lint_email.py`, `render_email.mjs` |
+  | landing-page-conversion | `lint_claims.py` |
   | figma-variables-sync | `figma_audit.py`, `figma_common.py`, `figma_to_tokens.py` (3.6.0 removed `dtcg_values.py` in favour of `dtcg.py`) |
   | perf-budget-gate | `crux_check.py`, `perf_audit.py`, `measure_vitals.mjs` |
   | web-design-studio | `audit_design.py`, `check_roles.py`, `generate_color_ramp.py`, `generate_type_scale.py`, `tw_probe.mjs` |
@@ -533,14 +534,13 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
 
   | Skill | Bytes |
   |---|---|
-  | landing-page-conversion | 20,500 |
   | figma-variables-sync | 20,497 |
+  | design-critique-gate | 20,496 |
   | component-state-matrix | 20,494 |
   | client-presentation-builder | 20,494 |
+  | landing-page-conversion | 20,492 |
   | perf-budget-gate | 20,491 |
   | web-design-studio | 20,488 |
-  | landing-page-conversion | 20,499 |
-  | design-critique-gate | 20,496 |
   | email-template-system | 20,474 |
   | design-system-versioning | 20,434 |
 
