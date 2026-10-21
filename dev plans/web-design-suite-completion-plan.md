@@ -534,11 +534,11 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 | ID | Severity or size | What is wrong or missing |
 |---|---|---|
 | PS-B1 | — | Accessibility of persuasive patterns. *Done for 4.0.0: conversion-audit.md §7.1 holds thirteen devices to their WCAG 2.2 criteria, with the check that decides each or a person, and the critique gate's layer 8 points to it as failure-catalog L8-6 (PR #190, P42 part 1).* |
-| PS-B2 | — | Consumer law beyond the EU/US basics. |
-| PS-B3 | — | Price experiments. |
+| PS-B2 | — | Consumer law beyond the EU/US basics. *Done for 4.0.0: conversion-audit.md §11.1, the UK and EU rules to flag for legal review, dated, each provision read at its source (the DMCC Act at legislation.gov.uk, the directives through the EU Publications Office), and drip pricing in SKILL.md's ethics boundary (PR #191, P42 part 2).* |
+| PS-B3 | — | Price experiments. *Done for 4.0.0: conversion-audit.md §9.1, packaging before price, four things to flag, and revenue per visitor's sample size (PR #191, P42 part 2).* |
 | PS-B4 | — | Page types and audiences. |
 | PS-B6 | — | No claims layer, and siblings don't route to each other. |
-| PS-B8 | — | Consent for tracking. |
+| PS-B8 | — | Consent for tracking. *Done for 4.0.0: conversion-audit.md §8.1, the EU's consent rules, the UK's 2026 statistics exception, masking, and the EDPB's banner findings (PR #191, P42 part 2).* |
 | PS-C5 | — | Add `critique_snapshots.mjs`: PNGs at 390 and 1440px plus blur, greyscale, mirror, 25%, dark and reduced-motion variants. |
 | PS-C6 | — | Add `lint_claims.py`: load-time countdowns, fake scarcity, pre-checked opt-ins, unsourced percentages and the like. |
 | PS-C12 | — | Bridge MESSAGE_BRIEF to DECISION_LOG. |

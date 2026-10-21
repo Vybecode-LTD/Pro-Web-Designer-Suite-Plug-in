@@ -212,13 +212,13 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-A21 | low | fixed in 3.4.0: a blocker stops the build and `--dry-run`, `\|` read, the 10 MB warning, exit 2 documented (PR #69; `test_presentation.DeckFromTheDefenceSheet`) | Smaller mismatches between docs and behaviour. |
 | PS-A22 | low | fixed in 3.4.0 (PR #70; `test_persuasion_docs`.PageSectionsSaysWhatItDoes) | The header says "SEVEN SECTION SHELLS" but lists eight (:7-13). |
 | PS-B1 | — | done in 4.0.0: `test_persuasion_docs.PersuasiveDevicesAgainstWcag`, PR #190 (P42 part 1) | Accessibility of persuasive patterns. |
-| PS-B2 | — | W14 (3.6.0+) | Consumer law beyond the EU/US basics. |
-| PS-B3 | — | W14 (3.6.0+) | Price experiments. |
+| PS-B2 | — | done in 4.0.0: `test_persuasion_docs.TheLawToFlagForReview`, PR #191 (P42 part 2) | Consumer law beyond the EU/US basics. |
+| PS-B3 | — | done in 4.0.0: `test_persuasion_docs.PriceTests`, PR #191 (P42 part 2) | Price experiments. |
 | PS-B4 | — | W14 (3.6.0+) | Page types and audiences. |
 | PS-B5 | — | fixed in 3.4.0: the template's "Checks a person runs", each run, run with a proxy, or "not run — needs a human" (PR #71; `test_critique_snapshots.TheTemplateHasAThirdState`) | Checks Claude can't honestly run. |
 | PS-B6 | — | W14 (3.6.0+) | No claims layer, and siblings don't route to each other. |
 | PS-B7 | — | fixed in 3.4.0: `test_deck.ThePresenterWindow`, `SinceLastTimeAndTheStage`, `TheDocsKeepTheirOwnRules` (PR #66) | Presenting in practice. |
-| PS-B8 | — | W14 (3.6.0+) | Consent for tracking. |
+| PS-B8 | — | done in 4.0.0: `test_persuasion_docs.ConsentForTracking`, PR #191 (P42 part 2) | Consent for tracking. |
 | PS-C1 | — | fixed in 3.4.0: `test_deck` (PRs #65 and #66) | Make the deck honest by construction: wording from the data, manual-test evidence as input, `--handout`, a presenter window. |
 | PS-C2 | — | fixed in 3.4.0: `covers` and `status` in 3.1.0; fixed findings labelled in every format and merge notes in triage and defence (PR #69; `test_presentation.CritiqueDefenceAndMerge`) | Fix critique_report: a `covers` field for merges, merge notes in every format, a `status` field. |
 | PS-C3 | — | fixed in 3.1.0, with PS-A4 | Close the HTML blind spot with web-design-studio: audit `<style>` and `style=""`; fail when zero files were audited. |

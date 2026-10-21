@@ -921,6 +921,97 @@
       "docs": [
         "landing-page-conversion/references/conversion-audit.md"
       ]
+    },
+    {
+      "figure": "6 April 2025",
+      "claim": "when the DMCC Act's unfair commercial practices chapter (Part 4, Chapter 1) came into force",
+      "source": "legislation.gov.uk, Digital Markets, Competition and Consumers Act 2024, Part 4, Chapter 1, commencement notes",
+      "url": "https://www.legislation.gov.uk/ukpga/2024/13/part/4/chapter/1",
+      "checked": "2026-10-21",
+      "quote": "S. 225 in force at 6.4.2025 by S.I. 2025/272, reg. 2(1)(3) ... 225 Prohibition of unfair commercial practices (1) Unfair commercial practices are prohibited.",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "10%",
+      "also": [
+        "£300,000"
+      ],
+      "claim": "the most the CMA can fine a trader directly for breaking consumer law: 10% of its turnover or £300,000, whichever is higher",
+      "source": "legislation.gov.uk, Digital Markets, Competition and Consumers Act 2024, section 182 (final infringement notice)",
+      "url": "https://www.legislation.gov.uk/ukpga/2024/13/section/182",
+      "checked": "2026-10-21",
+      "quote": "A penalty imposed under subsection (4)(b) must be a fixed amount not exceeding £300,000 or, if higher, 10% of the total value of the turnover (if any) of the respondent.",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "30 days",
+      "claim": "the period whose lowest price an EU price reduction must show as the prior price",
+      "source": "EUR-Lex, Directive 98/6/EC (Price Indication Directive), Article 6a, as inserted by Directive (EU) 2019/2161 (consolidated text of 2022-05-28, read through the EU Publications Office)",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:01998L0006-20220528",
+      "checked": "2026-10-21",
+      "quote": "1. Any announcement of a price reduction shall indicate the prior price applied by the trader for a determined period of time prior to the application of the price reduction. 2. The prior price means the lowest price applied by the trader during a period of time not shorter than 30 days prior to the application of the price reduction.",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "19 June 2026",
+      "claim": "the date from which the EU's online withdrawal function (Consumer Rights Directive Art. 11a) applies",
+      "source": "EUR-Lex, Directive (EU) 2023/2673, Articles 1(3) and 2(1) (read through the EU Publications Office)",
+      "url": "https://eur-lex.europa.eu/eli/dir/2023/2673/oj/eng",
+      "checked": "2026-10-21",
+      "quote": "They shall apply those measures from 19 June 2026. ... For distance contracts concluded by the means of an online interface, the trader shall ensure that the consumer can also withdraw from the contract by using a withdrawal function. The withdrawal function shall be labelled with the words “withdraw from contract here” or an unambiguous corresponding formulation in an easily legible way.",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "1 January 2027",
+      "claim": "when the UK's subscription rules would apply, if Parliament approves the draft regulations",
+      "source": "Department for Business and Trade, Guidance on the subscription contracts rules (draft, October 2026), published 19 October 2026",
+      "url": "https://www.gov.uk/government/publications/subscription-contracts",
+      "checked": "2026-10-21",
+      "quote": "The subscription rules apply to subscription contracts entered into on or after 1 January 2027. ... These Draft Regulations must be approved by Parliament before they can come into force.",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "40%",
+      "claim": "the share of US online shoppers' checkout abandonments, setting aside 'just browsing', given as 'extra costs too high (shipping, tax, fees)', the most common reason",
+      "source": "Baymard Institute, Cart Abandonment Rate statistics (reasons for abandonment)",
+      "url": "https://baymard.com/lists/cart-abandonment-rate",
+      "checked": "2026-10-21",
+      "quote": "if we ignore the “just browsing” segment, and instead look at the remaining reasons for abandonments we get the following distribution: 40 % Extra costs too high (shipping, tax, fees)",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "5 February 2026",
+      "claim": "when PECR's new regulation 6 and Schedule A1, with the exception for statistics about a site's use, took effect in the UK",
+      "source": "legislation.gov.uk, The Privacy and Electronic Communications (EC Directive) Regulations 2003, Schedule A1, textual amendments",
+      "url": "https://www.legislation.gov.uk/uksi/2003/2426/schedule/A1",
+      "checked": "2026-10-21",
+      "quote": "Sch. A1 inserted (5.2.2026) by Data (Use and Access) Act 2025 (c. 18), s. 142(1), Sch. 12; S.I. 2026/82, reg. 2(z13) ... 5. — (1) Regulation 6(1) does not prevent a person storing information, or gaining access to information stored, in the terminal equipment of a subscriber or user if— (a) the person provides an information society service, (b) the sole purpose of the storage or access is to enable the person— (i) to collect information for statistical purposes about how the service is used with a view to making improvements to the service",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
+    },
+    {
+      "figure": "17 January 2023",
+      "claim": "when the EDPB adopted its cookie banner taskforce report",
+      "source": "European Data Protection Board, Report of the work undertaken by the Cookie Banner Taskforce",
+      "url": "https://www.edpb.europa.eu/system/files/2023-01/edpb_20230118_report_cookie_banner_taskforce_en.pdf",
+      "checked": "2026-10-21",
+      "quote": "Report of the work undertaken by the Cookie Banner Taskforce Adopted on 17 January 2023 ... a vast majority of authorities considered that the absence of refuse/reject/not consent options on any layer with a consent button of the cookie consent banner is not in line with the requirements for a valid consent and thus constitutes an infringement",
+      "docs": [
+        "landing-page-conversion/references/conversion-audit.md"
+      ]
     }
   ],
   "not_statistics": [
