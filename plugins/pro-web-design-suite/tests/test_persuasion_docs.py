@@ -292,6 +292,44 @@ class PersuasiveDevicesAgainstWcag(unittest.TestCase):
         self.assertIn("24 by 24 CSS pixels", row[2])
         self.assertIn("`--tap-min` (44px) is its own policy, stricter than AA", row[2])
 
+    def test_the_target_size_row_keeps_every_exception(self):
+        """Codex and CodeRabbit on #190: 24px or spacing is not all of 2.5.8.
+        A link inside a sentence, an equivalent control, a browser's own
+        control and an essential presentation are exempt."""
+        row = next(r for r in device_rows() if "2.5.8" in r[1])
+        for exception in ("A link inside a sentence", "a control with an equivalent elsewhere on the page",
+                          "a browser's own control", "an essential presentation are exempt"):
+            with self.subTest(exception=exception):
+                self.assertIn(exception, row[2])
+
+    def test_authentication_is_not_account_creation(self):
+        """CodeRabbit on #190: 3.3.8 holds the steps that authenticate; WCAG's
+        Understanding puts its focus on logging in, not on creating an account."""
+        row = next(r for r in device_rows() if "3.3.8" in r[1])
+        self.assertIn("3.3.8 holds the steps that authenticate, not account creation", row[2])
+        self.assertNotIn("A signup or sign-in step", row[0])
+        self.assertIn("1.3.5", criteria(row[1]))
+
+    def test_a_modals_way_out_is_left_to_a_person(self):
+        """Codex on #190: `taborder` presses only Tab, and an open modal may
+        hold focus, so a modal with no keyboard way out passes it."""
+        runtime = (A11Y / "scripts" / "a11y_runtime.mjs").read_text(encoding="utf-8")
+        self.assertIn("const behindModal", runtime)                  # a modal may hold focus
+        row = next(r for r in device_rows() if "modal" in r[0])
+        self.assertIn("Esc, the close control and whether the order makes sense, a person", row[3])
+        self.assertIn("`taborder` presses only Tab, and lets a modal hold focus", row[3])
+
+    def test_the_catalogs_fix_keeps_two_point_two_points_conditions(self):
+        """CodeRabbit on #190: a pause control is owed to movement that starts
+        on its own and runs past five seconds beside other content, not to
+        every movement."""
+        catalog = (GATE / "references" / "failure-catalog.md").read_text(encoding="utf-8")
+        entry = " ".join(section(catalog.split("## Layer 8", 1)[1], "### L8-6 ·", "\n---").split())
+        self.assertNotIn("a pause control on every movement", entry)
+        self.assertIn("a pause control on movement that starts on its own and runs past five seconds beside "
+                      "other content (2.2.2's case)", entry)
+        self.assertIn("a sticky bar that hides a button reached by Tab", entry)
+
     def test_the_critique_gate_holds_the_same_devices(self):
         skill = (GATE / "SKILL.md").read_text(encoding="utf-8")
         layer = " ".join(section(skill, "### 8 — Interaction and motion", "\n### ").split())

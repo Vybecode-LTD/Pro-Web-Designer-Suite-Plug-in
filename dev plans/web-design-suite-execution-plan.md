@@ -153,7 +153,7 @@ Re-read `web-design-suite-review/claude-code-capabilities.md` against the curren
 
 ### Phase 6b · 4.0.0: broader coverage and the breaking change
 
-After 3.6.0. The workstreams are independent; ask the owner which comes first.
+After 3.6.0. The workstreams are independent; the owner chose the order of the last three on 2026-10-21: P42, then P43, then P41.
 
 | PR | What | Items | Main files | Size |
 |---|---|---|---|---|

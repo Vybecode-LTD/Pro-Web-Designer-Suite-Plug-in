@@ -44,7 +44,8 @@ renames the plugin.
   toasts, and never named the criterion each meets. `conversion-audit.md` §7.1 holds thirteen
   devices to their criteria at their levels (2.2.1 and 2.2.2 for timers and movement, 1.4.2 for an
   autoplaying demo, 2.4.11 for sticky bars and banners, 2.1.2 for modals, 1.4.13 for hover details,
-  2.5.8 and 1.4.3 for a small pale decline, 3.3.7 and 3.3.8 for signup, 4.1.3 for toasts), says
+  2.5.8 (with its exceptions) and 1.4.3 for a small pale decline, 3.3.7 for multi-step signup,
+  3.3.8 for sign-in and the steps that authenticate, 4.1.3 for toasts), says
   what each asks, and names the check that decides it (`a11y_runtime`'s `obscured`, `taborder` and
   `hover`, axe's `no-autoplay-audio`, `target-size` and `color-contrast`, `a11y_static`'s
   `missing-autocomplete`) or a person, as a11y-audit-runner's coverage table says. It tells WCAG's
