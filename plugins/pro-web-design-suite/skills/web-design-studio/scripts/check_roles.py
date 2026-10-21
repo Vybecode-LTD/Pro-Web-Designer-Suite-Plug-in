@@ -14,6 +14,16 @@ pairs components actually use:
   dark-inverse   dark + .inverse + [data-theme="dark"] .inverse
                                                    (on the dark --bg-inverse)
 
+Where two blocks of a scope set the same property, the cascade decides, as in
+a browser: the heavier selector wins, and of two the same weight the block
+written later does. `:root` and `[data-theme="dark"]` weigh the same, so a
+`:root` written below the dark block beats it on a dark page, while the dark
+band's selector is heavier than `.inverse`, whatever the order. Several files
+are one system, written in the order they are listed. Cascade layers are not
+modelled: a block inside `@layer` counts like an unlayered one, so a system
+that splits its scopes across layers (the starter keeps them all in `tokens`)
+can differ from the browser, which ranks an unlayered block above a layered one.
+
 A role written `light-dark(LIGHT, DARK)` (P33) takes the branch of the scope's
 `color-scheme`, the last one its blocks declare: the one it names alone
 (`.inverse { color-scheme: dark }` reads the dark branch), both when it allows
@@ -158,18 +168,31 @@ def element(selector: str) -> str:
     return "band" if selector.endswith(".inverse") else "root"
 
 
+def weight(selector: str) -> int:
+    """How many classes, attributes and pseudo-classes a scope's selector
+    holds, which is the part of its specificity that tells the four apart:
+    `:root`, `.inverse` and `[data-theme="dark"]` are one each, the
+    descendant form two. None has an id or a type selector."""
+    return len(re.findall(r"\.[\w-]+|\[[^\]]*\]|:[\w-]+", selector))
+
+
 def scopes(css: str) -> dict[str, dict[str, str]]:
     blocks = rules(css)
     merged = {}
     for name, wanted in SCOPES.items():
         env: dict[str, str] = {}
         for el in dict.fromkeys(element(w) for w in wanted):
+            here = [w for w in wanted if element(w) == el]
+            # The browser's cascade for the element: the heavier selector wins,
+            # and the block written later between two of the same weight, so
+            # `:root` below `[data-theme="dark"]` beats it (N51, CodeRabbit on #187).
+            matching = sorted(((max(weight(w) for w in here if w in sels), i, decls)
+                               for i, (sels, decls) in enumerate(blocks) if any(w in sels for w in here)),
+                              key=lambda m: m[:2])
             declared = None
-            for want in (w for w in wanted if element(w) == el):
-                for sels, decls in blocks:
-                    if want in sels:
-                        env.update({k: v for k, v in decls.items() if k != "color-scheme"})
-                        declared = decls.get("color-scheme", declared)
+            for _, _, decls in matching:
+                env.update({k: v for k, v in decls.items() if k != "color-scheme"})
+                declared = decls.get("color-scheme", declared)
             # Read once the element's own properties are all in, whatever their
             # order, then inherited by the band (CodeRabbit on #112).
             if declared is not None:
