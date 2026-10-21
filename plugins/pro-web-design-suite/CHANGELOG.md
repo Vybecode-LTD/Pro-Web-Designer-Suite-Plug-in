@@ -61,11 +61,12 @@ renames the plugin.
   - `conversion-audit.md` §11.1, the UK and EU rules a page meets:
     - the DMCC Act, in force since 6 April 2025, with CMA fines up to 10% of turnover or £300,000;
     - reviews: Schedule 20 and UCPD points 23b, 23c and Art. 7(6);
-    - the total price (s. 230, the CMA's drip pricing) and VAT;
+    - the total price, or how a part not yet knowable is worked out, as prominently (s. 230, the
+      CMA's drip pricing), and VAT;
     - "was" prices: the EU's 30-day low for goods (not services or digital content), and no fixed
       UK period;
     - personalised prices: Art. 6(1)(ea), with no UK match;
-    - the EU withdrawal button from 19 June 2026;
+    - the EU withdrawal button from 19 June 2026, where the sale carries a right of withdrawal;
     - the UK subscription rules, still draft, for contracts from 1 January 2027 if Parliament
       approves.
   - SKILL.md's ethics boundary declines drip pricing.

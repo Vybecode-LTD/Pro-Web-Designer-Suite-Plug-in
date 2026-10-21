@@ -533,6 +533,7 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
 
   | Skill | Bytes |
   |---|---|
+  | landing-page-conversion | 20,500 |
   | figma-variables-sync | 20,497 |
   | component-state-matrix | 20,494 |
   | client-presentation-builder | 20,494 |
