@@ -51,7 +51,7 @@ R4's `distribute` job is the first real push with the key; if it fails, the GitH
 
 ## Next steps
 
-1. **P43, then P41**, the owner's order (2026-10-21). P42 is done: #190 (PS-B1) and #191 (PS-B2, PS-B3, PS-B8). Sizes and scope are in the next-session prompt's §4.
+1. **P43, then P41**, the owner's order (2026-10-21). P42 is done: #190 (PS-B1) and #191 (PS-B2, PS-B3, PS-B8). P43 part 1 is done: #192, `lint_claims.py` (PS-C6); parts 2 (routing, page types) and 3 (brief to decision log) are next. Sizes and scope are in the next-session prompt's §4.
 2. Each split into PRs of under 100 files.
 3. Then **R4**, the 4.0.0 release, with its live check (the owner's OK and an estimate first).
 

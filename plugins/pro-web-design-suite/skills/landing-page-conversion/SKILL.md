@@ -10,15 +10,16 @@ description: Write and structure landing, pricing and product pages, from positi
 > inside this plugin:
 >
 > ```bash
-> python "${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py" src/ --strict
+> python "${CLAUDE_SKILL_DIR}/scripts/lint_claims.py" src/
 > ```
 >
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (lint_claims.py).
 > From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
 
-The sibling skill `web-design-studio` owns **form**: tokens, spacing, architecture, navigation, the audit gate. It says nothing about what a page should *say* or in what order. That omission is deliberate, and this skill is the missing half.
+The sibling skill `web-design-studio` owns **form**: tokens, spacing, architecture, navigation, the audit gate. It says nothing about what a page should *say* or in what order; this skill is that half.
 
 A page that converts is not a well-designed page with persuasive words dropped into it. It is an argument, sequenced, and then given a body. Get the argument wrong and no amount of spacing discipline rescues it — you have built a beautiful vehicle for a claim nobody wanted.
 
@@ -228,13 +229,14 @@ Two passes, both in `references/conversion-audit.md`:
 - **Conversion** — five-second test, squint test, scroll-depth reasoning, friction inventory from intent to completion.
 - **Technical** — LCP, CLS, render-blocking, form friction, tap targets, and the analytics you need in place *before* you are entitled to claim anything improved.
 
-Then run the design gate:
+Then the design gate and the claims lint:
 
 ```bash
 python -m scripts.audit_design PATH        # from web-design-studio
+python -m scripts.lint_claims PATH         # references/conversion-audit.md §13
 ```
 
-Law 9 applies here exactly as it does in the studio skill: nothing ships un-audited.
+Law 9 applies: nothing ships un-audited.
 
 Report findings ranked by **expected effect over effort**, and be honest that "expected" is a judgement, not a measurement, until the page has traffic and instrumentation. The ranking that holds up most often: `references/conversion-audit.md` §12.
 

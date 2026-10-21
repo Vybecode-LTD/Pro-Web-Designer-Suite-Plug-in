@@ -14,7 +14,9 @@
 
 **P42 is done (2026-10-21):** #190, the persuasive devices against WCAG 2.2 (PS-B1); #191, the UK and EU consumer law to flag for legal review, price tests and consent for tracking (PS-B2, PS-B3, PS-B8), every date and figure read at its source and registered.
 
-**Next: P43, then P41: the owner's order (2026-10-21). Both come before R4** (§4).
+**P43 part 1 is done (#192):** `lint_claims.py`, the claims lint, in landing's Phase 6 and the critique gate's layers 1 and 8 (PS-C6, and PS-B6's claims layer).
+
+**Next: P43's parts 2 (routing and page types: PS-B4, PS-B6's routing) and 3 (MESSAGE_BRIEF to DECISION_LOG, PS-C12), then P41: the owner's order (2026-10-21). Both come before R4** (§4).
 
 Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **the rest of Phase 6b in the owner's order** (§4), then R4.
 
@@ -536,10 +538,10 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
   | client-presentation-builder | 20,494 |
   | perf-budget-gate | 20,491 |
   | web-design-studio | 20,488 |
+  | landing-page-conversion | 20,499 |
+  | design-critique-gate | 20,496 |
   | email-template-system | 20,474 |
-  | landing-page-conversion | 20,444 |
   | design-system-versioning | 20,434 |
-  | design-critique-gate | 20,413 |
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.
 

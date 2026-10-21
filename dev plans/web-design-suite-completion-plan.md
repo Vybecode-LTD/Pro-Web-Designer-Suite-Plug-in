@@ -537,10 +537,10 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 | PS-B2 | — | Consumer law beyond the EU/US basics. *Done for 4.0.0: conversion-audit.md §11.1, the UK and EU rules to flag for legal review, dated, each provision read at its source (the DMCC Act at legislation.gov.uk, the directives through the EU Publications Office), and drip pricing in SKILL.md's ethics boundary (PR #191, P42 part 2).* |
 | PS-B3 | — | Price experiments. *Done for 4.0.0: conversion-audit.md §9.1, packaging before price, four things to flag, and revenue per visitor's sample size (PR #191, P42 part 2).* |
 | PS-B4 | — | Page types and audiences. |
-| PS-B6 | — | No claims layer, and siblings don't route to each other. |
+| PS-B6 | — | No claims layer, and siblings don't route to each other. *The claims layer is done for 4.0.0: failure-catalog L1-4 and layer 1's probe run `lint_claims.py` (PR #192, P43 part 1); the routing is P43 part 2.* |
 | PS-B8 | — | Consent for tracking. *Done for 4.0.0: conversion-audit.md §8.1, the EU's consent rules, the UK's 2026 statistics exception, masking, and the EDPB's banner findings (PR #191, P42 part 2).* |
 | PS-C5 | — | Add `critique_snapshots.mjs`: PNGs at 390 and 1440px plus blur, greyscale, mirror, 25%, dark and reduced-motion variants. |
-| PS-C6 | — | Add `lint_claims.py`: load-time countdowns, fake scarcity, pre-checked opt-ins, unsourced percentages and the like. |
+| PS-C6 | — | Add `lint_claims.py`: load-time countdowns, fake scarcity, pre-checked opt-ins, unsourced percentages and the like. *Done for 4.0.0: landing-page-conversion's `scripts/lint_claims.py`, ten rules (three errors, seven warnings), documented in conversion-audit.md §13 and run in landing's Phase 6 and the critique gate's layers 1 and 8 (failure-catalog L1-4, L8-6) (PR #192, P43 part 1).* |
 | PS-C12 | — | Bridge MESSAGE_BRIEF to DECISION_LOG. |
 
 ---

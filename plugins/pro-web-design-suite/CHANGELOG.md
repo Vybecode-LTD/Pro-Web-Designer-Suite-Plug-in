@@ -39,6 +39,22 @@ renames the plugin.
 
 ### Added
 
+- **`lint_claims.py`, the claims lint** (PS-C6, and PS-B6's claims layer; P43 part 1). No gate read
+  what a page says. A countdown that restarts on every visit, a newsletter box ticked in advance,
+  a stock count from `Math.random()` or an unsourced "47% faster" passed every one.
+  landing-page-conversion's `scripts/lint_claims.py` reads markup (HTML, JSX, Vue, Svelte,
+  Astro) and scripts for ten patterns:
+  - **errors:** a marketing, consent or add-on box ticked in advance (`checked`, `checked=""`,
+    `defaultChecked`, `checked={true}`, `:checked="true"`); a deadline counted from the page load,
+    or a constant counted down on every visit; a count made with `Math.random()`.
+  - **warnings, which are questions for a person:** "only 3 left" and "12 people are viewing";
+    a percentage with no source beside it; a struck-through price; `autocomplete="off"` on a
+    field the browser fills; a lazy first image; two filled calls to action in the hero; one
+    destination under two labels.
+
+  Warnings fail only under `--strict`. A pragma with a reason switches a rule off for a line or a
+  file. `conversion-audit.md` §13 documents it, landing's Phase 6 runs it, and so does the
+  critique gate's layer 1, through the new failure-catalog entry L1-4.
 - **The UK and EU consumer law to flag for legal review, price tests and consent for tracking**
   (PS-B2, PS-B3, PS-B8, P42 part 2). Each is dated and written as what to flag, never as advice,
   and each date and figure was read at its source on 2026-10-21 and registered:
