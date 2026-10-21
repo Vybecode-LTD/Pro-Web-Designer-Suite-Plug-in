@@ -11,6 +11,9 @@ Regressions covered:
 - SS-B3 (3.6.0): a role written `light-dark(LIGHT, DARK)` was not a colour to
   the gate, so a system themed without JavaScript could not be checked; and
   style-architecture.md §10's `light-dark()` example runs in a browser here.
+- N51 (P57, CodeRabbit on #187): a scope's blocks were applied by selector,
+  `:root` first and the dark block after, whatever order they were written
+  in. The browser applies the heavier selector, then the later block.
 """
 from __future__ import annotations
 
@@ -59,6 +62,27 @@ def light_dark_starter() -> str:
 def by_scheme(results: list) -> set:
     """What a visitor in each scheme sees, whichever scope's selectors got them there."""
     return {(r["fg"], r["bg"], r["scheme"], r["ratio"], r["ok"]) for r in results}
+
+
+# N51: the dark theme keeps its canvas and its ink in one block; `:root` sets
+# the ink again, dark on dark. The two selectors weigh the same, so a page in
+# the dark theme gets the ink of whichever block is written last.
+DARK_BLOCK = '[data-theme="dark"] { --bg-canvas: #1a1a1a; --fg-default: #f5f5f5; }'
+ROOT_BLOCK = ":root { --fg-default: #222222; }"
+DARK_PAIR = [{"fg": "--fg-default", "bg": "--bg-canvas", "min": 4.5, "scopes": ["dark"]}]
+# (name, the blocks in that order, what the gate exits with, the ink the page shows)
+ORDERS = (("dark block first", (DARK_BLOCK, ROOT_BLOCK), 1, "rgb(34, 34, 34)"),
+          ("root block first", (ROOT_BLOCK, DARK_BLOCK), 0, "rgb(245, 245, 245)"))
+
+
+def contrast(a: str, b: str) -> float:
+    """WCAG's ratio between two `rgb(r, g, b)` strings, as a browser prints them."""
+    def luminance(rgb: str) -> float:
+        lin = [(c / 255 / 12.92) if c / 255 <= 0.04045 else ((c / 255 + 0.055) / 1.055) ** 2.4
+               for c in map(int, re.findall(r"\d+", rgb)[:3])]
+        return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+    hi, lo = sorted((luminance(a), luminance(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
 
 
 class CheckRoles(TempDirTest):
@@ -216,6 +240,46 @@ class CheckRoles(TempDirTest):
                 proc = run_py("web-design-studio", "check_roles", alone, "--pairs", pairs, cwd=self.tmp)
                 self.assertEqual(2, proc.returncode, output(proc))
 
+    def test_the_block_written_last_wins_at_equal_weight(self):
+        """N51 (CodeRabbit on #187; reproduced on v3.6.0 in one file): `:root`
+        and `[data-theme="dark"]` are one selector heavy each, so the dark
+        theme gets the ink of the block written last. The gate applied `:root`
+        first and the dark block after, so a `:root` that set the ink again
+        below the dark block passed, and the page showed dark text on dark."""
+        pairs = self.write("pairs.json", json.dumps(DARK_PAIR))
+        for name, blocks, code, _ in ORDERS:
+            with self.subTest(order=name):
+                proc = self.roles("\n".join(blocks), "--pairs", pairs)
+                self.assertEqual(proc.returncode, code, output(proc))
+                if code:
+                    self.assertIn("FAIL  --fg-default on --bg-canvas (dark)", output(proc))
+
+    def test_files_are_written_in_the_order_they_are_listed(self):
+        """N51, several files: they are read as one system in the order given
+        (the config reader's order), so the file listed last is written last."""
+        pairs = self.write("pairs.json", json.dumps(DARK_PAIR))
+        self.write("dark.css", DARK_BLOCK + "\n")
+        self.write("root.css", ROOT_BLOCK + "\n")
+        for name, files, code in (("dark listed first", ("dark.css", "root.css"), 1),
+                                  ("root listed first", ("root.css", "dark.css"), 0)):
+            with self.subTest(order=name):
+                proc = run_py("web-design-studio", "check_roles", *files, "--pairs", pairs, cwd=self.tmp)
+                self.assertEqual(proc.returncode, code, output(proc))
+
+    def test_a_heavier_selector_beats_a_later_lighter_one(self):
+        """The control for the test above, passing on v3.6.0 and now: in a
+        dark band, `[data-theme="dark"] .inverse` is two selectors heavy and
+        `.inverse` one, so the dark block wins whichever is written last. A
+        gate that read source order alone would take the dark ink on dark."""
+        dark_band = '[data-theme="dark"] .inverse { --fg-default: #f5f5f5; }'
+        light_band = ".inverse { --fg-default: #222222; }"
+        pairs = self.write("pairs.json", json.dumps([
+            {"fg": "--fg-default", "bg": "--bg-inverse", "min": 4.5, "scopes": ["dark-inverse"], "on": "dark"}]))
+        for name, blocks in (("dark band first", (dark_band, light_band)), ("dark band last", (light_band, dark_band))):
+            with self.subTest(order=name):
+                proc = self.roles("\n".join((":root { --bg-inverse: #1a1a1a; }", *blocks)), "--pairs", pairs)
+                self.assertEqual(proc.returncode, 0, output(proc))
+
     def test_a_color_scheme_through_var_is_read_where_it_is_declared(self):
         """Codex on #112: `color-scheme: var(--scheme)` is the value of
         `--scheme` where it is declared, then inherited: an inverse band that
@@ -365,6 +429,9 @@ class LightDarkInABrowser(TempDirTest):
                 "<section data-theme='dark'><div data-probe='dark' %s></div></section>"
                 "<section data-theme='light'><div data-probe='light' %s></div></section>"
                 % (self.LIGHT, self.DARK, self.example(), tile, tile, tile))
+        return self.probe_page(html)
+
+    def probe_page(self, html: str) -> dict:
         page = self.write("page.html", html)
         probe = self.write("probe.mjs", PROBE_JS)
         proc = subprocess.run([NODE, probe, (PLUGIN / "shared" / "browser_common.mjs").as_uri(), page],
@@ -388,3 +455,24 @@ class LightDarkInABrowser(TempDirTest):
                     got = seen[run][probe]
                     self.assertEqual(got["bg"], expected["bg"], got)
                     self.assertIn(expected["alpha"], got["shadow"], got)
+
+    def test_the_block_written_last_wins_in_a_browser_and_the_gate_agrees(self):
+        """N51: the cascade the gate now models, run in Chromium. A page in the
+        dark theme shows the ink of the later of `:root` and `[data-theme]`
+        (one selector heavy each), and the gate's verdict is the verdict on the
+        two colours the page shows. The ink and the canvas are read off two
+        probes that paint with them."""
+        pairs = self.write("pairs.json", json.dumps(DARK_PAIR))
+        for name, blocks, code, ink in ORDERS:
+            with self.subTest(order=name):
+                css = "\n".join(blocks)
+                seen = self.probe_page("<!doctype html><style>%s</style>"
+                                       "<div data-probe='ink' style='background: var(--fg-default)'></div>"
+                                       "<div data-probe='canvas' style='background: var(--bg-canvas)'></div>"
+                                       % css)["light+dark"]
+                self.assertEqual(seen["ink"]["bg"], ink, seen)
+                shown = contrast(seen["ink"]["bg"], seen["canvas"]["bg"])
+                self.assertEqual(shown >= 4.5, code == 0, shown)
+                gate = run_py("web-design-studio", "check_roles", self.write("tokens.css", css), "--pairs", pairs,
+                              cwd=self.tmp)
+                self.assertEqual(gate.returncode, code, output(gate))

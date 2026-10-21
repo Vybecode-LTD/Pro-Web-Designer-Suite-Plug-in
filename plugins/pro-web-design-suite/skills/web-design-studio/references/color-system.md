@@ -370,6 +370,9 @@ resolves each role per theme (light, dark, and `.inverse` in both), a `light-dar
 each branch the scope's `color-scheme` allows ([style-architecture.md](style-architecture.md) §10),
 and checks the pairs components put together: every text role on every surface at 4.5:1, status text, labels on fills, text in an
 inverse band on its parent theme's `--bg-inverse`, and control borders and the focus ring at 3:1.
+Where a scope's blocks set the same role it applies them as a browser does, the heavier selector
+and then the block written later: `:root` below `[data-theme="dark"]` wins on a dark page, so keep
+the dark block last, in a file or in the last file listed.
 The starter passes all of them. Two were fixed by hand before the tool existed, and they show what
 it is for:
 

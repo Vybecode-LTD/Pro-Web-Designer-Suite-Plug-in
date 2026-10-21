@@ -297,6 +297,15 @@ renames the plugin.
   `src/styles/tokens.css`; with neither, the command says the pairs go unchecked. `check_roles.py`
   takes several files, read in order as one system, as the config reader merges them (Codex on #187). The command runs the check once before it writes the step (CodeRabbit on #187): a configured file that does not exist stops the install, a system `check_roles.py` cannot read as the role vocabulary gets no step and the reason, and pairs that fail now get the step and a warning. Run
   `/install-gate` again to upgrade a project's workflow.
+- **`check_roles` reads a scope's blocks as the cascade does** (P57, N51, CodeRabbit on #187). It
+  applied every `:root` block before every `[data-theme="dark"]` block, whatever order they were
+  written in, so a `:root` that set a role again below the dark block passed on the dark theme's
+  value while the page showed `:root`'s. The two selectors weigh the same, so the block written
+  later wins, as in a browser; a heavier selector (`[data-theme="dark"] .inverse` over
+  `.inverse`) wins whatever the order, and files given together are written in the order listed.
+  A system that keeps `:root` first, as the starter does, reads as before; one that put it last
+  may now fail pairs it passed. Cascade layers are still read as one: a block in `@layer` counts
+  like an unlayered one.
 - **The scaffold's controls keep arrays, nulls and the required state** (review of #176, React and
   Vue alike). A multiple select bound `String(value)` and sent one option; it binds the array and
   sends the selected options. An emptied number input sent `NaN`; it sends `null`. `tag-input` and
