@@ -12,7 +12,9 @@
 - **#187, F7** (`bc7a478`): `/install-gate`'s workflow runs `check_roles.py` on the configured token files, read together as one system; the command runs the check once first (a missing configured file stops the install; a system it cannot read gets no step and a reason; failing pairs get the step and a warning).
 - **#189, N51 as P57:** `check_roles` applies a scope's blocks as the cascade does (the heavier selector, then the block written later), in one file or across the files in the order listed. Before, it applied every `:root` block before every `[data-theme="dark"]` block, so a `:root` written below the dark block passed on the dark value while the page showed `:root`'s (CodeRabbit on #187; reproduced on `v3.6.0`). A system that keeps `:root` first, as the starter does, reads as before. Cascade layers are still read as one, which the script's docstring says.
 
-**Next: P42 (part 1 done, #190), then P43, then P41: the owner's order (2026-10-21). All three come before R4** (§4).
+**P42 is done (2026-10-21):** #190, the persuasive devices against WCAG 2.2 (PS-B1); #191, the UK and EU consumer law to flag for legal review, price tests and consent for tracking (PS-B2, PS-B3, PS-B8), every date and figure read at its source and registered.
+
+**Next: P43, then P41: the owner's order (2026-10-21). Both come before R4** (§4).
 
 Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **the rest of Phase 6b in the owner's order** (§4), then R4.
 
@@ -529,14 +531,15 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
 
   | Skill | Bytes |
   |---|---|
+  | landing-page-conversion | 20,500 |
   | figma-variables-sync | 20,497 |
   | component-state-matrix | 20,494 |
   | client-presentation-builder | 20,494 |
   | perf-budget-gate | 20,491 |
   | web-design-studio | 20,488 |
-  | landing-page-conversion | 20,477 |
   | email-template-system | 20,474 |
   | design-system-versioning | 20,434 |
+  | design-critique-gate | 20,413 |
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.
 
@@ -556,16 +559,15 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is re
 
 ## 4. The rest of Phase 6b, then 4.0.0
 
-Phase 6c is done (P50 to P55), and so are P56 (N50) and P57 (N51). In Phase 6b, P34, P35, P36 and P37 are done. **The owner chose the order on 2026-10-21: P42, then P43, then P41.** P42 is split in three: part 1 (#190, PS-B1, the persuasive devices against WCAG 2.2) is done; part 2 is the UK and EU consumer law with price experiments (PS-B2, PS-B3), part 3 consent for tracking (PS-B8). Read each item's rows in the completion plan and its review finding (`dev plans/web-design-suite-review/delivery.md` for DL-, `persuasion.md` for PS-) before planning, and split an L into PRs under 100 files each.
+Phase 6c is done (P50 to P55), and so are P56 (N50) and P57 (N51). In Phase 6b, P34, P35, P36 and P37 are done. **The owner chose the order on 2026-10-21: P42, then P43, then P41.** P42 is done in two PRs: #190 (PS-B1, the persuasive devices against WCAG 2.2) and #191 (PS-B2, PS-B3 and PS-B8: the law to flag, price tests, consent). **Next is P43.** Read each item's rows in the completion plan and its review finding (`dev plans/web-design-suite-review/delivery.md` for DL-, `persuasion.md` for PS-) before planning, and split an L into PRs under 100 files each.
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P42 | Persuasion: persuasive patterns mapped to the WCAG 2.2 criteria they touch (PS-B1: sticky bars, deadlines, carousels, modals, consent banners, multi-step forms); UK and EU consumer law to flag for legal review (PS-B2: the DMCC Act, in force since 6 April 2025, fake reviews and drip pricing); price experiments (PS-B3: disclosure, the lowest price shown, revenue per visitor's noise); consent for tracking (PS-B8: GDPR, ePrivacy, PECR, masking in session recordings) | PS-B1, PS-B2, PS-B3, PS-B8 | landing references, `evidence.json` | M-L |
 | P43 | Page types and audiences (PS-B4: B2B demo pages, gated lead magnets, booking and donation pages, regulated claims, localisation); a claims layer and `lint_claims.py` (PS-B6, PS-C6: load-time countdowns, "only N left", pre-checked opt-ins, unsourced percentages, struck-through prices); routing between the persuasion skills and to perf-budget-gate and a11y-audit-runner; MESSAGE_BRIEF to DECISION_LOG (PS-C12) | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
 | P41 | Email: MJML or React Email output (DL-B4: `mj-attributes`/`mj-class` or a React Email theme from `email-tokens.json`, or route away explicitly); a right-to-left template (DL-B5: `dir="rtl"` on tables so ghost-table order flips, mirrored `align`, padding and VML, per-locale `lang` and `<title>`, text expansion against fixed VML widths); a client matrix regenerated from caniemail's data, with test dates (DL-C9) | DL-B4, DL-B5, DL-C9 | email-template-system | L |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
-Every outside figure in P42 (a law's date, a fine's ceiling) is re-read at its source on the day and registered in `tests/fixtures/evidence.json` with its quote. A legal point is flagged for review, never stated as advice.
+Every outside figure, as in P42 and in P43's regulated claims (a law's date, a fine's ceiling), is re-read at its source on the day and registered in `tests/fixtures/evidence.json` with its quote. A legal point is flagged for review, never stated as advice.
 
 **Each PR:** fail before on `v3.6.0` (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES` (and `WDS_TAILWIND_MODULES` for `test_tw_probe`), both at `tooling/main/node_modules`; the CHANGELOG under 4.0.0; a done row `Pnn part N, #N` above the item's row, which goes when the item is done; a note in the completion plan. `test_static_checks` holds every new script and test to its five rules.
 

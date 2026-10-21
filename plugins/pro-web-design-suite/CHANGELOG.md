@@ -39,6 +39,31 @@ renames the plugin.
 
 ### Added
 
+- **The UK and EU consumer law to flag for legal review, price tests and consent for tracking**
+  (PS-B2, PS-B3, PS-B8, P42 part 2). Each is dated and written as what to flag, never as advice,
+  and each date and figure was read at its source on 2026-10-21 and registered:
+  - `conversion-audit.md` §11.1, the UK and EU rules a page meets:
+    - the DMCC Act, in force since 6 April 2025, with CMA fines up to 10% of turnover or £300,000;
+    - reviews: Schedule 20 and UCPD points 23b, 23c and Art. 7(6);
+    - the total price, or how a part not yet knowable is worked out, as prominently (s. 230, the
+      CMA's drip pricing), and VAT;
+    - "was" prices: the EU's 30-day low for goods (not services or digital content), and no fixed
+      UK period;
+    - personalised prices: Art. 6(1)(ea), with no UK match;
+    - the EU withdrawal button from 19 June 2026, where the sale carries a right of withdrawal;
+    - the UK subscription rules, still draft, for contracts from 1 January 2027 if Parliament
+      approves.
+  - SKILL.md's ethics boundary declines drip pricing.
+  - `conversion-audit.md` §9.1, price tests: test the packaging before the price, flag four
+    things, and size the test on revenue per visitor, whose noise grows with the orders' spread
+    (about twice the visitors when order values vary as much as their mean).
+  - `conversion-audit.md` §8.1, consent for what the instrumentation list measures:
+    - the EU: ePrivacy Art. 5(3), GDPR Arts. 4(11) and 7(3), and Planet49;
+    - the UK: PECR's statistics exception since 5 February 2026, with its conditions, and the UK
+      GDPR's duties it leaves in place;
+    - masking what session recordings see;
+    - the EDPB's cookie-banner findings: reject beside accept, nothing pre-ticked, and a legible
+      reject.
 - **The persuasive devices, held to WCAG 2.2** (PS-B1, P42 part 1). landing-page-conversion
   prescribed countdowns, carousels, sticky bars, modals, consent banners, multi-step signup and
   toasts, and never named the criterion each meets. `conversion-audit.md` §7.1 holds thirteen

@@ -1549,6 +1549,12 @@
  },
  {
   "from": "landing-page-conversion/references/conversion-audit.md",
+  "to": "client-presentation-builder/references/objection-handling.md",
+  "section": "5",
+  "heading": "Conceding well"
+ },
+ {
+  "from": "landing-page-conversion/references/conversion-audit.md",
   "to": "landing-page-conversion/references/copy-patterns.md",
   "section": "9",
   "heading": "Empty, error and success microcopy"

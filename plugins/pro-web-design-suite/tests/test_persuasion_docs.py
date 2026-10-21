@@ -24,6 +24,16 @@ Gaps closed (4.0.0, P42):
 - PS-B1: the skill prescribed countdowns, carousels, sticky bars, modals,
   consent banners, multi-step signup and toasts, and never held one to the
   WCAG 2.2 criterion it meets; the critique gate's layer 8 did not either.
+- PS-B2: nothing on UK consumer law, though the author is a UK company (the
+  DMCC Act's reviews, total price and fines; the subscription rules to
+  come), nor on the EU's reviews, "was" prices, personalised prices or
+  withdrawal button; and drip pricing was missing from the ethics table.
+- PS-B3: §9 treated a price test like any A/B test: no disclosure duty, no
+  lowest-price record, and revenue per visitor's extra noise unsaid.
+- PS-B8: §8 and §9 recommended session recordings, heatmaps and form
+  analytics with no word on consent (ePrivacy, the GDPR, PECR as amended in
+  2026) or on masking what people type, and the consent banner, a dark
+  pattern of its own, had no rule.
 
 The docs are read through SKILLS, which honours WDS_PLUGIN_ROOT, so
 tools/fail_before.py runs these against the previous release's docs.
@@ -349,6 +359,209 @@ class PersuasiveDevicesAgainstWcag(unittest.TestCase):
                 self.assertIsNotNone(entry)
                 self.assertEqual(f"https://www.w3.org/TR/WCAG22/#{anchor}", entry["url"])
                 self.assertIn(doc, entry["docs"])
+
+
+def audit_text() -> str:
+    return (LANDING / "references" / "conversion-audit.md").read_text(encoding="utf-8")
+
+
+def law_rows() -> dict[str, list[str]]:
+    """conversion-audit.md §11.1's rows by what the page does: UK, EU, flag."""
+    table = section(audit_text(), "### 11.1 The UK and EU rules to flag for legal review", "\n---")
+    rows = [[c.strip() for c in line.strip().strip("|").split("|")]
+            for line in table.splitlines() if line.startswith("| ") and not line.startswith("| What the page")]
+    return {row[0]: row[1:] for row in rows}
+
+
+class TheLawToFlagForReview(unittest.TestCase):
+    """PS-B2: the UK and EU rules a page meets, dated, each with the
+    provision its source gives, and flagged for a lawyer, never advised on."""
+
+    # What each row must cite, read at its source on 2026-10-21: the DMCC Act
+    # at legislation.gov.uk, the directives through the EU Publications Office.
+    CITES = {"reviews": ("Schedule 20, paragraph 13", "23b", "23c", "Art. 7(6)"),
+             "fees": ("s. 230", "drip pricing", "Price Marking Order 2004", "Price Indication Directive Art. 2"),
+             '"was" price': ("s. 226", "30 days", "Art. 6a"),
+             "algorithm": ("Schedule 2", "Art. 6(1)(ea)", "recital 45"),
+             "EU consumers": ("19 June 2026", '"withdraw from contract here"', "Art. 11a"),
+             "subscription": ("not in force", "1 January 2027", "if Parliament approves")}
+
+    def test_the_table_is_dated_and_flags_rather_than_advises(self):
+        head = " ".join(section(audit_text(), "### 11.1 The UK and EU rules to flag", "\n| ").split())
+        self.assertRegex(head, r"^[^*]*\*As of \d{4}-\d{2}-\d{2}\.\*")
+        self.assertIn("not legal advice", head)
+        self.assertIn("`objection-handling.md` §5", head)
+        self.assertIn("in force since 6 April 2025", head)
+        self.assertIn("10% of a trader's turnover or £300,000, whichever is higher", head)
+
+    def test_each_rule_cites_the_provision_its_source_gives(self):
+        rows = law_rows()
+        for key, cites in self.CITES.items():
+            with self.subTest(row=key):
+                row = next((cells for what, cells in rows.items() if key in what), None)
+                self.assertIsNotNone(row, f"no row for {key}")
+                self.assertEqual(3, len(row))
+                self.assertTrue(row[2], "nothing to flag")
+                text = " ".join(" ".join(row).split())
+                for cite in cites:
+                    self.assertIn(cite, text)
+
+    def test_the_30_day_rule_and_the_selling_price_are_for_goods(self):
+        """Codex on #191: the Price Indication Directive, Art. 6a and Art. 2
+        with it, covers goods only (the Commission's guidance, 2021/C 526/02:
+        not services, digital services or digital content), which is most of
+        what a plugin or SaaS page sells; and member states may vary Art. 6a."""
+        rows = law_rows()
+        was = next(cells for what, cells in rows.items() if '"was" price' in what)[1]
+        self.assertIn("For goods, the prior price is the lowest", was)
+        self.assertIn("It does not reach services, digital services or digital content", was)
+        self.assertIn("52021XC1229(06)", was)
+        self.assertIn("(UCPD Art. 6)", was)
+        self.assertIn("goods that perish, goods new to the market and reductions that grow", was)
+        fees = next(cells for what, cells in rows.items() if "fees" in what)
+        self.assertIn("UCPD Art. 7(4)(c)", fees[1])
+        self.assertIn("for goods, the selling price includes VAT", fees[1])
+        self.assertIn("For goods, the Price Marking Order 2004", fees[0])
+        tests = " ".join(section(audit_text(), "### 9.1 Price tests", "\n---").split())
+        self.assertIn('An EU "was" price on goods must be the lowest', tests)
+
+    def test_a_price_not_yet_knowable_and_a_sale_with_no_withdrawal_right(self):
+        """CodeRabbit on #191: s. 230(2)(c) and (5) let a part of the price
+        that cannot be calculated in advance be given as how it will be, as
+        prominently; and Art. 11a's button is owed only where the sale
+        carries a right of withdrawal, which Art. 16 takes from some, among
+        them digital content once supplied with the buyer's consent."""
+        rows = law_rows()
+        fees = next(cells for what, cells in rows.items() if "fees" in what)
+        self.assertIn("cannot reasonably be calculated in advance, it says how that part will be, "
+                      "as prominently as the price (s. 230(2)(c) and (5))", fees[0])
+        self.assertIn("how the rest will be calculated beside it as prominently", fees[2])
+        withdrawal = next(cells for what, cells in rows.items() if "EU consumers" in what)
+        self.assertIn("Where the sale carries a right of withdrawal (Art. 9; Art. 16 lists the exceptions", withdrawal[1])
+        self.assertIn("digital content once supplied with their express consent", withdrawal[1])
+        self.assertIn("Whether the sale carries a right of withdrawal", withdrawal[2])
+        skill = (LANDING / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("a charge not yet knowable, as prominent, with how it is worked out", skill)
+
+    def test_the_uk_subscription_rules_are_not_called_in_force(self):
+        uk = next(cells for what, cells in law_rows().items() if "subscription" in what)[0]
+        self.assertNotRegex(uk, r"(?<!not )in force")
+        self.assertIn("draft", uk.lower())
+
+    def test_drip_pricing_is_declined_and_the_law_is_where_skill_md_says(self):
+        skill = (LANDING / "SKILL.md").read_text(encoding="utf-8")
+        boundary = section(skill, "## The ethics boundary", "\n---")
+        self.assertRegex(boundary, r"\| Fees, delivery or tax added at checkout \| Drip pricing \|")
+        self.assertIn("The UK, EU and US law behind each, to flag for legal review, is in "
+                      "`references/conversion-audit.md` §11.", " ".join(boundary.split()))
+
+    def test_the_dates_the_fine_and_the_figure_are_registered_at_their_sources(self):
+        doc = "landing-page-conversion/references/conversion-audit.md"
+        for figure, host in (("6 April 2025", "www.legislation.gov.uk"), ("10%", "www.legislation.gov.uk"),
+                             ("30 days", "eur-lex.europa.eu"), ("19 June 2026", "eur-lex.europa.eu"),
+                             ("1 January 2027", "www.gov.uk"), ("40%", "baymard.com")):
+            with self.subTest(figure=figure):
+                entry = next((e for e in REGISTER["entries"] if e["figure"] == figure and doc in e["docs"]), None)
+                self.assertIsNotNone(entry)
+                self.assertEqual(host, entry["url"].split("/")[2])
+        fine = next(e for e in REGISTER["entries"] if e["figure"] == "10%" and doc in e["docs"])
+        self.assertIn("£300,000", fine["also"])
+
+
+class PriceTests(unittest.TestCase):
+    """PS-B3: a price test tests the business, carries duties a headline test
+    does not, and is measured on a noisier number."""
+
+    def test_packaging_first_and_four_things_flagged(self):
+        tests = " ".join(section(audit_text(), "### 9.1 Price tests", "\n---").split())
+        self.assertIn("Test the packaging before the price", tests)
+        for flag in ("**Personalisation.**", "**The lowest price shown is on the record.**",
+                     "**The checkout charges what the page showed,**", "**Customers compare.**"):
+            with self.subTest(flag=flag):
+                self.assertIn(flag, tests)
+        self.assertIn("(§11.1)", tests)
+
+    def test_the_revenue_per_visitor_arithmetic_holds(self):
+        """The doc's figures, from its own formula: n ≈ 16·σ²/δ², with
+        σ² = p(1 − p) for a conversion and p·μ²(1 + c² − p) for revenue per
+        visitor, where c is the orders' coefficient of variation."""
+        tests = " ".join(section(audit_text(), "### 9.1 Price tests", "\n---").split())
+        p, lift = 0.03, 0.20
+        conversion = 16 * p * (1 - p) / (lift * p) ** 2
+        revenue = 16 * (1 + 1 - p) / (lift ** 2 * p)                       # c = 1, μ cancels
+        self.assertIn(f"about {round(conversion, -2):,.0f} visitors per variant on conversion", tests)
+        self.assertIn(f"about {round(revenue, -2):,.0f} on revenue per visitor at c = 1", tests)
+        def ratio(c: float) -> float:                                      # revenue's n over conversion's
+            return (1 + c * c - p) / (1 - p)
+
+        self.assertAlmostEqual(ratio(1), 2, delta=0.1)
+        self.assertIn("about twice when order values vary as much as their mean (c = 1)", tests)
+        self.assertAlmostEqual(ratio(2), 5, delta=0.2)
+        self.assertIn("five times at c = 2", tests)
+        # The baseline and the change are §9's own example.
+        nine = " ".join(section(audit_text(), "## 9. A/B testing, honestly", "\n### 9.1").split())
+        self.assertIn("Baseline conversion 3%", nine)
+        self.assertIn("20% *relative* improvement", nine)
+        self.assertIn(f"{round(conversion, -2):,.0f} per variant", nine)
+
+
+class ConsentForTracking(unittest.TestCase):
+    """PS-B8: what the instrumentation list needs before it runs, in the EU
+    and the UK, read at the sources on 2026-10-21."""
+
+    def consent(self) -> str:
+        return " ".join(section(audit_text(), "### 8.1 Consent for what you measure", "\n---").split())
+
+    def test_it_is_dated_and_flagged_for_a_lawyer(self):
+        self.assertRegex(self.consent(), r"^[^*]*\*As of \d{4}-\d{2}-\d{2}, and a list to flag for the client's lawyer")
+
+    def test_the_eu_row_cites_the_directive_the_regulation_and_planet49(self):
+        text = self.consent()
+        for cite in ("ePrivacy Directive Art. 5(3)", "strictly necessary", "GDPR Art. 4(11)",
+                     "a pre-ticked box is not one", "C-673/17", "as easy as giving it (GDPR Art. 7(3))"):
+            with self.subTest(cite=cite):
+                self.assertIn(cite, text)
+
+    def test_the_uk_row_gives_the_2026_statistics_exception_and_its_conditions(self):
+        text = self.consent()
+        self.assertIn("Since 5 February 2026, PECR (as the Data (Use and Access) Act 2025 amended it)", text)
+        for condition in ("with a view to improving it", "can object simply and for free", "has not objected",
+                          "the data goes to no one but those helping to improve the site",
+                          "Schedule A1, paragraph 5"):
+            with self.subTest(condition=condition):
+                self.assertIn(condition, text)
+        self.assertIn("an advertising pixel, still need consent", text)
+
+    def test_the_pecr_exception_leaves_the_uk_gdpr_in_place(self):
+        """Codex on #191: Schedule A1 lifts PECR's consent requirement only;
+        analytics that handle personal data still need the UK GDPR's lawful
+        basis, transparency and minimisation."""
+        self.assertIn("as far as PECR goes. Where it handles personal data (an IP address, a persistent visitor ID), "
+                      "the UK GDPR still asks for a lawful basis, transparency and minimisation: flag both.",
+                      self.consent())
+
+    def test_recordings_are_masked_and_the_banner_is_held_to_the_edpb_and_wcag(self):
+        text = self.consent()
+        self.assertIn('"adequate, relevant and limited to what is necessary" (Art. 5(1)(c))', text)
+        self.assertIn("Mask every input by default", text)
+        self.assertIn("adopted on 17 January 2023", text)
+        self.assertIn("no reject option on the layer that holds the accept button", text)
+        self.assertIn("held to 1.4.3 like any other text (§7.1)", text)
+        banner = next(r for r in device_rows() if r[0] == "A consent banner")
+        self.assertIn("§8.1", banner[2])
+
+    def test_the_instrumentation_list_points_to_the_rule(self):
+        audit = " ".join(audit_text().split())
+        self.assertIn("Record the field, never what was typed in it (§8.1).", audit)
+        self.assertIn("With consent where the law asks for it, and every input masked (§8.1)", audit)
+
+    def test_the_dates_are_registered_at_their_sources(self):
+        doc = "landing-page-conversion/references/conversion-audit.md"
+        for figure, host in (("5 February 2026", "www.legislation.gov.uk"), ("17 January 2023", "www.edpb.europa.eu")):
+            with self.subTest(figure=figure):
+                entry = next((e for e in REGISTER["entries"] if e["figure"] == figure and doc in e["docs"]), None)
+                self.assertIsNotNone(entry)
+                self.assertEqual(host, entry["url"].split("/")[2])
 
 
 if __name__ == "__main__":

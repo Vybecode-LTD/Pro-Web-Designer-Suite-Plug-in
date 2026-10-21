@@ -28,9 +28,9 @@ A page that converts is not a well-designed page with persuasive words dropped i
 
 > **Message before layout. You cannot choose a section order until you know what the page is arguing, and you cannot write a hero until you can say who it is for and what it replaces.**
 
-This inverts how most landing pages get built. The usual order is: pick a template, fill the boxes, write copy to fit the boxes. That produces a page whose structure was decided by a template author who had never heard of the product, and whose copy was constrained to fit a 60-character slot.
+This inverts how most landing pages get built. The usual order is: pick a template, fill the boxes, write copy to fit the boxes. That produces a page whose structure was decided by a template author who had never heard of the product.
 
-The order here is the reverse: **positioning → message hierarchy → architecture → copy → layout → audit.** Layout is phase 5 of 6. By the time you open a stylesheet, every decision it has to express is already made, which is also why the markup goes on-system from the first commit rather than being retro-fitted.
+The order here is the reverse: **positioning → message hierarchy → architecture → copy → layout → audit.** Layout is phase 5 of 6. By the time you open a stylesheet, every decision it has to express is already made.
 
 The diagnostic that proves this matters: when a page "isn't converting," the cause is almost never the button colour. It is that a visitor got four screens in and still could not tell what the thing *is*, or who it is for, or what it replaces in their week. Those are message failures. They are invisible to a design review and obvious in a five-second test.
 
@@ -51,9 +51,10 @@ Honest persuasion is: making a true claim clearly, in the order a reader can abs
 | Ads or affiliate blocks styled as editorial content | Disguised advertising | Label it. A visible "Sponsored" costs less than the trust it protects |
 | Cancellation buried, phone-only, or behind a retention maze | Obstruction / roach motel | Cancel in the account page, in the same number of clicks it took to subscribe |
 | Pre-ticked upsells, sneaking items into a cart, hidden auto-renew | Sneaking | Opt-in, unticked, with the renewal terms next to the button |
+| Fees, delivery or tax added at checkout | Drip pricing | The total price, VAT in, from the first price shown; a charge not yet knowable, as prominent, with how it is worked out |
 | "Free" that is a trial with stored card and no reminder | Bait / hidden cost | Say "14-day trial, card required, we email you 3 days before it bills" |
 
-The EU and US law behind each is in `references/conversion-audit.md` §11. A client who asks for one in a review gets the same answer, and an accessibility risk is held, not built (client-presentation-builder's objection-handling.md §5).
+The UK, EU and US law behind each, to flag for legal review, is in `references/conversion-audit.md` §11. A client who asks for one in a review gets the same answer, and an accessibility risk is held, not built (client-presentation-builder's objection-handling.md §5).
 
 **The practical argument, which matters more for a small company than the legal one.** A dark pattern converts someone who did not want the thing. You now own a refund, a chargeback, a support ticket, a public review, and one person who tells their peers. For a plugin company selling to a few thousand producers, or an agency whose pipeline is referrals, the audience is small enough that reputations are single-threaded. A burned prospect costs more than a converted one is worth, and the arithmetic does not improve at scale — it just takes longer to show up.
 
@@ -179,7 +180,7 @@ Sequence the sections to answer objections in the order a real reader raises the
 
 **what is it → is it for me → does it work → can I trust you → what does it cost → what happens if I'm wrong**
 
-A page that answers these out of order loses people at the gap. Pricing before proof reads as presumptuous; proof before the reader knows what the thing is has nothing to attach to. The failure is not that the information is missing — it is usually all there — but that it arrives after the question has already been abandoned.
+A page that answers these out of order loses people at the gap. Pricing before proof reads as presumptuous; proof before the reader knows what the thing is has nothing to attach to. The failure is not that the information is missing but that it arrives after the question has already been abandoned.
 
 | The reader's question | The section that answers it | What happens if it is missing |
 |---|---|---|
