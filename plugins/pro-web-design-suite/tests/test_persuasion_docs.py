@@ -406,6 +406,25 @@ class TheLawToFlagForReview(unittest.TestCase):
                 for cite in cites:
                     self.assertIn(cite, text)
 
+    def test_the_30_day_rule_and_the_selling_price_are_for_goods(self):
+        """Codex on #191: the Price Indication Directive, Art. 6a and Art. 2
+        with it, covers goods only (the Commission's guidance, 2021/C 526/02:
+        not services, digital services or digital content), which is most of
+        what a plugin or SaaS page sells; and member states may vary Art. 6a."""
+        rows = law_rows()
+        was = next(cells for what, cells in rows.items() if '"was" price' in what)[1]
+        self.assertIn("For goods, the prior price is the lowest", was)
+        self.assertIn("It does not reach services, digital services or digital content", was)
+        self.assertIn("52021XC1229(06)", was)
+        self.assertIn("(UCPD Art. 6)", was)
+        self.assertIn("goods that perish, goods new to the market and reductions that grow", was)
+        fees = next(cells for what, cells in rows.items() if "fees" in what)
+        self.assertIn("UCPD Art. 7(4)(c)", fees[1])
+        self.assertIn("for goods, the selling price includes VAT", fees[1])
+        self.assertIn("For goods, the Price Marking Order 2004", fees[0])
+        tests = " ".join(section(audit_text(), "### 9.1 Price tests", "\n---").split())
+        self.assertIn('An EU "was" price on goods must be the lowest', tests)
+
     def test_the_uk_subscription_rules_are_not_called_in_force(self):
         uk = next(cells for what, cells in law_rows().items() if "subscription" in what)[0]
         self.assertNotRegex(uk, r"(?<!not )in force")
@@ -494,6 +513,14 @@ class ConsentForTracking(unittest.TestCase):
             with self.subTest(condition=condition):
                 self.assertIn(condition, text)
         self.assertIn("an advertising pixel, still need consent", text)
+
+    def test_the_pecr_exception_leaves_the_uk_gdpr_in_place(self):
+        """Codex on #191: Schedule A1 lifts PECR's consent requirement only;
+        analytics that handle personal data still need the UK GDPR's lawful
+        basis, transparency and minimisation."""
+        self.assertIn("as far as PECR goes. Where it handles personal data (an IP address, a persistent visitor ID), "
+                      "the UK GDPR still asks for a lawful basis, transparency and minimisation: flag both.",
+                      self.consent())
 
     def test_recordings_are_masked_and_the_banner_is_held_to_the_edpb_and_wcag(self):
         text = self.consent()

@@ -46,7 +46,8 @@ renames the plugin.
     - the DMCC Act, in force since 6 April 2025, with CMA fines up to 10% of turnover or £300,000;
     - reviews: Schedule 20 and UCPD points 23b, 23c and Art. 7(6);
     - the total price (s. 230, the CMA's drip pricing) and VAT;
-    - "was" prices: the EU's 30-day low, and no fixed UK period;
+    - "was" prices: the EU's 30-day low for goods (not services or digital content), and no fixed
+      UK period;
     - personalised prices: Art. 6(1)(ea), with no UK match;
     - the EU withdrawal button from 19 June 2026;
     - the UK subscription rules, still draft, for contracts from 1 January 2027 if Parliament
@@ -57,7 +58,8 @@ renames the plugin.
     (about twice the visitors when order values vary as much as their mean).
   - `conversion-audit.md` §8.1, consent for what the instrumentation list measures:
     - the EU: ePrivacy Art. 5(3), GDPR Arts. 4(11) and 7(3), and Planet49;
-    - the UK: PECR's statistics exception since 5 February 2026, with its conditions;
+    - the UK: PECR's statistics exception since 5 February 2026, with its conditions, and the UK
+      GDPR's duties it leaves in place;
     - masking what session recordings see;
     - the EDPB's cookie-banner findings: reject beside accept, nothing pre-ticked, and a legible
       reject.
