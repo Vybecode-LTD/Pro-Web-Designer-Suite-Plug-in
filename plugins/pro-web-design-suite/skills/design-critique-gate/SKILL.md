@@ -278,6 +278,9 @@ python -m scripts.critique_report findings.json --summary
 | Checking a token or role name | `references/token-contract.md` |
 | Mechanical conformance | `web-design-studio/references/review-checklist.md` + `scripts/audit_design.py` |
 | A layout that feels off and you cannot say why | `web-design-studio/references/spacing-system.md` §13, then §7 for optical |
+| Accessibility past a look (layers 6, 8) | `a11y-audit-runner`: two gates, then the manual pass |
+| Every state of every component (layer 7) | `component-state-matrix`: the proof sheet and its CI diff |
+| The defence sheet in front of a client | `client-presentation-builder`, which reads `--format defence` |
 
 ---
 
@@ -293,18 +296,14 @@ python -m scripts.critique_report findings.json --summary        # top three, no
 python -m scripts.critique_report findings.json --audit audit.json --fail-on blocking
 ```
 
-Findings are JSON. Each one carries `layer`, `severity`, `title`, `mechanism`, `evidence`,
-`fix`, `confidence` and `is_taste`, plus `status` (`open` | `fixed`) and optional `covers`;
-the schema is in the script's docstring and the shape is the same one
-`assets/CRITIQUE_TEMPLATE.md` fills in by hand. `--audit` folds `audit_design.py --json`
-output in as conformance findings, collapsed by rule, deduplicated against anything you
-already wrote up by hand — a whole rule only when your finding claims it (the rule id in
-`covers`, or in backticks), and otherwise site by site, so a group of eleven violations is
-not silently deleted because you mentioned one of them, or used the word "important".
-A rule raised with `--audit-blocking` is never folded, and every merge is reported in
-the output and on stderr. The defence sheet carries every open major and minor finding — confirmed ones
-first, suspicions labelled as suspicions — and drops the ones marked `fixed` unless they
-set `defend`.
+Findings are JSON: `layer`, `severity`, `title`, `mechanism`, `evidence`, `fix`,
+`confidence`, `is_taste`, `status` (`open` | `fixed`), optional `covers` and `defend`; the
+schema is in the script's docstring, and `assets/CRITIQUE_TEMPLATE.md` fills in the same shape.
+`--audit` folds `audit_design.py --json` in, collapsed by rule: a whole rule only when your
+finding claims it (its id in `covers`, or in backticks), otherwise site by site. A rule
+raised with `--audit-blocking` never folds, and every merge is reported, on stderr too. The
+defence sheet carries every open major and minor finding, confirmed first, suspicions
+labelled, and drops `fixed` ones unless they set `defend`.
 
 `scripts/critique_snapshots.mjs` — Node and Playwright, the browser found as the suite's
 other browser scripts find it, never downloaded. It renders what stands in for the checks

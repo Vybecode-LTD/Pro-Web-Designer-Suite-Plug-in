@@ -249,14 +249,38 @@ Each row is a complete section order. `→` is scroll order. Sections in *(paren
 | **Agency / services** | Hero (CTA = book a call) → Client logo strip → Problem → What we do (3 services) → How we work (process) → Case studies *(the deep-dives are the case studies)* → Team → Pricing or engagement model → FAQ (timeline, cost, ownership, what we need from you) → Final CTA → Footer |
 | **Single-product ecommerce** | Hero (product, price, buy — all three visible) → Gallery → Key specs → Value props → Reviews → Details & materials → Shipping & returns → FAQ → Final CTA → Footer |
 | **Event / webinar registration** | Hero (what, when, who, register) → Who it is for → Agenda → Speakers → *(Past attendee proof)* → Logistics (time zones, recording, cost) → FAQ → Final CTA → Footer |
+| **B2B demo request** (a buying committee) | Hero (CTA = book a demo, saying how long it takes and what it covers) → Logo strip from the reader's industry → Problem, in the business's units → Value props by role (the user, the budget holder, IT and security) → How it works → Security and compliance (the reports and policies a reviewer asks for, where the data lives, the data processing terms) → Return on investment, its assumptions shown → Case study from a comparable company → Pricing, or a starting price → FAQ (procurement, onboarding time, contract length, leaving) → Final CTA → Footer |
+| **Gated lead magnet** (a guide, a report, a template, for an email address) | Hero (what it is, its format and length, CTA = get it) → Preview (the contents, a sample page) → Who it is for → The form (the fewest fields delivery needs; what happens to the address; marketing consent as its own unticked box) → Who wrote it → FAQ → Footer |
+| **Local booking** (a clinic, a studio, a trade) | Hero (the service, the area, a price from, CTA = book, beside the next real slot) → Services and prices → The booking calendar → Location, hours, access → Reviews, with where they come from → Who does the work → Cancellation terms → FAQ → Footer |
+| **Donation** | Hero (the cause, the outcome a gift pays for, CTA = donate) → What each amount does, at its real cost → Where the money goes (the accounts, the registration number) → Stories told with their subjects' consent → One-off or monthly (monthly is a choice, never ticked in advance) → Tax relief the donor can claim, if any → FAQ (where it goes, cancelling a monthly gift) → Footer |
+| **Paid-search landing page** (message match) | Hero repeating the ad's promise in the ad's words, CTA = the action the ad offered → The proof that promise needs → The one objection the ad raises → Final CTA → A minimal footer. One page per ad group, with no navigation that leaves the argument |
 
-Three things to read out of that table.
+Six things to read out of that table.
 
 **Ecommerce is the exception that proves the ladder.** Price sits in the hero because the reader arrived already knowing what a pair of headphones is — questions 1 and 2 were answered by the ad they clicked. When the category is known, the ladder compresses at the top.
 
 **Waitlists invert proof and specifics.** With no users and no shipped product, questions 3 and 4 cannot be answered with testimonials, so they are answered with *transparency*: who is building it, in the open, on what timeline. That is the honest substitute and it works, because it is checkable.
 
 **Agency pages replace features with cases.** An agency's deep-dive section *is* its case studies; running both is how a services page reaches 4,000 words of nothing. The proof and the explanation are the same artifact.
+
+**A buying committee reads in parts.** The user wants the workflow, the budget holder the cost and the return, IT and security the data, the access and the way out. A demo page answers each in a section of its own, because each reader reads only theirs, and the one it leaves out is the one who says no.
+
+**Gated content trades an address for something the reader can see first.** Show the contents and a page before the form. A form that asks for a phone number and a company size in exchange for a PDF is asking a sales question; ask it on the sales call.
+
+**Paid search is a promise kept.** The click came from an ad that made one promise in one set of words. The hero repeats both, or the reader decides it is the wrong page in the first second, and every other section on it goes unread.
+
+### 3.1 Claims that need a lawyer before a writer
+
+*As of 2026-10-21; flag these, never write the claim.* Some pages make claims the law reserves. The rule is to stop and ask, not to draft a softer version.
+
+| What the page claims | The rule, read at its source | What to flag |
+|---|---|---|
+| A health benefit of a food or a supplement ("supports immunity") | A health claim is prohibited unless it is authorised and on the list of authorised claims ([Regulation (EC) No 1924/2006 Art. 10(1)](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02006R1924-20141213)); Great Britain keeps the rule with its own list ([the GB text](https://www.legislation.gov.uk/eur/2006/1924/article/10)) | Every health claim, word for word, against the list the market uses; a claim the list does not hold is not written |
+| A return on an investment, or any invitation to invest (UK) | No one may, in the course of business, communicate an invitation or inducement to engage in investment activity unless they are authorised, or an authorised person has approved it ([FSMA 2000 s. 21](https://www.legislation.gov.uk/ukpga/2000/8/section/21)); a firm's financial promotion must be fair, clear and not misleading ([FCA COBS 4.2.1R](https://www.handbook.fca.org.uk/handbook/COBS/4/2.html)) | Whether the client is authorised, or has the page approved by someone who is, before a word of it is written |
+
+### 3.2 Localised pages
+
+Localise the argument, do not translate the words. A headline's idiom rarely survives a language, so the claim is written again in the market's own terms. Prices are in the market's currency with its taxes in (`conversion-audit.md` §11.1). And text grows: W3C's guidance, from IBM's, gives English strings of up to 10 characters an average expansion of 200–300% into European languages, and strings over 70 characters about 130% ([W3C](https://www.w3.org/International/articles/article-text-size)). The short strings, buttons and navigation, grow most, so a CTA sized to its English label is the first thing to break. Set `lang` on each page and `hreflang` between them, and write dates, numbers and units in the market's format.
 
 ---
 

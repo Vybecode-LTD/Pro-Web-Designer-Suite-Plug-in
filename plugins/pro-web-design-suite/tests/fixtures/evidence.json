@@ -1012,6 +1012,20 @@
       "docs": [
         "landing-page-conversion/references/conversion-audit.md"
       ]
+    },
+    {
+      "figure": "200–300%",
+      "also": [
+        "130%"
+      ],
+      "claim": "the average expansion of English strings translated into European languages: 200–300% for strings of up to 10 characters, about 130% for strings over 70",
+      "source": "W3C Internationalization, Text size in translation (citing IBM's Guidelines to design global solutions)",
+      "url": "https://www.w3.org/International/articles/article-text-size",
+      "checked": "2026-10-21",
+      "quote": "The following are average expected expansion rates for text translated from English into European languages, as published by IBM in their Guidelines to design global solutions. No. of characters in English source Average expansion Up to 10 200–300% 11–20 180–200% 21–30 160–180% 31–50 140–160% 51–70 151-170% Over 70 130%",
+      "docs": [
+        "landing-page-conversion/references/page-architecture.md"
+      ]
     }
   ],
   "not_statistics": [

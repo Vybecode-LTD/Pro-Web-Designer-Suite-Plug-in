@@ -1543,6 +1543,18 @@
  },
  {
   "from": "landing-page-conversion/SKILL.md",
+  "to": "landing-page-conversion/references/conversion-audit.md",
+  "section": "7",
+  "heading": "The technical layer"
+ },
+ {
+  "from": "landing-page-conversion/SKILL.md",
+  "to": "landing-page-conversion/references/conversion-audit.md",
+  "section": "7.1",
+  "heading": "The persuasive devices, against WCAG 2.2"
+ },
+ {
+  "from": "landing-page-conversion/SKILL.md",
   "to": "landing-page-conversion/references/page-architecture.md",
   "section": "3",
   "heading": "Sequences by page type"
@@ -1552,6 +1564,12 @@
   "to": "landing-page-conversion/references/page-architecture.md",
   "section": "8",
   "heading": "Wiring sections to the design system"
+ },
+ {
+  "from": "landing-page-conversion/SKILL.md",
+  "to": "landing-page-conversion/references/worked-example.md",
+  "section": "2",
+  "heading": "Message hierarchy (Phase 2)"
  },
  {
   "from": "landing-page-conversion/references/conversion-audit.md",
@@ -1588,6 +1606,18 @@
   "to": "landing-page-conversion/references/page-architecture.md",
   "section": "6",
   "heading": "Rhythm, banding and the scroll contract"
+ },
+ {
+  "from": "landing-page-conversion/references/copy-patterns.md",
+  "to": "landing-page-conversion/references/page-architecture.md",
+  "section": "3",
+  "heading": "Sequences by page type"
+ },
+ {
+  "from": "landing-page-conversion/references/page-architecture.md",
+  "to": "landing-page-conversion/references/conversion-audit.md",
+  "section": "11.1",
+  "heading": "The UK and EU rules to flag for legal review"
  },
  {
   "from": "landing-page-conversion/references/page-architecture.md",

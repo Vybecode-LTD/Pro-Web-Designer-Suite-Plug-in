@@ -34,6 +34,14 @@ Gaps closed (4.0.0, P42):
   analytics with no word on consent (ePrivacy, the GDPR, PECR as amended in
   2026) or on masking what people type, and the consent banner, a dark
   pattern of its own, had no rule.
+- PS-B4 (P43): every sequence and example was audio, AI or agency: no B2B
+  demo page for a buying committee, no gated lead magnet, booking or
+  donation page, no paid-search page, nothing on regulated claims or on
+  a page for another market.
+- PS-B6 (P43, the routing): landing-page-conversion never sent the reader
+  to perf-budget-gate or a11y-audit-runner, and the critique gate never
+  named a11y-audit-runner, component-state-matrix or the deck that reads
+  its defence sheet.
 
 The docs are read through SKILLS, which honours WDS_PLUGIN_ROOT, so
 tools/fail_before.py runs these against the previous release's docs.
@@ -562,6 +570,85 @@ class ConsentForTracking(unittest.TestCase):
                 entry = next((e for e in REGISTER["entries"] if e["figure"] == figure and doc in e["docs"]), None)
                 self.assertIsNotNone(entry)
                 self.assertEqual(host, entry["url"].split("/")[2])
+
+
+def architecture() -> str:
+    return (LANDING / "references" / "page-architecture.md").read_text(encoding="utf-8")
+
+
+class PageTypesAndRouting(unittest.TestCase):
+    """PS-B4 and PS-B6's routing: the page types beyond software, the claims
+    and markets that need a lawyer or a rewrite, and each skill pointing at
+    the siblings that do the work it names."""
+
+    def test_the_new_page_types_are_whole_sequences(self):
+        table = section(architecture(), "## 3. Sequences by page type", "\n\n### 3.1")
+        rows = {m.group(1): m.group(2) for m in re.finditer(r"^\| \*\*([^*]+)\*\*[^|]*\| ([^|]+) \|$", table, re.M)}
+        for page, must in (("B2B demo request", ("Security and compliance", "Value props by role")),
+                           ("Gated lead magnet", ("Preview", "marketing consent as its own unticked box")),
+                           ("Local booking", ("the next real slot", "Cancellation terms")),
+                           ("Donation", ("never ticked in advance", "Where the money goes")),
+                           ("Paid-search landing page", ("in the ad's words",))):
+            with self.subTest(page=page):
+                self.assertIn(page, rows)
+                for part in must:
+                    self.assertIn(part, rows[page])
+        words = {"three": 3, "four": 4, "five": 5, "six": 6, "seven": 7}
+        stated = re.search(r"(\w+) things to read out of that table", table).group(1).lower()
+        notes = table.split("things to read out of that table.", 1)[1]
+        self.assertEqual(words[stated], len(re.findall(r"^\*\*[^*]+\*\*", notes, re.M)))
+
+    def test_regulated_claims_are_flagged_with_their_sources_provisions(self):
+        claims = " ".join(section(architecture(), "### 3.1 Claims that need a lawyer before a writer", "\n### ").split())
+        self.assertRegex(claims, r"^\*As of \d{4}-\d{2}-\d{2}; flag these, never write the claim\.\*")
+        for cite in ("Regulation (EC) No 1924/2006 Art. 10(1)", "https://www.legislation.gov.uk/eur/2006/1924/article/10",
+                     "FSMA 2000 s. 21", "https://www.legislation.gov.uk/ukpga/2000/8/section/21",
+                     "FCA COBS 4.2.1R", "fair, clear and not misleading", "unless they are authorised, or an authorised person has approved it"):
+            with self.subTest(cite=cite):
+                self.assertIn(cite, claims)
+
+    def test_a_localised_page_and_its_registered_figure(self):
+        local = " ".join(section(architecture(), "### 3.2 Localised pages", "\n---").split())
+        for part in ("Localise the argument, do not translate the words", "200–300%", "130%",
+                     "https://www.w3.org/International/articles/article-text-size", "`hreflang`"):
+            with self.subTest(part=part):
+                self.assertIn(part, local)
+        entry = next((e for e in REGISTER["entries"] if e["figure"] == "200–300%"), None)
+        self.assertIsNotNone(entry)
+        self.assertEqual(["landing-page-conversion/references/page-architecture.md"], entry["docs"])
+        self.assertIn("130%", entry["also"])
+
+    def test_copy_patterns_gives_the_other_pages_their_calls_to_action(self):
+        copy = (LANDING / "references" / "copy-patterns.md").read_text(encoding="utf-8")
+        ctas = section(copy, "### Calls to action for the other page types", "\n---")
+        for page in ("B2B demo request", "Gated lead magnet", "Local booking", "Donation", "Paid-search page"):
+            with self.subTest(page=page):
+                self.assertRegex(ctas, re.compile(rf"^\| {re.escape(page)} \|", re.M))
+        self.assertNotIn("All examples are drawn from the three markets", copy)
+
+    def test_landing_routes_to_the_siblings_that_measure_and_critique(self):
+        skill = " ".join((LANDING / "SKILL.md").read_text(encoding="utf-8").split())
+        cross = skill.split("Cross-skill:", 1)[1]
+        for sibling, does in (("perf-budget-gate", "measures in a browser the LCP, CLS and INP"),
+                              ("a11y-audit-runner", "runs the checks of `references/conversion-audit.md` §7.1"),
+                              ("design-critique-gate", "critiques the page you built")):
+            with self.subTest(sibling=sibling):
+                self.assertIn(f"`{sibling}` {does}", cross)
+        self.assertIn("`references/worked-example.md` §2", skill)
+
+    def test_the_critique_gate_routes_to_the_skills_its_layers_lean_on(self):
+        skill = (GATE / "SKILL.md").read_text(encoding="utf-8")
+        routing = section(skill, "## Routing", "\n---")
+        for sibling in ("a11y-audit-runner", "component-state-matrix", "client-presentation-builder"):
+            with self.subTest(sibling=sibling):
+                self.assertRegex(routing, re.compile(rf"^\| [^|]+ \| `{sibling}`", re.M))
+        # The shortened findings paragraph keeps every rule it stated (PS-A2, PS-A3).
+        scripts = " ".join(section(skill, "## The scripts", "\n---").split())
+        for rule in ("a whole rule only when your finding claims it (its id in `covers`, or in backticks), "
+                     "otherwise site by site", "`--audit-blocking` never folds", "every merge is reported, on stderr too",
+                     "confirmed first, suspicions labelled", "drops `fixed` ones unless they set `defend`"):
+            with self.subTest(rule=rule):
+                self.assertIn(rule, scripts)
 
 
 if __name__ == "__main__":
