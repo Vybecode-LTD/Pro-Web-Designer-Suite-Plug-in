@@ -2,6 +2,8 @@
 
 **2026-10-21: P42 is done** (#190, #191), in the owner's order P42, P43, P41. #190 holds thirteen persuasive devices to their WCAG 2.2 criteria (PS-B1); #191 adds the UK and EU consumer law to flag for legal review, price tests and consent for tracking (PS-B2, PS-B3, PS-B8), every date and figure read at its source on the day and registered. **P43 is done too** (#192 to #194): `lint_claims.py`, the page types beyond software with the routing between the persuasion skills, and `brief_to_log.py`. **Next: P41, then R4.** The owner's three pre-R4 steps are done (below).
 
+**At the session's end (2026-10-22):** #189 (P57, `57355ae`), #190 (`236fe41`) and #191 (`e0f985e`) are merged. **P43's three PRs are open as a stack, #192 → #193 → #194**, every review thread resolved and CI running: merge them bottom-up once each is green, retargeting the next to `main` before deleting the merged branch. The webdesignersuite.com PR #5 (N51 fixed, and its handoff) waits on its own CI the same way. Then P41.
+
 **2026-10-20: P56 and P57 are done** (N50, #185 to #187: the seven problems building webdesignersuite.com found, fixed on `main` for 4.0.0, F5 in part; N51, #189: `check_roles` applies a scope's blocks as the cascade does, so `:root` written below `[data-theme="dark"]` wins on a dark page, a heavier selector wins whatever the order, and files given together are written in the order listed). Cascade layers are still read as one (the script's docstring says so). Details are at the top of `dev plans/next-session-prompt.md`. The site (`C:\DEV\webdesignersuite.com`, `Vybecode-LTD/webdesignersuite.com`, staging on Railway) keeps a workaround per finding until 4.0.0 ships; after R4, rerun `/install-gate` there and remove them (`dev plans/plugin-findings.md` in the site).
 - **Three more CI traps from this session:** the `macos-latest · Python 3.14` cell failed four times on timing-dependent browser tests, none reached by the PRs: `test_vitals_measure_the_signed_in_page_and_the_late_content` on `main` (`76d4b18`), #185 and #186, and `test_a_page_type_picks_the_budget_its_page_is_held_to` on #187; `gh run rerun RUN --failed` passed each. **A local `check.py` run that errors with a subprocess `TimeoutExpired` and takes far longer than the usual 11 to 12 minutes means the laptop slept** (System log, Kernel-Power 42): rerun the failing test alone before you debug it. **Never chain `git commit` after `check.py` in one command**: read its exit first (a commit was pushed on a failed run this session; it was a sleep timeout, but the order was wrong).
 
@@ -51,9 +53,10 @@ R4's `distribute` job is the first real push with the key; if it fails, the GitH
 
 ## Next steps
 
-1. **P43, then P41**, the owner's order (2026-10-21). P42 is done: #190 (PS-B1) and #191 (PS-B2, PS-B3, PS-B8). P43 is done: #192, `lint_claims.py` (PS-C6); #193, page types and routing (PS-B4, PS-B6); #194, `brief_to_log.py` (PS-C12). P41 is next. Sizes and scope are in the next-session prompt's §4.
-2. Each split into PRs of under 100 files.
-3. Then **R4**, the 4.0.0 release, with its live check (the owner's OK and an estimate first).
+1. **Merge the open stack** #192 → #193 → #194 once each is green (and site PR #5). P42 is done: #190 (PS-B1) and #191 (PS-B2, PS-B3, PS-B8). P43 is #192, `lint_claims.py` (PS-C6); #193, page types and routing (PS-B4, PS-B6); #194, `brief_to_log.py` (PS-C12).
+2. **P41** (email, L: MJML or React Email output, a right-to-left template, the client matrix from caniemail's data), the last item before R4. Sizes and scope are in the next-session prompt's §4. Sizes and scope are in the next-session prompt's §4.
+3. Each split into PRs of under 100 files.
+4. Then **R4**, the 4.0.0 release, with its live check (the owner's OK and an estimate first).
 
 ## Open owner decisions
 
@@ -64,6 +67,12 @@ R4's `distribute` job is the first real push with the key; if it fails, the GitH
 
 - **This Windows machine refuses Playwright's unsigned Firefox build** ("Permission denied", probably Smart App Control). Firefox's tests skip locally and run on CI's Linux cells. Changing that is a system security setting: never touch it.
 - **`check.py` misses snippet tests** for a changed reference (see above). After editing a reference's code fence, run `test_doc_snippets` and `test_real_tools.StylelintConfig` yourself.
+- **2026-10-21's traps:**
+  - **A worktree under the scratchpad** puts five eval graders past Windows' 260-character path limit, so `test_evals` and `test_file_modes` error there (FileNotFoundError); everything else runs. Read those two errors as the path, not the change, or use a short worktree path.
+  - **A new script with a shebang** must be `git update-index --chmod=+x` on Windows: `test_file_modes` skips on a Windows checkout and failed every Linux and macOS cell of #192 until it was.
+  - **EUR-Lex refuses scripted fetches** (HTTP 202, empty body). Read a directive through the Publications Office: `https://publications.europa.eu/resource/celex/CELEX` with `Accept: text/html` and `Accept-Language: eng`.
+  - **Never chain a branch deletion after a merge a guard may stop.** `merge && …; push --delete` deleted the branch of a PR whose merge had refused (an open thread), which closed site PR #5; it was pushed back from its commit and reopened.
+  - **Codex reads legal text closely.** Its findings were scoping, every one right: the 30-day rule is for goods, PECR's exception leaves the UK GDPR, 3.3.8 is authentication not signup, FSMA is investment not ROI. Scope each rule as its source does before the PR.
 - **Never edit a file the suite reads while `check.py` runs.** It happened twice this session, so stop the run and start it again.
 - **Bash eats backslashes in heredocs**, twice this session. Use the Edit tool for any text with a backslash.
 - **The macOS Python 3.9 cell** failed once on `test_runtime_reach`'s vitals test (no LCP recorded): the known flake. A rerun passed.

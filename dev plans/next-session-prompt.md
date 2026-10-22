@@ -22,6 +22,8 @@
 
 **Next: P41 (email), the last item before R4** (§4).
 
+**Update 2026-10-22, at this session's end:** #189, #190 and #191 are merged. **P43's PRs are open as a stack, #192 → #193 → #194**, every review thread resolved, CI running when the session ended. Merge them first (§3), bottom-up, each once green: retarget the next to `main` before deleting the merged branch. webdesignersuite.com's PR #5 (N51 fixed in its findings file and handoff) waits the same way. `docs/HANDOFF.md`'s Warnings has this session's traps: a scratchpad worktree's path length, a new script's file mode, EUR-Lex's refusal, and a branch deleted after a refused merge.
+
 Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **the rest of Phase 6b in the owner's order** (§4), then R4.
 
 You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
@@ -559,7 +561,8 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
 ## 3. First: the state of `main`
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then:
-- **The docs PR** of 2026-10-19 may still be open: merge it once green (merge commit, `--match-head-commit` with the full SHA).
+- **P43's stack, #192 → #193 → #194,** may still be open: merge bottom-up, each once green, every thread resolved and the PR clean (merge commit, `--match-head-commit` with the full SHA); retarget the next PR to `main` (`gh pr edit N --base main`) before deleting the merged branch. A merge a guard refuses must stop the chain: never `;` a branch deletion after it.
+- **webdesignersuite.com's PR #5** the same way, in that repository.
 - Remove any worktree left in a scratchpad (`git worktree list`): `git worktree remove PATH`, then `git branch -d` each merged branch. The newest `wait_pr.sh` is in `478e774c-…\scratchpad`.
 - Then read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
 
