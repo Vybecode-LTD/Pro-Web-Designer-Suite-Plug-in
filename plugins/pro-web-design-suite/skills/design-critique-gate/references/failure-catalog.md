@@ -55,6 +55,16 @@ outliers meet a layout that has no rule for them.
 **Fix.** Put content constraints in the system: a stated truncation strategy, a `minmax()` grid, a designed
 zero state, a documented maximum.
 
+### L1-4 · A claim the page cannot back
+**Seen as.** "47% faster" with no source, "only 3 left" that never changes, a struck-through price nobody
+charged, a countdown that starts again on every visit, a newsletter box ticked in advance.
+**Mechanism.** The page argues with evidence it does not have, or presses with a device that deceives. No
+visual layer sees it: the page can be well made and still say something false.
+**Confirm.** Run `landing-page-conversion`'s `lint_claims.py` on the page (its `conversion-audit.md` §13),
+then read every claim it cannot: a named customer, a benchmark, a guarantee's terms.
+**Fix.** Source the figure or state the mechanism without it; wire a count to the stock it claims; count
+down to a real date; leave every box unticked. A finding here is `blocking` when the claim is false.
+
 ---
 
 ## Layer 2 — First impression
@@ -313,7 +323,7 @@ in its usual form: 2.2.1 and 2.2.2 for timers and movement, 2.4.11 for what sits
 the modal, 2.5.8 and 1.4.3 for the decline, 4.1.3 for the toast.
 **Confirm.** Hold every device on the page to its row in `landing-page-conversion`'s
 `references/conversion-audit.md` §7.1, then run `a11y_runtime` (`obscured`, `taborder`, `hover` and axe)
-for the rows a tool decides.
+for the rows a tool decides, and `lint_claims.py` (L1-4) for the countdowns and the ticked boxes.
 **Fix.** The device's accessible form is a property of the component: a pause control on movement that
 starts on its own and runs past five seconds beside other content (2.2.2's case), the dialog element for the
 modal, the status region in the toast, `--tap-min` on every decline.

@@ -10,15 +10,16 @@ description: Write and structure landing, pricing and product pages, from positi
 > inside this plugin:
 >
 > ```bash
-> python "${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py" src/ --strict
+> python "${CLAUDE_SKILL_DIR}/scripts/lint_claims.py" src/
 > ```
 >
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; here, use the path form.
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (lint_claims.py).
 > From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
 
-The sibling skill `web-design-studio` owns **form**: tokens, spacing, architecture, navigation, the audit gate. It says nothing about what a page should *say* or in what order. That omission is deliberate, and this skill is the missing half.
+The sibling skill `web-design-studio` owns **form**: tokens, spacing, architecture, navigation, the audit gate. It says nothing about what a page should *say* or in what order; this skill is that half.
 
 A page that converts is not a well-designed page with persuasive words dropped into it. It is an argument, sequenced, and then given a body. Get the argument wrong and no amount of spacing discipline rescues it — you have built a beautiful vehicle for a claim nobody wanted.
 
@@ -56,7 +57,7 @@ Honest persuasion is: making a true claim clearly, in the order a reader can abs
 
 The UK, EU and US law behind each, to flag for legal review, is in `references/conversion-audit.md` §11. A client who asks for one in a review gets the same answer, and an accessibility risk is held, not built (client-presentation-builder's objection-handling.md §5).
 
-**The practical argument, which matters more for a small company than the legal one.** A dark pattern converts someone who did not want the thing. You now own a refund, a chargeback, a support ticket, a public review, and one person who tells their peers. For a plugin company selling to a few thousand producers, or an agency whose pipeline is referrals, the audience is small enough that reputations are single-threaded. A burned prospect costs more than a converted one is worth, and the arithmetic does not improve at scale — it just takes longer to show up.
+**The practical argument, which matters more for a small company than the legal one.** A dark pattern converts someone who did not want the thing. You now own a refund, a chargeback, a support ticket, a public review, and one person who tells their peers. For a plugin company or an agency fed by referrals, the audience is small enough that reputations are single-threaded. A burned prospect costs more than a converted one is worth, and the arithmetic does not improve at scale — it just takes longer to show up.
 
 If a user asks for one of these directly, do not lecture. Name what it is in one line, produce the honest alternative that serves the same goal, and move on.
 
@@ -168,7 +169,7 @@ CLAIM     Match your mix to a reference track's tonal balance in one pass.
     P        VST3 / AU / AAX, macOS 12+ and Windows 10+, Apple silicon native.
 ```
 
-Note what every proof has in common: a sceptic can check it without trusting you. That is the test.
+Every proof here can be checked by a sceptic without trusting you. That is the test.
 
 Write this before any layout exists. It is the page's outline, and the section order in Phase 3 is derived from it rather than invented. If a section you want does not carry a support or a proof, it is decoration — cut it or demote it to the footer.
 
@@ -228,13 +229,14 @@ Two passes, both in `references/conversion-audit.md`:
 - **Conversion** — five-second test, squint test, scroll-depth reasoning, friction inventory from intent to completion.
 - **Technical** — LCP, CLS, render-blocking, form friction, tap targets, and the analytics you need in place *before* you are entitled to claim anything improved.
 
-Then run the design gate:
+Then the design gate and the claims lint:
 
 ```bash
 python -m scripts.audit_design PATH        # from web-design-studio
+python -m scripts.lint_claims PATH         # references/conversion-audit.md §13
 ```
 
-Law 9 applies here exactly as it does in the studio skill: nothing ships un-audited.
+Law 9 applies: nothing ships un-audited.
 
 Report findings ranked by **expected effect over effort**, and be honest that "expected" is a judgement, not a measurement, until the page has traffic and instrumentation. The ranking that holds up most often: `references/conversion-audit.md` §12.
 

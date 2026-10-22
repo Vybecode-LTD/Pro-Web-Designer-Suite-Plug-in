@@ -224,7 +224,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-C3 | — | fixed in 3.1.0, with PS-A4 | Close the HTML blind spot with web-design-studio: audit `<style>` and `style=""`; fail when zero files were audited. |
 | PS-C4 | — | fixed in 3.5.0: PR #89, `agents/design-critic.md` and `/critique` (`test_agents`, `test_commands.TheChains`) | Add an adversarial critic subagent, `agents/design-critic.md`, that returns `findings.json` from a fresh context. |
 | PS-C5 | — | fixed in 3.4.0: `critique_snapshots.mjs` (PR #71; `test_critique_snapshots.CritiqueSnapshots`, `test_browser_scripts`) | Add `critique_snapshots.mjs`: PNGs at 390 and 1440px plus blur, greyscale, mirror, 25%, dark and reduced-motion variants. |
-| PS-C6 | — | W14 (3.6.0+) | Add `lint_claims.py`: load-time countdowns, fake scarcity, pre-checked opt-ins, unsourced percentages and the like. |
+| PS-C6 | — | done in 4.0.0: `test_lint_claims`, PR #192 (P43 part 1) | Add `lint_claims.py`: load-time countdowns, fake scarcity, pre-checked opt-ins, unsourced percentages and the like. |
 | PS-C7 | — | fixed in 3.5.0: `evals/persuasion/no-fake-countdown`, scored against the no-plugin baseline, in PR #97 (`test_evals.TheOutcomeCases`) | Add an eval suite in `evals/`, scored against a no-plugin baseline. |
 | PS-C8 | — | fixed in 3.2.0 | Put landing-page-conversion on a token diet. |
 | PS-C9 | — | fixed in 3.2.0 | Rewrite the descriptions. |

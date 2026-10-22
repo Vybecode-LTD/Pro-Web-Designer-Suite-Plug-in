@@ -360,3 +360,30 @@ The drip-pricing row in SKILL.md's ethics boundary is there for the reason the l
 6. Everything else.
 
 Button colour is not on the list. It is not that colour never matters — contrast and visual hierarchy matter a great deal, and `web-design-studio`'s `references/color-system.md` owns that — but "change the button to orange" as a *conversion* intervention is the most-repeated piece of folklore in this field and the least supported.
+
+---
+
+## 13. The claims lint
+
+`scripts/lint_claims.py` reads the markup (HTML, JSX, Vue, Svelte, Astro) and the scripts for the claims and devices this skill declines, or asks you to back. It reads patterns, not truth: a clean run says none of these is on the page, not that every claim on it is true.
+
+```bash
+python -m scripts.lint_claims src/            # errors fail the run; warnings are questions
+python -m scripts.lint_claims src/ --strict   # warnings fail too
+python -m scripts.lint_claims dist/index.html --json
+```
+
+| Rule | What it reads | Severity | Why |
+|---|---|---|---|
+| `pre-checked-opt-in` | A marketing, consent or add-on box ticked in advance | error | Sneaking (SKILL.md's ethics boundary), and not consent (§8.1) |
+| `load-time-countdown` | A deadline counted from the page load, or a constant counted down on every visit | error | False urgency: it starts again on every reload |
+| `invented-scarcity` | A stock or viewer count built with `Math.random()` | error | Fabricated evidence |
+| `scarcity-claim` | "Only 3 left", "12 people are viewing" | warning | True only when it is live: wire it to the stock or the analytics it names |
+| `unsourced-percentage` | A percentage with no link, footnote, citation or `data-source` beside it | warning | Evidence discipline: source it, or state the mechanism |
+| `struck-price` | A struck-through price | warning | A "was" price needs its history (§11.1) |
+| `autocomplete-off` | `autocomplete="off"` on a field the browser could fill | warning | A keystroke tax at the moment of commitment, and 1.3.5 (§7.1) |
+| `lazy-first-image` | `loading="lazy"` on the first image | warning | It is usually the LCP element (§7) |
+| `two-filled-ctas` | Two filled calls to action in the first section or hero | warning | Two primaries ask two things at once (`page-architecture.md` §5) |
+| `mismatched-cta-labels` | One destination under two labels | warning | One action, one name |
+
+A warning is a question for a person: the count may come from the stock system, the figure may be sourced on the next page. Answer it, and where the answer is yes, say so in the markup, with the reason after `--`: `<!-- lint-claims-ignore-next-line: scarcity-claim -- the stock API's count -->`. A pragma with no reason should not survive review. The critique gate runs the same lint in its layer 1 (`design-critique-gate`'s `references/failure-catalog.md` L1-4).

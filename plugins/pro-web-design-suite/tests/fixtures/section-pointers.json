@@ -932,6 +932,12 @@
  {
   "from": "design-critique-gate/references/failure-catalog.md",
   "to": "landing-page-conversion/references/conversion-audit.md",
+  "section": "13",
+  "heading": "The claims lint"
+ },
+ {
+  "from": "design-critique-gate/references/failure-catalog.md",
+  "to": "landing-page-conversion/references/conversion-audit.md",
   "section": "7.1",
   "heading": "The persuasive devices, against WCAG 2.2"
  },
@@ -1531,6 +1537,12 @@
  },
  {
   "from": "landing-page-conversion/SKILL.md",
+  "to": "landing-page-conversion/references/conversion-audit.md",
+  "section": "13",
+  "heading": "The claims lint"
+ },
+ {
+  "from": "landing-page-conversion/SKILL.md",
   "to": "landing-page-conversion/references/page-architecture.md",
   "section": "3",
   "heading": "Sequences by page type"
@@ -1568,6 +1580,12 @@
  {
   "from": "landing-page-conversion/references/conversion-audit.md",
   "to": "landing-page-conversion/references/page-architecture.md",
+  "section": "5",
+  "heading": "One CTA or many"
+ },
+ {
+  "from": "landing-page-conversion/references/conversion-audit.md",
+  "to": "landing-page-conversion/references/page-architecture.md",
   "section": "6",
   "heading": "Rhythm, banding and the scroll contract"
  },
@@ -1588,6 +1606,30 @@
   "to": "landing-page-conversion/references/page-architecture.md",
   "section": "3",
   "heading": "Sequences by page type"
+ },
+ {
+  "from": "landing-page-conversion/scripts/lint_claims.py",
+  "to": "landing-page-conversion/references/conversion-audit.md",
+  "section": "11.1",
+  "heading": "The UK and EU rules to flag for legal review"
+ },
+ {
+  "from": "landing-page-conversion/scripts/lint_claims.py",
+  "to": "landing-page-conversion/references/conversion-audit.md",
+  "section": "13",
+  "heading": "The claims lint"
+ },
+ {
+  "from": "landing-page-conversion/scripts/lint_claims.py",
+  "to": "landing-page-conversion/references/conversion-audit.md",
+  "section": "7",
+  "heading": "The technical layer"
+ },
+ {
+  "from": "landing-page-conversion/scripts/lint_claims.py",
+  "to": "landing-page-conversion/references/conversion-audit.md",
+  "section": "8.1",
+  "heading": "Consent for what you measure"
  },
  {
   "from": "perf-budget-gate/SKILL.md",

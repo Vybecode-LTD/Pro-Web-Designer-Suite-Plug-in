@@ -98,6 +98,7 @@ two jobs and will do neither.
   Is that action the most prominent thing on screen?
 - **Probe.** Name the reader's state of mind arriving. A pricing page reached from a
   comparison article and one reached from a logged-in upgrade prompt are different pages.
+- **Probe.** Every claim the page makes, and every device pressing it: failure-catalog L1-4.
 - **Failure signature.** Solving a stated problem with an unstated one — the brief said
   "reduce support tickets", the design added a beautiful search that ranks by recency.
 - **What it moots.** Everything. A wrong-page failure cannot be fixed by spacing, and a
@@ -282,7 +283,7 @@ python -m scripts.critique_report findings.json --summary
 
 ## The scripts
 
-`scripts/critique_report.py` — stdlib only, Python 3.
+`scripts/critique_report.py` — stdlib only.
 
 ```bash
 python -m scripts.critique_report findings.json                  # ranked critique

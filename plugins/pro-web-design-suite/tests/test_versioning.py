@@ -783,7 +783,7 @@ class TheAuditsVersioningMediums(TempDirTest):
                                           env=env(PYTHONPATH=None), capture_output=True, timeout=120)
                     self.assertEqual(0, proc.returncode, f"{name}: {output(proc)}")
                 seen += 1
-        self.assertEqual(12, seen)
+        self.assertEqual(13, seen)
 
 
 if __name__ == "__main__":
