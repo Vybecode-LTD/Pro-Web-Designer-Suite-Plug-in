@@ -76,8 +76,12 @@ PERSONAL = re.compile(r"e-?mail|tel|phone|mobile|name|given|family|address|stree
                       r"zip|city|country|cc-|card|organi[sz]ation|company|username|birthday|bday", re.I)
 FILLED = {"cta", "btn-primary", "button--primary", "button-primary"}
 NOT_FILLED = re.compile(r"secondary|ghost|outline|tertiary|link|subtle", re.I)
+# The elements that own the text in them. Sectioning elements are among them:
+# a stats band's `<section><strong>47%</strong> faster</section>` has no
+# paragraph (CodeRabbit on #192).
 BLOCKS = {"p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "td", "th", "dd", "dt", "figcaption",
-          "blockquote", "caption", "summary", "label", "button", "a"}
+          "blockquote", "caption", "summary", "label", "button", "a",
+          "section", "article", "header", "footer", "aside", "main", "figure"}
 QUIET = {"script", "style", "code", "pre", "noscript"}
 PRAGMA_LINE = re.compile(r"lint-claims-ignore-next-line:\s*([\w,\s-]+?)(?:\s+--|-->|\*/|$)")
 PRAGMA_FILE = re.compile(r"lint-claims-ignore-file:\s*([\w,\s-]+?)(?:\s+--|-->|\*/|$)")
@@ -147,8 +151,13 @@ class Page(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         line = self.getpos()[0]
-        a = {plain(k): v for k, v in attrs}
+        # A static attribute beats a Vue binding of the same name: `class="cta"
+        # :class="{ wide: isWide }"` keeps `cta` (CodeRabbit on #192).
+        a: dict = {}
+        for k, v in sorted(attrs, key=lambda kv: kv[0].lower().startswith((":", "v-bind:"))):
+            a.setdefault(plain(k), v)
         classes = set((a.get("class") or a.get("classname") or "").split())
+        is_cta = tag in ("a", "button") and bool(classes & FILLED or "cta" in {c.split("--")[0] for c in classes})
         el = {"tag": tag, "line": line, "text": [], "percents": [], "sourced": False,
               "struck": tag in ("s", "del", "strike")
               or bool(re.search(r"line-through", a.get("style") or "", re.I))
@@ -161,10 +170,11 @@ class Page(HTMLParser):
         if not self.first_region and (tag == "section" or any("hero" in c.lower() for c in classes)):
             self.first_region = True
             el["region"] = 1
-        if tag in ("cite", "sup") or "data-source" in a or (tag == "a" and a.get("href")):
+        # A source is a citation, a footnote, data-source or a link; a call to
+        # action is a link but sources nothing (CodeRabbit on #192).
+        if tag in ("cite", "sup") or "data-source" in a or (tag == "a" and a.get("href") and not is_cta):
             for parent in self.stack:
-                if parent["tag"] in BLOCKS:
-                    parent["sourced"] = True
+                parent["sourced"] = True
             el["sourced"] = True
         if tag == "input":
             kind = (a.get("type") or "text").lower()
@@ -184,7 +194,7 @@ class Page(HTMLParser):
                 self.found.append((line, "lazy-first-image",
                                    'The first image is loading="lazy": it is usually the LCP element'))
         filled = bool(classes & FILLED) and not any(NOT_FILLED.search(c) for c in classes)
-        if tag in ("a", "button") and (filled or "cta" in {c.split("--")[0] for c in classes}):
+        if is_cta:
             el["cta"] = {"href": a.get("href") or "", "filled": filled}
             region = next((p.get("region") for p in reversed(self.stack) if "region" in p), None)
             if filled and region == 1:
@@ -221,7 +231,9 @@ class Page(HTMLParser):
                     box["words"] += " " + text
         if el["struck"] and (MONEY.search(text) or re.search(r"\d", text)):
             self.found.append((el["line"], "struck-price", f'A struck-through price, "{text[:40]}"'))
-        if el["tag"] in BLOCKS and not el["sourced"]:
+        # A block reports its own figures; a fragment's root, a component's
+        # `<span>47% faster</span>`, reports what reached it.
+        if (el["tag"] in BLOCKS or parent is None) and not el["sourced"]:
             for line, figure in el["percents"]:
                 self.found.append((line, "unsourced-percentage",
                                    f'"{figure}" with no source beside it'))

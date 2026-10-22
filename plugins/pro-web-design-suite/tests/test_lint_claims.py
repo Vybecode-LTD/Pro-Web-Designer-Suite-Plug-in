@@ -138,6 +138,29 @@ class LintClaims(TempDirTest):
         renamed = jsx.replace(">Buy</a>\n", ">Buy now</a>\n", 1)
         self.assertIn("mismatched-cta-labels", self.rules(renamed, name="Page.jsx"))
 
+    def test_a_static_class_survives_a_vue_binding(self):
+        """CodeRabbit on #192: `:class` overwrote `class`, so a Vue call to
+        action lost `cta` and the rules that read it went quiet."""
+        labels = ('<template><a class="cta" href="/buy" :class="{ wide: isWide }">Buy now</a>'
+                  '<a class="cta" href="/buy">Get it</a></template>')
+        self.assertIn("mismatched-cta-labels", self.rules(labels, name="Page.vue"))
+        hero = ('<template><section class="hero"><a class="cta" href="/a" :class="size">A</a>'
+                '<a class="cta" href="/b">B</a></section></template>')
+        self.assertIn("two-filled-ctas", self.rules(hero, name="Hero.vue"))
+
+    def test_a_percentage_with_no_paragraph_round_it_is_read(self):
+        """CodeRabbit on #192: a figure in a section with no paragraph, or at
+        a component's root, passed up to the root and was dropped; and a
+        call to action beside it is not its source."""
+        for name, markup in (("band.html", page('<section class="stats"><strong>47%</strong> faster</section>')),
+                             ("Stat.jsx", "<span>47% faster</span>"),
+                             ("cta.html", page('<section><strong>47%</strong> faster '
+                                               '<a class="cta" href="/buy">Buy</a></section>'))):
+            with self.subTest(name=name):
+                self.assertIn("unsourced-percentage", self.rules(markup, name=name))
+        sourced = page('<section><strong>47%</strong> faster (<a href="/method">method</a>)</section>')
+        self.assertNotIn("unsourced-percentage", self.rules(sourced))
+
     def test_errors_fail_the_run_and_warnings_only_under_strict(self):
         code, found = self.lint(page('<input type="checkbox" name="newsletter" checked>'))
         self.assertEqual(1, code)
