@@ -39,6 +39,19 @@ renames the plugin.
 
 ### Added
 
+- **`brief_to_log.py`, the message brief into the deck's decision log** (PS-C12, P43 part 3). The
+  positioning a landing page was built on reached the review only if someone wrote it up again,
+  and the brief's assumptions were never asked in the room. landing-page-conversion's
+  `scripts/brief_to_log.py` carries a filled `MESSAGE_BRIEF.md` into client-presentation-builder's
+  `DECISION_LOG.md`:
+  - **The positioning** becomes a decision. The first answers the specificity test rewrote are
+    the options it beat, and who it is not for is its cost.
+  - **The claim** becomes a decision, with its supports' proofs as evidence.
+  - **Each assumption and each UNKNOWN** becomes an open question.
+
+  What the brief does not record stays a `<placeholder>`, which the deck lists as a gap.
+  `--into LOG` adds the blocks under `## Decisions`, numbered after the log's own, and adds
+  nothing on a second run. The brief, the log and the SKILL.md name it.
 - **Page types beyond software, and the persuasion skills routing to each other** (PS-B4,
   PS-B6; P43 part 2). Every sequence and example was audio, AI or agency.
   - **New page types.** `page-architecture.md` §3 now sequences a B2B demo request for a buying

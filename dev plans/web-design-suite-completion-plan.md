@@ -541,7 +541,7 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 | PS-B8 | — | Consent for tracking. *Done for 4.0.0: conversion-audit.md §8.1, the EU's consent rules, the UK's 2026 statistics exception, masking, and the EDPB's banner findings (PR #191, P42 part 2).* |
 | PS-C5 | — | Add `critique_snapshots.mjs`: PNGs at 390 and 1440px plus blur, greyscale, mirror, 25%, dark and reduced-motion variants. |
 | PS-C6 | — | Add `lint_claims.py`: load-time countdowns, fake scarcity, pre-checked opt-ins, unsourced percentages and the like. *Done for 4.0.0: landing-page-conversion's `scripts/lint_claims.py`, ten rules (three errors, seven warnings), documented in conversion-audit.md §13 and run in landing's Phase 6 and the critique gate's layers 1 and 8 (failure-catalog L1-4, L8-6) (PR #192, P43 part 1).* |
-| PS-C12 | — | Bridge MESSAGE_BRIEF to DECISION_LOG. |
+| PS-C12 | — | Bridge MESSAGE_BRIEF to DECISION_LOG. *Done for 4.0.0: landing-page-conversion's `scripts/brief_to_log.py` carries the brief's positioning and claim into the deck's decision log as decisions and its assumptions and UNKNOWNs as open questions, leaving placeholders the deck reports as gaps (PR #194, P43 part 3).* |
 
 ---
 

@@ -230,7 +230,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | PS-C9 | — | fixed in 3.2.0 | Rewrite the descriptions. |
 | PS-C10 | — | fixed in 3.2.0 | Add an evidence register: each figure's value, URL, date verified and exact quote, with a test. |
 | PS-C11 | — | fixed in 3.5.0: PR #88, `/deck` (`test_commands.TheDeck`: the deck from the evidence, and a blocking finding stops it with no deck) | Add a user-invocable chain skill: audit → critique → defence → deck, stopping on blockers. |
-| PS-C12 | — | W14 (3.6.0+) | Bridge MESSAGE_BRIEF to DECISION_LOG. |
+| PS-C12 | — | done in 4.0.0: `test_brief_to_log`, PR #194 (P43 part 3) | Bridge MESSAGE_BRIEF to DECISION_LOG. |
 | DL-A1 | high | fixed in 3.1.0 | secret columns are shown and editable. |
 | DL-A2 | high | fixed in 3.1.0 | authorization columns are editable by default. |
 | DL-A3 | high | fixed in 3.1.0 | the RLS write-failure model is wrong. |
