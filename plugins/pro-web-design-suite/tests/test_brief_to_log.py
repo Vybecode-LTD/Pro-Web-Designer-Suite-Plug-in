@@ -11,9 +11,11 @@ template's decision log, read by the deck builder.
 from __future__ import annotations
 
 import re
+import subprocess
 import unittest
 
-from wds_support import SKILLS, TempDirTest, output, run_py
+from test_docs import FLOOR_PYTHON
+from wds_support import SKILLS, TempDirTest, env, output, run_py
 
 BRIEF = SKILLS / "landing-page-conversion" / "assets" / "MESSAGE_BRIEF.md"
 LOG = SKILLS / "client-presentation-builder" / "assets" / "DECISION_LOG.md"
@@ -84,6 +86,43 @@ class BriefToLog(TempDirTest):
             "| **Traffic source** | UNKNOWN |", 1)
         found = blocks(self.bridge(brief).stdout.decode("utf-8"))
         self.assertIn("**Status:** open", found["Unknown: Traffic source"])
+
+    def test_an_unknown_anywhere_is_a_question_never_evidence(self):
+        """Codex on #194: the brief asks for UNKNOWN in any field it cannot
+        fill; a support's Proof marked so was copied in as the claim's
+        evidence, and only §0 and §2 were read for questions."""
+        brief = worked_brief()
+        marked = brief.replace("| 2 | The correction is a transparent linear-phase EQ you can override, not a preset or a black box"
+                               " | Published null test and phase-response plots; every band is draggable in the UI |",
+                               "| 2 | The correction is a transparent linear-phase EQ you can override, not a preset or a black box"
+                               " | UNKNOWN |", 1)
+        self.assertNotEqual(brief, marked, "the worked example's support 2 moved")
+        found = blocks(self.bridge(marked).stdout.decode("utf-8"))
+        claim = next(b for t, b in found.items() if t.startswith("The claim: "))
+        self.assertNotIn("UNKNOWN", claim)
+        self.assertTrue(any(t.startswith("Unknown: ") and "2" in t for t in found), list(found))
+
+    def test_a_wrapped_assumption_is_read_whole(self):
+        """Codex on #194: an assumption continued on an indented line lost
+        its qualification."""
+        brief = worked_brief().replace(
+            '2. "One-time purchase" is a stronger differentiator than any feature, because the category is drifting to subscription. Untested.',
+            '2. "One-time purchase" is a stronger differentiator than any feature,\n   because the category is drifting to subscription. Untested.', 1)
+        found = blocks(self.bridge(brief).stdout.decode("utf-8"))
+        self.assertIn('Assumed: "One-time purchase" is a stronger differentiator than any feature, because the category'
+                      " is drifting to subscription. Untested", found)
+
+    @unittest.skipUnless(FLOOR_PYTHON, "set WDS_FLOOR_PYTHON, or install uv, to run on the floor interpreter")
+    def test_into_writes_on_the_python_floor(self):
+        """Codex on #194: Path.write_text(newline=) is Python 3.10's, so on
+        the 3.9 floor every --into raised TypeError before writing."""
+        self.write("MESSAGE_BRIEF.md", worked_brief())
+        log = self.write("DECISION_LOG.md", LOG.read_text(encoding="utf-8"))
+        script = SKILLS / "landing-page-conversion" / "scripts" / "brief_to_log.py"
+        proc = subprocess.run([FLOOR_PYTHON, "-B", str(script), "MESSAGE_BRIEF.md", "--into", "DECISION_LOG.md"],
+                              cwd=self.tmp, env=env(), capture_output=True, timeout=120)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("### D4 — Positioning", log.read_text(encoding="utf-8"))
 
     def test_the_empty_template_has_nothing_to_carry(self):
         self.write("MESSAGE_BRIEF.md", BRIEF.read_text(encoding="utf-8"))

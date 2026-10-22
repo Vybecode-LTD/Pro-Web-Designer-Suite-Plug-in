@@ -84,7 +84,13 @@ def clean(value: str) -> str:
         return ""
     value = BOLD.sub(lambda m: m.group(1), value)
     value = EMPHASIS.sub(lambda m: m.group(1), value)
-    return " ".join(value.replace("☐", " ").split()).strip(" .")
+    value = " ".join(value.replace("☐", " ").split()).strip(" .")
+    return "" if unknown(value) else value                         # an UNKNOWN is a question, not a value
+
+
+def unknown(cell: str) -> bool:
+    """A field the brief marks UNKNOWN, as its template asks of a gap."""
+    return re.sub(r"[*_`\s]", "", cell).upper() == "UNKNOWN"
 
 
 def sections(text: str) -> dict[str, str]:
@@ -127,7 +133,7 @@ def positioning(body: str) -> tuple[str, list[str], str]:
     quote = " ".join(line.lstrip("> ").strip() for line in body.splitlines() if line.startswith(">"))
     blanks = BOLD.findall(quote)
     sentence = ""
-    if len(blanks) >= 5 and not any(BLANK.match(b) for b in blanks[:5]):
+    if len(blanks) >= 5 and not any(BLANK.match(b) or not clean(b) for b in blanks[:5]):
         sentence = clean(quote)
     rejected = []
     for row in table(subsection(body, "The specificity test")):
@@ -168,13 +174,33 @@ def claim_and_proofs(body: str) -> tuple[str, list[str]]:
 def assumptions(body: str) -> list[str]:
     """§6's numbered items that have text on their own line: the template's
     empty `1.` is not an assumption, nor the line after it."""
-    return [clean(m.group(1)) for m in re.finditer(r"^[ \t]*\d+\.[ \t]*(\S.*)$", body, re.M) if clean(m.group(1))]
+    # An item runs on over its indented continuation lines (Codex on #194).
+    items = re.finditer(r"^[ \t]*\d+\.[ \t]*(\S[^\n]*(?:\n[ \t]+\S[^\n]*)*)", body, re.M)
+    return [clean(m.group(1)) for m in items if clean(m.group(1))]
+
+
+BLANKS = ("who it is for", "the product", "the category", "the one thing it does better", "what it replaces")
 
 
 def unknowns(found: dict[str, str]) -> list[str]:
-    """The labelled cells §0 and §2 mark UNKNOWN, as the brief asks."""
-    return [clean(row[0]) for key in ("0", "2") for row in table(found.get(key, ""))
-            if len(row) >= 2 and row[0].startswith("**") and clean(row[1]).upper() == "UNKNOWN"]
+    """Every field the brief marks UNKNOWN, in any section (Codex on #194): a
+    table row's label, under its subsection, or a positioning blank."""
+    out = []
+    for body in found.values():
+        heading = ""
+        for line in body.splitlines():
+            if line.startswith("### "):
+                heading = clean(line[4:])
+                continue
+            m = ROW.match(line.strip())
+            if m:
+                cells = [c.strip() for c in m.group(1).split("|")]
+                if any(unknown(c) for c in cells[1:]):
+                    label = clean(cells[0])
+                    out.append(f"{heading} — {label}" if heading and label else label or heading)
+    quote = " ".join(line.lstrip("> ") for line in found.get("1", "").splitlines() if line.startswith(">"))
+    out += [f"Positioning — {name}" for name, blank in zip(BLANKS, BOLD.findall(quote)) if unknown(blank)]
+    return out
 
 
 def field(name: str, value: str, placeholder: str) -> str:
@@ -275,7 +301,7 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         print(f"brief_to_log: {log}: {exc}", file=sys.stderr)
         return 2
-    log.write_text(text, encoding="utf-8", newline="\n")
+    log.write_bytes(text.encode("utf-8"))                         # write_text(newline=) is 3.10+ (Codex on #194)
     print(f"brief_to_log: added {added} block(s) to {log}"
           + (f"; {len(new) - added} were there already" if added < len(new) else ""))
     return 0
