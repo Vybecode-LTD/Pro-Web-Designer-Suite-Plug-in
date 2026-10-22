@@ -537,7 +537,7 @@ A real data table — a receipt's line items, arguably — is the one exception,
 | the VML label | `<center dir="rtl">`, its width sized for the label (§6) |
 | an English name, an address, a phone number inside the copy | `<span dir="ltr" lang="en">`; on a link, the span goes inside the `<a>`, since `dir` on `<a>` is buggy in the Word engine |
 
-`lint_email.py` checks the direction: a right-to-left language with no `dir="rtl"`, an outer or ghost table without it, and a `left` that was not mirrored (the `dir` check).
+`lint_email.py` checks the direction: a right-to-left language with no `dir="rtl"`, an outer or ghost table without it, and a `left` that was not mirrored, outside a `dir="ltr"` island (the `direction` check).
 
 **Each locale is its own email.** A translated email sets its own `lang` and `dir`, `<title>`, preheader, alt text and plain-text part, and its merge tags' fallbacks: `{{ first_name | default: "there" }}` in an Arabic email greets the reader in English. Yahoo ignores `lang` on a `<td>` (caniemail), so a change of language goes on a `<p>` or `<span>`.
 

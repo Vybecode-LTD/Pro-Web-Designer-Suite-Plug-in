@@ -180,6 +180,16 @@ class Direction(Lint):
                 self.assertEqual(1, len(found), found)
                 self.assertIn("Word-engine markup", found[0]["message"])
 
+    def test_a_left_to_right_island_may_align_left(self):
+        # CodeRabbit on #196: an English address inside Arabic copy aligns to its own start.
+        for cell in ('<p dir="ltr" lang="en" style="text-align:left">118 Wharf Road</p>',
+                     '<div dir="ltr"><p align="left">118 Wharf Road</p></div>',
+                     '<div style="direction:ltr"><p style="text-align:left">118 Wharf Road</p></div>'):
+            with self.subTest(cell=cell):
+                self.assertEqual([], self.of(self.page(cell=cell), "direction"))
+        inner = '<div dir="ltr"><div dir="rtl"><p align="left">مرحبا</p></div></div>'      # rtl again inside
+        self.assertEqual(1, len(self.of(self.page(cell=inner), "direction")))
+
     def test_dir_on_a_left_to_right_language_is_a_warning(self):
         found = self.of(self.page(lang="en", cell="Hello"), "direction")
         self.assertEqual(["warning"], [f["severity"] for f in found], found)
@@ -204,6 +214,7 @@ class LabelWidth(Lint):
         doc = (EMAIL / "references" / "email-architecture.md").read_text(encoding="utf-8")
         self.assertNotIn("vml-width", doc)
         self.assertIn("the `vml` check", doc)
+        self.assertIn("the `direction` check", doc)        # CodeRabbit on #196: it said `dir`
         proc = run_py("email-template-system", "lint_email", "--help", cwd=self.tmp)
         self.assertIn("direction,vml", "".join(output(proc).split()))     # argparse wraps mid-word
         found = self.findings(self.page("Jetzt die Ridgeline kaufen", 216), "--ignore", "vml")

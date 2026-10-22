@@ -426,6 +426,20 @@ def sets_rtl(node) -> bool:
     return (node.get("dir") or "").strip().lower() == "rtl" or bool(DIRECTION_RE.search(node.get("style") or ""))
 
 
+def in_ltr_island(node) -> bool:
+    """Whether the nearest direction set on the node or above it is ltr: an
+    English address inside Arabic copy aligns left (CodeRabbit on #196)."""
+    for each in (node, *node.ancestors()):
+        if each.kind != "element":
+            continue
+        if (each.get("dir") or "").strip().lower() in ("ltr", "rtl"):
+            return each.get("dir").strip().lower() == "ltr"
+        found = re.search(r"(?<![\w-])direction\s*:\s*(ltr|rtl)\b", each.get("style") or "", re.I)
+        if found:
+            return found.group(1).lower() == "ltr"
+    return False
+
+
 def is_preheader(node) -> bool:
     if node.get("data-preheader") is not None:
         return True
@@ -826,7 +840,7 @@ class Linter:
             left = (node.get("align") or "").strip().lower() == "left" or LEFT_RE.search(node.get("style") or "")
             if node.tag == "style":
                 left = LEFT_RE.search(node.text_content())
-            if left:
+            if left and not in_ltr_island(node):
                 self.add("warning", "direction", "a left alignment in a right-to-left email", node.line,
                          "The start of a line is the right here, so left is its far side.",
                          'mirror it: align="right", text-align:right')
