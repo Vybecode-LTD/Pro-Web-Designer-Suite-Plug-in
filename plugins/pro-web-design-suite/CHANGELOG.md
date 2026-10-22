@@ -39,6 +39,21 @@ renames the plugin.
 
 ### Added
 
+- **Right-to-left email, and a label a translation lengthens** (DL-B5, P41 part 2). The skill had
+  one line on direction. `assets/templates/product-announcement-rtl.html` is the announcement in
+  Arabic: `lang` and `dir` on `<html>`, `dir="rtl"` on every table, the ghost tables included, so
+  the Word engine lays the columns out right to left as every other client does, with the source
+  in reading order (a browser test measures the columns). Alignment is mirrored, the VML label is
+  sized for its text, and an English address is marked `dir="ltr"`. email-architecture.md §11
+  says why: Gmail, Outlook.com and Yahoo replace `<body>` with a `<div>` and Outlook for Mac does
+  not support it, so the direction lives on the tables, where caniemail tests it (`<body>` is a
+  row of the matrix now). It covers what to mirror, mixed-direction text, a translated email's
+  own `lang`, `<title>`, preheader, alt text and merge-tag fallbacks, and text that grows
+  (W3C's 200–300% for short English strings, registered). `lint_email.py` gains two checks:
+  `direction` (a right-to-left language without `dir="rtl"`, an outer table without it, both
+  errors; a ghost table without it, a left alignment not mirrored, and `dir="rtl"` on a
+  left-to-right language, warnings) and `vml` (a VML button label that looks wider than its
+  shape, a warning).
 - **`brief_to_log.py`, the message brief into the deck's decision log** (PS-C12, P43 part 3). The
   positioning a landing page was built on reached the review only if someone wrote it up again,
   and the brief's assumptions were never asked in the room. landing-page-conversion's

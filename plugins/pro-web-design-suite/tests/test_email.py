@@ -587,7 +587,7 @@ class TheAuditsEmailMediums(EmailTest):
         """E8: SKILL.md says the templates already compile clean, but their
         mobile media queries, dividers, pull quote and columns held literals
         (6, 6 and 1 warnings), so `--strict` failed the untouched template."""
-        self.assertEqual(3, len(TEMPLATES))
+        self.assertEqual(4, len(TEMPLATES))
         for template in TEMPLATES:
             with self.subTest(template=template.name):
                 proc = run_py("email-template-system", "lint_email", template, "--source", "--strict",
@@ -604,7 +604,7 @@ class TheAuditsEmailMediums(EmailTest):
             kept.append(sum(len(m.group(1).encode("utf-8"))
                             for m in re.finditer(r"<style[^>]*>(.*?)</style>", html, re.S)))
         doc = (EMAIL / "references" / "email-client-matrix.md").read_bytes().decode("utf-8")
-        self.assertIn(f"the three templates in `assets/templates/` keep {min(kept)} to {max(kept)} bytes", doc)
+        self.assertIn(f"the four templates in `assets/templates/` keep {min(kept)} to {max(kept)} bytes", doc)
 
 
 class TheAuditsEmailLows(EmailTest):

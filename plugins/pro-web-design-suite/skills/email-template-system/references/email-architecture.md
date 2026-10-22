@@ -16,6 +16,7 @@ The governing idea: **email has no cascade, so structure carries the meaning tha
 8. [Images](#8-images)
 9. [Accessibility in email](#9-accessibility-in-email)
 10. [Anti-patterns](#10-anti-patterns)
+11. [Right to left, and every other language](#11-right-to-left-and-every-other-language)
 
 ---
 
@@ -108,7 +109,7 @@ Every line earns its place. Nothing here is cargo. `build_email.py` adds the nam
 |---|---|
 | `<!DOCTYPE html>` | several clients drop to quirks mode and your box model changes |
 | `lang="en"` | a screen reader reads English copy with the system language's phonemes |
-| `dir="ltr"` | free now, and it matters the day you localise to Arabic or Hebrew |
+| `dir="ltr"` | the direction; a right-to-left email sets `dir="rtl"` here and on every table (§11) |
 | `xmlns:v` / `xmlns:o` | the VML and `o:` elements are unrecognised |
 | `charset=utf-8` | a smart quote renders as `â€™` |
 | `viewport` | Android clients zoom a 600px layout out to fit a 360px screen |
@@ -331,7 +332,7 @@ A button is the highest-stakes component in an email — it is the click — and
 - **`<w:anchorlock/>`** stops Word treating the shape as a draggable object.
 - **`arcsize`** is a percentage of the shorter side. 48px tall × `25%` = 12px radius. `50%` is a pill.
 - **`mso-hide:all`** on the anchor is belt-and-braces: the `[if !mso]` branch should already hide it from Word.
-- **The VML width is literal.** VML does not grow with its content. Measure the longest label you will ever use — including the German translation — and size it to that.
+- **The VML width is literal.** VML does not grow with its content. Measure the longest label you will ever use — including the German translation — and size it to that. `lint_email.py` warns when a label looks wider than its shape (§11).
 
 ### Tap target
 
@@ -516,6 +517,31 @@ A real data table — a receipt's line items, arguably — is the one exception,
 | A CSS comment in the retained `<style>` block | Bytes against Gmail's style limit. (Yahoo desktop used to ignore every rule after a comment; that no longer reproduces.) The compiler strips them. |
 | A dark-designed email | A client that force-inverts turns it light, with your dark-mode logo assets still in it. |
 | Hand-writing a hex in a template | Law 1. The compiler exists so you never have to. |
+
+---
+
+## 11. Right to left, and every other language
+
+`assets/templates/product-announcement-rtl.html` is the announcement in Arabic, mirrored. Copy it the way you copy the others. What changed from the left-to-right original, and why:
+
+**The direction lives on the tables.** `<html lang="ar" dir="rtl">` is right, and not enough: Gmail, Outlook.com and Yahoo replace `<body>` with a `<div>`, and Outlook for Mac does not support it ([caniemail](https://www.caniemail.com/features/html-body/)), so a direction set only there can be lost. caniemail tests `dir` on a `<table>` and its cells, and finds it supported in every client in the matrix, buggy only on links in the Word engine (`email-client-matrix.md` §2). So every table carries `dir="rtl"`: the wrapper, the container, and the ghost tables.
+
+**Keep the source in reading order, and let `dir` flip it.** A ghost table with `dir="rtl"` puts its first cell on the right in the Word engine, and the fluid-hybrid columns (§7) flow right to left inside a right-to-left container everywhere else. Reversing the columns by hand instead breaks the stacked order on a phone, where the first column must come first.
+
+| Left to right | Right to left |
+|---|---|
+| `align="left"` on a cell or a table | `align="right"`: the start is the right |
+| `text-align:left` | `text-align:right` |
+| an indent, `padding-left` | `padding-right` (symmetric padding stays) |
+| an arrow or chevron that points onward | the mirrored image |
+| the VML label | `<center dir="rtl">`, its width sized for the label (§6) |
+| an English name, an address, a phone number inside the copy | `<span dir="ltr" lang="en">`; on a link, the span goes inside the `<a>`, since `dir` on `<a>` is buggy in the Word engine |
+
+`lint_email.py` checks the direction: a right-to-left language with no `dir="rtl"`, an outer or ghost table without it, and a `left` that was not mirrored, outside a `dir="ltr"` island (the `direction` check).
+
+**Each locale is its own email.** A translated email sets its own `lang` and `dir`, `<title>`, preheader, alt text and plain-text part, and its merge tags' fallbacks: `{{ first_name | default: "there" }}` in an Arabic email greets the reader in English. Yahoo ignores `lang` on a `<td>` (caniemail), so a change of language goes on a `<p>` or `<span>`.
+
+**Text grows, and VML does not.** W3C's guidance, from IBM's, expects English strings of up to 10 characters to grow by 200–300% in European languages. A button label is that short, and its VML shape has a literal width (§6). `lint_email.py` warns when a label looks wider than its shape (the `vml` check, at 0.6em a character plus 16px each side). Arabic letters join, and the script has no capitals: drop `text-transform` and the tracking for it, as the template does.
 
 ---
 

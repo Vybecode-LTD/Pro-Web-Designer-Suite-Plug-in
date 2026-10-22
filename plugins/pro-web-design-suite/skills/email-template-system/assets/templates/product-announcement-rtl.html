@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<!--
+  SOURCE TEMPLATE — product announcement, right to left (Arabic).
+  product-announcement.html, mirrored (references/email-architecture.md §11):
+  lang and dir on <html>, dir="rtl" on every table, the ghost tables included,
+  so the Word engine lays the columns out right to left as every other client
+  does; the source keeps reading order. align and text-align mirrored, the
+  button's VML label sized for its own text, and an English address marked
+  dir="ltr". Arabic joins its letters and has no capitals, so the label has no
+  tracking and no text-transform.
+    python -m scripts.build_email assets/templates/product-announcement-rtl.html \
+      --out build/announcement-ar.html --text build/announcement-ar.txt
+-->
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="format-detection" content="telephone=no,address=no,email=no,date=no">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>عادت سترة ريدجلاين، بثلاثة ألوان جديدة</title>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    background-color: var(--bg-canvas);
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+  }
+
+  table { border-collapse: collapse; }
+  img { border: 0; display: block; outline: none; text-decoration: none; }
+
+  .wrap { width: 100%; background-color: var(--bg-canvas); }
+
+  .container {
+    width: 100%;
+    max-width: var(--email-width);
+    background-color: var(--bg-surface);
+  }
+
+  .pad { padding-left: var(--gutter-page); padding-right: var(--gutter-page); }
+
+  .display {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-display-size);
+    line-height: var(--type-display-line);
+    font-weight: var(--type-display-weight);
+    color: var(--fg-strong);
+  }
+
+  .h2 {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-h2-size);
+    line-height: var(--type-h2-line);
+    font-weight: var(--type-h2-weight);
+    color: var(--fg-strong);
+  }
+
+  .h3 {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-h3-size);
+    line-height: var(--type-h3-line);
+    font-weight: var(--type-h3-weight);
+    color: var(--fg-strong);
+  }
+
+  .lead {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-lead-size);
+    line-height: var(--type-lead-line);
+    font-weight: var(--type-lead-weight);
+    color: var(--fg-default);
+  }
+
+  .body {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-body-size);
+    line-height: var(--type-body-line);
+    font-weight: var(--type-body-weight);
+    color: var(--fg-default);
+  }
+
+  .label {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-label-size);
+    line-height: var(--type-label-line);
+    font-weight: var(--type-label-weight);
+    color: var(--fg-accent);
+  }
+
+  .legal {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-legal-size);
+    line-height: var(--type-legal-line);
+    color: var(--fg-muted);
+  }
+
+  a { color: var(--fg-link); }
+
+  .hero-img { width: 100%; max-width: var(--email-width); height: auto; }
+
+  /* The fluid-hybrid column. `display:inline-block` on a width-capped div is the
+     part that works without a media query: on a 375px phone the two divs cannot
+     both fit at 264px, so the second wraps. Clients that strip media queries —
+     and the classic Outlook engine, which is driven by the ghost table instead —
+     still stack correctly. See references/email-architecture.md §7. */
+  .col {
+    width: 100%;
+    max-width: var(--email-width-col);
+    display: inline-block;
+    vertical-align: top;
+    text-align: right;
+  }
+
+  .caption {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--type-legal-size);
+    line-height: var(--type-legal-line);
+    color: var(--fg-muted);
+  }
+
+  .divider { height: var(--stroke-hairline); background-color: var(--border-subtle); font-size: 0; line-height: 0; }
+
+  .footer { background-color: var(--bg-sunken); }
+
+  /* Utilities last — source order is the only layer order email has. */
+  .muted { color: var(--fg-muted); }
+  .center { text-align: center; }
+
+  a[x-apple-data-detectors] {
+    color: inherit !important;
+    text-decoration: none !important;
+    font-size: inherit !important;
+  }
+
+  @media only screen and (max-width: var(--email-bp-stack)) {
+    .pad { padding-left: var(--email-gutter-mobile) !important; padding-right: var(--email-gutter-mobile) !important; }
+    .display { font-size: var(--type-h1-size) !important; line-height: var(--type-h1-line) !important; }
+    .h2 { font-size: var(--email-h2-size-mobile) !important; line-height: var(--email-h2-line-mobile) !important; }
+    .col { max-width: 100% !important; }
+    .gutter { width: 0 !important; font-size: 0 !important; }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .wrap { background-color: var(--email-dark-canvas) !important; }
+    .container { background-color: var(--email-dark-surface) !important; }
+    .display, .h2, .h3, .lead, .body { color: var(--email-dark-fg) !important; }
+    .muted, .legal, .caption { color: var(--email-dark-fg-muted) !important; }
+    .label { color: var(--email-dark-link) !important; }
+    .footer { background-color: var(--email-dark-sunken) !important; }
+    .divider { background-color: var(--email-dark-border) !important; }
+    a { color: var(--email-dark-link) !important; }
+    /* A class beats `a`: without it the dark link colour lands on the
+       accent fill (DL-A10). */
+    .button { color: var(--fg-on-accent) !important; }
+  }
+</style>
+</head>
+
+<body>
+
+<div data-preheader="1" style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">
+  الرمادي الأردوازي والمغرة والصنوبري الداكن. القماش نفسه، وضمان الإصلاح نفسه لعشر سنوات.
+  &zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;
+</div>
+
+<table role="presentation" class="wrap" dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr>
+<td align="center" style="padding-top:var(--space-block);padding-bottom:var(--space-section);">
+
+  <!--[if mso]>
+  <table role="presentation" dir="rtl" align="center" cellpadding="0" cellspacing="0" border="0" style="width:600px;"><tr><td>
+  <![endif]-->
+
+  <table role="presentation" class="container" dir="rtl" cellpadding="0" cellspacing="0" border="0" align="center">
+
+    <!-- HEADER -->
+    <tr>
+      <td class="pad" align="center" style="padding-top:var(--pad-card);padding-bottom:var(--pad-card);">
+        <img src="https://cdn.example.com/northbeam/logo-2x.png" width="132" height="28" alt="Northbeam" style="width:132px;height:28px;">
+      </td>
+    </tr>
+
+    <!-- HERO IMAGE. The alt is in the email's language: it is what a reader
+         with images blocked reads instead. -->
+    <tr>
+      <td>
+        <a href="https://example.com/ridgeline">
+          <img class="hero-img" src="https://cdn.example.com/northbeam/ridgeline-hero-1200.jpg"
+               width="600" height="330"
+               alt="سترة ريدجلاين باللون الصنوبري الداكن، على درب ساحلي مبلل"
+               style="width:100%;max-width:var(--email-width);height:auto;">
+        </a>
+      </td>
+    </tr>
+
+    <!-- HEADLINE -->
+    <tr>
+      <td class="pad" style="padding-top:var(--space-subsection);">
+        <p class="label">متوفرة من جديد</p>
+      </td>
+    </tr>
+    <tr><td style="height:var(--gap-related);font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr>
+      <td class="pad">
+        <h1 class="display">ثلاثة ألوان جديدة. السترة نفسها.</h1>
+      </td>
+    </tr>
+    <tr><td style="height:var(--gap-grouped);font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr>
+      <td class="pad">
+        <p class="lead">الرمادي الأردوازي والمغرة والصنوبري الداكن، من القماش المعاد تدويره الذي لم نغيّره منذ 2019، لأنه لم يبلَ بعد.</p>
+      </td>
+    </tr>
+
+    <!-- CTA -->
+    <tr><td style="height:var(--gap-separate);font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr>
+      <td class="pad" align="right">
+        <!--[if mso]>
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"
+          href="https://example.com/ridgeline" style="height:48px;v-text-anchor:middle;width:176px;"
+          arcsize="25%" stroke="f" fillcolor="var(--bg-accent)">
+          <w:anchorlock/>
+          <center dir="rtl" style="color:var(--fg-on-accent);font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">تسوّق ريدجلاين</center>
+        </v:roundrect>
+        <![endif]-->
+        <!--[if !mso]><!-- -->
+        <a class="button" href="https://example.com/ridgeline"
+           style="display:inline-block;padding:var(--email-button-pad);background-color:var(--bg-accent);color:var(--fg-on-accent);font-family:var(--font-sans);font-size:var(--type-ui-size);line-height:var(--type-ui-line);font-weight:var(--type-ui-weight);text-decoration:none;border-radius:var(--radius-md);mso-hide:all;">تسوّق ريدجلاين</a>
+        <!--<![endif]-->
+      </td>
+    </tr>
+
+    <!-- TWO COLUMNS THAT STACK -->
+    <tr><td style="height:var(--space-subsection);font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr>
+      <td class="pad" style="font-size:0;">
+        <!--[if mso]>
+        <table role="presentation" dir="rtl" cellpadding="0" cellspacing="0" border="0" style="width:552px;"><tr>
+        <td style="width:264px;" valign="top">
+        <![endif]-->
+        <div class="col">
+          <img src="https://cdn.example.com/northbeam/ochre-600.jpg" width="264" height="198"
+               alt="سترة ريدجلاين بلون المغرة، مفرودة" style="width:100%;max-width:var(--email-width-col);height:auto;">
+          <h2 class="h3" style="padding-top:var(--gap-related);">المغرة</h2>
+          <p class="body" style="padding-top:var(--gap-tight);">لون خردلي دافئ يظهر بوضوح في الضباب، من دون أن يبدو كملابس السلامة.</p>
+        </div>
+        <!--[if mso]>
+        </td><td style="width:24px;">&nbsp;</td><td style="width:264px;" valign="top">
+        <![endif]-->
+        <div class="gutter" style="width:var(--gutter-page);display:inline-block;font-size:0;line-height:0;" aria-hidden="true">&nbsp;</div>
+        <div class="col">
+          <img src="https://cdn.example.com/northbeam/pine-600.jpg" width="264" height="198"
+               alt="سترة ريدجلاين باللون الصنوبري الداكن، مفرودة" style="width:100%;max-width:var(--email-width-col);height:auto;">
+          <h2 class="h3" style="padding-top:var(--gap-related);">الصنوبري الداكن</h2>
+          <p class="body" style="padding-top:var(--gap-tight);">يكاد يبدو أسود في الضوء الخافت، وأخضر بلا شك تحت الشمس. هو اللون الذي نرتديه.</p>
+        </div>
+        <!--[if mso]>
+        </td></tr></table>
+        <![endif]-->
+      </td>
+    </tr>
+
+    <!-- REASSURANCE -->
+    <tr><td style="height:var(--space-subsection);font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td class="pad"><div class="divider">&nbsp;</div></td></tr>
+    <tr><td style="height:var(--gap-separate);font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr>
+      <td class="pad" style="padding-bottom:var(--pad-card-lg);">
+        <h2 class="h2">ضمان الإصلاح لعشر سنوات</h2>
+        <p class="body" style="padding-top:var(--gap-tight);">مزّقتها، أو علقت بغصن، أو أحرقتها شرارة من نار المخيّم؟ أرسلها إلينا ونصلحها مجانًا، لعشر سنوات. <a href="https://example.com/repairs">كيف يتم الإصلاح</a>.</p>
+      </td>
+    </tr>
+
+    <!-- FOOTER -->
+    <tr>
+      <td class="footer pad" style="padding-top:var(--pad-card);padding-bottom:var(--pad-card);">
+        <p class="legal"><span dir="ltr" lang="en">Northbeam Supply Co., 118 Wharf Road, Portland, OR 97209</span></p>
+        <p class="legal" style="padding-top:var(--gap-tight);">تصلك هذه الرسالة لأنك طلبت أن نخبرك بعودة ريدجلاين. <a href="https://example.com/preferences?e={{email_hash}}">اختر ما نرسله إليك</a> أو <a href="https://example.com/unsubscribe?e={{email_hash}}">ألغِ الاشتراك في كل رسائلنا التسويقية</a>.</p>
+      </td>
+    </tr>
+
+  </table>
+
+  <!--[if mso]>
+  </td></tr></table>
+  <![endif]-->
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>

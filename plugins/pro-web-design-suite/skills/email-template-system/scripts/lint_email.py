@@ -11,7 +11,10 @@ flagged on taste. If the linter objects, a named client drops the thing on the f
 WHAT IT CHECKS
 --------------
   tokens      any `var(--…)` that survived the build — the compiler failed or was skipped
-  css         properties no client in the matrix supports (flex, grid, position, …)
+  css         properties a client in the matrix drops, by caniemail's data (flex, grid, …)
+  direction   a right-to-left language without dir="rtl", an outer or ghost table
+              without it, and an align or text-align left the email did not mirror
+  vml         a VML button label that looks wider than the shape's literal width
   structure   layout tables without role="presentation"; forms, script, iframe, video
   images      missing alt, missing explicit width/height, missing dimensions in style
   head        lang, <title>, charset, viewport, preheader, the MSO PixelsPerInch block,
@@ -55,6 +58,7 @@ import argparse
 import json
 import re
 import sys
+from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -89,6 +93,49 @@ LENGTH_LITERAL_RE = re.compile(r"(?<![\w.#])(-?\d*\.?\d+)(px|em|rem)\b")
 COLOUR_ATTRS = ("bgcolor", "color", "background", "fillcolor", "strokecolor")
 COMMENT_ATTR_RE = re.compile(r"\b(%s|style)\s*=\s*\"([^\"]*)\"" % "|".join(COLOUR_ATTRS), re.I)
 DARK_RE = re.compile(r"prefers-color-scheme\s*:\s*dark", re.I)
+# Right to left (DL-B5): the scripts W3C names as right-to-left
+# (w3.org/International/questions/qa-scripts), as BCP 47 script subtags. A tag
+# with a script subtag is read by it: ku-Arab is right to left, az-Latn is not.
+# One without is read by CLDR 48's likely subtags (unicode-org/cldr-json 49.0.0,
+# supplemental/likelySubtags.json): the languages whose likely script is one of
+# these, and the language-region pairs that differ from their language (pa-PK
+# is right to left, sd-IN is not). Codex on #196: a short list missed nqo, rhg.
+RTL_SCRIPTS = {"adlm", "arab", "hebr", "mand", "nkoo", "rohg", "samr", "syrc", "thaa", "yezi"}
+RTL_LANGUAGES = frozenset("""
+    aao abh abv acm acq acw acx adf aeb aec aee aeq afb aib aii aij aiq amw apc apd ar arq ars
+    ary arz ask atn auj auz avd avl ayh ayl ayn ayp azb bal bdz bej bft bgn bgp bhe bhm bhn bjf
+    bjm bqi brh brk bsh bsk chg cja ckb clh czk dcc def deh dgl dmk dml dv esh fa fay faz fia
+    fub gbz ggg gha ghr gig gjk gju glh glk grr gwc gwf gwt gzi hac haz hbo he hkh hnd hno hoh
+    hrt hrz hss huy isk itk iw jad jat jbe jbn jdg ji jnd jog jpa jpr jrb jye kbu kby kcy kfm
+    khw klj kmz kqd ks ktl kvx kxp lad lah lhs lki lrc lrk lrl lsa lsd lss luv luz mby mde mey
+    mfa mfi mhj mid mki mnj mve mvy myz mzb mzn nli nlm nqo ntz nyq oar odk oru ota pbt phl phr
+    phv plk prc prd prx ps psh psi pst qxq rdb rhg rmt sam sbn scl sd sdb sdf sdg sdh sds sgr
+    sgy shd shm shu shv siy siz skr smp smy sqo sqt srh srz ssh sts swb syc syn syr tjo tks tmr
+    tov tra trg trm trw ug ur ush uzs vaf vgr vmh wbk wlo wne wni wsv xhe xka xkc xkj xkp xvi
+    ydg yhd yi yih yud zba zdj zrp zum
+""".split())
+RTL_REGIONS = frozenset("""
+    az-iq az-ir ha-cm ha-sd kk-af kk-cn kk-ir kk-mn ku-iq ku-ir ku-lb ky-cn ms-cc pa-pk tg-pk
+    uz-af
+""".split())
+LTR_REGIONS = frozenset("""
+    mey-sn sd-in ug-kz ug-mn
+""".split())
+# A conditional comment the Word engine reads: [if mso], [if gte mso 9],
+# [if (gte mso 9)|(IE)], never [if !mso] (Codex on #196).
+MSO_IF_RE = re.compile(r"\s*\[if\b[^\]]*(?<![!\w])mso\b", re.I)
+DIRECTION_RE = re.compile(r"(?<![\w-])direction\s*:\s*rtl\b", re.I)
+LEFT_RE = re.compile(r"(?<![\w-])text-align\s*:\s*left\b", re.I)
+GHOST_TABLE_RE = re.compile(r"<table\b[^>]*>", re.I)
+TAG_RE = re.compile(r"<[a-z][^>]*>", re.I)
+# An attribute in a conditional comment, in any of HTML's quotings (Codex on #196).
+DIR_RTL_ATTR_RE = re.compile(r"""\bdir\s*=\s*(?:"rtl"|'rtl'|rtl(?![\w-]))""", re.I)
+ALIGN_LEFT_RE = re.compile(r"""\balign\s*=\s*(?:"left"|'left'|left(?![\w-]))""", re.I)
+ROUNDRECT_RE = re.compile(r"<v:roundrect\b([^>]*)>(.*?)</v:roundrect>", re.I | re.S)
+# A label's width, by its characters: 0.6em each, and 16px of the shape on
+# either side of it. An estimate, to flag a label worth measuring.
+GLYPH_EM = 0.6
+LABEL_SIDE_PX = 16
 
 VOID_TAGS = {
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link",
@@ -112,6 +159,7 @@ CANIEMAIL_CLIENTS = {
     "thunderbird": "Thunderbird",
 }
 CANIEMAIL = {
+    "html-body": ("2021-11-30", "outlook-mac", "outlook-com gmail-web gmail-app ganga yahoo"),
     "html-style": ("2023-07-27", "ganga", "word gmail-web gmail-app"),
     "css-at-media": ("2023-12-13", "word ganga thunderbird",
                                    "outlook-com outlook-mac gmail-web gmail-app yahoo samsung"),
@@ -357,6 +405,39 @@ def contrast_ratio(fg, bg) -> float:
     lf, lb = relative_luminance(fg), relative_luminance(bg)
     hi, lo = max(lf, lb), min(lf, lb)
     return (hi + 0.05) / (lo + 0.05)
+
+
+def rtl_language(tag: str) -> bool:
+    """Whether a BCP 47 tag names a language written right to left."""
+    parts = tag.strip().lower().replace("_", "-").split("-")
+    # The language identifier ends at the first singleton: an extension's value
+    # (ar-SA-u-nu-latn) is no script (Codex on #196).
+    parts = parts[:next((i for i, p in enumerate(parts) if i and len(p) == 1), len(parts))]
+    script = next((p for p in parts[1:] if len(p) == 4 and p.isalpha()), None)
+    if script:
+        return script in RTL_SCRIPTS
+    region = next((p for p in parts[1:] if (len(p) == 2 and p.isalpha()) or (len(p) == 3 and p.isdigit())), None)
+    if region and parts[0] + "-" + region in RTL_REGIONS | LTR_REGIONS:
+        return parts[0] + "-" + region in RTL_REGIONS
+    return parts[0] in RTL_LANGUAGES
+
+
+def sets_rtl(node) -> bool:
+    return (node.get("dir") or "").strip().lower() == "rtl" or bool(DIRECTION_RE.search(node.get("style") or ""))
+
+
+def in_ltr_island(node) -> bool:
+    """Whether the nearest direction set on the node or above it is ltr: an
+    English address inside Arabic copy aligns left (CodeRabbit on #196)."""
+    for each in (node, *node.ancestors()):
+        if each.kind != "element":
+            continue
+        if (each.get("dir") or "").strip().lower() in ("ltr", "rtl"):
+            return each.get("dir").strip().lower() == "ltr"
+        found = re.search(r"(?<![\w-])direction\s*:\s*(ltr|rtl)\b", each.get("style") or "", re.I)
+        if found:
+            return found.group(1).lower() == "ltr"
+    return False
 
 
 def is_preheader(node) -> bool:
@@ -670,7 +751,7 @@ class Linter:
         # style="font-family:Arial"> in the body is no scaffold (Codex on #57).
         head = next((n for n in self.root.elements() if n.tag == "head"), None)
         mso_font = head is not None and any(
-            n.kind == "comment" and re.match(r"\s*\[if\s+mso", n.data, re.I)
+            n.kind == "comment" and MSO_IF_RE.match(n.data)
             and sets_broad_font(n.data) for n in head.walk()
         )
         if not mso_font:
@@ -713,6 +794,77 @@ class Linter:
             elif len(visible) > 140:
                 self.add("info", "head", "preheader is %d characters" % len(visible),
                          preheader.line, "Everything past ~100 is invisible in every client.")
+
+    def check_direction(self):
+        """DL-B5: a right-to-left email carries its direction where every client
+        keeps it, on its tables (references/email-architecture.md §11)."""
+        html = next((n for n in self.root.elements() if n.tag == "html"), None)
+        if html is None:
+            return
+        lang = (html.get("lang") or "").strip()
+        rtl = sets_rtl(html)
+        if lang and rtl_language(lang) and not rtl:
+            self.add("error", "direction", '<html lang="%s"> is written right to left, with no dir="rtl"' % lang,
+                     html.line, "Without it every client lays the email out left to right: its columns, "
+                     "its alignment and the punctuation at the ends of its lines.",
+                     'add dir="rtl" to <html> and to every table (references/email-architecture.md §11)')
+            rtl = True
+        elif rtl and lang and not rtl_language(lang):
+            self.add("warning", "direction", '<html dir="rtl"> on a language written left to right (%s)' % lang,
+                     html.line, "lang and dir disagree: a screen reader reads %s, and the layout runs "
+                     "right to left." % lang, "set the lang the copy is written in")
+        if not rtl:
+            return
+        for node in self.root.elements():
+            if node.tag == "table" and not sets_rtl(node) and not any(a.tag == "table" for a in node.ancestors()):
+                self.add("error", "direction", 'an outer <table> of a right-to-left email has no dir="rtl"',
+                         node.line, "<body> is %s: a client that replaces it with a <div> may drop its "
+                         "direction, and <html>'s with it. caniemail tests dir on a table." % blame("html-body"),
+                         'add dir="rtl" to the table')
+        for node in self.root.walk():
+            if node.kind != "comment" or not MSO_IF_RE.match(node.data):
+                continue
+            for tag in TAG_RE.findall(node.data):     # the Word engine's own markup (Codex on #196)
+                if ALIGN_LEFT_RE.search(tag) or LEFT_RE.search(tag):
+                    self.add("warning", "direction", "a left alignment in a right-to-left email's Word-engine markup",
+                             node.line, "The start of a line is the right here, so left is its far side.",
+                             'mirror it: align="right", text-align:right')
+            for tag in GHOST_TABLE_RE.findall(node.data):
+                if not DIR_RTL_ATTR_RE.search(tag) and not DIRECTION_RE.search(tag):
+                    self.add("warning", "direction", 'a ghost table in a right-to-left email has no dir="rtl"',
+                             node.line, "The ghost table is the table the Word engine lays the columns out "
+                             "in, and caniemail tested dir on the table that holds the cells. Set it there, "
+                             "rather than trust it to reach through a conditional comment.",
+                             'add dir="rtl" to the ghost table')
+        for node in self.root.elements():
+            left = (node.get("align") or "").strip().lower() == "left" or LEFT_RE.search(node.get("style") or "")
+            if node.tag == "style":
+                left = LEFT_RE.search(node.text_content())
+            if left and not in_ltr_island(node):
+                self.add("warning", "direction", "a left alignment in a right-to-left email", node.line,
+                         "The start of a line is the right here, so left is its far side.",
+                         'mirror it: align="right", text-align:right')
+
+    def check_vml(self):
+        """DL-B5: a VML shape does not grow with its label (email-architecture.md
+        §6), and a translated label can be two or three times longer (§11)."""
+        for node in self.root.walk():
+            if node.kind != "comment":
+                continue
+            for attrs, inner in ROUNDRECT_RE.findall(node.data):
+                width = re.search(r"(?<![\w-])width\s*:\s*(\d+(?:\.\d+)?)px", attrs, re.I)
+                label = " ".join(unescape(re.sub(r"<[^>]+>", " ", inner)).split())
+                if not width or not label:
+                    continue
+                size = re.search(r"font-size\s*:\s*(\d+(?:\.\d+)?)px", inner, re.I)
+                font = float(size.group(1)) if size else 16.0
+                need = round(len(label) * font * GLYPH_EM) + 2 * LABEL_SIDE_PX
+                if need > float(width.group(1)):
+                    self.add("warning", "vml", "a VML button's label may not fit its %spx shape" % width.group(1),
+                             node.line, '"%s" is %d characters at %gpx: about %dpx, at %gem a character '
+                             "and %dpx a side. The Word engine does not widen the shape, so the label "
+                             "wraps or is cut." % (label, len(label), font, need, GLYPH_EM, LABEL_SIDE_PX),
+                             "widen the shape's width, or shorten the label")
 
     def check_links(self):
         seen_unsubscribe = False
@@ -1157,6 +1309,8 @@ class Linter:
         self.check_structure()
         self.check_images()
         self.check_head()
+        self.check_direction()
+        self.check_vml()
         self.check_links()
         self.check_size()
         self.check_contrast()
@@ -1251,8 +1405,8 @@ def main(argv=None) -> int:
     parser.add_argument("--strict", action="store_true", help="warnings fail the build too")
     parser.add_argument("--ignore", default="",
                         help="comma-separated check names to silence "
-                             "(tokens,css,css-partial,structure,images,head,links,"
-                             "link-text,size,contrast,dark,type,nostyle,source)")
+                             "(tokens,css,css-partial,structure,images,head,direction,vml,"
+                             "links,link-text,size,contrast,dark,type,nostyle,source)")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="list every occurrence instead of collapsing repeats")
     args = parser.parse_args(argv)

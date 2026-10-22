@@ -20,7 +20,7 @@ description: Build HTML email that survives Outlook, Gmail and dark mode, compil
 
 Every agency client eventually needs email, and email is the one place where **this suite's laws must be deliberately broken**. HTML email has no cascade layers, no custom properties you can rely on, no `gap`, no flexbox or grid in the client that matters most, and `<style>` blocks that several clients strip entirely.
 
-That is a real, principled exception, and it deserves to be owned explicitly rather than improvised badly the night before a send.
+It is a real, principled exception, to be owned explicitly, not improvised the night before a send.
 
 ## The principle
 
@@ -30,7 +30,7 @@ You never hand-write a hex in an email template. You author against the same Tie
 
 **The laws are not abandoned. They move from runtime to build time.**
 
-This reframing is the whole skill. Without it, "email is different" becomes a licence for a second, undisciplined design system that drifts from the first one within a quarter — and the drift is invisible, because nobody opens last quarter's email next to this quarter's website.
+This reframing is the whole skill. Without it, "email is different" becomes a licence for a second, undisciplined design system that drifts from the first one within a quarter, unseen, since nobody opens last quarter's email beside this quarter's site.
 
 ---
 
@@ -103,7 +103,7 @@ Worth seeing once, because it is what makes the exception credible rather than a
     Ten-year repair promise</h2></td>
 ```
 
-Note what survived and what did not. The media query stays, since its condition is evaluated at runtime, and so does the class it matches. Everything else became an attribute. No human typed `#080706`, and nobody will: change `--neutral-950` once and every template that reads `--fg-strong` moves with it.
+The media query stays, since its condition is evaluated at runtime, and so does the class it matches. Everything else became an attribute. No human typed `#080706`, and nobody will: change `--neutral-950` once and every template that reads `--fg-strong` moves with it.
 
 ---
 
@@ -119,13 +119,14 @@ Referencing a dropped token is a **hard build error**, not a silent nothing. `va
 
 ### 2. Author the source template
 
-Start from one of the three in `${CLAUDE_SKILL_DIR}/assets/templates/` — copy it into the project first. They are complete and they compile:
+Start from one of the four in `${CLAUDE_SKILL_DIR}/assets/templates/` — copy it into the project first. They are complete and they compile:
 
 | Template | Shows |
 |---|---|
 | `transactional-receipt.html` | line items, a totals row, a well, a single CTA, transactional footer |
 | `product-announcement.html` | hero image, two columns that stack without a media query, bulletproof button |
-| `newsletter.html` | text-forward, pull quote, captioned image, the best deliverability profile of the three |
+| `newsletter.html` | text-forward, pull quote, captioned image, the best deliverability profile |
+| `product-announcement-rtl.html` | the announcement in Arabic, right to left: `dir` on every table, mirrored alignment |
 
 Authoring rules, in full, in `references/email-workflow.md` §1. The short version: tokens everywhere, classes in one `<style>` block, **utilities declared last**, inline `style` only for genuinely per-instance values.
 
@@ -136,7 +137,7 @@ python -m scripts.build_email "${CLAUDE_SKILL_DIR}/assets/templates/transactiona
     --out build/receipt.html --text build/receipt.txt
 ```
 
-Resolves tokens, inlines with real cascade ordering, keeps media queries, adds the MSO scaffolding and plain-text part, and reports bytes against Gmail's clipping threshold.
+It does what the compile above shows; its flags are under Scripts.
 
 ### 4. Lint
 
@@ -148,7 +149,7 @@ Exits non-zero on anything that breaks in a named client: Law 9 for email.
 
 ### 5. Test
 
-Free checks first: `node scripts/render_email.mjs build/x.html` shows light, dark and no-`<style>` at 375px. `references/email-workflow.md` §4 lists them; §5 gives the five paid client combinations worth the budget, in priority order. The one people skip and should not: **the Gmail app signed in with a non-Google account**, where the `<style>` block does not apply at all.
+Free checks first: `node scripts/render_email.mjs build/x.html` shows light, dark and no-`<style>` at 375px. `references/email-workflow.md` §4 lists them; §5 gives the five paid client combinations worth the budget. The one people skip and should not: **the Gmail app signed in with a non-Google account**, where the `<style>` block does not apply at all.
 
 ### 6. Hand off
 
@@ -233,7 +234,7 @@ Exit `0` compiled · `1` over the clipping threshold (or `--strict` with warning
 
 ### `scripts/lint_email.py` — the gate
 
-Checks unresolved `var()`, unsupported CSS per the matrix, layout tables missing `role="presentation"`, images without `alt` or explicit dimensions, missing `lang`/`<title>`/charset/preheader/MSO font rule, relative URLs, size against both Gmail thresholds, measured contrast against the nearest resolvable background, in light and with the retained dark rules applied, non-descriptive link text, a missing unsubscribe link, forms and scripts, text below the 13px email floor, and inline widths over a phone's.
+Checks unresolved `var()`, unsupported CSS per the matrix, layout tables missing `role="presentation"`, images without `alt` or explicit dimensions, missing `lang`/`<title>`/charset/preheader/MSO font rule, relative URLs, size against both Gmail thresholds, measured contrast against the nearest resolvable background, in light and with the retained dark rules applied, non-descriptive link text, a missing unsubscribe link, a right-to-left email's direction, a VML label wider than its shape, forms and scripts, text below the 13px email floor, and inline widths over a phone's.
 
 | Flag | Does |
 |---|---|
@@ -287,6 +288,7 @@ Within this skill:
 | fluid-hybrid vs media queries | `references/email-architecture.md` §7 |
 | images, alt text, weight budget | `references/email-architecture.md` §8 |
 | accessibility in an email client | `references/email-architecture.md` §9 |
+| right to left, and translation | `references/email-architecture.md` §11 |
 | the source format and the build step | `references/email-workflow.md` §1–2 |
 | preheader text done properly | `references/email-workflow.md` §3 |
 | what to test free vs what to pay for | `references/email-workflow.md` §4–5 |
