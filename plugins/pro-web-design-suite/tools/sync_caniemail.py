@@ -63,6 +63,7 @@ COLUMNS = (
 # The matrix's rows: its label, and caniemail's feature. Every feature
 # lint_email.py names is one, so each of its errors traces to a row.
 ROWS = (
+    ("`<body>` element", "html-body"),
     ("`<style>` element", "html-style"),
     ("`@media` queries", "css-at-media"),
     ("`@media (prefers-color-scheme)`", "css-at-media-prefers-color-scheme"),

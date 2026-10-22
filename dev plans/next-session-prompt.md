@@ -546,7 +546,7 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
   | client-presentation-builder | 20,494 |
   | perf-budget-gate | 20,491 |
   | web-design-studio | 20,488 |
-  | email-template-system | 20,460 |
+  | email-template-system | 20,491 |
   | design-system-versioning | 20,434 |
 
 - **Earlier phases' facts** are in the CHANGELOG under 3.4.0 and 3.3.0, and in the git log. The worked examples are tests (`TheWorkedRun`, `TheWorkedRelease`): a change to what the migration tools, the audit or diff_system print can fail them.

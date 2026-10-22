@@ -51,6 +51,7 @@ caniemail.com's data of 2026-09-16; each row is linked to its page, which lists 
 
 | Feature | Tested | Outlook Win (Word) | Outlook.com | Outlook Mac | Gmail web | Gmail app | GANGA | Apple Mail | Yahoo | Samsung | Thunderbird |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| [`<body>` element](https://www.caniemail.com/features/html-body/) | 2021-11-30 | ✅ | ⚠️ ¹ | ❌ | ⚠️ ¹ | ⚠️ ¹ | ⚠️ ¹ | ✅ | ⚠️ ¹ | ✅ | ✅ |
 | [`<style>` element](https://www.caniemail.com/features/html-style/) | 2023-07-27 | ⚠️ ⁴ | ✅ | ✅ | ⚠️ ¹ ⁶ | ⚠️ ¹ | ❌ ² | ✅ | ✅ | ✅ | ✅ |
 | [`@media` queries](https://www.caniemail.com/features/css-at-media/) | 2023-12-13 | ❌ | ⚠️ ¹ ¹⁰ | ⚠️ ¹ ¹⁰ | ⚠️ ⁷ | ⚠️ ⁷ | ❌ ⁶ | ✅ | ⚠️ ² | ⚠️ ⁹ | ❌ |
 | [`@media (prefers-color-scheme)`](https://www.caniemail.com/features/css-at-media-prefers-color-scheme/) | 2023-03-08 | ❌ | ✅ ³ | ✅ ³ | ❌ | ❌ | ❌ | ✅ | ❌ ⁶ | ✅ | ❌ |
@@ -88,6 +89,7 @@ caniemail.com's data of 2026-09-16; each row is linked to its page, which lists 
 
 caniemail's notes on the results in the table:
 
+- **`<body>` element:** ¹ Partial. Replaced by a `<div>` with supported attributes.
 - **`<style>` element:** ¹ Partial. Not supported inside the `<body>`. ² Partial. Not supported with non Google accounts. ⁴ Buggy. `<style>` elements need to be declared before their rules are used. ⁶ The size of the `<style>` tag [is limited to 16 KB](https://github.com/hteumeuleu/email-bugs/issues/90)
 - **`@media` queries:** ¹ Partial. Does not support nested media queries. ² Partial. Only supports `screen`, `min-width`, `max-width`, `min-height` and `max-height` based media queries. ⁶ Partial. Not supported with non Google accounts. ⁷ Partial. Does not support height based media queries. ⁹ Partial. Not supported with Hotmail/Outlook accounts. ¹⁰ Partial. Nested media queries are removed.
 - **`@media (prefers-color-scheme)`:** ³ Additional custom `data` attributes (`data-ogsc`, `data-ogac`, `data-ogsb`, `data-ogab`) are added when viewing an email in dark mode. See [this article](https://www.hteumeuleu.com/2021/emails-react-outlook-com-dark-mode/) for examples. ⁶ Not supported. `@media (prefers-color-scheme:dark)` is transformed into `@media ()`
@@ -320,7 +322,7 @@ Three things people get wrong about it:
 
 ### Gmail `<style>` ceiling — 16,384 bytes
 
-Separate from the above, and it bites earlier than you would think on a template with a large dark-mode block. **Gmail removes every `<style>` element that crosses the ceiling, and every one after it**, so the failure mode is "my media queries vanished," not "my CSS looks half-applied." Past the ceiling, `build_email.py` splits the retained CSS into blocks of about 4 KB in authoring order, so Gmail keeps the first ones: write the retained CSS most important first. Since the compiler inlines nearly everything, a healthy retained block is under 1 KB — the three templates in `assets/templates/` keep 751 to 919 bytes.
+Separate from the above, and it bites earlier than you would think on a template with a large dark-mode block. **Gmail removes every `<style>` element that crosses the ceiling, and every one after it**, so the failure mode is "my media queries vanished," not "my CSS looks half-applied." Past the ceiling, `build_email.py` splits the retained CSS into blocks of about 4 KB in authoring order, so Gmail keeps the first ones: write the retained CSS most important first. Since the compiler inlines nearly everything, a healthy retained block is under 1 KB — the four templates in `assets/templates/` keep 751 to 919 bytes.
 
 ---
 

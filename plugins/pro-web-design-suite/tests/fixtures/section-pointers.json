@@ -1196,6 +1196,12 @@
  {
   "from": "email-template-system/SKILL.md",
   "to": "email-template-system/references/email-architecture.md",
+  "section": "11",
+  "heading": "Right to left, and every other language"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-architecture.md",
   "section": "3",
   "heading": "Spacing discipline — Law 2, table-shaped"
  },
@@ -1332,6 +1338,18 @@
   "heading": "Dark mode"
  },
  {
+  "from": "email-template-system/assets/templates/product-announcement-rtl.html",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "11",
+  "heading": "Right to left, and every other language"
+ },
+ {
+  "from": "email-template-system/assets/templates/product-announcement-rtl.html",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "7",
+  "heading": "Responsive: fluid-hybrid versus media queries"
+ },
+ {
   "from": "email-template-system/assets/templates/product-announcement.html",
   "to": "email-template-system/references/email-architecture.md",
   "section": "7",
@@ -1342,6 +1360,12 @@
   "to": "email-template-system/references/email-workflow.md",
   "section": "8",
   "heading": "ESP handoff"
+ },
+ {
+  "from": "email-template-system/references/email-architecture.md",
+  "to": "email-template-system/references/email-client-matrix.md",
+  "section": "2",
+  "heading": "The capability matrix"
  },
  {
   "from": "email-template-system/references/email-architecture.md",
@@ -1412,6 +1436,12 @@
  {
   "from": "email-template-system/scripts/lint_email.py",
   "to": "email-template-system/references/email-architecture.md",
+  "section": "11",
+  "heading": "Right to left, and every other language"
+ },
+ {
+  "from": "email-template-system/scripts/lint_email.py",
+  "to": "email-template-system/references/email-architecture.md",
   "section": "2",
   "heading": "The head, and the MSO scaffolding"
  },
@@ -1420,6 +1450,12 @@
   "to": "email-template-system/references/email-architecture.md",
   "section": "3",
   "heading": "Spacing discipline — Law 2, table-shaped"
+ },
+ {
+  "from": "email-template-system/scripts/lint_email.py",
+  "to": "email-template-system/references/email-architecture.md",
+  "section": "6",
+  "heading": "Bulletproof buttons"
  },
  {
   "from": "email-template-system/scripts/lint_email.py",

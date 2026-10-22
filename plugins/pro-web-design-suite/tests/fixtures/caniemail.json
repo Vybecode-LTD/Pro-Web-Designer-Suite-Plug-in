@@ -5,6 +5,74 @@
  "last_update_date": "2026-09-16 13:05:00 +0000",
  "data": [
   {
+   "slug": "html-body",
+   "title": "<body> element",
+   "url": "https://www.caniemail.com/features/html-body/",
+   "last_test_date": "2021-11-30",
+   "notes_by_num": {
+    "1": "Partial. Replaced by a `<div>` with supported attributes."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "15": "y"
+     },
+     "ios": {
+      "15": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2021-11": "a #1"
+     },
+     "ios": {
+      "2021-11": "a #1"
+     },
+     "android": {
+      "2021-11": "a #1"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "y",
+      "2010": "y",
+      "2013": "y",
+      "2016": "y",
+      "2019": "y"
+     },
+     "macos": {
+      "16.56": "y",
+      "16.80": "n"
+     },
+     "outlook-com": {
+      "2021-11": "a #1",
+      "2024-01": "a #1"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.0": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "78.14": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2021-11": "a #1"
+     },
+     "ios": {
+      "2021-11": "n"
+     },
+     "android": {
+      "2021-11": "n"
+     }
+    }
+   }
+  },
+  {
    "slug": "html-style",
    "title": "<style> element",
    "url": "https://www.caniemail.com/features/html-style/",

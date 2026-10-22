@@ -634,7 +634,7 @@ class PageTypesAndRouting(unittest.TestCase):
                 self.assertIn(part, local)
         entry = next((e for e in REGISTER["entries"] if e["figure"] == "200–300%"), None)
         self.assertIsNotNone(entry)
-        self.assertEqual(["landing-page-conversion/references/page-architecture.md"], entry["docs"])
+        self.assertIn("landing-page-conversion/references/page-architecture.md", entry["docs"])   # email §11 quotes it too
         self.assertIn("130%", entry["also"])
 
     def test_copy_patterns_gives_the_other_pages_their_calls_to_action(self):
