@@ -1,15 +1,8 @@
 # Handoff
 
-**2026-10-21: P42 is done** (#190, #191), in the owner's order P42, P43, P41. #190 holds thirteen persuasive devices to their WCAG 2.2 criteria (PS-B1); #191 adds the UK and EU consumer law to flag for legal review, price tests and consent for tracking (PS-B2, PS-B3, PS-B8), every date and figure read at its source on the day and registered. **P43 is done too** (#192 to #194): `lint_claims.py`, the page types beyond software with the routing between the persuasion skills, and `brief_to_log.py`. **Next: P41, then R4.** The owner's three pre-R4 steps are done (below).
+**2026-10-22: P41 parts 1 and 2 are done** (DL-C9, #195; DL-B5, #196). Part 3, DL-B4 (MJML or React Email output from the email tokens, or an explicit route away), is the last item before R4 and the next session's first job. P43's stack (#192 to #194) was merged before this session began.
 
-**At the session's end (2026-10-22):** #189 (P57, `57355ae`), #190 (`236fe41`) and #191 (`e0f985e`) are merged. **P43's three PRs are open as a stack, #192 → #193 → #194**, every review thread resolved and CI running: merge them bottom-up once each is green, retargeting the next to `main` before deleting the merged branch. The webdesignersuite.com PR #5 (N51 fixed, and its handoff) waits on its own CI the same way. Then P41.
-
-**2026-10-20: P56 and P57 are done** (N50, #185 to #187: the seven problems building webdesignersuite.com found, fixed on `main` for 4.0.0, F5 in part; N51, #189: `check_roles` applies a scope's blocks as the cascade does, so `:root` written below `[data-theme="dark"]` wins on a dark page, a heavier selector wins whatever the order, and files given together are written in the order listed). Cascade layers are still read as one (the script's docstring says so). Details are at the top of `dev plans/next-session-prompt.md`. The site (`C:\DEV\webdesignersuite.com`, `Vybecode-LTD/webdesignersuite.com`, staging on Railway) keeps a workaround per finding until 4.0.0 ships; after R4, rerun `/install-gate` there and remove them (`dev plans/plugin-findings.md` in the site).
-- **Three more CI traps from this session:** the `macos-latest · Python 3.14` cell failed four times on timing-dependent browser tests, none reached by the PRs: `test_vitals_measure_the_signed_in_page_and_the_late_content` on `main` (`76d4b18`), #185 and #186, and `test_a_page_type_picks_the_budget_its_page_is_held_to` on #187; `gh run rerun RUN --failed` passed each. **A local `check.py` run that errors with a subprocess `TimeoutExpired` and takes far longer than the usual 11 to 12 minutes means the laptop slept** (System log, Kernel-Power 42): rerun the failing test alone before you debug it. **Never chain `git commit` after `check.py` in one command**: read its exit first (a commit was pushed on a failed run this session; it was a sleep timeout, but the order was wrong).
-
-**2026-10-19**: **P35 is done** (#179, #183; GT-B6 and GT-B9 closed). **Next: P41, P42 and P43, in the order the owner chooses; ask first. Then R4.**
-
-**The next session starts from `dev plans/next-session-prompt.md`**: orientation, then the work in detail. `dev plans/next-session-opening-prompt.md` is the message to paste in.
+**The next session starts from `dev plans/next-session-prompt.md`** (§3, then §4). `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
 ## 2026-10-19: the rename and the distribution repository (another session)
 
@@ -35,50 +28,33 @@ R4's `distribute` job is the first real push with the key; if it fails, the GitH
 
 ## State
 
-- **#179, P35 part 1 (GT-B6)**, merged as `8a99f60`. `a11y_runtime.mjs` has four new checks, each skippable by name and counted by a budget key, and `reflow` reads clipped text:
-  - `spacing` (1.4.12): WCAG's text spacing injected, the text a box newly clips;
-  - `obscured` (2.4.11): Tab down and Shift+Tab up, a 5×5 hit test of each stop against the fixed and sticky elements that paint over it;
-  - `hover` (1.4.13): persistent, hoverable, dismissible, for each control a hidden node describes;
-  - `motion`: the page with and without `prefers-reduced-motion`, as the suite's policy (warnings);
-  - `reflow`: text clipped at 200% (1.4.4) and 320px (1.4.10).
-  - Clipping is measured on the text's own rectangles against the box that governs its overflow, never a box's scroll size.
-  - Budget keys: `text_spacing_failures`, `focus_obscured`, `hover_content_failures`, `motion_not_reduced`, `motion_content_hidden`, `motion_busy_stopped`. The 4.0.0 upgrade notes say the checks run by default, and that `--skip` is the rollout.
-- **#183, P35 part 2 (GT-B9)**, merged as `1a37335`. `--engine firefox|webkit` runs axe, the names and the tab order in Playwright's pinned builds; the rest stay Chromium's, and the run says so. Whether an engine's Tab skips bare links is read from the run: WebKit's Windows and macOS builds skip them, its Linux build does not. CI installs Firefox and WebKit on Linux and sets `WDS_REQUIRE_ENGINES` there (the owner's OK, 2026-10-19).
-- **#180, the rename** (the owner's other session), merged before #183. The plugin is **Pro Web Design Suite**, in `plugins/pro-web-design-suite`. #183 merged `main` across it.
-- **#181 and #182** (the distribution repository; ready for Anthropic's directory), the other session's, are merged too: see the section above.
-- **Reviews:**
-  - **#179, 14 distinct real issues** (Codex 11 over three rounds; CodeRabbit 3, one the same as Codex's; CI 1), each fixed with a test failing on the head it reviewed.
-  - **#183, 3 distinct** (CI 1: WebKit's Linux build tabs to links; CodeRabbit 2; Codex 1, the same as one of CodeRabbit's).
-- **At the end:** 11 open items, all scheduled; about 1,440 tests. This session used about 570 thousand tokens.
+- **`main` at `fd0f7a9`**, CI running on the merge of #196 when this was written (#196's own CI passed on all six cells). 3.6.0 is the latest release; 4.0.0 is in progress.
+- **#195, P41 part 1 (DL-C9)**, merged as `72047fa`. `tools/sync_caniemail.py` pins caniemail's `api/data.json` (35 features, the platforms of ten clients; MIT) in `tests/fixtures/caniemail.json` and writes email-client-matrix.md §2 (the table, caniemail's notes, each feature's test date) and `lint_email.py`'s `CANIEMAIL` block, from which the linter names the clients a property fails in. `--check` runs in `check.py`. About 60 cells had drifted since A15; the matrix's own notes are corrected to the data. **CHANGELOG.md** passed 262,144 bytes, past which Anthropic's directory holds a file for a reviewer: 3.4.0 and earlier are now in `CHANGELOG-earlier.md`.
+- **#196, P41 part 2 (DL-B5)**, merged as `fd0f7a9`. `assets/templates/product-announcement-rtl.html` (Arabic, `dir="rtl"` on every table, the ghost tables included), email-architecture.md §11, and two lint checks: `direction` (a right-to-left language by its script subtag, else CLDR 48's likely subtags; outer and ghost tables; left alignment, in the Word engine's conditional markup too, never inside a `dir="ltr"` island) and `vml` (a label wider than its shape). `MSO_IF_RE` reads every Word-engine condition (`[if gte mso 9]`, never `[if !mso]`), in the font-rule check too.
+- **Reviews:** CodeRabbit 1 on #195; Codex 6 on #196 over two rounds, and CodeRabbit 2 once #196 was retargeted to `main`. Each fixed with a test failing on the head it reviewed.
+- **main's CI** failed once at the session's start on `test_tbt_stops_at_tti` (Windows 3.9; a slow runner found no five-second quiet window before the 9-second settle). A rerun of the failed job passed.
+- **At the end:** 1 open item (DL-B4, P41's part 3), scheduled; about 1,570 tests.
 
 ## Next steps
 
-1. **Merge the open stack** #192 → #193 → #194 once each is green (and site PR #5). P42 is done: #190 (PS-B1) and #191 (PS-B2, PS-B3, PS-B8). P43 is #192, `lint_claims.py` (PS-C6); #193, page types and routing (PS-B4, PS-B6); #194, `brief_to_log.py` (PS-C12).
-2. **P41** (email, L: MJML or React Email output, a right-to-left template, the client matrix from caniemail's data), the last item before R4. Sizes and scope are in the next-session prompt's §4. Sizes and scope are in the next-session prompt's §4.
-3. Each split into PRs of under 100 files.
-4. Then **R4**, the 4.0.0 release, with its live check (the owner's OK and an estimate first).
+1. **P41 part 3, DL-B4.** The router (`hooks/design_hooks.mjs:80`) already sends "MJML" to email-template-system, and the skill says nothing about it. Output `mj-attributes`/`mj-class` (an `<mj-head>` to `mj-include`) or a React Email theme from `email-tokens.json`, or route away explicitly. **Ask the owner first** whether a real-tool test may add `mjml` (or `react`, `react-dom` and `@react-email/render`) to `tooling/main`, a new pinned dependency (`docs/TESTING.md`, the Stack in `CLAUDE.md`).
+2. **R4**, the 4.0.0 release, with its live check (the owner's OK and an estimate first). The rename section above lists the distribution steps.
 
 ## Open owner decisions
 
 - Whether issues live in the distribution repository or here; `supportUrl` points here for now.
-- Whether to start the proposed follow-up: `check.py` should select `test_doc_snippets` and stylelint's snippet test when a reference changes. It missed the snippet that failed #179's CI.
+- Whether to start the proposed follow-up: `check.py` should select `test_doc_snippets` and stylelint's snippet test when a reference changes.
+- MJML or React Email (or both), and the dependency a real-tool test needs.
 
 ## Warnings
 
-- **This Windows machine refuses Playwright's unsigned Firefox build** ("Permission denied", probably Smart App Control). Firefox's tests skip locally and run on CI's Linux cells. Changing that is a system security setting: never touch it.
-- **`check.py` misses snippet tests** for a changed reference (see above). After editing a reference's code fence, run `test_doc_snippets` and `test_real_tools.StylelintConfig` yourself.
-- **2026-10-21's traps:**
-  - **A worktree under the scratchpad** puts five eval graders past Windows' 260-character path limit, so `test_evals` and `test_file_modes` error there (FileNotFoundError); everything else runs. Read those two errors as the path, not the change, or use a short worktree path.
-  - **A new script with a shebang** must be `git update-index --chmod=+x` on Windows: `test_file_modes` skips on a Windows checkout and failed every Linux and macOS cell of #192 until it was.
-  - **EUR-Lex refuses scripted fetches** (HTTP 202, empty body). Read a directive through the Publications Office: `https://publications.europa.eu/resource/celex/CELEX` with `Accept: text/html` and `Accept-Language: eng`.
-  - **Never chain a branch deletion after a merge a guard may stop.** `merge && …; push --delete` deleted the branch of a PR whose merge had refused (an open thread), which closed site PR #5; it was pushed back from its commit and reopened.
-  - **Codex reads legal text closely.** Its findings were scoping, every one right: the 30-day rule is for goods, PECR's exception leaves the UK GDPR, 3.3.8 is authentication not signup, FSMA is investment not ROI. Scope each rule as its source does before the PR.
-- **Never edit a file the suite reads while `check.py` runs.** It happened twice this session, so stop the run and start it again.
-- **Bash eats backslashes in heredocs**, twice this session. Use the Edit tool for any text with a backslash.
-- **The macOS Python 3.9 cell** failed once on `test_runtime_reach`'s vitals test (no LCP recorded): the known flake. A rerun passed.
-- **Still open from earlier:**
-  - the `VitalsUnderCsp` macOS flake, and `test_interact_at_clicks_while_the_page_hydrates`;
-  - `perf_audit.py` and an unbundled `@import` chain;
-  - three tokens outside Display P3;
-  - the default scaffold's `focus-rule-invisible` warnings.
+- **Refreshing caniemail:** `curl --ssl-no-revoke -o caniemail.json https://www.caniemail.com/api/data.json`, then `python -B tools/sync_caniemail.py --data caniemail.json`, and read the diff: a moved cell may need a note in §2's "The suite's notes" changed too. caniemail lists versions oldest first; the tool reads the last listed, never a numeric sort (Outlook for Mac's `16.80` follows `2016`).
+- **Keep each shipped file under 262,144 bytes** (`test_release_build`). CHANGELOG.md is about 125 KB now.
+- **This Windows machine refuses Playwright's unsigned Firefox build.** Firefox's tests skip locally and run on CI's Linux cells. Never touch the system security setting.
+- **`check.py` prints only the first failure** and misses snippet tests for a changed reference. For a whole-suite run, `python -B -m unittest discover -s tests > suite.txt 2>&1` in the background, then grep `^FAIL:`.
+- **Bash heredocs eat backslashes** (three times this session: a `\n` in an f-string, and `\b` in a regex that became a backspace byte, invisible to the Read tool; `od -c` showed it). Write any text with a backslash with the Write or Edit tool.
+- **2026-10-21's traps still hold:** a scratchpad worktree's path length; `git update-index --chmod=+x` for a new script with a shebang; EUR-Lex refuses scripted fetches; never chain a branch deletion after a merge a guard may stop; scope each legal rule as its source does.
+- **Never edit a file the suite reads while it runs.**
+- **Known flakes:** `test_tbt_stops_at_tti` (Windows), `VitalsUnderCsp` (macOS), `test_interact_at_clicks_while_the_page_hydrates`, the vitals timing tests. Check a failure touches nothing the PR changed before rerunning.
+- **Still open from earlier:** `perf_audit.py` and an unbundled `@import` chain; three tokens outside Display P3; the default scaffold's `focus-rule-invisible` warnings.
 - **Standing:** don't grep `tooling/`; the repository is public; `Vybecode-LTD/wds-gate-scratch` is the owner's to delete.
