@@ -1,0 +1,67 @@
+<!--
+  SOURCE TEMPLATE (MJML 5): the product announcement.
+  It reads theme.mjml, which export_email_theme.py writes from the email tokens
+  into the same folder. Compile it with includes allowed, then lint the HTML:
+  references/email-workflow.md section 11 has the commands.
+  No literal colour or size: every one comes from the theme's mj-attributes and
+  mj-class names. The spacing is Law 2's: an mj-spacer between blocks, never a
+  block's own padding. A section of another surface adds gutter, whose class
+  the phone rule reads: mj-class="sunken gutter".
+-->
+<mjml lang="en" dir="ltr">
+  <mj-head>
+    <mj-include path="./theme.mjml" />
+    <mj-title>The Ridgeline is back, in three new colours</mj-title>
+    <mj-preview>Back in stock, now in Ochre, Slate and Fern, with the ten-year repair promise.</mj-preview>
+  </mj-head>
+  <mj-body>
+    <mj-section mj-class="canvas gutter">
+      <mj-column>
+        <mj-image src="https://cdn.example.com/northbeam/logo-2x.png" width="132px" height="28px"
+                  alt="Northbeam" align="left" padding="0" />
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column>
+        <mj-text mj-class="label">Back in stock</mj-text>
+        <mj-spacer mj-class="gap-tight" />
+        <mj-text mj-class="h1">The Ridgeline is back</mj-text>
+        <mj-spacer mj-class="gap-grouped" />
+        <mj-text mj-class="lead">The pack you asked us to bring back, now in Ochre, Slate and Fern. Same frame, same
+          ten-year repair promise.</mj-text>
+        <mj-spacer mj-class="gap-separate" />
+        <mj-button href="https://example.com/ridgeline?utm_source=email" align="left">Shop the Ridgeline</mj-button>
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column>
+        <mj-text mj-class="h3">Built to be repaired</mj-text>
+        <mj-spacer mj-class="gap-tight" />
+        <mj-text>Every seam, buckle and zip can be replaced. Send it back and we fix it, for ten years.</mj-text>
+      </mj-column>
+      <mj-column>
+        <mj-text mj-class="h3">Three new colours</mj-text>
+        <mj-spacer mj-class="gap-tight" />
+        <mj-text>Ochre for the hills, Slate for the city, Fern for everywhere in between.</mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column>
+        <mj-divider />
+      </mj-column>
+    </mj-section>
+
+    <mj-section mj-class="sunken gutter">
+      <mj-column>
+        <mj-text mj-class="legal">Northbeam Ltd, 12 Harbour Street, Bristol BS1 4QA, United Kingdom</mj-text>
+        <mj-spacer mj-class="gap-tight" />
+        <mj-text mj-class="legal">You are getting this because you asked us to tell you when the Ridgeline came
+          back. <a href="https://example.com/preferences?e={{email_hash}}">Choose what we send you</a> or
+          <a href="{{unsubscribe_url}}">unsubscribe</a>.</mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

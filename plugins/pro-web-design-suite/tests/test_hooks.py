@@ -575,6 +575,11 @@ class TheRouter(HookTest):
                  "We need a documentation site for our design system": ["design-system-docs", "web-design-studio"],
                  "Does our pricing page look professional?": ["landing-page-conversion", "design-critique-gate"],
                  "Build the welcome HTML email": ["email-template-system"],
+                 # DL-B4: the frameworks the skill now writes a theme for, and Maizzle it routes away
+                 "Generate a React Email theme from our brand colours": ["email-template-system"],
+                 "Our welcome email is built with react-email": ["email-template-system"],
+                 "Add an mj-class for the footer": ["email-template-system"],
+                 "We moved our campaigns to Maizzle": ["email-template-system"],
                  "Our LCP is 4s, set a performance budget": ["perf-budget-gate"],
                  "Replace the hardcoded colors with tokens": ["design-token-migration"],
                  "Make admin screens from the Supabase schema": ["content-model-to-ui"],
@@ -617,6 +622,7 @@ class TheRouter(HookTest):
 
     def test_other_prompts_and_named_skills_hear_nothing(self):
         for prompt in ("Fix the login bug", "Rename the class in utils.ts",
+                       "Send a react email when the order ships",            # not the product (DL-B4)
                        "Add prop tables to our React library's README",     # library docs (Codex on #95)
                        "Can this login fix ship as a patch release?",       # a release with no tokens in it
                        # an API's token is not a design token (Codex on #97)

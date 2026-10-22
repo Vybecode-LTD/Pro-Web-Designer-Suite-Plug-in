@@ -13,6 +13,8 @@ Authoring, building, testing, sending. `email-architecture.md` is what to build;
 7. [The plain-text part](#7-the-plain-text-part)
 8. [ESP handoff](#8-esp-handoff)
 9. [The pre-send checklist](#9-the-pre-send-checklist)
+10. [The requests you will actually get, and the answer](#10-the-requests-you-will-actually-get-and-the-answer)
+11. [MJML, React Email and Maizzle](#11-mjml-react-email-and-maizzle)
 
 ---
 
@@ -303,3 +305,79 @@ Related: `references/email-client-matrix.md` (what breaks where), `references/em
 | "Can we use our brand font?" | No, not as the design. | build on the websafe stack, layer `@font-face` as decoration |
 | "Can it have a carousel / accordion / countdown?" | Interactive email. Works in Apple Mail, nowhere that matters. | a static frame that links to a page |
 | "Just make it one big image" | Invisible with images blocked, and a spam signature. | `email-workflow.md` §6 |
+| "We write our emails in MJML" (or React Email) | The tokens have to reach a compiler that is not this one. | `export_email_theme.py`, §11 |
+
+---
+
+## 11. MJML, React Email and Maizzle
+
+The token file stays the source of truth whatever compiles the email. A team that writes its templates in MJML or React Email gets the roles this skill's compiler resolves, written by a script from the same `email-tokens.json`, and none of them typed by hand:
+
+```bash
+python -m scripts.export_email_theme --format mjml --out emails/theme.mjml
+python -m scripts.export_email_theme --format react-email --out emails/theme.ts
+```
+
+`--tokens`, and `.design-suite.json`'s `emailTokens`, work as they do for the build. Run it again whenever the tokens change, and never edit what it writes. A role the token file lacks is left to the framework's default and named (`--strict` fails on it); a value that could end the markup or CSS it lands in is refused.
+
+### What each one holds
+
+| Roles | MJML: `theme.mjml` | React Email: `theme.ts` |
+|---|---|---|
+| the font stack | `mj-all` | every `text.*`, `styles.body`, `styles.button` |
+| canvas, surface, sunken | the `mj-body` and `mj-section` defaults; `mj-class` `canvas`, `surface`, `sunken` | `styles.body`, `styles.container`, `styles.surface`, `styles.sunken` |
+| the type roles | the `mj-text` default (body); `mj-class` `display`, `h1`, `h2`, `h3`, `lead`, `body`, `ui`, `label`, `legal` | `text.display` to `text.legal` |
+| text colours | `mj-class` `strong`, `muted`, `subtle`, `accent` | `styles.strong` to `styles.accent` |
+| the button and the rule | the `mj-button` and `mj-divider` defaults | `styles.button`, `styles.divider`, `styles.link` |
+| the gaps, Law 2's spacer rows | the `mj-spacer` default; `mj-class` `gap-tight` to `gap-section` | `spacers.gapTight` to `spacers.gapSection` |
+| insets | `mj-class` `pad-card`, `pad-well` | `styles.padCard`, `styles.padWell` |
+| the page gutter, and its phone width | the `mj-section` default; `mj-class` `gutter` | `styles.section`, and `classes.gutter` on each `Section` |
+| dark mode, the phone sizes | `<mj-style>` | `headCss` |
+| the Word engine's font | an `[if mso]` rule in `<mj-raw>` | `withMso()` |
+| every token | — | `tokens`, camel-cased (`--bg-canvas` is `tokens.bgCanvas`) |
+
+Each class has a `wds-` name (`wds-h1`, `wds-muted`, `wds-sunken`) that the dark-mode and phone rules select, the rules the HTML templates write by hand. Text and buttons have no padding of their own: the gap between two blocks is a spacer between them, as `email-architecture.md` §3 has it.
+
+### MJML
+
+Include the theme inside the template's `<mj-head>`; MJML merges its `mj-attributes` and `mj-class` names into the template's:
+
+```xml
+<mj-head>
+  <mj-include path="./theme.mjml" />
+  <mj-title>The Ridgeline is back</mj-title>
+</mj-head>
+```
+
+**MJML 5 ignores the include unless it is allowed.** Its documentation: "`mj-include` tags are silently ignored unless you opt in" (https://documentation.mjml.io/#mj-include, read 2026-10-22). On the command line that is `--config.allowIncludes true`; from Node, `await mjml2html(source, { ignoreIncludes: false, filePath })`, since `mjml2html` returns a promise in MJML 5. Without it the email still compiles, with MJML's defaults and none of the tokens: the command line warns that includes are disabled, `mjml2html` says nothing.
+
+```bash
+npx mjml emails/product-announcement.mjml --config.allowIncludes true -o build/product-announcement.html
+python -m scripts.lint_email build/product-announcement.html
+python -m scripts.build_email build/product-announcement.html --text-only --out build/product-announcement.txt
+```
+
+- **Classes.** Several `mj-class` names merge their classes (`mj-class="h1 muted"` is both, and the later rule wins), but an `mj-class`'s `css-class` replaces the tag's default, and a `css-class` written on the element replaces both. Write the theme's class beside your own: `css-class="wds-muted promo"`. The gap and inset classes carry none, so a section given `mj-class="pad-card"` keeps its classes. A section of another surface loses the default's `wds-gutter`, which the phone gutter reads: write `mj-class="sunken gutter"`.
+- **What MJML adds and what it does not.** It writes the `PixelsPerInch` block and `role="presentation"`; the theme adds the `[if mso]` font rule. Set `lang` and `dir` on `<mjml>`, and a `<mj-title>` and `<mj-preview>` in the head.
+- The starter is `assets/templates/mjml/product-announcement.mjml`: copy it beside `theme.mjml`.
+
+### React Email
+
+```tsx
+import { classes, headCss, spacers, styles, text, withMso } from './theme';
+// <Head><style>{headCss}</style></Head>
+// <Text className={classes.h1} style={text.h1}>The Ridgeline is back</Text>
+const html = withMso(await render(<ProductAnnouncement />));
+```
+
+- **The class beside the style.** `style` sets the light colours; the class is what `headCss`'s dark and phone rules select. An element with one and not the other is wrong in one scheme. Each `Section` takes `classes.gutter` and the `Container` only `classes.surface`, so the phone gutter is set once.
+- **`withMso()`.** React renders no comment, so it cannot write the Word engine's `[if mso]` block; `withMso()` adds the namespaces and the block `build_email.py` adds, once. A provider that renders the component itself never calls it: render the email, then send the HTML string.
+- **`<Preview useTitleTag={false}>`.** React Email 6's `Preview` writes a `<title>` of the preview text unless told not to (`useTitleTag = true`, in react-email 6.11.3's source), and the email then has two titles.
+- **The text part.** `toPlainText(html)`, from `react-email`: it leaves out the preview, whose padding characters `build_email.py --text-only` would keep.
+- **TypeScript** by default, with `as const` so a weight or a `text-transform` keeps its literal type; an `--out` ending in `.js` or `.mjs` writes JavaScript.
+- The starter is `assets/templates/react-email/product-announcement.tsx`: copy it beside `theme.ts`. Render it to a file and lint that file.
+- **Not the site's linters.** `audit_design.py` leaves a file that imports `react-email` to `lint_email.py`, as it leaves HTML email, and the theme too, which is marked `@generated`. ESLint reads what its config names: give the design config's block `ignores: ['emails/**']`, or wherever the templates live.
+
+### Maizzle, and any other compiler
+
+This skill writes no Maizzle configuration: Maizzle reads its theme from a Tailwind config, so map its colours, sizes and spacing to the roles in `email-tokens.json` by hand, by the table above. Whatever compiles the email, `lint_email.py` reads the HTML it writes, not the tool that wrote it: lint every build, and the gate holds.

@@ -77,7 +77,8 @@ const ROUTES = [
    [/\b(?:WCAG|axe-core|a11y|screen[- ]?readers?)\b/i, /\baccessib\w* (?:audit|check|test|review)/i]],
   ['figma-variables-sync', 'Figma variables and tokens', [/\bfigma\b[^.?!]*\b(?:variables?|tokens?|styles?)\b/i,
                                                           /\btokens studio\b/i]],   // R3.6's live check
-  ['email-template-system', 'HTML email', [/\b(?:html e-?mails?|e-?mail templates?|newsletters?|MJML)\b/i]],
+  ['email-template-system', 'HTML email', [/\b(?:html e-?mails?|e-?mail templates?|newsletters?|MJML|Maizzle|mj-[a-z]+)\b/i,
+                                           /\b(?:React Email|react-email)\b/]],   // the product's name, not "a React email" (DL-B4)
   ['perf-budget-gate', 'performance budgets', [/\b(?:core web vitals|performance budgets?|page ?speed)\b/i,
                                                 /\b(?:LCP|INP|CLS|TTFB)\b/, about(PAGE_SPEED, /\blighthouse\b/i)]],
   ['design-token-migration', 'migrating a codebase onto tokens',
