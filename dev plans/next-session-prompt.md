@@ -557,13 +557,15 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
 ## 3. First: the state of `main`
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, read the failing test first: a known flake (`docs/HANDOFF.md`'s Warnings) that touches nothing recent is rerun with `gh run rerun RUN --failed`; anything else is fixed in a PR of its own. Then:
-- No PR should be open (`gh pr list --state open`); the docs PR, #199, merges at the end of the session that wrote this.
+- No PR should be open (`gh pr list --state open`); the last PR of the session that wrote this, #200, merges at its end.
 - Remove any worktree left in a scratchpad (`git worktree list`). The newest `wait_pr.sh` is in `57634616-…`'s scratchpad (the same script as `47067940-…`'s).
 - Then read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
 
 ## 4. R4, the 4.0.0 release
 
-Phase 6b is done: P41 part 3 (#198, DL-B4) was its last item, and the plan's checker reports nothing open. 4.0.0 holds Phases 6a's follow-ups, 6b and 6c and the rename.
+Phase 6b is done: P41 part 3 (#198, DL-B4) was its last item, and the plan's checker reports nothing open.
+
+**The owner's choices (2026-10-22):** the live check runs **the full list below** (about 15 headless sessions, about $8 to $10; ask once with the session list and the cap before the first), and **the evals are approved** on the release PR's merge (`tag=all`, about $11). **The free checks are done** (`web-design-suite-4.0.0-live-check.md`): the tree builds (229 files), and the rename path was run with Claude Code 2.1.308 in a throwaway `CLAUDE_CONFIG_DIR`. It found that an existing install must reinstall as `pro-web-design-suite@web-design-suite` (fixed in #200). The paid check still has to show what a session start does with the renamed plugin. Install the CLI the same way if the desktop app's bundled one is not at its path: `npm install @anthropic-ai/claude-code@VERSION` in the scratchpad. 4.0.0 holds Phases 6a's follow-ups, 6b and 6c and the rename.
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|

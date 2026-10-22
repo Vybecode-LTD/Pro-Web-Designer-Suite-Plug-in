@@ -582,6 +582,18 @@ class PasteableCommands(unittest.TestCase):
                       "/plugin install pro-web-design-suite@pro-web-design-suite", install)
         self.assertNotIn("path/to/", install)
 
+    def test_an_existing_install_reinstalls_under_its_own_marketplace(self):
+        """R4's free check, with Claude Code 2.1.308: after the marketplace's
+        update, `renames` moves the enabled plugin to the new name under the
+        marketplace's old one, and the install is gone. The note told an
+        existing install to run `@pro-web-design-suite`, a marketplace it does
+        not have ("not found in marketplace")."""
+        changelog = (PLUGIN / "CHANGELOG.md").read_text(encoding="utf-8")
+        renamed = changelog.split("### Renamed", 1)[1].split("\n### ", 1)[0]
+        upgrade = renamed.split("**Install from the distribution repository**", 1)[0]
+        self.assertIn("/plugin install pro-web-design-suite@web-design-suite", upgrade)
+        self.assertNotIn("/plugin install pro-web-design-suite@pro-web-design-suite", upgrade)
+
     def test_no_doc_runs_python3_or_writes_to_tmp(self):
         """python3 is the Microsoft Store placeholder on many Windows machines,
         and /tmp is not a Windows folder. Fences tagged as shell are read;
