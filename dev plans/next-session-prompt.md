@@ -1,14 +1,14 @@
 # Start here: the next session
 
-**Written 2026-10-22**, at the end of the session that did **P41's parts 1 and 2**:
-- **#195, P41 part 1 (DL-C9)**, merged as `72047fa`: `tools/sync_caniemail.py` writes email-client-matrix.md §2 and `lint_email.py`'s client lists from caniemail's data, pinned in `tests/fixtures/caniemail.json`. CHANGELOG.md's 3.4.0 and earlier moved to `CHANGELOG-earlier.md` (the directory's 256 KiB file hold).
-- **#196, P41 part 2 (DL-B5)**, merged as `fd0f7a9`: `product-announcement-rtl.html`, email-architecture.md §11, and `lint_email.py`'s `direction` and `vml` checks.
+**Written 2026-10-22**, at the end of the second session that day, which did **P41 part 3**:
+- **#198, P41 part 3 (DL-B4)**, merged as `3184a09`: `email-template-system/scripts/export_email_theme.py` writes the email tokens as an MJML head to `mj-include` or a React Email theme module with `withMso()`, with a starter for each (`assets/templates/mjml/`, `react-email/`) that compiles to HTML `lint_email.py --strict` passes; email-workflow.md §11. `tooling/main` gained `mjml` 5.4.1, `react` and `react-dom` 19.3.1 and `react-email` 6.11.3.
 
-Earlier: P35, P56, P57, P42 and P43 are done (#179 to #194); the plugin was renamed Pro Web Design Suite (#180 to #182). `docs/HANDOFF.md` has the owner's distribution steps and this session's warnings.
+That closes Phase 6b: `check_execution_plan.py` reports 0 open items. P41 parts 1 and 2 were #195 and #196, earlier the same day.
+Earlier: P35, P56, P57, P42, P43 and P41 are done (#179 to #198); the plugin was renamed Pro Web Design Suite (#180 to #182). `docs/HANDOFF.md` has the owner's distribution steps and this session's warnings.
 
-**Next: P41 part 3 (DL-B4), the last item before R4** (§4).
+**Next: R4, the 4.0.0 release** (§4). It is the whole session.
 
-Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **the rest of Phase 6b in the owner's order** (§4), then R4.
+Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **R4, the 4.0.0 release** (§4).
 
 You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills for designing and building websites that stay coherent under several developers.
 - **Repository:** `C:\DEV\Pro-Web-Designer-Suite-Plug-in`. It is public on GitHub as `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, under MIT.
@@ -273,6 +273,11 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
       - **Every form the engine reads:** `[if gte mso 9]` and `[if (gte mso 9)|(IE)]` are the Word engine's, `[if !mso]` is not; `dir='rtl'` and `dir=rtl` are HTML's. A check over parsed elements misses a conditional comment's markup, which classic Outlook renders. And a direction has islands: an English address marked `dir="ltr"` inside Arabic copy rightly aligns left.
       - **A doc names what the tool emits** (`vml`, not `vml-width`; `--ignore` matches exactly), and **a message agrees with the data beside it** ("no client resolves custom properties" above a list showing three that do).
       - **A test that pins a register entry's docs** breaks when another doc quotes the figure: assert membership.
+    - **The second 2026-10-22 session's reviews found 3 real issues on #198** (Codex 2, CodeRabbit 1, which was Codex's gutter finding too), each fixed with a test failing on the head it reviewed; `check.py` found a fourth before review:
+      - **A structural rule needs a class of its own, never a colour role's:** the phone gutter selected the surface class, so a section of another surface lost it, and a container that shared the class doubled it. MJML replaces a tag's `css-class` with an `mj-class`'s and merges only `mj-class` names'.
+      - **Detect a dependency by its declaration**, read with the comments blanked: a commented-out or quoted `react-email` import skipped a component's audit.
+      - **Run your own new starters through every gate the repository runs:** the design audit failed the React Email starter (L4), and would have failed a project's generated theme (L1) without the `@generated` marker it already honours.
+      - **Declined, and withdrawn by CodeRabbit:** registering an API's behaviour in `evidence.json` (it holds figures; a behaviour is quoted with its URL), and putting a file-selection rule into `design-rules.json` and ESLint (the spec governs constructs; ESLint's files are the project's `ignores`).
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -325,7 +330,7 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
    cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && git worktree list
    ```
    - Check out `main` and pull. Remove any worktree left in the scratchpad (`git worktree remove PATH`, then `git branch -d` its merged branch).
-5. `python -B "dev plans/check_execution_plan.py"` must say `11 open items, 11 scheduled`.
+5. `python -B "dev plans/check_execution_plan.py"` must say `0 open items, 0 scheduled`.
 6. Tell the user, in a few lines: the state, what this session does, and the budget.
 
 ## 2. Useful facts
@@ -547,27 +552,28 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
 
 - **The runtime gate's checks (P35).** `ALL_CHECKS` holds 12; `EVERY_ENGINE` the three that run outside Chromium (axe, names, taborder). `OVERFLOW_FN` and `clipFindings()` serve `reflow` and `spacing`; `OBSCURED_FN` (`stackAt`, `paints`, `clear`), `TRIGGERS_FN`, `TIP_FN`, `TIP_COVERS_FN`, `MOTION_LOG` (an init script, only in the motion contexts), `EXERCISE_FN` and `motionFindings()`. `newPage(forced, motion)` opens a motion context without the freeze. `launchEngine()` and `ENGINES` are in `shared/browser_common.mjs` (five byte-identical copies). Playwright 1.63's builds: Firefox 1543, WebKit 2359. The tests are `test_runtime_wcag_checks` (36) and `test_runtime_engines`.
 
+- **The email frameworks (#198).** `export_email_theme.py --format mjml|react-email`, through `build_email.load_tokens`. Its tables: `TYPE_ROLES`, `COLOURS`, `SURFACES`, `GAPS`, `INSETS`, the dark map, `MOBILE_TYPE`; `css_rules(theme, select)` builds the dark and phone rules with each format's selector (`mjml_select`, `react_select`). `Theme.get` refuses an unsafe value (`UNSAFE`) and records a missing role. `withMso()` carries `build_email.MSO_HEAD_BLOCK`. `lint_email.sized_text()` measures the text an element sizes itself; `check_contrast` skips a preheader. `audit_design.REACT_EMAIL_IMPORT` and `SKIP_REACT_EMAIL`. `tests/test_email_frameworks.py` compiles with MJML, transpiles with TypeScript and renders with React Email (CJS runners through `NODE_PATH`), and probes the dark, phone and gutter rules in Chromium.
+
 ## 3. First: the state of `main`
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, read the failing test first: a known flake (`docs/HANDOFF.md`'s Warnings) that touches nothing recent is rerun with `gh run rerun RUN --failed`; anything else is fixed in a PR of its own. Then:
-- No PR should be open (`gh pr list --state open`); the docs PR, #197, merges at the end of the session that wrote this.
-- Remove any worktree left in a scratchpad (`git worktree list`). The newest `wait_pr.sh` is in `47067940-…\scratchpad`.
+- No PR should be open (`gh pr list --state open`); the docs PR, #199, merges at the end of the session that wrote this.
+- Remove any worktree left in a scratchpad (`git worktree list`). The newest `wait_pr.sh` is in `57634616-…`'s scratchpad (the same script as `47067940-…`'s).
 - Then read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
 
-## 4. The rest of Phase 6b, then 4.0.0
+## 4. R4, the 4.0.0 release
 
-Phase 6b is done but for P41's part 3. **The owner chose the order on 2026-10-21: P42, P43, then P41**; P41's parts 1 (#195, DL-C9) and 2 (#196, DL-B5) are merged. Read DL-B4 in `dev plans/web-design-suite-review/delivery.md` before planning.
+Phase 6b is done: P41 part 3 (#198, DL-B4) was its last item, and the plan's checker reports nothing open. 4.0.0 holds Phases 6a's follow-ups, 6b and 6c and the rename.
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P41 | Part 3: MJML or React Email output (DL-B4). The router already sends "MJML" to the skill (`hooks/design_hooks.mjs:80`), which says nothing about it. Generate `mj-attributes`/`mj-class` (an `<mj-head>` for `mj-include`) or a React Email theme from `email-tokens.json`, through `build_email.py`'s token reader so `.design-suite.json`'s `emailTokens` holds; or route away explicitly. Each output passes `lint_email.py` once compiled. **Ask the owner first** whether a real-tool test may add `mjml` (or `react`, `react-dom` and `@react-email/render`) to `tooling/main`: a new pinned dependency, in `docs/TESTING.md` and `CLAUDE.md`'s Stack. Re-read MJML's `mj-include` and `mj-attributes` docs on the day. | DL-B4 | email-template-system | M |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
 Every outside figure, as in P42 and in P43's regulated claims (a law's date, a fine's ceiling), is re-read at its source on the day and registered in `tests/fixtures/evidence.json` with its quote. A legal point is flagged for review, never stated as advice.
 
 **Each PR:** fail before on `v3.6.0` (`fail_before.py`), and a review fix fails on the head it reviewed; `check.py` with `WDS_NODE_MODULES` (and `WDS_TAILWIND_MODULES` for `test_tw_probe`), both at `tooling/main/node_modules`; the CHANGELOG under 4.0.0; a done row `Pnn part N, #N` above the item's row, which goes when the item is done; a note in the completion plan. `test_static_checks` holds every new script and test to its five rules.
 
-**R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. The rename (#180) changes the install path: read its PR, and check the `renames` entry moves an existing install. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed, the migration's reconciliation on a real codebase (P52), the router (#143), the MCP server's containment (#155), P55's gates, P34's options on a real client-rendered app and a real signed-in page, a real web-component library, a site's sitemap through `--urls` at two viewports, P37's stacks, the scaffold's Vue and Svelte output in a real Vite and a real SvelteKit project, **P35's checks on a real site** (a sticky header, a cookie banner, tooltips, reduced motion; `--engine webkit` and, on Linux or macOS, `--engine firefox`), and **the routing evals on the renamed plugin**.
+**R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. The rename (#180) changes the install path: read its PR, and check the `renames` entry moves an existing install. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed, the migration's reconciliation on a real codebase (P52), the router (#143), the MCP server's containment (#155), P55's gates, P34's options on a real client-rendered app and a real signed-in page, a real web-component library, a site's sitemap through `--urls` at two viewports, P37's stacks, the scaffold's Vue and Svelte output in a real Vite and a real SvelteKit project, **P35's checks on a real site** (a sticky header, a cookie banner, tooltips, reduced motion; `--engine webkit` and, on Linux or macOS, `--engine firefox`), **the email skill's MJML and React Email themes** in a real MJML project and a real React Email project, from `npm install` to a send through a provider (#198), and **the routing evals on the renamed plugin**.
 
 Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
 
