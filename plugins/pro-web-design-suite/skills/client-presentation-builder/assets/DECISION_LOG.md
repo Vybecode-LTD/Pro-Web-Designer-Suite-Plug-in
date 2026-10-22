@@ -123,6 +123,11 @@ honest coin-flips is a far stronger position than eight decisions with
 manufactured reasons, because the second kind collapses the moment one of them
 is questioned properly.
 
+**Coming from a landing page?** landing-page-conversion's `brief_to_log.py` writes
+the positioning and the claim from its `MESSAGE_BRIEF.md` in here as decisions, and
+the brief's assumptions as open questions:
+`python -m scripts.brief_to_log MESSAGE_BRIEF.md --into DECISION_LOG.md`.
+
 ---
 
 ## Since last time

@@ -18,7 +18,9 @@
 
 **P43 part 2 is done (#193):** the page types beyond software (B2B demo, lead magnet, booking, donation, paid search), regulated claims and localised pages flagged, and the routing between the persuasion skills (PS-B4, PS-B6).
 
-**Next: P43 part 3 (MESSAGE_BRIEF to DECISION_LOG, PS-C12), then P41: the owner's order (2026-10-21). Both come before R4** (§4).
+**P43 is done (#192 to #194):** part 3 is `brief_to_log.py`, the message brief into the deck's decision log (PS-C12).
+
+**Next: P41 (email), the last item before R4** (§4).
 
 Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **the rest of Phase 6b in the owner's order** (§4), then R4.
 

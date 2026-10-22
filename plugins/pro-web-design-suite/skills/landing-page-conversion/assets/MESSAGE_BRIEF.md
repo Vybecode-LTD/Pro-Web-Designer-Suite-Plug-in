@@ -141,6 +141,8 @@ The page's section order is derived from this table. Every objection gets a sect
 2.
 3.
 
+**Into the review.** When the brief is done, carry it into the deck's decision log, client-presentation-builder's `DECISION_LOG.md`: `python -m scripts.brief_to_log MESSAGE_BRIEF.md --into DECISION_LOG.md`. §1 and §3 become decisions, §6 and every UNKNOWN open questions, and what this brief does not record is left as a placeholder to fill before the meeting.
+
 ---
 ---
 

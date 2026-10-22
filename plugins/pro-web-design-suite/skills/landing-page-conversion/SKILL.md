@@ -16,7 +16,7 @@ description: Write and structure landing, pricing and product pages, from positi
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (lint_claims.py).
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (lint_claims.py, brief_to_log.py).
 > From sibling skills: `${CLAUDE_PLUGIN_ROOT}/skills/web-design-studio/scripts/audit_design.py`.
 
 The sibling skill `web-design-studio` owns **form**: tokens, spacing, architecture, navigation, the audit gate. It says nothing about what a page should *say* or in what order; this skill is that half.
@@ -99,7 +99,7 @@ Two things worth refusing early, politely. A request to write a hero when nobody
 
 ## What this skill produces
 
-Unless told otherwise, finish with: the filled-in `MESSAGE_BRIEF.md`, the ordered section architecture with a one-line justification per section, the full page copy block by block, the markup in layout primitives, `page-sections.css` adapted to the project, and the audit results with fixes ranked by expected effect over effort. State every assumption you had to make about the audience at the top, because those are the assumptions a real test would attack first.
+Unless told otherwise, finish with: the filled-in `MESSAGE_BRIEF.md`, the ordered section architecture with a one-line justification per section, the full page copy block by block, the markup in layout primitives, `page-sections.css` adapted to the project, and the audit results with fixes ranked by expected effect over effort. State every assumption you had to make about the audience at the top, because those are the assumptions a real test would attack first. For the review, carry the brief into the deck's decision log: `python -m scripts.brief_to_log MESSAGE_BRIEF.md --into DECISION_LOG.md`.
 
 ---
 

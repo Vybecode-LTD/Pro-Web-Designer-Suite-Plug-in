@@ -54,6 +54,8 @@ CASES = {
                                       ["DECISION_LOG.md", "--tokens", "styles/tokens.css", "--emit-css", "styles"]),
     "critique_report": ("design-critique-gate", "critique_report.py", {"findings.json": "[]"},
                         ["findings.json", "-o", "findings.json"]),
+    "brief_to_log --into": ("landing-page-conversion", "brief_to_log.py", {"MESSAGE_BRIEF.md": "# A brief\n"},
+                            ["MESSAGE_BRIEF.md", "--into", "MESSAGE_BRIEF.md"]),
     "extract_system": ("design-system-docs", "extract_system.py", {"tokens.css": STARTER},
                        ["tokens.css", "--out", "tokens.css"]),
     "extract_literals": ("design-token-migration", "extract_literals.py", {"a.css": ".a { margin: 13px; }\n"},
@@ -211,6 +213,7 @@ class TheGuardIsShared(TempDirTest):
 
     def test_the_verbatim_copies_are_the_masters(self):
         for path in (SKILLS / "design-critique-gate" / "scripts" / "critique_report.py",
+                     SKILLS / "landing-page-conversion" / "scripts" / "brief_to_log.py",
                      SKILLS / "component-state-matrix" / "scripts" / "generate_matrix.py"):
             with self.subTest(script=path.name):
                 self.assertIn(self.master(), path.read_text(encoding="utf-8"))
