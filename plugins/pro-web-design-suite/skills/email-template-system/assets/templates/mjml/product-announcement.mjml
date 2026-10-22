@@ -5,7 +5,8 @@
   references/email-workflow.md section 11 has the commands.
   No literal colour or size: every one comes from the theme's mj-attributes and
   mj-class names. The spacing is Law 2's: an mj-spacer between blocks, never a
-  block's own padding.
+  block's own padding. A section of another surface adds gutter, whose class
+  the phone rule reads: mj-class="sunken gutter".
 -->
 <mjml lang="en" dir="ltr">
   <mj-head>
@@ -14,7 +15,7 @@
     <mj-preview>Back in stock, now in Ochre, Slate and Fern, with the ten-year repair promise.</mj-preview>
   </mj-head>
   <mj-body>
-    <mj-section mj-class="canvas">
+    <mj-section mj-class="canvas gutter">
       <mj-column>
         <mj-image src="https://cdn.example.com/northbeam/logo-2x.png" width="132px" height="28px"
                   alt="Northbeam" align="left" padding="0" />
@@ -53,7 +54,7 @@
       </mj-column>
     </mj-section>
 
-    <mj-section mj-class="sunken">
+    <mj-section mj-class="sunken gutter">
       <mj-column>
         <mj-text mj-class="legal">Northbeam Ltd, 12 Harbour Street, Bristol BS1 4QA, United Kingdom</mj-text>
         <mj-spacer mj-class="gap-tight" />

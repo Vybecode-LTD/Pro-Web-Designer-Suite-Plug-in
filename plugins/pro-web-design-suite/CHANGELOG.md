@@ -54,7 +54,8 @@ renames the plugin.
 
   Every class has a `wds-` name that the dark-mode and phone rules select. The gap and inset
   classes carry none, since MJML replaces a tag's `css-class` with an `mj-class`'s and a section
-  would lose its dark rule. A role the tokens lack is named (`--strict` fails on it), and a value
+  would lose its dark rule; the phone gutter has a class of its own, `gutter`, which a section of
+  another surface adds (`mj-class="sunken gutter"`), and a browser test measures it. A role the tokens lack is named (`--strict` fails on it), and a value
   that could end its attribute, declaration or comment is refused. Two starters,
   `assets/templates/mjml/product-announcement.mjml` and
   `assets/templates/react-email/product-announcement.tsx`, compile with MJML 5.4 and render with
@@ -405,7 +406,10 @@ renames the plugin.
   read as text at 0px: the type check now measures the text an element sizes itself, not the
   text of a child that sets its own size. And `audit_design.py`, which leaves HTML email to
   `lint_email.py`, now leaves a React Email template too (a file that imports `react-email` or
-  `@react-email/*`): it failed the starter's inline image size under L4, in the gate hook as well.
+  `@react-email/*`; a declaration, not a comment or a string): it failed the starter's inline image
+  size under L4, in the gate hook as well. The generated theme is marked `@generated`, which the
+  audit already leaves alone; email-workflow.md §11 says to keep `emails/` out of ESLint's design
+  config, whose files are the project's `ignores`.
 - **The email client matrix and the linter's client lists are caniemail's data** (DL-C9, P41
   part 1). A15 corrected the matrix from caniemail's pages by hand in 3.2.0, and the copies drifted
   again: against caniemail's data of 2026-09-16, some 60 cells differed from its latest results

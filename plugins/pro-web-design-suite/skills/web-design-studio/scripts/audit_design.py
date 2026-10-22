@@ -485,9 +485,12 @@ TAG_STYLE_ATTR = re.compile(r"""<[a-zA-Z][\w:-]*\b[^>]*?\sstyle\s*=\s*(["'])(.*?
 # not fit it; email-template-system's lint_email is its gate.
 EMAIL_MARKERS = ("<!--[if mso", "<!--[if gte mso", "urn:schemas-microsoft-com")
 # A React Email template is email too: its inline styles are the medium's,
-# and lint_email reads the HTML it renders (DL-B4).
+# and lint_email reads the HTML it renders (DL-B4). Only a declaration counts,
+# read with the comments blanked: a commented-out import, or one quoted in a
+# string, leaves a component audited (Codex on #198).
 REACT_EMAIL_IMPORT = re.compile(
-    r"""(?:\bfrom\s*|\brequire\s*\(\s*|\bimport\s*\(\s*)["'](?:react-email|@react-email/[\w.-]+)["']""")
+    r"""^[ \t]*(?:(?:import|export)\b[^;'"`]*?\bfrom\s*|import\s*|(?:const|let|var)\b[^;=]*=\s*require\s*\(\s*)"""
+    r"""["'](?:react-email|@react-email/[\w.-]+)["']""", re.M)
 # Commented-out markup never renders: the census blanks it too (template_of).
 HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
 
@@ -2729,7 +2732,7 @@ def audit_run(paths: list[str]) -> tuple[list[Finding], int, list[tuple[Path, st
         if kind == "template" and is_html_email(text):
             skipped.append((fp, SKIP_EMAIL))
             continue
-        if kind != "css" and REACT_EMAIL_IMPORT.search(text):
+        if kind == "js" and REACT_EMAIL_IMPORT.search(strip_js_comments(text)):
             skipped.append((fp, SKIP_REACT_EMAIL))
             continue
         audited += 1

@@ -331,6 +331,7 @@ python -m scripts.export_email_theme --format react-email --out emails/theme.ts
 | the button and the rule | the `mj-button` and `mj-divider` defaults | `styles.button`, `styles.divider`, `styles.link` |
 | the gaps, Law 2's spacer rows | the `mj-spacer` default; `mj-class` `gap-tight` to `gap-section` | `spacers.gapTight` to `spacers.gapSection` |
 | insets | `mj-class` `pad-card`, `pad-well` | `styles.padCard`, `styles.padWell` |
+| the page gutter, and its phone width | the `mj-section` default; `mj-class` `gutter` | `styles.section`, and `classes.gutter` on each `Section` |
 | dark mode, the phone sizes | `<mj-style>` | `headCss` |
 | the Word engine's font | an `[if mso]` rule in `<mj-raw>` | `withMso()` |
 | every token | — | `tokens`, camel-cased (`--bg-canvas` is `tokens.bgCanvas`) |
@@ -356,7 +357,7 @@ python -m scripts.lint_email build/product-announcement.html
 python -m scripts.build_email build/product-announcement.html --text-only --out build/product-announcement.txt
 ```
 
-- **Classes.** Several `mj-class` names merge their classes (`mj-class="h1 muted"` is both, and the later rule wins), but an `mj-class`'s `css-class` replaces the tag's default, and a `css-class` written on the element replaces both. Write the theme's class beside your own: `css-class="wds-muted promo"`. The gap and inset classes carry none, so a section given `mj-class="pad-card"` keeps `wds-surface`.
+- **Classes.** Several `mj-class` names merge their classes (`mj-class="h1 muted"` is both, and the later rule wins), but an `mj-class`'s `css-class` replaces the tag's default, and a `css-class` written on the element replaces both. Write the theme's class beside your own: `css-class="wds-muted promo"`. The gap and inset classes carry none, so a section given `mj-class="pad-card"` keeps its classes. A section of another surface loses the default's `wds-gutter`, which the phone gutter reads: write `mj-class="sunken gutter"`.
 - **What MJML adds and what it does not.** It writes the `PixelsPerInch` block and `role="presentation"`; the theme adds the `[if mso]` font rule. Set `lang` and `dir` on `<mjml>`, and a `<mj-title>` and `<mj-preview>` in the head.
 - The starter is `assets/templates/mjml/product-announcement.mjml`: copy it beside `theme.mjml`.
 
@@ -369,12 +370,13 @@ import { classes, headCss, spacers, styles, text, withMso } from './theme';
 const html = withMso(await render(<ProductAnnouncement />));
 ```
 
-- **The class beside the style.** `style` sets the light colours; the class is what `headCss`'s dark and phone rules select. An element with one and not the other is wrong in one scheme.
+- **The class beside the style.** `style` sets the light colours; the class is what `headCss`'s dark and phone rules select. An element with one and not the other is wrong in one scheme. Each `Section` takes `classes.gutter` and the `Container` only `classes.surface`, so the phone gutter is set once.
 - **`withMso()`.** React renders no comment, so it cannot write the Word engine's `[if mso]` block; `withMso()` adds the namespaces and the block `build_email.py` adds, once. A provider that renders the component itself never calls it: render the email, then send the HTML string.
 - **`<Preview useTitleTag={false}>`.** React Email 6's `Preview` writes a `<title>` of the preview text unless told not to (`useTitleTag = true`, in react-email 6.11.3's source), and the email then has two titles.
 - **The text part.** `toPlainText(html)`, from `react-email`: it leaves out the preview, whose padding characters `build_email.py --text-only` would keep.
 - **TypeScript** by default, with `as const` so a weight or a `text-transform` keeps its literal type; an `--out` ending in `.js` or `.mjs` writes JavaScript.
 - The starter is `assets/templates/react-email/product-announcement.tsx`: copy it beside `theme.ts`. Render it to a file and lint that file.
+- **Not the site's linters.** `audit_design.py` leaves a file that imports `react-email` to `lint_email.py`, as it leaves HTML email, and the theme too, which is marked `@generated`. ESLint reads what its config names: give the design config's block `ignores: ['emails/**']`, or wherever the templates live.
 
 ### Maizzle, and any other compiler
 

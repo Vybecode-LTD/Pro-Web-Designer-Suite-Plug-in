@@ -93,7 +93,7 @@ const { chromium } = require('playwright');
       if (c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') bg = c;
     }
     const cs = getComputedStyle(el);
-    return [name, { color: cs.color, bg, size: cs.fontSize }];
+    return [name, { color: cs.color, bg, size: cs.fontSize, left: Math.round(el.getBoundingClientRect().left) }];
   }));
   const out = {};
   for (const [label, scheme, width] of [['light', 'light', 800], ['dark', 'dark', 800], ['phone', 'light', 375]]) {
@@ -115,6 +115,10 @@ PROBES = {"h1": "The Ridgeline is back", "legal": "Northbeam Ltd, 12 Harbour Str
 def rgb(hex_colour: str) -> str:
     h = hex_colour.lstrip("#")
     return "rgb(%d, %d, %d)" % (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+
+def px(value: str) -> int:
+    return int(value.removesuffix("px")) if hasattr(value, "removesuffix") else int(value[:-2])
 
 
 def tokens() -> dict[str, str]:
@@ -179,9 +183,11 @@ class TheMjmlHead(Export):
         for name in ("gap-tight", "gap-section", "pad-card", "pad-well"):
             with self.subTest(name=name):
                 self.assertIsNone(classes[name].get("css-class"))
-        for name in ("h1", "muted", "sunken"):
+        for name in ("h1", "muted", "sunken", "gutter"):
             with self.subTest(name=name):
                 self.assertEqual("wds-" + name, classes[name].get("css-class"))
+        section = self.mjml().find("mj-head/mj-attributes/mj-section")
+        self.assertEqual("wds-surface wds-gutter", section.get("css-class"))
 
     def test_the_style_carries_dark_mode_and_the_phone_rules(self):
         t = tokens()
@@ -256,7 +262,8 @@ class TheReactTheme(Export):
         self.assertEqual("wds-h1", self.json_export(text, "classes")["h1"])
         css = self.json_export(text, "headCss")
         self.assertIn(".wds-h1, .wds-h2", css)
-        self.assertIn(".wds-surface > tbody > tr > td", css)
+        self.assertIn(".wds-gutter > tbody > tr > td", css)
+        self.assertNotIn(".wds-surface >", css)
 
     def test_two_tokens_with_one_javascript_name_are_refused(self):
         self.tokens_file(bgCanvas="#000000")
@@ -315,11 +322,26 @@ class TheAuditLeavesAReactEmailTemplate(TempDirTest):
         self.assertEqual(0, proc.returncode, output(proc))
         self.assertIn("React Email: render it, then lint the HTML", output(proc))
 
+    def test_the_generated_theme_is_left_alone(self):
+        theme = self.tmp / "emails" / "theme.ts"
+        proc = run_py("email-template-system", "export_email_theme", "--format", "react-email", "--out", theme,
+                      cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        proc = run_py("web-design-studio", "audit_design", theme, "--strict", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))      # 93 L1 warnings, which --strict fails, on 9e7e61f
+
     def test_a_component_of_another_library_is_still_audited(self):
-        text = REACT_STARTER.read_bytes().decode("utf-8").replace("from 'react-email'", "from '@acme/ui'")
-        proc = self.audit(text)
-        self.assertEqual(1, proc.returncode, output(proc))
-        self.assertIn("L4", output(proc))
+        starter = REACT_STARTER.read_bytes().decode("utf-8")
+        other = starter.replace("from 'react-email'", "from '@acme/ui'")
+        # An import commented out, or quoted in a string, is no dependency (Codex on #198).
+        cases = {"another library": other,
+                 "a commented import": other + "\n// import { Text } from 'react-email';\n",
+                 "a quoted import": other + "\nconst sample = \"import { Text } from 'react-email'\";\n"}
+        for case, text in cases.items():
+            with self.subTest(case=case):
+                proc = self.audit(text)
+                self.assertEqual(1, proc.returncode, output(proc))
+                self.assertIn("L4", output(proc))
 
 
 class Compiled(TempDirTest):
@@ -367,6 +389,13 @@ class Compiled(TempDirTest):
                          (dark["button"]["color"], dark["button"]["bg"]))
         self.assertEqual((t["--type-h1-size"], t["--email-h1-size-mobile"]),
                          (seen["light"]["h1"]["size"], seen["phone"]["h1"]["size"]))
+        # The gutter, once, on every section whatever its surface (Codex on #198):
+        # centred in 800px on a desktop, the phone's gutter on a 375px screen.
+        desktop = (800 - px(t["--email-width"])) // 2 + px(t["--gutter-page"])
+        for probe in ("h1", "body", "legal"):
+            with self.subTest(probe=probe):
+                self.assertEqual((desktop, px(t["--email-gutter-mobile"])),
+                                 (seen["light"][probe]["left"], seen["phone"][probe]["left"]))
 
 
 @unittest.skipUnless(NODE and MJML_MODULES, "needs node and mjml (tooling/main), with WDS_NODE_MODULES on")

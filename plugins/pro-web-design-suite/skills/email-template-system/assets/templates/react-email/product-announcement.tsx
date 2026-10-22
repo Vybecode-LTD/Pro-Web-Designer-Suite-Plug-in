@@ -4,8 +4,9 @@
   into the same folder; references/email-workflow.md §11 has the commands.
   No literal colour or size: every one comes from the theme. Each element
   takes its class beside its style, since the class is what dark mode and the
-  phone rules in headCss select. The spacing is Law 2's: a spacer row between
-  blocks, never a block's own margin.
+  phone rules in headCss select; each Section carries the gutter class, the
+  Container none, so the phone gutter is set once. The spacing is Law 2's: a
+  spacer row between blocks, never a block's own margin.
 */
 import * as React from 'react';
 import { Body, Button, Column, Container, Head, Heading, Hr, Html, Img, Link, Preview, Row, Section, Text } from 'react-email';
@@ -33,12 +34,12 @@ export default function ProductAnnouncement() {
       <Preview useTitleTag={false}>Back in stock, now in Ochre, Slate and Fern, with the ten-year repair promise.</Preview>
       <Body className={classes.canvas} style={styles.body}>
         <Container className={classes.surface} style={styles.container}>
-          <Section className={classes.surface} style={styles.section}>
+          <Section className={classes.gutter} style={styles.section}>
             <Img src="https://cdn.example.com/northbeam/logo-2x.png" width="132" height="28" alt="Northbeam"
                  style={{ width: '132px', height: '28px' }} />
           </Section>
 
-          <Section className={classes.surface} style={styles.section}>
+          <Section className={classes.gutter} style={styles.section}>
             <Text className={classes.label} style={text.label}>Back in stock</Text>
             <Spacer gap="gapTight" />
             <Heading as="h1" className={classes.h1} style={text.h1}>The Ridgeline is back</Heading>
@@ -54,7 +55,7 @@ export default function ProductAnnouncement() {
             </Button>
           </Section>
 
-          <Section className={classes.surface} style={styles.section}>
+          <Section className={classes.gutter} style={styles.section}>
             <Heading as="h3" className={classes.h3} style={text.h3}>Built to be repaired</Heading>
             <Spacer gap="gapTight" />
             <Text className={classes.body} style={text.body}>
@@ -64,7 +65,7 @@ export default function ProductAnnouncement() {
             <Hr className={classes.divider} style={styles.divider} />
           </Section>
 
-          <Section className={classes.sunken} style={{ ...styles.section, ...styles.sunken }}>
+          <Section className={`${classes.sunken} ${classes.gutter}`} style={{ ...styles.section, ...styles.sunken }}>
             <Text className={classes.legal} style={text.legal}>
               Northbeam Ltd, 12 Harbour Street, Bristol BS1 4QA, United Kingdom
             </Text>
