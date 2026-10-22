@@ -2,7 +2,7 @@
 
 The writing. Formulas, the worked version of each, and what each one fails at — because every headline formula has a characteristic failure and knowing it is what stops you shipping the bad instance.
 
-All examples are drawn from the three markets this skill exists to serve: audio software, AI tools, and agency work.
+Most examples come from the three markets this skill began with: audio software, AI tools and agency work. `page-architecture.md` §3 orders the other page types (a B2B demo, a gated lead magnet, a local booking, a donation, a paid-search page), and §4 here gives their calls to action.
 
 ## Contents
 
@@ -179,6 +179,20 @@ Set it at `--type-ui` with `--fg-muted`, `--gap-tight` below the button so it bi
 ### Secondary CTAs
 
 One primary action. A secondary CTA is a text link or a `--border-default` outline button, never a second filled button, and it should be a lower-commitment version of the same journey ("Buy now" / "Try the demo first"), not a different journey. Two filled buttons of equal weight is a choice the reader did not come to make, and the common response to an unwanted choice is neither option.
+
+### Calls to action for the other page types
+
+The same rule, verb plus outcome, with the friction reducer each page's reader needs:
+
+| Page | CTA | Friction reducer |
+|---|---|---|
+| B2B demo request | "Book a demo of the approval workflow" | "30 minutes, on your own data. No slides." |
+| Gated lead magnet | "Send me the guide" | "One email with the PDF. Nothing else unless you tick the box below." |
+| Local booking | "Book Thursday, 10:30" (the next real slot) | "Free to cancel until the day before." |
+| Donation | "Give £10 a month" beside "Give once" | "Stop a monthly gift any time, in one click." |
+| Paid-search page | The ad's own verb and object ("Get the quote") | The objection the ad itself raised, answered |
+
+Each reducer is a promise the page must keep: a demo that turns into slides, or a guide that brings a sales call, spends the trust the line bought.
 
 ---
 

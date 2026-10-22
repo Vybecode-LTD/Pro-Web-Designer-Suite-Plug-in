@@ -157,19 +157,7 @@ THE CLAIM            one sentence, the thing you want remembered
 
 Three supports, because two reads as thin and four reads as a list nobody finishes. Each support gets exactly one proof, and the proof has to be something a sceptic would accept: a number you can source, a named customer, a demo they can run, a spec, a guarantee with terms. "Trusted by thousands" is not a proof; it is the claim repeated in a lower voice.
 
-A filled-in one, for an audio plugin:
-
-```
-CLAIM     Match your mix to a reference track's tonal balance in one pass.
-  S1        It listens to both and shows you the difference, band by band.
-    P        Interactive demo: drop in any two files, see the curve, in the browser.
-  S2        The correction is a transparent linear-phase EQ, not a preset.
-    P        Spec: 32-band linear-phase, < 0.1 dB ripple, latency reported to the host.
-  S3        It runs on the session you already have open.
-    P        VST3 / AU / AAX, macOS 12+ and Windows 10+, Apple silicon native.
-```
-
-Every proof here can be checked by a sceptic without trusting you. That is the test.
+A filled-in one, for an audio plugin, is in `references/worked-example.md` §2. Every proof in it can be checked by a sceptic without trusting you. That is the test.
 
 Write this before any layout exists. It is the page's outline, and the section order in Phase 3 is derived from it rather than invented. If a section you want does not carry a support or a proof, it is decoration — cut it or demote it to the footer.
 
@@ -248,7 +236,7 @@ Read the file when you hit the decision it covers. Do not read them all up front
 
 | Read this | When |
 |---|---|
-| `references/page-architecture.md` | Choosing or ordering sections; deciding page length; one CTA vs many |
+| `references/page-architecture.md` | Choosing or ordering sections by page type; a regulated claim; another market; page length; one CTA vs many |
 | `references/copy-patterns.md` | Writing any line of page copy — headlines, CTAs, props, proof, pricing, FAQ |
 | `references/conversion-audit.md` | Reviewing an existing page; form design; LCP/CLS; A/B testing questions |
 | `references/worked-example.md` | You want the whole chain on one product before starting your own |
@@ -256,4 +244,4 @@ Read the file when you hit the decision it covers. Do not read them all up front
 | `assets/MESSAGE_BRIEF.md` | Phases 1–2. Fill it in; it is the deliverable, not a warm-up |
 | `assets/page-sections.css` | Phase 5. Drop-in section shells on the layout primitives |
 
-Cross-skill: `web-design-studio` owns `references/spacing-system.md` (any spacing value), `references/layout-composition.md` (the primitives), `references/accessibility.md` (always), and the audit script.
+Cross-skill: `web-design-studio` owns `references/spacing-system.md` (any spacing value), `references/layout-composition.md` (the primitives), `references/accessibility.md` (always), and the audit script. `perf-budget-gate` measures in a browser the LCP, CLS and INP of `references/conversion-audit.md` §7; `a11y-audit-runner` runs the checks of `references/conversion-audit.md` §7.1; `design-critique-gate` critiques the page you built.

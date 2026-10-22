@@ -16,7 +16,9 @@
 
 **P43 part 1 is done (#192):** `lint_claims.py`, the claims lint, in landing's Phase 6 and the critique gate's layers 1 and 8 (PS-C6, and PS-B6's claims layer).
 
-**Next: P43's parts 2 (routing and page types: PS-B4, PS-B6's routing) and 3 (MESSAGE_BRIEF to DECISION_LOG, PS-C12), then P41: the owner's order (2026-10-21). Both come before R4** (§4).
+**P43 part 2 is done (#193):** the page types beyond software (B2B demo, lead magnet, booking, donation, paid search), regulated claims and localised pages flagged, and the routing between the persuasion skills (PS-B4, PS-B6).
+
+**Next: P43 part 3 (MESSAGE_BRIEF to DECISION_LOG, PS-C12), then P41: the owner's order (2026-10-21). Both come before R4** (§4).
 
 Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **the rest of Phase 6b in the owner's order** (§4), then R4.
 
@@ -535,10 +537,9 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
   | Skill | Bytes |
   |---|---|
   | figma-variables-sync | 20,497 |
-  | design-critique-gate | 20,496 |
+  | design-critique-gate | 20,497 |
   | component-state-matrix | 20,494 |
   | client-presentation-builder | 20,494 |
-  | landing-page-conversion | 20,492 |
   | perf-budget-gate | 20,491 |
   | web-design-studio | 20,488 |
   | email-template-system | 20,474 |

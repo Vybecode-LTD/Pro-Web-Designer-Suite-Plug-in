@@ -39,6 +39,24 @@ renames the plugin.
 
 ### Added
 
+- **Page types beyond software, and the persuasion skills routing to each other** (PS-B4,
+  PS-B6; P43 part 2). Every sequence and example was audio, AI or agency.
+  - **New page types.** `page-architecture.md` §3 now sequences a B2B demo request for a buying
+    committee, a gated lead magnet, a local booking, a donation and a paid-search page (message
+    match), with three notes on reading them.
+  - **Regulated claims** (§3.1). Health claims are checked against Regulation (EC) No 1924/2006
+    Art. 10(1) and its GB text; UK financial promotions against FSMA 2000 s. 21 and FCA COBS
+    4.2.1R. Each is flagged before any copy is written.
+  - **Localised pages** (§3.2). W3C's expansion figures from IBM are registered: 200–300% for
+    strings of up to 10 characters, about 130% over 70.
+  - **Calls to action.** `copy-patterns.md` §4 gives each new page type its CTA and friction
+    reducer.
+  - **Routing.** landing-page-conversion now points to perf-budget-gate (LCP, CLS and INP measured
+    in a browser), a11y-audit-runner (§7.1's checks) and design-critique-gate. The critique gate
+    points to a11y-audit-runner, component-state-matrix and client-presentation-builder.
+  - **SKILL.md budgets.** In landing, the message-hierarchy example in the SKILL.md now points to
+    `worked-example.md` §2, which holds it. In the critique gate, the findings paragraph is
+    shorter and keeps every rule.
 - **`lint_claims.py`, the claims lint** (PS-C6, and PS-B6's claims layer; P43 part 1). No gate read
   what a page says. A countdown that restarts on every visit, a newsletter box ticked in advance,
   a stock count from `Math.random()` or an unsourced "47% faster" passed every one.
