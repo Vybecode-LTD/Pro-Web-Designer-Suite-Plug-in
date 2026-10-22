@@ -99,6 +99,45 @@ class LintClaims(TempDirTest):
         self.assertNotIn("pre-checked-opt-in",
                          self.rules('<input type="checkbox" name="marketing" checked={false} />', name="Off.jsx"))
 
+    def test_a_bound_box_is_ticked_only_by_a_literal_true(self):
+        """Codex on #192: `checked={marketingEnabled}` and Vue's
+        `:checked="isOptedIn"` are state the code sets, not a box ticked in
+        advance; HTML's bare `checked` and a literal `true` binding are."""
+        for name, box, ticked in (("State.jsx", 'checked={marketingEnabled}', False),
+                                  ("Default.jsx", 'defaultChecked={optedIn}', False),
+                                  ("State.vue", ':checked="isOptedIn"', False),
+                                  ("Bind.vue", 'v-bind:checked="isOptedIn"', False),
+                                  ("True.vue", ':checked="true"', True),
+                                  ("True.jsx", 'checked={true}', True),
+                                  ("plain.html", 'checked', True)):
+            with self.subTest(name=name, box=box):
+                markup = f'<input type="checkbox" name="marketing" {box}>'
+                if name.endswith(".vue"):
+                    markup = f"<template>{markup}</template>"
+                self.assertEqual(ticked, "pre-checked-opt-in" in self.rules(markup, name=name))
+
+    def test_only_a_decrement_the_interval_runs_is_a_countdown(self):
+        """Codex on #192: an item count decremented when a row is removed,
+        beside an unrelated refresh interval, is not a countdown; a named
+        callback that decrements the seed is."""
+        unrelated = ("let itemCount = 10;\nfunction remove() { itemCount--; }\n"
+                     "setInterval(refresh, 60000);\nfunction refresh() { fetch('/s'); }")
+        self.assertNotIn("load-time-countdown", self.rules(page("<p id=t></p>", unrelated)))
+        named = "let secondsLeft = 900;\nfunction tick() { secondsLeft -= 1; }\nsetInterval(tick, 1000);"
+        self.assertIn("load-time-countdown", self.rules(page("<p id=t></p>", named)))
+        arrow = "let minutesLeft = 15;\nconst tick = () => { --minutesLeft; };\nsetInterval(tick, 60000);"
+        self.assertIn("load-time-countdown", self.rules(page("<p id=t></p>", arrow)))
+
+    def test_a_jsx_handler_does_not_leak_into_a_label(self):
+        """Codex on #192: HTMLParser read the `>` of `=>` as the end of the
+        tag, so `onClick={() => track('top')}` became the link's text, and
+        two links both labelled "Buy" read as two labels for /buy."""
+        jsx = ('<a className="cta" href="/buy" onClick={() => track(\'top\')}>Buy</a>\n'
+               '<a className="cta cta--secondary" href="/buy" onClick={() => track(\'bottom\')}>Buy</a>')
+        self.assertNotIn("mismatched-cta-labels", self.rules(jsx, name="Page.jsx"))
+        renamed = jsx.replace(">Buy</a>\n", ">Buy now</a>\n", 1)
+        self.assertIn("mismatched-cta-labels", self.rules(renamed, name="Page.jsx"))
+
     def test_errors_fail_the_run_and_warnings_only_under_strict(self):
         code, found = self.lint(page('<input type="checkbox" name="newsletter" checked>'))
         self.assertEqual(1, code)

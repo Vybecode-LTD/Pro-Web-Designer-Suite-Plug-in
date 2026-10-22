@@ -107,11 +107,24 @@ class Finding:
     fix: str
 
 
-def truthy(value: str | None) -> bool:
-    """A boolean attribute that is present and not explicitly false:
-    `checked`, `checked=""` (HTML's present is true), `checked={true}`;
-    not `checked={false}` or Vue's `:checked="false"`."""
-    return value is None or value.strip().strip("{}").strip().lower() not in ("false", "0")
+def plain(name: str) -> str:
+    """An attribute's name without Vue's binding prefix (`:x`, `v-bind:x`)."""
+    name = name.lower()
+    return name[len("v-bind:"):] if name.startswith("v-bind:") else name.lstrip(":")
+
+
+def ticks(name: str, value: str | None) -> bool:
+    """Whether a `checked` attribute ticks its box. In HTML its presence
+    does, whatever the value (`checked`, `checked=""`). A framework binding
+    ticks it only when it is the literal `true` (`checked={true}`, Vue's
+    `:checked="true"`): `checked={marketingEnabled}` is state the code sets,
+    and starts wherever the code says (Codex on #192)."""
+    if value is None:
+        return True
+    value = value.strip()
+    if name.lower().startswith((":", "v-bind:")) or (value.startswith("{") and value.endswith("}")):
+        return value.strip("{}").strip() == "true"
+    return True
 
 
 class Page(HTMLParser):
@@ -134,7 +147,7 @@ class Page(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         line = self.getpos()[0]
-        a = {k.lstrip(":").lower(): v for k, v in attrs}
+        a = {plain(k): v for k, v in attrs}
         classes = set((a.get("class") or a.get("classname") or "").split())
         el = {"tag": tag, "line": line, "text": [], "percents": [], "sourced": False,
               "struck": tag in ("s", "del", "strike")
@@ -155,8 +168,8 @@ class Page(HTMLParser):
             el["sourced"] = True
         if tag == "input":
             kind = (a.get("type") or "text").lower()
-            if kind == "checkbox" and (("checked" in a and truthy(a["checked"]))
-                                       or ("defaultchecked" in a and truthy(a["defaultchecked"]))):
+            if kind == "checkbox" and any(plain(k) in ("checked", "defaultchecked") and ticks(k, v)
+                                          for k, v in attrs):
                 self.boxes.append({"line": line, "id": a.get("id") or "",
                                    "words": " ".join(filter(None, (a.get("name"), a.get("id"), a.get("value")))),
                                    "label": next((p for p in reversed(self.stack) if p["tag"] == "label"), None)})
@@ -241,9 +254,28 @@ def label_for(source: str) -> dict[str, str]:
     return found
 
 
+def masked(source: str) -> str:
+    """The markup with each `={…}` attribute expression's `<` and `>`
+    blanked, so an arrow function (`onClick={() => track('top')}`) is not
+    read as the end of its tag and its text as the link's (Codex on #192).
+    Lines and offsets stay where they were."""
+    out = list(source)
+    for m in re.finditer(r"=\s*\{", source):
+        depth, i = 1, m.end()
+        while i < len(source) and depth:
+            if source[i] == "{":
+                depth += 1
+            elif source[i] == "}":
+                depth -= 1
+            elif source[i] in "<>":
+                out[i] = " "
+            i += 1
+    return "".join(out)
+
+
 def markup_findings(source: str) -> list[tuple[int, str, str]]:
     page = Page()
-    page.feed(source)
+    page.feed(masked(source))
     page.close()
     while page.stack:                                              # an unclosed block still counts
         page.finish(page.stack.pop())
@@ -278,12 +310,40 @@ def script_findings(source: str) -> list[tuple[int, str, str]]:
             near = " ".join(lines[max(0, n - 3):n + 2])
             if SCARCITY_WORD.search(near):
                 out.append((n, "invented-scarcity", "A count made up with Math.random()"))
+    ticking = interval_code(source)
     for m in SEEDED.finditer(source):
         name = re.escape(m.group(1))
-        if re.search(rf"\b{name}\s*(?:--|-=\s*1\b)", source) and "setInterval" in source:
+        if re.search(rf"\b{name}\s*(?:--|-=\s*1\b)|--\s*{name}\b", ticking):
             out.append((source[:m.start()].count("\n") + 1, "load-time-countdown",
                         f"{m.group(1)} starts at {m.group(2)} on every visit and counts down"))
     return out
+
+
+def balanced(source: str, start: int, opening: str, closing: str) -> str:
+    """The text from `start`, just past an opening bracket, to its match."""
+    depth, i = 1, start
+    while i < len(source) and depth:
+        depth += {opening: 1, closing: -1}.get(source[i], 0)
+        i += 1
+    return source[start:i]
+
+
+def interval_code(source: str) -> str:
+    """The code each setInterval runs: its inline callback, or the body of
+    the function it names. A decrement elsewhere (an item count when a row
+    is removed) is not a countdown (Codex on #192)."""
+    found = []
+    for m in re.finditer(r"\bsetInterval\s*\(", source):
+        call = balanced(source, m.end(), "(", ")")
+        found.append(call)
+        named = re.match(r"\s*([A-Za-z_$][\w$]*)\s*,", call)
+        if named:
+            fn = re.escape(named.group(1))
+            head = re.search(rf"function\s+{fn}\s*\([^)]*\)\s*\{{|\b{fn}\s*=\s*(?:function\b[^{{]*|\([^)]*\)\s*=>\s*|\w+\s*=>\s*)\{{",
+                             source)
+            if head:
+                found.append(balanced(source, head.end(), "{", "}"))
+    return "\n".join(found)
 
 
 def ignored(source: str) -> tuple[set[str], dict[int, set[str]]]:
