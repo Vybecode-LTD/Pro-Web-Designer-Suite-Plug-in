@@ -504,7 +504,7 @@ class Linter:
             self.add(
                 "error", "tokens",
                 "unresolved token %s" % match.group(1), line,
-                "No email client resolves CSS custom properties reliably: they are %s. "
+                "CSS custom properties are not portable across email clients: they are %s. "
                 "Gmail reads var() but never lets you declare one." % blame("css-variables"),
                 "run build_email.py on the SOURCE template, or add the token to "
                 "assets/email-tokens.json",
