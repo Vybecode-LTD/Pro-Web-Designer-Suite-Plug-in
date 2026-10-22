@@ -256,7 +256,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-B2 | high | fixed: 3.3.0 the per-table policies, column grants and a smoke test (`test_policies`); 3.4.0 the server schema, zod and pydantic, `test_scaffold.TheServerSchemaMirrorsTheConstraints` (PR #64) | authorization and server validation belong to nobody. |
 | DL-B3 | medium | done in 4.0.0: in 3.6.0, `test_schema_sources.OrmSchemasReadAsTheMigrationDoes`, PR #117; in 4.0.0, server actions, `test_scaffold.TheServerActions`, PR #173, Vue output, `test_scaffold_frameworks.TheVueScaffold`, PR #176, and Svelte output, `TheSvelteScaffold`, PR #177 | stacks the description implies but doesn't serve. |
 | DL-B4 | medium | W13 (3.6.0+) | email frameworks. |
-| DL-B5 | medium | W13 (3.6.0+) | email translation and RTL. |
+| DL-B5 | medium | done in 4.0.0: `test_email_rtl`, PR #196 (P41 part 2) | email translation and RTL. |
 | DL-B6 | medium | fixed in 3.4.0: the dark pass and the MSO font check (PR #57), the `nostyle` check and `--source` (PR #58); generated-form ARIA (A9) is its own item | Checks the docs promise but nothing runs: email dark-mode contrast, the MSO font block, the no-`<style>` layout, source literals, generated-form ARIA. |
 | DL-B7 | low | fixed in 3.4.0: Google's and Microsoft's bulk-sender rules, re-read 2026-10-06, figures in `evidence.json` (PR #59; `test_email.EmailDocClaims`) | deliverability is dated. |
 | DL-B8 | low | fixed in 3.3.0: `test_schema_sources.TheWorkedExampleIsTheFixture`, `GeneratedTypesAgreeOnStructure` | unverifiable claims. |
@@ -268,4 +268,4 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-C6 | S | fixed in 3.2.0 | pointer and command hygiene; the detail file lists them. |
 | DL-C7 | M | fixed in 3.5.0: the two commands in PR #88 (`test_commands.TheDeliveryChains`), the supabase-security-reviewer in PR #89 (`test_agents`), the hook in PR #91, `hooks.emailBuild` and `emails` (`test_hooks.TheEmailBuild`); the evals, `evals/delivery/` (a profile form from a Supabase schema, a receipt email), in PR #97 (`test_evals.TheOutcomeCases`) | plugin features for these skills. |
 | DL-C8 | S | fixed in 3.2.0 | slimmer SKILL.md, sharper descriptions. |
-| DL-C9 | M | W13 (3.6.0+) | Keep the email client matrix honest: regenerate its cells from caniemail's data, with test dates. |
+| DL-C9 | M | done in 4.0.0: `test_caniemail`, PR #195 (P41 part 1) | Keep the email client matrix honest: regenerate its cells from caniemail's data, with test dates. |

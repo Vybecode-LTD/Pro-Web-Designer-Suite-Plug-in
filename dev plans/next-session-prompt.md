@@ -1,28 +1,12 @@
 # Start here: the next session
 
-**Written 2026-10-19**, at the end of the session that finished **P35**: two PRs, and the docs PR, which merges once green (§3):
-- **#179, P35 part 1 (GT-B6)**, merged as `8a99f60`: `spacing`, `obscured`, `hover` and `motion` in the runtime gate, and clipped text in `reflow`.
-- **#183, P35 part 2 (GT-B9)**, merged as `1a37335`: `--engine firefox|webkit`.
+**Written 2026-10-22**, at the end of the session that did **P41's parts 1 and 2**:
+- **#195, P41 part 1 (DL-C9)**, merged as `72047fa`: `tools/sync_caniemail.py` writes email-client-matrix.md §2 and `lint_email.py`'s client lists from caniemail's data, pinned in `tests/fixtures/caniemail.json`. CHANGELOG.md's 3.4.0 and earlier moved to `CHANGELOG-earlier.md` (the directory's 256 KiB file hold).
+- **#196, P41 part 2 (DL-B5)**, merged as `fd0f7a9`: `product-announcement-rtl.html`, email-architecture.md §11, and `lint_email.py`'s `direction` and `vml` checks.
 
-**The owner renamed the plugin Pro Web Design Suite** in another session (#180, merged): it lives in `plugins/pro-web-design-suite`. That session's #181 (the distribution repository) and #182 (ready for Anthropic's directory) are merged too; `docs/HANDOFF.md` has what the owner must do before R4.
+Earlier: P35, P56, P57, P42 and P43 are done (#179 to #194); the plugin was renamed Pro Web Design Suite (#180 to #182). `docs/HANDOFF.md` has the owner's distribution steps and this session's warnings.
 
-**Update 2026-10-20: P56 is done.** A third session built webdesignersuite.com (the plugin's site, `C:\DEV\webdesignersuite.com`) from `/new-system` and `/install-gate`, which found seven problems (N50, its record is `dev plans/plugin-findings.md` there). All are fixed on `main` for 4.0.0, each with a test that failed on `v3.6.0`:
-- **#185, F2 to F4** (`dd83683`): `perf_audit`'s `css-import` reads shipped stylesheets only (the starter's own `@import`s no longer fail a fresh project's first CI run); a preload of the bundler's hashed font counts; the canonical's host is first-party.
-- **#186, F1, F5 and F6** (`7a75151`): `pre > code` inherits `--font-mono`, `.page-grid > *` may shrink (a long `pre` no longer widens the page at 320px), a `pre` has an edge on the dark canvas. **F5 is fixed in part:** dark `--bg-sunken` still equals the canvas, a look for the owner to choose.
-- **#187, F7** (`bc7a478`): `/install-gate`'s workflow runs `check_roles.py` on the configured token files, read together as one system; the command runs the check once first (a missing configured file stops the install; a system it cannot read gets no step and a reason; failing pairs get the step and a warning).
-- **#189, N51 as P57:** `check_roles` applies a scope's blocks as the cascade does (the heavier selector, then the block written later), in one file or across the files in the order listed. Before, it applied every `:root` block before every `[data-theme="dark"]` block, so a `:root` written below the dark block passed on the dark value while the page showed `:root`'s (CodeRabbit on #187; reproduced on `v3.6.0`). A system that keeps `:root` first, as the starter does, reads as before. Cascade layers are still read as one, which the script's docstring says.
-
-**P42 is done (2026-10-21):** #190, the persuasive devices against WCAG 2.2 (PS-B1); #191, the UK and EU consumer law to flag for legal review, price tests and consent for tracking (PS-B2, PS-B3, PS-B8), every date and figure read at its source and registered.
-
-**P43 part 1 is done (#192):** `lint_claims.py`, the claims lint, in landing's Phase 6 and the critique gate's layers 1 and 8 (PS-C6, and PS-B6's claims layer).
-
-**P43 part 2 is done (#193):** the page types beyond software (B2B demo, lead magnet, booking, donation, paid search), regulated claims and localised pages flagged, and the routing between the persuasion skills (PS-B4, PS-B6).
-
-**P43 is done (#192 to #194):** part 3 is `brief_to_log.py`, the message brief into the deck's decision log (PS-C12).
-
-**Next: P41 (email), the last item before R4** (§4).
-
-**Update 2026-10-22, at this session's end:** #189, #190 and #191 are merged. **P43's PRs are open as a stack, #192 → #193 → #194**, every review thread resolved, CI running when the session ended. Merge them first (§3), bottom-up, each once green: retarget the next to `main` before deleting the merged branch. webdesignersuite.com's PR #5 (N51 fixed in its findings file and handoff) waits the same way. `docs/HANDOFF.md`'s Warnings has this session's traps: a scratchpad worktree's path length, a new script's file mode, EUR-Lex's refusal, and a branch deleted after a refused merge.
+**Next: P41 part 3 (DL-B4), the last item before R4** (§4).
 
 Read the whole file before you do anything. It tells you how to orient, then gives the session's work: **the rest of Phase 6b in the owner's order** (§4), then R4.
 
@@ -52,7 +36,7 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
     - waits for CodeRabbit's check to leave `pending`;
     - prints the checks, `mergeStateStatus`, the open-thread count and the reviews by commit.
 
-    It is in the last sessions' scratchpads; copy the newest (`478e774c-…`; `ed3194bc-…` also has `keep_both.py`, which resolves a merge from `main` in the CHANGELOG and both plans, and `plan_p55.py`, which writes a part's plan row and note), whose `gh run watch` has `--interval 30` and which waits for CodeRabbit 3 minutes at most. **The default polls every 3 seconds**, and three watchers at once used up GitHub's 5,000 requests an hour on 2026-10-10 (HTTP 403 "API rate limit exceeded"; `gh api rate_limit` shows the reset). Run one watcher at a time, and stop a superseded one with `TaskStop`.
+    It is in the last sessions' scratchpads; copy the newest (`47067940-…`, the 2026-10-22 session's, the same as `478e774c-…`'s; `ed3194bc-…` also has `keep_both.py`, which resolves a merge from `main` in the CHANGELOG and both plans, and `plan_p55.py`, which writes a part's plan row and note), whose `gh run watch` has `--interval 30` and which waits for CodeRabbit 3 minutes at most. **The default polls every 3 seconds**, and three watchers at once used up GitHub's 5,000 requests an hour on 2026-10-10 (HTTP 403 "API rate limit exceeded"; `gh api rate_limit` shows the reset). Run one watcher at a time, and stop a superseded one with `TaskStop`.
   - Never grep `tooling/`: its `node_modules` makes a search run for minutes. Reading one named file in it is fine.
   - **To wait** (for CodeRabbit's hourly limit, say), run `sleep N` with the Bash tool's `run_in_background`: a foreground `sleep` is blocked, and the notification wakes you.
   - **CodeRabbit is not a merge gate (the owner, 2026-10-12).** Its free tier gives one review an hour across all PRs, and waiting for it held PRs open for hours. Never wait for it or request a review to gate a merge.
@@ -284,6 +268,11 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
       - **A skip must not hide a broken install.** Where CI installs a browser, set a `WDS_REQUIRE_*` variable that turns the test's skip into a failure.
       - **A budget counts every finding a team may want to hold at zero** (`motion_busy_stopped`). An upgrade note says what goes red, and that an error fails whatever the budget allows: `--skip` is the rollout.
       - **`check.py` does not select `test_doc_snippets` or stylelint's snippet test** when a reference changes, so a new css fence reached CI. Run them yourself, and mark an illustration `/* example: illustration */`.
+    - **The 2026-10-22 session's reviews found 9 real issues:** #195 (CodeRabbit 1) and #196 (Codex 6 over two rounds, CodeRabbit 2), each fixed with a test failing on the head it reviewed. The lessons, for any reader of a standard's identifiers:
+      - **Derive a list from the standard's data, and read an identifier by its grammar.** Thirteen right-to-left languages missed `nqo` and `rhg`: CLDR's likely subtags give 239, and region pairs both ways (`pa-PK`, `sd-IN`). A BCP 47 tag's language identifier ends at its first singleton, so `-u-nu-latn` is no script.
+      - **Every form the engine reads:** `[if gte mso 9]` and `[if (gte mso 9)|(IE)]` are the Word engine's, `[if !mso]` is not; `dir='rtl'` and `dir=rtl` are HTML's. A check over parsed elements misses a conditional comment's markup, which classic Outlook renders. And a direction has islands: an English address marked `dir="ltr"` inside Arabic copy rightly aligns left.
+      - **A doc names what the tool emits** (`vml`, not `vml-width`; `--ignore` matches exactly), and **a message agrees with the data beside it** ("no client resolves custom properties" above a list showing three that do).
+      - **A test that pins a register entry's docs** breaks when another doc quotes the figure: assert membership.
     - **Staged changes travel with `git checkout`:** the session's draft docs, staged on another branch, rode into #102's last commit. Commit or stash before switching branches, and read `git diff --cached --stat` before every commit.
     - **The evals find router bugs.** `test_evals.TheRouterAgrees` runs the router on every case's prompt for free; the real run found a third (a hyphenated "screen-reader" heard nothing).
 - **Shell.**
@@ -560,20 +549,18 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
 
 ## 3. First: the state of `main`
 
-Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, fix it first, in a PR of its own. Then:
-- **P43's stack, #192 → #193 → #194,** may still be open: merge bottom-up, each once green, every thread resolved and the PR clean (merge commit, `--match-head-commit` with the full SHA); retarget the next PR to `main` (`gh pr edit N --base main`) before deleting the merged branch. A merge a guard refuses must stop the chain: never `;` a branch deletion after it.
-- **webdesignersuite.com's PR #5** the same way, in that repository.
-- Remove any worktree left in a scratchpad (`git worktree list`): `git worktree remove PATH`, then `git branch -d` each merged branch. The newest `wait_pr.sh` is in `478e774c-…\scratchpad`.
+Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, read the failing test first: a known flake (`docs/HANDOFF.md`'s Warnings) that touches nothing recent is rerun with `gh run rerun RUN --failed`; anything else is fixed in a PR of its own. Then:
+- No PR should be open (`gh pr list --state open`); the docs PR, #197, merges at the end of the session that wrote this.
+- Remove any worktree left in a scratchpad (`git worktree list`). The newest `wait_pr.sh` is in `47067940-…\scratchpad`.
 - Then read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
 
 ## 4. The rest of Phase 6b, then 4.0.0
 
-Phase 6c is done (P50 to P55), and so are P56 (N50) and P57 (N51). In Phase 6b, P34, P35, P36 and P37 are done. **The owner chose the order on 2026-10-21: P42, then P43, then P41.** P42 is done in two PRs: #190 (PS-B1, the persuasive devices against WCAG 2.2) and #191 (PS-B2, PS-B3 and PS-B8: the law to flag, price tests, consent). **Next is P43.** Read each item's rows in the completion plan and its review finding (`dev plans/web-design-suite-review/delivery.md` for DL-, `persuasion.md` for PS-) before planning, and split an L into PRs under 100 files each.
+Phase 6b is done but for P41's part 3. **The owner chose the order on 2026-10-21: P42, P43, then P41**; P41's parts 1 (#195, DL-C9) and 2 (#196, DL-B5) are merged. Read DL-B4 in `dev plans/web-design-suite-review/delivery.md` before planning.
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
-| P43 | Page types and audiences (PS-B4: B2B demo pages, gated lead magnets, booking and donation pages, regulated claims, localisation); a claims layer and `lint_claims.py` (PS-B6, PS-C6: load-time countdowns, "only N left", pre-checked opt-ins, unsourced percentages, struck-through prices); routing between the persuasion skills and to perf-budget-gate and a11y-audit-runner; MESSAGE_BRIEF to DECISION_LOG (PS-C12) | PS-B4, PS-B6, PS-C6, PS-C12 | landing-page-conversion, the deck | L |
-| P41 | Email: MJML or React Email output (DL-B4: `mj-attributes`/`mj-class` or a React Email theme from `email-tokens.json`, or route away explicitly); a right-to-left template (DL-B5: `dir="rtl"` on tables so ghost-table order flips, mirrored `align`, padding and VML, per-locale `lang` and `<title>`, text expansion against fixed VML widths); a client matrix regenerated from caniemail's data, with test dates (DL-C9) | DL-B4, DL-B5, DL-C9 | email-template-system | L |
+| P41 | Part 3: MJML or React Email output (DL-B4). The router already sends "MJML" to the skill (`hooks/design_hooks.mjs:80`), which says nothing about it. Generate `mj-attributes`/`mj-class` (an `<mj-head>` for `mj-include`) or a React Email theme from `email-tokens.json`, through `build_email.py`'s token reader so `.design-suite.json`'s `emailTokens` holds; or route away explicitly. Each output passes `lint_email.py` once compiled. **Ask the owner first** whether a real-tool test may add `mjml` (or `react`, `react-dom` and `@react-email/render`) to `tooling/main`: a new pinned dependency, in `docs/TESTING.md` and `CLAUDE.md`'s Stack. Re-read MJML's `mj-include` and `mj-attributes` docs on the day. | DL-B4 | email-template-system | M |
 | R4 | Release 4.0.0 | none | `plugin.json`, `CHANGELOG.md`, `README.md` | M |
 
 Every outside figure, as in P42 and in P43's regulated claims (a law's date, a fine's ceiling), is re-read at its source on the day and registered in `tests/fixtures/evidence.json` with its quote. A legal point is flagged for review, never stated as advice.
