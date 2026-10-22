@@ -541,7 +541,7 @@ A real data table — a receipt's line items, arguably — is the one exception,
 
 **Each locale is its own email.** A translated email sets its own `lang` and `dir`, `<title>`, preheader, alt text and plain-text part, and its merge tags' fallbacks: `{{ first_name | default: "there" }}` in an Arabic email greets the reader in English. Yahoo ignores `lang` on a `<td>` (caniemail), so a change of language goes on a `<p>` or `<span>`.
 
-**Text grows, and VML does not.** W3C's guidance, from IBM's, expects English strings of up to 10 characters to grow by 200–300% in European languages. A button label is that short, and its VML shape has a literal width (§6). `lint_email.py` warns when a label looks wider than its shape (`vml-width`, at 0.6em a character plus 16px each side). Arabic letters join, and the script has no capitals: drop `text-transform` and the tracking for it, as the template does.
+**Text grows, and VML does not.** W3C's guidance, from IBM's, expects English strings of up to 10 characters to grow by 200–300% in European languages. A button label is that short, and its VML shape has a literal width (§6). `lint_email.py` warns when a label looks wider than its shape (the `vml` check, at 0.6em a character plus 16px each side). Arabic letters join, and the script has no capitals: drop `text-transform` and the tracking for it, as the template does.
 
 ---
 

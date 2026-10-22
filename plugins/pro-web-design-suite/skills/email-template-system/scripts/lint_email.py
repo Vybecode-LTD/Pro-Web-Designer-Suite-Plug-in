@@ -127,6 +127,10 @@ MSO_IF_RE = re.compile(r"\s*\[if\b[^\]]*(?<![!\w])mso\b", re.I)
 DIRECTION_RE = re.compile(r"(?<![\w-])direction\s*:\s*rtl\b", re.I)
 LEFT_RE = re.compile(r"(?<![\w-])text-align\s*:\s*left\b", re.I)
 GHOST_TABLE_RE = re.compile(r"<table\b[^>]*>", re.I)
+TAG_RE = re.compile(r"<[a-z][^>]*>", re.I)
+# An attribute in a conditional comment, in any of HTML's quotings (Codex on #196).
+DIR_RTL_ATTR_RE = re.compile(r"""\bdir\s*=\s*(?:"rtl"|'rtl'|rtl(?![\w-]))""", re.I)
+ALIGN_LEFT_RE = re.compile(r"""\balign\s*=\s*(?:"left"|'left'|left(?![\w-]))""", re.I)
 ROUNDRECT_RE = re.compile(r"<v:roundrect\b([^>]*)>(.*?)</v:roundrect>", re.I | re.S)
 # A label's width, by its characters: 0.6em each, and 16px of the shape on
 # either side of it. An estimate, to flag a label worth measuring.
@@ -406,6 +410,9 @@ def contrast_ratio(fg, bg) -> float:
 def rtl_language(tag: str) -> bool:
     """Whether a BCP 47 tag names a language written right to left."""
     parts = tag.strip().lower().replace("_", "-").split("-")
+    # The language identifier ends at the first singleton: an extension's value
+    # (ar-SA-u-nu-latn) is no script (Codex on #196).
+    parts = parts[:next((i for i, p in enumerate(parts) if i and len(p) == 1), len(parts))]
     script = next((p for p in parts[1:] if len(p) == 4 and p.isalpha()), None)
     if script:
         return script in RTL_SCRIPTS
@@ -803,8 +810,13 @@ class Linter:
         for node in self.root.walk():
             if node.kind != "comment" or not MSO_IF_RE.match(node.data):
                 continue
+            for tag in TAG_RE.findall(node.data):     # the Word engine's own markup (Codex on #196)
+                if ALIGN_LEFT_RE.search(tag) or LEFT_RE.search(tag):
+                    self.add("warning", "direction", "a left alignment in a right-to-left email's Word-engine markup",
+                             node.line, "The start of a line is the right here, so left is its far side.",
+                             'mirror it: align="right", text-align:right')
             for tag in GHOST_TABLE_RE.findall(node.data):
-                if not re.search(r'\bdir\s*=\s*"rtl"', tag, re.I) and not DIRECTION_RE.search(tag):
+                if not DIR_RTL_ATTR_RE.search(tag) and not DIRECTION_RE.search(tag):
                     self.add("warning", "direction", 'a ghost table in a right-to-left email has no dir="rtl"',
                              node.line, "The ghost table is the table the Word engine lays the columns out "
                              "in, and caniemail tested dir on the table that holds the cells. Set it there, "
@@ -1379,8 +1391,8 @@ def main(argv=None) -> int:
     parser.add_argument("--strict", action="store_true", help="warnings fail the build too")
     parser.add_argument("--ignore", default="",
                         help="comma-separated check names to silence "
-                             "(tokens,css,css-partial,structure,images,head,links,"
-                             "link-text,size,contrast,dark,type,nostyle,source)")
+                             "(tokens,css,css-partial,structure,images,head,direction,vml,"
+                             "links,link-text,size,contrast,dark,type,nostyle,source)")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="list every occurrence instead of collapsing repeats")
     args = parser.parse_args(argv)

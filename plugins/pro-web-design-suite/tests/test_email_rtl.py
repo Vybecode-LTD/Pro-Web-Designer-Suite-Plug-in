@@ -155,6 +155,31 @@ class Direction(Lint):
         self.assertEqual([], rule)
         self.assertTrue([f for f in self.findings(page % "") if "no MSO font rule" in f["message"]])
 
+    def test_an_extension_value_is_no_script(self):
+        # Codex on #196: -u-nu-latn is a numbering system, not the language's script.
+        found = self.of(self.page(lang="ar-SA-u-nu-latn", html_dir="", table_dir=""), "direction")
+        self.assertIn("is written right to left", found[0]["message"] if found else "", found)
+        self.assertEqual([], self.of(self.page(lang="en-u-nu-arab", html_dir="", table_dir=""), "direction"))
+        self.assertEqual([], self.of(self.page(lang="en-x-arab", html_dir="", table_dir=""), "direction"))
+
+    def test_a_ghost_tables_dir_may_be_quoted_any_way_html_allows(self):
+        for attr in ("dir='rtl'", "dir=rtl", 'DIR="RTL"'):
+            ghost = ('<!--[if mso]><table role="presentation" %s style="width:600px;"><tr><td><![endif]-->'
+                     '<p>مرحبا</p><!--[if mso]></td></tr></table><![endif]-->' % attr)
+            with self.subTest(attr=attr):
+                self.assertEqual([], self.of(self.page(cell=ghost), "direction"))
+
+    def test_the_word_engines_own_markup_is_mirrored_too(self):
+        # Codex on #196: an align inside a conditional comment is what classic Outlook renders.
+        for cell in ('<!--[if mso]><table role="presentation" dir="rtl"><tr><td align="left"><![endif]-->x'
+                     '<!--[if mso]></td></tr></table><![endif]-->',
+                     '<!--[if mso]><table role="presentation" dir="rtl"><tr><td style="text-align:left;">'
+                     '<![endif]-->x<!--[if mso]></td></tr></table><![endif]-->'):
+            with self.subTest(cell=cell):
+                found = self.of(self.page(cell=cell), "direction")
+                self.assertEqual(1, len(found), found)
+                self.assertIn("Word-engine markup", found[0]["message"])
+
     def test_dir_on_a_left_to_right_language_is_a_warning(self):
         found = self.of(self.page(lang="en", cell="Hello"), "direction")
         self.assertEqual(["warning"], [f["severity"] for f in found], found)
@@ -173,6 +198,16 @@ class LabelWidth(Lint):
         self.assertIn("26 characters at 16px: about 282px", found[0]["detail"])
         self.assertEqual([], self.of(self.page("Jetzt die Ridgeline kaufen", 296), "vml"))
         self.assertEqual([], self.of(self.page("Shop the Ridgeline", 216), "vml"))
+
+    def test_the_docs_name_the_checks_the_linter_emits(self):
+        # Codex on #196: §11 said `vml-width`, and --ignore matches the emitted name.
+        doc = (EMAIL / "references" / "email-architecture.md").read_text(encoding="utf-8")
+        self.assertNotIn("vml-width", doc)
+        self.assertIn("the `vml` check", doc)
+        proc = run_py("email-template-system", "lint_email", "--help", cwd=self.tmp)
+        self.assertIn("direction,vml", "".join(output(proc).split()))     # argparse wraps mid-word
+        found = self.findings(self.page("Jetzt die Ridgeline kaufen", 216), "--ignore", "vml")
+        self.assertEqual([], [f for f in found if f["check"] == "vml"])
 
     def test_an_entity_counts_as_one_character(self):
         self.assertEqual([], self.of(self.page("Tea &amp; cakes for all", 216), "vml"))     # 19 characters, not 23
