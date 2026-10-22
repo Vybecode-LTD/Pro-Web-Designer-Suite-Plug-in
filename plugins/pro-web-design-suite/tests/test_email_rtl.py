@@ -124,6 +124,37 @@ class Direction(Lint):
         self.assertEqual([], self.of(self.page(lang="en", html_dir="", table_dir="",
                                                cell='<p align="left">Hello</p>'), "direction"))
 
+    def test_a_language_without_its_script_subtag_is_read_by_cldr(self):
+        # Codex on #196: nqo (N'Ko) and rhg (Hanifi Rohingya) omit their script.
+        for lang in ("nqo", "rhg", "ckb", "ar-EG", "pa-PK", "uz-AF"):
+            with self.subTest(lang=lang):
+                found = self.of(self.page(lang=lang, html_dir="", table_dir=""), "direction")
+                self.assertIn("is written right to left", found[0]["message"] if found else "", found)
+        for lang in ("pa", "uz", "sd-IN", "ug-KZ", "sd-Deva"):    # left to right there
+            with self.subTest(lang=lang):
+                self.assertEqual([], self.of(self.page(lang=lang, html_dir="", table_dir=""), "direction"))
+
+    def test_every_word_engine_condition_holds_a_ghost_table(self):
+        # Codex on #196: [if gte mso 9] and [if (gte mso 9)|(IE)] are the Word engine's too.
+        for condition in ("gte mso 9", "(gte mso 9)|(IE)", "mso | IE"):
+            ghost = ('<!--[if %s]><table role="presentation" style="width:600px;"><tr><td><![endif]-->'
+                     '<p>مرحبا</p><!--[if %s]></td></tr></table><![endif]-->' % (condition, condition))
+            with self.subTest(condition=condition):
+                found = self.of(self.page(cell=ghost), "direction")
+                self.assertEqual(["ghost table"], [f["message"].split(" in ")[0][2:] for f in found], found)
+        branch = '<!--[if !mso]><!-- --><table role="presentation"><tr><td>x</td></tr></table><!--<![endif]-->'
+        self.assertEqual([], self.of(self.page(cell=branch.replace("<table", '<table dir="rtl"')), "direction"))
+
+    def test_a_versioned_condition_carries_the_font_rule(self):
+        # The same match decides whether the head has the Word engine's font rule.
+        head = ('<!--[if gte mso 9]><style>table, td, div, p, a { font-family: Arial, sans-serif !important; }'
+                '</style><![endif]-->')
+        page = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>t</title>%s</head><body>'
+                '<p style="font-family:Inter, Arial, sans-serif">Hi</p></body></html>')
+        rule = [f for f in self.findings(page % head) if "no MSO font rule" in f["message"]]
+        self.assertEqual([], rule)
+        self.assertTrue([f for f in self.findings(page % "") if "no MSO font rule" in f["message"]])
+
     def test_dir_on_a_left_to_right_language_is_a_warning(self):
         found = self.of(self.page(lang="en", cell="Hello"), "direction")
         self.assertEqual(["warning"], [f["severity"] for f in found], found)

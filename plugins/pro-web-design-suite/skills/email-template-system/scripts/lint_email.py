@@ -94,11 +94,36 @@ COLOUR_ATTRS = ("bgcolor", "color", "background", "fillcolor", "strokecolor")
 COMMENT_ATTR_RE = re.compile(r"\b(%s|style)\s*=\s*\"([^\"]*)\"" % "|".join(COLOUR_ATTRS), re.I)
 DARK_RE = re.compile(r"prefers-color-scheme\s*:\s*dark", re.I)
 # Right to left (DL-B5): the scripts W3C names as right-to-left
-# (w3.org/International/questions/qa-scripts), as BCP 47 script subtags, and the
-# languages written in one of them by default. A script subtag decides: ku-Arab
-# is right to left, az-Latn is not.
+# (w3.org/International/questions/qa-scripts), as BCP 47 script subtags. A tag
+# with a script subtag is read by it: ku-Arab is right to left, az-Latn is not.
+# One without is read by CLDR 48's likely subtags (unicode-org/cldr-json 49.0.0,
+# supplemental/likelySubtags.json): the languages whose likely script is one of
+# these, and the language-region pairs that differ from their language (pa-PK
+# is right to left, sd-IN is not). Codex on #196: a short list missed nqo, rhg.
 RTL_SCRIPTS = {"adlm", "arab", "hebr", "mand", "nkoo", "rohg", "samr", "syrc", "thaa", "yezi"}
-RTL_LANGUAGES = {"ar", "ckb", "dv", "fa", "he", "iw", "prs", "ps", "sd", "syr", "ug", "ur", "yi"}
+RTL_LANGUAGES = frozenset("""
+    aao abh abv acm acq acw acx adf aeb aec aee aeq afb aib aii aij aiq amw apc apd ar arq ars
+    ary arz ask atn auj auz avd avl ayh ayl ayn ayp azb bal bdz bej bft bgn bgp bhe bhm bhn bjf
+    bjm bqi brh brk bsh bsk chg cja ckb clh czk dcc def deh dgl dmk dml dv esh fa fay faz fia
+    fub gbz ggg gha ghr gig gjk gju glh glk grr gwc gwf gwt gzi hac haz hbo he hkh hnd hno hoh
+    hrt hrz hss huy isk itk iw jad jat jbe jbn jdg ji jnd jog jpa jpr jrb jye kbu kby kcy kfm
+    khw klj kmz kqd ks ktl kvx kxp lad lah lhs lki lrc lrk lrl lsa lsd lss luv luz mby mde mey
+    mfa mfi mhj mid mki mnj mve mvy myz mzb mzn nli nlm nqo ntz nyq oar odk oru ota pbt phl phr
+    phv plk prc prd prx ps psh psi pst qxq rdb rhg rmt sam sbn scl sd sdb sdf sdg sdh sds sgr
+    sgy shd shm shu shv siy siz skr smp smy sqo sqt srh srz ssh sts swb syc syn syr tjo tks tmr
+    tov tra trg trm trw ug ur ush uzs vaf vgr vmh wbk wlo wne wni wsv xhe xka xkc xkj xkp xvi
+    ydg yhd yi yih yud zba zdj zrp zum
+""".split())
+RTL_REGIONS = frozenset("""
+    az-iq az-ir ha-cm ha-sd kk-af kk-cn kk-ir kk-mn ku-iq ku-ir ku-lb ky-cn ms-cc pa-pk tg-pk
+    uz-af
+""".split())
+LTR_REGIONS = frozenset("""
+    mey-sn sd-in ug-kz ug-mn
+""".split())
+# A conditional comment the Word engine reads: [if mso], [if gte mso 9],
+# [if (gte mso 9)|(IE)], never [if !mso] (Codex on #196).
+MSO_IF_RE = re.compile(r"\s*\[if\b[^\]]*(?<![!\w])mso\b", re.I)
 DIRECTION_RE = re.compile(r"(?<![\w-])direction\s*:\s*rtl\b", re.I)
 LEFT_RE = re.compile(r"(?<![\w-])text-align\s*:\s*left\b", re.I)
 GHOST_TABLE_RE = re.compile(r"<table\b[^>]*>", re.I)
@@ -382,7 +407,12 @@ def rtl_language(tag: str) -> bool:
     """Whether a BCP 47 tag names a language written right to left."""
     parts = tag.strip().lower().replace("_", "-").split("-")
     script = next((p for p in parts[1:] if len(p) == 4 and p.isalpha()), None)
-    return script in RTL_SCRIPTS if script else parts[0] in RTL_LANGUAGES
+    if script:
+        return script in RTL_SCRIPTS
+    region = next((p for p in parts[1:] if (len(p) == 2 and p.isalpha()) or (len(p) == 3 and p.isdigit())), None)
+    if region and parts[0] + "-" + region in RTL_REGIONS | LTR_REGIONS:
+        return parts[0] + "-" + region in RTL_REGIONS
+    return parts[0] in RTL_LANGUAGES
 
 
 def sets_rtl(node) -> bool:
@@ -700,7 +730,7 @@ class Linter:
         # style="font-family:Arial"> in the body is no scaffold (Codex on #57).
         head = next((n for n in self.root.elements() if n.tag == "head"), None)
         mso_font = head is not None and any(
-            n.kind == "comment" and re.match(r"\s*\[if\s+mso", n.data, re.I)
+            n.kind == "comment" and MSO_IF_RE.match(n.data)
             and sets_broad_font(n.data) for n in head.walk()
         )
         if not mso_font:
@@ -771,7 +801,7 @@ class Linter:
                          "direction, and <html>'s with it. caniemail tests dir on a table." % blame("html-body"),
                          'add dir="rtl" to the table')
         for node in self.root.walk():
-            if node.kind != "comment" or not re.match(r"\s*\[if\s+mso", node.data, re.I):
+            if node.kind != "comment" or not MSO_IF_RE.match(node.data):
                 continue
             for tag in GHOST_TABLE_RE.findall(node.data):
                 if not re.search(r'\bdir\s*=\s*"rtl"', tag, re.I) and not DIRECTION_RE.search(tag):
