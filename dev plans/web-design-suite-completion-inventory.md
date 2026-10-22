@@ -255,7 +255,7 @@ The status of all 265 items in the [review](web-design-suite-review.md) after 3.
 | DL-B1 | high | fixed in 3.3.0: the reference's §9 (`test_docs.SupabaseGuidance.test_the_access_boundary_is_stated`) and the generated `lib/supabase.ts` (`test_policies`) | no data-access boundary. |
 | DL-B2 | high | fixed: 3.3.0 the per-table policies, column grants and a smoke test (`test_policies`); 3.4.0 the server schema, zod and pydantic, `test_scaffold.TheServerSchemaMirrorsTheConstraints` (PR #64) | authorization and server validation belong to nobody. |
 | DL-B3 | medium | done in 4.0.0: in 3.6.0, `test_schema_sources.OrmSchemasReadAsTheMigrationDoes`, PR #117; in 4.0.0, server actions, `test_scaffold.TheServerActions`, PR #173, Vue output, `test_scaffold_frameworks.TheVueScaffold`, PR #176, and Svelte output, `TheSvelteScaffold`, PR #177 | stacks the description implies but doesn't serve. |
-| DL-B4 | medium | W13 (3.6.0+) | email frameworks. |
+| DL-B4 | medium | done in 4.0.0: `test_email_frameworks`, PR #198 (P41 part 3) | email frameworks. |
 | DL-B5 | medium | done in 4.0.0: `test_email_rtl`, PR #196 (P41 part 2) | email translation and RTL. |
 | DL-B6 | medium | fixed in 3.4.0: the dark pass and the MSO font check (PR #57), the `nostyle` check and `--source` (PR #58); generated-form ARIA (A9) is its own item | Checks the docs promise but nothing runs: email dark-mode contrast, the MSO font block, the no-`<style>` layout, source literals, generated-form ARIA. |
 | DL-B7 | low | fixed in 3.4.0: Google's and Microsoft's bulk-sender rules, re-read 2026-10-06, figures in `evidence.json` (PR #59; `test_email.EmailDocClaims`) | deliverability is dated. |

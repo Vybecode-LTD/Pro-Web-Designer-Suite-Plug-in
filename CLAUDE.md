@@ -8,6 +8,7 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Stack:**
   - The scripts and tests are Python 3.9 or newer, standard library only.
   - Node 20.19+, 22.13+ or 24+ (ESLint 10's range) is needed for the browser scripts and the real-tool tests.
+  - The real-tool tests' pinned packages are in `tooling/main` (ESLint, stylelint, Playwright, Tailwind, Vue, Svelte, MJML, React Email); `tooling/README.md` lists them.
   - The skills and references are Markdown.
 - **Repository:** https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in, where the plugin is developed. It is public (since 2026-09-28), and MIT-licensed like the plugin. From 4.0.0, users install from the **distribution repository**, https://github.com/Vybecode-LTD/pro-web-design-suite, which holds the built plugin at its root (no `tests/`, `evals/` or `tools/`). Only `release.yml`'s `distribute` job writes it, with the `DIST_DEPLOY_KEY` deploy key; nobody commits to it by hand. Anthropic's directory reads it.
 - **Type:** a Claude Code plugin marketplace. It is not a web app and not a desktop app, so the SEO and software-release directives do not apply.

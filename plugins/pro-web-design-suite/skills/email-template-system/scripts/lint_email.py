@@ -447,6 +447,20 @@ def is_preheader(node) -> bool:
     return "display:none" in style and ("max-height:0" in style or "opacity:0" in style)
 
 
+def sized_text(node) -> str:
+    """The text set at this element's own font-size: its descendants' text,
+    except under one that sets a size of its own. A `font-size:0` wrapper
+    round inline-block columns (MJML's, and the fluid-hybrid layout's) holds
+    no text at 0px when every column sets its size (DL-B4)."""
+    parts = []
+    for child in node.children:
+        if child.kind == "text":
+            parts.append(child.data)
+        elif child.kind == "element" and px(declarations(child.get("style") or "").get("font-size", "")) is None:
+            parts.append(sized_text(child))
+    return " ".join(parts)
+
+
 def declarations(style: str) -> dict[str, str]:
     out: dict[str, str] = {}
     for piece in style.split(";"):
@@ -982,6 +996,10 @@ class Linter:
                 continue
             if not " ".join(node.text_content().split()):
                 continue
+            # A preheader is hidden, so nobody reads its colour: MJML's is
+            # white on any canvas (DL-B4), as the dark pass already knew.
+            if any(is_preheader(n) for n in [node, *node.ancestors()] if n.kind == "element"):
+                continue
 
             bg, source_tag = self.resolve_background(node)
             if bg is None:
@@ -1171,7 +1189,7 @@ class Linter:
             size = px(decls.get("font-size", ""))
             if size is None:
                 continue
-            text = " ".join(node.text_content().split())
+            text = " ".join(sized_text(node).split())
             if size < EMAIL_MIN_FONT_PX and text and len(re.sub(r"[‌ ]", "", text)) > 3:
                 style = (node.get("style") or "").replace(" ", "").lower()
                 if "display:none" in style or "max-height:0" in style:

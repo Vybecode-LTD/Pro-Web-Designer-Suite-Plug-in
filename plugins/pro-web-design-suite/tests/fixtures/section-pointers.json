@@ -1280,6 +1280,12 @@
  {
   "from": "email-template-system/SKILL.md",
   "to": "email-template-system/references/email-workflow.md",
+  "section": "11",
+  "heading": "MJML, React Email and Maizzle"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
   "section": "2",
   "heading": "The build step"
  },
@@ -1400,6 +1406,12 @@
  {
   "from": "email-template-system/references/email-workflow.md",
   "to": "email-template-system/references/email-architecture.md",
+  "section": "3",
+  "heading": "Spacing discipline — Law 2, table-shaped"
+ },
+ {
+  "from": "email-template-system/references/email-workflow.md",
+  "to": "email-template-system/references/email-architecture.md",
   "section": "6",
   "heading": "Bulletproof buttons"
  },
@@ -1432,6 +1444,12 @@
   "to": "email-template-system/references/email-client-matrix.md",
   "section": "7",
   "heading": "Size limits and clipping"
+ },
+ {
+  "from": "email-template-system/scripts/export_email_theme.py",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "11",
+  "heading": "MJML, React Email and Maizzle"
  },
  {
   "from": "email-template-system/scripts/lint_email.py",

@@ -484,6 +484,10 @@ TAG_STYLE_ATTR = re.compile(r"""<[a-zA-Z][\w:-]*\b[^>]*?\sstyle\s*=\s*(["'])(.*?
 # HTML email cannot use custom properties or layers, so this script's laws do
 # not fit it; email-template-system's lint_email is its gate.
 EMAIL_MARKERS = ("<!--[if mso", "<!--[if gte mso", "urn:schemas-microsoft-com")
+# A React Email template is email too: its inline styles are the medium's,
+# and lint_email reads the HTML it renders (DL-B4).
+REACT_EMAIL_IMPORT = re.compile(
+    r"""(?:\bfrom\s*|\brequire\s*\(\s*|\bimport\s*\(\s*)["'](?:react-email|@react-email/[\w.-]+)["']""")
 # Commented-out markup never renders: the census blanks it too (template_of).
 HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
 
@@ -2694,6 +2698,7 @@ def is_html_email(text: str) -> bool:
 
 SKIP_NOT_AUDITABLE = "not CSS, JS or HTML"
 SKIP_EMAIL = "HTML email: lint it with email-template-system's lint_email"
+SKIP_REACT_EMAIL = "React Email: render it, then lint the HTML with email-template-system's lint_email"
 SKIP_INDENTED_SASS = "indented Sass, which this audit cannot read: audit the compiled CSS, or use .scss"
 
 
@@ -2723,6 +2728,9 @@ def audit_run(paths: list[str]) -> tuple[list[Finding], int, list[tuple[Path, st
             continue
         if kind == "template" and is_html_email(text):
             skipped.append((fp, SKIP_EMAIL))
+            continue
+        if kind != "css" and REACT_EMAIL_IMPORT.search(text):
+            skipped.append((fp, SKIP_REACT_EMAIL))
             continue
         audited += 1
         if kind == "css":
@@ -2939,7 +2947,7 @@ def main(argv: list[str] | None = None) -> int:
 
     findings, audited, skipped = audit_run(paths)
 
-    for why in (SKIP_NOT_AUDITABLE, SKIP_EMAIL, SKIP_INDENTED_SASS):
+    for why in (SKIP_NOT_AUDITABLE, SKIP_EMAIL, SKIP_REACT_EMAIL, SKIP_INDENTED_SASS):
         group = [p for p, reason in skipped if reason == why]
         if group:
             names = ", ".join(str(p) for p in group[:5]) + (" …" if len(group) > 5 else "")

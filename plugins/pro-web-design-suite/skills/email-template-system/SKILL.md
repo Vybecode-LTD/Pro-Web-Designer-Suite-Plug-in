@@ -1,6 +1,6 @@
 ---
 name: email-template-system
-description: Build HTML email that survives Outlook, Gmail and dark mode, compiling the design tokens into inlined, table-based markup. Use for templates and newsletters. Not for copywriting or ESP setup.
+description: Build HTML email that survives Outlook, Gmail and dark mode, compiling tokens to inlined tables or an MJML or React Email theme. Use for templates and newsletters. Not for copywriting or ESP setup.
 ---
 
 # Email Template System
@@ -16,11 +16,9 @@ description: Build HTML email that survives Outlook, Gmail and dark mode, compil
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_email.py, lint_email.py, render_email.mjs; copy their helpers too: browser_common.mjs, dtcg.py, project_config.mjs, project_config.py).
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_email.py, lint_email.py, export_email_theme.py, render_email.mjs; copy their helpers too: browser_common.mjs, dtcg.py, project_config.mjs, project_config.py).
 
 Every agency client eventually needs email, and email is the one place where **this suite's laws must be deliberately broken**. HTML email has no cascade layers, no custom properties you can rely on, no `gap`, no flexbox or grid in the client that matters most, and `<style>` blocks that several clients strip entirely.
-
-It is a real, principled exception, to be owned explicitly, not improvised the night before a send.
 
 ## The principle
 
@@ -30,7 +28,7 @@ You never hand-write a hex in an email template. You author against the same Tie
 
 **The laws are not abandoned. They move from runtime to build time.**
 
-This reframing is the whole skill. Without it, "email is different" becomes a licence for a second, undisciplined design system that drifts from the first one within a quarter, unseen, since nobody opens last quarter's email beside this quarter's site.
+This reframing is the whole skill. Without it, "email is different" licenses a second, undisciplined design system that drifts from the first within a quarter.
 
 ---
 
@@ -72,8 +70,6 @@ Python scripts: stdlib. `render_email.mjs`: Node and Playwright.
 ---
 
 ## What the compile actually does
-
-Worth seeing once, because it is what makes the exception credible rather than a slogan.
 
 **You author this:**
 
@@ -128,6 +124,8 @@ Start from one of the four in `${CLAUDE_SKILL_DIR}/assets/templates/` — copy i
 | `newsletter.html` | text-forward, pull quote, captioned image, the best deliverability profile |
 | `product-announcement-rtl.html` | the announcement in Arabic, right to left: `dir` on every table, mirrored alignment |
 
+Written in MJML or React Email? `export_email_theme.py` writes the tokens as an `mj-include` head or a theme module; starters are in `assets/templates/mjml/` and `react-email/` (`references/email-workflow.md` §11).
+
 Authoring rules, in full, in `references/email-workflow.md` §1. The short version: tokens everywhere, classes in one `<style>` block, **utilities declared last**, inline `style` only for genuinely per-instance values.
 
 ### 3. Build
@@ -136,8 +134,6 @@ Authoring rules, in full, in `references/email-workflow.md` §1. The short versi
 python -m scripts.build_email "${CLAUDE_SKILL_DIR}/assets/templates/transactional-receipt.html" \
     --out build/receipt.html --text build/receipt.txt
 ```
-
-It does what the compile above shows; its flags are under Scripts.
 
 ### 4. Lint
 
@@ -200,8 +196,6 @@ Full decision table and the `cellpadding` trap in `references/email-architecture
 
 ## When you are handed an existing email
 
-Common, and the instinct to rewrite it is usually right but not always affordable.
-
 1. **Lint it first.** `python -m scripts.lint_email their-template.html` on the file as it stands. The error count is the argument for whatever you propose next, and it is specific: "nine layout tables with no `role="presentation"`, four images with no alt, body text at 2.9:1, and it clips in Gmail at 118 KB."
 2. **Decide by where the values live.** If the colours and sizes are consistent literals, it is mechanical: extract them to `email-tokens.json`, replace with `var()`, and you have a source template. If they are inconsistent — three greys that meant to be one — that is a migration, and `design-token-migration` owns the extract-and-cluster pass.
 3. **Never edit the compiled file.** The moment someone hand-edits built HTML, the source stops being the truth and the next build silently reverts them. `build/` belongs in `.gitignore`.
@@ -211,7 +205,7 @@ Common, and the instinct to rewrite it is usually right but not always affordabl
 
 ## Scripts
 
-Both are stdlib-only Python 3, no dependencies.
+All three are stdlib-only Python 3, no dependencies; `export_email_theme.py` is in `references/email-workflow.md` §11.
 
 ### `scripts/build_email.py` — the compiler
 
@@ -296,6 +290,7 @@ Within this skill:
 | the plain-text part | `references/email-workflow.md` §7 |
 | ESP handoff and merge-tag portability | `references/email-workflow.md` §8 |
 | the pre-send checklist | `references/email-workflow.md` §9 |
+| MJML, React Email, Maizzle | `references/email-workflow.md` §11 |
 | every token substitution and its reason | `assets/email-tokens.json` |
 
 ---

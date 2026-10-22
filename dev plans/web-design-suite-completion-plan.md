@@ -518,7 +518,7 @@ DTCG 2025.10, Tokens Studio and Style Dictionary through a shared `dtcg.py`. A F
 | ID | Severity or size | What is wrong or missing |
 |---|---|---|
 | DL-B3 | medium | stacks the description implies but doesn't serve. *Done for 4.0.0: Prisma and Drizzle (PR #117, 3.6.0), Next.js server actions (PR #173), and Vue and Svelte output (PRs #176, #177, P37 parts 5 and 6).* |
-| DL-B4 | medium | email frameworks. |
+| DL-B4 | medium | email frameworks. *Done for 4.0.0: `scripts/export_email_theme.py` writes the email tokens as an MJML head to `mj-include` or a React Email theme module, with a starter for each that compiles to HTML `lint_email.py --strict` passes; email-workflow.md §11, and Maizzle routed away (#198).* |
 | DL-B5 | medium | email translation and RTL. *Done for 4.0.0: `assets/templates/product-announcement-rtl.html`, email-architecture.md §11, and `lint_email.py`'s `direction` and `vml` checks (#196).* |
 | DL-C9 | M | Keep the email client matrix honest: regenerate its cells from caniemail's data, with test dates. *Done for 4.0.0: `tools/sync_caniemail.py` writes email-client-matrix.md §2's table, its notes and test dates, and the clients `lint_email.py` names, from caniemail's data pinned in `tests/fixtures/caniemail.json` (#195).* |
 

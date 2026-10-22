@@ -39,6 +39,31 @@ renames the plugin.
 
 ### Added
 
+- **MJML and React Email from the email tokens** (DL-B4, P41 part 3). The router sent "MJML" to
+  email-template-system, which said nothing about it, and nothing reached React Email. The new
+  `scripts/export_email_theme.py` writes `email-tokens.json` (or `.design-suite.json`'s
+  `emailTokens`, or `--tokens`) in the form each framework reads:
+  - **`--format mjml`**: an `<mjml><mj-head>` file to `mj-include` in a template's head, with
+    `<mj-attributes>` (the defaults for `mj-all`, `mj-body`, `mj-section`, `mj-text`, `mj-button`,
+    `mj-divider`, `mj-spacer` and `mj-table`, and an `mj-class` for each type role, text colour,
+    surface, gap and inset), `<mj-breakpoint>`, the link colour inlined, the Word engine's
+    `[if mso]` font rule, and an `<mj-style>` with the dark-mode and phone rules.
+  - **`--format react-email`**: a TypeScript module (JavaScript for a `.js` or `.mjs` out) with
+    `tokens`, `text`, `styles`, `spacers`, `classes`, `headCss`, and `withMso()`, which adds the
+    `[if mso]` block React cannot render.
+
+  Every class has a `wds-` name that the dark-mode and phone rules select. The gap and inset
+  classes carry none, since MJML replaces a tag's `css-class` with an `mj-class`'s and a section
+  would lose its dark rule. A role the tokens lack is named (`--strict` fails on it), and a value
+  that could end its attribute, declaration or comment is refused. Two starters,
+  `assets/templates/mjml/product-announcement.mjml` and
+  `assets/templates/react-email/product-announcement.tsx`, compile with MJML 5.4 and render with
+  React Email 6.11 to HTML that passes `lint_email.py --strict`, and a browser test reads the dark
+  and phone rules on both. email-workflow.md §11 covers the include MJML 5 ignores unless it is
+  allowed, the classes, `withMso()`, React Email's `Preview` and its second `<title>`, the text
+  part, and Maizzle, which is routed away: map its Tailwind theme by hand and lint what it builds.
+  The router now also hears React Email, Maizzle and an `mj-` tag. The test toolchain gains
+  `mjml` 5.4.1, `react` and `react-dom` 19.3.1 and `react-email` 6.11.3 (`tooling/main`).
 - **Right-to-left email, and a label a translation lengthens** (DL-B5, P41 part 2). The skill had
   one line on direction. `assets/templates/product-announcement-rtl.html` is the announcement in
   Arabic: `lang` and `dir` on `<html>`, `dir="rtl"` on every table, the ghost tables included, so
@@ -373,6 +398,14 @@ renames the plugin.
 
 ### Fixed
 
+- **Two false findings in `lint_email.py` on a compiler's markup** (DL-B4, P41 part 3). MJML's
+  output had an error and a warning per column. A hidden preheader's colour was measured, and
+  MJML's is white on any canvas: the contrast check now skips a preheader, as the dark check did.
+  A `font-size:0` wrapper round inline-block columns, MJML's and the fluid-hybrid layout's, was
+  read as text at 0px: the type check now measures the text an element sizes itself, not the
+  text of a child that sets its own size. And `audit_design.py`, which leaves HTML email to
+  `lint_email.py`, now leaves a React Email template too (a file that imports `react-email` or
+  `@react-email/*`): it failed the starter's inline image size under L4, in the gate hook as well.
 - **The email client matrix and the linter's client lists are caniemail's data** (DL-C9, P41
   part 1). A15 corrected the matrix from caniemail's pages by hand in 3.2.0, and the copies drifted
   again: against caniemail's data of 2026-09-16, some 60 cells differed from its latest results
