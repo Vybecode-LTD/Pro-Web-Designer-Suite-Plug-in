@@ -598,6 +598,25 @@ class PageTypesAndRouting(unittest.TestCase):
         notes = table.split("things to read out of that table.", 1)[1]
         self.assertEqual(words[stated], len(re.findall(r"^\*\*[^*]+\*\*", notes, re.M)))
 
+    def test_every_new_sequence_closes_with_a_final_cta(self):
+        """Codex on #193: §2.12 includes a final CTA always; three of the new
+        sequences ended at the footer, leaving the convinced reader with
+        nothing to press."""
+        table = section(architecture(), "## 3. Sequences by page type", "\n\n### 3.1")
+        for page in ("B2B demo request", "Gated lead magnet", "Local booking", "Donation", "Paid-search landing page"):
+            with self.subTest(page=page):
+                row = next(line for line in table.splitlines() if line.startswith(f"| **{page}**"))
+                self.assertRegex(row, r"Final CTA[^|]*→ (?:A minimal )?[Ff]ooter")
+
+    def test_the_financial_promotion_row_leaves_ordinary_roi_alone(self):
+        """Codex on #193: FSMA s. 21 is about investment activity; a B2B
+        page's return on its own price, which the demo sequence asks for, is
+        not an invitation to invest."""
+        claims = " ".join(section(architecture(), "### 3.1 Claims that need a lawyer before a writer", "\n### ").split())
+        self.assertIn("An invitation or inducement to invest, or to take a regulated financial product", claims)
+        self.assertIn("A product's return on its own price, a B2B page's ROI, is not this", claims)
+        self.assertNotIn("A return on an investment, or any invitation to invest", claims)
+
     def test_regulated_claims_are_flagged_with_their_sources_provisions(self):
         claims = " ".join(section(architecture(), "### 3.1 Claims that need a lawyer before a writer", "\n### ").split())
         self.assertRegex(claims, r"^\*As of \d{4}-\d{2}-\d{2}; flag these, never write the claim\.\*")
