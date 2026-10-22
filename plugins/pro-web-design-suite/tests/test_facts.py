@@ -549,52 +549,9 @@ EMAIL = SKILLS / "email-template-system"
 
 
 class EmailClientFacts(TempDirTest):
-    """DL-A15, DL-A17. caniemail's raw data (github.com/hteumeuleu/caniemail,
-    _features/*.md), read 2026-09-25, latest tested entry per client:
-    display:flex yes in Outlook for Mac 16.80, Gmail (Google accounts),
-    Samsung 5.0, Thunderbird 60.5; no in classic Outlook and GANGA.
-    display:grid yes in Outlook.com (2024-01), Gmail web (2026-03), Yahoo,
-    Samsung, Thunderbird; no in classic Outlook and GANGA.
-    prefers-color-scheme (2023-03-08) yes in Apple Mail, Outlook.com, Mac,
-    iOS, Android, Samsung 6.1; no in Gmail, Yahoo, classic Outlook,
-    Thunderbird 78.5 and 91.13."""
-
-    CANIEMAIL = {
-        ("`display:flex`", "Outlook Mac"): "✅", ("`display:flex`", "Samsung"): "✅",
-        ("`display:flex`", "Thunderbird"): "✅", ("`display:flex`", "Gmail web"): "✅",
-        ("`display:flex`", "GANGA"): "❌", ("`display:flex`", "Outlook Win (Word)"): "❌",
-        ("`display:grid`", "Outlook Web"): "✅", ("`display:grid`", "Samsung"): "✅",
-        ("`display:grid`", "Thunderbird"): "✅", ("`display:grid`", "GANGA"): "❌",
-        ("`@media (prefers-color-scheme)`", "Outlook Web"): "✅",
-        ("`@media (prefers-color-scheme)`", "Thunderbird"): "❌",
-        ("`@media (prefers-color-scheme)`", "Gmail web"): "❌",
-        ("`@media (prefers-color-scheme)`", "Apple Mail"): "✅",
-    }
-
-    def matrix(self):
-        text = read(EMAIL / "references" / "email-client-matrix.md")
-        header = next(line for line in text.splitlines() if line.startswith("| Feature |"))
-        columns = [c.strip().strip("*") for c in header.strip("|").split("|")][1:]
-        rows = {}
-        for line in text.splitlines():
-            cells = [c.strip() for c in line.strip("|").split("|")]
-            if len(cells) == len(columns) + 1 and cells[0].startswith("`"):
-                rows[cells[0]] = {col: cell[:1] for col, cell in zip(columns, cells[1:])}
-        return rows
-
-    def test_the_matrix_agrees_with_caniemail(self):
-        rows = self.matrix()
-        for (feature, column), mark in self.CANIEMAIL.items():
-            with self.subTest(feature=feature, client=column):
-                self.assertEqual(rows[feature][column], mark[:1])
-
-    def test_the_linter_blames_only_the_clients_that_drop_flex(self):
-        source = read(EMAIL / "scripts" / "lint_email.py")
-        props = source.split("UNSUPPORTED_PROPS = {", 1)[1].split("\n}", 1)[0]
-        for value in ("flex", "grid"):
-            blamed = re.search(rf'"{value}": \(((?:"[^"]*"\s*)+),', props).group(1)
-            with self.subTest(value=value):
-                self.assertNotRegex(blamed, r"Outlook Mac|Samsung|Thunderbird")
+    """DL-A15, DL-A17. The matrix's cells, and the clients the linter blames,
+    are caniemail's data now, written by tools/sync_caniemail.py (DL-C9):
+    test_caniemail holds them to it."""
 
     def test_gone_quirks_and_dark_mode_claims_are_not_repeated(self):
         gone = re.compile(r"Thunderbird is Gecko and respects|respect \(Apple Mail, Thunderbird\)|"

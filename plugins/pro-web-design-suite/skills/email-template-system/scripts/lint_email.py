@@ -95,55 +95,129 @@ VOID_TAGS = {
     "meta", "param", "source", "track", "wbr",
 }
 
-# Properties no client worth supporting honours, mapped to who drops them and what
-# to use instead. Sourced from references/email-client-matrix.md §2.
+# BEGIN caniemail: written by tools/sync_caniemail.py from caniemail's data; never edit it by hand
+# Each client's name in a finding; then each feature: the date caniemail tested it,
+# and the clients without support and with partial support at the last version
+# tested, by key.
+CANIEMAIL_CLIENTS = {
+    "word": "classic Outlook for Windows (Word engine)",
+    "outlook-com": "Outlook.com",
+    "outlook-mac": "Outlook for Mac",
+    "gmail-web": "Gmail on the web",
+    "gmail-app": "the Gmail app",
+    "ganga": "the Gmail app with a non-Google account",
+    "apple-mail": "Apple Mail",
+    "yahoo": "Yahoo Mail",
+    "samsung": "Samsung Email",
+    "thunderbird": "Thunderbird",
+}
+CANIEMAIL = {
+    "html-style": ("2023-07-27", "ganga", "word gmail-web gmail-app"),
+    "css-at-media": ("2023-12-13", "word ganga thunderbird",
+                                   "outlook-com outlook-mac gmail-web gmail-app yahoo samsung"),
+    "css-at-media-prefers-color-scheme": ("2023-03-08", "word gmail-web gmail-app ganga yahoo thunderbird",
+                                                        ""),
+    "css-display-flex": ("2021-11-02", "word ganga", ""),
+    "css-display-grid": ("2019-02-28", "word ganga", ""),
+    "css-flex-direction": ("2023-01-17", "word gmail-web gmail-app ganga yahoo", ""),
+    "css-justify-content": ("2021-03-09", "word gmail-web gmail-app ganga yahoo", ""),
+    "css-align-items": ("2023-12-19", "word gmail-web gmail-app ganga yahoo", ""),
+    "css-gap": ("2022-12-28", "word yahoo", "outlook-com outlook-mac gmail-web gmail-app ganga"),
+    "css-float": ("2024-05-08", "word", "gmail-app ganga yahoo"),
+    "css-position": ("2021-05-16", "word gmail-web gmail-app ganga",
+                                   "outlook-com outlook-mac apple-mail yahoo samsung"),
+    "css-max-width": ("2019-08-02", "", "word"),
+    "css-min-height": ("2021-11-29", "word", ""),
+    "css-padding": ("2019-07-25", "", "word"),
+    "css-margin": ("2019-10-01", "",
+                                 "word outlook-com outlook-mac gmail-web gmail-app ganga yahoo"),
+    "css-border-radius": ("2021-03-09", "word", "yahoo"),
+    "css-box-shadow": ("2023-12-20", "word gmail-web gmail-app yahoo", ""),
+    "css-text-shadow": ("2019-02-28", "word outlook-com outlook-mac gmail-web gmail-app ganga", ""),
+    "css-letter-spacing": ("2020-01-19", "", "word"),
+    "css-opacity": ("2019-02-28", "word", ""),
+    "css-background-image": ("2023-07-24", "word", "yahoo"),
+    "css-background-size": ("2019-02-28", "word ganga", ""),
+    "css-object-fit": ("2021-07-15", "word ganga yahoo", ""),
+    "css-filter": ("2024-01-03", "word outlook-com outlook-mac gmail-web gmail-app ganga yahoo",
+                                 ""),
+    "css-transform": ("2019-02-28", "word outlook-com outlook-mac gmail-web gmail-app ganga yahoo",
+                                    ""),
+    "css-transition": ("2024-03-29", "word outlook-com outlook-mac gmail-web gmail-app ganga",
+                                     "yahoo samsung"),
+    "css-animation": ("2026-04-07", "word outlook-com outlook-mac gmail-web gmail-app ganga yahoo thunderbird",
+                                    ""),
+    "css-pseudo-class-hover": ("2019-10-23", "word ganga", "outlook-com outlook-mac gmail-app"),
+    "css-at-font-face": ("2023-12-19", "outlook-com outlook-mac gmail-web gmail-app ganga yahoo",
+                                       "word"),
+    "css-variables": ("2020-02-25", "word outlook-com outlook-mac gmail-web gmail-app ganga yahoo",
+                                    ""),
+    "html-svg": ("2020-02-06", "word outlook-com outlook-mac gmail-web gmail-app ganga yahoo",
+                               "apple-mail"),
+    "html-video": ("2019-09-16", "word outlook-com gmail-web gmail-app ganga yahoo",
+                                 "apple-mail samsung"),
+    "html-dir": ("2021-11-01", "", "word"),
+    "html-lang": ("2020-10-25", "", "yahoo"),
+}
+# END caniemail
+
+# Properties a client that matters drops, each with caniemail's feature (whose
+# CANIEMAIL entry above names who drops it, DL-C9) or, with none, who drops it,
+# and what to use instead. Every feature is a row of email-client-matrix.md §2.
 UNSUPPORTED_PROPS = {
     "display": {
-        "flex": ("classic Outlook for Windows (Word engine) and the Gmail app with a non-Google "
-                 "account; Gmail also drops flex-direction everywhere",
-                 "table cells, or an inline-block fluid-hybrid column"),
-        "inline-flex": ("same as display:flex", "inline-block"),
-        "grid": ("classic Outlook for Windows (Word engine) and the Gmail app with a non-Google "
-                 "account",
-                 "table cells"),
-        "inline-grid": ("same as display:grid", "table cells"),
+        "flex": ("css-display-flex", None, "table cells, or an inline-block fluid-hybrid column"),
+        "inline-flex": (None, "same as display:flex", "inline-block"),
+        "grid": ("css-display-grid", None, "table cells"),
+        "inline-grid": (None, "same as display:grid", "table cells"),
     },
-    "position": (None, "Gmail strips it entirely; the Word engine has no support",
-                 "normal table flow — there is nothing to position against"),
-    "float": (None, "the Word engine honours it inconsistently and never unsets it",
-              "table cells, or align on the <td>"),
-    "gap": (None, "no client in the matrix supports it",
-            "cell padding and spacer rows — see email-architecture.md §3"),
-    "row-gap": (None, "no client in the matrix supports it", "spacer rows"),
-    "column-gap": (None, "no client in the matrix supports it", "a gutter cell"),
-    "box-shadow": (None, "the Word engine ignores it; several clients flatten it",
-                   "a 1px border (--email-edge)"),
-    "text-shadow": (None, "the Word engine ignores it", "nothing"),
-    "transform": (None, "Gmail strips it; the Word engine has no support", "nothing"),
-    "transition": (None, "no state changes survive", "nothing"),
-    "animation": (None, "Gmail strips it; only WebKit clients would run it", "a static frame"),
-    "filter": (None, "Gmail strips it", "a pre-processed image"),
-    "object-fit": (None, "unsupported in the Word engine and Gmail",
-                   "crop the image at build time"),
-    "flex-direction": (None, "meaningless without flex", "table rows"),
-    "justify-content": (None, "meaningless without flex", "align on the <td>"),
-    "align-items": (None, "meaningless without flex", "valign on the <td>"),
+    "position": ("css-position", None, "normal table flow — there is nothing to position against"),
+    "float": ("css-float", None, "table cells, or align on the <td>"),
+    "gap": ("css-gap", None, "cell padding and spacer rows — see email-architecture.md §3"),
+    "row-gap": ("css-gap", None, "spacer rows"),
+    "column-gap": ("css-gap", None, "a gutter cell"),
+    "box-shadow": ("css-box-shadow", None, "a 1px border (--email-edge)"),
+    "text-shadow": ("css-text-shadow", None, "nothing"),
+    "transform": ("css-transform", None, "nothing"),
+    "transition": ("css-transition", None, "nothing"),
+    "animation": ("css-animation", None, "a static frame"),
+    "filter": ("css-filter", None, "a pre-processed image"),
+    "object-fit": ("css-object-fit", None, "crop the image at build time"),
+    "flex-direction": ("css-flex-direction", None, "table rows"),
+    "justify-content": ("css-justify-content", None, "align on the <td>"),
+    "align-items": ("css-align-items", None, "valign on the <td>"),
     "grid-template-columns": (None, "meaningless without grid", "table cells"),
 }
 
-# Properties that work but only in some clients — worth knowing, never fatal.
+# Properties that work but only in some clients — worth knowing, never fatal:
+# caniemail's feature, then the advice.
 PARTIAL_PROPS = {
-    "border-radius": "square corners in Outlook Windows (Word engine). Fine as "
-                     "degradation; use VML if the shape is load-bearing.",
-    "max-width": "ignored by the Word engine, which is why the ghost table exists.",
-    "background-image": "the Word engine needs VML; Gmail with a non-Google account "
-                        "may not show it at all. Always set a background-color too.",
-    "background-size": "not supported in Gmail. Use the `background` shorthand.",
-    "letter-spacing": "ignored by the Word engine. Harmless.",
-    "min-height": "Yahoo rewrites `height` to `min-height`; do not rely on either.",
-    "opacity": "unreliable outside WebKit clients.",
+    "border-radius": ("css-border-radius", "Fine as degradation; use VML if the shape is load-bearing."),
+    "max-width": ("css-max-width", "The ghost table gives the Word engine its width."),
+    "background-image": ("css-background-image", "The Word engine needs VML. Always set a "
+                                                 "background-color too."),
+    "background-size": ("css-background-size", "Use the `background` shorthand."),
+    "letter-spacing": ("css-letter-spacing", "Harmless."),
+    "min-height": ("css-min-height", "Do not rely on it for a layout."),
+    "opacity": ("css-opacity", "Harmless where it is decoration."),
     "width": None,  # handled separately, never flagged
 }
+
+
+def listing(names):
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def blame(slug):
+    """Who drops caniemail's feature `slug`, by its latest results (CANIEMAIL)."""
+    tested, never, partial = CANIEMAIL[slug]
+    said = []
+    if never:
+        said.append("not supported in " + listing([CANIEMAIL_CLIENTS[k] for k in never.split()]))
+    if partial:
+        said.append("partial in " + listing([CANIEMAIL_CLIENTS[k] for k in partial.split()]))
+    return "%s (caniemail.com, tested %s)" % ("; ".join(said) or "supported wherever caniemail tested it",
+                                             tested)
 
 WEAK_LINK_TEXT = {
     "click here", "here", "read more", "more", "learn more", "link", "this",
@@ -400,9 +474,8 @@ class Linter:
             self.add(
                 "error", "tokens",
                 "unresolved token %s" % match.group(1), line,
-                "No email client resolves CSS custom properties reliably: Outlook, "
-                "Yahoo, Samsung and Thunderbird have no support at all, and Gmail "
-                "supports var() only for values it never lets you declare.",
+                "No email client resolves CSS custom properties reliably: they are %s. "
+                "Gmail reads var() but never lets you declare one." % blame("css-variables"),
                 "run build_email.py on the SOURCE template, or add the token to "
                 "assets/email-tokens.json",
             )
@@ -418,16 +491,15 @@ class Linter:
                 if entry is None:
                     continue
                 if isinstance(entry, dict):
-                    hit = entry.get(value.split()[0] if value else "")
-                    if hit is None:
+                    entry = entry.get(value.split()[0] if value else "")
+                    if entry is None:
                         continue
-                    who, fix = hit
-                    self.add("error", "css", "%s:%s is unsupported" % (prop, value),
-                             node.line, "dropped by %s" % who, "use %s" % fix)
+                    message = "%s:%s is unsupported" % (prop, value)
                 else:
-                    _, who, fix = entry
-                    self.add("error", "css", "%s is unsupported" % prop, node.line,
-                             who, "use %s" % fix)
+                    message = "%s is unsupported" % prop
+                slug, who, fix = entry
+                self.add("error", "css", message, node.line, blame(slug) if slug else who,
+                         "use %s" % fix)
 
         # The same sweep over whatever <style> content survived.
         for node in self.root.elements():
@@ -441,22 +513,23 @@ class Linter:
                     if isinstance(entry, dict):
                         if value.split()[0] not in entry:
                             continue
-                        who, fix = entry[value.split()[0]]
+                        slug, who, fix = entry[value.split()[0]]
                     else:
-                        _, who, fix = entry
+                        slug, who, fix = entry
                     self.add("error", "css",
                              "%s:%s in the retained <style> block" % (prop, value),
-                             node.line, who, "use %s" % fix)
+                             node.line, blame(slug) if slug else who, "use %s" % fix)
 
         for node in self.root.elements():
             style = node.get("style") or ""
             if is_preheader(node):
                 continue  # its opacity:0 / max-width:0 are the technique, not a risk
             decls = declarations(style)
-            for prop, note in PARTIAL_PROPS.items():
-                if note and prop in decls:
+            for prop, entry in PARTIAL_PROPS.items():
+                if entry and prop in decls:
+                    slug, advice = entry
                     self.add("info", "css-partial", "%s is only partially supported" % prop,
-                             node.line, note)
+                             node.line, "%s. %s" % (blame(slug), advice))
 
     def check_structure(self):
         for node in self.root.elements():

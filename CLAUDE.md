@@ -36,6 +36,7 @@ python -B -m unittest discover -s tests                     # the whole suite; -
 python tools/check_pointers.py        # § pointers; --write-register after editing one, then read the diff
 python tools/sync_snippets.py --check # starter code quoted in the references
 python tools/sync_rules.py --check    # the spec's data in the gates; without --check it rewrites the blocks
+python tools/sync_caniemail.py --check   # caniemail's data in the email matrix and lint; --data FILE refreshes it
 python skills/web-design-studio/scripts/audit_design.py skills --strict
 cd ../.. && python -B tooling/release/build.py EMPTY_FOLDER [--rev REV] [--tree EMPTY_FOLDER]   # the zip, the .skill files, SHA256SUMS; --tree: the distribution repository's files
 ```
@@ -89,7 +90,7 @@ plugins/pro-web-design-suite/     the plugin; it ships without its tests/, evals
   mcp/, .mcp.json                 the MCP server: the gates as tools (node design_gates.mjs)
   evals/                          claude plugin eval cases: routing/ (one per skill), boundaries/ (sibling pairs), and outcome cases in build/, systems/, gates/, lifecycle/, persuasion/, delivery/
   tests/                          the suite; fixtures/ holds the pointer and evidence registers
-  tools/                          check.py, check_pointers.py, fail_before.py, sync_rules.py, sync_snippets.py
+  tools/                          check.py, check_pointers.py, fail_before.py, sync_rules.py, sync_snippets.py, sync_caniemail.py
   CHANGELOG.md, README.md, LICENSE
 tooling/                          pinned tools for the tests (main/, tailwind-v3/); release/build.py
 .github/workflows/                ci.yml (the suite on three platforms), release.yml (a v* tag makes the release, then `distribute` writes the distribution repository), evals.yml (the routing and outcome evals, by hand)
