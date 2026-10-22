@@ -5,7 +5,7 @@ usage: python tools/check.py [--all] [--base REF]
 
   1. tools/check_pointers.py
   2. tools/sync_snippets.py --check
-  3. tools/sync_rules.py --check, once it exists
+  3. tools/sync_rules.py --check and tools/sync_caniemail.py --check
   4. dev plans/check_execution_plan.py, inside the plugin's repository
   5. the audit on the plugin's own skills: audit_design.py skills --strict
   6. test_skill_budget
@@ -115,6 +115,8 @@ def main(argv: list[str] | None = None) -> int:
         ("sync_snippets --check", "", [*py, "tools/sync_snippets.py", "--check"], PLUGIN_ROOT),
         ("sync_rules --check", "", [*py, "tools/sync_rules.py", "--check"]
          if (PLUGIN_ROOT / "tools" / "sync_rules.py").exists() else None, PLUGIN_ROOT),
+        ("sync_caniemail --check", "", [*py, "tools/sync_caniemail.py", "--check"]
+         if (PLUGIN_ROOT / "tools" / "sync_caniemail.py").exists() else None, PLUGIN_ROOT),
         ("check_execution_plan", "", [*py, str(repo_plan)] if repo_plan.exists() else None, repo_plan.parent),
         ("the audit on skills --strict", "",
          [*py, "skills/web-design-studio/scripts/audit_design.py", "skills", "--strict"], PLUGIN_ROOT),

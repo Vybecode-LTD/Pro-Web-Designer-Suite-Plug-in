@@ -44,54 +44,102 @@ Nine rendering environments, not nine apps. Several apps share an engine; severa
 
 ## 2. The capability matrix
 
-**Legend:** ✅ works · ⚠️ partial, read the note · ❌ never · — not applicable
+**Legend:** ✅ supported · ⚠️ partial or buggy, read caniemail's note · ❌ not supported · ? support unknown · — not tested. Each cell is caniemail's result at the latest version it tested on that platform; a column that joins platforms (Apple Mail on macOS and iOS) is ⚠️ when they differ. caniemail does not test the new Outlook for Windows: it runs Chromium, the engine family of Outlook.com (§5), so that column is the nearest guide. Conditional comments and VML are the Word engine's alone, and every other client skips them (note 22).
 
-| Feature | Outlook Win (Word) | New Outlook | Outlook Web | Outlook Mac | Gmail web | Gmail app (Google) | **GANGA** | Apple Mail | Yahoo | Samsung | Thunderbird |
+<!-- BEGIN caniemail: written by tools/sync_caniemail.py from caniemail's data; never edit it by hand -->
+caniemail.com's data of 2026-09-16; each row is linked to its page, which lists every version tested.
+
+| Feature | Tested | Outlook Win (Word) | Outlook.com | Outlook Mac | Gmail web | Gmail app | GANGA | Apple Mail | Yahoo | Samsung | Thunderbird |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| `<style>` in `<head>` | ⚠️ ¹ | ✅ | ⚠️ ² | ✅ | ⚠️ ³ | ⚠️ ³ | **❌** | ✅ | ⚠️ ⁴ | ⚠️ | ⚠️ |
-| `<style>` in `<body>` | ⚠️ | ✅ | ⚠️ | ✅ | ❌ | ❌ | ❌ | ✅ | ⚠️ | ⚠️ | ⚠️ |
-| `@media` queries | ❌ | ⚠️ ⁵ | ⚠️ ⁵ | ⚠️ | ⚠️ ⁶ | ✅ | ❌ | ✅ | ⚠️ ⁷ | ⚠️ ⁸ | ✅ |
-| `@media (prefers-color-scheme)` | ❌ | ⚠️ | ✅ ²³ | ✅ ²³ | ❌ | ❌ | ❌ | ✅ | ❌ | ⚠️ ²³ | ❌ ²³ |
-| `display:flex` | ❌ | ✅ | ✅ | ✅ ⁹ | ✅ ¹⁰ | ✅ ¹⁰ | ❌ | ✅ | ✅ | ✅ | ✅ |
-| `display:grid` | ❌ | ✅ | ✅ | ✅ ⁹ | ✅ ¹⁰ | ✅ ¹⁰ | ❌ | ✅ | ✅ | ✅ | ✅ |
-| `max-width` | ❌ ¹¹ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `border-radius` | ❌ ¹² | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Web fonts (`@font-face`) | ❌ | ⚠️ | ❌ | ✅ | ❌ ¹³ | ❌ ¹³ | ❌ | ✅ | ❌ | ⚠️ | ⚠️ |
-| `background-image` (CSS) | ❌ ¹⁴ | ✅ | ⚠️ | ✅ | ⚠️ ¹⁵ | ⚠️ ¹⁵ | ❌ ¹⁶ | ✅ | ✅ | ✅ | ✅ |
-| `background-size` | ❌ | ✅ | ⚠️ | ✅ | ❌ ¹⁵ | ❌ ¹⁵ | ❌ | ✅ | ⚠️ | ⚠️ | ✅ |
-| `position` | ❌ | ✅ | ⚠️ | ✅ | ❌ ¹⁷ | ❌ ¹⁷ | ❌ | ✅ | ❌ | ❌ | ⚠️ |
-| CSS custom properties | ❌ | ⚠️ | ❌ | ❌ | ⚠️ ¹⁸ | ⚠️ ¹⁸ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| `<svg>` | ❌ | ⚠️ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ⚠️ | ⚠️ |
-| `<video>` | ❌ | ⚠️ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ⚠️ |
-| `:hover` | ❌ | ✅ | ⚠️ | ✅ | ❌ ¹⁹ | ❌ | ❌ | ✅ | ⚠️ | ⚠️ | ✅ |
-| `padding` on `<td>` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `margin` on `<div>` | ⚠️ ²⁰ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ ²¹ | ✅ |
-| `gap` | ❌ | ✅ | ⚠️ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| Conditional comments / VML | ✅ | ❌ ²² | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| [`<style>` element](https://www.caniemail.com/features/html-style/) | 2023-07-27 | ⚠️ ⁴ | ✅ | ✅ | ⚠️ ¹ ⁶ | ⚠️ ¹ | ❌ ² | ✅ | ✅ | ✅ | ✅ |
+| [`@media` queries](https://www.caniemail.com/features/css-at-media/) | 2023-12-13 | ❌ | ⚠️ ¹ ¹⁰ | ⚠️ ¹ ¹⁰ | ⚠️ ⁷ | ⚠️ ⁷ | ❌ ⁶ | ✅ | ⚠️ ² | ⚠️ ⁹ | ❌ |
+| [`@media (prefers-color-scheme)`](https://www.caniemail.com/features/css-at-media-prefers-color-scheme/) | 2023-03-08 | ❌ | ✅ ³ | ✅ ³ | ❌ | ❌ | ❌ | ✅ | ❌ ⁶ | ✅ | ❌ |
+| [`display:flex`](https://www.caniemail.com/features/css-display-flex/) | 2021-11-02 | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ ¹ | ✅ | ✅ ² | ✅ | ✅ |
+| [`display:grid`](https://www.caniemail.com/features/css-display-grid/) | 2019-02-28 | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ ¹ | ✅ | ✅ | ✅ | ✅ |
+| [`flex-direction:column`](https://www.caniemail.com/features/css-flex-direction/) | 2023-01-17 | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| [`justify-content`](https://www.caniemail.com/features/css-justify-content/) | 2021-03-09 | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| [`align-items`](https://www.caniemail.com/features/css-align-items/) | 2023-12-19 | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| [`gap`](https://www.caniemail.com/features/css-gap/) | 2022-12-28 | ❌ | ⚠️ ¹ | ⚠️ ¹ | ⚠️ ¹ | ⚠️ ¹ | ⚠️ ¹ | ✅ | ❌ | ✅ | ✅ |
+| [`float`](https://www.caniemail.com/features/css-float/) | 2024-05-08 | ❌ ¹ | ✅ | ✅ | ✅ | ⚠️ ² | ⚠️ ² | ✅ | ⚠️ ² | ✅ | ✅ |
+| [`position`](https://www.caniemail.com/features/css-position/) | 2021-05-16 | ❌ | ⚠️ ² | ⚠️ ² | ❌ | ❌ | ❌ | ⚠️ ¹ | ⚠️ ³ | ⚠️ ¹ | ✅ |
+| [`max-width`](https://www.caniemail.com/features/css-max-width/) | 2019-08-02 | ⚠️ ¹ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [`min-height`](https://www.caniemail.com/features/css-min-height/) | 2021-11-29 | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [`padding`](https://www.caniemail.com/features/css-padding/) | 2019-07-25 | ⚠️ ¹ ² | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [`margin`](https://www.caniemail.com/features/css-margin/) | 2019-10-01 | ⚠️ ¹ ² ³ ⁴ | ⚠️ ¹ | ⚠️ ¹ | ⚠️ ¹ | ⚠️ ¹ | ⚠️ ¹ | ✅ | ⚠️ ¹ | ✅ | ✅ |
+| [`border-radius`](https://www.caniemail.com/features/css-border-radius/) | 2021-03-09 | ❌ ¹ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ ² | ✅ | ✅ |
+| [`box-shadow`](https://www.caniemail.com/features/css-box-shadow/) | 2023-12-20 | ❌ | ✅ | ✅ | ❌ | ❌ ¹ | ✅ ¹ | ✅ | ❌ | ✅ | ✅ |
+| [`text-shadow`](https://www.caniemail.com/features/css-text-shadow/) | 2019-02-28 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| [`letter-spacing`](https://www.caniemail.com/features/css-letter-spacing/) | 2020-01-19 | ⚠️ ¹ ² | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [`opacity`](https://www.caniemail.com/features/css-opacity/) | 2019-02-28 | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [`background-image`](https://www.caniemail.com/features/css-background-image/) | 2023-07-24 | ❌ ⁵ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ ³ | ✅ | ✅ |
+| [`background-size`](https://www.caniemail.com/features/css-background-size/) | 2019-02-28 | ❌ ³ | ✅ | ✅ | ✅ | ✅ | ❌ ¹ | ✅ | ✅ ² | ✅ | ✅ |
+| [`object-fit`](https://www.caniemail.com/features/css-object-fit/) | 2021-07-15 | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ ¹ | ✅ | ❌ | ✅ | ✅ |
+| [`filter`](https://www.caniemail.com/features/css-filter/) | 2024-01-03 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| [`transform`](https://www.caniemail.com/features/css-transform/) | 2019-02-28 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| [`transition`](https://www.caniemail.com/features/css-transition/) | 2024-03-29 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ⚠️ ¹ ² | ⚠️ ⁵ | ✅ |
+| [`animation`](https://www.caniemail.com/features/css-animation/) | 2026-04-07 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| [`:hover`](https://www.caniemail.com/features/css-pseudo-class-hover/) | 2019-10-23 | ❌ | ⚠️ ² | ⚠️ ² | ✅ | ⚠️ | ❌ ¹ | ✅ | ✅ | ✅ | ✅ |
+| [Web fonts (`@font-face`)](https://www.caniemail.com/features/css-at-font-face/) | 2023-12-19 | ⚠️ ⁴ | ❌ | ❌ | ❌ ⁶ | ❌ | ❌ | ✅ | ❌ | ✅ ⁸ | ✅ |
+| [CSS custom properties](https://www.caniemail.com/features/css-variables/) | 2020-02-25 | ❌ | ❌ | ❌ | ❌ ¹ | ❌ ¹ | ❌ ² | ✅ | ❌ | ✅ | ✅ |
+| [`<svg>`](https://www.caniemail.com/features/html-svg/) | 2020-02-06 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ ¹ | ❌ | ✅ | ✅ |
+| [`<video>`](https://www.caniemail.com/features/html-video/) | 2019-09-16 | ❌ | ❌ ⁸ | ✅ ¹¹ | ❌ ² | ❌ ² | ❌ ² | ⚠️ ⁵ ⁶ | ❌ ⁴ | ⚠️ ⁵ | ✅ |
+| [`dir` attribute](https://www.caniemail.com/features/html-dir/) | 2021-11-01 | ⚠️ ³ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [`lang` attribute](https://www.caniemail.com/features/html-lang/) | 2020-10-25 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ ¹ | ✅ | ✅ |
 
-### Notes
+caniemail's notes on the results in the table:
 
-1. **Word engine `<style>`** — supported, but with a documented ordering bug: a style must be *declared before the markup it applies to*, and rules that reference a later element are unreliable. `caniemail.com` records this as "buggy support… styles must be declared before use." Since the compiler inlines almost everything, this rarely bites.
+- **`<style>` element:** ¹ Partial. Not supported inside the `<body>`. ² Partial. Not supported with non Google accounts. ⁴ Buggy. `<style>` elements need to be declared before their rules are used. ⁶ The size of the `<style>` tag [is limited to 16 KB](https://github.com/hteumeuleu/email-bugs/issues/90)
+- **`@media` queries:** ¹ Partial. Does not support nested media queries. ² Partial. Only supports `screen`, `min-width`, `max-width`, `min-height` and `max-height` based media queries. ⁶ Partial. Not supported with non Google accounts. ⁷ Partial. Does not support height based media queries. ⁹ Partial. Not supported with Hotmail/Outlook accounts. ¹⁰ Partial. Nested media queries are removed.
+- **`@media (prefers-color-scheme)`:** ³ Additional custom `data` attributes (`data-ogsc`, `data-ogac`, `data-ogsb`, `data-ogab`) are added when viewing an email in dark mode. See [this article](https://www.hteumeuleu.com/2021/emails-react-outlook-com-dark-mode/) for examples. ⁶ Not supported. `@media (prefers-color-scheme:dark)` is transformed into `@media ()`
+- **`display:flex`:** ¹ Not supported with non Google accounts. ² `display:inline-flex` is not supported.
+- **`display:grid`:** ¹ Not supported with non Google accounts.
+- **`gap`:** ¹ Partial. Supports column-gap for flexbox.
+- **`float`:** ¹ Not supported. `table` and `img` elements can use an `align` attribute to get a similar effect. ² Partial. Logical property values `inline-start` and `inline-end` are not supported.
+- **`position`:** ¹ Partial. Supports `relative`, `absolute` but not `sticky` and `fixed`. ² Partial. Supports `sticky` but not `relative`, `absolute` and `fixed`. ³ Partial. Supports `relative` but not `absolute`, `sticky` and `fixed`.
+- **`max-width`:** ¹ Partial. Only works on `<table>` elements.
+- **`padding`:** ¹ Partial. Only supported on table cells. ² Buggy. Vertical padding will be the same for all cells of a same row, adopting the biggest value.
+- **`margin`:** ¹ Partial. Negative values are not supported. ² Partial. Not supported on `<span>` and `<body>` elements. ³ Buggy. `background-color` is included inside the `margin`. ⁴ Partial. `auto` value is not supported.
+- **`border-radius`:** ¹ Round corners can be used in VML with the `RoundRect` element. See [buttons.cm](https://buttons.cm/) and [VML documentation](https://docs.microsoft.com/en-us/windows/win32/vml/msdn-online-vml-roundrect-element). ² Partial support. Shorthand for setting elliptical borders with the slash `/` notation is not supported e.g. `border-radius: 27% 73% 70% 30% / 30% 34% 66% 70%;`.
+- **`box-shadow`:** ¹ Partial. Only supported with non Google accounts.
+- **`letter-spacing`:** ¹ Partial. Big negative values are rendered differently from CSS standards. ² Buggy. Values set in `em` are smaller than the expected render in CSS. See [#192](https://github.com/hteumeuleu/caniemail/issues/192).
+- **`background-image`:** ³ Partial. Does not support multiple values. The comma between two values is removed. ⁵ Background images can be used in VML. See [backgrounds.cm](https://backgrounds.cm/) and [VML documentation](https://docs.microsoft.com/en-us/windows/win32/vml/web-workshop---how-to-use-vml-on-web-pages-----fill--element).
+- **`background-size`:** ¹ Partial. Not supported with non Google accounts. But it can be used in the `background` shorthand property instead. ² Partial. Does not support multiple values. The comma between two values is removed. ³ Background images size can be used in VML with the `size` attribute. See [VML documentation](https://docs.microsoft.com/en-us/windows/win32/vml/size-attribute--fill--vml).
+- **`object-fit`:** ¹ Partial. Not supported with non Google accounts.
+- **`transition`:** ¹ Partial. Longhand properties are not supported. ² Buggy. The `all` keyword is not supported. ⁵ Partial. Not supported with Outlook accounts.
+- **`:hover`:** ¹ Partial. Not supported with non Google accounts. ² Partial. Only supported on type selectors.
+- **Web fonts (`@font-face`):** ⁴ Partial. The declaration is supported but distant fonts are ignored. ⁶ Not supported. Roboto and Google Sans can be used, but only because they're embedded with the webmail's own styles. ⁸ Not supported when using a Microsoft email address; outlook, live, hotmail, etc.
+- **CSS custom properties:** ¹ Partial. The `var()` function is supported, but not the variable declaration. ² Partial. Not supported with non Google accounts.
+- **`<svg>`:** ¹ Buggy. Requires a background on the `<body>`. Can be any type of background, image or a color, can be set as attribute, inline style or in `<style>` block
+- **`<video>`:** ² `<video>`, `<source>` and `<track>` tags are replaced by `<u></u>` tags. ⁴ `<video>`, `<source>` and `<track>` tags are stripped. The fallback content is shown instead. ⁵ Partial support. Requires the `controls` attribute to play. ⁶ Partial support. `autoplay` is not supported. ⁸ The `<video>` element is supported, but the video can not play due to a strict Content Security Policy. ¹¹ Partial support. The video can be played by doing a right click and play. But `autoplay` and `controls` are not supported.
+- **`dir` attribute:** ³ Buggy on anchor `<a>` tags.
+- **`lang` attribute:** ¹ Not supported on `<td>` elements.
+<!-- END caniemail -->
+
+### The suite's notes
+
+What the cells cannot show, and what other sources add. caniemail's own notes are under the table.
+
+1. **Word engine `<style>`** — supported, but with a documented ordering bug: a style must be *declared before the markup it applies to*, and rules that reference a later element are unreliable. caniemail's note on the cell says the same. Since the compiler inlines almost everything, this rarely bites.
 2. **Outlook Web** applies a server-side rewrite before rendering: it prefixes class names, rewrites some selectors, and injects its own dark-mode overrides keyed on `[data-ogsc]` / `[data-ogsb]`. Your `<style>` block is not the one that runs.
 3. **Gmail `<style>`** — supported in `<head>` since the September 2016 update, **not** in `<body>`, and with a hard size ceiling (§7). Gmail also drops the whole block on some parse errors — historically including nested at-rules.
 4. **Yahoo** supports `<style>`. Two old quirks no longer reproduce in `caniemail.com`'s tests: desktop webmail ignored every rule after a CSS comment (gone by 2023-01), and the Android app stripped the first `<head>` (gone by 2025-06). `build_email.py` still strips comments, because they are bytes against Gmail's limit.
 5. **New Outlook / Outlook Web media queries** — support is reported as partial and nested media queries are explicitly not supported (and are removed in builds 16.80+). Sources disagree on how complete plain `max-width` support is. **Safe path: do not require a media query for the layout to be correct.** See §7 of `email-architecture.md` — fluid-hybrid first, media query as enhancement.
-6. **Gmail web media queries** is the sharpest live disagreement in this document. `caniemail.com` lists Gmail Desktop Webmail as *partial* (no nested, no height-based queries), Email on Acid's long-running Gmail article says embedded styles and media queries arrived in 2016 and work, and at least one 2026 rendering guide flatly states Gmail web "ignores" media queries. All three can be simultaneously true in practice, because **a desktop Gmail reading pane is wider than any `max-width` breakpoint you would set**, so a mobile-first media query never fires there and looks identical to "not supported." Treat Gmail web as: the block parses, the query may be evaluated, and it will not match on desktop anyway.
+6. **Gmail web media queries** is the sharpest live disagreement in this document. `caniemail.com` lists Gmail Desktop Webmail as *partial* (no height-based queries), Email on Acid's long-running Gmail article says embedded styles and media queries arrived in 2016 and work, and at least one 2026 rendering guide flatly states Gmail web "ignores" media queries. All three can be simultaneously true in practice, because **a desktop Gmail reading pane is wider than any `max-width` breakpoint you would set**, so a mobile-first media query never fires there and looks identical to "not supported." Treat Gmail web as: the block parses, the query may be evaluated, and it will not match on desktop anyway.
 7. **Yahoo** supports only `screen`, `min-width`, `max-width`, `min-height`, `max-height`. No `and`-chained feature queries beyond that.
-8. **Samsung Mail** media-query support is reported as depending on account type (Exchange vs IMAP) and app version. Unverifiable without a device farm; assume no.
+8. **Samsung Email** media queries are partial in caniemail's test of 6.1.90: not supported with a Hotmail or Outlook account. You cannot tell which account a reader uses, so assume a breakpoint may not fire.
 9. **Outlook for Mac** is WebKit-family, and `caniemail.com` records `display:flex` and `display:grid` as supported in 16.80. Still not worth relying on, when a table does the job in every client.
 10. **Gmail and flex/grid** — `caniemail.com` records `display:flex` as supported in Gmail since 2019, and `display:grid` on the web since 2026-03. Neither works with a non-Google account (GANGA). Gmail also rejects `flex-direction: column` on every platform (tested 2023-01) while keeping `display:flex`, so a flex column arrives in Gmail as a row. Do not use it.
-11. **`max-width` in the Word engine** is not supported at all. This is the entire reason ghost tables exist: the conditional-comment table supplies the fixed width the Word engine needs while `max-width` handles everyone else.
+11. **`max-width` in the Word engine** works on a `<table>` only, and a fluid-hybrid column is a `<div>`. This is the entire reason ghost tables exist: the conditional-comment table supplies the fixed width the Word engine needs while `max-width` handles everyone else.
 12. **`border-radius`** is ignored by the Word engine — corners render square. That is acceptable degradation for a card. It is not acceptable for a pill-shaped button that carries brand identity, which is what VML `roundrect` is for (§3).
 13. **Gmail web fonts** — only Roboto and Google Sans are available; other Google Fonts are excluded. Everything else falls back. Build the design on the fallback stack and treat a brand face as decoration.
 14. **Word engine background images** require VML (`v:rect` / `v:fill`), because the engine has no CSS `background-image` support. A `background-color` must always accompany it.
-15. **Gmail background images** work via the `background` *shorthand* (`background: url(…) center / cover no-repeat`) but `background-size` as a standalone property is not supported. Gmail has also historically rolled out changes that strip CSS carrying background images; verify at send time rather than assuming last year's result.
-16. **GANGA background images** frequently do not appear because images are blocked by default and a background image alone does not trigger the "display images" prompt — there must be a real `<img>` in the message to give the reader something to click. This is the documented "fake background image" technique.
+15. **Gmail background images** work on the web and in the app in caniemail's tests. With a non-Google account, `background-size` on its own is not supported, but the `background` *shorthand* carries it (`background: url(…) center / cover no-repeat`). Gmail has also historically rolled out changes that strip CSS carrying background images; verify at send time rather than assuming last year's result.
+16. **GANGA background images** are supported in caniemail's test, but they frequently do not appear, because images are blocked by default and a background image alone does not trigger the "display images" prompt — there must be a real `<img>` in the message to give the reader something to click. This is the documented "fake background image" technique.
 17. **Gmail strips `position` entirely.** There is nothing to position against and no way to fake it.
-18. **CSS custom properties in Gmail** are listed as *partial* on `caniemail.com`: Gmail recognises the `var()` function but provides no way to declare a variable, and the mobile apps do not support it with non-Google accounts. In other words `var()` in Gmail is a function whose argument can never be defined. That is not support; it is the shape of support. Outlook (all Windows versions, Outlook.com, macOS, iOS, Android), Yahoo, Samsung and Thunderbird have no support at all. **This single row is why this skill compiles tokens rather than shipping them.**
-19. **`:hover`** — Gmail does not support it except in webmail, per Email on Acid's Gmail reference. Since you cannot tell which reader is in which, design the resting state to be obviously clickable and treat hover as decoration.
+18. **CSS custom properties**: caniemail records Gmail as not supporting them. It reads the `var()` function but provides no way to declare a variable, and the app reads nothing with a non-Google account. In other words `var()` in Gmail is a function whose argument can never be defined. That is not support; it is the shape of support. Outlook (every version caniemail tests) and Yahoo have none. Apple Mail, Samsung Email and Thunderbird do: three clients of the ten, which is no token system. **This single row is why this skill compiles tokens rather than shipping them.**
+19. **`:hover`** — caniemail records it in Gmail on the web and in the Android app with a Google account, not in the iOS app or with a non-Google account; Outlook.com and Outlook for Mac honour it on type selectors only. Since you cannot tell which reader is in which, design the resting state to be obviously clickable and treat hover as decoration.
 20. **`margin` in the Word engine** is honoured inconsistently and collapses unpredictably. `padding` on a `<td>` is honoured reliably. This is the mechanical reason email spacing is table padding, not margins (see `email-architecture.md` §3).
-21. **Samsung Mail** is reported to apply `margin` on paragraphs and headings but not on `div`s or tables.
+21. **Samsung Email** was once reported to ignore `margin` on `div`s and tables; caniemail's test of 6.0 found `margin` supported. Spacing is table padding anyway (note 20).
 22. **New Outlook ignores conditional comments and VML entirely** — they are inert comments to a Chromium engine. This is the good news of the transition: one file can serve both engines, because each ignores what is addressed to the other. Downlevel-revealed comments (`<!--[if !mso]><!-- -->…<!--<![endif]-->`) are what make the non-Word branch visible to everyone else.
 23. **`prefers-color-scheme`**, per `caniemail.com` (tested 2023-03-08): Outlook.com, Outlook for Mac and the Outlook iOS and Android apps honour it, and also mark what they recolour with `data-og*` attributes. Samsung Email honours it in 6.1, not 6.0. Thunderbird honoured it in 68.4, but not in 78.5 or 91.13, the latest versions tested.
 
@@ -334,7 +382,7 @@ Stated explicitly so nobody mistakes an assumption for a finding.
 | New Outlook's exact media-query support | **Unresolved.** Sources say "partial" and "only partial support for media queries" without specifying which parts. Treat media queries as an enhancement there. |
 | Gmail web media-query behaviour | **Sources conflict** (note 6). The practical answer holds regardless, but the underlying fact is not settled. |
 | Whether Gmail still drops the whole `<style>` block on a nested at-rule | **Unverified in 2026.** Documented historically; not retested. Avoid nested at-rules regardless — several clients remove them. |
-| Samsung Mail media-query support by account type | **Unverified.** Reported as version- and account-dependent; needs a device to confirm. |
+| What the new Outlook for Windows supports, feature by feature | **Not tested by caniemail**, which has no column for it. It shares Outlook.com's engine family (§5); read that column, and test before relying on it. |
 | Classic Outlook's true end-of-life date | Supported until **at least 2029** (Microsoft, §5). October 2026 is Office 2021's retirement, not classic Outlook's; May 2027 is a tentative enterprise switch-over date. |
 | Exact current share of blocked-image opens | **Not established.** Widely repeated figures are old and vary by audience type. The design rule (alt text must carry meaning) does not depend on the number. |
 | Gmail iOS dark-mode inversion details | **Directionally verified, mechanically not.** Described consistently as high-risk full inversion; the exact algorithm is undocumented. |
@@ -353,10 +401,7 @@ Stated explicitly so nobody mistakes an assumption for a finding.
 - [Correcting Outlook DPI Scaling Issues — Courtney Fantinato](https://www.courtneyfantinato.com/correcting-outlook-dpi-scaling-issues/)
 - [Bulletproof Email Buttons: Why VML Still Matters in 2026 — MiN8T](https://min8t.com/articles/bulletproof-email-buttons)
 - [Email Client Dark Mode Support Matrix — MailMode](https://www.mailmode.app/learn/email-client-dark-mode-support-matrix)
-- [`<style>` element support — Can I email](https://www.caniemail.com/features/html-style/)
-- [`@media` support — Can I email](https://www.caniemail.com/features/css-at-media/)
-- [CSS variables support — Can I email](https://www.caniemail.com/features/css-variables/)
-- [`display:grid` support — Can I email](https://www.caniemail.com/features/css-display-grid/)
+- [Can I email](https://www.caniemail.com/): the table in §2, its notes and the clients `lint_email.py` names come from its data (`api/data.json`, MIT licence, © 2019 Rémi Parmentier), pinned in the repository and rewritten by `tools/sync_caniemail.py`. Each row links its own page.
 - ["Fake" Background Image Technique for GANGA — FreshInbox](https://freshinbox.com/blog/fake-background-image-technique-for-gmail-app-for-non-google-accounts-ganga/)
 - [Apple Mail Privacy Protection: The 2026 Guide — Sender](https://www.sender.net/blog/apple-mail-privacy-protection/)
 

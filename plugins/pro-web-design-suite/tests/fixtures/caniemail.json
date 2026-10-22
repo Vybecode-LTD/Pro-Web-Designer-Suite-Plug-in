@@ -1,0 +1,2533 @@
+{
+ "source": "https://www.caniemail.com/api/data.json",
+ "licence": "MIT licence, copyright (c) 2019 Remi Parmentier; https://github.com/hteumeuleu/caniemail",
+ "api_version": "1.0.4",
+ "last_update_date": "2026-09-16 13:05:00 +0000",
+ "data": [
+  {
+   "slug": "html-style",
+   "title": "<style> element",
+   "url": "https://www.caniemail.com/features/html-style/",
+   "last_test_date": "2023-07-27",
+   "notes_by_num": {
+    "1": "Partial. Not supported inside the `<body>`.",
+    "2": "Partial. Not supported with non Google accounts.",
+    "3": "Buggy. The first `<head>` in the HTML is removed, so `<style>` elements need to be in a second `<head>` element.",
+    "4": "Buggy. `<style>` elements need to be declared before their rules are used.",
+    "5": "A CSS rule following a CSS comment is ignored. (See [email-bugs#25](https://github.com/hteumeuleu/email-bugs/issues/25).)",
+    "6": "The size of the `<style>` tag [is limited to 16 KB](https://github.com/hteumeuleu/email-bugs/issues/90)"
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "10.3": "y",
+      "16.0": "y"
+     },
+     "ios": {
+      "10.3": "y",
+      "12.3": "y",
+      "16.2": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-06": "a #1",
+      "2023-01": "a #1 #6"
+     },
+     "ios": {
+      "2019-06": "a #1 #2",
+      "2023-01": "a #1 #2"
+     },
+     "android": {
+      "2019-06": "a #1 #2"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "y",
+      "2007": "a #4",
+      "2010": "a #4",
+      "2013": "a #4",
+      "2016": "a #4",
+      "2019": "a #4"
+     },
+     "macos": {
+      "2011": "y",
+      "2016": "y",
+      "2019": "y",
+      "2021": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2019-06": "y",
+      "2023-01": "y",
+      "2024-01": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y",
+      "6.0": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.3": "y",
+      "102.7": "y"
+     },
+     "windows": {
+      "102.7": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-06": "y #5",
+      "2023-01": "y"
+     },
+     "ios": {
+      "2019-06": "y",
+      "2023-01": "y"
+     },
+     "android": {
+      "2019-06": "a #3",
+      "2023-01": "a #3",
+      "2025-06": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-at-media",
+   "title": "@media",
+   "url": "https://www.caniemail.com/features/css-at-media/",
+   "last_test_date": "2023-12-13",
+   "notes_by_num": {
+    "1": "Partial. Does not support nested media queries.",
+    "2": "Partial. Only supports `screen`, `min-width`, `max-width`, `min-height` and `max-height` based media queries.",
+    "3": "Buggy. Requires a double `<head>` hack to work.",
+    "4": "Partial. Does not support simple `@media {}` declarations.",
+    "5": "Buggy. The first rule inside a media query is not prefixed.",
+    "6": "Partial. Not supported with non Google accounts.",
+    "7": "Partial. Does not support height based media queries.",
+    "8": "Partial. Does not support landscape media query.",
+    "9": "Partial. Not supported with Hotmail/Outlook accounts.",
+    "10": "Partial. Nested media queries are removed."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "10.3": "y"
+     },
+     "ios": {
+      "10.3": "y",
+      "12.2": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-08": "a #1 #7",
+      "2020-01": "a #7"
+     },
+     "ios": {
+      "2019-08": "a #1 #6 #7",
+      "2020-01": "a #6 #7"
+     },
+     "android": {
+      "2019-08": "a #1 #6 #7",
+      "2022-07": "a #6 #7"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "a #1",
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2011": "y",
+      "2016": "y",
+      "16.80": "a #1 #10"
+     },
+     "outlook-com": {
+      "2019-08": "a #1",
+      "2023-12": "a #1 #10"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y",
+      "6.0": "y",
+      "6.1.90.16": "a #9"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.3": "y",
+      "78.5": "n",
+      "102.11": "n"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-08": "a #1 #2",
+      "2020-01": "a #2"
+     },
+     "ios": {
+      "2019-08": "a #1 #2",
+      "2020-01": "a #2"
+     },
+     "android": {
+      "2019-08": "a #1 #2 #3",
+      "2020-01": "a #2 #3",
+      "2025-06": "a #2"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-at-media-prefers-color-scheme",
+   "title": "@media (prefers-color-scheme)",
+   "url": "https://www.caniemail.com/features/css-at-media-prefers-color-scheme/",
+   "last_test_date": "2023-03-08",
+   "notes_by_num": {
+    "1": "Not supported. `@media (prefers-color-scheme)` is transformed into `@media ( _filtered_a )`.",
+    "2": "Not supported. `@media (prefers-color-scheme:dark)` is transformed into `@media none`.",
+    "3": "Additional custom `data` attributes (`data-ogsc`, `data-ogac`, `data-ogsb`, `data-ogab`) are added when viewing an email in dark mode. See [this article](https://www.hteumeuleu.com/2021/emails-react-outlook-com-dark-mode/) for examples.",
+    "4": "`@media (prefers-color-scheme:dark)` is transformed into `@media all` at run time if it applies.",
+    "5": "Not supported. `@media (prefers-color-scheme:dark)` is transformed into `@media (false)`",
+    "6": "Not supported. `@media (prefers-color-scheme:dark)` is transformed into `@media ()`"
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "10.3": "n",
+      "12.4": "y",
+      "16.0": "y"
+     },
+     "ios": {
+      "12.2": "n",
+      "13.0": "y",
+      "16.1": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2020-01": "n",
+      "2022-12": "n"
+     },
+     "ios": {
+      "2020-01": "n",
+      "2022-12": "n"
+     },
+     "android": {
+      "2020-01": "n",
+      "2022-12": "n"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "n",
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2019": "y",
+      "16.70": "y #3",
+      "16.80": "y #3"
+     },
+     "outlook-com": {
+      "2019-07": "y",
+      "2022-12": "y #3"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.0": "n",
+      "6.1": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.8": "n",
+      "68.4": "y",
+      "78.5": "n",
+      "91.13": "n"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2020-01": "n #1",
+      "2022-12": "n #6"
+     },
+     "ios": {
+      "2020-01": "n #1",
+      "2022-12": "n"
+     },
+     "android": {
+      "2020-01": "n #1",
+      "2022-12": "n"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-display-flex",
+   "title": "display:flex",
+   "url": "https://www.caniemail.com/features/css-display-flex/",
+   "last_test_date": "2021-11-02",
+   "notes_by_num": {
+    "1": "Not supported with non Google accounts.",
+    "2": "`display:inline-flex` is not supported."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "12.1": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-02": "y"
+     },
+     "ios": {
+      "2019-02": "y",
+      "2020-11": "a #1",
+      "2026-03": "a #1"
+     },
+     "android": {
+      "2019-02": "y",
+      "2020-11": "a #1",
+      "2026-03": "a #1"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2019-02": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2019-02": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-02": "n",
+      "2020-11": "y #2"
+     },
+     "ios": {
+      "2019-02": "n",
+      "2020-11": "y #2"
+     },
+     "android": {
+      "2019-02": "n",
+      "2020-11": "y #2"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.5": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-display-grid",
+   "title": "display:grid",
+   "url": "https://www.caniemail.com/features/css-display-grid/",
+   "last_test_date": "2019-02-28",
+   "notes_by_num": {
+    "1": "Not supported with non Google accounts."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "12.1": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-02": "n",
+      "2026-03": "y"
+     },
+     "ios": {
+      "2019-02": "n",
+      "2026-03": "a #1"
+     },
+     "android": {
+      "2019-02": "n",
+      "2026-03": "a #1"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2019-02": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2019-02": "n",
+      "2024-01": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-02": "n",
+      "2026-03": "y"
+     },
+     "ios": {
+      "2019-02": "n",
+      "2026-03": "y"
+     },
+     "android": {
+      "2019-02": "n",
+      "2026-03": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.5": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-flex-direction",
+   "title": "flex-direction:column",
+   "url": "https://www.caniemail.com/features/css-flex-direction/",
+   "last_test_date": "2023-01-17",
+   "notes_by_num": null,
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "12.1": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-02": "n",
+      "2023-01": "n"
+     },
+     "ios": {
+      "2019-02": "n",
+      "2023-01": "n"
+     },
+     "android": {
+      "2019-02": "n",
+      "2023-01": "n"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2019-02": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2019-02": "n",
+      "2023-01": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-02": "n"
+     },
+     "ios": {
+      "2019-02": "n"
+     },
+     "android": {
+      "2019-02": "n"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.5": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-justify-content",
+   "title": "justify-content",
+   "url": "https://www.caniemail.com/features/css-justify-content/",
+   "last_test_date": "2021-03-09",
+   "notes_by_num": {},
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "11": "y",
+      "12": "y",
+      "13": "y"
+     },
+     "ios": {
+      "11": "y",
+      "12": "y",
+      "13": "y",
+      "14": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2020-12": "n"
+     },
+     "ios": {
+      "2020-12": "n"
+     },
+     "android": {
+      "2020-12": "n"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2020-12": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2020-12": "n",
+      "2023-01": "y",
+      "2023-12": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2020-12": "n"
+     },
+     "ios": {
+      "2021-03": "n"
+     },
+     "android": {
+      "6.16.2.1519779": "n"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.1.31.2": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "2020-12": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-align-items",
+   "title": "align-items",
+   "url": "https://www.caniemail.com/features/css-align-items/",
+   "last_test_date": "2023-12-19",
+   "notes_by_num": {
+    "1": "Supported. But a default style of `margin:auto` is applied on every element and can prevent the expected result."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "11": "y",
+      "12": "y",
+      "13": "y"
+     },
+     "ios": {
+      "11": "y",
+      "12": "y",
+      "13": "y",
+      "14": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2020-12": "n"
+     },
+     "ios": {
+      "2020-12": "n"
+     },
+     "android": {
+      "2020-12": "n"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2020-12": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2020-12": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2020-12": "n"
+     },
+     "ios": {
+      "2021-03": "n"
+     },
+     "android": {
+      "6.16.2.1519779": "n"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.1.31.2": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "2020-12": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-gap",
+   "title": "gap, column-gap, row-gap",
+   "url": "https://www.caniemail.com/features/css-gap/",
+   "last_test_date": "2022-12-28",
+   "notes_by_num": {
+    "1": "Partial. Supports column-gap for flexbox.",
+    "2": "Partial. Supports gap and column-gap for flexbox. Supports gap for multi-column layout (i.e. in conjunction with CSS column-count property)"
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "13.1": "y"
+     },
+     "ios": {
+      "16.2": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2022-12": "a #1"
+     },
+     "ios": {
+      "2022-12": "a #1"
+     },
+     "android": {
+      "2022-12": "a #1"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2022-12": "y",
+      "16.80": "a #1"
+     },
+     "outlook-com": {
+      "2022-12": "a #1",
+      "2023-12": "a #1"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2022-12": "n"
+     },
+     "ios": {
+      "2022-12": "n"
+     },
+     "android": {
+      "2022-12": "n"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.1": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "102.6.1": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-float",
+   "title": "float",
+   "url": "https://www.caniemail.com/features/css-float/",
+   "last_test_date": "2024-05-08",
+   "notes_by_num": {
+    "1": "Not supported. `table` and `img` elements can use an `align` attribute to get a similar effect.",
+    "2": "Partial. Logical property values `inline-start` and `inline-end` are not supported."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "11.7": "a #2",
+      "12.4": "y"
+     },
+     "ios": {
+      "14": "a #2",
+      "15": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-02": "y"
+     },
+     "ios": {
+      "2019-02": "y",
+      "2024-05": "a #2"
+     },
+     "android": {
+      "2019-02": "y",
+      "2024-05": "a #2"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n #1",
+      "2010": "n #1",
+      "2013": "n #1",
+      "2016": "n #1",
+      "2019": "n #1"
+     },
+     "macos": {
+      "2019-02": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2019-02": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-02": "y",
+      "2024-05": "a #2"
+     },
+     "ios": {
+      "2019-02": "y",
+      "2024-05": "a #2"
+     },
+     "android": {
+      "2019-02": "n",
+      "2023-01": "y",
+      "2024-05": "a #2"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.5": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-position",
+   "title": "position",
+   "url": "https://www.caniemail.com/features/css-position/",
+   "last_test_date": "2021-05-16",
+   "notes_by_num": {
+    "1": "Partial. Supports `relative`, `absolute` but not `sticky` and `fixed`.",
+    "2": "Partial. Supports `sticky` but not `relative`, `absolute` and `fixed`.",
+    "3": "Partial. Supports `relative` but not  `absolute`, `sticky` and `fixed`.",
+    "4": "Partial. Supports `relative` and `sticky` but not `absolute` and `fixed`.",
+    "5": "Buggy. `fixed` elements scroll with page.",
+    "6": "Buggy. `fixed` is replaced by `absolute`."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "14": "a #1"
+     },
+     "ios": {
+      "14.5": "a #1"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2021-05": "n"
+     },
+     "ios": {
+      "2021-05": "n"
+     },
+     "android": {
+      "2021-05": "n"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2016": "y",
+      "16.50": "y",
+      "16.80": "a #2"
+     },
+     "outlook-com": {
+      "2021-05": "a #2",
+      "2023-12": "a #2"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.0": "a #1"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "78.10": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2021-05": "a #3"
+     },
+     "ios": {
+      "2021-05": "a #3"
+     },
+     "android": {
+      "2021-05": "a #3"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-max-width",
+   "title": "max-width",
+   "url": "https://www.caniemail.com/features/css-max-width/",
+   "last_test_date": "2019-08-02",
+   "notes_by_num": {
+    "1": "Partial. Only works on `<table>` elements.",
+    "2": "Partial. Doesn't work on `<table>` elements, as per [CSS 2.1 specification](https://www.w3.org/TR/CSS2/visudet.html#min-max-widths)."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "10.3": "y"
+     },
+     "ios": {
+      "5.1": "a #2",
+      "6.1": "a #2",
+      "10.3": "y",
+      "12.2": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-08": "y"
+     },
+     "ios": {
+      "2019-08": "y"
+     },
+     "android": {
+      "2019-08": "y"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "a #2",
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "a #1"
+     },
+     "macos": {
+      "2011": "y",
+      "2016": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2019-08": "y",
+      "2024-01": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.0": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.7": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-08": "y"
+     },
+     "ios": {
+      "2019-08": "a #2",
+      "2025-11": "y"
+     },
+     "android": {
+      "2019-08": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-min-height",
+   "title": "min-height property",
+   "url": "https://www.caniemail.com/features/css-min-height/",
+   "last_test_date": "2021-11-29",
+   "notes_by_num": null,
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "15": "y"
+     },
+     "ios": {
+      "15": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2021-11": "y"
+     },
+     "ios": {
+      "2021-11": "y"
+     },
+     "android": {
+      "2021-11": "y"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "16.56": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2021-11": "y",
+      "2024-01": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.0": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "78.14": "y",
+      "91.3.2": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2021-11": "y"
+     },
+     "ios": {
+      "2021-11": "y"
+     },
+     "android": {
+      "2021-11": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-padding",
+   "title": "padding",
+   "url": "https://www.caniemail.com/features/css-padding/",
+   "last_test_date": "2019-07-25",
+   "notes_by_num": {
+    "1": "Partial. Only supported on table cells.",
+    "2": "Buggy. Vertical padding will be the same for all cells of a same row, adopting the biggest value."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "10.3": "y"
+     },
+     "ios": {
+      "10.3": "y",
+      "12.2": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-05": "y"
+     },
+     "ios": {
+      "2019-05": "y"
+     },
+     "android": {
+      "2019-05": "y"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "y",
+      "2007": "a #1 #2",
+      "2010": "a #1 #2",
+      "2013": "a #1 #2",
+      "2016": "a #1 #2",
+      "2019": "a #1 #2"
+     },
+     "macos": {
+      "2011": "y",
+      "2016": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2019-05": "y",
+      "2024-01": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.0": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.3": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-05": "y"
+     },
+     "ios": {
+      "2019-05": "y"
+     },
+     "android": {
+      "2019-05": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-margin",
+   "title": "margin",
+   "url": "https://www.caniemail.com/features/css-margin/",
+   "last_test_date": "2019-10-01",
+   "notes_by_num": {
+    "1": "Partial. Negative values are not supported.",
+    "2": "Partial. Not supported on `<span>` and `<body>` elements.",
+    "3": "Buggy. `background-color` is included inside the `margin`.",
+    "4": "Partial. `auto` value is not supported."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "12.4": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-10": "a #1"
+     },
+     "ios": {
+      "2019-10": "a #1"
+     },
+     "android": {
+      "2019-10": "a #1"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "y",
+      "2007": "a #1 #2 #3 #4",
+      "2010": "a #1 #2 #3 #4",
+      "2013": "a #1 #2 #3 #4",
+      "2016": "a #1 #2 #3 #4",
+      "2019": "a #1 #2 #3 #4"
+     },
+     "macos": {
+      "2011": "y",
+      "2016": "y",
+      "16.80": "a #1"
+     },
+     "outlook-com": {
+      "2019-10": "a #1",
+      "2023-12": "a #1"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.0": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.3": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-10": "y",
+      "2024-10": "a #1"
+     },
+     "ios": {
+      "2019-10": "y",
+      "2024-10": "a #1"
+     },
+     "android": {
+      "2019-10": "y",
+      "2024-10": "a #1"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-border-radius",
+   "title": "border-radius",
+   "url": "https://www.caniemail.com/features/css-border-radius/",
+   "last_test_date": "2021-03-09",
+   "notes_by_num": {
+    "1": "Round corners can be used in VML with the `RoundRect` element. See [buttons.cm](https://buttons.cm/) and [VML documentation](https://docs.microsoft.com/en-us/windows/win32/vml/msdn-online-vml-roundrect-element).",
+    "2": "Partial support. Shorthand for setting elliptical borders with the slash `/` notation is not supported e.g. `border-radius: 27% 73% 70% 30% / 30% 34% 66% 70%;`."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "10.3": "y"
+     },
+     "ios": {
+      "10.3": "y",
+      "12.2": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-08": "y"
+     },
+     "ios": {
+      "2019-08": "y"
+     },
+     "android": {
+      "2019-08": "y"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "n #1",
+      "2007": "n #1",
+      "2010": "n #1",
+      "2013": "n #1",
+      "2016": "n #1",
+      "2019": "n #1"
+     },
+     "macos": {
+      "2011": "y",
+      "2016": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2019-08": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.1.31.2": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.3": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2021-02": "a #2"
+     },
+     "ios": {
+      "2021-03": "a #2"
+     },
+     "android": {
+      "6.18.2.1529859": "a #2"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-box-shadow",
+   "title": "box-shadow",
+   "url": "https://www.caniemail.com/features/css-box-shadow/",
+   "last_test_date": "2023-12-20",
+   "notes_by_num": {
+    "1": "Partial. Only supported with non Google accounts."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y",
+      "16.0": "y"
+     },
+     "ios": {
+      "12.1": "y",
+      "17.2": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-02": "n",
+      "2023-01": "n"
+     },
+     "ios": {
+      "2019-02": "a #1",
+      "2023-01": "a #1"
+     },
+     "android": {
+      "2021-08": "a #1",
+      "2023-01": "a #1"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2019-02": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2019-02": "n",
+      "2023-01": "n",
+      "2023-12": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-02": "n",
+      "2023-01": "n"
+     },
+     "ios": {
+      "2019-02": "n",
+      "2023-01": "n"
+     },
+     "android": {
+      "2019-02": "n",
+      "2023-01": "n"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y",
+      "6.1.50.25": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.5": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-text-shadow",
+   "title": "text-shadow",
+   "url": "https://www.caniemail.com/features/css-text-shadow/",
+   "last_test_date": "2019-02-28",
+   "notes_by_num": null,
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "12.1": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-02": "n"
+     },
+     "ios": {
+      "2019-02": "n"
+     },
+     "android": {
+      "2019-02": "n"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2019-02": "y",
+      "16.80": "n"
+     },
+     "outlook-com": {
+      "2019-02": "n",
+      "2024-01": "n"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-02": "y"
+     },
+     "ios": {
+      "2019-02": "y"
+     },
+     "android": {
+      "2019-02": "n",
+      "2025-06": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.5": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-letter-spacing",
+   "title": "letter-spacing",
+   "url": "https://www.caniemail.com/features/css-letter-spacing/",
+   "last_test_date": "2020-01-19",
+   "notes_by_num": {
+    "1": "Partial. Big negative values are rendered differently from CSS standards.",
+    "2": "Buggy. Values set in `em` are smaller than the expected render in CSS. See [#192](https://github.com/hteumeuleu/caniemail/issues/192)."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "13.2": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2020-01": "y"
+     },
+     "ios": {
+      "2020-01": "y"
+     },
+     "android": {
+      "2020-01": "y"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "y",
+      "2007": "a #1 #2",
+      "2010": "a #1 #2",
+      "2013": "a #1 #2",
+      "2016": "a #1 #2",
+      "2019": "a #1 #2"
+     },
+     "macos": {
+      "2020-01": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2020-01": "y",
+      "2023-12": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2020-01": "y"
+     },
+     "ios": {
+      "2020-01": "y"
+     },
+     "android": {
+      "2020-01": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "68.4": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-opacity",
+   "title": "opacity",
+   "url": "https://www.caniemail.com/features/css-opacity/",
+   "last_test_date": "2019-02-28",
+   "notes_by_num": null,
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "12.1": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-02": "y"
+     },
+     "ios": {
+      "2019-02": "y"
+     },
+     "android": {
+      "2019-02": "y"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2019-02": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2019-02": "y",
+      "2024-01": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.8": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-02": "n",
+      "2025-06": "y"
+     },
+     "ios": {
+      "2019-02": "n",
+      "2025-06": "y"
+     },
+     "android": {
+      "2019-02": "n",
+      "2025-06": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-background-image",
+   "title": "background-image",
+   "url": "https://www.caniemail.com/features/css-background-image/",
+   "last_test_date": "2023-07-24",
+   "notes_by_num": {
+    "1": "Partial. Not supported with non Google accounts.",
+    "2": "Buggy. Requires at least one `<img>` element in the email to download all images.",
+    "3": "Partial. Does not support multiple values. The comma between two values is removed.",
+    "4": "Partial. Images URL must be between quotes.",
+    "5": "Background images can be used in VML. See [backgrounds.cm](https://backgrounds.cm/) and [VML documentation](https://docs.microsoft.com/en-us/windows/win32/vml/web-workshop---how-to-use-vml-on-web-pages-----fill--element).",
+    "6": "Partial and buggy. Removes the entire `style` attribute or `<style>` tag when a `url()` function with a valid image URL is present. See [Gmail rolling out changes that strip CSS with background images](https://freshinbox.com/blog/gmail-rolling-out-changes-that-strip-background-image-css/) and [Gmail and background images](https://parcel.io/blog/gmail-and-background-images)."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "12.1": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-02": "y",
+      "2023-07": "a #6",
+      "2023-08": "y"
+     },
+     "ios": {
+      "2018-09": "a #1",
+      "2018-10": "y",
+      "2019-02": "y"
+     },
+     "android": {
+      "2018-09": "a #1",
+      "2018-10": "y",
+      "2019-02": "y"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n #5",
+      "2010": "n #5",
+      "2013": "n #5",
+      "2016": "n #5",
+      "2019": "n #5"
+     },
+     "macos": {
+      "2019-02": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2019-02": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-02": "a #3 #4",
+      "2021-10": "a #3"
+     },
+     "ios": {
+      "2019-02": "a #3 #4",
+      "2021-10": "a #3"
+     },
+     "android": {
+      "2019-02": "a #3 #4",
+      "2021-10": "a #3"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "a #2",
+      "6.0.04.6": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.5.0": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-background-size",
+   "title": "background-size",
+   "url": "https://www.caniemail.com/features/css-background-size/",
+   "last_test_date": "2019-02-28",
+   "notes_by_num": {
+    "1": "Partial. Not supported with non Google accounts. But it can be used in the `background` shorthand property instead.",
+    "2": "Partial. Does not support multiple values. The comma between two values is removed.",
+    "3": "Background images size can be used in VML with the `size` attribute. See [VML documentation](https://docs.microsoft.com/en-us/windows/win32/vml/size-attribute--fill--vml)."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "12.1": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-02": "y"
+     },
+     "ios": {
+      "2019-02": "a #1"
+     },
+     "android": {
+      "2019-02": "a #1"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n #3",
+      "2010": "n #3",
+      "2013": "n #3",
+      "2016": "n #3",
+      "2019": "n #3"
+     },
+     "macos": {
+      "2019-02": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2019-02": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-02": "y #2"
+     },
+     "ios": {
+      "2019-02": "y #2"
+     },
+     "android": {
+      "2019-02": "y #2"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y",
+      "6.0.04.6": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.5.0": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-object-fit",
+   "title": "object-fit",
+   "url": "https://www.caniemail.com/features/css-object-fit/",
+   "last_test_date": "2021-07-15",
+   "notes_by_num": {
+    "1": "Partial. Not supported with non Google accounts."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "13": "y",
+      "14": "y"
+     },
+     "ios": {
+      "13": "y",
+      "14.6": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2021-07": "y"
+     },
+     "ios": {
+      "2021-07": "a #1"
+     },
+     "android": {
+      "2021-07": "a #1"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "n",
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2016": "y",
+      "2019": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2021-07": "y",
+      "2024-01": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "7.0": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "78.10": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2021-07": "n"
+     },
+     "ios": {
+      "2021-07": "n"
+     },
+     "android": {
+      "2021-07": "n"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-filter",
+   "title": "filter",
+   "url": "https://www.caniemail.com/features/css-filter/",
+   "last_test_date": "2024-01-03",
+   "notes_by_num": {
+    "1": "Partial. Multiple values don't work."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "12.1": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-02": "n"
+     },
+     "ios": {
+      "2019-02": "n"
+     },
+     "android": {
+      "2019-02": "n"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2019-02": "y",
+      "16.80": "n"
+     },
+     "outlook-com": {
+      "2019-02": "n"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.8": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-02": "n"
+     },
+     "ios": {
+      "2019-02": "n"
+     },
+     "android": {
+      "2019-02": "n"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-transform",
+   "title": "transform",
+   "url": "https://www.caniemail.com/features/css-transform/",
+   "last_test_date": "2019-02-28",
+   "notes_by_num": {
+    "1": "Partial. `scale translate` is not supported."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "12.1": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-02": "n"
+     },
+     "ios": {
+      "2019-02": "n"
+     },
+     "android": {
+      "2019-02": "n"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2019-02": "y",
+      "16.80": "n"
+     },
+     "outlook-com": {
+      "2019-02": "n",
+      "2024-01": "n"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.8": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-02": "n"
+     },
+     "ios": {
+      "2019-02": "n"
+     },
+     "android": {
+      "2019-02": "n"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-transition",
+   "title": "transition",
+   "url": "https://www.caniemail.com/features/css-transition/",
+   "last_test_date": "2024-03-29",
+   "notes_by_num": {
+    "1": "Partial. Longhand properties are not supported.",
+    "2": "Buggy. The `all` keyword is not supported.",
+    "3": "Buggy. `transition-duration` is forced to `0` on a global reset style.",
+    "4": "Transition properties are supported but pseudo-classes like `:hover` are not.",
+    "5": "Partial. Not supported with Outlook accounts."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "16.0": "y"
+     },
+     "ios": {
+      "17.4": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2024-03": "n"
+     },
+     "ios": {
+      "2024-03": "n"
+     },
+     "android": {
+      "2024-03": "n"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "16.80": "n"
+     },
+     "outlook-com": {
+      "2024-03": "n"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.1.90.16": "a #5"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "115.9.0": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2024-03": "a #1 #2"
+     },
+     "ios": {
+      "2024-03": "a #1 #2"
+     },
+     "android": {
+      "2024-03": "a #1 #2"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-animation",
+   "title": "animation",
+   "url": "https://www.caniemail.com/features/css-animation/",
+   "last_test_date": "2026-04-07",
+   "notes_by_num": {
+    "1": "Buggy. Animation properties are supported but `@keyframes` are incorrectly prefixed.",
+    "2": "Partial. Only supports from and to keyframes. Does not support % keyframes"
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "13": "y"
+     },
+     "ios": {
+      "13": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2021-05": "n"
+     },
+     "ios": {
+      "2021-05": "n"
+     },
+     "android": {
+      "2021-05": "n"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "n",
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2011": "y",
+      "2016": "y",
+      "16.80": "n"
+     },
+     "outlook-com": {
+      "2021-05": "n"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.1": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "78.10": "y",
+      "149.0.1": "n"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2021-05": "n"
+     },
+     "ios": {
+      "2021-05": "n"
+     },
+     "android": {
+      "2021-05": "n"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-pseudo-class-hover",
+   "title": ":hover",
+   "url": "https://www.caniemail.com/features/css-pseudo-class-hover/",
+   "last_test_date": "2019-10-23",
+   "notes_by_num": {
+    "1": "Partial. Not supported with non Google accounts.",
+    "2": "Partial. Only supported on type selectors."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "12.1": "y",
+      "13.1": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-10": "y"
+     },
+     "ios": {
+      "2019-10": "n"
+     },
+     "android": {
+      "2019-10": "a #1"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2019-02": "y",
+      "16.80": "a #2"
+     },
+     "outlook-com": {
+      "2019-10": "a #2",
+      "2024-01": "a #2"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.8": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-02": "y"
+     },
+     "ios": {
+      "2019-02": "y"
+     },
+     "android": {
+      "2019-02": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "5.0.10.2": "y",
+      "6.0.04.6": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-at-font-face",
+   "title": "@font-face",
+   "url": "https://www.caniemail.com/features/css-at-font-face/",
+   "last_test_date": "2023-12-19",
+   "notes_by_num": {
+    "1": "Partial. Only supported through a `<link>` tag.",
+    "2": "Partial. Only supported directly through a `<style>` tag.",
+    "3": "Buggy. Support depends on the version of IE installed.",
+    "4": "Partial. The declaration is supported but distant fonts are ignored.",
+    "5": "Buggy. Elements using a font declared with `@font-face` ignore the font stack and fall back to Times New Roman. Use `mso-generic-font-family` and `mso-font-alt` to control the fallback.",
+    "6": "Not supported. Roboto and Google Sans can be used, but only because they're embedded with the webmail's own styles.",
+    "7": "Not supported. The `@font-face` declaration is kept but the `src` property is removed.",
+    "8": "Not supported when using a Microsoft email address; outlook, live, hotmail, etc."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.2": "y"
+     },
+     "ios": {
+      "10.3": "y",
+      "12.3.1": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-07": "n #6"
+     },
+     "ios": {
+      "2019-07": "n"
+     },
+     "android": {
+      "2019-07": "n"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "a #3",
+      "2007": "a #4 #5",
+      "2010": "a #4 #5",
+      "2013": "a #4 #5",
+      "2016": "a #4 #5",
+      "2019": "a #4"
+     },
+     "macos": {
+      "2011": "y",
+      "2016": "y",
+      "16.80": "n"
+     },
+     "outlook-com": {
+      "2019-07": "n",
+      "2023-12": "n"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.0": "y #8",
+      "2021-11": "y #8"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.7": "y",
+      "78.5": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-07": "n"
+     },
+     "ios": {
+      "2019-07": "n"
+     },
+     "android": {
+      "2019-07": "n"
+     }
+    }
+   }
+  },
+  {
+   "slug": "css-variables",
+   "title": "CSS Variables (Custom Properties)",
+   "url": "https://www.caniemail.com/features/css-variables/",
+   "last_test_date": "2020-02-25",
+   "notes_by_num": {
+    "1": "Partial. The `var()` function is supported, but not the variable declaration.",
+    "2": "Partial. Not supported with non Google accounts."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "10.3": "y"
+     },
+     "ios": {
+      "10.3": "y",
+      "12.2": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-08": "n #1"
+     },
+     "ios": {
+      "2019-08": "n #1 #2"
+     },
+     "android": {
+      "2019-08": "n #1 #2"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "n",
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2011": "y",
+      "2016": "y",
+      "16.80": "n"
+     },
+     "outlook-com": {
+      "2019-08": "n",
+      "2020-02": "n",
+      "2024-01": "n"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.0": "y",
+      "9.0": "y"
+     }
+    },
+    "thunderbird": {
+     "windows": {
+      "2020-02": "y"
+     },
+     "macos": {
+      "60.3": "y",
+      "68.4": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-08": "n",
+      "2020-02": "n"
+     },
+     "ios": {
+      "2019-08": "n",
+      "2020-02": "n"
+     },
+     "android": {
+      "2019-08": "n",
+      "2020-02": "n"
+     }
+    }
+   }
+  },
+  {
+   "slug": "html-svg",
+   "title": "Embedded <svg> image",
+   "url": "https://www.caniemail.com/features/html-svg/",
+   "last_test_date": "2020-02-06",
+   "notes_by_num": {
+    "1": "Buggy. Requires a background on the `<body>`. Can be any type of background, image or a color, can be set as attribute, inline style or in `<style>` block",
+    "2": "Not supported. Element is removed along with any fallback content."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "13": "a #1"
+     },
+     "ios": {
+      "13": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2020-02": "n"
+     },
+     "ios": {
+      "2020-02": "n"
+     },
+     "android": {
+      "2020-02": "n"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2016": "y",
+      "16.80": "n"
+     },
+     "outlook-com": {
+      "2020-02": "n",
+      "2024-01": "n"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "9.0": "y"
+     }
+    },
+    "thunderbird": {
+     "windows": {
+      "2020-02": "y"
+     },
+     "macos": {
+      "68.4": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2020-02": "n"
+     },
+     "ios": {
+      "2020-02": "n"
+     },
+     "android": {
+      "2020-02": "n"
+     }
+    }
+   }
+  },
+  {
+   "slug": "html-video",
+   "title": "<video> element",
+   "url": "https://www.caniemail.com/features/html-video/",
+   "last_test_date": "2019-09-16",
+   "notes_by_num": {
+    "1": "The `<video>` element is supported, but not the inner `<source>` element so no video can play.",
+    "2": "`<video>`, `<source>` and `<track>` tags are replaced by `<u></u>` tags.",
+    "3": "Buggy. Support depends on the version of Internet Explorer installed.",
+    "4": "`<video>`, `<source>` and `<track>` tags are stripped. The fallback content is shown instead.",
+    "5": "Partial support. Requires the `controls` attribute to play.",
+    "6": "Partial support. `autoplay` is not supported.",
+    "7": "The `<video>` element is supported and the `poster` image is visible, but the video can not play due to a strict Content Security Policy.",
+    "8": "The `<video>` element is supported, but the video can not play due to a strict Content Security Policy.",
+    "9": "Not supported. The `<video>` element and all its content is removed.",
+    "10": "Not supported. The `src` attribute is replaced by `data-src`.",
+    "11": "Partial support. The video can be played by doing a right click and play. But `autoplay` and `controls` are not supported."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "12.4": "a #5",
+      "13.3": "a #5 #6"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2019-09": "n #2"
+     },
+     "ios": {
+      "2019-09": "n #2"
+     },
+     "android": {
+      "2019-09": "n #2"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "y #3",
+      "2007": "n",
+      "2010": "n",
+      "2013": "n",
+      "2016": "n",
+      "2019": "n"
+     },
+     "macos": {
+      "2011": "y",
+      "2016": "y",
+      "16.80": "y #11"
+     },
+     "outlook-com": {
+      "2019-09": "n #4",
+      "2021-05": "n #8",
+      "2024-01": "n #8"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.0": "a #5"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "60.9": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2019-09": "n #4"
+     },
+     "ios": {
+      "2019-09": "n #4"
+     },
+     "android": {
+      "2019-09": "n #4"
+     }
+    }
+   }
+  },
+  {
+   "slug": "html-dir",
+   "title": "dir attribute",
+   "url": "https://www.caniemail.com/features/html-dir/",
+   "last_test_date": "2021-11-01",
+   "notes_by_num": {
+    "1": "Buggy. The client applies an `rtl` direction to the entire email if it contains text in a `rtl` language.",
+    "2": "Partial. Removed from `<table>` and `<td>` elements.",
+    "3": "Buggy on anchor `<a>` tags.",
+    "4": "Buggy. LTR text in `[dir=rtl]` (and vice versa) is rendered with reversed word order."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "14": "y"
+     },
+     "ios": {
+      "15": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2021-10": "y"
+     },
+     "ios": {
+      "2021-10": "y"
+     },
+     "android": {
+      "2021-10": "y"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2007": "a #3 #4",
+      "2010": "a #3",
+      "2013": "a #3",
+      "2016": "a #3",
+      "2019": "a #3"
+     },
+     "macos": {
+      "16.55": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2021-10": "y",
+      "2024-01": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.0": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "78.14": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2021-10": "y"
+     },
+     "ios": {
+      "2021-10": "y"
+     },
+     "android": {
+      "2021-10": "y"
+     }
+    }
+   }
+  },
+  {
+   "slug": "html-lang",
+   "title": "lang attribute",
+   "url": "https://www.caniemail.com/features/html-lang/",
+   "last_test_date": "2020-10-25",
+   "notes_by_num": {
+    "1": "Not supported on `<td>` elements."
+   },
+   "stats": {
+    "apple-mail": {
+     "macos": {
+      "12.4": "y"
+     },
+     "ios": {
+      "14.0": "y"
+     }
+    },
+    "gmail": {
+     "desktop-webmail": {
+      "2020-10": "y"
+     },
+     "ios": {
+      "2020-10": "y"
+     },
+     "android": {
+      "2020-10": "y"
+     }
+    },
+    "outlook": {
+     "windows": {
+      "2003": "u",
+      "2007": "u",
+      "2010": "u",
+      "2013": "u",
+      "2016": "u",
+      "2019": "y"
+     },
+     "macos": {
+      "2011": "y",
+      "2016": "y",
+      "16.80": "y"
+     },
+     "outlook-com": {
+      "2020-10": "y",
+      "2024-01": "y"
+     }
+    },
+    "samsung-email": {
+     "android": {
+      "6.0": "y"
+     }
+    },
+    "thunderbird": {
+     "macos": {
+      "78.4": "y"
+     }
+    },
+    "yahoo": {
+     "desktop-webmail": {
+      "2020-10": "a #1"
+     },
+     "ios": {
+      "2020-10": "a #1"
+     },
+     "android": {
+      "2020-10": "a #1"
+     }
+    }
+   }
+  }
+ ]
+}

@@ -401,7 +401,8 @@
       "figure": "16,384 bytes",
       "also": [
         "16,384-byte",
-        "16 kB"
+        "16 kB",
+        "16 KB"
       ],
       "claim": "the ceiling on <style> content in Gmail, raised from 8,192 bytes; every element that crosses it is removed with every one after it",
       "source": "hteumeuleu/email-bugs, issue #90 \"Gmail limits <style> to 16 kB\" (opened 2021-03-02)",

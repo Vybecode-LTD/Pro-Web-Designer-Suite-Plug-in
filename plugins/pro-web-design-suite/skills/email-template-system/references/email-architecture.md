@@ -124,7 +124,7 @@ Every line earns its place. Nothing here is cargo. `build_email.py` adds the nam
 
 ## 3. Spacing discipline — Law 2, table-shaped
 
-Law 2 says *parents own the gaps*. Email has no `gap`, and child `margin` is unreliable in the Word engine and absent on `div`s in Samsung Mail. So the law does not disappear; it changes mechanism.
+Law 2 says *parents own the gaps*. Email has no `gap` it can rely on (the Word engine and Yahoo drop it), and child `margin` is unreliable in the Word engine. So the law does not disappear; it changes mechanism.
 
 > **In email, a gap is owned by the parent `<table>` — expressed either as padding on the content `<td>` or as a dedicated spacer `<tr>`. A content element never sets its own outer spacing.**
 
