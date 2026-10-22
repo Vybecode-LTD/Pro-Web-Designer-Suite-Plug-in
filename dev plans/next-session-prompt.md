@@ -557,13 +557,15 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
 ## 3. First: the state of `main`
 
 Read `main`'s latest CI run (`gh run list --branch main --limit 1`). If it is red, read the failing test first: a known flake (`docs/HANDOFF.md`'s Warnings) that touches nothing recent is rerun with `gh run rerun RUN --failed`; anything else is fixed in a PR of its own. Then:
-- No PR should be open (`gh pr list --state open`); the docs PR, #199, merges at the end of the session that wrote this.
+- No PR should be open (`gh pr list --state open`); the last PR of the session that wrote this, #200, merges at its end.
 - Remove any worktree left in a scratchpad (`git worktree list`). The newest `wait_pr.sh` is in `57634616-…`'s scratchpad (the same script as `47067940-…`'s).
 - Then read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
 
 ## 4. R4, the 4.0.0 release
 
-Phase 6b is done: P41 part 3 (#198, DL-B4) was its last item, and the plan's checker reports nothing open. 4.0.0 holds Phases 6a's follow-ups, 6b and 6c and the rename.
+Phase 6b is done: P41 part 3 (#198, DL-B4) was its last item, and the plan's checker reports nothing open.
+
+**The owner's choices (2026-10-22):** the live check runs **the full list below** (about 15 headless sessions, about $8 to $10; ask once with the session list and the cap before the first), and **the evals are approved** on the release PR's merge (`tag=all`, about $11). **The free checks are done** (`web-design-suite-4.0.0-live-check.md`): the tree builds (229 files), and the rename path was run with Claude Code 2.1.308 in a throwaway `CLAUDE_CONFIG_DIR`. It found that an existing install must reinstall as `pro-web-design-suite@web-design-suite` (fixed in #200). The paid check still has to show what a session start does with the renamed plugin. Install the CLI the same way if the desktop app's bundled one is not at its path: `npm install @anthropic-ai/claude-code@VERSION` in the scratchpad. 4.0.0 holds Phases 6a's follow-ups, 6b and 6c and the rename.
 
 | Item | Scope | Closes | Main files | Size |
 |---|---|---|---|---|
@@ -575,7 +577,7 @@ Every outside figure, as in P42 and in P43's regulated claims (a law's date, a f
 
 **R4** follows R3.6's order: a live check of what changed (the owner's OK, with its estimate); the release PR; the evals on its merge (the owner's OK, about $11, with `headSha` checked); then the tag. The rename (#180) changes the install path: read its PR, and check the `renames` entry moves an existing install. Its live check covers Part 5's Tailwind lint block in a real project, `/tw-probe`, the v3 upgrade path, the v4 census on a real Tailwind 4 project, the gates P50 changed, the migration's reconciliation on a real codebase (P52), the router (#143), the MCP server's containment (#155), P55's gates, P34's options on a real client-rendered app and a real signed-in page, a real web-component library, a site's sitemap through `--urls` at two viewports, P37's stacks, the scaffold's Vue and Svelte output in a real Vite and a real SvelteKit project, **P35's checks on a real site** (a sticky header, a cookie banner, tooltips, reduced motion; `--engine webkit` and, on Linux or macOS, `--engine firefox`), **the email skill's MJML and React Email themes** in a real MJML project and a real React Email project, from `npm install` to a send through a provider (#198), and **the routing evals on the renamed plugin**.
 
-Ask the owner before each eval run and each paid session, and keep each PR under 100 files for CodeRabbit.
+The owner approved the live check and the evals (above): show the session list and the cap once, before the first paid session, and ask again only for a run beyond them, a rerun included. Keep each PR under 100 files for CodeRabbit.
 
 **R4 also ships the rename and the distribution repository** (#180, #181 and #182, 2026-10-19). Read `dev plans/web-design-suite-distribution-and-promotion.md`'s "Rename and distribution plan" first.
 - **Before the tag**, check that `Vybecode-LTD/pro-web-design-suite` is still empty and public (`gh repo view`), that its write deploy key is there (`gh api repos/Vybecode-LTD/pro-web-design-suite/keys`) and that the `DIST_DEPLOY_KEY` secret is set (`gh secret list`), or `release.yml`'s `distribute` job fails. All three held on 2026-10-21.

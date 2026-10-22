@@ -14,9 +14,13 @@ renames the plugin.
   (`/pro-web-design-suite:gate`, `/pro-web-design-suite:new-system`...), of the MCP tools
   (`mcp__plugin_pro-web-design-suite_gates__*`) and of the subagents
   (`pro-web-design-suite:design-critic`); `displayName` is "Pro Web Design Suite". Both
-  marketplace files carry `"renames": {"web-design-suite": "pro-web-design-suite"}`, so Claude Code
-  moves an existing install to the new name. If it then reports the plugin as not cached, run
-  `/plugin install pro-web-design-suite@pro-web-design-suite` once. A permission rule, hook or
+  marketplace files carry `"renames": {"web-design-suite": "pro-web-design-suite"}`. When Claude Code
+  updates the marketplace it moves the enabled plugin to the new name, but **the marketplace keeps
+  the name it was added under**, so an install from this repository becomes
+  `pro-web-design-suite@web-design-suite`. Claude Code 2.1.308 then lists no installed plugin, and
+  `/plugin update web-design-suite@web-design-suite` reports it not found: run
+  `/plugin install pro-web-design-suite@web-design-suite` once. (`@pro-web-design-suite` names the
+  distribution repository's marketplace, below, and is not found in yours.) A permission rule, hook or
   script that names an old command or tool must be edited. **What keeps the old id:** the files
   in your projects. `contract.json`'s schema `web-design-suite/contract/1`, the DTCG `$extensions` key
   `io.github.vybecode-ltd.web-design-suite`, `/install-gate`'s stamp and `.design-suite.json` read

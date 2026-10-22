@@ -1,6 +1,6 @@
 # Handoff
 
-**2026-10-22, second session: P41 part 3 is done** (DL-B4, #198), so Phase 6b is complete and no item is open (`check_execution_plan.py`: 0 open, 0 scheduled). **R4, the 4.0.0 release, is the next session's whole job.** This session stopped at about 500 thousand tokens, past the owner's 400 thousand break, rather than start R4's live check.
+**2026-10-22, second session: P41 part 3 is done** (DL-B4, #198), so Phase 6b is complete and no item is open (`check_execution_plan.py`: 0 open, 0 scheduled). **R4, the 4.0.0 release, is the next session's whole job.** The owner then asked for R4 here and chose the full live check in a fresh session: this session ran only **R4's free checks**, which found the rename's upgrade command wrong (**#200**, `dev plans/web-design-suite-4.0.0-live-check.md`).
 
 **The next session starts from `dev plans/next-session-prompt.md`** (§3, then §4). `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
@@ -15,7 +15,7 @@ A second session, beside P35's, did the owner's distribution plan (`dev plans/we
 
 ## State
 
-- **`main` at `3184a09`** (#198's merge), with this session's docs PR, #199, on top. 3.6.0 is the latest release; 4.0.0 is unreleased, with Phases 6a, 6b and 6c all in it.
+- **`main` at `7ed9937`** (#199, the docs), with #200 (the rename's upgrade command and R4's free checks) on top. 3.6.0 is the latest release; 4.0.0 is unreleased, with Phases 6a, 6b and 6c all in it.
 - **#198, P41 part 3 (DL-B4)**, merged as `3184a09`. `email-template-system/scripts/export_email_theme.py` writes the email tokens as an `<mjml><mj-head>` to `mj-include` (`--format mjml`) or a React Email theme module with `withMso()` (`--format react-email`). The starters `assets/templates/mjml/` and `react-email/` compile with MJML 5.4.1 and React Email 6.11.3 to HTML that passes `lint_email.py --strict`, and a browser test reads their dark mode, phone sizes and gutter. email-workflow.md §11; Maizzle routed away. The router hears React Email, Maizzle and `mj-` tags. Three gate fixes came out of it: `lint_email` measured a hidden preheader's contrast and read a `font-size:0` column wrapper as text, and `audit_design` failed a React Email template (it now leaves one, and an `@generated` file, to the email lint).
 - **`tooling/main`** gains `mjml` 5.4.1, `react` and `react-dom` 19.3.1, and `react-email` 6.11.3 (+259 packages, test-only; the owner's OK, 2026-10-22). `@react-email/components` and its per-component packages are deprecated on npm, so its replacement `react-email` is the one pinned.
 - **Reviews on #198:** Codex 2 (the gutter read the surface class; a commented-out import skipped the audit) and CodeRabbit 3 (one the same gutter finding, two declined with reasons it then withdrew). Each fix fails on `9e7e61f`, the head reviewed.
@@ -27,8 +27,7 @@ A second session, beside P35's, did the owner's distribution plan (`dev plans/we
 
 ## Open owner decisions
 
-- R4's live check: its scope and its budget (a paid session).
-- The eval run on the release PR's merge (about $11).
+- **Decided 2026-10-22:** the full live check (about $8 to $10, in a fresh session; show the owner the session list and the cap once), and the evals on the release PR's merge (about $11).
 - Whether issues live in the distribution repository or here; `supportUrl` points here for now.
 - Whether to start the proposed follow-up: `check.py` should select `test_doc_snippets` and stylelint's snippet test when a reference changes.
 - `dev plans/next-session-prompt.md` is about 124 KB; the workspace's rule for a starting prompt is about 4 KB. Whether to split it: a short prompt that points at a reference file holding §0's lessons and §2's facts.
