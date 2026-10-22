@@ -249,6 +249,10 @@ class TheLinterBlamesCaniemailsClients(TempDirTest):
         self.assertEqual(1, len(found), output(proc))
         self.assertNotIn("Samsung", found[0]["detail"])           # Samsung Email 9.0 supports them
         self.assertIn("(caniemail.com, tested 2020-02-25)", found[0]["detail"])
+        # CodeRabbit on #195: Apple Mail, Samsung Email and Thunderbird support them, so the
+        # finding says they are not portable, not that no client resolves them.
+        self.assertNotIn("No email client resolves", found[0]["detail"])
+        self.assertIn("not portable across email clients", found[0]["detail"])
 
 
 class TheMatrixSaysWhatItsCellsSay(unittest.TestCase):
