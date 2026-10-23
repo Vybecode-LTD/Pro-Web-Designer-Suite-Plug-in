@@ -321,6 +321,9 @@ async function main() {
     const imports = /@(?:import|reference)\s+(?:url\(\s*(?:"([^"]+)"|'([^']+)'|([^)\s]+))\s*\)|"([^"]+)"|'([^']+)')/g;
     for (const m of text.matchAll(imports)) {
       const id = m.slice(1).find(Boolean);
+      // A URL (a web font's stylesheet) is the browser's: Tailwind leaves it
+      // in place, and the probe has no file to read (R4's live check).
+      if (/^(?:[a-z][\w+.-]+:|\/\/)/i.test(id)) continue;
       const child = resolveImport(id, path.dirname(file));
       const inTailwind = !path.relative(twDir, child).startsWith('..') && !path.isAbsolute(path.relative(twDir, child));
       if (!inTailwind) ownSheets(child, id, seen, out);

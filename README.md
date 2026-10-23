@@ -152,7 +152,7 @@ Claude loads a skill when your request matches it. You don't have to name it.
 | **content-model-to-ui** | Turns a Supabase or Postgres schema into an on-system UI spec and a React scaffold: CRUD screens, forms, list and detail pages, admin panels. | build screens or an admin panel from a database |
 | **email-template-system** | Compiles the same tokens into inlined, table-based HTML email that survives Outlook, Gmail and dark mode. | build email templates or newsletters |
 | **perf-budget-gate** | Performance budgets that fail the build: page weight on every commit, Core Web Vitals (LCP, CLS, INP) measured on each PR. | set budgets or fix a slow page |
-| **a11y-audit-runner** | WCAG 2.2 AA with axe-core, keyboard, focus, contrast and zoom checks in CI, plus the manual pass no tool can make. | audit accessibility or gather VPAT evidence |
+| **a11y-audit-runner** | WCAG 2.2 AA with axe-core, keyboard, focus, contrast, zoom, text spacing, hover and motion checks in CI, in Chromium, Firefox or WebKit, plus the manual pass no tool can make. | audit accessibility or gather VPAT evidence |
 | **design-system-versioning** | Classifies each change as major, minor or patch by what renders differently, and writes the changelog, migration guide and codemods. | release a change to the system without breaking its consumers |
 | **client-presentation-builder** | Presents the work as reasoning, not taste: decks, rationale, before-and-after comparisons, answers to objections. | present or defend design work to a client or team |
 

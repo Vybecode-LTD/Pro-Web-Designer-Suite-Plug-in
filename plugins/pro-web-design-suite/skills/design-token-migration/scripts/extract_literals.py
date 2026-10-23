@@ -1896,7 +1896,8 @@ TW_NUMERIC_RE = re.compile(
 # A class list's tokens; a `:` inside brackets or parentheses separates no variant.
 TW_TOKEN_RE = re.compile(r"[^\s'\"`{},]+")
 TW_IMPORT_RE = re.compile(
-    r"""@import\s+(?:url\(\s*)?(["']?)([^"'\s;)]+)\1\s*\)?([^;]*);""")
+    # A quoted target runs to its quote: a web font's URL can hold a `;`.
+    r"""@import\s+(?:url\(\s*)?(["']?)((?<=["'])[^"'\n]+|[^"'\s;)]+)\1\s*\)?([^;]*);""")
 TW_PREFIX_RE = re.compile(r"\bprefix\(\s*([A-Za-z][\w-]*)\s*\)")
 TW_THEME_RE = re.compile(r"@theme\b([^{;]*)\{")
 # The stock theme's `--spacing` (tailwindcss.com/docs/theme), when the

@@ -101,7 +101,7 @@ except ImportError:                               # python scripts/a11y_static.p
 MARKUP_EXT = {".html", ".htm", ".xhtml", ".vue", ".svelte", ".astro", ".php",
               ".erb", ".hbs", ".handlebars", ".twig", ".liquid", ".jinja",
               ".j2", ".ejs"}
-JSX_EXT = {".jsx", ".tsx", ".js", ".ts", ".mjs", ".cjs"}
+JSX_EXT = {".jsx", ".tsx", ".js", ".ts", ".mts", ".cts", ".mjs", ".cjs"}
 CSS_EXT = {".css", ".scss", ".less", ".pcss"}
 # Indented Sass has no braces for the CSS checks to follow, so reading it
 # would pass it; it is listed as skipped instead (N13).
@@ -817,11 +817,35 @@ def shell_outlets(path: Path, clean: str, nodes: list[Node], is_jsx: bool) -> tu
     return body_outlet, head_outlet
 
 
+TS_EXT = {".ts", ".mts", ".cts"}
+# TypeScript's own files hold no JSX: their markup is a string markup is made
+# from, lit's html`` and svg``, an Angular `template:` in any quotes, or what
+# innerHTML, outerHTML and insertAdjacentHTML() take. Any other string is data,
+# a test fixture's XSS sample included (R4's live check; CodeRabbit on #201).
+_BACKTICK = r"`(?:[^`\\]|\\.)*`"
+TS_MARKUP = re.compile(
+    rf"\b(?:html|svg)\s*{_BACKTICK}"
+    rf"|\btemplate\s*:\s*(?:{_BACKTICK}|'(?:[^'\\\n]|\\.)*'|\"(?:[^\"\\\n]|\\.)*\")"
+    rf"|\b(?:innerHTML|outerHTML)\s*\+?=\s*{_BACKTICK}"
+    rf"|\binsertAdjacentHTML\s*\([^,()]*,\s*{_BACKTICK}")
+
+
+def ts_markup_only(text: str) -> str:
+    """Blank all of a TypeScript file but its template literals and quoted
+    `template:` values, preserving offsets and line numbers."""
+    out = ["\n" if c == "\n" else " " for c in text]
+    for m in TS_MARKUP.finditer(text):
+        out[m.start():m.end()] = text[m.start():m.end()]
+    return "".join(out)
+
+
 def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
     findings: list[Finding] = []
     lines = text.splitlines()
     file_ignores, line_ignores = extract_pragmas(text)
     clean = blank_comments(text)
+    if path.suffix.lower() in TS_EXT:
+        clean = ts_markup_only(clean)
 
     def add(line: int, cat: str, rule: str, sc: str, sev: str,
             msg: str, fix: str) -> None:
@@ -1210,15 +1234,20 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                     bound = [k for k in ("name", "id") if a.get(k) == EXPR]
                     field_ = (attr_text(known[0], a[known[0]]) if known
                               else attr_text(bound[0], EXPR) if bound else 'name="?"')
+                    # A password field alone cannot say whether it signs in or
+                    # sets the password (R4's live check: a sign-up form was
+                    # told `current-password`).
+                    sets = (", or `new-password` where the form sets one (sign-up, a change)"
+                            if hint == "current-password" else "")
                     add(line, "F", "missing-autocomplete", "1.3.5", "error",
                         f"<{name} {field_}> "
                         f"collects the user's own data and has no "
-                        f"`autocomplete` (expected `{hint}`).",
+                        f"`autocomplete` (expected `{hint}`{sets}).",
                         "1.3.5 is an AA criterion and it is the one teams "
                         "discover during a procurement review. It also raises "
                         "completion rates and is half of what makes password "
                         "managers work (3.3.8). Add "
-                        f"`autocomplete=\"{hint}\"`. Prefix address fields with "
+                        f"`autocomplete=\"{hint}\"`{sets}. Prefix address fields with "
                         "`shipping`/`billing` when a form has more than one "
                         "address.")
                 elif ac not in (None, EXPR) and ac.strip():

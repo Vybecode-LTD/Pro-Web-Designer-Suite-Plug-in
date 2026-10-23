@@ -1076,6 +1076,18 @@ class TheV4SpacingCensus(TempDirTest):
         _, data = self.project(entry=entry)
         self.assertIn(("p-4", "16px", "tw:p"), self.counted(data))
 
+    def test_a_quoted_url_with_a_semicolon_is_the_browsers(self):
+        # R4's live check (react-movies): Google Fonts' axis ranges put a `;` in
+        # the quoted URL, the import pattern stopped there and read `url(` as a
+        # package not installed, so no numeric class was counted.
+        entry = ('@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;'
+                 '1,9..40,100..1000&display=swap");\n'
+                 "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');\n"
+                 '@import "tailwindcss";\n')
+        _, data = self.project(entry=entry)
+        self.assertIn(("p-4", "1rem", "tw:p"), self.counted(data))
+        self.assertEqual(data["tailwind"]["entries"][0]["unread"], [])
+
     def test_a_size_is_no_padding(self):
         # CodeRabbit on #129: size-4 is an icon's width and height, so a padding
         # role (size-well) would resize every icon when --pad-well moved.
