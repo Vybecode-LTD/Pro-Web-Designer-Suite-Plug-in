@@ -65,7 +65,7 @@ const OFF = /^(?:false|0|no|off)$/i;
 const about = (context, rx) => new RegExp(String.raw`^(?=[\s\S]*(?:${context.source}))[\s\S]*${rx.source}`, rx.flags);
 const DESIGN_TOKEN = /\bdesign[- ]?(?:tokens?|system)\b|\btokens\.(?:css|json)\b|\b(?:colou?rs?|spacing|typography|palette|themes?|CSS|tailwind|figma|DTCG|tokens studio|style dictionary|pixels?|hard-?coded|components?|prop tables?)\b|(?:^|[\s`(])--[a-z][\w-]*/;
 const DESIGN_WORK = /\b(?:designs?|pages?|homepage|screens?|layouts?|UI|UX|sites?|website|mock-?ups?|wireframes?|components?|dashboards?|interfaces?|apps?|figma|hero|landing|forms?|buttons?|typography|colou?rs?|visual\w*|brand\w*)\b/;
-const COMPONENT = new RegExp(String.raw`\b(?:design system|components?|buttons?|inputs?|checkbox\w*|selects?|dropdowns?|`
+const COMPONENT = new RegExp(String.raw`\b(?:design[- ]system|components?|buttons?|inputs?|checkbox\w*|selects?|dropdowns?|`
   + String.raw`toggles?|tabs?|cards?|modals?|dialogs?|menus?|links?|fields?|chips?|badges?|tooltips?|accordions?|widgets?|`
   + String.raw`hover|focus|disabled|storybook|UI)\b`);
 const PAGE_SPEED = /\b(?:scores?|performance|perf|audits?|reports?|CI|(?:home)?pages?|sites?|website|load\w*|speed|budgets?|metrics?|vitals|mobile|desktop|SEO)\b/;
@@ -103,7 +103,10 @@ const ROUTES = [
                                                /\blooks? (?:professional|amateur\w*|cheap|dated)\b/i]],
   ['client-presentation-builder', 'client presentations', [/\b(?:client presentations?|pitch decks?)\b/i]],
   ['web-design-studio', 'design systems and building them',
-   [/\b(?:design tokens?|spacing scale|type scale|colou?r ramps?|cascade layers|tailwind theme|design system)\b/i]],
+   [/\b(?:design[- ]tokens?|spacing scale|type scale|colou?r ramps?|cascade layers|tailwind theme|design[- ]system)\b/i,
+    // R4's live check: "the design-system lint" heard nothing, and the session
+    // copied the lint block from an older install it found on its own.
+    /\b(?:design[- ](?:lint\w*|rules|laws)|nine laws)\b/i]],
 ];
 
 function readInput() {

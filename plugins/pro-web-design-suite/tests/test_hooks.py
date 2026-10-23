@@ -620,6 +620,22 @@ class TheRouter(HookTest):
             with self.subTest(prompt=prompt):
                 self.assertIn(skill, self.routed(prompt))
 
+    def test_a_hyphenated_design_system_and_the_design_lint_hear_the_studio(self):
+        """R4's live check: a prompt asking for "the design-system lint" with
+        its Tailwind block heard no skill, so the session searched the disk
+        and copied the lint block from an older install of the plugin."""
+        cases = {"This is a Vite + React + Tailwind 4 app. Set up the pro-web-design-suite design-system lint "
+                 "for it: the ESLint config with its Tailwind block, so our components are linted against "
+                 "the design rules.": ["web-design-studio"],
+                 "Start a design-system for the new product": ["web-design-studio"],
+                 "Add the design lint to CI": ["web-design-studio"],
+                 "Check the components against the Nine Laws": ["web-design-studio"],
+                 "Render every state in the design-system": ["component-state-matrix", "web-design-studio"]}
+        for prompt, skills in cases.items():
+            with self.subTest(prompt=prompt):
+                self.assertEqual(skills, self.routed(prompt))
+        self.assertEqual([], self.routed("Set up ESLint for the API server"))
+
     def test_other_prompts_and_named_skills_hear_nothing(self):
         for prompt in ("Fix the login bug", "Rename the class in utils.ts",
                        "Send a react email when the order ships",            # not the product (DL-B4)
