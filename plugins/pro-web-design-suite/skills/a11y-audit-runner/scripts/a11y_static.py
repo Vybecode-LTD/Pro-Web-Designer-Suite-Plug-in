@@ -101,7 +101,7 @@ except ImportError:                               # python scripts/a11y_static.p
 MARKUP_EXT = {".html", ".htm", ".xhtml", ".vue", ".svelte", ".astro", ".php",
               ".erb", ".hbs", ".handlebars", ".twig", ".liquid", ".jinja",
               ".j2", ".ejs"}
-JSX_EXT = {".jsx", ".tsx", ".js", ".ts", ".mjs", ".cjs"}
+JSX_EXT = {".jsx", ".tsx", ".js", ".ts", ".mts", ".cts", ".mjs", ".cjs"}
 CSS_EXT = {".css", ".scss", ".less", ".pcss"}
 # Indented Sass has no braces for the CSS checks to follow, so reading it
 # would pass it; it is listed as skipped instead (N13).
@@ -818,10 +818,16 @@ def shell_outlets(path: Path, clean: str, nodes: list[Node], is_jsx: bool) -> tu
 
 
 TS_EXT = {".ts", ".mts", ".cts"}
-# TypeScript's own files hold no JSX: their markup is a template literal (lit's
-# html``, Angular's inline template) or a quoted `template:` value. Any other
-# string is data, a test fixture's XSS sample included (R4's live check).
-TS_MARKUP = re.compile(r"`(?:[^`\\]|\\.)*`|\btemplate\s*:\s*(?:'(?:[^'\\\n]|\\.)*'|\"(?:[^\"\\\n]|\\.)*\")")
+# TypeScript's own files hold no JSX: their markup is a string markup is made
+# from, lit's html`` and svg``, an Angular `template:` in any quotes, or what
+# innerHTML, outerHTML and insertAdjacentHTML() take. Any other string is data,
+# a test fixture's XSS sample included (R4's live check; CodeRabbit on #201).
+_BACKTICK = r"`(?:[^`\\]|\\.)*`"
+TS_MARKUP = re.compile(
+    rf"\b(?:html|svg)\s*{_BACKTICK}"
+    rf"|\btemplate\s*:\s*(?:{_BACKTICK}|'(?:[^'\\\n]|\\.)*'|\"(?:[^\"\\\n]|\\.)*\")"
+    rf"|\b(?:innerHTML|outerHTML)\s*\+?=\s*{_BACKTICK}"
+    rf"|\binsertAdjacentHTML\s*\([^,()]*,\s*{_BACKTICK}")
 
 
 def ts_markup_only(text: str) -> str:

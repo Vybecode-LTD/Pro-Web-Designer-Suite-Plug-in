@@ -405,7 +405,7 @@ renames the plugin.
 ### Fixed
 
 - **What R4's live check found in real projects** (`dev plans/web-design-suite-4.0.0-live-check.md`),
-  each with a test that fails on 3.6.0:
+  each code fix with a test that fails on 3.6.0 (the description below is text a session reads, with no test):
   - **A web font's `@import url()` stopped the Tailwind v4 census and `/tw-probe`** (react-movies).
     A quoted Google Fonts URL holds a `;` (`wght@0,9..40,100..1000;1,…`): the census's import
     pattern stopped there, read `url(` as a package not installed and withheld every numeric class;
@@ -418,7 +418,8 @@ renames the plugin.
   - **`a11y_static.py` told a sign-up form's password to take `current-password`** (the Vue
     RealWorld app); the type alone cannot say, so the finding names `new-password` too. And it read
     an XSS sample in a `.ts` fixture's string as an image with no alt: a TypeScript file's markup is
-    its template literals and its Angular `template:` values.
+    what markup is made from (lit's `html`/`svg` templates, an Angular `template:`, `innerHTML`),
+    and a `.mts` or `.cts` file is audited too.
   - **a11y-audit-runner's description** names the text spacing, hover and motion checks and the
     three engines: a session asked for exactly those wrote its own Playwright script instead.
 - **Two false findings in `lint_email.py` on a compiler's markup** (DL-B4, P41 part 3). MJML's

@@ -1238,6 +1238,19 @@ class TheAuditsRuntimeLows(TempDirTest):
         found = sorted((f["line"], f["rule"]) for f in self.findings("fixtures.ts", text))
         self.assertEqual([(2, "img-no-alt"), (3, "empty-control")], found)
 
+    def test_a_typescript_data_literal_is_no_markup(self):
+        """CodeRabbit on #201: a backtick string is data unless markup is made
+        from it (lit's html``, an Angular template:, innerHTML), and a .mts or
+        .cts file was never audited at all."""
+        text = ("const sample = `<img src=\"x.png\">`;\n"
+                "el.innerHTML = `<button></button>`;\n"
+                "export const card = html`<img src=\"a.png\">`;\n"
+                "@Component({ selector: 'x-a', template: `<a href=\"/x\"></a>` })\n")
+        for name in ("data.ts", "data.mts", "data.cts"):
+            with self.subTest(name=name):
+                found = sorted((f["line"], f["rule"]) for f in self.findings(name, text))
+                self.assertEqual([(2, "empty-control"), (3, "img-no-alt"), (4, "empty-control")], found)
+
     def test_a_transition_of_the_outline_colour_is_allowed(self):
         """G10: the fix text allows transitioning the ring's colour, but
         `\\boutline\\b` matched `outline-color` too."""
