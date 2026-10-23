@@ -1,6 +1,6 @@
 ---
 name: a11y-audit-runner
-description: WCAG 2.2 AA tests with axe, keyboard, focus, contrast, zoom, text spacing, hover and motion checks in Chromium, Firefox or WebKit, plus the manual pass. For audits and VPATs. Not design critique.
+description: WCAG 2.2 AA tests with axe, keyboard, focus, contrast, zoom, text spacing, hover and motion checks in Chromium, Firefox or WebKit, plus the manual pass. For audits and VPATs. Not for design critique.
 ---
 
 # Accessibility Audit Runner
