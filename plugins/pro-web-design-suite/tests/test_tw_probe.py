@@ -157,6 +157,17 @@ class TheProbe(ProbeProject):
         roles = {r["variable"]: r for r in self.report()["roles"]}
         self.assertIn("--color-extra", roles)
 
+    def test_a_url_import_is_left_to_the_browser(self):
+        """R4's live check (react-movies): a web font's `@import url("https://…")`
+        stopped the probe (exit 2, no package to find); Tailwind leaves it."""
+        entry = (self.tmp / "src/styles/index.css").read_bytes().decode("utf-8")
+        self.write("src/styles/index.css",
+                   '@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap");\n'
+                   "@import url(//fonts.example.com/inter.css);\n" + entry)
+        proc = self.probe()
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertGreater(len(self.report()["roles"]), 50)
+
     def test_a_namespace_cleared_after_its_variables_drops_them(self):
         self.add_theme("@theme { --radius-*: initial; }\n")
         roles = {r["variable"] for r in self.report()["roles"]}
