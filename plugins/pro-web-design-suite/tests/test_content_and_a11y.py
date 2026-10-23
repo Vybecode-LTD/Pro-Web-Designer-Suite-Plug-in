@@ -1212,6 +1212,32 @@ class TheAuditsRuntimeLows(TempDirTest):
                        for f in found if f["rule"] == "missing-autocomplete"]
                 self.assertEqual([want] if want else [], got)
 
+    def test_a_password_field_is_offered_both_purposes(self):
+        """R4's live check (the Vue RealWorld app): a sign-up form's password,
+        its name bound, was told to take `current-password`; a field that sets
+        the password takes `new-password`, and the type alone cannot say which."""
+        found = self.findings("Register.vue", '<template><form><label>Password '
+                                              '<input type="password" :name="field" /></label></form></template>\n')
+        messages = [f["message"] + " " + f["fix"] for f in found if f["rule"] == "missing-autocomplete"]
+        self.assertEqual(1, len(messages), found)
+        self.assertIn("expected `current-password`, or `new-password` where the form sets one", messages[0])
+        self.assertIn('`autocomplete="current-password"`, or `new-password`', messages[0])
+        found = self.findings("page.html", '<!doctype html><html lang="en"><title>t</title><main><label>Email '
+                                           '<input type="email" name="email" /></label></main></html>')
+        self.assertNotIn("new-password", " ".join(f["message"] for f in found))
+
+    def test_a_typescript_files_markup_is_its_templates(self):
+        """R4's live check (the Vue RealWorld app): an XSS sample in a test
+        fixture's string, `'<img src=1 onerror=…>'`, read as an image with no
+        alt. A .ts file holds no JSX; its markup is a template literal or an
+        Angular `template:`."""
+        text = ("const xss = '<script>alert(1)</script><img src=1 onerror=\"alert(2)\">';\n"
+                "export const card = html`<img src=\"a.png\">`;\n"
+                "@Component({ selector: 'x-fav', template: '<button><i class=\"icon\"></i></button>' })\n"
+                "export class Fav {}\n")
+        found = sorted((f["line"], f["rule"]) for f in self.findings("fixtures.ts", text))
+        self.assertEqual([(2, "img-no-alt"), (3, "empty-control")], found)
+
     def test_a_transition_of_the_outline_colour_is_allowed(self):
         """G10: the fix text allows transitioning the ring's colour, but
         `\\boutline\\b` matched `outline-color` too."""
