@@ -49,7 +49,7 @@ const AUDITED = ['.css', '.scss', '.sass', '.less', '.pcss', '.js', '.jsx', '.ts
                  '.html', '.htm', '.vue', '.svelte', '.astro'];
 // The files a11y_static.py reads: its AUDITABLE_EXT.
 const A11Y_READ = ['.html', '.htm', '.xhtml', '.vue', '.svelte', '.astro', '.php', '.erb', '.hbs', '.handlebars',
-                   '.twig', '.liquid', '.jinja', '.j2', '.ejs', '.jsx', '.tsx', '.js', '.ts', '.mjs', '.cjs',
+                   '.twig', '.liquid', '.jinja', '.j2', '.ejs', '.jsx', '.tsx', '.js', '.ts', '.mts', '.cts', '.mjs', '.cjs',
                    '.css', '.scss', '.less', '.pcss'];
 // audit_design.py's GENERATED_MARKERS, looked for in a file's first 800 characters.
 const GENERATED = ['@generated', 'DO NOT EDIT', 'AUTO-GENERATED', 'Auto-generated'];
