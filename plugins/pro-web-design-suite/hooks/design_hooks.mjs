@@ -106,7 +106,7 @@ const ROUTES = [
    [/\b(?:design[- ]tokens?|spacing scale|type scale|colou?r ramps?|cascade layers|tailwind theme|design[- ]system)\b/i,
     // R4's live check: "the design-system lint" heard nothing, and the session
     // copied the lint block from an older install it found on its own.
-    /\b(?:design[- ](?:lint\w*|rules|laws)|nine laws)\b/i]],
+    /\b(?:design[- ](?:lint\w*|rules|laws|audits?)|nine laws)\b/i]],
 ];
 
 function readInput() {

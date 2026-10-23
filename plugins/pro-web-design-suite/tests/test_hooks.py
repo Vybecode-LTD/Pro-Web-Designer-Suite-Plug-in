@@ -630,6 +630,7 @@ class TheRouter(HookTest):
                  "Start a design-system for the new product": ["web-design-studio"],
                  "Add the design lint to CI": ["web-design-studio"],
                  "Check the components against the Nine Laws": ["web-design-studio"],
+                 "Check our components against the design audit": ["web-design-studio"],
                  "Render every state in the design-system": ["component-state-matrix", "web-design-studio"]}
         for prompt, skills in cases.items():
             with self.subTest(prompt=prompt):
