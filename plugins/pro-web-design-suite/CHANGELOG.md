@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.0.0 — unreleased
+## 4.0.0 — 2026-10-23
 
 Phase 6b. 4.0.0 is a major release because Part 5 of the ESLint config moves to another
 Tailwind lint plugin (decision D4): a project that copied Part 5 must copy it again. It also
@@ -17,9 +17,10 @@ renames the plugin.
   marketplace files carry `"renames": {"web-design-suite": "pro-web-design-suite"}`. When Claude Code
   updates the marketplace it moves the enabled plugin to the new name, but **the marketplace keeps
   the name it was added under**, so an install from this repository becomes
-  `pro-web-design-suite@web-design-suite`. Claude Code 2.1.308 then lists no installed plugin, and
-  `/plugin update web-design-suite@web-design-suite` reports it not found: run
-  `/plugin install pro-web-design-suite@web-design-suite` once. (`@pro-web-design-suite` names the
+  `pro-web-design-suite@web-design-suite`. Claude Code then lists no installed plugin until the next
+  session starts, which installs the renamed plugin by itself (2.1.309, R4's live check); 2.1.308's
+  `/plugin update web-design-suite@web-design-suite` reported it not found. If `/plugin` still shows
+  none, run `/plugin install pro-web-design-suite@web-design-suite` once. (`@pro-web-design-suite` names the
   distribution repository's marketplace, below, and is not found in yours.) A permission rule, hook or
   script that names an old command or tool must be edited. **What keeps the old id:** the files
   in your projects. `contract.json`'s schema `web-design-suite/contract/1`, the DTCG `$extensions` key
@@ -403,6 +404,23 @@ renames the plugin.
 
 ### Fixed
 
+- **What R4's live check found in real projects** (`dev plans/web-design-suite-4.0.0-live-check.md`),
+  each with a test that fails on 3.6.0:
+  - **A web font's `@import url()` stopped the Tailwind v4 census and `/tw-probe`** (react-movies).
+    A quoted Google Fonts URL holds a `;` (`wght@0,9..40,100..1000;1,…`): the census's import
+    pattern stopped there, read `url(` as a package not installed and withheld every numeric class;
+    `tw_probe.mjs` looked for a package named by the URL and exited 2. A URL is the browser's, as
+    Tailwind leaves it.
+  - **The router heard no skill for "the design-system lint"** (a Vite + Tailwind 4 app), so the
+    session searched the disk and copied the lint block from an older install. A hyphenated
+    design-system and design-token, the design lint, rules, laws and audit now reach
+    web-design-studio.
+  - **`a11y_static.py` told a sign-up form's password to take `current-password`** (the Vue
+    RealWorld app); the type alone cannot say, so the finding names `new-password` too. And it read
+    an XSS sample in a `.ts` fixture's string as an image with no alt: a TypeScript file's markup is
+    its template literals and its Angular `template:` values.
+  - **a11y-audit-runner's description** names the text spacing, hover and motion checks and the
+    three engines: a session asked for exactly those wrote its own Playwright script instead.
 - **Two false findings in `lint_email.py` on a compiler's markup** (DL-B4, P41 part 3). MJML's
   output had an error and a warning per column. A hidden preheader's colour was measured, and
   MJML's is white on any canvas: the contrast check now skips a preheader, as the dark check did.
