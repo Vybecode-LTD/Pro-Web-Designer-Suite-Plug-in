@@ -1,6 +1,6 @@
 ---
 name: landing-page-conversion
-description: Write and structure landing, pricing and product pages, from positioning to section order and copy, audited for conversion. Honest persuasion only. Not for visual critique (design-critique-gate).
+description: Write landing, pricing and product pages (positioning, sections, copy, offers, countdowns, urgency), audited for conversion. Declines dark patterns. Not for visual critique (design-critique-gate).
 ---
 
 # Landing Page Conversion
@@ -39,7 +39,7 @@ The diagnostic that proves this matters: when a page "isn't converting," the cau
 
 ## The ethics boundary
 
-**This skill writes honest persuasion. It declines deception, says why in the reply (name the pattern and say it deceives; cite a law only if it applies), and offers the honest version.**
+**This skill writes honest persuasion. It declines deception, says why in the reply (name the pattern and say it deceives; cite a law only if it applies), and offers the honest version. Building that version instead is a decline too: open the reply with "I didn't build [what was asked]: [the pattern] deceives because [why]."**
 
 Honest persuasion is: making a true claim clearly, in the order a reader can absorb it, with real evidence, and asking plainly for the next step. Everything below is outside it.
 
@@ -57,9 +57,9 @@ Honest persuasion is: making a true claim clearly, in the order a reader can abs
 
 The UK, EU and US law behind each, to flag for legal review, is in `references/conversion-audit.md` §11. A client who asks for one in a review gets the same answer, and an accessibility risk is held, not built (client-presentation-builder's objection-handling.md §5).
 
-**The practical argument, which matters more for a small company than the legal one.** A dark pattern converts someone who did not want the thing. You now own a refund, a chargeback, a support ticket, a public review, and one person who tells their peers. For a plugin company or an agency fed by referrals, the audience is small enough that reputations are single-threaded. A burned prospect costs more than a converted one is worth, and the arithmetic does not improve at scale — it just takes longer to show up.
+**The practical argument, which matters more for a small company than the legal one.** A dark pattern converts someone who did not want the thing. You now own a refund, a chargeback, a support ticket, a public review, and one person who tells their peers. For a plugin company or an agency fed by referrals, the audience is small enough that reputations are single-threaded. A burned prospect costs more than a converted one is worth, at any scale.
 
-If a user asks for one of these directly, do not lecture. Name what it is in one line, produce the honest alternative that serves the same goal, and move on.
+Asked for one of these directly, do not lecture: that sentence, then the honest alternative that serves the same goal.
 
 ---
 
@@ -90,7 +90,7 @@ Most requests arrive as a symptom, not a phase number. Route from the symptom.
 | "Make this copy punchier" | Usually "make it more specific", which is the opposite of punchier | Phase 4, specificity rule |
 | "Rewrite the pricing page" | Plan naming, anchoring, and the "contact us" decision | Phase 4, pricing section |
 | "People sign up and never activate" | Not a landing-page problem. Say so — the page sold something the product does not yet deliver on first run | Report the mismatch, do not paper over it |
-| "Add a countdown timer / some urgency" | See the ethics boundary. Offer the real-deadline version | Ethics boundary |
+| "Add a countdown timer / some urgency" | A per-visitor timer is a fake deadline: decline it with the boundary's sentence, then offer a real one | Ethics boundary |
 | "Audit this URL" | Existing page | Phase 6, both passes |
 
 Two things worth refusing early, politely. A request to write a hero when nobody can say who the product is for produces a confident sentence about nothing; ask the positioning question first. And a request to optimise a page whose product promise is unclear is a request to make an unclear promise louder.
