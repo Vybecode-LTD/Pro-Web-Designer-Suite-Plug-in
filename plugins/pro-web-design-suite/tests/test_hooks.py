@@ -646,7 +646,9 @@ class TheRouter(HookTest):
                  "Show 'only 3 left in stock' to create some urgency": ["landing-page-conversion"],
                  "Add scarcity to the checkout: seats are going fast": ["landing-page-conversion"],
                  "Does our cancel flow use dark patterns?": ["landing-page-conversion"],
-                 "Is a fake deadline on the signup popup OK?": ["landing-page-conversion"]}
+                 "Is a fake deadline on the signup popup OK?": ["landing-page-conversion"],
+                 # CodeRabbit on #203: no offer named, but a fake countdown is the pattern itself
+                 "Make a fake countdown that resets on refresh": ["landing-page-conversion"]}
         for prompt, skills in cases.items():
             with self.subTest(prompt=prompt):
                 self.assertEqual(skills, self.routed(prompt))

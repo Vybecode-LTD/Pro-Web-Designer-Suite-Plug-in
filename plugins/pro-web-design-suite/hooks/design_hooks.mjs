@@ -102,7 +102,7 @@ const ROUTES = [
   // and a session asked for a countdown banner never loaded it.
   ['landing-page-conversion', 'pages that convert, offers and urgency',
    [/\b(?:landing pages?|conversion rates?|hero sections?|pricing pages?)\b/i, /\bCTAs?\b/,
-    about(SELLING, /\b(?:countdowns?|urgency|scarcity|FOMO)\b/i), /\b(?:dark patterns?|(?:fake|false) (?:urgency|scarcity|deadlines?))\b/i]],
+    about(SELLING, /\b(?:countdowns?|urgency|scarcity|FOMO)\b/i), /\b(?:dark patterns?|(?:fake|false) (?:urgency|scarcity|deadlines?|countdowns?))\b/i]],
   ['design-critique-gate', 'design critique', [/\bdesign review\b/i, about(DESIGN_WORK, /\bcritique\b/i),
                                                /\blooks? (?:professional|amateur\w*|cheap|dated)\b/i]],
   ['client-presentation-builder', 'client presentations', [/\b(?:client presentations?|pitch decks?)\b/i]],
