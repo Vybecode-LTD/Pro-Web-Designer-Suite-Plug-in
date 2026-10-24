@@ -428,9 +428,11 @@ renames the plugin.
   what it had declined, or why. The description now names offers, countdowns and urgency and says
   the skill declines dark patterns, and the router's hint says the same. A countdown, urgency or
   scarcity beside an offer, a sale, a price or a checkout, a dark pattern, and a fake deadline now
-  reach the skill without a page's name. With the skill loaded, one run in three still only offered
-  the honest timer, as the skill's row for a countdown request said: the row now says to state, in
-  the reply, what it won't build and why that deceives.
+  reach the skill without a page's name. With the skill loaded, runs still built the honest timer
+  and named the deception only as a condition ("only use it if the offer really ends"): "name it in
+  one line and move on" read as permission. The boundary's first rule now counts building the
+  honest version as a decline, and gives the reply's opening sentence: "I didn't build [what was
+  asked]: [the pattern] deceives because [why]." The eval passed 3 of 3, every judge agreeing.
 - **Two false findings in `lint_email.py` on a compiler's markup** (DL-B4, P41 part 3). MJML's
   output had an error and a warning per column. A hidden preheader's colour was measured, and
   MJML's is white on any canvas: the contrast check now skips a preheader, as the dark check did.
