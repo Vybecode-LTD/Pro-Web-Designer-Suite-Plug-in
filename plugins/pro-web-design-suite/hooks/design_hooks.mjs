@@ -69,6 +69,7 @@ const COMPONENT = new RegExp(String.raw`\b(?:design[- ]system|components?|button
   + String.raw`toggles?|tabs?|cards?|modals?|dialogs?|menus?|links?|fields?|chips?|badges?|tooltips?|accordions?|widgets?|`
   + String.raw`hover|focus|disabled|storybook|UI)\b`);
 const PAGE_SPEED = /\b(?:scores?|performance|perf|audits?|reports?|CI|(?:home)?pages?|sites?|website|load\w*|speed|budgets?|metrics?|vitals|mobile|desktop|SEO)\b/;
+const SELLING = /\b(?:offers?|sales?|deals?|discounts?|coupons?|promo\w*|pric\w*|checkout|carts?|visitors?|customers?|buy\w*|purchas\w*|sign-?ups?|conver\w*|in stock|seats?)\b/;
 
 // A skill, what it covers, and the words that name its work. Up to two are
 // named, in this order, so the specific ones come before the studio.
@@ -97,8 +98,11 @@ const ROUTES = [
                                                                      about(COMPONENT, /\bevery state\b/i)]],
   ['content-model-to-ui', 'screens from a data model',
    [/\b(?:CRUD|admin (?:screens?|panel|ui))\b/i, /\b(?:schema|supabase|prisma)\b[^.?!]*\b(?:forms?|screens?)\b/i]],
-  ['landing-page-conversion', 'pages that convert', [/\b(?:landing pages?|conversion rates?|hero sections?|pricing pages?)\b/i,
-                                                     /\bCTAs?\b/]],
+  // R4's no-fake-countdown: the hint named the skill for "pages that convert",
+  // and a session asked for a countdown banner never loaded it.
+  ['landing-page-conversion', 'pages that convert, offers and urgency',
+   [/\b(?:landing pages?|conversion rates?|hero sections?|pricing pages?)\b/i, /\bCTAs?\b/,
+    about(SELLING, /\b(?:countdowns?|urgency|scarcity|FOMO)\b/i), /\b(?:dark patterns?|(?:fake|false) (?:urgency|scarcity|deadlines?))\b/i]],
   ['design-critique-gate', 'design critique', [/\bdesign review\b/i, about(DESIGN_WORK, /\bcritique\b/i),
                                                /\blooks? (?:professional|amateur\w*|cheap|dated)\b/i]],
   ['client-presentation-builder', 'client presentations', [/\b(?:client presentations?|pitch decks?)\b/i]],

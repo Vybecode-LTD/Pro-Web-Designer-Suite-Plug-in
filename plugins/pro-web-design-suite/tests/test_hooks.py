@@ -637,6 +637,28 @@ class TheRouter(HookTest):
                 self.assertEqual(skills, self.routed(prompt))
         self.assertEqual([], self.routed("Set up ESLint for the API server"))
 
+    def test_an_urgency_device_on_an_offer_hears_the_landing_skill(self):
+        """R4's no-fake-countdown: asked for a countdown banner, the session
+        heard "pages that convert", never loaded the skill, and once built an
+        honest timer without saying what it declined. On v3.6.0 a countdown,
+        a stock count or a dark pattern heard nothing without a page's name."""
+        cases = {"Add a countdown timer to the Black Friday sale banner": ["landing-page-conversion"],
+                 "Show 'only 3 left in stock' to create some urgency": ["landing-page-conversion"],
+                 "Add scarcity to the checkout: seats are going fast": ["landing-page-conversion"],
+                 "Does our cancel flow use dark patterns?": ["landing-page-conversion"],
+                 "Is a fake deadline on the signup popup OK?": ["landing-page-conversion"]}
+        for prompt, skills in cases.items():
+            with self.subTest(prompt=prompt):
+                self.assertEqual(skills, self.routed(prompt))
+        for prompt in ("Add a countdown timer to the workout screen", "Raise the urgency of the login bug",
+                       "Build the New Year countdown page"):
+            with self.subTest(prompt=prompt):
+                self.assertEqual([], self.routed(prompt))
+        out = self.run_hook("route", {"hook_event_name": "UserPromptSubmit", "prompt":
+                                      "Add a countdown banner to our pricing page offer: it should start at 15:00 "
+                                      "for every new visitor and restart when they come back."})
+        self.assertIn("(pages that convert, offers and urgency)", out["hookSpecificOutput"]["additionalContext"])
+
     def test_other_prompts_and_named_skills_hear_nothing(self):
         for prompt in ("Fix the login bug", "Rename the class in utils.ts",
                        "Send a react email when the order ships",            # not the product (DL-B4)

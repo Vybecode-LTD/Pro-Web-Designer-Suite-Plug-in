@@ -1,6 +1,6 @@
 ---
 name: landing-page-conversion
-description: Write and structure landing, pricing and product pages, from positioning to section order and copy, audited for conversion. Honest persuasion only. Not for visual critique (design-critique-gate).
+description: Write landing, pricing and product pages (positioning, sections, copy, offers, countdowns, urgency), audited for conversion. Declines dark patterns. Not for visual critique (design-critique-gate).
 ---
 
 # Landing Page Conversion
