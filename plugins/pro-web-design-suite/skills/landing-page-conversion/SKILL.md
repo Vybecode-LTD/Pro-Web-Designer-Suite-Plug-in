@@ -90,7 +90,7 @@ Most requests arrive as a symptom, not a phase number. Route from the symptom.
 | "Make this copy punchier" | Usually "make it more specific", which is the opposite of punchier | Phase 4, specificity rule |
 | "Rewrite the pricing page" | Plan naming, anchoring, and the "contact us" decision | Phase 4, pricing section |
 | "People sign up and never activate" | Not a landing-page problem. Say so — the page sold something the product does not yet deliver on first run | Report the mismatch, do not paper over it |
-| "Add a countdown timer / some urgency" | See the ethics boundary. Offer the real-deadline version | Ethics boundary |
+| "Add a countdown timer / some urgency" | A per-visitor timer is a fake deadline. Say in the reply that you won't build it and why it deceives, then offer a real one | Ethics boundary |
 | "Audit this URL" | Existing page | Phase 6, both passes |
 
 Two things worth refusing early, politely. A request to write a hero when nobody can say who the product is for produces a confident sentence about nothing; ask the positioning question first. And a request to optimise a page whose product promise is unclear is a request to make an unclear promise louder.
