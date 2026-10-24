@@ -32,7 +32,7 @@ So the realistic goal is **a directory listing**. That's what the docs and claud
 
 - A **paid claude.ai plan** (Pro, Max, Team, Enterprise). On Pro and Max, from your own account.
   On Team or Enterprise, an Owner submits.
-- **GitHub connected on claude.ai** in that organization, with push access to `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`.
+- **GitHub connected on claude.ai** in that organization, with push access to `Vybecode-LTD/pro-web-design-suite`, the distribution repository (since 4.0.0).
 - The first organization to submit a repository folder **owns that listing for good**. Submit from the
   account that should own it long term (VybeCode's, not a personal one, if that matters).
 - There's no partner programme to apply to first, and no separate application for "Verified" or placement:
@@ -41,7 +41,7 @@ So the realistic goal is **a directory listing**. That's what the docs and claud
 ### The steps (developer portal, claude.ai/directory/manage)
 
 1. **Submit new → Plugin bundle.**
-2. **Source:** repository `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`, plugin path `plugins/web-design-suite`,
+2. **Source:** repository `Vybecode-LTD/pro-web-design-suite`, the plugin path empty (the plugin is at its root),
    tracked branch or tag (see *Owner decisions* below). **Validate**, fix anything **Blocking**, push, re-validate.
 3. **Listing details:** read from `plugin.json` and the plugin's README. To change them, edit the repository and validate again.
 4. **Data handling:** whether it reads or stores personal data, sends data anywhere, how long it keeps data, and whether it's meant for under-18s.
@@ -107,7 +107,7 @@ runs per skill and error rates. Updates need no resubmission: merge or move the 
 
 ### Before you press Submit
 
-- `claude plugin validate --strict plugins/web-design-suite` with the bundled CLI (already a habit here).
+- `claude plugin validate --strict` on a checkout of the distribution repository, with the bundled CLI (CI validates `plugins/pro-web-design-suite` on every PR).
 - Load it on each surface you want listed: Claude Code, Cowork, and an upload to claude.ai (Customize → Plugins → Upload).
 - The eval suite has the "with and without the plugin" comparison the checklist suggests; quote its result in the README.
 
@@ -130,7 +130,7 @@ when the design drifts, measured contrast, and ~1,400 tests. Every channel below
 - **Social-preview image** (1280×640). It's the card every link share shows. `dev plans/readme-art` can make it.
 - **A 30–60 second demo** at the top of the README: Claude writes a hard-coded colour, the gate fails, Claude fixes it with a token. That one loop is the pitch.
 - **A one-command install** high in the README, in both forms:
-  `/plugin install web-design-suite --marketplace Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in` (v2.1.275+), then the
+  `/plugin install pro-web-design-suite --marketplace Vybecode-LTD/pro-web-design-suite` (v2.1.275+), then the
   directory listing once it's live.
 - **A page on vybecod.ing** for the plugin (the homepage field points there). This is web-facing, so the SEO directive applies.
 
