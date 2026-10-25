@@ -53,6 +53,13 @@ def skill_md(name: str, description: str = "Builds alphas. Use when an alpha is 
     return f"---\nname: {name}\ndescription: >\n  {description}\n---\n\n# {name}\n"
 
 
+def png(width: int, height: int, size: int = 64) -> bytes:
+    """A PNG's signature and header, padded to `size` bytes: what the icon check reads."""
+    head = b"\x89PNG\r\n\x1a\n" + (13).to_bytes(4, "big") + b"IHDR"
+    head += width.to_bytes(4, "big") + height.to_bytes(4, "big") + b"\x08\x06\x00\x00\x00\0\0\0\0"
+    return head + b"\0" * max(0, size - len(head))
+
+
 @unittest.skipUnless(GIT and BUILDER and BUILDER.is_file(), "needs git and the repository's tooling/release")
 class ReleaseBuild(TempDirTest):
 
@@ -260,6 +267,27 @@ class ReleaseBuild(TempDirTest):
         self.git("commit", "-q", "-am", "a short README")
         self.assert_refused("Anthropic's directory would block it: the README has 4 words outside code blocks")
 
+    def test_a_listing_icon_the_directory_would_not_take_is_refused(self):
+        """4.0.1: the directory reads the listing's icon once, when the plugin
+        is first saved in its portal, so a release carries one it takes."""
+        self.write(f"{P}/.claude-plugin/icon.png", png(1024, 512))
+        self.git("add", f"{P}/.claude-plugin/icon.png")
+        self.git("commit", "-q", "-m", "a wide icon")
+        self.assert_refused(".claude-plugin/icon.png: it is 1024 by 512 px, not square")
+
+    def test_a_listing_icon_ships_and_none_is_a_warning(self):
+        proc = self.build("without")
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("warning: there is no .claude-plugin/icon.png", output(proc))
+        self.write(f"{P}/.claude-plugin/icon.png", png(1024, 1024))
+        self.git("add", f"{P}/.claude-plugin/icon.png")
+        self.git("commit", "-q", "-m", "an icon")
+        proc = self.build("with")
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertNotIn("icon.png", output(proc))
+        with zipfile.ZipFile(self.tmp / "with" / "pro-web-design-suite-9.8.7.zip") as z:
+            self.assertEqual(png(1024, 1024), z.read("pro-web-design-suite/.claude-plugin/icon.png"))
+
     def test_what_the_directory_holds_is_a_warning(self):
         self.write(f"{P}/assets/big.md", "x" * (256 * 1024 + 1))
         self.git("add", f"{P}/assets/big.md")
@@ -454,6 +482,54 @@ class TheDirectoryChecks(unittest.TestCase):
         big = b"\0" * (256 * 1024 + 1)
         self.assertEqual(([], []), self.build.directory_findings(self.plugin_with(
             {"assets/hero.png": big, "assets/font.woff2": big})))
+
+    def test_an_image_named_in_code_is_held(self):
+        """Re-read 2026-10-25: a bundled image is shown with Markdown's image
+        syntax; named in a script or quoted as code, it is held."""
+        image = {"assets/hero.png": png(1024, 1024)}
+        cases = {
+            "an inline code span": {"README.md": ("word " * 40 + "`assets/hero.png`").encode()},
+            "a fenced block": {"skills/a/SKILL.md": b"---\nname: a\n---\n```\ncp assets/hero.png out\n```\n"},
+            "a script": {"skills/a/scripts/show.py": b"open('assets/hero.png')\n"},
+        }
+        for name, extra in cases.items():
+            with self.subTest(case=name):
+                blocks, holds = self.build.directory_findings(self.plugin_with({**image, **extra}))
+                self.assertEqual([], blocks)
+                self.assertTrue(any("names assets/hero.png in code" in h for h in holds), holds)
+        shown = {"README.md": ("word " * 40 + "![The hero](assets/hero.png)").encode()}
+        self.assertEqual(([], []), self.build.directory_findings(self.plugin_with({**image, **shown})))
+
+
+@unittest.skipUnless(BUILDER and BUILDER.is_file(), "needs the repository's tooling/release")
+class TheListingIcon(unittest.TestCase):
+    """4.0.1: 4.0.0 shipped no icon, and the directory reads the listing's icon
+    once, the first time the plugin is saved in its portal (`claude plugin
+    validate`'s ICON_MISSING, Claude Code 2.1.309)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.build = builder_module()
+
+    def test_the_shipped_plugin_has_a_listing_icon(self):
+        icon = PLUGIN / ".claude-plugin" / "icon.png"
+        self.assertTrue(icon.is_file(), icon)
+        self.assertEqual([], self.build.icon_problems(icon.read_bytes()))
+
+    def test_what_the_icon_check_refuses(self):
+        self.assertEqual([], self.build.icon_problems(png(512, 512)))
+        self.assertEqual([], self.build.icon_problems(png(2048, 2048)))
+        cases = {
+            "a JPEG": (b"\xff\xd8\xff\xe0" + b"\0" * 60, "it is not a PNG"),
+            "an SVG": (b"<svg xmlns='http://www.w3.org/2000/svg'/>", "it is not a PNG"),
+            "a wide one": (png(1024, 512), "it is 1024 by 512 px, not square"),
+            "a small one": (png(511, 511), "its side is 511 px, outside 512 to 2048"),
+            "a large one": (png(2049, 2049), "its side is 2049 px, outside 512 to 2048"),
+            "a heavy one": (png(1024, 1024, 2 * 1024 * 1024), "it is 2097152 bytes, not under 2097152"),
+        }
+        for name, (data, problem) in cases.items():
+            with self.subTest(case=name):
+                self.assertIn(problem, self.build.icon_problems(data))
 
 
 class TheAuditsReleaseMediums(unittest.TestCase):
