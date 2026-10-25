@@ -30,6 +30,7 @@ import subprocess
 import sys
 import unittest
 import zipfile
+import zlib
 
 from wds_support import PLUGIN, REPO, SKILLS, TOOLING, TempDirTest, env, output
 
@@ -53,11 +54,16 @@ def skill_md(name: str, description: str = "Builds alphas. Use when an alpha is 
     return f"---\nname: {name}\ndescription: >\n  {description}\n---\n\n# {name}\n"
 
 
-def png(width: int, height: int, size: int = 64) -> bytes:
-    """A PNG's signature and header, padded to `size` bytes: what the icon check reads."""
-    head = b"\x89PNG\r\n\x1a\n" + (13).to_bytes(4, "big") + b"IHDR"
-    head += width.to_bytes(4, "big") + height.to_bytes(4, "big") + b"\x08\x06\x00\x00\x00\0\0\0\0"
-    return head + b"\0" * max(0, size - len(head))
+def png(width: int, height: int, size: int = 0) -> bytes:
+    """A whole, transparent PNG; with `size`, a text chunk pads it to that many bytes."""
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return len(body).to_bytes(4, "big") + kind + body + zlib.crc32(kind + body).to_bytes(4, "big")
+    data = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", width.to_bytes(4, "big") + height.to_bytes(4, "big")
+                                        + b"\x08\x06\x00\x00\x00")
+    data += chunk(b"IDAT", zlib.compress(b"\0" * (1 + width * 4) * height))
+    if size:
+        data += chunk(b"tEXt", b"pad\0" + b"x" * (size - len(data) - 28))
+    return data + chunk(b"IEND", b"")
 
 
 @unittest.skipUnless(GIT and BUILDER and BUILDER.is_file(), "needs git and the repository's tooling/release")
@@ -490,6 +496,8 @@ class TheDirectoryChecks(unittest.TestCase):
         cases = {
             "an inline code span": {"README.md": ("word " * 40 + "`assets/hero.png`").encode()},
             "a fenced block": {"skills/a/SKILL.md": b"---\nname: a\n---\n```\ncp assets/hero.png out\n```\n"},
+            "a tilde fence": {"skills/a/SKILL.md": b"---\nname: a\n---\n~~~sh\ncp assets/hero.png out\n~~~\n"},
+            "a longer fence holding ```": {"skills/a/SKILL.md": b"````md\n```\nx\n```\ncp assets/hero.png out\n````\n"},
             "a script": {"skills/a/scripts/show.py": b"open('assets/hero.png')\n"},
         }
         for name, extra in cases.items():
@@ -517,15 +525,19 @@ class TheListingIcon(unittest.TestCase):
         self.assertEqual([], self.build.icon_problems(icon.read_bytes()))
 
     def test_what_the_icon_check_refuses(self):
-        self.assertEqual([], self.build.icon_problems(png(512, 512)))
-        self.assertEqual([], self.build.icon_problems(png(2048, 2048)))
+        for good in (png(512, 512), png(2048, 2048), png(1024, 1024, 1_999_999)):
+            with self.subTest(size=len(good)):
+                self.assertEqual([], self.build.icon_problems(good))
+        whole = png(1024, 1024)
         cases = {
             "a JPEG": (b"\xff\xd8\xff\xe0" + b"\0" * 60, "it is not a PNG"),
             "an SVG": (b"<svg xmlns='http://www.w3.org/2000/svg'/>", "it is not a PNG"),
+            "a header alone": (whole[:33], "it is not a whole PNG: it needs its image data and its end"),
+            "no end": (whole[:-12], "it is not a whole PNG: it needs its image data and its end"),
             "a wide one": (png(1024, 512), "it is 1024 by 512 px, not square"),
             "a small one": (png(511, 511), "its side is 511 px, outside 512 to 2048"),
             "a large one": (png(2049, 2049), "its side is 2049 px, outside 512 to 2048"),
-            "a heavy one": (png(1024, 1024, 2 * 1024 * 1024), "it is 2097152 bytes, not under 2097152"),
+            "a heavy one": (png(1024, 1024, 2_000_000), "it is 2000000 bytes, not under 2000000"),
         }
         for name, (data, problem) in cases.items():
             with self.subTest(case=name):

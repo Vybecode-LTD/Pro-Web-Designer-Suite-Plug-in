@@ -95,12 +95,14 @@ LAUNCHERS = {("npx",): "@", ("bunx",): "@", ("pnpm", "dlx"): "@", ("yarn", "dlx"
 # The listing's icon, which the directory reads once, the first time the plugin
 # is saved or submitted in the developer portal: a square PNG, 512 to 2048 px a
 # side, under 2 MB (`claude plugin validate`'s ICON_MISSING, Claude Code 2.1.309,
-# read 2026-10-25). Its source is tooling/release/icon.svg.
+# read 2026-10-25). Its source is tooling/release/icon.svg. "Under 2 MB" is read
+# as the stricter 2,000,000 bytes (CodeRabbit on #205).
 ICON = ".claude-plugin/icon.png"
 ICON_SIDES = (512, 2048)
-ICON_MAX_BYTES = 2 * 1024 * 1024
+ICON_MAX_BYTES = 2_000_000
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 SCRIPTS = {".py", ".mjs", ".js", ".cjs", ".sh", ".json"}
+FENCE = re.compile(r" {0,3}(`{3,}|~{3,})")          # a Markdown code fence's opening or closing run
 
 
 def git(*args: str, env: dict[str, str] | None = None, cwd: str | None = None) -> bytes:
@@ -186,6 +188,12 @@ def icon_problems(data: bytes) -> list[str]:
         return ["it is not a PNG"]
     width, height = int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
     problems = []
+    kinds, at = [], len(PNG_SIGNATURE)                    # each chunk: length, type, body, CRC
+    while at + 8 <= len(data):
+        kinds.append(data[at + 4:at + 8])
+        at += 12 + int.from_bytes(data[at:at + 4], "big")
+    if b"IDAT" not in kinds or kinds[-1:] != [b"IEND"] or at != len(data):
+        problems.append("it is not a whole PNG: it needs its image data and its end")
     if width != height:
         problems.append(f"it is {width} by {height} px, not square")
     if not ICON_SIDES[0] <= max(width, height) <= ICON_SIDES[1]:
@@ -196,10 +204,22 @@ def icon_problems(data: bytes) -> list[str]:
 
 
 def quoted_as_code(text: str) -> str:
-    """A Markdown file's code: its fenced blocks and its inline code spans."""
-    fences = re.findall(r"```.*?```", text, re.S)
-    spans = re.findall(r"`[^`\n]+`", re.sub(r"```.*?```", " ", text, flags=re.S))
-    return "\n".join(fences + spans)
+    """A Markdown file's code: its fenced blocks, each closed by a run of its
+    opener's character at least as long (or by the end), and its inline code
+    spans (CodeRabbit on #205: ~~~ fences, and a longer fence holding ```)."""
+    code, prose, fence = [], [], None
+    for line in text.splitlines():
+        m = FENCE.match(line)
+        if fence is None:
+            if m:
+                fence = m.group(1)
+            else:
+                prose.append(line)
+        elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line[m.end():].strip():
+            fence = None
+        else:
+            code.append(line)
+    return "\n".join(code + re.findall(r"`[^`\n]+`", "\n".join(prose)))
 
 
 def directory_findings(files: dict[str, tuple[int, bytes]]) -> tuple[list[str], list[str]]:

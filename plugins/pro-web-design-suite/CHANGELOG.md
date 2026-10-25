@@ -16,10 +16,10 @@ skill, command, hook, script or MCP tool changes.
 ### Release builder (development repository)
 
 - `tooling/release/build.py` refuses a release whose icon the directory would not take: not a
-  PNG, not square, under 512 or over 2048 pixels a side, or 2 MB or more. It warns when there is
-  none. It also prints a directory hold when a script names a bundled image or font, or a
-  Markdown file quotes its path as code, which the pre-submission checklist holds for a reviewer
-  (re-read 2026-10-25). Regression test: `test_release_build.TheListingIcon`, which fails on
+  whole PNG, not square, under 512 or over 2048 pixels a side, or 2,000,000 bytes or more. It
+  warns when there is none. It also prints a directory hold when a script names a bundled image
+  or font, or a Markdown file quotes its path as code (in a span, or a fence of backticks or
+  tildes), which the pre-submission checklist holds for a reviewer (re-read 2026-10-25). Regression test: `test_release_build.TheListingIcon`, which fails on
   4.0.0, with the builder's controls in `ReleaseBuild` and `TheDirectoryChecks`.
 
 ## 4.0.0 — 2026-10-24
