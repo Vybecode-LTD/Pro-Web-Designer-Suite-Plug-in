@@ -69,6 +69,7 @@ import sys
 import tarfile
 import time
 import zipfile
+import zlib
 
 PLUGIN = "plugins/pro-web-design-suite"
 # Where the plugin was before 4.0.0 renamed it, so --rev can rebuild an older release.
@@ -188,12 +189,17 @@ def icon_problems(data: bytes) -> list[str]:
         return ["it is not a PNG"]
     width, height = int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
     problems = []
-    kinds, at = [], len(PNG_SIGNATURE)                    # each chunk: length, type, body, CRC
+    kinds, broken, at = [], [], len(PNG_SIGNATURE)        # each chunk: length, type, body, CRC
     while at + 8 <= len(data):
+        end = at + 8 + int.from_bytes(data[at:at + 4], "big")
         kinds.append(data[at + 4:at + 8])
-        at += 12 + int.from_bytes(data[at:at + 4], "big")
+        if zlib.crc32(data[at + 4:end]).to_bytes(4, "big") != data[end:end + 4]:
+            broken.append(kinds[-1].decode("latin-1"))
+        at = end + 4
     if b"IDAT" not in kinds or kinds[-1:] != [b"IEND"] or at != len(data):
         problems.append("it is not a whole PNG: it needs its image data and its end")
+    if broken:                                            # CodeRabbit on #205
+        problems.append(f"its {', '.join(broken)} chunk fails its CRC")
     if width != height:
         problems.append(f"it is {width} by {height} px, not square")
     if not ICON_SIDES[0] <= max(width, height) <= ICON_SIDES[1]:

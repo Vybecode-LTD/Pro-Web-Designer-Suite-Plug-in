@@ -497,7 +497,7 @@ class TheDirectoryChecks(unittest.TestCase):
             "an inline code span": {"README.md": ("word " * 40 + "`assets/hero.png`").encode()},
             "a fenced block": {"skills/a/SKILL.md": b"---\nname: a\n---\n```\ncp assets/hero.png out\n```\n"},
             "a tilde fence": {"skills/a/SKILL.md": b"---\nname: a\n---\n~~~sh\ncp assets/hero.png out\n~~~\n"},
-            "a longer fence holding ```": {"skills/a/SKILL.md": b"````md\n```\nx\n```\ncp assets/hero.png out\n````\n"},
+            "a longer fence holding ```": {"skills/a/SKILL.md": b"````md\n```\ncp assets/hero.png out\n````\n"},
             "a script": {"skills/a/scripts/show.py": b"open('assets/hero.png')\n"},
         }
         for name, extra in cases.items():
@@ -534,6 +534,7 @@ class TheListingIcon(unittest.TestCase):
             "an SVG": (b"<svg xmlns='http://www.w3.org/2000/svg'/>", "it is not a PNG"),
             "a header alone": (whole[:33], "it is not a whole PNG: it needs its image data and its end"),
             "no end": (whole[:-12], "it is not a whole PNG: it needs its image data and its end"),
+            "a damaged chunk": (whole[:41] + bytes([whole[41] ^ 1]) + whole[42:], "its IDAT chunk fails its CRC"),
             "a wide one": (png(1024, 512), "it is 1024 by 512 px, not square"),
             "a small one": (png(511, 511), "its side is 511 px, outside 512 to 2048"),
             "a large one": (png(2049, 2049), "its side is 2049 px, outside 512 to 2048"),
