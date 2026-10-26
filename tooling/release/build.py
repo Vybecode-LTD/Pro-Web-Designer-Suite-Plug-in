@@ -26,7 +26,8 @@ its folder and `name` must match, and the name and description must keep to
 https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview
 ("Field requirements": a name of at most 64 characters, lowercase letters,
 numbers and hyphens, without "anthropic" or "claude"; a description of at
-most 1024 characters, without XML tags).
+most 1024 characters, without XML tags). It refuses a listing icon the
+directory would not take (ICON), and warns when there is none.
 
 Into <out dir>, which must be empty or not exist yet:
   pro-web-design-suite-<version>.zip  the plugin, under pro-web-design-suite/: folders
@@ -68,6 +69,7 @@ import sys
 import tarfile
 import time
 import zipfile
+import zlib
 
 PLUGIN = "plugins/pro-web-design-suite"
 # Where the plugin was before 4.0.0 renamed it, so --rev can rebuild an older release.
@@ -91,6 +93,17 @@ WINDOWS_DEVICES = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)
 LOCKFILES = {"package-lock.json", "npm-shrinkwrap.json", "bun.lock", "bun.lockb"}
 LAUNCHERS = {("npx",): "@", ("bunx",): "@", ("pnpm", "dlx"): "@", ("yarn", "dlx"): "@",
              ("uvx",): "==", ("pipx", "run"): "=="}
+# The listing's icon, which the directory reads once, the first time the plugin
+# is saved or submitted in the developer portal: a square PNG, 512 to 2048 px a
+# side, under 2 MB (`claude plugin validate`'s ICON_MISSING, Claude Code 2.1.309,
+# read 2026-10-25). Its source is tooling/release/icon.svg. "Under 2 MB" is read
+# as the stricter 2,000,000 bytes (CodeRabbit on #205).
+ICON = ".claude-plugin/icon.png"
+ICON_SIDES = (512, 2048)
+ICON_MAX_BYTES = 2_000_000
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+SCRIPTS = {".py", ".mjs", ".js", ".cjs", ".sh", ".json"}
+FENCE = re.compile(r" {0,3}(`{3,}|~{3,})")          # a Markdown code fence's opening or closing run
 
 
 def git(*args: str, env: dict[str, str] | None = None, cwd: str | None = None) -> bytes:
@@ -170,6 +183,51 @@ def unpinned(argv: list[str]) -> str | None:
     return None
 
 
+def icon_problems(data: bytes) -> list[str]:
+    """Why the directory would not take these bytes as the listing's icon (ICON)."""
+    if not data.startswith(PNG_SIGNATURE) or data[12:16] != b"IHDR":
+        return ["it is not a PNG"]
+    width, height = int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
+    problems = []
+    kinds, broken, at = [], [], len(PNG_SIGNATURE)        # each chunk: length, type, body, CRC
+    while at + 8 <= len(data):
+        end = at + 8 + int.from_bytes(data[at:at + 4], "big")
+        kinds.append(data[at + 4:at + 8])
+        if zlib.crc32(data[at + 4:end]).to_bytes(4, "big") != data[end:end + 4]:
+            broken.append(kinds[-1].decode("latin-1"))
+        at = end + 4
+    if b"IDAT" not in kinds or kinds[-1:] != [b"IEND"] or at != len(data):
+        problems.append("it is not a whole PNG: it needs its image data and its end")
+    if broken:                                            # CodeRabbit on #205
+        problems.append(f"its {', '.join(broken)} chunk fails its CRC")
+    if width != height:
+        problems.append(f"it is {width} by {height} px, not square")
+    if not ICON_SIDES[0] <= max(width, height) <= ICON_SIDES[1]:
+        problems.append(f"its side is {max(width, height)} px, outside {ICON_SIDES[0]} to {ICON_SIDES[1]}")
+    if len(data) >= ICON_MAX_BYTES:
+        problems.append(f"it is {len(data)} bytes, not under {ICON_MAX_BYTES}")
+    return problems
+
+
+def quoted_as_code(text: str) -> str:
+    """A Markdown file's code: its fenced blocks, each closed by a run of its
+    opener's character at least as long (or by the end), and its inline code
+    spans (CodeRabbit on #205: ~~~ fences, and a longer fence holding ```)."""
+    code, prose, fence = [], [], None
+    for line in text.splitlines():
+        m = FENCE.match(line)
+        if fence is None:
+            if m:
+                fence = m.group(1)
+            else:
+                prose.append(line)
+        elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line[m.end():].strip():
+            fence = None
+        else:
+            code.append(line)
+    return "\n".join(code + re.findall(r"`[^`\n]+`", "\n".join(prose)))
+
+
 def directory_findings(files: dict[str, tuple[int, bytes]]) -> tuple[list[str], list[str]]:
     """What Anthropic's directory would block on, and what it would hold for a
     reviewer, in the files that ship (DIRECTORY_SOURCE)."""
@@ -218,6 +276,17 @@ def directory_findings(files: dict[str, tuple[int, bytes]]) -> tuple[list[str], 
             blocks += [f"{config} runs {what}: pin it to an exact version" for what in map(unpinned, runs) if what]
     if "package.json" in files and LOCKFILES & set(files):
         holds.append("package.json beside a lockfile: Claude Code installs its packages, which a reviewer reads")
+    # A bundled image or font is shown with Markdown's image syntax only: named
+    # in a script or a config, or quoted as code, it is held (re-read 2026-10-25).
+    media = [p for p in files if pathlib.PurePosixPath(p).suffix.lower() in DIRECTORY_IMAGES_AND_FONTS]
+    for path in sorted(files):
+        suffix = pathlib.PurePosixPath(path).suffix.lower()
+        if (suffix not in SCRIPTS and suffix != ".md") or path == ".claude-plugin/plugin.json":
+            continue
+        text = files[path][1].decode("utf-8", "replace")
+        code = quoted_as_code(text) if suffix == ".md" else text
+        holds += [f"{path} names {item} in code; the directory wants Markdown's image syntax"
+                  for item in media if item in code]
     return sorted(set(blocks)), holds
 
 
@@ -317,6 +386,10 @@ def main(argv: list[str] | None = None) -> int:
         if len(meta["description"]) > UPLOAD_DESCRIPTION:
             warnings.append(f"{skill}: its description has {len(meta['description'])} characters; "
                             f"claude.ai's help center gives {UPLOAD_DESCRIPTION} for an upload")
+    if ICON in files:
+        refused += [f"{ICON}: {p}" for p in icon_problems(files[ICON][1])]
+    else:
+        warnings.append(f"there is no {ICON}: the directory's listing takes its icon once, when it is first saved")
     if refused:
         for reason in refused:
             print(f"refused: {reason}", file=sys.stderr)

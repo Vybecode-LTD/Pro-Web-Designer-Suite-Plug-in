@@ -66,6 +66,7 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 - **Never run `npm ci` in a worktree whose `tooling/*/node_modules` is a junction**: it deletes the real toolchain through the link.
 - **The reader's copies.** `shared/project_config.py` and `shared/dtcg.py` have ten copies each, `shared/project_config.mjs` seven (`hooks/` among them). After a merge from a branch below, copy the three masters over every copy: git merges each copy on its own.
 - **The old id stays in four formats** that users' projects hold: the contract schema `web-design-suite/contract/1`, the DTCG `$extensions` key `io.github.vybecode-ltd.web-design-suite`, the install-gate stamp's `"plugin": "web-design-suite"`, and `.design-suite.json`. The 4.0.0 rename to `pro-web-design-suite` left them alone on purpose; never "fix" them.
+- **The listing icon** is the plugin's `.claude-plugin/icon.png`, rendered from `tooling/release/icon.svg`; the directory reads it once, at the first save in its portal. In a shipped file, never quote an image's path as code: the directory holds it, and `build.py` prints the hold.
 - **A DTCG resolver** (`*.resolver.json`) reads its sources only from its own folder or below, by name and by real path, in both readers (#105).
 
 ## Conventions

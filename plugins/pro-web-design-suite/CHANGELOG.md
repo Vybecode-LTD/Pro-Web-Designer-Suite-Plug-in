@@ -1,5 +1,27 @@
 # Changelog
 
+## 4.0.1 — 2026-10-25
+
+An icon for the plugin's listing in Anthropic's directory, before it is submitted there. No
+skill, command, hook, script or MCP tool changes.
+
+### Added
+
+- **The listing icon:** a 1024-pixel square PNG beside `plugin.json`, a four-by-four grid of
+  tokens stepping through a lightness ramp, with one accent, in VybeCode's colours. The
+  directory reads a plugin's icon once, the first time the plugin is saved or submitted in its
+  developer portal, and 4.0.0 had none (`claude plugin validate` warns `ICON_MISSING`, Claude
+  Code 2.1.309).
+
+### Release builder (development repository)
+
+- `tooling/release/build.py` refuses a release whose icon the directory would not take: not a
+  whole PNG (its image data, its end, every chunk's CRC), not square, under 512 or over 2048 pixels a side, or 2,000,000 bytes or more. It
+  warns when there is none. It also prints a directory hold when a script names a bundled image
+  or font, or a Markdown file quotes its path as code (in a span, or a fence of backticks or
+  tildes), which the pre-submission checklist holds for a reviewer (re-read 2026-10-25). Regression test: `test_release_build.TheListingIcon`, which fails on
+  4.0.0, with the builder's controls in `ReleaseBuild` and `TheDirectoryChecks`.
+
 ## 4.0.0 — 2026-10-24
 
 Phase 6b. 4.0.0 is a major release because Part 5 of the ESLint config moves to another

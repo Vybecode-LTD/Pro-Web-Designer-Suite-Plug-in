@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- The source of the plugin's listing icon (4.0.1), rendered at 1024 px to
+       plugins/pro-web-design-suite/.claude-plugin/icon.png with a Playwright
+       screenshot of this element. A 4x4 grid of tokens: each row one step of a
+       lightness ramp, one ember accent. The colours are VybeCode's tokens:
+       bg, chrome-3, ink-faint, ink-dim, ink and ember. -->
+  <rect width="1024" height="1024" fill="oklch(21.5% .003 264)"/>
+  <g>
+    <rect x="200" y="200" width="136" height="136" rx="28" fill="oklch(34.5% .003 264)"/>
+    <rect x="360" y="200" width="136" height="136" rx="28" fill="oklch(34.5% .003 264)"/>
+    <rect x="520" y="200" width="136" height="136" rx="28" fill="oklch(34.5% .003 264)"/>
+    <rect x="680" y="200" width="136" height="136" rx="28" fill="oklch(34.5% .003 264)"/>
+    <rect x="200" y="360" width="136" height="136" rx="28" fill="oklch(60% .005 264)"/>
+    <rect x="360" y="360" width="136" height="136" rx="28" fill="oklch(60% .005 264)"/>
+    <rect x="520" y="360" width="136" height="136" rx="28" fill="oklch(60% .005 264)"/>
+    <rect x="680" y="360" width="136" height="136" rx="28" fill="oklch(66% .2 40)"/>
+    <rect x="200" y="520" width="136" height="136" rx="28" fill="oklch(78% .004 264)"/>
+    <rect x="360" y="520" width="136" height="136" rx="28" fill="oklch(78% .004 264)"/>
+    <rect x="520" y="520" width="136" height="136" rx="28" fill="oklch(78% .004 264)"/>
+    <rect x="680" y="520" width="136" height="136" rx="28" fill="oklch(78% .004 264)"/>
+    <rect x="200" y="680" width="136" height="136" rx="28" fill="oklch(96.5% .003 264)"/>
+    <rect x="360" y="680" width="136" height="136" rx="28" fill="oklch(96.5% .003 264)"/>
+    <rect x="520" y="680" width="136" height="136" rx="28" fill="oklch(96.5% .003 264)"/>
+    <rect x="680" y="680" width="136" height="136" rx="28" fill="oklch(96.5% .003 264)"/>
+  </g>
+</svg>

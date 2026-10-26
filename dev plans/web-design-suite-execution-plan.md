@@ -222,6 +222,8 @@ The owner's audit of `main` at `9391774` (`dev plans/web-design-suite-audit-2026
 | PR | What | Items | Main files | Size |
 |---|---|---|---|---|
 | P58 | `no-fake-countdown`'s reliability: about six local runs with `--keep-temp` (about $0.55, the owner's OK first), read the failing transcripts, then change what they point to; it passes when the case scores 3 of 3 in `evals.yml` | N52 | landing-page-conversion's SKILL.md (20,498 of its 20,500 bytes), `evals/persuasion/no-fake-countdown/` | S |
+| P59, #205 | The listing icon before the directory submission: a 1024 px PNG beside `plugin.json` from `tooling/release/icon.svg`; `build.py` refuses an icon the directory would not take, warns on none, and holds an image quoted as code (the checklist re-read 2026-10-25); 4.0.1's version and CHANGELOG | N53 | `.claude-plugin/icon.png`, `tooling/release/build.py`, `icon.svg`, `test_release_build.py`, CHANGELOG | S |
+| R5 | Release 4.0.1 on P59's merge, after an `evals.yml` run (`tag=all`, the owner's OK, 2026-10-25); then the owner submits to the directory from the distribution repository | — | `v4.0.1` | S |
 
 ## 5. What moved, and why
 
