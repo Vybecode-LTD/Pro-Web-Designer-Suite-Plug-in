@@ -1,7 +1,14 @@
 # web-design-suite: getting listed and getting used
 
 Research, 2026-10-19. Every rule below was read at its source that day; the sources are at the end.
-Nothing here has been done yet. The items marked **owner** are decisions only the owner can make.
+The items marked **owner** are decisions only the owner can make.
+
+**Status, 2026-10-26: Part A is done.** The rename and the distribution repository shipped in 4.0.0; 4.0.1
+added the listing icon (N53, #205), which the directory reads once, at the first save. The owner submitted
+4.0.1 (`4809e3f`) from the portal on 2026-10-26: tracking `main`, **scheduled check only** (every version
+is held for a reviewer by the credential finding below, so a webhook's minutes buy nothing; **Check for new
+commits** scans at once), auto-publish on. The portal's validation: passed, 13 warnings, 7 policy holds
+(the six credential findings, and N54's image hold). It waits for its first scan and a reviewer. Part B is not started.
 
 ## Where things stand
 
