@@ -27,7 +27,8 @@ https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview
 ("Field requirements": a name of at most 64 characters, lowercase letters,
 numbers and hyphens, without "anthropic" or "claude"; a description of at
 most 1024 characters, without XML tags). It refuses a listing icon the
-directory would not take (ICON), and warns when there is none.
+directory would not take (plugin.json's `icon`, else ICON), and warns when
+there is none.
 
 Into <out dir>, which must be empty or not exist yet:
   pro-web-design-suite-<version>.zip  the plugin, under pro-web-design-suite/: folders
@@ -97,13 +98,13 @@ LAUNCHERS = {("npx",): "@", ("bunx",): "@", ("pnpm", "dlx"): "@", ("yarn", "dlx"
 # is saved or submitted in the developer portal: a square PNG, 512 to 2048 px a
 # side, under 2 MB (`claude plugin validate`'s ICON_MISSING, Claude Code 2.1.309,
 # read 2026-10-25). Its source is tooling/release/icon.svg. "Under 2 MB" is read
-# as the stricter 2,000,000 bytes (CodeRabbit on #205).
+# as the stricter 2,000,000 bytes (CodeRabbit on #205). plugin.json's `icon`
+# names it; without one, the directory looks here.
 ICON = ".claude-plugin/icon.png"
 ICON_SIDES = (512, 2048)
 ICON_MAX_BYTES = 2_000_000
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-SCRIPTS = {".py", ".mjs", ".js", ".cjs", ".sh", ".json"}
-FENCE = re.compile(r" {0,3}(`{3,}|~{3,})")          # a Markdown code fence's opening or closing run
+IMAGE_LINK = re.compile(r"!\[[^\]]*\]\([^)]*\)")    # Markdown's image syntax, the one way to show an image
 
 
 def git(*args: str, env: dict[str, str] | None = None, cwd: str | None = None) -> bytes:
@@ -209,23 +210,15 @@ def icon_problems(data: bytes) -> list[str]:
     return problems
 
 
-def quoted_as_code(text: str) -> str:
-    """A Markdown file's code: its fenced blocks, each closed by a run of its
-    opener's character at least as long (or by the end), and its inline code
-    spans (CodeRabbit on #205: ~~~ fences, and a longer fence holding ```)."""
-    code, prose, fence = [], [], None
-    for line in text.splitlines():
-        m = FENCE.match(line)
-        if fence is None:
-            if m:
-                fence = m.group(1)
-            else:
-                prose.append(line)
-        elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line[m.end():].strip():
-            fence = None
-        else:
-            code.append(line)
-    return "\n".join(code + re.findall(r"`[^`\n]+`", "\n".join(prose)))
+def icon_path(files: dict[str, tuple[int, bytes]]) -> str:
+    """The listing icon's path in the plugin: plugin.json's `icon`, or ICON."""
+    try:
+        named = json.loads(files[".claude-plugin/plugin.json"][1]).get("icon")
+    except (KeyError, ValueError, AttributeError):
+        named = None
+    if not isinstance(named, str) or not named.strip():
+        return ICON
+    return named[2:] if named.startswith("./") else named
 
 
 def directory_findings(files: dict[str, tuple[int, bytes]]) -> tuple[list[str], list[str]]:
@@ -276,17 +269,20 @@ def directory_findings(files: dict[str, tuple[int, bytes]]) -> tuple[list[str], 
             blocks += [f"{config} runs {what}: pin it to an exact version" for what in map(unpinned, runs) if what]
     if "package.json" in files and LOCKFILES & set(files):
         holds.append("package.json beside a lockfile: Claude Code installs its packages, which a reviewer reads")
-    # A bundled image or font is shown with Markdown's image syntax only: named
-    # in a script or a config, or quoted as code, it is held (re-read 2026-10-25).
-    media = [p for p in files if pathlib.PurePosixPath(p).suffix.lower() in DIRECTORY_IMAGES_AND_FONTS]
+    # A bundled image or font is shown with Markdown's image syntax only. The
+    # directory held 4.0.1 because a doc's code span said `label + icon`: it
+    # matched the icon by its stem (N54). Its exact rule is unknown, so this
+    # holds more than it does: the path, or the stem as a word, in any text that
+    # ships but plugin.json and image links. A distinctive name keeps it quiet.
+    media = {p: re.compile(rf"(?<![\w-])(?:{re.escape(p)}|{re.escape(pathlib.PurePosixPath(p).stem)})(?![\w-])", re.I)
+             for p in files if pathlib.PurePosixPath(p).suffix.lower() in DIRECTORY_IMAGES_AND_FONTS}
     for path in sorted(files):
-        suffix = pathlib.PurePosixPath(path).suffix.lower()
-        if (suffix not in SCRIPTS and suffix != ".md") or path == ".claude-plugin/plugin.json":
+        data = files[path][1]
+        if path in media or path == ".claude-plugin/plugin.json" or b"\0" in data:
             continue
-        text = files[path][1].decode("utf-8", "replace")
-        code = quoted_as_code(text) if suffix == ".md" else text
-        holds += [f"{path} names {item} in code; the directory wants Markdown's image syntax"
-                  for item in media if item in code]
+        text = IMAGE_LINK.sub(" ", data.decode("utf-8", "replace"))
+        holds += [f"{path} names {item}; outside Markdown's image syntax the directory may hold it"
+                  for item, name in media.items() if name.search(text)]
     return sorted(set(blocks)), holds
 
 
@@ -386,10 +382,11 @@ def main(argv: list[str] | None = None) -> int:
         if len(meta["description"]) > UPLOAD_DESCRIPTION:
             warnings.append(f"{skill}: its description has {len(meta['description'])} characters; "
                             f"claude.ai's help center gives {UPLOAD_DESCRIPTION} for an upload")
-    if ICON in files:
-        refused += [f"{ICON}: {p}" for p in icon_problems(files[ICON][1])]
+    icon = icon_path(files)
+    if icon in files:
+        refused += [f"{icon}: {p}" for p in icon_problems(files[icon][1])]
     else:
-        warnings.append(f"there is no {ICON}: the directory's listing takes its icon once, when it is first saved")
+        warnings.append(f"there is no {icon}: the directory's listing takes its icon once, when it is first saved")
     if refused:
         for reason in refused:
             print(f"refused: {reason}", file=sys.stderr)

@@ -281,6 +281,15 @@ class ReleaseBuild(TempDirTest):
         self.git("commit", "-q", "-m", "a wide icon")
         self.assert_refused(".claude-plugin/icon.png: it is 1024 by 512 px, not square")
 
+    def test_plugin_json_names_the_listing_icon(self):
+        """N54: plugin.json's `icon` names the icon; the builder checks that file."""
+        self.write(f"{P}/.claude-plugin/plugin.json",
+                   '{"name": "pro-web-design-suite", "version": "9.8.7", "icon": "./assets/mark.png"}\n')
+        self.write(f"{P}/assets/mark.png", png(600, 300))
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "a named icon")
+        self.assert_refused("assets/mark.png: it is 600 by 300 px, not square")
+
     def test_a_listing_icon_ships_and_none_is_a_warning(self):
         proc = self.build("without")
         self.assertEqual(0, proc.returncode, output(proc))
@@ -489,24 +498,36 @@ class TheDirectoryChecks(unittest.TestCase):
         self.assertEqual(([], []), self.build.directory_findings(self.plugin_with(
             {"assets/hero.png": big, "assets/font.woff2": big})))
 
-    def test_an_image_named_in_code_is_held(self):
-        """Re-read 2026-10-25: a bundled image is shown with Markdown's image
-        syntax; named in a script or quoted as code, it is held."""
+    def test_an_image_named_outside_an_image_link_is_held(self):
+        """N54: the directory held 4.0.1 because a doc's code span said
+        `label + icon`, matching the icon by its stem. Its rule is unknown, so
+        the builder holds more: the path, or the stem as a word, in any text
+        that ships but plugin.json and Markdown image links."""
         image = {"assets/hero.png": png(1024, 1024)}
         cases = {
             "an inline code span": {"README.md": ("word " * 40 + "`assets/hero.png`").encode()},
             "a fenced block": {"skills/a/SKILL.md": b"---\nname: a\n---\n```\ncp assets/hero.png out\n```\n"},
             "a tilde fence": {"skills/a/SKILL.md": b"---\nname: a\n---\n~~~sh\ncp assets/hero.png out\n~~~\n"},
-            "a longer fence holding ```": {"skills/a/SKILL.md": b"````md\n```\ncp assets/hero.png out\n````\n"},
             "a script": {"skills/a/scripts/show.py": b"open('assets/hero.png')\n"},
+            "prose": {"README.md": ("word " * 40 + "See assets/hero.png.").encode()},
+            "the stem in a code span": {"skills/a/references/doc.md": b"Centre `label + hero` as one."},
+            "the stem in a stylesheet": {"skills/a/assets/a.css": b"/* Hero + label */\n"},
         }
         for name, extra in cases.items():
             with self.subTest(case=name):
                 blocks, holds = self.build.directory_findings(self.plugin_with({**image, **extra}))
                 self.assertEqual([], blocks)
-                self.assertTrue(any("names assets/hero.png in code" in h for h in holds), holds)
-        shown = {"README.md": ("word " * 40 + "![The hero](assets/hero.png)").encode()}
-        self.assertEqual(([], []), self.build.directory_findings(self.plugin_with({**image, **shown})))
+                self.assertTrue(any("names assets/hero.png; outside Markdown's image syntax" in h for h in holds),
+                                holds)
+        controls = {
+            "an image link": {"README.md": ("word " * 40 + "![The hero](assets/hero.png)").encode()},
+            "a longer word": {"README.md": ("word " * 40 + "`heroes` and `hero-banner`").encode()},
+            "plugin.json": {".claude-plugin/plugin.json": b'{"name": "x", "version": "1.0.0", "license": "MIT", '
+                                                          b'"icon": "./assets/hero.png"}'},
+        }
+        for name, extra in controls.items():
+            with self.subTest(control=name):
+                self.assertEqual(([], []), self.build.directory_findings(self.plugin_with({**image, **extra})))
 
 
 @unittest.skipUnless(BUILDER and BUILDER.is_file(), "needs the repository's tooling/release")
@@ -520,7 +541,8 @@ class TheListingIcon(unittest.TestCase):
         cls.build = builder_module()
 
     def test_the_shipped_plugin_has_a_listing_icon(self):
-        icon = PLUGIN / ".claude-plugin" / "icon.png"
+        manifest = (PLUGIN / ".claude-plugin" / "plugin.json").read_bytes()
+        icon = PLUGIN / self.build.icon_path({".claude-plugin/plugin.json": (0o100644, manifest)})
         self.assertTrue(icon.is_file(), icon)
         self.assertEqual([], self.build.icon_problems(icon.read_bytes()))
 
