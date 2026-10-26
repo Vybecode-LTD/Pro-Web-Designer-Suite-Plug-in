@@ -576,8 +576,8 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`); #206, the 2
 **Then ask the owner what comes next:** P60, below, or any of the live check's six follow-ups (its report's last section). A follow-up gets an N-item and a P-row first (`check_execution_plan.py` must pass).
 
 **P60, the icon's directory hold** (N54). The portal's validation held 4.0.1 for `UNREAD_ASSET_REFERENCED`: `skills/web-design-studio/assets/starter/styles/layout.css` names `references/layout-composition.md`, whose code span `` `label + icon` `` the validator matched to `.claude-plugin/icon.png` by its stem.
-1. **Clear it:** name the icon distinctively and point plugin.json's `icon` field at it, after checking that CI's `claude plugin validate --strict` (2.1.293) takes the key; or reword the span. Either changes what ships, so it goes out in the next release, not alone.
-2. **Catch it locally:** `build.py`'s image hold matches full paths only. Make it match as the directory does, by stem and through the files a script or style names, with a test that fails on `v4.0.1`.
+1. **Clear it:** rename the icon to `pro-web-design-suite-icon.png` and point plugin.json's `icon` field at it. First check that CI's `claude plugin validate --strict` (2.1.293) takes the key; if it refuses it, keep the name and reword the span. Either changes what ships, so it goes out in the next release, not alone.
+2. **Catch it locally:** `build.py`'s image hold matches full paths only. N54 in the completion plan defines the rule (path or whole-word stem in a script, config or stylesheet, or in the code of a Markdown file one of those names) and the regression case that must fail on `v4.0.1`.
 3. The listing's icon doesn't change: it was read at the first save.
 
 | Item | Scope | Closes | Main files | Size |
