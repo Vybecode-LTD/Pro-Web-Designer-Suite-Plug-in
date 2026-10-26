@@ -105,6 +105,7 @@ ICON_SIDES = (512, 2048)
 ICON_MAX_BYTES = 2_000_000
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 IMAGE_LINK = re.compile(r"!\[[^\]]*\]\([^)]*\)")    # Markdown's image syntax, the one way to show an image
+FENCE = re.compile(r" {0,3}(`{3,}|~{3,})")          # a Markdown code fence's opening or closing run
 
 
 def git(*args: str, env: dict[str, str] | None = None, cwd: str | None = None) -> bytes:
@@ -210,15 +211,39 @@ def icon_problems(data: bytes) -> list[str]:
     return problems
 
 
-def icon_path(files: dict[str, tuple[int, bytes]]) -> str:
-    """The listing icon's path in the plugin: plugin.json's `icon`, or ICON."""
+def declared_icon(files: dict[str, tuple[int, bytes]]) -> str | None:
+    """plugin.json's `icon`, as a path in the plugin, or None."""
     try:
         named = json.loads(files[".claude-plugin/plugin.json"][1]).get("icon")
     except (KeyError, ValueError, AttributeError):
-        named = None
+        return None
     if not isinstance(named, str) or not named.strip():
-        return ICON
+        return None
     return named[2:] if named.startswith("./") else named
+
+
+def icon_path(files: dict[str, tuple[int, bytes]]) -> str:
+    """The listing icon's path in the plugin: plugin.json's `icon`, or ICON."""
+    return declared_icon(files) or ICON
+
+
+def without_rendered_images(text: str) -> str:
+    """A Markdown file's text without the image links it renders: those outside
+    its fences and code spans. Image syntax quoted as code still names the
+    image (CodeRabbit on #207)."""
+    kept, fence = [], None
+    for line in text.splitlines():
+        m = FENCE.match(line)
+        if fence is None and m:
+            fence = m.group(1)
+        elif fence is not None:
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line[m.end():].strip():
+                fence = None
+        else:
+            line = "".join(part if part.startswith("`") else IMAGE_LINK.sub(" ", part)
+                           for part in re.split(r"(`[^`\n]+`)", line))
+        kept.append(line)
+    return "\n".join(kept)
 
 
 def directory_findings(files: dict[str, tuple[int, bytes]]) -> tuple[list[str], list[str]]:
@@ -278,11 +303,13 @@ def directory_findings(files: dict[str, tuple[int, bytes]]) -> tuple[list[str], 
              for p in files if pathlib.PurePosixPath(p).suffix.lower() in DIRECTORY_IMAGES_AND_FONTS}
     for path in sorted(files):
         data = files[path][1]
-        if path in media or path == ".claude-plugin/plugin.json" or b"\0" in data:
+        if path == ".claude-plugin/plugin.json" or b"\0" in data:   # a text SVG is read too (CodeRabbit on #207)
             continue
-        text = IMAGE_LINK.sub(" ", data.decode("utf-8", "replace"))
+        text = data.decode("utf-8", "replace")
+        if pathlib.PurePosixPath(path).suffix.lower() == ".md":
+            text = without_rendered_images(text)
         holds += [f"{path} names {item}; outside Markdown's image syntax the directory may hold it"
-                  for item, name in media.items() if name.search(text)]
+                  for item, name in media.items() if item != path and name.search(text)]
     return sorted(set(blocks)), holds
 
 
@@ -385,6 +412,8 @@ def main(argv: list[str] | None = None) -> int:
     icon = icon_path(files)
     if icon in files:
         refused += [f"{icon}: {p}" for p in icon_problems(files[icon][1])]
+    elif declared_icon(files):                            # CodeRabbit on #207
+        refused.append(f"plugin.json's icon names {icon}, which is not in the plugin")
     else:
         warnings.append(f"there is no {icon}: the directory's listing takes its icon once, when it is first saved")
     if refused:

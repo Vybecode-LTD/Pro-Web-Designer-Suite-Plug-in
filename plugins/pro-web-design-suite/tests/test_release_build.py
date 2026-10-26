@@ -290,6 +290,15 @@ class ReleaseBuild(TempDirTest):
         self.git("commit", "-q", "-m", "a named icon")
         self.assert_refused("assets/mark.png: it is 600 by 300 px, not square")
 
+    def test_a_declared_icon_that_is_missing_is_refused(self):
+        """CodeRabbit on #207: a release whose plugin.json names an icon it
+        doesn't carry would ship a broken listing icon; without `icon`, a
+        missing default stays a warning."""
+        self.write(f"{P}/.claude-plugin/plugin.json",
+                   '{"name": "pro-web-design-suite", "version": "9.8.7", "icon": "./assets/mark.png"}\n')
+        self.git("commit", "-q", "-am", "an icon that isn't there")
+        self.assert_refused("plugin.json's icon names assets/mark.png, which is not in the plugin")
+
     def test_a_listing_icon_ships_and_none_is_a_warning(self):
         proc = self.build("without")
         self.assertEqual(0, proc.returncode, output(proc))
@@ -512,6 +521,11 @@ class TheDirectoryChecks(unittest.TestCase):
             "prose": {"README.md": ("word " * 40 + "See assets/hero.png.").encode()},
             "the stem in a code span": {"skills/a/references/doc.md": b"Centre `label + hero` as one."},
             "the stem in a stylesheet": {"skills/a/assets/a.css": b"/* Hero + label */\n"},
+            # CodeRabbit on #207: a text SVG is read, and image syntax quoted as code still names the image.
+            "a text SVG": {"assets/badge.svg": b'<svg xmlns="http://www.w3.org/2000/svg"><image href="assets/hero.png"/></svg>'},
+            "image syntax in a code span": {"README.md": ("word " * 40 + "`![preview](assets/hero.png)`").encode()},
+            "image syntax in a fence": {"skills/a/SKILL.md": b"---\nname: a\n---\n```md\n![preview](assets/hero.png)\n```\n"},
+            "image syntax in a script": {"skills/a/scripts/x.py": b"s = '![preview](assets/hero.png)'\n"},
         }
         for name, extra in cases.items():
             with self.subTest(case=name):

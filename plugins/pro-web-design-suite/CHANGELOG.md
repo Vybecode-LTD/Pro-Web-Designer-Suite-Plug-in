@@ -11,9 +11,10 @@
 
 ### Release builder (development repository)
 
-- `tooling/release/build.py` reads the icon from `plugin.json`'s `icon`, and holds any bundled image
-  or font whose path, or whose file name without its extension as a word, appears in text that ships,
-  except `plugin.json` and Markdown image links. That is broader than the directory's own match, whose
+- `tooling/release/build.py` reads the icon from `plugin.json`'s `icon`, and refuses a release when
+  that names a file it doesn't carry. It holds any bundled image or font whose path, or whose file
+  name without its extension as a word, appears in text that ships (a text SVG included), except
+  `plugin.json` and the image links a Markdown file renders; image syntax quoted as code still counts. That is broader than the directory's own match, whose
   exact rule is unknown, so a distinctive name keeps it quiet. Regression test:
   `test_release_build.TheDirectoryChecks.test_the_shipped_plugin_has_no_findings`, which fails on
   4.0.1, with the controls in `test_an_image_named_outside_an_image_link_is_held` and
