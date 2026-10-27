@@ -112,9 +112,9 @@
  *                         first that starts of /opt/pw-browsers/chromium,
  *                         Playwright's own Chromium, Chrome or Edge)
  *   --engine NAME         chromium (default), firefox or webkit: the others run
- *                         axe, names and taborder, in the build the locked
- *                         Playwright pins (npx playwright install firefox
- *                         webkit), or --browser PATH; the rest are Chromium's
+ *                         axe, names and taborder, in the build the loaded
+ *                         Playwright pins (a missing one's error names the
+ *                         command), or --browser PATH; the rest are Chromium's
  *   --json                machine-readable output
  *   --report FILE        also write the --json output to FILE; the text report
  *                         still prints, so a CI log has something a person reads
@@ -145,7 +145,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { DEEP_DOM, ENGINES, FREEZE_ANIMATIONS_CSS, MAX_URLS, NAV_OPTIONS, arrive, contrastRatio, elementAt, keepClosedRoots, launchEngine, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, readUrls, readViewports, refuseOverwrite, runEach, takeNavOption, unreadRoots, withoutOptions } from './browser_common.mjs';
+import { DEEP_DOM, ENGINES, FREEZE_ANIMATIONS_CSS, MAX_URLS, NAV_OPTIONS, arrive, contrastRatio, elementAt, installHint, keepClosedRoots, launchEngine, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, readUrls, readViewports, refuseOverwrite, runEach, takeNavOption, unreadRoots, withoutOptions } from './browser_common.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TAGS = 'wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice';
@@ -2860,7 +2860,7 @@ async function main() {
   });
   if (!launched.browser && opts.engine !== 'chromium') {
     die(`no usable ${opts.engine}. Tried:\n    ${launched.tried.join('\n    ')}\n` +
-        `  Install the build the locked Playwright pins (npx playwright install ${opts.engine}), ` +
+        `  Install the build the loaded Playwright pins (${installHint(opts.engine)}), ` +
         'or pass --browser PATH.');
   }
   if (!launched.browser) {

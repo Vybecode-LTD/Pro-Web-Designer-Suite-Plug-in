@@ -15,6 +15,9 @@ Regressions covered:
 - GT-A5: no context bypassed the page's Content-Security-Policy, so a strict
   one refused the injected freeze stylesheet, and the crash exited 1, the code
   for violations.
+- P64 (N58): a missing Firefox or WebKit build was answered with `npx
+  playwright install ENGINE`, which runs whichever Playwright the current
+  folder resolves, or downloads the newest, not the one the gate loaded.
 
 A stub `playwright` module stands in for the real one: its launch() prints the
 executable it was given and exits 42, or throws for the executables listed in
@@ -25,6 +28,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import unittest
@@ -65,6 +69,23 @@ export const chromium = {
 };
 export default { chromium };
 """
+
+# A Playwright with no Firefox or WebKit build installed, packaged with its own
+# CLI, which prints the arguments it was given.
+STUB_ENGINELESS_PLAYWRIGHT = """\
+const missing = {
+  executablePath() { return '/nonexistent/stub-engine'; },
+  async launch() { throw new Error('STUB: a missing build was launched'); },
+};
+export const chromium = missing;
+export const firefox = missing;
+export const webkit = missing;
+export default { chromium, firefox, webkit };
+"""
+STUB_PACKAGE = json.dumps({"name": "playwright", "version": "0.0.0-stub", "bin": {"playwright": "cli.js"},
+                           "exports": {".": "./index.mjs", "./package.json": "./package.json"}})
+STUB_CLI = "console.log('STUB-CLI ' + process.argv.slice(2).join(' '));\n"
+INSTALL_HINT = re.compile(r'node "([^"]+)" install (\w+)')
 
 SCRIPTS = {
     "snapshot_matrix": ("component-state-matrix", "snapshot_matrix.mjs"),
@@ -222,6 +243,71 @@ class BrowserScriptResolution(TempDirTest):
                             for line in output(proc).splitlines() if line.startswith("STUB-CONTEXT ")]
                 self.assertTrue(contexts, output(proc))
                 self.assertEqual([], [c for c in contexts if bool(c.get("bypassCSP")) is not INJECTS[name]])
+
+
+@unittest.skipUnless(NODE, "node is not installed")
+class TheInstallHintRunsTheLoadedPlaywright(TempDirTest):
+    """P64 (N58): a missing Firefox or WebKit build was answered with `npx
+    playwright install ENGINE`. npx runs the Playwright the current folder
+    resolves, and with none there downloads the newest from the registry, so
+    for a gate that loaded Playwright from NODE_PATH, npm's global folder or
+    beside its own scripts, the command installed another version's build. The
+    hint now names the loaded package's own CLI, by path."""
+
+    def setUp(self):
+        super().setUp()
+        self.page = self.write("page.html", "<!doctype html><title>t</title><main>hi</main>")
+        self.axe = self.write("axe.min.js", "window.axe = {};")
+        self.elsewhere = self.tmp / "elsewhere"
+        self.elsewhere.mkdir()
+
+    def plant(self, node_modules, cli=True):
+        self.write(f"{node_modules}/playwright/index.mjs", STUB_ENGINELESS_PLAYWRIGHT)
+        if cli:
+            self.write(f"{node_modules}/playwright/package.json", STUB_PACKAGE)
+            self.write(f"{node_modules}/playwright/cli.js", STUB_CLI)
+        return self.tmp / node_modules / "playwright"
+
+    def refused(self, script, node_path=None):
+        proc = subprocess.run(
+            [NODE, str(script), "--file", str(self.page), "--axe", str(self.axe), "--engine", "firefox"],
+            cwd=self.elsewhere, env=env(NODE_PATH=node_path, A11Y_CHROMIUM=None),
+            capture_output=True, timeout=120)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("no usable firefox", output(proc))
+        self.assertNotIn("npx", output(proc))
+        return output(proc)
+
+    def assert_runs_the_loaded_cli(self, text, package):
+        hints = INSTALL_HINT.findall(text)
+        self.assertEqual(len(hints), 2, text)   # the engine tried, and the advice
+        for cli, engine in hints:
+            self.assertEqual(engine, "firefox")
+            self.assertTrue(os.path.samefile(cli, package / "cli.js"), cli)
+        command = INSTALL_HINT.search(text).group(0)
+        ran = subprocess.run(command, shell=True, cwd=self.elsewhere, env=env(),
+                             capture_output=True, timeout=60)
+        self.assertEqual(output(ran).strip(), "STUB-CLI install firefox", command)
+
+    def test_a_playwright_on_node_path(self):
+        package = self.plant("global/node_modules")
+        text = self.refused(SKILLS / "a11y-audit-runner" / "scripts" / "a11y_runtime.mjs",
+                            node_path=str(self.tmp / "global" / "node_modules"))
+        self.assert_runs_the_loaded_cli(text, package)
+
+    def test_a_playwright_beside_the_scripts(self):
+        """The bare import('playwright'), which resolves from the scripts' own folder."""
+        scripts = self.tmp / "skill" / "scripts"
+        shutil.copytree(SKILLS / "a11y-audit-runner" / "scripts", scripts,
+                        ignore=shutil.ignore_patterns("node_modules"))
+        package = self.plant("skill/node_modules")
+        self.assert_runs_the_loaded_cli(self.refused(scripts / "a11y_runtime.mjs"), package)
+
+    def test_a_package_without_its_cli_is_named_by_the_command_alone(self):
+        self.plant("global/node_modules", cli=False)
+        text = self.refused(SKILLS / "a11y-audit-runner" / "scripts" / "a11y_runtime.mjs",
+                            node_path=str(self.tmp / "global" / "node_modules"))
+        self.assertEqual(text.count("(playwright install firefox)"), 2, text)
 
 
 @unittest.skipUnless(NODE, "node is not installed")

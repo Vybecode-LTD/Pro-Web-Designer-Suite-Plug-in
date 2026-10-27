@@ -44,6 +44,14 @@
   times could page with a skip or a repeat. Both now end with the primary key. Regression test:
   `test_scaffold.TheAnswersReachTheOutput.test_the_default_sort_is_a_constant_the_query_applies`,
   which fails on 4.0.1.
+- **A missing Firefox or WebKit build was answered with a command that could install another
+  version's** (a11y-audit-runner's `--engine`). The advice was `npx playwright install ENGINE`, and
+  npx runs whichever Playwright the current folder resolves, or downloads the newest from the
+  registry when there is none. For a gate that loaded Playwright from `NODE_PATH`, npm's global
+  folder or beside its own scripts, that was not the Playwright whose build it launches. The error
+  now names the loaded package's own CLI, by path: `node "…/playwright/cli.js" install firefox`.
+  Regression tests: `test_browser_scripts.TheInstallHintRunsTheLoadedPlaywright`, whose three tests
+  fail on 4.0.1.
 
 ### Release builder (development repository)
 
