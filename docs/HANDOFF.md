@@ -32,7 +32,7 @@
 
 - **The portal saves a draft at the first Validate** ("Draft saved in this tab"), and the icon is read then. Changing the icon later does not change the listing's.
 - **A release's upload can 404** right after the release is created. Rerun the failed job (`gh run rerun RUN --failed`); nothing is left behind.
-- **CI's browser install can crawl** (N55): 4 of 16 Ubuntu jobs on 10-25/26 spent 20 to 43 minutes in `playwright install --with-deps`, and two hit the 45-minute timeout as CANCELLED. Rerun the job (`gh run rerun RUN --failed`); P61 fixes it.
+- **CI's browser install can crawl** (N55): 4 of 16 Ubuntu jobs on 10-25/26 spent 20 to 43 minutes in `playwright install --with-deps`, and two hit the 45-minute timeout as CANCELLED. Rerun the job (`gh run rerun RUN --failed`); P61 is planned to address it.
 - **A new flake:** `test_runtime_urls.EachPageHasItsTypesBudget` on Windows (the strict page recorded no LCP), on #204's merge; the rerun passed.
 - **The bundled CLI** isn't under `%APPDATA%\Claude\claude-code` from Git Bash any more; the 2.1.309 CLI in `222f4831-…`'s scratchpad (`cc/`) and `unset.txt` work. CI's evals run 2.1.293.
 - **landing-page-conversion's SKILL.md is 20,498 of its 20,500 bytes.** Any addition needs a cut.

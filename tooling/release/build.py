@@ -104,7 +104,9 @@ ICON = ".claude-plugin/icon.png"
 ICON_SIDES = (512, 2048)
 ICON_MAX_BYTES = 2_000_000
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-IMAGE_LINK = re.compile(r"!\[[^\]]*\]\([^)]*\)")    # Markdown's image syntax, the one way to show an image
+# Markdown's image syntax, the one way to show an image; `\![...](...)` is
+# escaped, literal text, and still names the file (CodeRabbit on #207).
+IMAGE_LINK = re.compile(r"(?<!\\)!\[[^\]]*\]\([^)]*\)")
 FENCE = re.compile(r" {0,3}(`{3,}|~{3,})")          # a Markdown code fence's opening or closing run
 
 
@@ -212,19 +214,19 @@ def icon_problems(data: bytes) -> list[str]:
 
 
 def declared_icon(files: dict[str, tuple[int, bytes]]) -> str | None:
-    """plugin.json's `icon`, as a path in the plugin, or None."""
+    """plugin.json's `icon`, as a path in the plugin, or None when it sets
+    none. Any other value raises ValueError: the manifest wants a path, and a
+    release must not fall back past it (CodeRabbit on #207)."""
     try:
-        named = json.loads(files[".claude-plugin/plugin.json"][1]).get("icon")
-    except (KeyError, ValueError, AttributeError):
+        manifest = json.loads(files[".claude-plugin/plugin.json"][1])
+    except (KeyError, ValueError):
         return None
+    if not isinstance(manifest, dict) or "icon" not in manifest:
+        return None
+    named = manifest["icon"]
     if not isinstance(named, str) or not named.strip():
-        return None
+        raise ValueError(f"plugin.json's icon is {named!r}, not a path in the plugin")
     return named[2:] if named.startswith("./") else named
-
-
-def icon_path(files: dict[str, tuple[int, bytes]]) -> str:
-    """The listing icon's path in the plugin: plugin.json's `icon`, or ICON."""
-    return declared_icon(files) or ICON
 
 
 def without_rendered_images(text: str) -> str:
@@ -240,8 +242,9 @@ def without_rendered_images(text: str) -> str:
             if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line[m.end():].strip():
                 fence = None
         else:
-            line = "".join(part if part.startswith("`") else IMAGE_LINK.sub(" ", part)
-                           for part in re.split(r"(`[^`\n]+`)", line))
+            kept.append("".join(part if part.startswith("`") else IMAGE_LINK.sub(" ", part)
+                                for part in re.split(r"(`[^`\n]+`)", line)))
+            continue
         kept.append(line)
     return "\n".join(kept)
 
@@ -409,13 +412,18 @@ def main(argv: list[str] | None = None) -> int:
         if len(meta["description"]) > UPLOAD_DESCRIPTION:
             warnings.append(f"{skill}: its description has {len(meta['description'])} characters; "
                             f"claude.ai's help center gives {UPLOAD_DESCRIPTION} for an upload")
-    icon = icon_path(files)
-    if icon in files:
-        refused += [f"{icon}: {p}" for p in icon_problems(files[icon][1])]
-    elif declared_icon(files):                            # CodeRabbit on #207
-        refused.append(f"plugin.json's icon names {icon}, which is not in the plugin")
+    try:
+        declared = declared_icon(files)
+    except ValueError as exc:                             # CodeRabbit on #207
+        refused.append(str(exc))
     else:
-        warnings.append(f"there is no {icon}: the directory's listing takes its icon once, when it is first saved")
+        icon = declared or ICON
+        if icon in files:
+            refused += [f"{icon}: {p}" for p in icon_problems(files[icon][1])]
+        elif declared:                                    # CodeRabbit on #207
+            refused.append(f"plugin.json's icon names {icon}, which is not in the plugin")
+        else:
+            warnings.append(f"there is no {icon}: the directory's listing takes its icon once, when it is first saved")
     if refused:
         for reason in refused:
             print(f"refused: {reason}", file=sys.stderr)

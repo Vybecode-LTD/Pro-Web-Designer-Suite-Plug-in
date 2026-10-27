@@ -299,6 +299,16 @@ class ReleaseBuild(TempDirTest):
         self.git("commit", "-q", "-am", "an icon that isn't there")
         self.assert_refused("plugin.json's icon names assets/mark.png, which is not in the plugin")
 
+    def test_an_icon_that_is_not_a_path_is_refused(self):
+        """CodeRabbit on #207: a number, an object or a blank string in `icon`
+        fell back to the default icon, and the release shipped the bad manifest."""
+        for value in ('7', '{"path": "./icon.png"}', '"  "'):
+            with self.subTest(icon=value):
+                self.write(f"{P}/.claude-plugin/plugin.json",
+                           '{"name": "pro-web-design-suite", "version": "9.8.7", "icon": %s}\n' % value)
+                self.git("commit", "-q", "-am", f"icon {value}")
+                self.assert_refused("plugin.json's icon is ")
+
     def test_a_listing_icon_ships_and_none_is_a_warning(self):
         proc = self.build("without")
         self.assertEqual(0, proc.returncode, output(proc))
@@ -526,6 +536,7 @@ class TheDirectoryChecks(unittest.TestCase):
             "image syntax in a code span": {"README.md": ("word " * 40 + "`![preview](assets/hero.png)`").encode()},
             "image syntax in a fence": {"skills/a/SKILL.md": b"---\nname: a\n---\n```md\n![preview](assets/hero.png)\n```\n"},
             "image syntax in a script": {"skills/a/scripts/x.py": b"s = '![preview](assets/hero.png)'\n"},
+            "escaped image syntax": {"README.md": ("word " * 40 + "\\![preview](assets/hero.png)").encode()},
         }
         for name, extra in cases.items():
             with self.subTest(case=name):
@@ -556,7 +567,8 @@ class TheListingIcon(unittest.TestCase):
 
     def test_the_shipped_plugin_has_a_listing_icon(self):
         manifest = (PLUGIN / ".claude-plugin" / "plugin.json").read_bytes()
-        icon = PLUGIN / self.build.icon_path({".claude-plugin/plugin.json": (0o100644, manifest)})
+        icon = PLUGIN / (self.build.declared_icon({".claude-plugin/plugin.json": (0o100644, manifest)})
+                         or self.build.ICON)
         self.assertTrue(icon.is_file(), icon)
         self.assertEqual([], self.build.icon_problems(icon.read_bytes()))
 
