@@ -291,8 +291,9 @@ class TheInstallHintRunsTheLoadedPlaywright(TempDirTest):
         hints = INSTALL_HINT.findall(text)
         self.assertEqual(len(hints), 2, text)   # the engine tried, and the advice
         for command, engine in hints:
-            self.assertEqual(engine, "firefox")
-            self.assertTrue(os.path.samefile(cli_path(command), package / "cli.js"), command)
+            with self.subTest(command=command):
+                self.assertEqual(engine, "firefox")
+                self.assertTrue(os.path.samefile(cli_path(command), package / "cli.js"), command)
         ran = subprocess.run(hints[0][0], shell=True, cwd=self.elsewhere, env=env(),
                              capture_output=True, timeout=60)
         self.assertEqual(output(ran).strip(), "STUB-CLI install firefox", hints[0][0])
@@ -332,13 +333,14 @@ class TheInstallHintRunsTheLoadedPlaywright(TempDirTest):
         named = re.findall(r"\(install firefox with the CLI at (.+?)\)", text)
         self.assertEqual(len(named), 2, text)
         for cli in named:
-            self.assertTrue(os.path.samefile(cli, package / "cli.js"), cli)
+            with self.subTest(cli=cli):
+                self.assertTrue(os.path.samefile(cli, package / "cli.js"), cli)
 
     def test_each_platform_quotes_the_path_so_its_shells_read_it_literally(self):
         cases = [
             ["/srv/app/node_modules/playwright/cli.js", "linux", "'/srv/app/node_modules/playwright/cli.js'"],
             ["/srv/it's $HOME/cli.js", "darwin", "'/srv/it'\\''s $HOME/cli.js'"],
-            ["C:\\Program Files\\app & co\\cli.js", "win32", '"C:\\Program Files\\app & co\\cli.js"'],
+            ["C:\\path\\to\\app & co\\cli.js", "win32", '"C:\\path\\to\\app & co\\cli.js"'],
             ["C:\\$work\\cli.js", "win32", None],
             ["C:\\100%\\cli.js", "win32", None],
             ["C:\\hey!\\cli.js", "win32", None],
