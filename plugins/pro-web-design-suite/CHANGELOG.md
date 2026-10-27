@@ -34,9 +34,16 @@
 - **content-model-to-ui proposed a table's primary key as its sort when its time had another name.**
   The default sort knew `sort_order`, `position`, `created_at` and `updated_at`; `orders.placed_at`
   was not read, so the proposal was `id asc`. With none of the four, it is now the table's first
-  NOT NULL date or timestamp, newest first, unless its name says it is a deadline (`due`,
-  `expires`, `deadline`, `ends`) or migration plumbing. Regression test:
-  `test_schema_sources.TheDefaultSortReadsTheRecordsOwnTime`, whose first test fails on 4.0.1.
+  NOT NULL date or timestamp, newest first, unless it is an array or its name says it is a
+  deadline (`due`, `expiry`, `expires`, `deadline`, `ends`, `until`) or migration plumbing.
+  Regression test: `test_schema_sources.TheDefaultSortReadsTheRecordsOwnTime`, whose first test
+  fails on 4.0.1.
+- **The scaffold's default sort had no tiebreak.** `supabase-integration.md` says to add the
+  primary key as the final sort key, and the model carries it, but `orders.fields.ts`'s
+  `DefaultSort` and its `.order()` example named only the sort column, so rows with equal
+  times could page with a skip or a repeat. Both now end with the primary key. Regression test:
+  `test_scaffold.TheAnswersReachTheOutput.test_the_default_sort_is_a_constant_the_query_applies`,
+  which fails on 4.0.1.
 
 ### Release builder (development repository)
 

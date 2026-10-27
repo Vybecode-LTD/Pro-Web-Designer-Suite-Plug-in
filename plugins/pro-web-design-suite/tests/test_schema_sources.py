@@ -591,9 +591,17 @@ class TheDefaultSortReadsTheRecordsOwnTime(SchemaSources):
                    "  placedAt DateTime @default(now()) @db.Timestamptz(6)\n}\n")
         self.write("entries.sql", "create table entries (\n  id bigint primary key,\n"
                                   "  amount integer not null,\n  entry_date date not null\n);\n")
+        # `raw` inside a word is no plumbing, and an array of dates is no one
+        # time (CodeRabbit on #210).
+        self.write("withdrawals.sql", "create table withdrawals (\n  id bigint primary key,\n"
+                                      "  withdrawal_date date not null\n);\n")
+        self.write("rosters.sql", "create table rosters (\n  id bigint primary key,\n"
+                                  "  holidays date[] not null,\n  starts_on date not null\n);\n")
         for source, want in (("orders.sql", ("placed_at", "desc", "id")),
                              ("orders.prisma", ("placedAt", "desc", "id")),
-                             ("entries.sql", ("entry_date", "desc", "id"))):
+                             ("entries.sql", ("entry_date", "desc", "id")),
+                             ("withdrawals.sql", ("withdrawal_date", "desc", "id")),
+                             ("rosters.sql", ("starts_on", "desc", "id"))):
             with self.subTest(source=source):
                 self.assertEqual(want, self.sort(source))
 
@@ -606,6 +614,7 @@ class TheDefaultSortReadsTheRecordsOwnTime(SchemaSources):
     def test_a_deadline_plumbing_a_nullable_event_or_a_time_of_day_is_not_the_sort(self):
         self.write("tasks.sql", "create table tasks (\n  id bigint primary key,\n"
                                 "  title text not null,\n  due_at timestamptz not null,\n"
+                                "  expiry_date date not null,\n  valid_until timestamptz not null,\n"
                                 "  expires_on date not null,\n  imported_at timestamptz not null,\n"
                                 "  done_at timestamptz,\n  opens time not null\n);\n")
         self.assertEqual(("id", "asc", None), self.sort("tasks.sql"))

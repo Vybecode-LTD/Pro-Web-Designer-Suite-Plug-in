@@ -344,11 +344,13 @@ SYSTEM_TIMESTAMPS = _n(
 TIMESTAMP_SUFFIX = _n(r"_at$|^(created|updated|deleted|published|expires|"
                       r"starts|ends|scheduled|completed|due)(_on|_date)?$")
 
-# A date named for a migration: plumbing that escaped into the schema.
-PLUMBING_TIME = _n(r"(legacy|import|sync|migrat|raw|backfill)")
+# A date named for a migration: plumbing that escaped into the schema. Whole
+# words only: `withdrawal_date` holds `raw` and is no plumbing (CodeRabbit on #210).
+PLUMBING_TIME = _n(r"(^|_)(legacy|raw|imports?|imported|syncs?|synced|"
+                   r"synchroni[sz]ed|migrat[a-z]*|backfill(s|ed)?)(_|$)")
 
 # A deadline is when something must happen, not when the record did.
-DEADLINE_TIME = _n(r"(^|_)(due|expires|deadline|ends)(_|$)")
+DEADLINE_TIME = _n(r"(^|_)(due|expir[a-z]*|deadline|ends|until)(_|$)")
 
 TITLE_CANDIDATES = ("title", "name", "display_name", "full_name", "label",
                     "subject", "headline", "heading", "company_name",
@@ -2532,9 +2534,10 @@ def _default_sort(table: Table) -> dict[str, Any]:
             return {"column": names[cand], "direction": direction, "signal": why,
                     "tiebreak": table.primary_key[0] if table.primary_key else None}
     # The record's own time (`orders.placed_at`, N57): the first NOT NULL
-    # date or instant. A nullable one is an event that may never happen.
+    # date or instant. A nullable one is an event that may never happen, and
+    # an array of dates is no one time (CodeRabbit on #210).
     for c in table.columns:
-        if c.nullable or (c.ui.get("temporal") or {}).get("granularity") \
+        if c.nullable or c.is_array or (c.ui.get("temporal") or {}).get("granularity") \
                 not in ("date", "instant"):
             continue
         if PLUMBING_TIME.search(c.name) or DEADLINE_TIME.search(c.name):
