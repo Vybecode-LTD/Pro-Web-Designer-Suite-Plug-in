@@ -31,6 +31,12 @@
   `--dur-loop` and `--ease-linear` are dropped with a reason. `--fg-link`'s contrast note said 7.27:1
   and 6.90:1; measured, it is 7.28:1 and 6.92:1. Regression tests:
   `test_email_tokens.TheSkillsFileFollowsTheStarter`, both of which fail on 4.0.1.
+- **content-model-to-ui proposed a table's primary key as its sort when its time had another name.**
+  The default sort knew `sort_order`, `position`, `created_at` and `updated_at`; `orders.placed_at`
+  was not read, so the proposal was `id asc`. With none of the four, it is now the table's first
+  NOT NULL date or timestamp, newest first, unless its name says it is a deadline (`due`,
+  `expires`, `deadline`, `ends`) or migration plumbing. Regression test:
+  `test_schema_sources.TheDefaultSortReadsTheRecordsOwnTime`, whose first test fails on 4.0.1.
 
 ### Release builder (development repository)
 

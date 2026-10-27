@@ -344,6 +344,12 @@ SYSTEM_TIMESTAMPS = _n(
 TIMESTAMP_SUFFIX = _n(r"_at$|^(created|updated|deleted|published|expires|"
                       r"starts|ends|scheduled|completed|due)(_on|_date)?$")
 
+# A date named for a migration: plumbing that escaped into the schema.
+PLUMBING_TIME = _n(r"(legacy|import|sync|migrat|raw|backfill)")
+
+# A deadline is when something must happen, not when the record did.
+DEADLINE_TIME = _n(r"(^|_)(due|expires|deadline|ends)(_|$)")
+
 TITLE_CANDIDATES = ("title", "name", "display_name", "full_name", "label",
                     "subject", "headline", "heading", "company_name",
                     "product_name", "username", "email", "slug")
@@ -2437,7 +2443,7 @@ def _assign_placement(table: Table, title: str | None) -> None:
         # that may never have occurred; anything named for a migration is
         # plumbing that escaped into the schema.
         if c.type in TEMPORAL_TYPES or c.ui.get("temporal"):
-            if _n(r"(legacy|import|sync|migrat|raw|backfill)").search(c.name):
+            if PLUMBING_TIME.search(c.name):
                 return 5
             if c.name in ("created_at", "updated_at"):
                 return 40
@@ -2525,10 +2531,23 @@ def _default_sort(table: Table) -> dict[str, Any]:
         if cand in names:
             return {"column": names[cand], "direction": direction, "signal": why,
                     "tiebreak": table.primary_key[0] if table.primary_key else None}
+    # The record's own time (`orders.placed_at`, N57): the first NOT NULL
+    # date or instant. A nullable one is an event that may never happen.
+    for c in table.columns:
+        if c.nullable or (c.ui.get("temporal") or {}).get("granularity") \
+                not in ("date", "instant"):
+            continue
+        if PLUMBING_TIME.search(c.name) or DEADLINE_TIME.search(c.name):
+            continue
+        return {"column": c.name, "direction": "desc",
+                "signal": f"`{c.name}` is the record's own time (a NOT NULL date "
+                          "or timestamp), so newest first",
+                "tiebreak": table.primary_key[0] if table.primary_key else None}
     return {"column": table.primary_key[0] if table.primary_key else None,
             "direction": "asc",
-            "signal": "no temporal or ordering column — falling back to the "
-                      "primary key, which is stable but meaningless to a user",
+            "signal": "no ordering column and no NOT NULL time of its own — "
+                      "falling back to the primary key, which is stable but "
+                      "meaningless to a user",
             "tiebreak": None}
 
 

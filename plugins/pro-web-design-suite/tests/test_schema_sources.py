@@ -568,3 +568,44 @@ class TheAuditsContentLows(SchemaSources):
         # An SRID is no length, in either reader (Codex on #159).
         self.assertIsNone(ddl["place.spot"]["max_length"])
         self.assertNotIn("maxLength", [r for r, _ in facts(prisma["place.spot"])["rules"]])
+
+
+class TheDefaultSortReadsTheRecordsOwnTime(SchemaSources):
+    """N57, the 4.0.0 live check's S10: with no `sort_order`, `position`,
+    `created_at` or `updated_at`, `orders.placed_at` was not read as the time
+    to sort by, and the proposal fell back to the primary key."""
+
+    HEAD = 'datasource db {\n  provider = "postgresql"\n  url = env("DATABASE_URL")\n}\n'
+
+    def sort(self, source):
+        table = self.introspect(source)["tables"][0]
+        proposed = table["screens"]["default_sort"]
+        return proposed["column"], proposed["direction"], proposed["tiebreak"]
+
+    def test_a_not_null_timestamp_or_date_sorts_newest_first(self):
+        self.write("orders.sql", "create table orders (\n  id uuid primary key,\n"
+                                 "  reference text not null,\n  ships_at timestamptz,\n"
+                                 "  placed_at timestamptz not null default now()\n);\n")
+        self.write("orders.prisma", self.HEAD + "model orders {\n  id String @id @db.Uuid\n"
+                   "  reference String\n  shipsAt DateTime? @db.Timestamptz(6)\n"
+                   "  placedAt DateTime @default(now()) @db.Timestamptz(6)\n}\n")
+        self.write("entries.sql", "create table entries (\n  id bigint primary key,\n"
+                                  "  amount integer not null,\n  entry_date date not null\n);\n")
+        for source, want in (("orders.sql", ("placed_at", "desc", "id")),
+                             ("orders.prisma", ("placedAt", "desc", "id")),
+                             ("entries.sql", ("entry_date", "desc", "id"))):
+            with self.subTest(source=source):
+                self.assertEqual(want, self.sort(source))
+
+    def test_created_at_still_comes_first(self):
+        self.write("orders.sql", "create table orders (\n  id uuid primary key,\n"
+                                 "  placed_at timestamptz not null,\n"
+                                 "  created_at timestamptz not null default now()\n);\n")
+        self.assertEqual(("created_at", "desc", "id"), self.sort("orders.sql"))
+
+    def test_a_deadline_plumbing_a_nullable_event_or_a_time_of_day_is_not_the_sort(self):
+        self.write("tasks.sql", "create table tasks (\n  id bigint primary key,\n"
+                                "  title text not null,\n  due_at timestamptz not null,\n"
+                                "  expires_on date not null,\n  imported_at timestamptz not null,\n"
+                                "  done_at timestamptz,\n  opens time not null\n);\n")
+        self.assertEqual(("id", "asc", None), self.sort("tasks.sql"))
