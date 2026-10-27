@@ -2,12 +2,35 @@
 
 ## 4.0.2 — unreleased
 
+### Added
+
+- **`sync_email_tokens.py` writes a project's `email-tokens.json` from its `tokens.css`**
+  (email-template-system). The skill called that file the projection of `tokens.css`, but nothing
+  projected it, so a project wrote its own by hand. The script keeps an entry while its `from` is
+  what `tokens.css` says, so the email's own decisions (its heading scale, its font stacks) survive,
+  and projects it again when its source moves: OKLCH to hex, rem to px, `calc()` at density 1, a web
+  font to a websafe stack. A token the file has never seen takes its family's treatment. Every
+  contrast note is measured again, and a pair under 4.5:1 fails; `--check` fails when the file is
+  stale. See `references/email-workflow.md` §12. Regression tests: `test_email_tokens`, whose 24
+  tests fail on 4.0.1.
+
 ### Changed
 
 - **The listing icon has a name of its own,** and `plugin.json`'s `icon` field names it. Anthropic's
   directory held 4.0.1 for review as "an image the plugin's code could run": a reference whose code
   span said "label + icon" matched the icon by its file name. The image is the same, and the listing
   keeps the icon it took at submission.
+
+### Fixed
+
+- **The skill's own `email-tokens.json` had drifted from the starter's `tokens.css`.**
+  `--border-strong` pointed at `--neutral-400` (2.54:1 on white) where the starter says
+  `--neutral-500` (5.15:1); no shipped template reads it. Nine starter tokens were neither kept nor
+  dropped. The file is now the starter's projection: `--danger-400`, `--radius-xs`, `--radius-2xl`,
+  `--tracking-tighter` and `--tracking-wide` are kept, and `--stroke-focus`, `--shadow-none`,
+  `--dur-loop` and `--ease-linear` are dropped with a reason. `--fg-link`'s contrast note said 7.27:1
+  and 6.90:1; measured, it is 7.28:1 and 6.92:1. Regression tests:
+  `test_email_tokens.TheSkillsFileFollowsTheStarter`, both of which fail on 4.0.1.
 
 ### Release builder (development repository)
 

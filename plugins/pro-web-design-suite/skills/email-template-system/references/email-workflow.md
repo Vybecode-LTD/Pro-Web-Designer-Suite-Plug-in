@@ -15,6 +15,7 @@ Authoring, building, testing, sending. `email-architecture.md` is what to build;
 9. [The pre-send checklist](#9-the-pre-send-checklist)
 10. [The requests you will actually get, and the answer](#10-the-requests-you-will-actually-get-and-the-answer)
 11. [MJML, React Email and Maizzle](#11-mjml-react-email-and-maizzle)
+12. [A project's own token file](#12-a-projects-own-token-file)
 
 ---
 
@@ -381,3 +382,34 @@ const html = withMso(await render(<ProductAnnouncement />));
 ### Maizzle, and any other compiler
 
 This skill writes no Maizzle configuration: Maizzle reads its theme from a Tailwind config, so map its colours, sizes and spacing to the roles in `email-tokens.json` by hand, by the table above. Whatever compiles the email, `lint_email.py` reads the HTML it writes, not the tool that wrote it: lint every build, and the gate holds.
+
+## 12. A project's own token file
+
+`assets/email-tokens.json` is the projection of the starter's `tokens.css`. A project with its own `tokens.css` gets its own projection from a script, never by hand:
+
+```bash
+python -m scripts.sync_email_tokens               # .design-suite.json's tokens and emailTokens
+python -m scripts.sync_email_tokens --tokens src/styles/tokens.css --out emails/email-tokens.json
+python -m scripts.sync_email_tokens --check       # in CI: exit 1 when the file is stale
+```
+
+It reads the token files every gate reads (`tokens.css`, a contract.json or DTCG) at their defaults: the light theme, at `--density: 1`. The email file before it, `--base`, is `--out` when that exists, else this skill's own, and it decides what each entry becomes:
+
+| The entry | What the script does |
+|---|---|
+| its `from` is still what `tokens.css` says (with no `from`, its value) | kept as it is, value and note included |
+| its source moved | projected again: `oklch()`, `rgb()` and `hsl()` to hex, rem to px, `calc()` evaluated, `clamp()` to its minimum, a font stack to its websafe families and then its generic family's email stack, a `--type-*` shorthand to size, line (size × leading, in px) and weight. The note goes when the value changes |
+| a role kept as a pointer (`var(--neutral-600)`) | points where `tokens.css` points; at a token email drops, it is dropped too |
+| `email-only`, or a type role `tokens.css` has no shorthand for | kept: the email's own |
+| its token is gone from `tokens.css` | removed, so a template that reads it fails the build |
+| a token the file has never seen | its family's treatment: projected beside a kept sibling (`--danger-400` beside `--danger-500`), dropped with a dropped sibling's reason (`--dur-loop`); with no family, projected when it has an email form |
+
+Then every `contrast` note is measured again (WCAG 2, on the hex values the build writes), and a pair under 4.5:1 exits 1, with the file written. Nothing is written, and it exits 2, when a value has no email form (a translucent colour, a shadow outside a dropped family, a viewport unit outside `clamp()`) or a kept entry points at a token the file no longer has: point it elsewhere in the email file, or add the token to `dropped` with a reason, and run it again.
+
+**An email decision is a value whose `from` is current.** The heading scale, the page rhythm, the font stacks and the 16px button label in this skill's file differ from what a mechanical projection gives, on purpose. They survive every run until their source moves, and then the report names them. To keep one after that, set its value again in the email file and leave the new `from`: the next run keeps it.
+
+**The first run on a hand-made file** projects again every entry whose `from` is not exactly what `tokens.css` says: an abbreviation, `2.75rem (44px)`, a role's name. Read the report, one `name: before -> after` a line, and set again the values you meant.
+
+**The dark treatment** (`--email-dark-*`) is the email's own. It points at ramp steps, not at the site's `[data-theme="dark"]` roles, because a client's dark mode is not the site's (`email-client-matrix.md` §8). The steps' hex values follow the project's ramps, and their contrast is measured again.
+
+Run it whenever `tokens.css` changes, then build. With `--check` in CI, a pull request that changes the one and not the other fails.

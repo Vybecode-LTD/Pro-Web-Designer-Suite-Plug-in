@@ -16,7 +16,7 @@ description: Build HTML email that survives Outlook, Gmail and dark mode, compil
 > The commands below are written `python -m scripts.NAME`. That form is for a project that
 > has copied the scripts into its own `scripts/` folder, as CI and git hooks
 > do; here, use the path form.
-> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_email.py, lint_email.py, export_email_theme.py, render_email.mjs; copy their helpers too: browser_common.mjs, dtcg.py, project_config.mjs, project_config.py).
+> This skill's scripts are in `${CLAUDE_SKILL_DIR}/scripts/` (build_email.py, lint_email.py, export_email_theme.py, sync_email_tokens.py, render_email.mjs; copy their helpers too: browser_common.mjs, dtcg.py, project_config.mjs, project_config.py).
 
 Every agency client eventually needs email, and email is the one place where **this suite's laws must be deliberately broken**. HTML email has no cascade layers, no custom properties you can rely on, no `gap`, no flexbox or grid in the client that matters most, and `<style>` blocks that several clients strip entirely.
 
@@ -107,9 +107,9 @@ The media query stays, since its condition is evaluated at runtime, and so does 
 
 ### 1. Get the tokens into email form
 
-`assets/email-tokens.json` is the email-safe **projection** of `tokens.css` — not a second token system. Every entry is `survives`, `substituted` (with a documented reason), or listed in `dropped` with what to use instead.
+`assets/email-tokens.json` is the email-safe **projection** of `tokens.css`, not a second token system: `sync_email_tokens.py` writes a project's own (`references/email-workflow.md` §12). Every entry `survives`, is `substituted` (with a reason), or is `dropped` with what to use instead.
 
-The substitutions that matter: `oklch()` → hex, `clamp()` → the anchor that fits a 600px column, `calc()` → resolved arithmetic, the `font` shorthand → size/line/weight triples, elevation → a 1px border, web fonts → a websafe stack. Every colour carries its measured contrast ratio.
+The substitutions that matter: `oklch()` → hex, `clamp()` → the anchor that fits a 600px column, `calc()` → resolved arithmetic, the `font` shorthand → size/line/weight triples, elevation → a 1px border, web fonts → a websafe stack.
 
 Referencing a dropped token is a **hard build error**, not a silent nothing. `var(--elevation-card)` fails the build and tells you to use `--email-edge`.
 
@@ -205,7 +205,7 @@ Full decision table and the `cellpadding` trap in `references/email-architecture
 
 ## Scripts
 
-All three are stdlib-only Python 3, no dependencies; `export_email_theme.py` is in `references/email-workflow.md` §11.
+All are stdlib-only Python 3; `export_email_theme.py` and `sync_email_tokens.py` are in `references/email-workflow.md` §11 and §12.
 
 ### `scripts/build_email.py` — the compiler
 
