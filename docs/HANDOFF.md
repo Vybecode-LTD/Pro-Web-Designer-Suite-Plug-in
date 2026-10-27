@@ -33,7 +33,7 @@
   - the hover check on a JavaScript tooltip;
   - `contrast-under-overlay` on webawesome.com (21 to 147 findings a page);
   - migrating onto a codebase's own token names;
-  - a send through a real provider, which needs the owner's key.
+  - sending email through a real provider, which needs the owner's key.
 - **Part B** of `web-design-suite-distribution-and-promotion.md`: topics and a social preview for the distribution repository, then the listings.
 - **Where issues live:** the distribution repository or this one. Also whether to add a terms-of-service link.
 - **`check.py`:** should it run `test_doc_snippets` and stylelint's snippet test when a reference changes?

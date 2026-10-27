@@ -587,7 +587,7 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`): #210's merg
   - the hover check on a JavaScript tooltip (read the check's scope first);
   - `contrast-under-overlay` on webawesome.com;
   - migrating onto a codebase's own token names;
-  - a send through a real provider, which needs the owner's key.
+  - sending email through a real provider, which needs the owner's key.
 
   A follow-up gets an N-item (next free: N58) and a P-row (next free: P64) first, and `check_execution_plan.py` must pass.
 - **Part B** of the distribution plan: topics and a social preview for the distribution repository, then the listings and the launch.
