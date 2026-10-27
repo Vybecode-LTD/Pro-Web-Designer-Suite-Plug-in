@@ -13,6 +13,7 @@
   "documentationUrl": "https://github.com/Vybecode-LTD/pro-web-design-suite#readme",
   "supportUrl": "https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/issues",
   "privacyPolicyUrl": "https://github.com/Vybecode-LTD/pro-web-design-suite#what-it-runs-sends-and-stores",
+  "icon": "./.claude-plugin/pro-web-design-suite-icon.png",
   "skills": ["./workflow-commands/"],
   "userConfig": {
     "design_hooks": {

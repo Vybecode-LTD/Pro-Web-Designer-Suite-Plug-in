@@ -1,5 +1,25 @@
 # Changelog
 
+## 4.0.2 — unreleased
+
+### Changed
+
+- **The listing icon has a name of its own,** and `plugin.json`'s `icon` field names it. Anthropic's
+  directory held 4.0.1 for review as "an image the plugin's code could run": a reference whose code
+  span said "label + icon" matched the icon by its file name. The image is the same, and the listing
+  keeps the icon it took at submission.
+
+### Release builder (development repository)
+
+- `tooling/release/build.py` reads the icon from `plugin.json`'s `icon`, and refuses a release when
+  that names a file it doesn't carry. It holds any bundled image or font whose path, or whose file
+  name without its extension as a word, appears in text that ships (a text SVG included), except
+  `plugin.json` and the image links a Markdown file renders; image syntax quoted as code still counts. That is broader than the directory's own match, whose
+  exact rule is unknown, so a distinctive name keeps it quiet. Regression test:
+  `test_release_build.TheDirectoryChecks.test_the_shipped_plugin_has_no_findings`, which fails on
+  4.0.1, with the controls in `test_an_image_named_outside_an_image_link_is_held` and
+  `ReleaseBuild.test_plugin_json_names_the_listing_icon`.
+
 ## 4.0.1 — 2026-10-25
 
 An icon for the plugin's listing in Anthropic's directory, before it is submitted there. No
