@@ -10,9 +10,14 @@ source moves, and measures every contrast note again.
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
+import pathlib
 import re
+import tempfile
 import unittest
+from unittest import mock
 
 from wds_support import SKILLS, TempDirTest, load_script, output, run_py
 
@@ -250,6 +255,32 @@ class TheConversions(unittest.TestCase):
         for given in ("oklch(0% 0 0 / 0.6)", "#00000080", "rgba(0, 0, 0, .5)", "color-mix(in oklch, red, blue)"):
             with self.subTest(given=given), self.assertRaises(self.m.Unprojectable):
                 self.m.to_hex(given)
+
+    def test_a_hue_in_any_angle_unit(self):
+        """CodeRabbit on #209: `turn`, `rad` and `grad` were a traceback."""
+        for given, same in (("hsl(0.5turn 60% 40%)", "hsl(180 60% 40%)"), ("hsl(200grad 60% 40%)", "hsl(180 60% 40%)"),
+                            ("oklch(60% 0.15 1rad)", "oklch(60% 0.15 {!r})".format(180 / 3.141592653589793)),
+                            ("oklch(60% 37.5% 42deg)", "oklch(60% 0.15 42)")):
+            with self.subTest(given=given):
+                self.assertEqual(self.m.to_hex(same), self.m.to_hex(given))
+
+    def test_a_channel_that_is_not_a_number_has_no_email_form(self):
+        for given in ("hsl(10 100% abc%)", "rgb(1x 2 3)", "oklch(60% 0.15 1foo)", "oklch(60% x% 42)"):
+            with self.subTest(given=given), self.assertRaises(self.m.Unprojectable):
+                self.m.to_hex(given)
+
+    def test_a_token_file_unreadable_on_its_second_read_exits_2(self):
+        """CodeRabbit on #209: the declaration order reads tokens.css again."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tokens = pathlib.Path(tmp) / "tokens.css"
+            tokens.write_bytes(STARTER.read_bytes())
+            err = io.StringIO()
+            with mock.patch.object(self.m, "read_text", side_effect=PermissionError(13, "Permission denied")), \
+                    contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+                code = self.m.main(["--tokens", str(tokens), "--out", str(pathlib.Path(tmp) / "e.json")])
+            self.assertEqual(2, code, err.getvalue())
+            self.assertIn("Permission denied", err.getvalue())
+            self.assertFalse((pathlib.Path(tmp) / "e.json").exists())
 
     def test_lengths_become_px(self):
         for given, want in (("0.25rem", ("4px", "rem-to-px")), ("1px", ("1px", None)),

@@ -247,7 +247,22 @@ def _srgb_to_linear(c: float) -> float:
 
 
 def _channel(text: str, scale: float) -> float:
-    return float(text[:-1]) / 100 if text.endswith("%") else float(text) / scale
+    try:
+        return float(text[:-1]) / 100 if text.endswith("%") else float(text) / scale
+    except ValueError:
+        raise Unprojectable("%r is not a number a colour channel can take" % text) from None
+
+
+HUE = re.compile(r"^(-?(?:\d+\.?\d*|\.\d+))(deg|turn|rad|grad)?$")
+DEGREES = {None: 1.0, "deg": 1.0, "turn": 360.0, "rad": 180 / math.pi, "grad": 0.9}
+
+
+def _hue(text: str) -> float:
+    """A hue in degrees, in any of CSS's angle units (CodeRabbit on #209)."""
+    m = HUE.match(text)
+    if not m:
+        raise Unprojectable("%r is not a hue" % text)
+    return float(m.group(1)) * DEGREES[m.group(2)]
 
 
 def _opaque(alpha: str | None, value: str) -> None:
@@ -281,8 +296,8 @@ def to_hex(value: str) -> tuple[str, str | None]:
     parts = ["0" if p == "none" else p for p in parts]
     if fn.group(1) == "oklch":
         L = _channel(parts[0], 1)
-        C = _channel(parts[1], 1) if not parts[1].endswith("%") else float(parts[1][:-1]) * 0.004
-        h = math.radians(float(parts[2].replace("deg", "")))
+        C = _channel(parts[1], 1) * (0.4 if parts[1].endswith("%") else 1)    # 100% is 0.4
+        h = math.radians(_hue(parts[2]))
         a, b = C * math.cos(h), C * math.sin(h)
         l_ = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3
         m_ = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3
@@ -296,7 +311,7 @@ def to_hex(value: str) -> tuple[str, str | None]:
         rgb = [_channel(p, 255) for p in parts]
         reason = "colour-to-hex"
     else:
-        hue = float(parts[0].replace("deg", "")) % 360
+        hue = _hue(parts[0]) % 360
         sat, light = _channel(parts[1], 100), _channel(parts[2], 100)
 
         def hsl(n: int) -> float:                   # CSS Color 4's hslToRgb
@@ -373,6 +388,8 @@ def triple(source: str, part: str) -> dict:
     """One of a type role's three entries, from its resolved shorthand."""
     weight, size, line = shorthand(source)
     px, _ = length(size)
+    if not px.endswith("px"):
+        raise Unprojectable("%s's size, %s, is not a length" % (source, size))
     if part == "weight":
         return {"value": weight, "status": "substituted", "reason": "shorthand-font-removed"}
     if part == "size":
@@ -790,9 +807,17 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError) as exc:
         print("error: %s: %s" % (base_path, exc), file=sys.stderr)
         return 2
+    current = None
+    if args.check:
+        try:
+            current = email_file(out.read_bytes().decode("utf-8-sig"))
+        except (OSError, ValueError) as exc:
+            print("error: %s: %s" % (out, exc), file=sys.stderr)
+            return 2
     try:
         found = read_tokens(sources)
-    except ConfigError as exc:
+        order = declared_order(sources, list(found.values()))   # a second read (CodeRabbit on #209)
+    except (ConfigError, OSError) as exc:
         print("error: %s" % exc, file=sys.stderr)
         return 2
     if found.problems:                      # a token left out would be taken out of the email file
@@ -801,10 +826,7 @@ def main(argv: list[str] | None = None) -> int:
         print("error: nothing written: the token files were not read whole (Codex on #209)",
               file=sys.stderr)
         return 2
-    values = found.values()
-    tiers = found.tiers()
-    projection = Projection(base, values, tiers, declared_order(sources, list(values)),
-                            group_ends(base_text))
+    projection = Projection(base, found.values(), found.tiers(), order, group_ends(base_text))
     projection.run()
     if projection.problems:
         for problem in projection.problems:
@@ -816,12 +838,7 @@ def main(argv: list[str] | None = None) -> int:
     text = render(doc, {n for n, _, end in projection.entries + projection.dropped if end})
 
     stale = None
-    if args.check:
-        try:
-            current = email_file(out.read_bytes().decode("utf-8-sig"))
-        except (OSError, ValueError) as exc:
-            print("error: %s: %s" % (out, exc), file=sys.stderr)
-            return 2
+    if current is not None:
         stale = sorted(n for section in ("tokens", "dropped")
                        for n in set(doc[section]) | set(current.get(section) or {})
                        if doc[section].get(n) != (current.get(section) or {}).get(n))

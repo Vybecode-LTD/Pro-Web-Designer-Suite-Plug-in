@@ -134,8 +134,11 @@ CASES = {
                                  ["--tokens", "tokens.css", "--base", "BAD", "--out", "o.json"], CODE, [
         ({"tokens": []}, "tokens"), ({"tokens": {"--a": "#fff"}}, "--a"),
         ({"tokens": {"--a": {"value": 5}}}, "--a"), ({"tokens": {}, "dropped": []}, "`dropped`")]),
-    "sync_email_tokens --check": ("email-template-system", "sync_email_tokens",
-                                  ["--tokens", "tokens.css", "--out", "BAD", "--check"], CODE, []),
+    "sync_email_tokens --check": ("email-template-system", "sync_email_tokens",          # a sound base, so
+                                  ["--tokens", "tokens.css", "--base",                   # only --check's read
+                                   str(SKILLS / "email-template-system" / "assets" / "email-tokens.json"),
+                                   "--out", "BAD", "--check"], CODE, [                   # sees BAD (CodeRabbit)
+        ({"tokens": {}, "dropped": []}, "`dropped`")]),
     "figma_audit": ("figma-variables-sync", "figma_audit", ["BAD"], CODE, []),
     "figma_audit --styles": ("figma-variables-sync", "figma_audit", ["export.tokens.json", "--styles", "BAD"], CODE, []),
     "figma_to_tokens": ("figma-variables-sync", "figma_to_tokens", ["BAD"], CODE, []),
