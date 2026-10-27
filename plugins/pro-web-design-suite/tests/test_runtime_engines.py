@@ -20,7 +20,9 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import unittest
+from unittest import mock
 
 from test_browser_runtime import MODULES
 from wds_support import NODE, REPO, TempDirTest, env, output, run_node
@@ -153,10 +155,13 @@ class CiKeepsTheEnginesPackages(unittest.TestCase):
         save_at, save = self.step("uses: actions/cache/save@")
         self.assertEqual([at, restore_at, install_at, name_at, save_at],
                          sorted([at, restore_at, install_at, name_at, save_at]))
-        for text in (restore, save):
-            self.assertRegex(text, rf"(?m)^\s+path: {re.escape(folder)}/\*\.deb$")
-        for text in (config, restore, save, self.steps[name_at]):
-            self.assertRegex(text, r"(?m)^\s+if: runner\.os == 'Linux'")
+        for step, text in (("restore", restore), ("save", save)):
+            with self.subTest(step=step):
+                self.assertRegex(text, rf"(?m)^\s+path: {re.escape(folder)}/\*\.deb$")
+        for step, text in (("config", config), ("restore", restore), ("save", save),
+                           ("name", self.steps[name_at])):
+            with self.subTest(step=step):
+                self.assertRegex(text, r"(?m)^\s+if: runner\.os == 'Linux'")
 
     def test_a_run_saves_only_when_the_packages_changed(self):
         _, restore = self.step("uses: actions/cache/restore@")
@@ -176,6 +181,36 @@ class CiKeepsTheEnginesPackages(unittest.TestCase):
         self.assertIn("--with-deps chromium firefox webkit", install)
         _, suite = self.step("name: The suite")
         self.assertIn("WDS_REQUIRE_ENGINES: ${{ runner.os == 'Linux' && '1' || '' }}", suite)
+
+
+class AnEngineThatWillNotStart(TempDirTest):
+    """What EachEngine does with the runner's `no usable` exit, with no
+    browser needed: a skip, unless WDS_REQUIRE_ENGINES is set, as CI sets it
+    on Linux (P61; CodeRabbit on #208)."""
+
+    runtime = EachEngine.runtime
+
+    def refused(self):
+        proc = subprocess.CompletedProcess([], 2, b"", b"a11y_runtime: no usable webkit build\n")
+        return mock.patch.object(sys.modules[__name__], "run_node", return_value=proc)
+
+    def test_it_fails_when_the_engines_are_required(self):
+        # A skip raised here would report this test as skipped, not failed.
+        with self.refused(), mock.patch.dict(os.environ, {"WDS_REQUIRE_ENGINES": "1"}):
+            try:
+                self.runtime("--engine", "webkit")
+            except unittest.SkipTest as skip:
+                self.fail(f"skipped while the engines are required: {skip}")
+            except self.failureException as failure:
+                self.assertIn("no usable webkit build", str(failure))
+            else:
+                self.fail("returned while the engine did not start")
+
+    def test_it_is_skipped_otherwise(self):
+        with self.refused(), mock.patch.dict(os.environ):
+            os.environ.pop("WDS_REQUIRE_ENGINES", None)
+            with self.assertRaises(unittest.SkipTest):
+                self.runtime("--engine", "webkit")
 
 
 if __name__ == "__main__":
