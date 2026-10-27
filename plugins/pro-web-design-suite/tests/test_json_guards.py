@@ -130,6 +130,12 @@ CASES = {
     "lint_email --tokens": ("email-template-system", "lint_email", ["--source", "--tokens", "BAD", "a.html"], CODE, [
         ({"tokens": []}, "tokens")]),
     "build_email --tokens": ("email-template-system", "build_email", ["a.html", "--tokens", "BAD"], CODE, []),
+    "sync_email_tokens --base": ("email-template-system", "sync_email_tokens",              # P62
+                                 ["--tokens", "tokens.css", "--base", "BAD", "--out", "o.json"], CODE, [
+        ({"tokens": []}, "tokens"), ({"tokens": {"--a": "#fff"}}, "--a"),
+        ({"tokens": {"--a": {"value": 5}}}, "--a"), ({"tokens": {}, "dropped": []}, "`dropped`")]),
+    "sync_email_tokens --check": ("email-template-system", "sync_email_tokens",
+                                  ["--tokens", "tokens.css", "--out", "BAD", "--check"], CODE, []),
     "figma_audit": ("figma-variables-sync", "figma_audit", ["BAD"], CODE, []),
     "figma_audit --styles": ("figma-variables-sync", "figma_audit", ["export.tokens.json", "--styles", "BAD"], CODE, []),
     "figma_to_tokens": ("figma-variables-sync", "figma_to_tokens", ["BAD"], CODE, []),

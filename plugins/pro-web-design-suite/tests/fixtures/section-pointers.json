@@ -1286,6 +1286,12 @@
  {
   "from": "email-template-system/SKILL.md",
   "to": "email-template-system/references/email-workflow.md",
+  "section": "12",
+  "heading": "A project's own token file"
+ },
+ {
+  "from": "email-template-system/SKILL.md",
+  "to": "email-template-system/references/email-workflow.md",
   "section": "2",
   "heading": "The build step"
  },
@@ -1342,6 +1348,12 @@
   "to": "email-template-system/references/email-client-matrix.md",
   "section": "8",
   "heading": "Dark mode"
+ },
+ {
+  "from": "email-template-system/assets/email-tokens.json",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "12",
+  "heading": "A project's own token file"
  },
  {
   "from": "email-template-system/assets/templates/product-announcement-rtl.html",
@@ -1486,6 +1498,12 @@
   "to": "email-template-system/references/email-workflow.md",
   "section": "3",
   "heading": "Preheader text"
+ },
+ {
+  "from": "email-template-system/scripts/sync_email_tokens.py",
+  "to": "email-template-system/references/email-workflow.md",
+  "section": "12",
+  "heading": "A project's own token file"
  },
  {
   "from": "figma-variables-sync/SKILL.md",
