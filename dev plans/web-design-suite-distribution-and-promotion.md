@@ -124,16 +124,18 @@ runs per skill and error rates. Updates need no resubmission: merge or move the 
 Read in the portal on 2026-10-27 (Review tab): in review, waiting for a reviewer, no request, "nothing you need
 to do". Lines are 4.0.1's (`4809e3f`, the distribution repository's root). For the owner to paste or adapt, not to send unasked.
 
-**`MCP_FORWARDS_CREDENTIAL_ENV`, six findings.** Each credential goes only to its own vendor's API, and only in a
-step the user runs. The hooks and the MCP server read no credential and make no network call: their only
-environment reads are `WDS_PYTHON`, `CLAUDE_PLUGIN_OPTION_DESIGN_HOOKS`, `WDS_MCP_TIMEOUT_MS`,
-`CLAUDE_PROJECT_DIR` and `PWD`. A sensitive `userConfig` value would reach only hooks and MCP servers, never a
+**`MCP_FORWARDS_CREDENTIAL_ENV`, six findings.** By default each credential goes only to its own vendor's API,
+and only in a step the user runs; `CRUX_API_URL`, the user's own setting, can point the CrUX key elsewhere (below).
+The hooks and the MCP server read no credential: their only environment reads are `WDS_PYTHON`,
+`CLAUDE_PLUGIN_OPTION_DESIGN_HOOKS`, `WDS_MCP_TIMEOUT_MS`, `CLAUDE_PROJECT_DIR` and `PWD`. The MCP server's five
+tools run static checks (`audit_design.py`, `a11y_static.py`, `perf_audit.py`, `check_roles.py`, `diff_system.py`),
+none of which opens a connection; the browser gates, which load the pages the user names, are not among them. A sensitive `userConfig` value would reach only hooks and MCP servers, never a
 skill's text or the Bash tool, so it can't carry these keys. The README's "What it runs, sends and stores" names both.
 
 | File | What it is |
 |---|---|
 | `skills/figma-variables-sync/SKILL.md:88-92` | A `curl` shown for the user to run: `FIGMA_TOKEN` to `api.figma.com`, Figma's own REST API. Nothing in the plugin runs it. |
-| `skills/perf-budget-gate/scripts/crux_check.py:65, 126-138` | A CLI for the user's own CI. It reads `CRUX_API_KEY` and sends it to `chromeuxreport.googleapis.com`, Google's Chrome UX Report API. The `CRUX_API_URL` override must be `https://`, or `http://` to this machine (line 131). |
+| `skills/perf-budget-gate/scripts/crux_check.py:65, 126-138` | A CLI for the user's own CI. It reads `CRUX_API_KEY` and by default sends it to `chromeuxreport.googleapis.com`, Google's Chrome UX Report API. The user's `CRUX_API_URL` can name any `https://` endpoint instead, or `http://` to this machine (line 131). |
 | `skills/content-model-to-ui/references/supabase-integration.md:409-410, 446-450` | Example code for the user's own app: Supabase's publishable key (public by design; row-level security protects the data) to the user's own Supabase project. |
 | `CHANGELOG-earlier.md:118, 693` | History that names `CRUX_API_KEY` and `CRUX_API_URL`. No code. |
 | `skills/web-design-studio/scripts/audit_design.py:1102, 2774` | A false match: `CANCELLED_TOKEN` is a regex for a cancelled CSS design-token value, and the URL is the SARIF report's tool URI, written to a local file and never fetched. |
@@ -151,7 +153,9 @@ image. 4.0.2 gives the icon its own name (P60, #207), which clears the match.
 - **`RUNTIME_FETCH_EXEC`, ten files:** `CHANGELOG.md` (history), `README.md` (the Figma `curl` "for you to run"),
   `skills/perf-budget-gate/references/diagnosis.md` (`curl -sIL` as a diagnostic), `a11y_runtime.mjs` and the six
   copies of `browser_common.mjs` (a comment, and an error message that tells the user `npx playwright install
-  ENGINE`). Nothing in the plugin runs any of them; the portal says text needs no change.
+  ENGINE`). No code runs the matched text: in the scripts it is a comment or a message printed for the user, and
+  the rest is documentation. The portal says text needs no change. (P64, #212, changed that message anyway, since
+  `npx` could install another Playwright's build.)
 - Hooks, a local MCP server, the local server's absence from claude.ai, and the icon passed as an image: information only.
 
 ---
