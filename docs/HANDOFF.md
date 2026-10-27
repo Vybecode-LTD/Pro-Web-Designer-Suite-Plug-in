@@ -16,7 +16,7 @@
 ## Next steps
 
 1. **The submission.** Its page in the portal (claude.ai/directory/manage → Submissions) shows the scan and the reviewer's decision; questions go to the contact email. The owner answers them.
-2. **Then the owner chooses:** releasing 4.0.2 (P60 alone; an `evals.yml` run gates the tag), one of the live check's six follow-ups (each gets an N-item and a P-row first), or Part B of the distribution plan (promotion). Nothing is open in the plan (0 open, 0 scheduled).
+2. **Then the owner chooses:** releasing 4.0.2 (P60 alone; an `evals.yml` run gates the tag), P61 (N55, CI's slow browser install), one of the live check's six follow-ups (each gets an N-item and a P-row first), or Part B of the distribution plan (promotion).
 3. **After any later release:** the directory checks `main` about every 6 hours; **Check for new commits** on the plugin's page scans at once. Every version is held for a reviewer while the credential findings stand.
 
 ## Open owner decisions
@@ -32,6 +32,7 @@
 
 - **The portal saves a draft at the first Validate** ("Draft saved in this tab"), and the icon is read then. Changing the icon later does not change the listing's.
 - **A release's upload can 404** right after the release is created. Rerun the failed job (`gh run rerun RUN --failed`); nothing is left behind.
+- **CI's browser install can crawl** (N55): 4 of 16 Ubuntu jobs on 10-25/26 spent 20 to 43 minutes in `playwright install --with-deps`, and two hit the 45-minute timeout as CANCELLED. Rerun the job (`gh run rerun RUN --failed`); P61 fixes it.
 - **A new flake:** `test_runtime_urls.EachPageHasItsTypesBudget` on Windows (the strict page recorded no LCP), on #204's merge; the rerun passed.
 - **The bundled CLI** isn't under `%APPDATA%\Claude\claude-code` from Git Bash any more; the 2.1.309 CLI in `222f4831-…`'s scratchpad (`cc/`) and `unset.txt` work. CI's evals run 2.1.293.
 - **landing-page-conversion's SKILL.md is 20,498 of its 20,500 bytes.** Any addition needs a cut.

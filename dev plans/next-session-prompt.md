@@ -575,7 +575,8 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`); #207 merged
 
 **Then ask the owner what comes next:**
 - **Release 4.0.2**, which carries P60 alone (the icon renamed, plugin.json's `icon`). Its CHANGELOG section is `4.0.2 — unreleased`: give it the date and set plugin.json's `version` in the release PR, run `evals.yml` (`tag=all`, the owner's OK, about $10) on its merge, then tag. After the tag, the directory scans the new version (or **Check for new commits**); it is held for a reviewer like every version while the credential findings stand.
-- **One of the live check's six follow-ups** (its report's last section). A follow-up gets an N-item and a P-row first (`check_execution_plan.py` must pass; it is at 0 open, 0 scheduled).
+- **P61, CI's browser install** (N55 in the completion plan has the evidence): bound `--with-deps` so a slow apt mirror can't time out the Ubuntu job. Small, and it saves a 25-minute rerun about one CI run in four.
+- **One of the live check's six follow-ups** (its report's last section). A follow-up gets an N-item and a P-row first (`check_execution_plan.py` must pass; it is at 1 open, 1 scheduled: N55 as P61).
 - **Part B** of the distribution plan: topics and a social preview for the distribution repository, then the listings and launch.
 
 ## 5. End of session (never skip)

@@ -22,7 +22,7 @@ The binding directives are in `C:\DEV\CLAUDE.md` and `C:\DEV\DIRECTIVES.md`, whi
 - **Evals:** 23 routing cases and 11 outcome cases. `evals.yml` runs both only by hand (`tag=all`), under one $14 ceiling; the dispatch before a release's tag gates it, and a tag starts no run (the owner, 2026-10-11). The outcome cases grant Write, Edit and the gate MCP tools, never Bash. In `claude-code-capabilities.md`, §1 is the evals page, §10 P29's choices, and §11 the sandboxing page and P30's choices.
 - **Active work:** none in flight. Next: the submission's review (the owner answers it; at 2026-10-26 it waited for a reviewer, with nothing to do), then the owner chooses among the live check's six follow-ups and releasing 4.0.2. P58 closed with no change (14 of 15 runs since #203). Start each session from `dev plans/next-session-prompt.md`. A session may run up to 750 thousand tokens, with no compacting.
 - **Renamed and redistributed (2026-10-19, #180 to #182):** Pro Web Design Suite, `pro-web-design-suite`. From 4.0.0, releases go to the distribution repository through `release.yml`'s `distribute` job; the repository, its write deploy key and `DIST_DEPLOY_KEY` are in place, and private vulnerability reporting is on (verified 2026-10-21); the first real push, 4.0.0's, ran on 2026-10-24.
-- **Open:** nothing (`check_execution_plan.py`: 0 open, 0 scheduled). P60 (#207, N54) is on `main` for 4.0.2, unreleased.
+- **Open:** N55, scheduled as P61: CI's browser install sometimes crawls past the Ubuntu job's timeout (`check_execution_plan.py`: 1 open, 1 scheduled). P60 (#207, N54) is on `main` for 4.0.2, unreleased.
 
 ## Commands
 
