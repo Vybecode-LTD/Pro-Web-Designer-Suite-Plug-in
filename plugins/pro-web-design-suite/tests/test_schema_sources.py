@@ -622,5 +622,6 @@ class TheDefaultSortReadsTheRecordsOwnTime(SchemaSources):
                                 "  title text not null,\n  due_at timestamptz not null,\n"
                                 "  expiry_date date not null,\n  valid_until timestamptz not null,\n"
                                 "  expires_on date not null,\n  imported_at timestamptz not null,\n"
+                                "  migrated_at timestamptz not null,\n"
                                 "  done_at timestamptz,\n  opens time not null\n);\n")
         self.assertEqual(("id", "asc", None), self.sort("tasks.sql"))

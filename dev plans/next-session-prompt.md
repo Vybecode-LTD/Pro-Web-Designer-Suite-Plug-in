@@ -1,11 +1,11 @@
 # Start here: the next session
 
-**Written 2026-10-26**, at the end of the directory session:
-- **`v4.0.1` is tagged** on `84f4a4f` (#205's merge) and distributed: the distribution repository at `4809e3f` holds the 230 files of `build.py --tree`, byte for byte. 4.0.1 adds the listing icon, which the directory read once, at the first save.
-- **The owner submitted it to Anthropic's directory** on 2026-10-26. At the session's end it was in review, waiting for a reviewer, with nothing for the owner to do.
-- **P58 closed with no change** (14 of 15 runs since #203), and **#207 (P60, N54)** cleared the icon's directory hold on `main`, for 4.0.2 (unreleased).
+**Written 2026-10-27**, at the end of the follow-ups session:
+- **Three fixes for 4.0.2 merged:** P61 (#208, CI caches the browser engines' packages), P62 (#209, `sync_email_tokens.py` projects a project's `tokens.css` into its `email-tokens.json`, and the skill's own email file follows the starter again) and P63 (#210, the scaffold's default sort reads a table's own time and ends with the primary key). P60 (#207) was already there.
+- **4.0.1 is still in the directory's review** (submitted 2026-10-26). The owner holds 4.0.2 until the reviewer decides.
+- `check_execution_plan.py`: 0 open, 0 scheduled.
 
-**Next** (§4): follow the submission's review with the owner, then the owner's choice: release 4.0.2, a live-check follow-up, or Part B. `docs/HANDOFF.md` has the state and warnings.
+**Next** (§4): the submission's review with the owner, then the owner's choice: release 4.0.2, one of the live check's four remaining follow-ups, or Part B. `docs/HANDOFF.md` has the state and warnings.
 
 Read §0 to §2 as you need them, then §3 and §4. They tell you how to orient and what the session's work is.
 
@@ -563,21 +563,34 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
 
 ## 3. First: the state of `main`
 
-Read `main`'s latest CI run (`gh run list --branch main --limit 1`); #207 merged with CI green on its head. If it is red, read the failing test first. A known flake (`docs/HANDOFF.md`'s Warnings) that touches nothing recent is rerun with `gh run rerun RUN --failed`. Anything else is fixed in a PR of its own. Then:
+Read `main`'s latest CI run (`gh run list --branch main --limit 1`): #210's merge (`5f09493`) was in progress at the end; #208's and #209's passed. If it is red, read the failing test first. A known flake (`docs/HANDOFF.md`'s Warnings) that touches nothing recent is rerun with `gh run rerun RUN --failed`. Anything else is fixed in a PR of its own. Then:
 - No PR should be open (`gh pr list --state open`), and `v4.0.1` is the latest tag (`git tag -l "v4*"`).
 - The distribution repository's `main` is `4809e3f` (`gh api repos/Vybecode-LTD/pro-web-design-suite/commits/main --jq .sha`). Nobody commits to it by hand.
-- The 2026-10-26 session's scratchpad (`afb57f74-…`) holds `evals/run6.sh` (the local eval command, 6 runs, `--keep-temp`), the eval JSON, `icon/` (the two drafts and `render.mjs`, which screenshots an SVG at 1024 px with `tooling/main`'s Playwright). The 2.1.309 CLI and `unset.txt` are still in `222f4831-…`'s scratchpad (`cc/`). Reinstall the CLI if Storage Sense has emptied it, **with a `package.json` in the folder first**.
+- The 2026-10-27 session's scratchpad (`a1ddda11-…`) holds `p62/` and `p63/` (the PR bodies, the migration and comparison scripts). The 2.1.309 CLI and `unset.txt` are in `222f4831-…`'s scratchpad (`cc/`). Reinstall the CLI if Storage Sense has emptied it, **with a `package.json` in the folder first**.
 - Read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
 
 ## 4. After 4.0.1
 
-**First, the submission.** Ask the owner what the portal shows (claude.ai/directory/manage → Submissions → Pro Web Design Suite), or, with their OK, read it read-only in their Chrome: the scan, any reviewer's request under the Review tab. Help them answer it; **never submit, publish or withdraw anything yourself, and ask before any step in the portal**. With Claude in Chrome, the owner has let you fill a step after asking; keep the secrets (a webhook's) and the final buttons theirs. The directory checks `main` about every 6 hours; after a release, **Check for new commits** scans at once.
+**First, the submission.** Ask the owner what the portal shows (claude.ai/directory/manage → Submissions → Pro Web Design Suite), or, with their OK, read it read-only in their Chrome: the scan, and any reviewer's request under the Review tab. Help them answer it.
+- **Never submit, publish or withdraw anything yourself, and ask before any step in the portal.**
+- With Claude in Chrome, the owner has let you fill a step after asking. Keep the secrets (a webhook's) and the final buttons theirs.
+- The directory checks `main` about every 6 hours; after a release, **Check for new commits** scans at once.
 
 **Then ask the owner what comes next:**
-- **Release 4.0.2**, which carries P60 alone (the icon renamed, plugin.json's `icon`). Its CHANGELOG section is `4.0.2 — unreleased`: give it the date and set plugin.json's `version` in the release PR, run `evals.yml` (`tag=all`, the owner's OK, about $10) on its merge, then tag. After the tag, the directory scans the new version (or **Check for new commits**); it is held for a reviewer like every version while the credential findings stand.
-- **P61, CI's browser install** (N55 in the completion plan has the evidence): bound `--with-deps` so a slow apt mirror can't time out the Ubuntu job. Small, and it saves a 25-minute rerun about one CI run in four.
-- **One of the live check's six follow-ups** (its report's last section). A follow-up gets an N-item and a P-row first (`check_execution_plan.py` must pass; it is at 1 open, 1 scheduled: N55 as P61).
-- **Part B** of the distribution plan: topics and a social preview for the distribution repository, then the listings and launch.
+- **Release 4.0.2**, only when the owner says so. It carries P60 to P63 (CHANGELOG `4.0.2 — unreleased`).
+  1. In the release PR, give the section its date and set plugin.json's `version`.
+  2. Run `evals.yml` (`tag=all`, about $10, with the owner's OK) on its merge.
+  3. Then tag.
+
+  After the tag, the directory scans the new version, and it is held for a reviewer while the credential findings stand.
+- **One of the live check's four remaining follow-ups** (its report's last section):
+  - the hover check on a JavaScript tooltip (read the check's scope first);
+  - `contrast-under-overlay` on webawesome.com;
+  - migrating onto a codebase's own token names;
+  - sending email through a real provider, which needs the owner's key.
+
+  A follow-up gets an N-item (next free: N58) and a P-row (next free: P64) first, and `check_execution_plan.py` must pass.
+- **Part B** of the distribution plan: topics and a social preview for the distribution repository, then the listings and the launch.
 
 ## 5. End of session (never skip)
 
