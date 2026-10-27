@@ -9,15 +9,25 @@ Chromium stay Chromium's, and the report says which did not run. WebKit's
 Tab skips a link with no tabindex, as Safari does by default, so its tab
 order expects none. An engine whose build is not installed (or, on Windows,
 whose unsigned build the system will not start) is skipped.
+
+CI installs the engines on Linux, where one that will not start fails. Their
+system packages come from the Actions cache when it has them (P61, N55).
 """
 from __future__ import annotations
 
 import json
 import os
+import re
+import shutil
+import subprocess
+import sys
 import unittest
+from unittest import mock
 
 from test_browser_runtime import MODULES
-from wds_support import NODE, TempDirTest, output, run_node
+from wds_support import NODE, REPO, TempDirTest, env, output, run_node
+
+GIT = shutil.which("git")
 
 PAGE = ("<!doctype html><html lang=en><head><meta charset=utf-8><title>Engines</title></head>"
         "<body><main><h1>Engines</h1>"
@@ -101,6 +111,106 @@ class TheEngineIsNamed(TempDirTest):
                         cwd=self.tmp)
         self.assertEqual(2, proc.returncode, output(proc))
         self.assertIn("chromium, firefox, webkit", output(proc))
+
+
+def ci_workflow() -> str | None:
+    """ci.yml as the revision under test has it: at WDS_PLUGIN_REV when
+    tools/fail_before.py names one, else in the checkout around the tests."""
+    rev = os.environ.get("WDS_PLUGIN_REV")
+    if rev:
+        if not (REPO and GIT):
+            return None
+        proc = subprocess.run([GIT, "show", f"{rev}:.github/workflows/ci.yml"], cwd=REPO,
+                              capture_output=True, env=env())
+        return proc.stdout.decode("utf-8") if proc.returncode == 0 else None
+    path = REPO / ".github" / "workflows" / "ci.yml" if REPO else None
+    return path.read_text(encoding="utf-8") if path and path.is_file() else None
+
+
+class CiKeepsTheEnginesPackages(unittest.TestCase):
+    """P61 (N55): the engines' system libraries are about 120 MB of .deb
+    files, and the runners' apt mirror sometimes sent them at 50 kB/s, so two
+    Ubuntu jobs ran into the 45-minute timeout. apt keeps them in a folder the
+    Actions cache restores before the install and saves after it, under a key
+    named by the files, so a run downloads only the packages that changed."""
+
+    @classmethod
+    def setUpClass(cls):
+        text = ci_workflow()
+        if text is None:
+            raise unittest.SkipTest("the repository's workflows are not here")
+        cls.steps = text.split("\n  validate:\n", 1)[0].split("\n      - ")
+
+    def step(self, needle):
+        found = [i for i, s in enumerate(self.steps) if needle in s]
+        self.assertEqual(1, len(found), f"one step of the suite job holds {needle!r}")
+        return found[0], self.steps[found[0]]
+
+    def test_apt_keeps_its_packages_where_the_cache_restores_and_saves_them(self):
+        at, config = self.step("Dir::Cache::Archives")
+        folder = re.search(r'Dir::Cache::Archives "([^"]+?)/?"', config).group(1)
+        restore_at, restore = self.step("uses: actions/cache/restore@")
+        install_at, _ = self.step("playwright install")
+        name_at, _ = self.step("apt-get autoclean")
+        save_at, save = self.step("uses: actions/cache/save@")
+        self.assertEqual([at, restore_at, install_at, name_at, save_at],
+                         sorted([at, restore_at, install_at, name_at, save_at]))
+        for step, text in (("restore", restore), ("save", save)):
+            with self.subTest(step=step):
+                self.assertRegex(text, rf"(?m)^\s+path: {re.escape(folder)}/\*\.deb$")
+        for step, text in (("config", config), ("restore", restore), ("save", save),
+                           ("name", self.steps[name_at])):
+            with self.subTest(step=step):
+                self.assertRegex(text, r"(?m)^\s+if: runner\.os == 'Linux'")
+
+    def test_a_run_saves_only_when_the_packages_changed(self):
+        _, restore = self.step("uses: actions/cache/restore@")
+        name_at, name = self.step("apt-get autoclean")
+        _, save = self.step("uses: actions/cache/save@")
+        restore_id = re.search(r"(?m)^\s+id: (\S+)$", restore).group(1)
+        name_id = re.search(r"(?m)^\s+id: (\S+)$", name).group(1)
+        key = re.search(r"(?m)^\s+key: (.+)$", restore).group(1)
+        self.assertRegex(restore, rf"(?m)^\s+restore-keys: {re.escape(key)}-$")
+        self.assertRegex(name, r'echo "key=\$WDS_DEBS-\$\(')
+        self.assertIn(f"key: ${{{{ steps.{name_id}.outputs.key }}}}", save)
+        self.assertIn(f"steps.{name_id}.outputs.key != steps.{restore_id}.outputs.cache-matched-key",
+                      save)
+
+    def test_an_engine_that_will_not_start_still_fails_on_linux(self):
+        _, install = self.step("playwright install")
+        self.assertIn("--with-deps chromium firefox webkit", install)
+        _, suite = self.step("name: The suite")
+        self.assertIn("WDS_REQUIRE_ENGINES: ${{ runner.os == 'Linux' && '1' || '' }}", suite)
+
+
+class AnEngineThatWillNotStart(TempDirTest):
+    """What EachEngine does with the runner's `no usable` exit, with no
+    browser needed: a skip, unless WDS_REQUIRE_ENGINES is set, as CI sets it
+    on Linux (P61; CodeRabbit on #208)."""
+
+    runtime = EachEngine.runtime
+
+    def refused(self):
+        proc = subprocess.CompletedProcess([], 2, b"", b"a11y_runtime: no usable webkit build\n")
+        return mock.patch.object(sys.modules[__name__], "run_node", return_value=proc)
+
+    def test_it_fails_when_the_engines_are_required(self):
+        # A skip raised here would report this test as skipped, not failed.
+        with self.refused(), mock.patch.dict(os.environ, {"WDS_REQUIRE_ENGINES": "1"}):
+            try:
+                self.runtime("--engine", "webkit")
+            except unittest.SkipTest as skip:
+                self.fail(f"skipped while the engines are required: {skip}")
+            except self.failureException as failure:
+                self.assertIn("no usable webkit build", str(failure))
+            else:
+                self.fail("returned while the engine did not start")
+
+    def test_it_is_skipped_otherwise(self):
+        with self.refused(), mock.patch.dict(os.environ):
+            os.environ.pop("WDS_REQUIRE_ENGINES", None)
+            with self.assertRaises(unittest.SkipTest):
+                self.runtime("--engine", "webkit")
 
 
 if __name__ == "__main__":
