@@ -331,7 +331,13 @@ class Answers:
         direction = direction.lower()
         if direction not in ("asc", "desc"):
             direction = "asc"
-        return {"column": column, "direction": direction}
+        sort = {"column": column, "direction": direction}
+        # The primary key last, so equal times page without a skip or a
+        # repeat (supabase-integration.md; CodeRabbit on #210).
+        pk = table["primary_key"][0] if table.get("primary_key") else None
+        if pk and pk != column:
+            sort["tiebreak"] = pk
+        return sort
 
 
 # ---------------------------------------------------------------------------
@@ -1464,10 +1470,12 @@ def emit_fields(table: dict[str, Any], model: dict[str, Any],
                f"{json.dumps(list_cols)} as const;")
     out.append("")
     sort = ans.default_sort(table)
-    out.append("/** The designed order (the `.default_sort` answer). The list takes")
-    out.append(" *  its rows as props, so the query that fetches them applies this:")
-    out.append(f" *  `.order('{sort['column']}', {{ ascending: "
-               f"{'true' if sort['direction'] == 'asc' else 'false'} }})`. */")
+    ascending = "true" if sort["direction"] == "asc" else "false"
+    order = "".join(f".order('{c}', {{ ascending: {ascending} }})"
+                    for c in (sort["column"], sort.get("tiebreak")) if c)
+    out.append("/** The designed order (the `.default_sort` answer), the primary key")
+    out.append(" *  last. The list takes its rows as props, so the query that fetches")
+    out.append(f" *  them applies this: `{order}`. */")
     out.append(f"export const {camel(name)}DefaultSort = "
                f"{json.dumps(sort)} as const;")
     return "\n".join(out) + "\n"

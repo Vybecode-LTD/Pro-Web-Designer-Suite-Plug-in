@@ -199,12 +199,16 @@ class TheAnswersReachTheOutput(Answered):
 
     def test_the_default_sort_is_a_constant_the_query_applies(self):
         fields = self.orders(self.src, "orders.fields.ts")
-        self.assertIn('export const ordersDefaultSort = {"column": "placed_at", "direction": "desc"} as const;',
+        # The primary key is the tiebreak, in the constant and the query
+        # (CodeRabbit on #210): equal times would page with a skip or a repeat.
+        self.assertIn('export const ordersDefaultSort = '
+                      '{"column": "placed_at", "direction": "desc", "tiebreak": "id"} as const;', fields)
+        self.assertIn(".order('placed_at', { ascending: false }).order('id', { ascending: false })",
                       fields)
-        self.assertIn(".order('placed_at', { ascending: false })", fields)
         model = json.loads(read(self.tmp / "model.json"))
         proposed = next(t for t in model["tables"] if t["name"] == "orders")["screens"]["default_sort"]
-        self.assertIn(json.dumps({"column": proposed["column"], "direction": proposed["direction"]}),
+        self.assertIn(json.dumps({"column": proposed["column"], "direction": proposed["direction"],
+                                  "tiebreak": proposed["tiebreak"]}),
                       self.orders(self.plain, "orders.fields.ts"))
 
 
