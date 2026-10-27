@@ -577,8 +577,9 @@ class TheDefaultSortReadsTheRecordsOwnTime(SchemaSources):
 
     HEAD = 'datasource db {\n  provider = "postgresql"\n  url = env("DATABASE_URL")\n}\n'
 
-    def sort(self, source):
-        table = self.introspect(source)["tables"][0]
+    def sort(self, source, table=None):
+        tables = self.introspect(source)["tables"]
+        table = next((t for t in tables if t["name"] == table), tables[0])
         proposed = table["screens"]["default_sort"]
         return proposed["column"], proposed["direction"], proposed["tiebreak"]
 
@@ -597,13 +598,18 @@ class TheDefaultSortReadsTheRecordsOwnTime(SchemaSources):
                                       "  withdrawal_date date not null\n);\n")
         self.write("rosters.sql", "create table rosters (\n  id bigint primary key,\n"
                                   "  holidays date[] not null,\n  starts_on date not null\n);\n")
+        # A foreign key gets no UI temporal facts; its type still says date.
+        self.write("shifts.sql", "create table days (\n  day date primary key\n);\n"
+                                 "create table shifts (\n  id bigint primary key,\n"
+                                 "  day date not null references days(day)\n);\n")
         for source, want in (("orders.sql", ("placed_at", "desc", "id")),
                              ("orders.prisma", ("placedAt", "desc", "id")),
                              ("entries.sql", ("entry_date", "desc", "id")),
                              ("withdrawals.sql", ("withdrawal_date", "desc", "id")),
-                             ("rosters.sql", ("starts_on", "desc", "id"))):
+                             ("rosters.sql", ("starts_on", "desc", "id")),
+                             ("shifts.sql", ("day", "desc", "id"))):
             with self.subTest(source=source):
-                self.assertEqual(want, self.sort(source))
+                self.assertEqual(want, self.sort(source, table="shifts"))
 
     def test_created_at_still_comes_first(self):
         self.write("orders.sql", "create table orders (\n  id uuid primary key,\n"

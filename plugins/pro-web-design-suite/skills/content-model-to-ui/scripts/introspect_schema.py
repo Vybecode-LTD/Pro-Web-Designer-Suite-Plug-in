@@ -166,6 +166,7 @@ TEXTUAL_TYPES = {"text", "character varying", "character", "citext"}
 TEMPORAL_TYPES = {"date", "timestamp with time zone",
                   "timestamp without time zone",
                   "time with time zone", "time without time zone"}
+TIMES_OF_DAY = {"time with time zone", "time without time zone"}
 
 # ---------------------------------------------------------------------------
 # Name signals — the semantic layer the type system cannot carry.
@@ -2535,17 +2536,20 @@ def _default_sort(table: Table) -> dict[str, Any]:
                     "tiebreak": table.primary_key[0] if table.primary_key else None}
     # The record's own time (`orders.placed_at`, N57): the first NOT NULL
     # date or instant. A nullable one is an event that may never happen, and
-    # an array of dates is no one time (CodeRabbit on #210).
+    # an array of dates is no one time. The type decides as well as the UI
+    # facts, which a foreign key or a generated column never gets (CodeRabbit
+    # on #210).
     for c in table.columns:
-        if c.nullable or c.is_array or (c.ui.get("temporal") or {}).get("granularity") \
-                not in ("date", "instant"):
+        granularity = (c.ui.get("temporal") or {}).get("granularity")
+        if c.nullable or c.is_array or (c.type not in TEMPORAL_TYPES - TIMES_OF_DAY
+                                        and granularity not in ("date", "instant")):
             continue
         if PLUMBING_TIME.search(c.name) or DEADLINE_TIME.search(c.name):
             continue
         return {"column": c.name, "direction": "desc",
                 "signal": f"`{c.name}` is the record's own time (a NOT NULL date "
                           "or timestamp), so newest first",
-                "tiebreak": table.primary_key[0] if table.primary_key else None}
+                "tiebreak": next((k for k in table.primary_key[:1] if k != c.name), None)}
     return {"column": table.primary_key[0] if table.primary_key else None,
             "direction": "asc",
             "signal": "no ordering column and no NOT NULL time of its own — "
