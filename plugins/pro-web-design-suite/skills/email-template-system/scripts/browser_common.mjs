@@ -39,11 +39,16 @@ export const FREEZE_ANIMATIONS_CSS = `
   }
 `;
 
+// The folder of the `playwright` package loadPlaywright loaded, for installHint.
+let playwrightPackage = null;
+
 // `example` is how the calling script is run, for the error message.
 export async function loadPlaywright(die, example) {
   const tried = [];
   try {
-    return await import('playwright');
+    const loaded = await import('playwright');
+    playwrightPackage = resolvedPackage();
+    return loaded;
   } catch (err) { tried.push(`import 'playwright' — ${err.code || err.message}`); }
 
   const roots = [];
@@ -55,7 +60,9 @@ export async function loadPlaywright(die, example) {
       const p = path.join(root, 'playwright', entry);
       if (!fs.existsSync(p)) continue;
       try {
-        return await import(pathToFileURL(p).href);
+        const loaded = await import(pathToFileURL(p).href);
+        playwrightPackage = path.resolve(root, 'playwright');
+        return loaded;
       } catch (err) { tried.push(`${p} — ${err.message}`); }
     }
   }
@@ -67,6 +74,43 @@ export async function loadPlaywright(die, example) {
     `      NODE_PATH="$(npm root -g)" ${example}\n` +
     '  Tried:\n    ' + tried.join('\n    ')
   );
+}
+
+// Where the bare import found `playwright`: beside the scripts or above them.
+function resolvedPackage() {
+  try {
+    return path.dirname(fileURLToPath(import.meta.resolve('playwright/package.json')));
+  } catch { return null; }
+}
+
+// The command that installs `engine` for the Playwright loadPlaywright loaded:
+// that package's own CLI, by path. `npx playwright install` runs whichever
+// Playwright the current folder resolves, and with none there downloads the
+// newest from the registry, whose builds the loaded one may not launch (N58).
+export function installHint(engine) {
+  const cli = playwrightPackage && packageCli(playwrightPackage);
+  if (!cli) return `playwright install ${engine}`;
+  const arg = shellArgument(cli);
+  return arg ? `node ${arg} install ${engine}` : `install ${engine} with the CLI at ${cli}`;
+}
+
+// `p` as one argument that each shell it may be typed into reads literally, or
+// null when there is none. Elsewhere, single quotes, each ' written '\''. On
+// Windows, cmd and PowerShell share only double quotes, inside which cmd still
+// expands % and ! and PowerShell $ and ` (Codex on #212).
+export function shellArgument(p, platform = process.platform) {
+  if (platform !== 'win32') return `'${p.replaceAll("'", "'\\''")}'`;
+  return /[$`%!]/.test(p) ? null : `"${p}"`;
+}
+
+function packageCli(dir) {
+  let bin = 'cli.js';
+  try {
+    const declared = readJsonFile(path.join(dir, 'package.json')).bin;
+    bin = (typeof declared === 'string' ? declared : declared?.playwright) || bin;
+  } catch { /* no package.json: Playwright's own layout */ }
+  const cli = path.join(dir, bin);
+  return fs.existsSync(cli) ? cli : null;
 }
 
 // npm is npm.cmd on Windows, which execFile cannot start without a shell;
@@ -118,7 +162,7 @@ export async function launchBrowser(chromium, explicit, options) {
 
 // The engines a gate can run in (GT-B9). Chromium is found as launchBrowser
 // finds it. Firefox and WebKit are Playwright's own builds, the ones the
-// locked Playwright was built for (`npx playwright install firefox webkit`),
+// loaded Playwright was built for (installHint says how to install them),
 // unless a path is given; `options` (Chromium's switches) are Chromium's.
 export const ENGINES = ['chromium', 'firefox', 'webkit'];
 
@@ -129,7 +173,7 @@ export async function launchEngine(playwright, engine, explicit, options) {
   try { pinned = type.executablePath(); } catch { /* not resolvable here */ }
   const label = explicit || `Playwright's own ${engine}`;
   if (!explicit && !(pinned && fs.existsSync(pinned))) {
-    return { tried: [`${label}: not installed (npx playwright install ${engine})`] };
+    return { tried: [`${label}: not installed (${installHint(engine)})`] };
   }
   try {
     return { browser: await type.launch({ executablePath: explicit || undefined }),

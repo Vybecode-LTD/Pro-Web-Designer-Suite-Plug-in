@@ -8,7 +8,8 @@ added the listing icon (N53, #205), which the directory reads once, at the first
 4.0.1 (`4809e3f`) from the portal on 2026-10-26: tracking `main`, **scheduled check only** (every version
 is held for a reviewer by the credential finding below, so a webhook's minutes buy nothing; **Check for new
 commits** scans at once), auto-publish on. The portal's validation: passed, 13 warnings, 7 policy holds
-(the six credential findings, and N54's image hold). It waits for its first scan and a reviewer. Part B is not started.
+(the six credential findings, and N54's image hold). The scan passed on 2026-10-26; on 2026-10-27 it was still
+waiting for a reviewer, with no request (*If the reviewer asks*, below, has the answers ready). Part B is not started.
 
 ## Where things stand
 
@@ -117,6 +118,45 @@ runs per skill and error rates. Updates need no resubmission: merge or move the 
 - `claude plugin validate --strict` on a checkout of the distribution repository, with the bundled CLI (CI validates `plugins/pro-web-design-suite` on every PR).
 - Load it on each surface you want listed: Claude Code, Cowork, and an upload to claude.ai (Customize → Plugins → Upload).
 - The eval suite has the "with and without the plugin" comparison the checklist suggests; quote its result in the README.
+
+### If the reviewer asks: 4.0.1's findings, one by one
+
+Read in the portal on 2026-10-27 (Review tab): in review, waiting for a reviewer, no request, "nothing you need
+to do". Lines are 4.0.1's (`4809e3f`, the distribution repository's root). For the owner to paste or adapt, not to send unasked.
+
+**`MCP_FORWARDS_CREDENTIAL_ENV`, six findings.** By default each credential goes only to its own vendor's API,
+and only in a step the user runs; `CRUX_API_URL`, the user's own setting, can point the CrUX key elsewhere (below).
+The hooks and the MCP server read no credential: their only environment reads are `WDS_PYTHON`,
+`CLAUDE_PLUGIN_OPTION_DESIGN_HOOKS`, `WDS_MCP_TIMEOUT_MS`, `CLAUDE_PROJECT_DIR` and `PWD`. The MCP server's five
+tools run static checks (`audit_design.py`, `a11y_static.py`, `perf_audit.py`, `check_roles.py`, `diff_system.py`),
+none of which opens a connection; the browser gates, which load the pages the user names, are not among them. A sensitive `userConfig` value would reach only hooks and MCP servers, never a
+skill's text or the Bash tool, so it can't carry these keys. The README's "What it runs, sends and stores" names both.
+
+| File | What it is |
+|---|---|
+| `skills/figma-variables-sync/SKILL.md:88-92` | A `curl` shown for the user to run: `FIGMA_TOKEN` to `api.figma.com`, Figma's own REST API. Nothing in the plugin runs it. |
+| `skills/perf-budget-gate/scripts/crux_check.py:65, 126-138` | A CLI for the user's own CI. It reads `CRUX_API_KEY` and by default sends it to `chromeuxreport.googleapis.com`, Google's Chrome UX Report API. The user's `CRUX_API_URL` can name any `https://` endpoint instead, or `http://` to this machine (line 131). |
+| `skills/content-model-to-ui/references/supabase-integration.md:409-410, 446-450` | Example code for the user's own app: Supabase's publishable key (public by design; row-level security protects the data) to the user's own Supabase project. |
+| `CHANGELOG-earlier.md:118, 693` | History that names `CRUX_API_KEY` and `CRUX_API_URL`. No code. |
+| `skills/web-design-studio/scripts/audit_design.py:1102, 2774` | A false match: `CANCELLED_TOKEN` is a regex for a cancelled CSS design-token value, and the URL is the SARIF report's tool URI, written to a local file and never fetched. |
+| `.claude-plugin/plugin.json` | The plugin-level summary. Its only `userConfig` is the boolean `design_hooks`. |
+
+**"An image the plugin's code could run": `skills/web-design-studio/references/layout-composition.md`.** Line 748's
+code span says `label + icon`, which matched 4.0.1's `.claude-plugin/icon.png` by its stem. Nothing runs the
+image. 4.0.2 gives the icon its own name (P60, #207), which clears the match.
+
+**The warnings are not holds, and none needs a change:**
+- **`UNKNOWN_KEY` on `documentationUrl`, `privacyPolicyUrl` and `supportUrl`.** The manifest reference, re-read on
+  2026-10-27, says the opposite: "Anthropic's directory reads the `icon`, `documentationUrl`, `supportUrl`,
+  `privacyPolicyUrl`, and `termsOfServiceUrl` fields from `plugin.json` for your plugin's listing" (§Directory
+  listing fields). Keep them; the scanner is behind its own docs.
+- **`RUNTIME_FETCH_EXEC`, ten files:** `CHANGELOG.md` (history), `README.md` (the Figma `curl` "for you to run"),
+  `skills/perf-budget-gate/references/diagnosis.md` (`curl -sIL` as a diagnostic), `a11y_runtime.mjs` and the six
+  copies of `browser_common.mjs` (a comment, and an error message that tells the user `npx playwright install
+  ENGINE`). No code runs the matched text: in the scripts it is a comment or a message printed for the user, and
+  the rest is documentation. The portal says text needs no change. (P64, #212, changed that message anyway, since
+  `npx` could install another Playwright's build.)
+- Hooks, a local MCP server, the local server's absence from claude.ai, and the icon passed as an image: information only.
 
 ---
 
