@@ -56,6 +56,31 @@ jobs:
           npm ci --prefix tooling/main
           npm ci --prefix tooling/tailwind-v3
 
+      # Linux only: `--with-deps` below has apt install the engines' system
+      # libraries, about 120 MB of .deb files, and the runners' apt mirror
+      # sometimes sends them at 50 kB/s: two jobs ran into the timeout that way
+      # (N55, P61). apt keeps the files in a folder of their own, which the
+      # cache carries from run to run, so it downloads only what changed.
+      - name: Keep apt's packages in a folder the cache carries
+        if: runner.os == 'Linux'
+        run: |
+          sudo install -d -o "$(id -un)" /var/cache/wds-debs
+          echo 'Dir::Cache::Archives "/var/cache/wds-debs/";' | sudo tee /etc/apt/apt.conf.d/99wds-debs
+          echo "WDS_DEBS=debs-$ImageOS-$(uname -m)" >> "$GITHUB_ENV"
+
+      # Every save's key ends in a hash of its files, so the bare name never
+      # matches and the newest save for this OS image is restored. apt checks
+      # only the size of a file it finds there: the cache is trusted as the
+      # npm cache is, and only runs on main write what other branches read.
+      - name: Restore the packages
+        id: debs-restored
+        if: runner.os == 'Linux'
+        uses: actions/cache/restore@v6
+        with:
+          path: /var/cache/wds-debs/*.deb
+          key: ${{ env.WDS_DEBS }}
+          restore-keys: ${{ env.WDS_DEBS }}-
+
       # Linux only: the headless shell the browser tests use, Firefox and
       # WebKit for the runtime gate's other engines (P35, GT-B9; the owner's
       # OK, 2026-10-19), and the preinstalled Postgres for
@@ -65,6 +90,25 @@ jobs:
         run: |
           (cd tooling/main && npx playwright install --only-shell --with-deps chromium firefox webkit)
           ls -d /usr/lib/postgresql/*/bin | sort -V | tail -n 1 >> "$GITHUB_PATH"
+
+      # autoclean drops the files no index offers any more, the versions an
+      # update replaced. The key names the files that are left, so a run saves
+      # only when they differ from the ones it restored.
+      - name: Name the packages apt kept
+        id: debs
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get autoclean -qq
+          names=$(find /var/cache/wds-debs -maxdepth 1 -name '*.deb' -printf '%f\n' | LC_ALL=C sort)
+          echo "$(echo "$names" | grep -c . || true) packages kept"
+          echo "key=$WDS_DEBS-$(echo "$names" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Save them for the next run
+        if: runner.os == 'Linux' && steps.debs.outputs.key != steps.debs-restored.outputs.cache-matched-key
+        uses: actions/cache/save@v6
+        with:
+          path: /var/cache/wds-debs/*.deb
+          key: ${{ steps.debs.outputs.key }}
 
       # On Linux, Firefox and WebKit are installed above: an engine that will
       # not start fails test_runtime_engines there instead of skipping it.

@@ -20,6 +20,14 @@
   4.0.1, with the controls in `test_an_image_named_outside_an_image_link_is_held` and
   `ReleaseBuild.test_plugin_json_names_the_listing_icon`.
 
+### CI (development repository)
+
+- The Linux jobs keep the browser engines' system packages, about 120 MB, in the Actions cache,
+  so a run downloads only the ones that changed. The Ubuntu mirror sometimes sent them at
+  50 kB/s, and two jobs ran out of time. An engine that won't start still fails the suite on
+  Linux. Regression test: `test_runtime_engines.CiKeepsTheEnginesPackages`, two of whose three
+  tests fail on 4.0.1.
+
 ## 4.0.1 — 2026-10-25
 
 An icon for the plugin's listing in Anthropic's directory, before it is submitted there. No
