@@ -41,8 +41,9 @@ kept, defaults to `--out` when that exists, else the skill's own
 
 Exit codes: 0 written, or up to date · 1 written, with a measured pair under
 4.5:1; with --check, the file is not the projection · 2 nothing written: bad
-invocation, an unreadable file, a value with no email form, or a reference to
-a token the projection lacks.
+invocation, an unreadable file, token files not read whole (a resolver's
+missing source), a value with no email form, or a reference to a token the
+projection lacks.
 """
 
 from __future__ import annotations
@@ -328,8 +329,20 @@ def font_stack(value: str) -> str:
 
 
 def shorthand(value: str) -> tuple[str, str, str]:
-    """A resolved `font` shorthand's weight, size and line height."""
-    words = split_top(value, " ")
+    """A resolved `font` shorthand's weight, size and line height. The slash
+    may have spaces round it (`2.75rem / 1.15`; Codex on #209)."""
+    tight, depth, after = [], 0, False
+    for ch in value:
+        depth += {"(": 1, ")": -1}.get(ch, 0)
+        if ch == "/" and depth == 0:
+            while tight and tight[-1].isspace():
+                tight.pop()
+            tight.append(ch)
+            after = True
+        elif not (after and ch.isspace()):
+            tight.append(ch)
+            after = False
+    words = split_top("".join(tight), " ")
     at = next((i for i, w in enumerate(words) if len(split_top(w, "/")) == 2), None)
     if at is None:
         raise Unprojectable("%s is not a font shorthand with a line height" % value)
@@ -781,6 +794,12 @@ def main(argv: list[str] | None = None) -> int:
         found = read_tokens(sources)
     except ConfigError as exc:
         print("error: %s" % exc, file=sys.stderr)
+        return 2
+    if found.problems:                      # a token left out would be taken out of the email file
+        for problem in found.problems:
+            print("error: %s" % problem, file=sys.stderr)
+        print("error: nothing written: the token files were not read whole (Codex on #209)",
+              file=sys.stderr)
         return 2
     values = found.values()
     tiers = found.tiers()

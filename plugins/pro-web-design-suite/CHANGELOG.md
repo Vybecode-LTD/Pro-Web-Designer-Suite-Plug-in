@@ -11,7 +11,7 @@
   and projects it again when its source moves: OKLCH to hex, rem to px, `calc()` at density 1, a web
   font to a websafe stack. A token the file has never seen takes its family's treatment. Every
   contrast note is measured again, and a pair under 4.5:1 fails; `--check` fails when the file is
-  stale. See `references/email-workflow.md` §12. Regression tests: `test_email_tokens`, whose 19
+  stale. See `references/email-workflow.md` §12. Regression tests: `test_email_tokens`, whose 21
   tests fail on 4.0.1.
 
 ### Changed

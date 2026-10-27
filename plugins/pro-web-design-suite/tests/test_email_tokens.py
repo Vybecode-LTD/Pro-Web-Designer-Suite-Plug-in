@@ -201,6 +201,27 @@ class AProjectsOwnTokens(Sync):
         self.assertEqual(1, proc.returncode, output(proc))
         self.assertRegex(output(proc), r"STALE .*--accent-500")
 
+    def test_a_slash_with_spaces_round_it_reads_the_same(self):
+        """Codex on #209: `size / line` split into three words and failed."""
+        css = starter_css().replace("var(--text-4xl)/var(--leading-tight)", "var(--text-4xl) / var(--leading-tight)")
+        proc, doc, report = self.project(css)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual("32px", doc["tokens"]["--type-h1-size"]["value"])
+        self.assertEqual([], report["again"])
+
+    def test_token_files_not_read_whole_write_nothing(self):
+        """Codex on #209: a resolver's missing source was read as no tokens,
+        and every entry was taken out of the email file."""
+        out = self.tmp / "emails" / "email-tokens.json"
+        self.assertEqual(0, self.project(starter_css())[0].returncode)
+        before = out.read_bytes()
+        resolver = self.write("app.resolver.json", json.dumps({"version": "2025.10", "resolutionOrder": [
+            {"type": "set", "name": "s", "sources": [{"$ref": "gone.tokens.json"}]}]}))
+        proc = self.sync("--tokens", resolver, "--out", out)
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("gone.tokens.json", output(proc))
+        self.assertEqual(before, out.read_bytes())
+
     def test_it_will_not_write_over_a_token_file(self):
         tokens = self.write("styles/tokens.css", starter_css())
         proc = self.sync("--tokens", tokens, "--out", tokens)
