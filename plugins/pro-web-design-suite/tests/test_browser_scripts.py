@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -85,7 +86,15 @@ export default { chromium, firefox, webkit };
 STUB_PACKAGE = json.dumps({"name": "playwright", "version": "0.0.0-stub", "bin": {"playwright": "cli.js"},
                            "exports": {".": "./index.mjs", "./package.json": "./package.json"}})
 STUB_CLI = "console.log('STUB-CLI ' + process.argv.slice(2).join(' '));\n"
-INSTALL_HINT = re.compile(r'node "([^"]+)" install (\w+)')
+# A printed `node PATH install ENGINE`, inside its parentheses.
+INSTALL_HINT = re.compile(r"\((node .+? install (\w+))\)")
+
+
+def cli_path(command):
+    """The PATH of a printed `node PATH install ENGINE`, as this platform's shell reads it."""
+    if sys.platform == "win32":
+        return shlex.split(command, posix=False)[1].strip('"')
+    return shlex.split(command)[1]
 
 SCRIPTS = {
     "snapshot_matrix": ("component-state-matrix", "snapshot_matrix.mjs"),
@@ -281,13 +290,12 @@ class TheInstallHintRunsTheLoadedPlaywright(TempDirTest):
     def assert_runs_the_loaded_cli(self, text, package):
         hints = INSTALL_HINT.findall(text)
         self.assertEqual(len(hints), 2, text)   # the engine tried, and the advice
-        for cli, engine in hints:
+        for command, engine in hints:
             self.assertEqual(engine, "firefox")
-            self.assertTrue(os.path.samefile(cli, package / "cli.js"), cli)
-        command = INSTALL_HINT.search(text).group(0)
-        ran = subprocess.run(command, shell=True, cwd=self.elsewhere, env=env(),
+            self.assertTrue(os.path.samefile(cli_path(command), package / "cli.js"), command)
+        ran = subprocess.run(hints[0][0], shell=True, cwd=self.elsewhere, env=env(),
                              capture_output=True, timeout=60)
-        self.assertEqual(output(ran).strip(), "STUB-CLI install firefox", command)
+        self.assertEqual(output(ran).strip(), "STUB-CLI install firefox", hints[0][0])
 
     def test_a_playwright_on_node_path(self):
         package = self.plant("global/node_modules")
@@ -308,6 +316,41 @@ class TheInstallHintRunsTheLoadedPlaywright(TempDirTest):
         text = self.refused(SKILLS / "a11y-audit-runner" / "scripts" / "a11y_runtime.mjs",
                             node_path=str(self.tmp / "global" / "node_modules"))
         self.assertEqual(text.count("(playwright install firefox)"), 2, text)
+
+    def test_a_path_a_shell_would_expand_is_never_printed_as_one_it_expands(self):
+        """Codex on #212: inside double quotes, POSIX shells and PowerShell
+        expand `$`, and cmd `%`. Elsewhere the path is single-quoted and runs as
+        printed; on Windows, where cmd and PowerShell share no quoting that keeps
+        both literal, the hint names the path on its own."""
+        node_modules = "$HOME 'and' %PATH%/node_modules"
+        package = self.plant(node_modules)
+        text = self.refused(SKILLS / "a11y-audit-runner" / "scripts" / "a11y_runtime.mjs",
+                            node_path=str(self.tmp / node_modules))
+        if sys.platform != "win32":
+            self.assert_runs_the_loaded_cli(text, package)
+            return
+        named = re.findall(r"\(install firefox with the CLI at (.+?)\)", text)
+        self.assertEqual(len(named), 2, text)
+        for cli in named:
+            self.assertTrue(os.path.samefile(cli, package / "cli.js"), cli)
+
+    def test_each_platform_quotes_the_path_so_its_shells_read_it_literally(self):
+        cases = [
+            ["/srv/app/node_modules/playwright/cli.js", "linux", "'/srv/app/node_modules/playwright/cli.js'"],
+            ["/srv/it's $HOME/cli.js", "darwin", "'/srv/it'\\''s $HOME/cli.js'"],
+            ["C:\\Program Files\\app & co\\cli.js", "win32", '"C:\\Program Files\\app & co\\cli.js"'],
+            ["C:\\$work\\cli.js", "win32", None],
+            ["C:\\100%\\cli.js", "win32", None],
+            ["C:\\hey!\\cli.js", "win32", None],
+            ["C:\\tick`\\cli.js", "win32", None],
+        ]
+        script = ("import { shellArgument } from " + json.dumps((PLUGIN / "shared" / "browser_common.mjs").as_uri()) +
+                  ";\nconsole.log(JSON.stringify(JSON.parse(process.argv[1]).map(([p, os]) => shellArgument(p, os))));")
+        proc = subprocess.run([NODE, "--input-type=module", "-e", script,
+                               json.dumps([c[:2] for c in cases])],
+                              cwd=self.tmp, env=env(), capture_output=True, timeout=60)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertEqual(json.loads(proc.stdout), [c[2] for c in cases])
 
 
 @unittest.skipUnless(NODE, "node is not installed")

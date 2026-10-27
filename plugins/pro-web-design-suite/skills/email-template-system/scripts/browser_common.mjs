@@ -89,7 +89,18 @@ function resolvedPackage() {
 // newest from the registry, whose builds the loaded one may not launch (N58).
 export function installHint(engine) {
   const cli = playwrightPackage && packageCli(playwrightPackage);
-  return cli ? `node "${cli}" install ${engine}` : `playwright install ${engine}`;
+  if (!cli) return `playwright install ${engine}`;
+  const arg = shellArgument(cli);
+  return arg ? `node ${arg} install ${engine}` : `install ${engine} with the CLI at ${cli}`;
+}
+
+// `p` as one argument that each shell it may be typed into reads literally, or
+// null when there is none. Elsewhere, single quotes, each ' written '\''. On
+// Windows, cmd and PowerShell share only double quotes, inside which cmd still
+// expands % and ! and PowerShell $ and ` (Codex on #212).
+export function shellArgument(p, platform = process.platform) {
+  if (platform !== 'win32') return `'${p.replaceAll("'", "'\\''")}'`;
+  return /[$`%!]/.test(p) ? null : `"${p}"`;
 }
 
 function packageCli(dir) {

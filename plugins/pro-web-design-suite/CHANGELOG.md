@@ -49,9 +49,10 @@
   npx runs whichever Playwright the current folder resolves, or downloads the newest from the
   registry when there is none. For a gate that loaded Playwright from `NODE_PATH`, npm's global
   folder or beside its own scripts, that was not the Playwright whose build it launches. The error
-  now names the loaded package's own CLI, by path: `node "…/playwright/cli.js" install firefox`.
-  Regression tests: `test_browser_scripts.TheInstallHintRunsTheLoadedPlaywright`, whose three tests
-  fail on 4.0.1.
+  now names the loaded package's own CLI, by path: `node '…/playwright/cli.js' install firefox`,
+  in double quotes on Windows. A Windows path holding `$`, `` ` ``, `%` or `!`, which cmd or
+  PowerShell would expand inside double quotes, is named on its own instead. Regression tests:
+  `test_browser_scripts.TheInstallHintRunsTheLoadedPlaywright`, whose five tests fail on 4.0.1.
 
 ### Release builder (development repository)
 
