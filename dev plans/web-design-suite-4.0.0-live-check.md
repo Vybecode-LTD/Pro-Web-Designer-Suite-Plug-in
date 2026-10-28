@@ -47,12 +47,12 @@ The owner approved 15 sessions under a $10 cap. Each was one `claude -p` session
 
 ## Follow-ups, for the owner to schedule
 
-- **An email theme from the project's `tokens.css`** (S13, S14): the skill calls `email-tokens.json` the projection of `tokens.css`, but no script projects a project's own file; both sessions wrote one.
+- **An email theme from the project's `tokens.css`** (S13, S14): the skill calls `email-tokens.json` the projection of `tokens.css`, but no script projects a project's own file; both sessions wrote one. *Done for 4.0.2 in N56 (#209): `sync_email_tokens.py`.*
 - **The hover check and a JavaScript tooltip** (S9): `hover` raised nothing on Bootstrap's tooltip, which vanishes when the pointer moves onto it and ignores Esc. Read the check's scope first.
 - **`contrast-under-overlay` on webawesome.com** (S8): 21 to 147 a page; check the overlay detection against the page. *Done for 4.0.2 in N59 (#213): none were real.*
 - **webawesome.com's home page at 390x844 never finishes** (found 2026-10-27, while checking N59): the run hangs after `browser:`, on 4.0.1 too and with every check skipped; the button and docs pages finish at both sizes. S8 passed at 390 on 2026-10-23, so the page may have changed.
 - **A codebase with its own token names** (S5): the migration maps onto the contract's names; the skill could say how to map onto an existing layer.
-- **The scaffold's default sort** (S10): `placed_at` is not read as the time to sort by.
+- **The scaffold's default sort** (S10): `placed_at` is not read as the time to sort by. *Done for 4.0.2 in N57 (#210).*
 - **A provider send** (S13, S14): the sessions sent through a local SMTP sink; a send through a real provider needs the owner's key.
 
 ## The evals (2026-10-23)
