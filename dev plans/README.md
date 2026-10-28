@@ -2,7 +2,7 @@
 
 The review, plans and reports behind pro-web-design-suite. The plugin itself is in `plugins/pro-web-design-suite`.
 
-**Start with the [completion runbook](web-design-suite-completion-runbook.md)**, §2 (the owner's decisions), §3 (the owner's steps), then §4 (the packages, in order). The [execution plan](web-design-suite-execution-plan.md) is the schedule's record (its §9 is the history) and the [completion plan](web-design-suite-completion-plan.md) says what each earlier item needed; the runbook's packages get their rows in both.
+**Start with the [completion runbook](web-design-suite-completion-runbook.md)**, §4 (the packages, in order) and §5 (the protocol); its §7 holds the owner's answers to the twelve decisions (2026-10-28) and the ticks (P66 and P67 done), and §3 the owner's own steps. The [execution plan](web-design-suite-execution-plan.md) is the schedule's record (its §9 is the history) and the [completion plan](web-design-suite-completion-plan.md) says what each item needed; the runbook's packages have their rows in both (N60 to N83, P66 to P89).
 
 Every release is also a tagged commit, from `v3.0.0` on. So `git diff v3.1.0 v3.2.0 -- plugins` shows what a patch below holds.
 

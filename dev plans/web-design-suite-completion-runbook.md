@@ -209,8 +209,8 @@ Update this table in each PR. The finding ids each package closes are in §4; ti
 
 | Package | Closes (count) | N-item | P-row | PR | Merged | Fail-before table in the PR |
 |---|---|---|---|---|---|---|
-| P66 · `main` green, timing tests honest | 7 | N60 | P66 | #216 | | 4 fixed (all failures, no errors), 10 controls |
-| P67 · the process gates | 11 | N61 | P67 | #217 | | 11 fixed on `v4.0.1` and 8 outside the plugin by hand (all failures, no errors), 4 controls; TEST-10's second half to P76 |
+| P66 · `main` green, timing tests honest | 7 | N60 | P66 | #216 | [x] 2026-10-28, `9c1a528` | 4 fixed (all failures, no errors), 10 controls |
+| P67 · the process gates | 11 | N61 | P67 | #217 | [x] 2026-10-28, `e6c214c` | 11 fixed on `v4.0.1` and 8 outside the plugin by hand (all failures, no errors), 4 controls; TEST-10's second half to P76 |
 | P68 · the maintainer tools | 13 | N62 | P68 | | | |
 | P69 · the plans and the CLI path | 23 | N63 | P69 | | | |
 | P70 · one overwrite guard per script | 4 | N64 | P70 | | | |

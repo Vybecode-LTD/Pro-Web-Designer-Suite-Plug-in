@@ -8,38 +8,36 @@
 
 ## 2. Rules that override the defaults
 
-`CLAUDE.md`'s Gotchas and Conventions bind. Beyond them: one session at a time, in this checkout, no subagents or worktrees unless the owner asks; up to 750K tokens, no compacting, usage reported after each PR; Claude merges on CI green, threads resolved, GitHub clean, with a merge commit (CodeRabbit is not a gate); push once when the work is done; every fix gets a test seen failing on `v4.0.1` through `tools/fail_before.py`; a gate change goes into `design-rules.json` first. **Never:** act in the directory portal (only the owner does); commit to the distribution repository by hand; grep `tooling/`; write into OneDrive; "fix" the four old ids; run a paid eval without the owner's OK. Full list with sources: the runbook's §5; `next-session-prompt-2026-10-27-full.md` §0.
+`CLAUDE.md`'s Gotchas and Conventions bind, and the runbook's §5 protocol. One session, this checkout, no subagents or worktrees unless asked; up to 750K tokens, no compacting, usage reported after each PR; Claude merges on CI green, threads resolved, GitHub clean, with a merge commit (CodeRabbit is not a gate); push once; every fix gets a test seen failing on `v4.0.1` (`tools/fail_before.py`); a test that needs a browser skips through `wds_support.no_browser`. **Never:** act in the directory portal; commit to the distribution repository by hand; grep `tooling/`; write into OneDrive; "fix" the four old ids; run a paid eval without the owner's OK; delete a repository.
 
 ## 3. The state, verified 2026-10-28
 
-`docs/HANDOFF.md` has it. In short: `main` at `8441ff0`, **red** on macOS 3.14 in `test_runtime_urls.EachPageHasItsTypesBudget`; PR #215 (this session's docs) open or merged; `v4.0.1` the latest tag, in the directory's review, and installed at user scope on the owner's machine (3.6.0 removed); `check_execution_plan.py` 0 open; next free ids N60, P66, PR #216. Check it:
+`docs/HANDOFF.md` has it. In short: `main` at `e6c214c` (#217); #218 (this session's docs) open or merged; P66 (#216) and P67 (#217) done; the owner's twelve decisions in the runbook's §7 (one release, 4.1.0); the owner's four GitHub settings **not yet done**; `check_execution_plan.py` 22 open; next free ids N84, P90, PR #219. Check it:
 
 ```bash
-cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && gh run list --branch main --limit 1 && python -B "dev plans/check_execution_plan.py"
+cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && gh run list --branch main --limit 2 && python -B "dev plans/check_execution_plan.py"
 ```
 
 ## 4. The work, in order
 
-**Read `dev plans/web-design-suite-completion-runbook.md`: §1 (what done means), §2 (the decisions), §3 (the owner's steps), §4 (the packages).** Then:
+Read `dev plans/web-design-suite-completion-runbook.md` §4 (the packages) and §5 (the protocol); §7 has the answers and the ticks.
 
-1. Ask the owner the twelve decisions in §2 and record the answers in §7. Ask for the four GitHub settings in §3 (items 1 to 4).
-2. Add the packages' rows: N60 to N83 in the completion plan, P66 to P89 in the execution plan; `check_execution_plan.py` must pass.
-3. Do **P66** (`main` green, the timing tests honest), then **P67**, **P68**, **P69**, each by the runbook's §5, each its own PR. Stage 0 first: nothing after it is trustworthy without the ruleset, the release gate and an honest fail-before table.
-4. Then stage 1 (P70 to P73: the four critical findings and the theme-classification class), and stages 2 to 8 in the runbook's order.
-
-The findings each package closes are in `dev plans/web-design-suite-audit-2026-10-28/` (one file per pass); the summary is `web-design-suite-audit-2026-10-28.md`.
+1. Check the owner's GitHub settings with the runbook's §6 ruleset command and `gh api repos/Vybecode-LTD/REPO` (`security_and_analysis`, `topics`); if not done, give the owner the steps (`docs/HANDOFF.md`, Open owner steps) and go on.
+2. **P68, the maintainer tools**: the row in the runbook's §4 and N62 in the completion plan; the findings are in `dev plans/web-design-suite-audit-2026-10-28/test-suite.md` (TEST-2 to TEST-4, TEST-13 to TEST-19) and `ops-ci-release-evals-distribution.md` (OPS-7, OPS-8). Its own PR.
+3. **P69, the plans and the CLI path** (N63; the PLAN findings in `plan-what-is-left.md`), splitting the 125 KB prompt per Q7.
+4. Then stage 1 (P70 to P73), and on in the runbook's order.
 
 ## 5. Owner decisions still open
 
-The runbook's Q1 to Q12. Ask; do not decide. Q1 (one release or two) and Q7 (split the full prompt) change the order.
+None of the runbook's twelve. Ask before: a paid eval run (P89, stage 5), the release tag (stage 5), a large download, anything in the portal.
 
 ## 6. Environment and tooling
 
-Python 3.14 and `uv` for 3.9; Node 26; the pinned tools in `tooling/` (`npm ci --prefix tooling/main` once); the desktop app's CLI path is in `CLAUDE.md`. Traps: `python -B`; the Bash tool unescapes `\\` in heredocs (write Python with the Edit tool); look at the CPU before a long `check.py`; stop a hung run with `TaskStop`; the four timing flakes in the handoff's Warnings until P66.
+Python 3.14 and `uv` for 3.9; Node 26; `tooling/main` has Playwright's Chromium 153.0.8010.12; the desktop app's CLI path is in `CLAUDE.md`. Traps: `python -B`; the Bash tool unescapes `\\` in heredocs and `sed` mangles backslashes (write Python and regexes with the Edit tool); `python -X utf8` for non-ASCII output; run tests from `tests/`; look at the CPU before a long `check.py`; `TaskStop` a hung run; `rm` only on literal paths.
 
 ## 7. Evidence, memory, promotion candidates
 
-The audit's pass files (above); the memory index at `C:\Users\vybec\.claude\projects\C--DEV-Pro-Web-Designer-Suite-Plug-in\memory\MEMORY.md`. For `knowledge/`: the runbook's Q11, plus a parallel read-only audit by area with one findings file per pass, and `python -I` ignoring `PYTHONIOENCODING` (use `-X utf8`).
+The audit's pass files (above); the memory index at `C:\Users\vybec\.claude\projects\C--DEV-Pro-Web-Designer-Suite-Plug-in\memory\MEMORY.md`. For `knowledge/`: CI job names that include a matrix make `step()` needles ambiguous once a second step shares a word, so a CI test anchors on an `id:` or a unique command; a GitHub concurrency group holds one pending run, so a group per commit is the only way never to drop a push run.
 
 ## 8. End of session
 
