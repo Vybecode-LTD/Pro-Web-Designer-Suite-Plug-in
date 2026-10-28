@@ -23,8 +23,9 @@ Regressions covered:
   suite's own hover (4%) and pressed (8%) overlays, so deleting :hover or
   :active passed every cell.
 - N59 (P65): the overlay probe asked about a point clamped to the viewport, so
-  text below the fold took whatever sat at its edge as an overlay, and a text
-  the probe could not hit took everything beneath it.
+  text below the fold took whatever sat at its edge as an overlay, a text the
+  probe could not hit took everything beneath it, and a text clipped from its
+  point took whatever was painted there.
 """
 from __future__ import annotations
 
@@ -159,6 +160,78 @@ class RuntimeInABrowser(TempDirTest):
             ".under{position:absolute;inset:0;background:#fff;z-index:0}"
             ".t{position:relative;z-index:1;pointer-events:none}")
         self.assertEqual(set(), rules)
+
+    def component(self, body, shadow, mode):
+        """The page's `x-c` holds `shadow` in an open or closed shadow root."""
+        return self.contrast_findings(
+            body + "<script>customElements.define('x-c', class extends HTMLElement {"
+            "constructor() { super(); this.attachShadow({mode: '" + mode + "'}).innerHTML = "
+            + json.dumps(shadow) + "; } });</script>",
+            ".wrap{position:relative}.t{color:#595959}")
+
+    SCRIM = ".s{position:absolute;inset:0;pointer-events:none;background:rgba(255,255,255,.72)}"
+
+    def test_a_scrim_inside_another_component_is_over_the_text(self):
+        """P65, on #213 (Codex): the overlay probe asked the document what was at
+        the text, and the document names a component's insides by its host. A
+        scrim in the shadow root of a component laid over the text came back as
+        that transparent host, and the text passed."""
+        for mode in ("open", "closed"):
+            with self.subTest(mode=mode):
+                rules = {f["rule"] for f in self.component(
+                    "<div class=wrap><p class=t>This paragraph sits under a 72% white scrim.</p>"
+                    "<x-c></x-c></div>",
+                    "<style>:host{position:absolute;inset:0}" + self.SCRIM + "</style><div class=s></div>",
+                    mode)}
+                self.assertEqual({"contrast-under-overlay"}, rules)
+
+    def test_a_components_scrim_over_its_slotted_text_is_over_it(self):
+        """P65, on #213: asked of the document, a component's own scrim over its
+        slotted text is its host, listed after the text, so it did not count."""
+        for mode in ("open", "closed"):
+            with self.subTest(mode=mode):
+                rules = {f["rule"] for f in self.component(
+                    "<x-c><p class=t>This paragraph is slotted under a 72% white scrim.</p></x-c>",
+                    "<style>:host{display:block;position:relative}" + self.SCRIM + "</style>"
+                    "<slot></slot><div class=s></div>", mode)}
+                self.assertEqual({"contrast-under-overlay"}, rules)
+
+    def test_a_components_panel_behind_its_slotted_text_is_not_over_it(self):
+        """The control: the component's own white panel holds the slot, so it is
+        behind the text, and the text measures against it."""
+        for mode in ("open", "closed"):
+            with self.subTest(mode=mode):
+                rules = {f["rule"] for f in self.component(
+                    "<x-c><p>This dark paragraph is slotted onto a white panel.</p></x-c>",
+                    "<style>.p{position:relative;background:#fff;padding:8px}</style>"
+                    "<div class=p><slot></slot></div>", mode)}
+                self.assertEqual(set(), rules)
+
+    def test_a_text_clipped_from_its_point_has_nothing_over_it(self):
+        """P65, on #213: a text clipped out of sight, as in a collapsed code
+        block, is not at its own point, though the page that holds it is. The
+        translucent code element painted there was counted over it, since it
+        came before the page in the hit list: webawesome.com's button page
+        reported its code samples' `wa-button` tokens at 3.46:1."""
+        rules = self.contrast_rules(
+            "<div class=clip><p class=t>This paragraph is clipped out of sight.</p></div>"
+            "<p class=n><code class=c>A wide block of translucent code over the clipped line.</code></p>",
+            ".clip{height:4px;overflow:hidden}.t,.n{margin:0}.t{color:#767676}"
+            ".c{display:block;margin:0;background:rgba(128,128,128,.25)}")
+        self.assertNotIn("contrast-under-overlay", rules)
+
+    def test_a_scrim_over_text_scrolled_out_of_its_container_is_found(self):
+        """P65, on #213 (CodeRabbit): the probe scrolled the page only, so a text
+        scrolled out of view inside its own scroll container stayed clipped at
+        its point, and the scrim over that container was not counted."""
+        rules = self.contrast_rules(
+            "<div class=wrap><div class=box><div class=gap></div>"
+            "<p class=t>This paragraph is scrolled out of its box, under a scrim.</p></div>"
+            "<div class=s></div></div>",
+            ".wrap{position:relative}.box{height:60px;overflow:auto}.gap{height:300px}"
+            ".t{color:#595959}"
+            ".s{position:absolute;inset:0;pointer-events:none;background:rgba(255,255,255,.72)}")
+        self.assertEqual({"contrast-under-overlay"}, rules)
 
     def test_a_spinner_is_not_a_focus_ring(self):
         """GT-A14 (a), fixed with GT-C13: the freeze shortened animations

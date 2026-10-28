@@ -589,9 +589,25 @@ const HELPERS = () => {
     return v;
   };
 
+  // Every element at a point, topmost first, through every shadow root: a
+  // host's own insides come before it.
+  const stackAt = (x, y) => {
+    const out = [];
+    const visit = (root) => {
+      for (const e of root.elementsFromPoint(x, y)) {
+        if (e.getRootNode() !== root || out.includes(e)) continue;
+        const inner = deep.shadowOf(e);
+        if (inner && inner.elementsFromPoint) visit(inner);
+        out.push(e);
+      }
+    };
+    visit(document);
+    return out;
+  };
+
   window.__a11y = { FOCUSABLE, cssPath, visible, expectedTabbables, describeActive,
                     hiddenFromAT, openModal, takeTabCancelled, exposeClosed,
-                    rootCounts, activePath, deep };
+                    rootCounts, activePath, deep, stackAt };
 };
 
 // DEEP_DOM, then HELPERS, as one init script: Playwright does not promise the
@@ -1457,8 +1473,17 @@ const CONTRAST_FN = () => {
   // only for a point in the viewport, and one clamped to its edge asked about
   // whatever sat there: an opaque card at the fold measured every text below
   // it at 1:1 (N59). A text the page cannot scroll into view is not probed.
+  // A scroll container between the text and the page brings the line to its
+  // own middle first: scrolled out of a code block or a list, the text is
+  // clipped at its point, and what is over the container went uncounted
+  // (CodeRabbit on #213). A box the reader cannot scroll (hidden, clip) is
+  // left as it is. Each scroll position moved is put back after the pass.
   const scroller = document.scrollingElement || document.documentElement;
-  const home = [scroller.scrollLeft, scroller.scrollTop];
+  const scrolled = new Map();
+  const scrollBy = (box, dx, dy) => {
+    if (!scrolled.has(box)) scrolled.set(box, [box.scrollLeft, box.scrollTop]);
+    box.scrollTo({ left: box.scrollLeft + dx, top: box.scrollTop + dy, behavior: 'instant' });
+  };
   const inView = ([x, y]) => x >= 0 && y >= 0 &&
     x < document.documentElement.clientWidth && y < document.documentElement.clientHeight;
   const probeAt = (node, el) => {
@@ -1469,10 +1494,21 @@ const CONTRAST_FN = () => {
         el.getBoundingClientRect();
       return [line.left + line.width / 2, line.top + line.height / 2];
     };
+    for (let m = deep.parentOf(el); m && m !== scroller; m = deep.parentOf(m)) {
+      if (m.nodeType !== 1) continue;
+      const cs = getComputedStyle(m);
+      const x = /auto|scroll/.test(cs.overflowX) && m.scrollWidth > m.clientWidth;
+      const y = /auto|scroll/.test(cs.overflowY) && m.scrollHeight > m.clientHeight;
+      if (!x && !y) continue;
+      const [px, py] = point();
+      const b = m.getBoundingClientRect();
+      scrollBy(m, x ? px - (b.left + m.clientLeft + m.clientWidth / 2) : 0,
+               y ? py - (b.top + m.clientTop + m.clientHeight / 2) : 0);
+    }
     let p = point();
     if (inView(p)) return p;
-    scroller.scrollLeft += p[0] - document.documentElement.clientWidth / 2;
-    scroller.scrollTop += p[1] - document.documentElement.clientHeight / 2;
+    scrollBy(scroller, p[0] - document.documentElement.clientWidth / 2,
+             p[1] - document.documentElement.clientHeight / 2);
     p = point();
     return inView(p) ? p : null;
   };
@@ -1534,19 +1570,43 @@ const CONTRAST_FN = () => {
     const at = probeAt(node, el);
     if (at) {
       const [cx, cy] = at;
-      // Asked of the text's own root, so a hit inside it is not its host.
-      // Only what is listed before the text's own box is painted over it. A
-      // box that takes no pointer events is lifted too: unlisted, everything
-      // at the point counted, the elements beneath it among them (N59).
-      const scope = el.getRootNode().elementsFromPoint ? el.getRootNode() : document;
-      const hitsAt = () => { try { return scope.elementsFromPoint(cx, cy); } catch { return []; } };
+      // Every element at the point, through every shadow root: asked of one
+      // root, a scrim inside another component is that component's host, and
+      // a transparent host paints nothing (Codex on #213). A text box that
+      // takes no pointer events is lifted too: unlisted, everything at the
+      // point counted, the elements beneath it among them (N59).
+      const hitsAt = () => { try { return window.__a11y.stackAt(cx, cy); } catch { return []; } };
       let hits = hitsAt();
       if (!hits.includes(el) && el.style && getComputedStyle(el).pointerEvents === 'none') {
         lift(el);
         hits = hitsAt();
       }
-      for (const h of hits.slice(0, Math.max(hits.indexOf(el), 0))) {
-        if (deep.contains(h, el)) continue;
+      // An element is painted over the text when its own root lists it before
+      // the text, which that root sees as the text or a host whose shadow tree
+      // holds it: so a component's scrim over its slotted text counts, and its
+      // panel behind that text does not. An ancestor is no stand-in for the
+      // text: a text clipped from its point, as in a collapsed code block, has
+      // nothing there over it, though the page that holds it is there.
+      const holds = (x) => {
+        if (x === el) return true;
+        for (let r = el.getRootNode(); r && r.host; r = r.host.getRootNode()) if (r.host === x) return true;
+        return false;
+      };
+      const lists = new Map();
+      const above = (h) => {
+        const root = h.getRootNode();
+        if (!lists.has(root)) {
+          let list = [];
+          try { list = root.elementsFromPoint(cx, cy); } catch { /* not a root that answers */ }
+          lists.set(root, list);
+        }
+        const list = lists.get(root);
+        const i = list.indexOf(h);
+        const j = list.findIndex(holds);
+        return i >= 0 && j >= 0 && i < j;
+      };
+      for (const h of hits.includes(el) ? hits : []) {
+        if (deep.contains(h, el) || !above(h)) continue;
         const hc = parse(getComputedStyle(h).backgroundColor);
         if (!hc || hc.a <= 0) continue;
         // Its opacity, and that of each ancestor it does not share with the
@@ -1587,7 +1647,9 @@ const CONTRAST_FN = () => {
         ? deep.closest(el, '[data-cell-id]').getAttribute('data-cell-id') : null,
     });
   }
-  [scroller.scrollLeft, scroller.scrollTop] = home;
+  for (const [box, [left, top]] of [...scrolled].reverse()) {
+    box.scrollTo({ left, top, behavior: 'instant' });
+  }
   for (const [el, value, priority] of lifted.reverse()) {
     if (value) el.style.setProperty('pointer-events', value, priority);
     else el.style.removeProperty('pointer-events');
@@ -2142,21 +2204,7 @@ const OBSCURED_FN = () => {
     return q.right > L && q.left < R && q.bottom > T && q.top < B;
   });
   if (!covers.length) return { sel, hidden: 0, by: [] };
-  // Every element at a point, topmost first, through every shadow root: a
-  // host's own insides come before it.
-  const stackAt = (x, y) => {
-    const out = [];
-    const visit = (root) => {
-      for (const e of root.elementsFromPoint(x, y)) {
-        if (e.getRootNode() !== root || out.includes(e)) continue;
-        const inner = deep.shadowOf(e);
-        if (inner && inner.elementsFromPoint) visit(inner);
-        out.push(e);
-      }
-    };
-    visit(document);
-    return out;
-  };
+  const stackAt = a.stackAt;
   // Alpha from an alpha component only: an opaque colour computes as
   // `rgb(r, g, b)`, and black's last channel is no alpha (CodeRabbit on #179).
   const clear = (c) => c === 'transparent' ||

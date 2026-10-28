@@ -58,18 +58,24 @@
   every one at 1.00:1; 78 on the home page and 195 on the button page, none of them real:
   - The point it asked about was the middle of the text's box, clamped to the viewport, so for text
     below the fold it asked about whatever sat at the viewport's edge, and an opaque card there was
-    composited over every text below it. A text off screen is now scrolled into view, and the
-    point is the middle of its first line.
+    composited over every text below it. A text off screen is now scrolled into view, inside each
+    scroll container that holds it and then on the page, and the point is the middle of its first
+    line.
   - An element with `pointer-events: none` and a background counted wherever its box reached,
     painted beneath the text or clipped out of sight; a code block did. Such an element now takes
     pointer events while the pass runs, so the hit test puts it where it paints. So does a text
     whose own box takes none, which had made everything at the point count.
+  - A text clipped from its point, as in a collapsed code block, took whatever was painted there as
+    over it. Only a text in the hit list at its own point has anything over it now.
   - An overlay's opacity is read now, and an opaque layer over the text makes it unmeasurable
     (`contrast-unmeasurable`, naming the layer) instead of 1.00:1.
 
-  Both pages now report no overlay errors, and the contrast errors that were hidden behind the
-  false ones surface. Regression tests: six in `test_browser_runtime.RuntimeInABrowser`, all failing
-  on 4.0.1, among them a scrim over text below the fold, which 4.0.1 missed.
+  The hit test reads every shadow root, so a scrim inside a component still counts, laid over
+  another element's text or over the component's own slotted text. Both pages now report no
+  overlay errors, and the contrast errors that were hidden behind the false ones surface.
+  Regression tests: eleven in `test_browser_runtime.RuntimeInABrowser`. Eight fail on 4.0.1, among
+  them two scrims 4.0.1 missed, over text below the fold and over text scrolled out of its
+  container; three guard the component scrims and panels 4.0.1 already read.
 
 ### Release builder (development repository)
 
