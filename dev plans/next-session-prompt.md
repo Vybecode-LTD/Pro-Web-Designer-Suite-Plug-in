@@ -1,8 +1,8 @@
 # Start here: the next session
 
-**Written 2026-10-27**, at the end of the follow-ups session:
-- **Three fixes for 4.0.2 merged:** P61 (#208, CI caches the browser engines' packages), P62 (#209, `sync_email_tokens.py` projects a project's `tokens.css` into its `email-tokens.json`, and the skill's own email file follows the starter again) and P63 (#210, the scaffold's default sort reads a table's own time and ends with the primary key). P60 (#207) was already there.
-- **4.0.1 is still in the directory's review** (submitted 2026-10-26). The owner holds 4.0.2 until the reviewer decides.
+**Written 2026-10-27**, at the end of the second session that day:
+- **Two fixes for 4.0.2 merged:** P64 (#212, a missing engine's installation hint names the loaded Playwright's CLI) and P65 (#213, the contrast pass's overlay probe, which removes webawesome.com's false `contrast-under-overlay` errors: 78 on the home page and 195 on the button page). `main` carries P60 to P65.
+- **4.0.1 is still in the directory's review** (submitted 2026-10-26; read in the owner's Chrome on 2026-10-27). The owner holds 4.0.2 until the reviewer decides.
 - `check_execution_plan.py`: 0 open, 0 scheduled.
 
 **Next** (§4): the submission's review with the owner, then the owner's choice: release 4.0.2, one of the live check's four remaining follow-ups, or Part B. `docs/HANDOFF.md` has the state and warnings.
@@ -557,27 +557,27 @@ You are working on **pro-web-design-suite**, a Claude Code plugin of 13 skills f
   - Vue: a root's class is the component's name, since Vue scopes a child's root with the parent's attribute; the controls share `Control.css` through `<style scoped src>`. Svelte: the sheets keep `.root`, but each component holds only the rules its markup uses (`css_rules`, `svelte_sheet`), or Svelte drops them with a warning.
   - `tests/test_scaffold_frameworks.py` compiles with the real compilers, renders the form on the server, and drives its focus: Vue through a custom renderer with the kit stubbed, Svelte in jsdom with the real kit. Its Node harnesses are strings in the test, with modes (`compile`, `ssr`, `render`, `focus`, `select`).
 
-- **The runtime gate's checks (P35).** `ALL_CHECKS` holds 12; `EVERY_ENGINE` the three that run outside Chromium (axe, names, taborder). `OVERFLOW_FN` and `clipFindings()` serve `reflow` and `spacing`; `OBSCURED_FN` (`stackAt`, `paints`, `clear`), `TRIGGERS_FN`, `TIP_FN`, `TIP_COVERS_FN`, `MOTION_LOG` (an init script, only in the motion contexts), `EXERCISE_FN` and `motionFindings()`. `newPage(forced, motion)` opens a motion context without the freeze. `launchEngine()` and `ENGINES` are in `shared/browser_common.mjs` (five byte-identical copies). Playwright 1.63's builds: Firefox 1543, WebKit 2359. The tests are `test_runtime_wcag_checks` (36) and `test_runtime_engines`.
+- **The runtime gate's checks (P35).** `ALL_CHECKS` holds 12; `EVERY_ENGINE` the three that run outside Chromium (axe, names, taborder). `OVERFLOW_FN` and `clipFindings()` serve `reflow` and `spacing`; `OBSCURED_FN` (`paints`, `clear`; `stackAt`, which collects every element at a point through every shadow root, is in `window.__a11y` and is shared with `CONTRAST_FN`), `TRIGGERS_FN`, `TIP_FN`, `TIP_COVERS_FN`, `MOTION_LOG` (an init script, only in the motion contexts), `EXERCISE_FN` and `motionFindings()`. `newPage(forced, motion)` opens a motion context without the freeze. `launchEngine()` and `ENGINES` are in `shared/browser_common.mjs` (five byte-identical copies). Playwright 1.63's builds: Firefox 1543, WebKit 2359. The tests are `test_runtime_wcag_checks` (36) and `test_runtime_engines`.
 
 - **The email frameworks (#198).** `export_email_theme.py --format mjml|react-email`, through `build_email.load_tokens`. Its tables: `TYPE_ROLES`, `COLOURS`, `SURFACES`, `GAPS`, `INSETS`, the dark map, `MOBILE_TYPE`; `css_rules(theme, select)` builds the dark and phone rules with each format's selector (`mjml_select`, `react_select`). `Theme.get` refuses an unsafe value (`UNSAFE`) and records a missing role. `withMso()` carries `build_email.MSO_HEAD_BLOCK`. `lint_email.sized_text()` measures the text an element sizes itself; `check_contrast` skips a preheader. `audit_design.REACT_EMAIL_IMPORT` and `SKIP_REACT_EMAIL`. `tests/test_email_frameworks.py` compiles with MJML, transpiles with TypeScript and renders with React Email (CJS runners through `NODE_PATH`), and probes the dark, phone and gutter rules in Chromium.
 
 ## 3. First: the state of `main`
 
-Read `main`'s latest CI run (`gh run list --branch main --limit 1`): #210's merge (`5f09493`) was in progress at the end; #208's and #209's passed. If it is red, read the failing test first. A known flake (`docs/HANDOFF.md`'s Warnings) that touches nothing recent is rerun with `gh run rerun RUN --failed`. Anything else is fixed in a PR of its own. Then:
+Read `main`'s latest CI run (`gh run list --branch main --limit 1`): #213's merge (`e59d6b3`) was in progress at the end; #212's passed. If it is red, read the failing test first. A known flake (`docs/HANDOFF.md`'s Warnings) that touches nothing recent is rerun with `gh run rerun RUN --failed`. Anything else is fixed in a PR of its own. Then:
 - No PR should be open (`gh pr list --state open`), and `v4.0.1` is the latest tag (`git tag -l "v4*"`).
 - The distribution repository's `main` is `4809e3f` (`gh api repos/Vybecode-LTD/pro-web-design-suite/commits/main --jq .sha`). Nobody commits to it by hand.
-- The 2026-10-27 session's scratchpad (`a1ddda11-…`) holds `p62/` and `p63/` (the PR bodies, the migration and comparison scripts). The 2.1.309 CLI and `unset.txt` are in `222f4831-…`'s scratchpad (`cc/`). Reinstall the CLI if Storage Sense has emptied it, **with a `package.json` in the folder first**.
-- Read `docs/HANDOFF.md`'s Warnings and its open owner decisions.
+- The 2026-10-27 second session's scratchpad (`fb2d7136-…`) holds `p64-body.md`, `p65-body.md` and `overlay/` (the webawesome.com runs and the instrumented probes: `dbg2.mjs`, `dbg3/`). The 2.1.309 CLI and `unset.txt` are in `222f4831-…`'s scratchpad (`cc/`). Reinstall the CLI if Storage Sense has emptied it, **with a `package.json` in the folder first**.
+- Read `docs/HANDOFF.md`'s Warnings and its open owner decisions. **Before a long `check.py`, look at the CPU**: an unrelated build at 100% made it take 3.4 hours.
 
 ## 4. After 4.0.1
 
-**First, the submission.** Ask the owner what the portal shows (claude.ai/directory/manage → Submissions → Pro Web Design Suite), or, with their OK, read it read-only in their Chrome: the scan, and any reviewer's request under the Review tab. Help them answer it.
+**First, the submission.** Ask the owner what the portal shows (claude.ai/directory/manage → Submissions → Pro Web Design Suite), or, with their OK, read it read-only in their Chrome: the scan, and any reviewer's request under the Review tab. Help them answer it from the distribution plan's "If the reviewer asks" section.
 - **Never submit, publish or withdraw anything yourself, and ask before any step in the portal.**
 - With Claude in Chrome, the owner has let you fill a step after asking. Keep the secrets (a webhook's) and the final buttons theirs.
 - The directory checks `main` about every 6 hours; after a release, **Check for new commits** scans at once.
 
 **Then ask the owner what comes next:**
-- **Release 4.0.2**, only when the owner says so. It carries P60 to P63 (CHANGELOG `4.0.2 — unreleased`).
+- **Release 4.0.2**, only when the owner says so. It carries P60 to P65 (CHANGELOG `4.0.2 — unreleased`).
   1. In the release PR, give the section its date and set plugin.json's `version`.
   2. Run `evals.yml` (`tag=all`, about $10, with the owner's OK) on its merge.
   3. Then tag.
@@ -585,11 +585,11 @@ Read `main`'s latest CI run (`gh run list --branch main --limit 1`): #210's merg
   After the tag, the directory scans the new version, and it is held for a reviewer while the credential findings stand.
 - **One of the live check's four remaining follow-ups** (its report's last section):
   - the hover check on a JavaScript tooltip (read the check's scope first);
-  - `contrast-under-overlay` on webawesome.com;
   - migrating onto a codebase's own token names;
-  - sending email through a real provider, which needs the owner's key.
+  - sending email through a real provider, which needs the owner's key;
+  - webawesome.com's home page at 390x844, which never finishes: it hangs after `browser:`, on 4.0.1 too and with every check skipped, while the button and docs pages finish at both sizes. Start by finding which call never returns.
 
-  A follow-up gets an N-item (next free: N58) and a P-row (next free: P64) first, and `check_execution_plan.py` must pass.
+  A follow-up gets an N-item (next free: N60) and a P-row (next free: P66) first, and `check_execution_plan.py` must pass.
 - **Part B** of the distribution plan: topics and a social preview for the distribution repository, then the listings and the launch.
 
 ## 5. End of session (never skip)
