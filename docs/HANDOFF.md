@@ -1,7 +1,7 @@
 # Handoff
 
 **2026-10-28: the owner's twelve decisions, the packages' rows, and stage 0's first two packages.**
-- The owner answered the runbook's Q1 to Q12 (its §7): **one release, 4.1.0, absorbing 4.0.2**; Phase 7 after done; issues in the development repository; Q10's two 3.5.0 command notes itemised into P88; Q11's notes promoted to `C:\DEV\knowledge` (`e2899aa`).
+- The owner answered the runbook's Q1 to Q12 (asked in its §2, the answers recorded in its §7): **one release, 4.1.0, absorbing 4.0.2**; Phase 7 after done; issues in the development repository; Q10's two 3.5.0 command notes itemised into P88; Q11's notes promoted to `C:\DEV\knowledge` (`e2899aa`).
 - The 24 packages have their rows: N60 to N83 in the completion plan, P66 to P89 in the execution plan.
 - **P66, #216:** `measure_vitals.mjs` waits up to 5 s past its settle for a first LCP; the timing tests judge each run against its own page clock; CI keeps the measured numbers from a red leg. **The audit misread the macOS failure:** it was a missing LCP, not a breach (N60 has the evidence: eight macOS reds, one cause).
 - **P67, #217:** a `v*` tag releases only a commit CI passed on (`tooling/release/ci_gate.py`); `main`'s runs are never cancelled or replaced; every action is pinned and Dependabot moves the pins; the CLI is pinned at 2.1.312; every leg tests Playwright's Chromium (153.0.8010.12) and fails a test that finds no browser; a skip ceiling per leg.
