@@ -22,6 +22,9 @@ Regressions covered:
 - GT-A3: the visual matrix's default per-pixel tolerance was coarser than the
   suite's own hover (4%) and pressed (8%) overlays, so deleting :hover or
   :active passed every cell.
+- N59 (P65): the overlay probe asked about a point clamped to the viewport, so
+  text below the fold took whatever sat at its edge as an overlay, and a text
+  the probe could not hit took everything beneath it.
 """
 from __future__ import annotations
 
@@ -84,6 +87,78 @@ class RuntimeInABrowser(TempDirTest):
         errors = self.rules(self.runtime(html, *only("contrast")))
         self.assertIn("contrast-under-overlay", errors)
         self.assertIn("contrast-too-low", errors)
+
+    def contrast_findings(self, body, style=""):
+        html = ("<!doctype html><html lang=en><head><title>c</title><style>"
+                "body{margin:0;font:16px sans-serif;color:#222;background:#fff}"
+                "h1{margin:0;height:40px;font-size:24px}" + style +
+                "</style></head><body><main><h1>Contrast</h1>" + body + "</main></body></html>")
+        return [f for f in self.runtime(html, *only("contrast")) if f["rule"].startswith("contrast")]
+
+    def contrast_rules(self, body, style=""):
+        return {f["rule"] for f in self.contrast_findings(body, style)}
+
+    def overlaid(self, layer):
+        """A grey paragraph under a white layer, painted after it."""
+        return self.contrast_findings(
+            "<div class=wrap><p class=t>This paragraph sits under a white layer.</p>"
+            "<div class=layer></div></div>",
+            ".wrap{position:relative}.t{color:#595959}"
+            ".layer{position:absolute;inset:0;background:#fff;" + layer + "}")
+
+    def test_an_opaque_layer_over_text_is_unmeasurable_not_one_to_one(self):
+        """N59 (P65): an opaque layer over the text was composited as a
+        "translucent overlay", and the text measured 1.00:1. It hides the text,
+        so the text's contrast cannot be computed: a warning says so."""
+        self.assertEqual({"contrast-unmeasurable"}, {f["rule"] for f in self.overlaid("")})
+
+    def test_a_layer_at_opacity_0_is_not_over_the_text(self):
+        """N59 (P65): its opacity was not read, so an invisible panel counted as opaque."""
+        self.assertEqual([], self.overlaid("opacity:0"))
+
+    def test_a_layers_opacity_thins_what_it_paints(self):
+        """N59 (P65): a white panel at opacity .72 measured 1.00:1; it paints
+        what a 72% white scrim does."""
+        scrim = [f["ratio"] for f in self.contrast_findings(
+            "<div class=wrap><p class=t>This paragraph sits under a white layer.</p>"
+            "<div class=layer></div></div>",
+            ".wrap{position:relative}.t{color:#595959}"
+            ".layer{position:absolute;inset:0;background:rgba(255,255,255,.72)}")]
+        panel = [(f["rule"], f["ratio"]) for f in self.overlaid("opacity:.72")]
+        self.assertEqual(1, len(scrim), scrim)
+        self.assertEqual([("contrast-under-overlay", round(scrim[0], 1))],
+                         [(rule, round(ratio, 1)) for rule, ratio in panel])
+
+    def test_an_opaque_card_at_the_fold_is_not_over_the_text_below_it(self):
+        """N59 (P65): the overlay probe clamped a text's middle to the viewport,
+        so for text below the fold it asked what sat at the viewport's bottom
+        edge. An opaque card there was composited over every text below it, and
+        each measured 1.00:1: 21 to 147 false errors a page on webawesome.com."""
+        rules = self.contrast_rules("<div class=fold></div><div class=card></div>"
+                                    "<p>This paragraph sits well below the fold.</p>",
+                                    ".fold{height:830px}.card{height:60px;background:#fff}")
+        self.assertEqual(set(), rules)
+
+    def test_a_scrim_below_the_fold_is_found(self):
+        """N59 (P65): the same clamp missed a real scrim over text below the
+        fold, since the point it asked about was not under the scrim."""
+        rules = self.contrast_rules(
+            "<div class=fold></div><div class=wrap>"
+            "<p class=t>This paragraph sits under a 72% white scrim.</p><div class=scrim></div></div>",
+            ".fold{height:1200px}.wrap{position:relative}.t{color:#595959}"
+            ".scrim{position:absolute;inset:0;pointer-events:none;background:rgba(255,255,255,.72)}")
+        self.assertEqual({"contrast-under-overlay"}, rules)
+
+    def test_what_is_under_a_text_the_probe_cannot_hit_is_not_over_it(self):
+        """N59 (P65): with the text's own box absent from elementsFromPoint
+        (pointer-events: none), every element at the point counted as painted
+        over it, the panel beneath it among them."""
+        rules = self.contrast_rules(
+            "<div class=box><div class=under></div><p class=t>This label passes no clicks through.</p></div>",
+            ".box{position:relative;isolation:isolate}"
+            ".under{position:absolute;inset:0;background:#fff;z-index:0}"
+            ".t{position:relative;z-index:1;pointer-events:none}")
+        self.assertEqual(set(), rules)
 
     def test_a_spinner_is_not_a_focus_ring(self):
         """GT-A14 (a), fixed with GT-C13: the freeze shortened animations

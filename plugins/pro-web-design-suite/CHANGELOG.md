@@ -53,6 +53,23 @@
   in double quotes on Windows. A Windows path holding `$`, `` ` ``, `%` or `!`, which cmd or
   PowerShell would expand inside double quotes, is named on its own instead. Regression tests:
   `test_browser_scripts.TheInstallHintRunsTheLoadedPlaywright`, whose five tests fail on 4.0.1.
+- **The runtime contrast pass reported text it had not looked at as under an overlay**
+  (a11y-audit-runner). On webawesome.com, `contrast-under-overlay` raised 21 to 147 errors a page,
+  every one at 1.00:1; 78 on the home page and 195 on the button page, none of them real:
+  - The point it asked about was the middle of the text's box, clamped to the viewport, so for text
+    below the fold it asked about whatever sat at the viewport's edge, and an opaque card there was
+    composited over every text below it. A text off screen is now scrolled into view, and the
+    point is the middle of its first line.
+  - An element with `pointer-events: none` and a background counted wherever its box reached,
+    painted beneath the text or clipped out of sight; a code block did. Such an element now takes
+    pointer events while the pass runs, so the hit test puts it where it paints. So does a text
+    whose own box takes none, which had made everything at the point count.
+  - An overlay's opacity is read now, and an opaque layer over the text makes it unmeasurable
+    (`contrast-unmeasurable`, naming the layer) instead of 1.00:1.
+
+  Both pages now report no overlay errors, and the contrast errors that were hidden behind the
+  false ones surface. Regression tests: six in `test_browser_runtime.RuntimeInABrowser`, all failing
+  on 4.0.1, among them a scrim over text below the fold, which 4.0.1 missed.
 
 ### Release builder (development repository)
 
