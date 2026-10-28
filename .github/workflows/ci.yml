@@ -12,9 +12,12 @@ on:
 
 # A pull request's newer push replaces its older run; a run on main is never
 # cancelled, since a tag may name any merge (OPS-1: 5 of 60 main pushes had
-# no finished run, the next merge having cancelled theirs).
+# no finished run, the next merge having cancelled theirs). Each run off a
+# pull request has a group of its own commit: in one shared group a third
+# merge would replace the second's pending run however cancel-in-progress is
+# set, and the release gate would refuse that commit (Codex on #217).
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:

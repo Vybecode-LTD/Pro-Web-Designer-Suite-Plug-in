@@ -55,6 +55,9 @@ class TheCiWorkflow(Workflow):
 
     def test_only_a_pull_requests_run_is_cancelled(self):
         self.assertRegex(self.text, r"(?m)^  cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}$")
+        # Nor replaced while pending: a group holds one pending run, so each
+        # run off a pull request is grouped by its own commit (Codex on #217).
+        self.assertRegex(self.text, r"(?m)^  group: ci-\$\{\{ github\.event\.pull_request\.number \|\| github\.sha \}\}$")
 
     def test_every_action_is_pinned_to_a_commit(self):
         uses = re.findall(r"(?m)^\s*-?\s*uses:\s*(\S+)(.*)$", self.text)
