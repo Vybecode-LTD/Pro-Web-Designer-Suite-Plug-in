@@ -1,6 +1,6 @@
 # Start here: the next session
 
-**Written 2026-10-28**, at the end of the audit session. It points at files; it restates nothing.
+**Written 2026-10-28.** It points at files; it restates nothing.
 
 ## 1. What this is
 
@@ -27,7 +27,7 @@ cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short &
 3. Do **P66** (`main` green, the timing tests honest), then **P67**, **P68**, **P69**, each by the runbook's §5, each its own PR. Stage 0 first: nothing after it is trustworthy without the ruleset, the release gate and an honest fail-before table.
 4. Then stage 1 (P70 to P73: the four critical findings and the theme-classification class), and stages 2 to 8 in the runbook's order.
 
-The findings each package closes are in `dev plans/web-design-suite-audit-2026-10-28/` (one file per pass, with file, line, evidence and fix); the summary is `web-design-suite-audit-2026-10-28.md`.
+The findings each package closes are in `dev plans/web-design-suite-audit-2026-10-28/` (one file per pass); the summary is `web-design-suite-audit-2026-10-28.md`.
 
 ## 5. Owner decisions still open
 
