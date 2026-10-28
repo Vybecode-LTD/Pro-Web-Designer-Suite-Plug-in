@@ -1,38 +1,38 @@
 # Handoff
 
-**2026-10-28: the full audit of `main` and the completion runbook. No code changed.**
-- `dev plans/web-design-suite-audit-2026-10-28.md` records 281 findings (4 critical, 44 high, 109 medium, 124 low) and 23 open items over every script, browser script, hook, the MCP server, the lint configs, the suite, CI and release, the evals, the distribution repository, every shipped document and the plans; the thirteen pass files with every finding's evidence and fix are in `dev plans/web-design-suite-audit-2026-10-28/`.
-- `dev plans/web-design-suite-completion-runbook.md` defines "100% done" (nine conditions), lists twelve decisions for the owner (§2) and the owner's own steps (§3), and schedules 24 packages, P66 to P89, in eight stages (§4) that close every finding and open item.
-
-The next session starts from `dev plans/next-session-prompt.md`, which sends it to the runbook's §2 (the decisions) and §4 (the packages, in order).
+**2026-10-28: the owner's twelve decisions, the packages' rows, and stage 0's first two packages.**
+- The owner answered the runbook's Q1 to Q12 (asked in its §2, the answers recorded in its §7): **one release, 4.1.0, absorbing 4.0.2**; Phase 7 after done; issues in the development repository; Q10's two 3.5.0 command notes itemised into P88; Q11's notes promoted to `C:\DEV\knowledge` (`e2899aa`).
+- The 24 packages have their rows: N60 to N83 in the completion plan, P66 to P89 in the execution plan.
+- **P66, #216:** `measure_vitals.mjs` waits up to 5 s past its settle for a first LCP; the timing tests judge each run against its own page clock; CI keeps the measured numbers from a red leg. **The audit misread the macOS failure:** it was a missing LCP, not a breach (N60 has the evidence: eight macOS reds, one cause).
+- **P67, #217:** a `v*` tag releases only a commit CI passed on (`tooling/release/ci_gate.py`); `main`'s runs are never cancelled or replaced; every action is pinned and Dependabot moves the pins; the CLI is pinned at 2.1.312; every leg tests Playwright's Chromium (153.0.8010.12) and fails a test that finds no browser; a skip ceiling per leg.
 
 ## State
 
-- **`main` at `8441ff0`** (#214, the previous session's docs). **Its CI is red:** run 40681521613 failed on `macos-latest · Python 3.14` only, in `test_runtime_urls.EachPageHasItsTypesBudget` (a timing test the flake list called a Windows flake; it has now failed on a third platform). The code merge before it (`e59d6b3`, #213) was green on all seven legs. The first package, P66, makes the timing tests honest instead of rerunning.
-- **This PR, #215**, `docs/audit-2026-10-28-runbook`: the audit, the runbook, this handoff, the starting prompts, `CLAUDE.md`'s Current state and CLI path, and `dev plans/README.md`. The old 125 KB starting prompt is kept as `dev plans/next-session-prompt-2026-10-27-full.md` until P69 folds its rules and facts into `CLAUDE.md` and `docs/FACTS.md`.
-- **Released:** `v4.0.1` on `84f4a4f`; the distribution repository's `main` and `v4.0.1` at `4809e3f`, verified today: each of the release zip's 230 files has the same SHA-256 as the distribution tree's file at `v4.0.1`. 4.0.2 is unreleased on `main` (P60 to P65); the runbook's Q1 asks whether it ships alone or folds into the audit release, 4.1.0.
-- **The directory:** 4.0.1 submitted 2026-10-26, still waiting for a reviewer at the last read (2026-10-27).
-- **The owner's install is 4.0.1** (2026-10-28, user scope, from the distribution marketplace); the 3.6.0 `web-design-suite` install and its local marketplace are gone. The runbook's L4 and §3 item 6 are done for this release; the next release repeats `claude plugin update`.
-- **The execution plan:** `check_execution_plan.py` 0 open, 0 scheduled; the runbook's packages get their rows (N60 to N83, P66 to P89) in stage 0. Next free ids: N60, P66, PR #216.
-- **The desktop app's CLI** is at `C:\Users\vybec\AppData\Local\Claude-Data\claude_pzs8sxrjxfjjc\claude-code\2.1.308\c17a819afb40\claude.exe` (2.1.308); both paths the docs gave before are gone. `claude plugin validate --strict` passes on the plugin, the marketplace root and the built tree.
+- **`main` at `e6c214c`** (#217's merge); its CI was running at the end. #216's merge (`9c1a528`) passed on all seven legs, and so did #217's head (`6c1031f`).
+- **Dependabot's first PRs, opened on #217's merge:** #218 (`tooling/tailwind-v3`, 2 updates), #219 (`setup-uv` 10.2.0 to 10.3.2), #220 (`tooling/main`, 8 updates). P68 bumps those pins anyway: fold them into it (with the test pins that name the versions), and Dependabot closes each once `main` has them.
+- **This PR, #221,** `docs/handoff-2026-10-28-p66-p67`: this handoff, the starting prompts, `CLAUDE.md`'s Current state, the runbook's §7 ticks, `dev plans/README.md`.
+- **Released:** `v4.0.1` on `84f4a4f`; the distribution repository at `4809e3f`. On `main`, unreleased, for 4.1.0: P60 to P67.
+- **The directory:** 4.0.1 submitted 2026-10-26; no reviewer's answer at the last read.
+- **The owner's install:** 4.0.1, user scope.
+- **The plans:** `check_execution_plan.py` 22 open, 22 scheduled. Next free ids: **N84, P90, PR #222**.
 
 ## Next steps
 
-1. **Ask the owner the runbook's twelve decisions (§2)** and record the answers in its §7. Q1 (one release or two), Q2 (4.1.0), Q3 (Phase 7 out of done) and Q7 (split the starting prompt) shape the order.
-2. **Ask the owner for the four GitHub settings (§3, items 1 to 4):** the ruleset on `main`, security settings on both repositories, the distribution repository's settings, topics and the social preview.
-3. **Stage 0, in order:** P66 (`main` green, the timing tests honest), P67 (the process gates), P68 (the maintainer tools), P69 (the plans and the CLI path). Each gets its N-item and P-row first; each follows the runbook's §5 protocol.
-4. Then stages 1 to 4 by the runbook's order; stage 5 is the release.
+1. **P68, the maintainer tools** (the runbook's §4 stage 0): `check.py`'s folder map (Q8: yes), `fail_before.py`'s errors column, `evidence.json`'s age test, the three weak tests, the `__main__` guards, the pin bumps.
+2. **P69, the plans and the CLI path:** the full prompt split per Q7 (`docs/FACTS.md`), one state, `find_claude()`.
+3. Then stage 1 (P70 to P73, the four critical findings), and on in the runbook's order.
 
-## Open owner decisions
+## Open owner steps
 
-All twelve are in the runbook's §2 with a recommendation each; none is decided. The four from before (where issues live, a terms-of-service link, `check.py` and the snippet tests, splitting the prompt) are Q4, Q5, Q8 and Q7 there. The live check's three remaining follow-ups are Q9; the 3.5.0 notes are Q10; the memory notes are Q11; `wds-gate-scratch` is Q12.
+- **The four GitHub settings** (the runbook's §3, items 1 to 4): the ruleset on `main` (a PR and the seven checks required, no force-push or deletion), secret scanning, Dependabot security updates and private vulnerability reporting on both repositories, the distribution repository's Issues and Wiki off and its deploy-key-only ruleset, the topics and About. Not done at the end of this session; verify with the runbook's §6 commands before asking again.
+- **Delete `Vybecode-LTD/wds-gate-scratch`** (Q12): the owner asked the agent to; the agent declined, since a permanent deletion is the owner's.
 
 ## Warnings
 
-- **`main` is red** (above). The workspace rule puts a red suite before anything else; P66 is first for that reason.
-- **The four critical findings** are user-file hazards in shipped scripts (`cluster_values.py` overwrites `tokens.json`, `build_email.py --text` is unguarded, the schema reader drops `check_*`/`unique_*`/`exclude_*` columns, the extractor and the diff misread theme-scoped rules). They are P70 to P72, after stage 0.
-- **The 390 px hang is explained** (JS-B-1: `await document.fonts.ready` with no bound, in three browser scripts) and is P74. Until then a run on such a page prints `browser:` and never returns; stop it with `TaskStop`, never `Stop-Process`.
-- **Budget:** this session spent about 140K tokens in the main context and about 5.3M in the thirteen audit passes. A session may run up to 750K with no compacting; report usage after each PR.
-- **Before a long `check.py`, look at the CPU.** Known timing flakes until P66: `EachPageHasItsTypesBudget`, `test_tbt_stops_at_tti`, `VitalsUnderCsp`, `test_interact_at_clicks_while_the_page_hydrates`.
-- **Eight SKILL.md files are within 20 bytes of the 20,500-byte cap** (the runbook's P86 and P87 name the cuts); an addition needs a cut first.
+- **A tag now needs CI green on its commit.** Pushed before CI finishes, `release.yml` fails at "CI passed on the tagged commit"; rerun that job once CI is green.
+- **A new skip in CI can cross a ceiling** (`tools/skip_ceiling.py`; Linux 7, Windows 20, macOS 16): raise the ceiling in `ci.yml` on purpose, with the reason.
+- **A test that needs a browser calls `wds_support.no_browser(self, why)`**, never `self.skipTest`: `test_harness.NoBrowser` fails on a bare skip after a no-browser check.
+- **Dependabot opens PRs** (actions weekly, `tooling/` monthly). Fold them into a feature PR, never merge one alone; a bump that breaks a test pin is fixed there. They take PR numbers: predict the next one from `gh pr list --state all --limit 1`.
+- **Eight SKILL.md files are within 20 bytes of the 20,500-byte cap** (P86 and P87 name the cuts).
+- **Budget:** this session used about 560K tokens of its 750K. Before a long `check.py`, look at the CPU; stop a hung run with `TaskStop`.
 - **Standing:** never grep `tooling/`; the repository is public; nobody commits to the distribution repository by hand; nobody but the owner acts in the directory portal; the four old ids stay; `python -B`.
