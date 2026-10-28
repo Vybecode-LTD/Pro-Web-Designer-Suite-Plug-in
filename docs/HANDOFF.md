@@ -1,60 +1,38 @@
 # Handoff
 
-**2026-10-27 (second session): P64 and P65 merged for 4.0.2. 4.0.1 is still in the directory's review.**
-- #212 makes a missing engine's installation hint name the CLI of the Playwright the gate loaded.
-- #213 rebuilds the contrast pass's overlay probe. It removes webawesome.com's false `contrast-under-overlay` errors: 78 on the home page and 195 on the button page.
+**2026-10-28: the full audit of `main` and the completion runbook. No code changed.**
+- `dev plans/web-design-suite-audit-2026-10-28.md` records 281 findings (4 critical, 44 high, 109 medium, 124 low) and 23 open items over every script, browser script, hook, the MCP server, the lint configs, the suite, CI and release, the evals, the distribution repository, every shipped document and the plans; the thirteen pass files with every finding's evidence and fix are in `dev plans/web-design-suite-audit-2026-10-28/`.
+- `dev plans/web-design-suite-completion-runbook.md` defines "100% done" (nine conditions), lists twelve decisions for the owner (§2) and the owner's own steps (§3), and schedules 24 packages, P66 to P89, in eight stages (§4) that close every finding and open item.
 
-The next session starts from `dev plans/next-session-prompt.md` (§3, then §4). `dev plans/next-session-opening-prompt.md` is the message to paste in.
+The next session starts from `dev plans/next-session-prompt.md`, which sends it to the runbook's §2 (the decisions) and §4 (the packages, in order).
 
 ## State
 
-- **`main` at `e59d6b3`** (#213's merge); its CI run was in progress at the end. #212's merge passed. No PR is open.
-- **Released:** `v4.0.1` on `84f4a4f`. The distribution repository's `main` and `v4.0.1` are at `4809e3f`. 4.0.2 is unreleased and held by the owner until the reviewer decides on 4.0.1.
-- **On `main` for 4.0.2** (CHANGELOG `4.0.2 — unreleased`): P60 (#207) to P63 (#210), then:
-  - **P64 (#212, N58):** `installHint()` in `shared/browser_common.mjs` (five copies) names the loaded package's CLI by path. The path is quoted for POSIX shells, or in double quotes on Windows; a Windows path holding `$`, `` ` ``, `%` or `!` is named on its own.
-  - **P65 (#213, N59):** `CONTRAST_FN` in `a11y_runtime.mjs` changed in five ways (§7 of `references/runtime-checks.md` has the details):
-    - It probes the middle of the text's first line, scrolled into view inside each scroll container and then on the page. Every scroll is put back.
-    - It lifts `pointer-events: none` layers for the pass, then restores them.
-    - It collects the stack at the point through every shadow root (`window.__a11y.stackAt`, now shared with the obscured check).
-    - It counts only what the hit's own root lists before the text, weighted by opacity.
-    - An opaque layer makes the text `contrast-unmeasurable`.
-    - Codex and CodeRabbit each found a real gap (a scrim inside a shadow root, a text in a scroll container), and both are fixed with tests. The PR carries 11 tests: 8 fail on 4.0.1.
-- **The directory:** read in the owner's Chrome on 2026-10-27, still waiting for the reviewer. The scan's findings stand. The owner chose to change only the installation hint (P64). Answers to every finding are ready in `web-design-suite-distribution-and-promotion.md` ("If the reviewer asks").
-- **The execution plan:** `check_execution_plan.py` shows 0 open and 0 scheduled. The next free numbers are N60 and P66.
+- **`main` at `8441ff0`** (#214, the previous session's docs). **Its CI is red:** run 40681521613 failed on `macos-latest · Python 3.14` only, in `test_runtime_urls.EachPageHasItsTypesBudget` (a timing test the flake list called a Windows flake; it has now failed on a third platform). The code merge before it (`e59d6b3`, #213) was green on all seven legs. The first package, P66, makes the timing tests honest instead of rerunning.
+- **This PR, #215**, `docs/audit-2026-10-28-runbook`: the audit, the runbook, this handoff, the starting prompts, `CLAUDE.md`'s Current state and CLI path, and `dev plans/README.md`. The old 125 KB starting prompt is kept as `dev plans/next-session-prompt-2026-10-27-full.md` until P69 folds its rules and facts into `CLAUDE.md` and `docs/FACTS.md`.
+- **Released:** `v4.0.1` on `84f4a4f`; the distribution repository's `main` and `v4.0.1` at `4809e3f`, verified today: each of the release zip's 230 files has the same SHA-256 as the distribution tree's file at `v4.0.1`. 4.0.2 is unreleased on `main` (P60 to P65); the runbook's Q1 asks whether it ships alone or folds into the audit release, 4.1.0.
+- **The directory:** 4.0.1 submitted 2026-10-26, still waiting for a reviewer at the last read (2026-10-27).
+- **The owner's install is 4.0.1** (2026-10-28, user scope, from the distribution marketplace); the 3.6.0 `web-design-suite` install and its local marketplace are gone. The runbook's L4 and §3 item 6 are done for this release; the next release repeats `claude plugin update`.
+- **The execution plan:** `check_execution_plan.py` 0 open, 0 scheduled; the runbook's packages get their rows (N60 to N83, P66 to P89) in stage 0. Next free ids: N60, P66, PR #216.
+- **The desktop app's CLI** is at `C:\Users\vybec\AppData\Local\Claude-Data\claude_pzs8sxrjxfjjc\claude-code\2.1.308\c17a819afb40\claude.exe` (2.1.308); both paths the docs gave before are gone. `claude plugin validate --strict` passes on the plugin, the marketplace root and the built tree.
 
 ## Next steps
 
-1. **The submission.** Ask the owner what the portal shows. The owner answers the reviewer; ask before every step in the portal.
-2. **When the owner says so, release 4.0.2** (P60 to P65):
-   - date the CHANGELOG section and set `plugin.json`'s `version` in the release PR;
-   - run `evals.yml` (`tag=all`, about $10, with the owner's OK) on its merge;
-   - then tag.
-3. **Or the owner picks** one of the live check's four remaining follow-ups (each gets an N-item and a P-row first), or Part B of the distribution plan.
+1. **Ask the owner the runbook's twelve decisions (§2)** and record the answers in its §7. Q1 (one release or two), Q2 (4.1.0), Q3 (Phase 7 out of done) and Q7 (split the starting prompt) shape the order.
+2. **Ask the owner for the four GitHub settings (§3, items 1 to 4):** the ruleset on `main`, security settings on both repositories, the distribution repository's settings, topics and the social preview.
+3. **Stage 0, in order:** P66 (`main` green, the timing tests honest), P67 (the process gates), P68 (the maintainer tools), P69 (the plans and the CLI path). Each gets its N-item and P-row first; each follows the runbook's §5 protocol.
+4. Then stages 1 to 4 by the runbook's order; stage 5 is the release.
 
 ## Open owner decisions
 
-- **The live check's four remaining follow-ups** (the last section of `dev plans/web-design-suite-4.0.0-live-check.md`):
-  - the hover check on a JavaScript tooltip;
-  - migrating onto a codebase's own token names;
-  - sending email through a real provider, which needs the owner's key;
-  - **new:** webawesome.com's home page at 390x844 never finishes. It hangs after `browser:`, on 4.0.1 too and with every check skipped.
-- **Part B** of `web-design-suite-distribution-and-promotion.md`: topics and a social preview for the distribution repository, then the listings.
-- **Where issues live:** the distribution repository or this one. Also whether to add a terms-of-service link.
-- **`check.py`:** should it run `test_doc_snippets` and stylelint's snippet test when a reference changes?
-- **`next-session-prompt.md`:** should it be split? It is about 125 KB against the workspace's 4 KB rule.
-- **The owner's own install** is still 3.6.0.
+All twelve are in the runbook's §2 with a recommendation each; none is decided. The four from before (where issues live, a terms-of-service link, `check.py` and the snippet tests, splitting the prompt) are Q4, Q5, Q8 and Q7 there. The live check's three remaining follow-ups are Q9; the 3.5.0 notes are Q10; the memory notes are Q11; `wds-gate-scratch` is Q12.
 
 ## Warnings
 
-- **This session went over its 750K-token budget again.** It filled a context window and was compacted once. Report `get_usage` after every PR, and write the handoff while there is room.
-- **Look at the CPU before a long `check.py`.** An unrelated MSVC build (15 `cl.exe`) held it at 100%. The check then took 3.4 hours instead of about 20 minutes, and `test_runtime_urls.EachPageHasItsTypesBudget` timed out at 600 s; alone, it passes in 4 s.
-- **Stopping processes:** the auto-mode classifier refused `Stop-Process` on a hung runner. Stop the background task with `TaskStop` instead.
-- **A release's upload can 404** right after the release is created. Rerun the failed job (`gh run rerun RUN --failed`).
-- **Two SKILL.md files are near the 20,500-byte cap:** landing-page-conversion at 20,498 and email-template-system at 20,492. An addition needs a cut.
-- **Known flakes:**
-  - `test_runtime_urls.EachPageHasItsTypesBudget` (Windows, and under load);
-  - `test_tbt_stops_at_tti` (Windows);
-  - `VitalsUnderCsp` (macOS);
-  - `test_interact_at_clicks_while_the_page_hydrates`;
-  - the vitals timing tests.
-- **Standing:** never grep `tooling/`; the repository is public; `Vybecode-LTD/wds-gate-scratch` is the owner's to delete.
+- **`main` is red** (above). The workspace rule puts a red suite before anything else; P66 is first for that reason.
+- **The four critical findings** are user-file hazards in shipped scripts (`cluster_values.py` overwrites `tokens.json`, `build_email.py --text` is unguarded, the schema reader drops `check_*`/`unique_*`/`exclude_*` columns, the extractor and the diff misread theme-scoped rules). They are P70 to P72, after stage 0.
+- **The 390 px hang is explained** (JS-B-1: `await document.fonts.ready` with no bound, in three browser scripts) and is P74. Until then a run on such a page prints `browser:` and never returns; stop it with `TaskStop`, never `Stop-Process`.
+- **Budget:** this session spent about 140K tokens in the main context and about 5.3M in the thirteen audit passes. A session may run up to 750K with no compacting; report usage after each PR.
+- **Before a long `check.py`, look at the CPU.** Known timing flakes until P66: `EachPageHasItsTypesBudget`, `test_tbt_stops_at_tti`, `VitalsUnderCsp`, `test_interact_at_clicks_while_the_page_hydrates`.
+- **Eight SKILL.md files are within 20 bytes of the 20,500-byte cap** (the runbook's P86 and P87 name the cuts); an addition needs a cut first.
+- **Standing:** never grep `tooling/`; the repository is public; nobody commits to the distribution repository by hand; nobody but the owner acts in the directory portal; the four old ids stay; `python -B`.
