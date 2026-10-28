@@ -116,7 +116,19 @@ jobs:
         working-directory: plugins/pro-web-design-suite
         env:
           WDS_REQUIRE_ENGINES: ${{ runner.os == 'Linux' && '1' || '' }}
+          WDS_EVIDENCE_DIR: ${{ runner.temp }}/wds-evidence
         run: uv run --no-project --python ${{ matrix.python }} python -B -m unittest discover -s tests
+
+      # The timing tests keep what they measured (wds_support.keep_evidence),
+      # and a red leg uploads it, so a failure shows its numbers (OPS-4).
+      - name: Keep the measured numbers of a red run
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
+        with:
+          name: evidence-${{ matrix.os }}-python-${{ matrix.python }}
+          path: ${{ runner.temp }}/wds-evidence
+          retention-days: 7
+          if-no-files-found: ignore
 
       # The suite's run has no pydantic, so the scaffold's Pydantic model is run
       # here, with the major it is written for (H15). WDS_REQUIRE_PYDANTIC turns

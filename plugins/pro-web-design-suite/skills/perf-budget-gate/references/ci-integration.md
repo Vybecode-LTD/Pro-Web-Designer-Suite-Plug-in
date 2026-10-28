@@ -141,6 +141,7 @@ Each item below removes one class of false failure. Skipping any one of them wil
 | Timezone / locale drift | `locale: 'en-US'`, `timezoneId: 'UTC'` on the context | built in |
 | OS colour scheme leaking in | `colorScheme: 'light'` pinned | built in |
 | Late shifts missed | `--settle 3000` after load before reading the observers | `--settle` |
+| A first paint that lands after the settle | A run with no LCP at the end of `--settle` waits up to 5 s more for one, and the notes say how long; on a loaded runner a short settle read the page before its paint reached the observers, and the run exited 1 with no LCP | built in |
 | Real third-party origins | They change under you and can be down. **Record and replay, or stub them.** | yours |
 | Different geography per runner | Pin the runner region, or accept that absolute numbers are not comparable across regions | yours |
 

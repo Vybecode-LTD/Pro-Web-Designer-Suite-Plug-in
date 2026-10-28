@@ -231,6 +231,38 @@ The owner's audit of `main` at `9391774` (`dev plans/web-design-suite-audit-2026
 | R5 | Release 4.0.1 on P59's merge, after an `evals.yml` run (`tag=all`, the owner's OK, 2026-10-25); then the owner submits to the directory from the distribution repository. **Done 2026-10-26**: `v4.0.1` on `84f4a4f`, the distribution repository at `4809e3f`, submitted | — | `v4.0.1` | S |
 | P60, #207 | The icon's directory hold: the icon renamed to `pro-web-design-suite-icon.png` and named by plugin.json's `icon`; `build.py` reads the icon from `icon` and holds a bundled image whose path or whole-word stem appears in any shipped text but plugin.json and image links (a superset of the directory's unknown rule) | N54 | `.claude-plugin/`, `plugin.json`, `tooling/release/build.py`, `test_release_build.py`, CHANGELOG | S |
 
+### The 2026-10-28 audit · 4.1.0
+
+The full audit of `main` at `8441ff0` (`web-design-suite-audit-2026-10-28.md`): 281 findings and 23 open items, in 24 packages, in [the completion runbook](web-design-suite-completion-runbook.md)'s order (its §4 holds each package's files, tests and done-check; its §5 the per-PR protocol). The owner, 2026-10-28: one release, 4.1.0, absorbing 4.0.2 (Q1, Q2); Phase 7 after done (Q3); the other answers are in the runbook's §7. Each PR carries a fail-before table on `v4.0.1`.
+
+| PR | What | Items | Main files | Size |
+|---|---|---|---|---|
+| P66, #216 | `main` green: `measure_vitals` waits up to 5 s past its settle for a first LCP (the cause of eight macOS reds, not a breach as the audit read it); the timing tests judge each run against its own page clock; CI keeps the measured numbers and uploads them from a red leg | N60 | `measure_vitals.mjs`, `ci-integration.md`, `test_runtime_urls.py`, `test_browser_runtime.py`, `test_recipes.py`, `test_harness.py`, `wds_support.py`, `ci.yml` | M |
+| P67 | The process gates: the release requires the seven checks; every leg requires a browser; actions pinned; Dependabot | N61 | `ci.yml`, `release.yml`, `evals.yml`, `wds_support.py`, `compare.py`, `dependabot.yml` | M |
+| P68 | The maintainer tools: `check.py`'s folder map, `fail_before.py`'s errors column, the evidence's age, the pins bumped | N62 | `check.py`, `fail_before.py`, `wds_support.py`, five test files, `tooling/*/package.json` | M |
+| P69 | The plans and the CLI path: one state, the prompt split to 4 KB, `docs/FACTS.md`, `find_claude()` | N63 | `CLAUDE.md`, `docs/`, `dev plans/`, `check_execution_plan.py`, `wds_support.py` | M |
+| P70 | One overwrite guard per script | N64 | `shared/project_config.py` and its copies, four scripts | S |
+| P71 | One answer to "default or theme" | N65 | `shared/project_config.py` and its copies, `extract_system.py`, `diff_system.py`, `check_roles.py` | M |
+| P72 | The schema reader | N66 | `introspect_schema.py`, `test_schema_sources.py` | M |
+| P73 | The scaffold | N67 | `scaffold_ui.py`, two test files | M |
+| P74 | Bounded waits in the browser gates | N68 | `shared/browser_common.mjs` and its copies, three scripts, two test files | M |
+| P75 | The runtime checks give the right answer | N69 | `a11y_runtime.mjs`, `runtime-checks.md`, two test files | M |
+| P76 | Vitals, the matrix and the critique capture | N70 | `measure_vitals.mjs`, `snapshot_matrix.mjs`, `critique_snapshots.mjs`, two test files | M |
+| P77 | `a11y_static.py` | N71 | `a11y_static.py`, its references, two test files | M |
+| P78 | `audit_design.py`, `check_roles.py` and the generators | N72 | four scripts, `design-rules.json`, four test files | L |
+| P79 | design-token-migration | N73 | three scripts, its SKILL.md, `test_token_migration.py` | M |
+| P80 | `perf_audit.py` and `crux_check.py` | N74 | two scripts, `budgets.md`, two test files | S |
+| P81 | The deck, the critique report, the matrix generator, the landing lint | N75 | five scripts, their tests | M |
+| P82 | design-system-docs and design-system-versioning | N76 | four scripts, their SKILL.md and references, two test files | L |
+| P83 | Figma and DTCG | N77 | three Figma scripts, `shared/dtcg.py` and its copies, two test files | M |
+| P84 | The email scripts | N78 | `build_email.py`, `lint_email.py`, the SKILL.md and workflow, two test files | M |
+| P85 | The hooks, the MCP server, the shared JavaScript and the shipped configs | N79 | `design_gates.mjs`, `design_hooks.mjs`, `project_config.mjs` and its copies, the two configs, `design-rules.json`, `sync_rules.py`, four test files | L |
+| P86 | The documents of seven skills | N80 | seven skills' SKILL.md, references and assets, two test files | L |
+| P87 | The documents of six skills | N81 | six skills' SKILL.md, references and assets, `sync_rules.py`, three test files | L |
+| P88 | The plugin-level documents, the public face and the two command notes | N82 | both READMEs, the CHANGELOGs, `SECURITY.md` (and a root one), the marketplaces, `plugin.json`, the workflow commands, `.github/` templates, `test_release_build.py`, `test_commands.py` | M |
+| P89 | The evals cover every skill | N83 | `evals/`, `test_evals.py` | M |
+| R6 | Release 4.1.0: the release PR, the evals on its merge (the owner's OK), the tag, the distribution tree, the directory's rescan (the owner), the owner's install; then the live check (the runbook's stage 6) | — | `plugin.json`, `CHANGELOG.md` | M |
+
 ## 5. What moved, and why
 
 Each of these moved into the PR that already has its file open:
@@ -314,3 +346,4 @@ Update this table in each PR.
 | R4 | #200 (2026-10-22): the rename's upgrade command (the free checks); #201 (2026-10-23): the live check's fixes and the version; the evals passed routing 23 of 23 and outcome 10 of 11; #202: the session's docs; #203 (2026-10-24): `no-fake-countdown`, the skill loads and a decline opens with its reason; the outcome suite on its merge 10 of 11 again; #204: the session's docs | — | **4.0.0, tagged 2026-10-24** (`v4.0.0` on `d9125b7`); the distribution repository at `28efdaa` |
 | R5 | #205 (2026-10-25): P59, the listing icon; the evals on its merge (`84f4a4f`) passed routing 23 of 23 and outcome 11 of 11, `no-fake-countdown` 3 of 3 ($9.55); P58 closed with no change (6 of 6 locally, $0.53); #206 (2026-10-26): the session's docs; #207: P60, the icon's directory hold, for 4.0.2; #208 (2026-10-27): P61, CI's engine packages cached; #209: P62, `sync_email_tokens.py`; #210: P63, the scaffold's default sort; #211: the session's docs; #212: P64, the installation hint names the loaded Playwright's CLI; #213: P65, the contrast pass's overlay probe (webawesome.com: 78 and 195 false errors to none); #214: the session's docs | N53 (#205), N52 (P58, no PR), N54 (#207), N55 (#208), N56 (#209), N57 (#210), N58 (#212), N59 (#213) | **4.0.1, tagged 2026-10-26** (`v4.0.1` on `84f4a4f`; the release job's first attempt hit a 404 from GitHub's upload host, the rerun passed); the distribution repository at `4809e3f`; **submitted to Anthropic's directory 2026-10-26** |
 | Audit | #215 (2026-10-28): the full audit of `main` at `8441ff0` (281 findings, 23 open items) and the completion runbook, P66 to P89 in eight stages; no code changed | the runbook's packages are the open items from here (N60 to N83) | none; `main` red on macOS 3.14 (P66) |
+| 4.1.0 | #216 (2026-10-28): P66, `measure_vitals` waits for a first LCP and the timing tests judge each run by its own clock; the owner's twelve decisions recorded (the runbook's §7) and the packages' rows added | N60 | 4.1.0, one release absorbing 4.0.2 (the owner, Q1) |

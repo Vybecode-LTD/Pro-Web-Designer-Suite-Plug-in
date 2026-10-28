@@ -25,8 +25,10 @@ Regressions covered (3.3.0):
 from __future__ import annotations
 
 import ast
+import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -162,6 +164,40 @@ class TempFolders(TempDirTest):
             held.write("x")
             held.flush()
             holder.cleanup()
+
+
+class TimingEvidence(TempDirTest):
+    """OPS-4 (P66): a red timing test said only that two lists differed, and a
+    rerun measured again, so the numbers behind a failure were lost. The
+    timing tests keep what they measured in WDS_EVIDENCE_DIR, which CI sets
+    and uploads from a red leg."""
+
+    def test_the_numbers_are_kept_where_the_variable_says(self):
+        folder = self.tmp / "evidence"
+        with mock.patch.dict(os.environ, {"WDS_EVIDENCE_DIR": str(folder)}):
+            wds_support.keep_evidence(self, "vitals", {"lcp": 24})
+        self.assertEqual({"lcp": 24}, json.loads((folder / f"{self.id()}.vitals.json").read_text(encoding="utf-8")))
+
+    def test_nothing_is_written_without_it(self):
+        with mock.patch.dict(os.environ, {"WDS_EVIDENCE_DIR": ""}):
+            wds_support.keep_evidence(self, "vitals", {"lcp": 24})
+        self.assertEqual([], list(self.tmp.iterdir()))
+
+    def test_ci_sets_it_and_uploads_it_from_a_red_leg(self):
+        from test_runtime_engines import ci_workflow
+        text = ci_workflow()
+        if text is None:
+            self.skipTest("the repository's workflows are not here")
+        steps = text.split("\n  validate:\n", 1)[0].split("\n      - ")
+        [suite] = [s for s in steps if s.startswith("name: The suite\n")]
+        self.assertRegex(suite, r"(?m)^\s+WDS_EVIDENCE_DIR: ", "the suite's step sets the folder")
+        folder = re.search(r"(?m)^\s+WDS_EVIDENCE_DIR: (.+?)\s*$", suite).group(1)
+        [upload] = [s for s in steps if "actions/upload-artifact@" in s]
+        self.assertLess(steps.index(suite), steps.index(upload))
+        self.assertRegex(upload, r"(?m)^\s+if: failure\(\)$")
+        self.assertRegex(upload, rf"(?m)^\s+path: {re.escape(folder)}$")
+        self.assertRegex(upload, r"(?m)^\s+retention-days: 7$")
+        self.assertRegex(upload, r"uses: actions/upload-artifact@[0-9a-f]{40}\s")
 
 
 if __name__ == "__main__":

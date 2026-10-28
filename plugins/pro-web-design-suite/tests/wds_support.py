@@ -10,6 +10,7 @@ for example an unpacked earlier release, to see which bugs it still has.
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import pathlib
 import re
@@ -164,6 +165,19 @@ def load_script(skill: str, name: str):
 def output(proc: subprocess.CompletedProcess) -> str:
     """stdout + stderr of a finished process, decoded for assertions."""
     return (proc.stdout + proc.stderr).decode("utf-8", "replace")
+
+
+def keep_evidence(test: unittest.TestCase, name: str, data) -> None:
+    """A timing test's measured numbers, as `<test id>.<name>.json` in
+    WDS_EVIDENCE_DIR when it is set. CI sets it and uploads the folder when a
+    leg fails (OPS-4), so a red timing test shows what it measured, not only
+    that it disagreed. Unset, as it is locally, nothing is written."""
+    folder = os.environ.get("WDS_EVIDENCE_DIR")
+    if not folder:
+        return
+    path = pathlib.Path(folder)
+    path.mkdir(parents=True, exist_ok=True)
+    (path / f"{test.id()}.{name}.json").write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
 if sys.version_info >= (3, 10):

@@ -811,14 +811,17 @@ class NavigationCodeInABrowser(TempDirTest):
         # Up to three runs, all four outcomes from one of them. On a loaded
         # macOS runner the diagonal still failed now and then (CI run 7, on a
         # commit that run 6 passed), even on the fake clock; a broken triangle
-        # fails every run.
+        # fails every run. TEST-9 (P66): a failure names what each run saw
+        # wrong, so one outcome that keeps flaking is told from a slow runner.
+        runs = []
         for _ in range(3):
-            seen = self.scenario("megamenu", page_with("".join(code["css"]) + MEGAMENU_FRAME,
-                                                       MEGAMENU_BODY, "".join(code["js"])),
-                                 MEGAMENU_SCENARIO)
-            if seen == want:
+            runs.append(self.scenario("megamenu", page_with("".join(code["css"]) + MEGAMENU_FRAME,
+                                                            MEGAMENU_BODY, "".join(code["js"])),
+                                      MEGAMENU_SCENARIO))
+            if runs[-1] == want:
                 break
-        self.assertEqual(seen, want)
+        wrong = [{k: v for k, v in seen.items() if want.get(k) != v} for seen in runs]
+        self.assertEqual(want, runs[-1], f"what each of {len(runs)} runs saw wrong: {wrong}")
 
     def test_a_click_inside_the_drawer_does_not_close_it(self):
         code = section_code("## 3. Off-canvas drawer", NAV_CODE)

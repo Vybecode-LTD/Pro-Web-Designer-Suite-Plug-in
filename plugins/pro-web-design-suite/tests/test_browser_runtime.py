@@ -37,7 +37,7 @@ import time
 import unittest
 
 from test_browser_scripts import installed_browsers
-from wds_support import NODE, TempDirTest, output, run_node, run_py, tool_modules
+from wds_support import NODE, TempDirTest, keep_evidence, output, run_node, run_py, tool_modules
 
 
 def node_modules() -> str | None:
@@ -395,22 +395,35 @@ class VitalsUnderCsp(TempDirTest):
             "<h1>Prices</h1><p>Plans start at four pounds a month.</p></main><script>"
             # A shift before the first paint is not a layout shift, so it waits for one.
             "new PerformanceObserver((list, obs) => {{ obs.disconnect(); setTimeout(() =>"
-            " document.body.insertAdjacentHTML('afterbegin', '<div style=\"height:400px\">Banner</div>'),"
-            " 200); }}).observe({{ type: 'paint', buffered: true }});</script></body></html>")
+            " document.body.insertAdjacentHTML('afterbegin', '<div id=\"banner\" style=\"height:400px\">"
+            "Banner</div>'), 200); }}).observe({{ type: 'paint', buffered: true }});</script></body></html>")
 
-    def cls(self, head):
+    def vitals(self, head, *args):
         page = self.write("page.html", self.PAGE.format(head))
-        proc = run_node("perf-budget-gate", "measure_vitals.mjs", page, "--runs", "1",
-                        "--settle", "1500", "--json", cwd=self.tmp,
-                        env_changes={"NODE_PATH": MODULES}, timeout=240)
+        proc = run_node("perf-budget-gate", "measure_vitals.mjs", page, "--runs", "1", "--json", *args,
+                        cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=240)
         if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
             self.skipTest(output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
-        return json.loads(proc.stdout)["stats"]["cls"]["median"]
+        out = json.loads(proc.stdout)
+        keep_evidence(self, "csp" if head else "no-csp", out)
+        return out
 
     def test_a_script_the_csp_blocks_stays_blocked(self):
-        self.assertGreater(self.cls(""), 0.1)            # the shift is measured when it runs
-        self.assertLess(self.cls(CSP_META), 0.01)
+        """TEST-7 (P66): the shift is due 200 ms after the first paint, and
+        each run read the page 1.5 s after load; on a slow macOS runner the
+        paint came late enough that the shift landed after the reading, so
+        the control measured nothing. The control now waits for the banner,
+        and the blocked run is read late enough on its own clock that a
+        shift that ran would have been seen."""
+        shifted = self.vitals("", "--wait-for", "#banner", "--settle", "1500")
+        self.assertGreater(shifted["stats"]["cls"]["median"], 0.1)     # the shift is measured when it runs
+        blocked = self.vitals(CSP_META, "--settle", "3000")
+        [run] = blocked["perRun"]
+        self.assertIn("readAt", run, "each run says when it read the page")
+        self.assertIsNotNone(run["fcp"], run)
+        self.assertGreaterEqual(run["readAt"], run["fcp"] + 400, f"read before the shift was due: {run}")
+        self.assertLess(blocked["stats"]["cls"]["median"], 0.01)
 
 
 @unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
@@ -472,7 +485,10 @@ class VitalsMeasures(TempDirTest):
             self.skipTest(output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
         self.stderr = proc.stderr.decode("utf-8", "replace")
-        return json.loads(proc.stdout)
+        out = json.loads(proc.stdout)
+        self.runs = getattr(self, "runs", 0) + 1
+        keep_evidence(self, f"run{self.runs}", out)
+        return out
 
     def test_ttfb_counts_the_emulated_latency(self):
         out = self.vitals("", "--throttle", "slow4g", "--settle", "300")
@@ -498,23 +514,47 @@ class VitalsMeasures(TempDirTest):
         self.assertTrue(own, run["tasks"])
         self.assertGreaterEqual(max(t["duration"] for t in own), 200)
 
+    # The fixture's task, due AFTER ms past the first paint on the page's own
+    # clock, and due again AFTER ms past any long task of the runner's own that
+    # ends after the paint; #done shows once it has run, for --wait-for.
+    QUIET = ("<p id=done hidden>Done</p><script>let due = null, timer, ran = false;"
+             "const arm = (at) => { if (ran || (due != null && at <= due)) return; due = at;"
+             " clearTimeout(timer); timer = setTimeout(() => { ran = true; " + BUSY.format(ms=250)
+             + "; document.getElementById('done').hidden = false; }, Math.max(0, due - performance.now())); };"
+             "let paint = null;"
+             "new PerformanceObserver((list) => { for (const e of list.getEntries()) {"
+             " if (e.name === 'first-contentful-paint') { paint = e.startTime; arm(paint + AFTER); } }"
+             " }).observe({ type: 'paint', buffered: true });"
+             "new PerformanceObserver((list) => { for (const e of list.getEntries()) {"
+             " if (paint != null && e.startTime + e.duration > paint) arm(e.startTime + e.duration + AFTER); }"
+             " }).observe({ type: 'longtask', buffered: true });</script>")
+
     def test_tbt_stops_at_tti(self):
         """A long task after five quiet seconds is after TTI; one before is not.
-        A 9-second settle leaves a slow runner room for the quiet window
-        (CodeRabbit on #45). T2 (audit, 2026-10-14): each run is read
-        against its TTI, not against TBT under 50 ms, which a slow runner's
-        own loading could pass: the fixture's task is found by its start,
-        and its place against TTI decides whether TBT counted it."""
-        late = "<script>setTimeout(() => { " + self.BUSY.format(ms=250) + " }, {at});</script>"
-        out = self.vitals(late.replace("{at}", "6000"), "--throttle", "off", "--settle", "9000")
-        self.assertIsNotNone(out["stats"]["tti"])
-        task = the_task(out, after=6000)
-        self.assertGreaterEqual(task["start"], out["stats"]["tti"]["median"])   # after TTI
-        self.assertEqual("after-tti", task.get("leftOut"), task)                 # so left out
-        out = self.vitals(late.replace("{at}", "1000"), "--throttle", "off", "--settle", "9000")
-        task = the_task(out, after=1000)
-        self.assertLess(task["start"], out["stats"]["tti"]["median"])            # before TTI
-        self.assertTrue(task["inTbt"], task)                                     # so counted
+        T2 (audit, 2026-10-14): each run is read against its TTI, not against
+        TBT under 50 ms, which a slow runner's own loading could pass: the
+        fixture's task is found by its start, and its place against TTI
+        decides whether TBT counted it. TEST-6 (P66): the task was due 6 s
+        after the script ran, so a first paint after 1 s, or a long task of
+        the runner's own, left it less than five quiet seconds and TTI came
+        after it. It is now due on the page's own clock, 5.5 s past the first
+        paint and past any such task, and the run waits until it has run."""
+        out = self.vitals(self.QUIET.replace("AFTER", "5500"), "--throttle", "off",
+                          "--wait-for", "#done", "--settle", "500")
+        [run] = out["perRun"]
+        self.assertIsNotNone(out["stats"]["tti"], run)
+        task = the_task(out, after=run["fcp"] + 5000)
+        self.assertGreaterEqual(task["start"], out["stats"]["tti"]["median"], run)   # after TTI
+        self.assertEqual("after-tti", task.get("leftOut"), run)                       # so left out
+        # Half a second past the paint, and read six seconds after it ran, so
+        # its own quiet window fits in the run.
+        out = self.vitals(self.QUIET.replace("AFTER", "500"), "--throttle", "off",
+                          "--wait-for", "#done", "--settle", "6000")
+        [run] = out["perRun"]
+        task = the_task(out, after=run["fcp"])
+        if out["stats"]["tti"]:
+            self.assertLess(task["start"], out["stats"]["tti"]["median"], run)         # before TTI
+        self.assertTrue(task["inTbt"], run)                                            # so counted
         self.assertGreaterEqual(out["stats"]["tbt"]["median"], task["duration"] - 50)
 
     def test_requests_in_flight_keep_the_network_busy(self):
@@ -541,7 +581,15 @@ class VitalsMeasures(TempDirTest):
                 "Math.max(0, 1500 - performance.now()));</script>")
         out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "#buy",
                           "--interact-at", "2500")
-        self.assertLessEqual(out["perRun"][0]["clickedAt"], 2800, "the click came late")
+        # TEST-8 (P66): the click has only to land during the task, with half a
+        # second of it left for INP to wait behind; "by 2,800 ms" was a 300 ms
+        # race a slow runner lost.
+        [run] = out["perRun"]
+        task = the_task(out, after=1000)
+        self.assertGreaterEqual(task["duration"], 2900, run)
+        self.assertGreaterEqual(run["clickedAt"], task["start"], f"the click came before the task: {run}")
+        self.assertLessEqual(run["clickedAt"], task["start"] + task["duration"] - 500,
+                             f"the click came with under 500 ms of the task left: {run}")
         self.assertIsNotNone(out["stats"]["inp"], "no interaction entry: %s" % out["perRun"])
         during = out["stats"]["inp"]["median"]
         self.assertGreaterEqual(during, 500)
@@ -556,6 +604,36 @@ class VitalsMeasures(TempDirTest):
         out = self.vitals(page, "--throttle", "off", "--settle", "500", "--interact", "#after")
         self.assertLess((out["stats"]["inp"] or {"median": 0})["median"], during / 2)
         self.assertNotIn("did not match", self.stderr)          # CodeRabbit on #45: it clicked
+
+    def test_a_run_read_before_the_first_paint_waits_for_it(self):
+        """P66 (N60): a run with no LCP at the end of its settle exited 1 for a
+        page that had painted. At --settle 0 every run here read the page
+        before its paint reached the observers, as macOS CI's runs did at
+        --settle 500 (EachPageHasItsTypesBudget twice and
+        TheOtherGatesReachThePage six times, 2026-10-19 to 28). The run now
+        waits for the LCP, up to 5 s, and its notes say so."""
+        out = self.vitals("", "--throttle", "off", "--settle", "0")
+        [run] = out["perRun"]
+        self.assertIsNotNone(out["stats"]["lcp"], run)
+        self.assertGreaterEqual(run["readAt"], run["lcp"], run)
+        if run["lcpWait"] is not None:
+            self.assertTrue([n for n in out["notes"] if "was waited for" in n], out["notes"])
+
+    def test_a_page_that_never_paints_waits_five_seconds_and_has_no_lcp(self):
+        """The wait has an end: a page with nothing to paint still exits 1
+        with no LCP, after 5 s."""
+        self.write("blank.html", "<!doctype html><html lang=en><head><title>v</title></head><body></body></html>")
+        url = f"http://127.0.0.1:{self.server.server_address[1]}/blank.html"
+        proc = run_node("perf-budget-gate", "measure_vitals.mjs", url, "--runs", "1", "--json", "--throttle",
+                        "off", "--settle", "0", cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
+        if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
+            self.skipTest(output(proc)[-200:])
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("no LCP was recorded in any run", output(proc))
+        [run] = json.loads(proc.stdout)["perRun"]
+        self.assertIsNone(run["lcp"], run)
+        self.assertIn("lcpWait", run, "each run says how long it waited for an LCP")
+        self.assertGreaterEqual(run["lcpWait"], 4900, run)
 
 
 class MatrixSeesStateChanges(TempDirTest):
