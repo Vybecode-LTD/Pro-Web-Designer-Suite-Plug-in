@@ -122,6 +122,15 @@ jobs:
         if: runner.os != 'Linux'
         run: (cd tooling/main && npx playwright install --only-shell chromium)
 
+      # The scripts and the suite's probes launch Playwright's own Chromium
+      # first, and fall back to an installed Chrome or Edge only when it will
+      # not start: this proves it starts on this leg, and prints its version,
+      # so no leg passes on a browser nobody pinned (CodeRabbit on #217).
+      - name: Playwright's own Chromium starts
+        working-directory: tooling/main
+        run: |
+          node -e "require('playwright').chromium.launch().then(async (b) => { console.log('chromium ' + b.version()); await b.close(); }).catch((e) => { console.error(String(e.message).split('\n')[0]); process.exit(1); })"
+
       - name: Save the browsers for the next run
         if: steps.browsers-restored.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0

@@ -93,7 +93,14 @@ class TheCiWorkflow(Workflow):
         other = self.step("npx playwright install --only-shell chromium)")
         self.assertIn("if: runner.os == 'Linux'", linux)
         self.assertIn("if: runner.os != 'Linux'", other)
-        order = [self.steps.index(s) for s in (where, restore, linux, other, save)]
+        # A fallback to the image's Chrome would pass a leg on a browser
+        # nobody pinned, so every leg proves Playwright's own starts first
+        # (CodeRabbit on #217).
+        starts = self.step("require('playwright').chromium.launch()")
+        self.assertRegex(starts, r"(?m)^\s+working-directory: tooling/main$")
+        self.assertNotIn("if:", starts.split("\n      # ")[0])
+        self.assertIn("process.exit(1)", starts)
+        order = [self.steps.index(s) for s in (where, restore, linux, other, starts, save)]
         self.assertEqual(sorted(order), order)
         self.assertLess(self.steps.index(save), self.steps.index(self.step("name: The suite\n")))
 
