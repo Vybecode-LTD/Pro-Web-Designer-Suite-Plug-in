@@ -12,7 +12,7 @@
 
 ## 3. The state, verified 2026-10-28
 
-`docs/HANDOFF.md` has it. In short: `main` at `e6c214c` (#217); #218 (this session's docs) open or merged; P66 (#216) and P67 (#217) done; the owner's twelve decisions in the runbook's §7 (one release, 4.1.0); the owner's four GitHub settings **not yet done**; `check_execution_plan.py` 22 open; next free ids N84, P90, PR #219. Check it:
+`docs/HANDOFF.md` has it. In short: `main` at `e6c214c` (#217); #221 (this session's docs) open or merged; P66 (#216) and P67 (#217) done; Dependabot's #218 to #220 open, to fold into P68; the owner's twelve decisions in the runbook's §7 (one release, 4.1.0); the owner's four GitHub settings **not yet done**; `check_execution_plan.py` 22 open; next free ids N84, P90, PR #222. Check it:
 
 ```bash
 cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && gh run list --branch main --limit 2 && python -B "dev plans/check_execution_plan.py"

@@ -9,11 +9,12 @@
 ## State
 
 - **`main` at `e6c214c`** (#217's merge); its CI was running at the end. #216's merge (`9c1a528`) passed on all seven legs, and so did #217's head (`6c1031f`).
-- **This PR, #218,** `docs/handoff-2026-10-28-p66-p67`: this handoff, the starting prompts, `CLAUDE.md`'s Current state, the runbook's §7 ticks, `dev plans/README.md`.
+- **Dependabot's first PRs, opened on #217's merge:** #218 (`tooling/tailwind-v3`, 2 updates), #219 (`setup-uv` 10.2.0 to 10.3.2), #220 (`tooling/main`, 8 updates). P68 bumps those pins anyway: fold them into it (with the test pins that name the versions), and Dependabot closes each once `main` has them.
+- **This PR, #221,** `docs/handoff-2026-10-28-p66-p67`: this handoff, the starting prompts, `CLAUDE.md`'s Current state, the runbook's §7 ticks, `dev plans/README.md`.
 - **Released:** `v4.0.1` on `84f4a4f`; the distribution repository at `4809e3f`. On `main`, unreleased, for 4.1.0: P60 to P67.
 - **The directory:** 4.0.1 submitted 2026-10-26; no reviewer's answer at the last read.
 - **The owner's install:** 4.0.1, user scope.
-- **The plans:** `check_execution_plan.py` 22 open, 22 scheduled. Next free ids: **N84, P90, PR #219**.
+- **The plans:** `check_execution_plan.py` 22 open, 22 scheduled. Next free ids: **N84, P90, PR #222**.
 
 ## Next steps
 
@@ -31,7 +32,7 @@
 - **A tag now needs CI green on its commit.** Pushed before CI finishes, `release.yml` fails at "CI passed on the tagged commit"; rerun that job once CI is green.
 - **A new skip in CI can cross a ceiling** (`tools/skip_ceiling.py`; Linux 7, Windows 20, macOS 16): raise the ceiling in `ci.yml` on purpose, with the reason.
 - **A test that needs a browser calls `wds_support.no_browser(self, why)`**, never `self.skipTest`: `test_harness.NoBrowser` fails on a bare skip after a no-browser check.
-- **Dependabot's first PRs will arrive** (actions weekly, `tooling/` monthly). Fold them into a feature PR; a bump that breaks a test pin is fixed there.
+- **Dependabot opens PRs** (actions weekly, `tooling/` monthly). Fold them into a feature PR, never merge one alone; a bump that breaks a test pin is fixed there. They take PR numbers: predict the next one from `gh pr list --state all --limit 1`.
 - **Eight SKILL.md files are within 20 bytes of the 20,500-byte cap** (P86 and P87 name the cuts).
 - **Budget:** this session used about 560K tokens of its 750K. Before a long `check.py`, look at the CPU; stop a hung run with `TaskStop`.
 - **Standing:** never grep `tooling/`; the repository is public; nobody commits to the distribution repository by hand; nobody but the owner acts in the directory portal; the four old ids stay; `python -B`.
