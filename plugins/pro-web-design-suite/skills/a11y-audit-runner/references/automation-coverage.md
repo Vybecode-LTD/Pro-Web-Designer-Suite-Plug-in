@@ -160,7 +160,7 @@ Every static contrast checker reports 4.54:1 and moves on. **Composited, the tex
 
 Same shape, other forms: text over a gradient that is fine at one end; text over a video whose first frame is dark and whose tenth is white; a `mix-blend-mode` that inverts on scroll; a disabled overlay dropped over a live form.
 
-*How this skill catches it:* the runtime contrast pass composites every translucent overlay painted above the text, including `pointer-events: none` scrims, and reports both numbers so the gap is explicit. Verified on the fixture: declared **5.33:1**, rendered **1.46:1**.
+*How this skill catches it:* the runtime contrast pass composites every translucent overlay painted above the text, including `pointer-events: none` scrims and text below the fold, and reports both numbers so the gap is explicit. Verified on the fixture: declared **5.33:1**, rendered **1.46:1**.
 
 ### 4.5 The others, briefly
 

@@ -589,9 +589,25 @@ const HELPERS = () => {
     return v;
   };
 
+  // Every element at a point, topmost first, through every shadow root: a
+  // host's own insides come before it.
+  const stackAt = (x, y) => {
+    const out = [];
+    const visit = (root) => {
+      for (const e of root.elementsFromPoint(x, y)) {
+        if (e.getRootNode() !== root || out.includes(e)) continue;
+        const inner = deep.shadowOf(e);
+        if (inner && inner.elementsFromPoint) visit(inner);
+        out.push(e);
+      }
+    };
+    visit(document);
+    return out;
+  };
+
   window.__a11y = { FOCUSABLE, cssPath, visible, expectedTabbables, describeActive,
                     hiddenFromAT, openModal, takeTabCancelled, exposeClosed,
-                    rootCounts, activePath, deep };
+                    rootCounts, activePath, deep, stackAt };
 };
 
 // DEEP_DOM, then HELPERS, as one init script: Playwright does not promise the
@@ -1433,16 +1449,69 @@ const CONTRAST_FN = () => {
     return !!(label && label.control && label.control.matches(':disabled'));
   };
 
-  // A scrim built with pointer-events: none is missed by elementsFromPoint.
-  // Which elements could be one does not depend on the text, so it is asked
-  // once.
-  const scrims = [];
+  // elementsFromPoint skips an element with pointer-events: none, which is
+  // how most scrims are built. Such an element that paints a background takes
+  // pointer events while the pass runs, so the hit list puts it where it
+  // paints: over the text, under it, or clipped away. Its box alone said none
+  // of that, and an opaque code block under the text, or clipped out of sight,
+  // was composited over it (N59). Every element lifted is put back.
+  const lifted = [];
+  const lift = (el) => {
+    lifted.push([el, el.style.getPropertyValue('pointer-events'),
+                 el.style.getPropertyPriority('pointer-events')]);
+    el.style.setProperty('pointer-events', 'auto', 'important');
+  };
   for (const cand of deep.all(document)) {
     const cs2 = getComputedStyle(cand);
-    if (cs2.pointerEvents !== 'none') continue;
+    if (cs2.pointerEvents !== 'none' || !cand.style) continue;
     const cc = parse(cs2.backgroundColor);
-    if (cc && cc.a > 0) scrims.push([cand, cc]);
+    if (cc && cc.a > 0) lift(cand);
   }
+
+  // Where to ask what is painted over a text: the middle of its first line,
+  // where its glyphs are, brought into the viewport. elementsFromPoint answers
+  // only for a point in the viewport, and one clamped to its edge asked about
+  // whatever sat there: an opaque card at the fold measured every text below
+  // it at 1:1 (N59). A text the page cannot scroll into view is not probed.
+  // A scroll container between the text and the page brings the line to its
+  // own middle first: scrolled out of a code block or a list, the text is
+  // clipped at its point, and what is over the container went uncounted
+  // (CodeRabbit on #213). A box the reader cannot scroll (hidden, clip) is
+  // left as it is. Each scroll position moved is put back after the pass.
+  const scroller = document.scrollingElement || document.documentElement;
+  const scrolled = new Map();
+  const scrollBy = (box, dx, dy) => {
+    if (!scrolled.has(box)) scrolled.set(box, [box.scrollLeft, box.scrollTop]);
+    box.scrollTo({ left: box.scrollLeft + dx, top: box.scrollTop + dy, behavior: 'instant' });
+  };
+  const inView = ([x, y]) => x >= 0 && y >= 0 &&
+    x < document.documentElement.clientWidth && y < document.documentElement.clientHeight;
+  const probeAt = (node, el) => {
+    const point = () => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const line = [...range.getClientRects()].find((q) => q.width > 0 && q.height > 0) ||
+        el.getBoundingClientRect();
+      return [line.left + line.width / 2, line.top + line.height / 2];
+    };
+    for (let m = deep.parentOf(el); m && m !== scroller; m = deep.parentOf(m)) {
+      if (m.nodeType !== 1) continue;
+      const cs = getComputedStyle(m);
+      const x = /auto|scroll/.test(cs.overflowX) && m.scrollWidth > m.clientWidth;
+      const y = /auto|scroll/.test(cs.overflowY) && m.scrollHeight > m.clientHeight;
+      if (!x && !y) continue;
+      const [px, py] = point();
+      const b = m.getBoundingClientRect();
+      scrollBy(m, x ? px - (b.left + m.clientLeft + m.clientWidth / 2) : 0,
+               y ? py - (b.top + m.clientTop + m.clientHeight / 2) : 0);
+    }
+    let p = point();
+    if (inView(p)) return p;
+    scrollBy(scroller, p[0] - document.documentElement.clientWidth / 2,
+             p[1] - document.documentElement.clientHeight / 2);
+    p = point();
+    return inView(p) ? p : null;
+  };
 
   const out = [];
   const seen = new Set();
@@ -1496,29 +1565,66 @@ const CONTRAST_FN = () => {
     // Something painted ON TOP of this text changes what the eye receives,
     // and a source-level contrast check cannot see it at all: the colour pair
     // in the stylesheet is fine and the rendered result is not.
-    const r = el.getBoundingClientRect();
-    const cx = Math.min(window.innerWidth - 1, Math.max(0, r.left + r.width / 2));
-    const cy = Math.min(window.innerHeight - 1, Math.max(0, r.top + r.height / 2));
     const overlays = [];
-    // Asked of the text's own root, so a hit inside it is not its host.
-    let hits = [];
-    const scope = el.getRootNode().elementsFromPoint ? el.getRootNode() : document;
-    try { hits = scope.elementsFromPoint(cx, cy); } catch { hits = []; }
-    for (const h of hits) {
-      if (h === el) break;
-      if (deep.contains(h, el)) continue;
-      const hs = getComputedStyle(h);
-      const hc = parse(hs.backgroundColor);
-      if (hc && hc.a > 0) overlays.push(hc);
-    }
-    // elementsFromPoint skips pointer-events:none, which is exactly how most
-    // scrims are built, so they are found separately.
-    for (const [cand, cc] of scrims) {
-      if (cand === el || deep.contains(cand, el) || deep.contains(el, cand)) continue;
-      const cr = cand.getBoundingClientRect();
-      if (cx >= cr.left && cx <= cr.right && cy >= cr.top && cy <= cr.bottom) {
-        overlays.push(cc);
+    let covered = null;
+    const at = probeAt(node, el);
+    if (at) {
+      const [cx, cy] = at;
+      // Every element at the point, through every shadow root: asked of one
+      // root, a scrim inside another component is that component's host, and
+      // a transparent host paints nothing (Codex on #213). A text box that
+      // takes no pointer events is lifted too: unlisted, everything at the
+      // point counted, the elements beneath it among them (N59).
+      const hitsAt = () => { try { return window.__a11y.stackAt(cx, cy); } catch { return []; } };
+      let hits = hitsAt();
+      if (!hits.includes(el) && el.style && getComputedStyle(el).pointerEvents === 'none') {
+        lift(el);
+        hits = hitsAt();
       }
+      // An element is painted over the text when its own root lists it before
+      // the text, which that root sees as the text or a host whose shadow tree
+      // holds it: so a component's scrim over its slotted text counts, and its
+      // panel behind that text does not. An ancestor is no stand-in for the
+      // text: a text clipped from its point, as in a collapsed code block, has
+      // nothing there over it, though the page that holds it is there.
+      const holds = (x) => {
+        if (x === el) return true;
+        for (let r = el.getRootNode(); r && r.host; r = r.host.getRootNode()) if (r.host === x) return true;
+        return false;
+      };
+      const lists = new Map();
+      const above = (h) => {
+        const root = h.getRootNode();
+        if (!lists.has(root)) {
+          let list = [];
+          try { list = root.elementsFromPoint(cx, cy); } catch { /* not a root that answers */ }
+          lists.set(root, list);
+        }
+        const list = lists.get(root);
+        const i = list.indexOf(h);
+        const j = list.findIndex(holds);
+        return i >= 0 && j >= 0 && i < j;
+      };
+      for (const h of hits.includes(el) ? hits : []) {
+        if (deep.contains(h, el) || !above(h)) continue;
+        const hc = parse(getComputedStyle(h).backgroundColor);
+        if (!hc || hc.a <= 0) continue;
+        // Its opacity, and that of each ancestor it does not share with the
+        // text, thins what it paints; a panel at opacity 0 paints nothing.
+        let a = hc.a;
+        for (let m = h; m && !deep.contains(m, el); m = deep.parentOf(m)) {
+          if (m.nodeType === 1) a *= Number(getComputedStyle(m).opacity);
+        }
+        if (a <= 0) continue;
+        // An opaque layer over the text hides it, which is no contrast at all.
+        if (a >= 1) { covered = window.__a11y.cssPath(h); break; }
+        overlays.push({ ...hc, a });
+      }
+    }
+    if (covered) {
+      out.push({ sel: window.__a11y.cssPath(named), text: text.slice(0, 50),
+                 unmeasurable: 'covered by ' + covered, size, large });
+      continue;
     }
 
     let efg = fg.a < 1 ? over(fg, bg) : fg;
@@ -1540,6 +1646,13 @@ const CONTRAST_FN = () => {
       cell: deep.closest(el, '[data-cell-id]')
         ? deep.closest(el, '[data-cell-id]').getAttribute('data-cell-id') : null,
     });
+  }
+  for (const [box, [left, top]] of [...scrolled].reverse()) {
+    box.scrollTo({ left, top, behavior: 'instant' });
+  }
+  for (const [el, value, priority] of lifted.reverse()) {
+    if (value) el.style.setProperty('pointer-events', value, priority);
+    else el.style.removeProperty('pointer-events');
   }
   return out;
 };
@@ -1588,12 +1701,14 @@ function contrastFindings(samples) {
     out.push(finding(
       'contrast', 'contrast-unmeasurable', '1.4.3', 'warning',
       `${unmeasurable} text element(s) sit on a background-image or gradient, ` +
-      'so their contrast cannot be computed from styles.',
+      'or under an opaque layer, so their contrast cannot be computed from styles.',
       'This is a genuine limit, not a bug: contrast against a photograph ' +
       'varies per pixel, and the worst pixel is the one that matters. A tool ' +
       'that silently passed these would be lying. Check them by eye against ' +
       'the busiest region of the image, or remove the question by putting the ' +
-      'text on a solid scrim that is itself measured. Examples: ' +
+      'text on a solid scrim that is itself measured. A text under an opaque ' +
+      'layer is hidden where it was probed: a page still loading behind a ' +
+      'cover wants --wait-for. Examples: ' +
       unmeasurableWhere.join(', '),
       {}));
   }
@@ -2089,21 +2204,7 @@ const OBSCURED_FN = () => {
     return q.right > L && q.left < R && q.bottom > T && q.top < B;
   });
   if (!covers.length) return { sel, hidden: 0, by: [] };
-  // Every element at a point, topmost first, through every shadow root: a
-  // host's own insides come before it.
-  const stackAt = (x, y) => {
-    const out = [];
-    const visit = (root) => {
-      for (const e of root.elementsFromPoint(x, y)) {
-        if (e.getRootNode() !== root || out.includes(e)) continue;
-        const inner = deep.shadowOf(e);
-        if (inner && inner.elementsFromPoint) visit(inner);
-        out.push(e);
-      }
-    };
-    visit(document);
-    return out;
-  };
+  const stackAt = a.stackAt;
   // Alpha from an alpha component only: an opaque colour computes as
   // `rgb(r, g, b)`, and black's last channel is no alpha (CodeRabbit on #179).
   const clear = (c) => c === 'transparent' ||

@@ -301,16 +301,18 @@ For every element with a direct non-empty text node, except the text of an inact
 
 1. `fg = getComputedStyle(el).color`, with its alpha.
 2. Walk ancestors compositing `background-color` with source-over until one is opaque. **If any ancestor has a `background-image`, stop and report the pair as unmeasurable** — do not guess.
-3. Find everything painted *above* the text at its centre point and composite each in turn, over both the foreground and the background.
+3. Find everything painted *above* the text at the middle of its first line and composite each in turn, over both the foreground and the background, each at its background's alpha times its opacity.
 4. Required ratio: **3:1** if ≥24px, or ≥18.66px and weight ≥700; otherwise **4.5:1**.
 
 Step 3 is the one that distinguishes this from a stylesheet checker.
 
 ### Finding the overlays
 
-`document.elementsFromPoint(cx, cy)` returns the hit-test stack from the top down, respecting z-index and stacking contexts, which is exactly the paint order you need. Everything before the text's own element and not an ancestor of it is painted over the text.
-
-**It misses `pointer-events: none`**, which is how most scrims are built, so scan separately for positioned elements with `pointer-events: none` and a non-transparent background whose rect contains the point, and take the union. That is two cheap passes and it covers the real cases.
+`document.elementsFromPoint(cx, cy)` returns the hit-test stack from the top down, respecting z-index, stacking contexts and clipping, which is exactly the paint order you need. Everything before the text's own element and not an ancestor of it is painted over the text. Four things keep that true:
+- **The point is in the viewport.** `elementsFromPoint` answers only there, so a text off screen is scrolled to the middle of it first, and the scroll is put back after. A point clamped to the viewport's edge asks about whatever sits there: an opaque card at the fold would make every text below it measure 1:1. Each scroll container between the text and the page (`overflow: auto` or `scroll`) brings the line to its own middle first, since a text scrolled out of a code block or a list is clipped at its point; a box the reader cannot scroll (`hidden`, `clip`) is left as it is.
+- **It misses `pointer-events: none`**, which is how most scrims are built. While the pass runs, each such element with a background takes pointer events, so the stack puts it where it paints. Its box alone says nothing of that: an opaque code block beneath the text, or clipped out of sight, is not over it.
+- **The text's own element is in the stack.** If it takes no pointer events, it is lifted too; otherwise "before it" would be everything at the point, the panel beneath it included. A text still not in the stack is clipped from its point, as in a collapsed code block, and nothing there is over it: the page that holds it is at the point, and an ancestor is no stand-in for the text.
+- **Every shadow root is read.** Asked of one root, an element inside another component's shadow root is that component's host, and a transparent host paints nothing. So the stack is collected through every shadow root, and each element is over the text when its own root lists it before the text, which that root sees as the text itself or the host that holds it. A component's scrim over its slotted text counts that way, and its panel behind that text does not.
 
 ### What it finds that nothing else does
 
@@ -330,6 +332,8 @@ Where this shape occurs in practice: loading veils over a form, a "fade to backg
 ### Where it still refuses
 
 Text over a `background-image` is reported as **unmeasurable**, not as a pass. Contrast against a photograph varies per pixel and the worst pixel is the one that matters; a tool that quietly passed those would be lying. The finding names the ancestor that carries the image so a human can go and look — and the honest fix is usually to put the text on a solid scrim that *is* measurable, which converts a permanent unknown into a number.
+
+Text under an **opaque** layer is unmeasurable too, never 1:1: the layer hides it where it was probed, which is no contrast at all. The finding names the layer. When it is a cover over a page still loading, audit with `--wait-for`.
 
 ---
 
