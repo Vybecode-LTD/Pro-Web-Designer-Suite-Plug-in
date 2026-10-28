@@ -24,7 +24,7 @@ The execution plan's §1 already defines done in seven conditions. This runbook 
 
 **Not in the definition, by the owner's choice to make:** Phase 7 ("past the review": the ten candidate areas, probed with and without the plugin before any is built) and Part B's launch week. They are the path to "the end-all-be-all web development plugin" and are scheduled after done, as §4's last stage, so the owner decides whether done is the line or the start.
 
-**Where it stands today (2026-10-28):** D1 is open on 281 findings; D2 holds except the prose pins; D3 fails (main red on one macOS leg; no ruleset; no tag gate; silent skips); D4 holds except the router's over-firing; D5 holds for 4.0.1 but six skills have no outcome case; D6 fails on 81 document findings; D7 is half (released, submitted, not installed, six fixes ahead); D8 fails on 19 statements and a 125 KB prompt; D9 fails (no topics, no preview, no root security policy).
+**Where it stands today (2026-10-28):** D1 is open on 281 findings; D2 holds except the prose pins; D3 fails (main red on one macOS leg; no ruleset; no tag gate; silent skips); D4 holds except the router's over-firing; D5 holds for 4.0.1 but six skills have no outcome case; D6 fails on 81 document findings; D7 is half (released, submitted, installed at 4.0.1 since 2026-10-28, six fixes ahead); D8 fails on 19 statements and a 125 KB prompt; D9 fails (no topics, no preview, no root security policy).
 
 ---
 
@@ -58,7 +58,7 @@ These cannot be done by an agent. The first four come before any PR of stage 0.
 3. **The distribution repository's settings** (OPS-11, Q4): Issues and Wiki off (or on, per Q4), a ruleset on `main` that lets only the deploy key push.
 4. **Topics and the social preview** (L9, DOC-C-7): on both repositories, the description and homepage on the development one, the twelve topics the distribution plan lists on both, and the 1280×640 preview (the agent draws it from `dev plans/readme-art`; the owner uploads it, since the API cannot).
 5. **Answer the directory's review** of 4.0.1 when it comes (L1), from the distribution plan's "If the reviewer asks". Never let an agent submit, publish or withdraw.
-6. **Update the own install** after the audit release (L4): `/plugin marketplace add Vybecode-LTD/pro-web-design-suite`, then `/plugin install pro-web-design-suite@pro-web-design-suite`; remove the 3.6.0 `web-design-suite` marketplace and cache.
+6. **Update the own install** after each release (L4): done for 4.0.1 on 2026-10-28 (the marketplace registered, the plugin installed at user scope, the 3.6.0 `web-design-suite` install and marketplace removed); after 4.1.0 it is `claude plugin update pro-web-design-suite@pro-web-design-suite`.
 7. **OK each paid eval run** before it is dispatched (D5 of the execution plan): one `tag=all` run on the release PR's merge, about $10; one more if a skill changes after it.
 8. **Delete `wds-gate-scratch`** (Q12).
 9. **Part B** (stage 7): the listings' forms, the launch posts, GitHub Discussions on, the Usage tab.

@@ -12,7 +12,7 @@
 
 ## 3. The state, verified 2026-10-28
 
-`docs/HANDOFF.md` has it. In short: `main` at `8441ff0`, **red** on macOS 3.14 in `test_runtime_urls.EachPageHasItsTypesBudget`; PR #215 (this session's docs) open or merged; `v4.0.1` the latest tag, the distribution repository at `4809e3f`; 4.0.1 in the directory's review; the owner's install at 3.6.0; `check_execution_plan.py` 0 open, 0 scheduled; next free ids N60, P66, PR #216. Check it:
+`docs/HANDOFF.md` has it. In short: `main` at `8441ff0`, **red** on macOS 3.14 in `test_runtime_urls.EachPageHasItsTypesBudget`; PR #215 (this session's docs) open or merged; `v4.0.1` the latest tag, the distribution repository at `4809e3f`; 4.0.1 in the directory's review and installed at user scope on the owner's machine (3.6.0 removed); `check_execution_plan.py` 0 open, 0 scheduled; next free ids N60, P66, PR #216. Check it:
 
 ```bash
 cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && gh run list --branch main --limit 1 && python -B "dev plans/check_execution_plan.py"
