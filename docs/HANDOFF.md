@@ -1,8 +1,8 @@
 # Handoff
 
 **2026-10-27 (second session): P64 and P65 merged for 4.0.2. 4.0.1 is still in the directory's review.**
-- #212 makes a missing engine's install hint name the CLI of the Playwright the gate loaded.
-- #213 rebuilds the contrast pass's overlay probe. webawesome.com's 78 and 195 false `contrast-under-overlay` errors a page drop to none.
+- #212 makes a missing engine's installation hint name the CLI of the Playwright the gate loaded.
+- #213 rebuilds the contrast pass's overlay probe. It removes webawesome.com's false `contrast-under-overlay` errors: 78 on the home page and 195 on the button page.
 
 The next session starts from `dev plans/next-session-prompt.md` (§3, then §4). `dev plans/next-session-opening-prompt.md` is the message to paste in.
 
@@ -19,7 +19,7 @@ The next session starts from `dev plans/next-session-prompt.md` (§3, then §4).
     - It counts only what the hit's own root lists before the text, weighted by opacity.
     - An opaque layer makes the text `contrast-unmeasurable`.
     - Codex and CodeRabbit each found a real gap (a scrim inside a shadow root, a text in a scroll container), and both are fixed with tests. The PR carries 11 tests: 8 fail on 4.0.1.
-- **The directory:** read in the owner's Chrome on 2026-10-27, still waiting for the reviewer. The scan's findings stand. The owner chose to change only the install hint (P64). Answers to every finding are ready in `web-design-suite-distribution-and-promotion.md` ("If the reviewer asks").
+- **The directory:** read in the owner's Chrome on 2026-10-27, still waiting for the reviewer. The scan's findings stand. The owner chose to change only the installation hint (P64). Answers to every finding are ready in `web-design-suite-distribution-and-promotion.md` ("If the reviewer asks").
 - **The execution plan:** `check_execution_plan.py` shows 0 open and 0 scheduled. The next free numbers are N60 and P66.
 
 ## Next steps

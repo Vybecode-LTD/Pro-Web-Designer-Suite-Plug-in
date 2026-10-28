@@ -1,6 +1,6 @@
 # The opening prompt for the next session
 
-Written 2026-10-27, at the end of the day's second session. P64 (#212, the install hint) and P65 (#213, the contrast pass's overlay probe) merged for 4.0.2, and 4.0.1 is still in Anthropic's directory review. Paste the block below into a new session.
+Written at the end of the second session on 2026-10-27. P64 (#212, the installation hint) and P65 (#213, the contrast pass's overlay probe) merged for 4.0.2, and 4.0.1 is still in Anthropic's directory review. Paste the block below into a new session.
 
 ```
 You're continuing work on Pro Web Design Suite (pro-web-design-suite), a Claude Code plugin, in C:\DEV\Pro-Web-Designer-Suite-Plug-in. Budget: this session may run up to 750 thousand tokens, with no compacting. Report usage after each PR (the app's get_usage count), warn early, and write the handoff before the cap.
