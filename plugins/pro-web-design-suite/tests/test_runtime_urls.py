@@ -17,11 +17,12 @@ from __future__ import annotations
 
 import http.server
 import json
+import subprocess
 import threading
 import unittest
 
 from test_browser_runtime import MODULES, only
-from wds_support import NODE, TempDirTest, output, run_node
+from wds_support import NODE, TempDirTest, keep_evidence, output, run_node
 
 PAGE = ("<!doctype html><html lang=en><head><title>{title}</title>"
         "<meta name=viewport content='width=device-width'></head><body><main>"
@@ -84,8 +85,13 @@ class Served(TempDirTest):
         return f"http://127.0.0.1:{self.port}{path}"
 
     def node(self, skill, script, *args, codes=(0, 1)):
-        proc = run_node(skill, script, *args, cwd=self.tmp, timeout=600,
-                        env_changes={"NODE_PATH": MODULES})
+        try:
+            proc = run_node(skill, script, *args, cwd=self.tmp, timeout=600,
+                            env_changes={"NODE_PATH": MODULES})
+        except subprocess.TimeoutExpired:
+            # TEST-5: alone a run takes seconds; beside a build at 100 % CPU
+            # one ran out the 600 s, and the error was only TimeoutExpired.
+            self.fail(f"{script} timed out at 600 s: the machine was too busy to run it")
         if b"no usable chromium" in proc.stdout.lower() + proc.stderr.lower():
             self.skipTest(output(proc)[-200:])
         self.assertIn(proc.returncode, codes, output(proc))
@@ -171,12 +177,25 @@ class EachPageHasItsTypesBudget(Served):
         proc = self.node("perf-budget-gate", "measure_vitals.mjs", "--urls", str(listed), "--budget",
                          str(budget), "--runs", "1", "--settle", "500", "--throttle", "off", "--json")
         out = json.loads(proc.stdout)
-        # Each page against its own type: the strict one breaks its LCP limit,
-        # the home page none. (A run with no LCP recorded also exits 1, as
-        # macOS's headless shell did once in CI, so the breaches decide.)
-        self.assertEqual([("home", []), ("strict", ["lcp"])],
-                         [(r["pageType"], [b["metric"] for b in r["breaches"]]) for r in out["runs"]])
-        self.assertEqual(1, out["runs"][1]["exit"])
+        keep_evidence(self, "vitals", out)
+        runs = out["runs"]
+        measured = [{k: r[k] for k in ("pageType", "lcp", "exit", "error")} for r in runs]
+        self.assertTrue(all(r["report"] for r in runs), measured)
+        # Each page is held to its own type's budget, read from its report, not
+        # inferred from a breach: on macOS CI a run that recorded no LCP broke
+        # no budget, and the strict page passed (TEST-5, P66).
+        self.assertEqual([("home", {"lcp_ms": 60000}), ("strict", {"lcp_ms": 1})],
+                         [(r["pageType"], r["report"]["budget"]) for r in runs], measured)
+        for r in runs:
+            with self.subTest(page=r["pageType"]):
+                # A page that painted has an LCP: the run waits for one past
+                # its settle (P66), so none here is the gate's failure.
+                self.assertIsNotNone(r["lcp"], r["report"]["perRun"])
+                # The verdict is the recorded number's, against that budget.
+                breaks = r["lcp"] > r["report"]["budget"]["lcp_ms"]
+                self.assertEqual(["lcp"] if breaks else [], [b["metric"] for b in r["breaches"]], measured)
+                self.assertEqual(int(breaks), r["exit"], measured)
+        self.assertEqual([0, 1], [r["exit"] for r in runs], measured)   # the strict one breaks, the home one not
         self.assertEqual(1, proc.returncode)
 
 

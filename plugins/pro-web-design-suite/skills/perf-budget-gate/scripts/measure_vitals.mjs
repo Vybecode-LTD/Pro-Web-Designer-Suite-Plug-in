@@ -63,7 +63,8 @@
  *   --interact-at MS   click it MS after navigation starts instead, while
  *                      the page still loads and hydrates
  *   --warm             measure the SECOND load (warm cache) instead of a cold one
- *   --settle MS        quiet time after load before reading   (default 3000)
+ *   --settle MS        quiet time after load before reading   (default 3000);
+ *                      a run with no LCP by then waits up to 5s more for one
  *   --storage-state FILE  measure signed in: Playwright's storageState, the
  *                      cookies and localStorage of a session
  *   --wait-for SEL     wait until SEL is visible after load, then settle: a
@@ -493,6 +494,9 @@ const HARVEST = ({ topN, ttfb: networkTtfb, requests: networkRequests }) => {
     transferTotal: resources.reduce((s, r) => s + r.transfer, 0),
     resources: resources.sort((a, b) => b.transfer - a.transfer).slice(0, topN),
     observerErrors: v.errors || [],
+    // When the run read the page, on its clock: a reading that came before
+    // something the page does (a paint, a shift) cannot have seen it.
+    readAt: Math.round(now),
   };
 };
 
@@ -555,6 +559,22 @@ async function clickDuringLoad(page, opts) {
       `${opts.interactAt} did not click: ${err.message.split('\n')[0]}\n`);
     return null;
   }
+}
+
+// A run read before the page's first paint reached the observers has no LCP,
+// and exits 1 for a page that did paint: on a loaded machine the paint can
+// land after load plus the settle (P66: macOS CI at --settle 500, eight runs
+// in ten days; here, every run at --settle 0). So a run with no LCP at the
+// end of its settle waits for one, up to LCP_GRACE ms. Returns how long it
+// waited, or null when the LCP was already there.
+const LCP_GRACE = 5000;
+
+async function waitForLcp(page) {
+  const painted = () => Boolean(window.__vitals && window.__vitals.lcp != null);
+  if (await page.evaluate(painted)) return null;
+  const started = Date.now();
+  await page.waitForFunction(painted, null, { timeout: LCP_GRACE, polling: 50 }).catch(() => {});
+  return Date.now() - started;
 }
 
 async function runOnce(browser, opts, url) {
@@ -640,6 +660,7 @@ async function runOnce(browser, opts, url) {
     }
     try { await waitForNav(page, opts.reach); } catch (err) { die(err.message); }
     await page.waitForTimeout(opts.settle);
+    const lcpWait = await waitForLcp(page);
 
     if (opts.interact && opts.interactAt == null) {
       try {
@@ -658,6 +679,7 @@ async function runOnce(browser, opts, url) {
     const result = await page.evaluate(HARVEST,
       { topN: opts.resources, ttfb: doc && doc.ttfb != null ? doc.ttfb : null, requests });
     result.clickedAt = clickedAt;
+    result.lcpWait = lcpWait;
     await cdp.detach().catch(() => {});
     return result;
   } finally {
@@ -947,6 +969,13 @@ async function main() {
       `--interact-at ${opts.interactAt}: the target was ready only at ` +
       `${Math.min(...late)} ms or later in ${late.length} run(s), and was clicked then.`);
   }
+  const waited = runs.filter((r) => r.lcpWait != null && r.lcp != null);
+  if (waited.length) {
+    notes.push(
+      `The LCP came up to ${Math.max(...waited.map((r) => r.lcpWait))} ms after the ` +
+      `--settle ${opts.settle} window in ${waited.length} run(s), and was waited for: ` +
+      'raise --settle so the reading comes after the page has painted.');
+  }
   if (!opts.interact) {
     notes.push(
       'INP is n/a because nothing interacted with the page. TBT is the lab ' +
@@ -1020,6 +1049,7 @@ async function main() {
     perRun: runs.map((r) => ({
       lcp: r.lcp, cls: r.cls, tbt: r.tbt, ttfb: r.ttfb, fcp: r.fcp, tti: r.tti,
       inp: r.inp, longTaskCount: r.longTaskCount, clickedAt: r.clickedAt, tasks: r.tasks,
+      readAt: r.readAt, lcpWait: r.lcpWait,
     })),
   };
 
@@ -1034,7 +1064,7 @@ async function main() {
   if (breaches.length) return 1;
   if (stats.lcp == null) {
     process.stderr.write(
-      'measure_vitals: no LCP was recorded in any run. The page may have ' +
+      `measure_vitals: no LCP was recorded in any run, ${LCP_GRACE / 1000} s past the settle. The page may have ` +
       'rendered nothing, or failed to load.\n');
     return 1;
   }

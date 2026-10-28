@@ -23,6 +23,25 @@
 
 ### Fixed
 
+- **`measure_vitals.mjs` reported no LCP for a page that had painted** (perf-budget-gate). A run
+  read the page at the end of its `--settle`, and when the first paint had not reached the
+  observers by then, it exited 1 with "no LCP was recorded": at `--settle 0` every run did, and on
+  macOS CI at `--settle 500` eight runs did from 2026-10-19 to 28. A run with no LCP at the end of
+  its settle now waits up to 5 s more for one, and the notes say how long it waited; a page with
+  nothing to paint still exits 1, 5 s later. Each run in `perRun` now says when it read the page
+  (`readAt`, on the page's clock) and how long it waited (`lcpWait`). See
+  `references/ci-integration.md` §4. Regression tests:
+  `test_browser_runtime.VitalsMeasures.test_a_run_read_before_the_first_paint_waits_for_it`, which
+  fails on 4.0.1, and `test_a_page_that_never_paints_waits_five_seconds_and_has_no_lcp` beside it.
+  The suite's timing tests now judge each run against its own page clock rather than a fixed time
+  (TEST-5 to TEST-9 of the 2026-10-28 audit): the page-type budget test reads the budget each page
+  was held to from its report; the TTI test's task is due on the page's clock, past its first paint
+  and past any long task of the runner's own; the CSP test waits for the shift it measures, and
+  checks the blocked run read the page late enough to have seen one; the hydrating click has the
+  task's length to land in, not 300 ms; the safe-triangle test names what each of its runs saw
+  wrong. CI keeps the numbers the timing tests measured and uploads them from a red leg
+  (`WDS_EVIDENCE_DIR`). `test_browser_runtime.VitalsUnderCsp` and
+  `test_harness.TimingEvidence.test_ci_sets_it_and_uploads_it_from_a_red_leg` fail on 4.0.1.
 - **The skill's own `email-tokens.json` had drifted from the starter's `tokens.css`.**
   `--border-strong` pointed at `--neutral-400` (2.54:1 on white) where the starter says
   `--neutral-500` (5.15:1); no shipped template reads it. Nine starter tokens were neither kept nor
