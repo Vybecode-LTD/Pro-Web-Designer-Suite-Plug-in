@@ -53,8 +53,8 @@ import sys
 import unittest
 
 from test_browser_scripts import STUB_PLAYWRIGHT
-from wds_support import (NODE, SKILLS, TOOLING, TempDirTest, env, output, run_node, run_py, tailwind_part5,
-                         tool_modules)
+from wds_support import (NODE, SKILLS, TOOLING, TempDirTest, env, no_browser, output, run_node, run_py,
+                         tailwind_part5, tool_modules)
 
 SHELL_BREAK = {"&&", "||", "|", ";", ">", ">>", "2>&1", "&"}
 
@@ -312,7 +312,7 @@ class PerfBudgetFile(TempDirTest):
                         "--budget", "perf-budget.json", cwd=self.tmp, timeout=240,
                         env_changes={"NODE_PATH": playwright_modules()})
         if proc.returncode == 2 and "no usable chromium" in output(proc):
-            self.skipTest(output(proc))
+            no_browser(self, output(proc))
         self.assertIn(proc.returncode, (0, 1), output(proc))
         self.assertNotIn("cannot parse", output(proc))
         self.assertRegex(output(proc), r"Budget|breach")
@@ -800,7 +800,7 @@ class NavigationCodeInABrowser(TempDirTest):
         proc = subprocess.run([NODE, str(probe), str(page)], capture_output=True, timeout=240,
                               env=env(NODE_PATH=playwright_modules(), **env_changes))
         if proc.returncode == 3:
-            self.skipTest(output(proc))
+            no_browser(self, output(proc))
         self.assertEqual(proc.returncode, 0, output(proc))
         return json.loads(proc.stdout.decode("utf-8").strip().splitlines()[-1])
 
@@ -912,7 +912,7 @@ class PropertyRecipe(TempDirTest):
                               env=env(NODE_PATH=playwright_modules(),
                                       REGISTERED=json.dumps([n for n, _ in recipe])))
         if proc.returncode == 3:
-            self.skipTest(output(proc))
+            no_browser(self, output(proc))
         self.assertEqual(proc.returncode, 0, output(proc))
         seen = json.loads(proc.stdout.decode("utf-8").strip().splitlines()[-1])
         for name, value in seen.items():
@@ -928,7 +928,7 @@ class RuntimeReportFile(TempDirTest):
 
     def check(self, proc, report):
         if proc.returncode == 2 and b"browser" in proc.stderr.lower():
-            self.skipTest("no usable browser: " + output(proc)[-200:])
+            no_browser(self, "no usable browser: " + output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
         self.assertFalse(proc.stdout.lstrip().startswith(b"{"), "stdout is for a person")
         return json.loads((self.tmp / report).read_bytes())

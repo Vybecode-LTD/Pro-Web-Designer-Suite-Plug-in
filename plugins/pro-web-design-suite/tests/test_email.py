@@ -25,7 +25,7 @@ import json
 import re
 import unittest
 
-from wds_support import NODE, SKILLS, TempDirTest, output, run_node, run_py, tool_modules
+from wds_support import NODE, SKILLS, TempDirTest, no_browser, output, run_node, run_py, tool_modules
 
 EMAIL = SKILLS / "email-template-system"
 TEMPLATES = sorted((EMAIL / "assets" / "templates").glob("*.html"))
@@ -442,7 +442,7 @@ class RenderEmail(EmailTest):
                         self.tmp / "renders", "--json", cwd=self.tmp,
                         env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
-            self.skipTest(output(proc)[-200:])
+            no_browser(self, output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
         return proc.returncode, {r["mode"]: r for r in json.loads(proc.stdout)["results"]}
 

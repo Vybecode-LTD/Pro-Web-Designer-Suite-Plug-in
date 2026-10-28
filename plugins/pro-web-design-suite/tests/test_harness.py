@@ -166,6 +166,44 @@ class TempFolders(TempDirTest):
             holder.cleanup()
 
 
+class NoBrowser(unittest.TestCase):
+    """TEST-1 (P67): about 200 tests skip when no Chromium starts, and only
+    the engine tests turned that into a failure, on Linux alone; a leg whose
+    browser went missing printed OK with all of them skipped. Every such skip
+    goes through wds_support.no_browser, which fails under
+    WDS_REQUIRE_BROWSER, and CI sets it on every leg."""
+
+    # A skip right under one of these conditions is a skip for a missing browser.
+    CONDITION = re.compile(r'no usable|returncode == 3|b"browser"|rb"browser\|chromium"')
+    OWN_SWITCH = {"test_runtime_engines.py": "WDS_REQUIRE_ENGINES",   # Firefox and WebKit, on Linux
+                  "test_browser_scripts.py": None,                     # the resolution tests' own stubs
+                  "test_harness.py": None}
+
+    def test_it_skips_without_the_variable(self):
+        with mock.patch.dict(os.environ, {"WDS_REQUIRE_BROWSER": ""}):
+            with self.assertRaises(unittest.SkipTest):
+                wds_support.no_browser(self, "no chromium here")
+
+    def test_it_fails_with_it(self):
+        with mock.patch.dict(os.environ, {"WDS_REQUIRE_BROWSER": "1"}):
+            with self.assertRaises(self.failureException) as caught:
+                wds_support.no_browser(self, "no chromium here")
+        self.assertIn("no chromium here", str(caught.exception))
+
+    def test_every_skip_for_a_missing_browser_goes_through_it(self):
+        offenders, routed = [], 0
+        for path in sorted((PLUGIN / "tests").glob("test_*.py")):
+            if path.name in self.OWN_SWITCH:
+                continue
+            lines = path.read_text(encoding="utf-8").splitlines()
+            routed += sum("no_browser(self, " in line for line in lines)
+            for i, line in enumerate(lines):
+                if "self.skipTest(" in line and ("no usable" in line or (i and self.CONDITION.search(lines[i - 1]))):
+                    offenders.append(f"{path.name}:{i + 1}")
+        self.assertEqual([], offenders)
+        self.assertGreaterEqual(routed, 25)
+
+
 class TimingEvidence(TempDirTest):
     """OPS-4 (P66): a red timing test said only that two lists differed, and a
     rerun measured again, so the numbers behind a failure were lost. The

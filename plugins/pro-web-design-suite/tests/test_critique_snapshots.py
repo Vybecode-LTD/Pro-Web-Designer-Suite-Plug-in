@@ -19,7 +19,7 @@ import re
 import struct
 import unittest
 
-from wds_support import NODE, SKILLS, class_temp_dir, output, run_node, tool_modules
+from wds_support import NODE, SKILLS, class_temp_dir, no_browser, output, run_node, tool_modules
 
 MODULES = tool_modules("WDS_NODE_MODULES", "playwright", node_path=True)
 GATE = SKILLS / "design-critique-gate"
@@ -82,7 +82,7 @@ class CritiqueSnapshots(unittest.TestCase):
     def run_of(self, name):
         proc = self.runs[name]
         if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
-            self.skipTest(output(proc)[-200:])
+            no_browser(self, output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
         return proc.returncode, json.loads(proc.stdout)
 

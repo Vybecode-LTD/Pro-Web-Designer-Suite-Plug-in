@@ -106,8 +106,30 @@
   `test_release_build.TheDirectoryChecks.test_the_shipped_plugin_has_no_findings`, which fails on
   4.0.1, with the controls in `test_an_image_named_outside_an_image_link_is_held` and
   `ReleaseBuild.test_plugin_json_names_the_listing_icon`.
+- **A tag releases only a commit CI passed on.** `release.yml` released whatever commit a `v*` tag
+  named, red or cancelled, and the distribution repository took it from there. It now runs
+  `tooling/release/ci_gate.py` before it builds: each of CI's seven jobs must have concluded
+  `success` on its latest run on the tagged commit, or nothing is built. A tag pushed before CI
+  has finished fails the job; rerun it once CI is green. Regression tests:
+  `test_ci_workflow.TheReleaseGate`, which fail without the gate.
+- **The release log lists a file moved whole as removed.** With git's rename detection on, the
+  listing image's old name left the plugin unlisted after 4.0.1. Regression test:
+  `test_release_build.ReleaseBuild.test_a_moved_file_is_listed_as_removed`, which fails on 4.0.1's
+  builder.
 
 ### CI (development repository)
+
+- **CI holds every leg to the same bar.** A run on `main` is never cancelled (5 of 60 had no
+  finished run, the next merge having cancelled theirs); only a pull request's older run is.
+  Every action is pinned to a commit, and Dependabot moves the pins and `tooling/`'s packages.
+  The validate job installs one version of the CLI (2.1.312), not npm's latest. Every leg tests
+  Playwright's own Chromium headless shell at the version `tooling/main` pins, from a cache keyed
+  by that version: Windows and macOS used the runner image's Chrome, whose version nobody chose.
+  A browser test that finds no browser now fails on every leg (`WDS_REQUIRE_BROWSER`) instead of
+  skipping, and a leg fails when more tests skip than its ceiling (`tools/skip_ceiling.py`).
+  Regression tests: `test_ci_workflow.TheCiWorkflow`, `test_ci_workflow.TheSkipCeiling` and
+  `test_harness.NoBrowser.test_every_skip_for_a_missing_browser_goes_through_it`, which fail on
+  4.0.1.
 
 - The Linux jobs keep the browser engines' system packages, about 120 MB, in the Actions cache,
   so a run downloads only the ones that changed. The Ubuntu mirror sometimes sent them at

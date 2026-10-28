@@ -1,0 +1,35 @@
+# What moves the pins (OPS-9, P67). The workflows pin every action to a
+# commit, and tooling/ pins the real-tool tests' packages; nothing moved
+# either but a hand edit. Each update is a pull request, with the new commit
+# and its version comment; one that fails the suite's own pins (test_docs and
+# the real-tool tests name some versions) is folded into the next feature
+# pull request by hand.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /tooling/main
+    schedule:
+      interval: monthly
+    groups:
+      tooling-main:
+        patterns: ["*"]
+
+  # This folder is Tailwind 3 on purpose: the suite tests both majors.
+  - package-ecosystem: npm
+    directory: /tooling/tailwind-v3
+    schedule:
+      interval: monthly
+    ignore:
+      - dependency-name: tailwindcss
+        update-types: ["version-update:semver-major"]
+    groups:
+      tooling-tailwind-v3:
+        patterns: ["*"]

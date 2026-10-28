@@ -167,6 +167,16 @@ def output(proc: subprocess.CompletedProcess) -> str:
     return (proc.stdout + proc.stderr).decode("utf-8", "replace")
 
 
+def no_browser(test: unittest.TestCase, why: str) -> None:
+    """Skips a test whose browser would not start; with WDS_REQUIRE_BROWSER set
+    (CI sets it on every leg), fails it instead. TEST-1 (P67): about 200 tests
+    skip when no Chromium starts, and a leg whose browser went missing printed
+    OK with all of them skipped."""
+    if os.environ.get("WDS_REQUIRE_BROWSER", "").strip().lower() not in OFF:
+        test.fail("no usable browser, and WDS_REQUIRE_BROWSER is set: " + why)
+    test.skipTest(why)
+
+
 def keep_evidence(test: unittest.TestCase, name: str, data) -> None:
     """A timing test's measured numbers, as `<test id>.<name>.json` in
     WDS_EVIDENCE_DIR when it is set. CI sets it and uploads the folder when a

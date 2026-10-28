@@ -131,6 +131,16 @@ class ReleaseBuild(TempDirTest):
         self.assertEqual(0o100644, infos["pro-web-design-suite/scripts/new.py"].external_attr >> 16)
         self.assertIn("removed since v9.8.6: scripts/old.py", output(proc))
 
+    def test_a_moved_file_is_listed_as_removed(self):
+        """OPS-15 (P67): with git's rename detection on, a file moved whole was
+        a rename and not a deletion, so the release log never said its old path
+        had left the plugin (4.0.1's `.claude-plugin/icon.png`)."""
+        self.git("mv", f"{P}/scripts/tool.py", f"{P}/scripts/tools.py")
+        self.git("commit", "-q", "-m", "three")
+        proc = self.build()
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("removed since v9.8.6: scripts/tool.py", output(proc))
+
     def test_each_skill_is_a_skill_file(self):
         self.assertEqual(0, self.build().returncode)
         alpha = self.infos("alpha.skill")
