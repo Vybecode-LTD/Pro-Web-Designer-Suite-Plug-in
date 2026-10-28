@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  checks: read
 
 env:
   PYTHONDONTWRITEBYTECODE: "1"
@@ -42,6 +43,15 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # A tag released whatever commit it named, red or cancelled (OPS-2):
+      # nothing is built until CI's seven jobs each passed, on their latest
+      # run, on the tagged commit. Pushed before CI on it has finished, this
+      # job fails; rerun it once CI is green.
+      - name: CI passed on the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: uv run --no-project --python 3.14 python -B tooling/release/ci_gate.py "$GITHUB_SHA"
 
       - name: Build the zip, the .skill files and SHA256SUMS
         run: uv run --no-project --python 3.14 python -B tooling/release/build.py dist --rev "$GITHUB_REF_NAME"

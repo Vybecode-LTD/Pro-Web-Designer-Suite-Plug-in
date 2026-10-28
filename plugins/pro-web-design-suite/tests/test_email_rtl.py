@@ -12,7 +12,7 @@ import json
 import subprocess
 import unittest
 
-from wds_support import NODE, SKILLS, TempDirTest, env, output, run_py, tool_modules
+from wds_support import NODE, SKILLS, TempDirTest, env, no_browser, output, run_py, tool_modules
 
 EMAIL = SKILLS / "email-template-system"
 RTL = EMAIL / "assets" / "templates" / "product-announcement-rtl.html"
@@ -244,7 +244,7 @@ class TheColumnsFlip(Lint):
         proc = subprocess.run([NODE, str(probe), built["ltr"], built["rtl"]], cwd=self.tmp, capture_output=True,
                               env=env(NODE_PATH=MODULES), timeout=180)
         if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
-            self.skipTest("no usable chromium")
+            no_browser(self, "no usable chromium")
         self.assertEqual(0, proc.returncode, output(proc))
         lefts = json.loads(proc.stdout)
         ltr, rtl = lefts[built["ltr"]], lefts[built["rtl"]]

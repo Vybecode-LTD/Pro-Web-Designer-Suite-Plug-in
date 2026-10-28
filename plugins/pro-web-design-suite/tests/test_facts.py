@@ -55,7 +55,7 @@ import re
 import subprocess
 import unittest
 
-from wds_support import NODE, SKILLS, TempDirTest, env, output, run_node, tool_modules
+from wds_support import NODE, SKILLS, TempDirTest, env, no_browser, output, run_node, tool_modules
 
 A11Y = SKILLS / "a11y-audit-runner"
 RUNTIME = A11Y / "scripts" / "a11y_runtime.mjs"
@@ -164,7 +164,7 @@ class ZoomInABrowser(TempDirTest):
         proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", page, "--json",
                         cwd=self.tmp, env_changes={"NODE_PATH": a11y_modules()}, timeout=300)
         if proc.returncode == 2 and b"browser" in proc.stderr.lower():
-            self.skipTest("no usable browser: " + output(proc)[-200:])
+            no_browser(self, "no usable browser: " + output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
         reflow = [f for f in json.loads(proc.stdout)["findings"] if f["check"] == "reflow"]
         self.assertFalse([f for f in reflow if f["sc"] == "1.4.4" and f["severity"] == "error"],
@@ -485,7 +485,7 @@ class LayoutInABrowser(TempDirTest):
         proc = subprocess.run([NODE, str(probe), str(page)], capture_output=True, timeout=240,
                               env=env(NODE_PATH=a11y_modules()))
         if proc.returncode == 3:
-            self.skipTest(output(proc))
+            no_browser(self, output(proc))
         self.assertEqual(proc.returncode, 0, output(proc))
         seen = json.loads(proc.stdout.decode("utf-8").strip().splitlines()[-1])
         self.assertEqual(seen["fixedAt"], [0, 0], "a fixed child is placed against the viewport")

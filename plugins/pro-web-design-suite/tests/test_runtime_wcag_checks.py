@@ -16,7 +16,7 @@ import json
 import unittest
 
 from test_browser_runtime import MODULES, only
-from wds_support import NODE, PLUGIN, TempDirTest, output, run_node
+from wds_support import NODE, PLUGIN, TempDirTest, no_browser, output, run_node
 
 HEAD = ("<!doctype html><html lang=en><head><meta charset=utf-8><title>Page</title>"
         "<style>body{{font:16px/1.2 sans-serif;color:#111;background:#fff}}{}</style></head>"
@@ -37,7 +37,7 @@ class RuntimeCase(TempDirTest):
                         *only(*checks), *extra, cwd=self.tmp, env_changes={"NODE_PATH": MODULES},
                         timeout=300)
         if proc.returncode == 2 and b"browser" in proc.stderr.lower():
-            self.skipTest("no usable browser: " + output(proc)[-200:])
+            no_browser(self, "no usable browser: " + output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
         return json.loads(proc.stdout)
 

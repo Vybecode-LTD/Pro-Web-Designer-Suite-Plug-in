@@ -22,7 +22,7 @@ import subprocess
 import unittest
 
 from test_browser_runtime import MODULES, only
-from wds_support import NODE, PLUGIN, TempDirTest, env, output, run_node
+from wds_support import NODE, PLUGIN, TempDirTest, env, no_browser, output, run_node
 
 ICON = "<svg width=16 height=16 aria-hidden=true></svg>"
 PAGE = (
@@ -69,7 +69,7 @@ class TheChecksReadThroughShadowRoots(TempDirTest):
         proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", page, "--json", *args,
                         cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"browser" in proc.stderr.lower():
-            self.skipTest("no usable browser: " + output(proc)[-200:])
+            no_browser(self, "no usable browser: " + output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
         return json.loads(proc.stdout)
 
@@ -178,7 +178,7 @@ class ARootNoCheckReadIsSaid(TempDirTest):
         proc = subprocess.run([NODE, probe, (PLUGIN / "shared" / "browser_common.mjs").as_uri()],
                               cwd=self.tmp, env=env(NODE_PATH=MODULES), capture_output=True, timeout=180)
         if proc.returncode == 3:
-            self.skipTest(output(proc))
+            no_browser(self, output(proc))
         self.assertEqual(proc.returncode, 0, output(proc))
         seen = json.loads(proc.stdout)
         self.assertEqual({"closed": 1, "kept": 0}, seen["missed"])

@@ -16,7 +16,7 @@ import threading
 import unittest
 
 from test_browser_runtime import MODULES, only
-from wds_support import NODE, TempDirTest, output, run_node
+from wds_support import NODE, TempDirTest, no_browser, output, run_node
 
 TOKEN = "s3cret-token"
 # An image with no alt: axe's image-alt, so the audit says which page it read.
@@ -122,7 +122,7 @@ class Served(TempDirTest):
         proc = run_node(skill, script, *args, cwd=self.tmp, timeout=300,
                         env_changes={"NODE_PATH": MODULES, **(env or {})})
         if proc.returncode == 2 and b"no usable chromium" in proc.stderr.lower():
-            self.skipTest(output(proc)[-200:])
+            no_browser(self, output(proc)[-200:])
         self.assertIn(proc.returncode, codes, output(proc))
         return proc
 

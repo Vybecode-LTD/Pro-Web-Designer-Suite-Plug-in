@@ -37,7 +37,7 @@ import time
 import unittest
 
 from test_browser_scripts import installed_browsers
-from wds_support import NODE, TempDirTest, keep_evidence, output, run_node, run_py, tool_modules
+from wds_support import NODE, TempDirTest, keep_evidence, no_browser, output, run_node, run_py, tool_modules
 
 
 def node_modules() -> str | None:
@@ -68,7 +68,7 @@ class RuntimeInABrowser(TempDirTest):
         proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", page, "--json", *args,
                         cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"browser" in proc.stderr.lower():
-            self.skipTest("no usable browser: " + output(proc)[-200:])
+            no_browser(self, "no usable browser: " + output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
         return json.loads(proc.stdout)["findings"]
 
@@ -259,7 +259,7 @@ class RuntimeInABrowser(TempDirTest):
                         *only("focus", "contrast"),
                         cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"browser" in proc.stderr.lower():
-            self.skipTest("no usable browser: " + output(proc)[-200:])
+            no_browser(self, "no usable browser: " + output(proc)[-200:])
         self.assertEqual(proc.returncode, 0, output(proc))
         self.assertEqual([], [f for f in json.loads(proc.stdout)["findings"] if f["severity"] == "error"])
 
@@ -339,7 +339,7 @@ class RuntimeInABrowser(TempDirTest):
                         "--budget", budget, *only("axe"),
                         cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"browser" in proc.stderr.lower():
-            self.skipTest("no usable browser: " + output(proc)[-200:])
+            no_browser(self, "no usable browser: " + output(proc)[-200:])
         report = json.loads(proc.stdout)
         self.assertIn("tabindex", {f["rule"] for f in report["findings"]})
         self.assertEqual((0, []), (proc.returncode, report["breaches"]), output(proc)[-400:])
@@ -403,7 +403,7 @@ class VitalsUnderCsp(TempDirTest):
         proc = run_node("perf-budget-gate", "measure_vitals.mjs", page, "--runs", "1", "--json", *args,
                         cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=240)
         if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
-            self.skipTest(output(proc)[-200:])
+            no_browser(self, output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
         out = json.loads(proc.stdout)
         keep_evidence(self, "csp" if head else "no-csp", out)
@@ -482,7 +482,7 @@ class VitalsMeasures(TempDirTest):
         proc = run_node("perf-budget-gate", "measure_vitals.mjs", url, "--runs", "1", "--json",
                         *args, cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
-            self.skipTest(output(proc)[-200:])
+            no_browser(self, output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
         self.stderr = proc.stderr.decode("utf-8", "replace")
         out = json.loads(proc.stdout)
@@ -631,7 +631,7 @@ class VitalsMeasures(TempDirTest):
         proc = run_node("perf-budget-gate", "measure_vitals.mjs", url, "--runs", "1", "--json", "--throttle",
                         "off", "--settle", "0", cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
-            self.skipTest(output(proc)[-200:])
+            no_browser(self, output(proc)[-200:])
         # Kept before anything is asserted, so a red run uploads it (CodeRabbit on #216).
         report = json.loads(proc.stdout) if proc.stdout.strip() else {"output": output(proc)}
         keep_evidence(self, "blank", report)
@@ -673,7 +673,7 @@ class MatrixSeesStateChanges(TempDirTest):
                         "--baselines", self.tmp / "base", "--out", self.tmp / "report", *args,
                         cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"browser" in proc.stderr.lower():
-            self.skipTest("no usable browser: " + output(proc)[-200:])
+            no_browser(self, "no usable browser: " + output(proc)[-200:])
         return proc
 
     def test_a_state_cell_identical_to_its_default_fails_without_a_baseline(self):
@@ -780,7 +780,7 @@ class TheForcedColoursSurvey(TempDirTest):
         proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", page, "--json",
                         cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"browser" in proc.stderr.lower():
-            self.skipTest("no usable browser: " + output(proc)[-200:])
+            no_browser(self, "no usable browser: " + output(proc)[-200:])
         self.assertIn(proc.returncode, (0, 1), output(proc))
         survey = json.loads(proc.stdout)["forcedSurvey"]
         self.assertEqual(1, survey["fillOnly"], survey)

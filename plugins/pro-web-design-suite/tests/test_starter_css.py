@@ -23,7 +23,7 @@ import re
 import subprocess
 import unittest
 
-from wds_support import NODE, SKILLS, TempDirTest, env, output, tool_modules
+from wds_support import NODE, SKILLS, TempDirTest, env, no_browser, output, tool_modules
 
 STYLES = SKILLS / "web-design-studio" / "assets" / "starter" / "styles"
 
@@ -212,7 +212,7 @@ class StarterInABrowser(TempDirTest):
         proc = subprocess.run([NODE, str(probe), str(page)], capture_output=True, timeout=180,
                               env=env(NODE_PATH=modules))
         if proc.returncode == 3:
-            self.skipTest(output(proc))
+            no_browser(self, output(proc))
         self.assertEqual(proc.returncode, 0, output(proc))
         got = json.loads(proc.stdout.decode("utf-8").strip().splitlines()[-1])
         self.assertNotEqual(got["compactGap"], got["rootGap"], got)     # the dial works
@@ -248,7 +248,7 @@ class StarterInABrowser(TempDirTest):
         proc = subprocess.run([NODE, str(probe), str(page)], capture_output=True, timeout=180,
                               env=env(NODE_PATH=modules))
         if proc.returncode == 3:
-            self.skipTest(output(proc))
+            no_browser(self, output(proc))
         self.assertEqual(proc.returncode, 0, output(proc))
         seen = json.loads(proc.stdout.decode("utf-8").strip().splitlines()[-1])
         # visible: the positive control, proving the probe sees a ring at all.
@@ -325,7 +325,7 @@ class StarterCodeBlocks(TempDirTest):
         proc = subprocess.run([NODE, str(probe), str(page)], capture_output=True, timeout=180,
                               env=env(NODE_PATH=PLAYWRIGHT))
         if proc.returncode == 3:
-            self.skipTest(output(proc))
+            no_browser(self, output(proc))
         self.assertEqual(proc.returncode, 0, output(proc))
         return json.loads(proc.stdout.decode("utf-8").strip().splitlines()[-1])
 

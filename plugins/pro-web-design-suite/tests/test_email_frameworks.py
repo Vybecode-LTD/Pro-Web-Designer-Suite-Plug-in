@@ -21,7 +21,7 @@ import subprocess
 import unittest
 import xml.etree.ElementTree as ET
 
-from wds_support import NODE, SKILLS, TempDirTest, env, load_script, output, run_py, tool_modules
+from wds_support import NODE, SKILLS, TempDirTest, env, load_script, no_browser, output, run_py, tool_modules
 
 EMAIL = SKILLS / "email-template-system"
 TOKENS = EMAIL / "assets" / "email-tokens.json"
@@ -370,7 +370,7 @@ class Compiled(TempDirTest):
         proc = subprocess.run([NODE, "probe.cjs", str(self.tmp / html), json.dumps(PROBES)], cwd=self.tmp,
                               capture_output=True, timeout=180, env=env(NODE_PATH=BROWSER_MODULES))
         if proc.returncode == 3:
-            self.skipTest(output(proc))
+            no_browser(self, output(proc))
         self.assertEqual(0, proc.returncode, output(proc))
         return json.loads(proc.stdout)
 

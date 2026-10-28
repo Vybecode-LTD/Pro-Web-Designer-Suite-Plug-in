@@ -10,9 +10,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# A pull request's newer push replaces its older run; a run on main is never
+# cancelled, since a tag may name any merge (OPS-1: 5 of 60 main pushes had
+# no finished run, the next merge having cancelled theirs).
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -33,17 +36,19 @@ jobs:
     defaults:
       run:
         shell: bash
+    # Every action is pinned to a commit, as in release.yml and evals.yml, and
+    # Dependabot moves the pins (OPS-9): a moved tag would run new code here.
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
       # uv fetches the interpreter, so 3.9 comes from the same place on every
       # runner, arm64 macOS included, and the command is the one used locally.
-      - uses: astral-sh/setup-uv@v10.2.0   # this action publishes no major tag
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7   # v10.2.0
         with:
           enable-cache: false
 
       # ESLint 10 needs Node 20.19+, 22.13+ or 24+.
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1   # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -75,21 +80,51 @@ jobs:
       - name: Restore the packages
         id: debs-restored
         if: runner.os == 'Linux'
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
         with:
           path: /var/cache/wds-debs/*.deb
           key: ${{ env.WDS_DEBS }}
           restore-keys: ${{ env.WDS_DEBS }}-
 
-      # Linux only: the headless shell the browser tests use, Firefox and
-      # WebKit for the runtime gate's other engines (P35, GT-B9; the owner's
-      # OK, 2026-10-19), and the preinstalled Postgres for
+      # The browsers are Playwright's own on every leg, at the version
+      # tooling/main pins: Windows and macOS tested the runner image's Chrome
+      # or Edge, which the image updates without notice (TEST-10). They live in
+      # a folder the cache carries, keyed by that version, so a run downloads
+      # them only when the pin moves (OPS-14).
+      - name: Keep Playwright's browsers in a folder the cache carries
+        id: browsers
+        run: |
+          echo "PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/ms-playwright" >> "$GITHUB_ENV"
+          version=$(node -p "require('./tooling/main/node_modules/playwright/package.json').version")
+          echo "key=playwright-$version-$ImageOS-$(uname -m)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the browsers
+        id: browsers-restored
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ms-playwright
+          key: ${{ steps.browsers.outputs.key }}
+
+      # Linux: the headless shell the browser tests use, Firefox and WebKit for
+      # the runtime gate's other engines (P35, GT-B9; the owner's OK,
+      # 2026-10-19), and the preinstalled Postgres for
       # test_policies.PoliciesRunOnPostgres.
       - name: Install the browsers, and put Postgres on PATH
         if: runner.os == 'Linux'
         run: |
           (cd tooling/main && npx playwright install --only-shell --with-deps chromium firefox webkit)
           ls -d /usr/lib/postgresql/*/bin | sort -V | tail -n 1 >> "$GITHUB_PATH"
+
+      - name: Install the headless shell
+        if: runner.os != 'Linux'
+        run: (cd tooling/main && npx playwright install --only-shell chromium)
+
+      - name: Save the browsers for the next run
+        if: steps.browsers-restored.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ms-playwright
+          key: ${{ steps.browsers.outputs.key }}
 
       # autoclean drops the files no index offers any more, the versions an
       # update replaced. The key names the files that are left, so a run saves
@@ -105,19 +140,31 @@ jobs:
 
       - name: Save them for the next run
         if: runner.os == 'Linux' && steps.debs.outputs.key != steps.debs-restored.outputs.cache-matched-key
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
         with:
           path: /var/cache/wds-debs/*.deb
           key: ${{ steps.debs.outputs.key }}
 
       # On Linux, Firefox and WebKit are installed above: an engine that will
       # not start fails test_runtime_engines there instead of skipping it.
+      # Chromium is installed on every leg, so a browser test that finds no
+      # browser fails on every leg (WDS_REQUIRE_BROWSER, TEST-1). The log is
+      # kept for the skip count below.
       - name: The suite
         working-directory: plugins/pro-web-design-suite
         env:
           WDS_REQUIRE_ENGINES: ${{ runner.os == 'Linux' && '1' || '' }}
+          WDS_REQUIRE_BROWSER: "1"
           WDS_EVIDENCE_DIR: ${{ runner.temp }}/wds-evidence
-        run: uv run --no-project --python ${{ matrix.python }} python -B -m unittest discover -s tests
+        run: uv run --no-project --python ${{ matrix.python }} python -B -m unittest discover -s tests 2>&1 | tee "$RUNNER_TEMP/suite.log"
+
+      # A leg passed however many tests skipped, so a tool that went missing
+      # turned its tests into skips and the leg stayed green (OPS-13). Each
+      # ceiling is that OS's most on 2026-10-28 (Linux 5, Windows 18, macOS 14),
+      # plus two; one that a new skip crosses is raised on purpose.
+      - name: No more tests skipped than this leg allows
+        working-directory: plugins/pro-web-design-suite
+        run: uv run --no-project --python ${{ matrix.python }} python -B tools/skip_ceiling.py "$RUNNER_TEMP/suite.log" --max ${{ runner.os == 'Linux' && 7 || runner.os == 'Windows' && 20 || 16 }}
 
       # The timing tests keep what they measured (wds_support.keep_evidence),
       # and a red leg uploads it, so a failure shows its numbers (OPS-4).
@@ -155,13 +202,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1   # v7.1.0
         with:
           node-version: 22
       # Validation reads the manifests only: it needs no sign-in and no key.
+      # The CLI is pinned, so a release of it cannot turn an unrelated pull
+      # request red, or pass what an older one refused (OPS-3, TEST-11): 2.1.312
+      # validated #216 on 2026-10-28. Moved on purpose, with evals.yml's pin
+      # after that workflow's next run.
       - name: Install the Claude Code CLI
-        run: npm install --global @anthropic-ai/claude-code
+        run: npm install --global @anthropic-ai/claude-code@2.1.312
       - name: Validate the marketplace, the plugin folder and plugin.json
         run: |
           claude --version

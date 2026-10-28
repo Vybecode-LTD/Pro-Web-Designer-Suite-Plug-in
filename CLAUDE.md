@@ -43,7 +43,7 @@ python skills/web-design-studio/scripts/audit_design.py skills --strict
 cd ../.. && python -B tooling/release/build.py EMPTY_FOLDER [--rev REV] [--tree EMPTY_FOLDER]   # the zip, the .skill files, SHA256SUMS; --tree: the distribution repository's files
 ```
 
-CI (`.github/workflows/ci.yml`) runs the whole suite on Windows, Linux and macOS at Python 3.9 and 3.14 for every PR, so locally `check.py` is enough (decision D1). A pushed `v*` tag makes `release.yml` build and create the GitHub release; nothing else creates one.
+CI (`.github/workflows/ci.yml`) runs the whole suite on Windows, Linux and macOS at Python 3.9 and 3.14 for every PR, so locally `check.py` is enough (decision D1). Every leg tests Playwright's pinned Chromium, fails a test that finds no browser (`WDS_REQUIRE_BROWSER`), and fails over its skip ceiling (`tools/skip_ceiling.py`). A pushed `v*` tag makes `release.yml` build and create the GitHub release, only once CI's seven jobs passed on the tagged commit (`tooling/release/ci_gate.py`); nothing else creates one.
 
 `fail_before.py` unpacks the revision through `git archive` and sets `WDS_PLUGIN_ROOT` and `WDS_PLUGIN_REV` for the first run. By hand, the same is `set "WDS_PLUGIN_ROOT=UNPACKED_PLUGIN" && python -B -m unittest TEST_IDS` in cmd.exe.
 
@@ -93,9 +93,9 @@ plugins/pro-web-design-suite/     the plugin; it ships without its tests/, evals
   mcp/, .mcp.json                 the MCP server: the gates as tools (node design_gates.mjs)
   evals/                          claude plugin eval cases: routing/ (one per skill), boundaries/ (sibling pairs), and outcome cases in build/, systems/, gates/, lifecycle/, persuasion/, delivery/
   tests/                          the suite; fixtures/ holds the pointer and evidence registers
-  tools/                          check.py, check_pointers.py, fail_before.py, sync_rules.py, sync_snippets.py, sync_caniemail.py
+  tools/                          check.py, check_pointers.py, fail_before.py, sync_rules.py, sync_snippets.py, sync_caniemail.py, skip_ceiling.py
   CHANGELOG.md, README.md, LICENSE
-tooling/                          pinned tools for the tests (main/, tailwind-v3/); release/build.py
+tooling/                          pinned tools for the tests (main/, tailwind-v3/); release/build.py, release/ci_gate.py
 .github/workflows/                ci.yml (the suite on three platforms), release.yml (a v* tag makes the release, then `distribute` writes the distribution repository), evals.yml (the routing and outcome evals, by hand)
 dev plans/                        the review, the phase plans and reports, the completion plan and inventory
 docs/HANDOFF.md                   the current state and the next steps, one page

@@ -22,7 +22,7 @@ import threading
 import unittest
 
 from test_browser_runtime import MODULES, only
-from wds_support import NODE, TempDirTest, keep_evidence, output, run_node
+from wds_support import NODE, TempDirTest, keep_evidence, no_browser, output, run_node
 
 PAGE = ("<!doctype html><html lang=en><head><title>{title}</title>"
         "<meta name=viewport content='width=device-width'></head><body><main>"
@@ -93,7 +93,7 @@ class Served(TempDirTest):
             # one ran out the 600 s, and the error was only TimeoutExpired.
             self.fail(f"{script} timed out at 600 s: the machine was too busy to run it")
         if b"no usable chromium" in proc.stdout.lower() + proc.stderr.lower():
-            self.skipTest(output(proc)[-200:])
+            no_browser(self, output(proc)[-200:])
         self.assertIn(proc.returncode, codes, output(proc))
         return proc
 

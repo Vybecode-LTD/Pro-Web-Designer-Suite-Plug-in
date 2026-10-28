@@ -29,7 +29,7 @@ import re
 import subprocess
 import unittest
 
-from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, output, tool_modules
+from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, no_browser, output, tool_modules
 
 STUDIO = SKILLS / "web-design-studio"
 TOKENS = STUDIO / "assets" / "starter" / "styles" / "tokens.css"
@@ -162,7 +162,7 @@ class TheReferencesInABrowser(TempDirTest):
         proc = subprocess.run([NODE, probe, (PLUGIN / "shared" / "browser_common.mjs").as_uri(), page, scenario],
                               cwd=self.tmp, env=env(NODE_PATH=MODULES), capture_output=True, timeout=180)
         if proc.returncode == 3:
-            self.skipTest(output(proc))
+            no_browser(self, output(proc))
         self.assertEqual(proc.returncode, 0, output(proc))
         return json.loads(proc.stdout)
 

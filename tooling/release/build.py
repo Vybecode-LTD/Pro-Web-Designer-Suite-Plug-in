@@ -360,7 +360,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"cannot read {args.rev!r} from git: {detail.decode(errors='replace').strip() or exc}")
     try:
         previous = run("describe", "--tags", "--abbrev=0", "--match", "v*", commit + "^").decode().strip()
-        removed = run("diff", "--name-only", "--diff-filter=D", "-z", previous, commit, "--", plugin)
+        # --no-renames: a file moved whole is a deletion too (OPS-15).
+        removed = run("diff", "--no-renames", "--name-only", "--diff-filter=D", "-z", previous, commit, "--", plugin)
     except subprocess.CalledProcessError:
         previous, removed = None, b""
 

@@ -149,10 +149,10 @@ class CiKeepsTheEnginesPackages(unittest.TestCase):
     def test_apt_keeps_its_packages_where_the_cache_restores_and_saves_them(self):
         at, config = self.step("Dir::Cache::Archives")
         folder = re.search(r'Dir::Cache::Archives "([^"]+?)/?"', config).group(1)
-        restore_at, restore = self.step("uses: actions/cache/restore@")
-        install_at, _ = self.step("playwright install")
+        restore_at, restore = self.step("id: debs-restored")
+        install_at, _ = self.step("install --only-shell --with-deps")
         name_at, _ = self.step("apt-get autoclean")
-        save_at, save = self.step("uses: actions/cache/save@")
+        save_at, save = self.step("steps.debs.outputs.key }}")
         self.assertEqual([at, restore_at, install_at, name_at, save_at],
                          sorted([at, restore_at, install_at, name_at, save_at]))
         for step, text in (("restore", restore), ("save", save)):
@@ -164,9 +164,9 @@ class CiKeepsTheEnginesPackages(unittest.TestCase):
                 self.assertRegex(text, r"(?m)^\s+if: runner\.os == 'Linux'")
 
     def test_a_run_saves_only_when_the_packages_changed(self):
-        _, restore = self.step("uses: actions/cache/restore@")
+        _, restore = self.step("id: debs-restored")
         name_at, name = self.step("apt-get autoclean")
-        _, save = self.step("uses: actions/cache/save@")
+        _, save = self.step("steps.debs.outputs.key }}")
         restore_id = re.search(r"(?m)^\s+id: (\S+)$", restore).group(1)
         name_id = re.search(r"(?m)^\s+id: (\S+)$", name).group(1)
         key = re.search(r"(?m)^\s+key: (.+)$", restore).group(1)
@@ -177,7 +177,7 @@ class CiKeepsTheEnginesPackages(unittest.TestCase):
                       save)
 
     def test_an_engine_that_will_not_start_still_fails_on_linux(self):
-        _, install = self.step("playwright install")
+        _, install = self.step("install --only-shell --with-deps")
         self.assertIn("--with-deps chromium firefox webkit", install)
         _, suite = self.step("name: The suite")
         self.assertIn("WDS_REQUIRE_ENGINES: ${{ runner.os == 'Linux' && '1' || '' }}", suite)

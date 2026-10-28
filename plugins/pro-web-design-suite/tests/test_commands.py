@@ -41,7 +41,7 @@ import unittest
 from pathlib import Path
 
 from test_browser_runtime import MODULES as BROWSER_MODULES, QuietHandler, only
-from wds_support import NODE, PLUGIN, TOOLING, TempDirTest, env, output, tool_modules
+from wds_support import NODE, PLUGIN, TOOLING, TempDirTest, env, no_browser, output, tool_modules
 
 COMMANDS = PLUGIN / "workflow-commands"
 RUN_GATES = COMMANDS / "gate" / "scripts" / "run_gates.py"
@@ -914,7 +914,7 @@ class TheBrowserSteps(ChainTest):
 
     def browser(self, proc):
         if proc.returncode == 2 and re.search(rb"browser|chromium", proc.stderr, re.I):
-            self.skipTest("no usable browser: " + output(proc)[-200:])
+            no_browser(self, "no usable browser: " + output(proc)[-200:])
         return proc
 
     def test_gate_a11y_passes_a_clean_page_and_names_a_missing_alt(self):
