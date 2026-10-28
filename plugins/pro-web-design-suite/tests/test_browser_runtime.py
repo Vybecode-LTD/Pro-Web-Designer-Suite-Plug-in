@@ -611,13 +611,17 @@ class VitalsMeasures(TempDirTest):
         before its paint reached the observers, as macOS CI's runs did at
         --settle 500 (EachPageHasItsTypesBudget twice and
         TheOtherGatesReachThePage six times, 2026-10-19 to 28). The run now
-        waits for the LCP, up to 5 s, and its notes say so."""
-        out = self.vitals("", "--throttle", "off", "--settle", "0")
+        waits for the LCP, up to 5 s, and its notes say so. The content shows
+        300 ms after load, so the run has to wait on any machine (CodeRabbit
+        on #216)."""
+        late = ("<style>main{visibility:hidden}</style><script>addEventListener('load', () => setTimeout(()"
+                " => { document.querySelector('main').style.visibility = 'visible'; }, 300));</script>")
+        out = self.vitals(late, "--throttle", "off", "--settle", "0")
         [run] = out["perRun"]
         self.assertIsNotNone(out["stats"]["lcp"], run)
         self.assertGreaterEqual(run["readAt"], run["lcp"], run)
-        if run["lcpWait"] is not None:
-            self.assertTrue([n for n in out["notes"] if "was waited for" in n], out["notes"])
+        self.assertIsNotNone(run["lcpWait"], run)
+        self.assertTrue([n for n in out["notes"] if "was waited for" in n], out["notes"])
 
     def test_a_page_that_never_paints_waits_five_seconds_and_has_no_lcp(self):
         """The wait has an end: a page with nothing to paint still exits 1
@@ -628,9 +632,12 @@ class VitalsMeasures(TempDirTest):
                         "off", "--settle", "0", cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
             self.skipTest(output(proc)[-200:])
+        # Kept before anything is asserted, so a red run uploads it (CodeRabbit on #216).
+        report = json.loads(proc.stdout) if proc.stdout.strip() else {"output": output(proc)}
+        keep_evidence(self, "blank", report)
         self.assertEqual(1, proc.returncode, output(proc))
         self.assertIn("no LCP was recorded in any run", output(proc))
-        [run] = json.loads(proc.stdout)["perRun"]
+        [run] = report["perRun"]
         self.assertIsNone(run["lcp"], run)
         self.assertIn("lcpWait", run, "each run says how long it waited for an LCP")
         self.assertGreaterEqual(run["lcpWait"], 4900, run)
