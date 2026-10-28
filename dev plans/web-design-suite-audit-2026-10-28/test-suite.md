@@ -4,7 +4,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 
 ## Summary
 
-19 findings: 0 critical, 3 high, 8 medium, 8 low. By class: test-gap 2, weak-test 3, flake 5, infra 5, hygiene 2, stale-evidence 2.
+19 findings: 3 high, 8 medium, 8 low. By class (counted from the headings): flake 5, infra 5, weak-test 3, hygiene 2, stale-evidence 2, test-gap 2.
 
 1. About 200 of the 1,644 tests need a Chromium, and on every CI leg they turn into silent skips when none starts: only Firefox and WebKit (Linux) and the Pydantic test are made to fail instead (`WDS_REQUIRE_ENGINES`, `WDS_REQUIRE_PYDANTIC`); nothing requires a Chromium, so a broken headless-shell install or a runner image without Chrome would leave CI green with the browser gates untested (TEST-1).
 2. `tools/check.py` selects tests by substring of the changed file's stem or its skill folder, so an edit to four of the six agents, to `new_system.py` or `release_check.py` selects no test at all, and a reference edit in 11 of the 13 skills runs neither `test_doc_snippets` nor the stylelint/ESLint snippet tests (TEST-2, TEST-3). CI's full run is the only net.
@@ -13,6 +13,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 ## Findings
 
 ### TEST-1 · high · infra
+
 - **Where:** `.github/workflows/ci.yml:100-105`; `plugins/pro-web-design-suite/tests/test_runtime_engines.py:49-56`; `tests/test_browser_runtime.py:70-71` (and the same `skipTest("no usable browser…")` in 12 helper methods across the browser modules).
 - **What:** 166 tests sit in classes gated on a Playwright toolchain, plus 30 in `test_runtime_wcag_checks`' subclasses: about 200 in all. Each runs a script and, when it exits 2 saying no browser started, calls `self.skipTest`. Only `EachEngine.runtime` turns that skip into a failure, and only when `WDS_REQUIRE_ENGINES` is set, which CI sets on Linux alone; `grep -n WDS_REQUIRE tests/*.py` finds no other guard.
 - **Evidence:** `ci.yml:103`: `WDS_REQUIRE_ENGINES: ${{ runner.os == 'Linux' && '1' || '' }}`; `test_runtime_engines.py:52-56`: `if os.environ.get("WDS_REQUIRE_ENGINES"): self.fail(...)` else `self.skipTest(...)`; `test_browser_runtime.py:70`: `if proc.returncode == 2 and b"browser" in proc.stderr.lower(): self.skipTest(...)`. On Windows and macOS the Chromium comes from the runner image's Chrome or Edge (`shared/browser_common.mjs:186-201`), not from Playwright: `ci.yml:85-88` installs browsers on Linux only.
@@ -21,6 +22,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-2 · high · test-gap
+
 - **Where:** `plugins/pro-web-design-suite/tools/check.py:58-62`; `tests/test_agents.py:33,38,55,70,83` (`AGENTS.glob("*.md")`).
 - **What:** For a file outside `skills/`, `affected()` makes one key, the file name or the script's stem, and selects the test modules whose source text contains it. `test_agents.py` globs the agents folder, so its source names only `design-critic` (line 105's test). Likewise `test_commands.py` runs `new_system.py` and `release_check.py` through the command lines in each `SKILL.md` (`${CLAUDE_SKILL_DIR}/scripts/…`, `test_commands.py:495-499`), so the test's own source never names those stems.
 - **Evidence:** `check.affected([path], sources)` with the real test sources: `agents/a11y-auditor.md -> []`, `agents/codemod-batch-reviewer.md -> []`, `agents/design-auditor.md -> []`, `agents/gate-runner.md -> []`, `agents/supabase-security-reviewer.md -> ['test_pointers']`, `agents/design-critic.md -> ['test_agents']`; `workflow-commands/new-system/scripts/new_system.py -> []`; `workflow-commands/release-check/scripts/release_check.py -> []`.
@@ -29,6 +31,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-3 · medium · test-gap
+
 - **Where:** `plugins/pro-web-design-suite/tools/check.py:60-61`; `tests/test_doc_snippets.py:168-171`; `tests/test_real_tools.py:261,688`.
 - **What:** A reference under `skills/<skill>/references/` adds the skill folder name as a key, so every module whose source mentions the skill runs (9 to 41 modules, over-inclusive). But `test_doc_snippets`, which audits every CSS/TSX/JSX block in all thirteen skills' markdown, is selected only when the skill's name appears in its source, and the two snippet tests in `test_real_tools` (stylelint on the references' CSS, ESLint on their TSX) only for `web-design-studio`. This answers the handoff's open question.
 - **Evidence:** one reference per skill through `affected()`: `a11y-audit-runner … -> 26 modules; []`, `client-presentation-builder -> 11; []`, `component-state-matrix -> 13; []`, `content-model-to-ui -> 14; []`, `design-critique-gate -> 15; []`, `design-system-docs -> 16; ['test_rules_spec']`, `design-system-versioning -> 13; []`, `design-token-migration -> 18; ['test_rules_spec']`, `email-template-system -> 19; ['test_doc_snippets']`, `figma-variables-sync -> 12; []`, `landing-page-conversion -> 9; []`, `perf-budget-gate -> 18; []`, `web-design-studio -> 41; ['test_doc_snippets', 'test_real_tools', 'test_rules_spec']` (the list shows which of the three snippet modules were picked).
@@ -37,6 +40,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-4 · high · infra
+
 - **Where:** `plugins/pro-web-design-suite/tools/fail_before.py:72-79,149-156,204-209`.
 - **What:** The runner counts `addFailure` and `addError` alike (`failed += 1`) and records no message. The table prints `FAIL (n)` / `ok` / `skipped` and the verdict. A test that errors on the old tree because the script it runs did not exist at the tag (`FileNotFoundError` from `run_py`, or an `ImportError` in a `load_script`) is `FAIL (1)` before and `fixed` now, indistinguishable from an assertion that failed for the fix's reason. The docstring's "A failing test shows its failures and errors" (line 23) is not what the output does.
 - **Evidence:** lines 77-79: `def addError(self, test, err): if isinstance(test, unittest.TestCase): self.row(test)["failed"] += 1; return`; line 153: `return f"FAIL ({row['failed']})"`; `test_tools.FailBefore.test_each_verdict` (lines 128-146) asserts only the `(before, now, verdict)` triples. The CHANGELOG cites this table as the fail-before evidence for every fix (nine "Regression test" entries, e.g. line 39-45).
@@ -45,14 +49,16 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-5 · medium · flake
+
 - **Where:** `tests/test_runtime_urls.py:86-92,162-180` (`EachPageHasItsTypesBudget`).
 - **What:** One test runs `measure_vitals.mjs` over two pages (`--runs 1 --settle 500 --throttle off`) under a 600-second `subprocess.run` timeout and reads the breaches per page. The only timing assumption is that the child finishes inside 600 s; the assertions themselves (LCP over 1 ms breaks the strict budget, under 60,000 ms keeps the home one) cannot flake. No retry, no tolerance beyond the timeout.
 - **Evidence:** line 87: `run_node(..., timeout=600, ...)`; lines 174-176 explain that a run with no LCP also exits 1, so the test reads `breaches`, not the exit. `docs/HANDOFF.md:51`: under an MSVC build at 100 % CPU the test timed out at 600 s; alone it passes in 4 s.
-- **Effect:** Under load the whole `check.py` fails on this test with a `TimeoutExpired` error, not a wrong measurement.
-- **Fix:** It is CPU starvation, not a test bug: say so in the error (catch `TimeoutExpired` in `Served.node` and fail with "timed out at 600 s; the machine was busy") and keep the 600 s. A retry would only hide a hung browser.
+- **Effect:** Under load the whole `check.py` fails on this test with a `TimeoutExpired` error, not a wrong measurement. On CI the same class fails differently: run 40681521613 (macOS 3.14) asserted a strict-budget LCP breach (`['lcp']` where `[]` was expected), a real measurement on a slow shared runner (OPS-4).
+- **Fix:** It is CPU starvation, not a test bug: say so in the error (catch `TimeoutExpired` in `Served.node` and fail with "timed out at 600 s; the machine was busy") and keep the 600 s; and for the strict budget, classify a recorded number against the budget in one test and only assert in the live run that a number came back, so a slow runner cannot turn a measurement into a failure. A retry would only hide a hung browser.
 - **Confidence:** confirmed
 
 ### TEST-6 · medium · flake
+
 - **Where:** `tests/test_browser_runtime.py:502-518` (`VitalsMeasures.test_tbt_stops_at_tti`).
 - **What:** Two runs with `--settle 9000`. A 250 ms task at 6,000 ms must start at or after the run's TTI median and be marked `after-tti`; a task at 1,000 ms must start before TTI and be counted. The assumption is that the page reaches TTI (five quiet seconds) between 1 s and 6 s on the page's clock. On a slow Windows runner, loading can push the quiet window past 6 s, so the late task starts before TTI and the first assertion fails.
 - **Evidence:** lines 508-511: `out = self.vitals(late.replace("{at}", "6000"), "--throttle", "off", "--settle", "9000") … self.assertGreaterEqual(task["start"], out["stats"]["tti"]["median"])`. Tolerance: the 9 s settle and `task["duration"] - 50` on TBT (line 518); no retry.
@@ -61,6 +67,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** likely
 
 ### TEST-7 · medium · flake
+
 - **Where:** `tests/test_browser_runtime.py:388-413` (`VitalsUnderCsp`).
 - **What:** One run per variant with `--settle 1500`. The page shifts its content 200 ms after the first paint; the test asserts CLS over 0.1 without the CSP and under 0.01 with it. If the first paint comes late on the runner, the shift lands after the 1,500 ms settle window and the measured CLS is 0, failing the first assertion (the positive control), which is the macOS flake the handoff names.
 - **Evidence:** lines 396-399 (the `PerformanceObserver` on `paint` plus `setTimeout(…, 200)`), line 403 (`"--settle", "1500"`), line 412 (`self.assertGreater(self.cls(""), 0.1)`). No retry, no second run.
@@ -69,6 +76,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** likely
 
 ### TEST-8 · medium · flake
+
 - **Where:** `tests/test_browser_runtime.py:520-558` (`test_interact_at_clicks_while_the_page_hydrates`) and `446-500` (the other `VitalsMeasures` tests).
 - **What:** The click at 2,500 ms must land inside a 3-second task that starts at 1,500 ms on the page's clock; the assertions are `clickedAt <= 2800`, INP >= 500, TBT >= 1000, and the control's INP under half the hydrating click's. The upper bound (`<= 2800`) is the one a slow runner breaks: the button must be found and clicked within 300 ms of schedule. The other vitals tests assert lower bounds only (TTFB >= 140/540, INP >= 200, blocking >= 150), which a slow runner cannot break.
 - **Evidence:** lines 530-532: `"--interact-at", "2500"` then `self.assertLessEqual(out["perRun"][0]["clickedAt"], 2800, "the click came late")`; the docstring (lines 521-528) records two earlier timing fixes to this test. No retry.
@@ -77,6 +85,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** likely
 
 ### TEST-9 · low · flake
+
 - **Where:** `tests/test_recipes.py:810-821` (`test_the_safe_triangle_holds_and_a_click_keeps_a_hovered_panel`).
 - **What:** The only retry in the suite: up to three browser runs, passing if one of them gives all four outcomes. The comment says the diagonal still failed "now and then" on a loaded macOS runner even on the fake clock.
 - **Evidence:** lines 815-819: `for _ in range(3): seen = self.scenario(...); if seen == want: break` then `self.assertEqual(seen, want)`.
@@ -85,6 +94,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-10 · medium · infra
+
 - **Where:** `.github/workflows/ci.yml:85-88,100-105`; `plugins/pro-web-design-suite/shared/browser_common.mjs:145-149,186-201`.
 - **What:** On Windows and macOS the browser tests run against whatever Chrome or Edge the runner image ships, which the image updates without notice; only Linux runs Playwright's pinned headless shell. The three legs therefore test three Chromium versions, none recorded in the run.
 - **Evidence:** `ci.yml:85`: `if: runner.os == 'Linux'` on the only `playwright install`; `browser_common.mjs:146-148`: the candidates are the sandbox default, Playwright's own, then `installedBrowsers()`; `tooling/README.md`: "otherwise an installed Chrome or Edge, whose version is not pinned".
@@ -93,6 +103,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-11 · low · infra
+
 - **Where:** `.github/workflows/ci.yml:146`.
 - **What:** The `validate` job installs `@anthropic-ai/claude-code` unpinned, so the validator's rules drift with each CLI release while the suite's own facts pin 2.1.269 as the evals floor (`tests/fixtures/evidence.json`, entry 45).
 - **Evidence:** `run: npm install --global @anthropic-ai/claude-code`; `claude --version` is printed but not compared with anything.
@@ -101,6 +112,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-12 · medium · infra
+
 - **Where:** `.github/workflows/ci.yml:26-33,100-105`; `tests/test_policies.py:246-251`; `tests/test_runtime_engines.py:42-80`; `tests/test_token_migration.py:1148`; `tests/test_precommit_hook.py:357-360`; `tests/test_mcp.py:52`.
 - **What:** Each leg runs the whole suite (no sharding, no retries, `timeout-minutes: 45`), but some groups run on one leg only: Firefox and WebKit (3 tests) and Postgres (8 tests, `PoliciesRunOnPostgres`) on Linux, where CI puts them on PATH; the POSIX file-mode test and the symlink hook test on Linux and macOS. `test_mcp.TheServerFile.test_claude_plugin_validate_strict_passes` skips on every suite leg (no `claude` CLI there) and is covered only by the separate `validate` job, which `test_ci_validates_what_the_skipped_test_would` (`test_mcp.py:62`) checks.
 - **Evidence:** `ci.yml:85-88` (engines and Postgres on PATH, Linux only); `test_policies.py:251`: `@unittest.skipIf(_postgres(), _postgres())` where `_postgres()` needs `initdb`, `pg_ctl`, `psql` on PATH; the skip table below.
@@ -109,6 +121,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-13 · medium · stale-evidence
+
 - **Where:** `tests/fixtures/evidence.json` (79 entries); `tests/test_evidence.py:188-198`.
 - **What:** The register's tests hold every quoted figure to an entry with a `checked` date in `YYYY-MM-DD` form, but nothing reads the date's age: an entry checked in September stays valid for ever. Entries whose sources move: the npm registry's `latest` (entries 20-21, TypeScript 7.0.2 and typescript-eslint 8.71.0, checked 2026-10-04), Claude Code's evals requirement 2.1.269 (entry 45, 2026-10-16), the 20 web-features `.dist` files whose Baseline status changes monthly (entries 46-65, 2026-10-16; `@scope` quotes "Chrome 143, Firefox 146, Safari 26.4"), Figma's plan limits (33-37, 2026-10-11), Supabase's "end of 2026" key deadline (17, 2026-10-01), and the twelve entries checked 2026-09-25 (GDS 2017, Deque 2021, WebAIM Million 2026, Screen Reader Survey #10, NN/g, Baymard, Deloitte, DOJ).
 - **Evidence:** `test_evidence.py:193`: `self.assertRegex(entry["checked"], r"^\d{4}-\d{2}-\d{2}$")` is the only use of `checked`; the dates by count: 2026-09-25 ×12, 10-01 ×2, 10-04 ×3, 10-05 ×4, 10-06 ×2, 10-07 ×5, 10-11 ×5, 10-16 ×33, 10-21 ×13.
@@ -117,6 +130,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-14 · low · stale-evidence
+
 - **Where:** `tests/fixtures/caniemail.json:5`; `tooling/README.md` (Playwright 1.63, axe-core 4.13); `tests/test_commands.py:314-414`.
 - **What:** The caniemail pin is `last_update_date: 2026-09-16`, six weeks old; the matrix and the linter are held in step with it (`test_caniemail`), not with caniemail. The Playwright and axe-core versions the suite tests are pinned in `tooling/` (read only through its README here) and the install-gate fixtures name 1.62.1/1.63.0 and axe-core 4.11.0 as example values, so no test asserts which versions the gates were proven on.
 - **Evidence:** `caniemail.json:5`: `"last_update_date": "2026-09-16 13:05:00 +0000"`; `test_commands.py:445-447` reads the Playwright pin from `tooling/main/package.json` for the install gate's default image, which is the one place a tooling version reaches a test.
@@ -125,6 +139,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-15 · low · weak-test
+
 - **Where:** `tests/test_numbers.py:46-58,67-76` (`VerifiedRatios`).
 - **What:** The "Verified 4.60:1 (--neutral-500 on --neutral-100)" claims in the docs are recomputed with `generate_color_ramp.py`'s own `contrast_ratio_oklch` and `parse_color`, the code the claims come from. A wrong OKLCH-to-sRGB conversion would verify its own numbers.
 - **Evidence:** line 57: `return self.gen.contrast_ratio_oklch(self.gen.parse_color(...), self.gen.parse_color(...))`. Mitigation: `test_check_roles.py:78-86` has an independent sRGB WCAG `contrast()` applied to the browser's rendered ink (`ORDERS`, lines 74-75), and `test_check_roles.py:178-180` asserts a hard-coded `4.40:1` from `generate_color_ramp --check`.
@@ -133,6 +148,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-16 · low · weak-test
+
 - **Where:** `tests/test_harness.py:156-164` (`test_cleanup_leaves_behind_what_it_cannot_delete`).
 - **What:** No assertion: the test passes when `holder.cleanup()` does not raise while a file is held open. It does not assert the file was left behind, and on POSIX (where the delete succeeds) it asserts nothing about the path either.
 - **Evidence:** lines 159-164: `with open(... "held.txt", "w") as held: held.write("x"); held.flush(); holder.cleanup()`; the only call is `self.addCleanup(shutil.rmtree, holder.name, ignore_errors=True)`.
@@ -141,6 +157,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-17 · low · weak-test
+
 - **Where:** `tests/test_content_and_a11y.py:255-264`; the 114 `subprocess.run` calls without `check=` the static pass listed.
 - **What:** Two tests assert only exit 0 (`test_template_with_attrs_and_content_is_accepted`, `test_attrs_without_content_is_accepted`); both are marked as guards for the refusal tests beside them, which is fine. Of the 114 unchecked `subprocess.run` calls, 113 are followed within ten lines by a `returncode` assertion, a `return proc` to a helper that asserts, or an `output(proc)` read; the one that is not is `test_policies.py:280`, `pg_ctl … stop` in `tearDownClass`. None swallows a failing script.
 - **Evidence:** the classification script over `ruff-tests.txt` (`no returncode/assert/return/stdout within 10 lines: 1`, `test_policies.py:280 … tearDownClass`).
@@ -149,6 +166,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-18 · low · hygiene
+
 - **Where:** `plugins/pro-web-design-suite/tests/__pycache__/` (`wds_support.cpython-314.pyc`, `wds_support.cpython-39.pyc`); `tooling/release/__pycache__/`; `tests/wds_support.py:24`.
 - **What:** `wds_support.py` sets `sys.dont_write_bytecode = True` in its body, which runs after Python has already compiled and cached `wds_support` itself, so a run without `-B` writes exactly that one `.pyc` into the plugin (which is what the folder holds, for 3.9 and 3.14). `check.py` and `fail_before.py` set `PYTHONDONTWRITEBYTECODE`; the files came from a by-hand run. `tooling/release/__pycache__` is `build.py`'s, from a run without `-B`. Both are git-ignored (`git status --ignored`: `!! tests/__pycache__/`, `!! tooling/release/__pycache__/`), and `build.py` reads from `git archive`, so neither can ship.
 - **Evidence:** `ls tests/__pycache__` → 2 files, both `wds_support`; `test_tools.py:146` asserts fail_before leaves "no bytecode".
@@ -157,6 +175,7 @@ Audited 2026-10-28 at main 8441ff0. Commands run: `git rev-parse --short HEAD`; 
 - **Confidence:** confirmed
 
 ### TEST-19 · low · hygiene
+
 - **Where:** `tests/test_email.py`, `tests/test_perf_audit.py`, `tests/test_project_config.py`, `tests/test_schema_sources.py`.
 - **What:** Four of 68 test files have no `if __name__ == "__main__": unittest.main()` guard. Harmless under `discover` and `-m unittest module`, inconsistent with the other 64.
 - **Evidence:** AST pass: `files without unittest.main guard: 4`.
@@ -238,7 +257,7 @@ CI installs on every leg: uv (Python 3.9 and 3.14), Node 22, `npm ci` in `toolin
 | Condition | Tests (count) | Runs on | Effectively untested? |
 |---|---|---|---|
 | no Node (`NODE`) | 42 across browser_scripts, commands, content_and_a11y, docs, email, figma_sync (10), hooks, json_guards, mcp, out_guard, powershell_json, project_config, recipes, runtime_*, real_tools | all legs | no |
-| no Playwright+axe (`MODULES`, `PLAYWRIGHT`, `playwright_modules()`, `a11y_modules()`, `AXE`, `BROWSER_MODULES`) | ~196: browser_runtime 34, runtime_wcag_checks 30, runtime_shadow 9, runtime_urls 7, runtime_reach 8, runtime_engines 4, critique_snapshots 5, check_roles 2, email 3, email_rtl 1, modern_css 7, starter_css 5, recipes 9, commands 4, facts 3, persuasion_docs 1 | all legs (Linux: headless shell; Windows/macOS: the image's Chrome/Edge) | no, but a failed launch is a skip on every leg (TEST-1) |
+| no Playwright+axe (`MODULES`, `PLAYWRIGHT`, `playwright_modules()`, `a11y_modules()`, `AXE`, `BROWSER_MODULES`) | about 196 in all (TEST-1's 166 plus 30; the 131 listed here plus the per-engine and subclass variants): browser_runtime 34, runtime_wcag_checks 30, runtime_shadow 9, runtime_urls 7, runtime_reach 8, runtime_engines 4, critique_snapshots 5, check_roles 2, email 3, email_rtl 1, modern_css 7, starter_css 5, recipes 9, commands 4, facts 3, persuasion_docs 1 | all legs (Linux: headless shell; Windows/macOS: the image's Chrome/Edge) | no, but a failed launch is a skip on every leg (TEST-1) |
 | no Chromium at run time (`skipTest("no usable browser…")` in 12 helpers) | the same ~196 | all legs | see TEST-1 |
 | no Firefox / WebKit (`EachEngine`, `WDS_REQUIRE_ENGINES`) | 3 (`test_firefox…`, `test_webkit…`, `test_an_engine_that_skips_bare_links…`) | Linux only; fails there if an engine will not start | one leg |
 | no Chrome/Edge installed (`installed_browsers()`) | 1 (`test_a_browser_that_will_not_start_falls_back_to_chrome_or_edge`) | all legs (every image has Chrome) | no |

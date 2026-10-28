@@ -4,13 +4,14 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 
 ## Summary
 
-18 findings: 1 critical, 6 high, 5 medium, 6 low. By class: 13 bugs, 2 gaps, 1 dead-code, 2 inconsistencies. No Python 3.9 problem (both scripts and both masters run under `uv --python 3.9`); the three B023 closures are harmless; every ARG001 is a signature kept uniform.
+18 findings: 1 critical, 6 high, 5 medium, 6 low. By class (counted from the headings): bug 13, gap 2, inconsistency 2, dead-code 1. No Python 3.9 problem (both scripts and both masters run under `uv --python 3.9`); the three B023 closures are harmless; every ARG001 is a signature kept uniform.
 
 The three that matter most: (1) `_parse_create_table` tests `low.startswith("check")`/`"unique"`/`"exclude"` without a word boundary, so any column whose name begins with those words (`check_in`, `check_out`, `checksum`, `unique_code`, `exclude_from_search`) vanishes from `model.json` with no warning (PY-A-1, confirmed). (2) The DDL reader's CHECK handling fails on three realistic shapes — a `DROP CONSTRAINT` is never replayed so a re-created CHECK keeps the old option list, a table-level CHECK is discarded when one of its string literals happens to be another column's name, and `pg_dump`/`supabase db pull`'s `(price >= (0)::numeric)` yields no mirrored rule (PY-A-2, -3, -4, all confirmed). (3) `project_config._css_tokens` reads `html.dark`, `:root.dark`, `html[data-bs-theme="dark"]` and `html[data-mode="dark"]` as the default rule, and the cascade's "last wins" makes the dark theme's values the contract's defaults for every gate that reads tokens through it (PY-A-7, confirmed).
 
 ## Findings
 
 ### PY-A-1 · critical · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/introspect_schema.py:1142`
 - **What:** Inside `CREATE TABLE`, an item is classed as a table constraint by `low.startswith(("primary key", "foreign key", "unique", "check", "exclude", "not null "))`. Three of the six have no trailing space or boundary, so a column whose name begins with `unique`, `check` or `exclude` is sent to `_apply_constraint_to_table`, matches none of its clause regexes, and is dropped silently.
 - **Evidence:** `v1_columns.sql` declares `bookings(id, guest_name, check_in date not null, check_out date not null, checksum text, unique_code text, exclude_from_search boolean …, notes text)`; `introspect_schema.py v1_columns.sql -o v1.model.json` reports "1 entities, 3 columns" and the model's columns are `['id', 'guest_name', 'notes']`. No warning is printed.
@@ -19,6 +20,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-2 · high · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/introspect_schema.py:1406` (and `_apply_constraint_to_table`, which keeps no constraint names)
 - **What:** `ALTER TABLE … DROP CONSTRAINT name` is swallowed by the "a constraint this parser does not know is still never a column" early return, so a CHECK or UNIQUE that a later migration drops and re-creates stays in the model beside its replacement. `_closed_set` returns the first CHECK that matches, i.e. the dropped one.
 - **Evidence:** `v2_drop_constraint.sql` creates `orders_status_check check (status in ('pending','paid'))`, drops it, and adds it back with `('pending','paid','shipped','cancelled')`. The model's `status.checks` holds both expressions and `ui.options` is `['pending', 'paid']`.
@@ -27,6 +29,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-3 · high · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/introspect_schema.py:1464` (`_check_target`)
 - **What:** A table-level CHECK is attached to "the one column it mentions", found with a bare `\bname\b` search over the whole expression, string literals included. The masked matcher `_names()` (SQL_PIECES) exists forty lines above and is not used here.
 - **Evidence:** `v3_check_target.sql`: `contact_methods(label, kind text not null, email text, phone text, constraint … check (kind in ('email', 'phone')))`. The model gives `kind.checks == []`, `control == "select"`, `options == []`, confidence low, plus a `.options` question — the closed set the schema states is gone.
@@ -35,6 +38,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-4 · high · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/introspect_schema.py:2325` (also the `between` and `length()` regexes that follow)
 - **What:** `_validate` reads a bound with `name\s*(>=|<=|>|<)\s*([\-\d.]+)`. Postgres deparses a CHECK on a `numeric` column as `(price >= (0)::numeric)` — the number is parenthesised and cast — so `pg_dump`, `supabase db pull` and `supabase db dump` output never match.
 - **Evidence:** `v4_pgdump_cast.sql` (pg_dump's exact spelling). `price numeric(10,2)` with `CHECK ((price >= (0)::numeric))` gets only the mapper's invented `min 0` (`mirror: false`); `stock integer` with `CHECK ((stock >= 0))` gets the mirrored rule. A `CHECK (price > 0)` or `<= 1000000` on a numeric column yields nothing at all.
@@ -43,6 +47,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-5 · high · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/introspect_schema.py:2397` and `:2400` (`_title_column`); `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/scaffold_ui.py:1977` (`emit_detail`)
 - **What:** The title column is chosen before the name rules run and never excludes a credential: a `NOT NULL UNIQUE` text column wins the second rule even when it is `token`, `token_hash`, `api_key`, `secret`. The scaffold then writes `{record.token}` into the detail `<h1>` while `emit_types` deliberately leaves `token` out of the read type.
 - **Evidence:** `v5_token_title.sql` (`sessions(id, user_id, token text not null unique, expires_at, created_at)`). Model: `title_column == "token"`, `title_is_placeholder == false`, the `.title_column` question defaults to `token`, while `token.ui` is `password-input`, `never_display: true`, placement all false. Scaffold: `SessionDetail.tsx:38` is `{record.token}`; `sessions.types.ts:4` says "token: write-only — deliberately absent from the read type so it cannot be rendered". `SessionsList.tsx` has no link cell (the title is not a list column; see PY-A-6).
@@ -51,6 +56,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-6 · high · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/scaffold_ui.py:1716` (`emit_list`, table layout; the Vue and Svelte lists at `:3951` and `:4995` are the same)
 - **What:** In the table layout the only link to the detail page is placed on the cell whose column is the title. When the title is not among the list columns — always the case when the title is the placeholder primary key, because `_assign_placement` (`introspect_schema.py:2467`) skips a `hidden` column — no cell gets `<a>`, so the list has no way to reach the detail.
 - **Evidence:** `v6_no_title.sql`: `readings(id, sensor_id, value numeric, taken_at, quality)` has no text column, so `title_column == "id"`, `title_is_placeholder == true`, `index_layout == "table"`, list columns `['sensor_id', 'value', 'taken_at', 'quality']`. `grep -E "href|styles.link|<a " v6_out/features/readings/ReadingsList.tsx` prints nothing. The card layout is not affected (its `href` is on the title expression, which falls back to the key).
@@ -59,6 +65,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-7 · high · bug
+
 - **Where:** `plugins/pro-web-design-suite/shared/project_config.py:428`–`429` and `:537`–`540` (`_css_tokens`)
 - **What:** A rule is a default when its selector *starts with* `:root`/`html`/`:where(:root)`/`*` and `THEME_OR_DENSITY` (`[data-theme=`/`[data-density=`) does not appear in it. A class-based or differently-named theme selector passes both tests, and "the cascade: the last one wins" then makes the theme's value the default.
 - **Evidence:** `probe_dark.py` writes `:root { --bg: white; } <sel> { --bg: black; }` and reads it back: `html[data-bs-theme="dark"]`, `html[data-mode="dark"]`, `:root.dark`, `html.dark` and `:root:where(.dark)` all give `--bg = black`; only `:root[data-theme="dark"]` gives `white`. `probe_shared.py` on a two-rule sheet gives `{'--bg-page': 'black', '--fg-default': 'white', …}`.
@@ -67,6 +74,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-8 · medium · gap
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/introspect_schema.py:3079` (`parse_prisma`) and the `fidelity["missing"]` list at `:3148`
 - **What:** A Prisma implicit many-to-many (`tags Tag[]` on one model, `posts Post[]` on the other, no `@relation(fields:)`) is skipped on both sides, so neither the `_PostToTag` join table nor a `many-to-many` edge reaches the model, and `fidelity.missing` does not say so.
 - **Evidence:** `v13.prisma` (Post/Tag with implicit m:n): the model has two entities, zero relationships, and no entry in `missing` mentions many-to-many.
@@ -75,6 +83,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-9 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/introspect_schema.py:3482` (`main`, the several-files check; the guarded call is at `:3491`)
 - **What:** With more than one input, `detect_format()` is called for each file *outside* the `try … except SchemaError`, so a file it cannot classify raises straight through.
 - **Evidence:** `introspect_schema.py v1_columns.sql v7_other.txt -o v7.model.json` prints a traceback ending in `SchemaError: Cannot tell what v7_other.txt is. Pass --format …` instead of the one-line message and exit 1 the docstring promises.
@@ -83,6 +92,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-10 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/scaffold_ui.py:5766` (`emit_schema_zod`); pydantic's rule at `:5860`–`5863`
 - **What:** Every instant column becomes `z.string().datetime({ offset: true })`, which accepts `Z` or an explicit offset but rejects a string with no zone. The scaffold's own form posts `datetime-local` values (`2026-10-28T09:00`, no offset), and a `timestamp without time zone` column (`temporal.timezone == "ambiguous"`, every Prisma `DateTime`) cannot carry one. The pydantic twin uses plain `datetime` for the naive case and `AwareDatetime` only when `aware` is true, so the two server schemas disagree.
 - **Evidence:** Lines cited; `emit_actions` (`:2551`) already admits the gap with "a datetime-local value has no offset, and the schema wants one".
@@ -91,6 +101,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** likely (zod semantics from its docs; not executed)
 
 ### PY-A-11 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/scaffold_ui.py:2069` (`control_jsx`, radio-group), `:594` (`FIELD_TSX` root), `:2323` (the summary link); the Vue (`:3687`) and Svelte (`:4742`) controls are the same
 - **What:** The error summary links each entry to `'#' + fieldId(name)`, "because on a long form the invalid field is usually off-screen". A radio group gets no element with that id: `RadioGroup` is rendered without `id`, `Field`'s `<fieldset>` root carries none, and only the `<legend>` gets `${id}-label`.
 - **Evidence:** `v8_out/features/shows/ShowForm.tsx:93` `href={'#' + fieldId(name)}`; `:152` `id={fieldId('size')}` is the `Field` prop, `:159` `<RadioGroup` has no `id`, `:164` `labelledBy={fieldId('size') + '-label'}`; `v8_out/ui/Field/Field.tsx:64` `<Root` has no `id` attribute.
@@ -99,6 +110,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-12 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/shared/dtcg.py:1396` (`_shadow_layer`) and `:1465` (`_css_value`, the shadow branch runs before `_border` and the fallback)
 - **What:** With no literal colour, `_shadow_layer` takes the last reference as the colour, so any value made of three or four references (and nothing else) is typed `shadow`, whatever the tokens are.
 - **Evidence:** `probe_shared.py`: `document([("--space-1","4px"),("--space-2","8px"),("--space-3","16px"),("--inset-card","var(--space-1) var(--space-2) var(--space-3)")])` writes `inset.card` as `{"$type": "shadow", "$value": {"color": "{space.3}", "offsetX": "{space.1}", "offsetY": "{space.2}", "blur": 0px, "spread": 0px}}` with no problem reported.
@@ -107,6 +119,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-13 · low · bug / dead-code
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/introspect_schema.py:1984` (call) and `:2405` (`_subtitle_column`)
 - **What:** `screens.subtitle_column` is computed before the mapping loop fills `col.ui`, so its first test (`c.ui.get("control") in ("textarea", "rich-text")`) can never fire; only the name regex works. And nothing reads the field: `grep -rn subtitle_column` finds the two lines in introspect and nothing in scaffold_ui, the references or the tests.
 - **Evidence:** `v8_subtitle.sql` (`blurb varchar(1000)` → control `textarea`): `subtitle_column` is `None`.
@@ -115,6 +128,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-14 · low · gap
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/scaffold_ui.py:2054`–`2060` (`control_jsx`, select); the Vue and Svelte twins at `:3677` and `:4730`
 - **What:** A `select` whose option list is empty (a state-word text column with no CHECK, no enum and no `.options` answer — the model sets `options: []` and confidence `low`) is rendered as a real `<Select>` with no options (not even the blank when the column is required), not as a `ControlStub`.
 - **Evidence:** `v3_out/features/contact_methods/ContactMethodForm.tsx:139–150`: `<Select … required={true}>` … `</Select>` with no `<option>`.
@@ -123,6 +137,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-15 · low · dead-code
+
 - **Where:** `introspect_schema.py:95` (`CONTROLS`), `:345` (`TIMESTAMP_SUFFIX`), `:667` (`COL_MODIFIER_SPLIT`); `scaffold_ui.py:93` (`NATIVE_CONTROLS`), `:127` (`TS_KEYWORDS`)
 - **What:** Five module constants have no reference anywhere in the plugin or its tests beyond their definition (`grep -rn -w` over `skills shared hooks mcp tools tests`). `CONTROLS` is described as "the closed set of controls the scaffolder knows how to render … keep this closed", but nothing checks an emitted control against it. Separately, the `password-input` branches of `control_jsx`, `vue_control` and `svelte_control` (`:2127`/`:2136`, `:3728`/`:3737`, `:4783`/`:4792`) are unreachable from a model the introspector writes: the only rule that assigns `password-input` also sets `never_display`, which makes `placement.form` false and `Answers.in_form` (`:227`) refuse it.
 - **Evidence:** the grep counts (1 each) and the `in_form` logic cited.
@@ -131,6 +146,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** confirmed
 
 ### PY-A-16 · low · inconsistency
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/scaffold_ui.py:1694` (`href = f"'/{name}/' + String(row.{pk})"`), `:1732` (`key={String(row.$pk)}`), `:1979` (`String(record.{pk_detail})`)
 - **What:** The React list and detail write the primary key with `row.<pk>` directly, while the Vue and Svelte emitters use `member('row', pk)` (which brackets a non-identifier). A key column named like `order-id` or `2fa` (the E3 case the audit fixed for form fields) produces invalid TSX in React only.
 - **Evidence:** lines cited; `member()` at `:164` exists for this.
@@ -139,6 +155,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** likely (by reading; not executed)
 
 ### PY-A-17 · low · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/scaffold_ui.py:2826`–`2834` (`emit_states`: `headline="$headline"` at `:2826`, `body="$body"` at `:2829`, the action label) and `:2202` (`_form_sections`: `label="$label"`); `:2085` (`control_jsx`, Toggle `label="…"`)
 - **What:** Copy from the answers file and labels from `humanise()` are interpolated into JSX attribute strings without escaping, whereas the Vue and Svelte emitters route the same text through `vue_static`/`svelte_static`. A double quote in an `empty_state.headline` answer (`No "projects" yet`) ends the attribute early.
 - **Evidence:** lines cited.
@@ -147,6 +164,7 @@ The three that matter most: (1) `_parse_create_table` tests `low.startswith("che
 - **Confidence:** likely (by reading)
 
 ### PY-A-18 · low · inconsistency
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/introspect_schema.py:3431` (argparse help for `schema`) and the module docstring "WHAT IT READS" (`:19`–`:34`)
 - **What:** Both still list `.sql`, `.ts` and `.json` only; Prisma and Drizzle (3.6.0, documented in SKILL.md and `references/scripts.md`) are missing from the script's own `--help` and docstring, while `--format` already offers them.
 - **Evidence:** lines cited; `grep` of scripts.md shows every flag documented, so this is the only drift found between the CLI and its documentation.

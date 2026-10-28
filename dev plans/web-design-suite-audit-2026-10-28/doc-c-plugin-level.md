@@ -6,13 +6,14 @@ Commands run: `git rev-parse`, `ls`/`find` over the tree, `cmp` of the 13 contra
 
 ## Summary
 
-18 findings: 0 critical, 0 high, 8 medium, 10 low. By class: stale 5, contradiction 4, public-face 2, manifest 3, readme 5 (one of them frontmatter), changelog 1, security 1. No manifest error (all three `--strict` validations pass, with the directory checks, on 2.1.308), no missing file or flag behind any agent or command, no false statement in the disclosure.
+18 findings: 8 medium, 10 low. By class (counted from the headings): readme 5, manifest 3, stale 3, contradiction 2, public-face 2, changelog 1, frontmatter 1, security 1. No manifest error (all three `--strict` validations pass, with the directory checks, on 2.1.308), no missing file or flag behind any agent or command, no false statement in the disclosure.
 
 The three that matter most: (1) the root README still marks `tw-probe` and the Tailwind v4 probe "*(4.0.0)*: on `main` but not yet in a release zip", while 4.0.0 and 4.0.1 are both released (`README.md:180,350,357`); (2) the project `CLAUDE.md` says private vulnerability reporting is on for the distribution repository (verified 2026-10-21) but the API says it is off there, and the development repository, where `SECURITY.md` sends reporters, has no root `SECURITY.md` so GitHub shows no policy; (3) three counts in shipped text are wrong: "Eight" skills run `audit_design.py` (nine declare it), the 4.0.0 entry's "221 files" (229 at the tag), and 4.0.1's date (2026-10-25 in the CHANGELOG, tagged and released 2026-10-26).
 
 ## Findings
 
 ### DOC-C-1 · medium · stale
+
 - **Where:** `README.md:357` (markers at `README.md:180` and `README.md:350`)
 - **What:** The root README says the *(4.0.0)* marker means unreleased work, but 4.0.0 and 4.0.1 are released.
 - **Evidence:** Line 357: "*(4.0.0)* marks what's on `main` but not yet in a release zip: see the [CHANGELOG]". Line 180: "`tw-probe` ... *(4.0.0)*". Line 350: "*(The probe is 4.0.0.)*". `gh release list`: "Pro Web Design Suite 4.0.1 Latest v4.0.1 2026-10-26T13:24:43Z", "Pro Web Design Suite 4.0.0 v4.0.0 2026-10-24T20:48:32Z".
@@ -21,6 +22,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-2 · medium · contradiction
+
 - **Where:** `plugins/pro-web-design-suite/CHANGELOG.md:99`
 - **What:** The 4.0.1 section is dated a day before the tag and the release; 4.0.0's date matches its release, so the convention is the release date.
 - **Evidence:** Line 99: "## 4.0.1 — 2026-10-25". `git for-each-ref`: "v4.0.1 2026-10-26 7d672d0"; `git log -1 v4.0.1`: "84f4a4f 2026-10-26 08:29:21 -0400"; release published 2026-10-26T13:24:43Z. The line was written in `74333f3 2026-10-25 14:37:27 -0400 fix(release): ship a listing icon before the directory submission (4.0.1)`. Line 121: "## 4.0.0 — 2026-10-24" against the release's 2026-10-24T20:48:32Z. The project `CLAUDE.md:17` says "tagged 2026-10-26".
@@ -29,6 +31,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-3 · medium · contradiction
+
 - **Where:** `README.md:65`; `plugins/pro-web-design-suite/README.md:131-132`
 - **What:** Both READMEs say eight skills run `audit_design.py` as their gate; nine skills declare it as a sibling dependency.
 - **Evidence:** `README.md:65`: "Eight of them run web-design-studio's `audit_design.py` as their gate, so install **web-design-studio** beside any of them." `grep -l 'From sibling skills:.*audit_design.py' skills/*/SKILL.md | wc -l` → 9: a11y-audit-runner, client-presentation-builder, component-state-matrix, content-model-to-ui, design-critique-gate, design-system-docs, design-system-versioning, design-token-migration, landing-page-conversion (each at its `SKILL.md:20`).
@@ -37,6 +40,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** likely
 
 ### DOC-C-4 · medium · stale
+
 - **Where:** `plugins/pro-web-design-suite/CHANGELOG.md:152`
 - **What:** The 4.0.0 entry's file counts are the counts of 2026-10-19, not of the 4.0.0 tag.
 - **Evidence:** Line 151-152: "leave out the plugin's `tests/`, `evals/` and `tools/` (221 files where there were 477)". `git ls-tree -r v4.0.0 -- plugins/pro-web-design-suite` without those folders: 229 of 496. At `a7b45ce` (2026-10-19, where the line was written): 221 of 478. At `v4.0.1`: 230 (the project `CLAUDE.md:17`'s "230 files" is right; the distribution repository's `main` has 230 blobs).
@@ -45,6 +49,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-5 · medium · security
+
 - **Where:** `CLAUDE.md:28` (the project's)
 - **What:** The project map says private vulnerability reporting is on for the distribution repository; GitHub says it is off there and on for the development repository.
 - **Evidence:** `CLAUDE.md:28`: "the repository, its write deploy key and `DIST_DEPLOY_KEY` are in place, and private vulnerability reporting is on (verified 2026-10-21)". `gh api repos/Vybecode-LTD/pro-web-design-suite/private-vulnerability-reporting` → `{"enabled":false}`; `.../Pro-Web-Designer-Suite-Plug-in/private-vulnerability-reporting` → `{"enabled":true}`. `SECURITY.md:5-7` sends reporters to the development repository's Security tab, which works.
@@ -53,6 +58,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-6 · medium · public-face
+
 - **Where:** repository root (no `SECURITY.md`, `.github/SECURITY.md` or `docs/SECURITY.md`); `README.md:497`; `plugins/pro-web-design-suite/SECURITY.md:5-7`
 - **What:** The development repository, the one both documents send security reports to, has no security policy where GitHub looks for one; the only `SECURITY.md` is inside `plugins/pro-web-design-suite/`.
 - **Evidence:** `ls SECURITY.md .github/SECURITY.md docs/SECURITY.md` → all "No such file"; `gh api .../community/profile` → `"security_policy"` absent, every file null. `README.md:497`: "Report a security problem privately, as [SECURITY.md](plugins/pro-web-design-suite/SECURITY.md) says." The distribution repository has `SECURITY.md` at its root (its contents list) and so shows a policy.
@@ -61,6 +67,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-7 · medium · public-face
+
 - **Where:** both repositories' settings (not files)
 - **What:** The development repository's About box is empty and neither repository has topics, branch protection, templates or push protection.
 - **Evidence:** `gh api repos/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`: `"description":null,"homepage":null,"topics":[]`; the distribution repository: a description and `"homepage":"https://vybecod.ing"`, `"topics":[]`. `branches/main/protection` → "Branch not protected" (404) on both; `rules/branches/main` → `[]` on both. `community/profile` → `code_of_conduct`, `contributing`, `issue_template`, `pull_request_template` all null on both; `find .github -type f` lists only `assets/readme/*.svg` and `workflows/*.yml`; the distribution repository has no `.github` (404). `security_and_analysis` on both: `secret_scanning_push_protection` and `dependabot_security_updates` "disabled". The distribution repository has `has_issues: true` while `plugins/pro-web-design-suite/README.md:125` and `:348` say issues belong in the development repository. Social preview: not readable by API.
@@ -69,6 +76,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-8 · medium · stale
+
 - **Where:** `CLAUDE.md:62` and `CLAUDE.md:74` (the project's); `plugins/pro-web-design-suite/tests/test_mcp.py:35`
 - **What:** Neither path the project map gives for the desktop app's bundled CLI exists on this machine, and the suite's `find_claude()` globs the first of them, so the local `validate --strict` test skips.
 - **Evidence:** `CLAUDE.md:62`: "use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\<build>\claude.exe` (2.1.293's build folder is `83cb0bd7fed4`)"; `CLAUDE.md:74`: "Its bundled CLI is really in `C:\Users\vybec\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude-code\`". PowerShell `Get-ChildItem "$env:APPDATA\Claude\claude-code"` → nothing; `ls .../LocalCache/Roaming/Claude` → only `.user-data-left.claude_pzs8sxrjxfjjc`. `find` → `C:\Users\vybec\AppData\Local\Claude-Data\claude_pzs8sxrjxfjjc\claude-code\2.1.304\aed62990b91e\claude.exe` and `...\2.1.308\c17a819afb40\claude.exe`. `test_mcp.py:35`: `glob("Claude/claude-code/*/*/claude.exe")` under `APPDATA`. The CLI on PATH is 2.1.160 (`claude --version`).
@@ -77,6 +85,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-9 · low · manifest
+
 - **Where:** `.claude-plugin/marketplace.json:2`; `plugins/pro-web-design-suite/.claude-plugin/marketplace.json:2`
 - **What:** The `$schema` URL does not resolve.
 - **Evidence:** `"$schema": "https://anthropic.com/claude-code/marketplace.schema.json"`; `curl -I` → 301 to `https://www.anthropic.com/claude-code/marketplace.schema.json` → 404 `text/html`. The marketplace reference: "`$schema` | JSON Schema URL for editor autocomplete. Ignored at load time".
@@ -85,6 +94,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-10 · low · manifest
+
 - **Where:** `.claude-plugin/marketplace.json:13,21-40` vs `plugins/pro-web-design-suite/.claude-plugin/plugin.json:5,26-53`
 - **What:** The marketplace entry carries 18 keywords and a shorter description; `plugin.json` carries 26 and the long one. Claude Code shows the entry's values, so eight keywords in `plugin.json` are never shown in `/plugin`.
 - **Evidence:** Set difference (plugin.json only): `color-system`, `crud-scaffolding`, `css-modules`, `keyboard-navigation`, `navigation-patterns`, `typography`, `visual-regression`, `wcag`; `descriptions equal: False`. The marketplace reference: "For a field you set on the entry, users see the entry's value, even when `plugin.json` sets a different one." `tests/test_docs.py:440-445` compares the entry with `plugin.json` for `license`, `homepage`, `author` only.
@@ -93,6 +103,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-11 · low · frontmatter
+
 - **Where:** `workflow-commands/new-system/SKILL.md:5`, `deck/SKILL.md:5`, `release-check/SKILL.md:5`, `install-gate/SKILL.md:5`
 - **What:** The `argument-hint` of four commands omits flags their script takes.
 - **Evidence:** `new_system.py --help` has `--hue-shift`, `--gamut {srgb,p3}`, `--base`, `--snap-px`; the hint is `"BRAND [--out DIR] [--neutral-hue H] [--ratio R --dual-ratio R --fluid MIN MAX] [--force]"` (the body, line 22, names `--base` and `--snap-px`). `deck.py` and `release_check.py` take `--out DIR`; neither hint has it. `install_gate.py` takes `--force` and `--dry-run`, which the body uses (lines 16, 33); the hint lists `--dest --src --dist --build` only. The other twelve hints match their scripts' `--help`.
@@ -101,6 +112,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-12 · low · changelog
+
 - **Where:** `plugins/pro-web-design-suite/CHANGELOG-earlier.md:611,631,645,1358,1363,1404,1439`
 - **What:** Seven test identifiers in the earlier CHANGELOG no longer exist in `tests/` (renamed since); every identifier in `CHANGELOG.md` exists.
 - **Evidence:** See "CHANGELOG regression tests that do not exist" below. `CHANGELOG.md`: 102 backticked test identifiers checked, 0 missing; `CHANGELOG-earlier.md`: 118 checked, 7 missing.
@@ -109,6 +121,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-13 · low · readme
+
 - **Where:** `plugins/pro-web-design-suite/README.md:293`; `shared/token-contract.md:74` (and its 13 copies); `CHANGELOG.md:19-22,82,101,106-110,114,437,902,1177`; `CHANGELOG-earlier.md:964,1886`
 - **What:** The word "icon" occurs in shipped text outside `plugin.json` and image links. The listing icon is now `pro-web-design-suite-icon.png`, so none of these names its stem, and `build.py` matches the stem; but the directory's own rule is unknown and it held 4.0.1 for "label + icon" in a code span.
 - **Evidence:** `README.md:293`: "`font-size: 1em` for an icon"; `token-contract.md:74`: "| `--gap-fused` | 4px | Two halves of one thing (icon + label) |"; `CHANGELOG.md:21`: "span said \"label + icon\" matched the icon by its file name"; `CHANGELOG.md:85-86`: "broader than the directory's own match, whose exact rule is unknown". `grep -rn 'pro-web-design-suite-icon'` outside `plugin.json` and `tests/` → nothing.
@@ -117,6 +130,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** possible
 
 ### DOC-C-14 · low · readme
+
 - **Where:** `README.md:478-484`; `plugins/pro-web-design-suite/README.md:115-127`
 - **What:** Neither README tells a `web-design-suite` (3.x) user how to move to the renamed plugin; the only instructions are in the CHANGELOG.
 - **Evidence:** `README.md:482`: "Update the marketplace with `/plugin marketplace update pro-web-design-suite`, update the plugin from `/plugin`, then start a new session." (a user from 3.x has the marketplace under the name `web-design-suite`). `CHANGELOG.md:135-141`: "the marketplace keeps the name it was added under, so an install from this repository becomes `pro-web-design-suite@web-design-suite` ... run `/plugin install pro-web-design-suite@web-design-suite` once."
@@ -125,6 +139,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-15 · low · readme
+
 - **Where:** `plugins/pro-web-design-suite/README.md:107`
 - **What:** The disclosure's list of browser gates leaves out the email render, which also opens a page in Playwright.
 - **Evidence:** Line 107: "**The browser gates** (accessibility, performance, the state matrix, the critique's screenshots) load the pages you name"; `workflow-commands/email-build/SKILL.md:31-33` runs `render_email.mjs` ("It needs `playwright` in the project"); `README.md:35` (root) counts "email rendering" among the gates that open a browser.
@@ -133,6 +148,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-16 · low · readme
+
 - **Where:** `README.md:35`
 - **What:** The requirements table says the browser gates use Chromium, Chrome or Edge; the accessibility gate also runs Firefox and WebKit.
 - **Evidence:** Line 35: "they use Playwright's own Chromium if it's installed, else your Chrome or Edge." Line 136: "in Chromium, Firefox or WebKit"; `a11y_runtime.mjs` has `--engine`; `CHANGELOG.md:47-55` (4.0.2) is about the Firefox/WebKit install hint.
@@ -141,6 +157,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-17 · low · readme
+
 - **Where:** `README.md:203`; `plugins/pro-web-design-suite/README.md:205-208`
 - **What:** The name a user types to call a subagent is given without the `@agent-` prefix.
 - **Evidence:** `README.md:203`: "you can ask for one by name (`pro-web-design-suite:design-critic`)". The sub-agents reference: "Typed manually: `@agent-my-plugin:code-reviewer`."
@@ -149,6 +166,7 @@ The three that matter most: (1) the root README still marks `tw-probe` and the T
 - **Confidence:** confirmed
 
 ### DOC-C-18 · low · manifest
+
 - **Where:** `plugins/pro-web-design-suite/.claude-plugin/plugin.json:4,16`
 - **What:** `main`'s `plugin.json` says 4.0.1 but differs from the released 4.0.1's: the icon field names a different file. The project's convention bumps `version` at the tag, so this is the expected state between releases; it is recorded because the same version now names two manifests, and `claude plugin validate` cannot tell them apart.
 - **Evidence:** `diff` of the distribution repository's `plugin.json` (4.0.1, `4809e3f`) against `main`'s: only `>   "icon": "./.claude-plugin/pro-web-design-suite-icon.png",` (the released one has `./.claude-plugin/icon.png`, and the distribution's `.claude-plugin/` holds `icon.png`). `CHANGELOG.md:3`: "## 4.0.2 — unreleased"; the P60 entry at `CHANGELOG.md:19-22`.

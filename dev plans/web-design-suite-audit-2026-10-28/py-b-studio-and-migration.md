@@ -4,13 +4,14 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 
 ## Summary
 
-26 findings: 1 critical, 4 high, 10 medium, 11 low. By class: 14 bugs, 4 gaps (one of them documentation), 4 inconsistencies, 3 risks, 1 dead-code list (9 items). Every finding marked confirmed was reproduced with a command in the scratchpad; the rest are from reading.
+26 findings: 1 critical, 4 high, 10 medium, 11 low. By class (counted from the headings): bug 14, gap 4, inconsistency 4, risk 3, dead-code 1. Every finding marked confirmed was reproduced with a command in the scratchpad; the rest are from reading.
 
 The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that folder>` overwrites the project's own DTCG token file, because the overwrite guard names three outputs and the script writes four (PY-B-1). (2) The codemod turns `transition: opacity ease 200ms` into `opacity ease var(--motion-hover)`, which expands to two timing functions and is a transition the browser drops, and `cluster_z` maps z-index 1, 2, 3 and 10 all to `--z-raised` while its notes say "rank 1 of 4" to "rank 4 of 4" (PY-B-2, PY-B-3). (3) The design gate never reports a stylesheet as unlayered when its top-level rules are `:root`, `:where(body)` or `:is(…)`, because a pseudo-class-only selector counts as depth 0 at the top level too, which also under-counts nesting by one beneath it (PY-B-4).
 
 ## Findings
 
 ### PY-B-1 · critical · risk
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-token-migration/scripts/cluster_values.py:2858` and `:2974`
 - **What:** The overwrite guard checks `tokens.css`, `mapping.json` and `reconciliation.md` against the inputs, but the script also writes `tokens.json` (added with P31), which it never checks. With `--tokens tokens.json` (a DTCG file, which `read_tokens` accepts) and `-o` pointing at that file's folder, the input is replaced by the proposal.
 - **Evidence:** Line 2858 `for dest in ("tokens.css", "mapping.json", "reconciliation.md"):`; line 2974 `(out / "tokens.json").write_text(...)`. Probe `f/`: a DTCG `tokens.json` passed as `--tokens tokens.json -o .` → exit 0, `cmp` reports OVERWRITTEN, the file now starts `"$description": "cluster_values.py's proposal…"`. The same run with `--tokens tokens.css -o .` is refused: "tokens.css is the input tokens.css: writing there would replace it."
@@ -19,6 +20,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-2 · high · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-token-migration/scripts/apply_codemod.py:740-742`
 - **What:** `plan_motion` replaces the span from the duration to the last easing *after* it; an easing written before the duration (`transition: opacity ease 200ms`, which CSS allows in any order) survives beside the inserted `--motion-*` pair. The pair carries its own easing (`--motion-hover: var(--dur-fast) var(--ease-out)`), so the declaration becomes `opacity ease 150ms ease-out`: two timing functions, which is invalid, and the browser drops the whole transition.
 - **Evidence:** `span_end = max([times[0].end] + [e.end for e in easings if e.start > times[0].start])`. Probe `c/`: `.a { transition: opacity ease 200ms; }` with a motion rule for 200ms → diff `+.a { transition: opacity ease var(--motion-hover); }`, counted as "duration x1", exit 0.
@@ -27,6 +29,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-3 · high · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-token-migration/scripts/cluster_values.py:1743-1750`
 - **What:** `cluster_z` picks a rung by magnitude band, then "enforces rank order" with a backward pass that can only *lower* an earlier value's rung (`assigned[i - 1] = max(0, assigned[i] - 1)`). Values in the same band therefore collapse onto one rung instead of being spread upward, and the docstring's promise that "no two values swap places" fails: distinct z-indexes become equal, so DOM order decides what they used to decide.
 - **Evidence:** Probe `e/`: literals z-index 1, 2, 3, 10 → mapping rules `z-001 ['1'] -> var(--z-raised)`, `z-002 ['2'] -> var(--z-raised)`, `z-003 ['3'] -> var(--z-raised)`, `z-004 ['10'] -> var(--z-raised)`, each noted "rank n of 4. Confirm against the real stacking order". `tests/test_token_migration.py:434-440` only checks the note's wording, never that distinct values get distinct rungs.
@@ -35,6 +38,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-4 · high · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/audit_design.py:318-322`, `:671-676`, `:1281`, `:1330`, `:1332`
 - **What:** `rule_depth()` skips every selector that `pseudo_classes_only` accepts, meant for a nested `:hover`, but it is applied at the top level too. A top-level `:root {…}`, `:where(body) {…}` or `:is(.a, .b) {…}` therefore opens at depth 0, so the `depth == 1` test at line 1330 never records it as the first unlayered rule, nesting below it is counted one short (line 1281), and a mixin holding only such a rule is not an emitting mixin (line 1332).
 - **Evidence:** Probe `a/`: `src/styles/base.css` = `:where(body) { margin: 0; … }` + `:root { --page-bg: … }` with no `@layer` → no finding at all, while `src/styles/layout.css` = `.stack { padding: 0; }` → `L5 unlayered`. Probe `h/`: inside `@layer base`, `:root { & .a { & .b { & .c { & .d {…} } } } }` reports one `nesting-depth 3`; the same chain under `.x` reports `nesting-depth 3` and `4`. `tests/test_audit_design.py` has no top-level pseudo-only case.
@@ -43,6 +47,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-5 · high · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-token-migration/scripts/extract_literals.py:1001` and `:464-501`; `plugins/pro-web-design-suite/skills/design-token-migration/scripts/apply_codemod.py:618`, `:663`, `:674`
 - **What:** Both scripts scan the comment-blanked text to find declarations, then read the value back from the *real* text (`value = text[d.value_offset:d.value_offset + len(d.value)]`) and pass it through `mask_strings_and_urls`, which masks strings and `url()` but not comments. A comment inside a value, before its last slot, is counted by the census and rewritten by the codemod; both docstrings say comments are untouched. The extra comment words also inflate the slot count, so `padding` sides are misfiled.
 - **Evidence:** Probe `c/src/b.css`: `.b { padding: 16px /* was 12px */ 8px; }` and `.e { margin: 0 /* 12px */ auto; }`. Census CSV lists `12px` twice (cols 27 and 19, both `css-decl`) and files all three padding values under `padding` (six slots, not two). Codemod diff: `padding: var(--pad-card) /* was var(--pad-sm) */ 8px;` and `margin: 0 /* var(--pad-sm) */ auto;`. A comment at the end of the value (`16px /* was 12px */;`) is safe, because `d.value` is stripped before its length is taken.
@@ -51,6 +56,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-6 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-token-migration/scripts/apply_codemod.py:1200-1232`
 - **What:** The exit code is `1 if any(r.skipped for r in results) or line_skips else 0`. A skip that `process()` records with line 0 (a file whose rewrite failed the safety check, whose planning raised, that is generated, or unreadable) returns `None`, so it is in neither `results` nor `line_skips`: it is printed under "left alone" and the run exits 0. The docstring (line 56) and SKILL.md ("1 something was skipped") promise 1.
 - **Evidence:** Probe `d/`: a mapping whose replacement holds `;` → "1 file(s) were left alone: src/a.css rewrite failed its safety check (`;` count changed 1 -> 2) — file left untouched", `exit=0`.
@@ -59,6 +65,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-7 · medium · gap
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/check_roles.py:69-74`, `:154-156`, `:189-191`
 - **What:** A scope is the blocks whose selector list holds exactly `:root`, `[data-theme="dark"]`, `.inverse` or `[data-theme="dark"] .inverse`. When no block matches a scope's own selector (the dark theme lives in `@media (prefers-color-scheme: dark)`, which `rules()` excludes by design and `tests/test_check_roles.py:310` pins, or in `html[data-theme="dark"]`, `.dark`, `[data-theme=dark]`), the scope silently equals its parent and every dark pair is measured on the light colours.
 - **Evidence:** Probe `b/tokens.css`: dark surfaces `#111` with `--fg-default: #222` written both as a media query and as `html[data-theme="dark"]` → "role pairs: 82 of 100 pass", the 45 `"scope": "dark"` results all carry the light values, nothing says the dark theme was not read.
@@ -67,6 +74,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-8 · medium · inconsistency
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/audit_design.py:1603`
 - **What:** z-index is the one family checked by hand rather than through `off_family`: `"var(--" not in value and value.strip() not in ("0", "auto")`. The spec (`design-rules.json` stacking: `VAR_ONE, 0, auto, KEYWORDS`) allows the CSS-wide keywords, and `sass.variables` says a Sass reference is read as a token; the audit refuses both, and stylelint does not.
 - **Evidence:** Probe `a/`: `.card { z-index: inherit; }`, `.card2 { z-index: unset; }` and, in `card.scss`, `.card { z-index: $z-modal; }` → three `L1 raw-z-index … is a literal` errors.
@@ -75,6 +83,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-9 · medium · inconsistency
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/audit_design.py:445`, `:464-466`
 - **What:** `TW_ARBITRARY` matches the longest `name-[…]` and `TW_ARBITRARY_OK` whitelists only a variant whose *first* word is `data|aria|group|peer|…`, so the compound arbitrary variants `group-data-[state=open]:`, `peer-aria-[checked=true]:`, `group-has-[…]:` are reported as arbitrary values. ESLint's pattern (`eslint.design.config.mjs:102`, `(?!(?:data|aria|group|peer|…)\b)`) refuses to start a match at `group`, so it allows them.
 - **Evidence:** Probe `a/src/components/Card.jsx`: `className="group-data-[state=open]:bg-surface peer-aria-[checked=true]:p-card"` → `L3 tw-arbitrary group-data-[state=open]` and `peer-aria-[checked=true]`.
@@ -83,6 +92,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-10 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/audit_design.py:1521-1522`
 - **What:** The system-colour check splits the raw `value`, not `strip_var_refs(value)`, so a system colour inside a `var()` fallback is reported, against `var_fallback` ("a var() fallback is not checked").
 - **Evidence:** Probe `a/`: `.card3 { color: var(--fg-strong, CanvasText); }` → `L1 system-color CanvasText is a CSS system colour, outside @media (forced-colors: active)`.
@@ -91,14 +101,16 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-11 · medium · gap
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/audit_design.py:460` (`CLASS_ATTR`)
-- **What:** `CLASS_ATTR` captures `[^"'`]*` after the opening quote, so a Vue `:class="{ 'p-[17px]': on }"` object yields `{ ` and nothing is audited; the census's `CLASSNAME_RE` (`extract_literals.py:264-267`) captures to the matching quote and counts every arbitrary value inside, and the codemod rewrites them. ESLint parses no `.vue`, so these classes have no gate.
+- **What:** `CLASS_ATTR` captures ``[^"'`]*`` after the opening quote, so a Vue `:class="{ 'p-[17px]': on }"` object yields `{ ` and nothing is audited; the census's `CLASSNAME_RE` (`extract_literals.py:264-267`) captures to the matching quote and counts every arbitrary value inside, and the codemod rewrites them. ESLint parses no `.vue`, so these classes have no gate.
 - **Evidence:** Probe `i/src/components/Card.vue`: `:class="{ 'p-[17px]': on, 'bg-[#e8440a]': hot }" class="p-[13px]"` → the audit reports 1 `tw-arbitrary` (`p-[13px]`); the census lists all three as `tailwind-arbitrary`.
 - **Effect:** Arbitrary values and literal colours in Vue's bound class objects pass Law 1 and 3.
 - **Fix:** Match the attribute's value to its own closing quote (as `CLASSNAME_RE` does) and run the Tailwind checks on the quoted strings inside it; test with the probe file.
 - **Confidence:** confirmed
 
 ### PY-B-12 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-token-migration/scripts/cluster_values.py:1926-1927`, `:2846-2854`
 - **What:** `--accent` is parsed with `parse_any_color`, whose `ColorError` nothing catches (`main` catches only `ConfigError`), so a bad seed is a traceback, not the exit-2 message the docstring promises for a bad invocation.
 - **Evidence:** `cluster_values.py literals.json --dry-run --accent blurple` → `File "...cluster_values.py", line 295, in parse_any_color … ColorError: cannot parse color 'blurple'`.
@@ -107,6 +119,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-13 · medium · risk
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/audit_design.py:2748-2752`, `:3019-3021`
 - **What:** A rule that raises while auditing a file becomes one `internal-error` finding of severity `warning` ("a crashed rule must never block a commit"), and warnings fail only with `--strict`. So a file the audit could not parse passes the default gate, and the pre-commit hook SKILL.md prescribes (`audit_design src/`, no `--strict`) lets it through.
 - **Evidence:** The `except Exception` at 2748 and `failing = [f for f in findings if f.severity == "error" or (args.strict and …)]` at 3019.
@@ -115,6 +128,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed (by reading; the behaviour is explicit)
 
 ### PY-B-14 · medium · gap
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/generate_color_ramp.py:254-257`, `:300-327`; `check_roles.py:285-294`
 - **What:** `parse_color` reads a hex and `oklch(L C H)` only. Valid spellings of the same colour (`oklch(50% 0.1 20 / 1)`, `oklch(50% none 20)`, a chroma in `%`) and `rgb()`/`hsl()` are "Cannot parse", so `check_roles` exits 2 on a tokens.css that writes a ramp in rgb() or hsl(), while `cluster_values.parse_any_color` reads those. The docstrings say hex or oklch, but SKILL.md calls `check_roles` "the palette's gate" for any `tokens.css`.
 - **Evidence:** `generate_color_ramp.py --check "oklch(50% 0.1 20 / 1)" "#ffffff"`, `… "oklch(50% none 20)" …`, `… "rgb(0 0 0)" …` → each `error: Cannot parse …`.
@@ -123,6 +137,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-15 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-token-migration/scripts/cluster_values.py:2878`, `:597`, `:1476`
 - **What:** Strokes snap with tolerance `0.5` and `snap_to_scale` refuses only when `best_d > tolerance`, so a `0.5px` hairline (the retina hairline idiom) is exactly at the limit and snaps to `--stroke-default` (1px) with confidence `snapped`, since the review threshold is a 2px delta.
 - **Evidence:** Probe `j/`: a single `border-width: 0.5px` literal → rule `(['0.5px'], 'var(--stroke-default)', 'snapped', 0.5)`; nothing in the reconciliation's review table.
@@ -131,6 +146,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-16 · low · inconsistency
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/audit_design.py:1543-1565`, `:1532-1540` vs `design-rules.json:328`, `:375`
 - **What:** The type family is checked by literal shape only, so `font-weight: bold`, `line-height: normal` and `font-family: Georgia, serif` pass the audit while the spec's allowlist (`VAR_ONE, KEYWORDS`) refuses them in stylelint; `box-shadow: inset 0 0 0 var(--stroke-default) var(--border-default)` passes the audit (no literal length or colour) while the spec allows `VAR_ONE, none, KEYWORDS` only.
 - **Evidence:** Probe `a/`: `.card4` and `.card5` draw no finding.
@@ -139,6 +155,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-17 · low · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/audit_design.py:450-452` (`TW_LITERAL`), same regex in `eslint.design.config.mjs:147`
 - **What:** `z-0`, `border-0`, `duration-0`, `ring-0`, `outline-0` are reported as literal values, though 0 is on every allowlist the spec writes (`zero`, `stacking`, `stroke`, `motion`'s `0s`).
 - **Evidence:** Probe `a/`: `className="z-0 border-0 duration-0"` → three `L1 tw-literal`.
@@ -147,6 +164,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-18 · low · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/audit_design.py:434-437` with `:1059-1069`; `:1777-1783`
 - **What:** `raw_colour` removes `url()` and `var()` but not quoted strings, so a named colour inside a string is a finding; and the JS hex check takes any 3-to-8-hex-digit id string for a colour unless the line mentions `href|id|anchor|hash|sha|commit`.
 - **Evidence:** Probe `a/`: `.card6 { background: image-set("gold.png" 1x); }` → `L1 named-color`; `document.querySelector('#add')` → `L1 js-raw-color Hardcoded colour #add in JS` (warning).
@@ -155,6 +173,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-19 · low · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/generate_type_scale.py:382`
 - **What:** `snap_to_px` uses Python's `round()`, which rounds halves to even: 22.5 → 22, 23.5 → 24. The docstring says "nearest", and JavaScript's `Math.round` (what a designer checks with) gives 23.
 - **Evidence:** `--base 18 --ratio 1.25 --steps-down 1 --steps-up 2 --snap-px --preview` → `--text-lg 1.375rem 22`; `python -c "print(round(22.5), round(23.5))"` → `22 24`.
@@ -163,6 +182,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-20 · low · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/check_roles.py:340`, `:421`
 - **What:** `ok` compares the unrounded ratio (`ratio + 1e-9 >= min`) but the report prints `round(ratio, 2)`, so a pair at 4.4996:1 prints "FAIL … 4.50:1, needs 4.5:1".
 - **Evidence:** `"ratio": round(ratio, 2), … "ok": ratio + 1e-9 >= pair["min"]`.
@@ -171,6 +191,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** likely (by reading)
 
 ### PY-B-21 · low · dead-code
+
 - **Where and what (each verified by grep across the plugin and `tests/`):**
   - `audit_design.py:1217`, `:1345` — `declared_props` is filled and never read.
   - `audit_design.py:2654-2656` — `iter_files()` has no caller (every caller uses `iter_files_with_roots`; the `a11y_static.py`, `deprecate.py`, `perf_audit.py` hits are their own functions).
@@ -186,6 +207,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed
 
 ### PY-B-22 · low · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/scripts/audit_design.py:2729-2731`
 - **What:** `except OSError: continue` drops a file the audit cannot read from the audited count and from the skipped list, so the run reports nothing about it.
 - **Evidence:** The bare `continue` with no `skipped.append`.
@@ -194,6 +216,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed (by reading)
 
 ### PY-B-23 · low · risk
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-token-migration/scripts/apply_codemod.py:1122`
 - **What:** `git_root(Path(args.paths[0]))` reads the dirty set of the first path's repository only; a second path in another repository (or outside any) is treated as clean, and the "not a git repository" warning is only printed when the first path has no repo.
 - **Evidence:** `root = git_root(Path(args.paths[0]))`.
@@ -202,6 +225,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** likely
 
 ### PY-B-24 · low · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-token-migration/scripts/apply_codemod.py:295-314` vs `:638`, `:646`, `:691`
 - **What:** `rules_problem` validates `kind`, `replacement`, `match`, `props`, `prop_classes` and `scope`, but `plan_css` reads `rule["id"]` and `drule["token"]` unchecked; a hand-edited mapping missing either raises `KeyError`, which `process()` turns into "planning failed … file left untouched" — and, with PY-B-6, exit 0.
 - **Evidence:** The two accessor lines and the `except Exception` at 1015.
@@ -210,6 +234,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** confirmed (by reading)
 
 ### PY-B-25 · low · inconsistency
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-token-migration/scripts/extract_literals.py:1726` vs `plugins/pro-web-design-suite/skills/web-design-studio/scripts/audit_design.py:791-796`, `:1491`, `:1971`
 - **What:** The census treats every `.jsx`/`.tsx` file as a component ("a component by definition"); the audit treats a file as a component only by path (`components/`, `ui/`, `.module.`). A styled-components body in `src/pages/Home.tsx` is audited inside a synthetic `@layer components`, so Law 6 applies, but `component_file` is false, so Law 2 (`child-margin`, `foreign-selector`) does not.
 - **Evidence:** The three locations above.
@@ -218,6 +243,7 @@ The three that matter most: (1) `cluster_values.py --tokens tokens.json -o <that
 - **Confidence:** likely
 
 ### PY-B-26 · low · gap
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-token-migration/SKILL.md:215`, `:250-258`
 - **What:** The `extract_literals` flag table lists twelve `--kind` values and omits `other-length` (`KIND_ORDER`, `extract_literals.py:2323-2325`, which the report prints as its own section); the `apply_codemod` table omits `--include-vendor` (`apply_codemod.py:1091`). Both are in `--help`.
 - **Evidence:** The lines cited.

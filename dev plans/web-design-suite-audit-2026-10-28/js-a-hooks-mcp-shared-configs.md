@@ -4,11 +4,12 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 
 ## Summary
 
-11 findings: 2 high, 3 medium, 6 low; 7 bugs, 3 gaps, 1 risk (one of the bugs is also the risk). No dead code beyond one unused loop variable. The three that matter: (1) the MCP server's "a path must be inside the project" guard is fooled by a Windows drive-relative path (`C:..\outside.css`), and the scripts then read and quote files outside the project, while `..\outside.css` is refused as promised; (2) stylelint resolves `overrides.files` relative to the config file's folder with basename matching, so with `stylelint.config.mjs` kept at `assets/configs/`, the only placement the references name, the component-file block never reaches `src/components/card.css` and Law 2 (`design/component-margins`), the whole-file Law 6 and `selector-max-type` silently do not run there, though the tests put the config at the root and pass; (3) the router sends ordinary programming prompts ("remove the magic numbers from this Python function", "the hardcoded values in config.py", "write a codemod", "a CRUD API in FastAPI", "a pitch deck for our seed round") to design skills, against the S3 rule the file states for itself.
+11 findings: 2 high, 3 medium, 6 low. By class (counted from the headings): bug 6, gap 3, inconsistency 1, risk 1. No dead code beyond one unused loop variable. The three that matter: (1) the MCP server's "a path must be inside the project" guard is fooled by a Windows drive-relative path (`C:..\outside.css`), and the scripts then read and quote files outside the project, while `..\outside.css` is refused as promised; (2) stylelint resolves `overrides.files` relative to the config file's folder with basename matching, so with `stylelint.config.mjs` kept at `assets/configs/`, the only placement the references name, the component-file block never reaches `src/components/card.css` and Law 2 (`design/component-margins`), the whole-file Law 6 and `selector-max-type` silently do not run there, though the tests put the config at the root and pass; (3) the router sends ordinary programming prompts ("remove the magic numbers from this Python function", "the hardcoded values in config.py", "write a codemod", "a CRUD API in FastAPI", "a pitch deck for our seed round") to design skills, against the S3 rule the file states for itself.
 
 ## Findings
 
 ### JS-A-1 · high · risk (and bug)
+
 - **Where:** `plugins/pro-web-design-suite/mcp/design_gates.mjs:246-250` (`inProject`), with `real()` at 222–239.
 - **What:** A drive-relative Windows path (`C:..\x`, a drive letter with no separator after the colon) is not `path.isAbsolute`, so it is joined to the project (`<project>\C:..\x`); `real()` splits on separators and keeps `C:..` as one literal part, so nothing climbs out; `path.relative` then yields `C:..\x`, which starts with neither `..` nor a root, and the path passes. The script receives `C:..\x` as written, and Windows resolves it against the drive's current directory, the project, so `..` escapes.
 - **Evidence:** Driving the server from a scratchpad project with `CLAUDE_PROJECT_DIR` set: `tools/call audit_design {paths:["C:..\\outside.css"]}` returned `verdict fail, exit 1` with a finding whose `file` is `C:..\outside.css` and whose message quotes its line (`padding: 13px`); `a11y_static {paths:["C:..\\outside.html"]}` returned `<img> has no alt attribute (src=secret-chart.png)`, text from the outside file. The control `{paths:["..\\outside.css"]}` was refused: `'paths' must be inside the project (…)`. `checked()`'s own `path.resolve(project(), v)` at line 310 does resolve the spelling correctly (Node resolves a drive-relative path against the matching drive's cwd), so only `inProject` is fooled. `tests/test_mcp.py:240-256` cover `../`, `deep/../` and absolute paths, no drive-relative one.
@@ -17,6 +18,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 - **Confidence:** confirmed
 
 ### JS-A-2 · high · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/assets/configs/stylelint.config.mjs:1132-1142` (block 1), `1169-1172` (block 2, the `**/tokens/*.css` entries), `1250` (block 4); the header's `lint:css` line at 30 and "Copy project_config.mjs with this file" at 32–33.
 - **What:** stylelint matches `overrides.files` against the path relative to the config file's folder, with basename matching. A glob whose only directory part is a leading `**/` (`**/*.scss`, `**/theme.css`, `**/*.module.css`, `**/tokens.css`) still matches a file outside that folder by its basename; a glob with a literal directory segment (`**/components/**/*.css`, `**/ui/**/*.css`, `**/tokens/*.css`, `**/styles/legacy-bridge.css`) cannot, because `**` never crosses `..`. So when the config is not at the project root, those entries are dead for every file above it. The references name the file only as `assets/configs/stylelint.config.mjs` (stack-tailwind.md:7, stack-vanilla-css.md:999 "run the shipped `assets/configs/stylelint.config.mjs`", stack-css-modules.md:429) and never say to move it; `PROJECT.componentGlobs` and `tokenGlobs` from `.design-suite.json` are already built absolute (project_config.mjs `overrideGlobs`, `rootSpellings`), which is why they keep working. The tests write the config at the temp project's root (`test_real_tools.py:563`, run with `--config stylelint.config.mjs` at 593), so they cannot see it.
 - **Evidence:** Scratchpad project, config copied to `configs/`, `src/components/card.css` holding `margin-block-start: 16px` in `@layer components`: `stylelint --config configs/stylelint.config.mjs "src/**/*.{css,scss}"` reported `declaration-property-value-allowed-list` ×3 and `design/color-no-hex`, and no `design/component-margins`; `--print-config src/components/card.css` listed `design/component-margins` once (in `overrides`), against twice with the same config at the root, where the lint also reported `design/component-margins` on line 2. From `configs/`, `src/components/x.module.css` (glob `**/*.module.css`) and `configs/components/inside.css` (relative path `components/inside.css`) did get `design/component-margins`; `src/styles/theme.css` got block 3's `BINDING_ALLOWLIST` (`--spacing-card: 28px` refused). micromatch 4.0.8: `isMatch('../src/components/card.css', '**/components/**/*.css', {dot:true, matchBase:true})` is false; `isMatch('../src/components/_card.scss', '**/*.scss', …)` is true.
@@ -25,6 +27,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 - **Confidence:** confirmed
 
 ### JS-A-3 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/hooks/design_hooks.mjs:85-87` (`design-token-migration`: `hard-?coded|magic (values|colours|numbers|pixels)`, `codemods?`), `100` (`content-model-to-ui`: `CRUD`), `108` (`client-presentation-builder`: `pitch decks?`).
 - **What:** Lines 60–63 state the rule: "A word another domain shares is heard only beside one of the skill's own" (Codex on #97, S3), and the migration's `migrat…tokens` pattern is gated by `about(DESIGN_TOKEN, …)`. The patterns above are not gated, and each is a common phrase of ordinary programming or business work.
 - **Evidence:** `node design_hooks.mjs route` with `{"prompt": …}`: "Remove the magic numbers from this Python function and name them as constants." → `design-token-migration`; "The hardcoded values in config.py should come from environment variables." → `design-token-migration`; "Write a codemod that renames useQuery to useSuspenseQuery." → `design-token-migration`; "Write a CRUD API in FastAPI for the orders table." → `content-model-to-ui`; "Write a pitch deck outline for our seed round." → `client-presentation-builder`. Controls: "Add a Redis cache in front of the Postgres database." and "Fix the race condition in the job scheduler." → silent. `tests/test_hooks.py:596-612` (`elsewhere`) has no case for these words.
@@ -33,6 +36,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 - **Confidence:** confirmed
 
 ### JS-A-4 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/hooks/design_hooks.mjs:165-171` (`guard`: `buf.subarray(0, read).toString('utf8')`), against the docstring at 5–8 ("as audit_design.py reads it").
 - **What:** The guard decodes the file's head as UTF-8 only. `audit_design.py` reads a file through `decode_text()` (UTF-16 too, S8) and skips a generated one; the guard sees NUL-interleaved bytes, finds no marker and allows the edit.
 - **Evidence:** `.design-suite.json` with `"hooks": {"generatedFiles": true, "designGate": true}`; `gen8.css` (UTF-8) and `gen16.css` (UTF-16LE with BOM, as PowerShell 5.1's `>` and `Set-Content -Encoding Unicode` write), both starting `/* DO NOT EDIT: generated by build.py */`. `guard` on gen8.css printed `permissionDecision: "deny"`; on gen16.css printed nothing (exit 0). `gate` on gen16.css was silent too: the audit recognises the marker and returns `[]`, so the edit is neither refused nor audited. `test_hooks.py:497` covers a UTF-16 config, not a UTF-16 guarded file.
@@ -41,6 +45,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 - **Confidence:** confirmed
 
 ### JS-A-5 · medium · gap
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/assets/configs/eslint.design.config.mjs:137-138` (`NUMERIC_SPACING`), `176` (`SPACE_BETWEEN`), `127-128` (`STOCK_PALETTE`).
 - **What:** The lookbehind `(?<![-\w])` that stops `md:p-4` from matching inside a longer class also stops Tailwind's negative utilities (`-mt-2`, `-mx-4`, `-space-x-2`, `-m-4`), which `OUTER_MARGIN` (line 161) handles with `-?m`. `STOCK_PALETTE` lists the colour ramps and `\d{2,3}` steps, so `bg-white`, `text-black`, `bg-black/50` pass, although `--color-*: initial` removes them with the rest and `tw_probe`'s STOCK (tw_probe.mjs:81) checks `text-white` for exactly that reason. The audit's `TW_SPACE_XY` (`audit_design.py:447`) shares the lookbehind; it has no numeric-spacing or palette rule, so nothing else catches these.
 - **Evidence:** ESLint 10.11 through the shipped config on `src/pages/Home.jsx`: line 5 `className="mx-4 space-x-2 bg-gray-100"` → three reports (stock palette, numeric spacing, space-between); line 4 `className="-mx-4 -mt-2 -space-x-2 bg-white text-black"` → no report. (In `src/components/Card.jsx`, `-mx-4` was caught by `OUTER_MARGIN` only.)
@@ -49,6 +54,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 - **Confidence:** confirmed
 
 ### JS-A-6 · low · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/assets/configs/eslint.design.config.mjs:617-619`.
 - **What:** `name: 'design-laws/a11y'` is written before `...jsxA11y.flatConfigs.recommended`, and that object carries `name: 'jsx-a11y/recommended'` (its keys: `languageOptions, name, plugins, rules`), so the spread overwrites the name.
 - **Evidence:** `import('./eslint.config.mjs')` → `map(c => c.name)` prints `jsx-a11y/recommended | design-laws/core | design-laws/components`.
@@ -57,6 +63,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 - **Confidence:** confirmed
 
 ### JS-A-7 · low · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/assets/configs/eslint.design.config.mjs:116` (`IMPORTANT_MODIFIER`), scoped by `CLASS_TABLE` at 332–333.
 - **What:** The suffix alternative `[\w\])]!(?=\s|$)` matches any string literal ending in `!`. Inside a `VariableDeclarator` named `*Styles`, `*Variants`, `*Classes` or `*ClassNames` every string literal is read, so a message table named `errorStyles` or `toastVariants` reports Law 5.
 - **Evidence:** `src/components/Card.jsx:2`, `const errorStyles = { msg: 'Oops!' };` → `` `!important` is banned in both spellings ``. The audit's `TW_IMPORTANT_SUFFIX` (`audit_design.py:468`) requires a class-shaped token before the `!`.
@@ -65,6 +72,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 - **Confidence:** confirmed
 
 ### JS-A-8 · low · bug
+
 - **Where:** `plugins/pro-web-design-suite/shared/browser_common.mjs:657-661` (`xmlText`), called by `readUrls` at 700–701.
 - **What:** `String.fromCodePoint(Number(e.slice(1)))` throws `RangeError` for a numeric entity past U+10FFFF; `readUrls` catches file and JSON errors but not this one.
 - **Evidence:** `readUrls('sitemap.xml')` on `<urlset><url><loc>https://example.com/a&#99999999;</loc></url></urlset>` → `readUrls threw: RangeError: Invalid code point 99999999`.
@@ -73,6 +81,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 - **Confidence:** confirmed
 
 ### JS-A-9 · low · gap
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/assets/configs/stylelint.config.mjs:787` (`SASS_LENGTH`, units `px|rem|em|pt|pc|in|cm|mm|q`); the same list in `audit_design.py:425` (`LENGTH_LITERAL`).
 - **What:** `design-rules.json` `sass.variables.rule` refuses "a Sass variable that holds a length"; both gates know the absolute and font-relative units only, so viewport, container, `ch`/`ex` and percentage lengths pass, and so does the one the sizing family singles out, `65ch`.
 - **Evidence:** `_card.scss` with `$card-width: 50vw; $card-measure: 65ch; $card-pad: 24px;` → one report, `design/sass-variable-literal` for `24px` only. The spec's examples (`design-rules.json:198-206`) use `px` only, so `test_rules_spec` cannot see it.
@@ -81,6 +90,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 - **Confidence:** confirmed
 
 ### JS-A-10 · low · gap
+
 - **Where:** `plugins/pro-web-design-suite/skills/web-design-studio/assets/configs/stylelint.config.mjs:1203-1211` (block 3), comment at 1199–1201.
 - **What:** Block 3 replaces `declaration-property-value-allowed-list` with `BINDING_ALLOWLIST`, whose keys are custom-property regexes only, so in a theme file every ordinary declaration (an `@utility` block's `min-block-size: 44px; padding: 13px`) has no value allowlist at all. The comment says those "answer to the gates' other rules"; the ones left are `color-no-hex`, `no-literal-colour-function` and `color-named`, so lengths, durations and sizes pass. The audit treats a theme file as a token file (`design-rules.json` `file_classes.binding_files`), so neither gate sees them.
 - **Evidence:** `src/styles/theme.css` with `@theme { --spacing-card: 28px }` and `@utility tap-target { min-block-size: 44px; padding: 13px; }` → one report, `--spacing-card`.
@@ -89,6 +99,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 - **Confidence:** confirmed (the behaviour); possible (whether it is meant)
 
 ### JS-A-11 · low · inconsistency
+
 - **Where:** `plugins/pro-web-design-suite/mcp/design_gates.mjs:98-113` (`findPython`, `if (python !== undefined) return python;`).
 - **What:** The first probe's result is cached for the server's lifetime, `null` included; the hooks (`design_hooks.mjs:186-195`) probe on every run. A user who installs Python, or sets `WDS_PYTHON`, after the first tool call keeps getting "the gates need Python 3 … and none was found" until the session restarts, and the message does not say so.
 - **Evidence:** Lines 103 and 111: `python = candidates.find(…) ?? null; return python;` with the guard `python !== undefined`.

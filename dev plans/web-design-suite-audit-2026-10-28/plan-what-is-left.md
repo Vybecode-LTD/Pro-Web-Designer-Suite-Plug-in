@@ -44,114 +44,133 @@ Not listed as items because they are standing facts, not work: the directory hol
 ## Contradictions and stale statements
 
 ### PLAN-1 · high
+
 - **Where:** `docs/HANDOFF.md:11` and `dev plans/next-session-prompt.md:566` vs the tree and GitHub
 - **Says:** "**`main` at `e59d6b3`** (#213's merge); its CI run was in progress at the end. #212's merge passed. No PR is open." and "#213's merge (`e59d6b3`) was in progress at the end" vs `git rev-parse HEAD` = `8441ff0` (2026-10-28 07:38 -0400, "Merge pull request #214 from Vybecode-LTD/docs/handoff-2026-10-27-p65"); `e59d6b3`'s run 40619419703 **passed**; `8441ff0`'s run 40681521613 **failed** (macOS 3.14, `test_runtime_urls.EachPageHasItsTypesBudget.test_a_page_type_picks_the_budget_its_page_is_held_to`; the other six jobs passed).
 - **Right:** the tree. The handoff cannot know its own merge SHA, but the execution plan already names the docs PR by its predicted number (`dev plans/web-design-suite-execution-plan.md:315`: "#214: the session's docs"), as `C:\DEV\CLAUDE.md:75-78` asks. The handoff should do the same: "`main` = #214's merge once it lands, on `e59d6b3`".
 - **Fix:** `docs/HANDOFF.md` State and Warnings (the flake list at `:54-59` says "Windows, and under load" for this class; it has now failed on macOS); `dev plans/next-session-prompt.md` §3. Then L21.
 
 ### PLAN-2 · high
+
 - **Where:** `CLAUDE.md:52` and `CLAUDE.md:66`; `dev plans/next-session-prompt.md:292` and `:535` vs `dev plans/web-design-suite-4.0.0-live-check.md:9` and `dev plans/next-session-prompt.md:569`, and the machine
 - **Says:** "use the desktop app's bundled CLI, `%APPDATA%\Claude\claude-code\<version>\<build>\claude.exe` (2.1.293's build folder is `83cb0bd7fed4`)"; "Its bundled CLI is really in `C:\Users\vybec\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude-code\`"; the prompt: "`%APPDATA%\Claude\claude-code\2.1.295\d2e29494ec83\claude.exe`" (twice, with "2.1.288's `36aa8c97bf86` is still there") vs the live check: "the desktop app's bundled CLI was not at its old path and the one on PATH is 2.1.160", and the prompt's own §3: "The 2.1.309 CLI and `unset.txt` are in `222f4831-…`'s scratchpad (`cc/`). Reinstall the CLI if Storage Sense has emptied it".
 - **Right:** the live check and §3. Today `%APPDATA%\Claude\` holds only `claude_desktop_config.json`, and the MSIX `LocalCache\Roaming\Claude\` has no `claude-code` folder. The two versions the docs name (2.1.293, 2.1.295) also disagree with each other.
 - **Fix:** `CLAUDE.md` Commands (`:52`) and Gotchas (`:66`): say the CLI is an npm install of `@anthropic-ai/claude-code` in a scratch folder with a `package.json` first (the memory note `npm-install-walks-up-to-home.md`), or a durable folder outside OneDrive; `dev plans/next-session-prompt.md` §0 Shell and §2 "The release".
 
 ### PLAN-3 · high
+
 - **Where:** `dev plans/web-design-suite-completion-plan.md:15`, `:48-60` vs `CLAUDE.md:18`, `:21`, the inventory and CI
 - **Says:** "From `plugins/web-design-suite`, run `python -B -m unittest discover -s tests` ... It must report 406 tests OK before you change anything"; "3.2.1 is released (`v3.2.1`, 2026-09-26), and 3.3.0 is in progress on `main`"; "**Tests:** 406"; "**Linux (WSL):** the suite passes with the Node tests skipped"; "**macOS:** never run"; the table "Planned here 55 / 42 / 44"; "Open issues: 55" vs "4.0.1 is the latest release (`v4.0.1`, `84f4a4f`, tagged 2026-10-26)"; "**Tests:** about 1,600. CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node"; the inventory's 265 rows all "fixed in" or "done" (0 open); CI ran 1,658 tests on macOS at `8441ff0`; the folder is `plugins/pro-web-design-suite` since #180.
 - **Right:** `CLAUDE.md` and the tree. The section is dated by its heading's context (written 2026-09-25, `:3`) but reads as current.
 - **Fix:** the completion plan: a status line under the title ("Every workstream is done; the state is the execution plan's §9 and `docs/HANDOFF.md`"), and "as of 2026-09-25" on "Start here" step 3 and "Where things stand".
 
 ### PLAN-4 · high
+
 - **Where:** `dev plans/web-design-suite-completion-plan.md:564-581` ("Release procedure (every phase)") vs `dev plans/next-session-prompt.md:533-535`, `:580-585`, `docs/HANDOFF.md:28-31`, `CLAUDE.md:18`, `:24`
 - **Says:** "`plugins/web-design-suite/.claude-plugin/plugin.json`" (`:566`); "`claude plugin tag --dry-run plugins/web-design-suite` ... The CLI's own would be `web-design-suite--vX.Y.Z`" (`:570`); "`%APPDATA%\Claude\claude-code\<version>\claude.exe`" (`:572`); "Write the report as `dev plans/web-design-suite-<version>-report.md`" (`:573`; the last such report is 3.2.1's, and the live checks took their place from 3.5.0); "It writes `web-design-suite-<version>.zip`" (`:574`); "Mirror the release into `C:\Users\vybec\.claude\local-marketplaces\web-design-suite\` ... run `claude plugin update web-design-suite@web-design-suite`" (`:577-578`); no evals run and no `distribute` job vs the prompt: "The release is `python -B tooling/release/build.py OUT --rev SHA`, then a `v*` tag ... The tag is annotated ... **Replace** `C:\Users\vybec\.claude\local-marketplaces\pro-web-design-suite` with it ... `claude plugin update pro-web-design-suite@pro-web-design-suite`"; the handoff: "run `evals.yml` (`tag=all`, about $10, with the owner's OK) on its merge; then tag"; `CLAUDE.md:18`: "Its `distribute` job filled the distribution repository".
 - **Right:** the prompt, the handoff and `CLAUDE.md`. The procedure predates the rename (#180), the distribution job (#181) and D5's evals gate.
 - **Fix:** the completion plan's "Release procedure": replace with the current steps or a pointer to the prompt's §2 "The release" and §4.
 
 ### PLAN-5 · medium
+
 - **Where:** `dev plans/web-design-suite-distribution-and-promotion.md:16-19` vs its own `:6-12`, `CLAUDE.md:18-19`, and `gh api repos/...` today
 - **Says:** "The repository is public, MIT, at v3.6.0. It is its own marketplace (`web-design-suite@web-design-suite`)"; "On GitHub it has **no description, no topics, no homepage link, no social-preview image, and 0 stars**"; "It is in no directory, awesome list or registry yet" vs "**Status, 2026-10-26: Part A is done.** ... The owner submitted 4.0.1 (`4809e3f`) from the portal" and today: the distribution repository `Vybecode-LTD/pro-web-design-suite` has a description ("Pro Web Design Suite, a Claude Code plugin: design tokens, measured WCAG contrast and gates that fail the build on drift. Released builds; development is in ..."), homepage `https://vybecod.ing`, `topics: []`, 0 stars, Discussions off; the development repository has no description, no homepage, `topics: []`, 0 stars, Discussions off; the plugin is submitted to the directory (in review).
 - **Right:** today's `gh api` and the status line. "Where things stand" is the 2026-10-19 picture of the development repository, before the distribution repository existed.
 - **Fix:** the distribution plan: rewrite "Where things stand" per repository.
 
 ### PLAN-6 · medium
+
 - **Where:** `dev plans/web-design-suite-distribution-and-promotion.md:233-235` and `:315-320` vs `CLAUDE.md:19`, `CLAUDE.md:18`
 - **Says:** "**Recommended, not yet confirmed:** submit from the paid claude.ai account that should own the listing for good ... The directory tracks the distribution repository's `main` ... Auto-publish on."; open decisions "2. **Which account submits?**", "3. **What the directory tracks:** `main` ... or a tag", "4. **Auto-publish**", "5. **The 512-file line.** The plugin folder holds 477 files" vs "submitted by the owner on 2026-10-26 (from the owner's own claude.ai organization), tracking `main` with a scheduled check and auto-publish on" and "the 230 files of `build.py --tree`".
 - **Right:** `CLAUDE.md`: decisions 2 to 5 were settled by the submission and by the distribution repository; only `:307` (issues) and `:308` (the rename of the development repository) remain open.
 - **Fix:** the distribution plan: mark 2 to 5 decided with the date, and "Recommended, not yet confirmed" as done.
 
 ### PLAN-7 · medium
+
 - **Where:** `dev plans/web-design-suite-distribution-and-promotion.md:294-303` ("The owner's steps") vs `gh api` today and `CLAUDE.md:24`
 - **Says:** step 4 "Give the distribution repository its About description, homepage, topics and social preview (Part B1)" and step 5 "Turn on **private vulnerability reporting** for the development repository ... it was off on 2026-10-19", neither marked done vs today: the description and homepage are set, topics are empty, no social preview recorded (step 4 half done); private vulnerability reporting is `true` on the development repository (step 5 done, as `CLAUDE.md:24` says "verified 2026-10-21") and `false` on the distribution repository, which is consistent with `SECURITY.md:5-7` sending reports to the development repository.
 - **Right:** `gh api`.
 - **Fix:** the distribution plan: step 4 "part done 2026-10-2x: description and homepage; topics and the preview remain (L9)", step 5 "done 2026-10-21".
 
 ### PLAN-8 · medium
+
 - **Where:** `dev plans/web-design-suite-execution-plan.md:17` vs `CLAUDE.md:21` and CI
 - **Says:** "**CI is green on every platform:** Windows, Linux and macOS, on Python 3.9 and 3.14, with the Node tools installed. Today macOS has never run, and Linux runs without Node." vs "CI runs them on Windows, Linux and macOS at Python 3.9 and 3.14, with Node, so decision D1 is in force" and run 40681521613's seven jobs (macOS 3.9 passed; macOS 3.14 ran 1,658 tests).
 - **Right:** `CLAUDE.md`. The "Today" sentence is from 2026-10-02 (`:3`). The criterion itself is not met at `8441ff0` (PLAN-1).
 - **Fix:** the execution plan §1: strike the "Today" sentence or date it.
 
 ### PLAN-9 · medium
+
 - **Where:** `dev plans/README.md:11` vs `dev plans/web-design-suite-execution-plan.md:220-232`, `:302-315`
 - **Says:** "Every open item and N-item in one of 44 PRs, P0–P43, over phases 3 to 6 and four releases" vs the plan's rows run to P65 and N59, over phases 3, 4, 5, 6a, 6b, 6c, R4 and R5, and six releases (3.3.0, 3.4.0, 3.5.0, 3.6.0, 4.0.0, 4.0.1).
 - **Right:** the plan.
 - **Fix:** `dev plans/README.md`, the execution plan's row (its "(2026-10-02)" date can stay with "since extended to P65 and 4.0.1").
 
 ### PLAN-10 · low
+
 - **Where:** `dev plans/web-design-suite-completion-inventory.md:1`, `:212` vs `dev plans/check_execution_plan.py:26`
 - **Says:** "The status of all 265 items" (and the file has 265 rows: 138 A, 52 B, 75 C) vs the checker's regex `\| ([A-Z]{2}-[ABC]\d+) \| [^|]* \| ([^|]*) \|` reads 264: row PS-A21 (`:212`, "fixed in 3.4.0: a blocker stops the build and `--dry-run`, `\|` read, ...") holds an escaped pipe in its status cell, so the checker never reads that row's status.
 - **Right:** both documents; the checker is one row short. Nothing is hidden today (the row is fixed), but a reopened PS-A21 would never be counted open.
 - **Fix:** `check_execution_plan.py` (match `(?:[^|\\]|\\.)*` in the cells) or the row's wording.
 
 ### PLAN-11 · medium
+
 - **Where:** `dev plans/next-session-prompt.md:21-23`, `CLAUDE.md:23`, `C:\DEV\knowledge\owner.md:66-68` vs `docs/HANDOFF.md:49`
 - **Says:** "A session may run up to **750 thousand tokens, with no compacting** (the user, 2026-10-02)"; "Close out at a natural break past ~400K and before ~500K (750K on Pro-Web-Designer-Suite). Never let a session compact." vs "**This session went over its 750K-token budget again.** It filled a context window and was compacted once."
 - **Right:** the rule; the practice broke it twice running ("again"). Part of the cause is in the prompt itself: §0 is 300 lines (`:19-325`), most of it per-PR review lessons that every session reads, and `:26` records the counter being misread.
 - **Fix:** behavioural (`dev plans/next-session-prompt.md:22-23` already says to report usage after each PR and stop well before the cap); structural with L17 and PLAN-12.
 
 ### PLAN-12 · medium
+
 - **Where:** `C:\DEV\CLAUDE.md:90-93` vs `dev plans/next-session-prompt.md` (124,587 bytes), `dev plans/README.md:14`, `docs/HANDOFF.md:44`, `CLAUDE.md:3`, `:23`
 - **Says:** "every session ends with a starting prompt for the incoming agent ... in **about 4 KB at most**: it points at files rather than restating them" vs a 125 KB file the README calls "The prompt to start the next session from" (the pasted message, `next-session-opening-prompt.md`, is 1,570 bytes and points at it). The handoff lists the split as an open owner decision. The project `CLAUDE.md:3` says "Where the two differ, this file wins", and `:23` names the file without a size, so the override is implicit at best.
 - **Right:** the workspace rule, unless the owner records an override in the project `CLAUDE.md`. §0's review lessons (`:73-289`) are a lessons file, not a prompt; §2 (`:343-562`) is a facts file.
 - **Fix:** the owner decides (L17); then split §0's lessons and §2's facts into `dev plans/` files (or the `knowledge/skills` the memory notes already point at) and keep the prompt to §3 to §5.
 
 ### PLAN-13 · low
+
 - **Where:** `dev plans/next-session-prompt.md:315` vs `git tag -l 'v*'` and `plugins/pro-web-design-suite/CHANGELOG.md:14-15`
 - **Says:** "The default REV is the latest `v*` tag, **`v3.6.0`** until R4." vs the latest tag is `v4.0.1` (R4 and R5 are done), and every 4.0.2 entry says its tests "fail on 4.0.1".
 - **Right:** the tree.
 - **Fix:** the prompt's §0 "Fail before, pass after" bullet.
 
 ### PLAN-14 · low
+
 - **Where:** `dev plans/next-session-prompt.md:540-551` and `docs/HANDOFF.md:53` vs `wc -c` on every SKILL.md today
-- **Says:** the table of eight skills ("SKILL.md budgets are tight ... update a row when a SKILL.md changes size"), without landing-page-conversion or content-model-to-ui; the handoff: "**Two SKILL.md files are near the 20,500-byte cap:** landing-page-conversion at 20,498 and email-template-system at 20,492" vs today: landing-page-conversion 20,498 (the largest, missing from the table), figma-variables-sync 20,497, design-critique-gate 20,497, component-state-matrix 20,494, client-presentation-builder 20,494, email-template-system 20,492, perf-budget-gate 20,491, web-design-studio 20,488, design-system-versioning 20,434, content-model-to-ui 20,384. The eight rows the table has are right; five files, not two, are at 20,492 or above.
+- **Says:** the table of eight skills ("SKILL.md budgets are tight ... update a row when a SKILL.md changes size"), without landing-page-conversion or content-model-to-ui; the handoff: "**Two SKILL.md files are near the 20,500-byte cap:** landing-page-conversion at 20,498 and email-template-system at 20,492" vs today: landing-page-conversion 20,498 (the largest, missing from the table), figma-variables-sync 20,497, design-critique-gate 20,497, component-state-matrix 20,494, client-presentation-builder 20,494, email-template-system 20,492, perf-budget-gate 20,491, web-design-studio 20,488, design-system-versioning 20,434, content-model-to-ui 20,384. The eight rows the table has are right; six files, not two, are at 20,492 or above.
 - **Right:** the disk.
 - **Fix:** the prompt's table (add the two rows); the handoff's warning ("eight within 20 bytes").
 
 ### PLAN-15 · low
+
 - **Where:** `CLAUDE.md:20` vs the tree and `CLAUDE.md:24`
 - **Says:** "The marketplace is `C:\Users\vybec\.claude\local-marketplaces\web-design-suite`, a copy of `plugins/web-design-suite`" vs no `plugins/web-design-suite` exists: the folder became `plugins/pro-web-design-suite` on 2026-10-19 (#180). The local marketplace folder does exist and is 3.6.0's copy.
 - **Right:** both, read historically; the sentence names a folder a reader cannot find.
 - **Fix:** `CLAUDE.md:20`: "a copy of 3.6.0's `plugins/web-design-suite`".
 
 ### PLAN-16 · low
+
 - **Where:** `CLAUDE.md:21`, `dev plans/web-design-suite-distribution-and-promotion.md:168` vs CI and the tree
 - **Says:** "**Tests:** about 1,600" and "~1,400 tests" vs run 40681521613: "Ran 1658 tests" (13 skipped) on macOS 3.14; 1,653 `def test_` in 68 files in `tests/`.
 - **Right:** about 1,650. `CLAUDE.md`'s round number is close; the distribution plan's is 250 short and is the figure Part B's pitch would quote.
 - **Fix:** `dev plans/web-design-suite-distribution-and-promotion.md:168`; `CLAUDE.md:21` "about 1,650".
 
 ### PLAN-17 · low
+
 - **Where:** `dev plans/web-design-suite-audit-2026-10-14.md` (the whole file) vs `dev plans/web-design-suite-completion-plan.md:151-163` and `dev plans/README.md:15`
 - **Says:** the audit's 114 findings (2 critical, 15 high, 49 medium, 48 low, counted from the file; `:7`) carry no status anywhere in the file; closure is recorded only elsewhere: N41 (C1, C2, H1; #130), N42 (H4 to H8; #132), N43 (H2, H3, H9, H10; #133), N44 (H11 to H15; #135), N45 (the §6 step 5 classes; #136, #138, #139, #140, #142), N46 (§3's mediums, nine parts; #143 to #152, #154), N47 (§3's lows, six parts; #155 to #157, #159, #160, #162), every one "*Done for 4.0.0*". None of the 114 is named as declined or left. The README says "Scheduled as N41 to N47 and Phase 6c (P50 to P55)".
 - **Right:** the completion plan. A reader of the audit alone cannot tell that all 114 are closed.
 - **Fix:** one status line at the top of the audit file: "All 114 closed in 4.0.0: N41 to N47 (completion plan)".
 
 ### PLAN-18 · medium
+
 - **Where:** `docs/HANDOFF.md:42` and `dev plans/web-design-suite-distribution-and-promotion.md:307` vs `plugins/pro-web-design-suite/.claude-plugin/plugin.json:14` and `plugins/pro-web-design-suite/SECURITY.md:5-7`
 - **Says:** "**Where issues live:** the distribution repository or this one" (open) and "Issues in the distribution repository, the development repository, or both. (Recommended: the distribution repository, since that's where users land.)" vs the shipped manifest: `"supportUrl": "https://github.com/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/issues"` (the development repository; the directory reads this field), and `SECURITY.md`: "open the [development repository's Security tab]". Both repositories have Issues on.
 - **Right:** the decision is still the owner's, but the listing already answers it one way. If the owner picks the distribution repository, `plugin.json`, `SECURITY.md` and the directory listing change with it (a 4.0.2 item).
 - **Fix:** the owner decides (L13); then the three files and the plan agree, and the handoff's line closes.
 
 ### PLAN-19 · low
+
 - **Where:** `dev plans/web-design-suite-3.6.0-live-check.md:49` vs `dev plans/web-design-suite-completion-plan.md:147`
 - **Says:** "`cluster_values.py` matches a colour to a role by ΔE alone, so a grey can land on `--fg-warning`" (a note, no status) vs "**N40 · The migration proposal matches a colour to a role by ΔE alone (found in R3.6's live check).** *Done for 4.0.0 (PR #129)*". The 4.0.0 live check marks its done follow-ups inline (`:50`, `:52`, `:55`); the 3.6.0 one does not.
 - **Right:** the completion plan.

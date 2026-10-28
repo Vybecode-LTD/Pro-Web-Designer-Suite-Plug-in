@@ -2,13 +2,13 @@
 
 The review, plans and reports behind pro-web-design-suite. The plugin itself is in `plugins/pro-web-design-suite`.
 
-**Start with the [execution plan](web-design-suite-execution-plan.md).** It schedules everything left, PR by PR. The [completion plan](web-design-suite-completion-plan.md) says what each item needs.
+**Start with the [completion runbook](web-design-suite-completion-runbook.md)**, §2 (the owner's decisions), §3 (the owner's steps), then §4 (the packages, in order). The [execution plan](web-design-suite-execution-plan.md) is the schedule's record (its §9 is the history) and the [completion plan](web-design-suite-completion-plan.md) says what each earlier item needed; the runbook's packages get their rows in both.
 
 Every release is also a tagged commit, from `v3.0.0` on. So `git diff v3.1.0 v3.2.0 -- plugins` shows what a patch below holds.
 
 | File | What it is |
 |---|---|
-| **`web-design-suite-completion-runbook.md`** | **What "100% done" means and every step to it** (2026-10-28): nine done-conditions and where each stands, twelve owner decisions, the owner's own steps, twenty-four work packages (P66 to P89) in eight stages that close every finding of the 2026-10-28 audit and its 23 open items, the per-PR protocol, the verification commands and a status table. The next session starts from its §4. |
+| **`web-design-suite-completion-runbook.md`** | **What "100% done" means and every step to it** (2026-10-28): nine done-conditions and where each stands, twelve owner decisions, the owner's own steps, twenty-four work packages (P66 to P89) in eight stages that close every finding of the 2026-10-28 audit and its 23 open items, the per-PR protocol, the verification commands and a status table. The next session starts from its §2, then §3 and §4. |
 | **`web-design-suite-audit-2026-10-28.md`** | **The full audit of `main` at `8441ff0`** (2026-10-28): 281 findings (4 critical, 44 high, 109 medium, 124 low) over every script, browser script, hook, the MCP server, the lint configs, the suite, CI and release, the evals, the distribution repository, every shipped document and the plans; the verdict, the critical and high findings by theme, the eleven systemic classes, where the plan's "done" stands, and an index of every finding. |
 | `web-design-suite-audit-2026-10-28/` | The audit's thirteen pass files, one per area (`py-a` to `py-e`, `js-a`, `js-b`, `test-suite`, `doc-a` to `doc-c`, `ops`, `plan-what-is-left`): each finding with its file and line, evidence, effect, fix and confidence; `plan-what-is-left.md` holds the 23 open items (L1 to L23) with every file and line, the 19 stale plan statements, the binding rules and the done check. |
 | **`web-design-suite-execution-plan.md`** | **The schedule for everything left** (2026-10-02). Every open item and N-item in one of 44 PRs, P0–P43, over phases 3 to 6 and four releases. It also has the decisions the user made on 2026-10-02, the efficiency rules, the lean protocol per PR, and phase 7, an eval-driven method for going past the review. |

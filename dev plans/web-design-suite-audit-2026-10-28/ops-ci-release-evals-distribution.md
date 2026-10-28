@@ -4,11 +4,12 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 
 ## Summary
 
-15 findings: 0 critical, 2 high, 4 medium, 9 low. By class: ci 6, release 2, evals 2, tooling 2, secrets 1, distribution 1, validate/docs 1. The release artefacts, the distribution repository and `claude plugin validate --strict` are clean: the v4.0.1 zip's 230 files equal the distribution tree's 230 blobs hash for hash, the distribution's `main` is the `v4.0.1` tree, both commits are the bot's, and validate passes on the plugin, the marketplace root, `plugin.json`, the built tree and its marketplace manifest with no note. The three most important findings: (1) nothing is required to merge to `main` (no branch protection, no ruleset), and CI's concurrency group cancels `main`'s own runs (5 of the last 60 pushes), so a commit can reach `main` red or unverified; (2) a `v*` tag releases and distributes without checking CI on the tagged commit, and `main` is red right now (8441ff0, macOS · 3.14, a known timing flake), while the directory auto-publishes from the distribution repository; (3) CI's `validate` job installs the Claude Code CLI unpinned (2.1.312 today, against evals' 2.1.293 and the local 2.1.308), so a CLI release can turn an unrelated PR red or quietly relax a check.
+15 findings: 2 high, 4 medium, 9 low. By class (counted from the headings): ci 6, evals 2, release 2, tooling 2, distribution 1, secrets 1, validate 1. The release artefacts, the distribution repository and `claude plugin validate --strict` are clean: the v4.0.1 zip's 230 files equal the distribution tree's 230 blobs hash for hash, the distribution's `main` is the `v4.0.1` tree, both commits are the bot's, and validate passes on the plugin, the marketplace root, `plugin.json`, the built tree and its marketplace manifest with no note. The three most important findings: (1) nothing is required to merge to `main` (no branch protection, no ruleset), and CI's concurrency group cancels `main`'s own runs (5 of the last 60 pushes), so a commit can reach `main` red or unverified; (2) a `v*` tag releases and distributes without checking CI on the tagged commit, and `main` is red right now (8441ff0, macOS · 3.14, a known timing flake), while the directory auto-publishes from the distribution repository; (3) CI's `validate` job installs the Claude Code CLI unpinned (2.1.312 today, against evals' 2.1.293 and the local 2.1.308), so a CLI release can turn an unrelated PR red or quietly relax a check.
 
 ## Findings
 
 ### OPS-1 · high · ci
+
 - **Where:** repository setting (`main`, Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in); `.github/workflows/ci.yml:13-15`
 - **What:** `main` has no branch protection and no ruleset, so nothing is required to merge: no status check, no review, force-pushes and direct pushes allowed. The CI concurrency group also cancels `main`'s run when the next merge lands.
 - **Evidence:** `gh api repos/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in/branches/main/protection` → `{"message":"Branch not protected", "status":"404"}`; `gh api .../rulesets` → `[]`; repository settings `allow_auto_merge: false, delete_branch_on_merge: false`. `ci.yml:14-15`: `group: ci-${{ github.event.pull_request.number || github.ref }}` / `cancel-in-progress: true`, so a push to `main` is group `ci-refs/heads/main`. `gh run list --workflow ci.yml --branch main --event push --limit 60` → `{"cancelled":5,"failure":6,"success":49}`.
@@ -17,14 +18,16 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-2 · high · release
+
 - **Where:** `.github/workflows/release.yml:7-9`, `18-66`, `73-143`
 - **What:** a pushed `v*` tag builds, creates the release and writes the distribution repository without checking that CI passed on the tagged commit; the only gates are the tag-equals-`plugin.json` check (lines 36-44) and `build.py`'s own refusals.
 - **Evidence:** `release.yml:7-9` `on: push: tags: ["v*"]`; no step in either job reads a check-run or a CI run. `main` at 8441ff0 is red now: CI run 40681521613, `macos-latest · Python 3.14`, step `The suite`, `FAIL: test_a_page_type_picks_the_budget_its_page_is_held_to (test_runtime_urls.EachPageHasItsTypesBudget…)`, the other six legs green. The project `CLAUDE.md` records the directory "tracking `main` [of the distribution repository] with a scheduled check and auto-publish on".
 - **Effect:** `git tag v4.0.2 && git push --tags` on a red or cancelled commit publishes it to GitHub and to the distribution repository, from which the directory auto-publishes; the release cannot be rewritten by design (`release.yml:119-122`), so the fix is a new version.
-- **Fix:** before `Build the zip…`, a step that requires every CI check on `$GITHUB_SHA` to have concluded `success`: `gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs" --jq '[.check_runs[] | select(.app.slug=="github-actions") | .conclusion] | all(.=="success") and length>0'`, failing otherwise (`GH_TOKEN: ${{ github.token }}`, read scope); or make `release.yml` run on `workflow_run` of CI's success and verify the tag there.
+- **Fix:** before `Build the zip…`, a step that requires every CI check on `$GITHUB_SHA` to have concluded `success`: `gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs" --jq '[.check_runs[] | select(.app.slug=="github-actions") | .conclusion] | all(.=="success") and length>0'` and `[.check_runs[].name]` containing each of the seven required names, failing otherwise (`GH_TOKEN: ${{ github.token }}`, read scope); or make `release.yml` run on `workflow_run` of CI's success and verify the tag there.
 - **Confidence:** confirmed
 
 ### OPS-3 · medium · ci
+
 - **Where:** `.github/workflows/ci.yml:151-152`; `.github/workflows/evals.yml:54`
 - **What:** the `validate` job installs the Claude Code CLI unpinned, so each run validates with whatever npm's `latest` is; the evals pin 2.1.293 and the local bundled CLI is 2.1.308.
 - **Evidence:** `ci.yml:152` `run: npm install --global @anthropic-ai/claude-code`; today's run 40681521613 printed `2.1.312 (Claude Code)`; `evals.yml:54` `npm install --global @anthropic-ai/claude-code@2.1.293`; the bundled CLI reports `2.1.308 (Claude Code)`. `build.py:297` refuses, for the plugin's own `hooks.json`, a launcher that runs a package "without an exact version", the same rule.
@@ -33,6 +36,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-4 · medium · ci
+
 - **Where:** `.github/workflows/ci.yml:115-119` (the suite), whole file (no `upload-artifact`, no retry); `docs/HANDOFF.md:55-60`
 - **What:** the timing tests the handoff lists as known flakes fail `main` outright: no retry, no artefact with the measured numbers, so each red run costs a rerun and a judgement call.
 - **Evidence:** run 40681521613 on 8441ff0: `AssertionError: Lists differ: [('home', []), ('strict', ['lcp'])] != [('home', []), ('strict', [])]` in `test_runtime_urls.py:177` (the strict budget measured an LCP breach on the macOS runner; `macos-latest · Python 3.9` passed the same commit); `HANDOFF.md:56-60` lists `test_runtime_urls.EachPageHasItsTypesBudget`, `test_tbt_stops_at_tti`, `VitalsUnderCsp`, `test_interact_at_clicks_while_the_page_hydrates` and "the vitals timing tests" as known flakes; 6 failures in the last 60 `main` pushes. `ci.yml` has no `actions/upload-artifact` and no `retry`.
@@ -41,6 +45,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-5 · medium · evals
+
 - **Where:** `plugins/pro-web-design-suite/evals/` (file list); `tests/test_evals.py:53-57`, `115-116`
 - **What:** six of the thirteen skills have no outcome case and four have no boundary case; pairs the descriptions make easy to confuse are uncovered.
 - **Evidence:** the 11 outcome cases exercise web-design-studio (5: `build/*`, `systems/brand-tokens`), a11y-audit-runner, figma-variables-sync, design-system-versioning, landing-page-conversion, content-model-to-ui and email-template-system; none exercises client-presentation-builder, component-state-matrix, design-critique-gate, design-system-docs, design-token-migration or perf-budget-gate. `PAIRS` (`test_evals.py:53-57`) holds five pairs; client-presentation-builder, content-model-to-ui, email-template-system and perf-budget-gate appear in no boundary case. From the skills' descriptions: perf-budget-gate × a11y-audit-runner (both "fail the build" "in CI"), design-critique-gate × client-presentation-builder (both "before a client sees" / "to a client"), design-token-migration × web-design-studio (tokens into a codebase), content-model-to-ui × web-design-studio (React screens on the system), design-system-versioning × design-token-migration (renaming tokens), email-template-system × web-design-studio (the same tokens, compiled) are uncovered.
@@ -49,6 +54,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-6 · low · evals
+
 - **Where:** `evals/build/pricing-section/graders/audit-clean.md:4`, `evals/build/stretched-card/graders/audit-clean.md:4`, `evals/build/tailwind-button/graders/audit-clean.md:4`; `tests/test_evals.py:275-276`
 - **What:** `audit-clean` matches any gate's pass verdict anywhere in the trace, not `audit_design`'s.
 - **Evidence:** the pattern is `verdict\\*"\s*:\s*\\*"pass` on `target: trace`; `mcp/design_gates.mjs:206` writes `{ tool: name, exit, verdict, report }` for all five tools, so a `check_roles` or `a11y_static` pass satisfies it; `systems/brand-tokens/graders/contrast-pass.md` names its tool (`check_roles\\*"\s*,\s*\\*"exit\\*"\s*:\s*0\s*,…`); `test_evals.py` `SAMPLES["audit-clean"]` lists no other tool's pass among the misses (`mcp_result("check_roles", 0, "pass")` is a miss only for `contrast-pass`, line 278). A run that passes the audit and then breaks the file also keeps the earlier `pass`.
@@ -57,6 +63,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-7 · medium · tooling
+
 - **Where:** `tooling/tailwind-v3/package-lock.json`, `tooling/main/package-lock.json` (test-only; the plugin ships no dependency)
 - **What:** `npm audit` reports one high and one moderate advisory in the Tailwind v3 toolchain and one moderate plus four low in the main one; Dependabot shows none.
 - **Evidence:** `npm audit --prefix tooling/tailwind-v3 --json`: `source-map-js: high … event-loop denial of service through indexed source-map section offsets, range 1.0.0 - 1.2.1, fixAvailable True`; `postcss-selector-parser: moderate … Quadratic complexity in flat selector parsing, range <6.1.5, fixAvailable True`. `--prefix tooling/main`: `{"low": 4, "moderate": 1, "high": 0, "critical": 0}`: `fast-uri: moderate … URI scheme spoofing, range 3.0.0 - 3.1.8, fixAvailable True`; `react-email`, `@react-email/render`, `html-to-text`, `deepmerge`: low, whose fix is a downgrade to `react-email 5.2.11` (`isSemVerMajor: True`). `gh api .../dependabot/alerts?state=open` → `0`; vulnerability alerts enabled (`204`), `dependabot_security_updates: disabled`.
@@ -65,6 +72,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-8 · low · tooling
+
 - **Where:** `tooling/main/package.json:9-30`, `tooling/tailwind-v3/package.json:7-11`; `tests/test_recipes.py:531, 540-544, 553-555, 575`; `tests/test_commands.py:446`; `tests/fixtures/evidence.json:290-301`
 - **What:** eight pins are a minor or patch behind; no pin is a major behind by accident (TypeScript 7 is outside typescript-eslint's peer range, jsdom 30 drops Node 20, Tailwind 3 is the v3 folder's purpose). Seven pins are asserted exactly by tests, so a bump is a two-file change, and the evidence register's typescript-eslint entry names 8.71.0 as "latest" while the pin is 8.70.1 and npm's latest is 8.72.1.
 - **Evidence:** the table below. `evidence.json:294` `"claim": "typescript-eslint's latest release, 8.71.0, …"`, `"checked": "2026-10-04"`; `package.json:28` `"typescript-eslint": "8.70.1"`.
@@ -73,6 +81,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-9 · low · ci
+
 - **Where:** `.github/` (no `dependabot.yml`); `.github/workflows/ci.yml:37, 41, 46, 78, 108`
 - **What:** nothing updates the actions or the npm pins. `ci.yml` pins actions to mutable tags; `release.yml` and `evals.yml` pin to commit SHAs that only a hand edit moves.
 - **Evidence:** `ls .github/` → `assets workflows`; `ci.yml:37` `actions/checkout@v7`, `:41` `astral-sh/setup-uv@v10.2.0`, `:46` `actions/setup-node@v7`, `:78` `actions/cache/restore@v6`, `:108` `actions/cache/save@v6`; `release.yml:27, 32, 88, 93` and `evals.yml:43, 48, 143` are 40-hex SHAs with version comments.
@@ -81,6 +90,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-10 · low · secrets
+
 - **Where:** repository settings, Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in
 - **What:** secret-scanning push protection is off on a public repository, and Dependabot security updates are off.
 - **Evidence:** `gh api repos/Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in --jq .security_and_analysis` → `secret_scanning: disabled, secret_scanning_push_protection: disabled, dependabot_security_updates: disabled`. The secrets themselves are two (`ANTHROPIC_API_KEY` 2026-10-10, `DIST_DEPLOY_KEY` 2026-10-19), no variables; each is read by one step (table below); no workflow uses `pull_request_target`; `ci.yml` runs on `pull_request` with `contents: read` and no secret, so a fork's PR gets nothing.
@@ -89,6 +99,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-11 · low · distribution
+
 - **Where:** Vybecode-LTD/pro-web-design-suite (settings)
 - **What:** the distribution repository has Issues and Wiki on, and no ruleset on `main`, although its README and `release.yml:67-72` say only the workflow writes it and the issues live in the development repository.
 - **Evidence:** `gh api repos/Vybecode-LTD/pro-web-design-suite` → `{"default_branch":"main","private":false,"has_issues":true,"has_wiki":true}`; `.../branches/main/protection` → 404; `.../rulesets` → `[]`; branches: `main` only; commits: `4809e3f github-actions[bot] Pro Web Design Suite 4.0.1`, `28efdaa github-actions[bot] Pro Web Design Suite 4.0.0` (nobody by hand so far); deploy keys: one, `166961999`, `read_only: false`, "release.yml distribute (Pro-Web-Designer-Suite-Plug-in)".
@@ -97,6 +108,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-12 · low · validate
+
 - **Where:** `plugins/pro-web-design-suite/CLAUDE.md` ("Commands", the `claude plugin validate` paragraph, and "Gotchas", "The desktop app is an MSIX package")
 - **What:** the documented path of the bundled CLI no longer exists; the CLI moved folders and versions.
 - **Evidence:** `ls C:\Users\vybec\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude-code\` → no such directory (the `Claude` folder holds one zero-byte marker); `%APPDATA%\Claude\` holds `claude_desktop_config.json` only; `find` found `C:\Users\vybec\AppData\Local\Claude-Data\claude_pzs8sxrjxfjjc\claude-code\2.1.304\aed62990b91e\claude.exe` and `…\2.1.308\c17a819afb40\claude.exe`; the latter reports `2.1.308 (Claude Code)`.
@@ -105,6 +117,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-13 · low · ci
+
 - **Where:** `.github/workflows/ci.yml:115-128`; `tests/wds_support.py`
 - **What:** a leg passes however many tests skip; only two skips are turned into failures (`WDS_REQUIRE_ENGINES` on Linux, `WDS_REQUIRE_PYDANTIC`), so a broken tool resolution that skipped every real-tool test would still be green.
 - **Evidence:** run 40681521613: `ubuntu … 3.9: OK (skipped=2)`, `… 3.14: OK (skipped=5)`, `windows … 3.9: OK (skipped=15)`, `… 3.14: OK (skipped=18)`, `macos … 3.9: OK (skipped=14)`, `… 3.14: FAILED (failures=1, skipped=13)`; `grep WDS_REQUIRE tests/*.py` → only `test_runtime_engines.py` and `test_scaffold.py`; no test or step reads the skip count.
@@ -113,6 +126,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-14 · low · ci
+
 - **Where:** `.github/workflows/ci.yml:88-92`, `64-111`
 - **What:** P61 (#208) caches apt's `.deb` files, not the browsers: the Chromium headless shell, Firefox and WebKit download from Playwright's CDN on every Linux run.
 - **Evidence:** `ci.yml:91` `npx playwright install --only-shell --with-deps chromium firefox webkit`; the cache steps (`:75-82`, `:106-111`) cover `/var/cache/wds-debs/*.deb` only; no step caches `~/.cache/ms-playwright`.
@@ -121,6 +135,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `.github/workflows/ci.ym
 - **Confidence:** confirmed
 
 ### OPS-15 · low · release
+
 - **Where:** `tooling/release/build.py:362-363`, `475-477` (another pass audits the code; reported here for what the release log shows)
 - **What:** the "removed since the previous tag" list misses a renamed file, because `git diff --diff-filter=D` runs with rename detection on.
 - **Evidence:** `git diff --name-only --diff-filter=D v4.0.1 HEAD -- plugins/pro-web-design-suite` → empty; `git diff --name-status` → `R100 …/.claude-plugin/icon.png → …/pro-web-design-suite-icon.png`; the HEAD build printed no `removed since v4.0.1:` line.

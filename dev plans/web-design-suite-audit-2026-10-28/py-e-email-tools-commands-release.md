@@ -4,13 +4,14 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: `plugins/pro-web-design-
 
 ## Summary
 
-12 findings: 1 critical, 1 high, 7 medium, 3 low. By class: 9 bugs, 1 risk, 1 gap, 1 inconsistency. No dead code found (every function, constant and flag I suspected is reached; checked by grep). No Python 3.9 problem found (the `X | None` forms are all under `from __future__ import annotations`; `str.removeprefix` is 3.9). The release builder prints a clean build today: no refusal, no hold, no warning.
+12 findings: 1 critical, 1 high, 6 medium, 4 low. By class (counted from the headings): bug 8, gap 2, inconsistency 1, risk 1. No dead code found (every function, constant and flag I suspected is reached; checked by grep). No Python 3.9 problem found (the `X | None` forms are all under `from __future__ import annotations`; `str.removeprefix` is 3.9). The release builder prints a clean build today: no refusal, no hold, no warning.
 
 The three that matter most: (1) `build_email.py --text` is never passed to `refuse_overwrite`, so `--text emails/receipt.html` silently replaces the source template with its plain-text part and exits 0 (PY-E-1). (2) `--minify` strips every non-conditional comment, including the ESP directives the build's own comment filter deliberately keeps (`{{#if}}`, `htmlmin:ignore`), and `--keep-comments` does not stop it (PY-E-2). (3) The lint measures contrast only for hex, the 18 named colours it knows and `rgb()`; `hsl(0 0% 60%)` on white at 2.85:1 and `dimgray` pass both the contrast check and `--source`'s Law 1 check in silence (PY-E-7).
 
 ## Findings
 
 ### PY-E-1 · critical · risk
+
 - **Where:** `plugins/pro-web-design-suite/skills/email-template-system/scripts/build_email.py:1392`, `:1438-1441`
 - **What:** The overwrite guard covers `--out` but not `--text`. A `--text` that names the source template (or the token file, or `--out`) is written over without a word.
 - **Evidence:** `clash = refuse_overwrite(args.out, source_path, tokens_path)` at 1392; `text_path.write_text(text, encoding="utf-8")` at 1441 with no check. Run: `build_email.py victim.html --out out.html --text victim.html -q` exited 0 and `victim.html` now begins `Caf&eacute; & cr&egrave;me…` (the plain text). `--out same.html --text same.html` leaves `same.html` holding the text, not the HTML.
@@ -19,6 +20,7 @@ The three that matter most: (1) `build_email.py --text` is never passed to `refu
 - **Confidence:** confirmed
 
 ### PY-E-2 · high · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/email-template-system/scripts/build_email.py:1114` (`minify_html`), against `:112-115` (`COMMENT_KEEP_RE`) and `:1289-1295`
 - **What:** `strip_comments` keeps conditional comments and ESP directives (DL-A20). `--minify` then runs a second, blunter filter that removes every comment that is not `[if`/`<![endif]`, so the directives it just kept are gone; `--keep-comments` (documented in `email-workflow.md` line 109 as the escape hatch "when your ESP parses comment markers") is ignored by the minifier too.
 - **Evidence:** `html = re.sub(r"<!--(?!\[if|<!\[endif).*?-->", "", html, flags=re.S)` at 1114. Run on a template holding `<!-- {{#if vip}} -->…<!-- {{/if}} -->` and `<!-- htmlmin:ignore -->`: the plain build keeps both (`{{#if`: 1, `htmlmin`: 1); `--minify` keeps neither (0, 0), exit 0. `tests/test_email.py:233` tests the directives only on the unminified path.
@@ -27,6 +29,7 @@ The three that matter most: (1) `build_email.py --text` is never passed to `refu
 - **Confidence:** confirmed
 
 ### PY-E-3 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/email-template-system/scripts/build_email.py:908-909` (`inject_mso`)
 - **What:** The head's existing MSO block is recognised only when its comment opens with `[if mso`. The boilerplate most inherited emails carry (`<!--[if gte mso 9]>`, `[if (gte mso 9)|(IE)]`) is not seen, so the build adds a second `PixelsPerInch` block and a second font rule. `lint_email.py:126` already fixed the same test for the lint (`MSO_IF_RE`, "Codex on #196"); the build was not given it.
 - **Evidence:** `re.match(r"\s*\[if\s+mso", node.data, re.I)` at 909. Run on a head holding `<!--[if gte mso 9]><xml>…<o:PixelsPerInch>96</o:PixelsPerInch>…<style>table, td { font-family: Arial… }</style><![endif]-->`: notes "added <o:PixelsPerInch>96</o:PixelsPerInch>" and "added the [if mso] font rule"; the output holds `PixelsPerInch` four times (two blocks).
@@ -35,6 +38,7 @@ The three that matter most: (1) `build_email.py --text` is never passed to `refu
 - **Confidence:** confirmed
 
 ### PY-E-4 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/email-template-system/scripts/build_email.py:297` (`VAR_RE`), `:375-404`, `:1219-1223`
 - **What:** The `var()` regex allows one level of parentheses in a fallback. A fallback with two (`var(--pad-card, max(4px, min(8px, 1vw)))`) matches nothing, so the token is not substituted even though `--pad-card` exists, nothing is reported missing, and the literal `var(…)` ships with exit 0. The docstring and SKILL.md promise exit 2 on an unresolved token.
 - **Evidence:** `VAR_RE = re.compile(r"var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,([^()]*|[^()]*\([^()]*\)[^()]*))?\)")`. Run: the built HTML holds `padding:var(--pad-card, max(4px, min(8px, 1vw)))`, exit 0. `lint_email.py` then reports "unresolved token --pad-card … add the token to assets/email-tokens.json", which is the wrong diagnosis: the token is there.
@@ -43,6 +47,7 @@ The three that matter most: (1) `build_email.py --text` is never passed to `refu
 - **Confidence:** confirmed
 
 ### PY-E-5 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/email-template-system/scripts/build_email.py:1030-1056` (`ENTITIES`, `unescape_entities`)
 - **What:** The plain-text part decodes 40 named entities by table. Every other named entity (`&eacute;`, `&egrave;`, `&ouml;`, `&aring;`, `&ntilde;`, `&szlig;`, `&euml;`…) is written to the text part as its source text. `html.unescape` is in the stdlib and knows all 2,231.
 - **Evidence:** Run `--text-only` on `<p>Caf&eacute; &amp; cr&egrave;me, &ouml; &aring; &ntilde; &copy;</p>`: output `Caf&eacute; & cr&egrave;me, &ouml; &aring; &ntilde; ©`. SKILL.md: "Read the plain-text part … Somebody receives it."
@@ -51,6 +56,7 @@ The three that matter most: (1) `build_email.py --text` is never passed to `refu
 - **Confidence:** confirmed
 
 ### PY-E-6 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/email-template-system/scripts/build_email.py:1426`, `:1434`, `:1441`; `lint_email.py:1499`
 - **What:** `Path.write_text` without `newline=""` lets Windows turn every `\n` into `\r\n`. The build's byte count and clipping percentage are computed from the LF string, so on Windows the file on disk is larger than the number reported, the lint (which reads the bytes through `decode_text`, no newline translation) measures the larger file, and a Windows build differs byte for byte from the Linux one. `export_email_theme.py:488` and `sync_email_tokens.py:850-854` write bytes for exactly this reason ("LF, as the file has it, on Windows too").
 - **Evidence:** `out_path.write_text(html, encoding="utf-8")` at 1434. Run on `assets/templates/newsletter.html`: the report says `9,332 bytes — 9.1% of Gmail's 102,400-byte clipping threshold`; the file is 9,442 bytes with 110 `\r\n`; the text part has 49. `tests/test_email.py:594` already works round it (`.replace("\r\n", "\n")  # as the build counts it`).
@@ -59,6 +65,7 @@ The three that matter most: (1) `build_email.py --text` is never passed to `refu
 - **Confidence:** confirmed
 
 ### PY-E-7 · medium · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/email-template-system/scripts/lint_email.py:276-282` (`NAMED_COLORS`), `:371-393` (`parse_color`), `:994-996`, `:1124-1126`, `:1296-1297`
 - **What:** `parse_color` knows 18 named colours, 3/6/8-digit hex and comma- or space-separated `rgb()` with 0–255 channels. Any other notation (`hsl()`, `oklch()`, `rgb()` with percentages, the other 130 named colours) returns `None`, and `check_contrast`, `check_dark` and `resolve_background` `continue` without a finding. `check_source`'s "hand-written colour" check uses the same 18 names, so `color: dimgray` is not a Law 1 violation.
 - **Evidence:** Run on `<p style="color:hsl(0 0% 60%)">` and `<p style="color:dimgray">` on `#ffffff` beside a `#999999` control: the only contrast finding is `#999999 on #ffffff is 2.85:1` (the `hsl()` is the same grey). `--source` on `.a { color: dimgray; } .b { color: red; }`: one error, for `red`.
@@ -67,6 +74,7 @@ The three that matter most: (1) `build_email.py --text` is never passed to `refu
 - **Confidence:** confirmed
 
 ### PY-E-8 · low · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/email-template-system/scripts/lint_email.py:609`
 - **What:** The `<style>` sweep takes `value.split()[0]` without the empty guard its inline twin has at 589.
 - **Evidence:** `if value.split()[0] not in entry:`; run on `<style>.x { display: ; }</style>`: `IndexError: list index out of range`.
@@ -75,6 +83,7 @@ The three that matter most: (1) `build_email.py --text` is never passed to `refu
 - **Confidence:** confirmed
 
 ### PY-E-9 · medium · gap
+
 - **Where:** `plugins/pro-web-design-suite/tools/check.py:50`, `:58-62`
 - **What:** A changed file outside `skills/` selects the test modules whose text contains its file name. A file a test reads by glob but never spells gets no module, so the quick pass runs nothing for it. The docstring describes this behaviour; the consequence is that `check.py` can report "pass" on a change the suite would fail.
 - **Evidence:** `affected(["plugins/pro-web-design-suite/agents/gate-runner.md"], sources)` returns `[]`; `tests/test_agents.py:38` checks every agent through `AGENTS.glob("*.md")` and names `gate-runner` (line 19) but never `gate-runner.md`. `agents/design-critic.md` happens to select `test_agents` because another test spells it. Of 36 probed paths, three select nothing: that agent, `tooling/release/icon.svg` (no test reads it; fine) and `dev plans/check_execution_plan.py` (run as its own check; fine).
@@ -83,6 +92,7 @@ The three that matter most: (1) `build_email.py --text` is never passed to `refu
 - **Confidence:** confirmed
 
 ### PY-E-10 · low · inconsistency
+
 - **Where:** `plugins/pro-web-design-suite/skills/email-template-system/scripts/lint_email.py:900`, against `build_email.py:113`
 - **What:** The build's comment filter treats ERB `<%` as an ESP directive; the lint's relative-URL check accepts `{{`, `{%`, `*|`, `%%` and `#` as merge-tag prefixes but not `<%` (nor Mailjet's `{$`).
 - **Evidence:** `re.match(r"^(https?:|mailto:|tel:|sms:|\{\{|\{%|\*\||%%|#)", href, re.I)` at 900; `COMMENT_KEEP_RE` includes `<%` at 113.
@@ -91,6 +101,7 @@ The three that matter most: (1) `build_email.py --text` is never passed to `refu
 - **Confidence:** confirmed
 
 ### PY-E-11 · low · bug
+
 - **Where:** `plugins/pro-web-design-suite/skills/email-template-system/scripts/build_email.py:1313-1315`, `:1448-1449`
 - **What:** The "bytes of `<style>` survived" figure counts every `<style>` in the output, including the one inside the `[if mso]` conditional comment that the build itself adds (`MSO_FONT_STYLE`, about 110 bytes). Gmail drops comments whole, so that CSS never counts against its 16,384-byte ceiling.
 - **Evidence:** `for match in re.finditer(r"<style[^>]*>(.*?)</style>", html, flags=re.S | re.I)` at 1313 runs on the serialised document, comments included; `email-client-matrix.md` quotes the resulting 751–919 bytes as what the templates "keep" (`tests/test_email.py:598`).
@@ -99,6 +110,7 @@ The three that matter most: (1) `build_email.py --text` is never passed to `refu
 - **Confidence:** likely
 
 ### PY-E-12 · low · gap
+
 - **Where:** `plugins/pro-web-design-suite/skills/email-template-system/SKILL.md:233-241`, against `lint_email.py:1416`
 - **What:** The lint's flag table omits `--tokens`, the flag `--source` needs in a project with no `.design-suite.json` `emailTokens`; nothing in SKILL.md or `email-workflow.md` says `lint_email.py --source` takes it (the grep found no `lint_email … --tokens`). `build_email.py`'s `--quiet`/`-q` is likewise undocumented, harmlessly.
 - **Evidence:** `parser.add_argument("--tokens", help="token file for --source …")` at 1416; the SKILL table lists `--format`, `--source`, `--transactional`, `--strict`, `--ignore`, `--verbose`, `-o`.

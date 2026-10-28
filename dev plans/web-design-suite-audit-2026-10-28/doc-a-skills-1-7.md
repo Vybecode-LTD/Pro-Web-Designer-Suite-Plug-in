@@ -4,7 +4,7 @@ Audited 2026-10-28 at main 8441ff0. Files read in full: a11y-audit-runner 6 (SKI
 
 ## Summary
 
-25 findings: 3 high, 11 medium, 11 low. By class: contradiction 11, stale 5, undocumented-flag 2, missing-file 2, promise 1, budget 1, hazard 3. Frontmatter: no finding (all seven parse, `name` equals the folder, descriptions are 191–200 characters and say what the skill is not for). Documented-but-missing flags: none (the suite's `DocumentedFlags` test already pins that). `check_pointers.py` is clean.
+25 findings: 3 high, 11 medium, 11 low. By class (counted from the headings): contradiction 10, stale 7, hazard 2, missing-file 2, undocumented-flag 2, budget 1, promise 1. Frontmatter: no finding (all seven parse, `name` equals the folder, descriptions are 191–200 characters and say what the skill is not for). Documented-but-missing flags: none (the suite's `DocumentedFlags` test already pins that). `check_pointers.py` is clean.
 
 The three that matter most:
 
@@ -15,6 +15,7 @@ The three that matter most:
 ## Findings
 
 ### DOC-A-1 · high · contradiction
+
 - **Where:** `plugins/pro-web-design-suite/skills/a11y-audit-runner/SKILL.md:137`
 - **What:** The "short version" of the report wording that §7 of `automation-coverage.md` is said to supply states automation coverage as a fraction of *success criteria* — a quantity the reference says none of the sources measure, and a phrase a sibling skill explicitly rejects.
 - **Evidence:** SKILL.md:135–137: "`references/automation-coverage.md` §7 has the wording to use instead … The short version: *"… Automated testing covers an estimated third of WCAG success criteria; the manual evaluation recorded in Appendix B covers the remainder …"*". `automation-coverage.md:251`: "None of the three counts *criteria*. For that, use the table in §3: a tool fully decides 7 of the 55 A and AA criteria and part of 31 more." `automation-coverage.md:281` (the §7 wording itself): "Automated checks fully decide 7 of the 55 WCAG 2.2 A and AA success criteria and part of 31 more; the other 48 were evaluated manually". `client-presentation-builder/references/evidence.md:140`: ""Roughly a third" is not a figure either study gives." `tests/test_facts.py:221–224` forbids `(a|one) third of (the |WCAG )*(success )?criteria` and `(roughly|about) a third of WCAG`; "an estimated third of WCAG success criteria" matches neither, so the test passes.
@@ -23,6 +24,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-2 · high · contradiction
+
 - **Where:** `plugins/pro-web-design-suite/skills/a11y-audit-runner/references/automation-coverage.md:230`
 - **What:** The §5.5 priority list claims its six failures are all fully machine-decided and all caught by the static script; the file's own §3 table and the scripts reference say otherwise for four of the six, and contrast is not a static check.
 - **Evidence:** line 230: "All six are **Full** rows in §3 and all six are in `a11y_static.py` — no browser, one second, every commit." The six (lines 223–228) are low-contrast text (1.4.3), missing alt (1.1.1), missing form labels (3.3.2), empty links (2.4.4), empty buttons (4.1.2), missing `lang` (3.1.1). In §3: line 70 "**1.4.3** Contrast (Minimum) | **Partial**", line 57 "**1.1.1** … **Partial**", line 86 "**2.4.4** … **Partial**", line 107 "**4.1.2** … **Partial**"; only 3.3.2 (line 102) and 3.1.1 (line 97) are **Full**. `references/scripts.md:9–15`'s category table for `a11y_static.py` (S, N, K, R, F) has no contrast check; `scripts.md:58` lists `contrast` under `a11y_runtime.mjs` as "text contrast from computed styles … the case static analysis reports as a pass". `test_facts.py` checks only the "N of the 55" sentences, so this one is unpinned.
@@ -31,6 +33,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-3 · high · contradiction
+
 - **Where:** `plugins/pro-web-design-suite/skills/component-state-matrix/scripts/snapshot_matrix.mjs` `--help` (Usage block, "loosen once" example) against `references/visual-regression.md:121`
 - **What:** The script's own usage text recommends a per-pixel tolerance the reference, and the same help text one screen lower, say blinds the hover and active checks.
 - **Evidence:** `--help`: "# loosen once, deliberately, with a reason in the commit message / node snapshot_matrix.mjs sheet.html --threshold 0.004 --pixel-threshold 0.12". Same `--help`, after `--forced-colors`: "(At the old 0.10 tolerance the suite's own 4% hover and 8% pressed overlays were below the noise floor, so deleting :hover or :active passed every cell.)". `visual-regression.md:121`: "at `0.10` (a distance of ~352) the suite's own 4% hover overlay (~51) and 8% pressed overlay (~210) were invisible, so deleting `:hover` or `:active` passed every cell. At `0.03` (~32) both count." `SKILL.md:299`: "`--pixel-threshold N` | … (default `0.03`: the suite's 4% hover overlay is a distance of ~0.038)". `test_docs.DocumentedFlags` checks that documented flags exist, not the values.
@@ -39,6 +42,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-4 · medium · contradiction
+
 - **Where:** `plugins/pro-web-design-suite/skills/component-state-matrix/references/state-coverage.md:81` vs `plugins/pro-web-design-suite/skills/a11y-audit-runner/references/runtime-checks.md:179`
 - **What:** Two skills disagree on whether SC 2.4.13 (AAA) is part of the suite's floor.
 - **Evidence:** state-coverage.md:81: "or thinner than 2px (the 2px perimeter is 2.4.13, Level AAA, which this suite holds as a floor)". runtime-checks.md:179: "**Indicator contrast.** SC 2.4.13 (Level AAA, so beyond this skill's AA floor) asks for 3:1". token-contract.md:109: "WCAG 2.2 Level AA, treated as a floor." `test_facts.test_every_level_quoted_is_the_criterions_level` checks only that "2.4.13, Level AAA" carries the right letter, so the policy claim is unpinned.
@@ -47,6 +51,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-5 · medium · stale
+
 - **Where:** `plugins/pro-web-design-suite/skills/a11y-audit-runner/references/automation-coverage.md:187`; also `component-state-matrix/references/visual-regression.md:33–37` and `a11y-audit-runner/references/runtime-checks.md:36`
 - **What:** Three descriptions of how the browser scripts freeze animation before measuring disagree with each other about the mechanism and where it lives.
 - **Evidence:** automation-coverage.md:187: "Freeze animations before scanning. `a11y_runtime.mjs` injects a 1ms animation/transition override for exactly this". runtime-checks.md:36: "the runner pauses every animation and finishes every transition, with the same freeze `snapshot_matrix.mjs` uses (`scripts/browser_common.mjs`). Shortening an animation is not enough: a spinner that keeps turning changes pixels between the two screenshots". visual-regression.md:36–37 (column "Where in `snapshot_matrix.mjs`"): "Animations mid-flight | `animation-play-state: paused`, `animation-delay: -1ms` | `FREEZE_CSS`" and "Transitions mid-flight | `transition-duration: 1ms`". `grep` shows `FREEZE_CSS` only in `snapshot_matrix.mjs` and `FREEZE_ANIMATIONS_CSS` (`animation-play-state: paused !important`) in `browser_common.mjs`. Which freeze each script uses: **to verify in code** (`a11y_runtime.mjs`, `snapshot_matrix.mjs`, `browser_common.mjs`).
@@ -55,6 +60,7 @@ The three that matter most:
 - **Confidence:** likely
 
 ### DOC-A-6 · medium · stale
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/references/supabase-integration.md:25` (and the table at 27–43)
 - **What:** The source-fidelity section still says the reader takes three inputs; the skill now takes five, and the SKILL.md sends the reader here for the fidelity table.
 - **Evidence:** supabase-integration.md:25: "Three sources, three fidelities. `introspect_schema.py` reads all three and records what each one could not carry". Its table has columns for DDL, `gen types` and `information_schema` only. SKILL.md:63: "Reads a `.sql` DDL file, a … `.ts` file, a Prisma schema, a Drizzle `pgTable` schema, or a JSON schema dump, and normalises all five". SKILL.md:65: "`references/supabase-integration.md` §1 has the fidelity table and the measured difference." scripts.md:21: "**Prisma and Drizzle (3.6.0).** … Prisma has no CHECK constraints … Neither file carries row-level security" (CHANGELOG 3.6.0 confirms the version).
@@ -63,6 +69,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-7 · medium · missing-file
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-system-versioning/SKILL.md:126`; `content-model-to-ui/references/worked-example.md:7`; `content-model-to-ui/references/supabase-integration.md:45`; `shared/token-contract.md:3` (14 copies)
 - **What:** Shipped documents name files under `tests/`, a folder `build.py` strips from every release (`DEV_ONLY = {"tests", "evals", "tools"}`), so in the distribution repository and in every installed plugin the paths do not exist.
 - **Evidence:** versioning SKILL.md:126: "Five edits to the starter's `tokens.css` (`tests/fixtures/worked-release.json`, rerun by a test)". worked-example.md:7: "shipped as `tests/fixtures/supabase/shop.sql` … (`tests/test_schema_sources.py` checks that it still does)". supabase-integration.md:45: "which the plugin's tests carry in three forms (`tests/fixtures/supabase/`, held by `tests/test_schema_sources.py`)". token-contract.md:3: "change the master, copy it over all thirteen, and `tests/test_contract.py` fails until they match." `tooling/release/build.py:83`: `DEV_ONLY = {"tests", "evals", "tools"}`. `test_docs.NoMachinePaths` checks for the author's machine paths, not for dev-only repository paths.
@@ -71,6 +78,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-8 · medium · missing-file
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/references/screen-patterns.md:249`
 - **What:** The dashboard anatomy names a layout modifier the studio's primitives do not define.
 - **Evidence:** screen-patterns.md:249: "├── .switcher--max-4     headline metrics, equal peers". `web-design-studio/assets/starter/styles/layout.css` defines `.switcher--max-2` and `.switcher--max-3` (lines 578–583) plus `--tight`, `--loose`, `--narrow-threshold`; `layout-composition.md:271` names `--max-2` and `--max-3` only. screen-patterns.md:7 says the primitives "are used by name". `scaffold_ui.py` emits no `switcher--max-*` class (grep), so only the document is wrong.
@@ -79,6 +87,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-9 · medium · undocumented-flag
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-critique-gate/SKILL.md:289–325` (the only flag documentation the skill has)
 - **What:** `critique_report.py` and `critique_snapshots.mjs` accept flags no document in the skill names; the skill has no `references/scripts.md`, and `test_docs.TheScriptReferences` covers four other scripts only, so nothing pins this.
 - **Evidence:** `critique_report.py --help`: `--layer LAYER` ("restrict to a layer (repeatable)"), `--min-severity {blocking,major,minor,taste}` ("drop findings below this severity"), `--no-taste` ("drop taste findings entirely"); grep of the skill's `.md` files finds 0 mentions of each. `critique_snapshots.mjs --help`: `usage: node critique_snapshots.mjs URL|FILE.html [--out DIR] [--settle MS] [--browser PATH] [--json] [--wait-for SEL] [--steps FILE] [--storage-state FILE] [--header "Name: V"]...` — `--settle` and `--browser` have 0 mentions; the header comment names `CRITIQUE_CHROMIUM` as the browser variable, which no document names either. The help is a one-line usage with no descriptions, defaults or exit codes (the exit codes are in the file's header comment only; SKILL.md:319 and 325 state them).
@@ -87,6 +96,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-10 · medium · undocumented-flag
+
 - **Where:** `a11y-audit-runner/references/scripts.md:19–27` and `68–80`; `component-state-matrix/SKILL.md:273–306`; `design-system-versioning/references/scripts.md:46–61`
 - **What:** Flags each script accepts that its skill's flag tables omit.
 - **Evidence:** `a11y_static.py --help` has `--quiet` ("suppress the fix guidance") and `--no-color` (no help text at all); scripts.md §1 lists neither (its one `--quiet` is a11y_runtime's, line 80). `a11y_runtime.mjs --help` has `--report FILE`; the §2 flag table (lines 68–80) omits it (it appears only in prose at line 135 and in SKILL.md:187). `generate_matrix.py --help` and `snapshot_matrix.mjs --help` both have `--quiet`; 0 mentions in component-state-matrix. `deprecate.py`: `add --date YYYY-MM-DD`, `scan --date`, `retire --date`, `status --format {report,json}`, `import --date/--force/--dry-run` are absent from the versioning scripts.md tables (the file's one `--date` is diff_system's, line 13, so a whole-file regex test would pass). `build_presentation.py --help` `--tokens` default is "the CSS token files the project's .design-suite.json lists, else the bundled copy"; SKILL.md:253 says only "default: `.design-suite.json`'s CSS `tokens`".
@@ -95,14 +105,16 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-11 · medium · budget
+
 - **Where:** `design-critique-gate/SKILL.md` (20,497 bytes), `client-presentation-builder/SKILL.md` (20,494), `component-state-matrix/SKILL.md` (20,494), `design-system-versioning/SKILL.md` (20,434)
 - **What:** Four of the seven SKILL.md files sit within 100 bytes of `test_skill_budget.SKILL_BYTES = 20_500` (three within 6 bytes).
 - **Evidence:** `tests/test_skill_budget.py:23`: `SKILL_BYTES = 20_500`; sizes measured with `stat`. References are nowhere near `REFERENCE_BYTES = 60_500` (largest: runtime-checks.md, 40,948).
-- **Effect:** Any wording fix from this audit (DOC-A-1 lands in a11y's SKILL.md, which has room; DOC-A-9 and DOC-A-16 do not) fails CI until something else is cut; a one-word clarification is a trim-and-rewrite.
+- **Effect:** Any wording fix from this audit (DOC-A-1 lands in a11y's SKILL.md, which has room; DOC-A-9 lands in design-critique-gate's, which has 3 bytes; DOC-A-16 lands in design-system-docs', which has 2,692) fails CI until something else is cut; a one-word clarification is a trim-and-rewrite.
 - **Fix:** Move the critique gate's "Failure modes of critique itself" table (SKILL.md:346–356, already in critique-method.md §6) and the versioning skill's second anti-pattern table (SKILL.md:228–244, duplicated in rollout.md §9) into their references, freeing ~1.5 KB each.
 - **Confidence:** confirmed
 
 ### DOC-A-12 · medium · promise
+
 - **Where:** `plugins/pro-web-design-suite/skills/a11y-audit-runner/references/automation-coverage.md:53` and the §3 rows at 64, 74, 82, 92, 100
 - **What:** The table's convention says a row without "*Not in this suite.*" is a mechanism one of the two scripts runs; five rows name mechanisms that no documented check implements. **To verify in code** (`a11y_static.py`, `a11y_runtime.mjs`).
 - **Evidence:** line 53: "a row whose mechanism neither `a11y_static.py` nor `a11y_runtime.mjs` runs says *Not in this suite.*" Rows without the marker: line 64 "**1.3.2** … DOM order vs visual order disagreements from CSS `order`, `grid-area`, `position: absolute`"; line 74 "**1.4.11** … icon and border contrast against a solid adjacent colour" (scripts.md documents focus-ring contrast only: line 56); line 82 "**2.3.1** … frame-differencing a recording, in principle | Nobody does this in CI. Treat as manual"; line 92 "**2.5.2** … actions bound to `pointerdown`/`mousedown` rather than `click`"; line 100 "**3.2.3 / 3.2.4 / 3.2.6** … compare nav order and component names across a crawl" (scripts.md:135 describes `--urls` as "Each run is the script on one page at one size, in a process of its own"; no cross-page comparison is described). None of these mechanisms appears in scripts.md's category table (§1) or check table (§2).
@@ -111,6 +123,7 @@ The three that matter most:
 - **Confidence:** likely
 
 ### DOC-A-13 · medium · stale
+
 - **Where:** `plugins/pro-web-design-suite/skills/client-presentation-builder/assets/deck-tokens.css:395–409` (byte-identical to `web-design-studio/assets/starter/styles/tokens.css`; report once, owner is the studio)
 - **What:** The shipped token file's comment on the focus elevation role describes the older "bridge" ring (shadow ring + transparent outline) that the contract and the a11y reference have since replaced with an outline ring.
 - **Evidence:** deck-tokens.css:404–408: "The focus ring is an elevation role too. … Pair it with a transparent `outline` at the call site: forced-colors mode discards box-shadow, and the outline is what survives to become the indicator." and 395–396: `--shadow-focus: 0 0 0 var(--stroke-focus) var(--bg-canvas), 0 0 0 calc(var(--stroke-focus) * 2) var(--border-focus);` (a two-band ring drawn by shadow). token-contract.md:109: "the focus ring is an `outline` (`var(--stroke-focus) solid var(--border-focus)`, offset by `--stroke-focus`) … A component that adds `box-shadow: var(--elevation-focus)` keeps an outline beside it". runtime-checks.md:266: "The older "bridge", a transparent outline under a box-shadow ring, also survives forced colours, but in normal mode any component shadow replaces its ring." `test_docs.test_no_focus_style_removes_the_outline` guards `outline: none`, not a transparent one.
@@ -119,6 +132,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-14 · medium · contradiction
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/references/field-mapping.md:7` vs `references/worked-example.md:12–30`
 - **What:** The mapping reference says every signal string the script prints is quoted from it; the worked example reproduces the script's output and its signal strings are not in the reference.
 - **Evidence:** field-mapping.md:7: "every rule below is a rule in that file, and every `signal` string it emits is quoted from here." worked-example.md:12: "the record's title — one line, always, regardless of how much room the column allows"; line 30: "is_/has_ prefix — a boolean the user flips, not a form checkbox"; line 24: "`categories` reads as a lookup table, which is almost always under 20 rows". `grep` of field-mapping.md for "regardless of how much room", "a boolean the user flips", "reads as a lookup table": no hits.
@@ -127,6 +141,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-15 · low · stale
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-system-docs/references/extraction.md:92`
 - **What:** A count against "the canonical token file" no longer matches that file. **To verify by running `extract_system.py` on the starter** (not run here).
 - **Evidence:** extraction.md:92: "Against the canonical token file this recovers 31 dark re-points, 3 density modes and 6 reduced-motion overrides". The `[data-theme="dark"]` block of the canonical file (deck-tokens.css:491–545, identical to the starter) declares 33 tokens: 6 surfaces, 4 interaction, 9 foreground, 4 borders, 2 accent, 3 intent foregrounds, 5 shadows. The 6 reduced-motion overrides (lines 610–615) and 3 densities (597–599) still match.
@@ -135,6 +150,7 @@ The three that matter most:
 - **Confidence:** possible
 
 ### DOC-A-16 · low · contradiction
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-system-docs/SKILL.md:121` vs `SKILL.md:130` and `references/documentation-model.md:85–91`
 - **What:** The site is described as four pages, then given a fifth.
 - **Evidence:** SKILL.md:121: "Four pages, no build step, no network, opens from `file://`: an overview, a token reference …, a component reference …, and a patterns page if you have written any." SKILL.md:130: "principles.md                  the principles page". documentation-model.md §3 table lists Overview, Token group, Component, Pattern, Principles; §7 is "The principles page".
@@ -143,6 +159,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-17 · low · contradiction
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-system-docs/references/documentation-model.md:128`
 - **What:** The component page is introduced as eight sections with seven generated; nine follow and two are hand-written.
 - **Evidence:** line 128: "This is the page that justifies the skill. Eight sections, seven of them generated." Subsections run §5.1 to §5.9; line 177 (§5.8): "Hand-written. Always."; line 181 (§5.9): "Hand-written, and worth the two minutes"; §5.1 and §5.7 are "partly generated".
@@ -151,6 +168,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-18 · low · stale
+
 - **Where:** `client-presentation-builder/references/objection-handling.md:11–19`; `design-system-docs/references/documentation-model.md:9–20`; `content-model-to-ui/references/supabase-integration.md:386`
 - **What:** Sections appended after a file's "three sentences"/"Related" footer are missing from its Contents list.
 - **Evidence:** objection-handling.md's Contents ends at "9. Presenting alongside more senior designers"; line 428 is "## 10. The client who rejects the whole direction" (and client-presentation-builder/SKILL.md's routing table at 316–324 does not point at §10 either). documentation-model.md's Contents ends at "12. Anti-patterns"; line 334 is "## 13. Why not Storybook" (SKILL.md:89 points at §13). supabase-integration.md:386 "Related: …" sits before "## 9. Who talks to the database" at line 390. `test_facts` GT-A19 fixed a Contents list "numbered against the wrong headings"; omissions are unchecked.
@@ -159,6 +177,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-19 · low · contradiction
+
 - **Where:** `a11y-audit-runner/SKILL.md:61` vs `references/manual-protocol.md:7`
 - **What:** The manual pass is budgeted differently in the two places.
 - **Evidence:** SKILL.md:61: "| Runtime | ~1 second | ~30–90 seconds | 45–90 minutes per template |". manual-protocol.md:7: "**Budget: 60–90 minutes per template the first time, 30–45 once the team knows it.**" (its sections add to 75 minutes).
@@ -167,6 +186,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-20 · low · contradiction
+
 - **Where:** `component-state-matrix/SKILL.md:304` vs `SKILL.md:308` and `references/visual-regression.md:275`; same shape in `a11y-audit-runner/SKILL.md:194` vs `a11y_runtime.mjs --help`
 - **What:** The documented browser search order puts a CI-image path before Playwright's own Chromium, while the CI notes say the Playwright Chromium is tried first.
 - **Evidence:** matrix SKILL.md:304: "default `$MATRIX_CHROMIUM`, else the first that starts of `/opt/pw-browsers/chromium`, Playwright's own Chromium, an installed Chrome or Edge". SKILL.md:308: "It installs the Chromium that the locked Playwright was built for, which the script tries first". visual-regression.md:275: "`npx playwright install chromium` installs the Chromium that the locked Playwright was built for, and `snapshot_matrix.mjs` tries it first." a11y SKILL.md:194: "`a11y_runtime.mjs` tries it first"; `a11y_runtime.mjs --help`: "default: A11Y_CHROMIUM, else the first that starts of /opt/pw-browsers/chromium, Playwright's own Chromium, Chrome or Edge". `test_recipes.test_a_browser_script_runs_on_the_pinned_browser` checks the workflow text, not this sentence.
@@ -175,6 +195,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-21 · low · contradiction
+
 - **Where:** `design-critique-gate/references/failure-catalog.md:277` vs `component-state-matrix/references/state-coverage.md:229`
 - **What:** Two skills give two unregistered figures for translation expansion.
 - **Evidence:** failure-catalog.md:277: "translations (often 30% longer)". state-coverage.md:229: "German is ~35% longer than English". `tests/fixtures/evidence.json` registers W3C's figure ("200–300% for strings of up to 10 characters, about 130% for strings over 70"); neither 30% nor 35% is registered, and `test_evidence` pins attributed figures only.
@@ -183,6 +204,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-22 · low · hazard
+
 - **Where:** `design-critique-gate/references/failure-catalog.md:370`; `client-presentation-builder/references/evidence.md:75`; `client-presentation-builder/SKILL.md:120`
 - **What:** The chain studio → critique → presentation names two different decision records and no document says how one feeds the other.
 - **Evidence:** failure-catalog.md:370 (L10-1 fix): "`DESIGN_DECISIONS.md` written as decisions are made, plus `critique_report.py --format defence`". web-design-studio/SKILL.md:120: "`DESIGN_DECISIONS.md` for the non-obvious choices" (handoff-conventions.md:44: "Why non-obvious choices were made. Append-only."). evidence.md:75 lists `DESIGN_DECISIONS.md` as an artifact to translate. client-presentation-builder/SKILL.md:120: "`DECISION_LOG.md` | `assets/DECISION_LOG.md`, kept as you worked"; DECISION_LOG.md:9: "`scripts/build_presentation.py` reads this file. Keep the field names."
@@ -191,6 +213,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-23 · low · stale
+
 - **Where:** `plugins/pro-web-design-suite/skills/design-system-docs/SKILL.md:217`
 - **What:** The adoption step's command fragment mixes one script's flag with another's argument shape, and names `/tmp`, which the suite's own test forbids in commands.
 - **Evidence:** SKILL.md:217: "**Extract first, publish nothing.** `--out /tmp/docs --report`." `--report` is `extract_system.py`'s ("Print a human summary to stderr"), whose `--out FILE` is "Where to write system.json"; `/tmp/docs` reads as `build_docs.py`'s site directory. `test_docs.test_no_doc_runs_python3_or_writes_to_tmp` passes because the fragment is inline code, not a fenced command. (`build_docs.py --help`'s own Examples also use `--out /tmp/d`.)
@@ -199,6 +222,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-24 · low · stale
+
 - **Where:** `plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/introspect_schema.py` `--help` (positional `schema` text)
 - **What:** The script's own help names three input kinds while its `--format` choices and the docs name five.
 - **Evidence:** `--help`: "schema  a .sql DDL file, a `supabase gen types typescript` .ts file, or a .json dump." and "--format {auto,ddl,ts,json,prisma,drizzle}". scripts.md:12: "`.prisma`, and a `.ts` or `.js` file with `pgTable(`, are found by themselves".
@@ -207,6 +231,7 @@ The three that matter most:
 - **Confidence:** confirmed
 
 ### DOC-A-25 · low · hazard
+
 - **Where:** every hit of the word "icon" in the seven skills' shipped text (check 7); the one inside a code span is `a11y-audit-runner/references/scripts.md:131`
 - **What:** The directory held 4.0.1 for the word "icon" in a code span (CLAUDE.md gotcha); these seven skills contain 31 ordinary uses of the word, one of them in a code span.
 - **Evidence:** In a code span: scripts.md:131 "`main > x-card >> button.icon`". In quotes: runtime-checks.md:68 ""Button", "Link", "Menu", "Icon"". In prose: automation-coverage.md:74 ("icon and border contrast"), :226 ("an icon-only control"); manual-protocol.md:157 ("Icon-only buttons"), :179 ("the round icon"); token-contract.md:74 ("icon + label", ×7 copies); deck-tokens.css:53, :109, :336, :344; state-coverage.md:155; screen-patterns.md:83; supabase-integration.md:331 ("broken-image icons"); critique-method.md:124, :211 (heading "An icon set drawn at mixed optical weights"), :213, :214, :219, :222; failure-catalog.md:94, :210, :414; design-critique-gate/SKILL.md:168; change-classification.md:243. No hit names a bundled image's path or stem.
